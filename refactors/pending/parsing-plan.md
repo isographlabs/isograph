@@ -22,7 +22,7 @@ A chunk parses to exactly one grammar item, in its entirety and always independe
 
 - the declaration is one root-level chunk;
 - a selection is one chunk of its brace group's interior level;
-- an argument, a variable declaration, and an object-literal entry are one chunk of their group's interior level;
+- an argument, a variable declaration, an object-literal entry, and a list-literal element are one chunk of their group's interior level;
 - the element type of a `[...]` type annotation is the bracket level's one chunk.
 
 Composite items own groups within their chunk: `foo(arg: 1) { bar }` is one selection chunk whose paren and brace groups are the selection's arguments and selection set.
@@ -44,7 +44,7 @@ A boundary is a chunk's trailing separator run. Line breaks are swallowed by wha
    { bar }          <- a selection, then a failed slot on the orphaned group
 
    field Query.Foo
-   { bar }          <- an error at the end of the header chunk
+   { bar }          <- a complete field, then MultipleDeclarations on the brace chunk
 
    ($x:
    String)          <- an error
@@ -55,7 +55,7 @@ A boundary is a chunk's trailing separator run. Line breaks are swallowed by wha
 
 2. No trailing separator is ever required: `{ bar }` on one line parses. Trailing commas in lists parse. A comma at the root, inside `[...]`, before a list's first item, or doubled is an error.
 
-3. Directives land in parse-directives.md. Until that doc lands, `@` is leftover.
+3. Directives parse as raw `IsographFieldDirectiveList`. Typed sets are a later stage. Unknown names parse.
 
 4. An integer literal whose value does not fit in `i64` is `IntegerDoesNotFitI64`.
 
@@ -63,7 +63,9 @@ A boundary is a chunk's trailing separator run. Line breaks are swallowed by wha
 
 6. Variable defaults accept `$`. One value type (`NonConstantValue`). Upstream parses a `ConstantValue` and rejects `$` at the `$`.
 
-7. There is no `pointer` keyword. `field Type.name to Type { ... }` is a field with `target_type: Some`. Upstream's `pointer Type.name to Type { ... }` is `DECLARATION_KEYWORD` at `pointer`.
+7. There is no `pointer` keyword. `field Type.name to Type { ... }` is a selectable with `target_type: Some`. Upstream's `pointer Type.name to Type { ... }` is `DECLARATION_KEYWORD` at `pointer`.
+
+8. A selectable's selection set is optional. `field Query.Foo` parses. Upstream requires `{ }`.
 
 ## The error model
 
@@ -85,8 +87,7 @@ pub enum ParseError {
     IntegerDoesNotFitI64,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
-#[error("Expected {expected}, found {found}.")]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct ExpectedFound {
     pub expected: Expectation,
     pub found: Found,
@@ -109,6 +110,11 @@ pub enum Expectation {
     TypeAnnotation,
     EndOfType,
 }
+
+pub const DECLARATION_KEYWORD: Expectation = Expectation::OneOf(&[
+    Expectation::Keyword("entrypoint"),
+    Expectation::Keyword("field"),
+]);
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
 pub enum Found {
@@ -150,7 +156,7 @@ impl BracketKind {
 
 ## Names relative to isograph
 
-Where a type or function exists in both, i2 uses the isograph name. Wrappers that exist only so a lang type can carry `ResolvePosition` take the wrappee's name plus `Wrapper` (`EntityNameWrapper`, `VariableNameWrapper`, `ArgumentNameWrapper`, `ValueKeyNameWrapper`, `SelectionNameWrapper`, `SelectableNameWrapper`, `StringLiteralValueWrapper`, `IsographDirectiveNameWrapper`). `SelectionNameWrapper` is a selection name and a `reader_alias` (AST). `SelectableNameWrapper` is an entrypoint name and a field name (definition). The left-hand side of `Type.name` is `EntityNameWrapper`.
+Where a type or function exists in both, i2 uses the isograph name. Wrappers that exist only so a lang type can carry `ResolvePosition` take the wrappee's name plus `Wrapper` (`EntityNameWrapper`, `VariableNameWrapper`, `ArgumentNameWrapper`, `ValueKeyNameWrapper`, `SelectionNameWrapper`, `SelectableNameWrapper`, `StringLiteralValueWrapper`, `IsographDirectiveNameWrapper`). `SelectionNameWrapper` is a selection name and a `reader_alias` (AST). `SelectableNameWrapper` is an entrypoint name and a selectable name (definition). The left-hand side of `Type.name` is `EntityNameWrapper`.
 
 Justified differences:
 
@@ -166,9 +172,9 @@ Justified differences:
 - `IsoLiteralItem` (not `IsoLiteralExtractionResult`): extraction is a different stage.
 - `SelectableDeclaration` (isograph `ClientFieldDeclaration`).
 - `ArgumentName` / `ArgumentNameWrapper` / `Argument` (isograph `FieldArgumentName` / `SelectionFieldArgument`). The list is shared by selections and directives.
-- `SelectableNameWrapper` for entrypoint and field names (isograph `ClientScalarSelectableNameWrapper` / `ClientObjectSelectableName`). `SelectionNameWrapper` wraps `SelectionName` (isograph uses `SelectableName` as the interned key of a selection name).
+- `SelectableNameWrapper` for entrypoint and selectable names (isograph `ClientScalarSelectableNameWrapper` / `ClientObjectSelectableName`). `SelectionNameWrapper` wraps `SelectionName` (isograph uses `SelectableName` as the interned key of a selection name).
 - `SelectableDeclaration.target_type: Option<WithSpan<TypeAnnotation>>` (isograph has a separate `ClientPointerDeclaration` and a `pointer` keyword).
-- `name` on entrypoint and field declarations (isograph `client_field_name`).
+- `name` on entrypoint and selectable declarations (isograph `client_field_name`).
 - Raw `IsographFieldDirectiveList` (not immediate serde into typed `*DirectiveSet`).
 - `Description` stores quotes included (upstream unquotes and dedents).
 - Empty optional lists are `None` (upstream empty `Vec` with a generated span).
@@ -190,23 +196,13 @@ Justified differences:
 
 ## The docs, in order
 
-parsing-standards.md governs how every implementation below is written. Each doc is independently shippable and lands with its tests before the next begins.
+parsing-standards.md governs how every implementation below is written.
 
-1. `parse-variables.md`. Variable-declaration lists, `$name: Type = default` with `NonConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_nested_singleton`), and the `Box` delegation impl.
-2. `parse-type-dot-name.md`. Extract `Type.name` from entrypoint and field. No AST change.
-3. `selectable-name-wrapper.md`. `SelectableNameWrapper` for entrypoint and field names. `FieldDeclaration`. `name` not `client_field_name`. `SelectionNameWrapper` stays.
-4. `selection-name.md`. `SelectionNameWrapper` wraps `SelectionName`.
-5. `expectation-one-of.md`. `Expectation::OneOf` and `Keyword`. `DeclarationKeyword` and `ToOrDescriptionOrSelectionSet` become `OneOf`.
-6. `selectable-declaration.md`. `FieldDeclaration` is `SelectableDeclaration`. The keyword `field` stays.
-7. `optional-field-selection-set.md`. `field Type.name` with no `{ }`. `selection_set` is `Option`.
-8. `parse-directives.md`. `@name` and `@name(args)` on entrypoints, fields, and selections. Raw `IsographFieldDirectiveList`; typed sets are a later stage.
+1. `parser-test-gaps.md`. Missing grammar-stage tests.
+2. `extract-iso-literals.md`. Regex extraction of `iso(\`...\`)` from file text into `IsoLiteralExtraction`.
+3. `lsp-semantic-tokens.md`. `isograph lsp` answers `textDocument/semanticTokens/full` so iso literals are colored when a JS/TS file is opened.
+4. `lsp-parse-diagnostics.md`. Parse errors of those literals are `publishDiagnostics`.
 
-Later: `parse-arrays.md`. `[ ... ]` list values.
-
-Later: `extract-iso-literals.md`. Regex extraction of `iso(\`...\`)` from file text into `IsoLiteralExtraction`.
-
-Later: `lsp-semantic-tokens.md`. `isograph lsp` answers `textDocument/semanticTokens/full` so iso literals are colored when a JS/TS file is opened.
-
-Later: `lsp-parse-diagnostics.md`. Parse errors of those literals are `publishDiagnostics`.
+Later: leftover semantic-token fill-in (`semantic-tokens.md`), unclosed-group recovery, spanless parsing.
 
 Deferred: `token-kind-zst.md`. `NonBracketTokenKind` variants carry a ZST; matching yields proof passed into `parse_*`.
