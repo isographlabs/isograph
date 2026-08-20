@@ -5,14 +5,14 @@ use span::{Span, WithSpan, WithSpanPostfix};
 
 use crate::chunk_stream::ItemCursor;
 use crate::{
-    BracketKind, ChunkedLevel, ClientFieldDeclarationPath, EntityNameWrapper, Expectation, Found,
+    BracketKind, ChunkedLevel, EntityNameWrapper, Expectation, FieldDeclarationPath, Found,
     IsographResolutionNode, NonBracketTokenKind, NonConstantValue, ParseError, SemanticToken, Slot,
     UnparsedChunkItems, VariableNameWrapper, parse_name_colon, parse_non_constant_value,
     parse_variable_name,
 };
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ClientFieldDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = FieldDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct VariableDeclarationOrUsageList(
     #[resolve_field] pub Vec<WithSpan<Slot<VariableDeclarationOrUsage, UnparsedChunkItems>>>,
 );
@@ -64,7 +64,7 @@ pub enum TypeAnnotationParent<'a> {
 }
 
 pub type VariableDeclarationOrUsageListPath<'a> =
-    PositionResolutionPath<&'a VariableDeclarationOrUsageList, ClientFieldDeclarationPath<'a>>;
+    PositionResolutionPath<&'a VariableDeclarationOrUsageList, FieldDeclarationPath<'a>>;
 
 pub type VariableDeclarationOrUsageSlotPath<'a> = PositionResolutionPath<
     &'a Slot<VariableDeclarationOrUsage, UnparsedChunkItems>,

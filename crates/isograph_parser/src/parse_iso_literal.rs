@@ -6,7 +6,7 @@ use span::{WithSpan, WithSpanPostfix};
 use crate::chunk_stream::ItemCursor;
 use crate::{
     ChunkedLevel, Expectation, ExtraChunks, Found, IsographResolutionNode, NamedTypeAnnotationPath,
-    NonBracketTokenKind, ParseError, SelectionSet, SemanticToken, Singleton, Slot,
+    NonBracketTokenKind, ParseError, SelectionPath, SelectionSet, SemanticToken, Singleton, Slot,
     UnparsedChunkItems, VariableDeclarationOrUsageList, consume_variable_declaration_list,
     parse_singleton, require_selection_set,
 };
@@ -28,7 +28,7 @@ impl<'a> From<IsoLiteralSlotPath<'a>> for IsographResolutionNode<'a> {
 #[resolve_position(parent_type = IsoLiteralSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum IsoLiteralItem {
     Entrypoint(EntrypointDeclaration),
-    Field(ClientFieldDeclaration),
+    Field(FieldDeclaration),
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -39,24 +39,24 @@ pub struct EntrypointDeclaration {
     pub parent_type: WithSpan<EntityNameWrapper>,
     #[resolve_field]
     #[parent_variant(EntrypointDeclaration)]
-    pub client_field_name: WithSpan<ClientScalarSelectableNameWrapper>,
+    pub name: WithSpan<SelectableNameWrapper>,
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = IsoLiteralSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ClientFieldDeclaration {
+pub struct FieldDeclaration {
     #[resolve_field]
-    #[parent_variant(ClientFieldDeclaration)]
+    #[parent_variant(FieldDeclaration)]
     pub parent_type: WithSpan<EntityNameWrapper>,
     #[resolve_field]
-    #[parent_variant(ClientFieldDeclaration)]
-    pub client_field_name: WithSpan<ClientScalarSelectableNameWrapper>,
+    #[parent_variant(FieldDeclaration)]
+    pub name: WithSpan<SelectableNameWrapper>,
     #[resolve_field]
     pub variable_definitions: Option<WithSpan<VariableDeclarationOrUsageList>>,
     #[resolve_field]
     pub description: Option<WithSpan<Description>>,
     #[resolve_field]
-    #[parent_variant(ClientFieldDeclaration)]
+    #[parent_variant(FieldDeclaration)]
     pub selection_set: WithSpan<SelectionSet>,
 }
 
@@ -65,50 +65,48 @@ pub struct ClientFieldDeclaration {
 #[resolve_position(parent_type = EntityNameWrapperParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct EntityNameWrapper(pub common_lang_types::EntityName);
 
-/// The name of the client field an entrypoint targets, `foo` in `entrypoint Query.foo`.
+/// A selectable name: an entrypoint name, a field name, a selection name, or a reader_alias.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
-    parent_type = ClientScalarSelectableNameWrapperParent<'a>,
+    parent_type = SelectableNameWrapperParent<'a>,
     resolved_node = IsographResolutionNode<'a>
 )]
-pub struct ClientScalarSelectableNameWrapper(common_lang_types::SelectableName);
+pub struct SelectableNameWrapper(pub common_lang_types::SelectableName);
 
 /// The interned source slice of a description, quotes included.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ClientFieldDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = FieldDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct Description(common_lang_types::DescriptionValue);
 
 #[derive(Debug)]
 pub enum EntityNameWrapperParent<'a> {
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
-    ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
+    FieldDeclaration(FieldDeclarationPath<'a>),
     NamedTypeAnnotation(NamedTypeAnnotationPath<'a>),
 }
 
 #[derive(Debug)]
-pub enum ClientScalarSelectableNameWrapperParent<'a> {
+pub enum SelectableNameWrapperParent<'a> {
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
-    ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
+    FieldDeclaration(FieldDeclarationPath<'a>),
+    Selection(SelectionPath<'a>),
 }
 
 pub type EntrypointDeclarationPath<'a> =
     PositionResolutionPath<&'a EntrypointDeclaration, IsoLiteralSlotPath<'a>>;
 
-pub type ClientFieldDeclarationPath<'a> =
-    PositionResolutionPath<&'a ClientFieldDeclaration, IsoLiteralSlotPath<'a>>;
+pub type FieldDeclarationPath<'a> =
+    PositionResolutionPath<&'a FieldDeclaration, IsoLiteralSlotPath<'a>>;
 
-pub type DescriptionPath<'a> =
-    PositionResolutionPath<&'a Description, ClientFieldDeclarationPath<'a>>;
+pub type DescriptionPath<'a> = PositionResolutionPath<&'a Description, FieldDeclarationPath<'a>>;
 
 pub type ExtraChunksPath<'a> = PositionResolutionPath<&'a ExtraChunks, IsoLiteralParsePath<'a>>;
 
 pub type EntityNameWrapperPath<'a> =
     PositionResolutionPath<&'a EntityNameWrapper, EntityNameWrapperParent<'a>>;
 
-pub type ClientScalarSelectableNameWrapperPath<'a> = PositionResolutionPath<
-    &'a ClientScalarSelectableNameWrapper,
-    ClientScalarSelectableNameWrapperParent<'a>,
->;
+pub type SelectableNameWrapperPath<'a> =
+    PositionResolutionPath<&'a SelectableNameWrapper, SelectableNameWrapperParent<'a>>;
 
 pub fn parse_iso_literal(
     text: &str,
@@ -176,24 +174,22 @@ pub(crate) fn parse_type_dot_name<N: From<intern::string_key::StringKey>>(
 fn parse_entrypoint(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<EntrypointDeclaration, WithSpan<ParseError>> {
-    let (parent_type, client_field_name) = parse_type_dot_name(cursor)?;
+    let (parent_type, name) = parse_type_dot_name(cursor)?;
     EntrypointDeclaration {
         parent_type,
-        client_field_name: client_field_name.map(ClientScalarSelectableNameWrapper),
+        name: name.map(SelectableNameWrapper),
     }
     .wrap_ok()
 }
 
-fn parse_field(
-    cursor: &mut ItemCursor<'_>,
-) -> Result<ClientFieldDeclaration, WithSpan<ParseError>> {
-    let (parent_type, client_field_name) = parse_type_dot_name(cursor)?;
+fn parse_field(cursor: &mut ItemCursor<'_>) -> Result<FieldDeclaration, WithSpan<ParseError>> {
+    let (parent_type, name) = parse_type_dot_name(cursor)?;
     let variable_definitions = consume_variable_declaration_list(cursor);
     let description = consume_description(cursor);
     let selection_set = require_selection_set(cursor)?;
-    ClientFieldDeclaration {
+    FieldDeclaration {
         parent_type,
-        client_field_name: client_field_name.map(ClientScalarSelectableNameWrapper),
+        name: name.map(SelectableNameWrapper),
         variable_definitions,
         description,
         selection_set,
@@ -224,11 +220,10 @@ mod tests {
     use crate::{
         BracketError, BracketKind, ChunkContentItemParent, CommaWithoutItem, Expectation, Found,
         IntegerValue, IsographResolutionNode, NonBracketTokenKind, NonConstantValue,
-        NonConstantValueParent, ObjectEntry, ParseError, Selection, SelectionNameWrapper,
-        SelectionSet, SelectionSetParent, Slot, TypeAnnotation, TypeAnnotationParent,
-        UnparsedChunkItems, UnparsedChunkItemsParent, VariableDeclarationOrUsage,
-        VariableDeclarationOrUsageList, VariableNameWrapper, VariableNameWrapperParent, chunk,
-        match_brackets, tokenize,
+        NonConstantValueParent, ObjectEntry, ParseError, Selection, SelectionSet,
+        SelectionSetParent, Slot, TypeAnnotation, TypeAnnotationParent, UnparsedChunkItems,
+        UnparsedChunkItemsParent, VariableDeclarationOrUsage, VariableDeclarationOrUsageList,
+        VariableNameWrapper, VariableNameWrapperParent, chunk, match_brackets, tokenize,
     };
     use Expectation::{DeclarationKeyword, EndOfDeclaration};
     use NonBracketTokenKind::{
@@ -327,7 +322,7 @@ mod tests {
         }
     }
 
-    fn as_field(parse: &WithSpan<IsoLiteralParse>) -> &ClientFieldDeclaration {
+    fn as_field(parse: &WithSpan<IsoLiteralParse>) -> &FieldDeclaration {
         match parsed_item(parse).expect("the fixture's literal parsed an item") {
             IsoLiteralItem::Field(declaration) => declaration,
             item => panic!("expected a field declaration, got {item:?}"),
@@ -396,11 +391,11 @@ mod tests {
             EntityNameWrapper("Query".intern().to())
         );
         assert_eq!(
-            declaration.client_field_name.item,
-            ClientScalarSelectableNameWrapper("foo".intern().to())
+            declaration.name.item,
+            SelectableNameWrapper("foo".intern().to())
         );
         assert_eq!(declaration.parent_type.location, span_of(text, "Query"));
-        assert_eq!(declaration.client_field_name.location, span_of(text, "foo"));
+        assert_eq!(declaration.name.location, span_of(text, "foo"));
         assert_eq!(errors, vec![]);
         assert_eq!(parse.location, Span::from_usize(0, text.len()));
     }
@@ -420,7 +415,7 @@ mod tests {
                 "for literal {text:?}"
             );
             assert_eq!(
-                declaration.client_field_name.location,
+                declaration.name.location,
                 span_of(text, "foo"),
                 "for literal {text:?}"
             );
@@ -492,7 +487,7 @@ mod tests {
             let parse = parse.expect("the fixture is not an empty literal");
             let declaration = as_entrypoint(parse.reference());
             assert_eq!(
-                declaration.client_field_name.location,
+                declaration.name.location,
                 span_of(text, "foo"),
                 "for literal {text:?}"
             );
@@ -520,7 +515,7 @@ mod tests {
         let text = "entrypoint Query.foo, field User.name";
         let (parse, errors) = parsed(text);
         assert_eq!(
-            as_entrypoint(parse.reference()).client_field_name.location,
+            as_entrypoint(parse.reference()).name.location,
             span_of(text, "foo")
         );
         assert_eq!(
@@ -538,7 +533,7 @@ mod tests {
         let text = "entrypoint Query.foo\nfield User.name";
         let (parse, errors) = parsed(text);
         assert_eq!(
-            as_entrypoint(parse.reference()).client_field_name.location,
+            as_entrypoint(parse.reference()).name.location,
             span_of(text, "foo")
         );
         assert_eq!(
@@ -736,16 +731,13 @@ mod tests {
                     EntityNameWrapperParent::EntrypointDeclaration(declaration) => declaration,
                     parent => panic!("expected an entrypoint parent, got {parent:?}"),
                 };
-                assert_eq!(
-                    declaration.inner.client_field_name.location,
-                    span_of(text, "foo")
-                );
+                assert_eq!(declaration.inner.name.location, span_of(text, "foo"));
             }
             node => panic!("expected the entity name leaf, got {node:?}"),
         }
         match parse.resolve((), span_of(text, "foo")) {
-            IsographResolutionNode::ClientScalarSelectableNameWrapper(_) => {}
-            node => panic!("expected the client field name leaf, got {node:?}"),
+            IsographResolutionNode::SelectableNameWrapper(_) => {}
+            node => panic!("expected the selectable name leaf, got {node:?}"),
         }
         for span in [
             span_of(text, "entrypoint"),
@@ -860,7 +852,7 @@ mod tests {
     }
 
     #[test]
-    fn a_field_declaration_parses_with_scalar_selections() {
+    fn a_field_declaration_parses_with_selections() {
         let text = "field Query.Foo {\n  bar,\n  baz\n}";
         let (parse, errors) = parsed(text);
         let declaration = as_field(parse.reference());
@@ -869,11 +861,11 @@ mod tests {
             EntityNameWrapper("Query".intern().to())
         );
         assert_eq!(
-            declaration.client_field_name.item,
-            ClientScalarSelectableNameWrapper("Foo".intern().to())
+            declaration.name.item,
+            SelectableNameWrapper("Foo".intern().to())
         );
         assert_eq!(declaration.parent_type.location, span_of(text, "Query"));
-        assert_eq!(declaration.client_field_name.location, span_of(text, "Foo"));
+        assert_eq!(declaration.name.location, span_of(text, "Foo"));
         assert_eq!(
             declaration.selection_set.location,
             Span::new(span_of(text, "{").start, span_of(text, "}").end)
@@ -882,7 +874,7 @@ mod tests {
         assert_eq!(items.len(), 2);
         assert_eq!(
             as_selection(items[0].item.reference()).name.item,
-            SelectionNameWrapper("bar".intern().to())
+            SelectableNameWrapper("bar".intern().to())
         );
         assert_eq!(
             as_selection(items[0].item.reference()).name.location,
@@ -1053,10 +1045,7 @@ mod tests {
         let (parse, _) = parsed(text);
         match parse.resolve((), span_of(text, "home")) {
             IsographResolutionNode::Description(description) => {
-                assert_eq!(
-                    description.parent.inner.client_field_name.location,
-                    span_of(text, "Foo")
-                );
+                assert_eq!(description.parent.inner.name.location, span_of(text, "Foo"));
             }
             node => panic!("expected the description leaf, got {node:?}"),
         }
@@ -1067,24 +1056,25 @@ mod tests {
         let text = "field Query.Foo { pet { name } }";
         let (parse, _) = parsed(text);
         match parse.resolve((), span_of(text, "name")) {
-            IsographResolutionNode::SelectionNameWrapper(name) => {
-                assert_eq!(name.parent.inner.name.location, span_of(text, "name"));
-                let object = match name.parent.parent.parent.parent {
+            IsographResolutionNode::SelectableNameWrapper(name) => {
+                let selection = match name.parent {
+                    SelectableNameWrapperParent::Selection(selection) => selection,
+                    parent => panic!("expected a selection parent, got {parent:?}"),
+                };
+                assert_eq!(selection.inner.name.location, span_of(text, "name"));
+                let object = match selection.parent.parent.parent {
                     SelectionSetParent::Selection(object) => object,
                     parent => panic!("expected a nested-selection parent, got {parent:?}"),
                 };
                 assert_eq!(object.inner.name.location, span_of(text, "pet"));
                 match object.parent.parent.parent {
-                    SelectionSetParent::ClientFieldDeclaration(declaration) => {
-                        assert_eq!(
-                            declaration.inner.client_field_name.location,
-                            span_of(text, "Foo")
-                        );
+                    SelectionSetParent::FieldDeclaration(declaration) => {
+                        assert_eq!(declaration.inner.name.location, span_of(text, "Foo"));
                     }
                     parent => panic!("expected the declaration at the top, got {parent:?}"),
                 }
             }
-            node => panic!("expected the selection name leaf, got {node:?}"),
+            node => panic!("expected the selectable name leaf, got {node:?}"),
         }
     }
 
@@ -1097,8 +1087,11 @@ mod tests {
             node => panic!("expected the leftover token, got {node:?}"),
         }
         match parse.resolve((), span_of(text, "bar")) {
-            IsographResolutionNode::SelectionNameWrapper(_) => {}
-            node => panic!("expected the selection name, got {node:?}"),
+            IsographResolutionNode::SelectableNameWrapper(name) => match name.parent {
+                SelectableNameWrapperParent::Selection(_) => {}
+                parent => panic!("expected a selection parent, got {parent:?}"),
+            },
+            node => panic!("expected the selectable name leaf, got {node:?}"),
         }
     }
 
