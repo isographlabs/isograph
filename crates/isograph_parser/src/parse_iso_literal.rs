@@ -193,11 +193,10 @@ mod tests {
 
     use super::*;
     use crate::{
-        ArgumentListParent, BracketError, BracketKind, ChunkContentItemParent, CommaWithoutItem,
-        Expectation, Found, IsographResolutionNode, NonBracketTokenKind, ParseError,
-        ScalarSelection, Selection, SelectionNameWrapper, SelectionNameWrapperParent, SelectionSet,
-        SelectionSetParent, Slot, UnparsedChunkItems, UnparsedChunkItemsParent, chunk,
-        match_brackets, tokenize,
+        BracketError, BracketKind, ChunkContentItemParent, CommaWithoutItem, Expectation, Found,
+        IsographResolutionNode, NonBracketTokenKind, ParseError, Selection, SelectionNameWrapper,
+        SelectionSet, SelectionSetParent, Slot, UnparsedChunkItems, UnparsedChunkItemsParent,
+        chunk, match_brackets, tokenize,
     };
     use Expectation::{DeclarationKeyword, EndOfDeclaration};
     use NonBracketTokenKind::{
@@ -292,11 +291,11 @@ mod tests {
         selection_set.item.0.reference()
     }
 
-    fn as_scalar(slot: &Slot<Selection, UnparsedChunkItems>) -> &ScalarSelection {
-        match slot.item.as_ref().map(|wrapped| wrapped.item.reference()) {
-            Some(Selection::Scalar(scalar)) => scalar,
-            other => panic!("expected a scalar selection, got {other:?}"),
-        }
+    fn as_selection(slot: &Slot<Selection, UnparsedChunkItems>) -> &Selection {
+        slot.item
+            .as_ref()
+            .map(|wrapped| wrapped.item.reference())
+            .expect("expected a selection")
     }
 
     fn assert_no_declaration(text: &str, reason: ParseError, reason_span: Span) {
@@ -808,15 +807,15 @@ mod tests {
         let items = selections(declaration.selection_set.reference());
         assert_eq!(items.len(), 2);
         assert_eq!(
-            as_scalar(items[0].item.reference()).name.item,
+            as_selection(items[0].item.reference()).name.item,
             SelectionNameWrapper("bar".intern().to())
         );
         assert_eq!(
-            as_scalar(items[0].item.reference()).name.location,
+            as_selection(items[0].item.reference()).name.location,
             span_of(text, "bar")
         );
         assert_eq!(
-            as_scalar(items[1].item.reference()).name.location,
+            as_selection(items[1].item.reference()).name.location,
             span_of(text, "baz")
         );
         assert_eq!(items[0].location, span_of(text, "bar"));
@@ -895,13 +894,10 @@ mod tests {
         let (parse, _) = parsed(text);
         match parse.resolve((), span_of(text, "name")) {
             IsographResolutionNode::SelectionNameWrapper(name) => {
-                let scalar = match name.parent {
-                    SelectionNameWrapperParent::ScalarSelection(scalar) => scalar,
-                    parent => panic!("expected a scalar parent, got {parent:?}"),
-                };
-                let object = match scalar.parent.parent.parent {
-                    SelectionSetParent::ObjectSelection(object) => object,
-                    parent => panic!("expected an object-selection parent, got {parent:?}"),
+                assert_eq!(name.parent.inner.name.location, span_of(text, "name"));
+                let object = match name.parent.parent.parent.parent {
+                    SelectionSetParent::Selection(object) => object,
+                    parent => panic!("expected a nested-selection parent, got {parent:?}"),
                 };
                 assert_eq!(object.inner.name.location, span_of(text, "pet"));
                 match object.parent.parent.parent {
@@ -964,10 +960,10 @@ mod tests {
         let (parse, _) = parsed(text);
         match parse.resolve((), span_of(text, "id")) {
             IsographResolutionNode::FieldArgumentNameWrapper(name) => {
-                match name.parent.parent.parent.parent {
-                    ArgumentListParent::ScalarSelection(_) => {}
-                    parent => panic!("expected a scalar argument list, got {parent:?}"),
-                }
+                assert_eq!(
+                    name.parent.parent.parent.parent.inner.name.location,
+                    span_of(text, "bar")
+                );
             }
             node => panic!("expected the argument name, got {node:?}"),
         }

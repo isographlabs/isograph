@@ -4,8 +4,8 @@ use crate::{
     CloseBracketPath, EntityNameWrapperPath, EntrypointDeclarationPath, ExtraChunksPath,
     FieldArgumentNameWrapperPath, IntegerValuePath, IsoLiteralParsePath, IsoLiteralSlotPath,
     NonBracketTokenPath, NullValuePath, ObjectEntryPath, ObjectEntrySlotPath, ObjectLiteralPath,
-    ObjectSelectionPath, OpenBracketPath, ScalarSelectionPath, SelectionFieldArgumentPath,
-    SelectionFieldArgumentSlotPath, SelectionNameWrapperPath, SelectionSetPath, SelectionSlotPath,
+    OpenBracketPath, SelectionFieldArgumentPath, SelectionFieldArgumentSlotPath,
+    SelectionNameWrapperPath, SelectionPath, SelectionSetPath, SelectionSlotPath,
     StringLiteralValueWrapperPath, UnparsedChunkItemsPath, ValueKeyNameWrapperPath,
     VariableNameWrapperPath, VariableUsePath,
 };
@@ -50,7 +50,6 @@ pub enum IsographResolutionNode<'a> {
     NullValue(NullValuePath<'a>),
     SelectionSlot(SelectionSlotPath<'a>),
     SelectionSet(SelectionSetPath<'a>),
-    ScalarSelection(ScalarSelectionPath<'a>),
-    ObjectSelection(ObjectSelectionPath<'a>),
+    Selection(SelectionPath<'a>),
     SelectionNameWrapper(SelectionNameWrapperPath<'a>),
 }

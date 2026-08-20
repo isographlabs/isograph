@@ -15,56 +15,26 @@ pub struct SelectionSet(#[resolve_field] pub Vec<WithSpan<Slot<Selection, Unpars
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SelectionSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub enum Selection {
-    Scalar(ScalarSelection),
-    Object(ObjectSelection),
-}
-
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = SelectionSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ScalarSelection {
+pub struct Selection {
     #[resolve_field]
-    #[parent_variant(ScalarSelection)]
     pub reader_alias: Option<WithSpan<SelectionNameWrapper>>,
     #[resolve_field]
-    #[parent_variant(ScalarSelection)]
     pub name: WithSpan<SelectionNameWrapper>,
     #[resolve_field]
-    #[parent_variant(ScalarSelection)]
-    pub arguments: Option<WithSpan<ArgumentList>>,
-}
-
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = SelectionSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ObjectSelection {
-    #[resolve_field]
-    #[parent_variant(ObjectSelection)]
-    pub reader_alias: Option<WithSpan<SelectionNameWrapper>>,
-    #[resolve_field]
-    #[parent_variant(ObjectSelection)]
-    pub name: WithSpan<SelectionNameWrapper>,
-    #[resolve_field]
-    #[parent_variant(ObjectSelection)]
     pub arguments: Option<WithSpan<ArgumentList>>,
     #[resolve_field]
-    #[parent_variant(ObjectSelection)]
-    pub selection_set: WithSpan<SelectionSet>,
+    #[parent_variant(Selection)]
+    pub selection_set: Option<WithSpan<SelectionSet>>,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = SelectionNameWrapperParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = SelectionPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct SelectionNameWrapper(pub common_lang_types::SelectableName);
 
 #[derive(Debug)]
 pub enum SelectionSetParent<'a> {
     ClientFieldDeclaration(crate::ClientFieldDeclarationPath<'a>),
-    ObjectSelection(Box<ObjectSelectionPath<'a>>),
-}
-
-#[derive(Debug)]
-pub enum SelectionNameWrapperParent<'a> {
-    ScalarSelection(ScalarSelectionPath<'a>),
-    ObjectSelection(ObjectSelectionPath<'a>),
+    Selection(Box<SelectionPath<'a>>),
 }
 
 pub type SelectionSetPath<'a> = PositionResolutionPath<&'a SelectionSet, SelectionSetParent<'a>>;
@@ -72,14 +42,10 @@ pub type SelectionSetPath<'a> = PositionResolutionPath<&'a SelectionSet, Selecti
 pub type SelectionSlotPath<'a> =
     PositionResolutionPath<&'a Slot<Selection, UnparsedChunkItems>, SelectionSetPath<'a>>;
 
-pub type ScalarSelectionPath<'a> =
-    PositionResolutionPath<&'a ScalarSelection, SelectionSlotPath<'a>>;
-
-pub type ObjectSelectionPath<'a> =
-    PositionResolutionPath<&'a ObjectSelection, SelectionSlotPath<'a>>;
+pub type SelectionPath<'a> = PositionResolutionPath<&'a Selection, SelectionSlotPath<'a>>;
 
 pub type SelectionNameWrapperPath<'a> =
-    PositionResolutionPath<&'a SelectionNameWrapper, SelectionNameWrapperParent<'a>>;
+    PositionResolutionPath<&'a SelectionNameWrapper, SelectionPath<'a>>;
 
 impl<'a> From<SelectionSlotPath<'a>> for IsographResolutionNode<'a> {
     fn from(path: SelectionSlotPath<'a>) -> Self {
@@ -140,18 +106,11 @@ fn parse_selection(cursor: &mut ItemCursor<'_>) -> Result<Selection, WithSpan<Pa
         };
     let arguments = consume_argument_list(cursor);
     let selection_set = consume_selection_set(cursor);
-    match selection_set {
-        Some(selection_set) => Selection::Object(ObjectSelection {
-            reader_alias,
-            name,
-            arguments,
-            selection_set,
-        }),
-        None => Selection::Scalar(ScalarSelection {
-            reader_alias,
-            name,
-            arguments,
-        }),
+    Selection {
+        reader_alias,
+        name,
+        arguments,
+        selection_set,
     }
     .wrap_ok()
 }
@@ -212,18 +171,11 @@ mod tests {
         (items, errors, tokens)
     }
 
-    fn as_scalar(slot: &Slot<Selection, UnparsedChunkItems>) -> &ScalarSelection {
-        match slot.item.as_ref().map(|wrapped| wrapped.item.reference()) {
-            Some(Selection::Scalar(scalar)) => scalar,
-            other => panic!("expected a scalar selection, got {other:?}"),
-        }
-    }
-
-    fn as_object(slot: &Slot<Selection, UnparsedChunkItems>) -> &ObjectSelection {
-        match slot.item.as_ref().map(|wrapped| wrapped.item.reference()) {
-            Some(Selection::Object(object)) => object,
-            other => panic!("expected an object selection, got {other:?}"),
-        }
+    fn as_selection(slot: &Slot<Selection, UnparsedChunkItems>) -> &Selection {
+        slot.item
+            .as_ref()
+            .map(|wrapped| wrapped.item.reference())
+            .expect("expected a selection")
     }
 
     fn span_of(text: &str, pattern: &str) -> Span {
@@ -245,15 +197,15 @@ mod tests {
         assert_eq!(errors, vec![]);
         assert_eq!(items.len(), 2);
         assert_eq!(
-            as_scalar(items[0].item.reference()).name.item,
+            as_selection(items[0].item.reference()).name.item,
             SelectionNameWrapper("bar".intern().to())
         );
         assert_eq!(
-            as_scalar(items[0].item.reference()).name.location,
+            as_selection(items[0].item.reference()).name.location,
             span_of(text, "bar")
         );
         assert_eq!(
-            as_scalar(items[1].item.reference()).name.location,
+            as_selection(items[1].item.reference()).name.location,
             span_of(text, "baz")
         );
         assert_eq!(items[0].location, span_of(text, "bar"));
@@ -265,7 +217,7 @@ mod tests {
         let (items, errors, _) = parsed_selections(text);
         assert_eq!(items.len(), 1);
         assert_eq!(
-            as_scalar(items[0].item.reference()).name.location,
+            as_selection(items[0].item.reference()).name.location,
             span_of(text, "bar")
         );
         assert_eq!(errors, vec![]);
@@ -291,7 +243,7 @@ mod tests {
         assert_eq!(comma_errors.len(), 1);
         assert_eq!(items.len(), 1);
         assert_eq!(
-            as_scalar(items[0].item.reference()).name.location,
+            as_selection(items[0].item.reference()).name.location,
             span_of(text, "bar")
         );
         assert_eq!(errors, vec![]);
@@ -311,7 +263,7 @@ mod tests {
     fn an_alias_splits_from_the_name_at_the_colon() {
         let text = "b: bar";
         let (items, errors, tokens) = parsed_selections(text);
-        let scalar = as_scalar(items[0].item.reference());
+        let scalar = as_selection(items[0].item.reference());
         let alias = scalar
             .reader_alias
             .as_ref()
@@ -339,17 +291,28 @@ mod tests {
     fn object_selections_nest() {
         let text = "pet { name, age }";
         let (items, errors, _) = parsed_selections(text);
-        let object = as_object(items[0].item.reference());
+        let object = as_selection(items[0].item.reference());
         assert_eq!(object.name.location, span_of(text, "pet"));
-        let inner = object.selection_set.item.0.reference();
+        let inner = object
+            .selection_set
+            .as_ref()
+            .expect("the fixture selects a nested set")
+            .item
+            .0
+            .reference();
         assert_eq!(inner.len(), 2);
         assert_eq!(
-            as_scalar(inner[0].item.reference()).name.location,
+            as_selection(inner[0].item.reference()).name.location,
             span_of(text, "name")
         );
         assert_eq!(
-            as_scalar(inner[1].item.reference()).name.location,
+            as_selection(inner[1].item.reference()).name.location,
             span_of(text, "age")
+        );
+        assert!(
+            as_selection(inner[0].item.reference())
+                .selection_set
+                .is_none()
         );
         assert_eq!(errors, vec![]);
     }
@@ -359,16 +322,25 @@ mod tests {
         let text = "pet(id: $petId) { name(shouted: true) }";
         let (items, errors, _) = parsed_selections(text);
         assert_eq!(errors, vec![]);
-        let object = as_object(items[0].item.reference());
+        let object = as_selection(items[0].item.reference());
         let outer = object
             .arguments
             .as_ref()
             .expect("the fixture selects with arguments");
         assert_eq!(outer.location, span_of(text, "(id: $petId)"));
-        let inner = as_scalar(object.selection_set.item.0[0].item.reference())
-            .arguments
-            .as_ref()
-            .expect("the nested selection selects with arguments");
+        let inner = as_selection(
+            object
+                .selection_set
+                .as_ref()
+                .expect("the fixture selects a nested set")
+                .item
+                .0[0]
+                .item
+                .reference(),
+        )
+        .arguments
+        .as_ref()
+        .expect("the nested selection selects with arguments");
         assert_eq!(inner.location, span_of(text, "(shouted: true)"));
     }
 
@@ -378,7 +350,7 @@ mod tests {
         let (items, errors, _) = parsed_selections(text);
         assert_eq!(items.len(), 2);
         assert_eq!(
-            as_scalar(items[0].item.reference()).name.location,
+            as_selection(items[0].item.reference()).name.location,
             span_of(text, "bar")
         );
         assert!(items[1].item.item.is_none());
@@ -401,11 +373,11 @@ mod tests {
         assert_eq!(comma_errors.len(), 1);
         assert_eq!(items.len(), 2);
         assert_eq!(
-            as_scalar(items[0].item.reference()).name.location,
+            as_selection(items[0].item.reference()).name.location,
             span_of(text, "a")
         );
         assert_eq!(
-            as_scalar(items[1].item.reference()).name.location,
+            as_selection(items[1].item.reference()).name.location,
             span_of(text, "b")
         );
         assert_eq!(errors, vec![]);
@@ -417,7 +389,7 @@ mod tests {
         let (items, errors, _) = parsed_selections(text);
         assert_eq!(items.len(), 2);
         assert_eq!(
-            as_scalar(items[0].item.reference()).name.location,
+            as_selection(items[0].item.reference()).name.location,
             span_of(text, "bar")
         );
         assert!(items[0].item.extra_tokens.is_some());
@@ -430,7 +402,7 @@ mod tests {
                 && error.location == span_of(text, "baz")
         }));
         assert_eq!(
-            as_scalar(items[1].item.reference()).name.location,
+            as_selection(items[1].item.reference()).name.location,
             span_of(text, "qux")
         );
     }
@@ -440,7 +412,7 @@ mod tests {
         let text = "bar @loadable";
         let (items, errors, _) = parsed_selections(text);
         assert_eq!(
-            as_scalar(items[0].item.reference()).name.location,
+            as_selection(items[0].item.reference()).name.location,
             span_of(text, "bar")
         );
         assert_eq!(
@@ -478,7 +450,7 @@ mod tests {
         assert_eq!(errors[1].location, span_of(text, "d"));
         assert_eq!(errors[2].location, span_of(text, "f"));
         assert_eq!(
-            as_scalar(items[0].item.reference()).name.location,
+            as_selection(items[0].item.reference()).name.location,
             span_of(text, "a")
         );
     }
