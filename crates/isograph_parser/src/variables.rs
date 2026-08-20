@@ -36,6 +36,7 @@ pub struct VariableDeclaration {
 pub enum TypeAnnotation {
     Named(NamedTypeAnnotation),
     List(Box<ListTypeAnnotation>),
+    Null(Box<NullTypeAnnotation>),
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -57,11 +58,20 @@ pub struct ListTypeAnnotation {
     pub extra: Option<WithSpan<UnparsedChunkItems>>,
 }
 
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = TypeAnnotationParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct NullTypeAnnotation(
+    #[resolve_field]
+    #[parent_variant(Null)]
+    pub WithSpan<TypeAnnotation>,
+);
+
 #[derive(Debug)]
 pub enum TypeAnnotationParent<'a> {
     Variable(VariableDeclarationPath<'a>),
     List(Box<ListTypeAnnotationPath<'a>>),
     SelectableDeclaration(SelectableDeclarationPath<'a>),
+    Null(Box<NullTypeAnnotationPath<'a>>),
 }
 
 pub type VariableDeclarationListPath<'a> =
@@ -80,6 +90,9 @@ pub type NamedTypeAnnotationPath<'a> =
 
 pub type ListTypeAnnotationPath<'a> =
     PositionResolutionPath<&'a ListTypeAnnotation, TypeAnnotationParent<'a>>;
+
+pub type NullTypeAnnotationPath<'a> =
+    PositionResolutionPath<&'a NullTypeAnnotation, TypeAnnotationParent<'a>>;
 
 impl<'a> From<VariableDeclarationSlotPath<'a>> for IsographResolutionNode<'a> {
     fn from(path: VariableDeclarationSlotPath<'a>) -> Self {
@@ -127,15 +140,32 @@ fn parse_variable_declaration(
 pub(crate) fn parse_type_annotation(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<WithSpan<TypeAnnotation>, WithSpan<ParseError>> {
+    let core = parse_named_or_list(cursor)?;
+    match cursor.consume_token_if(
+        NonBracketTokenKind::Exclamation,
+        SemanticToken::GraphQLTypeName,
+    ) {
+        Some(bang) => core
+            .item
+            .with_span(Span::new(core.location.start, bang.location.end))
+            .wrap_ok(),
+        None => {
+            let location = core.location;
+            TypeAnnotation::Null(NullTypeAnnotation(core).boxed())
+                .with_span(location)
+                .wrap_ok()
+        }
+    }
+}
+
+fn parse_named_or_list(
+    cursor: &mut ItemCursor<'_>,
+) -> Result<WithSpan<TypeAnnotation>, WithSpan<ParseError>> {
     cursor.spanning(|cursor| {
         if let Some(name) = cursor.consume_token_if(
             NonBracketTokenKind::Identifier,
             SemanticToken::GraphQLTypeName,
         ) {
-            cursor.consume_token_if(
-                NonBracketTokenKind::Exclamation,
-                SemanticToken::GraphQLTypeName,
-            );
             return TypeAnnotation::Named(NamedTypeAnnotation {
                 name: name.interned().map(EntityNameWrapper),
             })
@@ -147,10 +177,6 @@ pub(crate) fn parse_type_annotation(
             |cursor, children| parse_bracket_interior_type(cursor, children),
         ) {
             let parsed = parsed.item?;
-            cursor.consume_token_if(
-                NonBracketTokenKind::Exclamation,
-                SemanticToken::GraphQLTypeName,
-            );
             return TypeAnnotation::List(
                 ListTypeAnnotation {
                     inner: parsed.item,

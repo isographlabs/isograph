@@ -1253,10 +1253,16 @@ mod tests {
             .expect("the fixture writes to Owner");
         assert_eq!(target.location, span_of(text, "Owner"));
         match target.item.reference() {
-            TypeAnnotation::Named(named) => {
-                assert_eq!(named.name.location, span_of(text, "Owner"));
+            TypeAnnotation::Null(null) => {
+                assert_eq!(null.0.location, span_of(text, "Owner"));
+                match null.0.item.reference() {
+                    TypeAnnotation::Named(named) => {
+                        assert_eq!(named.name.location, span_of(text, "Owner"));
+                    }
+                    annotation => panic!("expected Named inside Null, got {annotation:?}"),
+                }
             }
-            annotation => panic!("expected a named target, got {annotation:?}"),
+            annotation => panic!("expected Null, got {annotation:?}"),
         }
         assert_eq!(selections(selection_set_of(declaration)).len(), 1);
     }
@@ -1323,6 +1329,229 @@ mod tests {
                 }
             }
             annotation => panic!("expected a list target, got {annotation:?}"),
+        }
+    }
+
+    #[test]
+    fn a_named_target_without_bang_is_null_wrapped() {
+        let text = "field Query.Foo to Pet { id }";
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        let target = as_selectable(parse.reference())
+            .target_type
+            .as_ref()
+            .expect("the fixture writes to Pet");
+        assert_eq!(target.location, span_of(text, "Pet"));
+        match target.item.reference() {
+            TypeAnnotation::Null(null) => {
+                assert_eq!(null.0.location, span_of(text, "Pet"));
+                match null.0.item.reference() {
+                    TypeAnnotation::Named(named) => {
+                        assert_eq!(named.name.location, span_of(text, "Pet"));
+                    }
+                    annotation => panic!("expected Named inside Null, got {annotation:?}"),
+                }
+            }
+            annotation => panic!("expected Null, got {annotation:?}"),
+        }
+    }
+
+    #[test]
+    fn a_named_target_with_bang_is_not_null_wrapped() {
+        let text = "field Query.Foo to Pet! { id }";
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        let target = as_selectable(parse.reference())
+            .target_type
+            .as_ref()
+            .expect("the fixture writes to Pet!");
+        assert_eq!(target.location, span_of(text, "Pet!"));
+        match target.item.reference() {
+            TypeAnnotation::Named(named) => {
+                assert_eq!(named.name.location, span_of(text, "Pet"));
+            }
+            annotation => panic!("expected Named, got {annotation:?}"),
+        }
+    }
+
+    #[test]
+    fn a_list_target_maps_graphql_nullability() {
+        let text = "field Query.Foo to [Pet] { id }";
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        let target = as_selectable(parse.reference())
+            .target_type
+            .as_ref()
+            .expect("the fixture writes to [Pet]");
+        match target.item.reference() {
+            TypeAnnotation::Null(outer) => match outer.0.item.reference() {
+                TypeAnnotation::List(list) => {
+                    let inner = list.inner.as_ref().expect("the list holds a type");
+                    match inner.item.reference() {
+                        TypeAnnotation::Null(elem) => {
+                            assert!(matches!(elem.0.item, TypeAnnotation::Named(_)));
+                        }
+                        annotation => panic!("expected Null element, got {annotation:?}"),
+                    }
+                }
+                annotation => panic!("expected List, got {annotation:?}"),
+            },
+            annotation => panic!("expected Null list, got {annotation:?}"),
+        }
+    }
+
+    #[test]
+    fn a_non_null_list_of_non_null_named_is_list_of_named() {
+        let text = "field Query.Foo to [Pet!]! { id }";
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        let target = as_selectable(parse.reference())
+            .target_type
+            .as_ref()
+            .expect("the fixture writes to [Pet!]!");
+        match target.item.reference() {
+            TypeAnnotation::List(list) => {
+                let inner = list.inner.as_ref().expect("the list holds a type");
+                assert!(matches!(inner.item, TypeAnnotation::Named(_)));
+                assert_eq!(inner.location, span_of(text, "Pet!"));
+            }
+            annotation => panic!("expected List, got {annotation:?}"),
+        }
+    }
+
+    #[test]
+    fn a_second_bang_is_leftover() {
+        let text = "field Query.Foo to Pet!! { id }";
+        let (parse, errors) = parsed(text);
+        as_selectable(parse.reference());
+        let second_bang = Span::new(
+            span_of(text, "Pet!!").start + 4,
+            span_of(text, "Pet!!").start + 5,
+        );
+        assert_eq!(
+            errors,
+            expected(
+                EndOfDeclaration,
+                Found::Token(NonBracketTokenKind::Exclamation)
+            )
+            .with_span(second_bang)
+            .wrap_vec(),
+        );
+    }
+
+    #[test]
+    fn a_variable_type_without_bang_is_null_wrapped() {
+        let text = "field Query.Foo($x: ID) { bar }";
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        let declared = as_declared(variables_of(parse.reference()).item.0[0].item.reference());
+        match declared.type_.item.reference() {
+            TypeAnnotation::Null(null) => {
+                assert!(matches!(null.0.item, TypeAnnotation::Named(_)));
+            }
+            annotation => panic!("expected Null, got {annotation:?}"),
+        }
+    }
+
+    #[test]
+    fn a_variable_type_with_bang_is_not_null_wrapped() {
+        let text = "field Query.Foo($x: ID!) { bar }";
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        let declared = as_declared(variables_of(parse.reference()).item.0[0].item.reference());
+        match declared.type_.item.reference() {
+            TypeAnnotation::Named(_) => {}
+            annotation => panic!("expected Named, got {annotation:?}"),
+        }
+    }
+
+    #[test]
+    fn a_nested_list_target_wraps_null_at_every_layer() {
+        let text = "field Query.Foo to [[Pet]] { id }";
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        let target = as_selectable(parse.reference())
+            .target_type
+            .as_ref()
+            .expect("the fixture writes to [[Pet]]");
+        match target.item.reference() {
+            TypeAnnotation::Null(outer) => match outer.0.item.reference() {
+                TypeAnnotation::List(outer_list) => {
+                    let mid = outer_list
+                        .inner
+                        .as_ref()
+                        .expect("the outer list holds a type");
+                    match mid.item.reference() {
+                        TypeAnnotation::Null(mid_null) => match mid_null.0.item.reference() {
+                            TypeAnnotation::List(inner_list) => {
+                                let elem = inner_list
+                                    .inner
+                                    .as_ref()
+                                    .expect("the inner list holds a type");
+                                match elem.item.reference() {
+                                    TypeAnnotation::Null(elem_null) => {
+                                        assert!(matches!(
+                                            elem_null.0.item,
+                                            TypeAnnotation::Named(_)
+                                        ));
+                                    }
+                                    annotation => {
+                                        panic!("expected Null named, got {annotation:?}")
+                                    }
+                                }
+                            }
+                            annotation => panic!("expected inner List, got {annotation:?}"),
+                        },
+                        annotation => panic!("expected Null around inner List, got {annotation:?}"),
+                    }
+                }
+                annotation => panic!("expected outer List, got {annotation:?}"),
+            },
+            annotation => panic!("expected Null around outer List, got {annotation:?}"),
+        }
+    }
+
+    #[test]
+    fn a_nullable_list_of_non_null_named() {
+        let text = "field Query.Foo to [Pet!] { id }";
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        let target = as_selectable(parse.reference())
+            .target_type
+            .as_ref()
+            .expect("the fixture writes to [Pet!]");
+        match target.item.reference() {
+            TypeAnnotation::Null(outer) => match outer.0.item.reference() {
+                TypeAnnotation::List(list) => {
+                    let inner = list.inner.as_ref().expect("the list holds a type");
+                    assert!(matches!(inner.item, TypeAnnotation::Named(_)));
+                }
+                annotation => panic!("expected List, got {annotation:?}"),
+            },
+            annotation => panic!("expected Null list, got {annotation:?}"),
+        }
+    }
+
+    #[test]
+    fn a_non_null_list_of_nullable_named() {
+        let text = "field Query.Foo to [Pet]! { id }";
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        let target = as_selectable(parse.reference())
+            .target_type
+            .as_ref()
+            .expect("the fixture writes to [Pet]!");
+        match target.item.reference() {
+            TypeAnnotation::List(list) => {
+                let inner = list.inner.as_ref().expect("the list holds a type");
+                match inner.item.reference() {
+                    TypeAnnotation::Null(elem) => {
+                        assert!(matches!(elem.0.item, TypeAnnotation::Named(_)));
+                    }
+                    annotation => panic!("expected Null element, got {annotation:?}"),
+                }
+            }
+            annotation => panic!("expected List, got {annotation:?}"),
         }
     }
 
@@ -1430,8 +1659,11 @@ mod tests {
         match parse.resolve((), span_of(text, "Owner")) {
             IsographResolutionNode::EntityNameWrapper(name) => match name.parent {
                 EntityNameWrapperParent::NamedTypeAnnotation(named) => match named.parent {
-                    TypeAnnotationParent::SelectableDeclaration(_) => {}
-                    parent => panic!("expected the field as type parent, got {parent:?}"),
+                    TypeAnnotationParent::Null(null) => match null.as_ref().parent.reference() {
+                        TypeAnnotationParent::SelectableDeclaration(_) => {}
+                        parent => panic!("expected the field as type parent, got {parent:?}"),
+                    },
+                    parent => panic!("expected Null, got {parent:?}"),
                 },
                 parent => panic!("expected a named type annotation, got {parent:?}"),
             },
@@ -1988,12 +2220,20 @@ mod tests {
         let (parse, errors) = parsed(text);
         let declared = as_declared(variables_of(parse.reference()).item.0[0].item.reference());
         match declared.type_.item.reference() {
-            TypeAnnotation::List(list) => {
-                let inner = list.inner.as_ref().expect("chunk 0 parsed Pet");
-                assert!(matches!(inner.item, TypeAnnotation::Named(_)));
-                assert_eq!(inner.location, span_of(text, "Pet"));
-            }
-            annotation => panic!("expected a list type, got {annotation:?}"),
+            TypeAnnotation::Null(outer) => match outer.0.item.reference() {
+                TypeAnnotation::List(list) => {
+                    let inner = list.inner.as_ref().expect("chunk 0 parsed Pet");
+                    match inner.item.reference() {
+                        TypeAnnotation::Null(elem) => {
+                            assert!(matches!(elem.0.item, TypeAnnotation::Named(_)));
+                            assert_eq!(elem.0.location, span_of(text, "Pet"));
+                        }
+                        annotation => panic!("expected Null element, got {annotation:?}"),
+                    }
+                }
+                annotation => panic!("expected List, got {annotation:?}"),
+            },
+            annotation => panic!("expected Null list, got {annotation:?}"),
         }
         assert!(errors.iter().any(|error| {
             error.item
@@ -2011,16 +2251,23 @@ mod tests {
         let (parse, _) = parsed(text);
         match parse.resolve((), span_of(text, "Pet")) {
             IsographResolutionNode::EntityNameWrapper(name) => {
-                let list = match name.parent.reference() {
-                    EntityNameWrapperParent::NamedTypeAnnotation(named) => {
-                        match named.parent.reference() {
-                            TypeAnnotationParent::List(list) => list.as_ref(),
-                            parent => panic!("expected a list parent, got {parent:?}"),
-                        }
-                    }
+                let named = match name.parent.reference() {
+                    EntityNameWrapperParent::NamedTypeAnnotation(named) => named,
                     parent => panic!("expected a named type annotation, got {parent:?}"),
                 };
-                match list.parent.reference() {
+                let inner_null = match named.parent.reference() {
+                    TypeAnnotationParent::Null(null) => null.as_ref(),
+                    parent => panic!("expected Null around Named, got {parent:?}"),
+                };
+                let list = match inner_null.parent.reference() {
+                    TypeAnnotationParent::List(list) => list.as_ref(),
+                    parent => panic!("expected a list parent, got {parent:?}"),
+                };
+                let outer_null = match list.parent.reference() {
+                    TypeAnnotationParent::Null(null) => null.as_ref(),
+                    parent => panic!("expected Null around List, got {parent:?}"),
+                };
+                match outer_null.parent.reference() {
                     TypeAnnotationParent::Variable(variable) => {
                         assert_eq!(variable.inner.name.location, span_of(text, "$pets"));
                     }
@@ -2233,10 +2480,13 @@ mod tests {
             .item
             .reference()
         {
-            TypeAnnotation::Named(named) => {
-                assert_eq!(named.name.item, EntityNameWrapper("to".intern().to()));
-            }
-            annotation => panic!("expected a named target, got {annotation:?}"),
+            TypeAnnotation::Null(null) => match null.0.item.reference() {
+                TypeAnnotation::Named(named) => {
+                    assert_eq!(named.name.item, EntityNameWrapper("to".intern().to()));
+                }
+                annotation => panic!("expected Named inside Null, got {annotation:?}"),
+            },
+            annotation => panic!("expected Null, got {annotation:?}"),
         }
     }
 
