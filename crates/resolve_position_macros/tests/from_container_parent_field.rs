@@ -54,7 +54,7 @@ struct Slot<T, E> {
     #[resolve_field]
     item: Option<WithSpan<T>>,
     #[resolve_field]
-    #[from_container_parent]
+    #[parent_from]
     extra_tokens: Option<WithSpan<E>>,
 }
 

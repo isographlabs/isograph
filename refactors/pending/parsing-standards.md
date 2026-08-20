@@ -135,7 +135,7 @@ pub struct Slot<T, E> {
     #[resolve_field]
     pub item: Option<WithSpan<T>>,
     #[resolve_field]
-    #[from_container_parent]
+    #[parent_from]
     pub extra_tokens: Option<WithSpan<E>>,
 }
 
@@ -166,7 +166,7 @@ pub struct ExtraChunks(
 );
 ```
 
-Bare `#[resolve_field]` on `item` passes `self.path(parent)`, a path to this `Slot`. `T::Parent` is that path. `on_unmatched_span = from_path` makes the unmatched-span arm `self.path(parent).to()`. Each pin's `From` builds that pin's `ResolvedNode` variant (`IsoLiteralSlot`, `NamedArgumentSlot`, `ObjectEntrySlot`). `#[from_container_parent]` on `extra_tokens` passes `From::from(self.path(parent))`. Leftover's parent is an enum of those slot paths. A position in leftover walks `extra_tokens`. A position in the slot span but in neither field answers that `Slot<T, E>`'s `ResolvedNode` variant. `{ item: None, extra_tokens: None }` is the same arm.
+Bare `#[resolve_field]` on `item` passes `self.path(parent)`, a path to this `Slot`. `T::Parent` is that path. `on_unmatched_span = from_path` makes the unmatched-span arm `self.path(parent).to()`. Each pin's `From` builds that pin's `ResolvedNode` variant (`IsoLiteralSlot`, `NamedArgumentSlot`, `ObjectEntrySlot`). `#[parent_from]` on `extra_tokens` passes `From::from(self.path(parent))`. Leftover's parent is an enum of those slot paths. A position in leftover walks `extra_tokens`. A position in the slot span but in neither field answers that `Slot<T, E>`'s `ResolvedNode` variant. `{ item: None, extra_tokens: None }` is the same arm.
 
 Leftover span is tight to the leftover tokens. The gap after the item is a third region: the slot leaf.
 

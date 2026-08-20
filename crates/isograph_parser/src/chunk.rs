@@ -234,7 +234,7 @@ pub struct ExtraChunks(
 /// Walk, given that parent:
 /// - Position in `item`: bare `#[resolve_field]` passes `self.path(parent)`, a path
 ///   to this `Slot`. `T::Parent` is that path. `Slot` is a path segment.
-/// - Position in `extra_tokens`: `#[from_container_parent]` converts the slot path
+/// - Position in `extra_tokens`: `#[parent_from]` converts the slot path
 ///   into leftover's parent enum.
 /// - Position in the slot span but in neither field: `on_unmatched_span = from_path`
 ///   returns `self.path(parent).to()`. Each pin’s `From` builds that pin’s
@@ -255,7 +255,7 @@ pub struct Slot<T, E> {
     pub item: Option<WithSpan<T>>,
     /// Unread or failed tokens after the item. Span is tight to those tokens.
     #[resolve_field]
-    #[from_container_parent]
+    #[parent_from]
     pub extra_tokens: Option<WithSpan<E>>,
 }
 
