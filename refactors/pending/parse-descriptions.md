@@ -10,26 +10,21 @@ field <Identifier> . <Identifier> [<paren group>] [<description>] <brace group>
 
 A description is one `StringLiteral` token (`"..."`) or one `BlockStringLiteral` token (`"""..."""`). A block string is a single token whatever it contains, line breaks included, so a multi-line description never splits the chunk. The tree stores the interned source slice, quotes included. Unquoting and block-string dedenting are derivations a consumer computes from that key.
 
+Origin: `parse_optional_description` in `crates/isograph_lang_parser/src/description.rs` and `Description` in `crates/isograph_lang_types/src/string_key_wrappers.rs`. Delta: i2 does not unquote or dedent; isograph stores the cleaned inner text. i2 function name is `consume_description` (cursor `consume_*` convention).
+
 ## The types
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ClientFieldDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-// Quotes included. Unquoting and block-string dedent are later.
 pub struct Description(common_lang_types::DescriptionValue);
-
-impl From<intern::string_key::StringKey> for Description {
-    fn from(key: intern::string_key::StringKey) -> Self {
-        Description(key.to())
-    }
-}
 
 pub type DescriptionPath<'a> =
     PositionResolutionPath<&'a Description, ClientFieldDeclarationPath<'a>>;
 ```
 
-parse-pointers.md converts the parent to an enum when the second parent arrives.
+parse-pointers.md converts the parent to `DescriptionParent` when the second parent arrives.
 
 Before:
 
@@ -37,15 +32,15 @@ Before:
 // from crates/isograph_parser/src/parse_iso_literal.rs
 pub struct ClientFieldDeclaration {
     #[resolve_field]
-    #[parent_variant(Field)]
-    pub parent_type: WithSpan<EntityName>,
+    #[parent_variant(ClientFieldDeclaration)]
+    pub parent_type: WithSpan<EntityNameWrapper>,
     #[resolve_field]
-    #[parent_variant(Field)]
-    pub client_field_name: WithSpan<ClientFieldName>,
+    #[parent_variant(ClientFieldDeclaration)]
+    pub client_field_name: WithSpan<ClientScalarSelectableNameWrapper>,
     #[resolve_field]
     pub variable_definitions: Option<WithSpan<VariableDeclarationList>>,
     #[resolve_field]
-    #[parent_variant(Field)]
+    #[parent_variant(ClientFieldDeclaration)]
     pub selection_set: WithSpan<SelectionSet>,
 }
 ```
@@ -56,17 +51,17 @@ After:
 // from crates/isograph_parser/src/parse_iso_literal.rs
 pub struct ClientFieldDeclaration {
     #[resolve_field]
-    #[parent_variant(Field)]
-    pub parent_type: WithSpan<EntityName>,
+    #[parent_variant(ClientFieldDeclaration)]
+    pub parent_type: WithSpan<EntityNameWrapper>,
     #[resolve_field]
-    #[parent_variant(Field)]
-    pub client_field_name: WithSpan<ClientFieldName>,
+    #[parent_variant(ClientFieldDeclaration)]
+    pub client_field_name: WithSpan<ClientScalarSelectableNameWrapper>,
     #[resolve_field]
     pub variable_definitions: Option<WithSpan<VariableDeclarationList>>,
     #[resolve_field]
     pub description: Option<WithSpan<Description>>,
     #[resolve_field]
-    #[parent_variant(Field)]
+    #[parent_variant(ClientFieldDeclaration)]
     pub selection_set: WithSpan<SelectionSet>,
 }
 ```
@@ -77,22 +72,22 @@ pub struct ClientFieldDeclaration {
 // from crates/isograph_parser/src/parse_iso_literal.rs
 pub(crate) fn consume_description(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<Description>> {
     let span = cursor
-        .consume_token_if(NonBracketTokenKind::StringLiteral)
-        .or_else(|| cursor.consume_token_if(NonBracketTokenKind::BlockStringLiteral))?;
-    cursor
-        .token_text(span)
-        .intern()
-        .to::<Description>()
-        .with_span(span)
-        .wrap_some()
+        .consume_token_if(NonBracketTokenKind::StringLiteral, SemanticToken::String)
+        .or_else(|| {
+            cursor.consume_token_if(
+                NonBracketTokenKind::BlockStringLiteral,
+                SemanticToken::String,
+            )
+        })?;
+    span.interned().map(Description).wrap_some()
 }
 ```
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-    let variable_definitions = consume_variable_declaration_list(cursor, push_error);
+    let variable_definitions = consume_variable_declaration_list(cursor);
     let description = consume_description(cursor);
-    let selection_set = require_selection_set(cursor, push_error)?;
+    let selection_set = require_selection_set(cursor)?;
 ```
 
 A malformed string token is not consumed here and surfaces as the found token of the selection-set expectation. A description in any other position is an ordinary unexpected token there.
@@ -104,7 +99,7 @@ A malformed string token is not consumed here and surfaces as the found token of
     Description(DescriptionPath<'a>),
 ```
 
-The expansion follows `EntityName`.
+The expansion follows `EntityNameWrapper`.
 
 ## Tests
 
@@ -122,7 +117,7 @@ The expansion follows `EntityName`.
         assert_eq!(description.location, span_of(text, "\"the home route\""));
         assert_eq!(
             description.item,
-            "\"the home route\"".intern().to()
+            Description("\"the home route\"".intern().to())
         );
     }
 
