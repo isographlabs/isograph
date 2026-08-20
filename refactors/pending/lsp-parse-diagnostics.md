@@ -2,9 +2,9 @@
 
 Requires lsp-semantic-tokens.md. After a `didOpen` or `didChange`, the language server publishes parse errors for the iso literals in that file as `textDocument/publishDiagnostics`. Closing the file publishes an empty list for that URI, which clears the squiggles.
 
-The pipeline is `file_literals` from lsp-semantic-tokens.md. Each `FileLiteral` already holds `errors`, `bracket_errors`, and `comma_errors` with literal-relative spans. This doc rebases those spans to the file and turns them into `lsp_types::Diagnostic`.
+The pipeline is `file_literals` from lsp-semantic-tokens.md. Each `FileLiteral` holds `errors`, `bracket_errors`, and `comma_errors` with literal-relative spans, and `host_errors` with file-absolute spans from `HostLanguage::validate`. This doc turns those into `lsp_types::Diagnostic`. Literal-relative spans are rebased with `with_offset(extraction.span.start)`. Host-error spans are used as-is.
 
-Origin: isograph `crates/isograph_lsp/src/diagnostic_notification.rs` and the debounce-then-`validate_entire_schema` publish in `server.rs`. Delta: parse errors of the open file only, published on `didOpen` / `didChange` (no debounce, no schema, no file watcher). `didClose` clears. Messages are `Display` of the parser error types.
+Origin: isograph `crates/isograph_lsp/src/diagnostic_notification.rs` and the debounce-then-`validate_entire_schema` publish in `server.rs`. Delta: parse errors and host-language errors of the open file only, published on `didOpen` / `didChange` (no debounce, no schema, no file watcher). `didClose` clears. Messages are `Display` of the error types.
 
 ## What the user does
 
@@ -101,16 +101,21 @@ use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range};
 use prelude::Postfix;
 use span::Span;
 
+use isograph_parser::{HostLanguage, Javascript};
+
 use crate::file_literals::{FileLiteral, file_literals};
 
 pub fn diagnostics_for_file(source: &str) -> Vec<Diagnostic> {
-    file_literals(source)
+    file_literals(&Javascript, source)
         .iter()
         .flat_map(|literal| diagnostics_for_literal(source, literal))
         .collect()
 }
 
-fn diagnostics_for_literal(source: &str, literal: &FileLiteral<'_>) -> Vec<Diagnostic> {
+fn diagnostics_for_literal<THostLanguage: HostLanguage>(
+    source: &str,
+    literal: &FileLiteral<'_, THostLanguage>,
+) -> Vec<Diagnostic> {
     let offset = literal.extraction.span.start;
     let mut out = Vec::new();
     for error in &literal.errors {
@@ -136,6 +141,13 @@ fn diagnostics_for_literal(source: &str, literal: &FileLiteral<'_>) -> Vec<Diagn
             source,
             error.0.with_offset(offset),
             error.to_string(),
+        ));
+    }
+    for error in &literal.host_errors {
+        out.push(diagnostic(
+            source,
+            error.location,
+            error.item.to_string(),
         ));
     }
     out
@@ -198,6 +210,13 @@ mod tests {
             diagnostics_for_file("iso(`entrypoint Query.HomeRoute`)"),
             vec![]
         );
+    }
+
+    #[test]
+    fn tagged_template_is_a_host_error() {
+        let diagnostics = diagnostics_for_file("iso`entrypoint Query.HomeRoute`");
+        assert_eq!(diagnostics.len(), 1);
+        assert!(diagnostics[0].message.contains("parentheses"));
     }
 
     #[test]

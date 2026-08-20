@@ -29,31 +29,7 @@ Each seam is a trait, which is the case AGENTS.md reserves traits for: a boundar
 
 ### Extraction
 
-```rust
-/// One file the compiler read, as extraction sees it.
-pub struct SourceFile {
-    pub path: PathBuf,
-    pub contents: String,
-}
-
-/// One isograph literal found in a file. `offset_in_file` is the literal's byte offset, kept
-/// beside the contents so spans from the parse rebase with `span.with_offset(offset_in_file)`
-/// (see parser-lang-types.md); the parser itself never learns the file.
-pub struct ExtractedLiteral {
-    pub offset_in_file: u32,
-    pub contents: String,
-}
-
-/// The input-language seam.
-pub trait ExtractLiterals {
-    /// Extensions of files worth scanning, without the dot. The daemon's watcher tracks these;
-    /// the constant `TRACKED_EXTENSIONS` in cli-daemon.md is this method's placeholder and is
-    /// replaced by it when the pipeline lands.
-    fn source_extensions(&self) -> &'static [&'static str];
-
-    fn extract(&self, file: &SourceFile) -> Vec<ExtractedLiteral>;
-}
-```
+The extraction seam is `HostLanguage` in extract-iso-literals.md. `extract` finds iso literals in a file; `validate` checks the host embedding. `IsoLiteralExtraction` carries the common contents and span plus `THostLanguage::LiteralContext`. The first implementor is `Javascript`. File extensions for the watcher stay a later field on that trait (cli-daemon.md's `TRACKED_EXTENSIONS` is the placeholder).
 
 ### NetworkProtocol
 

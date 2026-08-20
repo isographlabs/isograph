@@ -27,23 +27,28 @@ Most important first.
 ```rust
 // from crates/isograph_lsp/src/file_literals.rs
 use isograph_parser::{
-    BracketError, CommaWithoutItem, IsoLiteralExtraction, IsoLiteralParse, ParseError,
-    SemanticToken, chunk, extract_iso_literals, match_brackets, parse_iso_literal, tokenize,
+    BracketError, CommaWithoutItem, HostLanguage, IsoLiteralExtraction, IsoLiteralItem,
+    IsoLiteralParse, ParseError, SemanticToken, chunk, match_brackets, parse_iso_literal,
+    tokenize,
 };
 use prelude::Postfix;
 use span::{WithSpan, WithSpanPostfix};
 
-pub struct FileLiteral<'a> {
-    pub extraction: IsoLiteralExtraction<'a>,
+pub struct FileLiteral<'a, THostLanguage: HostLanguage> {
+    pub extraction: IsoLiteralExtraction<'a, THostLanguage>,
     pub parse: Option<WithSpan<IsoLiteralParse>>,
     pub errors: Vec<WithSpan<ParseError>>,
     pub bracket_errors: Vec<BracketError>,
     pub comma_errors: Vec<CommaWithoutItem>,
+    pub host_errors: Vec<WithSpan<THostLanguage::Error>>,
     pub tokens: Vec<WithSpan<SemanticToken>>,
 }
 
-pub fn file_literals(source: &str) -> Vec<FileLiteral<'_>> {
-    extract_iso_literals(source)
+pub fn file_literals<THostLanguage: HostLanguage>(
+    host: &THostLanguage,
+    source: &str,
+) -> Vec<FileLiteral<'_, THostLanguage>> {
+    host.extract(source)
         .into_iter()
         .map(|extraction| {
             let text = extraction.iso_literal_text;
@@ -53,12 +58,22 @@ pub fn file_literals(source: &str) -> Vec<FileLiteral<'_>> {
             let mut errors = Vec::new();
             let mut tokens = Vec::new();
             let parse = parse_iso_literal(text, tree, &mut errors, &mut tokens);
+            let item = parse.as_ref().and_then(|tree| {
+                tree.item
+                    .item
+                    .item
+                    .item
+                    .as_ref()
+                    .map(|item| item.item.reference())
+            });
+            let host_errors = host.validate(&extraction, item);
             FileLiteral {
                 extraction,
                 parse,
                 errors,
                 bracket_errors,
                 comma_errors,
+                host_errors,
                 tokens,
             }
         })
@@ -139,7 +154,7 @@ pub fn start() -> std::process::ExitCode;
 // from crates/isograph_lsp/src/file_literals.rs
 #[cfg(test)]
 mod tests {
-    use isograph_parser::{IsoLiteralItem, SemanticToken};
+    use isograph_parser::{IsoLiteralItem, Javascript, SemanticToken};
     use intern::string_key::Intern;
     use prelude::Postfix;
     use span::{Span, WithSpanPostfix};
@@ -161,10 +176,10 @@ mod tests {
     #[test]
     fn exported_field_is_one_file_literal() {
         let source = "export const fullName = iso(`field Pet.fullName { id }`)(";
-        let literals = file_literals(source);
+        let literals = file_literals(&Javascript, source);
         assert_eq!(literals.len(), 1);
         assert_eq!(
-            literals[0].extraction.const_export_name,
+            literals[0].extraction.context.const_export_name,
             "fullName".intern().to::<common_lang_types::ConstExportName>().wrap_some()
         );
         assert!(matches!(
@@ -179,7 +194,7 @@ mod tests {
                 .as_ref()
                 .expect("the fixture parsed a declaration")
                 .item,
-            IsoLiteralItem::Field(_)
+            IsoLiteralItem::Selectable(_)
         ));
         assert_eq!(literals[0].errors, vec![]);
         assert!(
@@ -197,7 +212,7 @@ mod tests {
         let source = "\
 export const fullName = iso(`field Pet.fullName { id }`)(
 iso(`entrypoint Query.HomeRoute`)";
-        let literals = file_literals(source);
+        let literals = file_literals(&Javascript, source);
         assert_eq!(literals.len(), 2);
         assert!(matches!(
             literals[1]
@@ -313,16 +328,18 @@ Absolutize and encode, origin isograph `semantic_tokens.rs`. Delta: `text_source
 
 ```rust
 // from crates/isograph_lsp/src/semantic_tokens.rs
+use isograph_parser::{HostLanguage, Javascript};
+
 use crate::file_literals::{FileLiteral, file_literals};
 
 pub fn lsp_tokens_for_file(source: &str) -> Vec<LspSemanticToken> {
-    let literals = file_literals(source);
+    let literals = file_literals(&Javascript, source);
     let absolute = concatenate_and_absolutize(literals.iter(), source);
     convert_absolute_token_to_lsp_token(absolute, source).collect()
 }
 
-fn concatenate_and_absolutize<'a>(
-    literals: impl Iterator<Item = &'a FileLiteral<'a>> + 'a,
+fn concatenate_and_absolutize<'a, THostLanguage: HostLanguage>(
+    literals: impl Iterator<Item = &'a FileLiteral<'a, THostLanguage>> + 'a,
     page_content: &'a str,
 ) -> impl Iterator<Item = AbsoluteToken> + 'a {
     literals.flat_map(move |literal| {
@@ -400,7 +417,7 @@ Tests:
 // from crates/isograph_lsp/src/semantic_tokens.rs
 #[cfg(test)]
 mod tests {
-    use isograph_parser::SemanticToken;
+    use isograph_parser::{Javascript, SemanticToken};
     use prelude::Postfix;
 
     use super::{
@@ -410,7 +427,7 @@ mod tests {
     use crate::file_literals::file_literals;
 
     fn absolute_for(source: &str) -> Vec<AbsoluteToken> {
-        let literals = file_literals(source);
+        let literals = file_literals(&Javascript, source);
         concatenate_and_absolutize(literals.iter(), source).collect()
     }
 
