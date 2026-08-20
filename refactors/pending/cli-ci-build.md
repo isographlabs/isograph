@@ -14,7 +14,7 @@ Supported platforms, same as `index.js`:
 
 The cargo bin name is `isograph` (`isograph.exe` on Windows). The artifact file name stays `isograph_cli` (`isograph_cli.exe` on Windows) so `index.js` does not change.
 
-Each platform job builds, then runs that artifact: `start`, `status`, `stop`. The runner matches the target so the smoke can execute: no `cross`.
+Each platform job runs `cargo test --release --target` for this crate, then uploads that release binary. Every e2e test runs on every platform. The runner matches the target so the tests execute the binary they just built: no `cross`.
 
 ## Change 1: PR CI clippy's the crate
 
@@ -38,11 +38,11 @@ Each platform job builds, then runs that artifact: `start`, `status`, `stop`. Th
         run: cargo clippy --manifest-path crates/isograph_cli/Cargo.toml --all-targets -- -D warnings
 ```
 
-## Change 2: five-platform build, then smoke that binary
+## Change 2: five-platform build and e2e
 
-`.github/workflows/build-cli.yml` builds this crate, not the workspace. `pnpm build-compiler` is `cargo build` at the root and cannot see `isograph_cli`. One job per platform: build, copy to `artifact/`, `start` / `status` / `stop` that file, upload.
+`.github/workflows/build-cli.yml` builds this crate, not the workspace. `pnpm build-compiler` is `cargo build` at the root and cannot see `isograph_cli`. One job per platform: `cargo test --release --target`, copy that release binary to `artifact/`, upload.
 
-Native runners, so the smoke runs the artifact:
+Native runners, so the tests run the binary:
 
 - `linux-x64`: `ubuntu-latest`
 - `linux-arm64`: `ubuntu-24.04-arm`
@@ -65,7 +65,7 @@ Before, the build step:
 
 After, the whole workflow. Drop `cross` and `musl`. Drop pnpm, Node, and the turbo cache: this crate is cargo-only. `artifact-file` is the uploaded name (`isograph_cli` or `isograph_cli.exe`). `build-name` is the cargo output (`isograph` or `isograph.exe`).
 
-The smoke uses a private HOME under `$RUNNER_TEMP` and a temp cwd with `isograph.config.json` containing `{}\n`. `start` / `status` / `stop` are that artifact, not `cargo test`.
+`cargo test --release --target` compiles the bin and runs every test in this crate, including e2e under `tests/`. The integration tests drive `CARGO_BIN_EXE_isograph`, which is that release binary. HOME isolation is the tests' harness, not the workflow.
 
 ```yaml
 # from .github/workflows/build-cli.yml
@@ -93,7 +93,7 @@ on:
 
 jobs:
   build-cli:
-    name: Build and smoke ${{ inputs.artifact-name }}
+    name: Build and test ${{ inputs.artifact-name }}
     timeout-minutes: 15
     runs-on: ${{ inputs.os }}
     steps:
@@ -107,49 +107,14 @@ jobs:
       - name: Enable longer pathnames for git
         if: inputs.longpaths
         run: git config --system core.longpaths true
-      - name: 'Build isograph (${{inputs.target}})'
-        run: cargo build --manifest-path crates/isograph_cli/Cargo.toml --release --target ${{ inputs.target }}
+      - name: 'Test isograph (${{inputs.target}})'
+        run: cargo test --manifest-path crates/isograph_cli/Cargo.toml --release --target ${{ inputs.target }}
       - name: Name the artifact isograph_cli
         shell: bash
         run: |
           src="crates/isograph_cli/target/${{ inputs.target }}/release/${{ inputs.build-name }}"
           mkdir -p artifact
           cp "$src" "artifact/${{ inputs.artifact-file }}"
-      - name: Smoke test the binary
-        if: runner.os != 'Windows'
-        env:
-          HOME: ${{ runner.temp }}/isograph-home
-          XDG_STATE_HOME: ${{ runner.temp }}/isograph-home/state
-          LOCALAPPDATA: ${{ runner.temp }}/isograph-home/appdata
-        run: |
-          bin="$GITHUB_WORKSPACE/artifact/${{ inputs.artifact-file }}"
-          workdir="$RUNNER_TEMP/isograph-smoke"
-          mkdir -p "$workdir" "$HOME"
-          printf '%s\n' '{}' > "$workdir/isograph.config.json"
-          cd "$workdir"
-          "$bin" start
-          "$bin" status
-          "$bin" stop
-      - name: Smoke test the binary
-        if: runner.os == 'Windows'
-        env:
-          HOME: ${{ runner.temp }}/isograph-home
-          USERPROFILE: ${{ runner.temp }}/isograph-home
-          LOCALAPPDATA: ${{ runner.temp }}/isograph-home/appdata
-        shell: pwsh
-        run: |
-          $bin = Join-Path $env:GITHUB_WORKSPACE "artifact\${{ inputs.artifact-file }}"
-          $workdir = Join-Path $env:RUNNER_TEMP "isograph-smoke"
-          New-Item -ItemType Directory -Force -Path $workdir | Out-Null
-          New-Item -ItemType Directory -Force -Path $env:HOME | Out-Null
-          [System.IO.File]::WriteAllText((Join-Path $workdir "isograph.config.json"), "{}" + [Environment]::NewLine)
-          Set-Location $workdir
-          & $bin start
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          & $bin status
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          & $bin stop
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact-name }}

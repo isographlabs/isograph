@@ -176,7 +176,7 @@ The contents of the config file are not read.
 
 ## Tests
 
-Unit tests in `discover.rs`. Binary tests replace `Daemon` with `World`: one private HOME, any number of project directories, optional `--config`. Config files are `{}\n` so Change 3 does not break these tests. The platform jobs in cli-ci-build.md start and stop the release binary. These tests are `cargo test --manifest-path crates/isograph_cli/Cargo.toml`.
+Unit tests in `discover.rs`. Binary tests replace `Daemon` with `World`: one private HOME, any number of project directories, optional `--config`. Config files are `{}\n` so Change 3 does not break these tests. cli-ci-build.md runs `cargo test --release --target` on every platform, so every e2e test here runs on all five.
 
 ```rust
 // from crates/isograph_cli/src/discover.rs
