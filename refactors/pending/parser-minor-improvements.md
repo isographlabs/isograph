@@ -25,3 +25,11 @@ pub struct Slot<T, E> {
 ```
 
 `ChunkedLevel` is a `Vec`. Empty is legal (whitespace-only literals). The two production call sites check `len() == 0` first. The type does not. A `NonEmpty` level, or a different type for "level that has a first chunk," would make the index impossible.
+
+## `EndOfFile` is never emitted
+
+`tokenize` stops at the last real token. End of input at parse time is `Found::EndOfChunk`. Delete `EndOfFile` from `IsographLangTokenKind` and `NonBracketTokenKind`, and the `From` / `Display` / `SplitToken` arms.
+
+## `Expectation::Description` and `Expectation::SelectionSet`
+
+Never passed to `cursor.expected`. Descriptions and selection sets are optional. Delete the two variants. Display tests of `OneOf` use `Keyword` and `Selection` (`Selection` is used in production).

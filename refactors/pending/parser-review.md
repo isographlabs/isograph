@@ -60,7 +60,15 @@ Moved to variable-declaration-or-usage.md.
 
 ### Dead token kinds sit on every match
 
-`EndOfFile` is never emitted (`tokenize` stops at the last real token). `NonBracketTokenKind` still carries it, so every `From` / `Display` / `SplitToken` match pretends it exists. `SemanticToken::Content` is never recorded. `Expectation::Description` and `Expectation::SelectionSet` exist only for Display tests.
+Three different holes.
+
+`EndOfFile` is actually dead. `tokenize` stops at the last real token. End of input is `Found::EndOfChunk`. Every `From` / `Display` / `SplitToken` match still has an `EndOfFile` arm. Delete the variant from `IsographLangTokenKind` and `NonBracketTokenKind`. Small. parser-minor-improvements.md.
+
+`SemanticToken::Content` is leftover fill-in in semantic-tokens.md (`leftover_token` maps unparsed identifiers, `@`, `!`, `$`, and so on). Do not delete it here.
+
+`Expectation::Description` and `Expectation::SelectionSet` are never passed to `cursor.expected`. Descriptions and selection sets are optional in the language, so those variants will not become real diagnostics without a language change. Display tests can use `Keyword` and `Selection` (`Selection` is used). Delete the two variants. Also small. parser-minor-improvements.md.
+
+-----
 
 ### Wrapper interned keys have inconsistent visibility
 
