@@ -165,7 +165,7 @@ Justified differences:
 - Parent enums drop the `Type` suffix (`SelectionSetParent`, not `SelectionSetParentType`).
 - `IsoLiteralItem` (not `IsoLiteralExtractionResult`): extraction is a different stage.
 - `SelectableDeclaration` (isograph `ClientFieldDeclaration`).
-- `ArgumentName` / `ArgumentNameWrapper` / `SelectionArgument` (isograph `FieldArgumentName` / `SelectionFieldArgument`).
+- `ArgumentName` / `ArgumentNameWrapper` / `Argument` (isograph `FieldArgumentName` / `SelectionFieldArgument`). The list is shared by selections and directives.
 - `SelectableNameWrapper` for entrypoint and field names (isograph `ClientScalarSelectableNameWrapper` / `ClientObjectSelectableName`). `SelectionNameWrapper` wraps `SelectionName` (isograph uses `SelectableName` as the interned key of a selection name).
 - `SelectableDeclaration.target_type: Option<WithSpan<TypeAnnotation>>` (isograph has a separate `ClientPointerDeclaration` and a `pointer` keyword).
 - `name` on entrypoint and field declarations (isograph `client_field_name`).

@@ -14,9 +14,9 @@ as_field                         -> as_selectable
 IsoLiteralItem::Field            -> IsoLiteralItem::Selectable
 IsographResolutionNode::FieldDeclaration -> SelectableDeclaration
 
-SelectionFieldArgument           -> SelectionArgument
-SelectionFieldArgumentPath       -> SelectionArgumentPath
-SelectionFieldArgumentSlotPath   -> SelectionArgumentSlotPath
+SelectionFieldArgument           -> Argument
+SelectionFieldArgumentPath       -> ArgumentPath
+SelectionFieldArgumentSlotPath   -> ArgumentSlotPath
 FieldArgumentNameWrapper         -> ArgumentNameWrapper
 FieldArgumentNameWrapperPath     -> ArgumentNameWrapperPath
 ```
@@ -173,7 +173,9 @@ fn parse_selectable_declaration(
 
 ## Changes to argument names
 
-Origin: `FieldArgumentName` in `crates/common_lang_types/src/string_key_types.rs` and `SelectionFieldArgument` in `crates/isograph_parser/src/arguments.rs`. Delta: parser interned key is `ArgumentName`; the pair is `SelectionArgument`. `FieldArgumentName` stays in `common_lang_types`.
+`ArgumentList` is a parent of two hosts: a `Selection` (`foo(id: $id)`) and an `IsographFieldDirective` (`@loadable(lazyLoadArtifact: true)`). The name wrapper is not selection-specific.
+
+Origin: `FieldArgumentName` in `crates/common_lang_types/src/string_key_types.rs` and `SelectionFieldArgument` in `crates/isograph_parser/src/arguments.rs`. Delta: parser interned key is `ArgumentName`; the pair is `Argument`. `FieldArgumentName` stays in `common_lang_types`.
 
 ```rust
 // from crates/common_lang_types/src/string_key_types.rs
@@ -185,27 +187,27 @@ string_key_one_way_conversion!(from: InputValueName, to: ArgumentName);
 ```rust
 // from crates/isograph_parser/src/arguments.rs
 pub struct ArgumentList(
-    #[resolve_field] pub Vec<WithSpan<Slot<SelectionArgument, UnparsedChunkItems>>>,
+    #[resolve_field] pub Vec<WithSpan<Slot<Argument, UnparsedChunkItems>>>,
 );
 
-pub struct SelectionArgument {
+pub struct Argument {
     #[resolve_field]
     pub name: WithSpan<ArgumentNameWrapper>,
     #[resolve_field]
-    #[parent_variant(SelectionArgument)]
+    #[parent_variant(Argument)]
     pub value: WithSpan<NonConstantValue>,
 }
 
-#[resolve_position(parent_type = SelectionArgumentPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = ArgumentPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ArgumentNameWrapper(common_lang_types::ArgumentName);
 ```
 
-`NonConstantValueParent::SelectionFieldArgument` becomes `SelectionArgument`. `UnparsedChunkItemsParent::SelectionFieldArgumentSlot` becomes `SelectionArgumentSlot`. `parse_argument` returns `SelectionArgument`. Construction is `name.map(ArgumentNameWrapper)`.
+`NonConstantValueParent::SelectionFieldArgument` becomes `Argument`. `UnparsedChunkItemsParent::SelectionFieldArgumentSlot` becomes `ArgumentSlot`. `parse_argument` returns `Argument`. Construction is `name.map(ArgumentNameWrapper)`.
 
 ```rust
 // from crates/isograph_parser/src/isograph_resolution_node.rs
-    SelectionArgumentSlot(SelectionArgumentSlotPath<'a>),
-    SelectionArgument(SelectionArgumentPath<'a>),
+    ArgumentSlot(ArgumentSlotPath<'a>),
+    Argument(ArgumentPath<'a>),
     ArgumentNameWrapper(ArgumentNameWrapperPath<'a>),
 ```
 
