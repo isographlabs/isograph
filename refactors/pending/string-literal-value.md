@@ -58,7 +58,7 @@ Slices in `string_value` / `block_string_value` are of a token the lexer produce
 // from crates/isograph_parser/src/arguments.rs
 fn parse_string_literal(
     cursor: &mut ItemCursor<'_>,
-) -> Result<StringLiteralValueWrapper, WithSpan<ParseError>> {
+) -> Result<StringLiteralValueWrapper, WithSpan<AstError>> {
     if let Some(span) = cursor
         .consume_token_if(NonBracketTokenKind::StringLiteral, SemanticToken::String)
     {

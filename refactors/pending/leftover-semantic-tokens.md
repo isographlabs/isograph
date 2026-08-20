@@ -2,7 +2,7 @@
 
 `Slot.extra` and `Singleton.extra_chunks` get `leftover_token`. Grammar consume still names the role. Cut unmatched brackets stay `BracketError` until semantic-tokens.md leftover fill-in walks `tokenize`.
 
-Depends on leftover-in-extra.md. leftover-in-extra puts trailing separators and unread remainder in extra. `extra_chunks` is already in `parse_singleton`. Does not depend on four-trees.md, type-annotation-null.md, or parse-iso-literal-entry.md.
+Depends on leftover-in-extra.md and parse-iso-literal-entry.md. leftover-in-extra puts trailing separators and unread remainder in extra. `extra_chunks` is already in `parse_singleton`. Combined `parse_iso_literal` is the test entry. Does not depend on four-trees.md or type-annotation-null.md.
 
 Extracted from semantic-tokens.md leftover fill-in (`leftover_token` and the Content / Integer / String / Error / Bracket facts). Delta: leftover fill-in for extra and extra_chunks walks `Slot.extra` and `Singleton.extra_chunks`, not `tokenize`. `leftover_token` is `pub(crate)` so `chunk.rs` can call it. semantic-tokens.md leftover fill-in remains a walk of `tokenize` for the matcher's cut.
 
@@ -175,19 +175,18 @@ After:
     #[test]
     fn leftover_after_an_entrypoint_is_content() {
         let text = "entrypoint Query.foo bar";
-        let (parse, errors, bracket_errors, comma_errors, tokens) = parsed_with_tokens(text);
-        assert!(bracket_errors.is_empty());
-        assert_eq!(comma_errors, vec![]);
-        let parse = parse.expect("the fixture is not an empty literal");
+        let parsed = parse_iso_literal(text);
+        let parse = parsed.item.expect("the fixture is not an empty literal");
         as_entrypoint(parse.reference());
         assert_eq!(
-            errors,
+            parsed.errors,
             expected(EndOfDeclaration, Found::Token(Identifier))
+                .to::<ParseError>()
                 .with_span(span_of(text, "bar"))
                 .wrap_vec(),
         );
         assert_eq!(
-            tokens,
+            parsed.tokens,
             vec![
                 SemanticToken::Keyword.with_span(span_of(text, "entrypoint")),
                 SemanticToken::Type.with_span(span_of(text, "Query")),
@@ -201,15 +200,15 @@ After:
     #[test]
     fn leftover_dollars_after_entrypoint_are_content() {
         let text = "entrypoint $ $";
-        let (parse, _, _, _, tokens) = parsed_with_tokens(text);
-        let parse = parse.expect("the fixture is not an empty literal");
+        let parsed = parse_iso_literal(text);
+        let parse = parsed.item.expect("the fixture is not an empty literal");
         assert!(parsed_item(parse.reference()).is_none());
-        let dollars: Vec<_> = tokens
+        let dollars: Vec<_> = parsed.tokens
             .iter()
             .filter(|token| token.item == SemanticToken::Content)
             .collect();
         assert_eq!(dollars.len(), 2);
-        assert!(tokens.iter().any(|token| {
+        assert!(parsed.tokens.iter().any(|token| {
             token.item == SemanticToken::Keyword
                 && token.location == span_of(text, "entrypoint")
         }));
@@ -218,10 +217,10 @@ After:
     #[test]
     fn an_extra_chunk_is_recorded_as_content() {
         let text = "entrypoint\nasdf";
-        let (parse, _, _, _, tokens) = parsed_with_tokens(text);
-        let parse = parse.expect("the fixture is not an empty literal");
+        let parsed = parse_iso_literal(text);
+        let parse = parsed.item.expect("the fixture is not an empty literal");
         assert!(parse.item.extra_chunks.as_ref().is_some());
-        assert!(tokens.iter().any(|token| {
+        assert!(parsed.tokens.iter().any(|token| {
             token.item == SemanticToken::Content && token.location == span_of(text, "asdf")
         }));
     }
@@ -229,11 +228,11 @@ After:
     #[test]
     fn leftover_at_after_an_entrypoint_is_content() {
         let text = "entrypoint Query.foo @lazy";
-        let (_, _, _, _, tokens) = parsed_with_tokens(text);
-        assert!(tokens.iter().any(|token| {
+        let parsed = parse_iso_literal(text);
+        assert!(parsed.tokens.iter().any(|token| {
             token.item == SemanticToken::Content && token.location == span_of(text, "@")
         }));
-        assert!(tokens.iter().any(|token| {
+        assert!(parsed.tokens.iter().any(|token| {
             token.item == SemanticToken::Content && token.location == span_of(text, "lazy")
         }));
     }
@@ -241,8 +240,8 @@ After:
     #[test]
     fn a_trailing_comma_after_an_entrypoint_is_content() {
         let text = "entrypoint Query.foo,";
-        let (_, _, _, _, tokens) = parsed_with_tokens(text);
-        assert!(tokens.iter().any(|token| {
+        let parsed = parse_iso_literal(text);
+        assert!(parsed.tokens.iter().any(|token| {
             token.item == SemanticToken::Content && token.location == span_of(text, ",")
         }));
     }

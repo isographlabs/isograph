@@ -6,7 +6,7 @@ Does not depend on four-trees.md, type-annotation-null.md, parse-iso-literal-ent
 
 ## Trailing separators go in `Slot.extra`
 
-`entrypoint Query.foo,` parses. The comma is a `ParseError` and is not a content item; it sits on `Chunk.trailing_separator`. Resolve hits the slot unmatched span.
+`entrypoint Query.foo,` parses. The comma is an `AstError` and is not a content item; it sits on `Chunk.trailing_separator`. Resolve hits the slot unmatched span.
 
 After a successful `parse_one_chunk`, when `leftover` is not `Expectation::Separator(_)` (root / `[...]` type: `EndOfDeclaration`, `EndOfType`) and `trailing_separator` is `Some`, append those separator tokens to `extra` as `ChunkContentItem::NonBracket`.
 

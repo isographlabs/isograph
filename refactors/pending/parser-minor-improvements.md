@@ -36,7 +36,7 @@ Never passed to `cursor.expected`. Descriptions and selection sets are optional.
 
 ## `Expectation` is not an `Error`
 
-`ParseError` is the error. `Expectation` is a fragment of `ExpectedFound`.
+`AstError` is the AST-stage error. `Expectation` is a fragment of `ExpectedFound`. Pipeline `ParseError` wraps `AstError`.
 
 Before:
 
@@ -45,7 +45,7 @@ Before:
 impl std::error::Error for Expectation {}
 ```
 
-After: that impl is gone. `ParseError` stays `thiserror`. `Found` stays `strum::Display`. `Expectation` keeps its handwritten `Display`: `OneOf` is `write_one_of`, and `Separator` uses `kind.closing()`, neither of which is a per-variant strum string.
+After: that impl is gone. `AstError` stays `thiserror`. `Found` stays `strum::Display`. `Expectation` keeps its handwritten `Display`: `OneOf` is `write_one_of`, and `Separator` uses `kind.closing()`, neither of which is a per-variant strum string.
 
 ## Keyword-as-identifier is copy-pasted
 
