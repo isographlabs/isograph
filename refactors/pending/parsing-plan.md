@@ -199,7 +199,7 @@ Justified differences:
 
 parsing-standards.md governs how every implementation below is written. Each doc is independently shippable and lands with its tests before the next begins.
 
-1. `peek-then-parse.md`. `parse_non_constant_value` peeks, commits, and passes the peeked to `parse_*`. `parse_variable_name` takes the peeked `$`.
+1. `peek-then-parse.md`. `parse_non_constant_value` peeks once and passes that `CursorPeek` to `parse_*`. `parse_variable_name(peek)` commits `$` and requires the identifier.
 2. `parse-variables.md`. `require_variable_name`, variable-declaration lists, `$name: Type = default` with `NonConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_nested_singleton`), and the `Box` delegation impl.
 3. `parse-descriptions.md`. The optional description a field declaration carries before its selection set, via two `consume_token_if` calls.
 4. `parse-pointers.md`. `pointer Type.name to Type { ... }` via `require_token(Identifier, Keyword)` and `token_text == "to"`. Removes `UnsupportedDeclarationType`.
