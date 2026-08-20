@@ -9,6 +9,7 @@ mod parse_error;
 mod parse_iso_literal;
 mod selections;
 mod semantic_token;
+mod string_value;
 mod token_kind;
 mod tokenize;
 mod variables;
@@ -68,6 +69,7 @@ pub(crate) use matched_brackets::{BracketItem, Bracketed, MatchedBrackets, match
 pub(crate) use non_bracket_token::{BracketToken, SplitToken};
 pub(crate) use parse_error::DECLARATION_KEYWORD;
 pub(crate) use selections::consume_selection_set;
+pub(crate) use string_value::intern_block_string_value;
 pub(crate) use token_kind::IsographLangTokenKind;
 pub(crate) use tokenize::tokenize;
 pub(crate) use variables::{consume_variable_declaration_list, parse_type_annotation};

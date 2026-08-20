@@ -38,6 +38,13 @@ impl<'a> TokenText<'a> {
         &self.text[self.location.as_usize_range()]
     }
 
+    pub(crate) fn exclude_ends(self, n: u32) -> TokenText<'a> {
+        TokenText {
+            location: Span::new(self.location.start + n, self.location.end - n),
+            text: self.text,
+        }
+    }
+
     pub(crate) fn interned<T: From<intern::string_key::StringKey>>(self) -> WithSpan<T> {
         self.text().intern().to::<T>().with_span(self.location)
     }

@@ -7,7 +7,7 @@ use crate::chunk_stream::ItemCursor;
 use crate::{
     AstError, BracketKind, ChunkContentItem, Expectation, Found, IsographFieldDirectivePath,
     IsographResolutionNode, NonBracketToken, NonBracketTokenKind, SelectionPath, SemanticToken,
-    Slot, UnparsedChunkItems, VariableDeclarationPath,
+    Slot, UnparsedChunkItems, VariableDeclarationPath, intern_block_string_value,
 };
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -285,19 +285,21 @@ pub(crate) fn parse_variable_name(
 fn parse_string_literal(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<StringLiteralValueWrapper, WithSpan<AstError>> {
-    let span = cursor
-        .consume_token_if(NonBracketTokenKind::StringLiteral, SemanticToken::String)
-        .or_else(|| {
-            cursor.consume_token_if(
-                NonBracketTokenKind::BlockStringLiteral,
-                SemanticToken::String,
-            )
-        })
-        .ok_or_else(|| cursor.expected(Expectation::Token(NonBracketTokenKind::StringLiteral)))?;
-    span.interned()
-        .map(StringLiteralValueWrapper)
-        .item
-        .wrap_ok()
+    if let Some(span) =
+        cursor.consume_token_if(NonBracketTokenKind::StringLiteral, SemanticToken::String)
+    {
+        return StringLiteralValueWrapper(span.exclude_ends(1).interned().item).wrap_ok();
+    }
+    if let Some(span) = cursor.consume_token_if(
+        NonBracketTokenKind::BlockStringLiteral,
+        SemanticToken::String,
+    ) {
+        return StringLiteralValueWrapper(intern_block_string_value(span.exclude_ends(3).text()))
+            .wrap_ok();
+    }
+    cursor
+        .expected(Expectation::Token(NonBracketTokenKind::StringLiteral))
+        .wrap_err()
 }
 
 fn parse_integer_value(cursor: &mut ItemCursor<'_>) -> Result<IntegerValue, WithSpan<AstError>> {
@@ -986,18 +988,96 @@ mod tests {
     }
 
     #[test]
+    fn a_quoted_string_value_drops_the_quotes() {
+        let text = r#"a: "hi""#;
+        let (items, errors, _) = parsed_pairs(text);
+        assert_eq!(errors, vec![]);
+        match as_argument(items[0].item.reference())
+            .value
+            .item
+            .reference()
+        {
+            NonConstantValue::String(value) => {
+                assert_eq!(*value, StringLiteralValueWrapper("hi".intern().to()));
+            }
+            value => panic!("expected a string, got {value:?}"),
+        }
+        assert_eq!(
+            as_argument(items[0].item.reference()).value.location,
+            span_of(text, r#""hi""#),
+        );
+    }
+
+    #[test]
+    fn a_quoted_string_does_not_process_escapes() {
+        let text = r#"a: "hi\n""#;
+        let (items, errors, _) = parsed_pairs(text);
+        assert_eq!(errors, vec![]);
+        match as_argument(items[0].item.reference())
+            .value
+            .item
+            .reference()
+        {
+            NonConstantValue::String(value) => {
+                assert_eq!(*value, StringLiteralValueWrapper(r#"hi\n"#.intern().to()));
+            }
+            value => panic!("expected a string, got {value:?}"),
+        }
+    }
+
+    #[test]
+    fn a_quoted_string_interns_inner_quote_characters() {
+        let text = r#"a: "\"hi\"""#;
+        let (items, errors, _) = parsed_pairs(text);
+        assert_eq!(errors, vec![]);
+        match as_argument(items[0].item.reference())
+            .value
+            .item
+            .reference()
+        {
+            NonConstantValue::String(value) => {
+                assert_eq!(*value, StringLiteralValueWrapper(r#"\"hi\""#.intern().to()),);
+            }
+            value => panic!("expected a string, got {value:?}"),
+        }
+    }
+
+    #[test]
     fn a_block_string_is_a_value() {
         let text = "a: \"\"\"hi\"\"\"";
         let (items, errors, _) = parsed_pairs(text);
         assert_eq!(errors, vec![]);
-        assert!(matches!(
-            as_argument(items[0].item.reference()).value.item,
-            NonConstantValue::String(_)
-        ));
+        match as_argument(items[0].item.reference())
+            .value
+            .item
+            .reference()
+        {
+            NonConstantValue::String(value) => {
+                assert_eq!(*value, StringLiteralValueWrapper("hi".intern().to()));
+            }
+            value => panic!("expected a string, got {value:?}"),
+        }
         assert_eq!(
             as_argument(items[0].item.reference()).value.location,
             span_of(text, "\"\"\"hi\"\"\"")
         );
+    }
+
+    #[test]
+    fn a_one_line_block_string_keeps_leading_spaces() {
+        let text = r#"a: """   hi""""#;
+        let (items, errors, _) = parsed_pairs(text);
+        assert_eq!(errors, vec![]);
+        match as_argument(items[0].item.reference())
+            .value
+            .item
+            .reference()
+        {
+            NonConstantValue::String(value) => {
+                assert_eq!(*value, StringLiteralValueWrapper("   hi".intern().to()));
+            }
+            value => panic!("expected a string, got {value:?}"),
+        }
     }
 
     #[test]
@@ -1038,10 +1118,16 @@ mod tests {
         let text = "a: \"\"\"\"\"\"";
         let (items, errors, _) = parsed_pairs(text);
         assert_eq!(errors, vec![]);
-        assert!(matches!(
-            as_argument(items[0].item.reference()).value.item,
-            NonConstantValue::String(_)
-        ));
+        match as_argument(items[0].item.reference())
+            .value
+            .item
+            .reference()
+        {
+            NonConstantValue::String(value) => {
+                assert_eq!(*value, StringLiteralValueWrapper("".intern().to()));
+            }
+            value => panic!("expected a string, got {value:?}"),
+        }
     }
 
     #[test]

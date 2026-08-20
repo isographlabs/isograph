@@ -11,7 +11,7 @@ use crate::{
     NamedTypeAnnotationPath, NonBracketToken, NonBracketTokenKind, ParseError, SelectionSet,
     SemanticToken, Singleton, Slot, TypeAnnotation, UnparsedChunkItems, VariableDeclarationList,
     chunk, consume_directives, consume_selection_set, consume_variable_declaration_list,
-    match_brackets, parse_singleton, parse_type_annotation, tokenize,
+    intern_block_string_value, match_brackets, parse_singleton, parse_type_annotation, tokenize,
 };
 
 pub type IsoLiteralParse = Singleton<Slot<IsoLiteralItem, UnparsedChunkItems>, ExtraChunks>;
@@ -85,7 +85,7 @@ pub struct EntityNameWrapper(pub common_lang_types::EntityName);
 )]
 pub struct SelectableNameWrapper(pub common_lang_types::SelectableName);
 
-/// The interned source slice of a description, quotes included.
+/// The interned interior of a description, quotes excluded.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SelectableDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct Description(pub common_lang_types::DescriptionValue);
@@ -278,15 +278,22 @@ fn consume_to_target(
 }
 
 pub(crate) fn consume_description(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<Description>> {
-    let span = cursor
-        .consume_token_if(NonBracketTokenKind::StringLiteral, SemanticToken::String)
-        .or_else(|| {
-            cursor.consume_token_if(
-                NonBracketTokenKind::BlockStringLiteral,
-                SemanticToken::String,
-            )
-        })?;
-    span.interned().map(Description).wrap_some()
+    if let Some(span) =
+        cursor.consume_token_if(NonBracketTokenKind::StringLiteral, SemanticToken::String)
+    {
+        return Description(span.exclude_ends(1).interned().item)
+            .with_span(span.location)
+            .wrap_some();
+    }
+    cursor
+        .consume_token_if(
+            NonBracketTokenKind::BlockStringLiteral,
+            SemanticToken::String,
+        )
+        .map(|span| {
+            Description(intern_block_string_value(span.exclude_ends(3).text()))
+                .with_span(span.location)
+        })
 }
 
 #[cfg(test)]
@@ -1244,7 +1251,7 @@ mod tests {
         assert_eq!(description.location, span_of(text, "\"the home route\""));
         assert_eq!(
             description.item,
-            Description("\"the home route\"".intern().to())
+            Description("the home route".intern().to())
         );
     }
 
@@ -1905,7 +1912,7 @@ mod tests {
     }
 
     #[test]
-    fn a_single_line_description_is_the_source_slice_including_quotes() {
+    fn a_single_line_description_drops_the_quotes() {
         let text = "\"the home route\"";
         let tree = chunked(text);
         let mut tokens = Vec::new();
@@ -1916,7 +1923,7 @@ mod tests {
         assert_eq!(description.location, span_of(text, "\"the home route\""));
         assert_eq!(
             description.item,
-            Description("\"the home route\"".intern().to())
+            Description("the home route".intern().to())
         );
         assert_eq!(errors, vec![]);
         assert_eq!(
@@ -1937,7 +1944,7 @@ mod tests {
         let description =
             consume_description(stream.cursor()).expect("the fixture is a string description");
         assert_eq!(description.location, span_of(text, "\"\""));
-        assert_eq!(description.item, Description("\"\"".intern().to()));
+        assert_eq!(description.item, Description("".intern().to()));
     }
 
     #[test]
@@ -1956,7 +1963,7 @@ mod tests {
         );
         assert_eq!(
             description.item,
-            Description("\"\"\"\n  the home\n  route\n\"\"\"".intern().to())
+            Description("the home\nroute".intern().to())
         );
         assert_eq!(errors, vec![]);
         assert_eq!(
@@ -2085,7 +2092,7 @@ mod tests {
         let description = consume_description(stream.cursor())
             .expect("the fixture is a block-string description");
         assert_eq!(description.location, span_of(text, "\"\"\"\"\"\""));
-        assert_eq!(description.item, Description("\"\"\"\"\"\"".intern().to()));
+        assert_eq!(description.item, Description("".intern().to()));
     }
 
     #[test]
