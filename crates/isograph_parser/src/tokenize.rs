@@ -99,10 +99,19 @@ mod tests {
                 "for literal {text:?}"
             );
         }
-        assert_eq!(
-            tokenize("1.5")[0].item,
-            IsographLangTokenKind::IntegerLiteral
-        );
+    }
+
+    #[test]
+    fn floats_are_their_kind() {
+        for text in ["1.5", "12.34", "0.0", "-1.5", "1e2", "1.5e2"] {
+            let tokens = tokenize(text);
+            assert_eq!(tokens.len(), 1, "for literal {text:?}");
+            assert_eq!(
+                tokens[0].item,
+                IsographLangTokenKind::FloatLiteral,
+                "for literal {text:?}"
+            );
+        }
     }
 
     #[test]
@@ -135,7 +144,6 @@ mod tests {
             tokenize("1.")[0].item,
             IsographLangTokenKind::ErrorNumberLiteralTrailingInvalid
         );
-        assert_eq!(tokenize("1e2")[0].item, IsographLangTokenKind::Error);
         assert_eq!(tokenize("-")[0].item, IsographLangTokenKind::Error);
         let unterminated = tokenize("\"unterminated");
         assert_eq!(unterminated.len(), 1);

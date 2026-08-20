@@ -949,12 +949,17 @@ mod tests {
     }
 
     #[test]
-    fn a_float_does_not_fit_i64() {
+    fn a_float_is_not_a_value() {
         let text = "a: 1.5";
         let (items, errors, _) = parsed_pairs(text);
         assert!(items[0].item.item.is_none());
         assert!(errors.iter().any(|error| {
-            error.item == ParseError::IntegerDoesNotFitI64 && error.location == span_of(text, "1.5")
+            error.item
+                == ParseError::expected(
+                    Expectation::Value,
+                    Found::Token(NonBracketTokenKind::FloatLiteral),
+                )
+                && error.location == span_of(text, "1.5")
         }));
     }
 
@@ -1085,7 +1090,11 @@ mod tests {
                 Found::Token(NonBracketTokenKind::ErrorNumberLiteralTrailingInvalid),
                 "1.",
             ),
-            ("a: 1e2", Found::Token(NonBracketTokenKind::Error), "1e2"),
+            (
+                "a: 1e2",
+                Found::Token(NonBracketTokenKind::FloatLiteral),
+                "1e2",
+            ),
         ] {
             let (items, errors, _) = parsed_pairs(text);
             assert!(items[0].item.item.is_none(), "for literal {text:?}");

@@ -19,6 +19,7 @@ pub enum NonBracketTokenKind {
     Exclamation,
     Identifier,
     IntegerLiteral,
+    FloatLiteral,
     LineBreak,
     ErrorNumberLiteralLeadingZero,
     ErrorNumberLiteralTrailingInvalid,
@@ -114,6 +115,9 @@ impl From<IsographLangTokenKind> for SplitToken {
             IsographLangTokenKind::IntegerLiteral => {
                 SplitToken::NonBracket(NonBracketTokenKind::IntegerLiteral)
             }
+            IsographLangTokenKind::FloatLiteral => {
+                SplitToken::NonBracket(NonBracketTokenKind::FloatLiteral)
+            }
             IsographLangTokenKind::LineBreak => {
                 SplitToken::NonBracket(NonBracketTokenKind::LineBreak)
             }
@@ -159,6 +163,7 @@ impl From<NonBracketTokenKind> for IsographLangTokenKind {
             NonBracketTokenKind::Exclamation => IsographLangTokenKind::Exclamation,
             NonBracketTokenKind::Identifier => IsographLangTokenKind::Identifier,
             NonBracketTokenKind::IntegerLiteral => IsographLangTokenKind::IntegerLiteral,
+            NonBracketTokenKind::FloatLiteral => IsographLangTokenKind::FloatLiteral,
             NonBracketTokenKind::LineBreak => IsographLangTokenKind::LineBreak,
             NonBracketTokenKind::ErrorNumberLiteralLeadingZero => {
                 IsographLangTokenKind::ErrorNumberLiteralLeadingZero

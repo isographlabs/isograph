@@ -49,8 +49,9 @@ pub enum IsographLangTokenKind {
     // IntegerPart:    -?(0|[1-9][0-9]*)
     // FractionalPart: \\.[0-9]+
     // ExponentPart:   [eE][+-]?[0-9]+
-    // #[regex("-?(0|[1-9][0-9]*)(\\.[0-9]+[eE][+-]?[0-9]+|\\.[0-9]+|[eE][+-]?[0-9]+)")]
-    // FloatLiteral,
+    #[regex("-?(0|[1-9][0-9]*)(\\.[0-9]+[eE][+-]?[0-9]+|\\.[0-9]+|[eE][+-]?[0-9]+)")]
+    FloatLiteral,
+
     #[regex("[a-zA-Z_][a-zA-Z0-9_]*")]
     Identifier,
 
@@ -197,7 +198,7 @@ impl fmt::Display for IsographLangTokenKind {
             IsographLangTokenKind::EndOfFile => "end of file",
             IsographLangTokenKind::Equals => "equals ('=')",
             IsographLangTokenKind::Exclamation => "exclamation mark ('!')",
-            // IsographLangTokenKind::FloatLiteral => "floating point value (e.g. '3.14')",
+            IsographLangTokenKind::FloatLiteral => "floating point value (e.g. '3.14')",
             IsographLangTokenKind::Identifier => "non-variable identifier (e.g. 'x' or 'Foo')",
             IsographLangTokenKind::LineBreak => "line break",
             IsographLangTokenKind::IntegerLiteral => "integer value (e.g. '0' or '42')",
