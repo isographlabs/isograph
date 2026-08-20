@@ -1,6 +1,6 @@
-# Parser tests that are not written
+# Parser grammar-stage tests
 
-Fixtures and assertions that the grammar stage does not yet have. Helpers are the ones in each file's `tests` module (`parsed`, `assert_no_declaration`, `span_of`, `as_selectable`, `as_declared`, `variables_of`, `parsed_pairs`, `parsed_selections`).
+Fixtures and assertions for the grammar stage. Helpers are the ones in each file's `tests` module (`parsed`, `assert_no_declaration`, `span_of`, `as_selectable`, `as_declared`, `variables_of`, `parsed_pairs`, `parsed_selections`).
 
 ## parse_iso_literal.rs
 
@@ -209,16 +209,23 @@ Fixtures and assertions that the grammar stage does not yet have. Helpers are th
     }
 
     #[test]
-    fn true_as_a_selection_name_is_a_selection() {
-        let text = "field Query.Foo { true }";
-        let (parse, errors) = parsed(text);
-        assert_eq!(errors, vec![]);
-        assert_eq!(
-            as_selection(selections(selection_set_of(as_selectable(parse.reference())))[0].item.reference())
+    fn true_false_and_null_as_selection_names_are_selections() {
+        for name in ["true", "false", "null"] {
+            let text = format!("field Query.Foo {{ {name} }}");
+            let (parse, errors) = parsed(text.reference());
+            assert_eq!(errors, vec![], "for literal {text:?}");
+            assert_eq!(
+                as_selection(
+                    selections(selection_set_of(as_selectable(parse.reference())))[0]
+                        .item
+                        .reference()
+                )
                 .name
                 .item,
-            SelectionNameWrapper("true".intern().to())
-        );
+                SelectionNameWrapper(name.intern().to()),
+                "for literal {text:?}",
+            );
+        }
     }
 
     #[test]
@@ -272,6 +279,119 @@ Fixtures and assertions that the grammar stage does not yet have. Helpers are th
             }
             node => panic!("expected the directive name leaf, got {node:?}"),
         }
+    }
+
+    #[test]
+    fn a_field_with_only_variables_parses() {
+        let text = "field Query.Foo($id: ID)";
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        let declaration = as_selectable(parse.reference());
+        assert_eq!(variables_of(parse.reference()).item.0.len(), 1);
+        assert_eq!(declaration.selection_set, None);
+    }
+
+    #[test]
+    fn to_as_a_parent_type_name_is_the_parent() {
+        let text = "field to.Foo { bar }";
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        assert_eq!(
+            as_selectable(parse.reference()).parent_type.item,
+            EntityNameWrapper("to".intern().to())
+        );
+        assert_eq!(
+            as_selectable(parse.reference()).parent_type.location,
+            span_of(text, "to")
+        );
+        assert_eq!(as_selectable(parse.reference()).target_type, None);
+    }
+
+    #[test]
+    fn uppercase_field_is_not_the_keyword() {
+        let text = "FIELD Query.Foo { bar }";
+        assert_no_declaration(
+            text,
+            expected(DECLARATION_KEYWORD, Found::Token(Identifier)),
+            span_of(text, "FIELD"),
+        );
+    }
+
+    #[test]
+    fn at_without_a_name_fails_that_selection() {
+        let text = "field Query.Foo { bar @ }";
+        let (parse, errors) = parsed(text);
+        let items = selections(selection_set_of(as_selectable(parse.reference())));
+        assert_eq!(items.len(), 1);
+        assert!(items[0].item.item.is_none());
+        let at_end = span_of(text, "@").end;
+        assert!(errors.iter().any(|error| {
+            error.item == expected(token(Identifier), Found::EndOfChunk)
+                && error.location == Span::new(at_end, at_end)
+        }));
+    }
+
+    #[test]
+    fn an_entrypoint_directive_with_arguments_parses() {
+        let text = "entrypoint Query.foo @lazyLoad(x: 1)";
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        let arguments = as_entrypoint(parse.reference())
+            .directive_set
+            .as_ref()
+            .expect("the fixture carries a directive")
+            .item
+            .0[0]
+            .item
+            .arguments
+            .as_ref()
+            .expect("the fixture passes arguments");
+        assert_eq!(arguments.item.0.len(), 1);
+        assert_eq!(arguments.location, span_of(text, "(x: 1)"));
+    }
+
+    #[test]
+    fn a_field_directive_with_arguments_parses() {
+        let text = "field Query.Foo @component(x: 1) { bar }";
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        let arguments = as_selectable(parse.reference())
+            .directive_set
+            .as_ref()
+            .expect("the fixture carries a directive")
+            .item
+            .0[0]
+            .item
+            .arguments
+            .as_ref()
+            .expect("the fixture passes arguments");
+        assert_eq!(arguments.item.0.len(), 1);
+        assert_eq!(arguments.location, span_of(text, "(x: 1)"));
+    }
+
+    #[test]
+    fn a_field_records_keyword_type_to_and_selections() {
+        let text = "field Query.Foo to Pet { id }";
+        let (parse, errors, bracket_errors, comma_errors, tokens) = parsed_with_tokens(text);
+        assert!(bracket_errors.is_empty());
+        assert_eq!(comma_errors, vec![]);
+        let parse = parse.expect("the fixture is not an empty literal");
+        as_selectable(parse.reference());
+        assert_eq!(errors, vec![]);
+        assert_eq!(
+            tokens,
+            vec![
+                SemanticToken::Keyword.with_span(span_of(text, "field")),
+                SemanticToken::Type.with_span(span_of(text, "Query")),
+                SemanticToken::Period.with_span(span_of(text, ".")),
+                SemanticToken::FieldName.with_span(span_of(text, "Foo")),
+                SemanticToken::Keyword.with_span(span_of(text, "to")),
+                SemanticToken::GraphQLTypeName.with_span(span_of(text, "Pet")),
+                SemanticToken::Brace.with_span(span_of(text, "{")),
+                SemanticToken::FieldName.with_span(span_of(text, "id")),
+                SemanticToken::Brace.with_span(span_of(text, "}")),
+            ],
+        );
     }
 ```
 
@@ -331,12 +451,13 @@ Need `At` in the `NonBracketTokenKind` import for leftover `@`.
     }
 
     #[test]
-    fn a_float_is_not_a_value() {
+    fn a_float_does_not_fit_i64() {
         let text = "a: 1.5";
         let (items, errors, _) = parsed_pairs(text);
         assert!(items[0].item.item.is_none());
         assert!(errors.iter().any(|error| {
-            error.location == span_of(text, "1.5")
+            error.item == ParseError::IntegerDoesNotFitI64
+                && error.location == span_of(text, "1.5")
         }));
     }
 
@@ -352,8 +473,45 @@ Need `At` in the `NonBracketTokenKind` import for leftover `@`.
     }
 
     #[test]
-    fn a_block_string_is_a_value() {
+    fn a_block_string_is_not_a_value() {
         let text = "a: \"\"\"hi\"\"\"";
+        let (items, errors, _) = parsed_pairs(text);
+        assert!(items[0].item.item.is_none());
+        assert!(errors.iter().any(|error| {
+            error.item
+                == ParseError::expected(
+                    Expectation::Value,
+                    Found::Token(NonBracketTokenKind::BlockStringLiteral),
+                )
+                && error.location == span_of(text, "\"\"\"hi\"\"\"")
+        }));
+    }
+
+    #[test]
+    fn i64_max_parses() {
+        let text = "a: 9223372036854775807";
+        let (items, errors, _) = parsed_pairs(text);
+        assert_eq!(errors, vec![]);
+        assert!(matches!(
+            as_argument(items[0].item.reference()).value.item,
+            NonConstantValue::Integer(IntegerValue(i64::MAX))
+        ));
+    }
+
+    #[test]
+    fn negative_zero_parses_as_zero() {
+        let text = "a: -0";
+        let (items, errors, _) = parsed_pairs(text);
+        assert_eq!(errors, vec![]);
+        assert!(matches!(
+            as_argument(items[0].item.reference()).value.item,
+            NonConstantValue::Integer(IntegerValue(0))
+        ));
+    }
+
+    #[test]
+    fn an_empty_string_is_a_value() {
+        let text = "a: \"\"";
         let (items, errors, _) = parsed_pairs(text);
         assert_eq!(errors, vec![]);
         assert!(matches!(
@@ -361,9 +519,104 @@ Need `At` in the `NonBracketTokenKind` import for leftover `@`.
             NonConstantValue::String(_)
         ));
     }
+
+    #[test]
+    fn a_colon_without_a_value_fails_that_pair() {
+        let text = "a:";
+        let (items, errors, _) = parsed_pairs(text);
+        assert!(items[0].item.item.is_none());
+        let colon_end = span_of(text, ":").end;
+        assert!(errors.iter().any(|error| {
+            error.item == ParseError::expected(Expectation::Value, Found::EndOfChunk)
+                && error.location == Span::new(colon_end, colon_end)
+        }));
+    }
+
+    #[test]
+    fn a_dollar_without_a_name_is_not_a_value() {
+        let text = "a: $";
+        let (items, errors, _) = parsed_pairs(text);
+        assert!(items[0].item.item.is_none());
+        let dollar_end = span_of(text, "$").end;
+        assert!(errors.iter().any(|error| {
+            error.item
+                == ParseError::expected(
+                    Expectation::Token(NonBracketTokenKind::Identifier),
+                    Found::EndOfChunk,
+                )
+                && error.location == Span::new(dollar_end, dollar_end)
+        }));
+    }
+
+    #[test]
+    fn a_paren_group_is_not_a_value() {
+        let text = "a: (x)";
+        let (items, errors, _) = parsed_pairs(text);
+        assert!(items[0].item.item.is_none());
+        assert!(errors.iter().any(|error| {
+            error.item
+                == ParseError::expected(
+                    Expectation::Value,
+                    Found::Group(BracketKind::Parenthesis),
+                )
+                && error.location == span_of(text, "(x)")
+        }));
+    }
+
+    #[test]
+    fn a_non_integer_number_is_not_a_value() {
+        for (text, found, pattern) in [
+            (
+                "a: .5",
+                Found::Token(NonBracketTokenKind::ErrorFloatLiteralMissingZero),
+                ".5",
+            ),
+            (
+                "a: 1.",
+                Found::Token(NonBracketTokenKind::ErrorNumberLiteralTrailingInvalid),
+                "1.",
+            ),
+            ("a: 1e2", Found::Token(NonBracketTokenKind::Error), "1e2"),
+        ] {
+            let (items, errors, _) = parsed_pairs(text);
+            assert!(items[0].item.item.is_none(), "for literal {text:?}");
+            assert!(
+                errors.iter().any(|error| {
+                    error.item == ParseError::expected(Expectation::Value, found)
+                        && error.location == span_of(text, pattern)
+                }),
+                "for literal {text:?}, errors were {errors:?}",
+            );
+        }
+    }
+
+    #[test]
+    fn an_object_entry_that_does_not_start_with_a_name_fails_that_entry() {
+        let text = "input: { 1: 2 }";
+        let (items, errors, _) = parsed_pairs(text);
+        assert_eq!(errors.len(), 1);
+        match as_argument(items[0].item.reference())
+            .value
+            .item
+            .reference()
+        {
+            NonConstantValue::Object(object) => {
+                assert!(object.0[0].item.item.is_none());
+            }
+            value => panic!("expected an object, got {value:?}"),
+        }
+        assert!(errors.iter().any(|error| {
+            error.item
+                == ParseError::expected(
+                    Expectation::ObjectEntry,
+                    Found::Token(NonBracketTokenKind::IntegerLiteral),
+                )
+                && error.location == span_of(text, "1")
+        }));
+    }
 ```
 
-`a_float_is_not_a_value`: logos may emit `ErrorFloatLiteralMissingZero` or `ErrorNumberLiteralTrailingInvalid` for `1.5`. The test asserts the span of `1.5` and that the pair failed. Pin the `Found` once tokenize of `1.5` is written.
+`tokenize("1.5")` is one `IntegerLiteral` covering the whole slice. `a: 1.5` then fails as `IntegerDoesNotFitI64`. Block strings are not values: `parse_non_constant_value` matches `StringLiteral` only.
 
 ## selections.rs
 
@@ -382,6 +635,63 @@ Covered by the alias-without-name and `true`-as-name tests in parse_iso_literal.
             .to_string(),
             "the keyword `to`, a description, or a selection set, like '{ id, name }'",
         );
+        assert_eq!(Expectation::OneOf(&[]).to_string(), "one of");
+        assert_eq!(
+            Expectation::OneOf(&[Expectation::Description]).to_string(),
+            "a description",
+        );
+        assert_eq!(Expectation::Description.to_string(), "a description");
+        assert_eq!(
+            Expectation::SelectionSet.to_string(),
+            "a selection set, like '{ id, name }'",
+        );
+        assert_eq!(Expectation::Selection.to_string(), "a selection");
+        assert_eq!(
+            Expectation::Argument.to_string(),
+            "an argument, like 'id: $id'",
+        );
+        assert_eq!(
+            Expectation::Value.to_string(),
+            "a value, like $foo, 42, \"bar\", true, false, null, or an object literal",
+        );
+        assert_eq!(
+            Expectation::ObjectEntry.to_string(),
+            "an object entry, like 'id: 4'",
+        );
+        assert_eq!(
+            Expectation::VariableDeclarationOrUsage.to_string(),
+            "a variable declaration, like '$id: ID!'",
+        );
+        assert_eq!(
+            Expectation::TypeAnnotation.to_string(),
+            "a type, like 'String', 'String!', or '[String]'",
+        );
+        assert_eq!(Expectation::EndOfType.to_string(), "the end of the type");
+        assert_eq!(
+            Expectation::Separator(BracketKind::Brace).to_string(),
+            "a comma, a line break, or '}'",
+        );
+        assert_eq!(
+            Expectation::Separator(BracketKind::Bracket).to_string(),
+            "a comma, a line break, or ']'",
+        );
+    }
+
+    #[test]
+    fn parse_error_unit_variants_use_their_messages() {
+        assert_eq!(
+            ParseError::EmptyLiteral.to_string(),
+            "Expected a declaration. An isograph literal cannot be empty.",
+        );
+        assert_eq!(
+            ParseError::MultipleDeclarations.to_string(),
+            "Expected nothing after the declaration. Each literal holds exactly one declaration.",
+        );
+        assert_eq!(
+            ParseError::IntegerDoesNotFitI64.to_string(),
+            "This integer does not fit in a 64-bit signed integer.",
+        );
+    }
 ```
 
 ## tokenize.rs
@@ -412,8 +722,43 @@ Covered by the alias-without-name and `true`-as-name tests in parse_iso_literal.
             IsographLangTokenKind::StringLiteral
         );
         assert_eq!(
+            tokenize("\"\"")[0].item,
+            IsographLangTokenKind::StringLiteral
+        );
+        assert_eq!(
             tokenize("\"\"\"hi\"\"\"")[0].item,
             IsographLangTokenKind::BlockStringLiteral
+        );
+    }
+
+    #[test]
+    fn integers_are_their_kind() {
+        for text in ["0", "-0", "42", "-7", "9223372036854775807"] {
+            assert_eq!(
+                tokenize(text)[0].item,
+                IsographLangTokenKind::IntegerLiteral,
+                "for literal {text:?}"
+            );
+        }
+        assert_eq!(
+            tokenize("1.5")[0].item,
+            IsographLangTokenKind::IntegerLiteral
+        );
+    }
+
+    #[test]
+    fn brackets_are_their_kinds() {
+        let kinds: Vec<_> = tokenize("(){}[]").iter().map(|token| token.item).collect();
+        assert_eq!(
+            kinds,
+            vec![
+                IsographLangTokenKind::OpenParenthesis,
+                IsographLangTokenKind::CloseParenthesis,
+                IsographLangTokenKind::OpenBrace,
+                IsographLangTokenKind::CloseBrace,
+                IsographLangTokenKind::OpenBracket,
+                IsographLangTokenKind::CloseBracket,
+            ]
         );
     }
 
@@ -424,14 +769,27 @@ Covered by the alias-without-name and `true`-as-name tests in parse_iso_literal.
             IsographLangTokenKind::ErrorNumberLiteralLeadingZero
         );
         assert_eq!(
-            tokenize("\"unterminated")[0].item,
-            IsographLangTokenKind::ErrorUnterminatedString
+            tokenize(".5")[0].item,
+            IsographLangTokenKind::ErrorFloatLiteralMissingZero
         );
+        assert_eq!(
+            tokenize("1.")[0].item,
+            IsographLangTokenKind::ErrorNumberLiteralTrailingInvalid
+        );
+        assert_eq!(tokenize("1e2")[0].item, IsographLangTokenKind::Error);
+        assert_eq!(tokenize("-")[0].item, IsographLangTokenKind::Error);
+        let unterminated = tokenize("\"unterminated");
+        assert_eq!(unterminated[0].item, IsographLangTokenKind::Error);
+        assert_eq!(unterminated[0].location, Span::new(0, 1));
+        assert_eq!(unterminated[1].item, IsographLangTokenKind::Identifier);
+        let block = tokenize("\"\"\"unterminated");
+        assert_eq!(block[0].item, IsographLangTokenKind::Error);
+        assert_eq!(block[1].item, IsographLangTokenKind::Identifier);
     }
 ```
 
-Add the float kind once `tokenize("1.5")` is observed. Do not guess which of `ErrorFloatLiteralMissingZero` and `ErrorNumberLiteralTrailingInvalid` it is.
+`lex_string` / `lex_block_string` returning false emit `Error`, not `ErrorUnterminatedString` or `ErrorUnterminatedBlockString`. The opening quote (or `"""`) is the error token; the rest is an identifier.
 
 ## Not missing
 
-`a_to_after_the_description_is_not_a_target` already covers `to` after a description. `each_value_kind_parses` covers `$`, strings, positives, negatives, `true`/`false`/`null`. `defaults_parse_including_variables` covers list and object defaults with `$`. `an_empty_list_target_fails_as_a_type` covers `to []`. Overflow is tested; underflow is not.
+`a_to_after_the_description_is_not_a_target` already covers `to` after a description. `each_value_kind_parses` covers `$`, strings, positives, negatives, `true`/`false`/`null`. `defaults_parse_including_variables` covers list and object defaults with `$`. `an_empty_list_target_fails_as_a_type` covers `to []`. Overflow and underflow are both tested. `ErrorUnterminatedString` and `ErrorUnterminatedBlockString` are never emitted.
