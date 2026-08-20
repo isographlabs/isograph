@@ -28,7 +28,7 @@ Most important first.
 // from crates/isograph_lsp/src/file_literals.rs
 use isograph_parser::{
     HostLanguage, IsoLiteralError, IsoLiteralExtraction, IsoLiteralParse, SemanticToken,
-    chunk, match_brackets, parse_iso_literal, tokenize,
+    parse_iso_literal,
 };
 use prelude::Postfix;
 use span::{WithSpan, WithSpanPostfix};
@@ -49,17 +49,12 @@ pub fn file_literals<THostLanguage: HostLanguage>(
         .filter_map(|slot| {
             let extraction = slot.item?;
             let text = extraction.item.iso_literal_text;
-            let (brackets, bracket_errors) =
-                match_brackets(tokenize(text), text.len() as u32);
-            let (tree, comma_errors) = chunk(brackets.reference());
-            let mut errors = Vec::new();
-            let mut tokens = Vec::new();
-            let parse = parse_iso_literal(text, tree, &mut errors, &mut tokens);
+            let parsed = parse_iso_literal(text);
             FileLiteral {
                 extraction,
-                parse,
+                parse: parsed.item,
                 errors: slot.extra.map(|errors| errors.item).unwrap_or_default(),
-                tokens,
+                tokens: parsed.tokens,
             }
             .wrap_some()
         })
@@ -67,7 +62,7 @@ pub fn file_literals<THostLanguage: HostLanguage>(
 }
 ```
 
-`parse` is `None` when `parse_iso_literal` returns `None`. `tokens` are literal-relative, consume order, whatever the grammar recorded (leftover is not filled in). `errors` is `Slot.extra`'s inner vec: `IsoLiteralError` (`Host`, `Parse`, `Bracket`, `Comma`), already file-absolute.
+`parse` is `None` when `ParsedIsoLiteral.item` is `None` (empty literal). `tokens` are literal-relative, consume order, whatever the grammar recorded (leftover is not filled in). `errors` is `Slot.extra`'s inner vec: `IsoLiteralError` (`Host`, `Parse`, `Bracket`, `Comma`), already file-absolute.
 
 ```rust
 // from crates/isograph_lsp/src/lsp_state.rs

@@ -51,8 +51,7 @@ use common_lang_types::ConstExportName;
 use intern::string_key::Intern;
 use isograph_parser::{
     BracketError, CommaWithoutItem, HostLanguage, IsoLiteralError, IsoLiteralExtraction,
-    IsoLiteralItem, IsoLiteralParse, ParseError, ParsedIsoLiteral, SelectableNameWrapper, Slot,
-    parse_iso_literal,
+    IsoLiteralItem, IsoLiteralParse, ParseError, SelectableNameWrapper, Slot, parse_iso_literal,
 };
 use prelude::Postfix;
 use regex::Regex;
@@ -242,9 +241,8 @@ impl HostLanguage for TypeScriptHostLanguage {
                         },
                     },
                 };
-                let (parse, parse_errors, bracket_errors, comma_errors) =
-                    parse_tree(extraction.iso_literal_text);
-                let parsed_item = parse.as_ref().and_then(item_of);
+                let parsed = parse_iso_literal(extraction.iso_literal_text);
+                let parsed_item = parsed.item.as_ref().and_then(item_of);
                 let mut errors = Vec::new();
                 if let IsoCall::TaggedTemplate = extraction.context.call {
                     errors.push(
@@ -272,13 +270,13 @@ impl HostLanguage for TypeScriptHostLanguage {
                         );
                     }
                 }
-                for error in parse_errors {
+                for error in parsed.errors {
                     errors.push(
                         IsoLiteralError::Parse(error.item)
                             .with_span(error.location.with_offset(span.start)),
                     );
                 }
-                for error in bracket_errors {
+                for error in parsed.bracket_errors {
                     let location = match &error {
                         BracketError::UnmatchedOpen(open) => open.location,
                         BracketError::UnmatchedClose(close) => close.location,
@@ -288,7 +286,7 @@ impl HostLanguage for TypeScriptHostLanguage {
                             .with_span(location.with_offset(span.start)),
                     );
                 }
-                for error in comma_errors {
+                for error in parsed.comma_errors {
                     errors.push(
                         IsoLiteralError::Comma(error)
                             .with_span(error.0.with_offset(span.start)),
@@ -308,10 +306,6 @@ impl HostLanguage for TypeScriptHostLanguage {
     }
 }
 
-fn parse_tree(text: &str) -> ParsedIsoLiteral {
-    parse_iso_literal(text)
-}
-
 fn item_of(parse: &WithSpan<IsoLiteralParse>) -> Option<&IsoLiteralItem> {
     parse
         .item
@@ -323,7 +317,7 @@ fn item_of(parse: &WithSpan<IsoLiteralParse>) -> Option<&IsoLiteralItem> {
 }
 ```
 
-`parse_tree` / `item_of` are private helpers in the TypeScript crate: parentheses are a file fact; export and associated function depend on whether the contents parsed as `Selectable`. The parse tree is not `Slot.item`. `item` is the isograph string and host context. Grammar errors stay on `parse_iso_literal`'s error vec when a later caller parses.
+`item_of` is a private helper in the TypeScript crate: parentheses are a file fact; export and associated function depend on whether the contents parsed as `Selectable`. The parse tree is not `Slot.item`. `item` is the isograph string and host context. Grammar errors come from `parse_iso_literal(text)`.
 
 `Display` for `TypeScriptHostError` lands with Change 3. Change 4 is `Display` for `SelectableNameWrapper` (used by `MissingExport`) and the host-error tests.
 
