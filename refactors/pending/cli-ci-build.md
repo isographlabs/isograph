@@ -1,8 +1,8 @@
 # CI builds and ships the isograph binary
 
-Requires isograph-cli.md.
+Requires isograph-cli.md and ts-graphql-react-isograph-cli.md.
 
-`crates/isograph_cli` is excluded from the workspace, so `cargo test`, `cargo clippy`, and `pnpm build-compiler` never compile it. CI must build it on its own lockfile. Release still drops the binary into `libs/isograph-compiler/artifacts/{platform}/isograph_cli`, and `cli.js` / `index.js` still pick that file.
+`crates/isograph_cli` and `crates/ts_graphql_react_isograph_cli` are excluded from the root workspace, so `cargo test`, `cargo clippy`, and `pnpm build-compiler` never compile them. CI must build the mini-workspace on its own lockfile (`crates/ts_graphql_react_isograph_cli`). Release still drops the binary into `libs/isograph-compiler/artifacts/{platform}/isograph_cli`, and `cli.js` / `index.js` still pick that file.
 
 Supported platforms, same as `index.js`:
 
@@ -20,7 +20,7 @@ Each platform is two jobs: build and upload the release binary, then download th
 
 `.github/workflows/ci.yml` gains `cargo-clippy-cli`. `all-checks-passed` waits on it and on the five platform jobs from Change 3.
 
-`cargo-fmt` already runs `cargo fmt --manifest-path crates/isograph_cli/Cargo.toml`. Leave it.
+`cargo-fmt` already runs `cargo fmt --manifest-path crates/ts_graphql_react_isograph_cli/Cargo.toml`. Leave it.
 
 ```yaml
 # from .github/workflows/ci.yml
@@ -35,7 +35,7 @@ Each platform is two jobs: build and upload the release binary, then download th
           toolchain: stable
           components: clippy
       - name: Run cargo clippy
-        run: cargo clippy --manifest-path crates/isograph_cli/Cargo.toml --all-targets -- -D warnings
+        run: cargo clippy --manifest-path crates/ts_graphql_react_isograph_cli/Cargo.toml --all-targets -- -D warnings
 ```
 
 ## Change 2: e2e tests take the binary from `ISOGRAPH_BIN`
@@ -43,7 +43,7 @@ Each platform is two jobs: build and upload the release binary, then download th
 `tests/cli.rs` runs the path in `ISOGRAPH_BIN` when that environment variable is set. When it is absent, the binary cargo built for the test (`CARGO_BIN_EXE_isograph`). Local `cargo test` is unchanged. CI sets `ISOGRAPH_BIN` to the downloaded artifact.
 
 ```rust
-// from crates/isograph_cli/tests/cli.rs
+// from crates/ts_graphql_react_isograph_cli/tests/cli.rs
 use std::path::PathBuf;
 use std::process::{Command, Output};
 use std::time::{Duration, Instant};
@@ -75,7 +75,7 @@ impl Daemon {
 
 ## Change 3: five-platform build and upload, then download and test
 
-`.github/workflows/build-cli.yml` builds this crate, not the workspace. `pnpm build-compiler` is `cargo build` at the root and cannot see `isograph_cli`. Two jobs per platform: `build` compiles `--release --target` and uploads; `test` downloads that file and runs `cargo test` with `ISOGRAPH_BIN` pointing at it. Every e2e test runs on every platform.
+`.github/workflows/build-cli.yml` builds the mini-workspace, not the root workspace. `pnpm build-compiler` is `cargo build` at the root and cannot see `ts_graphql_react_isograph_cli`. Two jobs per platform: `build` compiles `--release --target` and uploads; `test` downloads that file and runs `cargo test` with `ISOGRAPH_BIN` pointing at it. Every e2e test runs on every platform.
 
 Native runners, so the tests can execute the download:
 
@@ -143,11 +143,11 @@ jobs:
         if: inputs.longpaths
         run: git config --system core.longpaths true
       - name: 'Build isograph (${{inputs.target}})'
-        run: cargo build --manifest-path crates/isograph_cli/Cargo.toml --release --target ${{ inputs.target }}
+        run: cargo build --manifest-path crates/ts_graphql_react_isograph_cli/Cargo.toml --release --target ${{ inputs.target }}
       - name: Name the artifact isograph_cli
         shell: bash
         run: |
-          src="crates/isograph_cli/target/${{ inputs.target }}/release/${{ inputs.build-name }}"
+          src="crates/ts_graphql_react_isograph_cli/target/${{ inputs.target }}/release/${{ inputs.build-name }}"
           mkdir -p artifact
           cp "$src" "artifact/${{ inputs.artifact-file }}"
       - uses: actions/upload-artifact@v4
@@ -178,7 +178,7 @@ jobs:
       - name: 'Test isograph (${{inputs.target}})'
         env:
           ISOGRAPH_BIN: ${{ github.workspace }}/artifact/${{ inputs.artifact-file }}
-        run: cargo test --manifest-path crates/isograph_cli/Cargo.toml --tests
+        run: cargo test --manifest-path crates/ts_graphql_react_isograph_cli/Cargo.toml --tests
 ```
 
 `ci.yml` calls the workflow once per platform. These jobs are in `all-checks-passed.needs` with `cargo-clippy-cli`. `main-release` and `versioned-release` already download the five artifact names into `libs/isograph-compiler/artifacts/...`. Those names stay.
