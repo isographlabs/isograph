@@ -2,7 +2,9 @@
 
 Requires the event model. The parked daemon in `isograph-cli.md` is not enough: CI needs a process that accepts filesystem facts as events.
 
-The binary does not read the filesystem. A production watcher is a source that emits `DiskChanged`. CI does not start that source. It starts the daemon in `Filesystem::Injected` and submits `DiskChanged` itself, with contents on `Present`.
+CI tests inner `handle`: feed events, assert effects. No daemon required for that.
+
+Driving the binary is the outer path: `Filesystem::Injected`, submit the same ingested events (`DiskChanged`, `EditorChanged`, …) the watcher or LSP adapter would have produced.
 
 Whether we also want tests that write real files and watch them is open. This doc is the injected path.
 
@@ -66,6 +68,8 @@ Until the event loop exists, `Injected` still parks after binding the socket, an
 pub enum IncomingEvent {
     #[serde(rename = "IncomingEvent.DiskChanged")]
     DiskChanged(DiskChanged),
+    #[serde(rename = "IncomingEvent.EditorChanged")]
+    EditorChanged(EditorChanged),
 }
 ```
 
@@ -73,7 +77,7 @@ pub enum IncomingEvent {
 
 `crates/isograph_cli/Cargo.toml` gains `serde` with `derive`, `serde_json`, `freddie_event_socket` at the same freddie rev, and `tokio` with `rt`, `macros`, `net`, `sync`.
 
-`run_daemon` builds a current-thread runtime, binds `freddie_event_socket::listen(port, ...)`, and on each frame deserializes `IncomingEvent` and sends `IsographEvent::DiskChanged`. A bad frame is logged and dropped, like figaro.
+`run_daemon` builds a current-thread runtime, binds `freddie_event_socket::listen(port, ...)`, and on each frame deserializes `IncomingEvent` and sends the matching `IsographEvent`. A bad frame is logged and dropped, like figaro. Ingested events on the wire are the same ones `handle` takes, including `EditorChanged`.
 
 `Watch` without a watcher yet: bind the socket and park. `Injected`: the same, no watcher to skip.
 
