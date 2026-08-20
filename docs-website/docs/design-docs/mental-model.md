@@ -77,6 +77,7 @@ struct Selectable {
     parent: Entity,
     name: SelectableName,
     target: Wrapper,
+    arguments: Vec<ArgumentDefinition>,
 }
 ```
 
@@ -93,6 +94,7 @@ struct SelectableDeclaration {
     parent: NamedEntity,
     name: SelectableName,
     to: Option<Wrapper>,
+    arguments: Vec<ArgumentDefinition>,
     selection_set: Option<SelectionSet>,
 }
 ```
@@ -135,15 +137,15 @@ field User.bestFriend to User {
 
 This creates the selectable `User.bestFriend` whose target is the named entity `User`. The selection set selects selectables of the parent `User`. It is how the declaration computes which `User` to point at.
 
-## Selection
+## Arguments
 
-A selection is a use of a selectable in a selection set. It may pass arguments to that selectable.
+A selectable has argument definitions. A selection passes arguments to a selectable. A directive also takes arguments.
 
 ```rust
-struct Selection {
-    selectable: Selectable,
-    arguments: Vec<Argument>,
-    selection_set: Option<SelectionSet>,
+struct ArgumentDefinition {
+    name: ArgumentName,
+    type_: Wrapper,
+    default_value: Option<ArgumentValue>,
 }
 
 struct Argument {
@@ -170,9 +172,32 @@ enum BooleanValue {
     True,
     False,
 }
+
+struct Directive {
+    name: DirectiveName,
+    arguments: Vec<Argument>,
+}
 ```
 
-Arguments are `name: value` pairs. The names are arguments the selectable accepts. A value is a variable or a literal.
+An argument definition is a name, a type, and an optional default. GraphQL writes it as `name: Type` on the field: `user(id: ID!)` defines `id` of type `ID`. Iso writes it as `$name: Type` on the selectable declaration: `field Query.HomePage($id: ID!)` defines `id` of type `ID`. The `$` is syntax. `$id: ID! = "x"` has a default.
+
+An argument is a `name: value` pair. The names are argument definitions of the selectable or directive being applied. A value is a variable or a literal. A variable names an argument of the enclosing selectable declaration.
+
+`user(id: $id)` passes `id` set to the variable `$id`. `user(id: 4)` passes a different value to the same definition.
+
+A directive takes the same `Argument` type. `@loadable(lazyLoadArtifact: true)` passes `lazyLoadArtifact` set to `true`. `@component` has no arguments.
+
+## Selection
+
+A selection is a use of a selectable in a selection set. It may pass arguments to that selectable.
+
+```rust
+struct Selection {
+    selectable: Selectable,
+    arguments: Vec<Argument>,
+    selection_set: Option<SelectionSet>,
+}
+```
 
 `name` in `{ name }` is a selection of `User.name` with no arguments. `friends { name }` is a selection of `User.friends` with a nested selection set on `User`. `user(id: $id)` is a selection of `Query.user` with one argument, `id` set to the variable `$id`. `user(id: 4)` is a selection of the same selectable with a different argument value.
 
@@ -232,7 +257,7 @@ field User.Avatar {
   name
 }
 
-field Query.HomePage {
+field Query.HomePage($id: ID!) {
   user(id: $id) {
     Avatar
     friends {
@@ -259,10 +284,10 @@ User.Avatar      ->  Avatar anonymous entity
 Query.HomePage   ->  HomePage anonymous entity
 ```
 
-Selectable declarations: the four GraphQL fields, plus the two iso fields.
+Selectable declarations: the four GraphQL fields, plus the two iso fields. `Query.user` has argument definition `id: ID`. `Query.HomePage` has argument definition `$id: ID!`.
 
 Selections inside `User.Avatar`: `name`.
 
-Selections inside `Query.HomePage`: `user(id: $id) { Avatar, friends { name } }`. `user(id: $id)` is a selection of `Query.user` with argument `id` set to `$id`. `Avatar` is a selection of `User.Avatar` with no arguments and no nested set. `friends { name }` is a selection of `User.friends` with a nested set on `User`.
+Selections inside `Query.HomePage`: `user(id: $id) { Avatar, friends { name } }`. `user(id: $id)` is a selection of `Query.user` with argument `id` set to `$id`, which names HomePage's argument `id`. `Avatar` is a selection of `User.Avatar` with no arguments and no nested set. `friends { name }` is a selection of `User.friends` with a nested set on `User`.
 
 Entrypoint: entity `Query`, selectable `HomePage`.
