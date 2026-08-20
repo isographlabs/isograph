@@ -166,26 +166,7 @@ impl App for Isograph {
 
 `IsographArgs` is deleted. The daemon still parks. `status` / `logs` / `stop` in a subdirectory find the right daemon because they go through `instance`.
 
-The contents of the config file are not read. That is the next milestone (scan the project root). When that milestone reads:
-
-```rust
-enum ConfigSyntax {
-    Json,
-    JavaScript,
-    TypeScript,
-}
-
-fn syntax(path: &Path) -> Option<ConfigSyntax> {
-    match path.extension().and_then(std::ffi::OsStr::to_str) {
-        Some("json") => ConfigSyntax::Json.wrap_some(),
-        Some("js") => ConfigSyntax::JavaScript.wrap_some(),
-        Some("ts") => ConfigSyntax::TypeScript.wrap_some(),
-        _ => None,
-    }
-}
-```
-
-`Json` is bytes plus serde. `JavaScript` and `TypeScript` are a module that exports the config (`export default` or `module.exports`). The loader runs that file with the first of `node` and `bun` that is on `PATH`, and reads JSON from stdout. No runtime on `PATH` is an error. This change does not call that loader.
+The contents of the config file are not read.
 
 ## Tests
 
@@ -206,3 +187,258 @@ Binary tests, same private-`HOME` harness as isograph-cli.md:
 - `--config` pointing at a missing file fails.
 - Two fixture projects are two daemons: `status` in each reports a different pid; `stop` in one leaves the other running.
 - `logs` contains the canonical config path.
+
+## Change 2: JS and TS configs become JSON
+
+A `.json` file is already JSON: read it. A `.js` or `.ts` file is a module. Run it with the first of `node` and `bun` on `PATH`, take the export (`export default` or `module.exports`), `JSON.stringify` that value, and that string is the JSON.
+
+```rust
+// from crates/isograph_cli/src/discover.rs
+use std::process::Command;
+
+enum ConfigSyntax {
+    Json,
+    JavaScript,
+    TypeScript,
+}
+
+enum JsRuntime {
+    Node,
+    Bun,
+}
+
+impl JsRuntime {
+    fn program(self) -> &'static str {
+        match self {
+            Self::Node => "node",
+            Self::Bun => "bun",
+        }
+    }
+}
+
+pub struct UnknownSyntax {
+    pub path: PathBuf,
+}
+
+pub struct NoJsRuntime {
+    pub path: PathBuf,
+}
+
+pub struct JsFailed {
+    pub path: PathBuf,
+    pub program: String,
+    pub stderr: String,
+}
+
+pub struct JsIo {
+    pub path: PathBuf,
+    pub program: String,
+    pub source: std::io::Error,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum LoadError {
+    #[error("could not read {}: {}", .0.path.display(), .0.source)]
+    Unreadable(ConfigNotReadable),
+    #[error("{} is not .json, .js, or .ts", .0.path.display())]
+    UnknownSyntax(UnknownSyntax),
+    #[error("no node or bun on PATH; needed to load {}", .0.path.display())]
+    NoJsRuntime(NoJsRuntime),
+    #[error("{} failed on {}: {}", .0.program, .0.path.display(), .0.stderr)]
+    JsFailed(JsFailed),
+    #[error("could not run {} on {}: {}", .0.program, .0.path.display(), .0.source)]
+    JsIo(JsIo),
+}
+
+fn syntax(path: &Path) -> Option<ConfigSyntax> {
+    match path.extension().and_then(std::ffi::OsStr::to_str) {
+        Some("json") => ConfigSyntax::Json.wrap_some(),
+        Some("js") => ConfigSyntax::JavaScript.wrap_some(),
+        Some("ts") => ConfigSyntax::TypeScript.wrap_some(),
+        _ => None,
+    }
+}
+
+fn first_js_runtime() -> Option<JsRuntime> {
+    [JsRuntime::Node, JsRuntime::Bun]
+        .into_iter()
+        .find(|runtime| {
+            Command::new(runtime.program())
+                .arg("--version")
+                .output()
+                .is_ok()
+        })
+}
+
+const EXPORT_TO_JSON: &str = r"
+const path = process.argv[process.argv.length - 1];
+import('node:url').then(({ pathToFileURL }) => import(pathToFileURL(path).href)).then((m) => {
+  const config = m.default ?? m;
+  process.stdout.write(JSON.stringify(config));
+}).catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
+";
+
+/// The config file as JSON text.
+pub fn config_json(path: &Path) -> Result<String, LoadError> {
+    match syntax(path) {
+        Some(ConfigSyntax::Json) => {
+            std::fs::read_to_string(path).map_err(|source| {
+                LoadError::Unreadable(ConfigNotReadable {
+                    path: path.to_owned(),
+                    source,
+                })
+            })
+        }
+        Some(ConfigSyntax::JavaScript | ConfigSyntax::TypeScript) => {
+            let runtime = match first_js_runtime() {
+                Some(runtime) => runtime,
+                None => {
+                    return LoadError::NoJsRuntime(NoJsRuntime {
+                        path: path.to_owned(),
+                    })
+                    .wrap_err();
+                }
+            };
+            run_js(runtime, path)
+        }
+        None => LoadError::UnknownSyntax(UnknownSyntax {
+            path: path.to_owned(),
+        })
+        .wrap_err(),
+    }
+}
+
+fn run_js(runtime: JsRuntime, path: &Path) -> Result<String, LoadError> {
+    let program = runtime.program();
+    let output = Command::new(program)
+        .arg("-e")
+        .arg(EXPORT_TO_JSON)
+        .arg("--")
+        .arg(path)
+        .output()
+        .map_err(|source| {
+            LoadError::JsIo(JsIo {
+                path: path.to_owned(),
+                program: program.to_owned(),
+                source,
+            })
+        })?;
+    if !output.status.success() {
+        return LoadError::JsFailed(JsFailed {
+            path: path.to_owned(),
+            program: program.to_owned(),
+            stderr: String::from_utf8_lossy(output.stderr.reference()).into_owned(),
+        })
+        .wrap_err();
+    }
+    String::from_utf8_lossy(output.stdout.reference())
+        .into_owned()
+        .wrap_ok()
+}
+```
+
+Inner structs derive `Debug`.
+
+This change does not parse the JSON and does not call `config_json` from `instance` / `run_daemon`.
+
+### Tests
+
+- A `.json` file whose contents are `{}\n` comes back as that text.
+- A `.js` file `export default {};` comes back as `{}` (skipped if no `node` or `bun`).
+- A `.ts` file `export default {};` comes back as `{}` (skipped if no runtime that will execute it).
+- A `.js` file that throws fails with `JsFailed`.
+- A `.txt` path fails with `UnknownSyntax`.
+
+## Change 3: deserialize the JSON
+
+`config_json` produces text. This change parses it into an empty struct. Unknown fields are ignored, so today's `project_root` / `schema` configs load. The struct grows later.
+
+`crates/isograph_cli/Cargo.toml` gains `serde` with `derive`, and `serde_json`.
+
+```rust
+// from crates/isograph_cli/src/discover.rs
+use serde::Deserialize;
+
+#[derive(Debug, Deserialize)]
+pub struct IsographConfig {}
+
+pub struct Unparseable {
+    pub path: PathBuf,
+    pub source: serde_json::Error,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum LoadError {
+    #[error("could not read {}: {}", .0.path.display(), .0.source)]
+    Unreadable(ConfigNotReadable),
+    #[error("{} is not .json, .js, or .ts", .0.path.display())]
+    UnknownSyntax(UnknownSyntax),
+    #[error("no node or bun on PATH; needed to load {}", .0.path.display())]
+    NoJsRuntime(NoJsRuntime),
+    #[error("{} failed on {}: {}", .0.program, .0.path.display(), .0.stderr)]
+    JsFailed(JsFailed),
+    #[error("could not run {} on {}: {}", .0.program, .0.path.display(), .0.source)]
+    JsIo(JsIo),
+    #[error("could not parse {}: {}", .0.path.display(), .0.source)]
+    Unparseable(Unparseable),
+}
+
+pub fn load_config(path: &Path) -> Result<IsographConfig, LoadError> {
+    let json = config_json(path)?;
+    serde_json::from_str(json.reference()).map_err(|source| {
+        LoadError::Unparseable(Unparseable {
+            path: path.to_owned(),
+            source,
+        })
+    })
+}
+
+pub fn config_and_instance(
+    flag: Option<&Path>,
+) -> Result<(PathBuf, Instance, IsographConfig), DiscoverError> {
+    let config_path = config_path(flag)?;
+    let config = load_config(config_path.reference()).map_err(DiscoverError::Load)?;
+    let instance = Instance::named(
+        "isograph",
+        slug(config_path.reference()),
+        config_path.display().to_string(),
+    )?;
+    (config_path, instance, config).wrap_ok()
+}
+```
+
+`DiscoverError` gains `Load(LoadError)` with `#[error(transparent)]`. `instance` still discards the config. `run_daemon` binds it:
+
+```rust
+    fn instance(id: &ConfigFlag) -> Result<Instance, Box<dyn std::error::Error + Send + Sync>> {
+        let (_, instance, _) = discover::config_and_instance(id.config.as_deref())?;
+        instance.wrap_ok()
+    }
+
+    fn run_daemon(id: &ConfigFlag, _: &NoArgs) {
+        match discover::config_and_instance(id.config.as_deref()) {
+            Ok((path, _, _config)) => {
+                tracing::info!(config = %path.display(), "isograph daemon up");
+                loop {
+                    std::thread::park();
+                }
+            }
+            Err(e) => {
+                tracing::error!(error = %e, "the config went away between naming this daemon and starting it");
+            }
+        }
+    }
+```
+
+A config that is not JSON (or whose JS/TS export is not JSON-serializable) fails every verb, including `start`, before the daemon is spawned.
+
+### Tests
+
+- `load_config` on `{}\n` succeeds.
+- `load_config` on `{"project_root":"./src"}` succeeds.
+- `load_config` on `{` fails with `Unparseable`.
+- `start` with a fixture whose config is `{` fails.
+- `start` with a fixture whose config is `{}` succeeds.
