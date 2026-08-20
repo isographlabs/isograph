@@ -137,16 +137,44 @@ This creates the selectable `User.bestFriend` whose target is the named entity `
 
 ## Selection
 
-A selection is a use of a selectable in a selection set.
+A selection is a use of a selectable in a selection set. It may pass arguments to that selectable.
 
 ```rust
 struct Selection {
     selectable: Selectable,
+    arguments: Vec<Argument>,
     selection_set: Option<SelectionSet>,
+}
+
+struct Argument {
+    name: ArgumentName,
+    value: ArgumentValue,
+}
+
+enum ArgumentValue {
+    Variable(VariableName),
+    String(String),
+    Integer(i64),
+    Boolean(BooleanValue),
+    Null,
+    Object(Vec<ObjectEntry>),
+    List(Vec<ArgumentValue>),
+}
+
+struct ObjectEntry {
+    name: ValueKeyName,
+    value: ArgumentValue,
+}
+
+enum BooleanValue {
+    True,
+    False,
 }
 ```
 
-`name` in `{ name }` is a selection of `User.name`. `friends { name }` is a selection of `User.friends` with a nested selection set on `User`.
+Arguments are `name: value` pairs. The names are arguments the selectable accepts. A value is a variable or a literal.
+
+`name` in `{ name }` is a selection of `User.name` with no arguments. `friends { name }` is a selection of `User.friends` with a nested selection set on `User`. `user(id: $id)` is a selection of `Query.user` with one argument, `id` set to the variable `$id`. `user(id: 4)` is a selection of the same selectable with a different argument value.
 
 ## SelectionSet
 
@@ -205,7 +233,7 @@ field User.Avatar {
 }
 
 field Query.HomePage {
-  user {
+  user(id: $id) {
     Avatar
     friends {
       name
@@ -235,6 +263,6 @@ Selectable declarations: the four GraphQL fields, plus the two iso fields.
 
 Selections inside `User.Avatar`: `name`.
 
-Selections inside `Query.HomePage`: `user { Avatar, friends { name } }`. `Avatar` is a selection of `User.Avatar` with no nested set. `friends { name }` is a selection of `User.friends` with a nested set on `User`.
+Selections inside `Query.HomePage`: `user(id: $id) { Avatar, friends { name } }`. `user(id: $id)` is a selection of `Query.user` with argument `id` set to `$id`. `Avatar` is a selection of `User.Avatar` with no arguments and no nested set. `friends { name }` is a selection of `User.friends` with a nested set on `User`.
 
 Entrypoint: entity `Query`, selectable `HomePage`.
