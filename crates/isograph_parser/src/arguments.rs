@@ -277,8 +277,14 @@ fn parse_string_literal(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<StringLiteralValueWrapper, WithSpan<ParseError>> {
     let span = cursor
-        .require_token(NonBracketTokenKind::StringLiteral, SemanticToken::String)
-        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::StringLiteral)))?;
+        .consume_token_if(NonBracketTokenKind::StringLiteral, SemanticToken::String)
+        .or_else(|| {
+            cursor.consume_token_if(
+                NonBracketTokenKind::BlockStringLiteral,
+                SemanticToken::String,
+            )
+        })
+        .ok_or_else(|| cursor.expected(Expectation::Token(NonBracketTokenKind::StringLiteral)))?;
     span.interned()
         .map(StringLiteralValueWrapper)
         .item
@@ -358,7 +364,7 @@ pub(crate) fn parse_non_constant_value(
                 .wrap_ok();
             }
             Some(ChunkContentItem::NonBracket(NonBracketToken(
-                NonBracketTokenKind::StringLiteral,
+                NonBracketTokenKind::StringLiteral | NonBracketTokenKind::BlockStringLiteral,
             ))) => {
                 return NonConstantValue::String(parse_string_literal(cursor)?).wrap_ok();
             }
@@ -968,18 +974,18 @@ mod tests {
     }
 
     #[test]
-    fn a_block_string_is_not_a_value() {
+    fn a_block_string_is_a_value() {
         let text = "a: \"\"\"hi\"\"\"";
         let (items, errors, _) = parsed_pairs(text);
-        assert!(items[0].item.item.is_none());
-        assert!(errors.iter().any(|error| {
-            error.item
-                == ParseError::expected(
-                    Expectation::Value,
-                    Found::Token(NonBracketTokenKind::BlockStringLiteral),
-                )
-                && error.location == span_of(text, "\"\"\"hi\"\"\"")
-        }));
+        assert_eq!(errors, vec![]);
+        assert!(matches!(
+            as_argument(items[0].item.reference()).value.item,
+            NonConstantValue::String(_)
+        ));
+        assert_eq!(
+            as_argument(items[0].item.reference()).value.location,
+            span_of(text, "\"\"\"hi\"\"\"")
+        );
     }
 
     #[test]
@@ -1007,6 +1013,17 @@ mod tests {
     #[test]
     fn an_empty_string_is_a_value() {
         let text = "a: \"\"";
+        let (items, errors, _) = parsed_pairs(text);
+        assert_eq!(errors, vec![]);
+        assert!(matches!(
+            as_argument(items[0].item.reference()).value.item,
+            NonConstantValue::String(_)
+        ));
+    }
+
+    #[test]
+    fn an_empty_block_string_is_a_value() {
+        let text = "a: \"\"\"\"\"\"";
         let (items, errors, _) = parsed_pairs(text);
         assert_eq!(errors, vec![]);
         assert!(matches!(
