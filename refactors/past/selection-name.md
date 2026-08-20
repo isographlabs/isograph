@@ -41,13 +41,7 @@ Construction is unchanged: `first.interned().map(SelectionNameWrapper)`. Tests t
 
 `SelectableNameWrapper` still wraps `SelectableName`.
 
-## AGENTS.md on landing
 
-The interned-key wrappers sentence includes `SelectionNameWrapper(SelectionName)`. The Selection vs Selectable paragraph:
-
-```
-Selection and Selectable are different types. A selection is an item in a selection set. A selectable is a definition of a field or pointer on a type. A selection's interned name is `SelectionName`. A selectable's interned name is `SelectableName`. Do not name a selection node `Selectable*`. Checking that a selection refers to a selectable that exists is a later pass.
-```
 
 ## Tests
 
