@@ -1,6 +1,6 @@
 # Parse tests assert semantic token sequences
 
-Every parse test asserts the semantic token sequence `parse_iso_literal` (or the sub-parser the test calls) recorded, in addition to the tree and error facts it already asserts. The sequence is the roles and source slices in consume order.
+Every parse test asserts the semantic token sequence `parse_iso_literal` (or the sub-parser the test calls) recorded, in addition to the tree and error facts it already asserts. Tests write the sequence as roles and source slices in consume order. The helper turns each slice into a span (next occurrence at or after the previous token's end) and `assert_eq`s the `WithSpan<SemanticToken>` values, so a wrong span fails even when the slice text matches.
 
 Parse tests are tests whose subject is a grammar parse: `parse_iso_literal`, `parse_selection`, `parse_argument` / `parse_non_constant_value` / `consume_argument_list`, `parse_each_chunk` with a parse function, and `consume_description`. tokenize, match_brackets, chunk-structure, parse_error Display, and cursor-mechanics tests in `chunk_stream.rs` that do not parse a form are not parse tests.
 
@@ -22,7 +22,7 @@ pub(crate) fn assert_semantic_tokens(
 ) {
     let mut search_from = 0usize;
     let mut expected_tokens = Vec::with_capacity(expected.len());
-    for (role, pattern) in expected {
+    for &(role, pattern) in expected {
         let offset = text[search_from..].find(pattern).expect(
             "the expected lexeme occurs in the fixture after the previous token",
         );
@@ -32,9 +32,11 @@ pub(crate) fn assert_semantic_tokens(
         search_from = end;
     }
     assert_eq!(
+        actual,
+        expected_tokens.as_slice(),
+        "for literal {text:?}, actual {:?}, expected {:?}",
         displayed(text, actual),
         displayed(text, &expected_tokens),
-        "for literal {text:?}"
     );
 }
 
@@ -54,7 +56,7 @@ fn displayed(
 }
 ```
 
-Sequential search: each lexeme is found at or after the previous token's end. Duplicate lexemes (`to to`, two `id`s, two `{`) resolve in source order. The helper does not skip a recorded token and does not invent a span for a lexeme the grammar did not commit.
+Sequential search: each lexeme is found at or after the previous token's end. Duplicate lexemes (`to to`, two `id`s, two `{`) resolve in source order. `assert_eq` of the `WithSpan` values checks role and span. `displayed` is only the panic message, so a failure reads as `(Keyword, "entrypoint")` rather than span offsets. A recorded token whose slice is right and whose span points at a later occurrence of that slice fails. The helper does not skip a recorded token and does not invent a span for a lexeme the grammar did not commit.
 
 ```rust
 // from crates/isograph_parser/src/lib.rs
