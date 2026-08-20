@@ -1715,9 +1715,12 @@ mod tests {
         assert_eq!(consume_description(cursor), None);
         assert_eq!(
             cursor
-                .consume_token_if(NonBracketTokenKind::Error, SemanticToken::Error)
+                .consume_token_if(
+                    NonBracketTokenKind::ErrorUnterminatedString,
+                    SemanticToken::Error
+                )
                 .map(|token| token.location),
-            span_of(text, "\"").wrap_some(),
+            span_of(text, "\"unterminated").wrap_some(),
         );
     }
 

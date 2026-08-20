@@ -12,6 +12,7 @@ pub fn tokenize(literal: &str) -> Vec<WithSpan<IsographLangTokenKind>> {
     let mut lexer = IsographLangTokenKind::lexer(literal);
     let mut tokens = Vec::new();
     while let Some(kind) = lexer.next() {
+        let kind = lexer.extras.error_token.take().unwrap_or(kind);
         tokens.push(kind.with_span(lexer.span().to()));
     }
     tokens
@@ -137,11 +138,36 @@ mod tests {
         assert_eq!(tokenize("1e2")[0].item, IsographLangTokenKind::Error);
         assert_eq!(tokenize("-")[0].item, IsographLangTokenKind::Error);
         let unterminated = tokenize("\"unterminated");
-        assert_eq!(unterminated[0].item, IsographLangTokenKind::Error);
-        assert_eq!(unterminated[0].location, Span::new(0, 1));
-        assert_eq!(unterminated[1].item, IsographLangTokenKind::Identifier);
+        assert_eq!(unterminated.len(), 1);
+        assert_eq!(
+            unterminated[0].item,
+            IsographLangTokenKind::ErrorUnterminatedString
+        );
+        assert_eq!(unterminated[0].location, Span::new(0, 13));
         let block = tokenize("\"\"\"unterminated");
-        assert_eq!(block[0].item, IsographLangTokenKind::Error);
-        assert_eq!(block[1].item, IsographLangTokenKind::Identifier);
+        assert_eq!(block.len(), 1);
+        assert_eq!(
+            block[0].item,
+            IsographLangTokenKind::ErrorUnterminatedBlockString
+        );
+        assert_eq!(block[0].location, Span::new(0, 15));
+        let unsupported = tokenize("\"\\x\"");
+        assert_eq!(unsupported.len(), 1);
+        assert_eq!(
+            unsupported[0].item,
+            IsographLangTokenKind::ErrorUnsupportedStringCharacter
+        );
+        assert_eq!(unsupported[0].location, Span::new(0, 4));
+        let unterminated_at_newline = tokenize("\"hi\n");
+        assert_eq!(unterminated_at_newline.len(), 2);
+        assert_eq!(
+            unterminated_at_newline[0].item,
+            IsographLangTokenKind::ErrorUnterminatedString
+        );
+        assert_eq!(unterminated_at_newline[0].location, Span::new(0, 3));
+        assert_eq!(
+            unterminated_at_newline[1].item,
+            IsographLangTokenKind::LineBreak
+        );
     }
 }

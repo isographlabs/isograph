@@ -1,8 +1,15 @@
 use std::fmt;
 
 use logos::{Lexer, Logos};
+use prelude::Postfix;
+
+#[derive(Default)]
+pub struct TokenKindExtras {
+    pub(crate) error_token: Option<IsographLangTokenKind>,
+}
 
 #[derive(Logos, Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[logos(extras = TokenKindExtras)]
 pub enum IsographLangTokenKind {
     // TODO don't skip comments and spaces, since we want to auto-format etc
     #[regex(r"[ \t\f\ufeff]+", logos::skip)]
@@ -129,27 +136,51 @@ pub enum BlockStringToken {
 fn lex_string(lexer: &mut Lexer<'_, IsographLangTokenKind>) -> bool {
     let remainder = lexer.remainder();
     let mut string_lexer = StringToken::lexer(remainder);
+    let mut first_error: Option<IsographLangTokenKind> = None;
     while let Some(string_token) = string_lexer.next() {
         match string_token {
             StringToken::Quote => {
                 lexer.bump(string_lexer.span().end);
-                return true;
+                return match first_error {
+                    None => true,
+                    Some(kind) => {
+                        lexer.extras.error_token = kind.wrap_some();
+                        false
+                    }
+                };
             }
             StringToken::LineTerminator => {
-                lexer.bump(string_lexer.span().start);
-                // lexer.extras.error_token = Some(IsographLangTokenKind::ErrorUnterminatedString);
-                return false;
+                return fail_with(
+                    lexer,
+                    string_lexer.span().start,
+                    first_error.unwrap_or(IsographLangTokenKind::ErrorUnterminatedString),
+                );
             }
             StringToken::EscapedCharacter
             | StringToken::EscapedUnicode
             | StringToken::StringCharacters => {}
             StringToken::Error => {
-                // lexer.extras.error_token = Some(TokenKind::ErrorUnsupportedStringCharacter);
-                return false;
+                if first_error.is_none() {
+                    first_error =
+                        IsographLangTokenKind::ErrorUnsupportedStringCharacter.wrap_some();
+                }
             }
         }
     }
-    // lexer.extras.error_token = Some(TokenKind::ErrorUnterminatedString);
+    fail_with(
+        lexer,
+        lexer.remainder().len(),
+        first_error.unwrap_or(IsographLangTokenKind::ErrorUnterminatedString),
+    )
+}
+
+fn fail_with(
+    lexer: &mut Lexer<'_, IsographLangTokenKind>,
+    n: usize,
+    kind: IsographLangTokenKind,
+) -> bool {
+    lexer.bump(n);
+    lexer.extras.error_token = kind.wrap_some();
     false
 }
 
@@ -215,5 +246,9 @@ fn lex_block_string(lexer: &mut Lexer<'_, IsographLangTokenKind>) -> bool {
             BlockStringToken::Error => unreachable!(),
         }
     }
-    false
+    fail_with(
+        lexer,
+        lexer.remainder().len(),
+        IsographLangTokenKind::ErrorUnterminatedBlockString,
+    )
 }
