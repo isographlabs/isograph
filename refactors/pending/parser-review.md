@@ -88,45 +88,32 @@ Moved to leftover-in-extra.md. The comma in `entrypoint Query.foo,` goes in `Slo
 
 Moved to leftover-semantic-tokens.md. `entrypoint $ $` extra is `$ $`, both `Content`. `entrypoint\nasdf` records `asdf` as `Content` from `extra_chunks`.
 
------
+### Keyword-as-identifier is copy-pasted (moved)
 
-### Keyword-as-identifier is copy-pasted
+Moved to parser-minor-improvements.md. `a: yes` records `BooleanOrNull` before checking the word.
 
-`entrypoint` / `field`, `to`, and `true` / `false` / `null` are all "require Identifier, then match the source slice." `consume_to_target` peeks, compares to `"to"`, then `require_token` with `Keyword`. `parse_boolean_or_null` records `BooleanOrNull` before checking the word, so `a: yes` highlights `yes` as boolean/null and then errors. A `consume_keyword` that records only on match would remove the duplication and the bad highlight.
+### `parse_each_chunk` is the one good shared seam; tests do not use a shared harness (moved)
 
-### `parse_each_chunk` is the one good shared seam; tests do not use a shared harness
-
-`consume_selection_set`, `consume_argument_list`, `consume_variable_declaration_list`, object interiors, and list interiors all go through `parse_each_chunk`. That is the right extraction.
-
-`span_of`, `parsed_items`, and the dummy parent-cursor setup are duplicated in `arguments.rs` and `selections.rs` tests. `crates/tests` is an empty crate.
+Moved to parser-minor-improvements.md.
 
 ### `lib.rs` glob-exports every module (moved)
 
 Moved to parse-iso-literal-entry.md Change 3.
 
-### `impl std::error::Error for Expectation`
+### `impl std::error::Error for Expectation` (moved)
 
-`Expectation` is a fragment of a diagnostic. `ParseError` is the error. The impl does not buy `thiserror` anything (`Expected(ExpectedFound)` already displays). Three number-error Displays are the identical string `"unsupported number (int or float) literal"`, so the three variants are indistinguishable in user text.
+Moved to parser-minor-improvements.md. `Expectation` is not an error. Display stays: `OneOf` is `write_one_of`, `Separator` uses `kind.closing()`.
 
-### Commented-out grammar in `token_kind.rs`
+### Commented-out grammar in `token_kind.rs` (moved)
 
-Spread, comments, `Pipe`, `PeriodPeriod` sit as comments, plus `TODO don't skip comments and spaces`. The crate rule is that a comment must not describe what was not done. `observe_kinds` is the same residue in test form.
+Moved to future-improvements.md.
 
-## Grammar sharp edges (tested, still wrong for a GraphQL-shaped language)
+## Grammar sharp edges (tested, still wrong for a GraphQL-shaped language) (moved)
 
-Line break and comma are the same chunk separator. These are tests, not accidents:
-
-- `field Query.Foo\n{ bar }` is a field with no selection set plus `MultipleDeclarations` on the brace.
-- `bar\n{ baz }` inside a set is a scalar plus a failed selection.
-- `bar\n@loadable` is a selection plus a failed selection on `@`.
-- `[Pet\n!]` does not attach the bang to `Pet`.
-
-Spaces do not split. Newlines do. Anyone who formats a selection set or a `to` clause onto the next line gets a second declaration. If that is the language, the diagnostic should say so (`expected the selection set on the same line`). It currently says `Expected nothing after the declaration`.
-
-`#` comments are `Error` plus identifiers. There is no comment token. The skip regex skips only `[ \t\f\ufeff]+`.
+Moved to future-improvements.md. Line break and comma are the same chunk separator. `#` comments are `Error` plus identifiers.
 
 ## What is in good shape
 
 Bracket matching with cut-and-diagnose is consistent and well tested. Crossing `foo { (} )` and unclosed interiors behave as documented. Chunking's `CommaWithoutItem` vs trailing comma is the right split. Per-chunk recovery (`each_malformed_variable_declaration_degrades_alone`, leftover keeps the item) is the right parser architecture. `SafePeekable` / `ItemCursor` make "peek without consume" a lifetime, not a boolean. `parse_name_colon` is the right helper for `name: value`. Resolve-position coverage on the grammar tree is thorough.
 
-Specified work is in type-annotation-null.md, parse-iso-literal-entry.md, variable-declaration-or-usage.md, string-literal-value.md, leftover-in-extra.md, leftover-semantic-tokens.md, and four-trees.md. `Slot`, `parse_singleton`, `EndOfFile`, and unused `Expectation` variants wait in parser-minor-improvements.md. Items below the `-----` have not been processed.
+Specified work is in type-annotation-null.md, parse-iso-literal-entry.md, variable-declaration-or-usage.md, string-literal-value.md, leftover-in-extra.md, leftover-semantic-tokens.md, four-trees.md, parser-minor-improvements.md, and future-improvements.md. Every heading is triaged.
