@@ -150,7 +150,7 @@ impl BracketKind {
 
 ## Names relative to isograph
 
-Where a type or function exists in both, i2 uses the isograph name. Wrappers that exist only so a lang type can carry `ResolvePosition` take the wrappee's name plus `Wrapper` (`EntityNameWrapper`, `VariableNameWrapper`, `FieldArgumentNameWrapper`, `ValueKeyNameWrapper`, `SelectionNameWrapper`, `SelectableNameWrapper`, `StringLiteralValueWrapper`, `IsographDirectiveNameWrapper`). `SelectionNameWrapper` is a selection name and a `reader_alias` (AST). `SelectableNameWrapper` is an entrypoint name and a field name (definition). The left-hand side of `Type.name` is `EntityNameWrapper`.
+Where a type or function exists in both, i2 uses the isograph name. Wrappers that exist only so a lang type can carry `ResolvePosition` take the wrappee's name plus `Wrapper` (`EntityNameWrapper`, `VariableNameWrapper`, `ArgumentNameWrapper`, `ValueKeyNameWrapper`, `SelectionNameWrapper`, `SelectableNameWrapper`, `StringLiteralValueWrapper`, `IsographDirectiveNameWrapper`). `SelectionNameWrapper` is a selection name and a `reader_alias` (AST). `SelectableNameWrapper` is an entrypoint name and a field name (definition). The left-hand side of `Type.name` is `EntityNameWrapper`.
 
 Justified differences:
 
@@ -165,6 +165,7 @@ Justified differences:
 - Parent enums drop the `Type` suffix (`SelectionSetParent`, not `SelectionSetParentType`).
 - `IsoLiteralItem` (not `IsoLiteralExtractionResult`): extraction is a different stage.
 - `SelectableDeclaration` (isograph `ClientFieldDeclaration`).
+- `ArgumentName` / `ArgumentNameWrapper` / `SelectionArgument` (isograph `FieldArgumentName` / `SelectionFieldArgument`).
 - `SelectableNameWrapper` for entrypoint and field names (isograph `ClientScalarSelectableNameWrapper` / `ClientObjectSelectableName`). `SelectionNameWrapper` wraps `SelectionName` (isograph uses `SelectableName` as the interned key of a selection name).
 - `SelectableDeclaration.target_type: Option<WithSpan<TypeAnnotation>>` (isograph has a separate `ClientPointerDeclaration` and a `pointer` keyword).
 - `name` on entrypoint and field declarations (isograph `client_field_name`).

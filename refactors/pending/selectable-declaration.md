@@ -7,12 +7,18 @@ Lands before optional-field-selection-set.md. No grammar change.
 ## What is renamed
 
 ```
-FieldDeclaration              -> SelectableDeclaration
-FieldDeclarationPath          -> SelectableDeclarationPath
-parse_field                   -> parse_selectable_declaration
-as_field                      -> as_selectable
-IsoLiteralItem::Field         -> IsoLiteralItem::Selectable
+FieldDeclaration                 -> SelectableDeclaration
+FieldDeclarationPath             -> SelectableDeclarationPath
+parse_field                      -> parse_selectable_declaration
+as_field                         -> as_selectable
+IsoLiteralItem::Field            -> IsoLiteralItem::Selectable
 IsographResolutionNode::FieldDeclaration -> SelectableDeclaration
+
+SelectionFieldArgument           -> SelectionArgument
+SelectionFieldArgumentPath       -> SelectionArgumentPath
+SelectionFieldArgumentSlotPath   -> SelectionArgumentSlotPath
+FieldArgumentNameWrapper         -> ArgumentNameWrapper
+FieldArgumentNameWrapperPath     -> ArgumentNameWrapperPath
 ```
 
 Parent-enum variants named `FieldDeclaration` become `SelectableDeclaration`:
@@ -38,7 +44,7 @@ The match arm is still `"field"`:
 
 - The keyword `field`.
 - `SemanticToken::FieldName`: highlighter role for an identifier in `Type.name` and in a selection, not the declaration type.
-- `FieldArgumentNameWrapper` / `FieldArgumentName`: argument names (`id` in `id: $id`).
+- `FieldArgumentName` in `common_lang_types`: isograph still uses it. The parser interned key is a new `ArgumentName`.
 - `Expectation::Selection` (a selection in a set). Its message becomes `"a selection"` (it currently says `"a field selection"`).
 
 ## Changes to the declaration
@@ -165,6 +171,44 @@ fn parse_selectable_declaration(
 }
 ```
 
+## Changes to argument names
+
+Origin: `FieldArgumentName` in `crates/common_lang_types/src/string_key_types.rs` and `SelectionFieldArgument` in `crates/isograph_parser/src/arguments.rs`. Delta: parser interned key is `ArgumentName`; the pair is `SelectionArgument`. `FieldArgumentName` stays in `common_lang_types`.
+
+```rust
+// from crates/common_lang_types/src/string_key_types.rs
+string_key_newtype!(ArgumentName);
+string_key_equality!(ArgumentName, VariableName);
+string_key_one_way_conversion!(from: InputValueName, to: ArgumentName);
+```
+
+```rust
+// from crates/isograph_parser/src/arguments.rs
+pub struct ArgumentList(
+    #[resolve_field] pub Vec<WithSpan<Slot<SelectionArgument, UnparsedChunkItems>>>,
+);
+
+pub struct SelectionArgument {
+    #[resolve_field]
+    pub name: WithSpan<ArgumentNameWrapper>,
+    #[resolve_field]
+    #[parent_variant(SelectionArgument)]
+    pub value: WithSpan<NonConstantValue>,
+}
+
+#[resolve_position(parent_type = SelectionArgumentPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct ArgumentNameWrapper(common_lang_types::ArgumentName);
+```
+
+`NonConstantValueParent::SelectionFieldArgument` becomes `SelectionArgument`. `UnparsedChunkItemsParent::SelectionFieldArgumentSlot` becomes `SelectionArgumentSlot`. `parse_argument` returns `SelectionArgument`. Construction is `name.map(ArgumentNameWrapper)`.
+
+```rust
+// from crates/isograph_parser/src/isograph_resolution_node.rs
+    SelectionArgumentSlot(SelectionArgumentSlotPath<'a>),
+    SelectionArgument(SelectionArgumentPath<'a>),
+    ArgumentNameWrapper(ArgumentNameWrapperPath<'a>),
+```
+
 ## Changes to selections.rs and variables.rs
 
 ```rust
@@ -209,7 +253,7 @@ pub type VariableDeclarationOrUsageListPath<'a> =
 
 ## Tests
 
-Every `FieldDeclaration`, `FieldDeclarationPath`, `parse_field`, `as_field`, and `IsoLiteralItem::Field` identifier in `crates/isograph_parser` becomes the new name. Test function names that say `field_declaration` become `selectable_declaration`. Fixtures still write the keyword `field`.
+Every `FieldDeclaration`, `FieldDeclarationPath`, `parse_field`, `as_field`, `IsoLiteralItem::Field`, `SelectionFieldArgument`, and `FieldArgumentNameWrapper` identifier in `crates/isograph_parser` becomes the new name. Test function names that say `field_declaration` become `selectable_declaration`. Fixtures still write the keyword `field`.
 
 ```rust
     fn as_selectable(parse: &WithSpan<IsoLiteralParse>) -> &SelectableDeclaration {
@@ -224,9 +268,9 @@ Every `FieldDeclaration`, `FieldDeclarationPath`, `parse_field`, `as_field`, and
 
 ## AGENTS.md on landing
 
-The interned-key sentence says an entrypoint name and a selectable name are `SelectableNameWrapper`.
+The interned-key sentence lists `ArgumentNameWrapper(ArgumentName)` in place of `FieldArgumentNameWrapper(FieldArgumentName)`. An entrypoint name and a selectable name are `SelectableNameWrapper`.
 
 ## Landing checklist
 
-1. The renames in parse_iso_literal.rs, selections.rs, variables.rs, isograph_resolution_node.rs, parse_error.rs, tests, and the AGENTS.md sentence. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+1. The renames in parse_iso_literal.rs, selections.rs, variables.rs, arguments.rs, chunk.rs, isograph_resolution_node.rs, parse_error.rs, `ArgumentName` in common_lang_types, tests, and the AGENTS.md sentence. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 2. Move this doc to refactors/past.
