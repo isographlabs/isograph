@@ -1,6 +1,6 @@
 # parse-name-colon: lhs, colon, rhs
 
-`parse_name_colon_value` inlines an identifier lhs, a colon, and `parse_non_constant_value`. This doc replaces it with one function that takes the lhs parser and the rhs parser. The colon stays in the middle.
+`parse_name_colon` takes an lhs parser and an rhs parser. It runs lhs, requires `:`, runs rhs. The lhs is whatever the caller passes: an identifier, `$` then an identifier, or another form. This doc's call sites pass an interned identifier and `parse_non_constant_value`. parse-variables.md passes a `$ ident` parser and `parse_type_annotation`.
 
 No AST type, path alias, or `IsographResolutionNode` variant changes. A selection alias is `consume_token_if(Colon)`, not this form.
 
@@ -107,7 +107,7 @@ fn parse_object_entry(cursor: &mut ItemCursor<'_>) -> Result<ObjectEntry, WithSp
 
 `parse_name_colon` is `pub(crate)` for parse-variables.md. `require_interned_identifier` stays in this module. `N` is the inner lang type; callers `.map` the wrapper.
 
-parse-variables.md's `$name: Type`:
+parse-variables.md's lhs is `require_variable_name` (`$` then identifier):
 
 ```rust
 // from crates/isograph_parser/src/variables.rs
