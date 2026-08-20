@@ -10,6 +10,8 @@ A field declaration (with or without `to`) may carry a description immediately b
 field <Identifier> . <Identifier> [<paren group>] [to <type>] [<description>] <brace group>
 ```
 
+`<type>` is a type annotation: `Pet`, `Pet!`, `[Pet]`, `[Pet!]!`, `[[Pet]]`.
+
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
     let description = consume_description(cursor);

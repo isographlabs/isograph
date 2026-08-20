@@ -1,6 +1,6 @@
 # optional-to: `to Type` on field declarations
 
-`field Type.name [vars] [to type] [description] { set }`. Fields and pointers are one struct. `to Type` is optional syntax. The keyword is `field`. There is no `pointer` keyword and no `ClientPointerDeclaration`. Removes `UnsupportedDeclarationType`.
+`field Type.name [vars] [to type] [description] { set }`. Fields and pointers are one struct. `to` is optional syntax. The target is parse-variables.md's type annotation (`Pet`, `Pet!`, `[Pet]`, `[Pet!]!`, `[[Pet]]`). The keyword is `field`. There is no `pointer` keyword and no `ClientPointerDeclaration`. Removes `UnsupportedDeclarationType`.
 
 Lands after parse-type-dot-name.md. Type annotations are parse-variables.md's. Directives land in parse-directives.md.
 
@@ -11,6 +11,14 @@ Origin: `ClientPointerDeclaration` in `crates/isograph_lang_types/src/declaratio
 ```
 field <Identifier> . <Identifier> [<paren group>] [to <type>] [<description>] <brace group>
 ```
+
+`<type>` is parse-variables.md's type annotation. Origin: the type forms in parse-variables.md. Delta: none.
+
+```
+Pet    Pet!    [Pet]    [Pet!]!    [[Pet]]
+```
+
+`consume_to_target` calls `parse_type_annotation`. A bracket group after `to` is a list type, not leftover.
 
 The `to` keyword is an identifier whose text is `to`. A position on `to` answers `ClientFieldDeclaration`. There is no `ToKeyword` node.
 
@@ -307,17 +315,63 @@ No new `IsographResolutionNode` variants. A position on `to` answers `ClientFiel
     }
 
     #[test]
-    fn a_bracketed_target_parses() {
-        let text = "field Pet.Friends to [Pet!]! { id }";
+    fn a_to_target_accepts_every_type_annotation_form() {
+        for (text, target) in [
+            ("field Query.Foo to Pet { id }", "Pet"),
+            ("field Query.Foo to Pet! { id }", "Pet!"),
+            ("field Query.Foo to [Pet] { id }", "[Pet]"),
+            ("field Query.Foo to [Pet!]! { id }", "[Pet!]!"),
+            ("field Query.Foo to [[Pet]] { id }", "[[Pet]]"),
+        ] {
+            let (parse, errors) = parsed(text);
+            assert_eq!(errors, vec![], "for literal {text:?}");
+            assert_eq!(
+                as_field(parse.reference())
+                    .target_type
+                    .as_ref()
+                    .expect("the fixture writes a target")
+                    .location,
+                span_of(text, target),
+                "for literal {text:?}",
+            );
+        }
+    }
+
+    #[test]
+    fn a_bracketed_target_is_a_list_annotation() {
+        let text = "field Query.Friends to [Pet!]! { id }";
         let (parse, errors) = parsed(text);
         assert_eq!(errors, vec![]);
-        assert_eq!(
-            as_field(parse.reference())
-                .target_type
-                .as_ref()
-                .expect("the fixture writes a list target")
-                .location,
-            span_of(text, "[Pet!]!")
+        let target = as_field(parse.reference())
+            .target_type
+            .as_ref()
+            .expect("the fixture writes a list target");
+        assert_eq!(target.location, span_of(text, "[Pet!]!"));
+        match target.item.reference() {
+            TypeAnnotation::List(list) => {
+                let inner = list
+                    .inner
+                    .as_ref()
+                    .expect("the list holds a type");
+                match inner.item.reference() {
+                    TypeAnnotation::Named(named) => {
+                        assert_eq!(named.name.location, span_of(text, "Pet"));
+                    }
+                    annotation => panic!("expected a named inner type, got {annotation:?}"),
+                }
+            }
+            annotation => panic!("expected a list target, got {annotation:?}"),
+        }
+    }
+
+    #[test]
+    fn an_empty_list_target_fails_as_a_type() {
+        let text = "field Query.Foo to [] { id }";
+        let interior = span_of(text, "[]").start + 1;
+        assert_no_declaration(
+            text,
+            expected(Expectation::TypeAnnotation, Found::EndOfChunk),
+            Span::new(interior, interior),
         );
     }
 
