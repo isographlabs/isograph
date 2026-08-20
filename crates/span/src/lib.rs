@@ -85,6 +85,9 @@ pub struct WithGenericLocation<TItem, TLocation> {
 /// An item located by a `Span`.
 pub type WithSpan<T> = WithGenericLocation<T, Span>;
 
+/// An item that may have no source span.
+pub type WithOptionalSpan<T> = WithGenericLocation<T, Option<Span>>;
+
 impl<T, TLocation> WithGenericLocation<T, TLocation> {
     pub fn new(item: T, location: TLocation) -> Self {
         WithGenericLocation { item, location }

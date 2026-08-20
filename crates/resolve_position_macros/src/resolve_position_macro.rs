@@ -280,6 +280,7 @@ fn resolve_field_inner_type(wrapper: &ResolveFieldInfoTypeWrapper) -> Option<&sy
             ResolveFieldInfoType::WithSpan(inner_type)
             | ResolveFieldInfoType::WithLocation(inner_type)
             | ResolveFieldInfoType::WithEmbeddedLocation(inner_type)
+            | ResolveFieldInfoType::WithOptionalSpan(inner_type)
             | ResolveFieldInfoType::GraphQLTypeAnnotation(inner_type) => inner_type.wrap_some(),
         },
         ResolveFieldInfoTypeWrapper::IteratorWrapper(inner) => resolve_field_inner_type(inner),
@@ -621,6 +622,7 @@ enum ResolveFieldInfoType {
     WithSpan(syn::Type),
     WithLocation(syn::Type),
     WithEmbeddedLocation(syn::Type),
+    WithOptionalSpan(syn::Type),
     GraphQLTypeAnnotation(syn::Type),
 }
 
@@ -786,7 +788,7 @@ fn parse_resolve_field_type(
 ) -> Result<ResolveFieldInfoTypeWrapper, proc_macro2::TokenStream> {
     if let Some(last_segment) = path.segments.last() {
         // Base cases: WithSpan<T>, WithLocation<T>, WithEmbeddedLocation<T>,
-        // GraphQLTypeAnnotation
+        // WithOptionalSpan<T>, GraphQLTypeAnnotation
         match last_segment.ident.to_string().as_str() {
             "WithSpan" => {
                 return handle_case(last_segment, generics_map, ResolveFieldInfoType::WithSpan);
@@ -812,6 +814,13 @@ fn parse_resolve_field_type(
                     last_segment,
                     generics_map,
                     ResolveFieldInfoType::WithEmbeddedLocation,
+                );
+            }
+            "WithOptionalSpan" => {
+                return handle_case(
+                    last_segment,
+                    generics_map,
+                    ResolveFieldInfoType::WithOptionalSpan,
                 );
             }
             "GraphQLTypeAnnotation" => {
@@ -841,7 +850,7 @@ fn parse_resolve_field_type(
 
     Error::new_spanned(
         path,
-        "Expected WithSpan<T>, WithLocation<T>, WithGenericLocation<T>, GraphQLTypeAnnotation, \
+        "Expected WithSpan<T>, WithLocation<T>, WithGenericLocation<T>, WithOptionalSpan<T>, GraphQLTypeAnnotation, \
         Vec<T>, Option<T>, or NonEmpty<T> where T is a valid resolve field type",
     )
     .to_compile_error()
@@ -1028,6 +1037,17 @@ fn generate_resolve_code_recursive(
                     if #field_expr.location.span.contains(position) {
                         let new_parent = #new_parent;
                         return #field_expr.item.resolve(new_parent, position);
+                    }
+                }
+            }
+            ResolveFieldInfoType::WithOptionalSpan(inner_type) => {
+                let new_parent = new_parent_expr(parent_construction, inner_type);
+                quote! {
+                    if let Some(span) = #field_expr.location {
+                        if span.contains(position) {
+                            let new_parent = #new_parent;
+                            return #field_expr.item.resolve(new_parent, position);
+                        }
                     }
                 }
             }
