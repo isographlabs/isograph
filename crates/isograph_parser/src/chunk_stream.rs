@@ -291,7 +291,7 @@ mod tests {
     use super::{ChunkStream, TokenText};
     use crate::{
         AstError, BracketKind, Chunk, ChunkedLevel, Expectation, Found, NonBracketTokenKind,
-        SemanticToken, chunk, match_brackets, tokenize,
+        SemanticToken, chunk, match_brackets, parsed_items::span_of, tokenize,
     };
 
     fn chunked(text: &str) -> WithSpan<ChunkedLevel> {
@@ -304,18 +304,6 @@ mod tests {
 
     fn first_chunk(tree: &WithSpan<ChunkedLevel>) -> &Chunk {
         tree.item.0[0].item.reference()
-    }
-
-    fn span_of(text: &str, pattern: &str) -> Span {
-        let mut occurrences = text.match_indices(pattern);
-        let (offset, _) = occurrences
-            .next()
-            .expect("the pattern the test anchors on occurs in the literal");
-        assert!(
-            occurrences.next().is_none(),
-            "the pattern the test anchors on occurs exactly once in the literal"
-        );
-        Span::from_usize(offset, offset + pattern.len())
     }
 
     fn token_text<'a>(text: &'a str, pattern: &str) -> TokenText<'a> {

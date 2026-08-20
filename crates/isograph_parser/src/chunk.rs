@@ -559,7 +559,11 @@ mod tests {
     use super::*;
     use crate::{
         AstError, BracketError, BracketKind, Expectation, Found, NonBracketTokenKind,
-        SemanticToken, chunk_stream::ItemCursor, match_brackets, tokenize,
+        SemanticToken,
+        chunk_stream::ItemCursor,
+        match_brackets,
+        parsed_items::{ParsedItems, parsed_items, span_of},
+        tokenize,
     };
     use BracketKind::Brace;
     use Expectation::Separator;
@@ -582,20 +586,6 @@ mod tests {
         let (brackets, bracket_errors) = tree(literal);
         assert_eq!(bracket_errors, vec![]);
         chunk(brackets.reference())
-    }
-
-    /// The span of `pattern`, which must occur exactly once in `text`: an anchor an edit
-    /// cannot silently shift, and one that fails loudly when it stops being unique.
-    fn span_of(text: &str, pattern: &str) -> Span {
-        let mut occurrences = text.match_indices(pattern);
-        let (offset, _) = occurrences
-            .next()
-            .expect("the pattern the test anchors on occurs in the literal");
-        assert!(
-            occurrences.next().is_none(),
-            "the pattern the test anchors on occurs exactly once in the literal"
-        );
-        Span::from_usize(offset, offset + pattern.len())
     }
 
     fn chunk_span(chunk: &Chunk) -> Span {
@@ -1289,27 +1279,8 @@ mod tests {
             .map(|token| token.location)
     }
 
-    type ParsedEach = (
-        Vec<WithSpan<Slot<Span, UnparsedChunkItems>>>,
-        Vec<WithSpan<AstError>>,
-        Vec<CommaWithoutItem>,
-        Vec<WithSpan<SemanticToken>>,
-    );
-
-    fn parsed_each(text: &str) -> ParsedEach {
-        let (brackets, bracket_errors) = match_brackets(tokenize(text), text.len() as u32);
-        assert!(bracket_errors.is_empty(), "for literal {text:?}");
-        let (tree, comma_errors) = chunk(brackets.reference());
-        let mut errors = Vec::new();
-        let mut tokens = Vec::new();
-        let dummy = chunked("x");
-        let mut parent = dummy.item.0[0].item.stream(text, &mut tokens, &mut errors);
-        let items = tree.item.parse_each_chunk(
-            parent.cursor(),
-            Separator(BracketKind::Parenthesis),
-            parse_identifier,
-        );
-        (items, errors, comma_errors, tokens)
+    fn parsed_each(text: &str) -> ParsedItems<Span> {
+        parsed_items(text, Separator(BracketKind::Parenthesis), parse_identifier)
     }
 
     fn expected(expectation: Expectation, found: Found) -> AstError {

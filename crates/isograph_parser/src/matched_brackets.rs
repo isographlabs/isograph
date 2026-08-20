@@ -200,7 +200,7 @@ mod tests {
     use prelude::Postfix;
 
     use super::*;
-    use crate::tokenize;
+    use crate::{parsed_items::span_of, tokenize};
     use BracketKind::{Brace, Parenthesis};
 
     fn tree(literal: &str) -> (WithSpan<MatchedBrackets>, Vec<BracketError>) {
@@ -213,20 +213,6 @@ mod tests {
         let (tree, errors) = tree(literal);
         assert_eq!(errors, vec![]);
         tree
-    }
-
-    /// The span of `pattern`, which must occur exactly once in `text`: an anchor an edit
-    /// cannot silently shift, and one that fails loudly when it stops being unique.
-    fn span_of(text: &str, pattern: &str) -> Span {
-        let mut occurrences = text.match_indices(pattern);
-        let (offset, _) = occurrences
-            .next()
-            .expect("the pattern the test anchors on occurs in the literal");
-        assert!(
-            occurrences.next().is_none(),
-            "the pattern the test anchors on occurs exactly once in the literal"
-        );
-        Span::from_usize(offset, offset + pattern.len())
     }
 
     fn raw(items: &[WithSpan<BracketItem>], index: usize) -> NonBracketToken {

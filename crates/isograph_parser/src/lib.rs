@@ -14,6 +14,9 @@ mod token_kind;
 mod tokenize;
 mod variables;
 
+#[cfg(test)]
+mod parsed_items;
+
 pub use arguments::{
     Argument, ArgumentList, ArgumentListParent, ArgumentListPath, ArgumentNameWrapper,
     ArgumentNameWrapperPath, ArgumentPath, ArgumentSlotPath, Boolean, BooleanValue,

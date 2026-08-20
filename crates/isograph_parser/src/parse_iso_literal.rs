@@ -312,7 +312,8 @@ mod tests {
         ObjectEntry, ParseError, Selection, SelectionNameWrapper, SelectionSet, SelectionSetParent,
         Slot, TypeAnnotation, TypeAnnotationParent, UnionTypeAnnotation, UnionVariant,
         UnparsedChunkItems, UnparsedChunkItemsParent, VariableDeclaration, VariableDeclarationList,
-        VariableDeclarationOrUsageParent, VariableNameWrapper, chunk, match_brackets, tokenize,
+        VariableDeclarationOrUsageParent, VariableNameWrapper, chunk, match_brackets,
+        parsed_items::span_of, tokenize,
     };
     use Expectation::EndOfDeclaration;
     use NonBracketTokenKind::{
@@ -351,18 +352,6 @@ mod tests {
 
     fn token(kind: NonBracketTokenKind) -> Expectation {
         Expectation::Token(kind)
-    }
-
-    fn span_of(text: &str, pattern: &str) -> Span {
-        let mut occurrences = text.match_indices(pattern);
-        let (offset, _) = occurrences
-            .next()
-            .expect("the pattern the test anchors on occurs in the literal");
-        assert!(
-            occurrences.next().is_none(),
-            "the pattern the test anchors on occurs exactly once in the literal"
-        );
-        Span::from_usize(offset, offset + pattern.len())
     }
 
     fn chunked(text: &str) -> WithSpan<ChunkedLevel> {

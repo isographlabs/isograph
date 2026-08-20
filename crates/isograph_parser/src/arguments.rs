@@ -417,16 +417,10 @@ mod tests {
 
     use super::*;
     use crate::{
-        AstError, CommaWithoutItem, Found, NonBracketTokenKind, SemanticToken, chunk,
-        match_brackets, tokenize,
+        AstError, Found, NonBracketTokenKind, SemanticToken, chunk, match_brackets,
+        parsed_items::{parsed_items, span_of},
+        tokenize,
     };
-
-    type ParsedItems<P> = (
-        Vec<WithSpan<Slot<P, UnparsedChunkItems>>>,
-        Vec<WithSpan<AstError>>,
-        Vec<CommaWithoutItem>,
-        Vec<WithSpan<SemanticToken>>,
-    );
 
     type ParsedPairs = (
         Vec<WithSpan<Slot<Argument, UnparsedChunkItems>>>,
@@ -439,27 +433,6 @@ mod tests {
         Vec<WithSpan<AstError>>,
         Vec<WithSpan<SemanticToken>>,
     );
-
-    fn parsed_items<P>(
-        text: &str,
-        leftover: Expectation,
-        parse_item: impl Fn(&mut ItemCursor<'_>) -> Result<P, WithSpan<AstError>>,
-    ) -> ParsedItems<P> {
-        let (brackets, bracket_errors) = match_brackets(tokenize(text), text.len() as u32);
-        assert!(bracket_errors.is_empty(), "for literal {text:?}");
-        let (tree, comma_errors) = chunk(brackets.reference());
-        let mut errors = Vec::new();
-        let mut tokens = Vec::new();
-        let dummy = {
-            let (brackets, _) = match_brackets(tokenize("x"), 1);
-            chunk(brackets.reference()).0
-        };
-        let mut parent = dummy.item.0[0].item.stream(text, &mut tokens, &mut errors);
-        let items = tree
-            .item
-            .parse_each_chunk(parent.cursor(), leftover, parse_item);
-        (items, errors, comma_errors, tokens)
-    }
 
     fn parsed_pairs(text: &str) -> ParsedPairs {
         let (items, errors, comma_errors, tokens) = parsed_items(
@@ -502,18 +475,6 @@ mod tests {
             .as_ref()
             .map(|wrapped| wrapped.item.reference())
             .expect("expected a list value")
-    }
-
-    fn span_of(text: &str, pattern: &str) -> Span {
-        let mut occurrences = text.match_indices(pattern);
-        let (offset, _) = occurrences
-            .next()
-            .expect("the pattern the test anchors on occurs in the literal");
-        assert!(
-            occurrences.next().is_none(),
-            "the pattern the test anchors on occurs exactly once in the literal"
-        );
-        Span::from_usize(offset, offset + pattern.len())
     }
 
     #[test]
