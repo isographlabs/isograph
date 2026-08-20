@@ -149,26 +149,40 @@ impl<'a> From<ObjectEntrySlotPath<'a>> for IsographResolutionNode<'a> {
     }
 }
 
-fn parse_name_colon_value<N: From<intern::string_key::StringKey>>(
+pub(crate) fn parse_name_colon<L, R>(
     cursor: &mut ItemCursor<'_>,
-    name_token: SemanticToken,
-    missing_name: Expectation,
-) -> Result<(WithSpan<N>, WithSpan<NonConstantValue>), WithSpan<ParseError>> {
-    let name = cursor
-        .require_token(NonBracketTokenKind::Identifier, name_token)
-        .map_err(|()| cursor.expected(missing_name))?;
+    parse_lhs: impl FnOnce(&mut ItemCursor<'_>) -> Result<L, WithSpan<ParseError>>,
+    parse_rhs: impl FnOnce(&mut ItemCursor<'_>) -> Result<R, WithSpan<ParseError>>,
+) -> Result<(L, R), WithSpan<ParseError>> {
+    let lhs = parse_lhs(cursor)?;
     cursor
         .require_token(NonBracketTokenKind::Colon, SemanticToken::Colon)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Colon)))?;
-    let value = parse_non_constant_value(cursor)?;
-    (name.interned(), value).wrap_ok()
+    let rhs = parse_rhs(cursor)?;
+    (lhs, rhs).wrap_ok()
+}
+
+fn require_interned_identifier<N: From<intern::string_key::StringKey>>(
+    cursor: &mut ItemCursor<'_>,
+    name_token: SemanticToken,
+    missing_name: Expectation,
+) -> Result<WithSpan<N>, WithSpan<ParseError>> {
+    let name = cursor
+        .require_token(NonBracketTokenKind::Identifier, name_token)
+        .map_err(|()| cursor.expected(missing_name))?;
+    name.interned().wrap_ok()
 }
 
 fn parse_argument(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<SelectionFieldArgument, WithSpan<ParseError>> {
-    let (name, value) =
-        parse_name_colon_value(cursor, SemanticToken::Argument, Expectation::Argument)?;
+    let (name, value) = parse_name_colon(
+        cursor,
+        |cursor| {
+            require_interned_identifier(cursor, SemanticToken::Argument, Expectation::Argument)
+        },
+        parse_non_constant_value,
+    )?;
     SelectionFieldArgument {
         name: name.map(FieldArgumentNameWrapper),
         value,
@@ -177,8 +191,13 @@ fn parse_argument(
 }
 
 fn parse_object_entry(cursor: &mut ItemCursor<'_>) -> Result<ObjectEntry, WithSpan<ParseError>> {
-    let (name, value) =
-        parse_name_colon_value(cursor, SemanticToken::ObjectKey, Expectation::ObjectEntry)?;
+    let (name, value) = parse_name_colon(
+        cursor,
+        |cursor| {
+            require_interned_identifier(cursor, SemanticToken::ObjectKey, Expectation::ObjectEntry)
+        },
+        parse_non_constant_value,
+    )?;
     ObjectEntry {
         name: name.map(ValueKeyNameWrapper),
         value,
