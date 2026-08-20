@@ -25,7 +25,7 @@ pub enum IsoLiteralItem {
 // from crates/isograph_parser/src/parse_iso_literal.rs
         "entrypoint" => IsoLiteralItem::Entrypoint(parse_entrypoint(cursor)?).wrap_ok(),
         "field" | "pointer" => ParseError::UnsupportedDeclarationType
-            .with_span(keyword)
+            .with_span(keyword.location)
             .wrap_err(),
 ```
 
@@ -42,9 +42,9 @@ pub enum IsoLiteralItem {
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
         "entrypoint" => IsoLiteralItem::Entrypoint(parse_entrypoint(cursor)?).wrap_ok(),
-        "field" => IsoLiteralItem::Field(parse_field(cursor, push_error)?).wrap_ok(),
+        "field" => IsoLiteralItem::Field(parse_field(cursor)?).wrap_ok(),
         "pointer" => ParseError::UnsupportedDeclarationType
-            .with_span(keyword)
+            .with_span(keyword.location)
             .wrap_err(),
 ```
 
@@ -53,117 +53,167 @@ The test `field_and_pointer_declarations_do_not_parse_yet` narrows to its pointe
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = IsoLiteralSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ClientFieldDeclaration {
     #[resolve_field]
     #[parent_variant(Field)]
-    pub parent_type: WithSpan<EntityName>,
+    pub parent_type: WithSpan<EntityNameWrapper>,
     #[resolve_field]
     #[parent_variant(Field)]
-    pub client_field_name: WithSpan<ClientFieldName>,
+    pub client_field_name: WithSpan<ClientFieldNameWrapper>,
     #[resolve_field]
     #[parent_variant(Field)]
     pub selection_set: WithSpan<SelectionSet>,
 }
 
 pub type ClientFieldDeclarationPath<'a> =
-    PositionResolutionPath<&'a ClientFieldDeclaration, IsoLiteralParsePath<'a>>;
+    PositionResolutionPath<&'a ClientFieldDeclaration, IsoLiteralSlotPath<'a>>;
 ```
 
 There is no `FieldKeyword`. A position on `field` answers `ClientFieldDeclaration`.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-fn parse_iso_literal_item<F>(
+fn parse_field(
     cursor: &mut ItemCursor<'_>,
-    push_error: &mut F,
-) -> Result<IsoLiteralItem, WithSpan<ParseError>>
-where
-    F: FnMut(WithSpan<ParseError>),
-{
-    let keyword = cursor
-        .require_token(NonBracketTokenKind::Identifier)
-        .map_err(|()| cursor.expected(Expectation::DeclarationKeyword))?;
-    match cursor.token_text(keyword) {
-        "entrypoint" => IsoLiteralItem::Entrypoint(parse_entrypoint(cursor)?).wrap_ok(),
-        "field" => IsoLiteralItem::Field(parse_field(cursor, push_error)?).wrap_ok(),
-        "pointer" => ParseError::UnsupportedDeclarationType
-            .with_span(keyword)
-            .wrap_err(),
-        _ => ParseError::expected(
-            Expectation::DeclarationKeyword,
-            Found::Token(NonBracketTokenKind::Identifier),
-        )
-        .with_span(keyword)
-        .wrap_err(),
-    }
-}
-
-fn parse_field<F>(
-    cursor: &mut ItemCursor<'_>,
-    push_error: &mut F,
-) -> Result<ClientFieldDeclaration, WithSpan<ParseError>>
-where
-    F: FnMut(WithSpan<ParseError>),
-{
+) -> Result<ClientFieldDeclaration, WithSpan<ParseError>> {
     let parent_type = cursor
-        .require_token(NonBracketTokenKind::Identifier)
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::Type)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
     cursor
-        .require_token(NonBracketTokenKind::Period)
+        .require_token(NonBracketTokenKind::Period, SemanticToken::Period)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Period)))?;
     let client_field_name = cursor
-        .require_token(NonBracketTokenKind::Identifier)
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
-    let selection_set = require_selection_set(cursor, push_error)?;
+    let selection_set = require_selection_set(cursor)?;
     ClientFieldDeclaration {
-        parent_type: cursor
-            .token_text(parent_type)
-            .intern()
-            .to::<EntityName>()
-            .with_span(parent_type),
-        client_field_name: cursor
-            .token_text(client_field_name)
-            .intern()
-            .to::<ClientFieldName>()
-            .with_span(client_field_name),
+        parent_type: parent_type.interned().map(EntityNameWrapper),
+        client_field_name: client_field_name.interned().map(ClientFieldNameWrapper),
         selection_set,
     }
     .wrap_ok()
 }
 ```
 
-`parse_iso_literal_item` already receives `push_error` from `parse_singleton` and ignores it (`|cursor, _|`). After this doc it is `|cursor, push_error| parse_iso_literal_item(cursor, push_error)`. `parse_entrypoint` stays `|cursor, _|`.
+## Change 2: `EntityNameWrapper` / `ClientFieldNameWrapper`
 
-`EntityName` and `ClientFieldName` gain a second parent. Before:
+`EntityName` and `ClientFieldName` gain a second parent and become wrappers without `From<StringKey>`.
+
+Before:
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = EntrypointDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct EntityName(common_lang_types::EntityName);
 
-pub type EntityNamePath<'a> = PositionResolutionPath<&'a EntityName, EntrypointDeclarationPath<'a>>;
-```
+impl From<intern::string_key::StringKey> for EntityName {
+    fn from(key: intern::string_key::StringKey) -> Self {
+        EntityName(key.to())
+    }
+}
 
-After (and identically for `ClientFieldName` with `ClientFieldNameParent`):
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = EntrypointDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct ClientFieldName(common_lang_types::SelectableName);
+
+impl From<intern::string_key::StringKey> for ClientFieldName {
+    fn from(key: intern::string_key::StringKey) -> Self {
+        ClientFieldName(key.to())
+    }
+}
+
+pub type EntityNamePath<'a> = PositionResolutionPath<&'a EntityName, EntrypointDeclarationPath<'a>>;
+
+pub type ClientFieldNamePath<'a> =
+    PositionResolutionPath<&'a ClientFieldName, EntrypointDeclarationPath<'a>>;
+```
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-#[resolve_position(parent_type = EntityNameParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct EntityName(common_lang_types::EntityName);
+pub struct EntrypointDeclaration {
+    #[resolve_field]
+    pub parent_type: WithSpan<EntityName>,
+    #[resolve_field]
+    pub client_field_name: WithSpan<ClientFieldName>,
+}
+```
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+    EntrypointDeclaration {
+        parent_type: parent_type.interned(),
+        client_field_name: client_field_name.interned(),
+    }
+```
+
+After:
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = EntityNameWrapperParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct EntityNameWrapper(common_lang_types::EntityName);
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = ClientFieldNameWrapperParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct ClientFieldNameWrapper(common_lang_types::SelectableName);
 
 #[derive(Debug)]
-pub enum EntityNameParent<'a> {
+pub enum EntityNameWrapperParent<'a> {
     Entrypoint(EntrypointDeclarationPath<'a>),
     Field(ClientFieldDeclarationPath<'a>),
 }
 
-pub type EntityNamePath<'a> = PositionResolutionPath<&'a EntityName, EntityNameParent<'a>>;
+#[derive(Debug)]
+pub enum ClientFieldNameWrapperParent<'a> {
+    Entrypoint(EntrypointDeclarationPath<'a>),
+    Field(ClientFieldDeclarationPath<'a>),
+}
+
+pub type EntityNameWrapperPath<'a> =
+    PositionResolutionPath<&'a EntityNameWrapper, EntityNameWrapperParent<'a>>;
+
+pub type ClientFieldNameWrapperPath<'a> =
+    PositionResolutionPath<&'a ClientFieldNameWrapper, ClientFieldNameWrapperParent<'a>>;
 ```
 
-`EntrypointDeclaration`'s two marked fields respell from bare `#[resolve_field]` to `#[resolve_field]` + `#[parent_variant(Entrypoint)]`.
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+pub struct EntrypointDeclaration {
+    #[resolve_field]
+    #[parent_variant(Entrypoint)]
+    pub parent_type: WithSpan<EntityNameWrapper>,
+    #[resolve_field]
+    #[parent_variant(Entrypoint)]
+    pub client_field_name: WithSpan<ClientFieldNameWrapper>,
+}
+```
 
-The resolve test `names_resolve_to_their_leaves_and_the_rest_to_the_declaration` matches `name.parent.inner.client_field_name` through `EntityNameParent::Entrypoint`.
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+    EntrypointDeclaration {
+        parent_type: parent_type.interned().map(EntityNameWrapper),
+        client_field_name: client_field_name.interned().map(ClientFieldNameWrapper),
+    }
+```
+
+Before:
+
+```rust
+// from crates/isograph_parser/src/isograph_resolution_node.rs
+    EntityName(EntityNamePath<'a>),
+    ClientFieldName(ClientFieldNamePath<'a>),
+```
+
+After:
+
+```rust
+// from crates/isograph_parser/src/isograph_resolution_node.rs
+    EntityNameWrapper(EntityNameWrapperPath<'a>),
+    ClientFieldNameWrapper(ClientFieldNameWrapperPath<'a>),
+```
 
 `as_entrypoint` gains an exhaustive arm:
 
@@ -178,7 +228,9 @@ The resolve test `names_resolve_to_their_leaves_and_the_rest_to_the_declaration`
     }
 ```
 
-## Change 2: `SelectionSetParent::Field`
+The resolve test `names_resolve_to_their_leaves_and_the_rest_to_the_declaration` matches through `EntityNameWrapperParent::Entrypoint`. The item-equality assertions in `an_entrypoint_declaration_parses_with_tight_spans` become `EntityNameWrapper("Query".intern().to())` and `ClientFieldNameWrapper("foo".intern().to())`.
+
+## Change 3: `SelectionSetParent::Field`
 
 Before:
 
@@ -208,7 +260,7 @@ pub enum SelectionSetParent<'a> {
     ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
 ```
 
-A position on a list comma or on whitespace inside a selection set answers `SelectionSet`. A leftover token answers `NonBracketToken` through `UnparsedChunkItemsParent::SelectionSet`. A failed selection chunk is the same walk.
+A position on a list comma or on whitespace inside a selection set answers `SelectionSet`. A leftover token answers `NonBracketToken` through `UnparsedChunkItemsParent::SelectionSlot`. A failed selection chunk is the same walk.
 
 ## Tests
 
@@ -248,8 +300,14 @@ Extending the `parse_iso_literal.rs` test module. Helpers `parsed`, `parsed_with
         let text = "field Query.Foo {\n  bar,\n  baz\n}";
         let (parse, errors) = parsed(text);
         let declaration = as_field(parse.reference());
-        assert_eq!(declaration.parent_type.item, "Query".intern().to());
-        assert_eq!(declaration.client_field_name.item, "Foo".intern().to());
+        assert_eq!(
+            declaration.parent_type.item,
+            EntityNameWrapper("Query".intern().to())
+        );
+        assert_eq!(
+            declaration.client_field_name.item,
+            ClientFieldNameWrapper("Foo".intern().to())
+        );
         assert_eq!(declaration.parent_type.location, span_of(text, "Query"));
         assert_eq!(declaration.client_field_name.location, span_of(text, "Foo"));
         assert_eq!(
@@ -258,7 +316,10 @@ Extending the `parse_iso_literal.rs` test module. Helpers `parsed`, `parsed_with
         );
         let items = selections(declaration.selection_set.reference());
         assert_eq!(items.len(), 2);
-        assert_eq!(as_scalar(items[0].item.reference()).name.item, "bar".intern().to());
+        assert_eq!(
+            as_scalar(items[0].item.reference()).name.item,
+            SelectionNameWrapper("bar".intern().to())
+        );
         assert_eq!(as_scalar(items[0].item.reference()).name.location, span_of(text, "bar"));
         assert_eq!(as_scalar(items[1].item.reference()).name.location, span_of(text, "baz"));
         assert_eq!(items[0].location, span_of(text, "bar"));
@@ -336,17 +397,17 @@ Extending the `parse_iso_literal.rs` test module. Helpers `parsed`, `parsed_with
         let text = "field Query.Foo { pet { name } }";
         let (parse, _) = parsed(text);
         match parse.resolve((), span_of(text, "name")) {
-            IsographResolutionNode::SelectionName(name) => {
+            IsographResolutionNode::SelectionNameWrapper(name) => {
                 let scalar = match name.parent {
-                    SelectionNameParent::Scalar(scalar) => scalar,
+                    SelectionNameWrapperParent::Scalar(scalar) => scalar,
                     parent => panic!("expected a scalar parent, got {parent:?}"),
                 };
-                let object = match scalar.parent {
+                let object = match scalar.parent.parent.parent {
                     SelectionSetParent::Object(object) => object,
                     parent => panic!("expected an object-selection parent, got {parent:?}"),
                 };
                 assert_eq!(object.inner.name.location, span_of(text, "pet"));
-                match object.parent {
+                match object.parent.parent.parent {
                     SelectionSetParent::Field(declaration) => {
                         assert_eq!(
                             declaration.inner.client_field_name.location,
@@ -369,7 +430,7 @@ Extending the `parse_iso_literal.rs` test module. Helpers `parsed`, `parsed_with
             node => panic!("expected the leftover token, got {node:?}"),
         }
         match parse.resolve((), span_of(text, "bar")) {
-            IsographResolutionNode::SelectionName(_) => {}
+            IsographResolutionNode::SelectionNameWrapper(_) => {}
             node => panic!("expected the selection name, got {node:?}"),
         }
     }
@@ -382,8 +443,8 @@ Extending the `parse_iso_literal.rs` test module. Helpers `parsed`, `parsed_with
             IsographResolutionNode::NonBracketToken(token) => {
                 match token.parent {
                     ChunkContentItemParent::Unparsed(unparsed) => match unparsed.parent {
-                        UnparsedChunkItemsParent::SelectionSet(_) => {}
-                        parent => panic!("expected a selection-set parent, got {parent:?}"),
+                        UnparsedChunkItemsParent::SelectionSlot(_) => {}
+                        parent => panic!("expected a selection-slot parent, got {parent:?}"),
                     },
                     parent => panic!("expected an unparsed parent, got {parent:?}"),
                 }
@@ -407,9 +468,14 @@ Extending the `parse_iso_literal.rs` test module. Helpers `parsed`, `parsed_with
         let text = "field Query.Foo { bar(id: $x) }";
         let (parse, _) = parsed(text);
         match parse.resolve((), span_of(text, "id")) {
-            IsographResolutionNode::ArgumentName(name) => match name.parent.parent.parent {
-                ArgumentListParent::Scalar(_) => {}
-                parent => panic!("expected a scalar argument list, got {parent:?}"),
+            IsographResolutionNode::FieldArgumentNameWrapper(name) => match name.parent {
+                FieldArgumentNameWrapperParent::NamedArgument(argument) => {
+                    match argument.parent.parent.parent {
+                        ArgumentListParent::Scalar(_) => {}
+                        parent => panic!("expected a scalar argument list, got {parent:?}"),
+                    }
+                }
+                parent => panic!("expected a named-argument parent, got {parent:?}"),
             },
             node => panic!("expected the argument name, got {node:?}"),
         }
@@ -418,11 +484,71 @@ Extending the `parse_iso_literal.rs` test module. Helpers `parsed`, `parsed_with
             node => panic!("expected the variable use, got {node:?}"),
         }
     }
+
+    #[test]
+    fn a_field_records_keyword_type_period_name_and_braces() {
+        let text = "field Query.Foo { bar }";
+        let (parse, errors, bracket_errors, comma_errors, tokens) = parsed_with_tokens(text);
+        assert!(bracket_errors.is_empty());
+        assert_eq!(comma_errors, vec![]);
+        let parse = parse.expect("the fixture is not an empty literal");
+        as_field(parse.reference());
+        assert_eq!(errors, vec![]);
+        assert_eq!(
+            tokens,
+            vec![
+                SemanticToken::Keyword.with_span(span_of(text, "field")),
+                SemanticToken::Type.with_span(span_of(text, "Query")),
+                SemanticToken::Period.with_span(span_of(text, ".")),
+                SemanticToken::FieldName.with_span(span_of(text, "Foo")),
+                SemanticToken::Brace.with_span(span_of(text, "{")),
+                SemanticToken::FieldName.with_span(span_of(text, "bar")),
+                SemanticToken::Brace.with_span(span_of(text, "}")),
+            ],
+        );
+    }
+
+    #[test]
+    fn names_resolve_to_their_leaves_and_the_rest_to_the_declaration() {
+        let text = "entrypoint Query.foo";
+        let (parse, _) = parsed(text);
+        match parse.resolve((), span_of(text, "Query")) {
+            IsographResolutionNode::EntityNameWrapper(name) => {
+                match name.parent {
+                    EntityNameWrapperParent::Entrypoint(declaration) => {
+                        assert_eq!(
+                            declaration.inner.client_field_name.location,
+                            span_of(text, "foo")
+                        );
+                    }
+                    parent => panic!("expected an entrypoint parent, got {parent:?}"),
+                }
+            }
+            node => panic!("expected the entity name leaf, got {node:?}"),
+        }
+        match parse.resolve((), span_of(text, "foo")) {
+            IsographResolutionNode::ClientFieldNameWrapper(_) => {}
+            node => panic!("expected the client field name leaf, got {node:?}"),
+        }
+        for span in [
+            span_of(text, "entrypoint"),
+            span_of(text, "."),
+            Span::new(
+                span_of(text, "entrypoint").end,
+                span_of(text, "Query").start,
+            ),
+        ] {
+            match parse.resolve((), span) {
+                IsographResolutionNode::EntrypointDeclaration(_) => {}
+                node => panic!("expected the declaration leaf at {span}, got {node:?}"),
+            }
+        }
+    }
 ```
 
 `field_and_pointer_declarations_do_not_parse_yet` keeps only the pointer fixture.
 
 ## Landing checklist
 
-1. `IsoLiteralItem::Field`, `ClientFieldDeclaration`, `SelectionSetParent::Field`, `EntityNameParent` / `ClientFieldNameParent`, the tests. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+1. `IsoLiteralItem::Field`, `ClientFieldDeclaration`, `SelectionSetParent::Field`, `EntityNameWrapper` / `ClientFieldNameWrapper`, the tests. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 2. Move this doc to refactors/past.
