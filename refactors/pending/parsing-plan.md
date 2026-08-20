@@ -166,7 +166,7 @@ Justified differences:
 - `consume_*` / `require_*` (not `parse_optional_*`): parsing-standards.md.
 - `ObjectEntry` (not `NameValuePair`): two slot `T`s, one per list parent.
 - `VariableUse`, `IntegerValue`, `BooleanValue`, `NullValue`: resolve-position leaves; isograph inlines `i64` / `bool` / unit.
-- `TypeAnnotation` as `Named` / `List` with `!` on the span (not `TypeAnnotationDeclaration` as `Scalar` / `Union` / `Plural`): i2 stores the written form; isograph converts from `GraphQLTypeAnnotation`.
+- `TypeAnnotation` as `Named` / `List` / `Union` with `Null` a `UnionVariant` at `None` location (isograph `Scalar` / `Plural` / `Union` with `nullable: bool` on the union; i2 stores `Null` as a member). `!` is peeked and is not on the span. Leftover inside `[...]` stays on `ListTypeAnnotation`.
 - `Selection` is one struct with optional `selection_set` (not `SelectionType<ScalarSelection, ObjectSelection>`).
 - Parent enums drop the `Type` suffix (`SelectionSetParent`, not `SelectionSetParentType`).
 - `IsoLiteralItem` (not `IsoLiteralExtractionResult`): extraction is a different stage.

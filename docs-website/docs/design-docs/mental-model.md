@@ -34,27 +34,37 @@ A wrapper is a type former over an entity. Wrappers nest.
 enum Wrapper {
     Entity(Entity),
     List(Box<Wrapper>),
-    Null(Box<Wrapper>),
+    Union(UnionWrapper),
+}
+
+struct UnionWrapper(pub Vec<WrapperVariant>);
+
+enum WrapperVariant {
+    Entity(Entity),
+    List(Box<Wrapper>),
+    Null,
 }
 ```
 
-`List` is `[W]`. `Null` is `W | null`.
+`List` is `[W]`. `Union([W, Null])` is `W | null`. Schema types are not located.
 
 ```text
 Foo
-Foo | null
+Union([Foo, Null])
 [Foo]
-[Foo | null]
-[Foo] | null
+[Union([Foo, Null])]
+Union([[Foo], Null])
 ```
 
 A GraphQL type annotation is a wrapper:
 
 ```text
-Foo!      ->  Foo
-Foo       ->  Foo | null
-[Foo!]!   ->  [Foo]
-[Foo]     ->  [Foo | null] | null
+Foo!      ->  Entity(Foo)
+Foo       ->  Union([Entity(Foo), Null])
+[Foo!]!   ->  List(Entity(Foo))
+[Foo]     ->  Union([List(Union([Entity(Foo), Null])), Null])
+[Foo!]    ->  Union([List(Entity(Foo)), Null])
+[Foo]!    ->  List(Union([Entity(Foo), Null]))
 ```
 
 A selectable's target is a `Wrapper`. Nested selections select on the inner entity, not on the wrapper.
@@ -162,7 +172,7 @@ field User.bestFriend to User {
 }
 ```
 
-This creates the selectable `User.bestFriend` whose target is the named entity `User`. The selection set selects selectables of the parent `User`. It is how the declaration computes which `User` to point at.
+This creates the selectable `User.bestFriend` whose target is Union([Entity(User), Null]). The selection set selects selectables of the parent `User`. It is how the declaration computes which `User` to point at.
 
 ## Arguments
 
@@ -307,10 +317,10 @@ Anonymous entities from in-project selectable declarations: the result of `User.
 Selectables from upstream:
 
 ```text
-Query.user       ->  User | null
-User.id          ->  ID
-User.name        ->  String
-User.friends     ->  [User]
+Query.user       ->  Union([Entity(User), Null])
+User.id          ->  Entity(ID)
+User.name        ->  Entity(String)
+User.friends     ->  List(Entity(User))
 ```
 
 Selectables from in-project declarations:

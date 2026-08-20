@@ -1,7 +1,7 @@
 use prelude::Postfix;
 use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
-use span::{Span, WithSpan, WithSpanPostfix};
+use span::{Span, WithGenericLocation, WithOptionalSpan, WithSpan, WithSpanPostfix};
 
 use crate::chunk_stream::ItemCursor;
 use crate::{
@@ -36,8 +36,28 @@ pub struct VariableDeclaration {
 pub enum TypeAnnotation {
     Named(NamedTypeAnnotation),
     List(Box<ListTypeAnnotation>),
-    Null(Box<NullTypeAnnotation>),
+    Union(UnionTypeAnnotation),
 }
+
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = TypeAnnotationParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct UnionTypeAnnotation(#[resolve_field] pub Vec<WithOptionalSpan<UnionVariant>>);
+
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = UnionTypeAnnotationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub enum UnionVariant {
+    Named(#[parent_variant(Union)] NamedTypeAnnotation),
+    List(#[parent_variant(Union)] Box<ListTypeAnnotation>),
+    Null(NullTypeAnnotation),
+}
+
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(
+    parent_type = UnionTypeAnnotationPath<'a>,
+    resolved_node = IsographResolutionNode<'a>,
+    on_unmatched_span = from_path
+)]
+pub struct NullTypeAnnotation;
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = TypeAnnotationParent<'a>, resolved_node = IsographResolutionNode<'a>)]
@@ -58,20 +78,12 @@ pub struct ListTypeAnnotation {
     pub extra: Option<WithSpan<UnparsedChunkItems>>,
 }
 
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = TypeAnnotationParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct NullTypeAnnotation(
-    #[resolve_field]
-    #[parent_variant(Null)]
-    pub WithSpan<TypeAnnotation>,
-);
-
 #[derive(Debug)]
 pub enum TypeAnnotationParent<'a> {
     Variable(VariableDeclarationPath<'a>),
     List(Box<ListTypeAnnotationPath<'a>>),
     SelectableDeclaration(SelectableDeclarationPath<'a>),
-    Null(Box<NullTypeAnnotationPath<'a>>),
+    Union(Box<UnionTypeAnnotationPath<'a>>),
 }
 
 pub type VariableDeclarationListPath<'a> =
@@ -91,12 +103,21 @@ pub type NamedTypeAnnotationPath<'a> =
 pub type ListTypeAnnotationPath<'a> =
     PositionResolutionPath<&'a ListTypeAnnotation, TypeAnnotationParent<'a>>;
 
+pub type UnionTypeAnnotationPath<'a> =
+    PositionResolutionPath<&'a UnionTypeAnnotation, TypeAnnotationParent<'a>>;
+
 pub type NullTypeAnnotationPath<'a> =
-    PositionResolutionPath<&'a NullTypeAnnotation, TypeAnnotationParent<'a>>;
+    PositionResolutionPath<&'a NullTypeAnnotation, UnionTypeAnnotationPath<'a>>;
 
 impl<'a> From<VariableDeclarationSlotPath<'a>> for IsographResolutionNode<'a> {
     fn from(path: VariableDeclarationSlotPath<'a>) -> Self {
         IsographResolutionNode::VariableDeclarationSlot(path)
+    }
+}
+
+impl<'a> From<NullTypeAnnotationPath<'a>> for IsographResolutionNode<'a> {
+    fn from(path: NullTypeAnnotationPath<'a>) -> Self {
+        IsographResolutionNode::UnionTypeAnnotation(path.parent)
     }
 }
 
@@ -137,6 +158,27 @@ fn parse_variable_declaration(
     .wrap_ok()
 }
 
+enum NamedOrList {
+    Named(NamedTypeAnnotation),
+    List(Box<ListTypeAnnotation>),
+}
+
+impl NamedOrList {
+    fn into_type_annotation(self) -> TypeAnnotation {
+        match self {
+            NamedOrList::Named(named) => TypeAnnotation::Named(named),
+            NamedOrList::List(list) => TypeAnnotation::List(list),
+        }
+    }
+
+    fn into_union_variant(self) -> UnionVariant {
+        match self {
+            NamedOrList::Named(named) => UnionVariant::Named(named),
+            NamedOrList::List(list) => UnionVariant::List(list),
+        }
+    }
+}
+
 pub(crate) fn parse_type_annotation(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<WithSpan<TypeAnnotation>, WithSpan<AstError>> {
@@ -148,23 +190,29 @@ pub(crate) fn parse_type_annotation(
         )
     {
         peek.advance();
-        return core.wrap_ok();
+        return core
+            .item
+            .into_type_annotation()
+            .with_span(core.location)
+            .wrap_ok();
     }
     let location = core.location;
-    TypeAnnotation::Null(NullTypeAnnotation(core).boxed())
+    let written = WithGenericLocation::new(core.item.into_union_variant(), location.wrap_some());
+    let null = WithGenericLocation::new(UnionVariant::Null(NullTypeAnnotation), None);
+    TypeAnnotation::Union(UnionTypeAnnotation(vec![written, null]))
         .with_span(location)
         .wrap_ok()
 }
 
 fn parse_named_or_list(
     cursor: &mut ItemCursor<'_>,
-) -> Result<WithSpan<TypeAnnotation>, WithSpan<AstError>> {
+) -> Result<WithSpan<NamedOrList>, WithSpan<AstError>> {
     cursor.spanning(|cursor| {
         if let Some(name) = cursor.consume_token_if(
             NonBracketTokenKind::Identifier,
             SemanticToken::GraphQLTypeName,
         ) {
-            return TypeAnnotation::Named(NamedTypeAnnotation {
+            return NamedOrList::Named(NamedTypeAnnotation {
                 name: name.interned().map(EntityNameWrapper),
             })
             .wrap_ok();
@@ -175,7 +223,7 @@ fn parse_named_or_list(
             |cursor, children| parse_bracket_interior_type(cursor, children),
         ) {
             let parsed = parsed.item?;
-            return TypeAnnotation::List(
+            return NamedOrList::List(
                 ListTypeAnnotation {
                     inner: parsed.item,
                     extra: parsed.extra,

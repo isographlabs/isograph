@@ -5,12 +5,13 @@ use crate::{
     IntegerValuePath, IsoLiteralParsePath, IsoLiteralSlotPath, IsographDirectiveNameWrapperPath,
     IsographFieldDirectiveListPath, IsographFieldDirectivePath, ListLiteralPath,
     ListLiteralValuePath, ListLiteralValueSlotPath, ListTypeAnnotationPath,
-    NamedTypeAnnotationPath, NonBracketTokenPath, NullTypeAnnotationPath, NullValuePath,
-    ObjectEntryPath, ObjectEntrySlotPath, ObjectLiteralPath, OpenBracketPath,
-    SelectableDeclarationPath, SelectableNameWrapperPath, SelectionNameWrapperPath, SelectionPath,
-    SelectionSetPath, SelectionSlotPath, StringLiteralValueWrapperPath, UnparsedChunkItemsPath,
-    ValueKeyNameWrapperPath, VariableDeclarationListPath, VariableDeclarationOrUsagePath,
-    VariableDeclarationPath, VariableDeclarationSlotPath, VariableNameWrapperPath, VariableUsePath,
+    NamedTypeAnnotationPath, NonBracketTokenPath, NullValuePath, ObjectEntryPath,
+    ObjectEntrySlotPath, ObjectLiteralPath, OpenBracketPath, SelectableDeclarationPath,
+    SelectableNameWrapperPath, SelectionNameWrapperPath, SelectionPath, SelectionSetPath,
+    SelectionSlotPath, StringLiteralValueWrapperPath, UnionTypeAnnotationPath,
+    UnparsedChunkItemsPath, ValueKeyNameWrapperPath, VariableDeclarationListPath,
+    VariableDeclarationOrUsagePath, VariableDeclarationPath, VariableDeclarationSlotPath,
+    VariableNameWrapperPath, VariableUsePath,
 };
 
 /// What a position resolves to: the leaves of the newest tree. Each parsing stage
@@ -62,7 +63,7 @@ pub enum IsographResolutionNode<'a> {
     SelectionNameWrapper(SelectionNameWrapperPath<'a>),
     NamedTypeAnnotation(NamedTypeAnnotationPath<'a>),
     ListTypeAnnotation(ListTypeAnnotationPath<'a>),
-    NullTypeAnnotation(NullTypeAnnotationPath<'a>),
+    UnionTypeAnnotation(UnionTypeAnnotationPath<'a>),
     IsographFieldDirectiveList(IsographFieldDirectiveListPath<'a>),
     IsographFieldDirective(IsographFieldDirectivePath<'a>),
     IsographDirectiveNameWrapper(IsographDirectiveNameWrapperPath<'a>),

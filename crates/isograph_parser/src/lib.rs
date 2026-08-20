@@ -56,8 +56,9 @@ pub use semantic_token::SemanticToken;
 pub use variables::{
     ListTypeAnnotation, ListTypeAnnotationPath, NamedTypeAnnotation, NamedTypeAnnotationPath,
     NullTypeAnnotation, NullTypeAnnotationPath, TypeAnnotation, TypeAnnotationParent,
-    VariableDeclaration, VariableDeclarationList, VariableDeclarationListPath,
-    VariableDeclarationPath, VariableDeclarationSlotPath,
+    UnionTypeAnnotation, UnionTypeAnnotationPath, UnionVariant, VariableDeclaration,
+    VariableDeclarationList, VariableDeclarationListPath, VariableDeclarationPath,
+    VariableDeclarationSlotPath,
 };
 
 pub(crate) use arguments::{
