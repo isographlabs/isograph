@@ -7,22 +7,22 @@ use crate::chunk_stream::ItemCursor;
 use crate::{
     BracketKind, ChunkedLevel, EntityNameWrapper, Expectation, Found, IsographResolutionNode,
     NonBracketTokenKind, NonConstantValue, ParseError, SelectableDeclarationPath, SemanticToken,
-    Slot, UnparsedChunkItems, VariableNameWrapper, parse_name_colon, parse_non_constant_value,
-    parse_variable_name,
+    Slot, UnparsedChunkItems, VariableDeclarationOrUsage, parse_name_colon,
+    parse_non_constant_value, parse_variable_name,
 };
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SelectableDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct VariableDeclarationOrUsageList(
-    #[resolve_field] pub Vec<WithSpan<Slot<VariableDeclarationOrUsage, UnparsedChunkItems>>>,
+pub struct VariableDeclarationList(
+    #[resolve_field] pub Vec<WithSpan<Slot<VariableDeclaration, UnparsedChunkItems>>>,
 );
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = VariableDeclarationOrUsageSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct VariableDeclarationOrUsage {
+#[resolve_position(parent_type = VariableDeclarationSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct VariableDeclaration {
     #[resolve_field]
     #[parent_variant(Declaration)]
-    pub name: WithSpan<VariableNameWrapper>,
+    pub name: WithSpan<VariableDeclarationOrUsage>,
     #[resolve_field]
     #[parent_variant(Variable)]
     pub type_: WithSpan<TypeAnnotation>,
@@ -59,21 +59,21 @@ pub struct ListTypeAnnotation {
 
 #[derive(Debug)]
 pub enum TypeAnnotationParent<'a> {
-    Variable(VariableDeclarationOrUsagePath<'a>),
+    Variable(VariableDeclarationPath<'a>),
     List(Box<ListTypeAnnotationPath<'a>>),
     SelectableDeclaration(SelectableDeclarationPath<'a>),
 }
 
-pub type VariableDeclarationOrUsageListPath<'a> =
-    PositionResolutionPath<&'a VariableDeclarationOrUsageList, SelectableDeclarationPath<'a>>;
+pub type VariableDeclarationListPath<'a> =
+    PositionResolutionPath<&'a VariableDeclarationList, SelectableDeclarationPath<'a>>;
 
-pub type VariableDeclarationOrUsageSlotPath<'a> = PositionResolutionPath<
-    &'a Slot<VariableDeclarationOrUsage, UnparsedChunkItems>,
-    VariableDeclarationOrUsageListPath<'a>,
+pub type VariableDeclarationSlotPath<'a> = PositionResolutionPath<
+    &'a Slot<VariableDeclaration, UnparsedChunkItems>,
+    VariableDeclarationListPath<'a>,
 >;
 
-pub type VariableDeclarationOrUsagePath<'a> =
-    PositionResolutionPath<&'a VariableDeclarationOrUsage, VariableDeclarationOrUsageSlotPath<'a>>;
+pub type VariableDeclarationPath<'a> =
+    PositionResolutionPath<&'a VariableDeclaration, VariableDeclarationSlotPath<'a>>;
 
 pub type NamedTypeAnnotationPath<'a> =
     PositionResolutionPath<&'a NamedTypeAnnotation, TypeAnnotationParent<'a>>;
@@ -81,20 +81,20 @@ pub type NamedTypeAnnotationPath<'a> =
 pub type ListTypeAnnotationPath<'a> =
     PositionResolutionPath<&'a ListTypeAnnotation, TypeAnnotationParent<'a>>;
 
-impl<'a> From<VariableDeclarationOrUsageSlotPath<'a>> for IsographResolutionNode<'a> {
-    fn from(path: VariableDeclarationOrUsageSlotPath<'a>) -> Self {
-        IsographResolutionNode::VariableDeclarationOrUsageSlot(path)
+impl<'a> From<VariableDeclarationSlotPath<'a>> for IsographResolutionNode<'a> {
+    fn from(path: VariableDeclarationSlotPath<'a>) -> Self {
+        IsographResolutionNode::VariableDeclarationSlot(path)
     }
 }
 
 pub(crate) fn consume_variable_declaration_list(
     cursor: &mut ItemCursor<'_>,
-) -> Option<WithSpan<VariableDeclarationOrUsageList>> {
+) -> Option<WithSpan<VariableDeclarationList>> {
     cursor.consume_group_if(
         BracketKind::Parenthesis,
         SemanticToken::Parenthesis,
         |cursor, children| {
-            VariableDeclarationOrUsageList(children.item.parse_each_chunk(
+            VariableDeclarationList(children.item.parse_each_chunk(
                 cursor,
                 Expectation::Separator(BracketKind::Parenthesis),
                 parse_variable_declaration,
@@ -105,10 +105,10 @@ pub(crate) fn consume_variable_declaration_list(
 
 fn parse_variable_declaration(
     cursor: &mut ItemCursor<'_>,
-) -> Result<VariableDeclarationOrUsage, WithSpan<ParseError>> {
+) -> Result<VariableDeclaration, WithSpan<ParseError>> {
     let (name, type_) = parse_name_colon(
         cursor,
-        |cursor| parse_variable_name(cursor, Expectation::VariableDeclarationOrUsage),
+        |cursor| parse_variable_name(cursor, Expectation::VariableDeclaration),
         parse_type_annotation,
     )?;
     let default_value =
@@ -116,7 +116,7 @@ fn parse_variable_declaration(
             Some(_) => parse_non_constant_value(cursor)?.wrap_some(),
             None => None,
         };
-    VariableDeclarationOrUsage {
+    VariableDeclaration {
         name,
         type_,
         default_value,

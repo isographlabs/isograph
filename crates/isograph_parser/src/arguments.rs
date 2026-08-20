@@ -7,7 +7,7 @@ use crate::chunk_stream::ItemCursor;
 use crate::{
     BracketKind, ChunkContentItem, Expectation, Found, IsographFieldDirectivePath,
     IsographResolutionNode, NonBracketToken, NonBracketTokenKind, ParseError, SelectionPath,
-    SemanticToken, Slot, UnparsedChunkItems, VariableDeclarationOrUsagePath,
+    SemanticToken, Slot, UnparsedChunkItems, VariableDeclarationPath,
 };
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -70,12 +70,22 @@ pub enum NonConstantValue {
     List(ListLiteral),
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = VariableDeclarationOrUsageParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct VariableDeclarationOrUsage(#[resolve_field] pub WithSpan<VariableNameWrapper>);
+
+#[derive(Debug)]
+pub enum VariableDeclarationOrUsageParent<'a> {
+    Declaration(VariableDeclarationPath<'a>),
+    Usage(VariableUsePath<'a>),
+}
+
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct VariableUse(
     #[resolve_field]
-    #[parent_variant(Use)]
-    pub WithSpan<VariableNameWrapper>,
+    #[parent_variant(Usage)]
+    pub WithSpan<VariableDeclarationOrUsage>,
 );
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
@@ -112,20 +122,14 @@ pub struct ArgumentNameWrapper(pub common_lang_types::ArgumentName);
 pub struct ValueKeyNameWrapper(pub common_lang_types::ValueKeyName);
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = VariableNameWrapperParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = VariableDeclarationOrUsagePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct VariableNameWrapper(pub common_lang_types::VariableName);
-
-#[derive(Debug)]
-pub enum VariableNameWrapperParent<'a> {
-    Use(VariableUsePath<'a>),
-    Declaration(VariableDeclarationOrUsagePath<'a>),
-}
 
 #[derive(Debug)]
 pub enum NonConstantValueParent<'a> {
     Argument(Box<ArgumentPath<'a>>),
     ObjectEntry(Box<ObjectEntryPath<'a>>),
-    VariableDefault(VariableDeclarationOrUsagePath<'a>),
+    VariableDefault(VariableDeclarationPath<'a>),
     List(Box<ListLiteralValuePath<'a>>),
 }
 
@@ -171,8 +175,11 @@ pub type ArgumentNameWrapperPath<'a> =
 pub type ValueKeyNameWrapperPath<'a> =
     PositionResolutionPath<&'a ValueKeyNameWrapper, ObjectEntryPath<'a>>;
 
+pub type VariableDeclarationOrUsagePath<'a> =
+    PositionResolutionPath<&'a VariableDeclarationOrUsage, VariableDeclarationOrUsageParent<'a>>;
+
 pub type VariableNameWrapperPath<'a> =
-    PositionResolutionPath<&'a VariableNameWrapper, VariableNameWrapperParent<'a>>;
+    PositionResolutionPath<&'a VariableNameWrapper, VariableDeclarationOrUsagePath<'a>>;
 
 impl<'a> From<ArgumentSlotPath<'a>> for IsographResolutionNode<'a> {
     fn from(path: ArgumentSlotPath<'a>) -> Self {
@@ -263,14 +270,16 @@ pub(crate) fn consume_argument_list(cursor: &mut ItemCursor<'_>) -> Option<WithS
 pub(crate) fn parse_variable_name(
     cursor: &mut ItemCursor<'_>,
     missing_dollar: Expectation,
-) -> Result<WithSpan<VariableNameWrapper>, WithSpan<ParseError>> {
-    cursor
-        .require_token(NonBracketTokenKind::Dollar, SemanticToken::Variable)
-        .map_err(|()| cursor.expected(missing_dollar))?;
-    let name = cursor
-        .require_token(NonBracketTokenKind::Identifier, SemanticToken::Variable)
-        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
-    name.interned().map(VariableNameWrapper).wrap_ok()
+) -> Result<WithSpan<VariableDeclarationOrUsage>, WithSpan<ParseError>> {
+    cursor.spanning(|cursor| {
+        cursor
+            .require_token(NonBracketTokenKind::Dollar, SemanticToken::Variable)
+            .map_err(|()| cursor.expected(missing_dollar))?;
+        let name = cursor
+            .require_token(NonBracketTokenKind::Identifier, SemanticToken::Variable)
+            .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+        VariableDeclarationOrUsage(name.interned().map(VariableNameWrapper)).wrap_ok()
+    })
 }
 
 fn parse_string_literal(

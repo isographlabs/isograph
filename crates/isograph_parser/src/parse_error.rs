@@ -41,7 +41,7 @@ pub enum Expectation {
     Argument,
     Value,
     ObjectEntry,
-    VariableDeclarationOrUsage,
+    VariableDeclaration,
     TypeAnnotation,
     EndOfType,
 }
@@ -65,7 +65,7 @@ impl fmt::Display for Expectation {
                 "a value, like $foo, 42, \"bar\", true, false, null, or an object literal"
             ),
             Expectation::ObjectEntry => write!(f, "an object entry, like 'id: 4'"),
-            Expectation::VariableDeclarationOrUsage => {
+            Expectation::VariableDeclaration => {
                 write!(f, "a variable declaration, like '$id: ID!'")
             }
             Expectation::TypeAnnotation => {
@@ -186,7 +186,7 @@ mod tests {
             "an object entry, like 'id: 4'",
         );
         assert_eq!(
-            Expectation::VariableDeclarationOrUsage.to_string(),
+            Expectation::VariableDeclaration.to_string(),
             "a variable declaration, like '$id: ID!'",
         );
         assert_eq!(

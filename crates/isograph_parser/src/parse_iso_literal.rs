@@ -9,7 +9,7 @@ use crate::{
     ChunkContentItem, ChunkedLevel, DECLARATION_KEYWORD, Expectation, ExtraChunks, Found,
     IsographFieldDirectiveList, IsographResolutionNode, NamedTypeAnnotationPath, NonBracketToken,
     NonBracketTokenKind, ParseError, SelectionSet, SemanticToken, Singleton, Slot, TypeAnnotation,
-    UnparsedChunkItems, VariableDeclarationOrUsageList, consume_directives, consume_selection_set,
+    UnparsedChunkItems, VariableDeclarationList, consume_directives, consume_selection_set,
     consume_variable_declaration_list, parse_singleton, parse_type_annotation,
 };
 
@@ -57,7 +57,7 @@ pub struct SelectableDeclaration {
     #[parent_variant(SelectableDeclaration)]
     pub name: WithSpan<SelectableNameWrapper>,
     #[resolve_field]
-    pub variable_definitions: Option<WithSpan<VariableDeclarationOrUsageList>>,
+    pub variable_definitions: Option<WithSpan<VariableDeclarationList>>,
     #[resolve_field]
     #[parent_variant(SelectableDeclaration)]
     pub target_type: Option<WithSpan<TypeAnnotation>>,
@@ -262,9 +262,9 @@ mod tests {
         IsographFieldDirectiveListParent, IsographResolutionNode, NonBracketTokenKind,
         NonConstantValue, NonConstantValueParent, ObjectEntry, ParseError, Selection,
         SelectionNameWrapper, SelectionSet, SelectionSetParent, Slot, TypeAnnotation,
-        TypeAnnotationParent, UnparsedChunkItems, UnparsedChunkItemsParent,
-        VariableDeclarationOrUsage, VariableDeclarationOrUsageList, VariableNameWrapper,
-        VariableNameWrapperParent, chunk, match_brackets, tokenize,
+        TypeAnnotationParent, UnparsedChunkItems, UnparsedChunkItemsParent, VariableDeclaration,
+        VariableDeclarationList, VariableDeclarationOrUsageParent, VariableNameWrapper, chunk,
+        match_brackets, tokenize,
     };
     use Expectation::EndOfDeclaration;
     use NonBracketTokenKind::{
@@ -370,18 +370,14 @@ mod tests {
         }
     }
 
-    fn variables_of(
-        parse: &WithSpan<IsoLiteralParse>,
-    ) -> &WithSpan<VariableDeclarationOrUsageList> {
+    fn variables_of(parse: &WithSpan<IsoLiteralParse>) -> &WithSpan<VariableDeclarationList> {
         as_selectable(parse)
             .variable_definitions
             .as_ref()
             .expect("the fixture's declaration carries variable definitions")
     }
 
-    fn as_declared(
-        slot: &Slot<VariableDeclarationOrUsage, UnparsedChunkItems>,
-    ) -> &VariableDeclarationOrUsage {
+    fn as_declared(slot: &Slot<VariableDeclaration, UnparsedChunkItems>) -> &VariableDeclaration {
         slot.item
             .as_ref()
             .map(|wrapped| wrapped.item.reference())
@@ -1543,8 +1539,56 @@ mod tests {
             node => panic!("expected the argument name, got {node:?}"),
         }
         match parse.resolve((), span_of(text, "$")) {
-            IsographResolutionNode::VariableUse(_) => {}
-            node => panic!("expected the variable use, got {node:?}"),
+            IsographResolutionNode::VariableDeclarationOrUsage(node) => {
+                assert!(matches!(
+                    node.parent,
+                    VariableDeclarationOrUsageParent::Usage(_)
+                ));
+            }
+            node => panic!("expected VariableDeclarationOrUsage, got {node:?}"),
+        }
+    }
+
+    #[test]
+    fn a_dollar_in_a_use_resolves_to_declaration_or_usage_with_usage_parent() {
+        let text = "field Query.Foo { bar(id: $x) }";
+        let (parse, _) = parsed(text);
+        match parse.resolve((), span_of(text, "$")) {
+            IsographResolutionNode::VariableDeclarationOrUsage(node) => {
+                assert!(matches!(
+                    node.parent,
+                    VariableDeclarationOrUsageParent::Usage(_)
+                ));
+            }
+            node => panic!("expected VariableDeclarationOrUsage, got {node:?}"),
+        }
+        match parse.resolve((), span_of(text, "x")) {
+            IsographResolutionNode::VariableNameWrapper(name) => {
+                assert_eq!(
+                    name.inner.dereference(),
+                    VariableNameWrapper("x".intern().to())
+                );
+            }
+            node => panic!("expected the name leaf, got {node:?}"),
+        }
+    }
+
+    #[test]
+    fn a_dollar_in_a_declaration_resolves_to_declaration_or_usage_with_declaration_parent() {
+        let text = "field Query.Foo($id: ID) { bar }";
+        let (parse, _) = parsed(text);
+        match parse.resolve((), span_of(text, "$")) {
+            IsographResolutionNode::VariableDeclarationOrUsage(node) => {
+                assert!(matches!(
+                    node.parent,
+                    VariableDeclarationOrUsageParent::Declaration(_)
+                ));
+            }
+            node => panic!("expected VariableDeclarationOrUsage, got {node:?}"),
+        }
+        match parse.resolve((), span_of(text, "id")) {
+            IsographResolutionNode::VariableNameWrapper(_) => {}
+            node => panic!("expected the name leaf, got {node:?}"),
         }
     }
 
@@ -1740,8 +1784,12 @@ mod tests {
         let variables = variables_of(parse.reference());
         assert_eq!(variables.item.0.len(), 1);
         let declared = as_declared(variables.item.0[0].item.reference());
-        assert_eq!(declared.name.item, VariableNameWrapper("id".intern().to()));
-        assert_eq!(declared.name.location, span_of(text, "id"));
+        assert_eq!(
+            declared.name.item.0.item,
+            VariableNameWrapper("id".intern().to())
+        );
+        assert_eq!(declared.name.item.0.location, span_of(text, "id"));
+        assert_eq!(declared.name.location, span_of(text, "$id"));
         match declared.type_.item.reference() {
             TypeAnnotation::Named(named) => {
                 assert_eq!(named.name.location, span_of(text, "ID"));
@@ -1877,14 +1925,16 @@ mod tests {
         let (parse, errors) = parsed(text);
         assert_eq!(errors, vec![]);
         match parse.resolve((), span_of(text, "other")) {
-            IsographResolutionNode::VariableNameWrapper(name) => match name.parent {
-                VariableNameWrapperParent::Use(variable_use) => match variable_use.parent {
-                    NonConstantValueParent::VariableDefault(declaration) => {
-                        assert_eq!(declaration.inner.name.location, span_of(text, "limit"));
+            IsographResolutionNode::VariableNameWrapper(name) => match name.parent.parent {
+                VariableDeclarationOrUsageParent::Usage(variable_use) => {
+                    match variable_use.parent {
+                        NonConstantValueParent::VariableDefault(declaration) => {
+                            assert_eq!(declaration.inner.name.location, span_of(text, "$limit"));
+                        }
+                        parent => panic!("expected VariableDefault, got {parent:?}"),
                     }
-                    parent => panic!("expected VariableDefault, got {parent:?}"),
-                },
-                parent => panic!("expected Use, got {parent:?}"),
+                }
+                parent => panic!("expected Usage, got {parent:?}"),
             },
             node => panic!("expected the variable name leaf, got {node:?}"),
         }
@@ -1893,8 +1943,13 @@ mod tests {
             span_of(text, "$other").start + 1,
         );
         match parse.resolve((), use_dollar) {
-            IsographResolutionNode::VariableUse(_) => {}
-            node => panic!("expected the variable use, got {node:?}"),
+            IsographResolutionNode::VariableDeclarationOrUsage(node) => {
+                assert!(matches!(
+                    node.parent,
+                    VariableDeclarationOrUsageParent::Usage(_)
+                ));
+            }
+            node => panic!("expected VariableDeclarationOrUsage, got {node:?}"),
         }
     }
 
@@ -1967,7 +2022,7 @@ mod tests {
                 };
                 match list.parent.reference() {
                     TypeAnnotationParent::Variable(variable) => {
-                        assert_eq!(variable.inner.name.location, span_of(text, "pets"));
+                        assert_eq!(variable.inner.name.location, span_of(text, "$pets"));
                     }
                     parent => panic!("expected the declared variable, got {parent:?}"),
                 }
@@ -1977,8 +2032,8 @@ mod tests {
         match parse.resolve((), span_of(text, "pets")) {
             IsographResolutionNode::VariableNameWrapper(name) => {
                 assert!(matches!(
-                    name.parent,
-                    VariableNameWrapperParent::Declaration(_)
+                    name.parent.parent,
+                    VariableDeclarationOrUsageParent::Declaration(_)
                 ));
             }
             node => panic!("expected the variable name leaf, got {node:?}"),

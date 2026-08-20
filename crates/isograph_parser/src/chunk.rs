@@ -11,8 +11,8 @@ use crate::{
     IsographResolutionNode, ListLiteralPath, ListLiteralValue, ListLiteralValueSlotPath,
     ListTypeAnnotationPath, MatchedBrackets, NonBracketToken, NonBracketTokenKind, ObjectEntry,
     ObjectEntrySlotPath, ObjectLiteralPath, OpenBracket, ParseError, Selection, SelectionSetPath,
-    SelectionSlotPath, SemanticToken, VariableDeclarationOrUsage,
-    VariableDeclarationOrUsageListPath, VariableDeclarationOrUsageSlotPath,
+    SelectionSlotPath, SemanticToken, VariableDeclaration, VariableDeclarationListPath,
+    VariableDeclarationSlotPath,
     chunk_stream::{ChunkStream, ItemCursor},
 };
 
@@ -197,7 +197,7 @@ pub enum UnparsedChunkItemsParent<'a> {
     ArgumentSlot(ArgumentSlotPath<'a>),
     ObjectEntrySlot(ObjectEntrySlotPath<'a>),
     SelectionSlot(SelectionSlotPath<'a>),
-    VariableDeclarationOrUsageSlot(VariableDeclarationOrUsageSlotPath<'a>),
+    VariableDeclarationSlot(VariableDeclarationSlotPath<'a>),
     ListTypeAnnotation(ListTypeAnnotationPath<'a>),
     ListLiteralValueSlot(ListLiteralValueSlotPath<'a>),
 }
@@ -229,9 +229,9 @@ impl<'a> From<SelectionSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
     }
 }
 
-impl<'a> From<VariableDeclarationOrUsageSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
-    fn from(path: VariableDeclarationOrUsageSlotPath<'a>) -> Self {
-        UnparsedChunkItemsParent::VariableDeclarationOrUsageSlot(path)
+impl<'a> From<VariableDeclarationSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
+    fn from(path: VariableDeclarationSlotPath<'a>) -> Self {
+        UnparsedChunkItemsParent::VariableDeclarationSlot(path)
     }
 }
 
@@ -277,7 +277,7 @@ pub struct ExtraChunks(
         (<Argument, UnparsedChunkItems>, ArgumentListPath<'a>),
         (<ObjectEntry, UnparsedChunkItems>, ObjectLiteralPath<'a>),
         (<Selection, UnparsedChunkItems>, SelectionSetPath<'a>),
-        (<VariableDeclarationOrUsage, UnparsedChunkItems>, VariableDeclarationOrUsageListPath<'a>),
+        (<VariableDeclaration, UnparsedChunkItems>, VariableDeclarationListPath<'a>),
         (<ListLiteralValue, UnparsedChunkItems>, ListLiteralPath<'a>),
     ]
 )]
