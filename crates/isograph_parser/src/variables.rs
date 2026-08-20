@@ -54,7 +54,7 @@ pub struct ListTypeAnnotation {
     pub inner: Option<WithSpan<TypeAnnotation>>,
     #[resolve_field]
     #[parent_from]
-    pub extra_tokens: Option<WithSpan<UnparsedChunkItems>>,
+    pub extra: Option<WithSpan<UnparsedChunkItems>>,
 }
 
 #[derive(Debug)]
@@ -154,7 +154,7 @@ pub(crate) fn parse_type_annotation(
             return TypeAnnotation::List(
                 ListTypeAnnotation {
                     inner: parsed.item,
-                    extra_tokens: parsed.extra_tokens,
+                    extra: parsed.extra,
                 }
                 .boxed(),
             )
@@ -166,7 +166,7 @@ pub(crate) fn parse_type_annotation(
 
 struct BracketInteriorType {
     item: Option<WithSpan<TypeAnnotation>>,
-    extra_tokens: Option<WithSpan<UnparsedChunkItems>>,
+    extra: Option<WithSpan<UnparsedChunkItems>>,
 }
 
 fn parse_bracket_interior_type(
@@ -192,7 +192,7 @@ fn parse_bracket_interior_type(
     );
     BracketInteriorType {
         item: singleton.item.item.item,
-        extra_tokens: singleton.item.item.extra_tokens,
+        extra: singleton.item.item.extra,
     }
     .wrap_ok()
 }

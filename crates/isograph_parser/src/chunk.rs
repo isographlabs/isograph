@@ -263,7 +263,7 @@ pub struct ExtraChunks(
 /// Walk, given that parent:
 /// - Position in `item`: bare `#[resolve_field]` passes `self.path(parent)`, a path
 ///   to this `Slot`. `T::Parent` is that path. `Slot` is a path segment.
-/// - Position in `extra_tokens`: `#[parent_from]` converts the slot path
+/// - Position in `extra`: `#[parent_from]` converts the slot path
 ///   into leftover's parent enum.
 /// - Position in the slot span but in neither field: `on_unmatched_span = from_path`
 ///   returns `self.path(parent).to()`. Each pin’s `From` builds that pin’s
@@ -288,7 +288,7 @@ pub struct Slot<T, E> {
     /// Unread or failed tokens after the item. Span is tight to those tokens.
     #[resolve_field]
     #[parent_from]
-    pub extra_tokens: Option<WithSpan<E>>,
+    pub extra: Option<WithSpan<E>>,
 }
 
 /// One-item level.
@@ -319,7 +319,7 @@ fn parse_one_chunk<'a, P>(
                 let location = item.location;
                 Slot {
                     item: item.wrap_some(),
-                    extra_tokens: None,
+                    extra: None,
                 }
                 .with_span(location)
             }
@@ -333,7 +333,7 @@ fn parse_one_chunk<'a, P>(
                 let location = Span::join(item.location, leftover_span);
                 Slot {
                     item: item.wrap_some(),
-                    extra_tokens: UnparsedChunkItems(remaining)
+                    extra: UnparsedChunkItems(remaining)
                         .with_span(leftover_span)
                         .wrap_some(),
                 }
@@ -345,7 +345,7 @@ fn parse_one_chunk<'a, P>(
             let location = chunk.item.contents_span();
             Slot {
                 item: None,
-                extra_tokens: UnparsedChunkItems(chunk.item.contents.clone())
+                extra: UnparsedChunkItems(chunk.item.contents.clone())
                     .with_span(location)
                     .wrap_some(),
             }
@@ -1330,8 +1330,8 @@ mod tests {
             items[1].item.item.as_ref().map(|item| item.item),
             span_of(text, "bar").wrap_some(),
         );
-        assert!(items[0].item.extra_tokens.is_none());
-        assert!(items[1].item.extra_tokens.is_none());
+        assert!(items[0].item.extra.is_none());
+        assert!(items[1].item.extra.is_none());
         assert_eq!(
             tokens,
             vec![
@@ -1352,7 +1352,7 @@ mod tests {
             items[0].item.item.as_ref().map(|item| item.item),
             span_of(text, "foo").wrap_some(),
         );
-        assert!(items[0].item.extra_tokens.is_none());
+        assert!(items[0].item.extra.is_none());
     }
 
     #[test]
@@ -1365,7 +1365,7 @@ mod tests {
             items[0].item.item.as_ref().map(|item| item.item),
             span_of(text, "foo").wrap_some(),
         );
-        assert!(items[0].item.extra_tokens.as_ref().is_some());
+        assert!(items[0].item.extra.as_ref().is_some());
         assert_eq!(
             errors,
             expected(
@@ -1390,7 +1390,7 @@ mod tests {
         assert_eq!(comma_errors, vec![]);
         assert_eq!(items.len(), 2);
         assert!(items[0].item.item.is_none());
-        assert!(items[0].item.extra_tokens.as_ref().is_some());
+        assert!(items[0].item.extra.as_ref().is_some());
         assert_eq!(
             items[1].item.item.as_ref().map(|item| item.item),
             span_of(text, "foo").wrap_some(),

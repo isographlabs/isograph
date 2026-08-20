@@ -343,7 +343,7 @@ mod tests {
             span_of(text, "bar")
         );
         assert!(items[1].item.item.is_none());
-        assert!(items[1].item.extra_tokens.is_some());
+        assert!(items[1].item.extra.is_some());
         assert!(errors.iter().any(|error| {
             error.item
                 == ParseError::expected(Expectation::Selection, Found::Group(BracketKind::Brace))
@@ -381,7 +381,7 @@ mod tests {
             as_selection(items[0].item.reference()).name.location,
             span_of(text, "bar")
         );
-        assert!(items[0].item.extra_tokens.is_some());
+        assert!(items[0].item.extra.is_some());
         assert!(errors.iter().any(|error| {
             error.item
                 == ParseError::expected(

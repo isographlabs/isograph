@@ -683,7 +683,7 @@ mod tests {
         let (parse, errors) = parsed(text);
         assert!(parsed_item(parse.reference()).is_none());
         match first_slot(parse.reference())
-            .extra_tokens
+            .extra
             .as_ref()
             .map(|wrapped| wrapped.item.reference())
         {
@@ -705,12 +705,7 @@ mod tests {
         let (parse, errors) = parsed(text);
         as_entrypoint(parse.reference());
         assert!(parsed_item(parse.reference()).is_some());
-        assert!(
-            first_slot(parse.reference())
-                .extra_tokens
-                .as_ref()
-                .is_some()
-        );
+        assert!(first_slot(parse.reference()).extra.as_ref().is_some());
         assert_eq!(
             errors,
             expected(EndOfDeclaration, Found::Token(Identifier))
@@ -914,7 +909,7 @@ mod tests {
         match parse.resolve((), gap) {
             IsographResolutionNode::IsoLiteralSlot(path) => {
                 assert!(path.inner.item.is_some());
-                assert!(path.inner.extra_tokens.is_some());
+                assert!(path.inner.extra.is_some());
             }
             node => panic!("expected IsoLiteralSlot, got {node:?}"),
         }
@@ -1144,7 +1139,7 @@ mod tests {
         let text = "field Query.Foo { bar } junk";
         let (parse, errors) = parsed(text);
         as_selectable(parse.reference());
-        assert!(first_slot(parse.reference()).extra_tokens.is_some());
+        assert!(first_slot(parse.reference()).extra.is_some());
         assert_eq!(
             errors,
             expected(Expectation::EndOfDeclaration, Found::Token(Identifier))
@@ -1199,7 +1194,7 @@ mod tests {
         let text = "field Query.Foo { bar } \"too late\"";
         let (parse, errors) = parsed(text);
         as_selectable(parse.reference());
-        assert!(first_slot(parse.reference()).extra_tokens.is_some());
+        assert!(first_slot(parse.reference()).extra.is_some());
         assert_eq!(
             errors,
             expected(

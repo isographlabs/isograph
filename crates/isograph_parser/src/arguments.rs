@@ -672,7 +672,7 @@ mod tests {
             as_argument(items[0].item.reference()).name.location,
             span_of(text, "id")
         );
-        assert!(items[0].item.extra_tokens.is_some());
+        assert!(items[0].item.extra.is_some());
         assert!(errors.iter().any(|error| {
             error.item
                 == ParseError::expected(
@@ -858,7 +858,7 @@ mod tests {
             as_list_value(items[0].item.reference()).value.item,
             NonConstantValue::Integer(IntegerValue(1))
         ));
-        assert!(items[0].item.extra_tokens.is_some());
+        assert!(items[0].item.extra.is_some());
         assert!(errors.iter().any(|error| {
             error.item
                 == ParseError::expected(
