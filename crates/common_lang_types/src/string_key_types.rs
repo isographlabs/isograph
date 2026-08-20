@@ -10,6 +10,7 @@ string_key_newtype!(DirectiveArgumentName);
 string_key_newtype!(InputValueName);
 string_key_one_way_conversion!(from: InputValueName, to: VariableName);
 string_key_one_way_conversion!(from: InputValueName, to: FieldArgumentName);
+string_key_one_way_conversion!(from: InputValueName, to: ArgumentName);
 
 string_key_newtype!(EnumLiteralValue);
 string_key_newtype!(StringLiteralValue);
@@ -67,6 +68,9 @@ string_key_newtype!(IsographDirectiveName);
 string_key_newtype!(FieldArgumentName);
 string_key_equality!(FieldArgumentName, VariableName);
 string_key_equality!(SelectableName, VariableName);
+
+string_key_newtype!(ArgumentName);
+string_key_equality!(ArgumentName, VariableName);
 
 string_key_newtype!(SelectionName);
 

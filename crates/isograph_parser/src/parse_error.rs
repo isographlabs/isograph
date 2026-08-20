@@ -55,7 +55,7 @@ impl fmt::Display for Expectation {
             Expectation::OneOf(items) => write_one_of(f, items),
             Expectation::EndOfDeclaration => write!(f, "the end of the declaration"),
             Expectation::SelectionSet => write!(f, "a selection set, like '{{ id, name }}'"),
-            Expectation::Selection => write!(f, "a field selection"),
+            Expectation::Selection => write!(f, "a selection"),
             Expectation::Separator(kind) => {
                 write!(f, "a comma, a line break, or {}", kind.closing())
             }

@@ -6,14 +6,13 @@ use safe_peekable::{IntoSafePeekable, SafePeekable};
 use span::{Span, WithSpan, WithSpanPostfix};
 
 use crate::{
-    ArgumentListPath, BracketItem, Bracketed, CloseBracket, Expectation, ExtraChunksPath, Found,
-    IsoLiteralItem, IsoLiteralParsePath, IsoLiteralSlotPath, IsographResolutionNode,
-    ListLiteralPath, ListLiteralValue, ListLiteralValueSlotPath, ListTypeAnnotationPath,
-    MatchedBrackets, NonBracketToken, NonBracketTokenKind, ObjectEntry, ObjectEntrySlotPath,
-    ObjectLiteralPath, OpenBracket, ParseError, Selection, SelectionFieldArgument,
-    SelectionFieldArgumentSlotPath, SelectionSetPath, SelectionSlotPath, SemanticToken,
-    VariableDeclarationOrUsage, VariableDeclarationOrUsageListPath,
-    VariableDeclarationOrUsageSlotPath,
+    Argument, ArgumentListPath, ArgumentSlotPath, BracketItem, Bracketed, CloseBracket,
+    Expectation, ExtraChunksPath, Found, IsoLiteralItem, IsoLiteralParsePath, IsoLiteralSlotPath,
+    IsographResolutionNode, ListLiteralPath, ListLiteralValue, ListLiteralValueSlotPath,
+    ListTypeAnnotationPath, MatchedBrackets, NonBracketToken, NonBracketTokenKind, ObjectEntry,
+    ObjectEntrySlotPath, ObjectLiteralPath, OpenBracket, ParseError, Selection, SelectionSetPath,
+    SelectionSlotPath, SemanticToken, VariableDeclarationOrUsage,
+    VariableDeclarationOrUsageListPath, VariableDeclarationOrUsageSlotPath,
     chunk_stream::{ChunkStream, ItemCursor},
 };
 
@@ -195,7 +194,7 @@ pub struct UnparsedChunkItems(
 #[derive(Debug)]
 pub enum UnparsedChunkItemsParent<'a> {
     IsoLiteralSlot(IsoLiteralSlotPath<'a>),
-    SelectionFieldArgumentSlot(SelectionFieldArgumentSlotPath<'a>),
+    ArgumentSlot(ArgumentSlotPath<'a>),
     ObjectEntrySlot(ObjectEntrySlotPath<'a>),
     SelectionSlot(SelectionSlotPath<'a>),
     VariableDeclarationOrUsageSlot(VariableDeclarationOrUsageSlotPath<'a>),
@@ -212,9 +211,9 @@ impl<'a> From<IsoLiteralSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
     }
 }
 
-impl<'a> From<SelectionFieldArgumentSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
-    fn from(path: SelectionFieldArgumentSlotPath<'a>) -> Self {
-        UnparsedChunkItemsParent::SelectionFieldArgumentSlot(path)
+impl<'a> From<ArgumentSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
+    fn from(path: ArgumentSlotPath<'a>) -> Self {
+        UnparsedChunkItemsParent::ArgumentSlot(path)
     }
 }
 
@@ -268,14 +267,14 @@ pub struct ExtraChunks(
 ///   into leftover's parent enum.
 /// - Position in the slot span but in neither field: `on_unmatched_span = from_path`
 ///   returns `self.path(parent).to()`. Each pin’s `From` builds that pin’s
-///   `ResolvedNode` variant (`IsoLiteralSlot`, `SelectionFieldArgumentSlot`, `ObjectEntrySlot`).
+///   `ResolvedNode` variant (`IsoLiteralSlot`, `ArgumentSlot`, `ObjectEntrySlot`).
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
     resolved_node = IsographResolutionNode<'a>,
     on_unmatched_span = from_path,
     pins = [
         (<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>),
-        (<SelectionFieldArgument, UnparsedChunkItems>, ArgumentListPath<'a>),
+        (<Argument, UnparsedChunkItems>, ArgumentListPath<'a>),
         (<ObjectEntry, UnparsedChunkItems>, ObjectLiteralPath<'a>),
         (<Selection, UnparsedChunkItems>, SelectionSetPath<'a>),
         (<VariableDeclarationOrUsage, UnparsedChunkItems>, VariableDeclarationOrUsageListPath<'a>),

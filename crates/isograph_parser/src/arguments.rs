@@ -12,9 +12,7 @@ use crate::{
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ArgumentListParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ArgumentList(
-    #[resolve_field] pub Vec<WithSpan<Slot<SelectionFieldArgument, UnparsedChunkItems>>>,
-);
+pub struct ArgumentList(#[resolve_field] pub Vec<WithSpan<Slot<Argument, UnparsedChunkItems>>>);
 
 #[derive(Debug)]
 pub enum ArgumentListParent<'a> {
@@ -33,12 +31,12 @@ pub struct ListLiteral(
 );
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = SelectionFieldArgumentSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct SelectionFieldArgument {
+#[resolve_position(parent_type = ArgumentSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct Argument {
     #[resolve_field]
-    pub name: WithSpan<FieldArgumentNameWrapper>,
+    pub name: WithSpan<ArgumentNameWrapper>,
     #[resolve_field]
-    #[parent_variant(SelectionFieldArgument)]
+    #[parent_variant(Argument)]
     pub value: WithSpan<NonConstantValue>,
 }
 
@@ -104,10 +102,10 @@ pub struct NullValue;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
-    parent_type = SelectionFieldArgumentPath<'a>,
+    parent_type = ArgumentPath<'a>,
     resolved_node = IsographResolutionNode<'a>
 )]
-pub struct FieldArgumentNameWrapper(common_lang_types::FieldArgumentName);
+pub struct ArgumentNameWrapper(common_lang_types::ArgumentName);
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ObjectEntryPath<'a>, resolved_node = IsographResolutionNode<'a>)]
@@ -125,7 +123,7 @@ pub enum VariableNameWrapperParent<'a> {
 
 #[derive(Debug)]
 pub enum NonConstantValueParent<'a> {
-    SelectionFieldArgument(Box<SelectionFieldArgumentPath<'a>>),
+    Argument(Box<ArgumentPath<'a>>),
     ObjectEntry(Box<ObjectEntryPath<'a>>),
     VariableDefault(VariableDeclarationOrUsagePath<'a>),
     List(Box<ListLiteralValuePath<'a>>),
@@ -144,16 +142,13 @@ pub type ListLiteralValueSlotPath<'a> =
 pub type ListLiteralValuePath<'a> =
     PositionResolutionPath<&'a ListLiteralValue, ListLiteralValueSlotPath<'a>>;
 
-pub type SelectionFieldArgumentSlotPath<'a> = PositionResolutionPath<
-    &'a Slot<SelectionFieldArgument, UnparsedChunkItems>,
-    ArgumentListPath<'a>,
->;
+pub type ArgumentSlotPath<'a> =
+    PositionResolutionPath<&'a Slot<Argument, UnparsedChunkItems>, ArgumentListPath<'a>>;
 
 pub type ObjectEntrySlotPath<'a> =
     PositionResolutionPath<&'a Slot<ObjectEntry, UnparsedChunkItems>, ObjectLiteralPath<'a>>;
 
-pub type SelectionFieldArgumentPath<'a> =
-    PositionResolutionPath<&'a SelectionFieldArgument, SelectionFieldArgumentSlotPath<'a>>;
+pub type ArgumentPath<'a> = PositionResolutionPath<&'a Argument, ArgumentSlotPath<'a>>;
 
 pub type ObjectEntryPath<'a> = PositionResolutionPath<&'a ObjectEntry, ObjectEntrySlotPath<'a>>;
 
@@ -170,8 +165,8 @@ pub type BooleanValuePath<'a> =
 
 pub type NullValuePath<'a> = PositionResolutionPath<&'a NullValue, NonConstantValueParent<'a>>;
 
-pub type FieldArgumentNameWrapperPath<'a> =
-    PositionResolutionPath<&'a FieldArgumentNameWrapper, SelectionFieldArgumentPath<'a>>;
+pub type ArgumentNameWrapperPath<'a> =
+    PositionResolutionPath<&'a ArgumentNameWrapper, ArgumentPath<'a>>;
 
 pub type ValueKeyNameWrapperPath<'a> =
     PositionResolutionPath<&'a ValueKeyNameWrapper, ObjectEntryPath<'a>>;
@@ -179,9 +174,9 @@ pub type ValueKeyNameWrapperPath<'a> =
 pub type VariableNameWrapperPath<'a> =
     PositionResolutionPath<&'a VariableNameWrapper, VariableNameWrapperParent<'a>>;
 
-impl<'a> From<SelectionFieldArgumentSlotPath<'a>> for IsographResolutionNode<'a> {
-    fn from(path: SelectionFieldArgumentSlotPath<'a>) -> Self {
-        IsographResolutionNode::SelectionFieldArgumentSlot(path)
+impl<'a> From<ArgumentSlotPath<'a>> for IsographResolutionNode<'a> {
+    fn from(path: ArgumentSlotPath<'a>) -> Self {
+        IsographResolutionNode::ArgumentSlot(path)
     }
 }
 
@@ -221,9 +216,7 @@ fn require_interned_identifier<N: From<intern::string_key::StringKey>>(
     name.interned().wrap_ok()
 }
 
-fn parse_argument(
-    cursor: &mut ItemCursor<'_>,
-) -> Result<SelectionFieldArgument, WithSpan<ParseError>> {
+fn parse_argument(cursor: &mut ItemCursor<'_>) -> Result<Argument, WithSpan<ParseError>> {
     let (name, value) = parse_name_colon(
         cursor,
         |cursor| {
@@ -231,8 +224,8 @@ fn parse_argument(
         },
         parse_non_constant_value,
     )?;
-    SelectionFieldArgument {
-        name: name.map(FieldArgumentNameWrapper),
+    Argument {
+        name: name.map(ArgumentNameWrapper),
         value,
     }
     .wrap_ok()
@@ -421,7 +414,7 @@ mod tests {
     );
 
     type ParsedPairs = (
-        Vec<WithSpan<Slot<SelectionFieldArgument, UnparsedChunkItems>>>,
+        Vec<WithSpan<Slot<Argument, UnparsedChunkItems>>>,
         Vec<WithSpan<ParseError>>,
         Vec<WithSpan<SemanticToken>>,
     );
@@ -475,9 +468,7 @@ mod tests {
         (list, errors, tokens)
     }
 
-    fn as_argument(
-        slot: &Slot<SelectionFieldArgument, UnparsedChunkItems>,
-    ) -> &SelectionFieldArgument {
+    fn as_argument(slot: &Slot<Argument, UnparsedChunkItems>) -> &Argument {
         slot.item
             .as_ref()
             .map(|wrapped| wrapped.item.reference())
@@ -522,7 +513,7 @@ mod tests {
         );
         assert_eq!(
             as_argument(items[0].item.reference()).name.item,
-            FieldArgumentNameWrapper("id".intern().to())
+            ArgumentNameWrapper("id".intern().to())
         );
         assert_eq!(
             as_argument(items[0].item.reference()).value.location,
@@ -601,7 +592,7 @@ mod tests {
         assert_eq!(items.len(), 1);
         assert_eq!(
             as_argument(items[0].item.reference()).name.item,
-            FieldArgumentNameWrapper("id".intern().to())
+            ArgumentNameWrapper("id".intern().to())
         );
         assert_eq!(errors, vec![]);
     }
@@ -717,7 +708,7 @@ mod tests {
         assert_eq!(list.item.0.len(), 1);
         assert_eq!(
             as_argument(list.item.0[0].item.reference()).name.item,
-            FieldArgumentNameWrapper("id".intern().to())
+            ArgumentNameWrapper("id".intern().to())
         );
         assert_eq!(
             tokens,

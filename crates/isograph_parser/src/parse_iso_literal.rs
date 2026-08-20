@@ -31,7 +31,7 @@ impl<'a> From<IsoLiteralSlotPath<'a>> for IsographResolutionNode<'a> {
 #[resolve_position(parent_type = IsoLiteralSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum IsoLiteralItem {
     Entrypoint(EntrypointDeclaration),
-    Field(FieldDeclaration),
+    Selectable(SelectableDeclaration),
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -50,25 +50,25 @@ pub struct EntrypointDeclaration {
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = IsoLiteralSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct FieldDeclaration {
+pub struct SelectableDeclaration {
     #[resolve_field]
-    #[parent_variant(FieldDeclaration)]
+    #[parent_variant(SelectableDeclaration)]
     pub parent_type: WithSpan<EntityNameWrapper>,
     #[resolve_field]
-    #[parent_variant(FieldDeclaration)]
+    #[parent_variant(SelectableDeclaration)]
     pub name: WithSpan<SelectableNameWrapper>,
     #[resolve_field]
     pub variable_definitions: Option<WithSpan<VariableDeclarationOrUsageList>>,
     #[resolve_field]
-    #[parent_variant(FieldDeclaration)]
+    #[parent_variant(SelectableDeclaration)]
     pub target_type: Option<WithSpan<TypeAnnotation>>,
     #[resolve_field]
-    #[parent_variant(FieldDeclaration)]
+    #[parent_variant(SelectableDeclaration)]
     pub directive_set: Option<WithSpan<IsographFieldDirectiveList>>,
     #[resolve_field]
     pub description: Option<WithSpan<Description>>,
     #[resolve_field]
-    #[parent_variant(FieldDeclaration)]
+    #[parent_variant(SelectableDeclaration)]
     pub selection_set: WithSpan<SelectionSet>,
 }
 
@@ -77,7 +77,7 @@ pub struct FieldDeclaration {
 #[resolve_position(parent_type = EntityNameWrapperParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct EntityNameWrapper(pub common_lang_types::EntityName);
 
-/// The name of an entrypoint or field, `foo` in `entrypoint Query.foo`.
+/// The name of an entrypoint or selectable, `foo` in `entrypoint Query.foo`.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
     parent_type = SelectableNameWrapperParent<'a>,
@@ -87,29 +87,30 @@ pub struct SelectableNameWrapper(common_lang_types::SelectableName);
 
 /// The interned source slice of a description, quotes included.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = FieldDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = SelectableDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct Description(common_lang_types::DescriptionValue);
 
 #[derive(Debug)]
 pub enum EntityNameWrapperParent<'a> {
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
-    FieldDeclaration(FieldDeclarationPath<'a>),
+    SelectableDeclaration(SelectableDeclarationPath<'a>),
     NamedTypeAnnotation(NamedTypeAnnotationPath<'a>),
 }
 
 #[derive(Debug)]
 pub enum SelectableNameWrapperParent<'a> {
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
-    FieldDeclaration(FieldDeclarationPath<'a>),
+    SelectableDeclaration(SelectableDeclarationPath<'a>),
 }
 
 pub type EntrypointDeclarationPath<'a> =
     PositionResolutionPath<&'a EntrypointDeclaration, IsoLiteralSlotPath<'a>>;
 
-pub type FieldDeclarationPath<'a> =
-    PositionResolutionPath<&'a FieldDeclaration, IsoLiteralSlotPath<'a>>;
+pub type SelectableDeclarationPath<'a> =
+    PositionResolutionPath<&'a SelectableDeclaration, IsoLiteralSlotPath<'a>>;
 
-pub type DescriptionPath<'a> = PositionResolutionPath<&'a Description, FieldDeclarationPath<'a>>;
+pub type DescriptionPath<'a> =
+    PositionResolutionPath<&'a Description, SelectableDeclarationPath<'a>>;
 
 pub type ExtraChunksPath<'a> = PositionResolutionPath<&'a ExtraChunks, IsoLiteralParsePath<'a>>;
 
@@ -150,7 +151,7 @@ fn parse_iso_literal_item(
         .map_err(|()| cursor.expected(DECLARATION_KEYWORD))?;
     match keyword.text() {
         "entrypoint" => IsoLiteralItem::Entrypoint(parse_entrypoint(cursor)?).wrap_ok(),
-        "field" => IsoLiteralItem::Field(parse_field(cursor)?).wrap_ok(),
+        "field" => IsoLiteralItem::Selectable(parse_selectable_declaration(cursor)?).wrap_ok(),
         _ => ParseError::expected(
             DECLARATION_KEYWORD,
             Found::Token(NonBracketTokenKind::Identifier),
@@ -192,14 +193,16 @@ fn parse_entrypoint(
     .wrap_ok()
 }
 
-fn parse_field(cursor: &mut ItemCursor<'_>) -> Result<FieldDeclaration, WithSpan<ParseError>> {
+fn parse_selectable_declaration(
+    cursor: &mut ItemCursor<'_>,
+) -> Result<SelectableDeclaration, WithSpan<ParseError>> {
     let (parent_type, name) = parse_type_dot_name(cursor)?;
     let variable_definitions = consume_variable_declaration_list(cursor);
     let target_type = consume_to_target(cursor)?;
     let directive_set = consume_directives(cursor)?;
     let description = consume_description(cursor);
     let selection_set = require_selection_set(cursor, TO_OR_DESCRIPTION_OR_SELECTION_SET)?;
-    FieldDeclaration {
+    SelectableDeclaration {
         parent_type,
         name: name.map(SelectableNameWrapper),
         variable_definitions,
@@ -362,17 +365,17 @@ mod tests {
         }
     }
 
-    fn as_field(parse: &WithSpan<IsoLiteralParse>) -> &FieldDeclaration {
+    fn as_selectable(parse: &WithSpan<IsoLiteralParse>) -> &SelectableDeclaration {
         match parsed_item(parse).expect("the fixture's literal parsed an item") {
-            IsoLiteralItem::Field(declaration) => declaration,
-            item => panic!("expected a field declaration, got {item:?}"),
+            IsoLiteralItem::Selectable(declaration) => declaration,
+            item => panic!("expected a selectable declaration, got {item:?}"),
         }
     }
 
     fn variables_of(
         parse: &WithSpan<IsoLiteralParse>,
     ) -> &WithSpan<VariableDeclarationOrUsageList> {
-        as_field(parse)
+        as_selectable(parse)
             .variable_definitions
             .as_ref()
             .expect("the fixture's declaration carries variable definitions")
@@ -747,7 +750,7 @@ mod tests {
         let text = "field Query.Foo($id: ID) @component \"the route\" { bar }";
         let (parse, errors) = parsed(text);
         assert_eq!(errors, vec![]);
-        let field = as_field(parse.reference());
+        let field = as_selectable(parse.reference());
         assert!(field.variable_definitions.is_some());
         assert_eq!(
             field
@@ -765,7 +768,7 @@ mod tests {
         let text = "field Pet.BestFriend to Owner @updatable \"x\" { id }";
         let (parse, errors) = parsed(text);
         assert_eq!(errors, vec![]);
-        let field = as_field(parse.reference());
+        let field = as_selectable(parse.reference());
         assert!(field.target_type.is_some());
         assert_eq!(
             field
@@ -784,7 +787,7 @@ mod tests {
         let (parse, errors) = parsed(text);
         assert_eq!(errors, vec![]);
         let selection = as_selection(
-            selections(as_field(parse.reference()).selection_set.reference())[0]
+            selections(as_selectable(parse.reference()).selection_set.reference())[0]
                 .item
                 .reference(),
         );
@@ -810,7 +813,7 @@ mod tests {
         let (parse, errors) = parsed(text);
         assert_eq!(errors, vec![]);
         let directives = as_selection(
-            selections(as_field(parse.reference()).selection_set.reference())[0]
+            selections(as_selectable(parse.reference()).selection_set.reference())[0]
                 .item
                 .reference(),
         )
@@ -825,7 +828,7 @@ mod tests {
     fn a_directive_on_the_next_line_is_its_own_failed_selection() {
         let text = "field Query.Foo { bar\n@loadable }";
         let (parse, errors) = parsed(text);
-        let items = selections(as_field(parse.reference()).selection_set.reference());
+        let items = selections(as_selectable(parse.reference()).selection_set.reference());
         assert_eq!(items.len(), 2);
         as_selection(items[0].item.reference());
         assert!(items[1].item.item.is_none());
@@ -1043,10 +1046,10 @@ mod tests {
     }
 
     #[test]
-    fn a_field_declaration_parses_with_selections() {
+    fn a_selectable_declaration_parses_with_selections() {
         let text = "field Query.Foo {\n  bar,\n  baz\n}";
         let (parse, errors) = parsed(text);
-        let declaration = as_field(parse.reference());
+        let declaration = as_selectable(parse.reference());
         assert_eq!(
             declaration.parent_type.item,
             EntityNameWrapper("Query".intern().to())
@@ -1088,7 +1091,7 @@ mod tests {
         ] {
             let (parse, errors) = parsed(text);
             assert_eq!(
-                selections(as_field(parse.reference()).selection_set.reference()).len(),
+                selections(as_selectable(parse.reference()).selection_set.reference()).len(),
                 0,
                 "for literal {text:?}"
             );
@@ -1097,7 +1100,7 @@ mod tests {
     }
 
     #[test]
-    fn a_field_declaration_without_a_selection_set_is_a_failed_item() {
+    fn a_selectable_declaration_without_a_selection_set_is_a_failed_item() {
         let text = "field Query.Foo";
         let end = span_of(text, "Foo").end;
         assert_no_declaration(
@@ -1119,10 +1122,10 @@ mod tests {
     }
 
     #[test]
-    fn a_final_comma_after_the_field_declaration_is_an_error() {
+    fn a_final_comma_after_the_selectable_declaration_is_an_error() {
         let text = "field Query.Foo { bar },";
         let (parse, errors) = parsed(text);
-        as_field(parse.reference());
+        as_selectable(parse.reference());
         assert_eq!(
             errors,
             expected(Expectation::EndOfDeclaration, Found::Token(Comma))
@@ -1135,7 +1138,7 @@ mod tests {
     fn tokens_after_the_selection_set_are_leftover() {
         let text = "field Query.Foo { bar } junk";
         let (parse, errors) = parsed(text);
-        as_field(parse.reference());
+        as_selectable(parse.reference());
         assert!(first_slot(parse.reference()).extra_tokens.is_some());
         assert_eq!(
             errors,
@@ -1150,7 +1153,7 @@ mod tests {
         let text = "field Query.Foo { bar }";
         let (parse, errors) = parsed(text);
         assert_eq!(errors, vec![]);
-        assert_eq!(as_field(parse.reference()).description, None);
+        assert_eq!(as_selectable(parse.reference()).description, None);
     }
 
     #[test]
@@ -1158,7 +1161,7 @@ mod tests {
         let text = "field Query.Foo \"the home route\" { bar }";
         let (parse, errors) = parsed(text);
         assert_eq!(errors, vec![]);
-        let description = as_field(parse.reference())
+        let description = as_selectable(parse.reference())
             .description
             .as_ref()
             .expect("the fixture carries a description");
@@ -1174,7 +1177,7 @@ mod tests {
         let text = "field Query.Foo \"\"\"\n  the home\n  route\n\"\"\" { bar }";
         let (parse, errors) = parsed(text);
         assert_eq!(errors, vec![]);
-        let declaration = as_field(parse.reference());
+        let declaration = as_selectable(parse.reference());
         let description = declaration
             .description
             .as_ref()
@@ -1190,7 +1193,7 @@ mod tests {
     fn a_description_after_the_selection_set_is_leftover() {
         let text = "field Query.Foo { bar } \"too late\"";
         let (parse, errors) = parsed(text);
-        as_field(parse.reference());
+        as_selectable(parse.reference());
         assert!(first_slot(parse.reference()).extra_tokens.is_some());
         assert_eq!(
             errors,
@@ -1235,7 +1238,7 @@ mod tests {
         let text = "field Query.Foo { bar }";
         let (parse, errors) = parsed(text);
         assert_eq!(errors, vec![]);
-        assert_eq!(as_field(parse.reference()).target_type, None);
+        assert_eq!(as_selectable(parse.reference()).target_type, None);
     }
 
     #[test]
@@ -1243,7 +1246,7 @@ mod tests {
         let text = "field Pet.BestFriend to Owner { id }";
         let (parse, errors) = parsed(text);
         assert_eq!(errors, vec![]);
-        let declaration = as_field(parse.reference());
+        let declaration = as_selectable(parse.reference());
         assert_eq!(
             declaration.name.item,
             SelectableNameWrapper("BestFriend".intern().to())
@@ -1268,7 +1271,7 @@ mod tests {
         let text = "field Pet.Owner($limit: Int) to Person! \"the owner\" { name }";
         let (parse, errors) = parsed(text);
         assert_eq!(errors, vec![]);
-        let declaration = as_field(parse.reference());
+        let declaration = as_selectable(parse.reference());
         assert!(declaration.variable_definitions.is_some());
         assert_eq!(
             declaration
@@ -1293,7 +1296,7 @@ mod tests {
             let (parse, errors) = parsed(text);
             assert_eq!(errors, vec![], "for literal {text:?}");
             assert_eq!(
-                as_field(parse.reference())
+                as_selectable(parse.reference())
                     .target_type
                     .as_ref()
                     .expect("the fixture writes a target")
@@ -1309,7 +1312,7 @@ mod tests {
         let text = "field Query.Friends to [Pet!]! { id }";
         let (parse, errors) = parsed(text);
         assert_eq!(errors, vec![]);
-        let target = as_field(parse.reference())
+        let target = as_selectable(parse.reference())
             .target_type
             .as_ref()
             .expect("the fixture writes a list target");
@@ -1387,7 +1390,7 @@ mod tests {
     fn a_final_comma_after_a_field_with_to_is_an_error() {
         let text = "field Pet.BestFriend to Owner { id },";
         let (parse, errors) = parsed(text);
-        as_field(parse.reference());
+        as_selectable(parse.reference());
         assert_eq!(
             errors,
             expected(Expectation::EndOfDeclaration, Found::Token(Comma))
@@ -1401,12 +1404,12 @@ mod tests {
         let text = "field Pet.BestFriend to Owner { id }";
         let (parse, _) = parsed(text);
         match parse.resolve((), span_of(text, "to")) {
-            IsographResolutionNode::FieldDeclaration(_) => {}
+            IsographResolutionNode::SelectableDeclaration(_) => {}
             node => panic!("expected the declaration at `to`, got {node:?}"),
         }
         match parse.resolve((), span_of(text, "BestFriend")) {
             IsographResolutionNode::SelectableNameWrapper(name) => match name.parent {
-                SelectableNameWrapperParent::FieldDeclaration(declaration) => {
+                SelectableNameWrapperParent::SelectableDeclaration(declaration) => {
                     assert_eq!(
                         declaration
                             .inner
@@ -1423,7 +1426,7 @@ mod tests {
         match parse.resolve((), span_of(text, "Owner")) {
             IsographResolutionNode::EntityNameWrapper(name) => match name.parent {
                 EntityNameWrapperParent::NamedTypeAnnotation(named) => match named.parent {
-                    TypeAnnotationParent::FieldDeclaration(_) => {}
+                    TypeAnnotationParent::SelectableDeclaration(_) => {}
                     parent => panic!("expected the field as type parent, got {parent:?}"),
                 },
                 parent => panic!("expected a named type annotation, got {parent:?}"),
@@ -1433,7 +1436,7 @@ mod tests {
         match parse.resolve((), span_of(text, "id")) {
             IsographResolutionNode::SelectionNameWrapper(name) => {
                 match name.parent.parent.parent.parent {
-                    SelectionSetParent::FieldDeclaration(_) => {}
+                    SelectionSetParent::SelectableDeclaration(_) => {}
                     parent => panic!("expected the field at the top, got {parent:?}"),
                 }
             }
@@ -1466,7 +1469,7 @@ mod tests {
                 };
                 assert_eq!(object.inner.name.location, span_of(text, "pet"));
                 match object.parent.parent.parent {
-                    SelectionSetParent::FieldDeclaration(declaration) => {
+                    SelectionSetParent::SelectableDeclaration(declaration) => {
                         assert_eq!(declaration.inner.name.location, span_of(text, "Foo"));
                     }
                     parent => panic!("expected the declaration at the top, got {parent:?}"),
@@ -1521,7 +1524,7 @@ mod tests {
         let text = "field Query.Foo { bar(id: $x) }";
         let (parse, _) = parsed(text);
         match parse.resolve((), span_of(text, "id")) {
-            IsographResolutionNode::FieldArgumentNameWrapper(name) => {
+            IsographResolutionNode::ArgumentNameWrapper(name) => {
                 match name.parent.parent.parent.parent {
                     ArgumentListParent::Selection(selection) => {
                         assert_eq!(selection.inner.name.location, span_of(text, "bar"));

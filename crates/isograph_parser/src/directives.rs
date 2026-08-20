@@ -5,8 +5,8 @@ use span::{Span, WithSpan, WithSpanPostfix};
 
 use crate::chunk_stream::ItemCursor;
 use crate::{
-    ArgumentList, ChunkContentItem, EntrypointDeclarationPath, Expectation, FieldDeclarationPath,
-    IsographResolutionNode, NonBracketToken, NonBracketTokenKind, ParseError, SelectionPath,
+    ArgumentList, ChunkContentItem, EntrypointDeclarationPath, Expectation, IsographResolutionNode,
+    NonBracketToken, NonBracketTokenKind, ParseError, SelectableDeclarationPath, SelectionPath,
     SemanticToken, consume_argument_list,
 };
 
@@ -31,7 +31,7 @@ pub struct IsographDirectiveNameWrapper(pub common_lang_types::IsographDirective
 #[derive(Debug)]
 pub enum IsographFieldDirectiveListParent<'a> {
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
-    FieldDeclaration(FieldDeclarationPath<'a>),
+    SelectableDeclaration(SelectableDeclarationPath<'a>),
     Selection(SelectionPath<'a>),
 }
 

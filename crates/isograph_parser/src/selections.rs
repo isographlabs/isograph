@@ -38,7 +38,7 @@ pub struct SelectionNameWrapper(pub common_lang_types::SelectionName);
 
 #[derive(Debug)]
 pub enum SelectionSetParent<'a> {
-    FieldDeclaration(crate::FieldDeclarationPath<'a>),
+    SelectableDeclaration(crate::SelectableDeclarationPath<'a>),
     Selection(Box<SelectionPath<'a>>),
 }
 

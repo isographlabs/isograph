@@ -5,14 +5,14 @@ use span::{Span, WithSpan, WithSpanPostfix};
 
 use crate::chunk_stream::ItemCursor;
 use crate::{
-    BracketKind, ChunkedLevel, EntityNameWrapper, Expectation, FieldDeclarationPath, Found,
-    IsographResolutionNode, NonBracketTokenKind, NonConstantValue, ParseError, SemanticToken, Slot,
-    UnparsedChunkItems, VariableNameWrapper, parse_name_colon, parse_non_constant_value,
+    BracketKind, ChunkedLevel, EntityNameWrapper, Expectation, Found, IsographResolutionNode,
+    NonBracketTokenKind, NonConstantValue, ParseError, SelectableDeclarationPath, SemanticToken,
+    Slot, UnparsedChunkItems, VariableNameWrapper, parse_name_colon, parse_non_constant_value,
     parse_variable_name,
 };
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = FieldDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = SelectableDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct VariableDeclarationOrUsageList(
     #[resolve_field] pub Vec<WithSpan<Slot<VariableDeclarationOrUsage, UnparsedChunkItems>>>,
 );
@@ -61,11 +61,11 @@ pub struct ListTypeAnnotation {
 pub enum TypeAnnotationParent<'a> {
     Variable(VariableDeclarationOrUsagePath<'a>),
     List(Box<ListTypeAnnotationPath<'a>>),
-    FieldDeclaration(FieldDeclarationPath<'a>),
+    SelectableDeclaration(SelectableDeclarationPath<'a>),
 }
 
 pub type VariableDeclarationOrUsageListPath<'a> =
-    PositionResolutionPath<&'a VariableDeclarationOrUsageList, FieldDeclarationPath<'a>>;
+    PositionResolutionPath<&'a VariableDeclarationOrUsageList, SelectableDeclarationPath<'a>>;
 
 pub type VariableDeclarationOrUsageSlotPath<'a> = PositionResolutionPath<
     &'a Slot<VariableDeclarationOrUsage, UnparsedChunkItems>,
