@@ -34,15 +34,12 @@ pub(crate) struct TokenText<'a> {
 }
 
 impl<'a> TokenText<'a> {
-    pub(crate) fn token_text(self) -> &'a str {
+    pub(crate) fn text(self) -> &'a str {
         &self.text[self.location.as_usize_range()]
     }
 
     pub(crate) fn interned<T: From<intern::string_key::StringKey>>(self) -> WithSpan<T> {
-        self.token_text()
-            .intern()
-            .to::<T>()
-            .with_span(self.location)
+        self.text().intern().to::<T>().with_span(self.location)
     }
 }
 
@@ -595,7 +592,7 @@ mod tests {
         let foo = cursor
             .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
             .expect("foo is present");
-        assert_eq!(foo.token_text(), "foo");
+        assert_eq!(foo.text(), "foo");
         assert_eq!(foo.location, span_of(text, "foo"));
         assert_eq!(cursor.text(), text);
     }

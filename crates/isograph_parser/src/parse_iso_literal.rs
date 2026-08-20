@@ -129,7 +129,7 @@ fn parse_iso_literal_item(
     let keyword = cursor
         .require_token(NonBracketTokenKind::Identifier, SemanticToken::Keyword)
         .map_err(|()| cursor.expected(Expectation::DeclarationKeyword))?;
-    match keyword.token_text() {
+    match keyword.text() {
         "entrypoint" => IsoLiteralItem::Entrypoint(parse_entrypoint(cursor)?).wrap_ok(),
         "field" => IsoLiteralItem::Field(parse_field(cursor)?).wrap_ok(),
         "pointer" => ParseError::UnsupportedDeclarationType

@@ -246,7 +246,7 @@ pub(crate) fn parse_non_constant_value(
         if let Some(span) =
             cursor.consume_token_if(NonBracketTokenKind::IntegerLiteral, SemanticToken::Integer)
         {
-            let value = match span.token_text().parse() {
+            let value = match span.text().parse() {
                 Ok(value) => value,
                 Err(_) => {
                     return ParseError::IntegerDoesNotFitI64
@@ -260,7 +260,7 @@ pub(crate) fn parse_non_constant_value(
             NonBracketTokenKind::Identifier,
             SemanticToken::BooleanOrNull,
         ) {
-            return match span.token_text() {
+            return match span.text() {
                 "true" => NonConstantValue::Boolean(BooleanValue(Boolean::True)).wrap_ok(),
                 "false" => NonConstantValue::Boolean(BooleanValue(Boolean::False)).wrap_ok(),
                 "null" => NonConstantValue::Null(NullValue).wrap_ok(),
