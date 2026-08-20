@@ -277,7 +277,7 @@ Extending the `parse_iso_literal.rs` test module. Helpers `parsed`, `parsed_with
         assert_eq!(items.len(), 2);
         assert_eq!(
             as_scalar(items[0].item.reference()).name.item,
-            SelectableNameWrapper("bar".intern().to())
+            SelectionNameWrapper("bar".intern().to())
         );
         assert_eq!(
             as_scalar(items[0].item.reference()).name.location,
@@ -362,9 +362,9 @@ Extending the `parse_iso_literal.rs` test module. Helpers `parsed`, `parsed_with
         let text = "field Query.Foo { pet { name } }";
         let (parse, _) = parsed(text);
         match parse.resolve((), span_of(text, "name")) {
-            IsographResolutionNode::SelectableNameWrapper(name) => {
+            IsographResolutionNode::SelectionNameWrapper(name) => {
                 let scalar = match name.parent {
-                    SelectableNameWrapperParent::Scalar(scalar) => scalar,
+                    SelectionNameWrapperParent::ScalarSelection(scalar) => scalar,
                     parent => panic!("expected a scalar parent, got {parent:?}"),
                 };
                 let object = match scalar.parent.parent.parent {
@@ -395,7 +395,7 @@ Extending the `parse_iso_literal.rs` test module. Helpers `parsed`, `parsed_with
             node => panic!("expected the leftover token, got {node:?}"),
         }
         match parse.resolve((), span_of(text, "bar")) {
-            IsographResolutionNode::SelectableNameWrapper(_) => {}
+            IsographResolutionNode::SelectionNameWrapper(_) => {}
             node => panic!("expected the selection name, got {node:?}"),
         }
     }
@@ -435,7 +435,7 @@ Extending the `parse_iso_literal.rs` test module. Helpers `parsed`, `parsed_with
         match parse.resolve((), span_of(text, "id")) {
             IsographResolutionNode::FieldArgumentNameWrapper(name) => {
                 match name.parent.parent.parent.parent {
-                    ArgumentListParent::Scalar(_) => {}
+                    ArgumentListParent::ScalarSelection(_) => {}
                     parent => panic!("expected a scalar argument list, got {parent:?}"),
                 }
             }
@@ -450,7 +450,7 @@ Extending the `parse_iso_literal.rs` test module. Helpers `parsed`, `parsed_with
 
 `field_and_pointer_declarations_do_not_parse_yet` keeps only the pointer fixture.
 
-`name.parent` is `SelectableNameWrapperParent::Scalar`. `scalar.parent` is the selection slot. `scalar.parent.parent` is the inner `SelectionSet`. `scalar.parent.parent.parent` is `SelectionSetParent::ObjectSelection`. The object's slot, then the outer set, then `SelectionSetParent::ClientFieldDeclaration` is `object.parent.parent.parent`.
+`name.parent` is `SelectionNameWrapperParent::ScalarSelection`. `scalar.parent` is the selection slot. `scalar.parent.parent` is the inner `SelectionSet`. `scalar.parent.parent.parent` is `SelectionSetParent::ObjectSelection`. The object's slot, then the outer set, then `SelectionSetParent::ClientFieldDeclaration` is `object.parent.parent.parent`.
 
 ## Landing checklist
 

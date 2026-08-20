@@ -46,6 +46,10 @@ pub enum Expectation {
     Value,
     #[error("an object entry, like 'id: 4'")]
     ObjectEntry,
+    #[error("a selection set, like '{{ id, name }}'")]
+    SelectionSet,
+    #[error("a field selection")]
+    Selection,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, strum::Display)]

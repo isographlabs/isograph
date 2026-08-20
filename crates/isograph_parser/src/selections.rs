@@ -1,58 +1,17 @@
-# parse-selection-sets: selections and selection sets
-
-Scalar selections, `alias: name`, object selections, and argument lists on those selections. Lands after align-parser-names.md. parse-fields.md is the host that requires a selection set on a declaration. Groups use the `parse_inside` form of `require_group` / `consume_group_if`.
-
-## The grammar this doc accepts
-
-Each contentful chunk of a selection set is one selection:
-
-```
-[<Identifier> :] <Identifier> [<paren group>] [<brace group>]
-```
-
-The leading identifier is the alias when a colon follows, the name otherwise. A paren group is `consume_argument_list`. A brace group is an object selection whose interior recurses; without one it is a scalar selection.
-
-Tests feed a list's interior to `parse_each_chunk`. The wrapping brace group lands with the host that requires it.
-
-`@` on a selection is leftover (`Expectation::Separator(Brace)`). parse-directives.md consumes it.
-
-A selection that starts with `.` is `Expected(Selection, Token(Period))`. Upstream emits a fragment-spread diagnostic for `...`; i2 does not. parsing-plan.md lists that.
-
-## Change 1: `Expectation`
-
-```rust
-// from crates/isograph_parser/src/parse_error.rs
-    #[error("a selection set, like '{{ id, name }}'")]
-    SelectionSet,
-    #[error("a field selection")]
-    Selection,
-```
-
-Selection leftover is `Expectation::Separator(BracketKind::Brace)`.
-
-## Change 2: `selections.rs`
-
-Origin for the types: `crates/isograph_lang_types/src/declarations/selection_declaration.rs` and `client_selectable_declaration.rs`. Delta: each selection sits in a `Slot`; names and aliases are resolve-position wrappers; `arguments` is `Option<WithSpan<ArgumentList>>` rather than `Vec<SelectionFieldArgument>`; directives are absent until parse-directives.md; `Selection` is an enum, not `SelectionType<ScalarSelection, ObjectSelection>`.
-
-```rust
-// from crates/isograph_parser/src/selections.rs
-use intern::string_key::Intern;
 use prelude::Postfix;
 use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
-use span::{WithSpan, WithSpanPostfix};
+use span::WithSpan;
 
 use crate::chunk_stream::ItemCursor;
 use crate::{
-    ArgumentList, BracketKind, Expectation, IsographResolutionNode, NonBracketTokenKind, ParseError,
-    SemanticToken, Slot, UnparsedChunkItems, consume_argument_list,
+    ArgumentList, BracketKind, Expectation, IsographResolutionNode, NonBracketTokenKind,
+    ParseError, SemanticToken, Slot, UnparsedChunkItems, consume_argument_list,
 };
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SelectionSetParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct SelectionSet(
-    #[resolve_field] pub Vec<WithSpan<Slot<Selection, UnparsedChunkItems>>>,
-);
+pub struct SelectionSet(#[resolve_field] pub Vec<WithSpan<Slot<Selection, UnparsedChunkItems>>>);
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SelectionSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
@@ -65,13 +24,13 @@ pub enum Selection {
 #[resolve_position(parent_type = SelectionSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ScalarSelection {
     #[resolve_field]
-    #[parent_variant(Scalar)]
-    pub reader_alias: Option<WithSpan<SelectableAliasWrapper>>,
+    #[parent_variant(ScalarSelection)]
+    pub reader_alias: Option<WithSpan<SelectionNameWrapper>>,
     #[resolve_field]
-    #[parent_variant(Scalar)]
-    pub name: WithSpan<SelectableNameWrapper>,
+    #[parent_variant(ScalarSelection)]
+    pub name: WithSpan<SelectionNameWrapper>,
     #[resolve_field]
-    #[parent_variant(Scalar)]
+    #[parent_variant(ScalarSelection)]
     pub arguments: Option<WithSpan<ArgumentList>>,
 }
 
@@ -79,13 +38,13 @@ pub struct ScalarSelection {
 #[resolve_position(parent_type = SelectionSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ObjectSelection {
     #[resolve_field]
-    #[parent_variant(Object)]
-    pub reader_alias: Option<WithSpan<SelectableAliasWrapper>>,
+    #[parent_variant(ObjectSelection)]
+    pub reader_alias: Option<WithSpan<SelectionNameWrapper>>,
     #[resolve_field]
-    #[parent_variant(Object)]
-    pub name: WithSpan<SelectableNameWrapper>,
+    #[parent_variant(ObjectSelection)]
+    pub name: WithSpan<SelectionNameWrapper>,
     #[resolve_field]
-    #[parent_variant(Object)]
+    #[parent_variant(ObjectSelection)]
     pub arguments: Option<WithSpan<ArgumentList>>,
     #[resolve_field]
     #[parent_variant(ObjectSelection)]
@@ -93,12 +52,8 @@ pub struct ObjectSelection {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = SelectableNameWrapperParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct SelectableNameWrapper(common_lang_types::SelectableName);
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = SelectableAliasWrapperParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct SelectableAliasWrapper(common_lang_types::SelectableAlias);
+#[resolve_position(parent_type = SelectionNameWrapperParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct SelectionNameWrapper(common_lang_types::SelectableName);
 
 #[derive(Debug)]
 pub enum SelectionSetParent<'a> {
@@ -106,15 +61,9 @@ pub enum SelectionSetParent<'a> {
 }
 
 #[derive(Debug)]
-pub enum SelectableNameWrapperParent<'a> {
-    Scalar(ScalarSelectionPath<'a>),
-    Object(ObjectSelectionPath<'a>),
-}
-
-#[derive(Debug)]
-pub enum SelectableAliasWrapperParent<'a> {
-    Scalar(ScalarSelectionPath<'a>),
-    Object(ObjectSelectionPath<'a>),
+pub enum SelectionNameWrapperParent<'a> {
+    ScalarSelection(ScalarSelectionPath<'a>),
+    ObjectSelection(ObjectSelectionPath<'a>),
 }
 
 pub type SelectionSetPath<'a> = PositionResolutionPath<&'a SelectionSet, SelectionSetParent<'a>>;
@@ -122,82 +71,22 @@ pub type SelectionSetPath<'a> = PositionResolutionPath<&'a SelectionSet, Selecti
 pub type SelectionSlotPath<'a> =
     PositionResolutionPath<&'a Slot<Selection, UnparsedChunkItems>, SelectionSetPath<'a>>;
 
-pub type ScalarSelectionPath<'a> = PositionResolutionPath<&'a ScalarSelection, SelectionSlotPath<'a>>;
+pub type ScalarSelectionPath<'a> =
+    PositionResolutionPath<&'a ScalarSelection, SelectionSlotPath<'a>>;
 
-pub type ObjectSelectionPath<'a> = PositionResolutionPath<&'a ObjectSelection, SelectionSlotPath<'a>>;
+pub type ObjectSelectionPath<'a> =
+    PositionResolutionPath<&'a ObjectSelection, SelectionSlotPath<'a>>;
 
-pub type SelectableNameWrapperPath<'a> =
-    PositionResolutionPath<&'a SelectableNameWrapper, SelectableNameWrapperParent<'a>>;
+pub type SelectionNameWrapperPath<'a> =
+    PositionResolutionPath<&'a SelectionNameWrapper, SelectionNameWrapperParent<'a>>;
 
-pub type SelectableAliasWrapperPath<'a> =
-    PositionResolutionPath<&'a SelectableAliasWrapper, SelectableAliasWrapperParent<'a>>;
-```
-
-`Selection`, `ScalarSelection`, and `ObjectSelection` take the slot path as parent: the same layout as `IsoLiteralItem` / `EntrypointDeclaration` on `IsoLiteralSlotPath`, and as `SelectionFieldArgument` on `SelectionFieldArgumentSlotPath`.
-
-`SelectionSetParent::ObjectSelection` is boxed to break the cycle `SelectionSetPath -> ObjectSelectionPath -> SelectionSetPath`. The derive's `parent.into()` converts through `From<T> for Box<T>`. parse-fields.md adds `ClientFieldDeclaration`. Variant names match isograph's `SelectionSetParentType` (`ObjectSelection`, `ClientFieldDeclaration`, `ClientPointerDeclaration`). The enum itself is `SelectionSetParent`: i2 parent enums do not take a `Type` suffix (`ArgumentListParent`, `NonConstantValueParent`).
-
-`reader_alias` and `name` are isograph's field names. The wrappers exist because those fields are resolve-position leaves; isograph stores `SelectableName` / `SelectableAlias` without a wrapper and does not `#[resolve_field]` them.
-
-```rust
-// from crates/isograph_parser/src/arguments.rs
-#[derive(Debug)]
-pub enum ArgumentListParent<'a> {
-    Scalar(ScalarSelectionPath<'a>),
-    Object(ObjectSelectionPath<'a>),
-}
-
-pub type ArgumentListPath<'a> = PositionResolutionPath<&'a ArgumentList, ArgumentListParent<'a>>;
-```
-
-`ArgumentList`'s `parent_type` becomes `ArgumentListParent<'a>`. parse-directives.md adds `IsographFieldDirective`.
-
-```rust
-// from crates/isograph_parser/src/chunk.rs
-    pins = [
-        (<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>),
-        (<SelectionFieldArgument, UnparsedChunkItems>, ArgumentListPath<'a>),
-        (<ObjectEntry, UnparsedChunkItems>, ObjectLiteralPath<'a>),
-        (<Selection, UnparsedChunkItems>, SelectionSetPath<'a>),
-    ]
-```
-
-```rust
-// from crates/isograph_parser/src/chunk.rs
-pub enum UnparsedChunkItemsParent<'a> {
-    IsoLiteralSlot(IsoLiteralSlotPath<'a>),
-    SelectionFieldArgumentSlot(SelectionFieldArgumentSlotPath<'a>),
-    ObjectEntrySlot(ObjectEntrySlotPath<'a>),
-    SelectionSlot(SelectionSlotPath<'a>),
-}
-
-impl<'a> From<SelectionSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
-    fn from(parent: SelectionSlotPath<'a>) -> Self {
-        UnparsedChunkItemsParent::SelectionSlot(parent)
-    }
-}
-```
-
-Leftover's parent is the slot path, as on the landed argument and object-entry pins. It is not `SelectionSetPath`.
-
-```rust
-// from crates/isograph_parser/src/selections.rs
 impl<'a> From<SelectionSlotPath<'a>> for IsographResolutionNode<'a> {
     fn from(path: SelectionSlotPath<'a>) -> Self {
         IsographResolutionNode::SelectionSlot(path)
     }
 }
-```
 
-```rust
-// from crates/isograph_parser/src/isograph_resolution_node.rs
-    SelectionSlot(SelectionSlotPath<'a>),
-```
-
-A gap in a selection slot answers `IsographResolutionNode::SelectionSlot`.
-
-```rust
-// from crates/isograph_parser/src/selections.rs
+#[expect(dead_code)]
 pub(crate) fn require_selection_set(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<WithSpan<SelectionSet>, WithSpan<ParseError>> {
@@ -234,21 +123,21 @@ fn parse_selection(cursor: &mut ItemCursor<'_>) -> Result<Selection, WithSpan<Pa
     let first = cursor
         .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
         .map_err(|()| cursor.expected(Expectation::Selection))?;
-    let (reader_alias, name) = match cursor.consume_token_if(NonBracketTokenKind::Colon, SemanticToken::Colon)
-    {
-        Some(_) => {
-            let name = cursor
-                .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
-                .map_err(|()| {
-                    cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier))
-                })?;
-            (
-                first.interned().map(SelectableAliasWrapper).wrap_some(),
-                name.interned().map(SelectableNameWrapper),
-            )
-        }
-        None => (None, first.interned().map(SelectableNameWrapper)),
-    };
+    let (reader_alias, name) =
+        match cursor.consume_token_if(NonBracketTokenKind::Colon, SemanticToken::Colon) {
+            Some(_) => {
+                let name = cursor
+                    .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
+                    .map_err(|()| {
+                        cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier))
+                    })?;
+                (
+                    first.interned().map(SelectionNameWrapper).wrap_some(),
+                    name.interned().map(SelectionNameWrapper),
+                )
+            }
+            None => (None, first.interned().map(SelectionNameWrapper)),
+        };
     let arguments = consume_argument_list(cursor);
     let selection_set = consume_selection_set(cursor);
     match selection_set {
@@ -266,39 +155,29 @@ fn parse_selection(cursor: &mut ItemCursor<'_>) -> Result<Selection, WithSpan<Pa
     }
     .wrap_ok()
 }
-```
 
-The first identifier of `alias: name` is `FieldName` on both arms. Origin: semantic-tokens.md. `SafePeekable` has one item of lookahead, so the identifier is consumed before the colon is visible.
+#[cfg(test)]
+mod tests {
+    use intern::string_key::Intern;
+    use prelude::Postfix;
+    use span::{Span, WithSpan, WithSpanPostfix};
 
-`lib.rs` adds `mod selections;` and `pub use selections::*;`.
+    use super::*;
+    use crate::{
+        CommaWithoutItem, Found, NonBracketTokenKind, ParseError, SemanticToken, chunk,
+        match_brackets, tokenize,
+    };
 
-`require_selection_set` has no production caller until parse-fields.md. It takes `#[cfg_attr(not(test), expect(dead_code))]`. `consume_selection_set` and `parse_selection` are used from tests via `parse_each_chunk`.
-
-## The resolution surface
-
-```rust
-// from crates/isograph_parser/src/isograph_resolution_node.rs
-    SelectionSet(SelectionSetPath<'a>),
-    ScalarSelection(ScalarSelectionPath<'a>),
-    ObjectSelection(ObjectSelectionPath<'a>),
-    SelectableNameWrapper(SelectableNameWrapperPath<'a>),
-    SelectableAliasWrapper(SelectableAliasWrapperPath<'a>),
-```
-
-A leftover token answers `NonBracketToken` through `UnparsedChunkItemsParent::SelectionSlot` once a host supplies `SelectionSetParent`. A failed selection chunk is the same walk; the whole chunk's items sit in `extra_tokens`.
-
-`SelectionSet` iterates the vec, each hit descending with the container's path. `Selection` delegates. `ObjectSelection` / `ScalarSelection` expand with `parent_variant` wrapping. `SelectableNameWrapper` and `SelectableAliasWrapper` are interned-key leaves.
-
-Resolve-from-a-declaration tests wait for parse-fields.md. This doc asserts parse structure.
-
-## Tests
-
-```rust
-// from crates/isograph_parser/src/selections.rs
     type ParsedItems<P> = (
         Vec<WithSpan<Slot<P, UnparsedChunkItems>>>,
         Vec<WithSpan<ParseError>>,
         Vec<CommaWithoutItem>,
+        Vec<WithSpan<SemanticToken>>,
+    );
+
+    type ParsedSelections = (
+        Vec<WithSpan<Slot<Selection, UnparsedChunkItems>>>,
+        Vec<WithSpan<ParseError>>,
         Vec<WithSpan<SemanticToken>>,
     );
 
@@ -323,13 +202,7 @@ Resolve-from-a-declaration tests wait for parse-fields.md. This doc asserts pars
         (items, errors, comma_errors, tokens)
     }
 
-    fn parsed_selections(
-        text: &str,
-    ) -> (
-        Vec<WithSpan<Slot<Selection, UnparsedChunkItems>>>,
-        Vec<WithSpan<ParseError>>,
-        Vec<WithSpan<SemanticToken>>,
-    ) {
+    fn parsed_selections(text: &str) -> ParsedSelections {
         let (items, errors, comma_errors, tokens) = parsed_items(
             text,
             Expectation::Separator(BracketKind::Brace),
@@ -373,7 +246,7 @@ Resolve-from-a-declaration tests wait for parse-fields.md. This doc asserts pars
         assert_eq!(items.len(), 2);
         assert_eq!(
             as_scalar(items[0].item.reference()).name.item,
-            SelectableNameWrapper("bar".intern().to())
+            SelectionNameWrapper("bar".intern().to())
         );
         assert_eq!(
             as_scalar(items[0].item.reference()).name.location,
@@ -444,7 +317,7 @@ Resolve-from-a-declaration tests wait for parse-fields.md. This doc asserts pars
             .as_ref()
             .expect("the fixture selects with an alias");
         let alias_anchor = span_of(text, "b:");
-        assert_eq!(alias.item, SelectableAliasWrapper("b".intern().to()));
+        assert_eq!(alias.item, SelectionNameWrapper("b".intern().to()));
         assert_eq!(
             alias.location,
             Span::new(alias_anchor.start, alias_anchor.start + 1)
@@ -454,7 +327,8 @@ Resolve-from-a-declaration tests wait for parse-fields.md. This doc asserts pars
         assert_eq!(
             tokens,
             vec![
-                SemanticToken::FieldName.with_span(Span::new(alias_anchor.start, alias_anchor.start + 1)),
+                SemanticToken::FieldName
+                    .with_span(Span::new(alias_anchor.start, alias_anchor.start + 1)),
                 SemanticToken::Colon.with_span(span_of(text, ":")),
                 SemanticToken::FieldName.with_span(span_of(text, "bar")),
             ]
@@ -511,10 +385,7 @@ Resolve-from-a-declaration tests wait for parse-fields.md. This doc asserts pars
         assert!(items[1].item.extra_tokens.is_some());
         assert!(errors.iter().any(|error| {
             error.item
-                == ParseError::expected(
-                    Expectation::Selection,
-                    Found::Group(BracketKind::Brace),
-                )
+                == ParseError::expected(Expectation::Selection, Found::Group(BracketKind::Brace))
                 && error.location == span_of(text, "{ baz }")
         }));
     }
@@ -611,11 +482,4 @@ Resolve-from-a-declaration tests wait for parse-fields.md. This doc asserts pars
             span_of(text, "a")
         );
     }
-```
-
-Resolve-from-a-declaration tests wait for parse-fields.md. Nested structure is `object_selections_nest`.
-
-## Landing checklist
-
-1. `Expectation::{SelectionSet, Selection}`, `selections.rs`, `ArgumentListParent::{Scalar, Object}`, the Selection slot pin, `UnparsedChunkItemsParent::SelectionSlot`, the resolution-node variants, the tests. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
-2. Move this doc to refactors/past.
+}

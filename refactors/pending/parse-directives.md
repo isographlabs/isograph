@@ -229,31 +229,31 @@ Selections. Upstream deserializes immediately into `ScalarSelectionDirectiveSet`
 // from crates/isograph_parser/src/selections.rs
 pub struct ScalarSelection {
     #[resolve_field]
-    #[parent_variant(Scalar)]
-    pub reader_alias: Option<WithSpan<SelectableAliasWrapper>>,
+    #[parent_variant(ScalarSelection)]
+    pub reader_alias: Option<WithSpan<SelectionNameWrapper>>,
     #[resolve_field]
-    #[parent_variant(Scalar)]
-    pub name: WithSpan<SelectableNameWrapper>,
+    #[parent_variant(ScalarSelection)]
+    pub name: WithSpan<SelectionNameWrapper>,
     #[resolve_field]
-    #[parent_variant(Scalar)]
+    #[parent_variant(ScalarSelection)]
     pub arguments: Option<WithSpan<ArgumentList>>,
     #[resolve_field]
-    #[parent_variant(Scalar)]
+    #[parent_variant(ScalarSelection)]
     pub directive_set: Option<WithSpan<IsographFieldDirectiveList>>,
 }
 
 pub struct ObjectSelection {
     #[resolve_field]
-    #[parent_variant(Object)]
-    pub reader_alias: Option<WithSpan<SelectableAliasWrapper>>,
+    #[parent_variant(ObjectSelection)]
+    pub reader_alias: Option<WithSpan<SelectionNameWrapper>>,
     #[resolve_field]
-    #[parent_variant(Object)]
-    pub name: WithSpan<SelectableNameWrapper>,
+    #[parent_variant(ObjectSelection)]
+    pub name: WithSpan<SelectionNameWrapper>,
     #[resolve_field]
-    #[parent_variant(Object)]
+    #[parent_variant(ObjectSelection)]
     pub arguments: Option<WithSpan<ArgumentList>>,
     #[resolve_field]
-    #[parent_variant(Object)]
+    #[parent_variant(ObjectSelection)]
     pub directive_set: Option<WithSpan<IsographFieldDirectiveList>>,
     #[resolve_field]
     #[parent_variant(ObjectSelection)]

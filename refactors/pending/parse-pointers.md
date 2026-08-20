@@ -309,9 +309,9 @@ Origin: `DescriptionParent` in `string_key_wrappers.rs`. Variant names match.
             node => panic!("expected the type name leaf, got {node:?}"),
         }
         match parse.resolve((), span_of(text, "id")) {
-            IsographResolutionNode::SelectableNameWrapper(name) => {
+            IsographResolutionNode::SelectionNameWrapper(name) => {
                 let scalar = match name.parent {
-                    SelectableNameWrapperParent::Scalar(scalar) => scalar,
+                    SelectionNameWrapperParent::ScalarSelection(scalar) => scalar,
                     parent => panic!("expected a scalar parent, got {parent:?}"),
                 };
                 match scalar.parent.parent.parent {

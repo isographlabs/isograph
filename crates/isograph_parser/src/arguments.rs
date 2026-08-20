@@ -10,7 +10,7 @@ use crate::{
 };
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ArgumentListParent, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = ArgumentListParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ArgumentList(
     #[resolve_field] pub Vec<WithSpan<Slot<SelectionFieldArgument, UnparsedChunkItems>>>,
 );
@@ -92,7 +92,10 @@ pub struct ValueKeyNameWrapper(common_lang_types::ValueKeyName);
 pub struct VariableNameWrapper(common_lang_types::VariableName);
 
 #[derive(Debug)]
-pub enum ArgumentListParent {}
+pub enum ArgumentListParent<'a> {
+    ScalarSelection(crate::ScalarSelectionPath<'a>),
+    ObjectSelection(crate::ObjectSelectionPath<'a>),
+}
 
 #[derive(Debug)]
 pub enum NonConstantValueParent<'a> {
@@ -100,7 +103,7 @@ pub enum NonConstantValueParent<'a> {
     ObjectEntry(Box<ObjectEntryPath<'a>>),
 }
 
-pub type ArgumentListPath<'a> = PositionResolutionPath<&'a ArgumentList, ArgumentListParent>;
+pub type ArgumentListPath<'a> = PositionResolutionPath<&'a ArgumentList, ArgumentListParent<'a>>;
 
 pub type ObjectLiteralPath<'a> =
     PositionResolutionPath<&'a ObjectLiteral, NonConstantValueParent<'a>>;

@@ -162,7 +162,7 @@ impl BracketKind {
 
 ## Names relative to isograph
 
-Where a type or function exists in both, i2 uses the isograph name. Wrappers that exist only so a lang type can carry `ResolvePosition` take the wrappee's name plus `Wrapper` (`EntityNameWrapper`, `VariableNameWrapper`, `FieldArgumentNameWrapper`, `ValueKeyNameWrapper`, `SelectableNameWrapper`, `SelectableAliasWrapper`, `StringLiteralValueWrapper`, `IsographDirectiveNameWrapper`, `ClientScalarSelectableNameWrapper`, `ClientObjectSelectableNameWrapper`).
+Where a type or function exists in both, i2 uses the isograph name. Wrappers that exist only so a lang type can carry `ResolvePosition` take the wrappee's name plus `Wrapper` (`EntityNameWrapper`, `VariableNameWrapper`, `FieldArgumentNameWrapper`, `ValueKeyNameWrapper`, `SelectionNameWrapper`, `StringLiteralValueWrapper`, `IsographDirectiveNameWrapper`, `ClientScalarSelectableNameWrapper`, `ClientObjectSelectableNameWrapper`). `SelectionNameWrapper` covers both a selection name and a `reader_alias`.
 
 Justified differences:
 

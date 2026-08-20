@@ -9,8 +9,8 @@ use crate::{
     ArgumentListPath, BracketItem, Bracketed, CloseBracket, Expectation, ExtraChunksPath, Found,
     IsoLiteralItem, IsoLiteralParsePath, IsoLiteralSlotPath, IsographResolutionNode,
     MatchedBrackets, NonBracketToken, NonBracketTokenKind, ObjectEntry, ObjectEntrySlotPath,
-    ObjectLiteralPath, OpenBracket, ParseError, SelectionFieldArgument,
-    SelectionFieldArgumentSlotPath, SemanticToken,
+    ObjectLiteralPath, OpenBracket, ParseError, Selection, SelectionFieldArgument,
+    SelectionFieldArgumentSlotPath, SelectionSetPath, SelectionSlotPath, SemanticToken,
     chunk_stream::{ChunkStream, ItemCursor},
 };
 
@@ -196,6 +196,7 @@ pub enum UnparsedChunkItemsParent<'a> {
     IsoLiteralSlot(IsoLiteralSlotPath<'a>),
     SelectionFieldArgumentSlot(SelectionFieldArgumentSlotPath<'a>),
     ObjectEntrySlot(ObjectEntrySlotPath<'a>),
+    SelectionSlot(SelectionSlotPath<'a>),
 }
 
 pub type UnparsedChunkItemsPath<'a> =
@@ -216,6 +217,12 @@ impl<'a> From<SelectionFieldArgumentSlotPath<'a>> for UnparsedChunkItemsParent<'
 impl<'a> From<ObjectEntrySlotPath<'a>> for UnparsedChunkItemsParent<'a> {
     fn from(path: ObjectEntrySlotPath<'a>) -> Self {
         UnparsedChunkItemsParent::ObjectEntrySlot(path)
+    }
+}
+
+impl<'a> From<SelectionSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
+    fn from(path: SelectionSlotPath<'a>) -> Self {
+        UnparsedChunkItemsParent::SelectionSlot(path)
     }
 }
 
@@ -248,6 +255,7 @@ pub struct ExtraChunks(
         (<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>),
         (<SelectionFieldArgument, UnparsedChunkItems>, ArgumentListPath<'a>),
         (<ObjectEntry, UnparsedChunkItems>, ObjectLiteralPath<'a>),
+        (<Selection, UnparsedChunkItems>, SelectionSetPath<'a>),
     ]
 )]
 pub struct Slot<T, E> {
