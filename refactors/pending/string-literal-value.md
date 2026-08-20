@@ -32,37 +32,74 @@ Callers intern the returned `String`.
 
 ## Parse
 
+The consume site already distinguished `StringLiteral` from `BlockStringLiteral`. Decode does not inspect the lexeme for quotes.
+
 ```rust
 // from crates/isograph_parser/src/string_value.rs
-pub(crate) fn intern_string_lexeme<T: From<intern::string_key::StringKey>>(
+use intern::string_key::Intern;
+use prelude::Postfix;
+
+pub(crate) fn intern_string_value<T: From<intern::string_key::StringKey>>(
     lexeme: &str,
 ) -> T {
-    let value = if lexeme.starts_with("\"\"\"") {
-        block_string_value(lexeme)
-    } else {
-        string_value(lexeme)
-    };
-    value.intern().to()
+    string_value(lexeme).intern().to()
+}
+
+pub(crate) fn intern_block_string_value<T: From<intern::string_key::StringKey>>(
+    lexeme: &str,
+) -> T {
+    block_string_value(lexeme).intern().to()
 }
 ```
 
-A quoted string cannot start with three quotes: the lexer already classified it. Slices in `string_value` / `block_string_value` are of a token the lexer produced (`""` is at least two characters, `""""""` at least six).
+Slices in `string_value` / `block_string_value` are of a token the lexer produced (`""` is at least two characters, `""""""` at least six).
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
-    StringLiteralValueWrapper(intern_string_lexeme(span.text())).wrap_ok()
+fn parse_string_literal(
+    cursor: &mut ItemCursor<'_>,
+) -> Result<StringLiteralValueWrapper, WithSpan<ParseError>> {
+    if let Some(span) = cursor
+        .consume_token_if(NonBracketTokenKind::StringLiteral, SemanticToken::String)
+    {
+        return StringLiteralValueWrapper(intern_string_value(span.text())).wrap_ok();
+    }
+    if let Some(span) = cursor.consume_token_if(
+        NonBracketTokenKind::BlockStringLiteral,
+        SemanticToken::String,
+    ) {
+        return StringLiteralValueWrapper(intern_block_string_value(span.text())).wrap_ok();
+    }
+    cursor
+        .expected(Expectation::Token(NonBracketTokenKind::StringLiteral))
+        .wrap_err()
+}
 ```
 
-Before: `span.interned().map(StringLiteralValueWrapper).item`.
+Before: `span.interned().map(StringLiteralValueWrapper).item` after `StringLiteral` or_else `BlockStringLiteral`.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-    Description(intern_string_lexeme(span.text()))
-        .with_span(span.location)
-        .wrap_some()
+pub(crate) fn consume_description(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<Description>> {
+    if let Some(span) = cursor
+        .consume_token_if(NonBracketTokenKind::StringLiteral, SemanticToken::String)
+    {
+        return Description(intern_string_value(span.text()))
+            .with_span(span.location)
+            .wrap_some();
+    }
+    cursor
+        .consume_token_if(
+            NonBracketTokenKind::BlockStringLiteral,
+            SemanticToken::String,
+        )
+        .map(|span| {
+            Description(intern_block_string_value(span.text())).with_span(span.location)
+        })
+}
 ```
 
-Before: `span.interned().map(Description).wrap_some()`.
+Before: `span.interned().map(Description).wrap_some()` after the same or_else.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -73,8 +110,6 @@ pub struct Description(pub common_lang_types::DescriptionValue);
 Before: "The interned source slice of a description, quotes included."
 
 Who calls: `parse_string_literal`, `consume_description`. `TokenText::interned` stays for names.
-
-The quoted-vs-block choice is duplicated. A `fn intern_string_token(span: TokenText<'_>) -> String` that reads `span.text()` and branches is the one helper both call.
 
 ## Tests
 
