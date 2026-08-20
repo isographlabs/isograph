@@ -90,11 +90,31 @@ The `None` arm of `commit` is the case `peek()` already established is not next.
     }
 ```
 
+`WithSpan` is a foreign type, so these are a local trait. The item holds the span; the cursor holds the source.
+
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
-impl<'a> TokenText<'a> {
-    pub(crate) fn new(location: Span, text: &'a str) -> Self {
-        TokenText { location, text }
+pub(crate) trait ItemTokenText {
+    fn token_text<'a>(&self, cursor: &ItemCursor<'a>) -> &'a str;
+    fn interned<'a, T: From<intern::string_key::StringKey>>(
+        &self,
+        cursor: &ItemCursor<'a>,
+    ) -> WithSpan<T>;
+}
+
+impl ItemTokenText for WithSpan<ChunkContentItem> {
+    fn token_text<'a>(&self, cursor: &ItemCursor<'a>) -> &'a str {
+        &cursor.text()[self.location.as_usize_range()]
+    }
+
+    fn interned<'a, T: From<intern::string_key::StringKey>>(
+        &self,
+        cursor: &ItemCursor<'a>,
+    ) -> WithSpan<T> {
+        self.token_text(cursor)
+            .intern()
+            .to::<T>()
+            .with_span(self.location)
     }
 }
 ```
@@ -194,8 +214,7 @@ pub(crate) fn parse_variable_name(
 
 fn parse_string_literal(peek: CursorPeek<'_, '_>) -> StringLiteralValueWrapper {
     let (cursor, item) = peek.commit(SemanticToken::String);
-    TokenText::new(item.location, cursor.text())
-        .interned()
+    item.interned(cursor)
         .map(StringLiteralValueWrapper)
         .item
 }
@@ -204,7 +223,7 @@ fn parse_integer_value(
     peek: CursorPeek<'_, '_>,
 ) -> Result<IntegerValue, WithSpan<ParseError>> {
     let (cursor, item) = peek.commit(SemanticToken::Integer);
-    match cursor.text()[item.location.as_usize_range()].parse() {
+    match item.token_text(cursor).parse() {
         Ok(value) => IntegerValue(value).wrap_ok(),
         Err(_) => ParseError::IntegerDoesNotFitI64
             .with_span(item.location)
@@ -216,7 +235,7 @@ fn parse_boolean_or_null(
     peek: CursorPeek<'_, '_>,
 ) -> Result<NonConstantValue, WithSpan<ParseError>> {
     let (cursor, item) = peek.commit(SemanticToken::BooleanOrNull);
-    match &cursor.text()[item.location.as_usize_range()] {
+    match item.token_text(cursor) {
         "true" => NonConstantValue::Boolean(BooleanValue(Boolean::True)).wrap_ok(),
         "false" => NonConstantValue::Boolean(BooleanValue(Boolean::False)).wrap_ok(),
         "null" => NonConstantValue::Null(NullValue).wrap_ok(),
@@ -289,9 +308,7 @@ pub(crate) fn parse_non_constant_value(
 }
 ```
 
-`RecordGroupClose` is `pub(crate)` so `parse_object_literal` can record the close. `TokenText::new` is `pub(crate)` and is used only to intern a string. Integer and boolean/null index `cursor.text()` at the item span.
-
-`ItemCursor::text` is used from parse functions; drop `#[cfg_attr(not(test), expect(dead_code))]`.
+`RecordGroupClose` is `pub(crate)` so `parse_object_literal` can record the close. `ItemCursor::text` is used from `token_text` / `interned`; drop `#[cfg_attr(not(test), expect(dead_code))]`.
 
 ## Tests
 

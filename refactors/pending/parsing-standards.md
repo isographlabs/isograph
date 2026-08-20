@@ -338,7 +338,7 @@ pub(crate) fn parse_non_constant_value(
 }
 ```
 
-`VariableUse` stores the interned name. A position on `$` answers `VariableUse`. There is no `Dollar` field. `string_key_newtype!` implements `From<StringKey>` for the inner lang types. Parser wrappers do not add a second `From`. Construction is `name.interned().map(VariableNameWrapper)`. A selection's name and `reader_alias` are `SelectionNameWrapper` over `SelectableName`. A field declaration's name is `ClientScalarSelectableNameWrapper`. A pointer declaration's name is `ClientObjectSelectableNameWrapper`. The integer arm is `parse()` on the committed item's slice of `cursor.text()`. `parse::<i64>()` on an `IntegerLiteral` token (`-?(0|[1-9][0-9]*)`) fails only as overflow or underflow. Variable defaults call this same function.
+`VariableUse` stores the interned name. A position on `$` answers `VariableUse`. There is no `Dollar` field. `string_key_newtype!` implements `From<StringKey>` for the inner lang types. Parser wrappers do not add a second `From`. Construction is `name.interned().map(VariableNameWrapper)`. A selection's name and `reader_alias` are `SelectionNameWrapper` over `SelectableName`. A field declaration's name is `ClientScalarSelectableNameWrapper`. A pointer declaration's name is `ClientObjectSelectableNameWrapper`. The integer arm is `item.token_text(cursor).parse()`. `parse::<i64>()` on an `IntegerLiteral` token (`-?(0|[1-9][0-9]*)`) fails only as overflow or underflow. Variable defaults call this same function.
 
 Keyword text after `require_token(Identifier, token)` or `consume_token_if(Identifier, token)`: `match` on `token_text` (`"entrypoint"` / `"field"` / `"pointer"`; `"true"` / `"false"` / `"null"`; `"to"`).
 
