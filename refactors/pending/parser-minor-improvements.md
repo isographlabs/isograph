@@ -182,12 +182,6 @@ fn consume_to_target(
 
 leftover-semantic-tokens.md records `Keyword` at `fieldd`; `parse_iso_literal_item` keeps require-then-match so that identifier stays `Keyword`.
 
-## `parse_each_chunk` tests do not use a shared harness
-
-`consume_selection_set`, `consume_argument_list`, `consume_variable_declaration_list`, object interiors, and list interiors all go through `parse_each_chunk`. That is the right extraction.
-
-`span_of`, `parsed_items`, and the dummy parent-cursor setup (`match_brackets(tokenize("x"), 1)` then `chunk` then `stream`) are duplicated in `arguments.rs` and `selections.rs` tests. `crates/tests` is an empty crate. The shared harness lives with the tests.
-
 ## `UnionVariant::Null` is a unit
 
 type-annotation-union.md uses `Null(NullTypeAnnotation)`, a ZST, so the all-delegate `ResolvePosition` derive compiles. The row's location is `None`; resolve is never called.
