@@ -2,9 +2,9 @@
 
 The schema is a graph. An entity is a node. A selectable is a named pointer from an entity to a wrapper of an entity.
 
-There is one kind of entity and one kind of selectable. `User`, `String`, `Query`, and the result of `field User.Avatar` are all entities. A GraphQL field and an iso `field` declaration are both selectable declarations. Each produces a selectable.
+There is one kind of entity and one kind of selectable. `User`, `String`, `Query`, and the result of `field User.Avatar` are all entities. A GraphQL field and an iso `field` declaration are both selectable declarations. Each produces a selectable. A GraphQL `type` or `scalar` is an entity declaration. Iso `type` is future.
 
-The building blocks are `Wrapper`, `Entity`, `Selectable`, `SelectableDeclaration`, `Selection`, `SelectionSet`, and `Entrypoint`.
+The building blocks are `Wrapper`, `Entity`, `EntityDeclaration`, `Selectable`, `SelectableDeclaration`, `Selection`, `SelectionSet`, and `Entrypoint`.
 
 ## Wrapper
 
@@ -67,6 +67,34 @@ An anonymous entity is created by a selectable declaration with no `to` clause, 
 `defined_by` is that unique incoming selectable. The selectable itself lives on the parent entity.
 
 A selectable declaration's parent is a named entity (`field User.Avatar`, `type User { name: String }`).
+
+## EntityDeclaration
+
+Future. An `EntityDeclaration` produces a named `Entity`. Every named entity comes from exactly one entity declaration. Anonymous entities are not produced by an entity declaration; they are produced by a selectable declaration with no `to`. The iso keyword is `type`.
+
+```rust
+struct EntityDeclaration {
+    name: EntityName,
+}
+```
+
+```text
+type Friend
+```
+
+This declares the named entity `Friend`. A selectable declaration can point at it with `to Friend`.
+
+A GraphQL entity declaration:
+
+```graphql
+type User {
+  name: String!
+}
+
+scalar ID
+```
+
+`type User` declares `User`. `scalar ID` declares `ID`. The nested GraphQL fields are selectable declarations, not part of the entity declaration.
 
 ## Selectable
 

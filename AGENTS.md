@@ -6,7 +6,7 @@ The parser does not use pico. The explicit assumption is that parsing a literal 
 
 ## Mental model
 
-The schema data model is `docs-website/docs/design-docs/mental-model.md`. Read it before working on entities, wrappers, selectables, selectable declarations, selections, selection sets, or entrypoints.
+The schema data model is `docs-website/docs/design-docs/mental-model.md`. Read it before working on entities, entity declarations, wrappers, selectables, selectable declarations, selections, selection sets, or entrypoints.
 
 ## Commits
 
