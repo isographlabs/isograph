@@ -1,8 +1,8 @@
 # Combined `parse_iso_literal` entry
 
-The crate entry is one function over `&str`. It runs tokenize, match brackets, chunk, grammar. The three error lists live on the return value, so a caller cannot drop a channel without ignoring a named field. Grammar-stage tests call this function. Stage unit tests (tokenize, brackets, chunk, subparsers) keep `pub(crate)` internals.
+The crate entry is one function over `&str`. It runs tokenize, match brackets, chunk, grammar. Matcher, chunker, and grammar errors are one `Vec<WithSpan<ParsedIsoLiteralError>>`. Grammar-stage tests call this function. Stage unit tests (tokenize, brackets, chunk, subparsers) keep `pub(crate)` internals.
 
-Does not depend on type-annotation-null.md or the `VariableDeclarationOrUsage` restructure. Public types keep their current names (`VariableDeclarationOrUsage`, `VariableDeclarationOrUsageList`, no `NullTypeAnnotation`).
+Does not depend on type-annotation-null.md. Grammar `ParseError` keeps its name. `ParsedIsoLiteralError` wraps it.
 
 ## Types
 
@@ -10,25 +10,49 @@ Most important first.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
+use thiserror::Error;
+
+#[derive(Debug, PartialEq, Eq, Error)]
+pub enum ParsedIsoLiteralError {
+    #[error("{0}")]
+    Parse(ParseError),
+    #[error("{0}")]
+    Bracket(BracketError),
+    #[error("{0}")]
+    Comma(CommaWithoutItem),
+}
+
 pub struct ParsedIsoLiteral {
     pub item: Option<WithSpan<IsoLiteralParse>>,
-    pub errors: Vec<WithSpan<ParseError>>,
-    pub bracket_errors: Vec<BracketError>,
-    pub comma_errors: Vec<CommaWithoutItem>,
+    pub errors: Vec<WithSpan<ParsedIsoLiteralError>>,
     pub tokens: Vec<WithSpan<SemanticToken>>,
 }
 
 pub fn parse_iso_literal(text: &str) -> ParsedIsoLiteral {
     let (brackets, bracket_errors) = match_brackets(tokenize(text), text.len() as u32);
     let (tree, comma_errors) = chunk(brackets.reference());
-    let mut errors = Vec::new();
+    let mut errors: Vec<WithSpan<ParsedIsoLiteralError>> = bracket_errors
+        .into_iter()
+        .map(|error| {
+            let location = match error.reference() {
+                BracketError::UnmatchedOpen(open) => open.location,
+                BracketError::UnmatchedClose(close) => close.location,
+            };
+            ParsedIsoLiteralError::Bracket(error).with_span(location)
+        })
+        .collect();
+    errors.extend(comma_errors.into_iter().map(|error| {
+        ParsedIsoLiteralError::Comma(error).with_span(error.0)
+    }));
+    let mut grammar_errors = Vec::new();
     let mut tokens = Vec::new();
-    let item = parse_chunked_iso_literal(text, tree, &mut errors, &mut tokens);
+    let item = parse_chunked_iso_literal(text, tree, &mut grammar_errors, &mut tokens);
+    errors.extend(grammar_errors.into_iter().map(|error| {
+        ParsedIsoLiteralError::Parse(error.item).with_span(error.location)
+    }));
     ParsedIsoLiteral {
         item,
         errors,
-        bracket_errors,
-        comma_errors,
         tokens,
     }
 }
@@ -55,48 +79,43 @@ pub fn parse_iso_literal(
 
 That body is `parse_chunked_iso_literal`. `item: None` is still only the empty-literal case.
 
-`ParsedIsoLiteral` derives `Debug`. No `PartialEq`: `BracketError` and the tree are compared field-wise in tests.
+`errors` is matcher, then chunker, then grammar, in that order. `parse_chunked_iso_literal` still takes `Vec<WithSpan<ParseError>>`. Mapping to `ParsedIsoLiteralError::Parse` is at the combined entry.
 
-## Change 1: `Display` on `BracketError` and `CommaWithoutItem`
+`match_brackets` still returns `Vec<BracketError>`. `chunk` still returns `Vec<CommaWithoutItem>`.
 
-Same impls as lsp-parse-diagnostics.md Change 1. Implement once, here. That doc's Change 1 is this work.
+`ParsedIsoLiteral` derives `Debug`. No `PartialEq`: the tree is compared field-wise in tests.
+
+`ParsedIsoLiteralError` is the combined error. Grammar `ParseError` is the payload of `Parse`. Do not flatten `Expected` / `EmptyLiteral` / `UnmatchedOpen` onto one enum.
+
+## Change 1: `thiserror` on `BracketError` and `CommaWithoutItem`
+
+`ParsedIsoLiteralError` wraps with `#[error("{0}")]`, so the inner types need `Display`. They are errors. Derive `Error`; do not write a manual `Display` or `std::error::Error` impl.
 
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
-use std::fmt;
+use thiserror::Error;
 
-impl fmt::Display for BracketError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            BracketError::UnmatchedOpen(open) => {
-                write!(f, "Unclosed {}", open.item.0)
-            }
-            BracketError::UnmatchedClose(close) => {
-                write!(f, "Unexpected {}", close.item.0)
-            }
-        }
-    }
+#[derive(Debug, PartialEq, Eq, Error)]
+pub enum BracketError {
+    #[error("Unclosed {}", .0.item.0)]
+    UnmatchedOpen(WithSpan<OpenBracket>),
+    #[error("Unexpected {}", .0.item.0)]
+    UnmatchedClose(WithSpan<CloseBracket>),
 }
-
-impl std::error::Error for BracketError {}
 ```
 
-Before: `BracketError` has no `Display`. `OpenBracket` / `CloseBracket` are `pub struct OpenBracket(pub BracketKind)` / `pub struct CloseBracket(pub BracketKind)`. `BracketKind` already displays as `'('`, `'{'`, `'['`.
+Before: `#[derive(Debug, PartialEq, Eq)]`, no `Error`, no `Display`. `OpenBracket` / `CloseBracket` are `pub struct OpenBracket(pub BracketKind)` / `pub struct CloseBracket(pub BracketKind)`. `BracketKind` already displays as `'('`, `'{'`, `'['`.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
-use std::fmt;
+use thiserror::Error;
 
-impl fmt::Display for CommaWithoutItem {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "A comma with no item before it.")
-    }
-}
-
-impl std::error::Error for CommaWithoutItem {}
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
+#[error("A comma with no item before it.")]
+pub struct CommaWithoutItem(pub Span);
 ```
 
-Before: `CommaWithoutItem` has no `Display`.
+Before: `#[derive(Copy, Clone, Debug, PartialEq, Eq)]`, no `Error`, no `Display`.
 
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
@@ -123,24 +142,34 @@ Before: `CommaWithoutItem` has no `Display`.
     fn comma_without_item_displays() {
         assert_eq!(
             CommaWithoutItem(Span::new(0, 1)).to_string(),
-            "A comma with no item before it."
+            "A comma with no item before it.",
         );
     }
 ```
 
+lsp-parse-diagnostics.md Change 1 is this work. Implement once, here.
+
 ## Change 2: combined entry and grammar tests
 
-`parse_iso_literal` / `parse_chunked_iso_literal` / `ParsedIsoLiteral` as in Types.
+`parse_iso_literal` / `parse_chunked_iso_literal` / `ParsedIsoLiteral` / `ParsedIsoLiteralError` as in Types.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
     fn parsed(text: &str) -> (WithSpan<IsoLiteralParse>, Vec<WithSpan<ParseError>>) {
         let parsed = parse_iso_literal(text);
-        assert!(parsed.bracket_errors.is_empty(), "for literal {text:?}");
-        assert_eq!(parsed.comma_errors, vec![], "for literal {text:?}");
+        let errors = parsed
+            .errors
+            .into_iter()
+            .map(|error| match error.item {
+                ParsedIsoLiteralError::Parse(parse) => parse.with_span(error.location),
+                ParsedIsoLiteralError::Bracket(_) | ParsedIsoLiteralError::Comma(_) => {
+                    panic!("for literal {text:?}")
+                }
+            })
+            .collect();
         (
             parsed.item.expect("the fixture is not an empty literal"),
-            parsed.errors,
+            errors,
         )
     }
 
@@ -167,11 +196,11 @@ Before:
     }
 ```
 
-Call sites of `parsed_with_errors` / `parsed_with_tokens` that bind the tuple become field reads (`parsed.item`, `parsed.errors`, `parsed.bracket_errors`, `parsed.comma_errors`, `parsed.tokens`). `ParsedWithErrors` and `ParsedWithTokens` aliases go. `parsed` still asserts `bracket_errors` empty and `comma_errors` empty.
+Call sites of `parsed_with_errors` / `parsed_with_tokens` that bind the tuple become field reads (`parsed.item`, `parsed.errors`, `parsed.tokens`). `ParsedWithErrors` and `ParsedWithTokens` aliases go. `parsed` still panics if a matcher or chunker variant is present.
 
 `chunked` / `stream_of` used by `consume_description` unit tests stay on `pub(crate)` internals.
 
-`arguments.rs` and `selections.rs` subparser tests stay on internals; they are not whole-literal parses.
+`arguments.rs` and `selections.rs` subparser tests stay on internals; they are not whole-literal parses. They keep asserting `bracket_errors` / `comma_errors` on the stage returns.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -180,29 +209,29 @@ Call sites of `parsed_with_errors` / `parsed_with_tokens` that bind the tuple be
         let parsed = parse_iso_literal("");
         assert!(parsed.item.is_none());
         assert!(parsed.errors.iter().any(|error| {
-            error.item == ParseError::EmptyLiteral
+            error.item == ParsedIsoLiteralError::Parse(ParseError::EmptyLiteral)
         }));
-        assert!(parsed.bracket_errors.is_empty());
-        assert_eq!(parsed.comma_errors, vec![]);
     }
 
     #[test]
-    fn a_stray_close_is_on_bracket_errors_and_the_declaration_parses() {
-        let parsed = parse_iso_literal("entrypoint Query.foo)");
+    fn a_stray_close_is_a_parse_error_and_the_declaration_parses() {
+        let text = "entrypoint Query.foo)";
+        let parsed = parse_iso_literal(text);
         assert!(parsed.item.is_some());
-        assert_eq!(parsed.bracket_errors.len(), 1);
-        match parsed.bracket_errors[0].reference() {
-            BracketError::UnmatchedClose(close) => {
-                assert_eq!(close.item.0, BracketKind::Parenthesis);
-            }
-            error => panic!("expected UnmatchedClose, got {error:?}"),
-        }
+        assert!(parsed.errors.iter().any(|error| {
+            matches!(
+                error.item.reference(),
+                ParsedIsoLiteralError::Bracket(BracketError::UnmatchedClose(close))
+                    if close.item.0 == BracketKind::Parenthesis
+                        && close.location == span_of(text, ")")
+            ) && error.location == span_of(text, ")")
+        }));
     }
 ```
 
-`the_cut_removes_an_unmatched_bracket_and_the_declaration_parses` already covers the cut. This test asserts the combined entry kept `bracket_errors` instead of dropping them.
+`the_cut_removes_an_unmatched_bracket_and_the_declaration_parses` already covers the cut. This test asserts the combined entry kept the unmatched close instead of dropping it.
 
-Who else calls the pipeline: extract-iso-literals.md and lsp-semantic-tokens.md `file_literals` call `parse_iso_literal(text)`. Those docs already use that call.
+Who else calls the pipeline: extract-iso-literals.md and lsp-semantic-tokens.md `file_literals` call `parse_iso_literal(text)`. Those docs already use that call. `parsed.errors` is the one vec. extract-iso-literals.md `IsoLiteralError` maps `ParsedIsoLiteralError::Parse` / `Bracket` / `Comma` onto its `Parse` / `Bracket` / `Comma` (Host stays).
 
 ## Change 3: public surface
 
@@ -254,7 +283,7 @@ pub use parse_iso_literal::{
     Description, DescriptionPath, EntityNameWrapper, EntityNameWrapperParent,
     EntityNameWrapperPath, EntrypointDeclaration, EntrypointDeclarationPath, ExtraChunksPath,
     IsoLiteralItem, IsoLiteralParse, IsoLiteralParsePath, IsoLiteralSlotPath, ParsedIsoLiteral,
-    SelectableDeclaration, SelectableDeclarationPath, SelectableNameWrapper,
+    ParsedIsoLiteralError, SelectableDeclaration, SelectableDeclarationPath, SelectableNameWrapper,
     SelectableNameWrapperParent, SelectableNameWrapperPath, parse_iso_literal,
 };
 pub use selections::{
@@ -264,9 +293,8 @@ pub use selections::{
 pub use semantic_token::SemanticToken;
 pub use variables::{
     ListTypeAnnotation, ListTypeAnnotationPath, NamedTypeAnnotation, NamedTypeAnnotationPath,
-    TypeAnnotation, TypeAnnotationParent, VariableDeclarationOrUsage,
-    VariableDeclarationOrUsageList, VariableDeclarationOrUsageListPath,
-    VariableDeclarationOrUsagePath, VariableDeclarationOrUsageSlotPath,
+    TypeAnnotation, TypeAnnotationParent, VariableDeclaration, VariableDeclarationList,
+    VariableDeclarationListPath, VariableDeclarationPath, VariableDeclarationSlotPath,
 };
 ```
 
