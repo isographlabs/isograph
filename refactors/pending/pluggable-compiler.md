@@ -22,14 +22,14 @@ Each seam is a trait, which is the case AGENTS.md reserves traits for: a boundar
 
 - The literal grammar and `isograph_parser`. The language of the literal is the product; every profile parses the same literals into the same trees.
 - The compiler's own model of a project between parsing and generation: the parsed literals, the validated selections. Protocol and generation plug into that model; they do not each get their own.
-- pico sits above the seams: a seam implementor is a deterministic pure function of its inputs, so its results can live behind memoization. An implementor that reads the filesystem or the clock inside the seam breaks that; reading the world happens in the daemon's sources and effects (`cli-daemon.md`), never inside a seam.
+- pico sits above the seams: a seam implementor is a deterministic pure function of its inputs, so its results can live behind memoization. An implementor that reads the filesystem or the clock inside the seam breaks that; reading the world happens in the daemon's sources and effects (`event-model.md`), never inside a seam.
 - The daemon and CLI are profile-agnostic. `IsographRequest` and dispatch never name a profile; a wrapper binary gets the whole lifecycle, socket, and LSP surface by composing its profile into the same `main`.
 
 ## The boundary types
 
 ### Extraction
 
-The extraction seam is `HostLanguage` in extract-iso-literals.md. `extract` finds iso literals in a file; `validate` checks the host embedding. `IsoLiteralExtraction` carries the common contents and span plus `THostLanguage::LiteralContext`. The first implementor is `TypeScriptHostLanguage`. File extensions for the watcher stay a later field on that trait (cli-daemon.md's `TRACKED_EXTENSIONS` is the placeholder).
+The extraction seam is `HostLanguage` in extract-iso-literals.md. `extract` finds iso literals in a file; `validate` checks the host embedding. `IsoLiteralExtraction` carries the common contents and span plus `THostLanguage::LiteralContext`. The first implementor is `TypeScriptHostLanguage`. File extensions for the watcher stay a later field on that trait.
 
 ### NetworkProtocol
 
@@ -93,7 +93,7 @@ Static generics, not trait objects: a binary compiles the profile it ships, mono
 
 - `crates/isograph_compiler`: the seam traits, the boundary types, the fixed project model, and the pipeline. Depends on `isograph_parser`; contains no implementor.
 - `crates/isograph_extract_typescript`, `crates/isograph_protocol_graphql`, `crates/isograph_generate_typescript`: the first implementor of each seam, one crate each, none depending on another.
-- `crates/isograph_cli` composes the shipped profile into the daemon from `cli-daemon.md`.
+- `crates/isograph_cli` composes the shipped profile into the daemon from `isograph-cli.md`.
 
 A wrapper is a crate outside this repo with its own `main`: it implements whichever seams it replaces, reuses the crates for the ones it keeps, and hands its `Profile` to the same pipeline and daemon entry points. Nothing in the core knows whether it is running inside `isograph` or inside a wrapper.
 
