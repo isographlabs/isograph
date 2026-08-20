@@ -1,8 +1,8 @@
 # Config discovery
 
-Requires isograph-cli.md. The daemon is keyed to one config: `--config` when given, otherwise the nearest `isograph.config.json` at or above the current directory. Two paths to one file are one daemon. The daemon still parks. It logs the config it is.
+Requires isograph-cli.md. The daemon is keyed to one config: `--config` when given, otherwise the nearest `isograph.config.json`, `isograph.config.js`, or `isograph.config.ts` at or above the current directory. At one directory, that order: json, then js, then ts. Two paths to one file are one daemon. The daemon still parks. It logs the config it is.
 
-This is how the babel plugin finds a config (`searchPlaces: ['isograph.config.json']`, walk up). The CLI does the same walk, or takes a path.
+Walk-up is the babel plugin's walk, with two extra names. The babel plugin still only opens `isograph.config.json`.
 
 ## What the user does
 
@@ -19,12 +19,13 @@ Every verb resolves the config the same way, so `isograph stop` in a subdirector
 
 ```
 $ cd /tmp && isograph status
-error: no isograph.config.json at or above /tmp; create one, or name one with --config
+error: no isograph.config.json, isograph.config.js, or isograph.config.ts at or above /tmp; create one, or name one with --config
 ```
 
 ```
 $ isograph --config ./isograph.config.json
-$ isograph --config /other/project/isograph.config.json status
+$ isograph --config ./isograph.config.ts
+$ isograph --config /other/project/isograph.config.js status
 ```
 
 ## Change 1: find the config, key the instance to it
@@ -40,7 +41,11 @@ use std::path::{Path, PathBuf};
 use freddie_cli::Instance;
 use prelude::Postfix;
 
-pub const CONFIG_FILE_NAME: &str = "isograph.config.json";
+pub const CONFIG_FILE_NAMES: &[&str] = &[
+    "isograph.config.json",
+    "isograph.config.js",
+    "isograph.config.ts",
+];
 
 pub struct ConfigNotReadable {
     pub path: PathBuf,
@@ -59,7 +64,7 @@ pub struct NoCurrentDir {
 pub enum DiscoverError {
     #[error("could not resolve the config at {}: {}", .0.path.display(), .0.source)]
     ConfigNotReadable(ConfigNotReadable),
-    #[error("no {CONFIG_FILE_NAME} at or above {}; create one, or name one with --config", .0.start.display())]
+    #[error("no isograph.config.json, isograph.config.js, or isograph.config.ts at or above {}; create one, or name one with --config", .0.start.display())]
     NotFound(ConfigNotFound),
     #[error("could not read the current directory: {}", .0.source)]
     NoCurrentDir(NoCurrentDir),
@@ -67,7 +72,7 @@ pub enum DiscoverError {
     NoUserDir(#[from] freddie_cli::NoUserDir),
 }
 
-/// The canonical path of the config `flag` names, or of the nearest `isograph.config.json`
+/// The canonical path of the config `flag` names, or of the nearest isograph config
 /// at or above the current directory. Canonical, so two paths to one file name one daemon.
 pub fn config_path(flag: Option<&Path>) -> Result<PathBuf, DiscoverError> {
     let named = match flag {
@@ -87,10 +92,12 @@ pub fn config_path(flag: Option<&Path>) -> Result<PathBuf, DiscoverError> {
 }
 
 fn nearest_config(start: &Path) -> Option<PathBuf> {
-    start
-        .ancestors()
-        .map(|dir| dir.join(CONFIG_FILE_NAME))
-        .find(|candidate| candidate.is_file())
+    start.ancestors().find_map(|dir| {
+        CONFIG_FILE_NAMES
+            .iter()
+            .map(|name| dir.join(name))
+            .find(|candidate| candidate.is_file())
+    })
 }
 
 pub fn config_and_instance(flag: Option<&Path>) -> Result<(PathBuf, Instance), DiscoverError> {
@@ -128,8 +135,8 @@ mod discover;
 
 #[derive(clap::Args, Debug)]
 pub struct ConfigFlag {
-    /// Path to the isograph config. When absent, the nearest isograph.config.json at or above
-    /// the current directory.
+    /// Path to the isograph config. When absent, the nearest isograph.config.json, .js, or .ts
+    /// at or above the current directory.
     #[arg(long)]
     pub config: Option<std::path::PathBuf>,
 }
@@ -165,13 +172,35 @@ impl App for Isograph {
 
 `IsographArgs` is deleted. The daemon still parks. `status` / `logs` / `stop` in a subdirectory find the right daemon because they go through `instance`.
 
-The contents of the config file are not read. That is the next milestone (scan the project root).
+The contents of the config file are not read. That is the next milestone (scan the project root). When that milestone reads:
+
+```rust
+enum ConfigSyntax {
+    Json,
+    JavaScript,
+    TypeScript,
+}
+
+fn syntax(path: &Path) -> Option<ConfigSyntax> {
+    match path.extension().and_then(std::ffi::OsStr::to_str) {
+        Some("json") => ConfigSyntax::Json.wrap_some(),
+        Some("js") => ConfigSyntax::JavaScript.wrap_some(),
+        Some("ts") => ConfigSyntax::TypeScript.wrap_some(),
+        _ => None,
+    }
+}
+```
+
+`Json` is bytes plus serde. `JavaScript` and `TypeScript` are a module that exports the config (`export default` or `module.exports`). The loader runs that file with the first of `node` and `bun` that is on `PATH`, and reads JSON from stdout. No runtime on `PATH` is an error. This change does not call that loader.
 
 ## Tests
 
 Unit tests on `nearest_config` and `slug`, in `discover.rs`, using a temp directory.
 
-- A config in `project/` is found from `project/src/components`.
+- A `isograph.config.json` in `project/` is found from `project/src/components`.
+- A `isograph.config.js` in `project/` is found from a subdirectory when no json is there.
+- A `isograph.config.ts` in `project/` is found from a subdirectory when no json or js is there.
+- In one directory that has both json and js, json is the one found.
 - A directory with no config above it is `None`.
 - Two canonical paths get two slugs; one path gets the same slug twice.
 

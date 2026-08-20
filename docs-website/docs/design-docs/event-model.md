@@ -20,7 +20,9 @@ struct Config {
 
 Figaro has one process on the machine (`Instance::global`). Isograph has one process per `Config` (`Instance::named`). `freddie_cli` is the same crate in both.
 
-The process is found by `--config`, or by the nearest `isograph.config.json` at or above the current directory. Two paths to one file are one process.
+The process is found by `--config`, or by the nearest `isograph.config.json`, `isograph.config.js`, or `isograph.config.ts` at or above the current directory. At one directory, that order: json, then js, then ts. Two paths to one file are one process.
+
+A `.json` config is data. A `.js` or `.ts` config is a module that exports the config object (`export default` or `module.exports`). Loading it runs the file with the first of `node` and `bun` that is on `PATH`, and reads JSON from stdout.
 
 Watch mode and the LSP are that process. They share the pico database.
 
