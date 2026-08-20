@@ -5,10 +5,11 @@ use crate::{
     IntegerValuePath, IsoLiteralParsePath, IsoLiteralSlotPath, ListTypeAnnotationPath,
     NamedTypeAnnotationPath, NonBracketTokenPath, NullValuePath, ObjectEntryPath,
     ObjectEntrySlotPath, ObjectLiteralPath, OpenBracketPath, SelectableNameWrapperPath,
-    SelectionFieldArgumentPath, SelectionFieldArgumentSlotPath, SelectionPath, SelectionSetPath,
-    SelectionSlotPath, StringLiteralValueWrapperPath, UnparsedChunkItemsPath,
-    ValueKeyNameWrapperPath, VariableDeclarationOrUsageListPath, VariableDeclarationOrUsagePath,
-    VariableDeclarationOrUsageSlotPath, VariableNameWrapperPath, VariableUsePath,
+    SelectionFieldArgumentPath, SelectionFieldArgumentSlotPath, SelectionNameWrapperPath,
+    SelectionPath, SelectionSetPath, SelectionSlotPath, StringLiteralValueWrapperPath,
+    UnparsedChunkItemsPath, ValueKeyNameWrapperPath, VariableDeclarationOrUsageListPath,
+    VariableDeclarationOrUsagePath, VariableDeclarationOrUsageSlotPath, VariableNameWrapperPath,
+    VariableUsePath,
 };
 
 /// What a position resolves to: the leaves of the newest tree. Each parsing stage
@@ -53,6 +54,7 @@ pub enum IsographResolutionNode<'a> {
     SelectionSlot(SelectionSlotPath<'a>),
     SelectionSet(SelectionSetPath<'a>),
     Selection(SelectionPath<'a>),
+    SelectionNameWrapper(SelectionNameWrapperPath<'a>),
     VariableDeclarationOrUsageSlot(VariableDeclarationOrUsageSlotPath<'a>),
     VariableDeclarationOrUsageList(VariableDeclarationOrUsageListPath<'a>),
     VariableDeclarationOrUsage(VariableDeclarationOrUsagePath<'a>),

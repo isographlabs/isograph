@@ -6,8 +6,7 @@ use span::WithSpan;
 use crate::chunk_stream::ItemCursor;
 use crate::{
     ArgumentList, BracketKind, Expectation, IsographResolutionNode, NonBracketTokenKind,
-    ParseError, SelectableNameWrapper, SemanticToken, Slot, UnparsedChunkItems,
-    consume_argument_list,
+    ParseError, SemanticToken, Slot, UnparsedChunkItems, consume_argument_list,
 };
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -18,17 +17,19 @@ pub struct SelectionSet(#[resolve_field] pub Vec<WithSpan<Slot<Selection, Unpars
 #[resolve_position(parent_type = SelectionSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct Selection {
     #[resolve_field]
-    #[parent_variant(Selection)]
-    pub reader_alias: Option<WithSpan<SelectableNameWrapper>>,
+    pub reader_alias: Option<WithSpan<SelectionNameWrapper>>,
     #[resolve_field]
-    #[parent_variant(Selection)]
-    pub name: WithSpan<SelectableNameWrapper>,
+    pub name: WithSpan<SelectionNameWrapper>,
     #[resolve_field]
     pub arguments: Option<WithSpan<ArgumentList>>,
     #[resolve_field]
     #[parent_variant(Selection)]
     pub selection_set: Option<WithSpan<SelectionSet>>,
 }
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = SelectionPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct SelectionNameWrapper(pub common_lang_types::SelectableName);
 
 #[derive(Debug)]
 pub enum SelectionSetParent<'a> {
@@ -42,6 +43,9 @@ pub type SelectionSlotPath<'a> =
     PositionResolutionPath<&'a Slot<Selection, UnparsedChunkItems>, SelectionSetPath<'a>>;
 
 pub type SelectionPath<'a> = PositionResolutionPath<&'a Selection, SelectionSlotPath<'a>>;
+
+pub type SelectionNameWrapperPath<'a> =
+    PositionResolutionPath<&'a SelectionNameWrapper, SelectionPath<'a>>;
 
 impl<'a> From<SelectionSlotPath<'a>> for IsographResolutionNode<'a> {
     fn from(path: SelectionSlotPath<'a>) -> Self {
@@ -94,11 +98,11 @@ fn parse_selection(cursor: &mut ItemCursor<'_>) -> Result<Selection, WithSpan<Pa
                         cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier))
                     })?;
                 (
-                    first.interned().map(SelectableNameWrapper).wrap_some(),
-                    name.interned().map(SelectableNameWrapper),
+                    first.interned().map(SelectionNameWrapper).wrap_some(),
+                    name.interned().map(SelectionNameWrapper),
                 )
             }
-            None => (None, first.interned().map(SelectableNameWrapper)),
+            None => (None, first.interned().map(SelectionNameWrapper)),
         };
     let arguments = consume_argument_list(cursor);
     let selection_set = consume_selection_set(cursor);
@@ -194,7 +198,7 @@ mod tests {
         assert_eq!(items.len(), 2);
         assert_eq!(
             as_selection(items[0].item.reference()).name.item,
-            SelectableNameWrapper("bar".intern().to())
+            SelectionNameWrapper("bar".intern().to())
         );
         assert_eq!(
             as_selection(items[0].item.reference()).name.location,
@@ -265,7 +269,7 @@ mod tests {
             .as_ref()
             .expect("the fixture selects with an alias");
         let alias_anchor = span_of(text, "b:");
-        assert_eq!(alias.item, SelectableNameWrapper("b".intern().to()));
+        assert_eq!(alias.item, SelectionNameWrapper("b".intern().to()));
         assert_eq!(
             alias.location,
             Span::new(alias_anchor.start, alias_anchor.start + 1)

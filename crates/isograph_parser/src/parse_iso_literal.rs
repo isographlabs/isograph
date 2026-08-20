@@ -6,7 +6,7 @@ use span::{WithSpan, WithSpanPostfix};
 use crate::chunk_stream::ItemCursor;
 use crate::{
     ChunkedLevel, Expectation, ExtraChunks, Found, IsographResolutionNode, NamedTypeAnnotationPath,
-    NonBracketTokenKind, ParseError, SelectionPath, SelectionSet, SemanticToken, Singleton, Slot,
+    NonBracketTokenKind, ParseError, SelectionSet, SemanticToken, Singleton, Slot,
     UnparsedChunkItems, VariableDeclarationOrUsageList, consume_variable_declaration_list,
     parse_singleton, require_selection_set,
 };
@@ -65,13 +65,13 @@ pub struct FieldDeclaration {
 #[resolve_position(parent_type = EntityNameWrapperParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct EntityNameWrapper(pub common_lang_types::EntityName);
 
-/// A selectable name: an entrypoint name, a field name, a selection name, or a reader_alias.
+/// The name of an entrypoint or field, `foo` in `entrypoint Query.foo`.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
     parent_type = SelectableNameWrapperParent<'a>,
     resolved_node = IsographResolutionNode<'a>
 )]
-pub struct SelectableNameWrapper(pub common_lang_types::SelectableName);
+pub struct SelectableNameWrapper(common_lang_types::SelectableName);
 
 /// The interned source slice of a description, quotes included.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
@@ -89,7 +89,6 @@ pub enum EntityNameWrapperParent<'a> {
 pub enum SelectableNameWrapperParent<'a> {
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
     FieldDeclaration(FieldDeclarationPath<'a>),
-    Selection(SelectionPath<'a>),
 }
 
 pub type EntrypointDeclarationPath<'a> =
@@ -220,10 +219,11 @@ mod tests {
     use crate::{
         BracketError, BracketKind, ChunkContentItemParent, CommaWithoutItem, Expectation, Found,
         IntegerValue, IsographResolutionNode, NonBracketTokenKind, NonConstantValue,
-        NonConstantValueParent, ObjectEntry, ParseError, Selection, SelectionSet,
-        SelectionSetParent, Slot, TypeAnnotation, TypeAnnotationParent, UnparsedChunkItems,
-        UnparsedChunkItemsParent, VariableDeclarationOrUsage, VariableDeclarationOrUsageList,
-        VariableNameWrapper, VariableNameWrapperParent, chunk, match_brackets, tokenize,
+        NonConstantValueParent, ObjectEntry, ParseError, Selection, SelectionNameWrapper,
+        SelectionSet, SelectionSetParent, Slot, TypeAnnotation, TypeAnnotationParent,
+        UnparsedChunkItems, UnparsedChunkItemsParent, VariableDeclarationOrUsage,
+        VariableDeclarationOrUsageList, VariableNameWrapper, VariableNameWrapperParent, chunk,
+        match_brackets, tokenize,
     };
     use Expectation::{DeclarationKeyword, EndOfDeclaration};
     use NonBracketTokenKind::{
@@ -874,7 +874,7 @@ mod tests {
         assert_eq!(items.len(), 2);
         assert_eq!(
             as_selection(items[0].item.reference()).name.item,
-            SelectableNameWrapper("bar".intern().to())
+            SelectionNameWrapper("bar".intern().to())
         );
         assert_eq!(
             as_selection(items[0].item.reference()).name.location,
@@ -1056,13 +1056,9 @@ mod tests {
         let text = "field Query.Foo { pet { name } }";
         let (parse, _) = parsed(text);
         match parse.resolve((), span_of(text, "name")) {
-            IsographResolutionNode::SelectableNameWrapper(name) => {
-                let selection = match name.parent {
-                    SelectableNameWrapperParent::Selection(selection) => selection,
-                    parent => panic!("expected a selection parent, got {parent:?}"),
-                };
-                assert_eq!(selection.inner.name.location, span_of(text, "name"));
-                let object = match selection.parent.parent.parent {
+            IsographResolutionNode::SelectionNameWrapper(name) => {
+                assert_eq!(name.parent.inner.name.location, span_of(text, "name"));
+                let object = match name.parent.parent.parent.parent {
                     SelectionSetParent::Selection(object) => object,
                     parent => panic!("expected a nested-selection parent, got {parent:?}"),
                 };
@@ -1074,7 +1070,7 @@ mod tests {
                     parent => panic!("expected the declaration at the top, got {parent:?}"),
                 }
             }
-            node => panic!("expected the selectable name leaf, got {node:?}"),
+            node => panic!("expected the selection name leaf, got {node:?}"),
         }
     }
 
@@ -1087,11 +1083,8 @@ mod tests {
             node => panic!("expected the leftover token, got {node:?}"),
         }
         match parse.resolve((), span_of(text, "bar")) {
-            IsographResolutionNode::SelectableNameWrapper(name) => match name.parent {
-                SelectableNameWrapperParent::Selection(_) => {}
-                parent => panic!("expected a selection parent, got {parent:?}"),
-            },
-            node => panic!("expected the selectable name leaf, got {node:?}"),
+            IsographResolutionNode::SelectionNameWrapper(_) => {}
+            node => panic!("expected the selection name leaf, got {node:?}"),
         }
     }
 
