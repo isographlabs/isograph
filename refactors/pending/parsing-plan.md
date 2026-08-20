@@ -201,8 +201,7 @@ parsing-standards.md governs how every implementation below is written. Each doc
 
 1. `peek-then-parse.md`. `parse_non_constant_value` peeks once and passes that `CursorPeek` to `parse_*`. `parse_variable_name(peek)` commits `$` and requires the identifier.
 2. `parse-variables.md`. `require_variable_name`, variable-declaration lists, `$name: Type = default` with `NonConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_nested_singleton`), and the `Box` delegation impl.
-3. `parse-descriptions.md`. `consume_description`: optional `StringLiteral` or `BlockStringLiteral`, interned with quotes included.
-4. `parse-pointers.md`. `pointer Type.name to Type { ... }` via `require_token(Identifier, Keyword)` and `token_text == "to"`. Removes `UnsupportedDeclarationType`.
-5. `parse-directives.md`. `@name` and `@name(args)` on entrypoints, fields, pointers, and selections. Raw `IsographFieldDirectiveList`; typed sets are a later stage.
+3. `parse-pointers.md`. `pointer Type.name to Type { ... }` via `require_token(Identifier, Keyword)` and `token_text == "to"`. Removes `UnsupportedDeclarationType`.
+4. `parse-directives.md`. `@name` and `@name(args)` on entrypoints, fields, pointers, and selections. Raw `IsographFieldDirectiveList`; typed sets are a later stage.
 
 Later: `parse-arrays.md`. `[ ... ]` list values.
