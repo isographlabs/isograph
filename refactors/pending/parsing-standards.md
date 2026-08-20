@@ -314,7 +314,7 @@ pub(crate) fn parse_value(
         if let Some(span) =
             cursor.consume_token_if(NonBracketTokenKind::StringLiteral, SemanticToken::String)
         {
-            return NonConstantValue::String(span.interned().map(StringValue).item)
+            return NonConstantValue::String(span.interned().map(StringLiteralValueWrapper).item)
                 .wrap_ok();
         }
         if let Some(span) = cursor
@@ -513,7 +513,7 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 - Multi-form position: `consume_*` ladder, last arm `expected`
 - Keyword / boolean / null text: `token.token_text()` after an identifier
 - Integer conversion: `token.token_text().parse()` on an `IntegerLiteral` token
-- Interned name: `token.interned()` when the wrapper implements `From<StringKey>`; `token.interned().map(ArgumentName)` when it does not
+- Interned name: `token.interned()` when the wrapper implements `From<StringKey>`; `token.interned().map(FieldArgumentNameWrapper)` when it does not
 - Composite span: `ItemCursor::spanning`
 - List of items: `ChunkedLevel::parse_each_chunk` → `Vec<WithSpan<Slot<P, UnparsedChunkItems>>>`
 - One-item context: `parse_singleton` → `Singleton<Slot<T, UnparsedChunkItems>, ExtraChunks>`

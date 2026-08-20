@@ -127,7 +127,7 @@ Origin: `Slot` and `UnparsedChunkItems` in `crates/isograph_parser/src/chunk.rs`
 
 `Slot<T, E>` has one `Parent`. The lists are vanilla: each pin's parent is that list's path, each vec is bare `#[resolve_field]`. The slot items are therefore two types, `NamedArgument` and `ObjectEntry`.
 
-Bare `#[resolve_field]` passes `self.path(parent)`. `#[parent_variant(V)]` wraps that path in variant `V` of the child's `Parent` enum. The child's `Parent` is an enum when that child appears under more than one parent. `ChunkContentItem` appears under `Chunk` and under `UnparsedChunkItems`. `ArgumentName` and `NonConstantValue` appear under `NamedArgument` and under `ObjectEntry`.
+Bare `#[resolve_field]` passes `self.path(parent)`. `#[parent_variant(V)]` wraps that path in variant `V` of the child's `Parent` enum. The child's `Parent` is an enum when that child appears under more than one parent. `ChunkContentItem` appears under `Chunk` and under `UnparsedChunkItems`. `FieldArgumentNameWrapper` and `NonConstantValue` appear under `NamedArgument` and under `ObjectEntry`.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -277,7 +277,7 @@ pub struct ObjectLiteral(
 pub struct NamedArgument {
     #[resolve_field]
     #[parent_variant(NamedArgument)]
-    pub name: WithSpan<ArgumentName>,
+    pub name: WithSpan<FieldArgumentNameWrapper>,
     #[resolve_field]
     #[parent_variant(NamedArgument)]
     pub value: WithSpan<NonConstantValue>,
@@ -288,7 +288,7 @@ pub struct NamedArgument {
 pub struct ObjectEntry {
     #[resolve_field]
     #[parent_variant(ObjectEntry)]
-    pub name: WithSpan<ArgumentName>,
+    pub name: WithSpan<FieldArgumentNameWrapper>,
     #[resolve_field]
     #[parent_variant(ObjectEntry)]
     pub value: WithSpan<NonConstantValue>,
@@ -298,7 +298,7 @@ pub struct ObjectEntry {
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum NonConstantValue {
     Variable(VariableUse),
-    String(StringValue),
+    String(StringLiteralValueWrapper),
     Integer(IntegerValue),
     Boolean(BooleanValue),
     Null(NullValue),
@@ -311,7 +311,7 @@ pub struct VariableUse(#[resolve_field] pub WithSpan<VariableNameWrapper>);
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct StringValue(common_lang_types::StringLiteralValue);
+pub struct StringLiteralValueWrapper(common_lang_types::StringLiteralValue);
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
@@ -332,8 +332,8 @@ pub enum Boolean {
 pub struct NullValue;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ArgumentNameParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ArgumentName(common_lang_types::FieldArgumentName);
+#[resolve_position(parent_type = FieldArgumentNameWrapperParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct FieldArgumentNameWrapper(common_lang_types::FieldArgumentName);
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = VariableUsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
@@ -343,7 +343,7 @@ pub struct VariableNameWrapper(common_lang_types::VariableName);
 pub enum ArgumentListParent {}
 
 #[derive(Debug)]
-pub enum ArgumentNameParent<'a> {
+pub enum FieldArgumentNameWrapperParent<'a> {
     NamedArgument(NamedArgumentPath<'a>),
     ObjectEntry(ObjectEntryPath<'a>),
 }
@@ -376,7 +376,7 @@ pub type ObjectEntryPath<'a> = PositionResolutionPath<&'a ObjectEntry, ObjectEnt
 
 pub type VariableUsePath<'a> = PositionResolutionPath<&'a VariableUse, NonConstantValueParent<'a>>;
 
-pub type StringValuePath<'a> = PositionResolutionPath<&'a StringValue, NonConstantValueParent<'a>>;
+pub type StringLiteralValueWrapperPath<'a> = PositionResolutionPath<&'a StringLiteralValueWrapper, NonConstantValueParent<'a>>;
 
 pub type IntegerValuePath<'a> = PositionResolutionPath<&'a IntegerValue, NonConstantValueParent<'a>>;
 
@@ -384,17 +384,17 @@ pub type BooleanValuePath<'a> = PositionResolutionPath<&'a BooleanValue, NonCons
 
 pub type NullValuePath<'a> = PositionResolutionPath<&'a NullValue, NonConstantValueParent<'a>>;
 
-pub type ArgumentNamePath<'a> = PositionResolutionPath<&'a ArgumentName, ArgumentNameParent<'a>>;
+pub type FieldArgumentNameWrapperPath<'a> = PositionResolutionPath<&'a FieldArgumentNameWrapper, FieldArgumentNameWrapperParent<'a>>;
 
 pub type VariableNameWrapperPath<'a> =
     PositionResolutionPath<&'a VariableNameWrapper, VariableUsePath<'a>>;
 ```
 
-`string_key_newtype!` already implements `From<StringKey>` for `FieldArgumentName`, `VariableName`, and `StringLiteralValue`. The parser wrappers do not add a second `From`. Construction is `name.interned().map(ArgumentName)` and `name.interned().map(VariableNameWrapper)`.
+`string_key_newtype!` already implements `From<StringKey>` for `FieldArgumentName`, `VariableName`, and `StringLiteralValue`. The parser wrappers do not add a second `From`. Construction is `name.interned().map(FieldArgumentNameWrapper)`, `name.interned().map(VariableNameWrapper)`, and `span.interned().map(StringLiteralValueWrapper)`.
 
 `NonConstantValueParent` variants are boxed to break `NamedArgumentPath` / `ObjectEntryPath` through `ObjectLiteral` back to a pair. A position on `$` answers `VariableUse`. `VariableNameWrapper` has one parent, `VariableUsePath`, so that field is bare `#[resolve_field]`.
 
-`ArgumentList` and `ObjectLiteral` vecs are bare `#[resolve_field]`. `NamedArgument`'s parent is `NamedArgumentSlotPath`. `ObjectEntry`'s parent is `ObjectEntrySlotPath`. `ArgumentName` and `NonConstantValue` have two parents, so those fields take `#[parent_variant]`.
+`ArgumentList` and `ObjectLiteral` vecs are bare `#[resolve_field]`. `NamedArgument`'s parent is `NamedArgumentSlotPath`. `ObjectEntry`'s parent is `ObjectEntrySlotPath`. `FieldArgumentNameWrapper` and `NonConstantValue` have two parents, so those fields take `#[parent_variant]`.
 
 `Slot`'s unmatched arm is `on_unmatched_span = from_path`: `self.path(parent).to()`. Each pin has a `From` into `IsographResolutionNode`. The root pin is live. These pins add two more.
 
@@ -466,12 +466,12 @@ After. Origin: that file. Delta: the use list and the argument/value variants.
 ```rust
 // from crates/isograph_parser/src/isograph_resolution_node.rs
 use crate::{
-    ArgumentListPath, ArgumentNamePath, BooleanValuePath, ChunkPath, ChunkSeparatorPath,
+    ArgumentListPath, FieldArgumentNameWrapperPath, BooleanValuePath, ChunkPath, ChunkSeparatorPath,
     ChunkedGroupPath, ChunkedLevelPath, ClientFieldNamePath, CloseBracketPath, EntityNamePath,
     EntrypointDeclarationPath, ExtraChunksPath, IntegerValuePath, IsoLiteralParsePath,
     IsoLiteralSlotPath, NamedArgumentPath, NamedArgumentSlotPath, NonBracketTokenPath,
     NullValuePath, ObjectEntryPath, ObjectEntrySlotPath, ObjectLiteralPath, OpenBracketPath,
-    StringValuePath, UnparsedChunkItemsPath, VariableNameWrapperPath, VariableUsePath,
+    StringLiteralValueWrapperPath, UnparsedChunkItemsPath, VariableNameWrapperPath, VariableUsePath,
 };
 
 /// What a position resolves to: the leaves of the newest tree. Each parsing stage
@@ -503,10 +503,10 @@ pub enum IsographResolutionNode<'a> {
     ObjectLiteral(ObjectLiteralPath<'a>),
     NamedArgument(NamedArgumentPath<'a>),
     ObjectEntry(ObjectEntryPath<'a>),
-    ArgumentName(ArgumentNamePath<'a>),
+    FieldArgumentNameWrapper(FieldArgumentNameWrapperPath<'a>),
     VariableUse(VariableUsePath<'a>),
     VariableNameWrapper(VariableNameWrapperPath<'a>),
-    StringValue(StringValuePath<'a>),
+    StringLiteralValueWrapper(StringLiteralValueWrapperPath<'a>),
     IntegerValue(IntegerValuePath<'a>),
     BooleanValue(BooleanValuePath<'a>),
     NullValue(NullValuePath<'a>),
@@ -520,7 +520,7 @@ fn parse_name_colon_value(
     cursor: &mut ItemCursor<'_>,
     name_token: SemanticToken,
     missing_name: Expectation,
-) -> Result<(WithSpan<ArgumentName>, WithSpan<NonConstantValue>), WithSpan<ParseError>> {
+) -> Result<(WithSpan<FieldArgumentNameWrapper>, WithSpan<NonConstantValue>), WithSpan<ParseError>> {
     let name = cursor
         .require_token(NonBracketTokenKind::Identifier, name_token)
         .map_err(|()| cursor.expected(missing_name))?;
@@ -529,7 +529,7 @@ fn parse_name_colon_value(
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Colon)))?;
     let value = parse_value(cursor)?;
     (
-        name.interned().map(ArgumentName),
+        name.interned().map(FieldArgumentNameWrapper),
         value,
     )
         .wrap_ok()
@@ -590,7 +590,7 @@ pub(crate) fn parse_value(
         if let Some(span) =
             cursor.consume_token_if(NonBracketTokenKind::StringLiteral, SemanticToken::String)
         {
-            return NonConstantValue::String(span.interned().map(StringValue).item)
+            return NonConstantValue::String(span.interned().map(StringLiteralValueWrapper).item)
                 .wrap_ok();
         }
         if let Some(span) = cursor
@@ -744,7 +744,7 @@ An entrypoint leftover token still answers `NonBracketToken`. `leftover_after_an
         );
         assert_eq!(
             as_argument(items[0].item.reference()).name.item,
-            ArgumentName("id".intern().to())
+            FieldArgumentNameWrapper("id".intern().to())
         );
         assert_eq!(
             as_argument(items[0].item.reference()).value.location,
@@ -817,7 +817,7 @@ An entrypoint leftover token still answers `NonBracketToken`. `leftover_after_an
         assert_eq!(items.len(), 1);
         assert_eq!(
             as_argument(items[0].item.reference()).name.item,
-            ArgumentName("id".intern().to())
+            FieldArgumentNameWrapper("id".intern().to())
         );
         assert_eq!(errors, vec![]);
     }
@@ -933,7 +933,7 @@ An entrypoint leftover token still answers `NonBracketToken`. `leftover_after_an
         assert_eq!(list.item.0.len(), 1);
         assert_eq!(
             as_argument(list.item.0[0].item.reference()).name.item,
-            ArgumentName("id".intern().to())
+            FieldArgumentNameWrapper("id".intern().to())
         );
         assert_eq!(
             tokens,
