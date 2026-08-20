@@ -63,8 +63,8 @@ A token that is not a string or block string is not consumed. An unterminated `"
         let mut tokens = Vec::new();
         let mut errors = Vec::new();
         let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
-        let description = consume_description(stream.cursor())
-            .expect("the fixture is a string description");
+        let description =
+            consume_description(stream.cursor()).expect("the fixture is a string description");
         assert_eq!(description.location, span_of(text, "\"the home route\""));
         assert_eq!(
             description.item,
@@ -86,8 +86,8 @@ A token that is not a string or block string is not consumed. An unterminated `"
         let mut tokens = Vec::new();
         let mut errors = Vec::new();
         let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
-        let description = consume_description(stream.cursor())
-            .expect("the fixture is a string description");
+        let description =
+            consume_description(stream.cursor()).expect("the fixture is a string description");
         assert_eq!(description.location, span_of(text, "\"\""));
         assert_eq!(description.item, Description("\"\"".intern().to()));
     }
@@ -134,8 +134,8 @@ A token that is not a string or block string is not consumed. An unterminated `"
                 .map(|token| token.location),
             span_of(text, "Foo").wrap_some(),
         );
-        let description = consume_description(cursor)
-            .expect("the fixture carries a block-string description");
+        let description =
+            consume_description(cursor).expect("the fixture carries a block-string description");
         assert_eq!(
             description.location,
             span_of(text, "\"\"\"\n  the home\n  route\n\"\"\"")
@@ -156,7 +156,8 @@ A token that is not a string or block string is not consumed. An unterminated `"
         let mut errors = Vec::new();
         let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
         let cursor = stream.cursor();
-        let description = consume_description(cursor).expect("the fixture starts with a description");
+        let description =
+            consume_description(cursor).expect("the fixture starts with a description");
         assert_eq!(description.location, span_of(text, "\"hi\""));
         assert_eq!(
             cursor
@@ -172,11 +173,15 @@ A token that is not a string or block string is not consumed. An unterminated `"
         let tree = chunked(text);
         let mut tokens = Vec::new();
         let mut errors = Vec::new();
+        {
+            let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
+            assert_eq!(consume_description(stream.cursor()), None);
+        }
+        assert_eq!(tokens, vec![]);
+        assert_eq!(errors, vec![]);
         let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
         let cursor = stream.cursor();
         assert_eq!(consume_description(cursor), None);
-        assert_eq!(tokens, vec![]);
-        assert_eq!(errors, vec![]);
         assert_eq!(
             cursor
                 .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
