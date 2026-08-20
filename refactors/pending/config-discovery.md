@@ -27,10 +27,12 @@ error: no isograph.config.json, isograph.config.js, or isograph.config.ts at or 
 ```
 
 ```
-$ isograph --config ./isograph.config.json
-$ isograph --config ./isograph.config.ts
-$ isograph --config /other/project/isograph.config.js status
+$ isograph start --config ./isograph.config.json
+$ isograph start --config ./isograph.config.ts
+$ isograph status --config /other/project/isograph.config.js
 ```
+
+`--config` is on the verb. Bare `isograph` is start with walk-up.
 
 ## Change 1: find the config, key the instance to it
 
@@ -133,18 +135,18 @@ Walk-up is `Path::ancestors`. At each directory, json then js then ts. No crate 
 `config_and_instance` computes the pair together so no caller can key an instance to the wrong config. `Instance::named` puts the log at `{log_dir}/{slug}.log`, not `isograph.log`.
 
 ```rust
-// from crates/isograph_cli/src/main.rs
+// from crates/isograph_cli/src/lib.rs
 mod discover;
 
 #[derive(clap::Args, Debug)]
-pub struct ConfigFlag {
+struct ConfigFlag {
     /// Path to the isograph config. When absent, the nearest isograph.config.json, .js, or .ts
     /// at or above the current directory.
     #[arg(long)]
     pub config: Option<std::path::PathBuf>,
 }
 
-pub struct Isograph;
+struct Isograph;
 
 impl App for Isograph {
     type Id = ConfigFlag;
@@ -585,24 +587,8 @@ fn first_executor(config: &Path) -> Option<Executor> {
     None
 }
 
-const EXPORT_TO_JSON: &str = r"
-const path = process.argv[process.argv.length - 1];
-import('node:url').then(({ pathToFileURL }) => import(pathToFileURL(path).href)).then((m) => {
-  const config = m.default ?? m;
-  process.stdout.write(JSON.stringify(config));
-}).catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
-";
-
-const DENO_EXPORT_TO_JSON: &str = r"
-const path = Deno.args[0];
-const href = new URL(path, 'file:///').href;
-const m = await import(href);
-const config = m.default ?? m;
-Deno.stdout.writeSync(new TextEncoder().encode(JSON.stringify(config)));
-";
+const EXPORT_TO_JSON: &str = include_str!("export_to_json.js");
+const DENO_EXPORT_TO_JSON: &str = include_str!("deno_export_to_json.js");
 
 /// The config file as JSON text.
 pub fn config_json(path: &Path) -> Result<String, LoadError> {
@@ -675,7 +661,28 @@ fn run_js(executor: &Executor, path: &Path) -> Result<String, LoadError> {
 }
 ```
 
-`on_path` is a PATH probe. Inner structs derive `Debug`.
+```js
+// from crates/isograph_cli/src/export_to_json.js
+const path = process.argv[process.argv.length - 1];
+import('node:url').then(({ pathToFileURL }) => import(pathToFileURL(path).href)).then((m) => {
+  const config = m.default ?? m;
+  process.stdout.write(JSON.stringify(config));
+}).catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
+```
+
+```js
+// from crates/isograph_cli/src/deno_export_to_json.js
+const path = Deno.args[0];
+const href = new URL(path, 'file:///').href;
+const m = await import(href);
+const config = m.default ?? m;
+Deno.stdout.writeSync(new TextEncoder().encode(JSON.stringify(config)));
+```
+
+`include_str!` so the shipped binary does not look for those files on disk. `on_path` is a PATH probe. Inner structs derive `Debug`.
 
 This change does not parse the JSON and does not call `config_json` from `instance` / `run_daemon`.
 
