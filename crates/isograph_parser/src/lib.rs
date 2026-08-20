@@ -15,6 +15,8 @@ mod tokenize;
 mod variables;
 
 #[cfg(test)]
+mod assert_semantic_tokens;
+#[cfg(test)]
 mod parsed_items;
 
 pub use arguments::{

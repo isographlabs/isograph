@@ -1,6 +1,7 @@
 use prelude::Postfix;
 use span::{Span, WithSpan};
 
+use crate::assert_semantic_tokens::assert_semantic_tokens;
 use crate::chunk_stream::ItemCursor;
 use crate::{
     AstError, CommaWithoutItem, Expectation, SemanticToken, Slot, UnparsedChunkItems, chunk,
@@ -11,13 +12,13 @@ pub(crate) type ParsedItems<P> = (
     Vec<WithSpan<Slot<P, UnparsedChunkItems>>>,
     Vec<WithSpan<AstError>>,
     Vec<CommaWithoutItem>,
-    Vec<WithSpan<SemanticToken>>,
 );
 
 pub(crate) fn parsed_items<P>(
     text: &str,
     leftover: Expectation,
     parse_item: impl Fn(&mut ItemCursor<'_>) -> Result<P, WithSpan<AstError>>,
+    expected_tokens: &[(SemanticToken, &str)],
 ) -> ParsedItems<P> {
     let (brackets, bracket_errors) = match_brackets(tokenize(text), text.len() as u32);
     assert!(bracket_errors.is_empty(), "for literal {text:?}");
@@ -35,7 +36,8 @@ pub(crate) fn parsed_items<P>(
     let items = tree
         .item
         .parse_each_chunk(parent.cursor(), leftover, parse_item);
-    (items, errors, comma_errors, tokens)
+    assert_semantic_tokens(text, &tokens, expected_tokens);
+    (items, errors, comma_errors)
 }
 
 /// The span of `pattern`, which must occur exactly once in `text`: an anchor an edit

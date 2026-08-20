@@ -413,11 +413,13 @@ pub(crate) fn parse_non_constant_value(
 mod tests {
     use intern::string_key::Intern;
     use prelude::Postfix;
-    use span::{Span, WithSpan, WithSpanPostfix};
+    use span::{Span, WithSpan};
 
     use super::*;
     use crate::{
-        AstError, Found, NonBracketTokenKind, SemanticToken, chunk, match_brackets,
+        AstError, Found, NonBracketTokenKind, SemanticToken,
+        assert_semantic_tokens::assert_semantic_tokens,
+        chunk, match_brackets,
         parsed_items::{parsed_items, span_of},
         tokenize,
     };
@@ -425,26 +427,25 @@ mod tests {
     type ParsedPairs = (
         Vec<WithSpan<Slot<Argument, UnparsedChunkItems>>>,
         Vec<WithSpan<AstError>>,
-        Vec<WithSpan<SemanticToken>>,
     );
 
-    type ParsedArgumentList = (
-        Option<WithSpan<ArgumentList>>,
-        Vec<WithSpan<AstError>>,
-        Vec<WithSpan<SemanticToken>>,
-    );
+    type ParsedArgumentList = (Option<WithSpan<ArgumentList>>, Vec<WithSpan<AstError>>);
 
-    fn parsed_pairs(text: &str) -> ParsedPairs {
-        let (items, errors, comma_errors, tokens) = parsed_items(
+    fn parsed_pairs(text: &str, expected_tokens: &[(SemanticToken, &str)]) -> ParsedPairs {
+        let (items, errors, comma_errors) = parsed_items(
             text,
             Expectation::Separator(BracketKind::Parenthesis),
             parse_argument,
+            expected_tokens,
         );
         assert_eq!(comma_errors, vec![], "for literal {text:?}");
-        (items, errors, tokens)
+        (items, errors)
     }
 
-    fn parsed_argument_list(text: &str) -> ParsedArgumentList {
+    fn parsed_argument_list(
+        text: &str,
+        expected_tokens: &[(SemanticToken, &str)],
+    ) -> ParsedArgumentList {
         let (brackets, bracket_errors) = match_brackets(tokenize(text), text.len() as u32);
         assert!(bracket_errors.is_empty(), "for literal {text:?}");
         let (tree, comma_errors) = chunk(brackets.reference());
@@ -453,7 +454,8 @@ mod tests {
         let mut tokens = Vec::new();
         let mut stream = tree.item.0[0].item.stream(text, &mut tokens, &mut errors);
         let list = consume_argument_list(stream.cursor());
-        (list, errors, tokens)
+        assert_semantic_tokens(text, &tokens, expected_tokens);
+        (list, errors)
     }
 
     fn as_argument(slot: &Slot<Argument, UnparsedChunkItems>) -> &Argument {
@@ -480,7 +482,18 @@ mod tests {
     #[test]
     fn pairs_parse_as_name_colon_value() {
         let text = "id: $petId, shouted: true";
-        let (items, errors, _) = parsed_pairs(text);
+        let (items, errors) = parsed_pairs(
+            text,
+            &[
+                (SemanticToken::Argument, "id"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "petId"),
+                (SemanticToken::Argument, "shouted"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::BooleanOrNull, "true"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         assert_eq!(items.len(), 2);
         assert_eq!(
@@ -504,7 +517,33 @@ mod tests {
     #[test]
     fn each_value_kind_parses() {
         let text = r#"a: $x, b: "hi", c: 42, d: -7, e: true, f: false, g: null"#;
-        let (items, errors, _) = parsed_pairs(text);
+        let (items, errors) = parsed_pairs(
+            text,
+            &[
+                (SemanticToken::Argument, "a"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "x"),
+                (SemanticToken::Argument, "b"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::String, "\"hi\""),
+                (SemanticToken::Argument, "c"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Integer, "42"),
+                (SemanticToken::Argument, "d"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Integer, "-7"),
+                (SemanticToken::Argument, "e"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::BooleanOrNull, "true"),
+                (SemanticToken::Argument, "f"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::BooleanOrNull, "false"),
+                (SemanticToken::Argument, "g"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::BooleanOrNull, "null"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let values: Vec<&NonConstantValue> = items
             .iter()
@@ -534,7 +573,25 @@ mod tests {
     #[test]
     fn object_values_use_braces() {
         let text = "input: { id: 4, nested: { on: true } }";
-        let (items, errors, _) = parsed_pairs(text);
+        let (items, errors) = parsed_pairs(
+            text,
+            &[
+                (SemanticToken::Argument, "input"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::ObjectKey, "id"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Integer, "4"),
+                (SemanticToken::ObjectKey, "nested"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::ObjectKey, "on"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::BooleanOrNull, "true"),
+                (SemanticToken::Brace, "}"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let value = as_argument(items[0].item.reference()).value.reference();
         assert_eq!(
@@ -555,7 +612,7 @@ mod tests {
     #[test]
     fn empty_and_whitespace_levels_hold_zero_pairs() {
         for text in ["", "   ", "\n"] {
-            let (items, errors, _) = parsed_pairs(text);
+            let (items, errors) = parsed_pairs(text, &[]);
             assert_eq!(items.len(), 0, "for literal {text:?}");
             assert_eq!(errors, vec![], "for literal {text:?}");
         }
@@ -564,7 +621,14 @@ mod tests {
     #[test]
     fn a_trailing_comma_after_a_pair_is_not_a_parse_error() {
         let text = "id: 1,";
-        let (items, errors, _) = parsed_pairs(text);
+        let (items, errors) = parsed_pairs(
+            text,
+            &[
+                (SemanticToken::Argument, "id"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Integer, "1"),
+            ],
+        );
         assert_eq!(items.len(), 1);
         assert_eq!(
             as_argument(items[0].item.reference()).name.item,
@@ -576,7 +640,17 @@ mod tests {
     #[test]
     fn integer_overflow_is_a_typed_error_on_that_pair() {
         let text = "a: 99999999999999999999, b: 1";
-        let (items, errors, _) = parsed_pairs(text);
+        let (items, errors) = parsed_pairs(
+            text,
+            &[
+                (SemanticToken::Argument, "a"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Integer, "99999999999999999999"),
+                (SemanticToken::Argument, "b"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Integer, "1"),
+            ],
+        );
         assert!(items[0].item.item.is_none());
         as_argument(items[1].item.reference());
         assert!(errors.iter().any(|error| {
@@ -588,7 +662,15 @@ mod tests {
     #[test]
     fn a_malformed_pair_degrades_that_pair_alone() {
         let text = "a 1, b: 2";
-        let (items, errors, _) = parsed_pairs(text);
+        let (items, errors) = parsed_pairs(
+            text,
+            &[
+                (SemanticToken::Argument, "a"),
+                (SemanticToken::Argument, "b"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Integer, "2"),
+            ],
+        );
         assert!(items[0].item.item.is_none());
         assert_eq!(
             as_argument(items[1].item.reference()).name.location,
@@ -606,7 +688,14 @@ mod tests {
     #[test]
     fn a_non_value_identifier_is_an_error_at_the_value() {
         let text = "a: yes";
-        let (items, errors, _) = parsed_pairs(text);
+        let (items, errors) = parsed_pairs(
+            text,
+            &[
+                (SemanticToken::Argument, "a"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::BooleanOrNull, "yes"),
+            ],
+        );
         assert!(items[0].item.item.is_none());
         assert!(errors.iter().any(|error| {
             error.item
@@ -621,7 +710,7 @@ mod tests {
     #[test]
     fn a_pair_that_does_not_start_with_a_name_is_an_argument_error() {
         let text = "42: 1";
-        let (items, errors, _) = parsed_pairs(text);
+        let (items, errors) = parsed_pairs(text, &[]);
         assert!(items[0].item.item.is_none());
         assert!(errors.iter().any(|error| {
             error.item
@@ -636,7 +725,15 @@ mod tests {
     #[test]
     fn leftover_after_a_pair_keeps_the_item() {
         let text = "id: $x junk";
-        let (items, errors, _) = parsed_pairs(text);
+        let (items, errors) = parsed_pairs(
+            text,
+            &[
+                (SemanticToken::Argument, "id"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "x"),
+            ],
+        );
         assert_eq!(items.len(), 1);
         assert_eq!(
             as_argument(items[0].item.reference()).name.location,
@@ -656,10 +753,18 @@ mod tests {
     #[test]
     fn a_doubled_comma_between_pairs_is_chunkings_error() {
         let text = "a: 1,, b: 2";
-        let (items, errors, comma_errors, _) = parsed_items(
+        let (items, errors, comma_errors) = parsed_items(
             text,
             Expectation::Separator(BracketKind::Parenthesis),
             parse_argument,
+            &[
+                (SemanticToken::Argument, "a"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Integer, "1"),
+                (SemanticToken::Argument, "b"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Integer, "2"),
+            ],
         );
         assert_eq!(comma_errors.len(), 1);
         assert_eq!(items.len(), 2);
@@ -677,7 +782,17 @@ mod tests {
     #[test]
     fn consume_argument_list_reads_a_paren_group() {
         let text = "(id: $petId)";
-        let (list, errors, tokens) = parsed_argument_list(text);
+        let (list, errors) = parsed_argument_list(
+            text,
+            &[
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Argument, "id"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "petId"),
+                (SemanticToken::Parenthesis, ")"),
+            ],
+        );
         let list = list.expect("the fixture opens with a paren group");
         assert_eq!(errors, vec![]);
         assert_eq!(list.location, span_of(text, "(id: $petId)"));
@@ -686,51 +801,36 @@ mod tests {
             as_argument(list.item.0[0].item.reference()).name.item,
             ArgumentNameWrapper("id".intern().to())
         );
-        assert_eq!(
-            tokens,
-            vec![
-                SemanticToken::Parenthesis.with_span(span_of(text, "(")),
-                SemanticToken::Argument.with_span(span_of(text, "id")),
-                SemanticToken::Colon.with_span(span_of(text, ":")),
-                SemanticToken::Variable.with_span(span_of(text, "$")),
-                SemanticToken::Variable.with_span(span_of(text, "petId")),
-                SemanticToken::Parenthesis.with_span(span_of(text, ")")),
-            ],
-        );
     }
 
     #[test]
     fn an_empty_paren_group_is_zero_pairs() {
         let text = "()";
-        let (list, errors, _) = parsed_argument_list(text);
+        let (list, errors) = parsed_argument_list(
+            text,
+            &[
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Parenthesis, ")"),
+            ],
+        );
         let list = list.expect("the fixture opens with a paren group");
         assert_eq!(list.item.0.len(), 0);
         assert_eq!(errors, vec![]);
     }
 
     #[test]
-    fn a_pair_records_argument_colon_and_value_tokens() {
-        let text = "id: $petId";
-        let (_, errors, tokens) = parsed_pairs(text);
-        assert_eq!(errors, vec![]);
-        assert_eq!(
-            tokens,
-            vec![
-                SemanticToken::Argument.with_span(span_of(text, "id")),
-                SemanticToken::Colon.with_span(span_of(text, ":")),
-                SemanticToken::Variable.with_span(span_of(text, "$")),
-                SemanticToken::Variable.with_span(span_of(text, "petId")),
-            ],
-        );
-    }
-
-    #[test]
     fn a_list_interior_holds_three_values() {
         let text = "1, $x, true";
-        let (items, errors, comma_errors, _) = parsed_items(
+        let (items, errors, comma_errors) = parsed_items(
             text,
             Expectation::Separator(BracketKind::Bracket),
             parse_list_literal_value,
+            &[
+                (SemanticToken::Integer, "1"),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "x"),
+                (SemanticToken::BooleanOrNull, "true"),
+            ],
         );
         assert_eq!(comma_errors, vec![]);
         assert_eq!(errors, vec![]);
@@ -752,9 +852,23 @@ mod tests {
     #[test]
     fn a_list_value_parses_nested_lists_and_objects() {
         let text = "[[1], { a: 2 }]";
-        let (items, errors, comma_errors, _) = parsed_items(text, Expectation::Value, |cursor| {
-            parse_non_constant_value(cursor).map(|wrapped| wrapped.item)
-        });
+        let (items, errors, comma_errors) = parsed_items(
+            text,
+            Expectation::Value,
+            |cursor| parse_non_constant_value(cursor).map(|wrapped| wrapped.item),
+            &[
+                (SemanticToken::Bracket, "["),
+                (SemanticToken::Bracket, "["),
+                (SemanticToken::Integer, "1"),
+                (SemanticToken::Bracket, "]"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::ObjectKey, "a"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Integer, "2"),
+                (SemanticToken::Brace, "}"),
+                (SemanticToken::Bracket, "]"),
+            ],
+        );
         assert_eq!(comma_errors, vec![]);
         assert_eq!(errors, vec![]);
         assert_eq!(items.len(), 1);
@@ -781,10 +895,12 @@ mod tests {
     #[test]
     fn empty_and_whitespace_list_interiors_are_empty() {
         for text in ["[]", "[ ]", "[\n]"] {
-            let (items, errors, comma_errors, _) =
-                parsed_items(text, Expectation::Value, |cursor| {
-                    parse_non_constant_value(cursor).map(|wrapped| wrapped.item)
-                });
+            let (items, errors, comma_errors) = parsed_items(
+                text,
+                Expectation::Value,
+                |cursor| parse_non_constant_value(cursor).map(|wrapped| wrapped.item),
+                &[(SemanticToken::Bracket, "["), (SemanticToken::Bracket, "]")],
+            );
             assert_eq!(comma_errors, vec![], "for literal {text:?}");
             assert_eq!(errors, vec![], "for literal {text:?}");
             match items[0]
@@ -804,10 +920,11 @@ mod tests {
     #[test]
     fn a_trailing_comma_in_a_list_is_not_a_parse_error() {
         let text = "1,";
-        let (items, errors, comma_errors, _) = parsed_items(
+        let (items, errors, comma_errors) = parsed_items(
             text,
             Expectation::Separator(BracketKind::Bracket),
             parse_list_literal_value,
+            &[(SemanticToken::Integer, "1")],
         );
         assert_eq!(comma_errors, vec![]);
         assert_eq!(items.len(), 1);
@@ -817,10 +934,11 @@ mod tests {
     #[test]
     fn leftover_after_a_list_value_keeps_the_item() {
         let text = "1 junk";
-        let (items, errors, comma_errors, _) = parsed_items(
+        let (items, errors, comma_errors) = parsed_items(
             text,
             Expectation::Separator(BracketKind::Bracket),
             parse_list_literal_value,
+            &[(SemanticToken::Integer, "1")],
         );
         assert_eq!(comma_errors, vec![]);
         assert_eq!(items.len(), 1);
@@ -842,10 +960,11 @@ mod tests {
     #[test]
     fn a_doubled_comma_in_a_list_is_chunkings_error() {
         let text = "1,, 2";
-        let (items, errors, comma_errors, _) = parsed_items(
+        let (items, errors, comma_errors) = parsed_items(
             text,
             Expectation::Separator(BracketKind::Bracket),
             parse_list_literal_value,
+            &[(SemanticToken::Integer, "1"), (SemanticToken::Integer, "2")],
         );
         assert_eq!(comma_errors.len(), 1);
         assert_eq!(items.len(), 2);
@@ -855,7 +974,17 @@ mod tests {
     #[test]
     fn a_list_parses_as_an_argument_value() {
         let text = "id: [1, 2]";
-        let (items, errors, _) = parsed_pairs(text);
+        let (items, errors) = parsed_pairs(
+            text,
+            &[
+                (SemanticToken::Argument, "id"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Bracket, "["),
+                (SemanticToken::Integer, "1"),
+                (SemanticToken::Integer, "2"),
+                (SemanticToken::Bracket, "]"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         match as_argument(items[0].item.reference())
             .value
@@ -872,7 +1001,17 @@ mod tests {
     #[test]
     fn integer_underflow_is_a_typed_error_on_that_pair() {
         let text = "a: -99999999999999999999, b: 1";
-        let (items, errors, _) = parsed_pairs(text);
+        let (items, errors) = parsed_pairs(
+            text,
+            &[
+                (SemanticToken::Argument, "a"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Integer, "-99999999999999999999"),
+                (SemanticToken::Argument, "b"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Integer, "1"),
+            ],
+        );
         assert!(items[0].item.item.is_none());
         as_argument(items[1].item.reference());
         assert!(errors.iter().any(|error| {
@@ -884,7 +1023,14 @@ mod tests {
     #[test]
     fn zero_parses_as_an_integer() {
         let text = "a: 0";
-        let (items, errors, _) = parsed_pairs(text);
+        let (items, errors) = parsed_pairs(
+            text,
+            &[
+                (SemanticToken::Argument, "a"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Integer, "0"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         assert!(matches!(
             as_argument(items[0].item.reference()).value.item,
@@ -895,7 +1041,14 @@ mod tests {
     #[test]
     fn i64_min_parses() {
         let text = "a: -9223372036854775808";
-        let (items, errors, _) = parsed_pairs(text);
+        let (items, errors) = parsed_pairs(
+            text,
+            &[
+                (SemanticToken::Argument, "a"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Integer, "-9223372036854775808"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         assert!(matches!(
             as_argument(items[0].item.reference()).value.item,
@@ -906,7 +1059,10 @@ mod tests {
     #[test]
     fn a_leading_zero_integer_is_not_a_value() {
         let text = "a: 01";
-        let (items, errors, _) = parsed_pairs(text);
+        let (items, errors) = parsed_pairs(
+            text,
+            &[(SemanticToken::Argument, "a"), (SemanticToken::Colon, ":")],
+        );
         assert!(items[0].item.item.is_none());
         assert!(errors.iter().any(|error| {
             error.item
@@ -921,7 +1077,10 @@ mod tests {
     #[test]
     fn a_float_is_not_a_value() {
         let text = "a: 1.5";
-        let (items, errors, _) = parsed_pairs(text);
+        let (items, errors) = parsed_pairs(
+            text,
+            &[(SemanticToken::Argument, "a"), (SemanticToken::Colon, ":")],
+        );
         assert!(items[0].item.item.is_none());
         assert!(errors.iter().any(|error| {
             error.item
@@ -936,7 +1095,15 @@ mod tests {
     #[test]
     fn an_empty_object_is_a_value() {
         let text = "input: {}";
-        let (items, errors, _) = parsed_pairs(text);
+        let (items, errors) = parsed_pairs(
+            text,
+            &[
+                (SemanticToken::Argument, "input"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         match as_argument(items[0].item.reference())
             .value
@@ -951,7 +1118,14 @@ mod tests {
     #[test]
     fn a_quoted_string_value_drops_the_quotes() {
         let text = r#"a: "hi""#;
-        let (items, errors, _) = parsed_pairs(text);
+        let (items, errors) = parsed_pairs(
+            text,
+            &[
+                (SemanticToken::Argument, "a"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::String, "\"hi\""),
+            ],
+        );
         assert_eq!(errors, vec![]);
         match as_argument(items[0].item.reference())
             .value
@@ -972,7 +1146,14 @@ mod tests {
     #[test]
     fn a_quoted_string_does_not_process_escapes() {
         let text = r#"a: "hi\n""#;
-        let (items, errors, _) = parsed_pairs(text);
+        let (items, errors) = parsed_pairs(
+            text,
+            &[
+                (SemanticToken::Argument, "a"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::String, "\"hi\\n\""),
+            ],
+        );
         assert_eq!(errors, vec![]);
         match as_argument(items[0].item.reference())
             .value
@@ -989,7 +1170,14 @@ mod tests {
     #[test]
     fn a_quoted_string_interns_inner_quote_characters() {
         let text = r#"a: "\"hi\"""#;
-        let (items, errors, _) = parsed_pairs(text);
+        let (items, errors) = parsed_pairs(
+            text,
+            &[
+                (SemanticToken::Argument, "a"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::String, "\"\\\"hi\\\"\""),
+            ],
+        );
         assert_eq!(errors, vec![]);
         match as_argument(items[0].item.reference())
             .value
@@ -1006,7 +1194,14 @@ mod tests {
     #[test]
     fn a_block_string_is_a_value() {
         let text = "a: \"\"\"hi\"\"\"";
-        let (items, errors, _) = parsed_pairs(text);
+        let (items, errors) = parsed_pairs(
+            text,
+            &[
+                (SemanticToken::Argument, "a"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::String, "\"\"\"hi\"\"\""),
+            ],
+        );
         assert_eq!(errors, vec![]);
         match as_argument(items[0].item.reference())
             .value
@@ -1027,7 +1222,14 @@ mod tests {
     #[test]
     fn a_one_line_block_string_keeps_leading_spaces() {
         let text = r#"a: """   hi""""#;
-        let (items, errors, _) = parsed_pairs(text);
+        let (items, errors) = parsed_pairs(
+            text,
+            &[
+                (SemanticToken::Argument, "a"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::String, "\"\"\"   hi\"\"\""),
+            ],
+        );
         assert_eq!(errors, vec![]);
         match as_argument(items[0].item.reference())
             .value
@@ -1044,7 +1246,14 @@ mod tests {
     #[test]
     fn i64_max_parses() {
         let text = "a: 9223372036854775807";
-        let (items, errors, _) = parsed_pairs(text);
+        let (items, errors) = parsed_pairs(
+            text,
+            &[
+                (SemanticToken::Argument, "a"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Integer, "9223372036854775807"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         assert!(matches!(
             as_argument(items[0].item.reference()).value.item,
@@ -1055,7 +1264,14 @@ mod tests {
     #[test]
     fn negative_zero_parses_as_zero() {
         let text = "a: -0";
-        let (items, errors, _) = parsed_pairs(text);
+        let (items, errors) = parsed_pairs(
+            text,
+            &[
+                (SemanticToken::Argument, "a"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Integer, "-0"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         assert!(matches!(
             as_argument(items[0].item.reference()).value.item,
@@ -1066,7 +1282,14 @@ mod tests {
     #[test]
     fn an_empty_string_is_a_value() {
         let text = "a: \"\"";
-        let (items, errors, _) = parsed_pairs(text);
+        let (items, errors) = parsed_pairs(
+            text,
+            &[
+                (SemanticToken::Argument, "a"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::String, "\"\""),
+            ],
+        );
         assert_eq!(errors, vec![]);
         assert!(matches!(
             as_argument(items[0].item.reference()).value.item,
@@ -1077,7 +1300,14 @@ mod tests {
     #[test]
     fn an_empty_block_string_is_a_value() {
         let text = "a: \"\"\"\"\"\"";
-        let (items, errors, _) = parsed_pairs(text);
+        let (items, errors) = parsed_pairs(
+            text,
+            &[
+                (SemanticToken::Argument, "a"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::String, "\"\"\"\"\"\""),
+            ],
+        );
         assert_eq!(errors, vec![]);
         match as_argument(items[0].item.reference())
             .value
@@ -1094,7 +1324,10 @@ mod tests {
     #[test]
     fn a_colon_without_a_value_fails_that_pair() {
         let text = "a:";
-        let (items, errors, _) = parsed_pairs(text);
+        let (items, errors) = parsed_pairs(
+            text,
+            &[(SemanticToken::Argument, "a"), (SemanticToken::Colon, ":")],
+        );
         assert!(items[0].item.item.is_none());
         let colon_end = span_of(text, ":").end;
         assert!(errors.iter().any(|error| {
@@ -1106,7 +1339,14 @@ mod tests {
     #[test]
     fn a_dollar_without_a_name_is_not_a_value() {
         let text = "a: $";
-        let (items, errors, _) = parsed_pairs(text);
+        let (items, errors) = parsed_pairs(
+            text,
+            &[
+                (SemanticToken::Argument, "a"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Variable, "$"),
+            ],
+        );
         assert!(items[0].item.item.is_none());
         let dollar_end = span_of(text, "$").end;
         assert!(errors.iter().any(|error| {
@@ -1122,7 +1362,10 @@ mod tests {
     #[test]
     fn a_paren_group_is_not_a_value() {
         let text = "a: (x)";
-        let (items, errors, _) = parsed_pairs(text);
+        let (items, errors) = parsed_pairs(
+            text,
+            &[(SemanticToken::Argument, "a"), (SemanticToken::Colon, ":")],
+        );
         assert!(items[0].item.item.is_none());
         assert!(errors.iter().any(|error| {
             error.item
@@ -1150,7 +1393,10 @@ mod tests {
                 "1e2",
             ),
         ] {
-            let (items, errors, _) = parsed_pairs(text);
+            let (items, errors) = parsed_pairs(
+                text,
+                &[(SemanticToken::Argument, "a"), (SemanticToken::Colon, ":")],
+            );
             assert!(items[0].item.item.is_none(), "for literal {text:?}");
             assert!(
                 errors.iter().any(|error| {
@@ -1165,7 +1411,15 @@ mod tests {
     #[test]
     fn an_object_entry_that_does_not_start_with_a_name_fails_that_entry() {
         let text = "input: { 1: 2 }";
-        let (items, errors, _) = parsed_pairs(text);
+        let (items, errors) = parsed_pairs(
+            text,
+            &[
+                (SemanticToken::Argument, "input"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors.len(), 1);
         match as_argument(items[0].item.reference())
             .value

@@ -312,7 +312,8 @@ mod tests {
         ObjectEntry, ParseError, Selection, SelectionNameWrapper, SelectionSet, SelectionSetParent,
         Slot, TypeAnnotation, TypeAnnotationParent, UnionTypeAnnotation, UnionVariant,
         UnparsedChunkItems, UnparsedChunkItemsParent, VariableDeclaration, VariableDeclarationList,
-        VariableDeclarationOrUsageParent, VariableNameWrapper, chunk, match_brackets,
+        VariableDeclarationOrUsageParent, VariableNameWrapper,
+        assert_semantic_tokens::assert_semantic_tokens, chunk, match_brackets,
         parsed_items::span_of, tokenize,
     };
     use Expectation::EndOfDeclaration;
@@ -320,8 +321,12 @@ mod tests {
         At, Comma, Dollar, ErrorNumberLiteralTrailingInvalid, Identifier, Period,
     };
 
-    fn parsed(text: &str) -> (WithSpan<IsoLiteralParse>, Vec<WithSpan<AstError>>) {
+    fn parsed(
+        text: &str,
+        expected_tokens: &[(SemanticToken, &str)],
+    ) -> (WithSpan<IsoLiteralParse>, Vec<WithSpan<AstError>>) {
         let parsed = parse_iso_literal(text);
+        assert_semantic_tokens(text, &parsed.tokens, expected_tokens);
         let errors = parsed
             .errors
             .into_iter()
@@ -338,12 +343,13 @@ mod tests {
         )
     }
 
-    fn parsed_with_errors(text: &str) -> ParsedIsoLiteral {
-        parse_iso_literal(text)
-    }
-
-    fn parsed_with_tokens(text: &str) -> ParsedIsoLiteral {
-        parse_iso_literal(text)
+    fn parsed_with_errors(
+        text: &str,
+        expected_tokens: &[(SemanticToken, &str)],
+    ) -> ParsedIsoLiteral {
+        let parsed = parse_iso_literal(text);
+        assert_semantic_tokens(text, &parsed.tokens, expected_tokens);
+        parsed
     }
 
     fn expected(expectation: Expectation, found: Found) -> AstError {
@@ -438,8 +444,13 @@ mod tests {
             .expect("expected a selection")
     }
 
-    fn assert_no_declaration(text: &str, reason: AstError, reason_span: Span) {
-        let (parse, errors) = parsed(text);
+    fn assert_no_declaration(
+        text: &str,
+        reason: AstError,
+        reason_span: Span,
+        expected_tokens: &[(SemanticToken, &str)],
+    ) {
+        let (parse, errors) = parsed(text, expected_tokens);
         assert!(
             parsed_item(parse.reference()).is_none(),
             "for literal {text:?}",
@@ -455,7 +466,15 @@ mod tests {
     #[test]
     fn an_entrypoint_declaration_parses_with_tight_spans() {
         let text = "entrypoint Query.foo";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "entrypoint"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "foo"),
+            ],
+        );
         let declaration = as_entrypoint(parse.reference());
         assert_eq!(
             declaration.parent_type.item,
@@ -478,7 +497,15 @@ mod tests {
             "\n\nentrypoint Query.foo",
             "entrypoint Query . foo",
         ] {
-            let (parse, errors) = parsed(text);
+            let (parse, errors) = parsed(
+                text,
+                &[
+                    (SemanticToken::Keyword, "entrypoint"),
+                    (SemanticToken::Type, "Query"),
+                    (SemanticToken::Period, "."),
+                    (SemanticToken::FieldName, "foo"),
+                ],
+            );
             let declaration = as_entrypoint(parse.reference());
             assert_eq!(
                 declaration.parent_type.location,
@@ -496,7 +523,7 @@ mod tests {
 
     #[test]
     fn empty_literal_is_none_with_empty_literal_error() {
-        let parsed = parse_iso_literal("");
+        let parsed = parsed_with_errors("", &[]);
         assert!(parsed.item.is_none());
         assert!(
             parsed
@@ -509,7 +536,7 @@ mod tests {
     #[test]
     fn empty_and_whitespace_only_literals_are_empty_literal_errors() {
         for text in ["", "   ", "\n\n"] {
-            let parsed = parsed_with_errors(text);
+            let parsed = parsed_with_errors(text, &[]);
             assert!(parsed.item.is_none(), "for literal {text:?}");
             assert_eq!(
                 parsed.errors,
@@ -526,7 +553,15 @@ mod tests {
         for (text, comma_error_count) in
             [(",entrypoint Query.foo", 1), (",,entrypoint Query.foo", 2)]
         {
-            let parsed = parsed_with_errors(text);
+            let parsed = parsed_with_errors(
+                text,
+                &[
+                    (SemanticToken::Keyword, "entrypoint"),
+                    (SemanticToken::Type, "Query"),
+                    (SemanticToken::Period, "."),
+                    (SemanticToken::FieldName, "foo"),
+                ],
+            );
             assert!(
                 parsed
                     .errors
@@ -552,7 +587,7 @@ mod tests {
     #[test]
     fn a_lone_comma_is_chunkings_error_and_an_empty_literal() {
         let text = ",";
-        let parsed = parsed_with_errors(text);
+        let parsed = parsed_with_errors(text, &[]);
         assert!(parsed.item.is_none());
         assert_eq!(
             parsed
@@ -577,7 +612,15 @@ mod tests {
     #[test]
     fn the_cut_removes_an_unmatched_bracket_and_the_declaration_parses() {
         for text in ["entrypoint Query.foo)", "entrypoint Query.foo ("] {
-            let parsed = parsed_with_errors(text);
+            let parsed = parsed_with_errors(
+                text,
+                &[
+                    (SemanticToken::Keyword, "entrypoint"),
+                    (SemanticToken::Type, "Query"),
+                    (SemanticToken::Period, "."),
+                    (SemanticToken::FieldName, "foo"),
+                ],
+            );
             assert!(
                 parsed
                     .errors
@@ -599,7 +642,15 @@ mod tests {
     #[test]
     fn a_stray_close_is_a_parse_error_and_the_declaration_parses() {
         let text = "entrypoint Query.foo)";
-        let parsed = parse_iso_literal(text);
+        let parsed = parsed_with_errors(
+            text,
+            &[
+                (SemanticToken::Keyword, "entrypoint"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "foo"),
+            ],
+        );
         assert!(parsed.item.is_some());
         assert!(parsed.errors.iter().any(|error| {
             matches!(
@@ -614,7 +665,15 @@ mod tests {
     #[test]
     fn a_final_comma_after_the_declaration_is_an_error() {
         for text in ["entrypoint Query.foo,", "\nentrypoint Query.foo,\n"] {
-            let (parse, errors) = parsed(text);
+            let (parse, errors) = parsed(
+                text,
+                &[
+                    (SemanticToken::Keyword, "entrypoint"),
+                    (SemanticToken::Type, "Query"),
+                    (SemanticToken::Period, "."),
+                    (SemanticToken::FieldName, "foo"),
+                ],
+            );
             as_entrypoint(parse.reference());
             assert_eq!(
                 errors,
@@ -629,7 +688,15 @@ mod tests {
     #[test]
     fn a_comma_before_a_second_declaration_is_the_boundary_comma() {
         let text = "entrypoint Query.foo, field User.name";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "entrypoint"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "foo"),
+            ],
+        );
         assert_eq!(
             as_entrypoint(parse.reference()).name.location,
             span_of(text, "foo")
@@ -647,7 +714,15 @@ mod tests {
     #[test]
     fn a_second_contentful_chunk_is_multiple_declarations() {
         let text = "entrypoint Query.foo\nfield User.name";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "entrypoint"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "foo"),
+            ],
+        );
         assert_eq!(
             as_entrypoint(parse.reference()).name.location,
             span_of(text, "foo")
@@ -665,7 +740,7 @@ mod tests {
     fn a_failed_first_chunk_is_reported_even_when_a_second_exists() {
         let text = "entrypoint\nQuery.foo";
         let keyword_end = span_of(text, "entrypoint").end;
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(text, &[(SemanticToken::Keyword, "entrypoint")]);
         assert!(parsed_item(parse.reference()).is_none());
         assert!(errors.iter().any(|error| {
             error.item == expected(token(Identifier), Found::EndOfChunk)
@@ -686,6 +761,7 @@ mod tests {
             text,
             expected(DECLARATION_KEYWORD, Found::Token(Identifier)),
             span_of(text, "fieldd"),
+            &[(SemanticToken::Keyword, "fieldd")],
         );
     }
 
@@ -696,6 +772,7 @@ mod tests {
             text,
             expected(DECLARATION_KEYWORD, Found::Group(BracketKind::Brace)),
             span_of(text, "{ bar }"),
+            &[],
         );
     }
 
@@ -706,6 +783,7 @@ mod tests {
             text,
             expected(DECLARATION_KEYWORD, Found::Token(Identifier)),
             span_of(text, "pointer"),
+            &[(SemanticToken::Keyword, "pointer")],
         );
     }
 
@@ -717,6 +795,7 @@ mod tests {
             bare,
             expected(token(Identifier), Found::EndOfChunk),
             Span::new(keyword_end, keyword_end),
+            &[(SemanticToken::Keyword, "entrypoint")],
         );
 
         let numeric = "entrypoint 42.foo";
@@ -727,6 +806,7 @@ mod tests {
                 Found::Token(ErrorNumberLiteralTrailingInvalid),
             ),
             span_of(numeric, "42."),
+            &[(SemanticToken::Keyword, "entrypoint")],
         );
 
         let dotless = "entrypoint Query foo";
@@ -734,6 +814,10 @@ mod tests {
             dotless,
             expected(token(Period), Found::Token(Identifier)),
             span_of(dotless, "foo"),
+            &[
+                (SemanticToken::Keyword, "entrypoint"),
+                (SemanticToken::Type, "Query"),
+            ],
         );
 
         let nameless = "entrypoint Query.";
@@ -742,13 +826,25 @@ mod tests {
             nameless,
             expected(token(Identifier), Found::EndOfChunk),
             Span::new(dot_end, dot_end),
+            &[
+                (SemanticToken::Keyword, "entrypoint"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+            ],
         );
     }
 
     #[test]
     fn a_failed_form_keeps_the_whole_chunk_as_remaining() {
         let text = "entrypoint Foo.$ asdf";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "entrypoint"),
+                (SemanticToken::Type, "Foo"),
+                (SemanticToken::Period, "."),
+            ],
+        );
         assert!(parsed_item(parse.reference()).is_none());
         match first_slot(parse.reference())
             .extra
@@ -770,7 +866,15 @@ mod tests {
     #[test]
     fn tokens_after_a_complete_entrypoint_are_leftover() {
         let text = "entrypoint Query.foo bar";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "entrypoint"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "foo"),
+            ],
+        );
         as_entrypoint(parse.reference());
         assert!(parsed_item(parse.reference()).is_some());
         assert!(first_slot(parse.reference()).extra.as_ref().is_some());
@@ -785,7 +889,15 @@ mod tests {
     #[test]
     fn a_selection_set_on_an_entrypoint_is_leftover() {
         let text = "entrypoint Query.foo { bar }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "entrypoint"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "foo"),
+            ],
+        );
         as_entrypoint(parse.reference());
         assert_eq!(
             errors,
@@ -798,7 +910,17 @@ mod tests {
     #[test]
     fn an_entrypoint_directive_parses() {
         let text = "entrypoint Query.foo @lazyLoad";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "entrypoint"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "foo"),
+                (SemanticToken::DirectiveName, "@"),
+                (SemanticToken::DirectiveName, "lazyLoad"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let directives = as_entrypoint(parse.reference())
             .directive_set
@@ -816,7 +938,27 @@ mod tests {
     #[test]
     fn a_field_directive_sits_between_variables_and_the_description() {
         let text = "field Query.Foo($id: ID) @component \"the route\" { bar }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "id"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::GraphQLTypeName, "ID"),
+                (SemanticToken::Parenthesis, ")"),
+                (SemanticToken::DirectiveName, "@"),
+                (SemanticToken::DirectiveName, "component"),
+                (SemanticToken::String, "\"the route\""),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let field = as_selectable(parse.reference());
         assert!(field.variable_definitions.is_some());
@@ -834,7 +976,23 @@ mod tests {
     #[test]
     fn a_field_directive_sits_between_the_target_and_the_description() {
         let text = "field Pet.BestFriend to Owner @updatable \"x\" { id }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Pet"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "BestFriend"),
+                (SemanticToken::Keyword, "to"),
+                (SemanticToken::GraphQLTypeName, "Owner"),
+                (SemanticToken::DirectiveName, "@"),
+                (SemanticToken::DirectiveName, "updatable"),
+                (SemanticToken::String, "\"x\""),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "id"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let field = as_selectable(parse.reference());
         assert!(field.target_type.is_some());
@@ -852,7 +1010,25 @@ mod tests {
     #[test]
     fn a_selection_directive_with_arguments_parses() {
         let text = "field Query.Foo { bar @loadable(lazyLoadArtifact: true) }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::DirectiveName, "@"),
+                (SemanticToken::DirectiveName, "loadable"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Argument, "lazyLoadArtifact"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::BooleanOrNull, "true"),
+                (SemanticToken::Parenthesis, ")"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let selection = as_selection(
             selections(selection_set_of(as_selectable(parse.reference())))[0]
@@ -878,7 +1054,22 @@ mod tests {
     #[test]
     fn two_directives_on_one_selection_stay_in_one_list() {
         let text = "field Query.Foo { bar @loadable @updatable }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::DirectiveName, "@"),
+                (SemanticToken::DirectiveName, "loadable"),
+                (SemanticToken::DirectiveName, "@"),
+                (SemanticToken::DirectiveName, "updatable"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let directives = as_selection(
             selections(selection_set_of(as_selectable(parse.reference())))[0]
@@ -895,7 +1086,18 @@ mod tests {
     #[test]
     fn a_directive_on_the_next_line_is_its_own_failed_selection() {
         let text = "field Query.Foo { bar\n@loadable }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         let items = selections(selection_set_of(as_selectable(parse.reference())));
         assert_eq!(items.len(), 2);
         as_selection(items[0].item.reference());
@@ -913,7 +1115,17 @@ mod tests {
     #[test]
     fn an_unknown_directive_name_parses() {
         let text = "entrypoint Query.foo @notARealDirective";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "entrypoint"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "foo"),
+                (SemanticToken::DirectiveName, "@"),
+                (SemanticToken::DirectiveName, "notARealDirective"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         assert_eq!(
             as_entrypoint(parse.reference())
@@ -937,13 +1149,33 @@ mod tests {
             text,
             expected(Expectation::Token(Identifier), Found::EndOfChunk),
             Span::new(end, end),
+            &[
+                (SemanticToken::Keyword, "entrypoint"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "foo"),
+                (SemanticToken::DirectiveName, "@"),
+            ],
         );
     }
 
     #[test]
     fn directive_names_resolve_through_the_host() {
         let text = "field Query.Foo { bar @loadable }";
-        let (parse, _) = parsed(text);
+        let (parse, _) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::DirectiveName, "@"),
+                (SemanticToken::DirectiveName, "loadable"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         match parse.resolve((), span_of(text, "loadable")) {
             IsographResolutionNode::IsographDirectiveNameWrapper(name) => {
                 match name.parent.parent.parent {
@@ -962,7 +1194,15 @@ mod tests {
     #[test]
     fn leftover_after_an_entrypoint_resolves_to_the_leftover_token() {
         let text = "entrypoint Query.foo bar";
-        let (parse, _) = parsed(text);
+        let (parse, _) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "entrypoint"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "foo"),
+            ],
+        );
         match parse.resolve((), span_of(text, "bar")) {
             IsographResolutionNode::NonBracketToken(_) => {}
             node => panic!("expected the leftover token, got {node:?}"),
@@ -972,7 +1212,15 @@ mod tests {
     #[test]
     fn a_gap_after_the_item_resolves_to_the_slot() {
         let text = "entrypoint Query.foo bar";
-        let (parse, _) = parsed(text);
+        let (parse, _) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "entrypoint"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "foo"),
+            ],
+        );
         let gap = Span::new(span_of(text, "foo").end, span_of(text, "bar").start);
         match parse.resolve((), gap) {
             IsographResolutionNode::IsoLiteralSlot(path) => {
@@ -986,7 +1234,15 @@ mod tests {
     #[test]
     fn names_resolve_to_their_leaves_and_the_rest_to_the_declaration() {
         let text = "entrypoint Query.foo";
-        let (parse, _) = parsed(text);
+        let (parse, _) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "entrypoint"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "foo"),
+            ],
+        );
         match parse.resolve((), span_of(text, "Query")) {
             IsographResolutionNode::EntityNameWrapper(name) => {
                 let declaration = match name.parent {
@@ -1019,7 +1275,7 @@ mod tests {
     #[test]
     fn positions_inside_a_failed_first_chunk_resolve_through_the_cloned_chunk() {
         let text = "fieldd Query.foo { bar }";
-        let (parse, _) = parsed(text);
+        let (parse, _) = parsed(text, &[(SemanticToken::Keyword, "fieldd")]);
         match parse.resolve((), span_of(text, "bar")) {
             IsographResolutionNode::NonBracketToken(token) => {
                 assert_eq!(token.inner.0, NonBracketTokenKind::Identifier);
@@ -1031,7 +1287,7 @@ mod tests {
     #[test]
     fn the_unrecognized_keyword_resolves_as_a_token_in_the_failed_chunk() {
         let text = "fieldd Query.foo { bar }";
-        let (parse, _) = parsed(text);
+        let (parse, _) = parsed(text, &[(SemanticToken::Keyword, "fieldd")]);
         match parse.resolve((), span_of(text, "fieldd")) {
             IsographResolutionNode::NonBracketToken(_) => {}
             node => panic!("expected the token leaf, got {node:?}"),
@@ -1039,88 +1295,21 @@ mod tests {
     }
 
     #[test]
-    fn an_entrypoint_records_keyword_type_period_field_name() {
-        let text = "entrypoint Query.foo";
-        let parsed = parsed_with_tokens(text);
-        let parse = parsed.item.expect("the fixture is not an empty literal");
-        as_entrypoint(parse.reference());
-        assert!(parsed.errors.is_empty());
-        assert_eq!(
-            parsed.tokens,
-            vec![
-                SemanticToken::Keyword.with_span(span_of(text, "entrypoint")),
-                SemanticToken::Type.with_span(span_of(text, "Query")),
-                SemanticToken::Period.with_span(span_of(text, ".")),
-                SemanticToken::FieldName.with_span(span_of(text, "foo")),
-            ],
-        );
-    }
-
-    #[test]
-    fn a_failed_prefix_keeps_the_tokens_it_committed() {
-        let text = "entrypoint Foo.$ asdf";
-        let parsed = parsed_with_tokens(text);
-        assert!(
-            parsed
-                .errors
-                .iter()
-                .all(|error| matches!(error.item, ParseError::Ast(_))),
-        );
-        assert_eq!(
-            parsed.tokens,
-            vec![
-                SemanticToken::Keyword.with_span(span_of(text, "entrypoint")),
-                SemanticToken::Type.with_span(span_of(text, "Foo")),
-                SemanticToken::Period.with_span(span_of(text, ".")),
-            ],
-        );
-    }
-
-    #[test]
-    fn an_unknown_keyword_records_keyword_at_that_identifier() {
-        let text = "fieldd Query.foo { bar }";
-        let parsed = parsed_with_tokens(text);
-        assert!(
-            parsed
-                .errors
-                .iter()
-                .all(|error| matches!(error.item, ParseError::Ast(_))),
-        );
-        assert_eq!(
-            parsed.tokens,
-            SemanticToken::Keyword
-                .with_span(span_of(text, "fieldd"))
-                .wrap_vec(),
-        );
-    }
-
-    #[test]
-    fn leftover_after_an_entrypoint_is_not_recorded() {
-        let text = "entrypoint Query.foo bar";
-        let parsed = parsed_with_tokens(text);
-        let parse = parsed.item.expect("the fixture is not an empty literal");
-        as_entrypoint(parse.reference());
-        assert_eq!(
-            parsed.errors,
-            ParseError::Ast(expected(EndOfDeclaration, Found::Token(Identifier)))
-                .with_span(span_of(text, "bar"))
-                .wrap_vec(),
-        );
-        assert_eq!(
-            parsed.tokens,
-            vec![
-                SemanticToken::Keyword.with_span(span_of(text, "entrypoint")),
-                SemanticToken::Type.with_span(span_of(text, "Query")),
-                SemanticToken::Period.with_span(span_of(text, ".")),
-                SemanticToken::FieldName.with_span(span_of(text, "foo")),
-            ],
-        );
-    }
-
-    #[test]
     fn a_selectable_declaration_parses_with_selections() {
         let text = "field Query.Foo {\n  bar,\n  baz\n}";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::FieldName, "baz"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         let declaration = as_selectable(parse.reference());
         assert_eq!(
             declaration.parent_type.item,
@@ -1161,7 +1350,17 @@ mod tests {
             "field Query.Foo { }",
             "field Query.Foo {\n}",
         ] {
-            let (parse, errors) = parsed(text);
+            let (parse, errors) = parsed(
+                text,
+                &[
+                    (SemanticToken::Keyword, "field"),
+                    (SemanticToken::Type, "Query"),
+                    (SemanticToken::Period, "."),
+                    (SemanticToken::FieldName, "Foo"),
+                    (SemanticToken::Brace, "{"),
+                    (SemanticToken::Brace, "}"),
+                ],
+            );
             assert_eq!(
                 selections(selection_set_of(as_selectable(parse.reference()))).len(),
                 0,
@@ -1174,7 +1373,15 @@ mod tests {
     #[test]
     fn a_field_declaration_without_a_selection_set_parses() {
         let text = "field Query.Foo";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         assert_eq!(as_selectable(parse.reference()).selection_set, None);
     }
@@ -1182,7 +1389,15 @@ mod tests {
     #[test]
     fn a_selection_set_on_its_own_line_is_a_second_declaration() {
         let text = "field Query.Foo\n{ bar }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+            ],
+        );
         assert_eq!(as_selectable(parse.reference()).selection_set, None);
         assert_eq!(
             errors,
@@ -1196,7 +1411,18 @@ mod tests {
     #[test]
     fn a_final_comma_after_the_selectable_declaration_is_an_error() {
         let text = "field Query.Foo { bar },";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         as_selectable(parse.reference());
         assert_eq!(
             errors,
@@ -1209,7 +1435,18 @@ mod tests {
     #[test]
     fn tokens_after_the_selection_set_are_leftover() {
         let text = "field Query.Foo { bar } junk";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         as_selectable(parse.reference());
         assert!(first_slot(parse.reference()).extra.is_some());
         assert_eq!(
@@ -1223,7 +1460,18 @@ mod tests {
     #[test]
     fn a_field_without_a_description_has_none() {
         let text = "field Query.Foo { bar }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         assert_eq!(as_selectable(parse.reference()).description, None);
     }
@@ -1231,7 +1479,19 @@ mod tests {
     #[test]
     fn a_single_line_description_parses_with_its_quotes() {
         let text = "field Query.Foo \"the home route\" { bar }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::String, "\"the home route\""),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let description = as_selectable(parse.reference())
             .description
@@ -1247,7 +1507,19 @@ mod tests {
     #[test]
     fn a_block_string_description_spans_lines_without_splitting_the_chunk() {
         let text = "field Query.Foo \"\"\"\n  the home\n  route\n\"\"\" { bar }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::String, "\"\"\"\n  the home\n  route\n\"\"\""),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let declaration = as_selectable(parse.reference());
         let description = declaration
@@ -1264,7 +1536,18 @@ mod tests {
     #[test]
     fn a_description_after_the_selection_set_is_leftover() {
         let text = "field Query.Foo { bar } \"too late\"";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         as_selectable(parse.reference());
         assert!(first_slot(parse.reference()).extra.is_some());
         assert_eq!(
@@ -1281,7 +1564,15 @@ mod tests {
     #[test]
     fn an_entrypoint_carries_no_description() {
         let text = "entrypoint Query.foo \"nope\"";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "entrypoint"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "foo"),
+            ],
+        );
         as_entrypoint(parse.reference());
         assert_eq!(
             errors,
@@ -1297,7 +1588,16 @@ mod tests {
     #[test]
     fn a_field_declaration_with_only_a_description_parses() {
         let text = "field Query.Foo \"the home route\"";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::String, "\"the home route\""),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let declaration = as_selectable(parse.reference());
         assert!(declaration.description.is_some());
@@ -1307,7 +1607,18 @@ mod tests {
     #[test]
     fn a_field_without_to_has_no_target_type() {
         let text = "field Query.Foo { bar }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         assert_eq!(as_selectable(parse.reference()).target_type, None);
     }
@@ -1387,7 +1698,20 @@ mod tests {
     #[test]
     fn a_field_with_to_parses_the_target_type() {
         let text = "field Pet.BestFriend to Owner { id }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Pet"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "BestFriend"),
+                (SemanticToken::Keyword, "to"),
+                (SemanticToken::GraphQLTypeName, "Owner"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "id"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let declaration = as_selectable(parse.reference());
         assert_eq!(
@@ -1424,7 +1748,27 @@ mod tests {
     #[test]
     fn a_full_field_parses_in_order() {
         let text = "field Pet.Owner($limit: Int) to Person! \"the owner\" { name }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Pet"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Owner"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "limit"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::GraphQLTypeName, "Int"),
+                (SemanticToken::Parenthesis, ")"),
+                (SemanticToken::Keyword, "to"),
+                (SemanticToken::GraphQLTypeName, "Person"),
+                (SemanticToken::String, "\"the owner\""),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "name"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let declaration = as_selectable(parse.reference());
         assert!(declaration.variable_definitions.is_some());
@@ -1448,7 +1792,50 @@ mod tests {
             ("field Query.Foo to [Pet!]! { id }", "[Pet!]"),
             ("field Query.Foo to [[Pet]] { id }", "[[Pet]]"),
         ] {
-            let (parse, errors) = parsed(text);
+            let expected_tokens: &[(SemanticToken, &str)] = if text.contains("[[") {
+                &[
+                    (SemanticToken::Keyword, "field"),
+                    (SemanticToken::Type, "Query"),
+                    (SemanticToken::Period, "."),
+                    (SemanticToken::FieldName, "Foo"),
+                    (SemanticToken::Keyword, "to"),
+                    (SemanticToken::GraphQLTypeName, "["),
+                    (SemanticToken::GraphQLTypeName, "["),
+                    (SemanticToken::GraphQLTypeName, "Pet"),
+                    (SemanticToken::GraphQLTypeName, "]"),
+                    (SemanticToken::GraphQLTypeName, "]"),
+                    (SemanticToken::Brace, "{"),
+                    (SemanticToken::FieldName, "id"),
+                    (SemanticToken::Brace, "}"),
+                ]
+            } else if text.contains('[') {
+                &[
+                    (SemanticToken::Keyword, "field"),
+                    (SemanticToken::Type, "Query"),
+                    (SemanticToken::Period, "."),
+                    (SemanticToken::FieldName, "Foo"),
+                    (SemanticToken::Keyword, "to"),
+                    (SemanticToken::GraphQLTypeName, "["),
+                    (SemanticToken::GraphQLTypeName, "Pet"),
+                    (SemanticToken::GraphQLTypeName, "]"),
+                    (SemanticToken::Brace, "{"),
+                    (SemanticToken::FieldName, "id"),
+                    (SemanticToken::Brace, "}"),
+                ]
+            } else {
+                &[
+                    (SemanticToken::Keyword, "field"),
+                    (SemanticToken::Type, "Query"),
+                    (SemanticToken::Period, "."),
+                    (SemanticToken::FieldName, "Foo"),
+                    (SemanticToken::Keyword, "to"),
+                    (SemanticToken::GraphQLTypeName, "Pet"),
+                    (SemanticToken::Brace, "{"),
+                    (SemanticToken::FieldName, "id"),
+                    (SemanticToken::Brace, "}"),
+                ]
+            };
+            let (parse, errors) = parsed(text, expected_tokens);
             assert_eq!(errors, vec![], "for literal {text:?}");
             assert_eq!(
                 as_selectable(parse.reference())
@@ -1465,7 +1852,22 @@ mod tests {
     #[test]
     fn a_bracketed_target_is_a_list_annotation() {
         let text = "field Query.Friends to [Pet!]! { id }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Friends"),
+                (SemanticToken::Keyword, "to"),
+                (SemanticToken::GraphQLTypeName, "["),
+                (SemanticToken::GraphQLTypeName, "Pet"),
+                (SemanticToken::GraphQLTypeName, "]"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "id"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let target = as_selectable(parse.reference())
             .target_type
@@ -1489,7 +1891,20 @@ mod tests {
     #[test]
     fn a_named_target_without_bang_is_a_union_with_null() {
         let text = "field Query.Foo to Pet { id }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Keyword, "to"),
+                (SemanticToken::GraphQLTypeName, "Pet"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "id"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let target = as_selectable(parse.reference())
             .target_type
@@ -1519,7 +1934,20 @@ mod tests {
     #[test]
     fn a_named_target_with_bang_is_not_null_wrapped() {
         let text = "field Query.Foo to Pet! { id }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Keyword, "to"),
+                (SemanticToken::GraphQLTypeName, "Pet"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "id"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let target = as_selectable(parse.reference())
             .target_type
@@ -1537,7 +1965,22 @@ mod tests {
     #[test]
     fn a_list_target_maps_graphql_nullability() {
         let text = "field Query.Foo to [Pet] { id }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Keyword, "to"),
+                (SemanticToken::GraphQLTypeName, "["),
+                (SemanticToken::GraphQLTypeName, "Pet"),
+                (SemanticToken::GraphQLTypeName, "]"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "id"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let target = as_selectable(parse.reference())
             .target_type
@@ -1577,7 +2020,22 @@ mod tests {
     #[test]
     fn a_non_null_list_of_non_null_named_is_list_of_named() {
         let text = "field Query.Foo to [Pet!]! { id }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Keyword, "to"),
+                (SemanticToken::GraphQLTypeName, "["),
+                (SemanticToken::GraphQLTypeName, "Pet"),
+                (SemanticToken::GraphQLTypeName, "]"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "id"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let target = as_selectable(parse.reference())
             .target_type
@@ -1596,7 +2054,17 @@ mod tests {
     #[test]
     fn a_second_bang_is_leftover() {
         let text = "field Query.Foo to Pet!! { id }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Keyword, "to"),
+                (SemanticToken::GraphQLTypeName, "Pet"),
+            ],
+        );
         as_selectable(parse.reference());
         let second_bang = Span::new(
             span_of(text, "Pet!!").start + 4,
@@ -1616,7 +2084,24 @@ mod tests {
     #[test]
     fn a_variable_type_without_bang_is_a_union_with_null() {
         let text = "field Query.Foo($x: ID) { bar }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "x"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::GraphQLTypeName, "ID"),
+                (SemanticToken::Parenthesis, ")"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let declared = as_declared(variables_of(parse.reference()).item.0[0].item.reference());
         match declared.type_.item.reference() {
@@ -1636,7 +2121,24 @@ mod tests {
     #[test]
     fn a_variable_type_with_bang_is_not_null_wrapped() {
         let text = "field Query.Foo($x: ID!) { bar }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "x"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::GraphQLTypeName, "ID"),
+                (SemanticToken::Parenthesis, ")"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let declared = as_declared(variables_of(parse.reference()).item.0[0].item.reference());
         match declared.type_.item.reference() {
@@ -1648,7 +2150,24 @@ mod tests {
     #[test]
     fn a_nested_list_target_is_a_union_at_every_layer() {
         let text = "field Query.Foo to [[Pet]] { id }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Keyword, "to"),
+                (SemanticToken::GraphQLTypeName, "["),
+                (SemanticToken::GraphQLTypeName, "["),
+                (SemanticToken::GraphQLTypeName, "Pet"),
+                (SemanticToken::GraphQLTypeName, "]"),
+                (SemanticToken::GraphQLTypeName, "]"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "id"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let target = as_selectable(parse.reference())
             .target_type
@@ -1718,7 +2237,22 @@ mod tests {
     #[test]
     fn a_nullable_list_of_non_null_named() {
         let text = "field Query.Foo to [Pet!] { id }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Keyword, "to"),
+                (SemanticToken::GraphQLTypeName, "["),
+                (SemanticToken::GraphQLTypeName, "Pet"),
+                (SemanticToken::GraphQLTypeName, "]"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "id"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let target = as_selectable(parse.reference())
             .target_type
@@ -1747,7 +2281,22 @@ mod tests {
     #[test]
     fn a_non_null_list_of_nullable_named() {
         let text = "field Query.Foo to [Pet]! { id }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Keyword, "to"),
+                (SemanticToken::GraphQLTypeName, "["),
+                (SemanticToken::GraphQLTypeName, "Pet"),
+                (SemanticToken::GraphQLTypeName, "]"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "id"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let target = as_selectable(parse.reference())
             .target_type
@@ -1781,13 +2330,30 @@ mod tests {
             text,
             expected(Expectation::TypeAnnotation, Found::EndOfChunk),
             Span::new(interior, interior),
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Keyword, "to"),
+                (SemanticToken::GraphQLTypeName, "["),
+                (SemanticToken::GraphQLTypeName, "]"),
+            ],
         );
     }
 
     #[test]
     fn a_non_to_identifier_is_not_consumed_as_to() {
         let text = "field Query.Foo Owner { id }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+            ],
+        );
         as_selectable(parse.reference());
         assert_eq!(as_selectable(parse.reference()).selection_set, None);
         assert_eq!(
@@ -1808,6 +2374,13 @@ mod tests {
                 Found::Group(BracketKind::Brace),
             ),
             span_of(text, "{ id }"),
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Pet"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "BestFriend"),
+                (SemanticToken::Keyword, "to"),
+            ],
         );
     }
 
@@ -1819,13 +2392,29 @@ mod tests {
             text,
             expected(Expectation::TypeAnnotation, Found::EndOfChunk),
             Span::new(end, end),
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Pet"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "BestFriend"),
+                (SemanticToken::Keyword, "to"),
+            ],
         );
     }
 
     #[test]
     fn a_to_after_the_description_is_not_a_target() {
         let text = "field Query.Foo \"x\" to Owner { id }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::String, "\"x\""),
+            ],
+        );
         let declaration = as_selectable(parse.reference());
         assert!(declaration.description.is_some());
         assert_eq!(declaration.target_type, None);
@@ -1840,7 +2429,20 @@ mod tests {
     #[test]
     fn a_final_comma_after_a_field_with_to_is_an_error() {
         let text = "field Pet.BestFriend to Owner { id },";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Pet"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "BestFriend"),
+                (SemanticToken::Keyword, "to"),
+                (SemanticToken::GraphQLTypeName, "Owner"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "id"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         as_selectable(parse.reference());
         assert_eq!(
             errors,
@@ -1853,7 +2455,20 @@ mod tests {
     #[test]
     fn to_and_the_target_resolve_with_their_ancestry() {
         let text = "field Pet.BestFriend to Owner { id }";
-        let (parse, _) = parsed(text);
+        let (parse, _) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Pet"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "BestFriend"),
+                (SemanticToken::Keyword, "to"),
+                (SemanticToken::GraphQLTypeName, "Owner"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "id"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         match parse.resolve((), span_of(text, "to")) {
             IsographResolutionNode::SelectableDeclaration(_) => {}
             node => panic!("expected the declaration at `to`, got {node:?}"),
@@ -1909,7 +2524,19 @@ mod tests {
     #[test]
     fn a_description_resolves_to_its_leaf() {
         let text = "field Query.Foo \"the home route\" { bar }";
-        let (parse, _) = parsed(text);
+        let (parse, _) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::String, "\"the home route\""),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         match parse.resolve((), span_of(text, "home")) {
             IsographResolutionNode::Description(description) => {
                 assert_eq!(description.parent.inner.name.location, span_of(text, "Foo"));
@@ -1921,7 +2548,21 @@ mod tests {
     #[test]
     fn selection_names_resolve_with_their_ancestry() {
         let text = "field Query.Foo { pet { name } }";
-        let (parse, _) = parsed(text);
+        let (parse, _) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "pet"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "name"),
+                (SemanticToken::Brace, "}"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         match parse.resolve((), span_of(text, "name")) {
             IsographResolutionNode::SelectionNameWrapper(name) => {
                 assert_eq!(name.parent.inner.name.location, span_of(text, "name"));
@@ -1944,7 +2585,18 @@ mod tests {
     #[test]
     fn leftover_positions_resolve_to_the_leftover_token() {
         let text = "field Query.Foo { bar baz }";
-        let (parse, _) = parsed(text);
+        let (parse, _) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         match parse.resolve((), span_of(text, "baz")) {
             IsographResolutionNode::NonBracketToken(_) => {}
             node => panic!("expected the leftover token, got {node:?}"),
@@ -1958,7 +2610,17 @@ mod tests {
     #[test]
     fn positions_inside_a_failed_selection_resolve_through_unparsed_items() {
         let text = "field Query.Foo { 42 }";
-        let (parse, _) = parsed(text);
+        let (parse, _) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         match parse.resolve((), span_of(text, "42")) {
             IsographResolutionNode::NonBracketToken(token) => match token.parent {
                 ChunkContentItemParent::Unparsed(unparsed) => match unparsed.parent {
@@ -1974,7 +2636,19 @@ mod tests {
     #[test]
     fn whitespace_and_separators_inside_a_selection_set_resolve_to_the_set() {
         let text = "field Query.Foo { bar, baz }";
-        let (parse, _) = parsed(text);
+        let (parse, _) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::FieldName, "baz"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         match parse.resolve((), span_of(text, ",")) {
             IsographResolutionNode::SelectionSet(_) => {}
             node => panic!("expected the selection set, got {node:?}"),
@@ -1984,7 +2658,24 @@ mod tests {
     #[test]
     fn argument_names_resolve_through_the_selection() {
         let text = "field Query.Foo { bar(id: $x) }";
-        let (parse, _) = parsed(text);
+        let (parse, _) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Argument, "id"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "x"),
+                (SemanticToken::Parenthesis, ")"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         match parse.resolve((), span_of(text, "id")) {
             IsographResolutionNode::ArgumentNameWrapper(name) => {
                 match name.parent.parent.parent.parent {
@@ -2010,7 +2701,24 @@ mod tests {
     #[test]
     fn a_dollar_in_a_use_resolves_to_declaration_or_usage_with_usage_parent() {
         let text = "field Query.Foo { bar(id: $x) }";
-        let (parse, _) = parsed(text);
+        let (parse, _) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Argument, "id"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "x"),
+                (SemanticToken::Parenthesis, ")"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         match parse.resolve((), span_of(text, "$")) {
             IsographResolutionNode::VariableDeclarationOrUsage(node) => {
                 assert!(matches!(
@@ -2034,7 +2742,24 @@ mod tests {
     #[test]
     fn a_dollar_in_a_declaration_resolves_to_declaration_or_usage_with_declaration_parent() {
         let text = "field Query.Foo($id: ID) { bar }";
-        let (parse, _) = parsed(text);
+        let (parse, _) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "id"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::GraphQLTypeName, "ID"),
+                (SemanticToken::Parenthesis, ")"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         match parse.resolve((), span_of(text, "$")) {
             IsographResolutionNode::VariableDeclarationOrUsage(node) => {
                 assert!(matches!(
@@ -2065,11 +2790,10 @@ mod tests {
             Description("the home route".intern().to())
         );
         assert_eq!(errors, vec![]);
-        assert_eq!(
-            tokens,
-            SemanticToken::String
-                .with_span(span_of(text, "\"the home route\""))
-                .wrap_vec(),
+        assert_semantic_tokens(
+            text,
+            &tokens,
+            &[(SemanticToken::String, "\"the home route\"")],
         );
     }
 
@@ -2084,6 +2808,7 @@ mod tests {
             consume_description(stream.cursor()).expect("the fixture is a string description");
         assert_eq!(description.location, span_of(text, "\"\""));
         assert_eq!(description.item, Description("".intern().to()));
+        assert_semantic_tokens(text, &tokens, &[(SemanticToken::String, "\"\"")]);
     }
 
     #[test]
@@ -2105,11 +2830,10 @@ mod tests {
             Description("the home\nroute".intern().to())
         );
         assert_eq!(errors, vec![]);
-        assert_eq!(
-            tokens,
-            SemanticToken::String
-                .with_span(span_of(text, "\"\"\"\n  the home\n  route\n\"\"\""))
-                .wrap_vec(),
+        assert_semantic_tokens(
+            text,
+            &tokens,
+            &[(SemanticToken::String, "\"\"\"\n  the home\n  route\n\"\"\"")],
         );
     }
 
@@ -2140,6 +2864,15 @@ mod tests {
                 .map(|token| token.location),
             span_of(text, "Bar").wrap_some(),
         );
+        assert_semantic_tokens(
+            text,
+            &tokens,
+            &[
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::String, "\"\"\"\n  the home\n  route\n\"\"\""),
+                (SemanticToken::FieldName, "Bar"),
+            ],
+        );
     }
 
     #[test]
@@ -2159,6 +2892,14 @@ mod tests {
                 .map(|token| token.location),
             span_of(text, "Foo").wrap_some(),
         );
+        assert_semantic_tokens(
+            text,
+            &tokens,
+            &[
+                (SemanticToken::String, "\"hi\""),
+                (SemanticToken::FieldName, "Foo"),
+            ],
+        );
     }
 
     #[test]
@@ -2171,7 +2912,7 @@ mod tests {
             let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
             assert_eq!(consume_description(stream.cursor()), None);
         }
-        assert_eq!(tokens, vec![]);
+        assert_semantic_tokens(text, &tokens, &[]);
         assert_eq!(errors, vec![]);
         let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
         let cursor = stream.cursor();
@@ -2182,6 +2923,7 @@ mod tests {
                 .map(|token| token.location),
             span_of(text, "Foo").wrap_some(),
         );
+        assert_semantic_tokens(text, &tokens, &[(SemanticToken::FieldName, "Foo")]);
     }
 
     #[test]
@@ -2190,6 +2932,11 @@ mod tests {
         let tree = chunked(text);
         let mut tokens = Vec::new();
         let mut errors = Vec::new();
+        {
+            let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
+            assert_eq!(consume_description(stream.cursor()), None);
+        }
+        assert_semantic_tokens(text, &tokens, &[]);
         let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
         let cursor = stream.cursor();
         assert_eq!(consume_description(cursor), None);
@@ -2199,6 +2946,11 @@ mod tests {
                 .map(|group| group.location),
             span_of(text, "{ bar }").wrap_some(),
         );
+        assert_semantic_tokens(
+            text,
+            &tokens,
+            &[(SemanticToken::Brace, "{"), (SemanticToken::Brace, "}")],
+        );
     }
 
     #[test]
@@ -2207,6 +2959,11 @@ mod tests {
         let tree = chunked(text);
         let mut tokens = Vec::new();
         let mut errors = Vec::new();
+        {
+            let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
+            assert_eq!(consume_description(stream.cursor()), None);
+        }
+        assert_semantic_tokens(text, &tokens, &[]);
         let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
         let cursor = stream.cursor();
         assert_eq!(consume_description(cursor), None);
@@ -2219,6 +2976,7 @@ mod tests {
                 .map(|token| token.location),
             span_of(text, "\"unterminated").wrap_some(),
         );
+        assert_semantic_tokens(text, &tokens, &[(SemanticToken::Error, "\"unterminated")]);
     }
 
     #[test]
@@ -2232,12 +2990,30 @@ mod tests {
             .expect("the fixture is a block-string description");
         assert_eq!(description.location, span_of(text, "\"\"\"\"\"\""));
         assert_eq!(description.item, Description("".intern().to()));
+        assert_semantic_tokens(text, &tokens, &[(SemanticToken::String, "\"\"\"\"\"\"")]);
     }
 
     #[test]
     fn a_multi_line_variable_list_parses_in_the_demo_style() {
         let text = "field Query.PetCheckinListRoute(\n  $id: ID !\n) {\n  pets\n}";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "PetCheckinListRoute"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "id"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::GraphQLTypeName, "ID"),
+                (SemanticToken::Parenthesis, ")"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "pets"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let variables = variables_of(parse.reference());
         assert_eq!(variables.item.0.len(), 1);
@@ -2260,7 +3036,26 @@ mod tests {
     #[test]
     fn list_types_nest_with_non_null_markers() {
         let text = "field Query.Foo($pets: [Pet!]!) { bar }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "pets"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::GraphQLTypeName, "["),
+                (SemanticToken::GraphQLTypeName, "Pet"),
+                (SemanticToken::GraphQLTypeName, "]"),
+                (SemanticToken::Parenthesis, ")"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let declared = as_declared(variables_of(parse.reference()).item.0[0].item.reference());
         assert_eq!(declared.type_.location, span_of(text, "[Pet!]"));
@@ -2281,7 +3076,26 @@ mod tests {
     #[test]
     fn defaults_parse_including_variables() {
         let text = "field Query.Foo($limit: Int = 10) { bar }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "limit"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::GraphQLTypeName, "Int"),
+                (SemanticToken::Equals, "="),
+                (SemanticToken::Integer, "10"),
+                (SemanticToken::Parenthesis, ")"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let declared = as_declared(variables_of(parse.reference()).item.0[0].item.reference());
         let default = declared
@@ -2294,7 +3108,27 @@ mod tests {
         ));
 
         let shallow = "field Query.Foo($limit: Int = $other) { bar }";
-        let (parse, errors) = parsed(shallow);
+        let (parse, errors) = parsed(
+            shallow,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "limit"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::GraphQLTypeName, "Int"),
+                (SemanticToken::Equals, "="),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "other"),
+                (SemanticToken::Parenthesis, ")"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let declared = as_declared(variables_of(parse.reference()).item.0[0].item.reference());
         let default = declared
@@ -2304,7 +3138,32 @@ mod tests {
         assert!(matches!(default.item, NonConstantValue::Variable(_)));
 
         let list = "field Query.Foo($ids: [ID!] = [1, $x]) { bar }";
-        let (parse, errors) = parsed(list);
+        let (parse, errors) = parsed(
+            list,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "ids"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::GraphQLTypeName, "["),
+                (SemanticToken::GraphQLTypeName, "ID"),
+                (SemanticToken::GraphQLTypeName, "]"),
+                (SemanticToken::Equals, "="),
+                (SemanticToken::Bracket, "["),
+                (SemanticToken::Integer, "1"),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "x"),
+                (SemanticToken::Bracket, "]"),
+                (SemanticToken::Parenthesis, ")"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let declared = as_declared(variables_of(parse.reference()).item.0[0].item.reference());
         let default = declared
@@ -2341,7 +3200,31 @@ mod tests {
         }
 
         let deep = "field Query.Foo($input: Input = { pet: $pet }) { bar }";
-        let (parse, errors) = parsed(deep);
+        let (parse, errors) = parsed(
+            deep,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "input"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::GraphQLTypeName, "Input"),
+                (SemanticToken::Equals, "="),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::ObjectKey, "pet"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "pet"),
+                (SemanticToken::Brace, "}"),
+                (SemanticToken::Parenthesis, ")"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let declared = as_declared(variables_of(parse.reference()).item.0[0].item.reference());
         let default = declared
@@ -2357,7 +3240,37 @@ mod tests {
         }
 
         let cross = "field Query.Foo($foo: String = \"foo\", $bar: Input = { foo: $foo }) { baz }";
-        let (parse, errors) = parsed(cross);
+        let (parse, errors) = parsed(
+            cross,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "foo"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::GraphQLTypeName, "String"),
+                (SemanticToken::Equals, "="),
+                (SemanticToken::String, "\"foo\""),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "bar"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::GraphQLTypeName, "Input"),
+                (SemanticToken::Equals, "="),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::ObjectKey, "foo"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "foo"),
+                (SemanticToken::Brace, "}"),
+                (SemanticToken::Parenthesis, ")"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "baz"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let variables = variables_of(parse.reference());
         assert_eq!(variables.item.0.len(), 2);
@@ -2380,7 +3293,27 @@ mod tests {
     #[test]
     fn a_default_variable_resolves_through_variable_default() {
         let text = "field Query.Foo($limit: Int = $other) { bar }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "limit"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::GraphQLTypeName, "Int"),
+                (SemanticToken::Equals, "="),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "other"),
+                (SemanticToken::Parenthesis, ")"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         match parse.resolve((), span_of(text, "other")) {
             IsographResolutionNode::VariableNameWrapper(name) => match name.parent.parent {
@@ -2414,7 +3347,29 @@ mod tests {
     #[test]
     fn each_malformed_variable_declaration_degrades_alone() {
         let text = "field Query.Foo($a Int, $b: , id: ID, $c: Float) { bar }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "a"),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "b"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "c"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::GraphQLTypeName, "Float"),
+                (SemanticToken::Parenthesis, ")"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         let variables = variables_of(parse.reference());
         assert_eq!(variables.item.0.len(), 4);
         assert!(variables.item.0[0].item.item.is_none());
@@ -2430,7 +3385,26 @@ mod tests {
     #[test]
     fn a_final_comma_inside_a_list_type_is_end_of_type() {
         let text = "field Query.Foo($pets: [Pet,]) { bar }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "pets"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::GraphQLTypeName, "["),
+                (SemanticToken::GraphQLTypeName, "Pet"),
+                (SemanticToken::GraphQLTypeName, "]"),
+                (SemanticToken::Parenthesis, ")"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         as_declared(variables_of(parse.reference()).item.0[0].item.reference());
         assert_eq!(
             errors,
@@ -2443,7 +3417,26 @@ mod tests {
     #[test]
     fn a_line_break_inside_a_list_type_does_not_attach_bang() {
         let text = "field Query.Foo($pets: [Pet\n!]) { bar }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "pets"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::GraphQLTypeName, "["),
+                (SemanticToken::GraphQLTypeName, "Pet"),
+                (SemanticToken::GraphQLTypeName, "]"),
+                (SemanticToken::Parenthesis, ")"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         let declared = as_declared(variables_of(parse.reference()).item.0[0].item.reference());
         match declared.type_.item.reference() {
             TypeAnnotation::Union(outer) => {
@@ -2487,7 +3480,26 @@ mod tests {
     #[test]
     fn type_names_resolve_through_their_annotation_ancestry() {
         let text = "field Query.Foo($pets: [Pet]) { bar }";
-        let (parse, _) = parsed(text);
+        let (parse, _) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "pets"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::GraphQLTypeName, "["),
+                (SemanticToken::GraphQLTypeName, "Pet"),
+                (SemanticToken::GraphQLTypeName, "]"),
+                (SemanticToken::Parenthesis, ")"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         match parse.resolve((), span_of(text, "Pet")) {
             IsographResolutionNode::EntityNameWrapper(name) => {
                 let named = match name.parent.reference() {
@@ -2539,7 +3551,24 @@ mod tests {
     #[test]
     fn a_bang_resolves_to_the_variable_declaration() {
         let text = "field Query.Foo($id: ID!) { bar }";
-        let (parse, _) = parsed(text);
+        let (parse, _) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "id"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::GraphQLTypeName, "ID"),
+                (SemanticToken::Parenthesis, ")"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         match parse.resolve((), span_of(text, "!")) {
             IsographResolutionNode::VariableDeclaration(declaration) => {
                 assert_eq!(declaration.inner.name.location, span_of(text, "$id"));
@@ -2551,7 +3580,20 @@ mod tests {
     #[test]
     fn an_empty_variable_list_is_some_and_empty() {
         let text = "field Query.Foo() { bar }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Parenthesis, ")"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let variables = as_selectable(parse.reference())
             .variable_definitions
@@ -2564,7 +3606,17 @@ mod tests {
     #[test]
     fn a_to_without_a_selection_set_parses() {
         let text = "field Query.Foo to Pet";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Keyword, "to"),
+                (SemanticToken::GraphQLTypeName, "Pet"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let declaration = as_selectable(parse.reference());
         assert_eq!(
@@ -2581,7 +3633,20 @@ mod tests {
     #[test]
     fn a_directive_without_vars_or_to_parses() {
         let text = "field Query.Foo @component { bar }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::DirectiveName, "@"),
+                (SemanticToken::DirectiveName, "component"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let field = as_selectable(parse.reference());
         assert!(field.variable_definitions.is_none());
@@ -2599,7 +3664,29 @@ mod tests {
     #[test]
     fn a_full_header_includes_directives() {
         let text = "field Pet.Owner($limit: Int) to Person! @updatable \"the owner\" { name }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Pet"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Owner"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "limit"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::GraphQLTypeName, "Int"),
+                (SemanticToken::Parenthesis, ")"),
+                (SemanticToken::Keyword, "to"),
+                (SemanticToken::GraphQLTypeName, "Person"),
+                (SemanticToken::DirectiveName, "@"),
+                (SemanticToken::DirectiveName, "updatable"),
+                (SemanticToken::String, "\"the owner\""),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "name"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let declaration = as_selectable(parse.reference());
         assert!(declaration.variable_definitions.is_some());
@@ -2612,7 +3699,22 @@ mod tests {
     #[test]
     fn two_directives_on_a_field_stay_in_one_list() {
         let text = "field Query.Foo @a @b { bar }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::DirectiveName, "@"),
+                (SemanticToken::DirectiveName, "a"),
+                (SemanticToken::DirectiveName, "@"),
+                (SemanticToken::DirectiveName, "b"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let directives = as_selectable(parse.reference())
             .directive_set
@@ -2625,7 +3727,19 @@ mod tests {
     #[test]
     fn two_directives_on_an_entrypoint_stay_in_one_list() {
         let text = "entrypoint Query.foo @a @b";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "entrypoint"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "foo"),
+                (SemanticToken::DirectiveName, "@"),
+                (SemanticToken::DirectiveName, "a"),
+                (SemanticToken::DirectiveName, "@"),
+                (SemanticToken::DirectiveName, "b"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let directives = as_entrypoint(parse.reference())
             .directive_set
@@ -2637,7 +3751,16 @@ mod tests {
     #[test]
     fn a_directive_after_the_description_is_leftover() {
         let text = "field Query.Foo \"x\" @component { bar }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::String, "\"x\""),
+            ],
+        );
         let declaration = as_selectable(parse.reference());
         assert!(declaration.description.is_some());
         assert_eq!(declaration.directive_set, None);
@@ -2650,7 +3773,17 @@ mod tests {
     #[test]
     fn a_to_after_a_directive_is_leftover() {
         let text = "field Query.Foo @component to Pet { id }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::DirectiveName, "@"),
+                (SemanticToken::DirectiveName, "component"),
+            ],
+        );
         let declaration = as_selectable(parse.reference());
         assert!(declaration.directive_set.is_some());
         assert_eq!(declaration.target_type, None);
@@ -2663,7 +3796,21 @@ mod tests {
     #[test]
     fn a_dollar_without_a_name_fails_that_variable() {
         let text = "field Query.Foo($) { bar }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Parenthesis, ")"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         as_selectable(parse.reference());
         let variables = variables_of(parse.reference());
         assert!(variables.item.0[0].item.item.is_none());
@@ -2677,7 +3824,25 @@ mod tests {
     #[test]
     fn an_equals_without_a_default_fails_that_variable() {
         let text = "field Query.Foo($id: ID =) { bar }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "id"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::GraphQLTypeName, "ID"),
+                (SemanticToken::Equals, "="),
+                (SemanticToken::Parenthesis, ")"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         as_selectable(parse.reference());
         let variables = variables_of(parse.reference());
         assert!(variables.item.0[0].item.item.is_none());
@@ -2691,7 +3856,19 @@ mod tests {
     #[test]
     fn an_alias_without_a_name_fails_that_selection() {
         let text = "field Query.Foo { b: }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "b"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         let items = selections(selection_set_of(as_selectable(parse.reference())));
         assert!(items[0].item.item.is_none());
         let colon_end = span_of(text, ":").end;
@@ -2704,7 +3881,18 @@ mod tests {
     #[test]
     fn to_as_a_selectable_name_is_the_name() {
         let text = "field Query.to { bar }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "to"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         assert_eq!(
             as_selectable(parse.reference()).name.location,
@@ -2716,7 +3904,20 @@ mod tests {
     #[test]
     fn to_as_a_target_type_name_parses() {
         let text = "field Query.Foo to to { bar }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Keyword, "to"),
+                (SemanticToken::GraphQLTypeName, "to"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         assert_eq!(
             as_selectable(parse.reference()).name.location,
@@ -2750,7 +3951,15 @@ mod tests {
     #[test]
     fn uppercase_to_is_not_the_keyword() {
         let text = "field Query.Foo TO Pet { bar }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+            ],
+        );
         as_selectable(parse.reference());
         assert_eq!(as_selectable(parse.reference()).target_type, None);
         assert_eq!(
@@ -2765,7 +3974,18 @@ mod tests {
     fn true_false_and_null_as_selection_names_are_selections() {
         for name in ["true", "false", "null"] {
             let text = format!("field Query.Foo {{ {name} }}");
-            let (parse, errors) = parsed(text.reference());
+            let (parse, errors) = parsed(
+                text.reference(),
+                &[
+                    (SemanticToken::Keyword, "field"),
+                    (SemanticToken::Type, "Query"),
+                    (SemanticToken::Period, "."),
+                    (SemanticToken::FieldName, "Foo"),
+                    (SemanticToken::Brace, "{"),
+                    (SemanticToken::FieldName, name),
+                    (SemanticToken::Brace, "}"),
+                ],
+            );
             assert_eq!(errors, vec![], "for literal {text:?}");
             assert_eq!(
                 as_selection(
@@ -2784,7 +4004,22 @@ mod tests {
     #[test]
     fn a_directive_with_empty_arguments_parses() {
         let text = "field Query.Foo { bar @loadable() }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::DirectiveName, "@"),
+                (SemanticToken::DirectiveName, "loadable"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Parenthesis, ")"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let arguments = as_selection(
             selections(selection_set_of(as_selectable(parse.reference())))[0]
@@ -2806,7 +4041,31 @@ mod tests {
     #[test]
     fn a_selection_with_alias_arguments_directives_and_a_nested_set_parses() {
         let text = "field Query.Foo { a: bar(id: $id) @loadable { baz } }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "a"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Argument, "id"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "id"),
+                (SemanticToken::Parenthesis, ")"),
+                (SemanticToken::DirectiveName, "@"),
+                (SemanticToken::DirectiveName, "loadable"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "baz"),
+                (SemanticToken::Brace, "}"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let selection = as_selection(
             selections(selection_set_of(as_selectable(parse.reference())))[0]
@@ -2822,7 +4081,20 @@ mod tests {
     #[test]
     fn field_directive_names_resolve_through_the_declaration() {
         let text = "field Query.Foo @component { bar }";
-        let (parse, _) = parsed(text);
+        let (parse, _) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::DirectiveName, "@"),
+                (SemanticToken::DirectiveName, "component"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         match parse.resolve((), span_of(text, "component")) {
             IsographResolutionNode::IsographDirectiveNameWrapper(name) => {
                 match name.parent.parent.parent {
@@ -2837,7 +4109,21 @@ mod tests {
     #[test]
     fn a_field_with_only_variables_parses() {
         let text = "field Query.Foo($id: ID)";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "id"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::GraphQLTypeName, "ID"),
+                (SemanticToken::Parenthesis, ")"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let declaration = as_selectable(parse.reference());
         assert_eq!(variables_of(parse.reference()).item.0.len(), 1);
@@ -2847,7 +4133,18 @@ mod tests {
     #[test]
     fn to_as_a_parent_type_name_is_the_parent() {
         let text = "field to.Foo { bar }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "to"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         assert_eq!(
             as_selectable(parse.reference()).parent_type.item,
@@ -2867,13 +4164,26 @@ mod tests {
             text,
             expected(DECLARATION_KEYWORD, Found::Token(Identifier)),
             span_of(text, "FIELD"),
+            &[(SemanticToken::Keyword, "FIELD")],
         );
     }
 
     #[test]
     fn at_without_a_name_fails_that_selection() {
         let text = "field Query.Foo { bar @ }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::DirectiveName, "@"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         let items = selections(selection_set_of(as_selectable(parse.reference())));
         assert_eq!(items.len(), 1);
         assert!(items[0].item.item.is_none());
@@ -2887,7 +4197,22 @@ mod tests {
     #[test]
     fn an_entrypoint_directive_with_arguments_parses() {
         let text = "entrypoint Query.foo @lazyLoad(x: 1)";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "entrypoint"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "foo"),
+                (SemanticToken::DirectiveName, "@"),
+                (SemanticToken::DirectiveName, "lazyLoad"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Argument, "x"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Integer, "1"),
+                (SemanticToken::Parenthesis, ")"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let arguments = as_entrypoint(parse.reference())
             .directive_set
@@ -2906,7 +4231,25 @@ mod tests {
     #[test]
     fn a_field_directive_with_arguments_parses() {
         let text = "field Query.Foo @component(x: 1) { bar }";
-        let (parse, errors) = parsed(text);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "field"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::DirectiveName, "@"),
+                (SemanticToken::DirectiveName, "component"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Argument, "x"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Integer, "1"),
+                (SemanticToken::Parenthesis, ")"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let arguments = as_selectable(parse.reference())
             .directive_set
@@ -2920,28 +4263,5 @@ mod tests {
             .expect("the fixture passes arguments");
         assert_eq!(arguments.item.0.len(), 1);
         assert_eq!(arguments.location, span_of(text, "(x: 1)"));
-    }
-
-    #[test]
-    fn a_field_records_keyword_type_to_and_selections() {
-        let text = "field Query.Foo to Pet! { id }";
-        let parsed = parsed_with_tokens(text);
-        let parse = parsed.item.expect("the fixture is not an empty literal");
-        as_selectable(parse.reference());
-        assert!(parsed.errors.is_empty());
-        assert_eq!(
-            parsed.tokens,
-            vec![
-                SemanticToken::Keyword.with_span(span_of(text, "field")),
-                SemanticToken::Type.with_span(span_of(text, "Query")),
-                SemanticToken::Period.with_span(span_of(text, ".")),
-                SemanticToken::FieldName.with_span(span_of(text, "Foo")),
-                SemanticToken::Keyword.with_span(span_of(text, "to")),
-                SemanticToken::GraphQLTypeName.with_span(span_of(text, "Pet")),
-                SemanticToken::Brace.with_span(span_of(text, "{")),
-                SemanticToken::FieldName.with_span(span_of(text, "id")),
-                SemanticToken::Brace.with_span(span_of(text, "}")),
-            ],
-        );
     }
 }

@@ -108,7 +108,7 @@ fn parse_selection(cursor: &mut ItemCursor<'_>) -> Result<Selection, WithSpan<As
 mod tests {
     use intern::string_key::Intern;
     use prelude::Postfix;
-    use span::{Span, WithSpan, WithSpanPostfix};
+    use span::{Span, WithSpan};
 
     use super::*;
     use crate::{
@@ -119,17 +119,20 @@ mod tests {
     type ParsedSelections = (
         Vec<WithSpan<Slot<Selection, UnparsedChunkItems>>>,
         Vec<WithSpan<AstError>>,
-        Vec<WithSpan<SemanticToken>>,
     );
 
-    fn parsed_selections(text: &str) -> ParsedSelections {
-        let (items, errors, comma_errors, tokens) = parsed_items(
+    fn parsed_selections(
+        text: &str,
+        expected_tokens: &[(SemanticToken, &str)],
+    ) -> ParsedSelections {
+        let (items, errors, comma_errors) = parsed_items(
             text,
             Expectation::Separator(BracketKind::Brace),
             parse_selection,
+            expected_tokens,
         );
         assert_eq!(comma_errors, vec![], "for literal {text:?}");
-        (items, errors, tokens)
+        (items, errors)
     }
 
     fn as_selection(slot: &Slot<Selection, UnparsedChunkItems>) -> &Selection {
@@ -142,7 +145,13 @@ mod tests {
     #[test]
     fn selections_without_a_nested_set() {
         let text = "bar, baz";
-        let (items, errors, _) = parsed_selections(text);
+        let (items, errors) = parsed_selections(
+            text,
+            &[
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::FieldName, "baz"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         assert_eq!(items.len(), 2);
         assert_eq!(
@@ -163,7 +172,7 @@ mod tests {
     #[test]
     fn a_single_selection_parses_without_a_trailing_separator() {
         let text = "bar";
-        let (items, errors, _) = parsed_selections(text);
+        let (items, errors) = parsed_selections(text, &[(SemanticToken::FieldName, "bar")]);
         assert_eq!(items.len(), 1);
         assert_eq!(
             as_selection(items[0].item.reference()).name.location,
@@ -175,7 +184,7 @@ mod tests {
     #[test]
     fn empty_and_whitespace_levels_hold_zero_selections() {
         for text in ["", "   ", "\n"] {
-            let (items, errors, _) = parsed_selections(text);
+            let (items, errors) = parsed_selections(text, &[]);
             assert_eq!(items.len(), 0, "for literal {text:?}");
             assert_eq!(errors, vec![], "for literal {text:?}");
         }
@@ -184,10 +193,11 @@ mod tests {
     #[test]
     fn a_comma_before_the_first_selection_is_chunkings_error() {
         let text = ", bar";
-        let (items, errors, comma_errors, _) = parsed_items(
+        let (items, errors, comma_errors) = parsed_items(
             text,
             Expectation::Separator(BracketKind::Brace),
             parse_selection,
+            &[(SemanticToken::FieldName, "bar")],
         );
         assert_eq!(comma_errors.len(), 1);
         assert_eq!(items.len(), 1);
@@ -198,10 +208,11 @@ mod tests {
         assert_eq!(errors, vec![]);
 
         let lone = ",";
-        let (items, errors, comma_errors, _) = parsed_items(
+        let (items, errors, comma_errors) = parsed_items(
             lone,
             Expectation::Separator(BracketKind::Brace),
             parse_selection,
+            &[],
         );
         assert_eq!(comma_errors.len(), 1);
         assert_eq!(items.len(), 0);
@@ -211,7 +222,14 @@ mod tests {
     #[test]
     fn an_alias_splits_from_the_name_at_the_colon() {
         let text = "b: bar";
-        let (items, errors, tokens) = parsed_selections(text);
+        let (items, errors) = parsed_selections(
+            text,
+            &[
+                (SemanticToken::FieldName, "b"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::FieldName, "bar"),
+            ],
+        );
         let scalar = as_selection(items[0].item.reference());
         let alias = scalar
             .reader_alias
@@ -225,21 +243,21 @@ mod tests {
         );
         assert_eq!(scalar.name.location, span_of(text, "bar"));
         assert_eq!(errors, vec![]);
-        assert_eq!(
-            tokens,
-            vec![
-                SemanticToken::FieldName
-                    .with_span(Span::new(alias_anchor.start, alias_anchor.start + 1)),
-                SemanticToken::Colon.with_span(span_of(text, ":")),
-                SemanticToken::FieldName.with_span(span_of(text, "bar")),
-            ]
-        );
     }
 
     #[test]
     fn selections_nest() {
         let text = "pet { name, age }";
-        let (items, errors, _) = parsed_selections(text);
+        let (items, errors) = parsed_selections(
+            text,
+            &[
+                (SemanticToken::FieldName, "pet"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "name"),
+                (SemanticToken::FieldName, "age"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         let object = as_selection(items[0].item.reference());
         assert_eq!(object.name.location, span_of(text, "pet"));
         let inner = object
@@ -269,7 +287,26 @@ mod tests {
     #[test]
     fn arguments_parse_on_selections() {
         let text = "pet(id: $petId) { name(shouted: true) }";
-        let (items, errors, _) = parsed_selections(text);
+        let (items, errors) = parsed_selections(
+            text,
+            &[
+                (SemanticToken::FieldName, "pet"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Argument, "id"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Variable, "$"),
+                (SemanticToken::Variable, "petId"),
+                (SemanticToken::Parenthesis, ")"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "name"),
+                (SemanticToken::Parenthesis, "("),
+                (SemanticToken::Argument, "shouted"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::BooleanOrNull, "true"),
+                (SemanticToken::Parenthesis, ")"),
+                (SemanticToken::Brace, "}"),
+            ],
+        );
         assert_eq!(errors, vec![]);
         let object = as_selection(items[0].item.reference());
         let outer = object
@@ -296,7 +333,7 @@ mod tests {
     #[test]
     fn an_orphaned_group_after_a_line_break_is_a_failed_selection() {
         let text = "bar\n{ baz }";
-        let (items, errors, _) = parsed_selections(text);
+        let (items, errors) = parsed_selections(text, &[(SemanticToken::FieldName, "bar")]);
         assert_eq!(items.len(), 2);
         assert_eq!(
             as_selection(items[0].item.reference()).name.location,
@@ -314,10 +351,14 @@ mod tests {
     #[test]
     fn a_doubled_comma_between_selections_is_chunkings_error() {
         let text = "a,, b";
-        let (items, errors, comma_errors, _) = parsed_items(
+        let (items, errors, comma_errors) = parsed_items(
             text,
             Expectation::Separator(BracketKind::Brace),
             parse_selection,
+            &[
+                (SemanticToken::FieldName, "a"),
+                (SemanticToken::FieldName, "b"),
+            ],
         );
         assert_eq!(comma_errors.len(), 1);
         assert_eq!(items.len(), 2);
@@ -335,7 +376,13 @@ mod tests {
     #[test]
     fn leftover_after_a_selection_keeps_the_item() {
         let text = "bar baz\nqux";
-        let (items, errors, _) = parsed_selections(text);
+        let (items, errors) = parsed_selections(
+            text,
+            &[
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::FieldName, "qux"),
+            ],
+        );
         assert_eq!(items.len(), 2);
         assert_eq!(
             as_selection(items[0].item.reference()).name.location,
@@ -359,7 +406,7 @@ mod tests {
     #[test]
     fn a_period_where_a_selection_should_start_is_a_selection_error() {
         let text = "...UserAvatar";
-        let (items, errors, _) = parsed_selections(text);
+        let (items, errors) = parsed_selections(text, &[]);
         assert!(items[0].item.item.is_none());
         assert!(errors.iter().any(|error| {
             error.item
@@ -374,7 +421,17 @@ mod tests {
     #[test]
     fn errors_collect_in_source_order_across_nesting() {
         let text = "a b\npet { c d }\ne f";
-        let (items, errors, _) = parsed_selections(text);
+        let (items, errors) = parsed_selections(
+            text,
+            &[
+                (SemanticToken::FieldName, "a"),
+                (SemanticToken::FieldName, "pet"),
+                (SemanticToken::Brace, "{"),
+                (SemanticToken::FieldName, "c"),
+                (SemanticToken::Brace, "}"),
+                (SemanticToken::FieldName, "e"),
+            ],
+        );
         assert_eq!(errors.len(), 3);
         assert_eq!(errors[0].location, span_of(text, "b"));
         assert_eq!(errors[1].location, span_of(text, "d"));

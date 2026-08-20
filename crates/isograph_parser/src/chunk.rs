@@ -1279,8 +1279,13 @@ mod tests {
             .map(|token| token.location)
     }
 
-    fn parsed_each(text: &str) -> ParsedItems<Span> {
-        parsed_items(text, Separator(BracketKind::Parenthesis), parse_identifier)
+    fn parsed_each(text: &str, expected_tokens: &[(SemanticToken, &str)]) -> ParsedItems<Span> {
+        parsed_items(
+            text,
+            Separator(BracketKind::Parenthesis),
+            parse_identifier,
+            expected_tokens,
+        )
     }
 
     fn expected(expectation: Expectation, found: Found) -> AstError {
@@ -1290,18 +1295,23 @@ mod tests {
     #[test]
     fn parse_each_chunk_on_an_empty_level_is_no_slots_and_no_errors() {
         for text in ["", "   ", "\n\n"] {
-            let (items, errors, comma_errors, tokens) = parsed_each(text);
+            let (items, errors, comma_errors) = parsed_each(text, &[]);
             assert_eq!(items, vec![], "for literal {text:?}");
             assert_eq!(errors, vec![], "for literal {text:?}");
             assert_eq!(comma_errors, vec![], "for literal {text:?}");
-            assert_eq!(tokens, vec![], "for literal {text:?}");
         }
     }
 
     #[test]
     fn parse_each_chunk_parses_one_identifier_per_chunk() {
         let text = "foo, bar";
-        let (items, errors, comma_errors, tokens) = parsed_each(text);
+        let (items, errors, comma_errors) = parsed_each(
+            text,
+            &[
+                (SemanticToken::FieldName, "foo"),
+                (SemanticToken::FieldName, "bar"),
+            ],
+        );
         assert_eq!(comma_errors, vec![]);
         assert_eq!(errors, vec![]);
         assert_eq!(items.len(), 2);
@@ -1315,19 +1325,12 @@ mod tests {
         );
         assert!(items[0].item.extra.is_none());
         assert!(items[1].item.extra.is_none());
-        assert_eq!(
-            tokens,
-            vec![
-                SemanticToken::FieldName.with_span(span_of(text, "foo")),
-                SemanticToken::FieldName.with_span(span_of(text, "bar")),
-            ],
-        );
     }
 
     #[test]
     fn a_list_trailing_comma_is_not_a_parse_each_chunk_diagnostic() {
         let text = "foo,";
-        let (items, errors, comma_errors, _) = parsed_each(text);
+        let (items, errors, comma_errors) = parsed_each(text, &[(SemanticToken::FieldName, "foo")]);
         assert_eq!(comma_errors, vec![]);
         assert_eq!(errors, vec![]);
         assert_eq!(items.len(), 1);
@@ -1341,7 +1344,7 @@ mod tests {
     #[test]
     fn leftover_after_a_list_item_keeps_the_item() {
         let text = "foo bar";
-        let (items, errors, comma_errors, tokens) = parsed_each(text);
+        let (items, errors, comma_errors) = parsed_each(text, &[(SemanticToken::FieldName, "foo")]);
         assert_eq!(comma_errors, vec![]);
         assert_eq!(items.len(), 1);
         assert_eq!(
@@ -1358,18 +1361,12 @@ mod tests {
             .with_span(span_of(text, "bar"))
             .wrap_vec(),
         );
-        assert_eq!(
-            tokens,
-            SemanticToken::FieldName
-                .with_span(span_of(text, "foo"))
-                .wrap_vec(),
-        );
     }
 
     #[test]
     fn a_failed_list_chunk_is_none_and_the_next_chunk_still_parses() {
         let text = ".\nfoo";
-        let (items, errors, comma_errors, tokens) = parsed_each(text);
+        let (items, errors, comma_errors) = parsed_each(text, &[(SemanticToken::FieldName, "foo")]);
         assert_eq!(comma_errors, vec![]);
         assert_eq!(items.len(), 2);
         assert!(items[0].item.item.is_none());
@@ -1382,18 +1379,18 @@ mod tests {
             error.item == expected(Expectation::Token(Identifier), Found::Token(Period))
                 && error.location == span_of(text, ".")
         }));
-        assert_eq!(
-            tokens,
-            SemanticToken::FieldName
-                .with_span(span_of(text, "foo"))
-                .wrap_vec(),
-        );
     }
 
     #[test]
     fn a_line_break_is_a_list_separator() {
         let text = "foo\nbar";
-        let (items, errors, comma_errors, _) = parsed_each(text);
+        let (items, errors, comma_errors) = parsed_each(
+            text,
+            &[
+                (SemanticToken::FieldName, "foo"),
+                (SemanticToken::FieldName, "bar"),
+            ],
+        );
         assert_eq!(comma_errors, vec![]);
         assert_eq!(errors, vec![]);
         assert_eq!(items.len(), 2);
@@ -1410,7 +1407,7 @@ mod tests {
     #[test]
     fn a_comma_without_item_is_chunkings_error_and_the_item_parses() {
         let text = ",foo";
-        let (items, errors, comma_errors, _) = parsed_each(text);
+        let (items, errors, comma_errors) = parsed_each(text, &[(SemanticToken::FieldName, "foo")]);
         assert_eq!(comma_errors.len(), 1);
         assert_eq!(errors, vec![]);
         assert_eq!(items.len(), 1);
