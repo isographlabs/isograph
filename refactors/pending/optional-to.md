@@ -103,7 +103,60 @@ pub struct ClientFieldDeclaration {
 }
 ```
 
-`IsoLiteralItem` is unchanged: `Entrypoint` and `Field`. No `Pointer` variant. `VariableDeclarationOrUsageList` and `Description` stay parented by `ClientFieldDeclarationPath`. `SelectionSetParent` is unchanged. `EntityNameWrapperParent` is unchanged: a target type name is `NamedTypeAnnotation`, not a new parent-type variant.
+`IsoLiteralItem` is unchanged: `Entrypoint` and `Field`.
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+pub enum IsoLiteralItem {
+    Entrypoint(EntrypointDeclaration),
+    Field(ClientFieldDeclaration),
+}
+```
+
+A field with `to` and a field without `to` are the same `ClientFieldDeclaration`. Variables, description, and `selection_set` are the same fields. Nested selections are the same `Selection` (`selection_set: Option`). `ClientScalarSelectableNameWrapper` is the declaration name on entrypoints and on fields, with or without `to`.
+
+```rust
+// from crates/isograph_parser/src/selections.rs
+pub struct Selection {
+    #[resolve_field]
+    pub reader_alias: Option<WithSpan<SelectionNameWrapper>>,
+    #[resolve_field]
+    pub name: WithSpan<SelectionNameWrapper>,
+    #[resolve_field]
+    pub arguments: Option<WithSpan<ArgumentList>>,
+    #[resolve_field]
+    #[parent_variant(Selection)]
+    pub selection_set: Option<WithSpan<SelectionSet>>,
+}
+```
+
+Origin: landed `Selection` in `crates/isograph_parser/src/selections.rs`. Delta: none.
+
+Parent enums stay:
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+pub enum EntityNameWrapperParent<'a> {
+    EntrypointDeclaration(EntrypointDeclarationPath<'a>),
+    ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
+    NamedTypeAnnotation(NamedTypeAnnotationPath<'a>),
+}
+
+pub enum ClientScalarSelectableNameWrapperParent<'a> {
+    EntrypointDeclaration(EntrypointDeclarationPath<'a>),
+    ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
+}
+```
+
+```rust
+// from crates/isograph_parser/src/selections.rs
+pub enum SelectionSetParent<'a> {
+    ClientFieldDeclaration(crate::ClientFieldDeclarationPath<'a>),
+    Selection(Box<SelectionPath<'a>>),
+}
+```
+
+`VariableDeclarationOrUsageList` and `Description` stay parented by `ClientFieldDeclarationPath`. `SelectionNameWrapper` stays parented by `SelectionPath`. A target type name is `EntityNameWrapperParent::NamedTypeAnnotation`; `TypeAnnotationParent` gains `ClientFieldDeclaration` below. parse-directives.md hangs one `IsographFieldDirectiveList` on `ClientFieldDeclaration`, after `target_type`.
 
 ## Changes to TypeAnnotationParent
 
