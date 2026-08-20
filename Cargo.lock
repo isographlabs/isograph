@@ -1076,7 +1076,6 @@ dependencies = [
  "clap",
  "freddie_cli",
  "prelude",
- "tempfile",
  "tracing",
 ]
 
@@ -2753,6 +2752,15 @@ checksum = "ef8f7726da4807b58ea5c96fdc122f80702030edc33b35aff9190a51148ccc85"
 dependencies = [
  "serde",
  "stable_deref_trait",
+]
+
+[[package]]
+name = "ts_graphql_react_isograph_cli"
+version = "0.5.3"
+dependencies = [
+ "isograph_cli",
+ "prelude",
+ "tempfile",
 ]
 
 [[package]]

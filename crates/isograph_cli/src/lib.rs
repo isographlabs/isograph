@@ -1,14 +1,29 @@
-//! The isograph binary: freddie's lifecycle verbs around a daemon that, for now, only says hello.
-
 use std::process::ExitCode;
 
 use clap::{CommandFactory, FromArgMatches, Parser};
 use freddie_cli::{App, Instance, NoArgs};
 use prelude::Postfix;
 
+pub fn run() -> ExitCode {
+    // First, so `--help` prints and a bad flag exits before the lock is taken.
+    // The matches are kept beside the parse because `run_lifecycle_verb` reads what was written
+    // from them, to forward to the daemon it spawns.
+    let matches = Cli::command().get_matches();
+    let cli = Cli::from_arg_matches(matches.reference())
+        .expect("the derived type matches the command it derived");
+
+    match cli.verb {
+        Some(verb) => freddie_cli::run_lifecycle_verb::<Isograph>(verb, matches.reference()),
+        None => freddie_cli::run_lifecycle_verb::<Isograph>(
+            freddie_cli::verb_for_bare_invocation::<Isograph>(),
+            matches.reference(),
+        ),
+    }
+}
+
 #[derive(Parser)]
 #[command(name = "isograph", version, about = "The isograph compiler.", long_about = None)]
-struct IsographCli {
+struct Cli {
     #[command(subcommand)]
     verb: Option<freddie_cli::Verb<Isograph>>,
 }
@@ -18,10 +33,10 @@ struct IsographCli {
 /// Not [`NoArgs`], because `start` flattens [`App::Id`] and [`App::DaemonArgs`] into one clap
 /// command, and clap requires the two derived argument groups to have distinct names.
 #[derive(clap::Args, Debug)]
-pub struct IsographArgs;
+struct IsographArgs;
 
 /// isograph, to the verbs that manage it.
-pub struct Isograph;
+struct Isograph;
 
 impl App for Isograph {
     // One isograph daemon to a machine, so no flag names which.
@@ -39,22 +54,5 @@ impl App for Isograph {
         loop {
             std::thread::park();
         }
-    }
-}
-
-fn main() -> ExitCode {
-    // First, so `--help` prints and a bad flag exits before the lock is taken.
-    // The matches are kept beside the parse because `run_lifecycle_verb` reads what was written
-    // from them, to forward to the daemon it spawns.
-    let matches = IsographCli::command().get_matches();
-    let cli = IsographCli::from_arg_matches(matches.reference())
-        .expect("the derived type matches the command it derived");
-
-    match cli.verb {
-        Some(verb) => freddie_cli::run_lifecycle_verb::<Isograph>(verb, matches.reference()),
-        None => freddie_cli::run_lifecycle_verb::<Isograph>(
-            freddie_cli::verb_for_bare_invocation::<Isograph>(),
-            matches.reference(),
-        ),
     }
 }

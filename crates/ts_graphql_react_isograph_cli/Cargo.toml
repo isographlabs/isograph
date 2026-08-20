@@ -1,0 +1,19 @@
+[package]
+name = "ts_graphql_react_isograph_cli"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+
+[[bin]]
+name = "isograph"
+path = "src/main.rs"
+
+[dependencies]
+isograph_cli = { path = "../isograph_cli" }
+
+[dev-dependencies]
+prelude = { path = "../prelude" }
+tempfile = "3"
+
+[lints]
+workspace = true

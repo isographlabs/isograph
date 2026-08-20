@@ -1,6 +1,6 @@
 # i2
 
-A re-implementation of isograph, rebuilt from the parser up. From upstream isograph we keep pico and pico_macros (unchanged), the swc plugin and its dependency chain (isograph_config, common_lang_types, string_key_newtype, prelude), resolve_position, the relay crates, the demos, the docs website, and the build process. The new work is `crates/isograph_parser` (the parser), `crates/tests` (its tests), and `crates/isograph_cli` (freddie_cli's lifecycle verbs around the daemon).
+A re-implementation of isograph, rebuilt from the parser up. From upstream isograph we keep pico and pico_macros (unchanged), the swc plugin and its dependency chain (isograph_config, common_lang_types, string_key_newtype, prelude), resolve_position, the relay crates, the demos, the docs website, and the build process. The new work is `crates/isograph_parser` (the parser), `crates/tests` (its tests), `crates/isograph_cli` (freddie_cli's lifecycle verbs around the daemon), and `crates/ts_graphql_react_isograph_cli` (the `isograph` binary).
 
 The parser does not use pico. The explicit assumption is that parsing a literal is trivially cheap and not worth memoizing; memoization applies above the parser (which files changed, which literals were extracted), and parser functions are plain functions over `&str`.
 
