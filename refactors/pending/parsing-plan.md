@@ -173,7 +173,7 @@ Justified differences:
 - `ObjectEntry` (not `NameValuePair`): two slot `T`s, one per list parent.
 - `VariableUse`, `IntegerValue`, `BooleanValue`, `NullValue`: resolve-position leaves; isograph inlines `i64` / `bool` / unit.
 - `TypeAnnotation` as `Named` / `List` with `!` on the span (not `TypeAnnotationDeclaration` as `Scalar` / `Union` / `Plural`): i2 stores the written form; isograph converts from `GraphQLTypeAnnotation`.
-- `Selection` as an enum (not `SelectionType<ScalarSelection, ObjectSelection>`).
+- `Selection` is one struct with optional `selection_set` (not `SelectionType<ScalarSelection, ObjectSelection>`).
 - Parent enums drop the `Type` suffix (`SelectionSetParent`, not `SelectionSetParentType`).
 - `IsoLiteralItem` (not `IsoLiteralExtractionResult`): extraction is a different stage.
 - `directive_set` on pointer declarations (upstream field name is `directives`).
@@ -197,7 +197,8 @@ Justified differences:
 
 parsing-standards.md governs how every implementation below is written. Each doc is independently shippable and lands with its tests before the next begins.
 
-1. `parse-variables.md`. Variable-declaration lists, `$name: Type = default` with `ConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_nested_singleton`), and the `Box` delegation impl.
+1. `one-kind-of-selection.md`. One `Selection` struct with optional `selection_set`. Deletes `ScalarSelection` / `ObjectSelection`.
+2. `parse-variables.md`. Variable-declaration lists, `$name: Type = default` with `ConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_nested_singleton`), and the `Box` delegation impl.
 3. `parse-descriptions.md`. The optional description a field declaration carries before its selection set, via two `consume_token_if` calls.
 4. `parse-pointers.md`. `pointer Type.name to Type { ... }` via `require_token(Identifier, Keyword)` and `token_text == "to"`. Removes `UnsupportedDeclarationType`.
 5. `parse-directives.md`. `@name` and `@name(args)` on entrypoints, fields, pointers, and selections. Raw `IsographFieldDirectiveList`; typed sets are a later stage.

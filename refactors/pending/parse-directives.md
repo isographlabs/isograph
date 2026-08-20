@@ -66,8 +66,7 @@ pub enum IsographFieldDirectiveListParent<'a> {
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
     ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
     ClientPointerDeclaration(ClientPointerDeclarationPath<'a>),
-    ScalarSelection(ScalarSelectionPath<'a>),
-    ObjectSelection(ObjectSelectionPath<'a>),
+    Selection(SelectionPath<'a>),
 }
 
 pub type IsographFieldDirectiveListPath<'a> = PositionResolutionPath<
@@ -86,14 +85,38 @@ The list is not a chunk list and does not use `Slot`. Directives are sequential 
 
 `IsographFieldDirectiveList` is the type isograph does not name (`Vec<IsographFieldDirective>` stored in a `directive_set` field). The wrapper exists so the vec has a span and a parent.
 
+one-kind-of-selection.md left `ArgumentList.parent_type` as `SelectionPath`. This doc introduces the enum.
+
+Before:
+
 ```rust
 // from crates/isograph_parser/src/arguments.rs
+#[resolve_position(parent_type = SelectionPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct ArgumentList(
+    #[resolve_field] pub Vec<WithSpan<Slot<SelectionFieldArgument, UnparsedChunkItems>>>,
+);
+
+pub type ArgumentListPath<'a> = PositionResolutionPath<&'a ArgumentList, SelectionPath<'a>>;
+```
+
+After:
+
+```rust
+// from crates/isograph_parser/src/arguments.rs
+#[resolve_position(parent_type = ArgumentListParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct ArgumentList(
+    #[resolve_field] pub Vec<WithSpan<Slot<SelectionFieldArgument, UnparsedChunkItems>>>,
+);
+
 pub enum ArgumentListParent<'a> {
-    ScalarSelection(ScalarSelectionPath<'a>),
-    ObjectSelection(ObjectSelectionPath<'a>),
+    Selection(SelectionPath<'a>),
     IsographFieldDirective(IsographFieldDirectivePath<'a>),
 }
+
+pub type ArgumentListPath<'a> = PositionResolutionPath<&'a ArgumentList, ArgumentListParent<'a>>;
 ```
+
+`Selection.arguments` respells to `#[resolve_field]` + `#[parent_variant(Selection)]`.
 
 ```rust
 // from crates/isograph_parser/src/directives.rs
@@ -223,41 +246,24 @@ Pointer. Upstream field name is `directives`. The field here is `directive_set`:
     let description = consume_description(cursor);
 ```
 
-Selections. Upstream deserializes immediately into `ScalarSelectionDirectiveSet` / `ObjectSelectionDirectiveSet`. This stage stores the raw list on both.
+Selections. Upstream deserializes immediately into typed scalar/object directive sets. This stage stores the raw list on `Selection`.
 
 ```rust
 // from crates/isograph_parser/src/selections.rs
-pub struct ScalarSelection {
+pub struct Selection {
     #[resolve_field]
-    #[parent_variant(ScalarSelection)]
     pub reader_alias: Option<WithSpan<SelectionNameWrapper>>,
     #[resolve_field]
-    #[parent_variant(ScalarSelection)]
     pub name: WithSpan<SelectionNameWrapper>,
     #[resolve_field]
-    #[parent_variant(ScalarSelection)]
+    #[parent_variant(Selection)]
     pub arguments: Option<WithSpan<ArgumentList>>,
     #[resolve_field]
-    #[parent_variant(ScalarSelection)]
-    pub directive_set: Option<WithSpan<IsographFieldDirectiveList>>,
-}
-
-pub struct ObjectSelection {
-    #[resolve_field]
-    #[parent_variant(ObjectSelection)]
-    pub reader_alias: Option<WithSpan<SelectionNameWrapper>>,
-    #[resolve_field]
-    #[parent_variant(ObjectSelection)]
-    pub name: WithSpan<SelectionNameWrapper>,
-    #[resolve_field]
-    #[parent_variant(ObjectSelection)]
-    pub arguments: Option<WithSpan<ArgumentList>>,
-    #[resolve_field]
-    #[parent_variant(ObjectSelection)]
+    #[parent_variant(Selection)]
     pub directive_set: Option<WithSpan<IsographFieldDirectiveList>>,
     #[resolve_field]
-    #[parent_variant(ObjectSelection)]
-    pub selection_set: WithSpan<SelectionSet>,
+    #[parent_variant(Selection)]
+    pub selection_set: Option<WithSpan<SelectionSet>>,
 }
 ```
 
@@ -266,20 +272,12 @@ pub struct ObjectSelection {
     let arguments = consume_argument_list(cursor);
     let directive_set = consume_directives(cursor)?;
     let selection_set = consume_selection_set(cursor);
-    match selection_set {
-        Some(selection_set) => Selection::Object(ObjectSelection {
-            reader_alias,
-            name,
-            arguments,
-            directive_set,
-            selection_set,
-        }),
-        None => Selection::Scalar(ScalarSelection {
-            reader_alias,
-            name,
-            arguments,
-            directive_set,
-        }),
+    Selection {
+        reader_alias,
+        name,
+        arguments,
+        directive_set,
+        selection_set,
     }
     .wrap_ok()
 ```
@@ -357,8 +355,8 @@ A position on `@` answers `IsographFieldDirective` (the `@` span is part of the 
         let text = "field Query.Foo { bar @loadable(lazyLoadArtifact: true) }";
         let (parse, errors) = parsed(text);
         assert_eq!(errors, vec![]);
-        let scalar = as_scalar(selections(as_field(parse.reference()).selection_set.reference())[0].item.reference());
-        let directives = scalar
+        let selection = as_selection(selections(as_field(parse.reference()).selection_set.reference())[0].item.reference());
+        let directives = selection
             .directive_set
             .as_ref()
             .expect("the fixture selects with a directive");
@@ -379,7 +377,7 @@ A position on `@` answers `IsographFieldDirective` (the `@` span is part of the 
         let text = "field Query.Foo { bar @loadable @updatable }";
         let (parse, errors) = parsed(text);
         assert_eq!(errors, vec![]);
-        let directives = as_scalar(
+        let directives = as_selection(
             selections(as_field(parse.reference()).selection_set.reference())[0]
                 .item
                 .reference(),
@@ -397,7 +395,7 @@ A position on `@` answers `IsographFieldDirective` (the `@` span is part of the 
         let (parse, errors) = parsed(text);
         let items = selections(as_field(parse.reference()).selection_set.reference());
         assert_eq!(items.len(), 2);
-        as_scalar(items[0].item.reference());
+        as_selection(items[0].item.reference());
         assert!(items[1].item.item.is_none());
         assert!(errors.iter().any(|error| {
             error.item
@@ -446,7 +444,7 @@ A position on `@` answers `IsographFieldDirective` (the `@` span is part of the 
         match parse.resolve((), span_of(text, "loadable")) {
             IsographResolutionNode::IsographDirectiveNameWrapper(name) => {
                 match name.parent.parent.parent {
-                    IsographFieldDirectiveListParent::ScalarSelection(_) => {}
+                    IsographFieldDirectiveListParent::Selection(_) => {}
                     parent => panic!("expected a scalar directive list, got {parent:?}"),
                 }
             }

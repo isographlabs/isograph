@@ -310,11 +310,7 @@ Origin: `DescriptionParent` in `string_key_wrappers.rs`. Variant names match.
         }
         match parse.resolve((), span_of(text, "id")) {
             IsographResolutionNode::SelectionNameWrapper(name) => {
-                let scalar = match name.parent {
-                    SelectionNameWrapperParent::ScalarSelection(scalar) => scalar,
-                    parent => panic!("expected a scalar parent, got {parent:?}"),
-                };
-                match scalar.parent.parent.parent {
+                match name.parent.parent.parent.parent {
                     SelectionSetParent::ClientPointerDeclaration(_) => {}
                     parent => panic!("expected the pointer at the top, got {parent:?}"),
                 }
