@@ -2,7 +2,7 @@ use std::fmt;
 
 use thiserror::Error;
 
-use crate::{BracketKind, ChunkContentItem, NonBracketTokenKind};
+use crate::{BracketError, BracketKind, ChunkContentItem, CommaWithoutItem, NonBracketTokenKind};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
 pub enum AstError {
@@ -14,6 +14,16 @@ pub enum AstError {
     MultipleDeclarations,
     #[error("This integer does not fit in a 64-bit signed integer.")]
     IntegerDoesNotFitI64,
+}
+
+#[derive(Debug, PartialEq, Eq, Error)]
+pub enum ParseError {
+    #[error("{0}")]
+    Ast(#[from] AstError),
+    #[error("{0}")]
+    Bracket(#[from] BracketError),
+    #[error("{0}")]
+    Comma(#[from] CommaWithoutItem),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

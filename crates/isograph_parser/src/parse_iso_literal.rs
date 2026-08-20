@@ -6,11 +6,12 @@ use span::{WithSpan, WithSpanPostfix};
 
 use crate::chunk_stream::ItemCursor;
 use crate::{
-    AstError, ChunkContentItem, ChunkedLevel, DECLARATION_KEYWORD, Expectation, ExtraChunks, Found,
-    IsographFieldDirectiveList, IsographResolutionNode, NamedTypeAnnotationPath, NonBracketToken,
-    NonBracketTokenKind, SelectionSet, SemanticToken, Singleton, Slot, TypeAnnotation,
-    UnparsedChunkItems, VariableDeclarationList, consume_directives, consume_selection_set,
-    consume_variable_declaration_list, parse_singleton, parse_type_annotation,
+    AstError, BracketError, ChunkContentItem, ChunkedLevel, DECLARATION_KEYWORD, Expectation,
+    ExtraChunks, Found, IsographFieldDirectiveList, IsographResolutionNode,
+    NamedTypeAnnotationPath, NonBracketToken, NonBracketTokenKind, ParseError, SelectionSet,
+    SemanticToken, Singleton, Slot, TypeAnnotation, UnparsedChunkItems, VariableDeclarationList,
+    chunk, consume_directives, consume_selection_set, consume_variable_declaration_list,
+    match_brackets, parse_singleton, parse_type_annotation, tokenize,
 };
 
 pub type IsoLiteralParse = Singleton<Slot<IsoLiteralItem, UnparsedChunkItems>, ExtraChunks>;
@@ -119,7 +120,47 @@ pub type EntityNameWrapperPath<'a> =
 pub type SelectableNameWrapperPath<'a> =
     PositionResolutionPath<&'a SelectableNameWrapper, SelectableNameWrapperParent<'a>>;
 
-pub fn parse_iso_literal(
+#[derive(Debug)]
+pub struct ParsedIsoLiteral {
+    pub item: Option<WithSpan<IsoLiteralParse>>,
+    pub errors: Vec<WithSpan<ParseError>>,
+    pub tokens: Vec<WithSpan<SemanticToken>>,
+}
+
+pub fn parse_iso_literal(text: &str) -> ParsedIsoLiteral {
+    let (brackets, bracket_errors) = match_brackets(tokenize(text), text.len() as u32);
+    let (tree, comma_errors) = chunk(brackets.reference());
+    let mut errors: Vec<WithSpan<ParseError>> = bracket_errors
+        .into_iter()
+        .map(|error| {
+            let location = match error.reference() {
+                BracketError::UnmatchedOpen(open) => open.location,
+                BracketError::UnmatchedClose(close) => close.location,
+            };
+            error.to::<ParseError>().with_span(location)
+        })
+        .collect();
+    errors.extend(
+        comma_errors
+            .into_iter()
+            .map(|error| error.to::<ParseError>().with_span(error.0)),
+    );
+    let mut ast_errors = Vec::new();
+    let mut tokens = Vec::new();
+    let item = parse_chunked_iso_literal(text, tree, &mut ast_errors, &mut tokens);
+    errors.extend(
+        ast_errors
+            .into_iter()
+            .map(|error| error.item.to::<ParseError>().with_span(error.location)),
+    );
+    ParsedIsoLiteral {
+        item,
+        errors,
+        tokens,
+    }
+}
+
+pub(crate) fn parse_chunked_iso_literal(
     text: &str,
     root: WithSpan<ChunkedLevel>,
     errors: &mut Vec<WithSpan<AstError>>,
@@ -258,9 +299,9 @@ mod tests {
     use super::*;
     use crate::{
         ArgumentListParent, AstError, BracketError, BracketKind, ChunkContentItemParent,
-        CommaWithoutItem, DECLARATION_KEYWORD, Expectation, Found, IntegerValue,
-        IsographDirectiveNameWrapper, IsographFieldDirectiveListParent, IsographResolutionNode,
-        NonBracketTokenKind, NonConstantValue, NonConstantValueParent, ObjectEntry, Selection,
+        DECLARATION_KEYWORD, Expectation, Found, IntegerValue, IsographDirectiveNameWrapper,
+        IsographFieldDirectiveListParent, IsographResolutionNode, NonBracketTokenKind,
+        NonConstantValue, NonConstantValueParent, ObjectEntry, ParseError, Selection,
         SelectionNameWrapper, SelectionSet, SelectionSetParent, Slot, TypeAnnotation,
         TypeAnnotationParent, UnparsedChunkItems, UnparsedChunkItemsParent, VariableDeclaration,
         VariableDeclarationList, VariableDeclarationOrUsageParent, VariableNameWrapper, chunk,
@@ -271,40 +312,30 @@ mod tests {
         At, Comma, Dollar, ErrorNumberLiteralTrailingInvalid, Identifier, Period,
     };
 
-    type ParsedWithErrors = (
-        Option<WithSpan<IsoLiteralParse>>,
-        Vec<WithSpan<AstError>>,
-        Vec<BracketError>,
-        Vec<CommaWithoutItem>,
-    );
-
-    type ParsedWithTokens = (
-        Option<WithSpan<IsoLiteralParse>>,
-        Vec<WithSpan<AstError>>,
-        Vec<BracketError>,
-        Vec<CommaWithoutItem>,
-        Vec<WithSpan<SemanticToken>>,
-    );
-
     fn parsed(text: &str) -> (WithSpan<IsoLiteralParse>, Vec<WithSpan<AstError>>) {
-        let (parse, errors, bracket_errors, comma_errors) = parsed_with_errors(text);
-        assert!(bracket_errors.is_empty(), "for literal {text:?}");
-        assert_eq!(comma_errors, vec![], "for literal {text:?}");
-        (parse.expect("the fixture is not an empty literal"), errors)
+        let parsed = parse_iso_literal(text);
+        let errors = parsed
+            .errors
+            .into_iter()
+            .map(|error| match error.item {
+                ParseError::Ast(ast) => ast.with_span(error.location),
+                ParseError::Bracket(_) | ParseError::Comma(_) => {
+                    panic!("for literal {text:?}")
+                }
+            })
+            .collect();
+        (
+            parsed.item.expect("the fixture is not an empty literal"),
+            errors,
+        )
     }
 
-    fn parsed_with_errors(text: &str) -> ParsedWithErrors {
-        let (parse, errors, bracket_errors, comma_errors, _) = parsed_with_tokens(text);
-        (parse, errors, bracket_errors, comma_errors)
+    fn parsed_with_errors(text: &str) -> ParsedIsoLiteral {
+        parse_iso_literal(text)
     }
 
-    fn parsed_with_tokens(text: &str) -> ParsedWithTokens {
-        let (brackets, bracket_errors) = match_brackets(tokenize(text), text.len() as u32);
-        let (tree, comma_errors) = chunk(brackets.reference());
-        let mut errors = Vec::new();
-        let mut tokens = Vec::new();
-        let parse = parse_iso_literal(text, tree, &mut errors, &mut tokens);
-        (parse, errors, bracket_errors, comma_errors, tokens)
+    fn parsed_with_tokens(text: &str) -> ParsedIsoLiteral {
+        parse_iso_literal(text)
     }
 
     fn expected(expectation: Expectation, found: Found) -> AstError {
@@ -468,15 +499,25 @@ mod tests {
     }
 
     #[test]
+    fn empty_literal_is_none_with_empty_literal_error() {
+        let parsed = parse_iso_literal("");
+        assert!(parsed.item.is_none());
+        assert!(
+            parsed
+                .errors
+                .iter()
+                .any(|error| { error.item == ParseError::Ast(AstError::EmptyLiteral) })
+        );
+    }
+
+    #[test]
     fn empty_and_whitespace_only_literals_are_empty_literal_errors() {
         for text in ["", "   ", "\n\n"] {
-            let (parse, errors, bracket_errors, comma_errors) = parsed_with_errors(text);
-            assert!(bracket_errors.is_empty(), "for literal {text:?}");
-            assert_eq!(comma_errors, vec![], "for literal {text:?}");
-            assert!(parse.is_none(), "for literal {text:?}");
+            let parsed = parsed_with_errors(text);
+            assert!(parsed.item.is_none(), "for literal {text:?}");
             assert_eq!(
-                errors,
-                AstError::EmptyLiteral
+                parsed.errors,
+                ParseError::Ast(AstError::EmptyLiteral)
                     .with_span(Span::from_usize(0, text.len()))
                     .wrap_vec(),
                 "for literal {text:?}",
@@ -489,54 +530,89 @@ mod tests {
         for (text, comma_error_count) in
             [(",entrypoint Query.foo", 1), (",,entrypoint Query.foo", 2)]
         {
-            let (parse, errors, bracket_errors, comma_errors) = parsed_with_errors(text);
-            assert!(bracket_errors.is_empty(), "for literal {text:?}");
+            let parsed = parsed_with_errors(text);
+            assert!(
+                parsed
+                    .errors
+                    .iter()
+                    .all(|error| matches!(error.item, ParseError::Comma(_))),
+                "for literal {text:?}",
+            );
             assert_eq!(
-                comma_errors.len(),
+                parsed.errors.len(),
                 comma_error_count,
                 "for literal {text:?}"
             );
-            let parse = parse.expect("the fixture is not an empty literal");
+            let parse = parsed.item.expect("the fixture is not an empty literal");
             let declaration = as_entrypoint(parse.reference());
             assert_eq!(
                 declaration.parent_type.location,
                 span_of(text, "Query"),
                 "for literal {text:?}"
             );
-            assert_eq!(errors, vec![], "for literal {text:?}");
         }
     }
 
     #[test]
     fn a_lone_comma_is_chunkings_error_and_an_empty_literal() {
         let text = ",";
-        let (parse, errors, bracket_errors, comma_errors) = parsed_with_errors(text);
-        assert!(bracket_errors.is_empty());
-        assert_eq!(comma_errors.len(), 1);
-        assert!(parse.is_none());
+        let parsed = parsed_with_errors(text);
+        assert!(parsed.item.is_none());
         assert_eq!(
-            errors,
-            AstError::EmptyLiteral
-                .with_span(Span::from_usize(0, text.len()))
-                .wrap_vec(),
+            parsed
+                .errors
+                .iter()
+                .filter(|error| matches!(error.item, ParseError::Comma(_)))
+                .count(),
+            1,
+        );
+        assert!(parsed.errors.iter().any(|error| {
+            error.item == ParseError::Ast(AstError::EmptyLiteral)
+                && error.location == Span::from_usize(0, text.len())
+        }));
+        assert!(
+            parsed
+                .errors
+                .iter()
+                .all(|error| matches!(error.item, ParseError::Comma(_) | ParseError::Ast(_)))
         );
     }
 
     #[test]
     fn the_cut_removes_an_unmatched_bracket_and_the_declaration_parses() {
         for text in ["entrypoint Query.foo)", "entrypoint Query.foo ("] {
-            let (parse, errors, bracket_errors, comma_errors) = parsed_with_errors(text);
-            assert_eq!(bracket_errors.len(), 1, "for literal {text:?}");
-            assert_eq!(comma_errors, vec![], "for literal {text:?}");
-            let parse = parse.expect("the fixture is not an empty literal");
+            let parsed = parsed_with_errors(text);
+            assert!(
+                parsed
+                    .errors
+                    .iter()
+                    .all(|error| matches!(error.item, ParseError::Bracket(_))),
+                "for literal {text:?}",
+            );
+            assert_eq!(parsed.errors.len(), 1, "for literal {text:?}");
+            let parse = parsed.item.expect("the fixture is not an empty literal");
             let declaration = as_entrypoint(parse.reference());
             assert_eq!(
                 declaration.name.location,
                 span_of(text, "foo"),
                 "for literal {text:?}"
             );
-            assert_eq!(errors, vec![], "for literal {text:?}");
         }
+    }
+
+    #[test]
+    fn a_stray_close_is_a_parse_error_and_the_declaration_parses() {
+        let text = "entrypoint Query.foo)";
+        let parsed = parse_iso_literal(text);
+        assert!(parsed.item.is_some());
+        assert!(parsed.errors.iter().any(|error| {
+            matches!(
+                error.item.reference(),
+                ParseError::Bracket(BracketError::UnmatchedClose(close))
+                    if close.item.0 == BracketKind::Parenthesis
+                        && close.location == span_of(text, ")")
+            ) && error.location == span_of(text, ")")
+        }));
     }
 
     #[test]
@@ -969,14 +1045,12 @@ mod tests {
     #[test]
     fn an_entrypoint_records_keyword_type_period_field_name() {
         let text = "entrypoint Query.foo";
-        let (parse, errors, bracket_errors, comma_errors, tokens) = parsed_with_tokens(text);
-        assert!(bracket_errors.is_empty());
-        assert_eq!(comma_errors, vec![]);
-        let parse = parse.expect("the fixture is not an empty literal");
+        let parsed = parsed_with_tokens(text);
+        let parse = parsed.item.expect("the fixture is not an empty literal");
         as_entrypoint(parse.reference());
-        assert_eq!(errors, vec![]);
+        assert!(parsed.errors.is_empty());
         assert_eq!(
-            tokens,
+            parsed.tokens,
             vec![
                 SemanticToken::Keyword.with_span(span_of(text, "entrypoint")),
                 SemanticToken::Type.with_span(span_of(text, "Query")),
@@ -989,11 +1063,15 @@ mod tests {
     #[test]
     fn a_failed_prefix_keeps_the_tokens_it_committed() {
         let text = "entrypoint Foo.$ asdf";
-        let (_, _, bracket_errors, comma_errors, tokens) = parsed_with_tokens(text);
-        assert!(bracket_errors.is_empty());
-        assert_eq!(comma_errors, vec![]);
+        let parsed = parsed_with_tokens(text);
+        assert!(
+            parsed
+                .errors
+                .iter()
+                .all(|error| matches!(error.item, ParseError::Ast(_))),
+        );
         assert_eq!(
-            tokens,
+            parsed.tokens,
             vec![
                 SemanticToken::Keyword.with_span(span_of(text, "entrypoint")),
                 SemanticToken::Type.with_span(span_of(text, "Foo")),
@@ -1005,11 +1083,15 @@ mod tests {
     #[test]
     fn an_unknown_keyword_records_keyword_at_that_identifier() {
         let text = "fieldd Query.foo { bar }";
-        let (_, _, bracket_errors, comma_errors, tokens) = parsed_with_tokens(text);
-        assert!(bracket_errors.is_empty());
-        assert_eq!(comma_errors, vec![]);
+        let parsed = parsed_with_tokens(text);
+        assert!(
+            parsed
+                .errors
+                .iter()
+                .all(|error| matches!(error.item, ParseError::Ast(_))),
+        );
         assert_eq!(
-            tokens,
+            parsed.tokens,
             SemanticToken::Keyword
                 .with_span(span_of(text, "fieldd"))
                 .wrap_vec(),
@@ -1019,19 +1101,17 @@ mod tests {
     #[test]
     fn leftover_after_an_entrypoint_is_not_recorded() {
         let text = "entrypoint Query.foo bar";
-        let (parse, errors, bracket_errors, comma_errors, tokens) = parsed_with_tokens(text);
-        assert!(bracket_errors.is_empty());
-        assert_eq!(comma_errors, vec![]);
-        let parse = parse.expect("the fixture is not an empty literal");
+        let parsed = parsed_with_tokens(text);
+        let parse = parsed.item.expect("the fixture is not an empty literal");
         as_entrypoint(parse.reference());
         assert_eq!(
-            errors,
-            expected(EndOfDeclaration, Found::Token(Identifier))
+            parsed.errors,
+            ParseError::Ast(expected(EndOfDeclaration, Found::Token(Identifier)))
                 .with_span(span_of(text, "bar"))
                 .wrap_vec(),
         );
         assert_eq!(
-            tokens,
+            parsed.tokens,
             vec![
                 SemanticToken::Keyword.with_span(span_of(text, "entrypoint")),
                 SemanticToken::Type.with_span(span_of(text, "Query")),
@@ -2668,14 +2748,12 @@ mod tests {
     #[test]
     fn a_field_records_keyword_type_to_and_selections() {
         let text = "field Query.Foo to Pet! { id }";
-        let (parse, errors, bracket_errors, comma_errors, tokens) = parsed_with_tokens(text);
-        assert!(bracket_errors.is_empty());
-        assert_eq!(comma_errors, vec![]);
-        let parse = parse.expect("the fixture is not an empty literal");
+        let parsed = parsed_with_tokens(text);
+        let parse = parsed.item.expect("the fixture is not an empty literal");
         as_selectable(parse.reference());
-        assert_eq!(errors, vec![]);
+        assert!(parsed.errors.is_empty());
         assert_eq!(
-            tokens,
+            parsed.tokens,
             vec![
                 SemanticToken::Keyword.with_span(span_of(text, "field")),
                 SemanticToken::Type.with_span(span_of(text, "Query")),
