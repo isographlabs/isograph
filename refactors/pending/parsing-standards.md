@@ -107,6 +107,7 @@ impl<'c, 'a> CursorPeek<'c, 'a> {
 - Parsed list item: the `WithSpan` `spanning` returned, stored on `Slot.item` when the form parsed.
 - Slot: form `Ok` and end is the item span. Form `Ok` and leftover is the join of the item span and the leftover items' span. Form `Err` is `contents_span`.
 - Value made of several items: one `spanning` call. The closure's first advance is a `consume_*` or `require_*`. Remaining items of that value are read inside the same `spanning`.
+- A value that is not in the source: `WithOptionalSpan<T>`, `location: None`. Do not invent a `Span`. `ResolvePosition` does not enter `None`. optional-span.md.
 
 `TokenText`'s `text` field is the whole literal. `text()` indexes it at `location`. A name in the tree is `token.interned()`. The converted scalar is the `i64`. The wrapper span is location only.
 
