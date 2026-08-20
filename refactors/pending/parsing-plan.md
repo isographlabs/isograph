@@ -41,7 +41,7 @@ A boundary is a chunk's trailing separator run. Line breaks are swallowed by wha
 
    ```
    foo
-   { bar }          <- a scalar selection, then a failed slot on the orphaned group
+   { bar }          <- a selection, then a failed slot on the orphaned group
 
    field Query.Foo
    { bar }          <- an error at the end of the header chunk
@@ -162,7 +162,7 @@ impl BracketKind {
 
 ## Names relative to isograph
 
-Where a type or function exists in both, i2 uses the isograph name. Wrappers that exist only so a lang type can carry `ResolvePosition` take the wrappee's name plus `Wrapper` (`EntityNameWrapper`, `VariableNameWrapper`, `FieldArgumentNameWrapper`, `ValueKeyNameWrapper`, `SelectionNameWrapper`, `StringLiteralValueWrapper`, `IsographDirectiveNameWrapper`, `ClientScalarSelectableNameWrapper`). `SelectionNameWrapper` covers both a selection name and a `reader_alias`.
+Where a type or function exists in both, i2 uses the isograph name. Wrappers that exist only so a lang type can carry `ResolvePosition` take the wrappee's name plus `Wrapper` (`EntityNameWrapper`, `VariableNameWrapper`, `FieldArgumentNameWrapper`, `ValueKeyNameWrapper`, `SelectableNameWrapper`, `StringLiteralValueWrapper`, `IsographDirectiveNameWrapper`). `SelectableNameWrapper` covers an entrypoint name, a field name, a selection name, and a `reader_alias`.
 
 Justified differences:
 
@@ -176,8 +176,10 @@ Justified differences:
 - `Selection` is one struct with optional `selection_set` (not `SelectionType<ScalarSelection, ObjectSelection>`).
 - Parent enums drop the `Type` suffix (`SelectionSetParent`, not `SelectionSetParentType`).
 - `IsoLiteralItem` (not `IsoLiteralExtractionResult`): extraction is a different stage.
-- `ClientFieldDeclaration.target_type: Option<WithSpan<TypeAnnotation>>` (isograph has a separate `ClientPointerDeclaration` and a `pointer` keyword).
-- Field names stay `ClientScalarSelectableNameWrapper` with or without `to` (isograph uses `ClientObjectSelectableName` on pointers).
+- `FieldDeclaration` (isograph `ClientFieldDeclaration`).
+- `SelectableNameWrapper` for entrypoint names, field names, selection names, and `reader_alias` (isograph `ClientScalarSelectableNameWrapper` / `ClientObjectSelectableName` / `SelectionNameWrapper`).
+- `FieldDeclaration.target_type: Option<WithSpan<TypeAnnotation>>` (isograph has a separate `ClientPointerDeclaration` and a `pointer` keyword).
+- `name` on entrypoint and field declarations (isograph `client_field_name`).
 - Raw `IsographFieldDirectiveList` (not immediate serde into typed `*DirectiveSet`).
 - `Description` stores quotes included (upstream unquotes and dedents).
 - Empty optional lists are `None` (upstream empty `Vec` with a generated span).
@@ -186,7 +188,7 @@ Justified differences:
 
 ## What later stages own
 
-- Typed directive sets (`from_isograph_field_directives`, `EntrypointDirectiveSet`, `ScalarSelectionDirectiveSet`, …).
+- Typed directive sets (`from_isograph_field_directives`, `EntrypointDirectiveSet`, …).
 - Description unquote and block-string dedent.
 - Semantic tokens: semantic-tokens.md.
 - Extraction context (`const_export_name`, definition path, export check).
@@ -202,7 +204,8 @@ parsing-standards.md governs how every implementation below is written. Each doc
 
 1. `parse-variables.md`. Variable-declaration lists, `$name: Type = default` with `NonConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_nested_singleton`), and the `Box` delegation impl.
 2. `parse-type-dot-name.md`. Extract `Type.name` from entrypoint and field. No AST change.
-3. `optional-to.md`. Optional `to Type` on `ClientFieldDeclaration`. The keyword is `field`. Removes `UnsupportedDeclarationType`.
-4. `parse-directives.md`. `@name` and `@name(args)` on entrypoints, fields, and selections. Raw `IsographFieldDirectiveList`; typed sets are a later stage.
+3. `selectable-name-wrapper.md`. `SelectableNameWrapper` for entrypoint, field, and selection names. `FieldDeclaration`. `name` not `client_field_name`.
+4. `optional-to.md`. Optional `to Type` on `FieldDeclaration`. The keyword is `field`. Removes `UnsupportedDeclarationType`.
+5. `parse-directives.md`. `@name` and `@name(args)` on entrypoints, fields, and selections. Raw `IsographFieldDirectiveList`; typed sets are a later stage.
 
 Later: `parse-arrays.md`. `[ ... ]` list values. `token-kind-zst.md`. `NonBracketTokenKind` variants carry a ZST; matching yields proof passed into `parse_*`.

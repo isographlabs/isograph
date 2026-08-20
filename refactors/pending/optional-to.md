@@ -2,9 +2,9 @@
 
 `field Type.name [vars] [to type] [description] { set }`. Fields and pointers are one struct. `to` is optional syntax. The target is parse-variables.md's type annotation (`Pet`, `Pet!`, `[Pet]`, `[Pet!]!`, `[[Pet]]`). The keyword is `field`. There is no `pointer` keyword and no `ClientPointerDeclaration`. Removes `UnsupportedDeclarationType`.
 
-Lands after parse-type-dot-name.md. Type annotations are parse-variables.md's. Directives land in parse-directives.md.
+Lands after selectable-name-wrapper.md. Type annotations are parse-variables.md's. Directives land in parse-directives.md.
 
-Origin: `ClientPointerDeclaration` in `crates/isograph_lang_types/src/declarations/client_selectable_declaration.rs` and `parse_iso_client_pointer_declaration` in `crates/isograph_lang_parser/src/parse_iso_literal.rs`. Delta: the target sits on `ClientFieldDeclaration` as `target_type: Option<WithSpan<TypeAnnotation>>`; the name wrapper stays `ClientScalarSelectableNameWrapper`; no `const_export_name`, `definition_path`, `directives`, or `semantic_tokens`.
+Origin: `ClientPointerDeclaration` in `crates/isograph_lang_types/src/declarations/client_selectable_declaration.rs` and `parse_iso_client_pointer_declaration` in `crates/isograph_lang_parser/src/parse_iso_literal.rs`. Delta: the target sits on `FieldDeclaration` as `target_type: Option<WithSpan<TypeAnnotation>>`; the name is `SelectableNameWrapper`; no `const_export_name`, `definition_path`, `directives`, or `semantic_tokens`.
 
 ## The grammar this doc accepts
 
@@ -20,7 +20,7 @@ Pet    Pet!    [Pet]    [Pet!]!    [[Pet]]
 
 `consume_to_target` calls `parse_type_annotation`. A bracket group after `to` is a list type, not leftover.
 
-The `to` keyword is an identifier whose text is `to`. A position on `to` answers `ClientFieldDeclaration`. There is no `ToKeyword` node.
+The `to` keyword is an identifier whose text is `to`. A position on `to` answers `FieldDeclaration`. There is no `ToKeyword` node.
 
 `pointer` is not a declaration keyword. `parse_iso_literal_item`'s `_` arm reports `DeclarationKeyword` at that identifier, including `pointer`.
 
@@ -54,27 +54,27 @@ The `to` keyword is an identifier whose text is `to`. A position on `to` answers
         );
 ```
 
-## Changes to ClientFieldDeclaration
+## Changes to FieldDeclaration
 
-Origin: landed `ClientFieldDeclaration` in `crates/isograph_parser/src/parse_iso_literal.rs`, plus `variable_definitions` from parse-variables.md. Delta: `target_type`.
+Origin: selectable-name-wrapper.md after. Delta: `target_type`.
 
 Before:
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-pub struct ClientFieldDeclaration {
+pub struct FieldDeclaration {
     #[resolve_field]
-    #[parent_variant(ClientFieldDeclaration)]
+    #[parent_variant(FieldDeclaration)]
     pub parent_type: WithSpan<EntityNameWrapper>,
     #[resolve_field]
-    #[parent_variant(ClientFieldDeclaration)]
-    pub client_field_name: WithSpan<ClientScalarSelectableNameWrapper>,
+    #[parent_variant(FieldDeclaration)]
+    pub name: WithSpan<SelectableNameWrapper>,
     #[resolve_field]
     pub variable_definitions: Option<WithSpan<VariableDeclarationOrUsageList>>,
     #[resolve_field]
     pub description: Option<WithSpan<Description>>,
     #[resolve_field]
-    #[parent_variant(ClientFieldDeclaration)]
+    #[parent_variant(FieldDeclaration)]
     pub selection_set: WithSpan<SelectionSet>,
 }
 ```
@@ -83,22 +83,22 @@ After:
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-pub struct ClientFieldDeclaration {
+pub struct FieldDeclaration {
     #[resolve_field]
-    #[parent_variant(ClientFieldDeclaration)]
+    #[parent_variant(FieldDeclaration)]
     pub parent_type: WithSpan<EntityNameWrapper>,
     #[resolve_field]
-    #[parent_variant(ClientFieldDeclaration)]
-    pub client_field_name: WithSpan<ClientScalarSelectableNameWrapper>,
+    #[parent_variant(FieldDeclaration)]
+    pub name: WithSpan<SelectableNameWrapper>,
     #[resolve_field]
     pub variable_definitions: Option<WithSpan<VariableDeclarationOrUsageList>>,
     #[resolve_field]
-    #[parent_variant(ClientFieldDeclaration)]
+    #[parent_variant(FieldDeclaration)]
     pub target_type: Option<WithSpan<TypeAnnotation>>,
     #[resolve_field]
     pub description: Option<WithSpan<Description>>,
     #[resolve_field]
-    #[parent_variant(ClientFieldDeclaration)]
+    #[parent_variant(FieldDeclaration)]
     pub selection_set: WithSpan<SelectionSet>,
 }
 ```
@@ -109,19 +109,21 @@ pub struct ClientFieldDeclaration {
 // from crates/isograph_parser/src/parse_iso_literal.rs
 pub enum IsoLiteralItem {
     Entrypoint(EntrypointDeclaration),
-    Field(ClientFieldDeclaration),
+    Field(FieldDeclaration),
 }
 ```
 
-A field with `to` and a field without `to` are the same `ClientFieldDeclaration`. Variables, description, and `selection_set` are the same fields. Nested selections are the same `Selection` (`selection_set: Option`). `ClientScalarSelectableNameWrapper` is the declaration name on entrypoints and on fields, with or without `to`.
+A field with `to` and a field without `to` are the same `FieldDeclaration`. Variables, description, and `selection_set` are the same fields. Nested selections are the same `Selection` (`selection_set: Option`). `SelectableNameWrapper` is the declaration name on entrypoints and on fields, with or without `to`.
 
 ```rust
 // from crates/isograph_parser/src/selections.rs
 pub struct Selection {
     #[resolve_field]
-    pub reader_alias: Option<WithSpan<SelectionNameWrapper>>,
+    #[parent_variant(Selection)]
+    pub reader_alias: Option<WithSpan<SelectableNameWrapper>>,
     #[resolve_field]
-    pub name: WithSpan<SelectionNameWrapper>,
+    #[parent_variant(Selection)]
+    pub name: WithSpan<SelectableNameWrapper>,
     #[resolve_field]
     pub arguments: Option<WithSpan<ArgumentList>>,
     #[resolve_field]
@@ -130,7 +132,7 @@ pub struct Selection {
 }
 ```
 
-Origin: landed `Selection` in `crates/isograph_parser/src/selections.rs`. Delta: none.
+Origin: selectable-name-wrapper.md after. Delta: none.
 
 Parent enums stay:
 
@@ -138,29 +140,30 @@ Parent enums stay:
 // from crates/isograph_parser/src/parse_iso_literal.rs
 pub enum EntityNameWrapperParent<'a> {
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
-    ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
+    FieldDeclaration(FieldDeclarationPath<'a>),
     NamedTypeAnnotation(NamedTypeAnnotationPath<'a>),
 }
 
-pub enum ClientScalarSelectableNameWrapperParent<'a> {
+pub enum SelectableNameWrapperParent<'a> {
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
-    ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
+    FieldDeclaration(FieldDeclarationPath<'a>),
+    Selection(SelectionPath<'a>),
 }
 ```
 
 ```rust
 // from crates/isograph_parser/src/selections.rs
 pub enum SelectionSetParent<'a> {
-    ClientFieldDeclaration(crate::ClientFieldDeclarationPath<'a>),
+    FieldDeclaration(crate::FieldDeclarationPath<'a>),
     Selection(Box<SelectionPath<'a>>),
 }
 ```
 
-`VariableDeclarationOrUsageList` and `Description` stay parented by `ClientFieldDeclarationPath`. `SelectionNameWrapper` stays parented by `SelectionPath`. A target type name is `EntityNameWrapperParent::NamedTypeAnnotation`; `TypeAnnotationParent` gains `ClientFieldDeclaration` below. parse-directives.md hangs one `IsographFieldDirectiveList` on `ClientFieldDeclaration`, after `target_type`.
+`VariableDeclarationOrUsageList` and `Description` stay parented by `FieldDeclarationPath`. A target type name is `EntityNameWrapperParent::NamedTypeAnnotation`; `TypeAnnotationParent` gains `FieldDeclaration` below. parse-directives.md hangs one `IsographFieldDirectiveList` on `FieldDeclaration`, after `target_type`.
 
 ## Changes to TypeAnnotationParent
 
-Origin: parse-variables.md. Delta: `ClientFieldDeclaration`.
+Origin: parse-variables.md. Delta: `FieldDeclaration`.
 
 Before:
 
@@ -179,7 +182,7 @@ After:
 pub enum TypeAnnotationParent<'a> {
     Variable(VariableDeclarationOrUsagePath<'a>),
     List(Box<ListTypeAnnotationPath<'a>>),
-    ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
+    FieldDeclaration(FieldDeclarationPath<'a>),
 }
 ```
 
@@ -218,7 +221,7 @@ The test `field_and_pointer_declarations_do_not_parse_yet` is deleted.
 
 ## Changes to parse_type_dot_name
 
-Origin: parse-type-dot-name.md after. Delta: `N` is `SelectableName`. Both callers still `.map(ClientScalarSelectableNameWrapper)`.
+Origin: parse-type-dot-name.md after. Delta: `N` is `SelectableName`. Both callers still `.map(SelectableNameWrapper)`.
 
 Before:
 
@@ -272,7 +275,7 @@ fn parse_type_dot_name(
 
 ## Changes to parse_field
 
-Origin: parse-type-dot-name.md after. Delta: `consume_to_target` between the variable list and the description.
+Origin: selectable-name-wrapper.md after. Delta: `consume_to_target` between the variable list and the description.
 
 `use crate` in parse_iso_literal.rs gains `ChunkContentItem`, `NonBracketToken`, `parse_type_annotation`.
 
@@ -282,14 +285,14 @@ Before:
 // from crates/isograph_parser/src/parse_iso_literal.rs
 fn parse_field(
     cursor: &mut ItemCursor<'_>,
-) -> Result<ClientFieldDeclaration, WithSpan<ParseError>> {
-    let (parent_type, client_field_name) = parse_type_dot_name(cursor)?;
+) -> Result<FieldDeclaration, WithSpan<ParseError>> {
+    let (parent_type, name) = parse_type_dot_name(cursor)?;
     let variable_definitions = consume_variable_declaration_list(cursor);
     let description = consume_description(cursor);
     let selection_set = require_selection_set(cursor)?;
-    ClientFieldDeclaration {
+    FieldDeclaration {
         parent_type,
-        client_field_name: client_field_name.map(ClientScalarSelectableNameWrapper),
+        name: name.map(SelectableNameWrapper),
         variable_definitions,
         description,
         selection_set,
@@ -304,15 +307,15 @@ After:
 // from crates/isograph_parser/src/parse_iso_literal.rs
 fn parse_field(
     cursor: &mut ItemCursor<'_>,
-) -> Result<ClientFieldDeclaration, WithSpan<ParseError>> {
-    let (parent_type, client_field_name) = parse_type_dot_name(cursor)?;
+) -> Result<FieldDeclaration, WithSpan<ParseError>> {
+    let (parent_type, name) = parse_type_dot_name(cursor)?;
     let variable_definitions = consume_variable_declaration_list(cursor);
     let target_type = consume_to_target(cursor)?;
     let description = consume_description(cursor);
     let selection_set = require_selection_set(cursor)?;
-    ClientFieldDeclaration {
+    FieldDeclaration {
         parent_type,
-        client_field_name: client_field_name.map(ClientScalarSelectableNameWrapper),
+        name: name.map(SelectableNameWrapper),
         variable_definitions,
         target_type,
         description,
@@ -361,7 +364,7 @@ A non-`to` identifier is not consumed. `field Query.Foo Owner { id }` fails at `
 
 ## The resolution surface
 
-No new `IsographResolutionNode` variants. A position on `to` answers `ClientFieldDeclaration`. A target type name answers `EntityNameWrapper` with `EntityNameWrapperParent::NamedTypeAnnotation` whose `TypeAnnotationParent` is `ClientFieldDeclaration`. A field without `to` has `target_type: None`.
+No new `IsographResolutionNode` variants. A position on `to` answers `FieldDeclaration`. A target type name answers `EntityNameWrapper` with `EntityNameWrapperParent::NamedTypeAnnotation` whose `TypeAnnotationParent` is `FieldDeclaration`. A field without `to` has `target_type: None`.
 
 ## Tests
 
@@ -382,11 +385,11 @@ No new `IsographResolutionNode` variants. A position on `to` answers `ClientFiel
         assert_eq!(errors, vec![]);
         let declaration = as_field(parse.reference());
         assert_eq!(
-            declaration.client_field_name.item,
-            ClientScalarSelectableNameWrapper("BestFriend".intern().to())
+            declaration.name.item,
+            SelectableNameWrapper("BestFriend".intern().to())
         );
         assert_eq!(
-            declaration.client_field_name.location,
+            declaration.name.location,
             span_of(text, "BestFriend")
         );
         let target = declaration
@@ -554,13 +557,13 @@ No new `IsographResolutionNode` variants. A position on `to` answers `ClientFiel
         let text = "field Pet.BestFriend to Owner { id }";
         let (parse, _) = parsed(text);
         match parse.resolve((), span_of(text, "to")) {
-            IsographResolutionNode::ClientFieldDeclaration(_) => {}
+            IsographResolutionNode::FieldDeclaration(_) => {}
             node => panic!("expected the declaration at `to`, got {node:?}"),
         }
         match parse.resolve((), span_of(text, "BestFriend")) {
-            IsographResolutionNode::ClientScalarSelectableNameWrapper(name) => {
+            IsographResolutionNode::SelectableNameWrapper(name) => {
                 match name.parent {
-                    ClientScalarSelectableNameWrapperParent::ClientFieldDeclaration(
+                    SelectableNameWrapperParent::FieldDeclaration(
                         declaration,
                     ) => {
                         assert_eq!(
@@ -580,7 +583,7 @@ No new `IsographResolutionNode` variants. A position on `to` answers `ClientFiel
         match parse.resolve((), span_of(text, "Owner")) {
             IsographResolutionNode::EntityNameWrapper(name) => match name.parent {
                 EntityNameWrapperParent::NamedTypeAnnotation(named) => match named.parent {
-                    TypeAnnotationParent::ClientFieldDeclaration(_) => {}
+                    TypeAnnotationParent::FieldDeclaration(_) => {}
                     parent => panic!("expected the field as type parent, got {parent:?}"),
                 },
                 parent => panic!("expected a named type annotation, got {parent:?}"),
@@ -588,12 +591,15 @@ No new `IsographResolutionNode` variants. A position on `to` answers `ClientFiel
             node => panic!("expected the type name leaf, got {node:?}"),
         }
         match parse.resolve((), span_of(text, "id")) {
-            IsographResolutionNode::SelectionNameWrapper(name) => {
-                match name.parent.parent.parent.parent {
-                    SelectionSetParent::ClientFieldDeclaration(_) => {}
-                    parent => panic!("expected the field at the top, got {parent:?}"),
+            IsographResolutionNode::SelectableNameWrapper(name) => match name.parent {
+                SelectableNameWrapperParent::Selection(selection) => {
+                    match selection.parent.parent.parent {
+                        SelectionSetParent::FieldDeclaration(_) => {}
+                        parent => panic!("expected the field at the top, got {parent:?}"),
+                    }
                 }
-            }
+                parent => panic!("expected a selection parent, got {parent:?}"),
+            },
             node => panic!("expected the selection name leaf, got {node:?}"),
         }
     }

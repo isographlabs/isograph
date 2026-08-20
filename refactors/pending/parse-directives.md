@@ -2,7 +2,7 @@
 
 Lands after optional-to.md. Every host that isograph attaches directives to already exists: entrypoints, fields (with or without `to`), and selections. isograph's pointer site is the field site after `to`.
 
-The grammar stage stores the raw `@name` form. Typed sets (`EntrypointDirectiveSet`, `ScalarSelectionDirectiveSet`, `ClientScalarSelectableDirectiveSet`, …) are a later stage. Unknown names parse.
+The grammar stage stores the raw `@name` form. Typed sets (`EntrypointDirectiveSet`, …) are a later stage. Unknown names parse.
 
 ## The grammar this doc accepts
 
@@ -20,7 +20,7 @@ Sites, matching `crates/isograph_lang_parser/src/parse_iso_literal.rs`:
 - field: after variable definitions and optional `to` type, before the description
 - selection: after arguments, before the nested selection set
 
-A line break before `@` ends the host chunk. `bar @loadable` is one selection. `bar\n@loadable` is a scalar `bar` plus a failed selection at `@`. That is language change 1 in parsing-plan.md.
+A line break before `@` ends the host chunk. `bar @loadable` is one selection. `bar\n@loadable` is a selection `bar` plus a failed selection at `@`. That is language change 1 in parsing-plan.md.
 
 ## Change 1: `directives.rs`
 
@@ -63,7 +63,7 @@ pub struct IsographDirectiveNameWrapper(common_lang_types::IsographDirectiveName
 #[derive(Debug)]
 pub enum IsographFieldDirectiveListParent<'a> {
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
-    ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
+    FieldDeclaration(FieldDeclarationPath<'a>),
     Selection(SelectionPath<'a>),
 }
 
@@ -179,9 +179,11 @@ Entrypoint. Origin field name: `directive_set`.
 // from crates/isograph_parser/src/parse_iso_literal.rs
 pub struct EntrypointDeclaration {
     #[resolve_field]
+    #[parent_variant(EntrypointDeclaration)]
     pub parent_type: WithSpan<EntityNameWrapper>,
     #[resolve_field]
-    pub client_field_name: WithSpan<ClientScalarSelectableNameWrapper>,
+    #[parent_variant(EntrypointDeclaration)]
+    pub name: WithSpan<SelectableNameWrapper>,
     #[resolve_field]
     #[parent_variant(EntrypointDeclaration)]
     pub directive_set: Option<WithSpan<IsographFieldDirectiveList>>,
@@ -190,12 +192,11 @@ pub struct EntrypointDeclaration {
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
+    let (parent_type, name) = parse_type_dot_name(cursor)?;
     let directive_set = consume_directives(cursor)?;
     EntrypointDeclaration {
-        parent_type: parent_type.interned().map(EntityNameWrapper),
-        client_field_name: client_field_name
-            .interned()
-            .map(ClientScalarSelectableNameWrapper),
+        parent_type,
+        name: name.map(SelectableNameWrapper),
         directive_set,
     }
     .wrap_ok()
@@ -210,13 +211,13 @@ Field. Origin field name: `directive_set`.
     #[resolve_field]
     pub variable_definitions: Option<WithSpan<VariableDeclarationOrUsageList>>,
     #[resolve_field]
-    #[parent_variant(ClientFieldDeclaration)]
+    #[parent_variant(FieldDeclaration)]
     pub target_type: Option<WithSpan<TypeAnnotation>>,
     #[resolve_field]
-    #[parent_variant(ClientFieldDeclaration)]
+    #[parent_variant(FieldDeclaration)]
     pub directive_set: Option<WithSpan<IsographFieldDirectiveList>>,
     #[resolve_field]
-    #[parent_variant(ClientFieldDeclaration)]
+    #[parent_variant(FieldDeclaration)]
     pub description: Option<WithSpan<Description>>,
 ```
 
@@ -228,15 +229,17 @@ Field. Origin field name: `directive_set`.
     let selection_set = require_selection_set(cursor)?;
 ```
 
-Selections. Upstream deserializes immediately into typed scalar/object directive sets. This stage stores the raw list on `Selection`.
+Selections. Upstream deserializes immediately into typed directive sets. This stage stores the raw list on `Selection`.
 
 ```rust
 // from crates/isograph_parser/src/selections.rs
 pub struct Selection {
     #[resolve_field]
-    pub reader_alias: Option<WithSpan<SelectionNameWrapper>>,
+    #[parent_variant(Selection)]
+    pub reader_alias: Option<WithSpan<SelectableNameWrapper>>,
     #[resolve_field]
-    pub name: WithSpan<SelectionNameWrapper>,
+    #[parent_variant(Selection)]
+    pub name: WithSpan<SelectableNameWrapper>,
     #[resolve_field]
     #[parent_variant(Selection)]
     pub arguments: Option<WithSpan<ArgumentList>>,
@@ -430,7 +433,7 @@ A position on `@` answers `IsographFieldDirective` (the `@` span is part of the 
             IsographResolutionNode::IsographDirectiveNameWrapper(name) => {
                 match name.parent.parent.parent {
                     IsographFieldDirectiveListParent::Selection(_) => {}
-                    parent => panic!("expected a scalar directive list, got {parent:?}"),
+                    parent => panic!("expected a selection directive list, got {parent:?}"),
                 }
             }
             node => panic!("expected the directive name leaf, got {node:?}"),
