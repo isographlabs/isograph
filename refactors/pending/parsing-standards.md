@@ -292,7 +292,7 @@ A group plus its interior is `consume_group_if` or `require_group` with a functi
 
 ## Dispatch
 
-When the next item may start several forms, peek, `commit`, then parse with the cursor and the committed item. The last arm is `expected`. If those arms are one value, the match is inside `spanning`. A form used without a peek (`require_variable_name`) requires its first token then calls the same rest parse.
+When the next item may start several forms, peek without `commit` to choose a parse function that requires its first token. The last arm is `expected`. If those arms are one value, the match is inside `spanning`.
 
 `parse_non_constant_value`'s object arm is `{ ... }`. The same `name : value` list in `( ... )` is `consume_argument_list`, not a value.
 
@@ -305,46 +305,43 @@ pub(crate) fn parse_non_constant_value(
         if let Some(peek) = cursor.peek() {
             match peek.view().item.reference() {
                 ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::Dollar)) => {
-                    peek.commit(SemanticToken::Variable);
-                    return NonConstantValue::Variable(VariableUse(parse_variable_name(cursor)?))
-                        .wrap_ok();
+                    return NonConstantValue::Variable(VariableUse(parse_variable_name(
+                        cursor,
+                        Expectation::Token(NonBracketTokenKind::Dollar),
+                    )?))
+                    .wrap_ok();
                 }
                 ChunkContentItem::NonBracket(NonBracketToken(
                     NonBracketTokenKind::StringLiteral,
                 )) => {
-                    let item = peek.commit(SemanticToken::String);
-                    return NonConstantValue::String(parse_string_literal(cursor, item)).wrap_ok();
+                    return NonConstantValue::String(parse_string_literal(cursor)?).wrap_ok();
                 }
                 ChunkContentItem::NonBracket(NonBracketToken(
                     NonBracketTokenKind::IntegerLiteral,
                 )) => {
-                    let item = peek.commit(SemanticToken::Integer);
-                    return NonConstantValue::Integer(parse_integer_value(cursor, item)?).wrap_ok();
+                    return NonConstantValue::Integer(parse_integer_value(cursor)?).wrap_ok();
                 }
                 ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::Identifier)) => {
-                    let item = peek.commit(SemanticToken::BooleanOrNull);
-                    return parse_boolean_or_null(cursor, item);
+                    return parse_boolean_or_null(cursor);
+                }
+                ChunkContentItem::Group(group)
+                    if group.opening.item.0 == BracketKind::Brace =>
+                {
+                    return NonConstantValue::Object(parse_object_literal(cursor)?).wrap_ok();
                 }
                 _ => {}
             }
-        }
-        if let Some(object) = cursor.consume_group_if(
-            BracketKind::Brace,
-            SemanticToken::Brace,
-            parse_object_literal,
-        ) {
-            return NonConstantValue::Object(object.item).wrap_ok();
         }
         cursor.expected(Expectation::Value).wrap_err()
     })
 }
 ```
 
-`VariableUse` stores the interned name. A position on `$` answers `VariableUse`. There is no `Dollar` field. `string_key_newtype!` implements `From<StringKey>` for the inner lang types. Parser wrappers do not add a second `From`. Construction is `name.interned().map(VariableNameWrapper)`. A selection's name and `reader_alias` are `SelectionNameWrapper` over `SelectableName`. A field declaration's name is `ClientScalarSelectableNameWrapper`. A pointer declaration's name is `ClientObjectSelectableNameWrapper`. The integer arm is `item.text(cursor).parse()`. `parse::<i64>()` on an `IntegerLiteral` token (`-?(0|[1-9][0-9]*)`) fails only as overflow or underflow. Variable defaults call this same function.
+`VariableUse` stores the interned name. A position on `$` answers `VariableUse`. There is no `Dollar` field. `string_key_newtype!` implements `From<StringKey>` for the inner lang types. Parser wrappers do not add a second `From`. Construction is `name.interned().map(VariableNameWrapper)`. A selection's name and `reader_alias` are `SelectionNameWrapper` over `SelectableName`. A field declaration's name is `ClientScalarSelectableNameWrapper`. A pointer declaration's name is `ClientObjectSelectableNameWrapper`. The integer arm is `span.text().parse()` on the token `require_token(IntegerLiteral)` just returned. `parse::<i64>()` on an `IntegerLiteral` token (`-?(0|[1-9][0-9]*)`) fails only as overflow or underflow. Variable defaults call this same function.
 
 Keyword text after `require_token(Identifier, token)` or `consume_token_if(Identifier, token)`: `match` on `text()` (`"entrypoint"` / `"field"` / `"pointer"`; `"true"` / `"false"` / `"null"`; `"to"`).
 
-One optional item is `consume_*`. Two optional kinds in one position is two `consume_token_if` calls. The optional `!` after a type name is `consume_token_if(Exclamation, SemanticToken::GraphQLTypeName)`: the next item may be the caller's `=`. `$name` after a committed `$` is `parse_variable_name(cursor)`; without a peek it is `require_variable_name`. After `require_token` on an identifier, `consume_token_if(Colon, SemanticToken::Colon)` is the alias; both arms use the identifier.
+One optional item is `consume_*`. Two optional kinds in one position is two `consume_token_if` calls. The optional `!` after a type name is `consume_token_if(Exclamation, SemanticToken::GraphQLTypeName)`: the next item may be the caller's `=`. `$name` is `parse_variable_name(cursor, missing_dollar)`. After `require_token` on an identifier, `consume_token_if(Colon, SemanticToken::Colon)` is the alias; both arms use the identifier.
 
 ```rust
     let first = cursor
@@ -508,7 +505,7 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 - Nested list stream: `ItemCursor::stream_chunk`
 - Group interior: `require_group` / `consume_group_if` with a function that parses the inside; close is recorded when that function returns.
 - lhs, colon, rhs: `parse_name_colon(cursor, parse_lhs, parse_rhs)` → `(L, R)`
-- `$ ident` after `$` is committed: `parse_variable_name(cursor)`; without a peek: `require_variable_name`
+- `$ ident`: `parse_variable_name(cursor, missing_dollar)`
 
 ## Shipping and amending
 
@@ -520,8 +517,8 @@ Each grammar feature lands on this surface.
 - parse-selection-sets.md: selections, selection sets, arguments on selections
 - parse-fields.md: `field Type.name { ... }` via `require_selection_set`
 - parse-name-colon.md: `parse_name_colon(parse_lhs, parse_rhs)`
-- peek-then-parse.md: peek, `commit`, parse with the cursor and the item; `parse_variable_name` requires the identifier
-- parse-variables.md: `require_variable_name`, `parse_type_annotation`, `parse_singleton` on `[...]`, `NonConstantValueParent::VariableDefault`, `Box<T>` delegation in `resolve_position`
+- peek-then-parse.md: peek without `commit`, parse function requires the first token; `parse_variable_name` requires `$` then the identifier
+- parse-variables.md: `parse_type_annotation`, `parse_singleton` on `[...]`, `NonConstantValueParent::VariableDefault`, `Box<T>` delegation in `resolve_position`
 - parse-descriptions.md: description via two `consume_token_if`
 - token-text.md: `TokenText` from `consume_token_if` / `require_token`; `text` and `interned` on that value
 - parse-pointers.md: `to` via `require_token(Identifier)` and `text()`

@@ -1,6 +1,6 @@
 # parse-variables: variable declarations and type annotations
 
-Field declarations gain variable-declaration lists. Type annotations land here; parse-pointers.md reuses them for `to` targets. Defaults call parse-arguments.md's `parse_non_constant_value`. `$name: Type` is `parse_name_colon` with `require_variable_name` and `parse_type_annotation`. Lands after peek-then-parse.md.
+Field declarations gain variable-declaration lists. Type annotations land here; parse-pointers.md reuses them for `to` targets. Defaults call parse-arguments.md's `parse_non_constant_value`. `$name: Type` is `parse_name_colon` with `parse_variable_name` and `parse_type_annotation`. Lands after peek-then-parse.md.
 
 ## The grammar this doc accepts
 
@@ -22,24 +22,7 @@ Pet    Pet!    [Pet]    [Pet!]!    [[Pet]]
 
 A default value is a `NonConstantValue`. `$` is a variable use, including nested in an object.
 
-## Change 1: `require_variable_name`
-
-peek-then-parse.md's `parse_variable_name` requires the identifier after `$` is already committed. A declaration did not peek. This function requires `$` then calls `parse_variable_name`. No AST type, path alias, or `IsographResolutionNode` variant changes.
-
-```rust
-// from crates/isograph_parser/src/arguments.rs
-pub(crate) fn require_variable_name(
-    cursor: &mut ItemCursor<'_>,
-    missing_dollar: Expectation,
-) -> Result<WithSpan<VariableNameWrapper>, WithSpan<ParseError>> {
-    cursor
-        .require_token(NonBracketTokenKind::Dollar, SemanticToken::Variable)
-        .map_err(|()| cursor.expected(missing_dollar))?;
-    parse_variable_name(cursor)
-}
-```
-
-## Change 2: `Box` delegation in resolve_position
+## Change 1: `Box` delegation in resolve_position
 
 ```rust
 // from crates/resolve_position/src/lib.rs
@@ -59,7 +42,7 @@ impl<T: ResolvePosition> ResolvePosition for Box<T> {
 }
 ```
 
-## Change 3: `Expectation`
+## Change 2: `Expectation`
 
 ```rust
 // from crates/isograph_parser/src/parse_error.rs
@@ -71,7 +54,7 @@ impl<T: ResolvePosition> ResolvePosition for Box<T> {
     EndOfType,
 ```
 
-## Change 4: `ItemCursor::parse_nested_singleton`
+## Change 3: `ItemCursor::parse_nested_singleton`
 
 `parse_singleton` takes `text`, `tokens`, and `errors`. A nested `[...]` is parsed from a cursor that already holds those. This method forwards.
 
@@ -117,7 +100,7 @@ use crate::{
     BracketKind, ChunkedLevel, ClientFieldDeclarationPath, EntityNameWrapper,
     Expectation, Found, IsographResolutionNode, NonBracketTokenKind, NonConstantValue, ParseError,
     SemanticToken, Slot, UnparsedChunkItems, VariableNameWrapper, parse_name_colon,
-    parse_non_constant_value, require_variable_name,
+    parse_non_constant_value, parse_variable_name,
 };
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -316,7 +299,7 @@ fn parse_variable_declaration(
 ) -> Result<VariableDeclarationOrUsage, WithSpan<ParseError>> {
     let (name, type_) = parse_name_colon(
         cursor,
-        |cursor| require_variable_name(cursor, Expectation::VariableDeclarationOrUsage),
+        |cursor| parse_variable_name(cursor, Expectation::VariableDeclarationOrUsage),
         parse_type_annotation,
     )?;
     let default_value = match cursor.consume_token_if(NonBracketTokenKind::Equals, SemanticToken::Equals)
@@ -729,7 +712,6 @@ The boxed recursive field uses the `Box<T>` blanket. `VariableDeclarationOrUsage
 
 ## Landing checklist
 
-1. `require_variable_name`; `cargo test -p isograph_parser` passes.
-2. The `Box<T>` blanket; `cargo test -p resolve_position` passes.
-3. `parse_nested_singleton`, variables.rs, the `NonConstantValueParent::VariableDefault` variant, the `ClientFieldDeclaration` slot, the resolution-node variants, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
-4. Move this doc to refactors/past.
+1. The `Box<T>` blanket; `cargo test -p resolve_position` passes.
+2. `parse_nested_singleton`, variables.rs, the `NonConstantValueParent::VariableDefault` variant, the `ClientFieldDeclaration` slot, the resolution-node variants, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+3. Move this doc to refactors/past.
