@@ -8,7 +8,9 @@
 pointer <Identifier> . <Identifier> [<paren group>] to <type> [<description>] <brace group>
 ```
 
-The `to` keyword is an identifier whose text is `to`. The target type is a type annotation. Variable definitions, the description, and the selection set behave as on field declarations.
+The `to` keyword is an identifier whose text is `to`. The target type is a type annotation. Variable definitions, the description, and the selection set behave as on field declarations. Directives land in parse-directives.md.
+
+Origin: `ClientPointerDeclaration` in `crates/isograph_lang_types/src/declarations/client_selectable_declaration.rs` and `parse_iso_client_pointer_declaration` in `crates/isograph_lang_parser/src/parse_iso_literal.rs`. Delta: no `const_export_name`, `definition_path`, `directives`, or `semantic_tokens`. The name wrapper is `ClientObjectSelectableNameWrapper`.
 
 ## Changes to parse_error.rs
 
@@ -34,9 +36,9 @@ pub enum IsoLiteralItem {
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-        "field" => IsoLiteralItem::Field(parse_field(cursor, push_error)?).wrap_ok(),
+        "field" => IsoLiteralItem::Field(parse_field(cursor)?).wrap_ok(),
         "pointer" => ParseError::UnsupportedDeclarationType
-            .with_span(keyword)
+            .with_span(keyword.location)
             .wrap_err(),
 ```
 
@@ -53,8 +55,8 @@ pub enum IsoLiteralItem {
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-        "field" => IsoLiteralItem::Field(parse_field(cursor, push_error)?).wrap_ok(),
-        "pointer" => IsoLiteralItem::Pointer(parse_pointer(cursor, push_error)?).wrap_ok(),
+        "field" => IsoLiteralItem::Field(parse_field(cursor)?).wrap_ok(),
+        "pointer" => IsoLiteralItem::Pointer(parse_pointer(cursor)?).wrap_ok(),
 ```
 
 The test `field_and_pointer_declarations_do_not_parse_yet` is deleted.
@@ -62,90 +64,76 @@ The test `field_and_pointer_declarations_do_not_parse_yet` is deleted.
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = IsoLiteralSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ClientPointerDeclaration {
     #[resolve_field]
-    #[parent_variant(Pointer)]
-    pub parent_type: WithSpan<EntityName>,
+    #[parent_variant(ClientPointerDeclaration)]
+    pub parent_type: WithSpan<EntityNameWrapper>,
     #[resolve_field]
-    pub client_pointer_name: WithSpan<ClientPointerName>,
+    pub client_pointer_name: WithSpan<ClientObjectSelectableNameWrapper>,
     #[resolve_field]
-    #[parent_variant(Pointer)]
+    #[parent_variant(ClientPointerDeclaration)]
     pub variable_definitions: Option<WithSpan<VariableDeclarationList>>,
     #[resolve_field]
     #[parent_variant(PointerTarget)]
     pub target_type: WithSpan<TypeAnnotation>,
     #[resolve_field]
-    #[parent_variant(Pointer)]
+    #[parent_variant(ClientPointerDeclaration)]
     pub description: Option<WithSpan<Description>>,
     #[resolve_field]
-    #[parent_variant(Pointer)]
+    #[parent_variant(ClientPointerDeclaration)]
     pub selection_set: WithSpan<SelectionSet>,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ClientPointerDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ClientPointerName(common_lang_types::SelectableName);
-
-impl From<intern::string_key::StringKey> for ClientPointerName {
-    fn from(key: intern::string_key::StringKey) -> Self {
-        ClientPointerName(key.to())
-    }
-}
+pub struct ClientObjectSelectableNameWrapper(common_lang_types::SelectableName);
 
 pub type ClientPointerDeclarationPath<'a> =
-    PositionResolutionPath<&'a ClientPointerDeclaration, IsoLiteralParsePath<'a>>;
+    PositionResolutionPath<&'a ClientPointerDeclaration, IsoLiteralSlotPath<'a>>;
 
-pub type ClientPointerNamePath<'a> =
-    PositionResolutionPath<&'a ClientPointerName, ClientPointerDeclarationPath<'a>>;
+pub type ClientObjectSelectableNameWrapperPath<'a> = PositionResolutionPath<
+    &'a ClientObjectSelectableNameWrapper,
+    ClientPointerDeclarationPath<'a>,
+>;
 ```
 
-There is no `PointerKeyword` and no `ToKeyword`. A position on `pointer` or `to` answers `ClientPointerDeclaration`.
+There is no `PointerKeyword` and no `ToKeyword` node. A position on `pointer` or `to` answers `ClientPointerDeclaration`.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-fn parse_pointer<F>(
+fn parse_pointer(
     cursor: &mut ItemCursor<'_>,
-    push_error: &mut F,
-) -> Result<ClientPointerDeclaration, WithSpan<ParseError>>
-where
-    F: FnMut(WithSpan<ParseError>),
-{
+) -> Result<ClientPointerDeclaration, WithSpan<ParseError>> {
     let parent_type = cursor
-        .require_token(NonBracketTokenKind::Identifier)
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::Type)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
     cursor
-        .require_token(NonBracketTokenKind::Period)
+        .require_token(NonBracketTokenKind::Period, SemanticToken::Period)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Period)))?;
     let client_pointer_name = cursor
-        .require_token(NonBracketTokenKind::Identifier)
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
-    let variable_definitions = consume_variable_declaration_list(cursor, push_error);
+    let variable_definitions = consume_variable_declaration_list(cursor);
     let to_keyword = cursor
-        .require_token(NonBracketTokenKind::Identifier)
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::Keyword)
         .map_err(|()| cursor.expected(Expectation::ToKeyword))?;
-    if cursor.token_text(to_keyword) != "to" {
+    if to_keyword.token_text() != "to" {
         return ParseError::expected(
             Expectation::ToKeyword,
             Found::Token(NonBracketTokenKind::Identifier),
         )
-        .with_span(to_keyword)
+        .with_span(to_keyword.location)
         .wrap_err();
     }
-    let target_type = parse_type_annotation(cursor, push_error)?;
+    let target_type = parse_type_annotation(cursor)?;
     let description = consume_description(cursor);
-    let selection_set = require_selection_set(cursor, push_error)?;
+    let selection_set = require_selection_set(cursor)?;
     ClientPointerDeclaration {
-        parent_type: cursor
-            .token_text(parent_type)
-            .intern()
-            .to::<EntityName>()
-            .with_span(parent_type),
-        client_pointer_name: cursor
-            .token_text(client_pointer_name)
-            .intern()
-            .to::<ClientPointerName>()
-            .with_span(client_pointer_name),
+        parent_type: parent_type.interned().map(EntityNameWrapper),
+        client_pointer_name: client_pointer_name
+            .interned()
+            .map(ClientObjectSelectableNameWrapper),
         variable_definitions,
         target_type,
         description,
@@ -157,8 +145,8 @@ where
 
 ## The parent-enum conversions
 
-1. `EntityNameParent` gains `Pointer(ClientPointerDeclarationPath<'a>)`.
-2. `SelectionSetParent` gains `Pointer(ClientPointerDeclarationPath<'a>)`.
+1. `EntityNameWrapperParent` gains `ClientPointerDeclaration(ClientPointerDeclarationPath<'a>)`.
+2. `SelectionSetParent` gains `ClientPointerDeclaration(ClientPointerDeclarationPath<'a>)`.
 3. `TypeAnnotationParent` gains `PointerTarget(ClientPointerDeclarationPath<'a>)`.
 4. `VariableDeclarationList` and `Description` parents become enums:
 
@@ -166,33 +154,37 @@ where
 // from crates/isograph_parser/src/variables.rs
 #[derive(Debug)]
 pub enum VariableDeclarationListParent<'a> {
-    Field(ClientFieldDeclarationPath<'a>),
-    Pointer(ClientPointerDeclarationPath<'a>),
+    ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
+    ClientPointerDeclaration(ClientPointerDeclarationPath<'a>),
 }
 
 pub type VariableDeclarationListPath<'a> =
     PositionResolutionPath<&'a VariableDeclarationList, VariableDeclarationListParent<'a>>;
 ```
 
+Origin: `VariableDeclarationParentType` in isograph. The i2 enum is on the list wrapper, not on each `VariableDeclaration`.
+
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
 #[derive(Debug)]
 pub enum DescriptionParent<'a> {
-    Field(ClientFieldDeclarationPath<'a>),
-    Pointer(ClientPointerDeclarationPath<'a>),
+    ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
+    ClientPointerDeclaration(ClientPointerDeclarationPath<'a>),
 }
 
 pub type DescriptionPath<'a> = PositionResolutionPath<&'a Description, DescriptionParent<'a>>;
 ```
 
-`ClientFieldDeclaration`'s `variable_definitions` and `description` fields respell to `#[resolve_field]` + `#[parent_variant(Field)]`.
+Origin: `DescriptionParent` in `string_key_wrappers.rs`. Variant names match.
+
+`ClientFieldDeclaration`'s `variable_definitions` and `description` fields respell to `#[resolve_field]` + `#[parent_variant(ClientFieldDeclaration)]`. `VariableDeclarationList`'s `parent_type` becomes `VariableDeclarationListParent`. `Description`'s `parent_type` becomes `DescriptionParent`.
 
 ## The resolution surface
 
 ```rust
 // from crates/isograph_parser/src/isograph_resolution_node.rs
     ClientPointerDeclaration(ClientPointerDeclarationPath<'a>),
-    ClientPointerName(ClientPointerNamePath<'a>),
+    ClientObjectSelectableNameWrapper(ClientObjectSelectableNameWrapperPath<'a>),
 ```
 
 ## Tests
@@ -227,7 +219,7 @@ pub type DescriptionPath<'a> = PositionResolutionPath<&'a Description, Descripti
         let declaration = as_pointer(parse.reference());
         assert_eq!(
             declaration.client_pointer_name.item,
-            "BestFriend".intern().to()
+            ClientObjectSelectableNameWrapper("BestFriend".intern().to())
         );
         assert_eq!(
             declaration.client_pointer_name.location,
@@ -296,7 +288,7 @@ pub type DescriptionPath<'a> = PositionResolutionPath<&'a Description, Descripti
         let text = "pointer Pet.BestFriend to Owner { id }";
         let (parse, _) = parsed(text);
         match parse.resolve((), span_of(text, "BestFriend")) {
-            IsographResolutionNode::ClientPointerName(name) => {
+            IsographResolutionNode::ClientObjectSelectableNameWrapper(name) => {
                 assert_eq!(
                     name.parent.inner.target_type.location,
                     span_of(text, "Owner")
@@ -305,20 +297,25 @@ pub type DescriptionPath<'a> = PositionResolutionPath<&'a Description, Descripti
             node => panic!("expected the pointer name leaf, got {node:?}"),
         }
         match parse.resolve((), span_of(text, "Owner")) {
-            IsographResolutionNode::TypeName(name) => match name.parent.parent.reference() {
-                TypeAnnotationParent::PointerTarget(_) => {}
-                parent => panic!("expected the pointer-target parent, got {parent:?}"),
+            IsographResolutionNode::EntityNameWrapper(name) => match name.parent {
+                EntityNameWrapperParent::NamedTypeAnnotation(named) => {
+                    match named.parent.reference() {
+                        TypeAnnotationParent::PointerTarget(_) => {}
+                        parent => panic!("expected the pointer-target parent, got {parent:?}"),
+                    }
+                }
+                parent => panic!("expected a named type annotation, got {parent:?}"),
             },
             node => panic!("expected the type name leaf, got {node:?}"),
         }
         match parse.resolve((), span_of(text, "id")) {
-            IsographResolutionNode::SelectionName(name) => {
+            IsographResolutionNode::SelectableNameWrapper(name) => {
                 let scalar = match name.parent {
-                    SelectionNameParent::Scalar(scalar) => scalar,
+                    SelectableNameWrapperParent::Scalar(scalar) => scalar,
                     parent => panic!("expected a scalar parent, got {parent:?}"),
                 };
-                match scalar.parent {
-                    SelectionSetParent::Pointer(_) => {}
+                match scalar.parent.parent.parent {
+                    SelectionSetParent::ClientPointerDeclaration(_) => {}
                     parent => panic!("expected the pointer at the top, got {parent:?}"),
                 }
             }
