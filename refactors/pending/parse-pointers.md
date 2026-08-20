@@ -118,7 +118,7 @@ fn parse_pointer(
     let to_keyword = cursor
         .require_token(NonBracketTokenKind::Identifier, SemanticToken::Keyword)
         .map_err(|()| cursor.expected(Expectation::ToKeyword))?;
-    if to_keyword.token_text() != "to" {
+    if to_keyword.text() != "to" {
         return ParseError::expected(
             Expectation::ToKeyword,
             Found::Token(NonBracketTokenKind::Identifier),

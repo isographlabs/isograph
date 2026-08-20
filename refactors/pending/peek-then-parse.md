@@ -95,7 +95,7 @@ The `None` arm of `commit` is the case `peek()` already established is not next.
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
 pub(crate) trait ItemTokenText {
-    fn token_text<'a>(&self, cursor: &ItemCursor<'a>) -> &'a str;
+    fn text<'a>(&self, cursor: &ItemCursor<'a>) -> &'a str;
     fn interned<'a, T: From<intern::string_key::StringKey>>(
         &self,
         cursor: &ItemCursor<'a>,
@@ -103,7 +103,7 @@ pub(crate) trait ItemTokenText {
 }
 
 impl ItemTokenText for WithSpan<ChunkContentItem> {
-    fn token_text<'a>(&self, cursor: &ItemCursor<'a>) -> &'a str {
+    fn text<'a>(&self, cursor: &ItemCursor<'a>) -> &'a str {
         &cursor.text()[self.location.as_usize_range()]
     }
 
@@ -111,7 +111,7 @@ impl ItemTokenText for WithSpan<ChunkContentItem> {
         &self,
         cursor: &ItemCursor<'a>,
     ) -> WithSpan<T> {
-        self.token_text(cursor)
+        self.text(cursor)
             .intern()
             .to::<T>()
             .with_span(self.location)
@@ -152,7 +152,7 @@ pub(crate) fn parse_non_constant_value(
         if let Some(span) =
             cursor.consume_token_if(NonBracketTokenKind::IntegerLiteral, SemanticToken::Integer)
         {
-            let value = match span.token_text().parse() {
+            let value = match span.text().parse() {
                 Ok(value) => value,
                 Err(_) => {
                     return ParseError::IntegerDoesNotFitI64
@@ -166,7 +166,7 @@ pub(crate) fn parse_non_constant_value(
             NonBracketTokenKind::Identifier,
             SemanticToken::BooleanOrNull,
         ) {
-            return match span.token_text() {
+            return match span.text() {
                 "true" => NonConstantValue::Boolean(BooleanValue(Boolean::True)).wrap_ok(),
                 "false" => NonConstantValue::Boolean(BooleanValue(Boolean::False)).wrap_ok(),
                 "null" => NonConstantValue::Null(NullValue).wrap_ok(),
@@ -223,7 +223,7 @@ fn parse_integer_value(
     peek: CursorPeek<'_, '_>,
 ) -> Result<IntegerValue, WithSpan<ParseError>> {
     let (cursor, item) = peek.commit(SemanticToken::Integer);
-    match item.token_text(cursor).parse() {
+    match item.text(cursor).parse() {
         Ok(value) => IntegerValue(value).wrap_ok(),
         Err(_) => ParseError::IntegerDoesNotFitI64
             .with_span(item.location)
@@ -235,7 +235,7 @@ fn parse_boolean_or_null(
     peek: CursorPeek<'_, '_>,
 ) -> Result<NonConstantValue, WithSpan<ParseError>> {
     let (cursor, item) = peek.commit(SemanticToken::BooleanOrNull);
-    match item.token_text(cursor) {
+    match item.text(cursor) {
         "true" => NonConstantValue::Boolean(BooleanValue(Boolean::True)).wrap_ok(),
         "false" => NonConstantValue::Boolean(BooleanValue(Boolean::False)).wrap_ok(),
         "null" => NonConstantValue::Null(NullValue).wrap_ok(),
@@ -308,7 +308,7 @@ pub(crate) fn parse_non_constant_value(
 }
 ```
 
-`RecordGroupClose` is `pub(crate)` so `parse_object_literal` can record the close. `ItemCursor::text` is used from `token_text` / `interned`; drop `#[cfg_attr(not(test), expect(dead_code))]`.
+`RecordGroupClose` is `pub(crate)` so `parse_object_literal` can record the close. `ItemCursor::text` is used from `text` / `interned`; drop `#[cfg_attr(not(test), expect(dead_code))]`.
 
 ## Tests
 

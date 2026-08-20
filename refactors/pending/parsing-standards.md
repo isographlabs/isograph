@@ -38,7 +38,7 @@ pub(crate) struct TokenText<'a> {
 }
 
 impl<'a> TokenText<'a> {
-    pub(crate) fn token_text(self) -> &'a str;
+    pub(crate) fn text(self) -> &'a str;
     pub(crate) fn interned<T: From<intern::string_key::StringKey>>(self) -> WithSpan<T>;
 }
 
@@ -110,7 +110,7 @@ impl<'c, 'a> CursorPeek<'c, 'a> {
 - Slot: form `Ok` and end is the item span. Form `Ok` and leftover is the join of the item span and the leftover items' span. Form `Err` is `contents_span`.
 - Value made of several items: one `spanning` call. The closure's first advance is a `consume_*` or `require_*`. Remaining items of that value are read inside the same `spanning`.
 
-`TokenText.text` is the whole literal. `token_text` indexes it at `location`. A name in the tree is `token.interned()`. The converted scalar is the `i64`. The wrapper span is location only.
+`TokenText`'s `text` field is the whole literal. `text()` indexes it at `location`. A name in the tree is `token.interned()`. The converted scalar is the `i64`. The wrapper span is location only.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -338,9 +338,9 @@ pub(crate) fn parse_non_constant_value(
 }
 ```
 
-`VariableUse` stores the interned name. A position on `$` answers `VariableUse`. There is no `Dollar` field. `string_key_newtype!` implements `From<StringKey>` for the inner lang types. Parser wrappers do not add a second `From`. Construction is `name.interned().map(VariableNameWrapper)`. A selection's name and `reader_alias` are `SelectionNameWrapper` over `SelectableName`. A field declaration's name is `ClientScalarSelectableNameWrapper`. A pointer declaration's name is `ClientObjectSelectableNameWrapper`. The integer arm is `item.token_text(cursor).parse()`. `parse::<i64>()` on an `IntegerLiteral` token (`-?(0|[1-9][0-9]*)`) fails only as overflow or underflow. Variable defaults call this same function.
+`VariableUse` stores the interned name. A position on `$` answers `VariableUse`. There is no `Dollar` field. `string_key_newtype!` implements `From<StringKey>` for the inner lang types. Parser wrappers do not add a second `From`. Construction is `name.interned().map(VariableNameWrapper)`. A selection's name and `reader_alias` are `SelectionNameWrapper` over `SelectableName`. A field declaration's name is `ClientScalarSelectableNameWrapper`. A pointer declaration's name is `ClientObjectSelectableNameWrapper`. The integer arm is `item.text(cursor).parse()`. `parse::<i64>()` on an `IntegerLiteral` token (`-?(0|[1-9][0-9]*)`) fails only as overflow or underflow. Variable defaults call this same function.
 
-Keyword text after `require_token(Identifier, token)` or `consume_token_if(Identifier, token)`: `match` on `token_text` (`"entrypoint"` / `"field"` / `"pointer"`; `"true"` / `"false"` / `"null"`; `"to"`).
+Keyword text after `require_token(Identifier, token)` or `consume_token_if(Identifier, token)`: `match` on `text()` (`"entrypoint"` / `"field"` / `"pointer"`; `"true"` / `"false"` / `"null"`; `"to"`).
 
 One optional item is `consume_*`. Two optional kinds in one position is two `consume_token_if` calls. The optional `!` after a type name is `consume_token_if(Exclamation, SemanticToken::GraphQLTypeName)`: the next item may be the caller's `=`. `$name` after `peek()` is `parse_variable_name(peek)`; without a peek it is `require_variable_name`. After `require_token` on an identifier, `consume_token_if(Colon, SemanticToken::Colon)` is the alias; both arms use the identifier.
 
@@ -488,8 +488,8 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 - Optional group: `ItemCursor::consume_group_if`
 - Wrong or missing item: `ItemCursor::expected`
 - Multi-form position: `consume_*` ladder, last arm `expected`
-- Keyword / boolean / null text: `token.token_text()` after an identifier
-- Integer conversion: `token.token_text().parse()` on an `IntegerLiteral` token
+- Keyword / boolean / null text: `token.text()` after an identifier
+- Integer conversion: `token.text().parse()` on an `IntegerLiteral` token
 - Interned name: `token.interned().map(SelectionNameWrapper)` (the inner lang type implements `From<StringKey>`; the wrapper does not)
 - Composite span: `ItemCursor::spanning`
 - List of items: `ChunkedLevel::parse_each_chunk` → `Vec<WithSpan<Slot<P, UnparsedChunkItems>>>`
@@ -521,7 +521,7 @@ Each grammar feature lands on this surface.
 - peek-then-parse.md: peek once, pass `CursorPeek` to `parse_*`; `commit` returns the cursor
 - parse-variables.md: `require_variable_name`, `parse_type_annotation`, `parse_singleton` on `[...]`, `NonConstantValueParent::VariableDefault`, `Box<T>` delegation in `resolve_position`
 - parse-descriptions.md: description via two `consume_token_if`
-- token-text.md: `TokenText` from `consume_token_if` / `require_token`; `token_text` and `interned` on that value
-- parse-pointers.md: `to` via `require_token(Identifier)` and `token_text`
+- token-text.md: `TokenText` from `consume_token_if` / `require_token`; `text` and `interned` on that value
+- parse-pointers.md: `to` via `require_token(Identifier)` and `text()`
 
 A feature is reviewed against this doc when it lands. Amendment sites: the `ItemCursor` and `ChunkStream` impls, `parse_one_chunk`, `parse_each_chunk`, and `parse_singleton`. This doc stays in `refactors/pending`.
