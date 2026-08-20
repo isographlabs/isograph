@@ -1,6 +1,8 @@
 # selection-name: `SelectionNameWrapper` wraps `SelectionName`
 
-`SelectionNameWrapper` wraps `common_lang_types::SelectionName`, not `SelectableName`. A selection's `name` and `reader_alias` stay that wrapper.
+A selectable is a definition: `FieldDeclaration.name` and `EntrypointDeclaration.name` are `SelectableNameWrapper(SelectableName)`. A selection is an item in a selection set: `Selection.name` and `reader_alias` are `SelectionNameWrapper(SelectionName)`. The interned keys are different types. A later pass checks that a selection name refers to a selectable that exists.
+
+`SelectionNameWrapper` wraps `common_lang_types::SelectionName`, not `SelectableName`.
 
 Lands after selectable-name-wrapper.md, before optional-to.md. No grammar change.
 
@@ -44,7 +46,7 @@ Construction is unchanged: `first.interned().map(SelectionNameWrapper)`. Tests t
 The interned-key wrappers sentence includes `SelectionNameWrapper(SelectionName)`. The Selection vs Selectable paragraph:
 
 ```
-Selection and Selectable are different types. A selection is an item in a selection set. A selectable is a field or pointer on a type. A selection's interned name is `SelectionName`. Do not name a selection node `Selectable*`.
+Selection and Selectable are different types. A selection is an item in a selection set. A selectable is a definition of a field or pointer on a type. A selection's interned name is `SelectionName`. A selectable's interned name is `SelectableName`. Do not name a selection node `Selectable*`. Checking that a selection refers to a selectable that exists is a later pass.
 ```
 
 ## Tests

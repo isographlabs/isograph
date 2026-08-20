@@ -162,7 +162,7 @@ impl BracketKind {
 
 ## Names relative to isograph
 
-Where a type or function exists in both, i2 uses the isograph name. Wrappers that exist only so a lang type can carry `ResolvePosition` take the wrappee's name plus `Wrapper` (`EntityNameWrapper`, `VariableNameWrapper`, `FieldArgumentNameWrapper`, `ValueKeyNameWrapper`, `SelectionNameWrapper`, `SelectableNameWrapper`, `StringLiteralValueWrapper`, `IsographDirectiveNameWrapper`). `SelectionNameWrapper` is a selection name and a `reader_alias`. `SelectableNameWrapper` is an entrypoint name and a field name. The left-hand side of `Type.name` is `EntityNameWrapper`.
+Where a type or function exists in both, i2 uses the isograph name. Wrappers that exist only so a lang type can carry `ResolvePosition` take the wrappee's name plus `Wrapper` (`EntityNameWrapper`, `VariableNameWrapper`, `FieldArgumentNameWrapper`, `ValueKeyNameWrapper`, `SelectionNameWrapper`, `SelectableNameWrapper`, `StringLiteralValueWrapper`, `IsographDirectiveNameWrapper`). `SelectionNameWrapper` is a selection name and a `reader_alias` (AST). `SelectableNameWrapper` is an entrypoint name and a field name (definition). The left-hand side of `Type.name` is `EntityNameWrapper`.
 
 Justified differences:
 
@@ -197,6 +197,7 @@ Justified differences:
 - Span-slot genericity: spanless-parsing.md.
 - Storing leftover as a range into the original chunk instead of a clone.
 - Reachable variables as `HashSet<VariableName>` from a walk of `NonConstantValue`. A later pass panics if a context that forbids variables contains any.
+- Checking that a `SelectionName` refers to a `SelectableName` that exists.
 
 ## The docs, in order
 
