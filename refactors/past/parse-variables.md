@@ -63,9 +63,9 @@ impl<T: ResolvePosition> ResolvePosition for Box<T> {
 impl<'a> ItemCursor<'a> {
     pub(crate) fn parse_nested_singleton<T>(
         &mut self,
-        level: &'a WithSpan<ChunkedLevel>,
+        level: &WithSpan<ChunkedLevel>,
         end: Expectation,
-        extra_chunks: impl FnOnce(&'a WithSpan<Chunk>) -> WithSpan<ParseError>,
+        extra_chunks: impl FnOnce(&WithSpan<Chunk>) -> WithSpan<ParseError>,
         parse: impl FnOnce(&mut ItemCursor<'_>) -> Result<T, WithSpan<ParseError>>,
     ) -> Singleton<Slot<T, UnparsedChunkItems>, ExtraChunks> {
         parse_singleton(
@@ -89,7 +89,6 @@ Origin for the declaration: `crates/isograph_lang_types/src/declarations/variabl
 
 ```rust
 // from crates/isograph_parser/src/variables.rs
-use intern::string_key::Intern;
 use prelude::Postfix;
 use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
@@ -381,8 +380,8 @@ fn parse_bracket_interior_type(
         |cursor| parse_type_annotation(cursor).map(|wrapped| wrapped.item),
     );
     BracketInteriorType {
-        item: singleton.item.item,
-        extra_tokens: singleton.item.extra_tokens,
+        item: singleton.item.item.item,
+        extra_tokens: singleton.item.item.extra_tokens,
     }
     .wrap_ok()
 }
@@ -621,7 +620,11 @@ The boxed recursive field uses the `Box<T>` blanket. `VariableDeclarationOrUsage
             },
             node => panic!("expected the variable name leaf, got {node:?}"),
         }
-        match parse.resolve((), span_of(text, "$")) {
+        let use_dollar = Span::new(
+            span_of(text, "$other").start,
+            span_of(text, "$other").start + 1,
+        );
+        match parse.resolve((), use_dollar) {
             IsographResolutionNode::VariableUse(_) => {}
             node => panic!("expected the variable use, got {node:?}"),
         }
@@ -685,7 +688,7 @@ The boxed recursive field uses the `Box<T>` blanket. `VariableDeclarationOrUsage
         let (parse, _) = parsed(text);
         match parse.resolve((), span_of(text, "Pet")) {
             IsographResolutionNode::EntityNameWrapper(name) => {
-                let list = match name.parent {
+                let list = match name.parent.reference() {
                     EntityNameWrapperParent::NamedTypeAnnotation(named) => {
                         match named.parent.reference() {
                             TypeAnnotationParent::List(list) => list.as_ref(),
