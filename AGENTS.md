@@ -6,7 +6,7 @@ The parser does not use pico. The explicit assumption is that parsing a literal 
 
 ## Mental model
 
-The schema data model is `mental-model.md`. Read it before working on entities, wrappers, selectables, field definitions, selections, selection sets, or entrypoints.
+The schema data model is `docs-website/docs/design-docs/mental-model.md`. Read it before working on entities, wrappers, selectables, field definitions, selections, selection sets, or entrypoints.
 
 ## Commits
 
@@ -14,7 +14,7 @@ Commit after every change, small and atomically, without being asked. Each logic
 
 ## Memory
 
-Do not use Claude's persistent memory feature in this project: write no memory files, and disregard any recalled memories. Everything that governs work here lives in this file, in `mental-model.md`, and in `refactors/`.
+Do not use Claude's persistent memory feature in this project: write no memory files, and disregard any recalled memories. Everything that governs work here lives in this file, in `docs-website/docs/design-docs/mental-model.md`, and in `refactors/`.
 
 ## Refactor docs
 
@@ -141,7 +141,7 @@ When told to audit, the deliverable is the whole class fixed everywhere, not the
 - Whether a type is span-carrying is decided once, at the type: every use of an enum is `WithSpan`-wrapped or none is, and within one enum, every variant's payload carries its span or none does. Do not mix wrapped and bare at either level. A value's span lives on its nearest wrapper, exactly once: the field wrapper when the value is a struct field, the item wrapper when the value rides in an enum whose items are wrapped — never both.
 - A struct with exactly one field is a newtype (`struct Foo(pub Bar)`), not a struct with one named field — especially when no second field is possible. The exceptions are shapes an external derive dictates: serde types where the field name is the wire key, clap types where the field name is the flag. When it is not clear whether a struct will grow a second field, use the newtype only if we do not suspect another field will be added; if we do suspect more fields, keep the named-field struct so the new field slots in without a rename.
 - Parser interned-key wrappers are named `$RoleWrapper` and wrap the `common_lang_types` interned type for that role (`FieldArgumentNameWrapper(FieldArgumentName)`, `SelectionNameWrapper(SelectionName)`, `SelectableNameWrapper(SelectableName)`). They do not implement `From<StringKey>`: `string_key_newtype!` already does that on the inner type. Construction is `token.interned().map(SelectionNameWrapper)`. A selection name and a `reader_alias` are `SelectionNameWrapper`. An entrypoint name and a field name are `SelectableNameWrapper`. The left-hand side of `Type.name` is `EntityNameWrapper`.
-- Selection, Selectable, and SelectionSet are defined in `mental-model.md`. Do not name a selection node `Selectable*`. Checking that a selection refers to a selectable that exists is a later pass.
+- Selection, Selectable, and SelectionSet are defined in `docs-website/docs/design-docs/mental-model.md`. Do not name a selection node `Selectable*`. Checking that a selection refers to a selectable that exists is a later pass.
 - The map `entry` API is encouraged. Prefer `map.entry(k).or_insert(...)`, `or_default`, `and_modify`, or a match on `Entry` over a separate `contains_key` / `get` / `get_mut` plus `insert` when both reading and writing a slot.
 - Never `#[allow(lint)]`. Use `#[expect(lint)]`, so the attribute fails when the lint stops firing. An item whose only callers are tests is `#[cfg_attr(not(test), expect(dead_code))]`. Clippy `allow_attributes` is deny in workspace lints (and in isograph_cli, which is not in the workspace). That lint covers outer `#[allow]` only, not inner `#![allow]`; do not use inner `allow` in our crates either. Relay crates keep crate-level `#![allow(clippy::all)]`.
 

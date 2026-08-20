@@ -41,6 +41,7 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: 'Design docs',
       items: [
+        'design-docs/mental-model',
         'design-docs/incremental-compilation',
         'design-docs/isograph-data-model',
       ],
