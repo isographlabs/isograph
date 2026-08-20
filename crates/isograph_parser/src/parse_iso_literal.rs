@@ -6,11 +6,11 @@ use span::{WithSpan, WithSpanPostfix};
 
 use crate::chunk_stream::ItemCursor;
 use crate::{
-    ChunkContentItem, ChunkedLevel, Expectation, ExtraChunks, Found, IsographResolutionNode,
-    NamedTypeAnnotationPath, NonBracketToken, NonBracketTokenKind, ParseError, SelectionSet,
-    SemanticToken, Singleton, Slot, TypeAnnotation, UnparsedChunkItems,
-    VariableDeclarationOrUsageList, consume_variable_declaration_list, parse_singleton,
-    parse_type_annotation, require_selection_set,
+    ChunkContentItem, ChunkedLevel, Expectation, ExtraChunks, Found, IsographFieldDirectiveList,
+    IsographResolutionNode, NamedTypeAnnotationPath, NonBracketToken, NonBracketTokenKind,
+    ParseError, SelectionSet, SemanticToken, Singleton, Slot, TypeAnnotation, UnparsedChunkItems,
+    VariableDeclarationOrUsageList, consume_directives, consume_variable_declaration_list,
+    parse_singleton, parse_type_annotation, require_selection_set,
 };
 
 pub type IsoLiteralParse = Singleton<Slot<IsoLiteralItem, UnparsedChunkItems>, ExtraChunks>;
@@ -42,6 +42,9 @@ pub struct EntrypointDeclaration {
     #[resolve_field]
     #[parent_variant(EntrypointDeclaration)]
     pub name: WithSpan<SelectableNameWrapper>,
+    #[resolve_field]
+    #[parent_variant(EntrypointDeclaration)]
+    pub directive_set: Option<WithSpan<IsographFieldDirectiveList>>,
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -58,6 +61,9 @@ pub struct FieldDeclaration {
     #[resolve_field]
     #[parent_variant(FieldDeclaration)]
     pub target_type: Option<WithSpan<TypeAnnotation>>,
+    #[resolve_field]
+    #[parent_variant(FieldDeclaration)]
+    pub directive_set: Option<WithSpan<IsographFieldDirectiveList>>,
     #[resolve_field]
     pub description: Option<WithSpan<Description>>,
     #[resolve_field]
@@ -176,9 +182,11 @@ fn parse_entrypoint(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<EntrypointDeclaration, WithSpan<ParseError>> {
     let (parent_type, name) = parse_type_dot_name(cursor)?;
+    let directive_set = consume_directives(cursor)?;
     EntrypointDeclaration {
         parent_type,
         name: name.map(SelectableNameWrapper),
+        directive_set,
     }
     .wrap_ok()
 }
@@ -187,6 +195,7 @@ fn parse_field(cursor: &mut ItemCursor<'_>) -> Result<FieldDeclaration, WithSpan
     let (parent_type, name) = parse_type_dot_name(cursor)?;
     let variable_definitions = consume_variable_declaration_list(cursor);
     let target_type = consume_to_target(cursor)?;
+    let directive_set = consume_directives(cursor)?;
     let description = consume_description(cursor);
     let selection_set = require_selection_set(cursor, Expectation::ToOrDescriptionOrSelectionSet)?;
     FieldDeclaration {
@@ -194,6 +203,7 @@ fn parse_field(cursor: &mut ItemCursor<'_>) -> Result<FieldDeclaration, WithSpan
         name: name.map(SelectableNameWrapper),
         variable_definitions,
         target_type,
+        directive_set,
         description,
         selection_set,
     }
@@ -244,17 +254,18 @@ mod tests {
 
     use super::*;
     use crate::{
-        BracketError, BracketKind, ChunkContentItemParent, CommaWithoutItem, Expectation, Found,
-        IntegerValue, IsographResolutionNode, NonBracketTokenKind, NonConstantValue,
-        NonConstantValueParent, ObjectEntry, ParseError, Selection, SelectionNameWrapper,
-        SelectionSet, SelectionSetParent, Slot, TypeAnnotation, TypeAnnotationParent,
-        UnparsedChunkItems, UnparsedChunkItemsParent, VariableDeclarationOrUsage,
-        VariableDeclarationOrUsageList, VariableNameWrapper, VariableNameWrapperParent, chunk,
-        match_brackets, tokenize,
+        ArgumentListParent, BracketError, BracketKind, ChunkContentItemParent, CommaWithoutItem,
+        Expectation, Found, IntegerValue, IsographDirectiveNameWrapper,
+        IsographFieldDirectiveListParent, IsographResolutionNode, NonBracketTokenKind,
+        NonConstantValue, NonConstantValueParent, ObjectEntry, ParseError, Selection,
+        SelectionNameWrapper, SelectionSet, SelectionSetParent, Slot, TypeAnnotation,
+        TypeAnnotationParent, UnparsedChunkItems, UnparsedChunkItemsParent,
+        VariableDeclarationOrUsage, VariableDeclarationOrUsageList, VariableNameWrapper,
+        VariableNameWrapperParent, chunk, match_brackets, tokenize,
     };
     use Expectation::{DeclarationKeyword, EndOfDeclaration};
     use NonBracketTokenKind::{
-        At, Comma, Dollar, ErrorNumberLiteralTrailingInvalid, Identifier, Period,
+        Comma, Dollar, ErrorNumberLiteralTrailingInvalid, Identifier, Period,
     };
 
     type ParsedWithErrors = (
@@ -712,16 +723,167 @@ mod tests {
     }
 
     #[test]
-    fn a_directive_is_an_ordinary_unexpected_token() {
-        let text = "entrypoint Query.foo @lazy";
+    fn an_entrypoint_directive_parses() {
+        let text = "entrypoint Query.foo @lazyLoad";
         let (parse, errors) = parsed(text);
-        as_entrypoint(parse.reference());
+        assert_eq!(errors, vec![]);
+        let directives = as_entrypoint(parse.reference())
+            .directive_set
+            .as_ref()
+            .expect("the fixture carries a directive");
+        assert_eq!(directives.location, span_of(text, "@lazyLoad"));
+        assert_eq!(directives.item.0.len(), 1);
         assert_eq!(
-            errors,
-            expected(EndOfDeclaration, Found::Token(At))
-                .with_span(span_of(text, "@"))
-                .wrap_vec(),
+            directives.item.0[0].item.name.item,
+            IsographDirectiveNameWrapper("lazyLoad".intern().to())
         );
+        assert!(directives.item.0[0].item.arguments.is_none());
+    }
+
+    #[test]
+    fn a_field_directive_sits_between_variables_and_the_description() {
+        let text = "field Query.Foo($id: ID) @component \"the route\" { bar }";
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        let field = as_field(parse.reference());
+        assert!(field.variable_definitions.is_some());
+        assert_eq!(
+            field
+                .directive_set
+                .as_ref()
+                .expect("the fixture carries a directive")
+                .location,
+            span_of(text, "@component")
+        );
+        assert!(field.description.is_some());
+    }
+
+    #[test]
+    fn a_field_directive_sits_between_the_target_and_the_description() {
+        let text = "field Pet.BestFriend to Owner @updatable \"x\" { id }";
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        let field = as_field(parse.reference());
+        assert!(field.target_type.is_some());
+        assert_eq!(
+            field
+                .directive_set
+                .as_ref()
+                .expect("the fixture carries a directive")
+                .location,
+            span_of(text, "@updatable")
+        );
+        assert!(field.description.is_some());
+    }
+
+    #[test]
+    fn a_selection_directive_with_arguments_parses() {
+        let text = "field Query.Foo { bar @loadable(lazyLoadArtifact: true) }";
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        let selection = as_selection(
+            selections(as_field(parse.reference()).selection_set.reference())[0]
+                .item
+                .reference(),
+        );
+        let directives = selection
+            .directive_set
+            .as_ref()
+            .expect("the fixture selects with a directive");
+        assert_eq!(
+            directives.location,
+            span_of(text, "@loadable(lazyLoadArtifact: true)")
+        );
+        let arguments = directives.item.0[0]
+            .item
+            .arguments
+            .as_ref()
+            .expect("the fixture passes arguments");
+        assert_eq!(arguments.item.0.len(), 1);
+    }
+
+    #[test]
+    fn two_directives_on_one_selection_stay_in_one_list() {
+        let text = "field Query.Foo { bar @loadable @updatable }";
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        let directives = as_selection(
+            selections(as_field(parse.reference()).selection_set.reference())[0]
+                .item
+                .reference(),
+        )
+        .directive_set
+        .as_ref()
+        .expect("the fixture selects with directives");
+        assert_eq!(directives.item.0.len(), 2);
+        assert_eq!(directives.location, span_of(text, "@loadable @updatable"));
+    }
+
+    #[test]
+    fn a_directive_on_the_next_line_is_its_own_failed_selection() {
+        let text = "field Query.Foo { bar\n@loadable }";
+        let (parse, errors) = parsed(text);
+        let items = selections(as_field(parse.reference()).selection_set.reference());
+        assert_eq!(items.len(), 2);
+        as_selection(items[0].item.reference());
+        assert!(items[1].item.item.is_none());
+        assert!(errors.iter().any(|error| {
+            error.item
+                == expected(
+                    Expectation::Selection,
+                    Found::Token(NonBracketTokenKind::At),
+                )
+                && error.location == span_of(text, "@")
+        }));
+    }
+
+    #[test]
+    fn an_unknown_directive_name_parses() {
+        let text = "entrypoint Query.foo @notARealDirective";
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        assert_eq!(
+            as_entrypoint(parse.reference())
+                .directive_set
+                .as_ref()
+                .expect("the fixture carries a directive")
+                .item
+                .0[0]
+                .item
+                .name
+                .item,
+            IsographDirectiveNameWrapper("notARealDirective".intern().to())
+        );
+    }
+
+    #[test]
+    fn at_without_a_name_fails_the_host() {
+        let text = "entrypoint Query.foo @";
+        let end = span_of(text, "@").end;
+        assert_no_declaration(
+            text,
+            expected(Expectation::Token(Identifier), Found::EndOfChunk),
+            Span::new(end, end),
+        );
+    }
+
+    #[test]
+    fn directive_names_resolve_through_the_host() {
+        let text = "field Query.Foo { bar @loadable }";
+        let (parse, _) = parsed(text);
+        match parse.resolve((), span_of(text, "loadable")) {
+            IsographResolutionNode::IsographDirectiveNameWrapper(name) => {
+                match name.parent.parent.parent {
+                    IsographFieldDirectiveListParent::Selection(_) => {}
+                    parent => panic!("expected a selection directive list, got {parent:?}"),
+                }
+            }
+            node => panic!("expected the directive name leaf, got {node:?}"),
+        }
+        match parse.resolve((), span_of(text, "@")) {
+            IsographResolutionNode::IsographFieldDirective(_) => {}
+            node => panic!("expected the directive, got {node:?}"),
+        }
     }
 
     #[test]
@@ -1373,10 +1535,12 @@ mod tests {
         let (parse, _) = parsed(text);
         match parse.resolve((), span_of(text, "id")) {
             IsographResolutionNode::FieldArgumentNameWrapper(name) => {
-                assert_eq!(
-                    name.parent.parent.parent.parent.inner.name.location,
-                    span_of(text, "bar")
-                );
+                match name.parent.parent.parent.parent {
+                    ArgumentListParent::Selection(selection) => {
+                        assert_eq!(selection.inner.name.location, span_of(text, "bar"));
+                    }
+                    parent => panic!("expected a selection argument list, got {parent:?}"),
+                }
             }
             node => panic!("expected the argument name, got {node:?}"),
         }

@@ -5,16 +5,22 @@ use span::{WithSpan, WithSpanPostfix};
 
 use crate::chunk_stream::ItemCursor;
 use crate::{
-    BracketKind, ChunkContentItem, Expectation, Found, IsographResolutionNode, NonBracketToken,
-    NonBracketTokenKind, ParseError, SelectionPath, SemanticToken, Slot, UnparsedChunkItems,
-    VariableDeclarationOrUsagePath,
+    BracketKind, ChunkContentItem, Expectation, Found, IsographFieldDirectivePath,
+    IsographResolutionNode, NonBracketToken, NonBracketTokenKind, ParseError, SelectionPath,
+    SemanticToken, Slot, UnparsedChunkItems, VariableDeclarationOrUsagePath,
 };
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = SelectionPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = ArgumentListParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ArgumentList(
     #[resolve_field] pub Vec<WithSpan<Slot<SelectionFieldArgument, UnparsedChunkItems>>>,
 );
+
+#[derive(Debug)]
+pub enum ArgumentListParent<'a> {
+    Selection(SelectionPath<'a>),
+    IsographFieldDirective(IsographFieldDirectivePath<'a>),
+}
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
@@ -109,7 +115,7 @@ pub enum NonConstantValueParent<'a> {
     VariableDefault(VariableDeclarationOrUsagePath<'a>),
 }
 
-pub type ArgumentListPath<'a> = PositionResolutionPath<&'a ArgumentList, SelectionPath<'a>>;
+pub type ArgumentListPath<'a> = PositionResolutionPath<&'a ArgumentList, ArgumentListParent<'a>>;
 
 pub type ObjectLiteralPath<'a> =
     PositionResolutionPath<&'a ObjectLiteral, NonConstantValueParent<'a>>;

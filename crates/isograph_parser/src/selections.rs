@@ -5,8 +5,9 @@ use span::WithSpan;
 
 use crate::chunk_stream::ItemCursor;
 use crate::{
-    ArgumentList, BracketKind, Expectation, IsographResolutionNode, NonBracketTokenKind,
-    ParseError, SemanticToken, Slot, UnparsedChunkItems, consume_argument_list,
+    ArgumentList, BracketKind, Expectation, IsographFieldDirectiveList, IsographResolutionNode,
+    NonBracketTokenKind, ParseError, SemanticToken, Slot, UnparsedChunkItems,
+    consume_argument_list, consume_directives,
 };
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -21,7 +22,11 @@ pub struct Selection {
     #[resolve_field]
     pub name: WithSpan<SelectionNameWrapper>,
     #[resolve_field]
+    #[parent_variant(Selection)]
     pub arguments: Option<WithSpan<ArgumentList>>,
+    #[resolve_field]
+    #[parent_variant(Selection)]
+    pub directive_set: Option<WithSpan<IsographFieldDirectiveList>>,
     #[resolve_field]
     #[parent_variant(Selection)]
     pub selection_set: Option<WithSpan<SelectionSet>>,
@@ -106,11 +111,13 @@ fn parse_selection(cursor: &mut ItemCursor<'_>) -> Result<Selection, WithSpan<Pa
             None => (None, first.interned().map(SelectionNameWrapper)),
         };
     let arguments = consume_argument_list(cursor);
+    let directive_set = consume_directives(cursor)?;
     let selection_set = consume_selection_set(cursor);
     Selection {
         reader_alias,
         name,
         arguments,
+        directive_set,
         selection_set,
     }
     .wrap_ok()
@@ -405,25 +412,6 @@ mod tests {
         assert_eq!(
             as_selection(items[1].item.reference()).name.location,
             span_of(text, "qux")
-        );
-    }
-
-    #[test]
-    fn a_directive_on_a_selection_is_trailing_leftover() {
-        let text = "bar @loadable";
-        let (items, errors, _) = parsed_selections(text);
-        assert_eq!(
-            as_selection(items[0].item.reference()).name.location,
-            span_of(text, "bar")
-        );
-        assert_eq!(
-            errors,
-            ParseError::expected(
-                Expectation::Separator(BracketKind::Brace),
-                Found::Token(NonBracketTokenKind::At),
-            )
-            .with_span(span_of(text, "@"))
-            .wrap_vec(),
         );
     }
 

@@ -2,7 +2,8 @@ use crate::{
     ArgumentListPath, BooleanValuePath, ChunkPath, ChunkSeparatorPath, ChunkedGroupPath,
     ChunkedLevelPath, CloseBracketPath, DescriptionPath, EntityNameWrapperPath,
     EntrypointDeclarationPath, ExtraChunksPath, FieldArgumentNameWrapperPath, FieldDeclarationPath,
-    IntegerValuePath, IsoLiteralParsePath, IsoLiteralSlotPath, ListTypeAnnotationPath,
+    IntegerValuePath, IsoLiteralParsePath, IsoLiteralSlotPath, IsographDirectiveNameWrapperPath,
+    IsographFieldDirectiveListPath, IsographFieldDirectivePath, ListTypeAnnotationPath,
     NamedTypeAnnotationPath, NonBracketTokenPath, NullValuePath, ObjectEntryPath,
     ObjectEntrySlotPath, ObjectLiteralPath, OpenBracketPath, SelectableNameWrapperPath,
     SelectionFieldArgumentPath, SelectionFieldArgumentSlotPath, SelectionNameWrapperPath,
@@ -60,4 +61,7 @@ pub enum IsographResolutionNode<'a> {
     VariableDeclarationOrUsage(VariableDeclarationOrUsagePath<'a>),
     NamedTypeAnnotation(NamedTypeAnnotationPath<'a>),
     ListTypeAnnotation(ListTypeAnnotationPath<'a>),
+    IsographFieldDirectiveList(IsographFieldDirectiveListPath<'a>),
+    IsographFieldDirective(IsographFieldDirectivePath<'a>),
+    IsographDirectiveNameWrapper(IsographDirectiveNameWrapperPath<'a>),
 }

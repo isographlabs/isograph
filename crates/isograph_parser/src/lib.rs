@@ -1,6 +1,7 @@
 mod arguments;
 mod chunk;
 mod chunk_stream;
+mod directives;
 mod isograph_resolution_node;
 mod matched_brackets;
 mod non_bracket_token;
@@ -14,6 +15,7 @@ mod variables;
 
 pub use arguments::*;
 pub use chunk::*;
+pub use directives::*;
 pub use isograph_resolution_node::*;
 pub use matched_brackets::*;
 pub use non_bracket_token::*;
