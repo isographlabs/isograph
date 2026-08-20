@@ -2,7 +2,7 @@
 
 Passing the peek into `parse_*` would be the better API. It needs `CursorPeek` to yield the cursor after `commit`, which makes `consume_token_if` / `consume_group_if` worse. This doc does not change `CursorPeek`.
 
-`parse_non_constant_value` peeks to choose a form, `drop`s the peek without `commit`, then calls a parse function that requires its first token. That `require_token` / `require_group` is the assert that the item is still what the peek saw.
+`parse_non_constant_value` peeks to choose a form. `cursor.peek().map(|peek| peek.view().item.reference())` ends the guard with the closure, without `commit`. Then a parse function requires its first token. That `require_token` / `require_group` is the assert that the item is still what the peek saw.
 
 `$ ident` is `parse_variable_name(cursor, missing_dollar)`: require `$`, then the identifier. The value arm passes `Expectation::Token(Dollar)`. parse-variables.md passes `Expectation::VariableDeclarationOrUsage`.
 
@@ -108,12 +108,13 @@ fn parse_string_literal(
     let span = cursor
         .require_token(NonBracketTokenKind::StringLiteral, SemanticToken::String)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::StringLiteral)))?;
-    span.interned().map(StringLiteralValueWrapper).item.wrap_ok()
+    span.interned()
+        .map(StringLiteralValueWrapper)
+        .item
+        .wrap_ok()
 }
 
-fn parse_integer_value(
-    cursor: &mut ItemCursor<'_>,
-) -> Result<IntegerValue, WithSpan<ParseError>> {
+fn parse_integer_value(cursor: &mut ItemCursor<'_>) -> Result<IntegerValue, WithSpan<ParseError>> {
     let span = cursor
         .require_token(NonBracketTokenKind::IntegerLiteral, SemanticToken::Integer)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::IntegerLiteral)))?;
@@ -129,7 +130,10 @@ fn parse_boolean_or_null(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<NonConstantValue, WithSpan<ParseError>> {
     let span = cursor
-        .require_token(NonBracketTokenKind::Identifier, SemanticToken::BooleanOrNull)
+        .require_token(
+            NonBracketTokenKind::Identifier,
+            SemanticToken::BooleanOrNull,
+        )
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
     match span.text() {
         "true" => NonConstantValue::Boolean(BooleanValue(Boolean::True)).wrap_ok(),
@@ -167,47 +171,40 @@ pub(crate) fn parse_non_constant_value(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<WithSpan<NonConstantValue>, WithSpan<ParseError>> {
     cursor.spanning(|cursor| {
-        if let Some(peek) = cursor.peek() {
-            match peek.view().item.reference() {
-                ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::Dollar)) => {
-                    drop(peek);
-                    return NonConstantValue::Variable(VariableUse(parse_variable_name(
-                        cursor,
-                        Expectation::Token(NonBracketTokenKind::Dollar),
-                    )?))
-                    .wrap_ok();
-                }
-                ChunkContentItem::NonBracket(NonBracketToken(
-                    NonBracketTokenKind::StringLiteral,
-                )) => {
-                    drop(peek);
-                    return NonConstantValue::String(parse_string_literal(cursor)?).wrap_ok();
-                }
-                ChunkContentItem::NonBracket(NonBracketToken(
-                    NonBracketTokenKind::IntegerLiteral,
-                )) => {
-                    drop(peek);
-                    return NonConstantValue::Integer(parse_integer_value(cursor)?).wrap_ok();
-                }
-                ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::Identifier)) => {
-                    drop(peek);
-                    return parse_boolean_or_null(cursor);
-                }
-                ChunkContentItem::Group(group)
-                    if group.opening.item.0 == BracketKind::Brace =>
-                {
-                    drop(peek);
-                    return NonConstantValue::Object(parse_object_literal(cursor)?).wrap_ok();
-                }
-                _ => {}
+        match cursor.peek().map(|peek| peek.view().item.reference()) {
+            Some(ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::Dollar))) => {
+                return NonConstantValue::Variable(VariableUse(parse_variable_name(
+                    cursor,
+                    Expectation::Token(NonBracketTokenKind::Dollar),
+                )?))
+                .wrap_ok();
             }
+            Some(ChunkContentItem::NonBracket(NonBracketToken(
+                NonBracketTokenKind::StringLiteral,
+            ))) => {
+                return NonConstantValue::String(parse_string_literal(cursor)?).wrap_ok();
+            }
+            Some(ChunkContentItem::NonBracket(NonBracketToken(
+                NonBracketTokenKind::IntegerLiteral,
+            ))) => {
+                return NonConstantValue::Integer(parse_integer_value(cursor)?).wrap_ok();
+            }
+            Some(ChunkContentItem::NonBracket(NonBracketToken(
+                NonBracketTokenKind::Identifier,
+            ))) => {
+                return parse_boolean_or_null(cursor);
+            }
+            Some(ChunkContentItem::Group(group)) if group.opening.item.0 == BracketKind::Brace => {
+                return NonConstantValue::Object(parse_object_literal(cursor)?).wrap_ok();
+            }
+            _ => {}
         }
         cursor.expected(Expectation::Value).wrap_err()
     })
 }
 ```
 
-The peek is not committed. Each arm `drop`s it, then `parse_*` requires its first token.
+The peek is not committed. The `map` ends the guard, then `parse_*` requires its first token.
 
 ## Tests
 
