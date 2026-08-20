@@ -1,6 +1,6 @@
 # Extract iso literals
 
-Iso literals exist in files: an isograph source string occupies a span in a file. Finding that string, and checking that the host-language embedding is valid, is `THostLanguage: HostLanguage`. `extract_iso_literals` returns `Vec<Slot<IsoLiteralExtraction<Self>, Vec<WithSpan<IsoLiteralError<Self>>>>>`. `Slot.item` is `Some` when the host produced the string. `Slot.extra` is `Some` when there were errors, never `Some` of an empty vec. `IsoLiteralError` is `Host`, `Parse`, `Bracket`, `Comma`. How the host finds the string is not common. Host facts live on `THostLanguage::LiteralContext`, not on `SelectableDeclaration`.
+Iso literals exist in files: an isograph source string occupies a span in a file. Finding that string, and checking that the host-language embedding is valid, is `THostLanguage: HostLanguage`. `extract_iso_literals` returns `Vec<WithErrors<WithSpan<IsoLiteralExtraction<Self>>, Vec<WithSpan<IsoLiteralError<Self>>>>>`. `item` is the isograph string and host context. `errors` is empty when there were none. `IsoLiteralError` is `Host`, `Parse`, `Bracket`, `Comma`. How the host finds the string is not common. Host facts live on `THostLanguage::LiteralContext`, not on `SelectableDeclaration`.
 
 The first implementor is `TypeScriptHostLanguage`: the same regex isograph uses on JavaScript and TypeScript source. It finds `iso(\`...\`)` and `iso\`...\`` and puts the interior of the backticks in `item`.
 
@@ -13,7 +13,7 @@ Most important first. Parser crate: the trait. TypeScript crate: the implementor
 use span::WithSpan;
 use thiserror::Error;
 
-use crate::{BracketError, CommaWithoutItem, ParseError, Slot};
+use crate::{BracketError, CommaWithoutItem, ParseError};
 
 pub trait HostLanguage: Sized {
     type Error: std::fmt::Display + std::error::Error;
@@ -22,7 +22,18 @@ pub trait HostLanguage: Sized {
     fn extract_iso_literals<'a>(
         &self,
         source: &'a str,
-    ) -> Vec<Slot<IsoLiteralExtraction<'a, Self>, Vec<WithSpan<IsoLiteralError<Self>>>>>;
+    ) -> Vec<
+        WithErrors<
+            WithSpan<IsoLiteralExtraction<'a, Self>>,
+            Vec<WithSpan<IsoLiteralError<Self>>>,
+        >,
+    >;
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct WithErrors<T, E> {
+    pub item: T,
+    pub errors: E,
 }
 
 pub struct IsoLiteralExtraction<'a, THostLanguage: HostLanguage> {
@@ -43,7 +54,7 @@ pub enum IsoLiteralError<THostLanguage: HostLanguage> {
 }
 ```
 
-`IsoLiteralError` derives `Error`. Spans on those errors are the inner `WithSpan` in `Slot.extra`'s `Vec<WithSpan<IsoLiteralError<Self>>>`. The outer `WithSpan` on `extra` is the extraction span.
+`IsoLiteralError` derives `Error`. Spans on those errors are the `WithSpan` wrapping each `IsoLiteralError`. Host errors use the extraction span (`WithErrors.item.location`). Parse, bracket, and comma errors use the inner span rebased with `with_offset`. `WithErrors` does not implement `Error`.
 
 ```rust
 // from crates/isograph_extract_typescript/src/lib.rs
@@ -51,7 +62,8 @@ use common_lang_types::ConstExportName;
 use intern::string_key::Intern;
 use isograph_parser::{
     BracketError, CommaWithoutItem, HostLanguage, IsoLiteralError, IsoLiteralExtraction,
-    IsoLiteralItem, IsoLiteralParse, ParseError, SelectableNameWrapper, Slot, parse_iso_literal,
+    IsoLiteralItem, IsoLiteralParse, ParseError, SelectableNameWrapper, WithErrors,
+    parse_iso_literal,
 };
 use prelude::Postfix;
 use regex::Regex;
@@ -92,13 +104,13 @@ pub enum TypeScriptHostError {
 }
 ```
 
-Derives: `TypeScriptHostLanguage` is `Copy, Clone, Debug, Default, PartialEq, Eq`. `IsoLiteralExtraction` is `Copy, Clone, Debug, PartialEq, Eq` when `LiteralContext` is. `TypeScriptLiteralContext`, `IsoCall`, `AssociatedJsFunction`, `TypeScriptHostError` are `Copy, Clone, Debug, PartialEq, Eq`. `isograph_parser` does not depend on `regex` or on the TypeScript crate.
+Derives: `TypeScriptHostLanguage` is `Copy, Clone, Debug, Default, PartialEq, Eq`. `WithErrors` is `Clone, Debug, PartialEq, Eq`. `IsoLiteralExtraction` is `Copy, Clone, Debug, PartialEq, Eq` when `LiteralContext` is. `TypeScriptLiteralContext`, `IsoCall`, `AssociatedJsFunction`, `TypeScriptHostError` are `Copy, Clone, Debug, PartialEq, Eq`. `isograph_parser` does not depend on `regex` or on the TypeScript crate.
 
-The string's location in the file is `Slot.item`'s `WithSpan`, not a field on `IsoLiteralExtraction`. For `TypeScriptHostLanguage`, that span is the interior of the backticks, and `&source[item.location.as_usize_range()] == item.item.iso_literal_text`. Host errors share that span: `extra` is `WithSpan<Vec<Error>>` at the same location.
+The string's location in the file is `WithErrors.item`'s `WithSpan`, not a field on `IsoLiteralExtraction`. For `TypeScriptHostLanguage`, that span is the interior of the backticks, and `&source[item.location.as_usize_range()] == item.item.iso_literal_text`. Host errors share that span.
 
 `IsoCall::FunctionCall` is `iso(\`...\`)`. `IsoCall::TaggedTemplate` is `iso\`...\``. `AssociatedJsFunction::Present` is the `(` the regex reads after the iso call, the start of the resolver argument.
 
-Origin of `IsoLiteralExtraction`: isograph `crates/isograph_schema/src/validated_isograph_schema/isograph_literals.rs`. Delta: host facts move to `TypeScriptLiteralContext`; location is `Slot.item.location`; return is `Slot` (`item` / `extra`); `IsoLiteralError` is `Host` / `Parse` / `Bracket` / `Comma`.
+Origin of `IsoLiteralExtraction`: isograph `crates/isograph_schema/src/validated_isograph_schema/isograph_literals.rs`. Delta: host facts move to `TypeScriptLiteralContext`; location is `WithErrors.item.location`; return is `WithErrors` (`item` / `errors`); `IsoLiteralError` is `Host` / `Parse` / `Bracket` / `Comma`.
 
 ```rust
 // from crates/isograph_schema/src/validated_isograph_schema/isograph_literals.rs (upstream)
@@ -130,7 +142,7 @@ mod host_language;
 pub use host_language::*;
 ```
 
-`HostLanguage`, `IsoLiteralExtraction`, and `IsoLiteralError` as in Types. No TypeScript types, no regex.
+`HostLanguage`, `WithErrors`, `IsoLiteralExtraction`, and `IsoLiteralError` as in Types. No TypeScript types, no regex.
 
 `BracketError` and `CommaWithoutItem` derive `thiserror::Error` here (messages as in lsp-parse-diagnostics.md Change 1), so `IsoLiteralError` can wrap them. `SelectableNameWrapper` gains `Display` here so `TypeScriptHostError::MissingExport` can format the name.
 
@@ -207,7 +219,12 @@ impl HostLanguage for TypeScriptHostLanguage {
     fn extract_iso_literals<'a>(
         &self,
         source: &'a str,
-    ) -> Vec<Slot<IsoLiteralExtraction<'a, Self>, Vec<WithSpan<IsoLiteralError<Self>>>>> {
+    ) -> Vec<
+        WithErrors<
+            WithSpan<IsoLiteralExtraction<'a, Self>>,
+            Vec<WithSpan<IsoLiteralError<Self>>>,
+        >,
+    > {
         EXTRACT_ISO_LITERAL
             .captures_iter(source)
             .filter_map(|captures| {
@@ -283,13 +300,9 @@ impl HostLanguage for TypeScriptHostLanguage {
                             .with_span(error.0.with_offset(span.start)),
                     );
                 }
-                Slot {
-                    item: extraction.with_span(span).wrap_some(),
-                    extra: if errors.is_empty() {
-                        None
-                    } else {
-                        errors.with_span(span).wrap_some()
-                    },
+                WithErrors {
+                    item: extraction.with_span(span),
+                    errors,
                 }
                 .wrap_some()
             })
@@ -308,24 +321,24 @@ fn item_of(parse: &WithSpan<IsoLiteralParse>) -> Option<&IsoLiteralItem> {
 }
 ```
 
-`item_of` is a private helper in the TypeScript crate: parentheses are a file fact; export and associated function depend on whether the contents parsed as `Selectable`. The parse tree is not `Slot.item`. `item` is the isograph string and host context. Grammar errors come from `parse_iso_literal(text)`.
+`item_of` is a private helper in the TypeScript crate: parentheses are a file fact; export and associated function depend on whether the contents parsed as `Selectable`. The parse tree is not `WithErrors.item`. `item` is the isograph string and host context. Grammar errors come from `parse_iso_literal(text)`.
 
 `TypeScriptHostError` derives `thiserror::Error` in this crate. `SelectableNameWrapper`'s `Display` is Change 1.
 
 `TypeScriptHostLanguage`: empty backticks (`iso(\`\`)`) do not match (`[^`]+` needs at least one character). A missing `literal` group skips the match. `close_paren` is in the pattern so the associated `(` can match; it is not a field.
 
-Origin of `extract_iso_literals`: `extract_iso_literals_from_file_content` plus the host checks in `process_iso_literal_extraction` in isograph's `isograph_literals.rs`. Delta: method on `TypeScriptHostLanguage`; named groups; interned `ConstExportName`; host facts on `context`; return is `Slot` (`item` / `extra`).
+Origin of `extract_iso_literals`: `extract_iso_literals_from_file_content` plus the host checks in `process_iso_literal_extraction` in isograph's `isograph_literals.rs`. Delta: method on `TypeScriptHostLanguage`; named groups; interned `ConstExportName`; host facts on `context`; return is `WithErrors` (`item` / `errors`).
 
 ### Tests
 
-In `crates/isograph_extract_typescript/src/lib.rs` under `#[cfg(test)]`. Helper `extract` takes `.item` of each `Slot`. Host-error tests read `.extra`.
+In `crates/isograph_extract_typescript/src/lib.rs` under `#[cfg(test)]`. Helper `extract` takes `.item` of each `WithErrors`. Host-error tests read `.errors`.
 
 ```rust
 // from crates/isograph_extract_typescript/src/lib.rs
 #[cfg(test)]
 mod tests {
     use intern::string_key::Intern;
-    use isograph_parser::{HostLanguage, IsoLiteralError, IsoLiteralExtraction, Slot};
+    use isograph_parser::{HostLanguage, IsoLiteralError, IsoLiteralExtraction, WithErrors};
     use prelude::Postfix;
     use span::{Span, WithSpan, WithSpanPostfix};
 
@@ -340,15 +353,15 @@ mod tests {
         TypeScriptHostLanguage
             .extract_iso_literals(source)
             .into_iter()
-            .filter_map(|slot| slot.item)
+            .map(|extracted| extracted.item)
             .collect()
     }
 
     fn extract_all(
         source: &str,
     ) -> Vec<
-        Slot<
-            IsoLiteralExtraction<'_, TypeScriptHostLanguage>,
+        WithErrors<
+            WithSpan<IsoLiteralExtraction<'_, TypeScriptHostLanguage>>,
             Vec<WithSpan<IsoLiteralError<TypeScriptHostLanguage>>>,
         >,
     > {
@@ -582,7 +595,7 @@ export const HomeRoute = iso(`
 
 `exported_field_with_associated_function` computes the expected span from `source.find` on the fixture text, not from the extraction. `&source[span] == iso_literal_text` is asserted there and on `unexported_entrypoint` and `multiline_literal`.
 
-`TypeScriptHostError` implements `Error` via `thiserror`. Origin of the three messages: isograph `process_iso_literal_extraction` and `expected_literal_to_be_exported_diagnostic`. Delta: typed errors; span is `Slot.item.location` (the contents), not `Span::todo_generated`. Parentheses apply to every literal. Export and associated function apply only to `IsoLiteralItem::Selectable`. Entrypoints and a failed parse (`parsed_item: None`) get the parentheses check only. Parse / bracket / comma errors from `parse_tree` go in `extra` as `IsoLiteralError::Parse` / `Bracket` / `Comma`, rebased with `with_offset(span.start)`.
+`TypeScriptHostError` implements `Error` via `thiserror`. Origin of the three messages: isograph `process_iso_literal_extraction` and `expected_literal_to_be_exported_diagnostic`. Delta: typed errors; span is `WithErrors.item.location` (the contents), not `Span::todo_generated`. Parentheses apply to every literal. Export and associated function apply only to `IsoLiteralItem::Selectable`. Entrypoints and a failed parse (`parsed_item: None`) get the parentheses check only. Parse, bracket, and comma errors from `parse_iso_literal` go in `errors` as `IsoLiteralError::Parse` / `Bracket` / `Comma`, rebased with `with_offset(span.start)`.
 
 `MissingExport` writes `SelectableNameWrapper`. That `Display` lands in Change 1:
 
@@ -599,33 +612,32 @@ Before: `SelectableNameWrapper` has no `Display`. `parse_iso_literal.rs` gains `
 
 ## Change 3: host-error tests
 
-Same `tests` module. `extract_all` is `TypeScriptHostLanguage.extract_iso_literals`. Helper `extra_items` takes the inner vec of `Slot.extra`.
+Same `tests` module. `extract_all` is `TypeScriptHostLanguage.extract_iso_literals`. Helper `errors_of` takes `WithErrors.errors`.
 
 ```rust
-    fn extra_items(
+    fn errors_of(
         source: &str,
     ) -> Vec<IsoLiteralError<TypeScriptHostLanguage>> {
         let extracted = extract_all(source);
         assert_eq!(extracted.len(), 1);
         extracted[0]
-            .extra
-            .as_ref()
-            .map(|errors| errors.item.iter().map(|error| error.item.clone()).collect())
-            .unwrap_or_default()
+            .errors
+            .iter()
+            .map(|error| error.item.clone())
+            .collect()
     }
 
     #[test]
     fn tagged_template_is_missing_parentheses() {
         assert_eq!(
-            extra_items("iso`entrypoint Query.HomeRoute`"),
+            errors_of("iso`entrypoint Query.HomeRoute`"),
             IsoLiteralError::Host(TypeScriptHostError::MissingParentheses).wrap_vec()
         );
     }
 
     #[test]
-    #[test]
     fn incomplete_entrypoint_is_a_parse_error() {
-        let errors = extra_items("iso(`entrypoint`)");
+        let errors = errors_of("iso(`entrypoint`)");
         assert!(
             errors
                 .iter()
@@ -635,12 +647,12 @@ Same `tests` module. `extract_all` is `TypeScriptHostLanguage.extract_iso_litera
 
     #[test]
     fn entrypoint_without_export_is_valid() {
-        assert_eq!(extra_items("iso(`entrypoint Query.HomeRoute`)"), vec![]);
+        assert_eq!(errors_of("iso(`entrypoint Query.HomeRoute`)"), vec![]);
     }
 
     #[test]
     fn field_without_export_is_missing_export() {
-        let errors = extra_items("iso(`field Pet.fullName { id }`)(");
+        let errors = errors_of("iso(`field Pet.fullName { id }`)(");
         assert_eq!(errors.len(), 1);
         assert!(matches!(
             errors[0],
@@ -651,7 +663,7 @@ Same `tests` module. `extract_all` is `TypeScriptHostLanguage.extract_iso_litera
     #[test]
     fn field_without_associated_function_is_missing_associated_function() {
         assert_eq!(
-            extra_items("export const fullName = iso(`field Pet.fullName { id }`)"),
+            errors_of("export const fullName = iso(`field Pet.fullName { id }`)"),
             IsoLiteralError::Host(TypeScriptHostError::MissingAssociatedFunction).wrap_vec()
         );
     }
@@ -659,14 +671,14 @@ Same `tests` module. `extract_all` is `TypeScriptHostLanguage.extract_iso_litera
     #[test]
     fn exported_field_with_associated_function_is_valid() {
         assert_eq!(
-            extra_items("export const fullName = iso(`field Pet.fullName { id }`)("),
+            errors_of("export const fullName = iso(`field Pet.fullName { id }`)("),
             vec![]
         );
     }
 
     #[test]
     fn tagged_template_field_reports_parentheses_and_export_and_associated() {
-        let errors = extra_items("iso`field Pet.fullName { id }`");
+        let errors = errors_of("iso`field Pet.fullName { id }`");
         assert_eq!(errors.len(), 3);
         assert_eq!(
             errors[0],
@@ -686,29 +698,23 @@ Same `tests` module. `extract_all` is `TypeScriptHostLanguage.extract_iso_litera
     fn host_error_span_is_the_extraction_span() {
         let source = "iso`entrypoint Query.HomeRoute`";
         let extracted = extract_all(source);
-        let item = extracted[0]
-            .item
-            .as_ref()
-            .expect("the fixture extracts a literal");
-        let extra = extracted[0]
-            .extra
-            .as_ref()
-            .expect("the fixture has host errors");
-        assert_eq!(extra.item.len(), 1);
-        assert_eq!(extra.item[0].location, item.location);
-        assert_eq!(extra.location, item.location);
+        assert_eq!(extracted.len(), 1);
+        assert_eq!(extracted[0].errors.len(), 1);
+        assert_eq!(
+            extracted[0].errors[0].location,
+            extracted[0].item.location
+        );
     }
 
     #[test]
-    fn valid_extraction_has_item_and_no_extra() {
+    fn valid_extraction_has_no_errors() {
         let extracted = extract_all("iso(`entrypoint Query.HomeRoute`)");
         assert_eq!(extracted.len(), 1);
-        assert!(extracted[0].item.is_some());
-        assert!(extracted[0].extra.is_none());
+        assert!(extracted[0].errors.is_empty());
     }
 ```
 
-`host_errors("iso(`field Pet.fullName { id }`)(")`: associated `(` is present, export is not. One error, `MissingExport`. The suggested name is `fullName`.
+`errors_of("iso(`field Pet.fullName { id }`)(")`: associated `(` is present, export is not. One error, `MissingExport`. The suggested name is `fullName`.
 
 `Display` tests:
 
@@ -724,6 +730,6 @@ Same `tests` module. `extract_all` is `TypeScriptHostLanguage.extract_iso_litera
 
 ## Order
 
-1. Change 1; `HostLanguage`, `IsoLiteralExtraction`, `IsoLiteralError` in `isograph_parser`. `thiserror` on `BracketError` and `CommaWithoutItem`. `Display` on `SelectableNameWrapper`.
+1. Change 1; `HostLanguage`, `WithErrors`, `IsoLiteralExtraction`, `IsoLiteralError` in `isograph_parser`. `thiserror` on `BracketError` and `CommaWithoutItem`. `Display` on `SelectableNameWrapper`.
 2. Change 2; `crates/isograph_extract_typescript`, `typescript` feature on callers, regex, extract tests.
 3. Change 3; host-error tests.

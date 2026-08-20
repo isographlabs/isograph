@@ -30,8 +30,7 @@ use isograph_parser::{
     HostLanguage, IsoLiteralError, IsoLiteralExtraction, IsoLiteralParse, SemanticToken,
     parse_iso_literal,
 };
-use prelude::Postfix;
-use span::{WithSpan, WithSpanPostfix};
+use span::WithSpan;
 
 pub struct FileLiteral<'a, THostLanguage: HostLanguage> {
     pub extraction: WithSpan<IsoLiteralExtraction<'a, THostLanguage>>,
@@ -46,23 +45,22 @@ pub fn file_literals<THostLanguage: HostLanguage>(
 ) -> Vec<FileLiteral<'_, THostLanguage>> {
     host.extract_iso_literals(source)
         .into_iter()
-        .filter_map(|slot| {
-            let extraction = slot.item?;
+        .map(|extracted| {
+            let extraction = extracted.item;
             let text = extraction.item.iso_literal_text;
             let parsed = parse_iso_literal(text);
             FileLiteral {
                 extraction,
                 parse: parsed.item,
-                errors: slot.extra.map(|errors| errors.item).unwrap_or_default(),
+                errors: extracted.errors,
                 tokens: parsed.tokens,
             }
-            .wrap_some()
         })
         .collect()
 }
 ```
 
-`parse` is `None` when `ParsedIsoLiteral.item` is `None` (empty literal). `tokens` are literal-relative, consume order, whatever the grammar recorded. extra and extra_chunks leftover is leftover-semantic-tokens.md. The matcher's cut is not filled in. `errors` is `Slot.extra`'s inner vec: `IsoLiteralError` (`Host`, `Parse`, `Bracket`, `Comma`), already file-absolute.
+`parse` is `None` when `ParsedIsoLiteral.item` is `None` (empty literal). `tokens` are literal-relative, consume order, whatever the grammar recorded. extra and extra_chunks leftover is leftover-semantic-tokens.md. The matcher's cut is not filled in. `errors` is `WithErrors.errors`: `IsoLiteralError` (`Host`, `Parse`, `Bracket`, `Comma`), already file-absolute.
 
 ```rust
 // from crates/isograph_lsp/src/lsp_state.rs
