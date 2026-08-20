@@ -292,7 +292,7 @@ A group plus its interior is `consume_group_if` or `require_group` with a functi
 
 ## Dispatch
 
-When the next item may start several forms, peek without `commit` to choose a parse function that requires its first token. The last arm is `expected`. If those arms are one value, the match is inside `spanning`.
+When the next item may start several forms, peek without `commit`, `drop` the peek, then call a parse function that requires its first token. The last arm is `expected`. If those arms are one value, the match is inside `spanning`.
 
 `parse_non_constant_value`'s object arm is `{ ... }`. The same `name : value` list in `( ... )` is `consume_argument_list`, not a value.
 
@@ -305,6 +305,7 @@ pub(crate) fn parse_non_constant_value(
         if let Some(peek) = cursor.peek() {
             match peek.view().item.reference() {
                 ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::Dollar)) => {
+                    drop(peek);
                     return NonConstantValue::Variable(VariableUse(parse_variable_name(
                         cursor,
                         Expectation::Token(NonBracketTokenKind::Dollar),
@@ -314,19 +315,23 @@ pub(crate) fn parse_non_constant_value(
                 ChunkContentItem::NonBracket(NonBracketToken(
                     NonBracketTokenKind::StringLiteral,
                 )) => {
+                    drop(peek);
                     return NonConstantValue::String(parse_string_literal(cursor)?).wrap_ok();
                 }
                 ChunkContentItem::NonBracket(NonBracketToken(
                     NonBracketTokenKind::IntegerLiteral,
                 )) => {
+                    drop(peek);
                     return NonConstantValue::Integer(parse_integer_value(cursor)?).wrap_ok();
                 }
                 ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::Identifier)) => {
+                    drop(peek);
                     return parse_boolean_or_null(cursor);
                 }
                 ChunkContentItem::Group(group)
                     if group.opening.item.0 == BracketKind::Brace =>
                 {
+                    drop(peek);
                     return NonConstantValue::Object(parse_object_literal(cursor)?).wrap_ok();
                 }
                 _ => {}
@@ -517,7 +522,7 @@ Each grammar feature lands on this surface.
 - parse-selection-sets.md: selections, selection sets, arguments on selections
 - parse-fields.md: `field Type.name { ... }` via `require_selection_set`
 - parse-name-colon.md: `parse_name_colon(parse_lhs, parse_rhs)`
-- peek-then-parse.md: peek without `commit`, parse function requires the first token; `parse_variable_name` requires `$` then the identifier
+- peek-then-parse.md: peek without `commit`, `drop` the peek, parse function requires the first token; `parse_variable_name` requires `$` then the identifier
 - parse-variables.md: `parse_type_annotation`, `parse_singleton` on `[...]`, `NonConstantValueParent::VariableDefault`, `Box<T>` delegation in `resolve_position`
 - parse-descriptions.md: description via two `consume_token_if`
 - token-text.md: `TokenText` from `consume_token_if` / `require_token`; `text` and `interned` on that value

@@ -2,7 +2,7 @@
 
 Passing the peek into `parse_*` would be the better API. It needs `CursorPeek` to yield the cursor after `commit`, which makes `consume_token_if` / `consume_group_if` worse. This doc does not change `CursorPeek`.
 
-`parse_non_constant_value` peeks to choose a form, drops the peek without `commit`, then calls a parse function that requires its first token. That `require_token` / `require_group` is the assert that the item is still what the peek saw.
+`parse_non_constant_value` peeks to choose a form, `drop`s the peek without `commit`, then calls a parse function that requires its first token. That `require_token` / `require_group` is the assert that the item is still what the peek saw.
 
 `$ ident` is `parse_variable_name(cursor, missing_dollar)`: require `$`, then the identifier. The value arm passes `Expectation::Token(Dollar)`. parse-variables.md passes `Expectation::VariableDeclarationOrUsage`.
 
@@ -170,6 +170,7 @@ pub(crate) fn parse_non_constant_value(
         if let Some(peek) = cursor.peek() {
             match peek.view().item.reference() {
                 ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::Dollar)) => {
+                    drop(peek);
                     return NonConstantValue::Variable(VariableUse(parse_variable_name(
                         cursor,
                         Expectation::Token(NonBracketTokenKind::Dollar),
@@ -179,19 +180,23 @@ pub(crate) fn parse_non_constant_value(
                 ChunkContentItem::NonBracket(NonBracketToken(
                     NonBracketTokenKind::StringLiteral,
                 )) => {
+                    drop(peek);
                     return NonConstantValue::String(parse_string_literal(cursor)?).wrap_ok();
                 }
                 ChunkContentItem::NonBracket(NonBracketToken(
                     NonBracketTokenKind::IntegerLiteral,
                 )) => {
+                    drop(peek);
                     return NonConstantValue::Integer(parse_integer_value(cursor)?).wrap_ok();
                 }
                 ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::Identifier)) => {
+                    drop(peek);
                     return parse_boolean_or_null(cursor);
                 }
                 ChunkContentItem::Group(group)
                     if group.opening.item.0 == BracketKind::Brace =>
                 {
+                    drop(peek);
                     return NonConstantValue::Object(parse_object_literal(cursor)?).wrap_ok();
                 }
                 _ => {}
@@ -202,7 +207,7 @@ pub(crate) fn parse_non_constant_value(
 }
 ```
 
-The peek is not committed. Each `parse_*` requires its first token. If the match-arm borrow of `peek` outlives the `parse_*` call, copy the kind off `view()` first so the peek is dropped.
+The peek is not committed. Each arm `drop`s it, then `parse_*` requires its first token.
 
 ## Tests
 
