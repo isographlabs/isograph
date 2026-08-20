@@ -125,6 +125,8 @@ fn slug(config: &Path) -> String {
 }
 ```
 
+Walk-up is `Path::ancestors`. At each directory, json then js then ts. No crate searches that way and returns the path without also parsing.
+
 `thiserror` on `DiscoverError` for the `Display` / `Error` impls. `NoUserDir` converts with `From`.
 
 `config_and_instance` computes the pair together so no caller can key an instance to the wrong config. `Instance::named` puts the log at `{log_dir}/{slug}.log`, not `isograph.log`.
