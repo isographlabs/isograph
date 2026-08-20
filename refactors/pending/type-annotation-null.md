@@ -11,7 +11,7 @@ Foo       ->  Foo | null
 [Foo]!    ->  [Foo | null]
 ```
 
-Does not depend on the `VariableDeclarationOrUsage` restructure or the combined `parse_iso_literal` entry. `TypeAnnotationParent::Variable` stays `VariableDeclarationOrUsagePath`.
+Does not depend on the combined `parse_iso_literal` entry. `TypeAnnotationParent::Variable` is `VariableDeclarationPath`.
 
 One change: types, parse, resolve node, tests.
 
@@ -39,7 +39,7 @@ pub struct NullTypeAnnotation(
 
 #[derive(Debug)]
 pub enum TypeAnnotationParent<'a> {
-    Variable(VariableDeclarationOrUsagePath<'a>),
+    Variable(VariableDeclarationPath<'a>),
     List(Box<ListTypeAnnotationPath<'a>>),
     SelectableDeclaration(SelectableDeclarationPath<'a>),
     Null(Box<NullTypeAnnotationPath<'a>>),
@@ -59,7 +59,7 @@ pub enum TypeAnnotation {
 }
 
 pub enum TypeAnnotationParent<'a> {
-    Variable(VariableDeclarationOrUsagePath<'a>),
+    Variable(VariableDeclarationPath<'a>),
     List(Box<ListTypeAnnotationPath<'a>>),
     SelectableDeclaration(SelectableDeclarationPath<'a>),
 }
@@ -69,21 +69,19 @@ pub enum TypeAnnotationParent<'a> {
 
 ```rust
 // from crates/isograph_parser/src/isograph_resolution_node.rs
+    ListTypeAnnotationPath, NamedTypeAnnotationPath, NullTypeAnnotationPath,
+```
+
+```rust
+// from crates/isograph_parser/src/isograph_resolution_node.rs
     NamedTypeAnnotation(NamedTypeAnnotationPath<'a>),
     ListTypeAnnotation(ListTypeAnnotationPath<'a>),
     NullTypeAnnotation(NullTypeAnnotationPath<'a>),
 ```
 
-Before: no `NullTypeAnnotation` variant.
+Before: no `NullTypeAnnotationPath` import and no `NullTypeAnnotation` variant.
 
-```rust
-// from crates/isograph_parser/src/variables.rs
-impl<'a> From<NullTypeAnnotationPath<'a>> for IsographResolutionNode<'a> {
-    fn from(path: NullTypeAnnotationPath<'a>) -> Self {
-        IsographResolutionNode::NullTypeAnnotation(path)
-    }
-}
-```
+`NullTypeAnnotation` uses the same `resolved_node = IsographResolutionNode<'a>` as `NamedTypeAnnotation` and `ListTypeAnnotation`. The derive emits `From<NullTypeAnnotationPath<'a>> for IsographResolutionNode<'a>`. Do not write that `From`.
 
 ## Parse
 
@@ -302,6 +300,119 @@ In `parse_iso_literal.rs`. Existing span tests stay (`a_to_target_accepts_every_
     }
 ```
 
-`a_field_with_to_parses_the_target_type` (`to Owner`) matches `Null` then `Named`, not `Named` at the top. `a_line_break_inside_a_list_type_does_not_attach_bang` (`[Pet\n!]`) inner is `Null(Named(Pet))`, not `Named`. `type_names_resolve_through_their_annotation_ancestry` (`$pets: [Pet]`): `Pet` is `EntityNameWrapper` -> `NamedTypeAnnotation` -> `TypeAnnotationParent::Null` -> `List` -> `Null` -> `Variable`. `a_bang_resolves_to_the_annotation` (`ID!`) is still `NamedTypeAnnotation` covering `!`.
+Existing matches on `TypeAnnotation::Named` for no-bang types, and resolve ancestry that skipped `Null`:
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+    fn a_field_with_to_parses_the_target_type() {
+        let text = "field Pet.BestFriend to Owner { id }";
+        // ...
+        match target.item.reference() {
+            TypeAnnotation::Null(null) => {
+                assert_eq!(null.0.location, span_of(text, "Owner"));
+                match null.0.item.reference() {
+                    TypeAnnotation::Named(named) => {
+                        assert_eq!(named.name.location, span_of(text, "Owner"));
+                    }
+                    annotation => panic!("expected Named inside Null, got {annotation:?}"),
+                }
+            }
+            annotation => panic!("expected Null, got {annotation:?}"),
+        }
+    }
+
+    fn to_as_a_target_type_name_parses() {
+        let text = "field Query.Foo to to { bar }";
+        // ...
+        match as_selectable(parse.reference())
+            .target_type
+            .as_ref()
+            .expect("the fixture writes a target")
+            .item
+            .reference()
+        {
+            TypeAnnotation::Null(null) => match null.0.item.reference() {
+                TypeAnnotation::Named(named) => {
+                    assert_eq!(named.name.item, EntityNameWrapper("to".intern().to()));
+                }
+                annotation => panic!("expected Named inside Null, got {annotation:?}"),
+            },
+            annotation => panic!("expected Null, got {annotation:?}"),
+        }
+    }
+
+    fn to_and_the_target_resolve_with_their_ancestry() {
+        let text = "field Pet.BestFriend to Owner { id }";
+        // ...
+        match parse.resolve((), span_of(text, "Owner")) {
+            IsographResolutionNode::EntityNameWrapper(name) => match name.parent {
+                EntityNameWrapperParent::NamedTypeAnnotation(named) => match named.parent {
+                    TypeAnnotationParent::Null(null) => match null.as_ref().parent.reference() {
+                        TypeAnnotationParent::SelectableDeclaration(_) => {}
+                        parent => panic!("expected the field as type parent, got {parent:?}"),
+                    },
+                    parent => panic!("expected Null, got {parent:?}"),
+                },
+                parent => panic!("expected a named type annotation, got {parent:?}"),
+            },
+            node => panic!("expected the type name leaf, got {node:?}"),
+        }
+    }
+
+    fn a_line_break_inside_a_list_type_does_not_attach_bang() {
+        let text = "field Query.Foo($pets: [Pet\n!]) { bar }";
+        // ...
+        match declared.type_.item.reference() {
+            TypeAnnotation::Null(outer) => match outer.0.item.reference() {
+                TypeAnnotation::List(list) => {
+                    let inner = list.inner.as_ref().expect("chunk 0 parsed Pet");
+                    match inner.item.reference() {
+                        TypeAnnotation::Null(elem) => {
+                            assert!(matches!(elem.0.item, TypeAnnotation::Named(_)));
+                            assert_eq!(elem.0.location, span_of(text, "Pet"));
+                        }
+                        annotation => panic!("expected Null element, got {annotation:?}"),
+                    }
+                }
+                annotation => panic!("expected List, got {annotation:?}"),
+            },
+            annotation => panic!("expected Null list, got {annotation:?}"),
+        }
+    }
+
+    fn type_names_resolve_through_their_annotation_ancestry() {
+        let text = "field Query.Foo($pets: [Pet]) { bar }";
+        let (parse, _) = parsed(text);
+        match parse.resolve((), span_of(text, "Pet")) {
+            IsographResolutionNode::EntityNameWrapper(name) => {
+                let named = match name.parent.reference() {
+                    EntityNameWrapperParent::NamedTypeAnnotation(named) => named,
+                    parent => panic!("expected a named type annotation, got {parent:?}"),
+                };
+                let inner_null = match named.parent.reference() {
+                    TypeAnnotationParent::Null(null) => null.as_ref(),
+                    parent => panic!("expected Null around Named, got {parent:?}"),
+                };
+                let list = match inner_null.parent.reference() {
+                    TypeAnnotationParent::List(list) => list.as_ref(),
+                    parent => panic!("expected a list parent, got {parent:?}"),
+                };
+                let outer_null = match list.parent.reference() {
+                    TypeAnnotationParent::Null(null) => null.as_ref(),
+                    parent => panic!("expected Null around List, got {parent:?}"),
+                };
+                match outer_null.parent.reference() {
+                    TypeAnnotationParent::Variable(variable) => {
+                        assert_eq!(variable.inner.name.location, span_of(text, "$pets"));
+                    }
+                    parent => panic!("expected the declared variable, got {parent:?}"),
+                }
+            }
+            node => panic!("expected the type name leaf, got {node:?}"),
+        }
+    }
+```
+
+`a_bang_resolves_to_the_annotation` (`ID!`) is still `NamedTypeAnnotation` covering `!`. `list_types_nest_with_non_null_markers` and `a_bracketed_target_is_a_list_annotation` (`[Pet!]!`) stay `List` of `Named`. `a_multi_line_variable_list_parses_in_the_demo_style` (`ID !`) stays `Named`.
 
 Degenerate: `$x: ID` is `Null(Named)`. `$x: ID!` is `Named`. `to [[Pet]]` is `Null(List(Null(List(Null(Named)))))`. `to [Pet!]` is `Null(List(Named))`. `to [Pet]!` is `List(Null(Named))`.
