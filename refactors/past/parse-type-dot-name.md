@@ -43,6 +43,7 @@ fn parse_field(
     let client_field_name = cursor
         .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+    let variable_definitions = consume_variable_declaration_list(cursor);
     let description = consume_description(cursor);
     let selection_set = require_selection_set(cursor)?;
     ClientFieldDeclaration {
@@ -50,6 +51,7 @@ fn parse_field(
         client_field_name: client_field_name
             .interned()
             .map(ClientScalarSelectableNameWrapper),
+        variable_definitions,
         description,
         selection_set,
     }
@@ -61,7 +63,7 @@ fn parse_field(
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-fn parse_type_dot_name<N: From<intern::string_key::StringKey>>(
+pub(crate) fn parse_type_dot_name<N: From<intern::string_key::StringKey>>(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<(WithSpan<EntityNameWrapper>, WithSpan<N>), WithSpan<ParseError>> {
     let parent_type = cursor
@@ -77,7 +79,7 @@ fn parse_type_dot_name<N: From<intern::string_key::StringKey>>(
         parent_type.interned().map(EntityNameWrapper),
         name.interned(),
     )
-    .wrap_ok()
+        .wrap_ok()
 }
 
 fn parse_entrypoint(
