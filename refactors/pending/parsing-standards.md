@@ -524,7 +524,8 @@ Each grammar feature lands on this surface.
 - parse-selection-sets.md: selections, selection sets, arguments on selections
 - parse-fields.md: `field Type.name { ... }` via `require_selection_set`
 - parse-name-colon.md: `parse_name_colon(parse_lhs, parse_rhs)`
-- parse-variables.md: peek-then-parse in `parse_non_constant_value`, `parse_variable_name` / `require_variable_name`, `parse_type_annotation`, `parse_singleton` on `[...]`, `NonConstantValueParent::VariableDefault`, `Box<T>` delegation in `resolve_position`
+- peek-then-parse.md: peek, commit, pass `TokenText` to `parse_*` in `parse_non_constant_value`; `parse_variable_name` takes the peeked `$`
+- parse-variables.md: `require_variable_name`, `parse_type_annotation`, `parse_singleton` on `[...]`, `NonConstantValueParent::VariableDefault`, `Box<T>` delegation in `resolve_position`
 - parse-descriptions.md: description via two `consume_token_if`
 - token-text.md: `TokenText` from `consume_token_if` / `require_token`; `token_text` and `interned` on that value
 - parse-pointers.md: `to` via `require_token(Identifier)` and `token_text`

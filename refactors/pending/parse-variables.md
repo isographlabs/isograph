@@ -1,6 +1,6 @@
 # parse-variables: variable declarations and type annotations
 
-Field declarations gain variable-declaration lists. Type annotations land here; parse-pointers.md reuses them for `to` targets. Defaults call parse-arguments.md's `parse_non_constant_value`. `$name: Type` is `parse_name_colon` with `require_variable_name` and `parse_type_annotation`.
+Field declarations gain variable-declaration lists. Type annotations land here; parse-pointers.md reuses them for `to` targets. Defaults call parse-arguments.md's `parse_non_constant_value`. `$name: Type` is `parse_name_colon` with `require_variable_name` and `parse_type_annotation`. Lands after peek-then-parse.md.
 
 ## The grammar this doc accepts
 
@@ -22,38 +22,12 @@ Pet    Pet!    [Pet]    [Pet!]!    [[Pet]]
 
 A default value is a `NonConstantValue`. `$` is a variable use, including nested in an object.
 
-## Prefactor: peek, then parse the peeked
+## Change 1: `require_variable_name`
 
-`parse_non_constant_value` peeks, commits, and passes the peeked `TokenText` to a parse function. `$ ident` has two functions: `parse_variable_name` takes the peeked `$` and requires the identifier; `require_variable_name` requires `$` then calls `parse_variable_name` (a declaration did not peek). No AST type, path alias, or `IsographResolutionNode` variant changes.
-
-`ItemCursor::token_text` builds `TokenText` from a committed item's span.
-
-```rust
-// from crates/isograph_parser/src/chunk_stream.rs
-    pub(crate) fn token_text(&self, location: Span) -> TokenText<'a> {
-        TokenText {
-            location,
-            text: self.text,
-        }
-    }
-```
-
-Before: `parse_non_constant_value` is a `consume_token_if` / `consume_group_if` ladder; `$ ident` is inlined in the `$` arm.
-
-After. `ChunkContentItem`, `NonBracketToken`, `ChunkedLevel`, and `TokenText` join the `use` lists in arguments.rs.
+peek-then-parse.md's `parse_variable_name` takes a peeked `$`. A declaration did not peek. This wrapper requires `$` then calls it. No AST type, path alias, or `IsographResolutionNode` variant changes.
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
-fn parse_variable_name(
-    cursor: &mut ItemCursor<'_>,
-    _dollar: TokenText<'_>,
-) -> Result<WithSpan<VariableNameWrapper>, WithSpan<ParseError>> {
-    let name = cursor
-        .require_token(NonBracketTokenKind::Identifier, SemanticToken::Variable)
-        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
-    name.interned().map(VariableNameWrapper).wrap_ok()
-}
-
 pub(crate) fn require_variable_name(
     cursor: &mut ItemCursor<'_>,
     missing_dollar: Expectation,
@@ -63,98 +37,9 @@ pub(crate) fn require_variable_name(
         .map_err(|()| cursor.expected(missing_dollar))?;
     parse_variable_name(cursor, dollar)
 }
-
-fn parse_string_literal(span: TokenText<'_>) -> StringLiteralValueWrapper {
-    span.interned().map(StringLiteralValueWrapper).item
-}
-
-fn parse_integer_value(span: TokenText<'_>) -> Result<IntegerValue, WithSpan<ParseError>> {
-    match span.token_text().parse() {
-        Ok(value) => IntegerValue(value).wrap_ok(),
-        Err(_) => ParseError::IntegerDoesNotFitI64
-            .with_span(span.location)
-            .wrap_err(),
-    }
-}
-
-fn parse_boolean_or_null(
-    span: TokenText<'_>,
-) -> Result<NonConstantValue, WithSpan<ParseError>> {
-    match span.token_text() {
-        "true" => NonConstantValue::Boolean(BooleanValue(Boolean::True)).wrap_ok(),
-        "false" => NonConstantValue::Boolean(BooleanValue(Boolean::False)).wrap_ok(),
-        "null" => NonConstantValue::Null(NullValue).wrap_ok(),
-        _ => ParseError::expected(
-            Expectation::Value,
-            Found::Token(NonBracketTokenKind::Identifier),
-        )
-        .with_span(span.location)
-        .wrap_err(),
-    }
-}
-
-fn parse_object_literal(
-    cursor: &mut ItemCursor<'_>,
-    children: &WithSpan<ChunkedLevel>,
-) -> ObjectLiteral {
-    ObjectLiteral(children.item.parse_each_chunk(
-        cursor,
-        Expectation::Separator(BracketKind::Brace),
-        parse_object_entry,
-    ))
-}
-
-pub(crate) fn parse_non_constant_value(
-    cursor: &mut ItemCursor<'_>,
-) -> Result<WithSpan<NonConstantValue>, WithSpan<ParseError>> {
-    cursor.spanning(|cursor| {
-        if let Some(peek) = cursor.peek() {
-            match peek.view().item.reference() {
-                ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::Dollar)) => {
-                    let dollar =
-                        cursor.token_text(peek.commit(SemanticToken::Variable).location);
-                    return NonConstantValue::Variable(VariableUse(parse_variable_name(
-                        cursor, dollar,
-                    )?))
-                    .wrap_ok();
-                }
-                ChunkContentItem::NonBracket(NonBracketToken(
-                    NonBracketTokenKind::StringLiteral,
-                )) => {
-                    let span = cursor.token_text(peek.commit(SemanticToken::String).location);
-                    return NonConstantValue::String(parse_string_literal(span)).wrap_ok();
-                }
-                ChunkContentItem::NonBracket(NonBracketToken(
-                    NonBracketTokenKind::IntegerLiteral,
-                )) => {
-                    let span = cursor.token_text(peek.commit(SemanticToken::Integer).location);
-                    return NonConstantValue::Integer(parse_integer_value(span)?).wrap_ok();
-                }
-                ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::Identifier)) => {
-                    let span =
-                        cursor.token_text(peek.commit(SemanticToken::BooleanOrNull).location);
-                    return parse_boolean_or_null(span);
-                }
-                _ => {}
-            }
-        }
-        if let Some(object) = cursor.consume_group_if(
-            BracketKind::Brace,
-            SemanticToken::Brace,
-            parse_object_literal,
-        ) {
-            return NonConstantValue::Object(object.item).wrap_ok();
-        }
-        cursor.expected(Expectation::Value).wrap_err()
-    })
-}
 ```
 
-A token arm commits the peek and passes `TokenText`. `{ ... }` is `consume_group_if`; `parse_object_literal` receives the peeked group's children. The `_` arm drops the peek uncommitted so `consume_group_if` can take a brace group.
-
-A declaration uses `require_variable_name` as `parse_name_colon`'s lhs. Existing value tests. Behavior is unchanged.
-
-## Change 1: `Box` delegation in resolve_position
+## Change 2: `Box` delegation in resolve_position
 
 ```rust
 // from crates/resolve_position/src/lib.rs
@@ -174,7 +59,7 @@ impl<T: ResolvePosition> ResolvePosition for Box<T> {
 }
 ```
 
-## Change 2: `Expectation`
+## Change 3: `Expectation`
 
 ```rust
 // from crates/isograph_parser/src/parse_error.rs
@@ -186,7 +71,7 @@ impl<T: ResolvePosition> ResolvePosition for Box<T> {
     EndOfType,
 ```
 
-## Change 3: `ItemCursor::parse_nested_singleton`
+## Change 4: `ItemCursor::parse_nested_singleton`
 
 `parse_singleton` takes `text`, `tokens`, and `errors`. A nested `[...]` is parsed from a cursor that already holds those. This method forwards.
 
@@ -844,7 +729,7 @@ The boxed recursive field uses the `Box<T>` blanket. `VariableDeclarationOrUsage
 
 ## Landing checklist
 
-1. `ItemCursor::token_text`, `parse_variable_name` / `require_variable_name`, peek-then-parse in `parse_non_constant_value`; `cargo test -p isograph_parser` passes.
+1. `require_variable_name`; `cargo test -p isograph_parser` passes.
 2. The `Box<T>` blanket; `cargo test -p resolve_position` passes.
 3. `parse_nested_singleton`, variables.rs, the `NonConstantValueParent::VariableDefault` variant, the `ClientFieldDeclaration` slot, the resolution-node variants, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 4. Move this doc to refactors/past.
