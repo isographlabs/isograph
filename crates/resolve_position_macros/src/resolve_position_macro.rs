@@ -16,9 +16,13 @@ pub(crate) fn resolve_position_macro(item: TokenStream) -> TokenStream {
     let mut input = parse_macro_input!(item as syn::DeriveInput);
     let struct_name = input.ident.clone();
 
-    let resolve_position_args = match deluxe::extract_attributes(&mut input) {
-        Ok(resolve_position_args) => resolve_position_args,
+    let resolve_position_attr = match deluxe::extract_attributes(&mut input) {
+        Ok(resolve_position_attr) => resolve_position_attr,
         Err(e) => return e.into_compile_error().to(),
+    };
+    let resolve_position_args = match ResolvePositionArgs::from_attr(resolve_position_attr) {
+        Ok(resolve_position_args) => resolve_position_args,
+        Err(e) => return e.to(),
     };
 
     match input.data {
@@ -48,12 +52,8 @@ fn handle_data_struct(
     data_struct: syn::DataStruct,
     input_generics: syn::Generics,
 ) -> TokenStream {
-    match args.self_type_generics.reference() {
-        None => {
-            let parent_type = match require_parent_type(&args) {
-                Ok(parent_type) => parent_type,
-                Err(e) => return e.to(),
-            };
+    match args.parent_type.reference() {
+        ParentType::Container(parent_type) => {
             let field_infos = match collect_field_infos(&data_struct, &HashMap::new()) {
                 Ok(field_infos) => field_infos,
                 Err(e) => return e.to(),
@@ -62,7 +62,7 @@ fn handle_data_struct(
             emit_one_impl(EmitImpl {
                 struct_name: struct_name.reference(),
                 resolved_node: args.resolved_node.reference(),
-                parent_type: parent_type.reference(),
+                parent_type,
                 on_unmatched_span: args.on_unmatched_span.as_ref(),
                 impl_generics: quote!(#impl_generics),
                 ty_generics: quote!(#ty_generics),
@@ -71,15 +71,7 @@ fn handle_data_struct(
             })
             .to()
         }
-        Some(pins) => {
-            if let Some(parent_type) = args.parent_type.as_ref() {
-                return Error::new_spanned(
-                    parent_type,
-                    "`parent_type` is on each pin when `self_type_generics` is present",
-                )
-                .to_compile_error()
-                .to();
-            }
+        ParentType::Pins(pins) => {
             if let Err(e) =
                 require_from_path_with_pins(pins.0.len(), args.on_unmatched_span.as_ref())
             {
@@ -240,16 +232,6 @@ fn emit_one_impl(
     }
 }
 
-fn require_parent_type(args: &ResolvePositionArgs) -> Result<syn::Type, proc_macro2::TokenStream> {
-    args.parent_type.clone().ok_or_else(|| {
-        Error::new_spanned(
-            args.resolved_node.reference(),
-            "`parent_type` is required when `self_type_generics` is omitted",
-        )
-        .to_compile_error()
-    })
-}
-
 fn require_from_path_with_pins(
     pin_count: usize,
     on_unmatched_span: Option<&syn::Ident>,
@@ -399,16 +381,12 @@ fn handle_data_enum(
         })
         .collect::<Vec<_>>();
 
-    match args.self_type_generics.reference() {
-        None => {
-            let parent_type = match require_parent_type(&args) {
-                Ok(parent_type) => parent_type,
-                Err(e) => return e.to(),
-            };
+    match args.parent_type.reference() {
+        ParentType::Container(parent_type) => {
             let (impl_generics, ty_generics, where_clause) = input_generics.split_for_impl();
             emit_one_enum_impl(
                 enum_name.reference(),
-                parent_type.reference(),
+                parent_type,
                 args.resolved_node.reference(),
                 quote!(#impl_generics),
                 quote!(#ty_generics),
@@ -417,15 +395,7 @@ fn handle_data_enum(
             )
             .to()
         }
-        Some(pins) => {
-            if let Some(parent_type) = args.parent_type.as_ref() {
-                return Error::new_spanned(
-                    parent_type,
-                    "`parent_type` is on each pin when `self_type_generics` is present",
-                )
-                .to_compile_error()
-                .to();
-            }
+        ParentType::Pins(pins) => {
             let mut impls = Vec::new();
             for pin in pins.0.iter() {
                 if let Err(e) =
@@ -558,13 +528,55 @@ fn single_payload_error(variant: &syn::Variant) -> proc_macro2::TokenStream {
     .to_compile_error()
 }
 
+struct ResolvePositionArgs {
+    parent_type: ParentType,
+    resolved_node: syn::Type,
+    on_unmatched_span: Option<syn::Ident>,
+}
+
+enum ParentType {
+    Container(Box<syn::Type>),
+    Pins(SelfTypeGenerics),
+}
+
 #[derive(deluxe::ExtractAttributes)]
 #[deluxe(attributes(resolve_position))]
-struct ResolvePositionArgs {
+struct ResolvePositionAttr {
     parent_type: Option<syn::Type>,
     resolved_node: syn::Type,
     self_type_generics: Option<SelfTypeGenerics>,
     on_unmatched_span: Option<syn::Ident>,
+}
+
+impl ResolvePositionArgs {
+    fn from_attr(attr: ResolvePositionAttr) -> Result<Self, proc_macro2::TokenStream> {
+        let parent_type = match (attr.parent_type, attr.self_type_generics) {
+            (Some(parent_type), None) => ParentType::Container(parent_type.boxed()),
+            (None, Some(pins)) => ParentType::Pins(pins),
+            (Some(parent_type), Some(_)) => {
+                return Error::new_spanned(
+                    parent_type,
+                    "`parent_type` is on each pin when `self_type_generics` is present",
+                )
+                .to_compile_error()
+                .wrap_err();
+            }
+            (None, None) => {
+                return Error::new_spanned(
+                    attr.resolved_node.reference(),
+                    "`parent_type` is required when `self_type_generics` is omitted",
+                )
+                .to_compile_error()
+                .wrap_err();
+            }
+        };
+        ResolvePositionArgs {
+            parent_type,
+            resolved_node: attr.resolved_node,
+            on_unmatched_span: attr.on_unmatched_span,
+        }
+        .wrap_ok()
+    }
 }
 
 struct SelfTypeGenerics(Vec<SelfTypePin>);

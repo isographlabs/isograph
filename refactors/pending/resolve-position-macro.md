@@ -15,7 +15,7 @@ struct ResolvePositionArgs {
 }
 
 enum ParentType {
-    Container(syn::Type),
+    Container(Box<syn::Type>),
     Pins(SelfTypeGenerics),
 }
 
@@ -209,7 +209,7 @@ struct ResolvePositionArgs {
 }
 
 enum ParentType {
-    Container(syn::Type),
+    Container(Box<syn::Type>),
     Pins(SelfTypeGenerics),
 }
 
@@ -230,7 +230,7 @@ Before: `ResolvePositionArgs` is the deluxe extract, with `parent_type: Option<s
 impl ResolvePositionArgs {
     fn from_attr(attr: ResolvePositionAttr) -> Result<Self, proc_macro2::TokenStream> {
         let parent_type = match (attr.parent_type, attr.self_type_generics) {
-            (Some(parent_type), None) => ParentType::Container(parent_type),
+            (Some(parent_type), None) => ParentType::Container(parent_type.boxed()),
             (None, Some(pins)) => ParentType::Pins(pins),
             (Some(parent_type), Some(_)) => {
                 return Error::new_spanned(
