@@ -101,7 +101,8 @@ use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range};
 use prelude::Postfix;
 use span::Span;
 
-use isograph_parser::{HostLanguage, TypeScriptHostLanguage};
+use isograph_extract_typescript::TypeScriptHostLanguage;
+use isograph_parser::HostLanguage;
 
 use crate::file_literals::{FileLiteral, file_literals};
 

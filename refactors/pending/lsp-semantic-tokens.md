@@ -122,6 +122,7 @@ license = { workspace = true }
 [dependencies]
 common_lang_types = { path = "../common_lang_types" }
 intern = { path = "../../relay-crates/intern" }
+isograph_extract_typescript = { path = "../isograph_extract_typescript", optional = true }
 isograph_parser = { path = "../isograph_parser" }
 lsp-server = { workspace = true }
 lsp-types = { workspace = true }
@@ -129,6 +130,10 @@ prelude = { path = "../prelude" }
 serde_json = { workspace = true }
 span = { path = "../span" }
 tracing = { workspace = true }
+
+[features]
+default = ["typescript"]
+typescript = ["dep:isograph_extract_typescript"]
 
 [lints]
 workspace = true
@@ -147,6 +152,9 @@ mod semantic_tokens;
 mod server;
 mod text_document;
 
+#[cfg(feature = "typescript")]
+pub use isograph_extract_typescript::TypeScriptHostLanguage;
+
 pub fn start() -> std::process::ExitCode;
 ```
 
@@ -156,7 +164,8 @@ pub fn start() -> std::process::ExitCode;
 // from crates/isograph_lsp/src/file_literals.rs
 #[cfg(test)]
 mod tests {
-    use isograph_parser::{IsoLiteralItem, TypeScriptHostLanguage, SemanticToken};
+    use isograph_extract_typescript::TypeScriptHostLanguage;
+    use isograph_parser::{IsoLiteralItem, SemanticToken};
     use intern::string_key::Intern;
     use prelude::Postfix;
     use span::{Span, WithSpanPostfix};
@@ -330,7 +339,8 @@ Absolutize and encode, origin isograph `semantic_tokens.rs`. Delta: `text_source
 
 ```rust
 // from crates/isograph_lsp/src/semantic_tokens.rs
-use isograph_parser::{HostLanguage, TypeScriptHostLanguage};
+use isograph_extract_typescript::TypeScriptHostLanguage;
+use isograph_parser::HostLanguage;
 
 use crate::file_literals::{FileLiteral, file_literals};
 
@@ -419,7 +429,8 @@ Tests:
 // from crates/isograph_lsp/src/semantic_tokens.rs
 #[cfg(test)]
 mod tests {
-    use isograph_parser::{TypeScriptHostLanguage, SemanticToken};
+    use isograph_extract_typescript::TypeScriptHostLanguage;
+    use isograph_parser::SemanticToken;
     use prelude::Postfix;
 
     use super::{

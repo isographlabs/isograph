@@ -6,22 +6,13 @@ The first implementor is `TypeScriptHostLanguage`: the same regex isograph uses 
 
 ## Types
 
-Most important first.
+Most important first. Parser crate: the trait. TypeScript crate: the implementor.
 
 ```rust
-// from crates/isograph_parser/src/extract.rs
-use common_lang_types::ConstExportName;
-use intern::string_key::Intern;
-use prelude::Postfix;
-use regex::Regex;
-use span::{Span, WithSpan, WithSpanPostfix};
+// from crates/isograph_parser/src/host_language.rs
 use std::fmt;
-use std::sync::LazyLock;
 
-use crate::{
-    IsoLiteralItem, IsoLiteralParse, SelectableNameWrapper, Slot, chunk, match_brackets,
-    parse_iso_literal, tokenize,
-};
+use crate::Slot;
 
 pub trait HostLanguage: Sized {
     type LiteralContext;
@@ -37,6 +28,21 @@ pub struct IsoLiteralExtraction<'a, THostLanguage: HostLanguage> {
     pub iso_literal_text: &'a str,
     pub context: THostLanguage::LiteralContext,
 }
+```
+
+```rust
+// from crates/isograph_extract_typescript/src/lib.rs
+use common_lang_types::ConstExportName;
+use intern::string_key::Intern;
+use isograph_parser::{
+    HostLanguage, IsoLiteralExtraction, IsoLiteralItem, IsoLiteralParse, SelectableNameWrapper,
+    Slot, chunk, match_brackets, parse_iso_literal, tokenize,
+};
+use prelude::Postfix;
+use regex::Regex;
+use span::{Span, WithSpan, WithSpanPostfix};
+use std::fmt;
+use std::sync::LazyLock;
 
 pub struct TypeScriptHostLanguage;
 
@@ -63,7 +69,7 @@ pub enum TypeScriptHostError {
 }
 ```
 
-Derives: `TypeScriptHostLanguage` is `Copy, Clone, Debug, Default, PartialEq, Eq`. `IsoLiteralExtraction` is `Copy, Clone, Debug, PartialEq, Eq` when `LiteralContext` is. `TypeScriptLiteralContext`, `IsoCall`, `AssociatedJsFunction`, `TypeScriptHostError` are `Copy, Clone, Debug, PartialEq, Eq`.
+Derives: `TypeScriptHostLanguage` is `Copy, Clone, Debug, Default, PartialEq, Eq`. `IsoLiteralExtraction` is `Copy, Clone, Debug, PartialEq, Eq` when `LiteralContext` is. `TypeScriptLiteralContext`, `IsoCall`, `AssociatedJsFunction`, `TypeScriptHostError` are `Copy, Clone, Debug, PartialEq, Eq`. `isograph_parser` does not depend on `regex` or on the TypeScript crate.
 
 The string's location in the file is `Slot.item`'s `WithSpan`, not a field on `IsoLiteralExtraction`. For `TypeScriptHostLanguage`, that span is the interior of the backticks, and `&source[item.location.as_usize_range()] == item.item.iso_literal_text`. Host errors share that span: `extra` is `WithSpan<Vec<Error>>` at the same location.
 
@@ -98,67 +104,62 @@ pub struct Slot<T, E> {
 
 Before: `extra_tokens`. Every `extra_tokens` in `crates/isograph_parser` (struct field, constructions, tests, `#[parent_from]` on that field) becomes `extra`. `UnparsedChunkItemsParent` and resolve pins stay. `parsing-standards.md` Slot listings become `extra`.
 
-## Change 2: `HostLanguage::extract_iso_literals` and `TypeScriptHostLanguage`
+## Change 2: `HostLanguage` in the parser
 
-`crates/isograph_parser/Cargo.toml` gains `regex`:
-
-```toml
-# from crates/isograph_parser/Cargo.toml
-[dependencies]
-common_lang_types = { path = "../common_lang_types" }
-intern = { path = "../../relay-crates/intern" }
-logos = { workspace = true }
-nonempty = { workspace = true }
-prelude = { path = "../prelude" }
-regex = { workspace = true }
-resolve_position = { path = "../resolve_position" }
-resolve_position_macros = { path = "../resolve_position_macros" }
-safe_peekable = { path = "../safe_peekable" }
-scoped_stack = { path = "../scoped_stack" }
-span = { path = "../span" }
-strum = { workspace = true }
-thiserror = { workspace = true }
-```
-
-Before: no `regex` line.
-
-New module `crates/isograph_parser/src/extract.rs`, registered in `lib.rs`:
+New module `crates/isograph_parser/src/host_language.rs`. Parser `Cargo.toml` does not gain `regex`.
 
 ```rust
 // from crates/isograph_parser/src/lib.rs
-mod arguments;
-mod chunk;
-mod chunk_stream;
-mod directives;
-mod extract;
-mod isograph_resolution_node;
-mod matched_brackets;
-mod non_bracket_token;
-mod parse_error;
-mod parse_iso_literal;
-mod selections;
-mod semantic_token;
-mod token_kind;
-mod tokenize;
-mod variables;
+mod host_language;
 
-pub use arguments::*;
-pub use chunk::*;
-pub use directives::*;
-pub use extract::*;
-pub use isograph_resolution_node::*;
-pub use matched_brackets::*;
-pub use non_bracket_token::*;
-pub use parse_error::*;
-pub use parse_iso_literal::*;
-pub use selections::*;
-pub use semantic_token::*;
-pub use token_kind::*;
-pub use tokenize::*;
-pub use variables::*;
+pub use host_language::*;
 ```
 
-Before: no `mod extract` / `pub use extract::*`.
+`HostLanguage` and `IsoLiteralExtraction` as in Types. No TypeScript types, no regex.
+
+## Change 3: `isograph_extract_typescript`
+
+New crate. The regex and `TypeScriptHostLanguage` live here. `isograph_parser` does not depend on this crate (that would cycle). Callers that want TypeScript take the feature `typescript`.
+
+```toml
+# from crates/isograph_extract_typescript/Cargo.toml
+[package]
+name = "isograph_extract_typescript"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+common_lang_types = { path = "../common_lang_types" }
+intern = { path = "../../relay-crates/intern" }
+isograph_parser = { path = "../isograph_parser" }
+prelude = { path = "../prelude" }
+regex = { workspace = true }
+span = { path = "../span" }
+
+[lints]
+workspace = true
+```
+
+Workspace member via `./crates/*`.
+
+`crates/isograph_lsp/Cargo.toml` (and any other binary that extracts from TS/JS files):
+
+```toml
+isograph_extract_typescript = { path = "../isograph_extract_typescript", optional = true }
+
+[features]
+default = ["typescript"]
+typescript = ["dep:isograph_extract_typescript"]
+```
+
+```rust
+// from crates/isograph_lsp/src/lib.rs
+#[cfg(feature = "typescript")]
+pub use isograph_extract_typescript::*;
+```
+
+Without `--features typescript` (or with `--no-default-features`), the TypeScript regex is not in the graph.
 
 The regex is isograph's, with named groups. Origin pattern:
 
@@ -167,7 +168,7 @@ The regex is isograph's, with named groups. Origin pattern:
 ```
 
 ```rust
-// from crates/isograph_parser/src/extract.rs
+// from crates/isograph_extract_typescript/src/lib.rs
 const EXTRACT_ISO_LITERAL_PATTERN: &str =
     r"(?<comment>// )?(export const (?<export_name>[^ ]+) =\s+)?iso(?<open_paren>\()?\s*`(?<literal>[^`]+)`,?\s*(?<close_paren>\))?(?<associated>\()?";
 
@@ -180,7 +181,7 @@ static EXTRACT_ISO_LITERAL: LazyLock<Regex> = LazyLock::new(|| {
 `expect`: the pattern is a string literal in this file. `Regex::new` returns `Err` only for invalid syntax; the type system cannot check regex syntax. The invariant is that this pattern compiles.
 
 ```rust
-// from crates/isograph_parser/src/extract.rs
+// from crates/isograph_extract_typescript/src/lib.rs
 impl HostLanguage for TypeScriptHostLanguage {
     type LiteralContext = TypeScriptLiteralContext;
     type Error = TypeScriptHostError;
@@ -264,9 +265,9 @@ fn item_of(parse: &WithSpan<IsoLiteralParse>) -> Option<&IsoLiteralItem> {
 }
 ```
 
-`parse_tree` / `item_of` are private helpers in `extract.rs` for `TypeScriptHostLanguage`: parentheses are a file fact; export and associated function depend on whether the contents parsed as `Selectable`. The parse tree is not `Slot.item`. `item` is the isograph string and host context. Grammar errors stay on `parse_iso_literal`'s error vec when a later caller parses.
+`parse_tree` / `item_of` are private helpers in the TypeScript crate: parentheses are a file fact; export and associated function depend on whether the contents parsed as `Selectable`. The parse tree is not `Slot.item`. `item` is the isograph string and host context. Grammar errors stay on `parse_iso_literal`'s error vec when a later caller parses.
 
-`Display` for `TypeScriptHostError` lands with Change 2. Change 3 is `Display` for `SelectableNameWrapper` (used by `MissingExport`) and the host-error tests.
+`Display` for `TypeScriptHostError` lands with Change 3. Change 4 is `Display` for `SelectableNameWrapper` (used by `MissingExport`) and the host-error tests.
 
 `TypeScriptHostLanguage`: empty backticks (`iso(\`\`)`) do not match (`[^`]+` needs at least one character). A missing `literal` group skips the match. `close_paren` is in the pattern so the associated `(` can match; it is not a field.
 
@@ -274,19 +275,20 @@ Origin of `extract_iso_literals`: `extract_iso_literals_from_file_content` plus 
 
 ### Tests
 
-In `extract.rs` under `#[cfg(test)]`. Helper `extract` takes `.item` of each `Slot`. Host-error tests read `.extra`.
+In `crates/isograph_extract_typescript/src/lib.rs` under `#[cfg(test)]`. Helper `extract` takes `.item` of each `Slot`. Host-error tests read `.extra`.
 
 ```rust
-// from crates/isograph_parser/src/extract.rs
+// from crates/isograph_extract_typescript/src/lib.rs
 #[cfg(test)]
 mod tests {
     use intern::string_key::Intern;
+    use isograph_parser::{HostLanguage, IsoLiteralExtraction, Slot};
     use prelude::Postfix;
     use span::{Span, WithSpan, WithSpanPostfix};
 
     use super::{
-        AssociatedJsFunction, HostLanguage, IsoCall, IsoLiteralExtraction, Slot,
-        TypeScriptHostError, TypeScriptHostLanguage, TypeScriptLiteralContext,
+        AssociatedJsFunction, IsoCall, TypeScriptHostError, TypeScriptHostLanguage,
+        TypeScriptLiteralContext,
     };
 
     fn extract(
@@ -536,7 +538,7 @@ export const HomeRoute = iso(`
 `Display` for `TypeScriptHostError` lands in this change, next to the impl:
 
 ```rust
-// from crates/isograph_parser/src/extract.rs
+// from crates/isograph_extract_typescript/src/lib.rs
 impl fmt::Display for TypeScriptHostError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -574,7 +576,7 @@ impl fmt::Display for SelectableNameWrapper {
 
 Before: `SelectableNameWrapper` has no `Display`. `parse_iso_literal.rs` gains `use std::fmt;`.
 
-## Change 3: host-error tests
+## Change 4: host-error tests
 
 Same `tests` module. `extract_all` is `TypeScriptHostLanguage.extract_iso_literals`. Helper `host_errors` takes the one extracted slot's `extra`.
 
@@ -682,5 +684,6 @@ Same `tests` module. `extract_all` is `TypeScriptHostLanguage.extract_iso_litera
 ## Order
 
 1. Change 1; `Slot.extra_tokens` is `extra`.
-2. Change 2; trait, `extract_iso_literals` returning `Slot`, TypeScript regex, `Display` for `TypeScriptHostError`, extract tests.
-3. Change 3; `Display` for `SelectableNameWrapper`, host-error tests.
+2. Change 2; `HostLanguage` / `IsoLiteralExtraction` in `isograph_parser`.
+3. Change 3; `crates/isograph_extract_typescript`, `typescript` feature on callers, regex, extract tests.
+4. Change 4; `Display` for `SelectableNameWrapper`, host-error tests.
