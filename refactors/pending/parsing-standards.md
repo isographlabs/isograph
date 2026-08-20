@@ -333,7 +333,7 @@ When the next item may start several forms, peek without `commit`. Copy what the
 
 Keyword text after `require_token(Identifier, token)` or `consume_token_if(Identifier, token)`: `match` on `text()` (`"entrypoint"` / `"field"`; `"true"` / `"false"` / `"null"`). Optional `to` copies the identifier span from `peek().and_then`, then compares `cursor.text()` at that span to `"to"`, then `require_token(Identifier, Keyword)` and parse the type. A non-`to` identifier is not consumed.
 
-One optional item is `consume_*`. Two optional kinds in one position is two `consume_token_if` calls. The optional `!` after a type name is `consume_token_if(Exclamation, SemanticToken::GraphQLTypeName)`: the next item may be the caller's `=`. `$name` is `parse_variable_name(cursor, missing_dollar)`. After `require_token` on an identifier, `consume_token_if(Colon, SemanticToken::Colon)` is the alias; both arms use the identifier.
+One optional item is `consume_*`. Two optional kinds in one position is two `consume_token_if` calls. The optional `!` after a type name is `consume_token_if(Exclamation, SemanticToken::GraphQLTypeName)`: the next item may be the caller's `=`. That consume is the use of `!` (semantic token plus span on the annotation). `$name` is `parse_variable_name(cursor, missing_dollar)`. After `require_token` on an identifier, `consume_token_if(Colon, SemanticToken::Colon)` is the alias; both arms use the identifier.
 
 ```rust
     let first = cursor
