@@ -276,17 +276,26 @@ impl<'a> From<VariableDeclarationOrUsageSlotPath<'a>> for IsographResolutionNode
     VariableDeclarationOrUsageSlot(VariableDeclarationOrUsageSlotPath<'a>),
 ```
 
-`$name` after a `$` that the caller already took. These two functions do not change `VariableNameWrapper` or its parent enum.
+`$ ident`, including the `$`. These two functions do not change `VariableNameWrapper` or its parent enum. `require_variable_name` is parse-name-colon.md's lhs for a declaration. `consume_variable_name` is the value ladder's `$` arm.
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
-pub(crate) fn parse_variable_name(
+pub(crate) fn consume_variable_name(
     cursor: &mut ItemCursor<'_>,
-) -> Result<WithSpan<VariableNameWrapper>, WithSpan<ParseError>> {
+) -> Result<Option<WithSpan<VariableNameWrapper>>, WithSpan<ParseError>> {
+    if cursor
+        .consume_token_if(NonBracketTokenKind::Dollar, SemanticToken::Variable)
+        .is_none()
+    {
+        return None.wrap_ok();
+    }
     let name = cursor
         .require_token(NonBracketTokenKind::Identifier, SemanticToken::Variable)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
-    name.interned().map(VariableNameWrapper).wrap_ok()
+    name.interned()
+        .map(VariableNameWrapper)
+        .wrap_some()
+        .wrap_ok()
 }
 
 pub(crate) fn require_variable_name(
@@ -296,7 +305,10 @@ pub(crate) fn require_variable_name(
     cursor
         .require_token(NonBracketTokenKind::Dollar, SemanticToken::Variable)
         .map_err(|()| cursor.expected(missing_dollar))?;
-    parse_variable_name(cursor)
+    let name = cursor
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::Variable)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+    name.interned().map(VariableNameWrapper).wrap_ok()
 }
 ```
 
@@ -324,11 +336,8 @@ After:
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
-        if cursor
-            .consume_token_if(NonBracketTokenKind::Dollar, SemanticToken::Variable)
-            .is_some()
-        {
-            return NonConstantValue::Variable(VariableUse(parse_variable_name(cursor)?)).wrap_ok();
+        if let Some(name) = consume_variable_name(cursor)? {
+            return NonConstantValue::Variable(VariableUse(name)).wrap_ok();
         }
 ```
 
@@ -769,5 +778,5 @@ The boxed recursive field uses the `Box<T>` blanket. `VariableDeclarationOrUsage
 ## Landing checklist
 
 1. The `Box<T>` blanket; `cargo test -p resolve_position` passes.
-2. `parse_nested_singleton`, variables.rs, `parse_variable_name` / `require_variable_name`, the `NonConstantValueParent::VariableDefault` variant, the `ClientFieldDeclaration` slot, the resolution-node variants, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+2. `parse_nested_singleton`, variables.rs, `consume_variable_name` / `require_variable_name`, the `NonConstantValueParent::VariableDefault` variant, the `ClientFieldDeclaration` slot, the resolution-node variants, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 3. Move this doc to refactors/past.

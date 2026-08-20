@@ -533,7 +533,7 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 - Nested list stream: `ItemCursor::stream_chunk`
 - Group interior: `require_group` / `consume_group_if` with a function that parses the inside; close is recorded when that function returns.
 - lhs, colon, rhs: `parse_name_colon(cursor, parse_lhs, parse_rhs)` → `(L, R)`
-- `$name` after `$` already taken: `parse_variable_name`; `$` required: `require_variable_name`
+- `$ ident`: `consume_variable_name` → `Result<Option<WithSpan<VariableNameWrapper>>, _>` (`Ok(None)` if the next item is not `$`); `require_variable_name` takes the missing-`$` expectation
 
 ## Shipping and amending
 
@@ -545,7 +545,7 @@ Each grammar feature lands on this surface.
 - parse-selection-sets.md: selections, selection sets, arguments on selections
 - parse-fields.md: `field Type.name { ... }` via `require_selection_set`
 - parse-name-colon.md: `parse_name_colon(parse_lhs, parse_rhs)`
-- parse-variables.md: `parse_type_annotation`, `parse_singleton` on `[...]`, `NonConstantValueParent::VariableDefault`, `require_variable_name` / `parse_variable_name`, `Box<T>` delegation in `resolve_position`
+- parse-variables.md: `parse_type_annotation`, `parse_singleton` on `[...]`, `NonConstantValueParent::VariableDefault`, `consume_variable_name` / `require_variable_name`, `Box<T>` delegation in `resolve_position`
 - parse-descriptions.md: description via two `consume_token_if`
 - token-text.md: `TokenText` from `consume_token_if` / `require_token`; `token_text` and `interned` on that value
 - parse-pointers.md: `to` via `require_token(Identifier)` and `token_text`
