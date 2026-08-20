@@ -176,7 +176,7 @@ The contents of the config file are not read.
 
 ## Tests
 
-Unit tests in `discover.rs`. Binary tests replace `Daemon` with `World`: one private HOME, any number of project directories, optional `--config`. Config files are `{}\n` so Change 3 does not break these tests. cli-ci-build.md runs `cargo test --release --target` on every platform, so every e2e test here runs on all five.
+Unit tests in `discover.rs`. Binary tests replace `Daemon` with `World`: one private HOME, any number of project directories, optional `--config`. Config files are `{}\n` so Change 3 does not break these tests. `World::isograph` uses `isograph_bin()` from cli-ci-build.md. The test job on each platform downloads the release artifact and runs `cargo test --tests` with `ISOGRAPH_BIN` set to it.
 
 ```rust
 // from crates/isograph_cli/src/discover.rs
@@ -446,7 +446,7 @@ impl World {
     ) -> Output {
         let home = self.dir.path().join("home");
         std::fs::create_dir_all(home.reference()).expect("a test can create its private HOME");
-        let mut command = Command::new(env!("CARGO_BIN_EXE_isograph"));
+        let mut command = Command::new(isograph_bin());
         command.args(args);
         if let Some(config) = config {
             command.arg("--config").arg(config);
