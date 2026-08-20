@@ -41,6 +41,16 @@ pub enum BracketKind {
     Bracket,
 }
 
+impl BracketKind {
+    pub fn closing(self) -> &'static str {
+        match self {
+            BracketKind::Parenthesis => "')'",
+            BracketKind::Brace => "'}'",
+            BracketKind::Bracket => "']'",
+        }
+    }
+}
+
 /// One of the six bracket tokens.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum BracketToken {

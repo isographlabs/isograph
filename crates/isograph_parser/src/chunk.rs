@@ -1228,9 +1228,11 @@ mod tests {
         let mut tokens = Vec::new();
         let dummy = chunked("x");
         let mut parent = dummy.item.0[0].item.stream(text, &mut tokens, &mut errors);
-        let items = tree
-            .item
-            .parse_each_chunk(parent.cursor(), Separator, parse_identifier);
+        let items = tree.item.parse_each_chunk(
+            parent.cursor(),
+            Separator(BracketKind::Parenthesis),
+            parse_identifier,
+        );
         (items, errors, comma_errors, tokens)
     }
 
@@ -1302,9 +1304,12 @@ mod tests {
         assert!(items[0].item.extra_tokens.as_ref().is_some());
         assert_eq!(
             errors,
-            expected(Separator, Found::Token(Identifier))
-                .with_span(span_of(text, "bar"))
-                .wrap_vec(),
+            expected(
+                Separator(BracketKind::Parenthesis),
+                Found::Token(Identifier)
+            )
+            .with_span(span_of(text, "bar"))
+            .wrap_vec(),
         );
         assert_eq!(
             tokens,

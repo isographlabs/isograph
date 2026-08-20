@@ -14,6 +14,8 @@ pub enum ParseError {
     MultipleDeclarations,
     #[error("This declaration type is not supported yet.")]
     UnsupportedDeclarationType,
+    #[error("This integer does not fit in a 64-bit signed integer.")]
+    IntegerDoesNotFitI64,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -28,16 +30,22 @@ impl fmt::Display for ExpectedFound {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, strum::Display)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
 pub enum Expectation {
-    #[strum(to_string = "{0}")]
+    #[error("{0}")]
     Token(NonBracketTokenKind),
-    #[strum(to_string = "one of `entrypoint`, `field`, or `pointer`")]
+    #[error("one of `entrypoint`, `field`, or `pointer`")]
     DeclarationKeyword,
-    #[strum(to_string = "the end of the declaration")]
+    #[error("the end of the declaration")]
     EndOfDeclaration,
-    #[strum(to_string = "a comma or line break")]
-    Separator,
+    #[error("a comma, a line break, or {}", .0.closing())]
+    Separator(BracketKind),
+    #[error("an argument, like 'id: $id'")]
+    Argument,
+    #[error("a value, like $foo, 42, \"bar\", true, false, null, or an object literal")]
+    Value,
+    #[error("an object entry, like 'id: 4'")]
+    ObjectEntry,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, strum::Display)]
@@ -88,7 +96,10 @@ mod tests {
             Expectation::EndOfDeclaration.to_string(),
             "the end of the declaration",
         );
-        assert_eq!(Expectation::Separator.to_string(), "a comma or line break");
+        assert_eq!(
+            Expectation::Separator(BracketKind::Parenthesis).to_string(),
+            "a comma, a line break, or ')'",
+        );
     }
 
     #[test]
@@ -127,8 +138,12 @@ mod tests {
     #[test]
     fn parse_error_expected_uses_expected_found() {
         assert_eq!(
-            ParseError::expected(Expectation::Separator, Found::EndOfChunk).to_string(),
-            "Expected a comma or line break, found nothing more.",
+            ParseError::expected(
+                Expectation::Separator(BracketKind::Parenthesis),
+                Found::EndOfChunk,
+            )
+            .to_string(),
+            "Expected a comma, a line break, or ')', found nothing more.",
         );
     }
 }

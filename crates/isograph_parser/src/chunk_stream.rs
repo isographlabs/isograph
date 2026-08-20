@@ -421,8 +421,12 @@ mod tests {
             .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
             .expect("foo is present");
         assert_eq!(
-            cursor.expected(Expectation::Separator),
-            expected(Expectation::Separator, Found::EndOfChunk).with_span(Span::new(
+            cursor.expected(Expectation::Separator(BracketKind::Parenthesis)),
+            expected(
+                Expectation::Separator(BracketKind::Parenthesis),
+                Found::EndOfChunk,
+            )
+            .with_span(Span::new(
                 span_of(text, "foo").end,
                 span_of(text, "foo").end,
             )),
