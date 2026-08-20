@@ -10,9 +10,89 @@ Origin: isograph `crates/isograph_lsp/src/diagnostic_notification.rs` and the de
 
 Open a file containing `iso(\`entrypoint\`)`. The `Type.name` is missing. A red squiggle appears on the literal with "Expected an identifier, found nothing more." (or whatever `ParseError` displays for that span). Fix the literal; the squiggle goes away. Close the file; diagnostics for that URI are cleared.
 
-## Change 1: `thiserror` on `BracketError` and `CommaWithoutItem`
+## Change 1: `Display` on `BracketError` and `CommaWithoutItem`
 
-Owned by parse-iso-literal-entry.md Change 2. `BracketError` and `CommaWithoutItem` derive `thiserror::Error`. `ParseError` wraps them with `#[error("{0}")]`. Implement once.
+Owned by parse-iso-literal-entry.md Change 1. Same impls. Implement once.
+
+```rust
+// from crates/isograph_parser/src/matched_brackets.rs
+use std::fmt;
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum BracketError {
+    UnmatchedOpen(WithSpan<OpenBracket>),
+    UnmatchedClose(WithSpan<CloseBracket>),
+}
+
+impl fmt::Display for BracketError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BracketError::UnmatchedOpen(open) => {
+                write!(f, "Unclosed {}", open.item.0)
+            }
+            BracketError::UnmatchedClose(close) => {
+                write!(f, "Unexpected {}", close.item.0)
+            }
+        }
+    }
+}
+
+impl std::error::Error for BracketError {}
+```
+
+Before: `BracketError` has no `Display`. `OpenBracket` / `CloseBracket` are `pub struct OpenBracket(pub BracketKind)` / `pub struct CloseBracket(pub BracketKind)`. `BracketKind` already displays as `'('`, `'{'`, `'['`.
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+use std::fmt;
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct CommaWithoutItem(pub Span);
+
+impl fmt::Display for CommaWithoutItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "A comma with no item before it.")
+    }
+}
+
+impl std::error::Error for CommaWithoutItem {}
+```
+
+Before: `CommaWithoutItem` has no `Display`.
+
+`ParseError` already implements `Display` via `thiserror`.
+
+Tests in those modules:
+
+```rust
+// from crates/isograph_parser/src/matched_brackets.rs
+    #[test]
+    fn unmatched_open_displays_the_kind() {
+        let err = BracketError::UnmatchedOpen(
+            OpenBracket(BracketKind::Brace).with_span(Span::new(0, 1)),
+        );
+        assert_eq!(err.to_string(), "Unclosed '{'");
+    }
+
+    #[test]
+    fn unmatched_close_displays_the_kind() {
+        let err = BracketError::UnmatchedClose(
+            CloseBracket(BracketKind::Parenthesis).with_span(Span::new(0, 1)),
+        );
+        assert_eq!(err.to_string(), "Unexpected '('");
+    }
+```
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+    #[test]
+    fn comma_without_item_displays() {
+        assert_eq!(
+            CommaWithoutItem(Span::new(0, 1)).to_string(),
+            "A comma with no item before it."
+        );
+    }
+```
 
 ## Change 2: file diagnostics
 
@@ -342,6 +422,6 @@ fn run(connection: Connection) {
 
 ## Order
 
-1. Change 1; parse-iso-literal-entry.md thiserror on `BracketError` / `CommaWithoutItem` and pipeline `ParseError`.
+1. Change 1; `Display` on `BracketError` and `CommaWithoutItem`.
 2. Change 2; `diagnostics_for_file`, `char_index_to_position`, unit tests.
 3. Change 3; publish on open/change, clear on close, `LspState` sender, handler tests with `Connection::memory()`.
