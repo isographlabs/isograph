@@ -18,7 +18,7 @@ pub fn parse_iso_literal(
 
 `parse_iso_literal` takes `text: &str`, the chunked literal, `errors`, and `tokens`. Each chunk is passed to `Chunk::stream(text, tokens, errors)`, which returns one `ChunkStream`. A group's interior is the `ChunkedLevel` in `group.children`.
 
-A group is one item. `require_group` and `consume_group_if` return it in one call. The interior is parsed by calling `parse_each_chunk` or `parse_singleton` on `group.children`.
+A group is one item. `require_group` and `consume_group_if` take a function that parses the inside. They commit the open, run that function against the group's children, wrap the result with the group's span, and record the close when the function returns.
 
 Each token and group has a span. A parse function assigns a span to a value made of more than one item by calling `spanning`. `expected` on an exhausted cursor is `Expected(_, EndOfChunk)` at `end_span`.
 
@@ -65,23 +65,24 @@ impl<'a> ItemCursor<'a> {
         kind: NonBracketTokenKind,
         token: SemanticToken,
     ) -> Option<TokenText<'a>>;
-    pub(crate) fn consume_group_if(
+    pub(crate) fn consume_group_if<R>(
         &mut self,
         kind: BracketKind,
         token: SemanticToken,
-    ) -> Option<WithSpan<&'a ChunkedGroup>>;
+        parse_inside: impl FnOnce(&mut Self, &'a WithSpan<ChunkedLevel>) -> R,
+    ) -> Option<WithSpan<R>>;
     pub(crate) fn expected(&mut self, expected: Expectation) -> WithSpan<ParseError>;
     pub(crate) fn require_token(
         &mut self,
         kind: NonBracketTokenKind,
         token: SemanticToken,
     ) -> Result<TokenText<'a>, ()>;
-    pub(crate) fn require_group(
+    pub(crate) fn require_group<R>(
         &mut self,
         kind: BracketKind,
         token: SemanticToken,
-    ) -> Result<WithSpan<&'a ChunkedGroup>, ()>;
-    pub(crate) fn record_group_close(&mut self, group: &ChunkedGroup, token: SemanticToken);
+        parse_inside: impl FnOnce(&mut Self, &'a WithSpan<ChunkedLevel>) -> R,
+    ) -> Result<WithSpan<R>, ()>;
     pub(crate) fn report_error(&mut self, error: WithSpan<ParseError>);
     pub(crate) fn stream_chunk<'c>(&'c mut self, chunk: &'c Chunk) -> ChunkStream<'c>;
     pub(crate) fn text(&self) -> &'a str;
@@ -259,32 +260,34 @@ A type that contains a group stores `Vec<WithSpan<Slot<P, UnparsedChunkItems>>>`
 
 ## Function shapes
 
-- `consume_*`: `ItemCursor` method. Match: `commit` and `Some`. Else: `None`.
+- `consume_*`: `ItemCursor` method. Match: `commit` and `Some`. Else: `None`. A group is: Match: `commit`, run `parse_inside` on the children, record close, `Some` of that result with the group's span. Else: `None`.
 - `expected`: `ItemCursor` method. Peek, no `commit`. Next item or `EndOfChunk` becomes `Expected(expected, found)`.
 - `require_*`: `consume_*` or `Err(())`. The caller maps `Err` with `expected`.
 - `parse_*`: implements a form made of several items. Parameter is `&mut ItemCursor`. First `Err` is returned. Shared iteration is `parse_each_chunk`, `parse_singleton`, or `spanning`. A nested list takes the cursor.
 - Diagnostic: `report_error` on the child cursor in `parse_one_chunk`; `errors.push` in `parse_singleton` and `parse_iso_literal`. Not stored on the tree.
 
-A group plus its interior is `consume_group_if` or `require_group`, then `parse_each_chunk` or `parse_singleton` on `group.children`:
+A group plus its interior is `consume_group_if` or `require_group` with a function that parses the inside:
 
 ```rust
-    let group = cursor.consume_group_if(BracketKind::Brace, SemanticToken::Brace)?;
-    group.item.children.item.parse_each_chunk(
-        cursor,
-        Expectation::Separator(BracketKind::Brace),
-        parse_item,
-    )
+    cursor.consume_group_if(BracketKind::Brace, SemanticToken::Brace, |cursor, children| {
+        children.item.parse_each_chunk(
+            cursor,
+            Expectation::Separator(BracketKind::Brace),
+            parse_item,
+        )
+    })
 ```
 
 ```rust
-    let group = cursor
-        .require_group(BracketKind::Brace, SemanticToken::Brace)
-        .map_err(|()| cursor.expected(expectation))?;
-    group.item.children.item.parse_each_chunk(
-        cursor,
-        Expectation::Separator(BracketKind::Brace),
-        parse_item,
-    )
+    cursor
+        .require_group(BracketKind::Brace, SemanticToken::Brace, |cursor, children| {
+            children.item.parse_each_chunk(
+                cursor,
+                Expectation::Separator(BracketKind::Brace),
+                parse_item,
+            )
+        })
+        .map_err(|()| cursor.expected(expectation))?
 ```
 
 ## Dispatch
@@ -344,14 +347,18 @@ pub(crate) fn parse_value(
                 .wrap_err(),
             };
         }
-        if let Some(group) = cursor.consume_group_if(BracketKind::Brace, SemanticToken::Brace) {
-            let object = ObjectLiteral(group.item.children.item.parse_each_chunk(
-                cursor,
-                Expectation::Separator(BracketKind::Brace),
-                parse_object_entry,
-            ));
-            cursor.record_group_close(group.item, SemanticToken::Brace);
-            return NonConstantValue::Object(object).wrap_ok();
+        if let Some(object) = cursor.consume_group_if(
+            BracketKind::Brace,
+            SemanticToken::Brace,
+            |cursor, children| {
+                ObjectLiteral(children.item.parse_each_chunk(
+                    cursor,
+                    Expectation::Separator(BracketKind::Brace),
+                    parse_object_entry,
+                ))
+            },
+        ) {
+            return NonConstantValue::Object(object.item).wrap_ok();
         }
         cursor.expected(Expectation::Value).wrap_err()
     })
@@ -530,7 +537,7 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 - Extra root chunks: `ExtraChunks` plus `errors.push(MultipleDeclarations)`
 - Diagnostic: `report_error` on the child cursor in `parse_one_chunk`; `errors.push` in `parse_singleton` / `parse_iso_literal`
 - Nested list stream: `ItemCursor::stream_chunk`
-- Group interior: `require_group` / `consume_group_if`, then `parse_each_chunk(cursor, ...)` or `parse_singleton` on `group.children`
+- Group interior: `require_group` / `consume_group_if` with a function that parses the inside; close is recorded when that function returns.
 - Constant-only value: `parse_constant_value` → `ConstantValue`
 
 ## Shipping and amending

@@ -60,7 +60,7 @@ Call sites, by variant:
 - `Bracket`: leftover fill-in only. `(`, `)`, `{`, `}`, `[`, `]` that no consume covered.
 - `Error`: leftover fill-in only. An `Error` token.
 
-Open and close of one `BracketKind` share one token. `consume_group_if(kind, token)` records `token` on the open; `record_group_close(group, token)` records the same `token` on the close.
+Open and close of one `BracketKind` share one token. `consume_group_if(kind, token, parse_inside)` records `token` on the open, runs `parse_inside`, and records the same `token` on the close when `parse_inside` returns.
 
 No `line_behavior` / `indent_change` on this type. Upstream puts both on `IsographSemanticToken` and the formatter walks that vec. Formatter metadata is a later change on this same type.
 
@@ -130,7 +130,7 @@ let dot = tokens
 
 Delta from that extract:
 
-- `ItemCursor::peek` does not take a `SemanticToken`. `CursorPeek::commit` takes the `SemanticToken` and records. `require_token` / `consume_token_if` take the kind and the token and pass the token to `commit`. `require_group` / `consume_group_if` take the `BracketKind` and the token the same way.
+- `ItemCursor::peek` does not take a `SemanticToken`. `CursorPeek::commit` takes the `SemanticToken` and records. `require_token` / `consume_token_if` take the kind and the token and pass the token to `commit`. `require_group` / `consume_group_if` take the `BracketKind`, the token, and `parse_inside`.
 - Open and close share one token. Upstream splits `ST_OPEN_PAREN` / `ST_CLOSE_PAREN` (and the brace pair) for formatter metadata.
 - One variant per role. Upstream's `ST_DIRECTIVE_AT` / `ST_DIRECTIVE` are both `DirectiveName`; `ST_VARIABLE_DOLLAR_DECLARATION` / `ST_VARIABLE_DOLLAR_USAGE` / `ST_VARIABLE` are `Variable`; `ST_KEYWORD_USE` / `ST_KEYWORD_DECLARATION` / `ST_TO` are `Keyword`; `ST_SERVER_OBJECT_TYPE` is `Type`; `ST_TYPE_ANNOTATION` and `!` are `GraphQLTypeName`; `ST_CLIENT_SELECTABLE_NAME` / `ST_SELECTION_NAME_OR_ALIAS` / `ST_SELECTION_NAME_OR_ALIAS_POST_COLON` are `FieldName`; `ST_OBJECT_LITERAL_KEY` is `ObjectKey`; `ST_STRING_LITERAL` covers string and block string.
 - The constructor does not push a dummy token and pop it. Upstream `PeekableLexer::new` does `parse_token(ST_COMMENT)` then `semantic_tokens.pop()`.
