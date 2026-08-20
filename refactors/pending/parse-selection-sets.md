@@ -182,7 +182,7 @@ Before:
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
-    self_type_generics = [
+    pins = [
         (<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>),
         (<NamedArgument, UnparsedChunkItems>, ArgumentListPath<'a>),
         (<ObjectEntry, UnparsedChunkItems>, ObjectLiteralPath<'a>),
@@ -202,7 +202,7 @@ After. Origin: those two listings. Delta: the `Selection` pin and the `Selection
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
-    self_type_generics = [
+    pins = [
         (<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>),
         (<NamedArgument, UnparsedChunkItems>, ArgumentListPath<'a>),
         (<ObjectEntry, UnparsedChunkItems>, ObjectLiteralPath<'a>),

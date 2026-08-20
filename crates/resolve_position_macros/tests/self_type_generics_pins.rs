@@ -46,7 +46,7 @@ type SlotBPath<'a> = PositionResolutionPath<&'a Slot<ChildB, ExtraB>, PathB<'a>>
 #[resolve_position(
     resolved_node = TestResolvedNode<'a>,
     on_unmatched_span = from_path,
-    self_type_generics = [
+    pins = [
         (<ChildA, ExtraA>, PathA<'a>),
         (<ChildB, ExtraB>, PathB<'a>),
     ]

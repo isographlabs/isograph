@@ -243,7 +243,7 @@ pub struct ExtraChunks(
 #[resolve_position(
     resolved_node = IsographResolutionNode<'a>,
     on_unmatched_span = from_path,
-    self_type_generics = [
+    pins = [
         (<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>),
         (<NamedArgument, UnparsedChunkItems>, ArgumentListPath<'a>),
         (<ObjectEntry, UnparsedChunkItems>, ObjectLiteralPath<'a>),
@@ -263,7 +263,7 @@ pub struct Slot<T, E> {
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
     resolved_node = IsographResolutionNode<'a>,
-    self_type_generics = [
+    pins = [
         (<Slot<IsoLiteralItem, UnparsedChunkItems>, ExtraChunks>, ()),
     ]
 )]

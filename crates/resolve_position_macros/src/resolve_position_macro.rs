@@ -243,13 +243,13 @@ fn require_from_path_with_pins(
         Some(ident) if ident == "from_path" => ().wrap_ok(),
         Some(ident) => Error::new_spanned(
             ident,
-            "`on_unmatched_span = from_path` is required when `self_type_generics` has more than one pin",
+            "`on_unmatched_span = from_path` is required when `pins` has more than one pin",
         )
         .to_compile_error()
         .wrap_err(),
         None => Error::new(
             proc_macro2::Span::call_site(),
-            "`on_unmatched_span = from_path` is required when `self_type_generics` has more than one pin",
+            "`on_unmatched_span = from_path` is required when `pins` has more than one pin",
         )
         .to_compile_error()
         .wrap_err(),
@@ -544,19 +544,19 @@ enum ParentType {
 struct ResolvePositionAttr {
     parent_type: Option<syn::Type>,
     resolved_node: syn::Type,
-    self_type_generics: Option<SelfTypeGenerics>,
+    pins: Option<SelfTypeGenerics>,
     on_unmatched_span: Option<syn::Ident>,
 }
 
 impl ResolvePositionArgs {
     fn from_attr(attr: ResolvePositionAttr) -> Result<Self, proc_macro2::TokenStream> {
-        let parent_type = match (attr.parent_type, attr.self_type_generics) {
+        let parent_type = match (attr.parent_type, attr.pins) {
             (Some(parent_type), None) => ParentType::Container(parent_type.boxed()),
             (None, Some(pins)) => ParentType::Pins(pins),
             (Some(parent_type), Some(_)) => {
                 return Error::new_spanned(
                     parent_type,
-                    "`parent_type` is on each pin when `self_type_generics` is present",
+                    "`parent_type` is on each pin when `pins` is present",
                 )
                 .to_compile_error()
                 .wrap_err();
@@ -564,7 +564,7 @@ impl ResolvePositionArgs {
             (None, None) => {
                 return Error::new_spanned(
                     attr.resolved_node.reference(),
-                    "`parent_type` is required when `self_type_generics` is omitted",
+                    "`parent_type` is required when `pins` is omitted",
                 )
                 .to_compile_error()
                 .wrap_err();
@@ -605,11 +605,7 @@ impl Parse for SelfTypeGenerics {
             }
         }
         if pins.is_empty() {
-            return Error::new(
-                input.span(),
-                "`self_type_generics` must contain at least one pin",
-            )
-            .wrap_err();
+            return Error::new(input.span(), "`pins` must contain at least one pin").wrap_err();
         }
         SelfTypeGenerics(pins).wrap_ok()
     }

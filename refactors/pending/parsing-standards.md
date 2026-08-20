@@ -125,7 +125,7 @@ pub type IsoLiteralParsePath<'a> = PositionResolutionPath<&'a IsoLiteralParse, (
 #[resolve_position(
     resolved_node = IsographResolutionNode<'a>,
     on_unmatched_span = from_path,
-    self_type_generics = [
+    pins = [
         (<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>),
         (<NamedArgument, UnparsedChunkItems>, ArgumentListPath<'a>),
         (<ObjectEntry, UnparsedChunkItems>, ObjectLiteralPath<'a>),
@@ -142,7 +142,7 @@ pub struct Slot<T, E> {
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
     resolved_node = IsographResolutionNode<'a>,
-    self_type_generics = [
+    pins = [
         (<Slot<IsoLiteralItem, UnparsedChunkItems>, ExtraChunks>, ()),
     ]
 )]
@@ -205,7 +205,7 @@ impl<'a> From<ObjectEntrySlotPath<'a>> for UnparsedChunkItemsParent<'a> {
 
 `IsoLiteralItem`'s `parent_type` is `IsoLiteralSlotPath<'a>`. `EntrypointDeclaration`'s `parent_type` is `IsoLiteralSlotPath<'a>`. `NamedArgument`'s `parent_type` is `NamedArgumentSlotPath<'a>`. `ObjectEntry`'s `parent_type` is `ObjectEntrySlotPath<'a>`.
 
-`Singleton` at the root stays pinned (`self_type_generics` as above). parse-variables.md adds a generic `Singleton` impl when `[...]` stores one.
+`Singleton` at the root stays pinned (`pins` as above). parse-variables.md adds a generic `Singleton` impl when `[...]` stores one.
 
 `item: None` and `extra_tokens: None` together is representable and never constructed.
 
