@@ -11,9 +11,7 @@ Foo!      Named(Foo)
 [Foo!]!   List(Named(Foo))
 ```
 
-`TypeAnnotation` is never `Null`. `Null` is only `UnionVariant::Null`. A union member is never a nested `Union`.
-
-`IsographResolutionNode` has `NamedTypeAnnotation`, `ListTypeAnnotation`, and `UnionTypeAnnotation`. It does not have `Null`. `UnionVariant::Null` has an empty span, so a non-empty position never enters it. A zero-width position at that end answers the union. The union that contains `Null` sits on the path.
+`TypeAnnotation` is never `Null`. A union member is never a nested `Union`. `UnionVariant` is `Named` or `List`. Those are the resolve nodes. `Null` is `NullPresence` on the union. `IsographResolutionNode` has `NamedTypeAnnotation`, `ListTypeAnnotation`, and `UnionTypeAnnotation`. It does not have `Null`. Clicking `Foo` in `$x: Foo` is Named → Union. `NullPresence::Present` is on that union.
 
 Does not depend on parse-iso-literal-entry.md. One change.
 
@@ -32,6 +30,15 @@ pub enum TypeAnnotation {
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = TypeAnnotationParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct UnionTypeAnnotation {
+    #[resolve_field]
+    #[parent_variant(Union)]
+    pub variants: Vec<WithSpan<UnionVariant>>,
+    pub null: NullPresence,
+}
+
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = UnionTypeAnnotationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum UnionVariant {
     Named(
@@ -42,23 +49,13 @@ pub enum UnionVariant {
         #[parent_variant(Union)]
         Box<ListTypeAnnotation>,
     ),
-    Null(NullTypeAnnotation),
 }
 
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = TypeAnnotationParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct UnionTypeAnnotation(
-    #[resolve_field]
-    pub Vec<WithSpan<UnionVariant>>,
-);
-
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(
-    parent_type = UnionTypeAnnotationPath<'a>,
-    resolved_node = IsographResolutionNode<'a>,
-    on_unmatched_span = from_path
-)]
-pub struct NullTypeAnnotation;
+#[derive(Debug, PartialEq, Eq)]
+pub enum NullPresence {
+    Present,
+    Absent,
+}
 
 #[derive(Debug)]
 pub enum TypeAnnotationParent<'a> {
@@ -70,15 +67,6 @@ pub enum TypeAnnotationParent<'a> {
 
 pub type UnionTypeAnnotationPath<'a> =
     PositionResolutionPath<&'a UnionTypeAnnotation, TypeAnnotationParent<'a>>;
-
-pub type NullTypeAnnotationPath<'a> =
-    PositionResolutionPath<&'a NullTypeAnnotation, UnionTypeAnnotationPath<'a>>;
-
-impl<'a> From<NullTypeAnnotationPath<'a>> for IsographResolutionNode<'a> {
-    fn from(path: NullTypeAnnotationPath<'a>) -> Self {
-        IsographResolutionNode::UnionTypeAnnotation(path.parent)
-    }
-}
 ```
 
 Before:
@@ -108,9 +96,11 @@ pub type NullTypeAnnotationPath<'a> =
     PositionResolutionPath<&'a NullTypeAnnotation, TypeAnnotationParent<'a>>;
 ```
 
-`NamedTypeAnnotation` and `ListTypeAnnotation` are unchanged. `TypeAnnotation::Union` is not boxed. `UnionTypeAnnotation` is a `Vec`. `NullTypeAnnotation` is a ZST. Its parent is the union. `on_unmatched_span = from_path` plus the `From` answers that union. Do not put `NullTypeAnnotation` on `IsographResolutionNode`.
+Delete `NullTypeAnnotation` and `NullTypeAnnotationPath`. `NamedTypeAnnotation` and `ListTypeAnnotation` are unchanged.
 
-`#[parent_variant(Union)]` on `Named` and `List` builds `TypeAnnotationParent::Union(parent.into())`. `parent` is `UnionTypeAnnotationPath`. The `Union` payload is `Box<UnionTypeAnnotationPath>`. Std `From<T> for Box<T>`.
+`UnionVariant` is all-delegate. `#[parent_variant(Union)]` builds `TypeAnnotationParent::Union(parent.into())`. `parent` is `UnionTypeAnnotationPath`. The `Union` payload is `Box<UnionTypeAnnotationPath>`. Std `From<T> for Box<T>`.
+
+`NullPresence` is not `ResolvePosition`. It is not `#[resolve_field]`.
 
 The derive emits `From<UnionTypeAnnotationPath<'a>> for IsographResolutionNode<'a>`. Do not write that `From`.
 
@@ -177,12 +167,16 @@ pub(crate) fn parse_type_annotation(
             .wrap_ok();
     }
     let location = core.location;
-    let written = core.item.into_union_variant().with_span(location);
-    let null = UnionVariant::Null(NullTypeAnnotation)
-        .with_span(Span::new(location.end, location.end));
-    TypeAnnotation::Union(UnionTypeAnnotation(vec![written, null]))
-        .with_span(location)
-        .wrap_ok()
+    TypeAnnotation::Union(UnionTypeAnnotation {
+        variants: core
+            .item
+            .into_union_variant()
+            .with_span(location)
+            .wrap_vec(),
+        null: NullPresence::Present,
+    })
+    .with_span(location)
+    .wrap_ok()
 }
 
 fn parse_named_or_list(
@@ -220,9 +214,9 @@ fn parse_named_or_list(
 
 Before: `parse_named_or_list` returns `WithSpan<TypeAnnotation>` as `Named` or `List`. No bang wraps `TypeAnnotation::Null(NullTypeAnnotation(core).boxed())` at `core.location`. Bang peeks, advances, and returns `core` unchanged.
 
-Parser order of union members is the written type, then `Null`. `Null`'s span is empty at the written type's end. `Span::contains` does not hold for a non-empty position against an empty span. A zero-width position at that end is contained; `NullTypeAnnotation` then answers the union.
+Parser-produced unions are one written type and `NullPresence::Present`. `NullPresence::Absent` is a non-null union of the variants. This syntax cannot write that.
 
-`parse_bracket_interior_type` still calls `parse_type_annotation`, so `[Pet]`'s element is already `Union([Named(Pet), Null])`.
+`parse_bracket_interior_type` still calls `parse_type_annotation`, so `[Pet]`'s element is already `Union { variants: [Named(Pet)], null: Present }`.
 
 Who calls: `consume_to_target` and `parse_variable_declaration` already call `parse_type_annotation`. No other call sites.
 
@@ -236,12 +230,19 @@ enum Wrapper {
     Union(UnionWrapper),
 }
 
-struct UnionWrapper(pub Vec<WrapperVariant>);
+struct UnionWrapper {
+    variants: Vec<WrapperVariant>,
+    null: NullPresence,
+}
 
 enum WrapperVariant {
     Entity(Entity),
     List(Box<Wrapper>),
-    Null,
+}
+
+enum NullPresence {
+    Present,
+    Absent,
 }
 ```
 
@@ -256,15 +257,15 @@ enum Wrapper {
 }
 ```
 
-`List` is `[W]`. `Union([W, Null])` is `W | null`.
+`List` is `[W]`. `Union { variants: [W], null: Present }` is `W | null`.
 
 ```text
 Foo!      ->  Entity(Foo)
-Foo       ->  Union([Entity(Foo), Null])
+Foo       ->  Union { variants: [Entity(Foo)], null: Present }
 [Foo!]!   ->  List(Entity(Foo))
-[Foo]     ->  Union([List(Union([Entity(Foo), Null])), Null])
-[Foo!]    ->  Union([List(Entity(Foo)), Null])
-[Foo]!    ->  List(Union([Entity(Foo), Null]))
+[Foo]     ->  Union { variants: [List(Union { variants: [Entity(Foo)], null: Present })], null: Present }
+[Foo!]    ->  Union { variants: [List(Entity(Foo))], null: Present }
+[Foo]!    ->  List(Union { variants: [Entity(Foo)], null: Present })
 ```
 
 Before:
@@ -281,7 +282,7 @@ and `Null` is `W | null`.
 Selectable example `to User`:
 
 ```text
-This creates the selectable `User.bestFriend` whose target is Union([Entity(User), Null]).
+This creates the selectable `User.bestFriend` whose target is Union { variants: [Entity(User)], null: Present }.
 ```
 
 Before: `whose target is the named entity `User``.
@@ -289,7 +290,7 @@ Before: `whose target is the named entity `User``.
 Upstream selectables:
 
 ```text
-Query.user       ->  Union([Entity(User), Null])
+Query.user       ->  Union { variants: [Entity(User)], null: Present }
 User.id          ->  Entity(ID)
 User.name        ->  Entity(String)
 User.friends     ->  List(Entity(User))
@@ -307,7 +308,7 @@ User.friends     ->  [User]
 ## parsing-plan
 
 ```text
-- `TypeAnnotation` as `Named` / `List` / `Union` with `Null` a `UnionVariant` (isograph `Scalar` / `Plural` / `Union` with `nullable: bool` on the union; i2 stores `Null` as a member). `!` is peeked and is not on the span. Leftover inside `[...]` stays on `ListTypeAnnotation`.
+- `TypeAnnotation` as `Named` / `List` / `Union` with `NullPresence` on the union (isograph `Scalar` / `Plural` / `Union` with `nullable: bool` on the union; i2 names the two cases `Present` / `Absent`). `!` is peeked and is not on the span. Leftover inside `[...]` stays on `ListTypeAnnotation`.
 ```
 
 Before:
@@ -318,25 +319,21 @@ Before:
 
 ## Tests
 
-In `parse_iso_literal.rs`. The test module's `use crate::{...}` list gains `UnionVariant`. Span tests that do not mention `Null` stay (`a_to_target_accepts_every_type_annotation_form`, `a_full_field` `Person!`, `a_bracketed_target_is_a_list_annotation` `[Pet!]!` is `List` of `Named` with location `[Pet!]`, `list_types_nest_with_non_null_markers`, `a_multi_line_variable_list_parses_in_the_demo_style`, `a_bang_resolves_to_the_variable_declaration`).
+In `parse_iso_literal.rs`. The test module's `use crate::{...}` list gains `UnionVariant` and `NullPresence`. Span tests that do not mention `Null` stay (`a_to_target_accepts_every_type_annotation_form`, `a_full_field` `Person!`, `a_bracketed_target_is_a_list_annotation` `[Pet!]!` is `List` of `Named` with location `[Pet!]`, `list_types_nest_with_non_null_markers`, `a_multi_line_variable_list_parses_in_the_demo_style`, `a_bang_resolves_to_the_variable_declaration`).
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
         match target.item.reference() {
             TypeAnnotation::Union(union) => {
-                assert_eq!(union.0.len(), 2);
-                match union.0[0].item.reference() {
+                assert_eq!(union.null, NullPresence::Present);
+                assert_eq!(union.variants.len(), 1);
+                match union.variants[0].item.reference() {
                     UnionVariant::Named(named) => {
                         assert_eq!(named.name.location, span_of(text, "Owner"));
                     }
                     variant => panic!("expected Named, got {variant:?}"),
                 }
-                assert_eq!(union.0[0].location, span_of(text, "Owner"));
-                assert!(matches!(union.0[1].item, UnionVariant::Null(_)));
-                assert_eq!(
-                    union.0[1].location,
-                    Span::new(span_of(text, "Owner").end, span_of(text, "Owner").end)
-                );
+                assert_eq!(union.variants[0].location, span_of(text, "Owner"));
             }
             annotation => panic!("expected Union, got {annotation:?}"),
         }
@@ -368,22 +365,20 @@ Before, `a_field_with_to_parses_the_target_type`:
 // from crates/isograph_parser/src/parse_iso_literal.rs
         match target.item.reference() {
             TypeAnnotation::Union(outer) => {
-                assert_eq!(outer.0.len(), 2);
-                match outer.0[0].item.reference() {
+                assert_eq!(outer.null, NullPresence::Present);
+                match outer.variants[0].item.reference() {
                     UnionVariant::List(list) => {
                         let inner = list.inner.as_ref().expect("the list holds a type");
                         match inner.item.reference() {
                             TypeAnnotation::Union(elem) => {
-                                assert_eq!(elem.0.len(), 2);
-                                assert!(matches!(elem.0[0].item, UnionVariant::Named(_)));
-                                assert!(matches!(elem.0[1].item, UnionVariant::Null(_)));
+                                assert_eq!(elem.null, NullPresence::Present);
+                                assert!(matches!(elem.variants[0].item, UnionVariant::Named(_)));
                             }
                             annotation => panic!("expected Union element, got {annotation:?}"),
                         }
                     }
                     variant => panic!("expected List, got {variant:?}"),
                 }
-                assert!(matches!(outer.0[1].item, UnionVariant::Null(_)));
             }
             annotation => panic!("expected Union list, got {annotation:?}"),
         }
@@ -408,20 +403,23 @@ Before, `a_list_target_maps_graphql_nullability`:
             annotation => panic!("expected Null list, got {annotation:?}"),
 ```
 
-`a_variable_type_without_bang_is_null_wrapped` becomes `a_variable_type_without_bang_is_a_union_with_null`: `$x: ID` is `Union([Named(ID), Null])`.
+`a_variable_type_without_bang_is_null_wrapped` becomes `a_variable_type_without_bang_is_a_union_with_null`: `$x: ID` is `Union { variants: [Named(ID)], null: Present }`.
 
-`a_nested_list_target_wraps_null_at_every_layer` becomes `a_nested_list_target_is_a_union_at_every_layer`. `[[Pet]]` is `Union([List(Union([List(Union([Named(Pet), Null])), Null])), Null])`.
+`a_nested_list_target_wraps_null_at_every_layer` becomes `a_nested_list_target_is_a_union_at_every_layer`. `[[Pet]]` is Union of List of Union of List of Union of Named, each union `Present`.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
         match target.item.reference() {
-            TypeAnnotation::Union(outer) => match outer.0[0].item.reference() {
-                UnionVariant::List(list) => {
-                    let inner = list.inner.as_ref().expect("the list holds a type");
-                    assert!(matches!(inner.item, TypeAnnotation::Named(_)));
+            TypeAnnotation::Union(outer) => {
+                assert_eq!(outer.null, NullPresence::Present);
+                match outer.variants[0].item.reference() {
+                    UnionVariant::List(list) => {
+                        let inner = list.inner.as_ref().expect("the list holds a type");
+                        assert!(matches!(inner.item, TypeAnnotation::Named(_)));
+                    }
+                    variant => panic!("expected List, got {variant:?}"),
                 }
-                variant => panic!("expected List, got {variant:?}"),
-            },
+            }
             annotation => panic!("expected Union list, got {annotation:?}"),
         }
 ```
@@ -434,8 +432,8 @@ Before, `a_nullable_list_of_non_null_named` (`[Pet!]`): `Null(List(Named))`.
                 let inner = list.inner.as_ref().expect("the list holds a type");
                 match inner.item.reference() {
                     TypeAnnotation::Union(elem) => {
-                        assert!(matches!(elem.0[0].item, UnionVariant::Named(_)));
-                        assert!(matches!(elem.0[1].item, UnionVariant::Null(_)));
+                        assert_eq!(elem.null, NullPresence::Present);
+                        assert!(matches!(elem.variants[0].item, UnionVariant::Named(_)));
                     }
                     annotation => panic!("expected Union element, got {annotation:?}"),
                 }
@@ -468,7 +466,7 @@ Before, `to_and_the_target_resolve_with_their_ancestry` on `Owner`: `TypeAnnotat
                     TypeAnnotationParent::Union(union) => union.as_ref(),
                     parent => panic!("expected Union around Named, got {parent:?}"),
                 };
-                assert!(matches!(inner_union.inner.0[1].item, UnionVariant::Null(_)));
+                assert_eq!(inner_union.inner.null, NullPresence::Present);
                 let list = match inner_union.parent.reference() {
                     TypeAnnotationParent::List(list) => list.as_ref(),
                     parent => panic!("expected a list parent, got {parent:?}"),
@@ -477,7 +475,7 @@ Before, `to_and_the_target_resolve_with_their_ancestry` on `Owner`: `TypeAnnotat
                     TypeAnnotationParent::Union(union) => union.as_ref(),
                     parent => panic!("expected Union around List, got {parent:?}"),
                 };
-                assert!(matches!(outer_union.inner.0[1].item, UnionVariant::Null(_)));
+                assert_eq!(outer_union.inner.null, NullPresence::Present);
                 match outer_union.parent.reference() {
                     TypeAnnotationParent::Variable(variable) => {
                         assert_eq!(variable.inner.name.location, span_of(text, "$pets"));
@@ -488,6 +486,6 @@ Before, `to_and_the_target_resolve_with_their_ancestry` on `Owner`: `TypeAnnotat
 
 Before, `type_names_resolve_through_their_annotation_ancestry`: Named → Null → List → Null → Variable.
 
-`to_as_a_target_type_name_parses` (`to to`): `Union([Named(to), Null])` instead of `Null(Named(to))`.
+`to_as_a_target_type_name_parses` (`to to`): `Union { variants: [Named(to)], null: Present }` instead of `Null(Named(to))`.
 
-`a_line_break_inside_a_list_type_does_not_attach_bang`: chunk 0 is `Union([Named(Pet), Null])` instead of `Null(Named(Pet))`.
+`a_line_break_inside_a_list_type_does_not_attach_bang`: chunk 0 is `Union { variants: [Named(Pet)], null: Present }` instead of `Null(Named(Pet))`.
