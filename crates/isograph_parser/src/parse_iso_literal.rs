@@ -51,6 +51,8 @@ pub struct ClientFieldDeclaration {
     #[parent_variant(ClientFieldDeclaration)]
     pub client_field_name: WithSpan<ClientScalarSelectableNameWrapper>,
     #[resolve_field]
+    pub description: Option<WithSpan<Description>>,
+    #[resolve_field]
     #[parent_variant(ClientFieldDeclaration)]
     pub selection_set: WithSpan<SelectionSet>,
 }
@@ -69,7 +71,8 @@ pub struct EntityNameWrapper(common_lang_types::EntityName);
 pub struct ClientScalarSelectableNameWrapper(common_lang_types::SelectableName);
 
 /// The interned source slice of a description, quotes included.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = ClientFieldDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct Description(common_lang_types::DescriptionValue);
 
 #[derive(Debug)]
@@ -89,6 +92,9 @@ pub type EntrypointDeclarationPath<'a> =
 
 pub type ClientFieldDeclarationPath<'a> =
     PositionResolutionPath<&'a ClientFieldDeclaration, IsoLiteralSlotPath<'a>>;
+
+pub type DescriptionPath<'a> =
+    PositionResolutionPath<&'a Description, ClientFieldDeclarationPath<'a>>;
 
 pub type ExtraChunksPath<'a> = PositionResolutionPath<&'a ExtraChunks, IsoLiteralParsePath<'a>>;
 
@@ -177,18 +183,19 @@ fn parse_field(
     let client_field_name = cursor
         .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+    let description = consume_description(cursor);
     let selection_set = require_selection_set(cursor)?;
     ClientFieldDeclaration {
         parent_type: parent_type.interned().map(EntityNameWrapper),
         client_field_name: client_field_name
             .interned()
             .map(ClientScalarSelectableNameWrapper),
+        description,
         selection_set,
     }
     .wrap_ok()
 }
 
-#[cfg_attr(not(test), expect(dead_code))]
 pub(crate) fn consume_description(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<Description>> {
     let span = cursor
         .consume_token_if(NonBracketTokenKind::StringLiteral, SemanticToken::String)
@@ -920,6 +927,106 @@ mod tests {
                 .with_span(span_of(text, "junk"))
                 .wrap_vec(),
         );
+    }
+
+    #[test]
+    fn a_field_without_a_description_has_none() {
+        let text = "field Query.Foo { bar }";
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        assert_eq!(as_field(parse.reference()).description, None);
+    }
+
+    #[test]
+    fn a_single_line_description_parses_with_its_quotes() {
+        let text = "field Query.Foo \"the home route\" { bar }";
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        let description = as_field(parse.reference())
+            .description
+            .as_ref()
+            .expect("the fixture carries a description");
+        assert_eq!(description.location, span_of(text, "\"the home route\""));
+        assert_eq!(
+            description.item,
+            Description("\"the home route\"".intern().to())
+        );
+    }
+
+    #[test]
+    fn a_block_string_description_spans_lines_without_splitting_the_chunk() {
+        let text = "field Query.Foo \"\"\"\n  the home\n  route\n\"\"\" { bar }";
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        let declaration = as_field(parse.reference());
+        let description = declaration
+            .description
+            .as_ref()
+            .expect("the fixture carries a description");
+        assert_eq!(
+            description.location,
+            span_of(text, "\"\"\"\n  the home\n  route\n\"\"\"")
+        );
+        assert_eq!(selections(declaration.selection_set.reference()).len(), 1);
+    }
+
+    #[test]
+    fn a_description_after_the_selection_set_is_leftover() {
+        let text = "field Query.Foo { bar } \"too late\"";
+        let (parse, errors) = parsed(text);
+        as_field(parse.reference());
+        assert!(first_slot(parse.reference()).extra_tokens.is_some());
+        assert_eq!(
+            errors,
+            expected(
+                Expectation::EndOfDeclaration,
+                Found::Token(NonBracketTokenKind::StringLiteral)
+            )
+            .with_span(span_of(text, "\"too late\""))
+            .wrap_vec(),
+        );
+    }
+
+    #[test]
+    fn an_entrypoint_carries_no_description() {
+        let text = "entrypoint Query.foo \"nope\"";
+        let (parse, errors) = parsed(text);
+        as_entrypoint(parse.reference());
+        assert_eq!(
+            errors,
+            expected(
+                Expectation::EndOfDeclaration,
+                Found::Token(NonBracketTokenKind::StringLiteral)
+            )
+            .with_span(span_of(text, "\"nope\""))
+            .wrap_vec(),
+        );
+    }
+
+    #[test]
+    fn a_description_without_a_selection_set_is_a_failed_item() {
+        let text = "field Query.Foo \"the home route\"";
+        let end = span_of(text, "\"the home route\"").end;
+        assert_no_declaration(
+            text,
+            expected(Expectation::SelectionSet, Found::EndOfChunk),
+            Span::new(end, end),
+        );
+    }
+
+    #[test]
+    fn a_description_resolves_to_its_leaf() {
+        let text = "field Query.Foo \"the home route\" { bar }";
+        let (parse, _) = parsed(text);
+        match parse.resolve((), span_of(text, "home")) {
+            IsographResolutionNode::Description(description) => {
+                assert_eq!(
+                    description.parent.inner.client_field_name.location,
+                    span_of(text, "Foo")
+                );
+            }
+            node => panic!("expected the description leaf, got {node:?}"),
+        }
     }
 
     #[test]
