@@ -8,10 +8,11 @@ use span::{Span, WithSpan, WithSpanPostfix};
 use crate::{
     ArgumentListPath, BracketItem, Bracketed, CloseBracket, Expectation, ExtraChunksPath, Found,
     IsoLiteralItem, IsoLiteralParsePath, IsoLiteralSlotPath, IsographResolutionNode,
-    ListTypeAnnotationPath, MatchedBrackets, NonBracketToken, NonBracketTokenKind, ObjectEntry,
-    ObjectEntrySlotPath, ObjectLiteralPath, OpenBracket, ParseError, Selection,
-    SelectionFieldArgument, SelectionFieldArgumentSlotPath, SelectionSetPath, SelectionSlotPath,
-    SemanticToken, VariableDeclarationOrUsage, VariableDeclarationOrUsageListPath,
+    ListLiteralPath, ListLiteralValue, ListLiteralValueSlotPath, ListTypeAnnotationPath,
+    MatchedBrackets, NonBracketToken, NonBracketTokenKind, ObjectEntry, ObjectEntrySlotPath,
+    ObjectLiteralPath, OpenBracket, ParseError, Selection, SelectionFieldArgument,
+    SelectionFieldArgumentSlotPath, SelectionSetPath, SelectionSlotPath, SemanticToken,
+    VariableDeclarationOrUsage, VariableDeclarationOrUsageListPath,
     VariableDeclarationOrUsageSlotPath,
     chunk_stream::{ChunkStream, ItemCursor},
 };
@@ -199,6 +200,7 @@ pub enum UnparsedChunkItemsParent<'a> {
     SelectionSlot(SelectionSlotPath<'a>),
     VariableDeclarationOrUsageSlot(VariableDeclarationOrUsageSlotPath<'a>),
     ListTypeAnnotation(ListTypeAnnotationPath<'a>),
+    ListLiteralValueSlot(ListLiteralValueSlotPath<'a>),
 }
 
 pub type UnparsedChunkItemsPath<'a> =
@@ -240,6 +242,12 @@ impl<'a> From<ListTypeAnnotationPath<'a>> for UnparsedChunkItemsParent<'a> {
     }
 }
 
+impl<'a> From<ListLiteralValueSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
+    fn from(path: ListLiteralValueSlotPath<'a>) -> Self {
+        UnparsedChunkItemsParent::ListLiteralValueSlot(path)
+    }
+}
+
 /// Extra root chunks after the first.
 #[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
@@ -271,6 +279,7 @@ pub struct ExtraChunks(
         (<ObjectEntry, UnparsedChunkItems>, ObjectLiteralPath<'a>),
         (<Selection, UnparsedChunkItems>, SelectionSetPath<'a>),
         (<VariableDeclarationOrUsage, UnparsedChunkItems>, VariableDeclarationOrUsageListPath<'a>),
+        (<ListLiteralValue, UnparsedChunkItems>, ListLiteralPath<'a>),
     ]
 )]
 pub struct Slot<T, E> {

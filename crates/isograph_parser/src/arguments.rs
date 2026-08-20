@@ -27,6 +27,12 @@ pub enum ArgumentListParent<'a> {
 pub struct ObjectLiteral(#[resolve_field] pub Vec<WithSpan<Slot<ObjectEntry, UnparsedChunkItems>>>);
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct ListLiteral(
+    #[resolve_field] pub Vec<WithSpan<Slot<ListLiteralValue, UnparsedChunkItems>>>,
+);
+
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SelectionFieldArgumentSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct SelectionFieldArgument {
     #[resolve_field]
@@ -47,6 +53,14 @@ pub struct ObjectEntry {
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = ListLiteralValueSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct ListLiteralValue {
+    #[resolve_field]
+    #[parent_variant(List)]
+    pub value: WithSpan<NonConstantValue>,
+}
+
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum NonConstantValue {
     Variable(VariableUse),
@@ -55,6 +69,7 @@ pub enum NonConstantValue {
     Boolean(BooleanValue),
     Null(NullValue),
     Object(ObjectLiteral),
+    List(ListLiteral),
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -113,12 +128,21 @@ pub enum NonConstantValueParent<'a> {
     SelectionFieldArgument(Box<SelectionFieldArgumentPath<'a>>),
     ObjectEntry(Box<ObjectEntryPath<'a>>),
     VariableDefault(VariableDeclarationOrUsagePath<'a>),
+    List(Box<ListLiteralValuePath<'a>>),
 }
 
 pub type ArgumentListPath<'a> = PositionResolutionPath<&'a ArgumentList, ArgumentListParent<'a>>;
 
 pub type ObjectLiteralPath<'a> =
     PositionResolutionPath<&'a ObjectLiteral, NonConstantValueParent<'a>>;
+
+pub type ListLiteralPath<'a> = PositionResolutionPath<&'a ListLiteral, NonConstantValueParent<'a>>;
+
+pub type ListLiteralValueSlotPath<'a> =
+    PositionResolutionPath<&'a Slot<ListLiteralValue, UnparsedChunkItems>, ListLiteralPath<'a>>;
+
+pub type ListLiteralValuePath<'a> =
+    PositionResolutionPath<&'a ListLiteralValue, ListLiteralValueSlotPath<'a>>;
 
 pub type SelectionFieldArgumentSlotPath<'a> = PositionResolutionPath<
     &'a Slot<SelectionFieldArgument, UnparsedChunkItems>,
@@ -164,6 +188,12 @@ impl<'a> From<SelectionFieldArgumentSlotPath<'a>> for IsographResolutionNode<'a>
 impl<'a> From<ObjectEntrySlotPath<'a>> for IsographResolutionNode<'a> {
     fn from(path: ObjectEntrySlotPath<'a>) -> Self {
         IsographResolutionNode::ObjectEntrySlot(path)
+    }
+}
+
+impl<'a> From<ListLiteralValueSlotPath<'a>> for IsographResolutionNode<'a> {
+    fn from(path: ListLiteralValueSlotPath<'a>) -> Self {
+        IsographResolutionNode::ListLiteralValueSlot(path)
     }
 }
 
@@ -296,6 +326,13 @@ fn parse_boolean_or_null(
     }
 }
 
+fn parse_list_literal_value(
+    cursor: &mut ItemCursor<'_>,
+) -> Result<ListLiteralValue, WithSpan<ParseError>> {
+    let value = parse_non_constant_value(cursor)?;
+    ListLiteralValue { value }.wrap_ok()
+}
+
 fn parse_object_literal(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<ObjectLiteral, WithSpan<ParseError>> {
@@ -346,6 +383,19 @@ pub(crate) fn parse_non_constant_value(
                 return NonConstantValue::Object(parse_object_literal(cursor)?).wrap_ok();
             }
             _ => {}
+        }
+        if let Some(list) = cursor.consume_group_if(
+            BracketKind::Bracket,
+            SemanticToken::Bracket,
+            |cursor, children| {
+                ListLiteral(children.item.parse_each_chunk(
+                    cursor,
+                    Expectation::Separator(BracketKind::Bracket),
+                    parse_list_literal_value,
+                ))
+            },
+        ) {
+            return NonConstantValue::List(list.item).wrap_ok();
         }
         cursor.expected(Expectation::Value).wrap_err()
     })
@@ -439,6 +489,13 @@ mod tests {
             .as_ref()
             .map(|wrapped| wrapped.item.reference())
             .expect("expected an object entry")
+    }
+
+    fn as_list_value(slot: &Slot<ListLiteralValue, UnparsedChunkItems>) -> &ListLiteralValue {
+        slot.item
+            .as_ref()
+            .map(|wrapped| wrapped.item.reference())
+            .expect("expected a list value")
     }
 
     fn span_of(text: &str, pattern: &str) -> Span {
@@ -698,5 +755,150 @@ mod tests {
                 SemanticToken::Variable.with_span(span_of(text, "petId")),
             ],
         );
+    }
+
+    #[test]
+    fn a_list_interior_holds_three_values() {
+        let text = "1, $x, true";
+        let (items, errors, comma_errors, _) = parsed_items(
+            text,
+            Expectation::Separator(BracketKind::Bracket),
+            parse_list_literal_value,
+        );
+        assert_eq!(comma_errors, vec![]);
+        assert_eq!(errors, vec![]);
+        assert_eq!(items.len(), 3);
+        assert!(matches!(
+            as_list_value(items[0].item.reference()).value.item,
+            NonConstantValue::Integer(IntegerValue(1))
+        ));
+        assert!(matches!(
+            as_list_value(items[1].item.reference()).value.item,
+            NonConstantValue::Variable(_)
+        ));
+        assert!(matches!(
+            as_list_value(items[2].item.reference()).value.item,
+            NonConstantValue::Boolean(BooleanValue(Boolean::True))
+        ));
+    }
+
+    #[test]
+    fn a_list_value_parses_nested_lists_and_objects() {
+        let text = "[[1], { a: 2 }]";
+        let (items, errors, comma_errors, _) = parsed_items(text, Expectation::Value, |cursor| {
+            parse_non_constant_value(cursor).map(|wrapped| wrapped.item)
+        });
+        assert_eq!(comma_errors, vec![]);
+        assert_eq!(errors, vec![]);
+        assert_eq!(items.len(), 1);
+        let list = match items[0]
+            .item
+            .item
+            .as_ref()
+            .map(|wrapped| wrapped.item.reference())
+        {
+            Some(NonConstantValue::List(list)) => list,
+            value => panic!("expected a list, got {value:?}"),
+        };
+        assert_eq!(list.0.len(), 2);
+        assert!(matches!(
+            as_list_value(list.0[0].item.reference()).value.item,
+            NonConstantValue::List(_)
+        ));
+        assert!(matches!(
+            as_list_value(list.0[1].item.reference()).value.item,
+            NonConstantValue::Object(_)
+        ));
+    }
+
+    #[test]
+    fn empty_and_whitespace_list_interiors_are_empty() {
+        for text in ["[]", "[ ]", "[\n]"] {
+            let (items, errors, comma_errors, _) =
+                parsed_items(text, Expectation::Value, |cursor| {
+                    parse_non_constant_value(cursor).map(|wrapped| wrapped.item)
+                });
+            assert_eq!(comma_errors, vec![], "for literal {text:?}");
+            assert_eq!(errors, vec![], "for literal {text:?}");
+            match items[0]
+                .item
+                .item
+                .as_ref()
+                .map(|wrapped| wrapped.item.reference())
+            {
+                Some(NonConstantValue::List(list)) => {
+                    assert_eq!(list.0.len(), 0, "for literal {text:?}");
+                }
+                value => panic!("expected an empty list, got {value:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn a_trailing_comma_in_a_list_is_not_a_parse_error() {
+        let text = "1,";
+        let (items, errors, comma_errors, _) = parsed_items(
+            text,
+            Expectation::Separator(BracketKind::Bracket),
+            parse_list_literal_value,
+        );
+        assert_eq!(comma_errors, vec![]);
+        assert_eq!(items.len(), 1);
+        assert_eq!(errors, vec![]);
+    }
+
+    #[test]
+    fn leftover_after_a_list_value_keeps_the_item() {
+        let text = "1 junk";
+        let (items, errors, comma_errors, _) = parsed_items(
+            text,
+            Expectation::Separator(BracketKind::Bracket),
+            parse_list_literal_value,
+        );
+        assert_eq!(comma_errors, vec![]);
+        assert_eq!(items.len(), 1);
+        assert!(matches!(
+            as_list_value(items[0].item.reference()).value.item,
+            NonConstantValue::Integer(IntegerValue(1))
+        ));
+        assert!(items[0].item.extra_tokens.is_some());
+        assert!(errors.iter().any(|error| {
+            error.item
+                == ParseError::expected(
+                    Expectation::Separator(BracketKind::Bracket),
+                    Found::Token(NonBracketTokenKind::Identifier),
+                )
+                && error.location == span_of(text, "junk")
+        }));
+    }
+
+    #[test]
+    fn a_doubled_comma_in_a_list_is_chunkings_error() {
+        let text = "1,, 2";
+        let (items, errors, comma_errors, _) = parsed_items(
+            text,
+            Expectation::Separator(BracketKind::Bracket),
+            parse_list_literal_value,
+        );
+        assert_eq!(comma_errors.len(), 1);
+        assert_eq!(items.len(), 2);
+        assert_eq!(errors, vec![]);
+    }
+
+    #[test]
+    fn a_list_parses_as_an_argument_value() {
+        let text = "id: [1, 2]";
+        let (items, errors, _) = parsed_pairs(text);
+        assert_eq!(errors, vec![]);
+        match as_argument(items[0].item.reference())
+            .value
+            .item
+            .reference()
+        {
+            NonConstantValue::List(list) => {
+                assert_eq!(list.0.len(), 2);
+            }
+            value => panic!("expected a list argument, got {value:?}"),
+        }
     }
 }

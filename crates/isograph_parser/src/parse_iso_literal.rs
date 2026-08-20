@@ -1796,6 +1796,43 @@ mod tests {
             .expect("the fixture declares a default");
         assert!(matches!(default.item, NonConstantValue::Variable(_)));
 
+        let list = "field Query.Foo($ids: [ID!] = [1, $x]) { bar }";
+        let (parse, errors) = parsed(list);
+        assert_eq!(errors, vec![]);
+        let declared = as_declared(variables_of(parse.reference()).item.0[0].item.reference());
+        let default = declared
+            .default_value
+            .as_ref()
+            .expect("the fixture declares a list default");
+        match default.item.reference() {
+            NonConstantValue::List(list) => {
+                assert_eq!(list.0.len(), 2);
+                assert!(matches!(
+                    list.0[0]
+                        .item
+                        .item
+                        .as_ref()
+                        .expect("the fixture's first element parsed")
+                        .item
+                        .value
+                        .item,
+                    NonConstantValue::Integer(IntegerValue(1))
+                ));
+                assert!(matches!(
+                    list.0[1]
+                        .item
+                        .item
+                        .as_ref()
+                        .expect("the fixture's second element parsed")
+                        .item
+                        .value
+                        .item,
+                    NonConstantValue::Variable(_)
+                ));
+            }
+            value => panic!("expected a list default, got {value:?}"),
+        }
+
         let deep = "field Query.Foo($input: Input = { pet: $pet }) { bar }";
         let (parse, errors) = parsed(deep);
         assert_eq!(errors, vec![]);

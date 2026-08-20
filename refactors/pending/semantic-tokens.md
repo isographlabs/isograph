@@ -57,7 +57,7 @@ Call sites, by variant:
 - `Parenthesis`: `(` and `)` the grammar consumes.
 - `Brace`: `{` and `}` the grammar consumes.
 - `Content`: leftover fill-in only. Identifiers, `@`, `!`, `$`, `.`, `:`, `=`, `,`, and the other non-bracket content kinds that no consume covered.
-- `Bracket`: leftover fill-in only. `(`, `)`, `{`, `}`, `[`, `]` that no consume covered.
+- `Bracket`: list-value `[` and `]` the grammar consumes, and leftover `(`, `)`, `{`, `}`, `[`, `]` that no consume covered. Type-list brackets stay `GraphQLTypeName`.
 - `Error`: leftover fill-in only. An `Error` token.
 
 Open and close of one `BracketKind` share one token. `consume_group_if(kind, token, parse_inside)` records `token` on the open, runs `parse_inside`, and records the same `token` on the close when `parse_inside` returns.
