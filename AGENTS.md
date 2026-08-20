@@ -115,7 +115,7 @@ Do not pass a value that is used only on one arm of the `Result` or `Option` the
 
 Error types use `thiserror`. Derive `Error`; put the message on `#[error("...")]`. Do not write a manual `Display` or `std::error::Error` impl. Wrapping another error is `#[error("{0}")]` on that variant.
 
-A type that is not an error must not implement `std::error::Error`.
+A type that is not an error must not implement `std::error::Error`. A non-error enum that needs `Display` uses `strum::Display` (`#[strum(to_string = "...")]` on the variants). Do not write a manual `Display` impl for that enum.
 
 ## Postfix wrappers
 
