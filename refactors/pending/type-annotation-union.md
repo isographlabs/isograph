@@ -11,11 +11,122 @@ Foo!      Named(Foo)
 [Foo!]!   List(Named(Foo))
 ```
 
-`TypeAnnotation` is never `Null`. A union member is never a nested `Union`. `UnionVariant` is `Named` or `List`. Those are the resolve nodes. `Null` is `NullPresence` on the union. `IsographResolutionNode` has `NamedTypeAnnotation`, `ListTypeAnnotation`, and `UnionTypeAnnotation`. It does not have `Null`. Clicking `Foo` in `$x: Foo` is Named → Union. `NullPresence::Present` is on that union.
+`TypeAnnotation` is never `Null`. `Null` is only `UnionVariant::Null`. A union member is never a nested `Union`. `Null` has no source; its location is `None`. `IsographResolutionNode` has `NamedTypeAnnotation`, `ListTypeAnnotation`, and `UnionTypeAnnotation`. It does not have `Null`. A position never enters `Null`. The union that contains it sits on the path.
 
-Does not depend on parse-iso-literal-entry.md. One change.
+Does not depend on parse-iso-literal-entry.md. Change 2 depends on Change 1.
 
-## Types
+## Change 1: `WithOptionalSpan`
+
+`span::WithGenericLocation<T, TLocation>` already pairs an item with a location. `WithSpan<T>` is `TLocation = Span`. `Null` is not in the text, so its location is `Option<Span>` and the `None` is `Null`.
+
+```rust
+// from crates/span/src/lib.rs
+/// An item that may have no source span.
+pub type WithOptionalSpan<T> = WithGenericLocation<T, Option<Span>>;
+```
+
+Before: no alias. `drop_location` still produces `WithGenericLocation<T, ()>` (a tree with no positions at all). That is not this. `()` is spanless parsing. `Option<Span>` is a spanned tree in which some nodes have no source.
+
+Do not write a second `ResolvePosition` impl for `WithGenericLocation<T, Option<Span>>`. The blanket already covers every `TLocation`:
+
+```rust
+// from crates/resolve_position/src/lib.rs
+impl<T: ResolvePosition, TLocation> ResolvePosition for WithGenericLocation<T, TLocation> {
+    fn resolve<'a>(&'a self, parent: Self::Parent<'a>, position: Span) -> Self::ResolvedNode<'a> {
+        self.item.resolve(parent, position)
+    }
+}
+```
+
+The parent checks the location, then calls `resolve`. `WithSpan` is `location.contains(position)`. `WithLocation` (file-qualified, kept chain) is already `if let Some(span) = location.span()`. `WithOptionalSpan` is the same check on `Option<Span>`:
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+enum ResolveFieldInfoType {
+    WithSpan(syn::Type),
+    WithLocation(syn::Type),
+    WithEmbeddedLocation(syn::Type),
+    WithOptionalSpan(syn::Type),
+    GraphQLTypeAnnotation(syn::Type),
+}
+```
+
+Before: no `WithOptionalSpan` variant.
+
+`parse_resolve_field_type` gains `"WithOptionalSpan" => handle_case(..., ResolveFieldInfoType::WithOptionalSpan)`. The expected-type error lists `WithOptionalSpan`. `resolve_field_inner_type` matches it with the other wrappers.
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+            ResolveFieldInfoType::WithOptionalSpan(inner_type) => {
+                let new_parent = new_parent_expr(parent_construction, inner_type);
+                quote! {
+                    if let Some(span) = #field_expr.location {
+                        if span.contains(position) {
+                            let new_parent = #new_parent;
+                            return #field_expr.item.resolve(new_parent, position);
+                        }
+                    }
+                }
+            }
+```
+
+`None` does not contain a position. The item is never `resolve`d.
+
+Who calls: Change 2's `UnionTypeAnnotation.variants`. Existing `WithSpan` / `WithLocation` / `WithEmbeddedLocation` sites are unchanged.
+
+```rust
+// from crates/resolve_position_macros/tests/optional_span.rs
+#![expect(dead_code)]
+
+use prelude::Postfix;
+use resolve_position::{PositionResolutionPath, ResolvePosition};
+use resolve_position_macros::ResolvePosition;
+use span::{Span, WithGenericLocation, WithOptionalSpan, WithSpanPostfix};
+
+#[derive(Debug)]
+enum TestResolvedNode<'a> {
+    Container(ContainerPath<'a>),
+    Child(ChildPath<'a>),
+}
+
+#[derive(Debug, ResolvePosition)]
+#[resolve_position(parent_type = (), resolved_node = TestResolvedNode<'a>)]
+struct Container(#[resolve_field] Vec<WithOptionalSpan<Child>>);
+
+#[derive(Debug, ResolvePosition)]
+#[resolve_position(parent_type = ContainerPath<'a>, resolved_node = TestResolvedNode<'a>)]
+struct Child;
+
+type ContainerPath<'a> = PositionResolutionPath<&'a Container, ()>;
+type ChildPath<'a> = PositionResolutionPath<&'a Child, ContainerPath<'a>>;
+
+#[test]
+fn a_none_location_is_not_entered() {
+    let container = Container(vec![
+        WithGenericLocation::new(Child, None),
+        Child.with_span(Span::new(0, 4)).map_location(|span| span.wrap_some()),
+    ]);
+    match container.resolve((), Span::new(1, 2)) {
+        TestResolvedNode::Child(_) => {}
+        node => panic!("expected the spanned child, got {node:?}"),
+    }
+}
+
+#[test]
+fn a_none_location_does_not_match_a_zero_width_position() {
+    let container = Container(WithGenericLocation::new(Child, None).wrap_vec());
+    match container.resolve((), Span::new(0, 0)) {
+        TestResolvedNode::Container(_) => {}
+        node => panic!("expected the container, got {node:?}"),
+    }
+}
+```
+
+`map_location(Some)` turns `WithSpan<Child>` into `WithOptionalSpan<Child>`. The `None` row does not steal a zero-width position.
+
+## Change 2: `TypeAnnotation` is Named / List / Union
+
+### Types
 
 Most important first.
 
@@ -31,30 +142,23 @@ pub enum TypeAnnotation {
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = TypeAnnotationParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct UnionTypeAnnotation {
+pub struct UnionTypeAnnotation(
     #[resolve_field]
-    #[parent_variant(Union)]
-    pub variants: Vec<WithSpan<UnionVariant>>,
-    pub null: NullPresence,
-}
+    pub Vec<WithOptionalSpan<UnionVariant>>,
+);
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = UnionTypeAnnotationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(
+    parent_type = UnionTypeAnnotationPath<'a>,
+    resolved_node = IsographResolutionNode<'a>,
+    fallback = UnionTypeAnnotation
+)]
 pub enum UnionVariant {
-    Named(
-        #[parent_variant(Union)]
-        NamedTypeAnnotation,
-    ),
-    List(
-        #[parent_variant(Union)]
-        Box<ListTypeAnnotation>,
-    ),
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum NullPresence {
-    Present,
-    Absent,
+    #[resolve_into]
+    Named(NamedTypeAnnotation),
+    #[resolve_into]
+    List(Box<ListTypeAnnotation>),
+    Null,
 }
 
 #[derive(Debug)]
@@ -67,6 +171,12 @@ pub enum TypeAnnotationParent<'a> {
 
 pub type UnionTypeAnnotationPath<'a> =
     PositionResolutionPath<&'a UnionTypeAnnotation, TypeAnnotationParent<'a>>;
+
+impl<'a> From<UnionTypeAnnotationPath<'a>> for TypeAnnotationParent<'a> {
+    fn from(path: UnionTypeAnnotationPath<'a>) -> Self {
+        TypeAnnotationParent::Union(path.boxed())
+    }
+}
 ```
 
 Before:
@@ -96,11 +206,33 @@ pub type NullTypeAnnotationPath<'a> =
     PositionResolutionPath<&'a NullTypeAnnotation, TypeAnnotationParent<'a>>;
 ```
 
-Delete `NullTypeAnnotation` and `NullTypeAnnotationPath`. `NamedTypeAnnotation` and `ListTypeAnnotation` are unchanged.
+Delete `NullTypeAnnotation` and `NullTypeAnnotationPath`. `NamedTypeAnnotation` and `ListTypeAnnotation` are unchanged. `TypeAnnotation::Union` is not boxed. `UnionTypeAnnotation` is a `Vec`.
 
-`UnionVariant` is all-delegate. `#[parent_variant(Union)]` builds `TypeAnnotationParent::Union(parent.into())`. `parent` is `UnionTypeAnnotationPath`. The `Union` payload is `Box<UnionTypeAnnotationPath>`. Std `From<T> for Box<T>`.
+`UnionVariant::Null` is a unit. It has no span. The vec row is `WithGenericLocation::new(UnionVariant::Null, None)`. `None` does not contain, so `UnionVariant::Null.resolve` is not called.
 
-`NullPresence` is not `ResolvePosition`. It is not `#[resolve_field]`.
+`UnionVariant` is a mixed enum: `Named` / `List` continue, `Null` is inert. Origin of the derive: `refactors/past/resolve-option-like-enums.md`. Delta: `ResolvePositionAttr` already has `parent_type`, `pins`, and `on_unmatched_span`; add `fallback` to that attr. Mixed emission is a branch when any variant has `#[resolve_into]`. Structs reject `fallback`. Enums still reject `on_unmatched_span`. A `#[resolve_into]` payload converts the parent with `From`; it does not take `parent_variant` or `parent_from`. `resolve_into` on a struct field is an error. The derive attribute list gains `resolve_into`. All-delegate enums are unchanged.
+
+`handle_data_enum` after the `on_unmatched_span` error:
+
+- `#[resolve_into]` is a bare path on the variant. Arguments are an error: `` expected bare `#[resolve_into]` ``.
+- A unit variant with `#[resolve_into]` is an error: `` a unit variant may only be unmarked ``.
+- A variant with named fields or not exactly one unnamed payload is the existing `single_payload_error`, except an unmarked unit which is allowed in mixed mode.
+- A `#[resolve_into]` payload with `parent_variant` or `parent_from` is an error: `` a `#[resolve_into]` payload converts the parent with `From`; do not annotate `parent_variant` or `parent_from` ``.
+
+No `#[resolve_into]`: `fallback` is `Some` is `` `fallback` requires a mixed enum ``; otherwise today's all-delegate, including `single_payload_error` on unit variants.
+
+At least one `#[resolve_into]`: every variant marked is `` drop the `#[resolve_into]` marks; an all-delegate enum does not use them ``. Some unmarked and no `fallback` is `` mixed enums require `fallback = VariantName` ``. Otherwise marked arms are `inner.resolve(parent.to(), position)` and unmarked is `_ => Self::ResolvedNode::#fallback(parent.to())`.
+
+`emit_one_enum_impl` gains `extra_predicates`. All-delegate passes `&[]`. Mixed passes, for each marked payload `P`:
+
+```rust
+#P: ::resolve_position::ResolvePosition<ResolvedNode<'a> = #resolved_node>,
+<#P as ::resolve_position::ResolvePosition>::Parent<'a>: ::std::convert::From<#parent_type>,
+```
+
+`#[resolve_into]` does `parent.to()`, so `NamedTypeAnnotation::Parent` (`TypeAnnotationParent`) is `From<UnionTypeAnnotationPath>`. A named type inside a union has `TypeAnnotationParent::Union`. `UnionVariant` is not a path node. `Null` is visible as a row of `union.0` whose `location` is `None`.
+
+If a position did enter `Null`, `fallback = UnionTypeAnnotation` answers the union. The vec walk does not enter it.
 
 The derive emits `From<UnionTypeAnnotationPath<'a>> for IsographResolutionNode<'a>`. Do not write that `From`.
 
@@ -122,7 +254,7 @@ The derive emits `From<UnionTypeAnnotationPath<'a>> for IsographResolutionNode<'
 
 Before: `NullTypeAnnotationPath` in the import list and `NullTypeAnnotation(NullTypeAnnotationPath<'a>)` on the enum. `NullValue` stays; it is the value `null`.
 
-## Parse
+### Parse
 
 `parse_named_or_list` returns a private enum that cannot be `Union` or `Null`.
 
@@ -167,16 +299,14 @@ pub(crate) fn parse_type_annotation(
             .wrap_ok();
     }
     let location = core.location;
-    TypeAnnotation::Union(UnionTypeAnnotation {
-        variants: core
-            .item
-            .into_union_variant()
-            .with_span(location)
-            .wrap_vec(),
-        null: NullPresence::Present,
-    })
-    .with_span(location)
-    .wrap_ok()
+    let written = WithGenericLocation::new(
+        core.item.into_union_variant(),
+        location.wrap_some(),
+    );
+    let null = WithGenericLocation::new(UnionVariant::Null, None);
+    TypeAnnotation::Union(UnionTypeAnnotation(vec![written, null]))
+        .with_span(location)
+        .wrap_ok()
 }
 
 fn parse_named_or_list(
@@ -214,13 +344,15 @@ fn parse_named_or_list(
 
 Before: `parse_named_or_list` returns `WithSpan<TypeAnnotation>` as `Named` or `List`. No bang wraps `TypeAnnotation::Null(NullTypeAnnotation(core).boxed())` at `core.location`. Bang peeks, advances, and returns `core` unchanged.
 
-Parser-produced unions are one written type and `NullPresence::Present`. `NullPresence::Absent` is a non-null union of the variants. This syntax cannot write that.
+Parser order of union members is the written type (`Some(core.location)`), then `Null` (`None`).
 
-`parse_bracket_interior_type` still calls `parse_type_annotation`, so `[Pet]`'s element is already `Union { variants: [Named(Pet)], null: Present }`.
+`parse_bracket_interior_type` still calls `parse_type_annotation`, so `[Pet]`'s element is already `Union([Named(Pet), Null])`.
 
 Who calls: `consume_to_target` and `parse_variable_declaration` already call `parse_type_annotation`. No other call sites.
 
-## Mental model
+`variables.rs` already imports `Span`, `WithSpan`, `WithSpanPostfix`. It gains `WithGenericLocation` and `WithOptionalSpan`.
+
+### Mental model
 
 ```rust
 // from docs-website/docs/design-docs/mental-model.md
@@ -230,19 +362,12 @@ enum Wrapper {
     Union(UnionWrapper),
 }
 
-struct UnionWrapper {
-    variants: Vec<WrapperVariant>,
-    null: NullPresence,
-}
+struct UnionWrapper(pub Vec<WrapperVariant>);
 
 enum WrapperVariant {
     Entity(Entity),
     List(Box<Wrapper>),
-}
-
-enum NullPresence {
-    Present,
-    Absent,
+    Null,
 }
 ```
 
@@ -257,15 +382,15 @@ enum Wrapper {
 }
 ```
 
-`List` is `[W]`. `Union { variants: [W], null: Present }` is `W | null`.
+`List` is `[W]`. `Union([W, Null])` is `W | null`. Schema types are not located.
 
 ```text
 Foo!      ->  Entity(Foo)
-Foo       ->  Union { variants: [Entity(Foo)], null: Present }
+Foo       ->  Union([Entity(Foo), Null])
 [Foo!]!   ->  List(Entity(Foo))
-[Foo]     ->  Union { variants: [List(Union { variants: [Entity(Foo)], null: Present })], null: Present }
-[Foo!]    ->  Union { variants: [List(Entity(Foo))], null: Present }
-[Foo]!    ->  List(Union { variants: [Entity(Foo)], null: Present })
+[Foo]     ->  Union([List(Union([Entity(Foo), Null])), Null])
+[Foo!]    ->  Union([List(Entity(Foo)), Null])
+[Foo]!    ->  List(Union([Entity(Foo), Null]))
 ```
 
 Before:
@@ -282,7 +407,7 @@ and `Null` is `W | null`.
 Selectable example `to User`:
 
 ```text
-This creates the selectable `User.bestFriend` whose target is Union { variants: [Entity(User)], null: Present }.
+This creates the selectable `User.bestFriend` whose target is Union([Entity(User), Null]).
 ```
 
 Before: `whose target is the named entity `User``.
@@ -290,7 +415,7 @@ Before: `whose target is the named entity `User``.
 Upstream selectables:
 
 ```text
-Query.user       ->  Union { variants: [Entity(User)], null: Present }
+Query.user       ->  Union([Entity(User), Null])
 User.id          ->  Entity(ID)
 User.name        ->  Entity(String)
 User.friends     ->  List(Entity(User))
@@ -305,10 +430,10 @@ User.name        ->  String
 User.friends     ->  [User]
 ```
 
-## parsing-plan
+### parsing-plan
 
 ```text
-- `TypeAnnotation` as `Named` / `List` / `Union` with `NullPresence` on the union (isograph `Scalar` / `Plural` / `Union` with `nullable: bool` on the union; i2 names the two cases `Present` / `Absent`). `!` is peeked and is not on the span. Leftover inside `[...]` stays on `ListTypeAnnotation`.
+- `TypeAnnotation` as `Named` / `List` / `Union` with `Null` a `UnionVariant` at `None` location (isograph `Scalar` / `Plural` / `Union` with `nullable: bool` on the union; i2 stores `Null` as a member). `!` is peeked and is not on the span. Leftover inside `[...]` stays on `ListTypeAnnotation`.
 ```
 
 Before:
@@ -317,23 +442,24 @@ Before:
 - `TypeAnnotation` as `Named` / `List` with `!` on the span (not `TypeAnnotationDeclaration` as `Scalar` / `Union` / `Plural`): i2 stores the written form; isograph converts from `GraphQLTypeAnnotation`.
 ```
 
-## Tests
+### Tests
 
-In `parse_iso_literal.rs`. The test module's `use crate::{...}` list gains `UnionVariant` and `NullPresence`. Span tests that do not mention `Null` stay (`a_to_target_accepts_every_type_annotation_form`, `a_full_field` `Person!`, `a_bracketed_target_is_a_list_annotation` `[Pet!]!` is `List` of `Named` with location `[Pet!]`, `list_types_nest_with_non_null_markers`, `a_multi_line_variable_list_parses_in_the_demo_style`, `a_bang_resolves_to_the_variable_declaration`).
+In `parse_iso_literal.rs`. The test module's `use crate::{...}` list gains `UnionVariant`. Span tests that do not mention `Null` stay (`a_to_target_accepts_every_type_annotation_form`, `a_full_field` `Person!`, `a_bracketed_target_is_a_list_annotation` `[Pet!]!` is `List` of `Named` with location `[Pet!]`, `list_types_nest_with_non_null_markers`, `a_multi_line_variable_list_parses_in_the_demo_style`, `a_bang_resolves_to_the_variable_declaration`).
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
         match target.item.reference() {
             TypeAnnotation::Union(union) => {
-                assert_eq!(union.null, NullPresence::Present);
-                assert_eq!(union.variants.len(), 1);
-                match union.variants[0].item.reference() {
+                assert_eq!(union.0.len(), 2);
+                match union.0[0].item.reference() {
                     UnionVariant::Named(named) => {
                         assert_eq!(named.name.location, span_of(text, "Owner"));
                     }
                     variant => panic!("expected Named, got {variant:?}"),
                 }
-                assert_eq!(union.variants[0].location, span_of(text, "Owner"));
+                assert_eq!(union.0[0].location, span_of(text, "Owner").wrap_some());
+                assert!(matches!(union.0[1].item, UnionVariant::Null));
+                assert_eq!(union.0[1].location, None);
             }
             annotation => panic!("expected Union, got {annotation:?}"),
         }
@@ -365,20 +491,24 @@ Before, `a_field_with_to_parses_the_target_type`:
 // from crates/isograph_parser/src/parse_iso_literal.rs
         match target.item.reference() {
             TypeAnnotation::Union(outer) => {
-                assert_eq!(outer.null, NullPresence::Present);
-                match outer.variants[0].item.reference() {
+                assert_eq!(outer.0.len(), 2);
+                match outer.0[0].item.reference() {
                     UnionVariant::List(list) => {
                         let inner = list.inner.as_ref().expect("the list holds a type");
                         match inner.item.reference() {
                             TypeAnnotation::Union(elem) => {
-                                assert_eq!(elem.null, NullPresence::Present);
-                                assert!(matches!(elem.variants[0].item, UnionVariant::Named(_)));
+                                assert_eq!(elem.0.len(), 2);
+                                assert!(matches!(elem.0[0].item, UnionVariant::Named(_)));
+                                assert!(matches!(elem.0[1].item, UnionVariant::Null));
+                                assert_eq!(elem.0[1].location, None);
                             }
                             annotation => panic!("expected Union element, got {annotation:?}"),
                         }
                     }
                     variant => panic!("expected List, got {variant:?}"),
                 }
+                assert!(matches!(outer.0[1].item, UnionVariant::Null));
+                assert_eq!(outer.0[1].location, None);
             }
             annotation => panic!("expected Union list, got {annotation:?}"),
         }
@@ -403,23 +533,20 @@ Before, `a_list_target_maps_graphql_nullability`:
             annotation => panic!("expected Null list, got {annotation:?}"),
 ```
 
-`a_variable_type_without_bang_is_null_wrapped` becomes `a_variable_type_without_bang_is_a_union_with_null`: `$x: ID` is `Union { variants: [Named(ID)], null: Present }`.
+`a_variable_type_without_bang_is_null_wrapped` becomes `a_variable_type_without_bang_is_a_union_with_null`: `$x: ID` is `Union([Named(ID), Null])` with `Null` at `None`.
 
-`a_nested_list_target_wraps_null_at_every_layer` becomes `a_nested_list_target_is_a_union_at_every_layer`. `[[Pet]]` is Union of List of Union of List of Union of Named, each union `Present`.
+`a_nested_list_target_wraps_null_at_every_layer` becomes `a_nested_list_target_is_a_union_at_every_layer`. `[[Pet]]` is `Union([List(Union([List(Union([Named(Pet), Null])), Null])), Null])`.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
         match target.item.reference() {
-            TypeAnnotation::Union(outer) => {
-                assert_eq!(outer.null, NullPresence::Present);
-                match outer.variants[0].item.reference() {
-                    UnionVariant::List(list) => {
-                        let inner = list.inner.as_ref().expect("the list holds a type");
-                        assert!(matches!(inner.item, TypeAnnotation::Named(_)));
-                    }
-                    variant => panic!("expected List, got {variant:?}"),
+            TypeAnnotation::Union(outer) => match outer.0[0].item.reference() {
+                UnionVariant::List(list) => {
+                    let inner = list.inner.as_ref().expect("the list holds a type");
+                    assert!(matches!(inner.item, TypeAnnotation::Named(_)));
                 }
-            }
+                variant => panic!("expected List, got {variant:?}"),
+            },
             annotation => panic!("expected Union list, got {annotation:?}"),
         }
 ```
@@ -432,8 +559,9 @@ Before, `a_nullable_list_of_non_null_named` (`[Pet!]`): `Null(List(Named))`.
                 let inner = list.inner.as_ref().expect("the list holds a type");
                 match inner.item.reference() {
                     TypeAnnotation::Union(elem) => {
-                        assert_eq!(elem.null, NullPresence::Present);
-                        assert!(matches!(elem.variants[0].item, UnionVariant::Named(_)));
+                        assert!(matches!(elem.0[0].item, UnionVariant::Named(_)));
+                        assert!(matches!(elem.0[1].item, UnionVariant::Null));
+                        assert_eq!(elem.0[1].location, None);
                     }
                     annotation => panic!("expected Union element, got {annotation:?}"),
                 }
@@ -466,7 +594,8 @@ Before, `to_and_the_target_resolve_with_their_ancestry` on `Owner`: `TypeAnnotat
                     TypeAnnotationParent::Union(union) => union.as_ref(),
                     parent => panic!("expected Union around Named, got {parent:?}"),
                 };
-                assert_eq!(inner_union.inner.null, NullPresence::Present);
+                assert!(matches!(inner_union.inner.0[1].item, UnionVariant::Null));
+                assert_eq!(inner_union.inner.0[1].location, None);
                 let list = match inner_union.parent.reference() {
                     TypeAnnotationParent::List(list) => list.as_ref(),
                     parent => panic!("expected a list parent, got {parent:?}"),
@@ -475,7 +604,8 @@ Before, `to_and_the_target_resolve_with_their_ancestry` on `Owner`: `TypeAnnotat
                     TypeAnnotationParent::Union(union) => union.as_ref(),
                     parent => panic!("expected Union around List, got {parent:?}"),
                 };
-                assert_eq!(outer_union.inner.null, NullPresence::Present);
+                assert!(matches!(outer_union.inner.0[1].item, UnionVariant::Null));
+                assert_eq!(outer_union.inner.0[1].location, None);
                 match outer_union.parent.reference() {
                     TypeAnnotationParent::Variable(variable) => {
                         assert_eq!(variable.inner.name.location, span_of(text, "$pets"));
@@ -486,6 +616,6 @@ Before, `to_and_the_target_resolve_with_their_ancestry` on `Owner`: `TypeAnnotat
 
 Before, `type_names_resolve_through_their_annotation_ancestry`: Named → Null → List → Null → Variable.
 
-`to_as_a_target_type_name_parses` (`to to`): `Union { variants: [Named(to)], null: Present }` instead of `Null(Named(to))`.
+`to_as_a_target_type_name_parses` (`to to`): `Union([Named(to), Null])` instead of `Null(Named(to))`.
 
-`a_line_break_inside_a_list_type_does_not_attach_bang`: chunk 0 is `Union { variants: [Named(Pet)], null: Present }` instead of `Null(Named(Pet))`.
+`a_line_break_inside_a_list_type_does_not_attach_bang`: chunk 0 is `Union([Named(Pet), Null])` instead of `Null(Named(Pet))`.
