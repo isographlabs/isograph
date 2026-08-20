@@ -5,9 +5,10 @@ use span::{WithSpan, WithSpanPostfix};
 
 use crate::chunk_stream::ItemCursor;
 use crate::{
-    ChunkedLevel, Expectation, ExtraChunks, Found, IsographResolutionNode, NonBracketTokenKind,
-    ParseError, SelectionSet, SemanticToken, Singleton, Slot, UnparsedChunkItems, parse_singleton,
-    require_selection_set,
+    ChunkedLevel, Expectation, ExtraChunks, Found, IsographResolutionNode, NamedTypeAnnotationPath,
+    NonBracketTokenKind, ParseError, SelectionSet, SemanticToken, Singleton, Slot,
+    UnparsedChunkItems, VariableDeclarationOrUsageList, consume_variable_declaration_list,
+    parse_singleton, require_selection_set,
 };
 
 pub type IsoLiteralParse = Singleton<Slot<IsoLiteralItem, UnparsedChunkItems>, ExtraChunks>;
@@ -51,6 +52,8 @@ pub struct ClientFieldDeclaration {
     #[parent_variant(ClientFieldDeclaration)]
     pub client_field_name: WithSpan<ClientScalarSelectableNameWrapper>,
     #[resolve_field]
+    pub variable_definitions: Option<WithSpan<VariableDeclarationOrUsageList>>,
+    #[resolve_field]
     pub description: Option<WithSpan<Description>>,
     #[resolve_field]
     #[parent_variant(ClientFieldDeclaration)]
@@ -60,7 +63,7 @@ pub struct ClientFieldDeclaration {
 /// The name of a schema type, `Query` in `entrypoint Query.foo`.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = EntityNameWrapperParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct EntityNameWrapper(common_lang_types::EntityName);
+pub struct EntityNameWrapper(pub common_lang_types::EntityName);
 
 /// The name of the client field an entrypoint targets, `foo` in `entrypoint Query.foo`.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
@@ -79,6 +82,7 @@ pub struct Description(common_lang_types::DescriptionValue);
 pub enum EntityNameWrapperParent<'a> {
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
     ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
+    NamedTypeAnnotation(NamedTypeAnnotationPath<'a>),
 }
 
 #[derive(Debug)]
@@ -183,6 +187,7 @@ fn parse_field(
     let client_field_name = cursor
         .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+    let variable_definitions = consume_variable_declaration_list(cursor);
     let description = consume_description(cursor);
     let selection_set = require_selection_set(cursor)?;
     ClientFieldDeclaration {
@@ -190,6 +195,7 @@ fn parse_field(
         client_field_name: client_field_name
             .interned()
             .map(ClientScalarSelectableNameWrapper),
+        variable_definitions,
         description,
         selection_set,
     }
@@ -218,9 +224,12 @@ mod tests {
     use super::*;
     use crate::{
         BracketError, BracketKind, ChunkContentItemParent, CommaWithoutItem, Expectation, Found,
-        IsographResolutionNode, NonBracketTokenKind, ParseError, Selection, SelectionNameWrapper,
-        SelectionSet, SelectionSetParent, Slot, UnparsedChunkItems, UnparsedChunkItemsParent,
-        chunk, match_brackets, tokenize,
+        IntegerValue, IsographResolutionNode, NonBracketTokenKind, NonConstantValue,
+        NonConstantValueParent, ObjectEntry, ParseError, Selection, SelectionNameWrapper,
+        SelectionSet, SelectionSetParent, Slot, TypeAnnotation, TypeAnnotationParent,
+        UnparsedChunkItems, UnparsedChunkItemsParent, VariableDeclarationOrUsage,
+        VariableDeclarationOrUsageList, VariableNameWrapper, VariableNameWrapperParent, chunk,
+        match_brackets, tokenize,
     };
     use Expectation::{DeclarationKeyword, EndOfDeclaration};
     use NonBracketTokenKind::{
@@ -324,6 +333,31 @@ mod tests {
             IsoLiteralItem::Field(declaration) => declaration,
             item => panic!("expected a field declaration, got {item:?}"),
         }
+    }
+
+    fn variables_of(
+        parse: &WithSpan<IsoLiteralParse>,
+    ) -> &WithSpan<VariableDeclarationOrUsageList> {
+        as_field(parse)
+            .variable_definitions
+            .as_ref()
+            .expect("the fixture's declaration carries variable definitions")
+    }
+
+    fn as_declared(
+        slot: &Slot<VariableDeclarationOrUsage, UnparsedChunkItems>,
+    ) -> &VariableDeclarationOrUsage {
+        slot.item
+            .as_ref()
+            .map(|wrapped| wrapped.item.reference())
+            .expect("expected a declared variable")
+    }
+
+    fn as_entry(slot: &Slot<ObjectEntry, UnparsedChunkItems>) -> &ObjectEntry {
+        slot.item
+            .as_ref()
+            .map(|wrapped| wrapped.item.reference())
+            .expect("expected an object entry")
     }
 
     fn selections(
@@ -1293,5 +1327,233 @@ mod tests {
             .expect("the fixture is a block-string description");
         assert_eq!(description.location, span_of(text, "\"\"\"\"\"\""));
         assert_eq!(description.item, Description("\"\"\"\"\"\"".intern().to()));
+    }
+
+    #[test]
+    fn a_multi_line_variable_list_parses_in_the_demo_style() {
+        let text = "field Query.PetCheckinListRoute(\n  $id: ID !\n) {\n  pets\n}";
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        let variables = variables_of(parse.reference());
+        assert_eq!(variables.item.0.len(), 1);
+        let declared = as_declared(variables.item.0[0].item.reference());
+        assert_eq!(declared.name.item, VariableNameWrapper("id".intern().to()));
+        assert_eq!(declared.name.location, span_of(text, "id"));
+        match declared.type_.item.reference() {
+            TypeAnnotation::Named(named) => {
+                assert_eq!(named.name.location, span_of(text, "ID"));
+                assert_eq!(declared.type_.location, span_of(text, "ID !"));
+            }
+            annotation => panic!("expected a named type, got {annotation:?}"),
+        }
+    }
+
+    #[test]
+    fn list_types_nest_with_non_null_markers() {
+        let text = "field Query.Foo($pets: [Pet!]!) { bar }";
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        let declared = as_declared(variables_of(parse.reference()).item.0[0].item.reference());
+        assert_eq!(declared.type_.location, span_of(text, "[Pet!]!"));
+        let list = match declared.type_.item.reference() {
+            TypeAnnotation::List(list) => list.as_ref(),
+            annotation => panic!("expected a list type, got {annotation:?}"),
+        };
+        let inner = list.inner.as_ref().expect("the list holds an element type");
+        match inner.item.reference() {
+            TypeAnnotation::Named(named) => {
+                assert_eq!(named.name.location, span_of(text, "Pet"));
+                assert_eq!(inner.location, span_of(text, "Pet!"));
+            }
+            annotation => panic!("expected the named element type, got {annotation:?}"),
+        }
+    }
+
+    #[test]
+    fn defaults_parse_including_variables() {
+        let text = "field Query.Foo($limit: Int = 10) { bar }";
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        let declared = as_declared(variables_of(parse.reference()).item.0[0].item.reference());
+        let default = declared
+            .default_value
+            .as_ref()
+            .expect("the fixture declares a default");
+        assert!(matches!(
+            default.item,
+            NonConstantValue::Integer(IntegerValue(10))
+        ));
+
+        let shallow = "field Query.Foo($limit: Int = $other) { bar }";
+        let (parse, errors) = parsed(shallow);
+        assert_eq!(errors, vec![]);
+        let declared = as_declared(variables_of(parse.reference()).item.0[0].item.reference());
+        let default = declared
+            .default_value
+            .as_ref()
+            .expect("the fixture declares a default");
+        assert!(matches!(default.item, NonConstantValue::Variable(_)));
+
+        let deep = "field Query.Foo($input: Input = { pet: $pet }) { bar }";
+        let (parse, errors) = parsed(deep);
+        assert_eq!(errors, vec![]);
+        let declared = as_declared(variables_of(parse.reference()).item.0[0].item.reference());
+        let default = declared
+            .default_value
+            .as_ref()
+            .expect("the fixture declares a default");
+        match default.item.reference() {
+            NonConstantValue::Object(object) => {
+                let entry = as_entry(object.0[0].item.reference());
+                assert!(matches!(entry.value.item, NonConstantValue::Variable(_)));
+            }
+            value => panic!("expected an object default, got {value:?}"),
+        }
+
+        let cross = "field Query.Foo($foo: String = \"foo\", $bar: Input = { foo: $foo }) { baz }";
+        let (parse, errors) = parsed(cross);
+        assert_eq!(errors, vec![]);
+        let variables = variables_of(parse.reference());
+        assert_eq!(variables.item.0.len(), 2);
+        let bar = as_declared(variables.item.0[1].item.reference());
+        match bar
+            .default_value
+            .as_ref()
+            .expect("bar has a default")
+            .item
+            .reference()
+        {
+            NonConstantValue::Object(object) => {
+                let entry = as_entry(object.0[0].item.reference());
+                assert!(matches!(entry.value.item, NonConstantValue::Variable(_)));
+            }
+            value => panic!("expected an object default, got {value:?}"),
+        }
+    }
+
+    #[test]
+    fn a_default_variable_resolves_through_variable_default() {
+        let text = "field Query.Foo($limit: Int = $other) { bar }";
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        match parse.resolve((), span_of(text, "other")) {
+            IsographResolutionNode::VariableNameWrapper(name) => match name.parent {
+                VariableNameWrapperParent::Use(variable_use) => match variable_use.parent {
+                    NonConstantValueParent::VariableDefault(declaration) => {
+                        assert_eq!(declaration.inner.name.location, span_of(text, "limit"));
+                    }
+                    parent => panic!("expected VariableDefault, got {parent:?}"),
+                },
+                parent => panic!("expected Use, got {parent:?}"),
+            },
+            node => panic!("expected the variable name leaf, got {node:?}"),
+        }
+        let use_dollar = Span::new(
+            span_of(text, "$other").start,
+            span_of(text, "$other").start + 1,
+        );
+        match parse.resolve((), use_dollar) {
+            IsographResolutionNode::VariableUse(_) => {}
+            node => panic!("expected the variable use, got {node:?}"),
+        }
+    }
+
+    #[test]
+    fn each_malformed_variable_declaration_degrades_alone() {
+        let text = "field Query.Foo($a Int, $b: , id: ID, $c: Float) { bar }";
+        let (parse, errors) = parsed(text);
+        let variables = variables_of(parse.reference());
+        assert_eq!(variables.item.0.len(), 4);
+        assert!(variables.item.0[0].item.item.is_none());
+        assert!(variables.item.0[1].item.item.is_none());
+        assert!(variables.item.0[2].item.item.is_none());
+        as_declared(variables.item.0[3].item.reference());
+        assert_eq!(errors.len(), 3);
+        assert_eq!(errors[0].location, span_of(text, "Int"));
+        assert!(errors[1].item == expected(Expectation::TypeAnnotation, Found::EndOfChunk));
+        assert_eq!(errors[2].location, span_of(text, "id"));
+    }
+
+    #[test]
+    fn a_final_comma_inside_a_list_type_is_end_of_type() {
+        let text = "field Query.Foo($pets: [Pet,]) { bar }";
+        let (parse, errors) = parsed(text);
+        as_declared(variables_of(parse.reference()).item.0[0].item.reference());
+        assert_eq!(
+            errors,
+            expected(Expectation::EndOfType, Found::Token(Comma))
+                .with_span(span_of(text, ","))
+                .wrap_vec(),
+        );
+    }
+
+    #[test]
+    fn a_line_break_inside_a_list_type_does_not_attach_bang() {
+        let text = "field Query.Foo($pets: [Pet\n!]) { bar }";
+        let (parse, errors) = parsed(text);
+        let declared = as_declared(variables_of(parse.reference()).item.0[0].item.reference());
+        match declared.type_.item.reference() {
+            TypeAnnotation::List(list) => {
+                let inner = list.inner.as_ref().expect("chunk 0 parsed Pet");
+                assert!(matches!(inner.item, TypeAnnotation::Named(_)));
+                assert_eq!(inner.location, span_of(text, "Pet"));
+            }
+            annotation => panic!("expected a list type, got {annotation:?}"),
+        }
+        assert!(errors.iter().any(|error| {
+            error.item
+                == expected(
+                    Expectation::EndOfType,
+                    Found::Token(NonBracketTokenKind::Exclamation),
+                )
+                && error.location == span_of(text, "!")
+        }));
+    }
+
+    #[test]
+    fn type_names_resolve_through_their_annotation_ancestry() {
+        let text = "field Query.Foo($pets: [Pet]) { bar }";
+        let (parse, _) = parsed(text);
+        match parse.resolve((), span_of(text, "Pet")) {
+            IsographResolutionNode::EntityNameWrapper(name) => {
+                let list = match name.parent.reference() {
+                    EntityNameWrapperParent::NamedTypeAnnotation(named) => {
+                        match named.parent.reference() {
+                            TypeAnnotationParent::List(list) => list.as_ref(),
+                            parent => panic!("expected a list parent, got {parent:?}"),
+                        }
+                    }
+                    parent => panic!("expected a named type annotation, got {parent:?}"),
+                };
+                match list.parent.reference() {
+                    TypeAnnotationParent::Variable(variable) => {
+                        assert_eq!(variable.inner.name.location, span_of(text, "pets"));
+                    }
+                    parent => panic!("expected the declared variable, got {parent:?}"),
+                }
+            }
+            node => panic!("expected the type name leaf, got {node:?}"),
+        }
+        match parse.resolve((), span_of(text, "pets")) {
+            IsographResolutionNode::VariableNameWrapper(name) => {
+                assert!(matches!(
+                    name.parent,
+                    VariableNameWrapperParent::Declaration(_)
+                ));
+            }
+            node => panic!("expected the variable name leaf, got {node:?}"),
+        }
+    }
+
+    #[test]
+    fn a_bang_resolves_to_the_annotation() {
+        let text = "field Query.Foo($id: ID!) { bar }";
+        let (parse, _) = parsed(text);
+        match parse.resolve((), span_of(text, "!")) {
+            IsographResolutionNode::NamedTypeAnnotation(annotation) => {
+                assert_eq!(annotation.inner.name.location, span_of(text, "ID"));
+            }
+            node => panic!("expected the named type, got {node:?}"),
+        }
     }
 }

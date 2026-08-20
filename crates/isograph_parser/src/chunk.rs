@@ -8,9 +8,11 @@ use span::{Span, WithSpan, WithSpanPostfix};
 use crate::{
     ArgumentListPath, BracketItem, Bracketed, CloseBracket, Expectation, ExtraChunksPath, Found,
     IsoLiteralItem, IsoLiteralParsePath, IsoLiteralSlotPath, IsographResolutionNode,
-    MatchedBrackets, NonBracketToken, NonBracketTokenKind, ObjectEntry, ObjectEntrySlotPath,
-    ObjectLiteralPath, OpenBracket, ParseError, Selection, SelectionFieldArgument,
-    SelectionFieldArgumentSlotPath, SelectionSetPath, SelectionSlotPath, SemanticToken,
+    ListTypeAnnotationPath, MatchedBrackets, NonBracketToken, NonBracketTokenKind, ObjectEntry,
+    ObjectEntrySlotPath, ObjectLiteralPath, OpenBracket, ParseError, Selection,
+    SelectionFieldArgument, SelectionFieldArgumentSlotPath, SelectionSetPath, SelectionSlotPath,
+    SemanticToken, VariableDeclarationOrUsage, VariableDeclarationOrUsageListPath,
+    VariableDeclarationOrUsageSlotPath,
     chunk_stream::{ChunkStream, ItemCursor},
 };
 
@@ -140,7 +142,6 @@ impl Chunk {
         )
     }
 
-    #[cfg_attr(not(test), expect(dead_code))]
     pub(crate) fn first_item(&self) -> &WithSpan<ChunkContentItem> {
         self.contents.first()
     }
@@ -196,6 +197,8 @@ pub enum UnparsedChunkItemsParent<'a> {
     SelectionFieldArgumentSlot(SelectionFieldArgumentSlotPath<'a>),
     ObjectEntrySlot(ObjectEntrySlotPath<'a>),
     SelectionSlot(SelectionSlotPath<'a>),
+    VariableDeclarationOrUsageSlot(VariableDeclarationOrUsageSlotPath<'a>),
+    ListTypeAnnotation(ListTypeAnnotationPath<'a>),
 }
 
 pub type UnparsedChunkItemsPath<'a> =
@@ -222,6 +225,18 @@ impl<'a> From<ObjectEntrySlotPath<'a>> for UnparsedChunkItemsParent<'a> {
 impl<'a> From<SelectionSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
     fn from(path: SelectionSlotPath<'a>) -> Self {
         UnparsedChunkItemsParent::SelectionSlot(path)
+    }
+}
+
+impl<'a> From<VariableDeclarationOrUsageSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
+    fn from(path: VariableDeclarationOrUsageSlotPath<'a>) -> Self {
+        UnparsedChunkItemsParent::VariableDeclarationOrUsageSlot(path)
+    }
+}
+
+impl<'a> From<ListTypeAnnotationPath<'a>> for UnparsedChunkItemsParent<'a> {
+    fn from(path: ListTypeAnnotationPath<'a>) -> Self {
+        UnparsedChunkItemsParent::ListTypeAnnotation(path)
     }
 }
 
@@ -255,6 +270,7 @@ pub struct ExtraChunks(
         (<SelectionFieldArgument, UnparsedChunkItems>, ArgumentListPath<'a>),
         (<ObjectEntry, UnparsedChunkItems>, ObjectLiteralPath<'a>),
         (<Selection, UnparsedChunkItems>, SelectionSetPath<'a>),
+        (<VariableDeclarationOrUsage, UnparsedChunkItems>, VariableDeclarationOrUsageListPath<'a>),
     ]
 )]
 pub struct Slot<T, E> {

@@ -7,6 +7,7 @@ use crate::chunk_stream::ItemCursor;
 use crate::{
     BracketKind, ChunkContentItem, Expectation, Found, IsographResolutionNode, NonBracketToken,
     NonBracketTokenKind, ParseError, SelectionPath, SemanticToken, Slot, UnparsedChunkItems,
+    VariableDeclarationOrUsagePath,
 };
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -52,7 +53,11 @@ pub enum NonConstantValue {
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct VariableUse(#[resolve_field] pub WithSpan<VariableNameWrapper>);
+pub struct VariableUse(
+    #[resolve_field]
+    #[parent_variant(Use)]
+    pub WithSpan<VariableNameWrapper>,
+);
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
@@ -88,13 +93,20 @@ pub struct FieldArgumentNameWrapper(common_lang_types::FieldArgumentName);
 pub struct ValueKeyNameWrapper(common_lang_types::ValueKeyName);
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = VariableUsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct VariableNameWrapper(common_lang_types::VariableName);
+#[resolve_position(parent_type = VariableNameWrapperParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct VariableNameWrapper(pub common_lang_types::VariableName);
+
+#[derive(Debug)]
+pub enum VariableNameWrapperParent<'a> {
+    Use(VariableUsePath<'a>),
+    Declaration(VariableDeclarationOrUsagePath<'a>),
+}
 
 #[derive(Debug)]
 pub enum NonConstantValueParent<'a> {
     SelectionFieldArgument(Box<SelectionFieldArgumentPath<'a>>),
     ObjectEntry(Box<ObjectEntryPath<'a>>),
+    VariableDefault(VariableDeclarationOrUsagePath<'a>),
 }
 
 pub type ArgumentListPath<'a> = PositionResolutionPath<&'a ArgumentList, SelectionPath<'a>>;
@@ -135,7 +147,7 @@ pub type ValueKeyNameWrapperPath<'a> =
     PositionResolutionPath<&'a ValueKeyNameWrapper, ObjectEntryPath<'a>>;
 
 pub type VariableNameWrapperPath<'a> =
-    PositionResolutionPath<&'a VariableNameWrapper, VariableUsePath<'a>>;
+    PositionResolutionPath<&'a VariableNameWrapper, VariableNameWrapperParent<'a>>;
 
 impl<'a> From<SelectionFieldArgumentSlotPath<'a>> for IsographResolutionNode<'a> {
     fn from(path: SelectionFieldArgumentSlotPath<'a>) -> Self {

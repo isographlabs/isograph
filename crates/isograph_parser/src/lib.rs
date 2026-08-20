@@ -10,6 +10,7 @@ mod selections;
 mod semantic_token;
 mod token_kind;
 mod tokenize;
+mod variables;
 
 pub use arguments::*;
 pub use chunk::*;
@@ -22,3 +23,4 @@ pub use selections::*;
 pub use semantic_token::*;
 pub use token_kind::*;
 pub use tokenize::*;
+pub use variables::*;

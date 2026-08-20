@@ -50,6 +50,12 @@ pub enum Expectation {
     SelectionSet,
     #[error("a field selection")]
     Selection,
+    #[error("a variable declaration, like '$id: ID!'")]
+    VariableDeclarationOrUsage,
+    #[error("a type, like 'String', 'String!', or '[String]'")]
+    TypeAnnotation,
+    #[error("the end of the type")]
+    EndOfType,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, strum::Display)]

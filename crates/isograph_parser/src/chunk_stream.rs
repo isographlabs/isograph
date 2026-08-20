@@ -5,8 +5,9 @@ use safe_peekable::{IntoSafePeekable, Peek, SafePeekable};
 use span::{Span, WithSpan, WithSpanPostfix};
 
 use crate::{
-    BracketKind, Chunk, ChunkContentItem, ChunkedLevel, Expectation, Found, NonBracketTokenKind,
-    ParseError, SemanticToken,
+    BracketKind, Chunk, ChunkContentItem, ChunkedLevel, Expectation, ExtraChunks, Found,
+    NonBracketTokenKind, ParseError, SemanticToken, Singleton, Slot, UnparsedChunkItems,
+    parse_singleton,
 };
 
 /// Sequential reader of one chunk. Parameter of a parse function.
@@ -198,6 +199,24 @@ impl<'a> ItemCursor<'a> {
         parse_inside: impl FnOnce(&mut Self, &'a WithSpan<ChunkedLevel>) -> R,
     ) -> Result<WithSpan<R>, ()> {
         self.consume_group_if(kind, token, parse_inside).ok_or(())
+    }
+
+    pub(crate) fn parse_nested_singleton<T>(
+        &mut self,
+        level: &WithSpan<ChunkedLevel>,
+        end: Expectation,
+        extra_chunks: impl FnOnce(&WithSpan<Chunk>) -> WithSpan<ParseError>,
+        parse: impl FnOnce(&mut ItemCursor<'_>) -> Result<T, WithSpan<ParseError>>,
+    ) -> Singleton<Slot<T, UnparsedChunkItems>, ExtraChunks> {
+        parse_singleton(
+            level,
+            self.text,
+            self.tokens,
+            self.errors,
+            end,
+            extra_chunks,
+            parse,
+        )
     }
 
     #[cfg_attr(not(test), expect(dead_code))]
