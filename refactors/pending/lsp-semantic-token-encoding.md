@@ -47,11 +47,11 @@ pub fn lsp_semantic_tokens(
         while piece_start < span.end {
             let start = cursor.position(piece_start);
             // An LSP token cannot include a line break.
-            let line_end = match cursor.break_before(span.end) {
+            let piece_end = match cursor.break_before(span.end) {
                 Some(line_break) => line_break.start,
                 None => span.end,
             };
-            if line_end > piece_start {
+            if piece_end > piece_start {
                 let delta_line = start.line - last.line;
                 encoded.push(LspSemanticToken {
                     delta_line,
@@ -61,7 +61,7 @@ pub fn lsp_semantic_tokens(
                         _ => start.col,
                     },
                     length: utf16_units(
-                        &page_content[(piece_start as usize)..(line_end as usize)],
+                        &page_content[(piece_start as usize)..(piece_end as usize)],
                     ),
                     token_type: lsp_type_index(token.item),
                     token_modifiers_bitset: 0,
@@ -294,7 +294,7 @@ fn utf16_units(text: &str) -> u32 {
 
 `LineIndex` holds every break index from one scan of `page_content`. `LineCursor` walks that vec: `break_index` is the first break not yet passed. `position(offset)` advances while `after <= offset` (each such advance is one line). `break_before` peeks the current break if it starts before `span.end`. `advance_break` consumes it and moves to the next line. Tokens are in file order, so the cursor only moves forward. `break_index` is the line number after those advances.
 
-`last` is the previous piece's start `Pos`. Same-line `delta_start` is `start.col - last.col`. After a line break it is `start.col`. A blank line inside a span is `line_end == piece_start`; nothing is emitted, then `advance_break` still runs, so the next `position` is on the following line.
+`last` is the previous piece's start `Pos`. Same-line `delta_start` is `start.col - last.col`. After a line break it is `start.col`. A blank line inside a span is `piece_end == piece_start`; nothing is emitted, then `advance_break` still runs, so the next `position` is on the following line.
 
 `check_span` runs before any slice. Ordered exclusive spans are not enough: `page = "a\r\nb"` with tokens `[0..1, 2..3]` is ordered and exclusive, and offset 2 sits strictly inside the break `{ start: 1, after: 3 }`. Parser leftover skips `LineBreak` tokens, so this is a caller concat bug. `EncodeError` names it instead of panicking on `page_content[3..2]`.
 
