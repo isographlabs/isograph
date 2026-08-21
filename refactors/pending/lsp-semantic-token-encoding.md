@@ -1,8 +1,10 @@
 # LSP semantic token encoding
 
-`Vec<WithSpan<IsographSemanticToken>>` is literal-relative byte spans. LSP `textDocument/semanticTokens/full` wants `lsp_types::SemanticToken`: `delta_line`, `delta_start`, `length`, `token_type` index into a legend, `token_modifiers_bitset`. `delta_start` and `length` are UTF-16 code units. A token does not include a line break.
+`Vec<WithSpan<IsographSemanticToken>>` is literal-relative byte spans. LSP `textDocument/semanticTokens/full` wants `lsp_types::SemanticToken`: `delta_line`, `delta_start`, `length`, `token_type` index into a legend, `token_modifiers_bitset`. `delta_start` and `length` are UTF-16 code units.
 
-`LineIndex` records every line-break index in `page_content` once. A `LineCursor` walks that vec as tokens are encoded (file order). `position(offset)` advances past breaks with `after <= offset`; `break_index` is the line. The encoder delta-encodes those positions: `delta_line = line - prev_line`; `delta_start` is `col - prev_col` on the same line and `col` after a line break; `length` is UTF-16 of the piece. Spans are file-absolute, mutually exclusive, ordered, in range, on char boundaries, not strictly inside a line break, and each contains at least one byte that is not a line break. A violation is `EncodeError`. Every isograph token produces at least one LSP token. A block string is one isograph token and several LSP tokens (one per line of text). The caller rebases a literal-relative span with `with_offset` before concatenating literals. The server (lsp-semantic-tokens.md) logs the error and answers with empty tokens.
+A client that does not advertise `multilineTokenSupport` clips a token at the end of the line (LSP 3.17). VS Code does not advertise it. So an isograph token whose span contains a line break becomes one LSP token per line of text. That cut is `single_line_pieces`: one isograph token to a non-empty `Vec` of single-line spans, or `EncodeError::NoText`. Encode is then one LSP token per piece: `extend(pieces.into_iter().map(encode_piece))`. One pass over the file; no collect-all-pieces then encode.
+
+`LineIndex` records every line-break index in `page_content` once. Spans are file-absolute, mutually exclusive, ordered, in range, on char boundaries, and not strictly inside a line break. A violation is `EncodeError`. The caller rebases a literal-relative span with `with_offset` before concatenating literals. The server (lsp-semantic-tokens.md) logs the error and answers with empty tokens.
 
 Origin: `crates/isograph_lsp/src/semantic_tokens.rs` and `crates/isograph_lang_types/src/semantic_token_legend/mod.rs` in isograph. This crate is `crates/isograph_lsp`. It does not start the server. lsp-semantic-tokens.md adds `file_literals` and the stdio loop, and calls the functions here.
 
@@ -22,99 +24,113 @@ Most important first.
 // from crates/isograph_lsp/src/semantic_tokens.rs
 use isograph_parser::IsographSemanticToken;
 use prelude::Postfix;
-use span::{Span, WithSpan};
+use span::{Span, WithSpan, WithSpanPostfix};
 use thiserror::Error;
 
 /// File-absolute parser tokens as LSP semantic-token deltas.
 ///
-/// Walks tokens and precomputed line breaks in file order. Each parser span
-/// is split at line breaks. A line with text becomes one LSP token,
-/// delta-encoded from the previous piece's start. Every isograph token
-/// produces at least one LSP token.
+/// `single_line_pieces` is the flat-map: one isograph token to a non-empty
+/// vec of single-line spans. `encode_piece` is 1:1. `extend` + `map` is one
+/// pass; there is no collect-all-pieces then encode.
 pub fn lsp_semantic_tokens(
     tokens: &[WithSpan<IsographSemanticToken>],
     page_content: &str,
 ) -> Result<Vec<lsp_types::SemanticToken>, EncodeError> {
     let index = LineIndex::new(page_content);
-    let mut cursor = index.cursor();
-    // Two pieces of state, both "previous", not the same thing:
-    // `last` is the start of the last *emitted piece* (LSP deltas are start-to-start).
-    // `last_span_end` is the end of the last *parser token* (overlap check).
+    let mut split_cursor = index.cursor();
+    let mut encode_cursor = index.cursor();
     let mut last = Position { line: 0, col: 0 };
     let mut last_span_end = 0u32;
     let mut encoded: Vec<lsp_types::SemanticToken> = Vec::new();
     for token in tokens {
         index.check_span(token.location, last_span_end)?;
         last_span_end = token.location.end;
-        let encoded_before = encoded.len();
-        // Inner loop: one line of this span per iteration. A parser span can
-        // cross lines; LSP cannot. Cut at each line break (or at span.end when
-        // none remain). `push` is once per line that has text, not once per
-        // parser token: a four-line block string pushes four times here.
-        let mut piece_start = token.location.start;
-        while piece_start < token.location.end {
-            let piece_position = cursor.position(piece_start);
-            let offset_on_line = piece_position.col;
-            let line_break_in_span = match cursor.current_line_break() {
-                Some(line_break) if line_break.start < token.location.end => {
-                    line_break.wrap_some()
-                }
-                _ => None,
-            };
-            // Consecutive line breaks (a blank line in a block string) are not
-            // text. Jump past them; the next iteration is the following line.
-            match line_break_in_span {
-                Some(line_break) if line_break.start == piece_start => {
-                    piece_start = line_break.after;
-                    cursor.advance_break();
-                    continue;
-                }
-                _ => {}
-            }
-            let piece_end = match line_break_in_span {
-                Some(line_break) => line_break.start,
-                None => token.location.end,
-            };
-            let length = utf16_units(
-                &page_content[(piece_start as usize)..(piece_end as usize)],
-            );
-            let token_type = lsp_type_index(token.item);
-            // Same line: `delta_start` is how far this start is from `last`'s start.
-            // Later line: `delta_start` is this piece's column on the line we landed on
-            // (from 0, not from `last`).
-            let relative_to_previous = match piece_position.line - last.line {
-                0 => RelativeToPrevious::SameLine(SameLine(
-                    offset_on_line - last.col,
-                )),
-                delta_line => RelativeToPrevious::MultiLine(MultiLine {
-                    delta_line,
-                    offset_on_line,
+        encoded.extend(
+            single_line_pieces(*token, &mut split_cursor)?
+                .into_iter()
+                .map(|piece| {
+                    encode_piece(piece, &mut last, &mut encode_cursor, page_content)
                 }),
-            };
-            encoded.push(convert_to_lsp_semantic_token(
-                length,
-                token_type,
-                relative_to_previous,
-            ));
-            last = piece_position;
-            match line_break_in_span {
-                Some(line_break) => {
-                    piece_start = line_break.after;
-                    cursor.advance_break();
-                }
-                None => break,
-            }
-        }
-        // Empty or line-break-only span: this isograph token highlighted nothing.
-        if encoded.len() == encoded_before {
-            return EncodeError::NoText(SpanEnds {
-                start: token.location.start,
-                end: token.location.end,
-            })
-            .wrap_err();
-        }
+        );
     }
     encoded.wrap_ok()
+}
+
+/// One isograph token to the single-line spans clients can highlight.
+/// A block string spanning four lines of text is four items. Consecutive
+/// line breaks (a blank line) are skipped. Empty or line-break-only is
+/// `EncodeError::NoText`.
+fn single_line_pieces(
+    token: WithSpan<IsographSemanticToken>,
+    cursor: &mut LineCursor,
+) -> Result<Vec<WithSpan<IsographSemanticToken>>, EncodeError> {
+    let mut piece_start = token.location.start;
+    let mut pieces = Vec::new();
+    while piece_start < token.location.end {
+        cursor.advance_to(piece_start);
+        let line_break_in_span = match cursor.current_line_break() {
+            Some(line_break) if line_break.start < token.location.end => {
+                line_break.wrap_some()
+            }
+            _ => None,
+        };
+        match line_break_in_span {
+            Some(line_break) if line_break.start == piece_start => {
+                piece_start = line_break.after;
+                cursor.advance_break();
+                continue;
+            }
+            _ => {}
+        }
+        let piece_end = match line_break_in_span {
+            Some(line_break) => line_break.start,
+            None => token.location.end,
+        };
+        pieces.push(token.item.with_span(Span::new(piece_start, piece_end)));
+        match line_break_in_span {
+            Some(line_break) => {
+                piece_start = line_break.after;
+                cursor.advance_break();
+            }
+            None => break,
+        }
+    }
+    if pieces.is_empty() {
+        return EncodeError::NoText(SpanEnds {
+            start: token.location.start,
+            end: token.location.end,
+        })
+        .wrap_err();
+    }
+    pieces.wrap_ok()
+}
+
+/// One single-line piece, one LSP token. Deltas are from `last`, the previous
+/// piece's start.
+fn encode_piece(
+    piece: WithSpan<IsographSemanticToken>,
+    last: &mut Position,
+    cursor: &mut LineCursor,
+    page_content: &str,
+) -> lsp_types::SemanticToken {
+    let position = cursor.position(piece.location.start);
+    let length = utf16_units(&page_content[piece.location.as_usize_range()]);
+    // Same line: `delta_start` is how far this start is from `last`'s start.
+    // Later line: `delta_start` is this piece's column on the line we landed on
+    // (from 0, not from `last`).
+    let relative_to_previous = match position.line - last.line {
+        0 => RelativeToPrevious::SameLine(SameLine(position.col - last.col)),
+        delta_line => RelativeToPrevious::MultiLine(MultiLine {
+            delta_line,
+            offset_on_line: position.col,
+        }),
+    };
+    *last = position;
+    convert_to_lsp_semantic_token(
+        length,
+        lsp_type_index(piece.item),
+        relative_to_previous,
+    )
 }
 
 /// Relative to the previous piece. `SameLine` is start-to-start on this line.
@@ -300,13 +316,17 @@ impl<'a> LineIndex<'a> {
 }
 
 impl LineCursor<'_> {
-    /// Line and UTF-16 column of `offset`. Advances `break_index` past breaks that end at or before `offset`.
-    fn position(&mut self, offset: u32) -> Position {
+    fn advance_to(&mut self, offset: u32) {
         while self.break_index < self.breaks.len()
             && self.breaks[self.break_index].after <= offset
         {
             self.break_index += 1;
         }
+    }
+
+    /// Line and UTF-16 column of `offset`. Offsets must not decrease.
+    fn position(&mut self, offset: u32) -> Position {
+        self.advance_to(offset);
         let line_start = match self.break_index {
             0 => 0,
             n => self.breaks[n - 1].after,
@@ -368,13 +388,15 @@ fn utf16_units(text: &str) -> u32 {
 }
 ```
 
-`LineIndex` holds every break index from one scan of `page_content`. `LineCursor` walks that vec: `break_index` is the first break not yet passed. `position(offset)` advances while `after <= offset` (each such advance is one line). `current_line_break` is the break at `break_index`. The loop uses it when `start` is before the span end. `advance_break` consumes it and moves to the next line. Tokens are in file order, so the cursor only moves forward. `break_index` is the line number after those advances.
+`LineIndex` holds every break index from one scan of `page_content`. Two cursors walk that vec forward: `split_cursor` in `single_line_pieces`, `encode_cursor` in `encode_piece`. They are separate because split advances past a piece's trailing break before encode reads that piece's start. `advance_to(offset)` skips breaks with `after <= offset`. `position` is `advance_to` then UTF-16 from the line start. `current_line_break` is the break at `break_index`. `advance_break` consumes it.
 
-`last` is the previous piece's start `Position`. `offset_on_line` is this piece's UTF-16 column on the line it starts on. `SameLine` subtracts `last.col` (start-to-start). `MultiLine` keeps `offset_on_line` as-is: that is the offset on the line we landed on, and `convert_to_lsp_semantic_token` writes it to `delta_start`. That function fills `delta_line: 0` on `SameLine` and `token_modifiers_bitset: 0`. A blank line inside a block string is two consecutive line breaks in a span that still has text (`"""`, then `  x`). The loop jumps `piece_start` to `after` without a `push` for that line; the isograph `String` still produces LSP tokens for the lines that have text. If the inner loop never `push`es, the span was empty or only line breaks: `EncodeError::NoText`. Parser leftover skips `LineBreak` (`leftover_token` returns `None`), and leftover is one lexer token at a time, so that span is not parse output.
+`lsp_semantic_tokens` is one pass: for each isograph token, `extend(single_line_pieces(...)?.into_iter().map(encode_piece))`. `single_line_pieces` is the flat-map. `encode_piece` is 1:1. A four-line block string is four pieces and four `encode_piece` calls, not a nested push inside encode. `last` is the previous piece's start `Position`. Same-line `delta_start` is `position.col - last.col`. Later-line `delta_start` is `position.col`. `convert_to_lsp_semantic_token` fills `delta_line: 0` on `SameLine` and `token_modifiers_bitset: 0`.
+
+A blank line inside a block string is two consecutive line breaks in a span that still has text. `single_line_pieces` jumps `piece_start` to `after` and does not push a piece for that line. If it would return an empty vec, that is `EncodeError::NoText`. Parser leftover skips `LineBreak` (`leftover_token` returns `None`), so a line-break-only span is not parse output.
 
 `check_span` runs before any slice. Ordered exclusive spans are not enough: `page = "a\r\nb"` with tokens `[0..1, 2..3]` is ordered and exclusive, and offset 2 sits strictly inside the break `{ start: 1, after: 3 }`. Parser leftover skips `LineBreak` tokens, so this is a caller concat bug. `EncodeError` names it instead of panicking on `page_content[3..2]`.
 
-`position` is only called on a piece start after `check_span`, so `line_start..offset` is in range and on a char boundary. Offsets passed to the cursor are non-decreasing.
+`position` is only called on a piece start after `check_span`, so `line_start..offset` is in range and on a char boundary. Offsets passed to either cursor are non-decreasing.
 
 `utf16_units` is `text.len()` when `is_ascii`, else `encode_utf16().count()`. Almost every iso lexeme is ASCII.
 
@@ -448,7 +470,7 @@ Deltas from that extract:
 - `token` is `&WithSpan<IsographSemanticToken>`. Span is file-absolute. The caller applied `with_offset(extraction_span.start)` when the parse was literal-relative.
 - `token_type` is `lsp_type_index(token.item)`, not a field on the parser token. `lsp_type_index` is private.
 - Origin `split_inclusive('\n')` kept the line break in `line_text`, so `len` included `\n` and the client may discard the token. Origin also treated only `\n` as a break. `line_breaks` records `\r\n` then `\n` then `\r`; `length` is the text before the break.
-- Consecutive line breaks inside a token that still has text are skipped (`piece_start = after`) without a `push` for that line. Origin's empty `split_inclusive` chunk still produced a token whose `len` was the newline. A span that is empty or only line breaks is `EncodeError::NoText`; origin still emitted.
+- `single_line_pieces` is the flat-map; encode is `extend` + `map` of `encode_piece` (1:1). Origin fused split and delta-encode. Consecutive line breaks inside a token that still has text are skipped in `single_line_pieces`. Origin's empty `split_inclusive` chunk still produced a token whose `len` was the newline. A span that is empty or only line breaks is `EncodeError::NoText`; origin still emitted.
 - Origin `line_text.len()` is UTF-8 bytes. `length` and `col` are UTF-16: `utf16_units`, ASCII `len()` otherwise `encode_utf16().count()`.
 - Origin `delta_line_delta_start` used `chars().enumerate()` for `\n` and `text.len()` (bytes) for the last-line width. `Position` is `(line, utf16_col)` from `LineIndex::position`.
 - Unordered, inverted, out-of-range, non-char-boundary, CRLF-interior, and no-text spans are `EncodeError`. Origin sliced `page_content[last_token_start..new_start]` and panics on a backwards range. The server logs the error and returns empty tokens.
@@ -576,7 +598,7 @@ pub use semantic_tokens::{
 };
 ```
 
-`convert_to_lsp_semantic_token`, `RelativeToPrevious`, `SameLine`, `MultiLine`, `LineIndex`, `LineCursor`, `Position`, `LineBreak`, `line_breaks`, `utf16_units`, `lsp_type_index`, `legend_index` stay in the module. Tests in that module call them. `legend_index` `expect`s that `LEGEND_TOKEN_TYPES` lists every type the match names.
+`single_line_pieces`, `encode_piece`, `convert_to_lsp_semantic_token`, `RelativeToPrevious`, `SameLine`, `MultiLine`, `LineIndex`, `LineCursor`, `Position`, `LineBreak`, `line_breaks`, `utf16_units`, `lsp_type_index`, `legend_index` stay in the module. Tests in that module call them. `legend_index` `expect`s that `LEGEND_TOKEN_TYPES` lists every type the match names.
 
 ## Tests
 
@@ -594,7 +616,7 @@ mod tests {
     use super::{
         EncodeError, InsideLineBreak, LineBreak, LineIndex, NotCharBoundary, OutOfRange,
         Overlap, Position, SpanEnds, line_breaks, lsp_semantic_tokens, lsp_type_index,
-        semantic_token_legend,
+        semantic_token_legend, single_line_pieces,
     };
 
     const STRING: u32 = 18;
@@ -639,6 +661,30 @@ mod tests {
         lsp_semantic_tokens(tokens, page_content).expect(
             "the fixture's spans are mutually exclusive, ordered, in range, on char boundaries, not inside a line break, and each contains text to highlight",
         )
+    }
+
+    fn pieces(
+        tokens: &[WithSpan<IsographSemanticToken>],
+        page_content: &str,
+    ) -> Vec<WithSpan<IsographSemanticToken>> {
+        let index = LineIndex::new(page_content);
+        let mut cursor = index.cursor();
+        let mut last_span_end = 0u32;
+        let mut out = Vec::new();
+        for token in tokens {
+            index
+                .check_span(token.location, last_span_end)
+                .expect(
+                    "the fixture's spans are mutually exclusive, ordered, in range, on char boundaries, not inside a line break, and each contains text to highlight",
+                );
+            last_span_end = token.location.end;
+            out.extend(
+                single_line_pieces(*token, &mut cursor).expect(
+                    "the fixture's spans are mutually exclusive, ordered, in range, on char boundaries, not inside a line break, and each contains text to highlight",
+                ),
+            );
+        }
+        out
     }
 
     #[test]
@@ -929,6 +975,23 @@ mod tests {
         assert_eq!(lsp[8].delta_start, 4);
         assert_eq!(lsp[8].length, 1);
         assert_eq!(lsp[8].token_type, OPERATOR);
+    }
+
+    #[test]
+    fn encode_is_one_lsp_token_per_single_line_piece() {
+        let source = "field Query.Foo \"\"\"\n  the home\n  route\n\"\"\" { bar }";
+        let parsed = parse_iso_literal(source);
+        let lsp = encoded(source);
+        assert_eq!(lsp.len(), pieces(&parsed.tokens, source).len());
+        assert_eq!(
+            parsed
+                .tokens
+                .iter()
+                .filter(|token| token.item == IsographSemanticToken::String)
+                .count(),
+            1,
+        );
+        assert_eq!(of_type(&lsp, STRING).len(), 4);
     }
 
     #[test]
@@ -1356,6 +1419,8 @@ mod tests {
 `two_literals_on_the_same_line`: same line as `A`; `delta_start` 9 is the column of the second `entrypoint`.
 
 `a_quoted_string_is_one_lsp_token`: `"the home route"` is 16 UTF-16 units. `{` is one space after that lexeme, `delta_start` 17.
+
+`encode_is_one_lsp_token_per_single_line_piece`: one isograph `String`, four pieces, four LSP string tokens, and `lsp.len()` equals `pieces.len()`.
 
 `a_quoted_string_with_an_escaped_newline_is_one_lsp_token`: source `"hi\n"` is quote, `h`, `i`, backslash, `n`, quote. Length 6. Not split.
 
