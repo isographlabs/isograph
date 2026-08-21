@@ -1,6 +1,6 @@
 # Filesystem events, the CLI, config globs, and the watcher
 
-Requires `docs-website/docs/design-docs/event-model.md` and config-discovery.md. Five shippable changes. Send is its own change. Created, deleted, and moved are not in change 1.
+Requires event-loop.md, `docs-website/docs/design-docs/event-model.md`, and config-discovery.md. The daemon already recvs, calls `handle`, and performs effects. This file adds disk facts, `isograph send`, config `includes`, `Presence`, and the watcher. Five shippable changes after event-loop.md.
 
 The watcher posts in-process. It does not run `isograph send` and it does not write to the event socket. The CLI and the socket are a separate source of the same event type.
 
@@ -26,13 +26,15 @@ $ isograph logs
 {"timestamp":"...","level":"INFO","fields":{"message":"disk changed","path":".../src/Pet.tsx","presence":"present","file_count":3}}
 ```
 
-## Change 1: the event loop and one event
+## Change 1: one event, this path has these contents
 
-The daemon stops parking. It binds the event socket, owns `IsographState`, and dispatches one event: this path has these contents. No `Absent`. No `Filesystem` flag. No watcher. No CLI verb. Tests call `handle` directly and also drive the socket the way figaro's `tests/external.rs` does.
+event-loop.md already recvs and performs. This change adds `DiskChanged { path, contents }` and a path-to-contents map. Tests call `handle` and also drive the socket the way figaro's `tests/external.rs` does.
 
 ### Types
 
 Most important first.
+
+Origin: event-loop.md `IsographEvent`. Delta: one variant.
 
 ```rust
 // from crates/isograph_cli/src/event.rs

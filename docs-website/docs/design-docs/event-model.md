@@ -184,7 +184,7 @@ struct StartAsyncWork;
 
 `Kill` ends the process.
 
-The first shipped slice (filesystem-events.md change 1) has no effect variants and no `Absent`. `handle` returns `()`. The loop traces. `Presence` lands in that doc's change 4. The signature becomes `Vec<IsographEffect>` when the first performer exists.
+event-loop.md ships `handle` returning `Vec<IsographEffect>` with both enums empty. filesystem-events.md adds `DiskChanged`. `Presence` is that doc's created/deleted/moved change.
 
 ## State
 
@@ -208,7 +208,7 @@ Artifact generation and watch mode read `DiskFile`. They do not read `OpenFile`.
 
 The LSP adapter reads `OpenFile` when it exists for that path, otherwise `DiskFile`. The LSP adapter does not generate artifacts.
 
-The first shipped slice's state is a `BTreeMap<PathBuf, String>` of disk contents. pico intern of `DiskFile` replaces that map; `DiskChanged` stays. `OpenFile` lands with the adapter.
+event-loop.md ships `IsographState` with no fields. filesystem-events.md adds a path-to-contents map. pico intern of `DiskFile` replaces that map; `DiskChanged` stays. `OpenFile` lands with the adapter.
 
 ## Dispatch
 
