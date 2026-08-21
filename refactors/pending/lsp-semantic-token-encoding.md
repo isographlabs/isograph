@@ -28,7 +28,7 @@ use thiserror::Error;
 /// File-absolute parser tokens as LSP semantic-token deltas.
 ///
 /// Walks tokens and precomputed line breaks in file order. Each parser span
-/// is split at line breaks; each nonempty piece becomes one LSP token,
+/// is split at line breaks. A line with text becomes one LSP token,
 /// delta-encoded from the previous piece's start.
 pub fn lsp_semantic_tokens(
     tokens: &[WithSpan<IsographSemanticToken>],
@@ -46,9 +46,9 @@ pub fn lsp_semantic_tokens(
         index.check_span(token.location, last_span_end)?;
         last_span_end = token.location.end;
         // Inner loop: one line of this span per iteration. A parser span can
-        // cross lines; LSP cannot. Cut a piece at each line break (or at
-        // span.end when none remain). `push` below is per nonempty piece, not
-        // per parser token: a four-line block string pushes four times here.
+        // cross lines; LSP cannot. Cut at each line break (or at span.end when
+        // none remain). `push` is once per line that has text, not once per
+        // parser token: a four-line block string pushes four times here.
         let mut piece_start = token.location.start;
         while piece_start < token.location.end {
             let piece_position = cursor.position(piece_start);
@@ -87,8 +87,9 @@ pub fn lsp_semantic_tokens(
                 ));
                 last = piece_position;
             }
-            // Advance past the break even when the piece was empty (a blank line
-            // in the span: nothing emitted, next piece is still on the following line).
+            // Blank line in the span: the next line break is at `piece_start`, so
+            // `piece_end == piece_start` and the `if` above did not push. Still
+            // consume the break so the next iteration starts on the following line.
             // No break left in the span: this token is done.
             match line_break_in_span {
                 Some(line_break) => {
