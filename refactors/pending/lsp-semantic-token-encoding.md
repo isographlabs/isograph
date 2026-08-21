@@ -2,7 +2,7 @@
 
 `Vec<WithSpan<SemanticToken>>` is literal-relative byte spans. LSP `textDocument/semanticTokens/full` wants `lsp_types::SemanticToken`: `delta_line`, `delta_start`, `length`, `token_type` index into a legend, `token_modifiers_bitset`. `delta_start` and `length` are UTF-16 code units. A token does not include a line break.
 
-The encoder is one walk: for each parser token in iterator order, add `extraction_span.start`, split that span on line breaks, encode each nonempty piece. A piece contains no line break. The next delta therefore walks only the gap after the previous piece's end, and same-line `delta_start` is the previous piece's UTF-16 length plus the gap's last-line width. Parser tokens (and the literals iterator) are mutually exclusive and ordered in file-absolute bytes. A violation is a compiler bug; the walk panics.
+The encoder is one walk over a file-absolute `tokens` slice: split each span on line breaks, encode each nonempty piece. A piece contains no line break. The next delta therefore walks only the gap after the previous piece's end, and same-line `delta_start` is the previous piece's UTF-16 length plus the gap's last-line width. Spans are mutually exclusive and ordered. A violation is a compiler bug; the walk panics. The caller rebases a literal-relative span with `with_offset` before concatenating literals.
 
 Origin: `crates/isograph_lsp/src/semantic_tokens.rs` and `crates/isograph_lang_types/src/semantic_token_legend/mod.rs` in isograph. This crate is `crates/isograph_lsp`. It does not start the server. lsp-semantic-tokens.md adds `file_literals` and the stdio loop, and calls the functions here.
 
@@ -23,69 +23,56 @@ Most important first.
 use isograph_parser::SemanticToken;
 use lsp_types::SemanticToken as LspSemanticToken;
 use prelude::Postfix;
-use span::{Span, WithSpan};
+use span::WithSpan;
 
 pub fn lsp_semantic_tokens(
     tokens: &[WithSpan<SemanticToken>],
     page_content: &str,
-    extraction_span: Span,
-) -> Vec<LspSemanticToken> {
-    lsp_semantic_tokens_for_literals([(tokens, extraction_span)], page_content)
-}
-
-pub fn lsp_semantic_tokens_for_literals<'a>(
-    literals: impl IntoIterator<Item = (&'a [WithSpan<SemanticToken>], Span)>,
-    page_content: &'a str,
 ) -> Vec<LspSemanticToken> {
     let mut last_end = 0u32;
     let mut last_len = 0u32;
     let mut last_span_end = 0u32;
     let mut encoded = Vec::new();
-    for (tokens, extraction_span) in literals {
-        for relative_token in tokens {
-            let span = relative_token.location.with_offset(extraction_span.start);
-            assert!(
-                span.start >= last_span_end && span.end >= span.start,
-                "semantic token spans must be mutually exclusive and ordered; got {}..{} after end {last_span_end}",
-                span.start,
-                span.end,
-            );
-            last_span_end = span.end;
-            let mut remaining = &page_content[(span.start as usize)..(span.end as usize)];
-            let mut piece_start = span.start;
-            loop {
-                let (line_text, next) = match next_line_break(remaining) {
-                    Some((break_at, after)) => (
-                        &remaining[..break_at],
-                        (piece_start + after as u32, &remaining[after..]).wrap_some(),
-                    ),
-                    None => (remaining, None),
+    for token in tokens {
+        let span = token.location;
+        assert!(
+            span.start >= last_span_end && span.end >= span.start,
+            "semantic token spans must be mutually exclusive and ordered; got {}..{} after end {last_span_end}",
+            span.start,
+            span.end,
+        );
+        last_span_end = span.end;
+        let mut remaining = &page_content[(span.start as usize)..(span.end as usize)];
+        let mut piece_start = span.start;
+        loop {
+            let (line_text, after_break) = match next_line_break(remaining) {
+                Some((break_at, after)) => (&remaining[..break_at], after.wrap_some()),
+                None => (remaining, None),
+            };
+            if !line_text.is_empty() {
+                let gap = &page_content[(last_end as usize)..(piece_start as usize)];
+                let (delta_line, gap_tail) = delta_line_delta_start(gap);
+                let delta_start = match delta_line {
+                    0 => last_len + gap_tail,
+                    _ => gap_tail,
                 };
-                if !line_text.is_empty() {
-                    let gap = &page_content[(last_end as usize)..(piece_start as usize)];
-                    let (delta_line, gap_tail) = delta_line_delta_start(gap);
-                    let delta_start = match delta_line {
-                        0 => last_len + gap_tail,
-                        _ => gap_tail,
-                    };
-                    let length = utf16_units(line_text);
-                    encoded.push(LspSemanticToken {
-                        delta_line,
-                        delta_start,
-                        length,
-                        token_type: lsp_type_index(relative_token.item),
-                        token_modifiers_bitset: 0,
-                    });
-                    last_end = piece_start + line_text.len() as u32;
-                    last_len = length;
+                let length = utf16_units(line_text);
+                encoded.push(LspSemanticToken {
+                    delta_line,
+                    delta_start,
+                    length,
+                    token_type: lsp_type_index(token.item),
+                    token_modifiers_bitset: 0,
+                });
+                last_end = piece_start + line_text.len() as u32;
+                last_len = length;
+            }
+            match after_break {
+                Some(after) => {
+                    piece_start += after as u32;
+                    remaining = &remaining[after..];
                 }
-                match next {
-                    Some((next_start, next_remaining)) => {
-                        piece_start = next_start;
-                        remaining = next_remaining;
-                    }
-                    None => break,
-                }
+                None => break,
             }
         }
     }
@@ -124,9 +111,7 @@ fn delta_line_delta_start(text: &str) -> (u32, u32) {
 }
 ```
 
-`extraction_span` is the literal's range in `page_content`. Relative token spans add to `extraction_span.start` via `Span::with_offset`. Literals are concatenated in iterator order; that order must be file order.
-
-`assert!` is a panic. The input is `Vec<WithSpan<SemanticToken>>`; disjoint ordered spans are a parser invariant that type cannot hold. Adjacent spans (`end` of one equals `start` of the next) pass. `last_span_end` is the previous parser token's absolute end.
+`assert!` is a panic. The input is `&[WithSpan<SemanticToken>]` with file-absolute spans; disjoint ordered spans are a parser-plus-caller invariant that type cannot hold. Adjacent spans (`end` of one equals `start` of the next) pass. `last_span_end` is the previous parser token's absolute end.
 
 `last_end` is the previous emitted piece's byte end. `last_len` is that piece's UTF-16 length. The gap is `page_content[last_end..piece_start]`. A piece contains no line break, so `delta_line` cannot change inside it: the newlines that matter live in the gap. Same-line `delta_start` is `last_len + gap_tail`. After a line break, `delta_start` is `gap_tail` (UTF-16 from column 0). Adjacent tokens have an empty gap; `delta_start` is `last_len`.
 
@@ -203,7 +188,7 @@ Checked against the LSP 3.17 encoding: five integers per token; `deltaLine` is l
 Deltas from that extract:
 
 - One walk. Origin materializes `AbsoluteIsographSemanticToken` then delta-encodes. There is no `AbsoluteToken`.
-- `relative_token` is `&WithSpan<SemanticToken>`. Span is `relative_token.location.with_offset(extraction_span.start)`.
+- `token` is `&WithSpan<SemanticToken>`. Span is file-absolute. The caller applied `with_offset(extraction_span.start)` when the parse was literal-relative.
 - `token_type` is `lsp_type_index(relative_token.item)`, not a field on the parser token.
 - Origin `split_inclusive('\n')` kept the line break in `line_text`, so `len` included `\n` and the client may discard the token. Origin also treated only `\n` as a break, so `\r\n` left `\r` in `len` and a bare `\r` did not split. `next_line_break` is `\r\n` then `\n` then `\r`; `length` is the text before the break.
 - Empty pieces emit nothing. `last_span_end` still advances by the whole parser token. `last_end` / `last_len` do not; the skipped break is in the next gap.
@@ -326,17 +311,14 @@ Workspace member via `./crates/*`.
 // from crates/isograph_lsp/src/lib.rs
 mod semantic_tokens;
 
-pub use semantic_tokens::{
-    lsp_semantic_tokens, lsp_semantic_tokens_for_literals, lsp_type_index,
-    semantic_token_legend,
-};
+pub use semantic_tokens::{lsp_semantic_tokens, semantic_token_legend};
 ```
 
 `next_line_break`, `utf16_units`, `delta_line_delta_start` stay in the module. Tests in that module call them.
 
 ## Tests
 
-Test helpers live in the test module. `encoded` parses then encodes a source that is the whole file. `of_type` picks LSP tokens by legend index.
+Test helpers live in the test module. `encoded` parses then encodes a source that is the whole file. `rebased` applies `with_offset`. `of_type` picks LSP tokens by legend index.
 
 ```rust
 // from crates/isograph_lsp/src/semantic_tokens.rs
@@ -345,11 +327,10 @@ mod tests {
     use isograph_parser::{SemanticToken, parse_iso_literal};
     use lsp_types::SemanticToken as LspSemanticToken;
     use prelude::Postfix;
-    use span::{Span, WithSpanPostfix};
+    use span::{Span, WithSpan, WithSpanPostfix};
 
     use super::{
-        delta_line_delta_start, lsp_semantic_tokens, lsp_semantic_tokens_for_literals,
-        lsp_type_index, semantic_token_legend,
+        delta_line_delta_start, lsp_semantic_tokens, lsp_type_index, semantic_token_legend,
     };
 
     const STRING: u32 = 18;
@@ -360,11 +341,25 @@ mod tests {
 
     fn encoded(source: &str) -> Vec<LspSemanticToken> {
         let parsed = parse_iso_literal(source);
-        lsp_semantic_tokens(
-            &parsed.tokens,
-            source,
-            Span::from_usize(0, source.len()),
-        )
+        lsp_semantic_tokens(&parsed.tokens, source)
+    }
+
+    fn rebased(
+        tokens: &[WithSpan<SemanticToken>],
+        offset: u32,
+    ) -> Vec<WithSpan<SemanticToken>> {
+        tokens
+            .iter()
+            .map(|token| token.item.with_span(token.location.with_offset(offset)))
+            .collect()
+    }
+
+    fn encode_rebased(
+        tokens: &[WithSpan<SemanticToken>],
+        offset: u32,
+        page_content: &str,
+    ) -> Vec<LspSemanticToken> {
+        lsp_semantic_tokens(&rebased(tokens, offset), page_content)
     }
 
     fn of_type(lsp: &[LspSemanticToken], token_type: u32) -> Vec<&LspSemanticToken> {
@@ -429,8 +424,7 @@ mod tests {
         let literal = "field Pet.fullName { id }";
         let source = format!("{prefix}{literal}`)");
         let parsed = parse_iso_literal(literal);
-        let extraction = Span::from_usize(prefix.len(), prefix.len() + literal.len());
-        let lsp = lsp_semantic_tokens(&parsed.tokens, source.reference(), extraction);
+        let lsp = encode_rebased(&parsed.tokens, prefix.len() as u32, source.reference());
         assert_eq!(lsp[0].delta_line, 0);
         assert_eq!(lsp[0].delta_start, prefix.len() as u32);
         assert_eq!(lsp[0].token_type, KEYWORD);
@@ -444,8 +438,7 @@ mod tests {
         let literal = "field Pet.fullName { id }";
         let source = format!("{prefix}{literal}`)");
         let parsed = parse_iso_literal(literal);
-        let extraction = Span::from_usize(prefix.len(), prefix.len() + literal.len());
-        let lsp = lsp_semantic_tokens(&parsed.tokens, source.reference(), extraction);
+        let lsp = encode_rebased(&parsed.tokens, prefix.len() as u32, source.reference());
         assert_eq!(lsp[0].delta_line, 1);
         assert_eq!(lsp[0].delta_start, 2);
         assert_eq!(lsp[0].token_type, KEYWORD);
@@ -458,8 +451,7 @@ mod tests {
         let literal = "field Pet.fullName { id }";
         let source = format!("{prefix}{literal}`)");
         let parsed = parse_iso_literal(literal);
-        let extraction = Span::from_usize(prefix.len(), prefix.len() + literal.len());
-        let lsp = lsp_semantic_tokens(&parsed.tokens, source.reference(), extraction);
+        let lsp = encode_rebased(&parsed.tokens, prefix.len() as u32, source.reference());
         assert_eq!(prefix.len(), 16);
         assert_eq!(lsp[0].delta_line, 0);
         assert_eq!(lsp[0].delta_start, 15);
@@ -475,19 +467,9 @@ mod tests {
         let second_start = source.find(second).expect("the second literal is in the file");
         let parsed_a = parse_iso_literal(first);
         let parsed_b = parse_iso_literal(second);
-        let lsp = lsp_semantic_tokens_for_literals(
-            [
-                (
-                    parsed_a.tokens.as_slice(),
-                    Span::from_usize(first_start, first_start + first.len()),
-                ),
-                (
-                    parsed_b.tokens.as_slice(),
-                    Span::from_usize(second_start, second_start + second.len()),
-                ),
-            ],
-            source,
-        );
+        let mut tokens = rebased(&parsed_a.tokens, first_start as u32);
+        tokens.extend(rebased(&parsed_b.tokens, second_start as u32));
+        let lsp = lsp_semantic_tokens(&tokens, source);
         assert_eq!(lsp.len(), 8);
         assert_eq!(lsp[4].delta_line, 1);
         assert_eq!(lsp[4].delta_start, 5);
@@ -507,19 +489,9 @@ mod tests {
         let second_start = source.find(second).expect("the second literal is in the file");
         let parsed_a = parse_iso_literal(first);
         let parsed_b = parse_iso_literal(second);
-        let lsp = lsp_semantic_tokens_for_literals(
-            [
-                (
-                    parsed_a.tokens.as_slice(),
-                    Span::from_usize(first_start, first_start + first.len()),
-                ),
-                (
-                    parsed_b.tokens.as_slice(),
-                    Span::from_usize(second_start, second_start + second.len()),
-                ),
-            ],
-            source,
-        );
+        let mut tokens = rebased(&parsed_a.tokens, first_start as u32);
+        tokens.extend(rebased(&parsed_b.tokens, second_start as u32));
+        let lsp = lsp_semantic_tokens(&tokens, source);
         assert_eq!(lsp.len(), 8);
         assert_eq!(lsp[4].delta_line, 0);
         assert_eq!(lsp[4].delta_start, 9);
@@ -748,11 +720,7 @@ mod tests {
         let tokens = SemanticToken::Content
             .with_span(Span::from_usize(0, source.len()))
             .wrap_vec();
-        let lsp = lsp_semantic_tokens(
-            &tokens,
-            source,
-            Span::from_usize(0, source.len()),
-        );
+        let lsp = lsp_semantic_tokens(&tokens, source);
         assert_eq!(lsp.len(), 2);
         assert_eq!(lsp[0].token_type, OPERATOR);
         assert_eq!(lsp[0].length, 3);
@@ -768,11 +736,7 @@ mod tests {
         let tokens = SemanticToken::String
             .with_span(Span::from_usize(1, 3))
             .wrap_vec();
-        let lsp = lsp_semantic_tokens(
-            &tokens,
-            source,
-            Span::from_usize(0, source.len()),
-        );
+        let lsp = lsp_semantic_tokens(&tokens, source);
         assert_eq!(lsp.len(), 1);
         assert_eq!(lsp[0].delta_start, 1);
         assert_eq!(lsp[0].length, 1);
@@ -784,11 +748,7 @@ mod tests {
         let tokens = SemanticToken::String
             .with_span(Span::from_usize(1, 5))
             .wrap_vec();
-        let lsp = lsp_semantic_tokens(
-            &tokens,
-            source,
-            Span::from_usize(0, source.len()),
-        );
+        let lsp = lsp_semantic_tokens(&tokens, source);
         assert_eq!(lsp.len(), 1);
         assert_eq!(lsp[0].delta_start, 1);
         assert_eq!(lsp[0].length, 2);
@@ -801,11 +761,7 @@ mod tests {
             SemanticToken::Keyword.with_span(Span::from_usize(0, 1)),
             SemanticToken::Type.with_span(Span::from_usize(1, 2)),
         ];
-        let lsp = lsp_semantic_tokens(
-            &tokens,
-            source,
-            Span::from_usize(0, source.len()),
-        );
+        let lsp = lsp_semantic_tokens(&tokens, source);
         assert_eq!(lsp.len(), 2);
         assert_eq!(lsp[0].delta_start, 0);
         assert_eq!(lsp[0].length, 1);
@@ -821,11 +777,7 @@ mod tests {
             SemanticToken::Keyword.with_span(Span::from_usize(0, 0)),
             SemanticToken::Type.with_span(Span::from_usize(0, 1)),
         ];
-        let lsp = lsp_semantic_tokens(
-            &tokens,
-            source,
-            Span::from_usize(0, source.len()),
-        );
+        let lsp = lsp_semantic_tokens(&tokens, source);
         assert_eq!(lsp.len(), 1);
         assert_eq!(lsp[0].delta_start, 0);
         assert_eq!(lsp[0].length, 1);
@@ -840,11 +792,7 @@ mod tests {
             SemanticToken::Keyword.with_span(Span::from_usize(0, 2)),
             SemanticToken::Type.with_span(Span::from_usize(1, 3)),
         ];
-        let _ = lsp_semantic_tokens(
-            &tokens,
-            source,
-            Span::from_usize(0, source.len()),
-        );
+        let _ = lsp_semantic_tokens(&tokens, source);
     }
 
     #[test]
@@ -855,11 +803,7 @@ mod tests {
             SemanticToken::Keyword.with_span(Span::from_usize(2, 4)),
             SemanticToken::Type.with_span(Span::from_usize(0, 1)),
         ];
-        let _ = lsp_semantic_tokens(
-            &tokens,
-            source,
-            Span::from_usize(0, source.len()),
-        );
+        let _ = lsp_semantic_tokens(&tokens, source);
     }
 
     #[test]
@@ -872,19 +816,9 @@ mod tests {
         let second_start = source.find(second).expect("the second literal is in the file");
         let parsed_a = parse_iso_literal(first);
         let parsed_b = parse_iso_literal(second);
-        let _ = lsp_semantic_tokens_for_literals(
-            [
-                (
-                    parsed_b.tokens.as_slice(),
-                    Span::from_usize(second_start, second_start + second.len()),
-                ),
-                (
-                    parsed_a.tokens.as_slice(),
-                    Span::from_usize(first_start, first_start + first.len()),
-                ),
-            ],
-            source,
-        );
+        let mut tokens = rebased(&parsed_b.tokens, second_start as u32);
+        tokens.extend(rebased(&parsed_a.tokens, first_start as u32));
+        let _ = lsp_semantic_tokens(&tokens, source);
     }
 
     #[test]
