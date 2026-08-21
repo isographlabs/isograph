@@ -199,9 +199,10 @@ Justified differences:
 parsing-standards.md governs how every implementation below is written.
 
 1. `parser-test-gaps.md`. Missing grammar-stage tests.
-2. `extract-iso-literals.md`. `HostLanguage` in `isograph_parser`. `TypeScriptHostLanguage` in `isograph_extract_typescript`, behind the `typescript` feature.
-3. `lsp-semantic-tokens.md`. `isograph lsp` answers `textDocument/semanticTokens/full` so iso literals are colored when a JS/TS file is opened.
-4. `lsp-parse-diagnostics.md`. Parse errors of those literals are `publishDiagnostics`.
+2. `ts-graphql-react-isograph-cli.md`. `isograph_cli` is a library. `ts_graphql_react_isograph_cli` exports the `isograph` binary and calls `isograph_cli::run`.
+3. `extract-iso-literals.md`. `HostLanguage` in `isograph_compiler`. `TypeScriptHostLanguage` in `isograph_extract_typescript`. `ts_graphql_react_isograph_cli` is the crate that names the TypeScript implementor; `isograph_cli` is generic over the trait.
+4. `lsp-semantic-tokens.md`. `isograph lsp` answers `textDocument/semanticTokens/full` so iso literals are colored when a JS/TS file is opened.
+5. `lsp-parse-diagnostics.md`. Parse errors of those literals are `publishDiagnostics`.
 
 Later: leftover semantic-token fill-in (`semantic-tokens.md`), unclosed-group recovery, spanless parsing.
 
