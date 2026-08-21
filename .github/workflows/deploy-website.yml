@@ -1,0 +1,40 @@
+name: Deploy website
+
+on:
+  workflow_call:
+
+jobs:
+  deploy-website:
+    name: Deploy website
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./docs-website
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Download build folder
+        uses: actions/download-artifact@v4
+        with:
+          name: docusaurus-build
+          path: docs-website/build
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+      - name: Upload custom
+        run: tar --dereference --hard-dereference --directory "build" -cvf "$RUNNER_TEMP/artifact.tar" --exclude=.git --exclude =.github .
+      - name: Upload artifact
+        id: upload-artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-pages
+          path: ${{ runner.temp }}/artifact.tar
+          retention-days: 1
+          if-no-files-found: error
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

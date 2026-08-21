@@ -1,0 +1,56 @@
+name: NPM release
+
+on:
+  workflow_call:
+    inputs:
+      kind:
+        description: main or versioned
+        required: true
+        type: string
+    secrets:
+      NPM_TOKEN:
+        required: true
+
+env:
+  TURBO_TELEMETRY_DISABLED: 1
+
+jobs:
+  release:
+    name: NPM release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check release kind
+        run: |
+          case "${{ inputs.kind }}" in
+            main|versioned) ;;
+            *)
+              echo "unknown npm-release kind: ${{ inputs.kind }}"
+              exit 1
+              ;;
+          esac
+      - uses: ./.github/actions/setup-js
+      - name: Change package versions to commit
+        if: inputs.kind == 'main'
+        run: pnpm gulp setMainVersion
+        env:
+          RELEASE_COMMIT_SHA: ${{ github.sha }}
+      - name: Re-install dependencies without frozen lockfile
+        if: inputs.kind == 'main'
+        # pnpm re-installs because verify-deps-before-run = install, and CI
+        # always passes --frozen-lockfile.
+        run: pnpm install --no-frozen-lockfile --ignore-scripts
+      - name: Build
+        run: pnpm compile-libs
+      - uses: ./.github/actions/install-cli-artifacts
+      - uses: ./.github/actions/build-swc
+      - name: Publish to NPM
+        if: inputs.kind == 'main'
+        run: pnpm --filter='./libs/*' publish --no-git-checks --tag ${{ startsWith(github.ref, 'refs/heads/deploy/') && 'deploy' || 'main' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Publish latest version to NPM
+        if: inputs.kind == 'versioned'
+        run: pnpm --filter './libs/*' publish --no-git-checks --tag latest
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -1,0 +1,29 @@
+name: Setup JS
+description: Configure pnpm and Node 22, then install workspace dependencies.
+
+inputs:
+  install-args:
+    description: Arguments passed to pnpm install
+    required: false
+    default: --frozen-lockfile --ignore-scripts
+
+runs:
+  using: composite
+  steps:
+    - name: Cache turbo
+      uses: actions/cache@v4
+      with:
+        path: .turbo
+        key: ${{ runner.os }}-turbo-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-turbo-
+    - uses: pnpm/action-setup@v4
+    - name: Use Node.js 22
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: pnpm
+        registry-url: https://registry.npmjs.org/
+    - name: Install dependencies
+      run: pnpm install ${{ inputs.install-args }}
+      shell: bash

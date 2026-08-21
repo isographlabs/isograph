@@ -1,0 +1,30 @@
+name: Build website
+
+on:
+  workflow_call:
+
+env:
+  TURBO_TELEMETRY_DISABLED: 1
+
+jobs:
+  build-website:
+    name: Build website
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./docs-website
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-js
+      - name: Build website
+        run: pnpm build
+      - name: Upload artifact
+        id: upload-artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docusaurus-build
+          # upload-artifact ignores working-directory, seemingly, though
+          # the docs indicate otherwise.
+          path: docs-website/build/
+          retention-days: 1
+          if-no-files-found: error

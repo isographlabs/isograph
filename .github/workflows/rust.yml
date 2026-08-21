@@ -1,0 +1,57 @@
+name: Rust
+
+on:
+  workflow_call:
+
+jobs:
+  cargo-fmt:
+    name: cargo fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt
+      - name: Run cargo fmt --check
+        run: ./scripts/check-rustfmt.sh
+
+  cargo-clippy:
+    name: cargo clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: clippy
+      - name: Run cargo clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+  cargo-clippy-cli:
+    name: cargo clippy isograph_cli
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: clippy
+      - name: Run cargo clippy
+        run: cargo clippy --manifest-path crates/ts_graphql_react_isograph_cli/Cargo.toml --all-targets -- -D warnings
+
+  cargo-test:
+    name: Run cargo test (excluding relay tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt
+      - name: Run cargo test
+        run: cargo test

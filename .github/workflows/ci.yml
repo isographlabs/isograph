@@ -17,214 +17,26 @@ jobs:
     with:
       binary: build_json_schema
 
-  typecheck-demos:
-    name: Typecheck and Lint Demos
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        target:
-          - folder: github-demo
-          - folder: pet-demo
-          - folder: vite-demo
-    steps:
-      - uses: actions/checkout@v2
-      - name: Cache turbo
-        uses: actions/cache@v4
-        with:
-          path: .turbo
-          key: ${{ runner.os }}-turbo-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-turbo-
-      - uses: pnpm/action-setup@v2
-      - name: Use Node.js 22
-        uses: actions/setup-node@v3
-        with:
-          node-version: 22
-          cache: 'pnpm'
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Build JS files
-        run: pnpm compile-libs
-      - name: Typecheck
-        run: cd ./demos/${{ matrix.target.folder }} && pnpm tsc
-      - name: Lint
-        run: cd ./demos/${{ matrix.target.folder }} && pnpm lint
+  rust:
+    name: Rust
+    uses: ./.github/workflows/rust.yml
 
-  build-js-packages:
-    name: Build js packages
-    runs-on: ubuntu-latest
-    needs: [build-swc]
-    timeout-minutes: 15 # in case unit test goes into infinite loop
-    steps:
-      - uses: actions/checkout@v2
-      - name: Cache turbo
-        uses: actions/cache@v4
-        with:
-          path: .turbo
-          key: ${{ runner.os }}-turbo-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-turbo-
-      - uses: pnpm/action-setup@v2
-      - name: Use Node.js 22
-        uses: actions/setup-node@v3
-        with:
-          node-version: 22
-          cache: 'pnpm'
-      - name: Install dependencies
-        # this used to be --frozen-lockfile --ignore-scripts
-        # see pnpm-workspace.yaml's onlyBuildDependencies key to see which packages need scripts
-        run: pnpm install --frozen-lockfile
-      - name: Build
-        run: pnpm compile-libs
-      - name: Run unit tests
-        # Note: unit tests have to run after building, because the unit tests
-        # rely on Isograph, which relies on @isograph/react being a valid input
-        #
-        # This can be overcome, if necessary, e.g. if "@isograph/react" was a
-        # parameter passed to the CLI.
-        run: pnpm test
-
-  build-website:
-    name: Build website
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./docs-website
-    steps:
-      - uses: actions/checkout@v3
-      - uses: pnpm/action-setup@v2
-      - name: Use Node.js 22
-        uses: actions/setup-node@v3
-        with:
-          node-version: 22
-          cache: 'pnpm'
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Build website
-        run: pnpm build
-      - name: Upload artifact
-        id: upload-artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: docusaurus-build
-          # upload-artifact ignores working-directory, seemingly, though
-          # the docs indicate otherwise.
-          path: docs-website/build/
-          retention-days: 1
-          if-no-files-found: error
-
-  prettier:
-    name: Run prettier
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: pnpm/action-setup@v2
-      - name: Use Node.js 22
-        uses: actions/setup-node@v3
-        with:
-          node-version: 22
-          cache: 'pnpm'
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Run prettier
-        run: pnpm run format-prettier
-      - name: 'Check working directory status'
-        run: './scripts/check-git-status.sh'
-
-  lint:
-    name: Run lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: pnpm/action-setup@v2
-      - name: Use Node.js 22
-        uses: actions/setup-node@v3
-        with:
-          node-version: 22
-          cache: 'pnpm'
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Run lint
-        run: pnpm run lint --deny-warnings
-
-  cargo-fmt:
-    name: cargo fmt
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: stable
-          components: rustfmt
-      - name: Run cargo fmt --check
-        run: ./scripts/check-rustfmt.sh
-
-  cargo-clippy:
-    name: cargo clippy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: stable
-          components: clippy
-      - name: Run cargo clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
-
-  cargo-clippy-cli:
-    name: cargo clippy isograph_cli
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: stable
-          components: clippy
-      - name: Run cargo clippy
-        run: cargo clippy --manifest-path crates/ts_graphql_react_isograph_cli/Cargo.toml --all-targets -- -D warnings
-
-  cargo-test:
-    name: Run cargo test (excluding relay tests)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: stable
-          components: rustfmt
-      - name: Run cargo test
-        run: cargo test
+  js:
+    name: JavaScript
+    uses: ./.github/workflows/js.yml
 
   build-swc:
     name: Build swc
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          target: wasm32-wasip1
-          toolchain: stable
-          components: rustfmt
-          rustflags: '-D warnings -C link-arg=--allow-undefined'
-      - uses: awalsh128/cache-apt-pkgs-action@v1
-        with:
-          packages: musl-tools # provides musl-gcc
-          version: 1.0
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org/
-          cache: 'pnpm'
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Build swc
-        run: pnpm build-swc
+    uses: ./.github/workflows/build-swc.yml
+
+  build-js-packages:
+    name: Build js packages
+    needs: [build-swc]
+    uses: ./.github/workflows/build-js-packages.yml
+
+  build-website:
+    name: Build website
+    uses: ./.github/workflows/build-website.yml
 
   cli-linux-x64:
     uses: ./.github/workflows/build-cli.yml
@@ -280,14 +92,9 @@ jobs:
         build-js-packages,
         build-json-schema,
         build-website,
-        prettier,
-        cargo-fmt,
-        cargo-clippy,
-        cargo-clippy-cli,
-        cargo-test,
-        typecheck-demos,
+        rust,
+        js,
         build-swc,
-        lint,
         cli-linux-x64,
         cli-linux-arm64,
         cli-macos-x64,
@@ -300,44 +107,12 @@ jobs:
 
   deploy-website:
     name: Deploy website
-    runs-on: ubuntu-latest
-    needs: [all-checks-passed]
+    needs: [all-checks-passed, build-website]
     if: github.event_name == 'push' && github.repository == 'isographlabs/isograph' && github.ref == 'refs/heads/main' || github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
-    defaults:
-      run:
-        working-directory: ./docs-website
-    steps:
-      - uses: actions/checkout@v3
-      - uses: pnpm/action-setup@v2
-      - name: Use Node.js 22
-        uses: actions/setup-node@v3
-        with:
-          node-version: 22
-          cache: 'pnpm'
-      - name: 'Download build folder'
-        uses: actions/download-artifact@v4
-        with:
-          name: docusaurus-build
-          path: docs-website/build
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-      - name: Upload custom
-        run: tar --dereference --hard-dereference --directory "build" -cvf "$RUNNER_TEMP/artifact.tar" --exclude=.git --exclude =.github .
-      - name: Upload artifact
-        id: upload-artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: github-pages
-          path: ${{ runner.temp }}/artifact.tar
-          retention-days: 1
-          if-no-files-found: error
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+    uses: ./.github/workflows/deploy-website.yml
 
   main-release:
     name: Main NPM release
-    runs-on: ubuntu-latest
     if: >-
       github.event_name == 'push' &&
       github.repository == 'isographlabs/isograph' &&
@@ -346,171 +121,38 @@ jobs:
         github.ref_type != 'tag') ||
         startsWith(github.ref, 'refs/heads/deploy/')
       )
-    needs: [all-checks-passed]
-    steps:
-      - uses: actions/checkout@v2
-      - name: Cache turbo
-        uses: actions/cache@v4
-        with:
-          path: .turbo
-          key: ${{ runner.os }}-turbo-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-turbo-
-      - uses: pnpm/action-setup@v2
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org/
-          cache: 'pnpm'
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Change package versions to commit
-        run: pnpm gulp setMainVersion
-        env:
-          RELEASE_COMMIT_SHA: ${{ github.sha }}
-
-      - name: Re-install dependencies without frozen lockfile
-        # This is required because pnpm tries to re-install dependencies due to `verify-deps-before-run = install`,
-        # and in CI, this is always done with --frozen-lockfile.
-        run: pnpm install --no-frozen-lockfile --ignore-scripts
-      # TODO do not rebuild the libs
-      - name: Build
-        run: pnpm compile-libs
-
-      - name: Download artifact isograph_cli-linux-x64
-        uses: actions/download-artifact@v4
-        with:
-          name: isograph_cli-linux-x64
-          path: libs/isograph-compiler/artifacts/linux-x64
-      - name: Download artifact isograph_cli-bin-linux-arm64
-        uses: actions/download-artifact@v4
-        with:
-          name: isograph_cli-bin-linux-arm64
-          path: libs/isograph-compiler/artifacts/linux-arm64
-      - name: Download artifact isograph_cli-macos-x64
-        uses: actions/download-artifact@v4
-        with:
-          name: isograph_cli-macos-x64
-          path: libs/isograph-compiler/artifacts/macos-x64
-      - name: Download artifact isograph_cli-macos-arm64
-        uses: actions/download-artifact@v4
-        with:
-          name: isograph_cli-macos-arm64
-          path: libs/isograph-compiler/artifacts/macos-arm64
-      - name: Download artifact isograph_cli-bin-win-x64
-        uses: actions/download-artifact@v4
-        with:
-          name: isograph_cli-bin-win-x64
-          path: libs/isograph-compiler/artifacts/win-x64
-      - name: Mark binaries as executable
-        run: |
-          chmod +x libs/isograph-compiler/artifacts/linux-x64/isograph_cli
-          chmod +x libs/isograph-compiler/artifacts/linux-arm64/isograph_cli
-          chmod +x libs/isograph-compiler/artifacts/macos-x64/isograph_cli
-          chmod +x libs/isograph-compiler/artifacts/macos-arm64/isograph_cli
-          chmod +x libs/isograph-compiler/artifacts/win-x64/isograph_cli.exe
-
-      # TODO do not rebuild the swc plugin
-      - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          target: wasm32-wasip1
-          toolchain: stable
-          components: rustfmt
-          rustflags: '-D warnings -C link-arg=--allow-undefined'
-      - uses: awalsh128/cache-apt-pkgs-action@v1
-        with:
-          packages: musl-tools # provides musl-gcc
-          version: 1.0
-      - name: Build swc
-        run: pnpm build-swc
-
-      - name: Publish to NPM
-        run: pnpm --filter='./libs/*' publish --no-git-checks --tag ${{ startsWith(github.ref, 'refs/heads/deploy/') && 'deploy' || 'main' }}
-        env:
-          NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
+    needs:
+      [
+        all-checks-passed,
+        cli-linux-x64,
+        cli-linux-arm64,
+        cli-macos-x64,
+        cli-macos-arm64,
+        cli-win-x64,
+      ]
+    uses: ./.github/workflows/npm-release.yml
+    with:
+      kind: main
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   versioned-release:
     name: Versioned NPM release
-    runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.repository == 'isographlabs/isograph' && github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
-    needs: [all-checks-passed]
-    steps:
-      - uses: actions/checkout@v2
-      - name: Cache turbo
-        uses: actions/cache@v4
-        with:
-          path: .turbo
-          key: ${{ runner.os }}-turbo-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-turbo-
-      - uses: pnpm/action-setup@v2
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org/
-          cache: 'pnpm'
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
-      # - name: Change package versions to commit
-      #   run: pnpm gulp setMainVersion
-      #   # TODO do this less hackily
-
-      # TODO do not rebuild the libs
-      - name: Build
-        run: pnpm compile-libs
-      - name: Download artifact isograph_cli-linux-x64
-        uses: actions/download-artifact@v4
-        with:
-          name: isograph_cli-linux-x64
-          path: libs/isograph-compiler/artifacts/linux-x64
-      - name: Download artifact isograph_cli-bin-linux-arm64
-        uses: actions/download-artifact@v4
-        with:
-          name: isograph_cli-bin-linux-arm64
-          path: libs/isograph-compiler/artifacts/linux-arm64
-      - name: Download artifact isograph_cli-macos-x64
-        uses: actions/download-artifact@v4
-        with:
-          name: isograph_cli-macos-x64
-          path: libs/isograph-compiler/artifacts/macos-x64
-      - name: Download artifact isograph_cli-macos-arm64
-        uses: actions/download-artifact@v4
-        with:
-          name: isograph_cli-macos-arm64
-          path: libs/isograph-compiler/artifacts/macos-arm64
-      - name: Download artifact isograph_cli-bin-win-x64
-        uses: actions/download-artifact@v4
-        with:
-          name: isograph_cli-bin-win-x64
-          path: libs/isograph-compiler/artifacts/win-x64
-      - name: Mark binaries as executable
-        run: |
-          chmod +x libs/isograph-compiler/artifacts/linux-x64/isograph_cli
-          chmod +x libs/isograph-compiler/artifacts/linux-arm64/isograph_cli
-          chmod +x libs/isograph-compiler/artifacts/macos-x64/isograph_cli
-          chmod +x libs/isograph-compiler/artifacts/macos-arm64/isograph_cli
-          chmod +x libs/isograph-compiler/artifacts/win-x64/isograph_cli.exe
-
-      # TODO do not rebuild the swc plugin
-      - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          target: wasm32-wasip1
-          toolchain: stable
-          components: rustfmt
-          rustflags: '-D warnings -C link-arg=--allow-undefined'
-      - uses: awalsh128/cache-apt-pkgs-action@v1
-        with:
-          packages: musl-tools # provides musl-gcc
-          version: 1.0
-      - name: Build swc
-        run: pnpm build-swc
-
-      - name: Publish latest version to NPM
-        run: pnpm --filter './libs/*' publish --no-git-checks --tag latest
-        env:
-          NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
+    needs:
+      [
+        all-checks-passed,
+        cli-linux-x64,
+        cli-linux-arm64,
+        cli-macos-x64,
+        cli-macos-arm64,
+        cli-win-x64,
+      ]
+    uses: ./.github/workflows/npm-release.yml
+    with:
+      kind: versioned
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   publish-isograph-extension:
     name: Publish Isograph Extension
