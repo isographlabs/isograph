@@ -2,7 +2,7 @@
 
 Requires config-discovery.md.
 
-An event loop (`run_event_loop`) recvs `IsographEvent`s and calls `handle`. An effects loop (`run_effect_loop`) recvs `IsographEffect`s and calls `perform`. `handle` turns `HelloWorld` into `LogHelloWorld` and `Quit` into `Kill`. `perform` logs `hello world` for `LogHelloWorld`. `perform` returns `ControlFlow::Break` for `Kill`, which ends the effect loop. `std::sync::mpsc` carries both. The event thread is `run`. The effects thread is `std::thread::spawn`. A unix SIGTERM thread sends `Quit` and drops its sender, so the event loop's next `recv()?` ends. Origin of the two loops and of SIGTERM → Quit → Kill: figaro `src/daemon.rs`. Delta: `std::sync::mpsc` and `std::thread` in place of tokio tasks; `signal-hook` in place of `tokio::signal`; the SIGTERM thread drops the event sender after `Quit` in place of `select!` cancelling the event loop; `HelloWorld` / `LogHelloWorld` beside `Quit` / `Kill`.
+An event loop (`run_event_loop`) recvs `IsographEvent`s and calls `handle`. An effects loop (`run_effect_loop`) recvs `IsographEffect`s and calls `perform`. `handle` turns `HelloWorld` into `LogHelloWorld` and `Quit` into `Kill`. `perform` logs `hello world` for `LogHelloWorld`. `perform` returns `ControlFlow::Break` for `Kill`, which ends the effect loop. `tokio::sync::mpsc::unbounded_channel` carries both. `run` builds a current-thread runtime and `block_on(serve)`. `serve` `tokio::select!`s the two loops. A unix `tokio::signal` task sends `Quit`. Origin: figaro `src/daemon.rs`. Delta: no AppKit worker thread (`run` is already the daemon thread); `handle` takes `event: IsographEvent`, owned; `HelloWorld` / `LogHelloWorld` beside `Quit` / `Kill`; SIGTERM is `#[cfg(unix)]`.
 
 ## What the user does
 
@@ -20,7 +20,7 @@ $ isograph logs
 {"timestamp":"...","level":"INFO","fields":{"message":"kill: exiting"}}
 ```
 
-`isograph stop` without `--force` is SIGTERM (unix). `run` sends `HelloWorld` at boot. SIGTERM sends `Quit`. `handle` returns `Kill`. The process returns from `run_daemon`.
+`isograph stop` without `--force` is SIGTERM (unix). `serve` sends `HelloWorld` at boot. SIGTERM sends `Quit`. `handle` returns `Kill`. `select!` ends. The process returns from `run_daemon`.
 
 A test sends `HelloWorld` into `run_event_loop`. The effects channel receives `LogHelloWorld`. A test sends `Quit`. The effects channel receives `Kill`. A test sends `Kill` into `run_effect_loop`. The loop returns.
 
@@ -90,7 +90,7 @@ pub fn perform(effect: IsographEffect) -> ControlFlow<()> {
 }
 ```
 
-Origin of `perform` returning `ControlFlow`: figaro `perform_effect` in `src/daemon.rs`. `Kill` breaks rather than `process::exit`, so `run` returns and destructors run.
+Origin of `perform` returning `ControlFlow`: figaro `perform_effect` in `src/daemon.rs`. `Kill` breaks rather than `process::exit`, so `serve` returns and destructors run.
 
 ## Change 1: two loops
 
@@ -165,102 +165,94 @@ prelude = { path = "../prelude" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = "2"
+tokio = { workspace = true, features = ["rt", "macros", "signal", "sync", "time"] }
 tracing = { workspace = true }
-
-[target.'cfg(unix)'.dependencies]
-signal-hook = "0.3"
 ```
 
-`std` has no SIGTERM API. Origin of a dedicated SIGTERM waiter: figaro `tokio::signal::unix::signal(SignalKind::terminate())`. Delta: `signal-hook` `Signals` on a `std::thread`, unix only.
+Origin of the tokio features: figaro `Cargo.toml` `["rt", "macros", "signal", "sync", "time"]`. The workspace already pins `tokio` 1.35.
 
 ```rust
 // from crates/isograph_cli/src/daemon.rs
 use std::ops::ControlFlow;
-use std::sync::mpsc::{Receiver, RecvError, SendError, Sender, channel};
+
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 
 use crate::effect::IsographEffect;
 use crate::event::IsographEvent;
 use crate::state::IsographState;
-use prelude::Postfix;
-
-#[derive(Debug, thiserror::Error)]
-enum EventLoopError {
-    #[error("{0}")]
-    Recv(#[from] RecvError),
-    #[error("{0}")]
-    Send(#[from] SendError<IsographEffect>),
-}
 
 pub fn run() {
-    let (event_tx, event_rx) = channel::<IsographEvent>();
-    let (effect_tx, effect_rx) = channel::<IsographEffect>();
+    let runtime = match tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(runtime) => runtime,
+        Err(e) => {
+            tracing::error!(error = %e, "could not start the tokio runtime");
+            return;
+        }
+    };
+    runtime.block_on(serve());
+}
+
+async fn serve() {
+    let (event_tx, event_rx) = unbounded_channel::<IsographEvent>();
+    let (effect_tx, effect_rx) = unbounded_channel::<IsographEffect>();
     let _ = event_tx.send(IsographEvent::HelloWorld);
-    let _hold_events = spawn_sigterm_or_hold(event_tx);
-    let effect_thread = std::thread::spawn(move || {
-        run_effect_loop(effect_rx).unwrap_or_else(|e| {
-            tracing::error!(error = %e, "effect loop ended");
-        });
-    });
-    run_event_loop(event_rx, effect_tx).unwrap_or_else(|e| {
-        tracing::error!(error = %e, "event loop ended");
-    });
-    if effect_thread.join().is_err() {
-        tracing::error!("effect thread panicked");
-    }
-}
 
-/// `None`: the SIGTERM thread owns `event_tx` and drops it after sending `Quit`.
-/// `Some`: no such thread; the caller holds the sender so the event channel stays open.
-fn spawn_sigterm_or_hold(event_tx: Sender<IsographEvent>) -> Option<Sender<IsographEvent>> {
+    // `isograph stop` sends SIGTERM. Route it into the event channel as Quit, so the
+    // model turns it into Kill, the effect loop breaks, and serve returns.
+    //
+    // A spawned task rather than a third `select!` arm, because an arm that completed
+    // would drop the other two futures and skip the graceful path this exists to run.
     #[cfg(unix)]
-    {
-        let mut signals = match signal_hook::iterator::Signals::new([signal_hook::consts::SIGTERM])
-        {
-            Ok(signals) => signals,
-            Err(e) => {
-                tracing::warn!(
-                    error = %e,
-                    "no SIGTERM handler; a terminated isograph will not run Kill"
-                );
-                return event_tx.wrap_some();
-            }
-        };
-        std::thread::spawn(move || {
-            if signals.forever().next().is_some() {
-                tracing::info!("SIGTERM: quitting");
-                let _ = event_tx.send(IsographEvent::Quit);
-            }
-        });
-        None
+    match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+        Ok(mut term) => {
+            let event_tx = event_tx.clone();
+            tokio::spawn(async move {
+                if term.recv().await.is_some() {
+                    tracing::info!("SIGTERM: quitting");
+                    let _ = event_tx.send(IsographEvent::Quit);
+                }
+            });
+        }
+        Err(e) => {
+            tracing::warn!(
+                error = %e,
+                "no SIGTERM handler; a terminated isograph will not run Kill"
+            );
+        }
     }
-    #[cfg(not(unix))]
-    {
-        event_tx.wrap_some()
+
+    // `select!` rather than `join!`: the effect loop ends on `Kill`, and the event
+    // loop never does, because `_hold_events` holds a sender for as long as serve runs.
+    let _hold_events = event_tx;
+    let state = IsographState;
+    tokio::select! {
+        () = run_event_loop(state, event_rx, effect_tx) => {}
+        () = run_effect_loop(effect_rx) => {}
     }
 }
 
-pub(crate) fn run_event_loop(
-    event_rx: Receiver<IsographEvent>,
-    effect_tx: Sender<IsographEffect>,
-) -> Result<(), EventLoopError> {
-    let mut state = IsographState;
-    loop {
-        let event = event_rx.recv()?;
+pub(crate) async fn run_event_loop(
+    mut state: IsographState,
+    mut event_rx: UnboundedReceiver<IsographEvent>,
+    effect_tx: UnboundedSender<IsographEffect>,
+) {
+    while let Some(event) = event_rx.recv().await {
         let effects = state.handle(event);
         for effect in effects {
-            effect_tx.send(effect)?;
+            let _ = effect_tx.send(effect);
         }
     }
 }
 
-fn run_effect_loop(effect_rx: Receiver<IsographEffect>) -> Result<(), RecvError> {
-    loop {
-        let effect = effect_rx.recv()?;
+pub(crate) async fn run_effect_loop(mut effect_rx: UnboundedReceiver<IsographEffect>) {
+    while let Some(effect) = effect_rx.recv().await {
         if perform(effect).is_break() {
             break;
         }
     }
-    ().wrap_ok()
 }
 
 pub fn perform(effect: IsographEffect) -> ControlFlow<()> {
@@ -277,19 +269,17 @@ pub fn perform(effect: IsographEffect) -> ControlFlow<()> {
 }
 ```
 
-`run` sends `HelloWorld` before moving `event_tx`. `spawn_sigterm_or_hold` registers SIGTERM on this thread, then either moves `event_tx` into a waiter thread (`None`) or returns it (`Some`). The waiter sends `Quit` and returns, which drops the last sender, which makes `run_event_loop`'s next `recv()?` return `RecvError`. `run` then joins the effect thread.
+Origin of `run` / `serve` / the two loops / SIGTERM / `select!`: figaro `src/daemon.rs`. Figaro builds the current-thread runtime on a worker because main is AppKit. `run` is already the daemon thread, so it builds the runtime here. Figaro `expect`s that `build()`. `run` logs and returns if `build()` fails.
 
-On Windows, and if `Signals::new` fails, `_hold_events` holds the sender. The event loop stays blocked until SIGKILL. `isograph stop` on Windows is `--force` (SIGKILL). Origin: `crates/ts_graphql_react_isograph_cli/tests/cli.rs` `STOP`.
+`_hold_events` keeps the event channel open while `serve` runs. `run_event_loop` holds `effect_tx`, which keeps the effect channel open. A closed event channel ends `while let Some`. `Kill` breaks the effect loop. `select!` then cancels the event loop.
 
-`recv()?` and `send()?` end a loop when the other end hangs up.
+On Windows there is no SIGTERM task. The event loop stays selected until SIGKILL. `isograph stop` on Windows is `--force` (SIGKILL). Origin: `crates/ts_graphql_react_isograph_cli/tests/cli.rs` `STOP`.
 
 `App::DaemonArgs` remains `NoArgs`. `ConfigFlag` remains.
 
-`isograph_cli` already depends on `thiserror`.
-
 ## Tests
 
-`run_event_loop` is `pub(crate)`.
+`run_event_loop` and `run_effect_loop` are `pub(crate)`.
 
 ```rust
 // from crates/isograph_cli/src/state.rs
@@ -323,55 +313,54 @@ mod tests {
     use super::{run_effect_loop, run_event_loop};
     use crate::effect::IsographEffect;
     use crate::event::IsographEvent;
-    use std::sync::mpsc::channel;
+    use crate::state::IsographState;
+    use tokio::sync::mpsc::unbounded_channel;
 
-    #[test]
-    fn sending_hello_world_emits_log_hello_world() {
-        let (event_tx, event_rx) = channel();
-        let (effect_tx, effect_rx) = channel();
+    #[tokio::test]
+    async fn sending_hello_world_emits_log_hello_world() {
+        let (event_tx, event_rx) = unbounded_channel();
+        let (effect_tx, mut effect_rx) = unbounded_channel();
         event_tx
             .send(IsographEvent::HelloWorld)
             .expect("the test sends HelloWorld");
         drop(event_tx);
-        run_event_loop(event_rx, effect_tx)
-            .expect_err("the test dropped the event sender after one event");
+        run_event_loop(IsographState, event_rx, effect_tx).await;
         let effect = effect_rx
             .recv()
+            .await
             .expect("handle sent one effect");
         assert_eq!(effect, IsographEffect::LogHelloWorld);
     }
 
-    #[test]
-    fn sending_quit_emits_kill() {
-        let (event_tx, event_rx) = channel();
-        let (effect_tx, effect_rx) = channel();
+    #[tokio::test]
+    async fn sending_quit_emits_kill() {
+        let (event_tx, event_rx) = unbounded_channel();
+        let (effect_tx, mut effect_rx) = unbounded_channel();
         event_tx
             .send(IsographEvent::Quit)
             .expect("the test sends Quit");
         drop(event_tx);
-        run_event_loop(event_rx, effect_tx)
-            .expect_err("the test dropped the event sender after one event");
+        run_event_loop(IsographState, event_rx, effect_tx).await;
         let effect = effect_rx
             .recv()
+            .await
             .expect("handle sent one effect");
         assert_eq!(effect, IsographEffect::Kill);
     }
 
-    #[test]
-    fn kill_ends_the_effect_loop() {
-        let (effect_tx, effect_rx) = channel();
-        let effect_thread = std::thread::spawn(move || run_effect_loop(effect_rx));
+    #[tokio::test]
+    async fn kill_ends_the_effect_loop() {
+        let (effect_tx, effect_rx) = unbounded_channel();
         effect_tx
             .send(IsographEffect::Kill)
             .expect("the test sends Kill");
-        drop(effect_tx);
-        effect_thread
-            .join()
-            .expect("the effect loop thread returns")
-            .expect("Kill ends the effect loop without RecvError");
+        run_effect_loop(effect_rx).await;
+        let _hold = effect_tx;
     }
 }
 ```
+
+`kill_ends_the_effect_loop` keeps the sender alive. The loop returns because `Kill` breaks, not because the channel closed.
 
 ## e2e
 

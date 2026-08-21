@@ -4,7 +4,7 @@ Architecture is `docs-website/docs/design-docs/event-model.md`. This file is the
 
 Requires config-discovery.md (landed) and the design-doc.
 
-1. event-loop.md. `HelloWorld` / `LogHelloWorld`, `Quit` / `Kill`. SIGTERM sends `Quit`. `run_event_loop`, `run_effect_loop`.
+1. event-loop.md. tokio current-thread runtime. `HelloWorld` / `LogHelloWorld`, `Quit` / `Kill`. SIGTERM sends `Quit`. `run_event_loop`, `run_effect_loop`.
 2. filesystem-events.md, after event-loop.md. CLI send, config `includes`, `Presence`, watcher.
 3. pico intern of `DiskFile`. Same `DiskChanged`. No pending doc yet.
 4. lsp-semantic-token-encoding.md. Encoder only. May overlap (2).
