@@ -22,7 +22,11 @@ A leftover `{ bar }` records Bracket on `{` and `}`, Content on `bar`. Leftover 
 
 ## Dependencies
 
-This change depends on leftover-in-extra.md, which puts trailing separators and unread remainder in `Slot.extra`. Tests call `parse_iso_literal` (parse-iso-literal-entry.md). `parse_singleton` already builds `extra_chunks`. This change does not depend on four-trees.md or type-annotation-null.md.
+This change depends on leftover-in-extra.md (in past), which puts trailing separators and unread remainder in `Slot.extra`. Tests call `parsed` (parse-test-semantic-tokens). `parse_singleton` already builds `extra_chunks`. This change does not depend on four-trees.md or type-annotation-null.md.
+
+Blockers: leftover-semantic-tokens-blockers.md. Fold those into this doc before implementing.
+
+WIP parser implementation: git stash `wip leftover-semantic-tokens`.
 
 ## Extraction
 
