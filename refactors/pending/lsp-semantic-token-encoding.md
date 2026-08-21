@@ -6,7 +6,7 @@
 
 Origin: `crates/isograph_lsp/src/semantic_tokens.rs` and `crates/isograph_lang_types/src/semantic_token_legend/mod.rs` in isograph. This crate is `crates/isograph_lsp`. It does not start the server. lsp-semantic-tokens.md adds `file_literals` and the stdio loop, and calls the functions here.
 
-The parser type is `IsographSemanticToken`. `lsp_types::SemanticToken` is `LspSemanticToken` at the use site.
+The parser type is `IsographSemanticToken`. Tests use `lsp_types::SemanticToken`.
 
 One shippable change.
 
@@ -47,7 +47,13 @@ pub fn lsp_semantic_tokens(
             let piece_position = cursor.position(piece_start);
             // Column of this piece on the line it starts on.
             let offset_on_line = piece_position.col;
-            let piece_end = match cursor.break_before(token.location.end) {
+            let line_break_in_span = match cursor.current_line_break() {
+                Some(line_break) if line_break.start < token.location.end => {
+                    line_break.wrap_some()
+                }
+                _ => None,
+            };
+            let piece_end = match line_break_in_span {
                 Some(line_break) => line_break.start,
                 None => token.location.end,
             };
@@ -67,16 +73,15 @@ pub fn lsp_semantic_tokens(
                         offset_on_line,
                     }),
                 };
-                let lsp_semantic_token = LspSemanticToken {
-                    relative_to_previous,
+                encoded.push(convert_to_lsp_semantic_token(
                     length,
                     token_type,
-                };
-                encoded.push(lsp_semantic_token.to());
+                    relative_to_previous,
+                ));
                 // Next delta is from this start, not from this end.
                 last = piece_position;
             }
-            match cursor.break_before(token.location.end) {
+            match line_break_in_span {
                 Some(line_break) => {
                     piece_start = line_break.after;
                     // Consume even when the piece was empty (a blank line in the span).
@@ -87,12 +92,6 @@ pub fn lsp_semantic_tokens(
         }
     }
     encoded.wrap_ok()
-}
-
-struct LspSemanticToken {
-    relative_to_previous: RelativeToPrevious,
-    length: u32,
-    token_type: u32,
 }
 
 /// Relative to the previous piece. `SameLine` is start-to-start on this line.
@@ -112,25 +111,27 @@ struct MultiLine {
     offset_on_line: u32,
 }
 
-impl From<LspSemanticToken> for lsp_types::SemanticToken {
-    fn from(token: LspSemanticToken) -> Self {
-        let (delta_line, delta_start) = match token.relative_to_previous {
-            RelativeToPrevious::SameLine(SameLine(delta_start)) => (0, delta_start),
-            RelativeToPrevious::MultiLine(MultiLine {
-                delta_line,
-                offset_on_line,
-            }) => {
-                // After a line change `delta_start` is the column on the new line, not a delta from the previous start.
-                (delta_line, offset_on_line)
-            }
-        };
-        lsp_types::SemanticToken {
+fn convert_to_lsp_semantic_token(
+    length: u32,
+    token_type: u32,
+    relative_to_previous: RelativeToPrevious,
+) -> lsp_types::SemanticToken {
+    let (delta_line, delta_start) = match relative_to_previous {
+        RelativeToPrevious::SameLine(SameLine(delta_start)) => (0, delta_start),
+        RelativeToPrevious::MultiLine(MultiLine {
             delta_line,
-            delta_start,
-            length: token.length,
-            token_type: token.token_type,
-            token_modifiers_bitset: 0,
+            offset_on_line,
+        }) => {
+            // After a line change `delta_start` is the column on the new line, not a delta from the previous start.
+            (delta_line, offset_on_line)
         }
+    };
+    lsp_types::SemanticToken {
+        delta_line,
+        delta_start,
+        length,
+        token_type,
+        token_modifiers_bitset: 0,
     }
 }
 
@@ -290,12 +291,8 @@ impl LineCursor<'_> {
         }
     }
 
-    /// The current break, if it starts before `span_end`. Does not consume it.
-    fn break_before(&self, span_end: u32) -> Option<LineBreak> {
-        self.breaks
-            .get(self.break_index)
-            .filter(|line_break| line_break.start < span_end)
-            .copied()
+    fn current_line_break(&self) -> Option<LineBreak> {
+        self.breaks.get(self.break_index).copied()
     }
 
     fn advance_break(&mut self) {
@@ -345,9 +342,9 @@ fn utf16_units(text: &str) -> u32 {
 }
 ```
 
-`LineIndex` holds every break index from one scan of `page_content`. `LineCursor` walks that vec: `break_index` is the first break not yet passed. `position(offset)` advances while `after <= offset` (each such advance is one line). `break_before` peeks the current break if it starts before `span.end`. `advance_break` consumes it and moves to the next line. Tokens are in file order, so the cursor only moves forward. `break_index` is the line number after those advances.
+`LineIndex` holds every break index from one scan of `page_content`. `LineCursor` walks that vec: `break_index` is the first break not yet passed. `position(offset)` advances while `after <= offset` (each such advance is one line). `current_line_break` is the break at `break_index`. The loop uses it when `start` is before the span end. `advance_break` consumes it and moves to the next line. Tokens are in file order, so the cursor only moves forward. `break_index` is the line number after those advances.
 
-`last` is the previous piece's start `Position`. `offset_on_line` is this piece's UTF-16 column on the line it starts on. `SameLine` subtracts `last.col` (start-to-start). `MultiLine` keeps `offset_on_line` as-is: that is the offset on the line we landed on, and `From` writes it to `delta_start`. `length` and `token_type` live on `LspSemanticToken`. `From` fills `delta_line: 0` on `SameLine` and `token_modifiers_bitset: 0`. A blank line inside a span is `piece_end == piece_start`; nothing is emitted, then `advance_break` still runs, so the next `position` is on the following line.
+`last` is the previous piece's start `Position`. `offset_on_line` is this piece's UTF-16 column on the line it starts on. `SameLine` subtracts `last.col` (start-to-start). `MultiLine` keeps `offset_on_line` as-is: that is the offset on the line we landed on, and `convert_to_lsp_semantic_token` writes it to `delta_start`. That function fills `delta_line: 0` on `SameLine` and `token_modifiers_bitset: 0`. A blank line inside a span is `piece_end == piece_start`; nothing is emitted, then `advance_break` still runs, so the next `position` is on the following line.
 
 `check_span` runs before any slice. Ordered exclusive spans are not enough: `page = "a\r\nb"` with tokens `[0..1, 2..3]` is ordered and exclusive, and offset 2 sits strictly inside the break `{ start: 1, after: 3 }`. Parser leftover skips `LineBreak` tokens, so this is a caller concat bug. `EncodeError` names it instead of panicking on `page_content[3..2]`.
 
@@ -553,7 +550,7 @@ pub use semantic_tokens::{
 };
 ```
 
-`LspSemanticToken`, `RelativeToPrevious`, `SameLine`, `MultiLine`, `LineIndex`, `LineCursor`, `Position`, `LineBreak`, `line_breaks`, `utf16_units`, `lsp_type_index`, `legend_index` stay in the module. Tests in that module call them. `legend_index` `expect`s that `LEGEND_TOKEN_TYPES` lists every type the match names.
+`convert_to_lsp_semantic_token`, `RelativeToPrevious`, `SameLine`, `MultiLine`, `LineIndex`, `LineCursor`, `Position`, `LineBreak`, `line_breaks`, `utf16_units`, `lsp_type_index`, `legend_index` stay in the module. Tests in that module call them. `legend_index` `expect`s that `LEGEND_TOKEN_TYPES` lists every type the match names.
 
 ## Tests
 
@@ -564,7 +561,7 @@ Test helpers live in the test module. `encoded` parses then encodes a source tha
 #[cfg(test)]
 mod tests {
     use isograph_parser::{IsographSemanticToken, parse_iso_literal};
-    use lsp_types::{SemanticToken as LspSemanticToken, SemanticTokenType};
+    use lsp_types::{SemanticToken, SemanticTokenType};
     use prelude::Postfix;
     use span::{Span, WithSpan, WithSpanPostfix};
 
@@ -580,7 +577,7 @@ mod tests {
     const PROPERTY: u32 = 9;
     const OPERATOR: u32 = 21;
 
-    fn encoded(source: &str) -> Vec<LspSemanticToken> {
+    fn encoded(source: &str) -> Vec<SemanticToken> {
         let parsed = parse_iso_literal(source);
         encode(&parsed.tokens, source)
     }
@@ -599,11 +596,11 @@ mod tests {
         tokens: &[WithSpan<IsographSemanticToken>],
         offset: u32,
         page_content: &str,
-    ) -> Vec<LspSemanticToken> {
+    ) -> Vec<SemanticToken> {
         encode(&rebased(tokens, offset), page_content)
     }
 
-    fn of_type(lsp: &[LspSemanticToken], token_type: u32) -> Vec<&LspSemanticToken> {
+    fn of_type(lsp: &[SemanticToken], token_type: u32) -> Vec<&SemanticToken> {
         lsp.iter()
             .filter(|token| token.token_type == token_type)
             .collect()
@@ -612,7 +609,7 @@ mod tests {
     fn encode(
         tokens: &[WithSpan<IsographSemanticToken>],
         page_content: &str,
-    ) -> Vec<LspSemanticToken> {
+    ) -> Vec<SemanticToken> {
         lsp_semantic_tokens(tokens, page_content).expect(
             "the fixture's spans are mutually exclusive, ordered, in range, on char boundaries, and not inside a line break",
         )
