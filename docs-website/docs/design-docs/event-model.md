@@ -58,7 +58,7 @@ The test harness calls this. It does not start a daemon, open a socket, or write
 The binary is the outer. Each source is outside `handle` and feeds it. One process, one channel, one worker that owns `Database`. Sources do not read state. Performers do not mutate it.
 
 - Watcher: OS notifications become `DiskChanged` (path plus contents or absent). It may read the disk to fill `Present.contents`. `handle` does not. The watcher posts in-process on the event channel. It does not run the CLI and it does not write to the event socket.
-- Event socket (`freddie_event_socket`): JSON `IncomingEvent` frames. The CLI is a client of this socket. CI is a client of this socket.
+- Event socket (`freddie_event_socket`): JSON `IsographEvent` frames (`Serialize` + `Deserialize`, `serde_json`). The CLI is a client of this socket. CI is a client of this socket.
 - LSP adapter: an LSP notification (`textDocument/didOpen`, `didChange`, `didClose`) becomes `EditorChanged`. An LSP request (hover, `semanticTokens/full`, …) is request/response in the adapter: it reads `OpenFile` if present else `DiskFile`, computes, replies. `handle` is not request/response. Effects from `handle` (`ReportDiagnostics`) become LSP notifications (`publishDiagnostics`).
 - Effect loop: performs `WriteArtifacts`, `ReportDiagnostics`, `StartAsyncWork`, `Kill`.
 
@@ -83,70 +83,64 @@ The LSP adapter is a second listener, `{log_dir}/{slug}.lsp`. The event socket i
 An event is something that happened, already carrying what the source knows.
 
 ```rust
+#[derive(serde::Deserialize, serde::Serialize)]
+#[serde(tag = "kind", content = "value")]
 enum IsographEvent {
+    #[serde(rename = "IsographEvent.DiskChanged")]
     DiskChanged(DiskChanged),
+    #[serde(rename = "IsographEvent.EditorChanged")]
     EditorChanged(EditorChanged),
-    AsyncWorkFinished(AsyncWorkFinished),
-    Quit(Quit),
+    #[serde(rename = "IsographEvent.AsyncWorkFinished")]
+    AsyncWorkFinished,
+    #[serde(rename = "IsographEvent.Quit")]
+    Quit,
 }
 
+#[derive(serde::Deserialize, serde::Serialize)]
 struct DiskChanged {
     path: PathBuf,
     presence: Presence,
 }
 
+#[derive(serde::Deserialize, serde::Serialize)]
 enum Presence {
     Present(Present),
     Absent,
 }
 
+#[derive(serde::Deserialize, serde::Serialize)]
 struct Present {
     contents: String,
 }
 
+#[derive(serde::Deserialize, serde::Serialize)]
 struct EditorChanged {
     path: PathBuf,
     buffer: Buffer,
 }
 
+#[derive(serde::Deserialize, serde::Serialize)]
 enum Buffer {
     Open(String),
     Closed,
 }
-
-struct AsyncWorkFinished;
-
-struct Quit;
 ```
 
 `path` is absolute and canonical. A relative path is resolved by the source that constructed the event, never by `handle`.
 
 `Present` is create or modify or the destination of a move. `Absent` is delete or the source of a move. There is no `Moved` variant. A rename the watcher sees becomes `Absent` then `Present`. pico sources are keyed by path; a rename is remove old plus intern new.
 
-Ingested events come from outside `handle`: `DiskChanged`, `EditorChanged`. The CLI can submit any of them. The watcher submits `DiskChanged`. The LSP adapter submits `EditorChanged`.
+Ingested events come from outside `handle`: `DiskChanged`, `EditorChanged`. The CLI can submit any `IsographEvent`. The watcher submits `DiskChanged`. The LSP adapter submits `EditorChanged`.
 
-`IsographEvent` does not derive `Deserialize`. A wire client cannot construct `AsyncWorkFinished` or `Quit`.
-
-```rust
-#[derive(serde::Deserialize, Debug)]
-#[serde(tag = "kind", content = "value")]
-enum IncomingEvent {
-    #[serde(rename = "IncomingEvent.DiskChanged")]
-    DiskChanged(DiskChanged),
-    #[serde(rename = "IncomingEvent.EditorChanged")]
-    EditorChanged(EditorChanged),
-}
-```
-
-A frame that is not a valid `IncomingEvent` is logged and dropped. The connection stays up.
+The wire is `serde_json` of `IsographEvent`. Every event is `Serialize` + `Deserialize`. There is no second enum. A frame that is not a valid `IsographEvent` is logged and dropped. The connection stays up.
 
 `DiskChanged` is a filesystem fact. `Present` carries the contents. `handle` does not open the path. Boot scan is a burst of `DiskChanged` from the watcher; Injected mode has no such burst.
 
 `EditorChanged` is an editor-buffer fact. The LSP adapter produces it from `didOpen` / `didChange` / `didClose`. The CLI can produce the same event without an editor.
 
-`AsyncWorkFinished` is the answer to work `handle` asked the effect loop to do off-thread: a compilation, a schema fetch. Tests may inject it. It is not on the wire.
+`AsyncWorkFinished` is the answer to work `handle` asked the effect loop to do off-thread: a compilation, a schema fetch. Tests and the CLI may inject it.
 
-`Quit` is `isograph stop` and SIGTERM, once the daemon maps those onto an event and a `Kill` effect. It is not on the wire.
+`Quit` is `isograph stop`, SIGTERM, and a `Quit` frame on the socket. `handle` returns `Kill`.
 
 ## Effect
 
@@ -184,7 +178,7 @@ struct StartAsyncWork;
 
 `Kill` ends the effect loop. `run` returns. The process exits.
 
-event-loop.md ships `HelloWorld` / `LogHelloWorld`, `Quit` / `Kill`, tokio `run_event_loop` / `run_effect_loop`, and `handle` returning `Vec<IsographEffect>`. send-events.md ships the event socket, the port file, `IncomingEvent.HelloWorld`, and `isograph send`. filesystem-events.md adds `DiskChanged`. `Presence` is that doc's created/deleted/moved change.
+event-loop.md ships `HelloWorld` / `LogHelloWorld`, `Quit` / `Kill`, tokio `run_event_loop` / `run_effect_loop`, and `handle` returning `Vec<IsographEffect>`. send-events.md ships the event socket, the port file, `Serialize` + `Deserialize` on `IsographEvent`, and `isograph send`. filesystem-events.md adds `DiskChanged`. `Presence` is that doc's created/deleted/moved change.
 
 ## State
 

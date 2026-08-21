@@ -2,9 +2,9 @@
 
 Requires event-loop.md (landed) and config-discovery.md (landed).
 
-The daemon listens on `freddie_event_socket`. `isograph send` finds the config, finds that daemon's port file, and writes one JSON `IncomingEvent` frame. `IncomingEvent::HelloWorld` becomes `IsographEvent::HelloWorld`. `Quit` is not on the wire.
+The daemon listens on `freddie_event_socket`. `isograph send` finds the config, finds that daemon's port file, and writes one JSON `IsographEvent` frame. Every event is `Serialize` + `Deserialize`. The wire is `serde_json`. `on_message` deserializes `IsographEvent` and sends it. There is no second event enum.
 
-Origin of the socket and of `on_message`: figaro `src/daemon.rs` and `src/external.rs`. Origin of `isograph send`: `refactors/pending/filesystem-events.md` change 2. Delta: `HelloWorld` instead of `DiskChanged`; tungstenite 0.24, matching `freddie_event_socket`; `listen(0)` plus `EventSocket::local_addr()`.
+Origin of the socket and of `on_message`: figaro `src/daemon.rs` and `src/external.rs`. Origin of `isograph send`: `refactors/pending/filesystem-events.md` change 2. Delta: the wire type is `IsographEvent`, not a separate `IncomingEvent`; figaro keeps `IncomingEvent` so keys and quit are unrepresentable on the socket; isograph events are all serde JSON, including `Quit`; tungstenite 0.24, matching `freddie_event_socket`; `listen(0)` plus `EventSocket::local_addr()`.
 
 ## What the user does
 
@@ -12,7 +12,7 @@ Origin of the socket and of `on_message`: figaro `src/daemon.rs` and `src/extern
 $ isograph start
 /Users/x/app/isograph.config.json started (pid 12345)
 $ isograph send <<'EOF'
-{"kind":"IncomingEvent.HelloWorld"}
+{"kind":"IsographEvent.HelloWorld"}
 EOF
 $ isograph logs
 {"timestamp":"...","level":"INFO","fields":{"message":"isograph daemon up","config":"/Users/x/app/isograph.config.json","port":53124}}
@@ -27,30 +27,37 @@ $ isograph logs
 Most important first.
 
 ```rust
+// from crates/isograph_cli/src/event.rs
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[serde(tag = "kind", content = "value")]
+pub enum IsographEvent {
+    #[serde(rename = "IsographEvent.HelloWorld")]
+    HelloWorld,
+    #[serde(rename = "IsographEvent.Quit")]
+    Quit,
+}
+```
+
+Origin: landed `event.rs`. Delta: `Serialize` + `Deserialize`, adjacent tagging. Unit variant JSON is `{"kind":"IsographEvent.HelloWorld"}` with no `value` field. `Quit` is on the wire. A send of `Quit` is `handle(Quit)` and `Kill`.
+
+```rust
 // from crates/isograph_cli/src/external.rs
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::warn;
 
 use crate::event::IsographEvent;
 
-#[derive(serde::Deserialize, Debug)]
-#[serde(tag = "kind", content = "value")]
-pub enum IncomingEvent {
-    #[serde(rename = "IncomingEvent.HelloWorld")]
-    HelloWorld,
-}
-
 pub fn on_message(text: &str, event_tx: &UnboundedSender<IsographEvent>) {
-    match serde_json::from_str::<IncomingEvent>(text) {
-        Ok(IncomingEvent::HelloWorld) => {
-            let _ = event_tx.send(IsographEvent::HelloWorld);
+    match serde_json::from_str::<IsographEvent>(text) {
+        Ok(event) => {
+            let _ = event_tx.send(event);
         }
         Err(e) => warn!(error = %e, frame = text, "undeserializable frame"),
     }
 }
 ```
 
-Origin of `IncomingEvent`: `docs-website/docs/design-docs/event-model.md`. Delta: `HelloWorld` this slice. `DiskChanged` and `EditorChanged` land later. `IsographEvent` does not derive `Deserialize`. Adjacent tagging of a unit variant is `{"kind":"IncomingEvent.HelloWorld"}` with no `value` field.
+A frame that is not a valid `IsographEvent` is logged and dropped. The connection stays up.
 
 ```rust
 // from crates/isograph_cli/src/lib.rs
@@ -65,6 +72,17 @@ struct IsographArgs {
 `App::DaemonArgs` is `IsographArgs`. `App::Id` stays `ConfigFlag`. `port: Option<u16>` is unspecified versus specified.
 
 ## Change 1: the daemon listens
+
+```rust
+// from crates/isograph_cli/src/event.rs (before)
+#[derive(Debug)]
+pub enum IsographEvent {
+    HelloWorld,
+    Quit,
+}
+```
+
+The after is the `Serialize` + `Deserialize` enum in Types.
 
 `run_daemon` today logs `isograph daemon up` and calls `daemon::run()` with no instance.
 
@@ -141,7 +159,7 @@ mod external;
 mod state;
 
 pub use event::IsographEvent;
-pub use external::{IncomingEvent, on_message};
+pub use external::on_message;
 ```
 
 ```rust
@@ -223,29 +241,41 @@ The SIGTERM task, `_hold_events`, and `select!` stay. `_socket` is held across `
 ### Tests
 
 ```rust
-// from crates/isograph_cli/src/external.rs
+// from crates/isograph_cli/src/event.rs
 #[cfg(test)]
-mod tests {
-    use super::IncomingEvent;
+mod serde_tests {
+    use super::IsographEvent;
 
     #[test]
-    fn hello_world_deserializes() {
-        let event: IncomingEvent = serde_json::from_str(r#"{"kind":"IncomingEvent.HelloWorld"}"#)
-            .expect("a HelloWorld frame deserializes");
-        assert!(matches!(event, IncomingEvent::HelloWorld));
+    fn hello_world_round_trips() {
+        let json = r#"{"kind":"IsographEvent.HelloWorld"}"#;
+        let event: IsographEvent =
+            serde_json::from_str(json).expect("a HelloWorld frame deserializes");
+        assert!(matches!(event, IsographEvent::HelloWorld));
+        assert_eq!(
+            serde_json::to_string(&event).expect("HelloWorld serializes"),
+            json
+        );
     }
 
     #[test]
-    fn nothing_outside_the_vocabulary_deserializes() {
+    fn quit_round_trips() {
+        let json = r#"{"kind":"IsographEvent.Quit"}"#;
+        let event: IsographEvent = serde_json::from_str(json).expect("a Quit frame deserializes");
+        assert!(matches!(event, IsographEvent::Quit));
+        assert_eq!(serde_json::to_string(&event).expect("Quit serializes"), json);
+    }
+
+    #[test]
+    fn garbage_does_not_deserialize() {
         for frame in [
-            r#"{"kind":"IncomingEvent.Quit"}"#,
-            r#"{"kind":"IncomingEvent.Quit","value":null}"#,
             r#"{"kind":"IsographEvent.HelloWorld"}"#,
+            r#"{"kind":"Nope"}"#,
             "{}",
             "not json at all",
         ] {
             assert!(
-                serde_json::from_str::<IncomingEvent>(frame).is_err(),
+                serde_json::from_str::<IsographEvent>(frame).is_err(),
                 "{frame} should not deserialize"
             );
         }
@@ -276,7 +306,7 @@ async fn a_hello_world_frame_arrives_as_an_event() {
         .await
         .expect("connecting");
     ws.send(Message::Text(
-        r#"{"kind":"IncomingEvent.HelloWorld"}"#.to_owned(),
+        r#"{"kind":"IsographEvent.HelloWorld"}"#.to_owned(),
     ))
     .await
     .expect("sending");
@@ -298,10 +328,7 @@ async fn an_unknown_frame_is_dropped_without_disturbing_the_connection() {
     let (mut ws, _) = tokio_tungstenite::connect_async(format!("ws://127.0.0.1:{port}"))
         .await
         .expect("connecting");
-    for frame in [
-        r#"{"kind":"IncomingEvent.Quit"}"#,
-        "not json at all",
-    ] {
+    for frame in [r#"{"kind":"Nope"}"#, "not json at all"] {
         ws.send(Message::Text(frame.to_owned()))
             .await
             .expect("sending");
@@ -309,7 +336,7 @@ async fn an_unknown_frame_is_dropped_without_disturbing_the_connection() {
     tokio::time::sleep(SETTLE).await;
     assert!(event_rx.try_recv().is_err(), "nothing was dispatched");
     ws.send(Message::Text(
-        r#"{"kind":"IncomingEvent.HelloWorld"}"#.to_owned(),
+        r#"{"kind":"IsographEvent.HelloWorld"}"#.to_owned(),
     ))
     .await
     .expect("the connection survived two bad frames");
@@ -336,7 +363,7 @@ futures-util = { version = "0.3", default-features = false, features = ["sink"] 
 
 ## Change 2: `isograph send`
 
-A client verb. It does not start the daemon. It reads one JSON `IncomingEvent` from stdin, or from `--file`, and writes it as one websocket text frame.
+A client verb. It does not start the daemon. It reads one JSON `IsographEvent` from stdin, or from `--file`, and writes it as one websocket text frame.
 
 freddie_cli `Verb` is closed. Extra verbs sit beside it, the way figaro's launch-agent verbs do.
 
@@ -365,7 +392,7 @@ enum CliVerb {
     #[command(flatten)]
     Lifecycle(freddie_cli::Verb<Isograph>),
 
-    /// Write one IncomingEvent JSON frame to the running daemon.
+    /// Write one IsographEvent JSON frame to the running daemon.
     Send(SendArgs),
 }
 
@@ -429,7 +456,7 @@ use tungstenite::client::connect;
 
 use crate::SendArgs;
 use crate::discover::DiscoverError;
-use crate::external::IncomingEvent;
+use crate::event::IsographEvent;
 
 #[derive(Debug)]
 struct ReadFile {
@@ -457,8 +484,8 @@ enum SendError {
     ReadFile(ReadFile),
     #[error("could not read stdin: {0}")]
     ReadStdin(io::Error),
-    #[error("the frame is not IncomingEvent JSON: {0}")]
-    NotIncoming(serde_json::Error),
+    #[error("the frame is not IsographEvent JSON: {0}")]
+    NotEvent(serde_json::Error),
     #[error("no port file at {}; is the daemon running?", .0.display())]
     NoPortFile(PathBuf),
     #[error("could not read {}: {}", .0.path.display(), .0.source)]
@@ -504,7 +531,7 @@ fn run_inner(args: &SendArgs) -> Result<(), SendError> {
         }
     };
     let frame = frame.trim();
-    let _: IncomingEvent = serde_json::from_str(frame).map_err(SendError::NotIncoming)?;
+    let _: IsographEvent = serde_json::from_str(frame).map_err(SendError::NotEvent)?;
     let (mut ws, _) = connect(format!("ws://127.0.0.1:{port}"))
         .map_err(|source| SendError::Connect(Connect { port, source }))?;
     ws.send(Message::Text(frame.to_owned()))
@@ -631,7 +658,7 @@ fn send_hello_world_logs_a_second_hello_world() {
     let daemon = Daemon::start();
     let sent = daemon.isograph_stdin(
         ["send"].reference(),
-        "{\"kind\":\"IncomingEvent.HelloWorld\"}\n",
+        "{\"kind\":\"IsographEvent.HelloWorld\"}\n",
     );
     assert!(
         sent.status.success(),
@@ -674,7 +701,7 @@ fn send_of_not_json_fails() {
     let sent = daemon.isograph_stdin(["send"].reference(), "not json\n");
     assert!(!sent.status.success());
     let err = stderr(sent.reference());
-    assert!(err.contains("IncomingEvent"), "{err}");
+    assert!(err.contains("IsographEvent"), "{err}");
 }
 
 #[test]
@@ -683,7 +710,7 @@ fn send_file_logs_a_second_hello_world() {
     let frame = daemon.dir.path().join("frame.json");
     std::fs::write(
         frame.reference(),
-        "{\"kind\":\"IncomingEvent.HelloWorld\"}\n",
+        "{\"kind\":\"IsographEvent.HelloWorld\"}\n",
     )
     .expect("a test can write a frame");
     let sent = daemon.isograph(["send", "--file", frame.to_str().expect("utf-8")].reference());

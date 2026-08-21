@@ -1,6 +1,6 @@
 # Filesystem events, the CLI, config globs, and the watcher
 
-Requires event-loop.md (landed), send-events.md, `docs-website/docs/design-docs/event-model.md`, and config-discovery.md. The daemon already recvs, calls `handle`, performs effects, listens on the event socket, and `isograph send` writes one `IncomingEvent` frame. This file adds disk facts, config `includes`, `Presence`, and the watcher. Four shippable changes after send-events.md.
+Requires event-loop.md (landed), send-events.md, `docs-website/docs/design-docs/event-model.md`, and config-discovery.md. The daemon already recvs, calls `handle`, performs effects, listens on the event socket, and `isograph send` writes one `IsographEvent` JSON frame. This file adds disk facts, config `includes`, `Presence`, and the watcher. Four shippable changes after send-events.md.
 
 The watcher posts in-process. It does not run `isograph send` and it does not write to the event socket. The CLI and the socket are a separate source of the same event type. `isograph send` is send-events.md.
 
@@ -11,7 +11,7 @@ After change 2:
 ```
 $ isograph start
 $ isograph send <<'EOF'
-{"kind":"IncomingEvent.DiskChanged","value":{"path":"/tmp/proj/src/a.ts","contents":"export const a = 1;\n"}}
+{"kind":"IsographEvent.DiskChanged","value":{"path":"/tmp/proj/src/a.ts","contents":"export const a = 1;\n"}}
 EOF
 $ isograph logs
 {"timestamp":"...","level":"INFO","fields":{"message":"disk changed","path":"/tmp/proj/src/a.ts","file_count":1}}
@@ -34,19 +34,24 @@ send-events.md already recvs, performs, and listens. This change adds `DiskChang
 
 Most important first.
 
-Origin: send-events.md `IsographEvent` / `IncomingEvent`. Delta: `DiskChanged` beside `HelloWorld`.
+Origin: send-events.md `IsographEvent`. Delta: `DiskChanged` beside `HelloWorld`. `DiskChanged` is `Serialize` + `Deserialize`.
 
 ```rust
 // from crates/isograph_cli/src/event.rs
 use std::path::PathBuf;
 
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[serde(tag = "kind", content = "value")]
 pub enum IsographEvent {
+    #[serde(rename = "IsographEvent.HelloWorld")]
     HelloWorld,
+    #[serde(rename = "IsographEvent.Quit")]
     Quit,
+    #[serde(rename = "IsographEvent.DiskChanged")]
     DiskChanged(DiskChanged),
 }
 
-#[derive(serde::Deserialize, Debug)]
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct DiskChanged {
     pub path: PathBuf,
     pub contents: String,
@@ -89,31 +94,7 @@ impl IsographState {
 
 Origin: send-events.md / event-loop.md `handle`. Delta: `files` and a `DiskChanged` arm. `BTreeMap` so a log of the map is sorted. A second event for the same path replaces the contents. There is no way to remove a path yet. `DiskChanged` returns no effects this change. The `disk changed` log for the e2e is change 2.
 
-```rust
-// from crates/isograph_cli/src/external.rs
-use tokio::sync::mpsc::UnboundedSender;
-use tracing::warn;
-
-use crate::event::{DiskChanged, IsographEvent};
-
-#[derive(serde::Deserialize, Debug)]
-#[serde(tag = "kind", content = "value")]
-pub enum IncomingEvent {
-    #[serde(rename = "IncomingEvent.DiskChanged")]
-    DiskChanged(DiskChanged),
-}
-
-pub fn on_message(text: &str, event_tx: &UnboundedSender<IsographEvent>) {
-    match serde_json::from_str::<IncomingEvent>(text) {
-        Ok(IncomingEvent::DiskChanged(change)) => {
-            let _ = event_tx.send(IsographEvent::DiskChanged(change));
-        }
-        Err(e) => warn!(error = %e, frame = text, "undeserializable frame"),
-    }
-}
-```
-
-`DiskChanged` derives `Deserialize`. `IsographEvent` does not. The socket, `IsographArgs.port`, `listen`, the port file, and `select!` are send-events.md. This change does not replace them.
+`on_message` is send-events.md: `from_str::<IsographEvent>`. No new arm. `DiskChanged` is `Serialize` + `Deserialize`.
 
 The socket, `IsographArgs.port`, `listen`, the port file, and `select!` stay as send-events.md left them.
 
@@ -130,8 +111,7 @@ In `state.rs`:
 
 In `external.rs`:
 
-- A `IncomingEvent.DiskChanged` frame with `path` and `contents` deserializes.
-- `{"kind":"IncomingEvent.Quit","value":null}` does not deserialize.
+- A `IsographEvent.DiskChanged` frame with `path` and `contents` round-trips.
 - `{"kind":"IsographEvent.DiskChanged",...}` does not deserialize.
 - `"not json"` does not deserialize.
 
@@ -143,48 +123,13 @@ The e2e crate does not yet send; that is change 2. Existing start/status/logs/st
 
 ## Change 2: send `DiskChanged`
 
-`isograph send`, the socket, the port file, and `IncomingEvent` are send-events.md. This change adds `IncomingEvent.DiskChanged` to that vocabulary and an e2e that sends it.
+`isograph send`, the socket, and the port file are send-events.md. This change adds `IsographEvent.DiskChanged` and an e2e that sends it.
 
-Origin of the verb: send-events.md. Delta: a `DiskChanged` frame instead of `HelloWorld`.
-
-### CLI shape
-
-Already send-events.md. `SendArgs` does not change.
-
-```rust
-// from crates/isograph_cli/src/external.rs
-#[derive(serde::Deserialize, Debug)]
-#[serde(tag = "kind", content = "value")]
-pub enum IncomingEvent {
-    #[serde(rename = "IncomingEvent.HelloWorld")]
-    HelloWorld,
-    #[serde(rename = "IncomingEvent.DiskChanged")]
-    DiskChanged(DiskChanged),
-}
-```
-
-```rust
-// from crates/isograph_cli/src/external.rs
-pub fn on_message(text: &str, event_tx: &UnboundedSender<IsographEvent>) {
-    match serde_json::from_str::<IncomingEvent>(text) {
-        Ok(IncomingEvent::HelloWorld) => {
-            let _ = event_tx.send(IsographEvent::HelloWorld);
-        }
-        Ok(IncomingEvent::DiskChanged(change)) => {
-            let _ = event_tx.send(IsographEvent::DiskChanged(change));
-        }
-        Err(e) => warn!(error = %e, frame = text, "undeserializable frame"),
-    }
-}
-```
-
-Origin: send-events.md `IncomingEvent`. Delta: `DiskChanged` beside `HelloWorld`.
+Origin of the verb: send-events.md. Delta: a `DiskChanged` frame instead of `HelloWorld`. `on_message` does not change.
 
 ### Tests
 
-In `external.rs`: a `IncomingEvent.DiskChanged` frame with `path` and `contents` deserializes. Quit still does not.
-
-A tokio test in `crates/isograph_cli/tests/socket.rs`: send one `DiskChanged` frame, `event_rx.try_recv()` is `DiskChanged` with that path and contents.
+A `IsographEvent.DiskChanged` frame with `path` and `contents` round-trips. A tokio test in `crates/isograph_cli/tests/socket.rs`: send one `DiskChanged` frame, `event_rx.try_recv()` is `DiskChanged` with that path and contents.
 
 E2E in `crates/ts_graphql_react_isograph_cli/tests/cli.rs`:
 
@@ -566,8 +511,8 @@ The log line gains `presence` (`present` / `absent`).
 Wire frames change. Change 2's `{"path","contents"}` no longer deserializes.
 
 ```json
-{"kind":"IncomingEvent.DiskChanged","value":{"path":"/tmp/proj/src/a.ts","presence":{"Present":{"contents":"export const a = 1;\n"}}}}
-{"kind":"IncomingEvent.DiskChanged","value":{"path":"/tmp/proj/src/a.ts","presence":"Absent"}}
+{"kind":"IsographEvent.DiskChanged"},"value":{"path":"/tmp/proj/src/a.ts","presence":{"Present":{"contents":"export const a = 1;\n"}}}}
+{"kind":"IsographEvent.DiskChanged"},"value":{"path":"/tmp/proj/src/a.ts","presence":"Absent"}}
 ```
 
 A move is two frames, in that order: `Absent` of `from`, `Present` of `to`.
@@ -583,7 +528,7 @@ Tests in `state.rs`:
 - `Present` of an empty string is present, not absent.
 - Two events `Absent` then `Present` on different paths is a move: old path gone, new path present with those contents.
 
-`on_message` still has one `IncomingEvent` arm. `Presence` derives `Deserialize`.
+`on_message` is still `from_str::<IsographEvent>`. `Presence` is `Serialize` + `Deserialize`.
 
 ## Change 5: the watcher
 
