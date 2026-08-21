@@ -4,7 +4,7 @@
 
 A client that does not advertise `multilineTokenSupport` clips a token at the end of the line (LSP 3.17). VS Code does not advertise it. So an isograph token whose span contains a line break becomes one LSP token per line of text. `single_line_pieces` cuts one isograph token into a non-empty `Vec` of single-line spans, or `EncodeError::NoText`. `lsp_semantic_tokens` does `extend(single_line_pieces(...)?.into_iter().map(encode_piece))`.
 
-`LineIndex` records every line-break index in `page_content` once. Spans are file-absolute, mutually exclusive, ordered, in range, on char boundaries, and not strictly inside a line break. A violation is `EncodeError`. The caller rebases a literal-relative span with `with_offset` before concatenating literals. The server (lsp-semantic-tokens.md) logs the error and answers with empty tokens.
+`LineIndex` records every line-break index in `page_content` once. Spans are offsets into `page_content`, mutually exclusive, ordered, in range, on char boundaries, and not strictly inside a line break. A violation is `EncodeError`. When concatenating literals from a file, the caller rebases each parse with `with_offset`. Tests pass a literal as the whole `page_content`. The server (lsp-semantic-tokens.md) logs the error and answers with empty tokens.
 
 Origin: `crates/isograph_lsp/src/semantic_tokens.rs` and `crates/isograph_lang_types/src/semantic_token_legend/mod.rs` in isograph. This crate is `crates/isograph_lsp`. It does not start the server. lsp-semantic-tokens.md adds `file_literals` and the stdio loop, and calls the functions here.
 
@@ -27,16 +27,13 @@ use prelude::Postfix;
 use span::{Span, WithSpan, WithSpanPostfix};
 use thiserror::Error;
 
-/// File-absolute parser tokens as LSP semantic-token deltas.
+/// Parser tokens whose spans are byte offsets into `page_content`.
 pub fn lsp_semantic_tokens(
     tokens: &[WithSpan<IsographSemanticToken>],
     page_content: &str,
 ) -> Result<Vec<lsp_types::SemanticToken>, EncodeError> {
     let index = LineIndex::new(page_content);
-    // Split consumes a piece's trailing break before encode reads that piece's
-    // start, so they cannot share a cursor.
-    let mut split_cursor = index.cursor();
-    let mut encode_cursor = index.cursor();
+    let mut cursor = index.cursor();
     // `last`: previous piece start (LSP deltas are start-to-start).
     // `last_span_end`: previous parser token end (overlap).
     let mut last = Position { line: 0, col: 0 };
@@ -46,11 +43,9 @@ pub fn lsp_semantic_tokens(
         index.check_span(token.location, last_span_end)?;
         last_span_end = token.location.end;
         encoded.extend(
-            single_line_pieces(*token, &mut split_cursor)?
+            single_line_pieces(*token, &mut cursor)?
                 .into_iter()
-                .map(|piece| {
-                    encode_piece(piece, &mut last, &mut encode_cursor, page_content)
-                }),
+                .map(|piece| encode_piece(piece, &mut last, page_content)),
         );
     }
     encoded.wrap_ok()
@@ -62,7 +57,7 @@ pub fn lsp_semantic_tokens(
 fn single_line_pieces(
     token: WithSpan<IsographSemanticToken>,
     cursor: &mut LineCursor,
-) -> Result<Vec<WithSpan<IsographSemanticToken>>, EncodeError> {
+) -> Result<Vec<SingleLinePiece>, EncodeError> {
     let mut piece_start = token.location.start;
     let mut pieces = Vec::new();
     while piece_start < token.location.end {
@@ -85,7 +80,12 @@ fn single_line_pieces(
             Some(line_break) => line_break.start,
             None => token.location.end,
         };
-        pieces.push(token.item.with_span(Span::new(piece_start, piece_end)));
+        // Position now, before `advance_break` moves the cursor past this line.
+        let position = cursor.position(piece_start);
+        pieces.push(SingleLinePiece {
+            token: token.item.with_span(Span::new(piece_start, piece_end)),
+            position,
+        });
         match line_break_in_span {
             Some(line_break) => {
                 piece_start = line_break.after;
@@ -104,27 +104,32 @@ fn single_line_pieces(
     pieces.wrap_ok()
 }
 
+struct SingleLinePiece {
+    token: WithSpan<IsographSemanticToken>,
+    position: Position,
+}
+
 /// LSP deltas are from `last`, the previous piece's start, not its end.
 fn encode_piece(
-    piece: WithSpan<IsographSemanticToken>,
+    piece: SingleLinePiece,
     last: &mut Position,
-    cursor: &mut LineCursor,
     page_content: &str,
 ) -> lsp_types::SemanticToken {
-    let position = cursor.position(piece.location.start);
-    let length = utf16_units(&page_content[piece.location.as_usize_range()]);
+    let length = utf16_units(&page_content[piece.token.location.as_usize_range()]);
     // Same line: column minus `last.col`. New line: column on this line.
-    let relative_to_previous = match position.line - last.line {
-        0 => RelativeToPrevious::SameLine(SameLine(position.col - last.col)),
+    let relative_to_previous = match piece.position.line - last.line {
+        0 => RelativeToPrevious::SameLine(SameLine(
+            piece.position.col - last.col,
+        )),
         delta_line => RelativeToPrevious::MultiLine(MultiLine {
             delta_line,
-            offset_on_line: position.col,
+            offset_on_line: piece.position.col,
         }),
     };
-    *last = position;
+    *last = piece.position;
     convert_to_lsp_semantic_token(
         length,
-        lsp_type_index(piece.item),
+        lsp_type_index(piece.token.item),
         relative_to_previous,
     )
 }
@@ -373,8 +378,6 @@ fn utf16_units(text: &str) -> u32 {
 }
 ```
 
-`split_cursor` and `encode_cursor` cannot be one cursor: split consumes a piece's trailing break before encode reads that piece's start.
-
 Parser leftover skips `LineBreak` (`leftover_token` returns `None`), so a line-break-only span is not parse output. `NoText` is a caller concat bug, same class as `InsideLineBreak`: `page = "a\r\nb"` with tokens `[0..1, 2..3]` is ordered and exclusive, and offset 2 sits inside `{ start: 1, after: 3 }`.
 
 `position` runs after `check_span`, so `line_start..offset` is in range and on a char boundary.
@@ -448,7 +451,7 @@ Checked against the LSP 3.17 encoding: five integers per token; `deltaLine` is l
 Deltas from that extract:
 
 - `LineIndex` holds every break. `LineCursor` walks it forward (`break_index` is the line). Origin materializes `AbsoluteIsographSemanticToken` then delta-encodes from `last_token_start`. There is no `AbsoluteToken`, no `partition_point` per piece.
-- `token` is `&WithSpan<IsographSemanticToken>`. Span is file-absolute. The caller applied `with_offset(extraction_span.start)` when the parse was literal-relative.
+- `token` is `&WithSpan<IsographSemanticToken>`. Span is an offset into `page_content`. When concatenating literals, the caller applied `with_offset(extraction_span.start)`.
 - `token_type` is `lsp_type_index(token.item)`, not a field on the parser token. `lsp_type_index` is private.
 - Origin `split_inclusive('\n')` kept the line break in `line_text`, so `len` included `\n` and the client may discard the token. Origin also treated only `\n` as a break. `line_breaks` records `\r\n` then `\n` then `\r`; `length` is the text before the break.
 - Split is `single_line_pieces`, then `encode_piece` per piece. Origin fused those. Origin's empty `split_inclusive` chunk still produced a token whose `len` was the newline. Empty or line-break-only is `NoText`.
@@ -578,7 +581,7 @@ pub use semantic_tokens::{
 };
 ```
 
-`single_line_pieces`, `encode_piece`, `convert_to_lsp_semantic_token`, `RelativeToPrevious`, `SameLine`, `MultiLine`, `LineIndex`, `LineCursor`, `Position`, `LineBreak`, `line_breaks`, `utf16_units`, `lsp_type_index`, `legend_index` stay in the module. Tests in that module call them. `legend_index` `expect`s that `LEGEND_TOKEN_TYPES` lists every type the match names.
+`single_line_pieces`, `SingleLinePiece`, `encode_piece`, `convert_to_lsp_semantic_token`, `RelativeToPrevious`, `SameLine`, `MultiLine`, `LineIndex`, `LineCursor`, `Position`, `LineBreak`, `line_breaks`, `utf16_units`, `lsp_type_index`, `legend_index` stay in the module. Tests in that module call them. `legend_index` `expect`s that `LEGEND_TOKEN_TYPES` lists every type the match names.
 
 ## Tests
 
@@ -595,8 +598,8 @@ mod tests {
 
     use super::{
         EncodeError, InsideLineBreak, LineBreak, LineIndex, NotCharBoundary, OutOfRange,
-        Overlap, Position, SpanEnds, line_breaks, lsp_semantic_tokens, lsp_type_index,
-        semantic_token_legend, single_line_pieces,
+        Overlap, Position, SingleLinePiece, SpanEnds, line_breaks, lsp_semantic_tokens,
+        lsp_type_index, semantic_token_legend, single_line_pieces,
     };
 
     const STRING: u32 = 18;
@@ -646,7 +649,7 @@ mod tests {
     fn pieces(
         tokens: &[WithSpan<IsographSemanticToken>],
         page_content: &str,
-    ) -> Vec<WithSpan<IsographSemanticToken>> {
+    ) -> Vec<SingleLinePiece> {
         let index = LineIndex::new(page_content);
         let mut cursor = index.cursor();
         let mut last_span_end = 0u32;
