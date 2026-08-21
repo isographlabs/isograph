@@ -22,14 +22,14 @@ Each seam is a trait, which is the case AGENTS.md reserves traits for: a boundar
 
 - The literal grammar and `isograph_parser`. The language of the literal is the product; every profile parses the same literals into the same trees.
 - The compiler's own model of a project between parsing and generation: the parsed literals, the validated selections. Protocol and generation plug into that model; they do not each get their own.
-- pico sits above the seams: a seam implementor is a deterministic pure function of its inputs, so its results can live behind memoization. An implementor that reads the filesystem or the clock inside the seam breaks that; reading the world happens in the daemon's sources and effects (`event-model.md`), never inside a seam.
-- The daemon and CLI library are profile-agnostic. `IsographRequest` and dispatch never name a profile; a binary gets the whole lifecycle, socket, and LSP surface by composing its profile into `isograph_cli::IsographCli::run`.
+- pico sits above the seams: a seam implementor is a deterministic pure function of its inputs, so its results can live behind memoization. An implementor that reads the filesystem or the clock inside the seam breaks that; reading the world happens in the daemon's sources and effects (`docs-website/docs/design-docs/event-model.md`), never inside a seam.
+- The daemon and CLI library are profile-agnostic. `IsographEvent` and `handle` never name a profile; a binary gets the whole lifecycle, socket, and LSP adapter by composing its profile into the daemon. Generation returns `Vec<Artifact>`; `WriteArtifacts` is the effect that writes them.
 
 ## The boundary types
 
 ### Extraction
 
-The extraction seam is `HostLanguage` in extract-iso-literals.md, in `crates/isograph_compiler`. `extract_iso_literals` finds iso literals in a file and returns `WithErrors` (`item` / `errors`). `item` is `WithSpan<(&str, THostLanguage::LiteralContext)>`. The first implementor is `TypeScriptHostLanguage` in `isograph_extract_typescript`. File extensions for the watcher stay a later field on that trait.
+The extraction seam is `HostLanguage` in `crates/isograph_compiler` (landed). `extract_iso_literals` finds iso literals in a file and returns `WithErrors` (`item` / `errors`). `item` is `WithSpan<(&str, THostLanguage::LiteralContext)>`. The first implementor is `TypeScriptHostLanguage` in `isograph_extract_typescript`. Which files are walked is config `includes` (filesystem-events.md). File extensions as a field on `HostLanguage` stay later.
 
 ### NetworkProtocol
 
@@ -107,11 +107,11 @@ isograph_lsp, isograph_cli
 ts_graphql_react_isograph_cli
 ```
 
-`crates/isograph_compiler`: the seam traits, the boundary types, the fixed project model, and the pipeline. Depends on `isograph_parser`; contains no implementor. extract-iso-literals.md creates this crate with `HostLanguage` only.
+`crates/isograph_compiler`: the seam traits, the boundary types, the fixed project model, and the pipeline. Depends on `isograph_parser`; contains no implementor. `HostLanguage` already lives here.
 
 `crates/isograph_extract_typescript`, `crates/isograph_protocol_graphql`, `crates/isograph_generate_typescript`: the first implementor of each seam, one crate each, none depending on another.
 
-`crates/isograph_cli`: library. Bootstraps the daemon, lifecycle verbs, and LSP given a `Profile`. Depends on `isograph_compiler` and `isograph_lsp`. Does not depend on any implementor crate. Does not name TypeScript, GraphQL, or React.
+`crates/isograph_cli`: library. Bootstraps the daemon, lifecycle verbs, the event socket, and the LSP adapter given a `Profile`. Depends on `isograph_compiler` and on `isograph_lsp` for `file_literals` and token encoding, not for a standalone stdio server. Does not depend on any implementor crate. Does not name TypeScript, GraphQL, or React. `isograph lsp` is a stdio proxy onto the adapter (`docs-website/docs/design-docs/event-model.md`).
 
 ```rust
 // from crates/isograph_cli/src/lib.rs
@@ -130,7 +130,7 @@ where
     TGenerate: GenerateArtifacts,
 {
     pub fn run(self) -> ExitCode {
-        // clap, freddie lifecycle verbs, `isograph lsp` -> isograph_lsp::start(self.profile.extract)
+        // clap, freddie lifecycle verbs, daemon owns handle + adapter; `isograph lsp` is the stdio proxy
     }
 }
 ```
@@ -188,30 +188,7 @@ The crate split is ts-graphql-react-isograph-cli.md. After that doc, `isograph_c
 
 A wrapper outside this repo is the same shape as `ts_graphql_react_isograph_cli` with a different profile and a different `App::NAME`. Nothing in `isograph_compiler`, `isograph_cli`, or `isograph_lsp` knows whether it is running inside `ts_graphql_react_isograph_cli` or inside a wrapper.
 
-lsp-semantic-tokens.md is the first doc that needs a binary to name `TypeScriptHostLanguage`. Until `NetworkProtocol` and `GenerateArtifacts` exist, `IsographCli` is generic over `THostLanguage` only:
-
-```rust
-// from crates/isograph_cli/src/lib.rs (lsp-semantic-tokens.md)
-pub struct IsographCli<THostLanguage: HostLanguage> {
-    pub host: THostLanguage,
-}
-
-impl<THostLanguage: HostLanguage> IsographCli<THostLanguage> {
-    pub fn run(self) -> ExitCode {
-        // `isograph lsp` -> isograph_lsp::start(self.host)
-    }
-}
-```
-
-```rust
-// from crates/ts_graphql_react_isograph_cli/src/main.rs (lsp-semantic-tokens.md)
-fn main() -> ExitCode {
-    IsographCli {
-        host: TypeScriptHostLanguage,
-    }
-    .run()
-}
-```
+The daemon is the process that names the profile. `file_literals` and the encoder (lsp-semantic-tokens.md changes 1–2, lsp-semantic-token-encoding.md) take `THostLanguage` and run inside the adapter. lsp-semantic-tokens.md change 3's standalone `isograph_lsp::start` stdio loop is not the process model. Until `NetworkProtocol` and `GenerateArtifacts` exist, the daemon is generic over `THostLanguage` only.
 
 ## Open questions
 
@@ -219,4 +196,4 @@ fn main() -> ExitCode {
 - `App::NAME` is `"isograph"` on the `Isograph` impl in `isograph_cli`. A second in-process wrapper cannot share that daemon lock. The name becomes data the binary supplies when a second binary exists.
 - `FrameworkBindings`: data on the generator (current position), a second trait, or a closed enum. Data keeps out-of-tree frameworks possible without a trait; the generation doc decides when the real fields exist.
 - Artifact kinds: whether a generator's output set is fixed per generator or independently toggleable (a user who wants readers but not entrypoints). Currently fixed per generator.
-- Whether `source_extensions` belongs on `ExtractLiterals` or file discovery moves wholly into the extraction seam (an input language where "which files" is not an extension check, like literals in markdown code fences, would force the latter).
+- Whether `source_extensions` belongs on `HostLanguage` or file discovery stays wholly in config `includes` (filesystem-events.md). An input language where "which files" is not an extension check, like literals in markdown code fences, would force discovery into the extraction seam.

@@ -1,6 +1,6 @@
 # Filesystem events, the CLI, config globs, and the watcher
 
-Requires event-model.md and config-discovery.md. Four shippable changes. After the fourth, `isograph logs` on a watched project shows the path-to-contents map, and CI drives the same `handle` through `isograph send` without touching the watcher.
+Requires `docs-website/docs/design-docs/event-model.md` and config-discovery.md. Four shippable changes. This slice implements `DiskChanged` only. `EditorChanged`, `OpenFile`, and effects are later slices in `refactors/pending/event-model.md`. After the fourth change, `isograph logs` on a watched project shows the path-to-contents map, and CI drives the same `handle` through `isograph send` without touching the watcher.
 
 The watcher posts in-process. It does not run `isograph send` and it does not write to the event socket. The CLI and the socket are a separate source of the same `DiskChanged` type.
 
@@ -45,11 +45,11 @@ pub enum IsographEvent {
 #[derive(serde::Deserialize, Debug)]
 pub struct DiskChanged {
     pub path: PathBuf,
-    pub presence: PathPresence,
+    pub presence: Presence,
 }
 
 #[derive(serde::Deserialize, Debug)]
-pub enum PathPresence {
+pub enum Presence {
     Present(Present),
     Absent,
 }
@@ -65,7 +65,7 @@ pub struct Present {
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use crate::event::{DiskChanged, IsographEvent, PathPresence};
+use crate::event::{DiskChanged, IsographEvent, Presence};
 
 pub struct IsographState {
     pub files: BTreeMap<PathBuf, String>,
@@ -86,11 +86,11 @@ impl IsographState {
 
     fn handle_disk_changed(&mut self, change: &DiskChanged) {
         match &change.presence {
-            PathPresence::Present(present) => {
+            Presence::Present(present) => {
                 self.files
                     .insert(change.path.clone(), present.contents.clone());
             }
-            PathPresence::Absent => {
+            Presence::Absent => {
                 self.files.remove(change.path.reference());
             }
         }
@@ -126,7 +126,7 @@ pub fn on_message(text: &str, event_tx: &UnboundedSender<IsographEvent>) {
 }
 ```
 
-`DiskChanged` and `PathPresence` derive `Deserialize` (and `Serialize` is not required). `IsographEvent` does not derive `Deserialize`.
+`DiskChanged` and `Presence` derive `Deserialize` (and `Serialize` is not required). `IsographEvent` does not derive `Deserialize`.
 
 ```rust
 // from crates/isograph_cli/src/lib.rs
@@ -161,7 +161,7 @@ use tokio::sync::mpsc::unbounded_channel;
 use tracing::{error, info};
 
 use crate::discover::{self, ConfigFlag};
-use crate::event::{IsographEvent, PathPresence};
+use crate::event::{IsographEvent, Presence};
 use crate::external::on_message;
 use crate::state::IsographState;
 use crate::{Filesystem, IsographArgs};
@@ -230,8 +230,8 @@ async fn serve(
         match &event {
             IsographEvent::DiskChanged(change) => {
                 let presence = match change.presence {
-                    PathPresence::Present(_) => "present",
-                    PathPresence::Absent => "absent",
+                    Presence::Present(_) => "present",
+                    Presence::Absent => "absent",
                 };
                 state.handle(&event);
                 info!(
@@ -271,7 +271,7 @@ freddie_event_socket = { git = "https://github.com/freddiehg/freddie", rev = "af
 tokio = { workspace = true }
 ```
 
-Same rev as `freddie_cli`. After the `local_addr` prefactor, the rev is the commit that landed it. serde is already a dependency. `DiskChanged` needs `Deserialize` on `PathBuf` (serde's) and on `PathPresence`.
+Same rev as `freddie_cli`. After the `local_addr` prefactor, the rev is the commit that landed it. serde is already a dependency. `DiskChanged` needs `Deserialize` on `PathBuf` (serde's) and on `Presence`.
 
 `event.rs`, `state.rs`, `external.rs`, `daemon.rs` are new modules, declared in `lib.rs`.
 
@@ -879,7 +879,7 @@ use prelude::Postfix;
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{info, warn};
 
-use crate::event::{DiskChanged, IsographEvent, PathPresence, Present};
+use crate::event::{DiskChanged, IsographEvent, Presence, Present};
 use crate::scope::SourceScope;
 
 const DEBOUNCE: Duration = Duration::from_millis(50);
@@ -1062,7 +1062,7 @@ fn on_maybe_absent(event_tx: &UnboundedSender<IsographEvent>, path: &Path) {
         event_tx,
         DiskChanged {
             path,
-            presence: PathPresence::Absent,
+            presence: Presence::Absent,
         },
     );
 }
@@ -1079,7 +1079,7 @@ fn post_present(event_tx: &UnboundedSender<IsographEvent>, path: &Path) {
         event_tx,
         DiskChanged {
             path: path.to_owned(),
-            presence: PathPresence::Present(Present { contents }),
+            presence: Presence::Present(Present { contents }),
         },
     );
 }

@@ -1,10 +1,8 @@
 # LSP semantic tokens
 
-Requires extract-iso-literals.md. Opening a JavaScript or TypeScript file in VS Code colors the contents of each `iso(\`...\`)` (and `iso\`...\``) according to the grammar: `field` / `entrypoint` / `to` as keywords, type names as classes, field and selection names as properties, and so on.
+Requires `HostLanguage` in `crates/isograph_compiler` (landed). Opening a JavaScript or TypeScript file in VS Code colors the contents of each `iso(\`...\`)` (and `iso\`...\``) according to the grammar: `field` / `entrypoint` / `to` as keywords, type names as classes, field and selection names as properties, and so on.
 
-The VS Code extension already starts `isograph lsp` on those languages (`vscode-extension/src/languageClient.ts`). This doc makes that process a language server that answers `textDocument/semanticTokens/full`. The extension is unchanged.
-
-The server is isograph's LSP: stdio, `lsp-server` + `lsp-types`, full text-document sync, a semantic-tokens legend, `didOpen` / `didChange` / `didClose`, and the same absolutize-then-delta-encode walk as `crates/isograph_lsp/src/semantic_tokens.rs` in isograph. It has no pico, no schema, no file watcher. Open-file text is a `HashMap` keyed by URI string. `--config` is accepted so the extension's flag does not fail clap, and is unused.
+Changes 1–2 land: `file_literals` and the legend/absolutize walk. Change 3's standalone stdio `isograph lsp` loop is not the process in `docs-website/docs/design-docs/event-model.md`. The LSP adapter in the daemon calls these functions. `didOpen` / `didChange` / `didClose` become `EditorChanged`. `semanticTokens/full` is answered by the adapter reading `OpenFile` else `DiskFile`. The vscode-extension spawn of `isograph lsp` becomes the stdio proxy (`refactors/pending/event-model.md` item 6). Until that adapter exists, change 3 is not the next slice.
 
 ## What the user does
 

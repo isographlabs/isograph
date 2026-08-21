@@ -1,6 +1,6 @@
 # Zed and VS Code extensions
 
-Requires event-model.md. The editors talk to the multiplexer via `isograph lsp`. This doc is what each extension is, how highlighting works in each, and what CI can assert. It does not ship before the multiplexer and `isograph lsp` exist.
+Requires `docs-website/docs/design-docs/event-model.md`. The editors talk to the LSP adapter via `isograph lsp` (stdio proxy). This doc is what each extension is, how highlighting works in each, and what CI can assert. It does not ship before the adapter and the proxy exist (`refactors/pending/event-model.md` item 6).
 
 ## What the user does
 
@@ -190,10 +190,10 @@ Distribution:
 - VS Code: vsce / Open VSX, `publish-isograph-extension.yml`.
 - Zed: `zed-industries/extensions` submodule PR, or Install Dev Extension from a local folder.
 
-Process model once the multiplexer exists:
+Process model once the LSP adapter exists:
 
 - Both spawn `isograph lsp`.
-- That process is a stdio proxy onto the per-config daemon (event-model.md). Several editor windows share one compiler. Until that proxy exists, both spawns fail the same way.
+- That process is a stdio proxy onto the per-config daemon (`docs-website/docs/design-docs/event-model.md`). Several editor windows share one compiler. Until that proxy exists, both spawns fail the same way.
 
 ## Highlighting mechanism
 
@@ -221,7 +221,7 @@ Document that in the extension README. There is no extension API that turns sema
 What we can assert without an editor:
 
 - `handle` and `isograph send` (filesystem-events.md). Already on `cargo test` / `build-cli.yml`.
-- LSP: spawn `isograph lsp`, speak JSON-RPC, assert `initialize` capabilities include semantic tokens, `textDocument/didOpen` of a fixture, `textDocument/semanticTokens/full` returns a non-empty `data` whose first token_type is KEYWORD for a `field` literal. No VS Code, no Zed. This lands with the multiplexer doc. Encoding unit tests already live in lsp-semantic-token-encoding.md.
+- LSP: spawn `isograph lsp`, speak JSON-RPC, assert `initialize` capabilities include semantic tokens, `textDocument/didOpen` of a fixture, `textDocument/semanticTokens/full` returns a non-empty `data` whose first token_type is KEYWORD for a `field` literal. No VS Code, no Zed. This lands with the LSP adapter (`refactors/pending/event-model.md` item 6). Encoding unit tests already live in lsp-semantic-token-encoding.md.
 - VS Code extension: `npm run typecheck`, `npm run lint`, `npm run prettier-check` in `vscode-extension/`. Add a `ci.yml` job. Do not add `@vscode/test-electron`: it downloads Electron, needs a display, and tests the editor instead of the protocol.
 - Zed extension: `cargo check --target wasm32-wasip2 --manifest-path zed-extension/Cargo.toml`. Add the target in that job. This proves the wasm crate compiles. It does not prove Zed loads it.
 
@@ -238,7 +238,7 @@ Each is independently shippable.
 
 ### Change 1: `isograph lsp` as the stdio proxy
 
-Specified in event-model.md. The vscode-extension spawn starts working for whatever the multiplexer answers (semantic tokens first). No extension code change required if args stay `['lsp']` and optional `--config`.
+Specified in `docs-website/docs/design-docs/event-model.md`. The vscode-extension spawn starts working for whatever the adapter answers (semantic tokens first). No extension code change required if args stay `['lsp']` and optional `--config`.
 
 ### Change 2: VS Code CI job
 
