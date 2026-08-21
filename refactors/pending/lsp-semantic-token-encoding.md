@@ -35,6 +35,7 @@ pub fn lsp_semantic_tokens(
 ) -> Result<Vec<lsp_types::SemanticToken>, EncodeError> {
     let index = LineIndex::new(page_content);
     let mut cursor = index.cursor();
+    // Start of the previous emitted piece. (0, 0) before the first.
     let mut last = Pos { line: 0, col: 0 };
     let mut last_span_end = 0u32;
     let mut encoded: Vec<lsp_types::SemanticToken> = Vec::new();
@@ -45,7 +46,7 @@ pub fn lsp_semantic_tokens(
         let mut piece_start = span.start;
         while piece_start < span.end {
             let piece_pos = cursor.position(piece_start);
-            // UTF-16 column of this piece on the line it starts on.
+            // Column of this piece on the line it starts on.
             let offset_on_line = piece_pos.col;
             // An LSP token cannot include a line break.
             let piece_end = match cursor.break_before(span.end) {
@@ -57,6 +58,8 @@ pub fn lsp_semantic_tokens(
                     &page_content[(piece_start as usize)..(piece_end as usize)],
                 );
                 let token_type = lsp_type_index(token.item);
+                // Same line as the previous piece: wire delta_start is start-to-start.
+                // Later line: wire delta_start is offset_on_line (column on the line we landed on).
                 let lsp_semantic_token = match piece_pos.line - last.line {
                     0 => LspSemanticToken::SameLine(SameLine {
                         delta_start: offset_on_line - last.col,
@@ -71,6 +74,7 @@ pub fn lsp_semantic_tokens(
                     }),
                 };
                 encoded.push(lsp_semantic_token.to());
+                // Next delta is from this start, not from this end.
                 last = piece_pos;
             }
             match cursor.break_before(span.end) {
@@ -95,6 +99,7 @@ enum LspSemanticToken {
 }
 
 struct SameLine {
+    /// UTF-16 from the previous piece's start to this piece's start.
     delta_start: u32,
     length: u32,
     token_type: u32,
@@ -102,6 +107,7 @@ struct SameLine {
 
 struct MultiLine {
     delta_line: u32,
+    /// UTF-16 from column 0 of this piece's line to this piece's start.
     offset_on_line: u32,
     length: u32,
     token_type: u32,
@@ -119,6 +125,7 @@ impl From<LspSemanticToken> for lsp_types::SemanticToken {
             },
             LspSemanticToken::MultiLine(token) => lsp_types::SemanticToken {
                 delta_line: token.delta_line,
+                // After a line change the wire measures from column 0, not from the previous start.
                 delta_start: token.offset_on_line,
                 length: token.length,
                 token_type: token.token_type,
