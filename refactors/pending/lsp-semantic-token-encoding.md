@@ -21,7 +21,6 @@ Most important first.
 ```rust
 // from crates/isograph_lsp/src/semantic_tokens.rs
 use isograph_parser::SemanticToken;
-use lsp_types::SemanticToken as LspSemanticToken;
 use prelude::Postfix;
 use span::{Span, WithSpan};
 use thiserror::Error;
@@ -33,12 +32,12 @@ use thiserror::Error;
 pub fn lsp_semantic_tokens(
     tokens: &[WithSpan<SemanticToken>],
     page_content: &str,
-) -> Result<Vec<LspSemanticToken>, EncodeError> {
+) -> Result<Vec<lsp_types::SemanticToken>, EncodeError> {
     let index = LineIndex::new(page_content);
     let mut cursor = index.cursor();
     let mut last = Pos { line: 0, col: 0 };
     let mut last_span_end = 0u32;
-    let mut encoded = Vec::new();
+    let mut encoded: Vec<lsp_types::SemanticToken> = Vec::new();
     for token in tokens {
         let span = token.location;
         index.check_span(span, last_span_end)?;
@@ -52,20 +51,24 @@ pub fn lsp_semantic_tokens(
                 None => span.end,
             };
             if piece_end > piece_start {
-                let delta_line = start.line - last.line;
-                encoded.push(LspSemanticToken {
-                    delta_line,
-                    // Same line: start-to-start column. Otherwise column from 0.
-                    delta_start: match delta_line {
-                        0 => start.col - last.col,
-                        _ => start.col,
-                    },
-                    length: utf16_units(
-                        &page_content[(piece_start as usize)..(piece_end as usize)],
-                    ),
-                    token_type: lsp_type_index(token.item),
-                    token_modifiers_bitset: 0,
-                });
+                let length = utf16_units(
+                    &page_content[(piece_start as usize)..(piece_end as usize)],
+                );
+                let token_type = lsp_type_index(token.item);
+                let lsp_semantic_token = match start.line - last.line {
+                    0 => LspSemanticToken::SameLine(SameLine {
+                        delta_start: start.col - last.col,
+                        length,
+                        token_type,
+                    }),
+                    delta_line => LspSemanticToken::MultiLine(MultiLine {
+                        delta_line,
+                        delta_start: start.col,
+                        length,
+                        token_type,
+                    }),
+                };
+                encoded.push(lsp_semantic_token.to());
                 last = start;
             }
             match cursor.break_before(span.end) {
@@ -79,6 +82,47 @@ pub fn lsp_semantic_tokens(
         }
     }
     encoded.wrap_ok()
+}
+
+/// Relative to the previous piece. `SameLine` is start-to-start on this line.
+/// `MultiLine` is the previous piece on an earlier line; `delta_start` is the column from 0.
+enum LspSemanticToken {
+    SameLine(SameLine),
+    MultiLine(MultiLine),
+}
+
+struct SameLine {
+    delta_start: u32,
+    length: u32,
+    token_type: u32,
+}
+
+struct MultiLine {
+    delta_line: u32,
+    delta_start: u32,
+    length: u32,
+    token_type: u32,
+}
+
+impl From<LspSemanticToken> for lsp_types::SemanticToken {
+    fn from(token: LspSemanticToken) -> Self {
+        match token {
+            LspSemanticToken::SameLine(token) => lsp_types::SemanticToken {
+                delta_line: 0,
+                delta_start: token.delta_start,
+                length: token.length,
+                token_type: token.token_type,
+                token_modifiers_bitset: 0,
+            },
+            LspSemanticToken::MultiLine(token) => lsp_types::SemanticToken {
+                delta_line: token.delta_line,
+                delta_start: token.delta_start,
+                length: token.length,
+                token_type: token.token_type,
+                token_modifiers_bitset: 0,
+            },
+        }
+    }
 }
 
 /// Why `lsp_semantic_tokens` refused a span. Ordered and exclusive is not enough:
@@ -294,7 +338,7 @@ fn utf16_units(text: &str) -> u32 {
 
 `LineIndex` holds every break index from one scan of `page_content`. `LineCursor` walks that vec: `break_index` is the first break not yet passed. `position(offset)` advances while `after <= offset` (each such advance is one line). `break_before` peeks the current break if it starts before `span.end`. `advance_break` consumes it and moves to the next line. Tokens are in file order, so the cursor only moves forward. `break_index` is the line number after those advances.
 
-`last` is the previous piece's start `Pos`. Same-line `delta_start` is `start.col - last.col`. After a line break it is `start.col`. A blank line inside a span is `piece_end == piece_start`; nothing is emitted, then `advance_break` still runs, so the next `position` is on the following line.
+`last` is the previous piece's start `Pos`. `LspSemanticToken::SameLine` is start-to-start on this line. `MultiLine` is the previous piece on an earlier line; `delta_start` is the column from 0. `From` fills `delta_line: 0` on `SameLine` and `token_modifiers_bitset: 0` on both. A blank line inside a span is `piece_end == piece_start`; nothing is emitted, then `advance_break` still runs, so the next `position` is on the following line.
 
 `check_span` runs before any slice. Ordered exclusive spans are not enough: `page = "a\r\nb"` with tokens `[0..1, 2..3]` is ordered and exclusive, and offset 2 sits strictly inside the break `{ start: 1, after: 3 }`. Parser leftover skips `LineBreak` tokens, so this is a caller concat bug. `EncodeError` names it instead of panicking on `page_content[3..2]`.
 
@@ -500,7 +544,7 @@ pub use semantic_tokens::{
 };
 ```
 
-`LineIndex`, `LineCursor`, `Pos`, `LineBreak`, `line_breaks`, `utf16_units`, `lsp_type_index`, `legend_index` stay in the module. Tests in that module call them. `legend_index` `expect`s that `LEGEND_TOKEN_TYPES` lists every type the match names.
+`LspSemanticToken`, `SameLine`, `MultiLine`, `LineIndex`, `LineCursor`, `Pos`, `LineBreak`, `line_breaks`, `utf16_units`, `lsp_type_index`, `legend_index` stay in the module. Tests in that module call them. `legend_index` `expect`s that `LEGEND_TOKEN_TYPES` lists every type the match names.
 
 ## Tests
 
