@@ -44,7 +44,9 @@ pub fn lsp_semantic_tokens(
         last_span_end = span.end;
         let mut piece_start = span.start;
         while piece_start < span.end {
-            let start = cursor.position(piece_start);
+            let piece_pos = cursor.position(piece_start);
+            // UTF-16 column of this piece on the line it starts on.
+            let offset_on_line = piece_pos.col;
             // An LSP token cannot include a line break.
             let piece_end = match cursor.break_before(span.end) {
                 Some(line_break) => line_break.start,
@@ -55,21 +57,21 @@ pub fn lsp_semantic_tokens(
                     &page_content[(piece_start as usize)..(piece_end as usize)],
                 );
                 let token_type = lsp_type_index(token.item);
-                let lsp_semantic_token = match start.line - last.line {
+                let lsp_semantic_token = match piece_pos.line - last.line {
                     0 => LspSemanticToken::SameLine(SameLine {
-                        delta_start: start.col - last.col,
+                        delta_start: offset_on_line - last.col,
                         length,
                         token_type,
                     }),
                     delta_line => LspSemanticToken::MultiLine(MultiLine {
                         delta_line,
-                        col: start.col,
+                        offset_on_line,
                         length,
                         token_type,
                     }),
                 };
                 encoded.push(lsp_semantic_token.to());
-                last = start;
+                last = piece_pos;
             }
             match cursor.break_before(span.end) {
                 Some(line_break) => {
@@ -85,7 +87,8 @@ pub fn lsp_semantic_tokens(
 }
 
 /// Relative to the previous piece. `SameLine` is start-to-start on this line.
-/// `MultiLine` is the previous piece on an earlier line; `col` is UTF-16 from column 0.
+/// `MultiLine` is the previous piece on an earlier line; `offset_on_line` is this
+/// piece's UTF-16 column on the line we landed on (wire `delta_start`).
 enum LspSemanticToken {
     SameLine(SameLine),
     MultiLine(MultiLine),
@@ -99,7 +102,7 @@ struct SameLine {
 
 struct MultiLine {
     delta_line: u32,
-    col: u32,
+    offset_on_line: u32,
     length: u32,
     token_type: u32,
 }
@@ -116,7 +119,7 @@ impl From<LspSemanticToken> for lsp_types::SemanticToken {
             },
             LspSemanticToken::MultiLine(token) => lsp_types::SemanticToken {
                 delta_line: token.delta_line,
-                delta_start: token.col,
+                delta_start: token.offset_on_line,
                 length: token.length,
                 token_type: token.token_type,
                 token_modifiers_bitset: 0,
@@ -338,7 +341,7 @@ fn utf16_units(text: &str) -> u32 {
 
 `LineIndex` holds every break index from one scan of `page_content`. `LineCursor` walks that vec: `break_index` is the first break not yet passed. `position(offset)` advances while `after <= offset` (each such advance is one line). `break_before` peeks the current break if it starts before `span.end`. `advance_break` consumes it and moves to the next line. Tokens are in file order, so the cursor only moves forward. `break_index` is the line number after those advances.
 
-`last` is the previous piece's start `Pos`. `LspSemanticToken::SameLine` is start-to-start on this line (`delta_start`). `MultiLine` is the previous piece on an earlier line; `col` is UTF-16 from column 0 and becomes wire `delta_start`. `From` fills `delta_line: 0` on `SameLine` and `token_modifiers_bitset: 0` on both. A blank line inside a span is `piece_end == piece_start`; nothing is emitted, then `advance_break` still runs, so the next `position` is on the following line.
+`last` is the previous piece's start `Pos`. `offset_on_line` is this piece's UTF-16 column on the line it starts on. `SameLine` subtracts `last.col` (start-to-start). `MultiLine` keeps `offset_on_line` as-is: that is the offset on the line we landed on, and `From` writes it to wire `delta_start`. `From` fills `delta_line: 0` on `SameLine` and `token_modifiers_bitset: 0` on both. A blank line inside a span is `piece_end == piece_start`; nothing is emitted, then `advance_break` still runs, so the next `position` is on the following line.
 
 `check_span` runs before any slice. Ordered exclusive spans are not enough: `page = "a\r\nb"` with tokens `[0..1, 2..3]` is ordered and exclusive, and offset 2 sits strictly inside the break `{ start: 1, after: 3 }`. Parser leftover skips `LineBreak` tokens, so this is a caller concat bug. `EncodeError` names it instead of panicking on `page_content[3..2]`.
 
