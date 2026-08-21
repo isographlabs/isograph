@@ -705,7 +705,7 @@ dependencies = [
 [[package]]
 name = "freddie_cli"
 version = "0.0.1"
-source = "git+https://github.com/freddiehg/freddie?rev=c81e3782d53ca1775cbc761dab322f296d9b25a4#c81e3782d53ca1775cbc761dab322f296d9b25a4"
+source = "git+https://github.com/freddiehg/freddie?rev=af6b57df9732f42cde9bafc109bcf1b6a32f28e0#af6b57df9732f42cde9bafc109bcf1b6a32f28e0"
 dependencies = [
  "clap",
  "freddie_single_instance",
@@ -714,12 +714,13 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
 name = "freddie_single_instance"
 version = "0.0.1"
-source = "git+https://github.com/freddiehg/freddie?rev=c81e3782d53ca1775cbc761dab322f296d9b25a4#c81e3782d53ca1775cbc761dab322f296d9b25a4"
+source = "git+https://github.com/freddiehg/freddie?rev=af6b57df9732f42cde9bafc109bcf1b6a32f28e0#af6b57df9732f42cde9bafc109bcf1b6a32f28e0"
 
 [[package]]
 name = "from_variant"

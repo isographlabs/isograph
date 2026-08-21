@@ -6,7 +6,7 @@ license = { workspace = true }
 
 [dependencies]
 clap = { workspace = true }
-freddie_cli = { git = "https://github.com/freddiehg/freddie", rev = "c81e3782d53ca1775cbc761dab322f296d9b25a4" }
+freddie_cli = { git = "https://github.com/freddiehg/freddie", rev = "af6b57df9732f42cde9bafc109bcf1b6a32f28e0" }
 prelude = { path = "../prelude" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
