@@ -1,12 +1,12 @@
 # i2
 
-A re-implementation of isograph, rebuilt from the parser up. From upstream isograph we keep pico and pico_macros (unchanged), the swc plugin and its dependency chain (isograph_config, common_lang_types, string_key_newtype, prelude), resolve_position, the relay crates, the demos, the docs website, and the build process. The new work is `crates/isograph_parser` (the parser), `crates/tests` (its tests), `crates/isograph_cli` (freddie_cli's lifecycle verbs around the daemon), and `crates/ts_graphql_react_isograph_cli` (the `isograph` binary).
+From upstream isograph we keep pico and pico_macros (unchanged), the swc plugin and its dependency chain (isograph_config, common_lang_types, string_key_newtype, prelude), resolve_position, the relay crates, the demos, the docs website, and the build process. The new work is `crates/isograph_parser`, `crates/tests`, `crates/isograph_cli` (freddie_cli's lifecycle verbs around the daemon), and `crates/ts_graphql_react_isograph_cli` (the `isograph` binary).
 
-The parser does not use pico. The explicit assumption is that parsing a literal is trivially cheap and not worth memoizing; memoization applies above the parser (which files changed, which literals were extracted), and parser functions are plain functions over `&str`.
+The parser does not use pico. Parser functions are plain functions over `&str`. Memoization applies above the parser (which files changed, which literals were extracted).
 
 ## Mental model
 
-The schema data model is `docs-website/docs/design-docs/mental-model.md`. Read it before working on entities, entity declarations, wrappers, selectables, selectable declarations, selections, selection sets, or entrypoints.
+Schema data model: `docs-website/docs/design-docs/mental-model.md`. Read it before working on entities, entity declarations, wrappers, selectables, selectable declarations, selections, selection sets, or entrypoints.
 
 ## Commits
 
@@ -14,122 +14,109 @@ Commit after every change, small and atomically, without being asked. Each logic
 
 ## Memory
 
-Do not use Claude's persistent memory feature in this project: write no memory files, and disregard any recalled memories. Everything that governs work here lives in this file, in `docs-website/docs/design-docs/mental-model.md`, and in `refactors/`.
+No Claude memory files. Disregard recalled memories. Project rules live here, in `docs-website/docs/design-docs/mental-model.md`, and in `refactors/`.
 
 ## Refactor docs
 
-This section is extremely important. A frequent source of frustration is deviations from this protocol. Take it very seriously and frequently refresh your memory on how to write planning documents. 99% of our time is spent iterating on planning documents, so it is extremely important that you do this correctly.
+Plan in `refactors/`. Move `refactors/pending` to `refactors/past` when we will not work on it again. Do not modify `refactors/past/`.
 
-- The primary way we plan things is through documents in the `refactors/` folder.
-- Move a `refactors/pending` doc to `refactors/past` when we will not work on it in the future.
-- Each doc must, at all times that we are actively working on it, conform to several standards:
-  - It should describe what we are building. Do not discuss how we came to a conclusion, or what we are not building. Do not narrate your thought process. Do not discuss what has already landed.
-  - All big changes must be discussed, either in the document or with the user in chat. Any big change that surprises the user is an automatic reason to not proceed. YOU MUST RUN ALL BIG CHANGES BY THE USER, especially those that relate to "inner" or "core" or "reusable" code, or code that should exemplify best practices.
-  - It should have enough information for a new agent, with no context, to completely implement the feature **without making any important decisions.** All decisions are made as part of the planning document. Do not take shortcuts.
-  - Stubs, hand-waving, and "sketch this later" are disallowed. The planning document must be comprehensive: write out the real types, functions, call sites, and before/after snippets. If we do not actually write the stuff out, it is impossible to know whether the implementation is real or just fantasy.
-  - Every struct, enum, and other data type must be written out in full. The data layout is the most important thing to review; a prose description of the shape is not a substitute for the actual fields and variants.
-  - Every interface must be explicit: the functions, their signatures, who calls them, and what they return. The end-user experience must be written out too (what the user does, what they see), not left as a gloss on the code.
-  - Write out generated or expanded code only when the change touches the generating macro itself, or when the expansion is a novel shape the docs have not shown before. A derive whose expansion follows an already-established pattern needs no listing; the attribute changes at the derive site suffice.
-  - Mark every generated or expanded code block with a comment as its first line naming the generator, `// generated by $file` (for example `// generated by resolve_position_macros/src/resolve_position_macro.rs`), so hand-written and generated code cannot be confused.
-  - All changes should have before and after snippets. New functions, new structs, etc. should be written out in advance.
-  - When a doc extracts code from another doc or from landed code, it carries the extracted code verbatim, names its origin, and states its delta explicitly. Any unstated difference in an extraction is a defect, whatever its merits; a difference worth making is worth stating and getting reviewed as the delta.
-  - Every before or after snippet opens with a comment naming the file the code lives in, `// from $file` (for example `// from crates/isograph_parser/src/matched_brackets.rs`); generated code carries its `// generated by $file` marker instead.
-  - "Define before use" is an anti-pattern in listings of types: order structs, enums, and aliases from most important to least important, even when the most important one references leaf types defined further down.
-  - If you need to have an additional scratch pad, you may — but do not do that work within this repository, and do not check it in. Do not "write tests" for work that is still under active discussion.
-  - Paragraphs of text are useless. Prefer code snippets.
-  - Follow all coding standards listed below.
-- The docs may have two parts (which may be split across multiple docs):
-  - An overall discussion of the problem being worked on, and
-  - An ordered list of changes. Each change should be self-contained and independently shippable. It should be ordered such that early changes are prefactors that make the actual, consequential change as easy as possible.
-- When we are discussing a change, always try to identify independently shippable changes. If these changes are guaranteed (or nigh thereunto), then we can ship them as a prefactor, and thus limit the complexity of the actual change (and planning document).
-- When a doc is not being actively worked on, it may become stale. That is okay. It should be updated to not be stale when we start working on it in the future. In other words, if we are working on `A`, and `B` depends on `A`, we do not need to keep `B` up to date unless it's part of the discussion.
-- If a refactor is too large and should be broken up into smaller steps, let the user know, and do so. The files should be "conceptually different".
-- While we are iterating on a pending doc, stay in the doc. Start implementing only when the user gives explicit permission to implement. "Looks good," edits to the doc, "go on," "continue," or further planning discussion are not permission. If there is any ambiguity about whether implementation has been authorized, do not start implementing.
-- If, due to iteration or requirements changing, a previous requirement or goal becomes unachievable, RAISE THIS WITH THE USER.
-- Do not modify files in refactors/past/.
+An actively worked doc:
+
+- Describes what we are building. Not how we got there, what we are not building, thought process, or what has already landed.
+- Has every big change already discussed with the user (in the doc or in chat), especially inner/core/reusable code. A surprise is a reason not to proceed.
+- Is enough for a new agent to implement with no important decisions left. Write out every type in full (fields and variants, not a prose description), every function signature, who calls it, what it returns, and the end-user experience (what the user does and sees). No stubs. Before/after snippets for every change, including new types and functions.
+- Writes generated or expanded code only when changing the generator, or when the expansion is a novel shape. A derive that matches an established pattern needs only the attribute change. Generated blocks start with `// generated by $file`.
+- Copies extracted code verbatim, names the origin, and states the delta. An unstated difference is a defect.
+- Opens every snippet with `// from $file` (generated blocks use `// generated by $file` instead).
+- Orders types most important first, not define-before-use.
+- Prefers code snippets over paragraphs.
+- Follows the coding standards below.
+
+No scratch pad in this repo. No tests for work still under discussion.
+
+A doc may split into a problem discussion and an ordered list of independently shippable changes, prefactors first. Identify those and ship them as prefactors. If a refactor is too large, say so and split into conceptually different files.
+
+Stale is fine while a doc is idle. Update it when we start working on it. If we are working on `A` and `B` depends on `A`, do not keep `B` current unless `B` is in the discussion.
+
+Stay in the doc until the user gives explicit permission to implement. "Looks good," edits to the doc, "go on," "continue," and further planning are not permission. Ambiguity means do not implement.
+
+If a previous requirement becomes unachievable, raise it with the user.
 
 ## Implementing a refactor doc
 
-Implementation begins only after the explicit permission above. Starting an implementation is not a commitment to finish it no matter what the code turns out to say. The doc was written so that no important decisions are left to the implementer, so when you hit something the doc did not anticipate, the decision is still the user's to make, not yours to improvise.
+Stop and ask as soon as the doc stops matching the code. Fix the doc first.
 
-- Stop and ask as soon as the doc stops matching the code. A step that assumed a type, a call site, or an ownership arrangement that is not there is a defect in the doc, and the fix goes into the doc first.
-- The signal to stop is complexity, above all. If a step that read as small turns out to pull in a redesign, a new shared-state primitive, a new trait, or a change to a crate the doc never mentioned, that is exactly the case to raise rather than absorb quietly. Say what exploded and what the options are, and let the user pick.
-- `git stash` the half-finished work while we settle it, if that leaves a cleaner tree to discuss against. Say what you stashed and what state it is in, so nothing is lost while the doc is being corrected.
-- Do not paper over the gap by choosing the easy version, leaving a TODO, or narrowing the step so it fits. Those hide the decision instead of surfacing it.
+Stop on unexpected complexity: a redesign, a new shared-state primitive, a new trait, or a crate the doc never mentioned. Say what exploded and the options; the user picks.
+
+`git stash` half-finished work if that leaves a cleaner tree. Say what you stashed and its state.
+
+Do not paper over a gap by choosing the easy version, leaving a TODO, or narrowing the step so it fits.
 
 ## Tests
 
-- No snapshot tests. A snapshot pins the implementation's entire output, so it tests the implementation rather than the behavior: every refactor churns the snapshots, and a reviewer cannot tell an intended change from a regression by reading the diff.
-- Assert facts about the result instead. A test states what must be true of the output — this position sits in a matched section, this group has these children, this parse produced an error covering this span — and nothing else.
-- Test behavior, not implementation. If a test breaks under a refactor that preserves behavior, the test was asserting the wrong thing.
-- Fixtures are inputs only. Expected results live in the test as explicit assertions, never in checked-in expected-output files.
-- Tests may `expect` with a reason that names an invariant the test itself established (a fixture it built, an env the harness sets). Production code is not a test fixture.
-- An API that only tests call should not exist: delete it and assert on the real structures instead. A helper the tests genuinely need lives with the tests — in the tests crate or under `#[cfg(test)]` — never in the production surface.
+No snapshot tests; they pin implementation, not behavior. Assert facts about the result. Test behavior, not implementation.
+
+Fixtures are inputs only. Expected results are assertions in the test, never checked-in expected-output files.
+
+`expect` is allowed with a reason that names an invariant the test itself established (a fixture it built, an env the harness sets). Production code is not a test fixture.
+
+An API only tests call should not exist. A helper tests need lives in the tests crate or under `#[cfg(test)]`.
 
 ## Booleans
 
-`bool` is almost always the wrong reach. Prefer an enum whose variants name the states. A boolean is two anonymous cases; an enum makes those cases part of the type, so call sites match on meaning rather than on `true`/`false`, and a third state is a new variant instead of a second flag or a comment.
+Prefer an enum whose variants name the states. A `bool` field, parameter, or return type: question whether it is needed, default to the enum, and raise it with the user every time before it goes into a planning doc or into code. Name the `bool` and the two cases. Fall back to `bool` only when the value is a pure yes/no with no domain names.
 
-So when a design proposes a `bool` field, parameter, or return type, three things happen every time:
-
-- Question whether it is needed at all. Most of the time the two cases have names and belong as variants of an enum, not as `true`/`false` on a field called `is_*`.
-- Default to the enum. Write that version first and only fall back to a `bool` when the value is genuinely a pure yes/no with no domain names worth carrying — not merely because a flag is shorter to type.
-- Raise it with the user, every single time, before it goes into a planning doc or into code. There are no exceptions to this. Name the `bool`, say what the two cases mean, and wait for the user's decision if an enum is not the obvious replacement.
-
-This is the same maintainability rule as "make impossible states unrepresentable." A field that only exists when a flag is set is not `flag: bool` plus `payload: Option<T>`; it is `Option<T>`, or an enum with a payload-bearing variant. Two booleans that cannot both be true are not two fields; they are one enum.
+A field that exists only when a flag is set is `Option<T>` or an enum with a payload-bearing variant, not `flag: bool` plus `payload: Option<T>`. Two booleans that cannot both be true are one enum.
 
 ## unwrap, unreachable, Infallible
 
-`unwrap`, `expect`, `unreachable!`, `panic!`, `todo!`, `unimplemented!`, and `Infallible` (including a `Result<T, Infallible>` or any other type-level claim that a failure case cannot occur) are almost always the wrong reach. So when a design proposes any of these, three things happen every time:
+`unwrap`, `expect`, `unreachable!`, `panic!`, `todo!`, `unimplemented!`, and `Infallible` (including `Result<T, Infallible>`) are almost always the wrong reach. An `Option` or `Result` the body will always unwrap should not have been optional. A match arm that is always unreachable is a state the function should never have been handed. An `Infallible` error type is a `Result` that should not be a `Result`. Question whether it is needed, default to types that do not need it, and raise it with the user every time before it goes into a planning doc or into code. Name the construct, the invariant, and why the type system cannot express it.
 
-- Question whether it is needed at all. Most of the time the type is wrong. An `Option` or `Result` the body will always unwrap should not have been optional. A match arm that is always unreachable is a state the function should never have been handed. An `Infallible` error type is a `Result` that should not be a `Result`.
-- Default to the version that does not need it. Fix the types so the success path is the only path the compiler allows. Write that version first and only fall back to a panic or an infallibility claim when the non-panicking version is genuinely, provably impossible — not merely more work.
-- Raise it with the user, every single time, before it goes into a planning doc or into code. There are no exceptions to this. Name the construct, say what invariant it is asserting and why the type system cannot express that invariant, and wait for the user's decision.
-
-This is distinct from total handling of values the outside world owns. A parse of user-supplied source text, a file read, a socket read: those can fail for reasons the program does not control, and the response is a typed error or a recovered region — never a panic. The parser in particular never panics on any input; malformed input is a representable state.
+The parser never panics on any input. Malformed input is a representable state. Parses of user-supplied text, file reads, and socket reads return a typed error or a recovered region.
 
 ## Coding standards
 
-- Maintainability is the most important standard. And that specifically means one thing: make impossible states unrepresentable and use the correct underlying representation or building blocks. Prefer enums over booleans (see Booleans above). If a field is not used when a flag is one way or the other, use an `Option` or a sum type, not a `bool` plus a spare field.
-- We do not have anything we do not use. A token kind, field, variant, or recorded value exists only because something reads it. A semantic token, a span, or a resolve leaf is a reader only if the item carries information worth highlighting or hovering. An AST field is a reader only if resolve or a later pass uses it. Tests-only is not a reader.
-- A token that carries no semantic information is not recorded and is not a resolve leaf. Consume it if the parse needs the presence, and leave it off the child's span. A position on it resolves to the parent. `!` after a type decides Null vs not and is this case.
-- If we have to do extra refactoring work to maintain the above, we should do the extra work. If we need to refactor large parts of this repo in order to have the right building blocks, then we will do that.
-- Prefer the structurally correct solution to the easy one, even when the easy one is fast. Find the version that reuses the seams the code already has and generalizes to the next problem, and do the work to reach it; the right structure is what lets us build far more complicated things on top.
-- If we need a more performant, but less idiomatic impl, then create a newtype/struct/enum that encapsulates the ugly complexity but exposes an idiomatic API.
-- If a comment provides no more information than one would get by reading the code, do not include the comment.
-- A comment should not describe what wasn't done, ESPECIALLY if "we didn't do x" is more indicative of the fact that we either previously discussed doing X or in a previous iteration of a planning doc, you suggested doing X.
-- A comment must not describe what lives elsewhere unless a reader of this file has a concrete reason to expect it here. A doc comment names what the thing is and stops.
-- Never rely on discipline what we can enforce with newtypes.
-- If std or an existing crate provides what we need, evaluate that before rolling our own. Without a clear, stated reason to use our own, we use std or the existing crate; the reason goes in the planning doc that introduces the hand-rolled version.
-- Custom traits are generally to be avoided. Prefer a concrete type, an enum, a plain function, or a standard-library trait (`From`/`Into`, `Default`, the iterator traits) over introducing a trait of our own. A trait earns its place when several types genuinely implement it or it marks a real abstraction boundary; a trait with one implementor, reached for to make a generic infer or to fold a single call site's boilerplate, is the case to avoid. When a design introduces a trait, say what it buys over a concrete type, and default to the version without it.
-- If a function does not return every variant of an enum, e.g. only a Some, it should not return a value whose type is that enum. Return something narrower instead, e.g. a different enum or T. In some cases, for example when propagating errors, we can return the final type instead of dealing with many intermediate narrower enums. However, even in situations like this, this pattern is an anti-pattern.
-- Always test degenerate cases.
+Make impossible states unrepresentable. Use the correct representation. Extra refactoring to get the right building blocks is required. Prefer the structurally correct solution to the easy one, even when the easy one is fast. Reuse the seams the code already has.
+
+We do not have anything we do not use. A token kind, field, variant, or recorded value exists only because something reads it. Tests-only is not a reader. A semantic token, span, or resolve leaf is a reader only if it carries information worth highlighting or hovering. An AST field is a reader only if resolve or a later pass uses it.
+
+A token that carries no semantic information is not recorded and is not a resolve leaf. Consume it if the parse needs the presence, and leave it off the child's span. A position on it resolves to the parent. `!` after a type decides Null vs not and is this case.
+
+A more performant, less idiomatic impl lives behind a newtype/struct/enum that exposes an idiomatic API.
+
+No comment that restates the code, that describes what wasn't done, or that describes what lives elsewhere unless a reader of this file has a concrete reason to expect it here. A doc comment names what the thing is and stops.
+
+Never rely on discipline what we can enforce with newtypes.
+
+If std or an existing crate provides it, use that. A hand-rolled version needs a stated reason in the planning doc that introduces it.
+
+Avoid custom traits. Prefer a concrete type, an enum, a plain function, or a std trait (`From`/`Into`, `Default`, the iterator traits). A trait with one implementor is the case to avoid. When a design introduces a trait, say what it buys over a concrete type, and default to the version without it.
+
+If a function does not return every variant of an enum, return something narrower. Propagating a final error type is allowed; it is still an anti-pattern.
+
+Always test degenerate cases.
 
 ## Result
 
-Do not `match` a `Result` to bind the success value and return or convert the error. Write `let value = expr.map_err(...)?;`.
+Do not `match` a `Result` to bind the success value and return or convert the error. Write `let value = expr.map_err(...)?;`. Same type on both arms: `expr.unwrap_or_else(|err| ...)`.
 
-When both arms produce the same type, write `expr.unwrap_or_else(|err| ...)`. Do not `match` on `Ok` / `Err` then.
-
-Do not pass a value that is used only on one arm of the `Result` or `Option` the function returns, when the caller has that same arm. Return the success side; the caller fills the other arm. `require_token(kind, expected)` is `require_token(kind)` plus `map_err(|()| cursor.expected(expected))`. Same for `require_group`.
+Do not pass a value used only on one arm of the `Result` or `Option` the function returns, when the caller has that same arm. Return the success side; the caller fills the other. `require_token(kind)` plus `map_err(|()| cursor.expected(expected))`, not `require_token(kind, expected)`. Same for `require_group`.
 
 ## Iterators
 
-Prefer iterator combinators over `for`, `while`, and `loop`. A walk that maps, filters, finds, folds, or collects is `.map`, `.filter`, `.filter_map`, `.find`, `.position`, `.any`, `.all`, `.fold`, `.collect`, or the matching iterator method, not a mutable accumulator and a loop.
+Prefer iterator combinators over `for`, `while`, and `loop`. Do not `.collect()` into a `Vec` unless a later step needs the owned list (random access, stored length, ownership past the walk, or an API that takes a collection). A once-consumed walk stays an iterator.
 
-Do not `.collect()` into a `Vec` (or other collection) unless a later step needs the owned list: random access, a stored length, ownership past the walk, or an API that takes a collection. A walk that is consumed once stays an iterator.
-
-A loop is the right tool when the walk is a state machine the iterator traits do not express: a parser cursor consuming a stream, a worklist, a walk whose next step depends on mutation that is not the iterator's item. If the body is "push to a vec", "set a flag", or "return the first match", it is not that case.
+A loop is for a state machine the iterator traits do not express: a parser cursor, a worklist, a walk whose next step depends on mutation that is not the iterator's item. Pushing to a vec, setting a flag, or returning the first match is not that case.
 
 ## Errors
 
-Error types use `thiserror`. Derive `Error`; put the message on `#[error("...")]`. Do not write a manual `Display` or `std::error::Error` impl. Wrapping another error is `#[error("{0}")]` on that variant.
+Error types use `thiserror`: `#[error("...")]` on the derive, `#[error("{0}")]` when wrapping. No manual `Display` or `std::error::Error` impl.
 
-A type that is not an error must not implement `std::error::Error`. A non-error enum that needs `Display` uses `strum::Display` (`#[strum(to_string = "...")]` on the variants). Do not write a manual `Display` impl for that enum.
+A non-error type must not implement `std::error::Error`. A non-error enum that needs `Display` uses `strum::Display` (`#[strum(to_string = "...")]` on the variants).
 
 ## Postfix wrappers
 
-Do not write prefix or constructor wrappers that `prelude::Postfix` or `span::WithSpanPostfix` already names. Write the method.
+Do not write prefix or constructor wrappers that `prelude::Postfix` or `span::WithSpanPostfix` already names.
 
 - `Ok(value)` / `Err(value)` / `Some(value)` → `value.wrap_ok()` / `value.wrap_err()` / `value.wrap_some()`
 - `Box::new(value)` → `value.boxed()`
@@ -139,29 +126,25 @@ Do not write prefix or constructor wrappers that `prelude::Postfix` or `span::Wi
 - `&value` when taking a shared reference to a value → `value.reference()`
 - `WithSpan::new(item, span)` → `item.with_span(span)`
 
-Patterns stay: `if let Some(x)`, `match r { Ok(v) =>`, `let Err(e) =`, `matches!(x, Some(_))`. `None` has no value to wrap; it stays `None`.
+Patterns stay (`if let Some(x)`, `match r { Ok(v) =>`, `let Err(e) =`, `matches!(x, Some(_))`). `None` stays `None`. `&T` / `&str` / `&[T]` in type position, `&mut`, `&self`, `&mut self` stay. Empty `vec![]` and `vec![a, b, ..]` stay. Prefix `&` also stays when `Postfix` cannot express it: `s[i..]` is unsized, `let x = &foo()` needs temporary lifetime extension, `&|...|` for higher-ranked `Fn` bounds. `.to()` takes a turbofish when the target type is not inferred.
 
-`&T` / `&str` / `&[T]` in type position, `&mut`, `&self`, and `&mut self` stay. Empty `vec![]` and `vec![a, b, ..]` stay. Prefix `&` also stays when `Postfix` cannot express it: `s[i..]` is unsized, `let x = &foo()` relies on temporary lifetime extension that `foo().reference()` does not get, and `&|...|` is what higher-ranked `Fn` bounds need. `.to()` takes a turbofish when the target type is not inferred.
-
-The bodies of these methods in prelude are the one place the std forms appear. `WithSpan::new` appears only in the body of `span::WithSpanPostfix::with_span`.
-
-`crates/prelude` holds the enforcement: `clippy.toml` bans `dbg` / `dbg_with_note` / `note_do_not_commit`, and `postfix_constructors` flags `Ok`/`Err`/`Some`, `Box::new`, one-element `vec![]`, and `.into()`. It does not enforce `.reference()` or `.dereference()`: prefix `&` and `*` are also types, mutable places, and patterns, and a walk cannot tell those from a value borrow or a copy-out without too many holes. Still write `.reference()` and `.dereference()` in new code.
+The std forms appear only in the method bodies in prelude. `WithSpan::new` appears only in `span::WithSpanPostfix::with_span`. `clippy.toml` in `crates/prelude` bans `dbg` / `dbg_with_note` / `note_do_not_commit` and flags `Ok`/`Err`/`Some`, `Box::new`, one-element `vec![]`, and `.into()`. It does not flag `.reference()` / `.dereference()`; still write them in new code.
 
 ## Audits
 
-When told to audit, the deliverable is the whole class fixed everywhere, not the instance that was quoted. Sweep every file the standard touches before reporting done; the failure mode is the user opening the most obvious place and finding the problem still there. An audit that only edits what was pointed at is not an audit.
+An audit fixes the whole class, not the quoted instance. Sweep every file the standard touches before reporting done.
 
 ## Coding standards: nits
 
-- Rust enums are unit variants (`NoData`) or a single named payload (`Named(NamedTypeAnnotation)`, `List(Box<ListTypeAnnotation>)`). `Foo { x: T }` is forbidden: that data is a named struct, then `Foo(TheStruct)`. `Foo(A, B)` is forbidden: name the pair (`Foo(FooPair)` or `Foo((A, B))`).
-- Whether a type is span-carrying is decided once, at the type: every use of an enum is `WithSpan`-wrapped or none is, and within one enum, every variant's payload carries its span or none does. Do not mix wrapped and bare at either level. A value's span lives on its nearest wrapper, exactly once: the field wrapper when the value is a struct field, the item wrapper when the value rides in an enum whose items are wrapped — never both.
-- A value that does not exist in the source has no span. Do not invent an empty span, a sibling's span, or the parent's span to fill `WithSpan`. A collection that holds both source nodes and synthetic nodes is `WithOptionalSpan<T>` (`WithGenericLocation<T, Option<Span>>`). `Some(span)` is the source range. `None` is not in the text. `ResolvePosition` does not enter `None`. `()` as a location is a tree with no positions at all (spanless parsing), not a missing node in a spanned tree.
-- A struct with exactly one field is a newtype (`struct Foo(pub Bar)`), not a struct with one named field — especially when no second field is possible. The exceptions are shapes an external derive dictates: serde types where the field name is the wire key, clap types where the field name is the flag. When it is not clear whether a struct will grow a second field, use the newtype only if we do not suspect another field will be added; if we do suspect more fields, keep the named-field struct so the new field slots in without a rename.
-- Parser interned-key wrappers are named `$RoleWrapper` and wrap the `common_lang_types` interned type for that role (`ArgumentNameWrapper(ArgumentName)`, `SelectionNameWrapper(SelectionName)`, `SelectableNameWrapper(SelectableName)`). The inner field is `pub`: resolve returns the wrapper, and callers read `.0`. They do not implement `From<StringKey>`: `string_key_newtype!` already does that on the inner type. Construction is `token.interned().map(SelectionNameWrapper)`. A selection name and a `reader_alias` are `SelectionNameWrapper`. An entrypoint name and a selectable name are `SelectableNameWrapper`. The left-hand side of `Type.name` is `EntityNameWrapper`. `Description` is the same shape (`pub DescriptionValue`) without the `Wrapper` suffix.
+- Enums are unit variants (`NoData`) or a single named payload (`Named(NamedTypeAnnotation)`, `List(Box<ListTypeAnnotation>)`). `Foo { x: T }` is a named struct, then `Foo(TheStruct)`. `Foo(A, B)` is `Foo(FooPair)` or `Foo((A, B))`.
+- Span-carrying is decided once, at the type: every use of an enum is `WithSpan`-wrapped or none is, and within one enum every variant's payload carries its span or none does. A value's span lives on its nearest wrapper, exactly once: the field wrapper when the value is a struct field, the item wrapper when the value rides in an enum whose items are wrapped.
+- A value that does not exist in the source has no span. Do not invent an empty span, a sibling's span, or the parent's span to fill `WithSpan`. A collection of source and synthetic nodes is `WithOptionalSpan<T>` (`WithGenericLocation<T, Option<Span>>`). `Some(span)` is the source range. `None` is not in the text. `ResolvePosition` does not enter `None`. `()` as a location is a tree with no positions at all (spanless parsing), not a missing node in a spanned tree.
+- A struct with exactly one field is a newtype (`struct Foo(pub Bar)`), except shapes an external derive dictates (serde field names, clap flag names). If another field is suspected, keep the named-field struct.
+- Parser interned-key wrappers are `$RoleWrapper` over the `common_lang_types` interned type (`ArgumentNameWrapper(ArgumentName)`, `SelectionNameWrapper(SelectionName)`, `SelectableNameWrapper(SelectableName)`). Inner field is `pub`; resolve returns the wrapper; callers read `.0`. No `From<StringKey>`: `string_key_newtype!` already does that on the inner type. Construction is `token.interned().map(SelectionNameWrapper)`. A selection name and a `reader_alias` are `SelectionNameWrapper`. An entrypoint name and a selectable name are `SelectableNameWrapper`. The left-hand side of `Type.name` is `EntityNameWrapper`. `Description` is the same shape (`pub DescriptionValue`) without the `Wrapper` suffix.
 - Selection, Selectable, and SelectionSet are defined in `docs-website/docs/design-docs/mental-model.md`. Do not name a selection node `Selectable*`. Checking that a selection refers to a selectable that exists is a later pass.
-- The map `entry` API is encouraged. Prefer `map.entry(k).or_insert(...)`, `or_default`, `and_modify`, or a match on `Entry` over a separate `contains_key` / `get` / `get_mut` plus `insert` when both reading and writing a slot.
-- Never `#[allow(lint)]`. Use `#[expect(lint)]`, so the attribute fails when the lint stops firing. An item whose only callers are tests is `#[cfg_attr(not(test), expect(dead_code))]`. Clippy `allow_attributes` is deny in workspace lints. That lint covers outer `#[allow]` only, not inner `#![allow]`; do not use inner `allow` in our crates either. Relay crates keep crate-level `#![allow(clippy::all)]`.
+- Prefer `map.entry(k).or_insert(...)`, `or_default`, `and_modify`, or a match on `Entry` over `contains_key` / `get` / `get_mut` plus `insert` when both reading and writing a slot.
+- Never `#[allow(lint)]`. Use `#[expect(lint)]`. An item whose only callers are tests is `#[cfg_attr(not(test), expect(dead_code))]`. Clippy `allow_attributes` is deny in workspace lints and covers outer `#[allow]` only; do not use inner `#![allow]` in our crates either. Relay crates keep crate-level `#![allow(clippy::all)]`.
 
 ## Invariants - do not work around these
 
-- No manual impl's of `ResolvePosition`, ever. Most likely, this implies that we are modeling our state incorrectly or misunderstanding the crate. If there is a genuine need for a manual impl, then that implies a missing feature in the `resolve_position` crate, and we should do a prefactor to add that first.
+- No manual `ResolvePosition` impls. If one seems needed, that is a missing feature in `resolve_position`; add it as a prefactor first.
