@@ -34,7 +34,7 @@ event-loop.md already recvs and performs. This change adds `DiskChanged { path, 
 
 Most important first.
 
-Origin: event-loop.md `IsographEvent`. Delta: one variant.
+Origin: event-loop.md `IsographEvent`. Delta: `DiskChanged` beside `HelloWorld`.
 
 ```rust
 // from crates/isograph_cli/src/event.rs

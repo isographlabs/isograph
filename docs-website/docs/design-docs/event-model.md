@@ -184,7 +184,7 @@ struct StartAsyncWork;
 
 `Kill` ends the process.
 
-event-loop.md ships `handle` returning `Vec<IsographEffect>` with both enums empty. filesystem-events.md adds `DiskChanged`. `Presence` is that doc's created/deleted/moved change.
+event-loop.md ships `HelloWorld` / `LogHelloWorld` and `handle` returning `Vec<IsographEffect>`. filesystem-events.md adds `DiskChanged`. `Presence` is that doc's created/deleted/moved change.
 
 ## State
 
