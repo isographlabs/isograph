@@ -45,7 +45,6 @@ pub fn lsp_semantic_tokens(
         let mut piece_start = token.location.start;
         while piece_start < token.location.end {
             let piece_position = cursor.position(piece_start);
-            // Column of this piece on the line it starts on.
             let offset_on_line = piece_position.col;
             let line_break_in_span = match cursor.current_line_break() {
                 Some(line_break) if line_break.start < token.location.end => {
