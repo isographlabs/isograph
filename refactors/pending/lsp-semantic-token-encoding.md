@@ -60,18 +60,19 @@ pub fn lsp_semantic_tokens(
                 let token_type = lsp_type_index(token.item);
                 // Same line as the previous piece: wire delta_start is start-to-start.
                 // Later line: wire delta_start is offset_on_line (column on the line we landed on).
-                let lsp_semantic_token = match piece_pos.line - last.line {
-                    0 => LspSemanticToken::SameLine(SameLine {
-                        delta_start: offset_on_line - last.col,
-                        length,
-                        token_type,
-                    }),
-                    delta_line => LspSemanticToken::MultiLine(MultiLine {
+                let relative_to_previous = match piece_pos.line - last.line {
+                    0 => RelativeToPrevious::SameLine(SameLine(
+                        offset_on_line - last.col,
+                    )),
+                    delta_line => RelativeToPrevious::MultiLine(MultiLine {
                         delta_line,
                         offset_on_line,
-                        length,
-                        token_type,
                     }),
+                };
+                let lsp_semantic_token = LspSemanticToken {
+                    relative_to_previous,
+                    length,
+                    token_type,
                 };
                 encoded.push(lsp_semantic_token.to());
                 // Next delta is from this start, not from this end.
@@ -90,47 +91,47 @@ pub fn lsp_semantic_tokens(
     encoded.wrap_ok()
 }
 
+struct LspSemanticToken {
+    relative_to_previous: RelativeToPrevious,
+    length: u32,
+    token_type: u32,
+}
+
 /// Relative to the previous piece. `SameLine` is start-to-start on this line.
 /// `MultiLine` is the previous piece on an earlier line; `offset_on_line` is this
 /// piece's UTF-16 column on the line we landed on (wire `delta_start`).
-enum LspSemanticToken {
+enum RelativeToPrevious {
     SameLine(SameLine),
     MultiLine(MultiLine),
 }
 
-struct SameLine {
-    /// UTF-16 from the previous piece's start to this piece's start.
-    delta_start: u32,
-    length: u32,
-    token_type: u32,
-}
+/// UTF-16 from the previous piece's start to this piece's start.
+struct SameLine(u32);
 
 struct MultiLine {
     delta_line: u32,
     /// UTF-16 from column 0 of this piece's line to this piece's start.
     offset_on_line: u32,
-    length: u32,
-    token_type: u32,
 }
 
 impl From<LspSemanticToken> for lsp_types::SemanticToken {
     fn from(token: LspSemanticToken) -> Self {
-        match token {
-            LspSemanticToken::SameLine(token) => lsp_types::SemanticToken {
-                delta_line: 0,
-                delta_start: token.delta_start,
-                length: token.length,
-                token_type: token.token_type,
-                token_modifiers_bitset: 0,
-            },
-            LspSemanticToken::MultiLine(token) => lsp_types::SemanticToken {
-                delta_line: token.delta_line,
+        let (delta_line, delta_start) = match token.relative_to_previous {
+            RelativeToPrevious::SameLine(SameLine(delta_start)) => (0, delta_start),
+            RelativeToPrevious::MultiLine(MultiLine {
+                delta_line,
+                offset_on_line,
+            }) => {
                 // After a line change the wire measures from column 0, not from the previous start.
-                delta_start: token.offset_on_line,
-                length: token.length,
-                token_type: token.token_type,
-                token_modifiers_bitset: 0,
-            },
+                (delta_line, offset_on_line)
+            }
+        };
+        lsp_types::SemanticToken {
+            delta_line,
+            delta_start,
+            length: token.length,
+            token_type: token.token_type,
+            token_modifiers_bitset: 0,
         }
     }
 }
@@ -348,7 +349,7 @@ fn utf16_units(text: &str) -> u32 {
 
 `LineIndex` holds every break index from one scan of `page_content`. `LineCursor` walks that vec: `break_index` is the first break not yet passed. `position(offset)` advances while `after <= offset` (each such advance is one line). `break_before` peeks the current break if it starts before `span.end`. `advance_break` consumes it and moves to the next line. Tokens are in file order, so the cursor only moves forward. `break_index` is the line number after those advances.
 
-`last` is the previous piece's start `Pos`. `offset_on_line` is this piece's UTF-16 column on the line it starts on. `SameLine` subtracts `last.col` (start-to-start). `MultiLine` keeps `offset_on_line` as-is: that is the offset on the line we landed on, and `From` writes it to wire `delta_start`. `From` fills `delta_line: 0` on `SameLine` and `token_modifiers_bitset: 0` on both. A blank line inside a span is `piece_end == piece_start`; nothing is emitted, then `advance_break` still runs, so the next `position` is on the following line.
+`last` is the previous piece's start `Pos`. `offset_on_line` is this piece's UTF-16 column on the line it starts on. `SameLine` subtracts `last.col` (start-to-start). `MultiLine` keeps `offset_on_line` as-is: that is the offset on the line we landed on, and `From` writes it to wire `delta_start`. `length` and `token_type` live on `LspSemanticToken`. `From` fills `delta_line: 0` on `SameLine` and `token_modifiers_bitset: 0`. A blank line inside a span is `piece_end == piece_start`; nothing is emitted, then `advance_break` still runs, so the next `position` is on the following line.
 
 `check_span` runs before any slice. Ordered exclusive spans are not enough: `page = "a\r\nb"` with tokens `[0..1, 2..3]` is ordered and exclusive, and offset 2 sits strictly inside the break `{ start: 1, after: 3 }`. Parser leftover skips `LineBreak` tokens, so this is a caller concat bug. `EncodeError` names it instead of panicking on `page_content[3..2]`.
 
@@ -554,7 +555,7 @@ pub use semantic_tokens::{
 };
 ```
 
-`LspSemanticToken`, `SameLine`, `MultiLine`, `LineIndex`, `LineCursor`, `Pos`, `LineBreak`, `line_breaks`, `utf16_units`, `lsp_type_index`, `legend_index` stay in the module. Tests in that module call them. `legend_index` `expect`s that `LEGEND_TOKEN_TYPES` lists every type the match names.
+`LspSemanticToken`, `RelativeToPrevious`, `SameLine`, `MultiLine`, `LineIndex`, `LineCursor`, `Pos`, `LineBreak`, `line_breaks`, `utf16_units`, `lsp_type_index`, `legend_index` stay in the module. Tests in that module call them. `legend_index` `expect`s that `LEGEND_TOKEN_TYPES` lists every type the match names.
 
 ## Tests
 
