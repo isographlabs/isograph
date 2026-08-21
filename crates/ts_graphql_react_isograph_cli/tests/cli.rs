@@ -41,46 +41,14 @@ impl Daemon {
     fn isograph(&self, args: &[&str]) -> Output {
         let home = self.dir.path().join("home");
         std::fs::create_dir_all(home.reference()).expect("a test can create its private HOME");
-        // Files, not pipes: on Windows the daemon inherits the client's stdout handle, so
-        // `output()` never sees EOF.
-        let stdout_path = self.dir.path().join("client.stdout");
-        let stderr_path = self.dir.path().join("client.stderr");
-        let stdout_file =
-            std::fs::File::create(stdout_path.reference()).expect("a test can capture stdout");
-        let stderr_file =
-            std::fs::File::create(stderr_path.reference()).expect("a test can capture stderr");
-        let mut child = Command::new(isograph_bin())
+        Command::new(isograph_bin())
             .args(args)
             .current_dir(self.dir.path())
             .env("HOME", home.reference())
             .env("XDG_STATE_HOME", home.join("state"))
             .env("LOCALAPPDATA", home.join("appdata"))
-            .stdout(stdout_file)
-            .stderr(stderr_file)
-            .spawn()
-            .expect("the isograph binary runs");
-        let started = Instant::now();
-        let status = loop {
-            if let Some(status) = child
-                .try_wait()
-                .expect("the isograph process can be waited on")
-            {
-                break status;
-            }
-            if started.elapsed() >= DEADLINE {
-                let _ = child.kill();
-                let _ = child.wait();
-                panic!("isograph {args:?} did not exit");
-            }
-            std::thread::sleep(Duration::from_millis(50));
-        };
-        Output {
-            status,
-            stdout: std::fs::read(stdout_path.reference())
-                .expect("a test can read captured stdout"),
-            stderr: std::fs::read(stderr_path.reference())
-                .expect("a test can read captured stderr"),
-        }
+            .output()
+            .expect("the isograph binary runs")
     }
 
     fn log_text(&self) -> String {
