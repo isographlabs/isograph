@@ -2,7 +2,7 @@
 
 `lsp_semantic_tokens` takes `&[WithSpan<IsographSemanticToken>]` whose spans are byte offsets into `page_content`, and returns `Vec<lsp_types::SemanticToken>`: `delta_line`, `delta_start`, `length`, `token_type`, `token_modifiers_bitset`. `delta_start` and `length` are UTF-16.
 
-VS Code does not advertise `multilineTokenSupport`. A token whose length crosses a line is clipped at the line end (LSP 3.17). `single_line_pieces` returns one piece for a one-line span, and one piece per line of text when the span contains a line break (a block string, or leftover `Content` from an unterminated block string). `lsp_semantic_tokens` is `single_line_pieces(tokens).into_iter().fold(...)`: `encode_piece` threads `last_start` through the fold because LSP deltas are from the previous piece start.
+VS Code does not advertise `multilineTokenSupport`. A token whose length crosses a line is clipped at the line end (LSP 3.17). `single_line_pieces` is an iterator: one piece for a one-line span, one piece per line of text when the span contains a line break (a block string, or leftover `Content` from an unterminated block string). `lsp_semantic_tokens` is `single_line_pieces(tokens).fold(...)`. `encode_piece` threads `last_start` through the fold because LSP deltas are from the previous piece start.
 
 A span must be in range of `page_content`, on a char boundary, not strictly inside a line break, not inverted, not empty, and not start before the previous token's end. A line-break-only span is also invalid. Those are caller bugs and `assert`. Concatenating literals uses `with_offset`. Tests pass a literal as the whole `page_content`.
 
@@ -32,101 +32,139 @@ pub fn lsp_semantic_tokens(
     page_content: &str,
 ) -> Vec<lsp_types::SemanticToken> {
     let index = LineIndex::new(page_content);
-    let mut cursor = index.cursor();
-    single_line_pieces(tokens, &index, &mut cursor)
-        .into_iter()
-        .fold(
-            (Vec::new(), Position { line: 0, col: 0 }),
-            |(mut encoded, last_start), piece| {
-                let (token, last_start) = encode_piece(piece, last_start, page_content);
-                encoded.push(token);
-                (encoded, last_start)
-            },
-        )
-        .0
+    single_line_pieces(tokens, &index).fold(
+        (Vec::new(), Position { line: 0, col: 0 }),
+        |(mut encoded, last_start), piece| {
+            let (token, last_start) = encode_piece(piece, last_start, page_content);
+            encoded.push(token);
+            (encoded, last_start)
+        },
+    )
+    .0
 }
 
-fn single_line_pieces(
-    tokens: &[WithSpan<IsographSemanticToken>],
-    index: &LineIndex,
-    cursor: &mut LineCursor,
-) -> Vec<SingleLinePiece> {
-    let mut previous_token_end = 0u32;
-    let mut pieces = Vec::new();
-    for token in tokens {
-        index.check_span(token.location, previous_token_end);
-        previous_token_end = token.location.end;
-        pieces.extend(pieces_for_token(*token, cursor));
+fn single_line_pieces<'a>(
+    tokens: &'a [WithSpan<IsographSemanticToken>],
+    index: &'a LineIndex<'a>,
+) -> SingleLinePieces<'a> {
+    SingleLinePieces {
+        tokens: tokens.iter(),
+        index,
+        cursor: index.cursor(),
+        previous_token_end: 0,
+        remaining_split: None,
     }
-    pieces
 }
 
-/// One piece when the span is on one line.
-/// One piece per line of text when the span contains a line break: a block
-/// string, or leftover `Content` from an unterminated block string.
-fn pieces_for_token(
+struct SingleLinePieces<'a> {
+    tokens: std::slice::Iter<'a, WithSpan<IsographSemanticToken>>,
+    index: &'a LineIndex<'a>,
+    cursor: LineCursor<'a>,
+    previous_token_end: u32,
+    remaining_split: Option<RemainingSplit>,
+}
+
+#[derive(Copy, Clone)]
+struct RemainingSplit {
     token: WithSpan<IsographSemanticToken>,
-    cursor: &mut LineCursor,
-) -> Vec<SingleLinePiece> {
-    cursor.advance_to(token.location.start);
-    match cursor.current_line_break() {
-        Some(line_break) if line_break.start < token.location.end => {
-            split_at_line_breaks(token, cursor)
+    piece_start: u32,
+}
+
+impl Iterator for SingleLinePieces<'_> {
+    type Item = SingleLinePiece;
+
+    fn next(&mut self) -> Option<SingleLinePiece> {
+        loop {
+            if let Some(remaining) = self.remaining_split {
+                match self.next_split_piece(remaining) {
+                    Some(piece) => return piece.wrap_some(),
+                    None => {
+                        self.remaining_split = None;
+                        continue;
+                    }
+                }
+            }
+            let token = *self.tokens.next()?;
+            self.index
+                .check_span(token.location, self.previous_token_end);
+            self.previous_token_end = token.location.end;
+            self.cursor.advance_to(token.location.start);
+            match self.cursor.current_line_break() {
+                Some(line_break) if line_break.start < token.location.end => {
+                    let remaining = RemainingSplit {
+                        token,
+                        piece_start: token.location.start,
+                    };
+                    match self.next_split_piece(remaining) {
+                        Some(piece) => return piece.wrap_some(),
+                        None => panic!(
+                            "semantic token span {}..{} contains no text to highlight",
+                            token.location.start, token.location.end,
+                        ),
+                    }
+                }
+                _ => {
+                    return SingleLinePiece {
+                        token,
+                        position: self.cursor.position(token.location.start),
+                    }
+                    .wrap_some();
+                }
+            }
         }
-        _ => SingleLinePiece {
-            token,
-            position: cursor.position(token.location.start),
-        }
-        .wrap_vec(),
     }
 }
 
-fn split_at_line_breaks(
-    token: WithSpan<IsographSemanticToken>,
-    cursor: &mut LineCursor,
-) -> Vec<SingleLinePiece> {
-    let mut piece_start = token.location.start;
-    let mut pieces = Vec::new();
-    while piece_start < token.location.end {
-        cursor.advance_to(piece_start);
-        let line_break_in_span = match cursor.current_line_break() {
-            Some(line_break) if line_break.start < token.location.end => {
-                line_break.wrap_some()
+impl SingleLinePieces<'_> {
+    fn next_split_piece(
+        &mut self,
+        mut remaining: RemainingSplit,
+    ) -> Option<SingleLinePiece> {
+        while remaining.piece_start < remaining.token.location.end {
+            self.cursor.advance_to(remaining.piece_start);
+            let line_break_in_span = match self.cursor.current_line_break() {
+                Some(line_break)
+                    if line_break.start < remaining.token.location.end =>
+                {
+                    line_break.wrap_some()
+                }
+                _ => None,
+            };
+            match line_break_in_span {
+                Some(line_break) if line_break.start == remaining.piece_start => {
+                    remaining.piece_start = line_break.after;
+                    self.cursor.advance_break();
+                    continue;
+                }
+                _ => {}
             }
-            _ => None,
-        };
-        match line_break_in_span {
-            Some(line_break) if line_break.start == piece_start => {
-                piece_start = line_break.after;
-                cursor.advance_break();
-                continue;
+            let piece_end = match line_break_in_span {
+                Some(line_break) => line_break.start,
+                None => remaining.token.location.end,
+            };
+            let position = self.cursor.position(remaining.piece_start);
+            let piece = SingleLinePiece {
+                token: remaining
+                    .token
+                    .item
+                    .with_span(Span::new(remaining.piece_start, piece_end)),
+                position,
+            };
+            match line_break_in_span {
+                Some(line_break) => {
+                    remaining.piece_start = line_break.after;
+                    self.cursor.advance_break();
+                    self.remaining_split = remaining.wrap_some();
+                }
+                None => {
+                    self.remaining_split = None;
+                }
             }
-            _ => {}
+            return piece.wrap_some();
         }
-        let piece_end = match line_break_in_span {
-            Some(line_break) => line_break.start,
-            None => token.location.end,
-        };
-        let position = cursor.position(piece_start);
-        pieces.push(SingleLinePiece {
-            token: token.item.with_span(Span::new(piece_start, piece_end)),
-            position,
-        });
-        match line_break_in_span {
-            Some(line_break) => {
-                piece_start = line_break.after;
-                cursor.advance_break();
-            }
-            None => break,
-        }
+        self.remaining_split = None;
+        None
     }
-    assert!(
-        !pieces.is_empty(),
-        "semantic token span {}..{} contains no text to highlight",
-        token.location.start,
-        token.location.end,
-    );
-    pieces
 }
 
 struct SingleLinePiece {
@@ -553,7 +591,7 @@ mod semantic_tokens;
 pub use semantic_tokens::{lsp_semantic_tokens, semantic_token_legend};
 ```
 
-`single_line_pieces`, `pieces_for_token`, `split_at_line_breaks`, `SingleLinePiece`, `encode_piece`, `convert_to_lsp_semantic_token`, `RelativeToPrevious`, `SameLine`, `LaterLine`, `LineIndex`, `LineCursor`, `Position`, `LineBreak`, `line_breaks`, `utf16_units`, `lsp_type_index`, `legend_index` stay in the module. `legend_index` `expect`s that `LEGEND_TOKEN_TYPES` lists every type `lsp_type_index` maps. `check_span` and `split_at_line_breaks` `assert` on caller bugs (inverted, overlapping, out of range, non-char-boundary, CRLF-interior, empty, line-break-only).
+`single_line_pieces`, `SingleLinePieces`, `RemainingSplit`, `SingleLinePiece`, `encode_piece`, `convert_to_lsp_semantic_token`, `RelativeToPrevious`, `SameLine`, `LaterLine`, `LineIndex`, `LineCursor`, `Position`, `LineBreak`, `line_breaks`, `utf16_units`, `lsp_type_index`, `legend_index` stay in the module. `legend_index` `expect`s that `LEGEND_TOKEN_TYPES` lists every type `lsp_type_index` maps. `check_span` `assert`s on inverted, overlapping, out of range, non-char-boundary, CRLF-interior, and empty spans. A line-break-only span panics in `Iterator::next`.
 
 ## Tests
 
