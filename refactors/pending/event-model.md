@@ -4,7 +4,7 @@ Architecture is `docs-website/docs/design-docs/event-model.md`. This file is the
 
 Requires config-discovery.md (landed) and the design-doc.
 
-1. event-loop.md. `HelloWorld` / `LogHelloWorld`. `run_event_loop`, `run_effect_loop`.
+1. event-loop.md. `HelloWorld` / `LogHelloWorld`, `Quit` / `Kill`. SIGTERM sends `Quit`. `run_event_loop`, `run_effect_loop`.
 2. filesystem-events.md, after event-loop.md. CLI send, config `includes`, `Presence`, watcher.
 3. pico intern of `DiskFile`. Same `DiskChanged`. No pending doc yet.
 4. lsp-semantic-token-encoding.md. Encoder only. May overlap (2).
@@ -13,4 +13,4 @@ Requires config-discovery.md (landed) and the design-doc.
 7. lsp-parse-diagnostics.md, against the adapter.
 8. zed-and-vscode-extensions.md.
 
-`AsyncWorkFinished`, `StartAsyncWork`, `Quit`, and `Kill` land with compilation.
+`AsyncWorkFinished` and `StartAsyncWork` land with compilation.

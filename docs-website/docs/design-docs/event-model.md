@@ -182,9 +182,9 @@ struct StartAsyncWork;
 
 `StartAsyncWork` runs something off the event thread; its result returns as `AsyncWorkFinished`.
 
-`Kill` ends the process.
+`Kill` ends the effect loop. `run` returns. The process exits.
 
-event-loop.md ships `HelloWorld` / `LogHelloWorld` and `handle` returning `Vec<IsographEffect>`. filesystem-events.md adds `DiskChanged`. `Presence` is that doc's created/deleted/moved change.
+event-loop.md ships `HelloWorld` / `LogHelloWorld`, `Quit` / `Kill`, and `handle` returning `Vec<IsographEffect>`. filesystem-events.md adds `DiskChanged`. `Presence` is that doc's created/deleted/moved change.
 
 ## State
 
