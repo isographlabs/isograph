@@ -2,9 +2,9 @@
 
 `lsp_semantic_tokens` takes `&[WithSpan<IsographSemanticToken>]` whose spans are byte offsets into `page_content`, and returns `Vec<lsp_types::SemanticToken>`: `delta_line`, `delta_start`, `length`, `token_type`, `token_modifiers_bitset`. `delta_start` and `length` are UTF-16.
 
-VS Code does not advertise `multilineTokenSupport`. A token whose length crosses a line is clipped at the line end (LSP 3.17). `single_line_pieces` returns one piece for a one-line span, and one piece per line of text when the span contains a line break (a block string, or leftover `Content` from an unterminated block string). `encode_piece` emits one LSP token per piece.
+VS Code does not advertise `multilineTokenSupport`. A token whose length crosses a line is clipped at the line end (LSP 3.17). `single_line_pieces` returns one piece for a one-line span, and one piece per line of text when the span contains a line break (a block string, or leftover `Content` from an unterminated block string). `lsp_semantic_tokens` is `single_line_pieces(tokens).into_iter().fold(...)`: `encode_piece` threads `last_start` through the fold because LSP deltas are from the previous piece start.
 
-A span must be in range of `page_content`, on a char boundary, not strictly inside a line break, not inverted, and not start before the previous token's end. Empty and line-break-only spans are `EncodeError::NoText`. Concatenating literals uses `with_offset`. Tests pass a literal as the whole `page_content`. The server (lsp-semantic-tokens.md) logs the error and answers with empty tokens.
+A span must be in range of `page_content`, on a char boundary, not strictly inside a line break, not inverted, not empty, and not start before the previous token's end. A line-break-only span is also invalid. Those are caller bugs and `assert`. Concatenating literals uses `with_offset`. Tests pass a literal as the whole `page_content`.
 
 Origin: `crates/isograph_lsp/src/semantic_tokens.rs` and `crates/isograph_lang_types/src/semantic_token_legend/mod.rs` in isograph. This crate is `crates/isograph_lsp`. It does not start the server. lsp-semantic-tokens.md adds `file_literals` and the stdio loop, and calls the functions here.
 
@@ -25,37 +25,49 @@ Most important first.
 use isograph_parser::IsographSemanticToken;
 use prelude::Postfix;
 use span::{Span, WithSpan, WithSpanPostfix};
-use thiserror::Error;
 
 /// Parser tokens whose spans are byte offsets into `page_content`.
 pub fn lsp_semantic_tokens(
     tokens: &[WithSpan<IsographSemanticToken>],
     page_content: &str,
-) -> Result<Vec<lsp_types::SemanticToken>, EncodeError> {
+) -> Vec<lsp_types::SemanticToken> {
     let index = LineIndex::new(page_content);
     let mut cursor = index.cursor();
-    let mut last_start = Position { line: 0, col: 0 };
+    single_line_pieces(tokens, &index, &mut cursor)
+        .into_iter()
+        .fold(
+            (Vec::new(), Position { line: 0, col: 0 }),
+            |(mut encoded, last_start), piece| {
+                let (token, last_start) = encode_piece(piece, last_start, page_content);
+                encoded.push(token);
+                (encoded, last_start)
+            },
+        )
+        .0
+}
+
+fn single_line_pieces(
+    tokens: &[WithSpan<IsographSemanticToken>],
+    index: &LineIndex,
+    cursor: &mut LineCursor,
+) -> Vec<SingleLinePiece> {
     let mut previous_token_end = 0u32;
-    let mut encoded: Vec<lsp_types::SemanticToken> = Vec::new();
+    let mut pieces = Vec::new();
     for token in tokens {
-        index.check_span(token.location, previous_token_end)?;
+        index.check_span(token.location, previous_token_end);
         previous_token_end = token.location.end;
-        encoded.extend(
-            single_line_pieces(*token, &mut cursor)?
-                .into_iter()
-                .map(|piece| encode_piece(piece, &mut last_start, page_content)),
-        );
+        pieces.extend(pieces_for_token(*token, cursor));
     }
-    encoded.wrap_ok()
+    pieces
 }
 
 /// One piece when the span is on one line.
 /// One piece per line of text when the span contains a line break: a block
 /// string, or leftover `Content` from an unterminated block string.
-fn single_line_pieces(
+fn pieces_for_token(
     token: WithSpan<IsographSemanticToken>,
     cursor: &mut LineCursor,
-) -> Result<Vec<SingleLinePiece>, EncodeError> {
+) -> Vec<SingleLinePiece> {
     cursor.advance_to(token.location.start);
     match cursor.current_line_break() {
         Some(line_break) if line_break.start < token.location.end => {
@@ -65,15 +77,14 @@ fn single_line_pieces(
             token,
             position: cursor.position(token.location.start),
         }
-        .wrap_vec()
-        .wrap_ok(),
+        .wrap_vec(),
     }
 }
 
 fn split_at_line_breaks(
     token: WithSpan<IsographSemanticToken>,
     cursor: &mut LineCursor,
-) -> Result<Vec<SingleLinePiece>, EncodeError> {
+) -> Vec<SingleLinePiece> {
     let mut piece_start = token.location.start;
     let mut pieces = Vec::new();
     while piece_start < token.location.end {
@@ -109,14 +120,13 @@ fn split_at_line_breaks(
             None => break,
         }
     }
-    if pieces.is_empty() {
-        return EncodeError::NoText(SpanEnds {
-            start: token.location.start,
-            end: token.location.end,
-        })
-        .wrap_err();
-    }
-    pieces.wrap_ok()
+    assert!(
+        !pieces.is_empty(),
+        "semantic token span {}..{} contains no text to highlight",
+        token.location.start,
+        token.location.end,
+    );
+    pieces
 }
 
 struct SingleLinePiece {
@@ -126,9 +136,9 @@ struct SingleLinePiece {
 
 fn encode_piece(
     piece: SingleLinePiece,
-    last_start: &mut Position,
+    last_start: Position,
     page_content: &str,
-) -> lsp_types::SemanticToken {
+) -> (lsp_types::SemanticToken, Position) {
     let length = utf16_units(&page_content[piece.token.location.as_usize_range()]);
     let relative_to_previous = match piece.position.line - last_start.line {
         0 => RelativeToPrevious::SameLine(SameLine(
@@ -139,12 +149,12 @@ fn encode_piece(
             offset_on_line: piece.position.col,
         }),
     };
-    *last_start = piece.position;
-    convert_to_lsp_semantic_token(
+    let token = convert_to_lsp_semantic_token(
         length,
         lsp_type_index(piece.token.item),
         relative_to_previous,
-    )
+    );
+    (token, piece.position)
 }
 
 /// `SameLine.0` is this start minus `last_start`. `LaterLine.offset_on_line` is
@@ -182,55 +192,6 @@ fn convert_to_lsp_semantic_token(
         token_type,
         token_modifiers_bitset: 0,
     }
-}
-
-/// Ordered and exclusive is not enough: a boundary can sit between `\r` and `\n`.
-/// `NoText` is an isograph token with no line of text.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Error)]
-pub enum EncodeError {
-    #[error("semantic token spans must be mutually exclusive and ordered; got {}..{} after end {}", .0.start, .0.end, .0.previous_end)]
-    Overlap(Overlap),
-    #[error("semantic token span {}..{} is inverted", .0.start, .0.end)]
-    Inverted(SpanEnds),
-    #[error("byte {} is out of range for a document of length {}", .0.offset, .0.len)]
-    OutOfRange(OutOfRange),
-    #[error("byte {} is not a char boundary", .0.offset)]
-    NotCharBoundary(NotCharBoundary),
-    #[error("byte {} is strictly inside a line break {}..{}", .0.offset, .0.start, .0.after)]
-    InsideLineBreak(InsideLineBreak),
-    #[error("semantic token span {}..{} contains no text to highlight", .0.start, .0.end)]
-    NoText(SpanEnds),
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct Overlap {
-    pub start: u32,
-    pub end: u32,
-    pub previous_end: u32,
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct SpanEnds {
-    pub start: u32,
-    pub end: u32,
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct OutOfRange {
-    pub offset: u32,
-    pub len: u32,
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct NotCharBoundary {
-    pub offset: u32,
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct InsideLineBreak {
-    pub offset: u32,
-    pub start: u32,
-    pub after: u32,
 }
 
 struct LineIndex<'a> {
@@ -276,53 +237,52 @@ impl<'a> LineIndex<'a> {
         }
     }
 
-    fn check_span(&self, span: Span, previous_token_end: u32) -> Result<(), EncodeError> {
-        if span.end < span.start {
-            return EncodeError::Inverted(SpanEnds {
-                start: span.start,
-                end: span.end,
-            })
-            .wrap_err();
-        }
-        if span.start < previous_token_end {
-            return EncodeError::Overlap(Overlap {
-                start: span.start,
-                end: span.end,
-                previous_end: previous_token_end,
-            })
-            .wrap_err();
-        }
-        self.check_offset(span.start)?;
-        self.check_offset(span.end)?;
-        if span.start == span.end {
-            return EncodeError::NoText(SpanEnds {
-                start: span.start,
-                end: span.end,
-            })
-            .wrap_err();
-        }
-        ().wrap_ok()
+    fn check_span(&self, span: Span, previous_token_end: u32) {
+        assert!(
+            span.end >= span.start,
+            "semantic token span {}..{} is inverted",
+            span.start,
+            span.end,
+        );
+        assert!(
+            span.start >= previous_token_end,
+            "semantic token spans must be mutually exclusive and ordered; got {}..{} after end {}",
+            span.start,
+            span.end,
+            previous_token_end,
+        );
+        self.check_offset(span.start);
+        self.check_offset(span.end);
+        assert!(
+            span.start < span.end,
+            "semantic token span {}..{} contains no text to highlight",
+            span.start,
+            span.end,
+        );
     }
 
-    fn check_offset(&self, offset: u32) -> Result<(), EncodeError> {
+    fn check_offset(&self, offset: u32) {
         let len = self.text.len() as u32;
-        if offset > len {
-            return EncodeError::OutOfRange(OutOfRange { offset, len }).wrap_err();
-        }
-        if !self.text.is_char_boundary(offset as usize) {
-            return EncodeError::NotCharBoundary(NotCharBoundary { offset }).wrap_err();
-        }
+        assert!(
+            offset <= len,
+            "byte {} is out of range for a document of length {}",
+            offset,
+            len,
+        );
+        assert!(
+            self.text.is_char_boundary(offset as usize),
+            "byte {} is not a char boundary",
+            offset,
+        );
         for line_break in &self.breaks {
-            if line_break.start < offset && offset < line_break.after {
-                return EncodeError::InsideLineBreak(InsideLineBreak {
-                    offset,
-                    start: line_break.start,
-                    after: line_break.after,
-                })
-                .wrap_err();
-            }
+            assert!(
+                !(line_break.start < offset && offset < line_break.after),
+                "byte {} is strictly inside a line break {}..{}",
+                offset,
+                line_break.start,
+                line_break.after,
+            );
         }
-        ().wrap_ok()
     }
 }
 
@@ -397,7 +357,7 @@ fn utf16_units(text: &str) -> u32 {
 }
 ```
 
-`leftover_token` returns `None` for `LineBreak`, so a line-break-only span is not parse output. `InsideLineBreak`: `page = "a\r\nb"` with tokens `[0..1, 2..3]` is ordered and exclusive; offset 2 sits between `\r` and `\n`. `position` runs after `check_span`, so `line_start..offset` is in range and on a char boundary. `utf16_units` is `text.len()` when `is_ascii`, else `encode_utf16().count()`.
+`leftover_token` returns `None` for `LineBreak`, so a line-break-only span is not parse output. `page = "a\r\nb"` with tokens `[0..1, 2..3]` is ordered and exclusive; offset 2 sits between `\r` and `\n` and `check_offset` asserts. `position` runs after `check_span`, so `line_start..offset` is in range and on a char boundary. `utf16_units` is `text.len()` when `is_ascii`, else `encode_utf16().count()`.
 
 ## Origin
 
@@ -469,10 +429,10 @@ Deltas from that extract:
 - `token` is `&WithSpan<IsographSemanticToken>`. Span is an offset into `page_content`. Concatenating literals uses `with_offset(extraction_span.start)`.
 - `token_type` is `lsp_type_index(token.item)`. Private. Origin stored the index on the parser token.
 - Origin `split_inclusive('\n')` included the newline in `len`. `line_breaks` records `\r\n`, `\n`, and `\r`. `length` is the text before the break.
-- `single_line_pieces` then `encode_piece`. Origin's empty `split_inclusive` chunk had `len` equal to the newline. Empty or line-break-only is `NoText`.
+- `single_line_pieces` then `fold` of `encode_piece`. Origin's empty `split_inclusive` chunk had `len` equal to the newline. Empty or line-break-only spans `assert`.
 - `length` and `col` are UTF-16 (`utf16_units`). Origin used UTF-8 byte length.
 - `Position` is line and UTF-16 column from `LineCursor::position`. Origin used `chars().enumerate()` for `\n` and `text.len()` for last-line width.
-- Unordered, inverted, out-of-range, non-char-boundary, CRLF-interior, and no-text spans are `EncodeError`. Origin panics on a backwards slice.
+- Unordered, inverted, out-of-range, non-char-boundary, CRLF-interior, empty, and line-break-only spans `assert`. Origin panics on a backwards slice.
 
 ## Legend and `lsp_type_index`
 
@@ -579,7 +539,6 @@ isograph_parser = { path = "../isograph_parser" }
 lsp-types = { workspace = true }
 prelude = { path = "../prelude" }
 span = { path = "../span" }
-thiserror = { workspace = true }
 
 [lints]
 workspace = true
@@ -591,12 +550,10 @@ Workspace member via `./crates/*`.
 // from crates/isograph_lsp/src/lib.rs
 mod semantic_tokens;
 
-pub use semantic_tokens::{
-    EncodeError, lsp_semantic_tokens, semantic_token_legend,
-};
+pub use semantic_tokens::{lsp_semantic_tokens, semantic_token_legend};
 ```
 
-`single_line_pieces`, `split_at_line_breaks`, `SingleLinePiece`, `encode_piece`, `convert_to_lsp_semantic_token`, `RelativeToPrevious`, `SameLine`, `LaterLine`, `LineIndex`, `LineCursor`, `Position`, `LineBreak`, `line_breaks`, `utf16_units`, `lsp_type_index`, `legend_index` stay in the module. `legend_index` `expect`s that `LEGEND_TOKEN_TYPES` lists every type `lsp_type_index` maps.
+`single_line_pieces`, `pieces_for_token`, `split_at_line_breaks`, `SingleLinePiece`, `encode_piece`, `convert_to_lsp_semantic_token`, `RelativeToPrevious`, `SameLine`, `LaterLine`, `LineIndex`, `LineCursor`, `Position`, `LineBreak`, `line_breaks`, `utf16_units`, `lsp_type_index`, `legend_index` stay in the module. `legend_index` `expect`s that `LEGEND_TOKEN_TYPES` lists every type `lsp_type_index` maps. `check_span` and `split_at_line_breaks` `assert` on caller bugs (inverted, overlapping, out of range, non-char-boundary, CRLF-interior, empty, line-break-only).
 
 ## Tests
 
@@ -612,8 +569,7 @@ mod tests {
     use span::{Span, WithSpan, WithSpanPostfix};
 
     use super::{
-        EncodeError, InsideLineBreak, LineBreak, LineIndex, NotCharBoundary, OutOfRange,
-        Overlap, Position, SpanEnds, line_breaks, lsp_semantic_tokens, lsp_type_index,
+        LineBreak, LineIndex, Position, line_breaks, lsp_semantic_tokens, lsp_type_index,
         semantic_token_legend,
     };
 
@@ -656,9 +612,7 @@ mod tests {
         tokens: &[WithSpan<IsographSemanticToken>],
         page_content: &str,
     ) -> Vec<SemanticToken> {
-        lsp_semantic_tokens(tokens, page_content).expect(
-            "the fixture's spans are mutually exclusive, ordered, in range, on char boundaries, not inside a line break, and each contains text to highlight",
-        )
+        lsp_semantic_tokens(tokens, page_content)
     }
 
     #[test]
@@ -1134,51 +1088,43 @@ mod tests {
     }
 
     #[test]
-    fn a_span_of_only_line_breaks_is_an_error() {
+    #[should_panic(expected = "contains no text to highlight")]
+    fn a_span_of_only_line_breaks_panics() {
         let source = "\n\n";
         let tokens = IsographSemanticToken::Content
             .with_span(Span::from_usize(0, source.len()))
             .wrap_vec();
-        assert_eq!(
-            lsp_semantic_tokens(&tokens, source),
-            EncodeError::NoText(SpanEnds { start: 0, end: 2 }).wrap_err(),
-        );
+        lsp_semantic_tokens(&tokens, source);
     }
 
     #[test]
-    fn a_span_of_one_line_break_is_an_error() {
+    #[should_panic(expected = "contains no text to highlight")]
+    fn a_span_of_one_line_break_panics() {
         let source = "\n";
         let tokens = IsographSemanticToken::Content
             .with_span(Span::from_usize(0, source.len()))
             .wrap_vec();
-        assert_eq!(
-            lsp_semantic_tokens(&tokens, source),
-            EncodeError::NoText(SpanEnds { start: 0, end: 1 }).wrap_err(),
-        );
+        lsp_semantic_tokens(&tokens, source);
     }
 
     #[test]
-    fn a_span_of_only_crlf_is_an_error() {
+    #[should_panic(expected = "contains no text to highlight")]
+    fn a_span_of_only_crlf_panics() {
         let source = "\r\n";
         let tokens = IsographSemanticToken::Content
             .with_span(Span::from_usize(0, source.len()))
             .wrap_vec();
-        assert_eq!(
-            lsp_semantic_tokens(&tokens, source),
-            EncodeError::NoText(SpanEnds { start: 0, end: 2 }).wrap_err(),
-        );
+        lsp_semantic_tokens(&tokens, source);
     }
 
     #[test]
-    fn a_span_of_only_cr_is_an_error() {
+    #[should_panic(expected = "contains no text to highlight")]
+    fn a_span_of_only_cr_panics() {
         let source = "\r";
         let tokens = IsographSemanticToken::Content
             .with_span(Span::from_usize(0, source.len()))
             .wrap_vec();
-        assert_eq!(
-            lsp_semantic_tokens(&tokens, source),
-            EncodeError::NoText(SpanEnds { start: 0, end: 1 }).wrap_err(),
-        );
+        lsp_semantic_tokens(&tokens, source);
     }
 
     #[test]
@@ -1222,109 +1168,81 @@ mod tests {
     }
 
     #[test]
-    fn an_empty_span_is_an_error() {
+    #[should_panic(expected = "contains no text to highlight")]
+    fn an_empty_span_panics() {
         let source = "a";
         let tokens = IsographSemanticToken::Keyword
             .with_span(Span::from_usize(0, 0))
             .wrap_vec();
-        assert_eq!(
-            lsp_semantic_tokens(&tokens, source),
-            EncodeError::NoText(SpanEnds { start: 0, end: 0 }).wrap_err(),
-        );
+        lsp_semantic_tokens(&tokens, source);
     }
 
     #[test]
-    fn overlapping_spans_are_an_error() {
+    #[should_panic(expected = "mutually exclusive and ordered")]
+    fn overlapping_spans_panic() {
         let source = "abcd";
         let tokens = vec![
             IsographSemanticToken::Keyword.with_span(Span::from_usize(0, 2)),
             IsographSemanticToken::Type.with_span(Span::from_usize(1, 3)),
         ];
-        assert_eq!(
-            lsp_semantic_tokens(&tokens, source),
-            EncodeError::Overlap(Overlap {
-                start: 1,
-                end: 3,
-                previous_end: 2,
-            })
-            .wrap_err(),
-        );
+        lsp_semantic_tokens(&tokens, source);
     }
 
     #[test]
-    fn out_of_order_spans_are_an_error() {
+    #[should_panic(expected = "mutually exclusive and ordered")]
+    fn out_of_order_spans_panic() {
         let source = "abcd";
         let tokens = vec![
             IsographSemanticToken::Keyword.with_span(Span::from_usize(2, 4)),
             IsographSemanticToken::Type.with_span(Span::from_usize(0, 1)),
         ];
-        assert_eq!(
-            lsp_semantic_tokens(&tokens, source),
-            EncodeError::Overlap(Overlap {
-                start: 0,
-                end: 1,
-                previous_end: 4,
-            })
-            .wrap_err(),
-        );
+        lsp_semantic_tokens(&tokens, source);
     }
 
     #[test]
-    fn inverted_span_is_an_error() {
+    #[should_panic(expected = "is inverted")]
+    fn inverted_span_panics() {
         let source = "abcd";
         let tokens = IsographSemanticToken::Keyword
             .with_span(Span { start: 3, end: 1 })
             .wrap_vec();
-        assert_eq!(
-            lsp_semantic_tokens(&tokens, source),
-            EncodeError::Inverted(SpanEnds { start: 3, end: 1 }).wrap_err(),
-        );
+        lsp_semantic_tokens(&tokens, source);
     }
 
     #[test]
-    fn out_of_range_span_is_an_error() {
+    #[should_panic(expected = "out of range")]
+    fn out_of_range_span_panics() {
         let source = "ab";
         let tokens = IsographSemanticToken::Keyword
             .with_span(Span::from_usize(0, 5))
             .wrap_vec();
-        assert_eq!(
-            lsp_semantic_tokens(&tokens, source),
-            EncodeError::OutOfRange(OutOfRange { offset: 5, len: 2 }).wrap_err(),
-        );
+        lsp_semantic_tokens(&tokens, source);
     }
 
     #[test]
-    fn a_span_inside_a_multibyte_char_is_an_error() {
+    #[should_panic(expected = "not a char boundary")]
+    fn a_span_inside_a_multibyte_char_panics() {
         let source = "aéb";
         let tokens = IsographSemanticToken::Keyword
             .with_span(Span::from_usize(2, 3))
             .wrap_vec();
-        assert_eq!(
-            lsp_semantic_tokens(&tokens, source),
-            EncodeError::NotCharBoundary(NotCharBoundary { offset: 2 }).wrap_err(),
-        );
+        lsp_semantic_tokens(&tokens, source);
     }
 
     #[test]
-    fn a_span_strictly_inside_crlf_is_an_error() {
+    #[should_panic(expected = "strictly inside a line break")]
+    fn a_span_strictly_inside_crlf_panics() {
         let source = "a\r\nb";
         let tokens = vec![
             IsographSemanticToken::Keyword.with_span(Span::from_usize(0, 1)),
             IsographSemanticToken::Type.with_span(Span::from_usize(2, 3)),
         ];
-        assert_eq!(
-            lsp_semantic_tokens(&tokens, source),
-            EncodeError::InsideLineBreak(InsideLineBreak {
-                offset: 2,
-                start: 1,
-                after: 3,
-            })
-            .wrap_err(),
-        );
+        lsp_semantic_tokens(&tokens, source);
     }
 
     #[test]
-    fn reversed_literals_are_an_error() {
+    #[should_panic(expected = "mutually exclusive and ordered")]
+    fn reversed_literals_panic() {
         let source = "iso(`entrypoint Query.A`)\niso(`entrypoint Query.B`)";
         let first = "entrypoint Query.A";
         let second = "entrypoint Query.B";
@@ -1334,10 +1252,7 @@ mod tests {
         let parsed_b = parse_iso_literal(second);
         let mut tokens = rebased(&parsed_b.tokens, second_start as u32);
         tokens.extend(rebased(&parsed_a.tokens, first_start as u32));
-        assert!(matches!(
-            lsp_semantic_tokens(&tokens, source),
-            Err(EncodeError::Overlap(_)),
-        ));
+        lsp_semantic_tokens(&tokens, source);
     }
 
     #[test]
@@ -1393,23 +1308,23 @@ mod tests {
 
 `a_span_starting_at_a_line_break_emits_the_text_after_it`: fused `\n  x`. Parser leftover would not fuse this; the encoder still emits `  x`. One LSP token.
 
-`a_span_of_only_line_breaks_is_an_error`: `\n\n` is `NoText`. Parser leftover does not record `LineBreak`.
+`a_span_of_only_line_breaks_panics`: `\n\n` has no line of text. Parser leftover does not record `LineBreak`.
 
-`a_span_of_one_line_break_is_an_error`: `\n` is `NoText`.
+`a_span_of_one_line_break_panics`: `\n` has no line of text.
 
-`a_span_of_only_crlf_is_an_error`: `\r\n` is `NoText`.
+`a_span_of_only_crlf_panics`: `\r\n` has no line of text.
 
-`a_span_of_only_cr_is_an_error`: `\r` is `NoText`.
+`a_span_of_only_cr_panics`: `\r` has no line of text.
 
 `no_tokens_encodes_empty`: no isograph tokens, no LSP tokens.
 
 `utf16_length_of_a_surrogate_pair`: `😀` is bytes 1..5 of `a😀b`, two UTF-16 units.
 
-`an_empty_span_is_an_error`: `0..0` is `NoText`.
+`an_empty_span_panics`: `0..0` has no text.
 
 `position_counts_utf16_on_the_line`: `a😀` is 3 UTF-16 units (1 + 2).
 
-`a_span_strictly_inside_crlf_is_an_error`: tokens `[0..1, 2..3]` on `"a\r\nb"`; offset 2 is inside `{ start: 1, after: 3 }`.
+`a_span_strictly_inside_crlf_panics`: tokens `[0..1, 2..3]` on `"a\r\nb"`; offset 2 is between `\r` and `\n`.
 
 `lsp_type_index_matches_the_legend`: `legend.token_types[lsp_type_index(token)]` is the `SemanticTokenType` that variant maps to. Inserting a type at the front of `LEGEND_TOKEN_TYPES` fails this test.
 
