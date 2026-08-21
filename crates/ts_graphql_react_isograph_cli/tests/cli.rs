@@ -128,6 +128,21 @@ fn stdout(output: &Output) -> String {
     String::from_utf8_lossy(output.stdout.reference()).into_owned()
 }
 
+fn stderr(output: &Output) -> String {
+    String::from_utf8_lossy(output.stderr.reference()).into_owned()
+}
+
+/// The path as it appears in the daemon's JSON log, where `\` is escaped.
+fn path_in_json_log(path: &str) -> String {
+    path.replace('\\', "\\\\")
+}
+
+// freddie_cli's stop without --force is SIGTERM, which it does not send on Windows.
+#[cfg(windows)]
+const STOP: &[&str] = &["stop", "--force"];
+#[cfg(not(windows))]
+const STOP: &[&str] = &["stop"];
+
 #[test]
 fn start_then_status_reports_running() {
     let daemon = Daemon::start();
@@ -155,9 +170,10 @@ fn the_log_contains_the_config_path() {
         .expect("the fixture exists")
         .display()
         .to_string();
+    let path_in_log = path_in_json_log(path.reference());
     poll(|| {
         let log = daemon.log_text();
-        (log.contains("isograph daemon up") && log.contains(path.reference())).then_some(())
+        (log.contains("isograph daemon up") && log.contains(path_in_log.reference())).then_some(())
     });
 }
 
@@ -165,8 +181,13 @@ fn the_log_contains_the_config_path() {
 fn stop_then_status_reports_not_running() {
     let daemon = Daemon::start();
     assert!(daemon.isograph(["status"].reference()).status.success());
-    let stopped = daemon.isograph(["stop"].reference());
-    assert!(stopped.status.success());
+    let stopped = daemon.isograph(STOP);
+    assert!(
+        stopped.status.success(),
+        "stdout: {} stderr: {}",
+        stdout(stopped.reference()),
+        stderr(stopped.reference())
+    );
     poll(|| (!daemon.isograph(["status"].reference()).status.success()).then_some(()));
 }
 
