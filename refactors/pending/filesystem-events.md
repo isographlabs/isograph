@@ -156,8 +156,6 @@ struct IsographArgs {
 
 ```rust
 // from crates/isograph_cli/src/daemon.rs
-use std::net::SocketAddr;
-
 use prelude::Postfix;
 use tokio::sync::mpsc::unbounded_channel;
 use tracing::{error, info};
@@ -209,14 +207,7 @@ async fn serve(
             return;
         }
     };
-    let port = match socket.local_addr() {
-        Ok(SocketAddr::V4(addr)) => addr.port(),
-        Ok(SocketAddr::V6(addr)) => addr.port(),
-        Err(e) => {
-            error!(error = %e, "the event socket bound but has no local address");
-            return;
-        }
-    };
+    let port = socket.local_addr().port();
     let port_file = instance.log_dir().join(format!("{}.port", instance.slug()));
     if let Err(e) = std::fs::write(port_file.reference(), format!("{port}\n")) {
         error!(error = %e, path = %port_file.display(), "could not write the port file");
@@ -256,11 +247,7 @@ async fn serve(
 }
 ```
 
-`freddie_event_socket::listen` today returns `EventSocket` without `local_addr`. Binding `0` is useless unless the bound port is readable. Change 1 includes a prefactor in freddie: `EventSocket` stores the `SocketAddr` it bound and exposes `local_addr(&self) -> io::Result<SocketAddr>`. The bind is already synchronous on a `StdTcpListener`; that listener's `local_addr()` is the value. i2 cannot invent a second listener to learn the port: two binds of `0` are two ports.
-
-If that freddie change is not acceptable as a pin-rev of `freddie_event_socket`, bind with `std` first, read `local_addr`, then convert to the tokio listener and pass that in. That would be a fork of `listen`. The freddie prefactor is the smaller change. It is a pin-rev of the git dependency already used for `freddie_cli`. Raise: this is a change to freddie, not only i2. The alternative that stays in i2 is `--port` required when we need to send, which makes OS-assigned ports unusable and makes two configs collide on a default. Do the freddie prefactor.
-
-`listen(0, ...)` plus `local_addr` is the combination. `None` for `--port` is OS-assigned.
+`listen(0, ...)` plus `socket.local_addr().port()` is the combination. `None` for `--port` is OS-assigned. `EventSocket::local_addr` returns `SocketAddr`, not `io::Result`: the address is captured at bind, so an `EventSocket` that exists has one. That method is freddie `refactors/pending/event-socket-local-addr.md`. This change pin-revs `freddie_event_socket` to the commit that landed it. Do not fork `listen` in i2.
 
 `Filesystem::Watch` in this change is the same as `Injected`: no watcher yet. The flag is parsed and logged so change 4 only fills the arm.
 
