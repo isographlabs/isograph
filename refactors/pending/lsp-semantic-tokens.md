@@ -2,7 +2,7 @@
 
 Requires `HostLanguage` in `crates/isograph_compiler` (landed). Opening a JavaScript or TypeScript file in VS Code colors the contents of each `iso(\`...\`)` (and `iso\`...\``) according to the grammar: `field` / `entrypoint` / `to` as keywords, type names as classes, field and selection names as properties, and so on.
 
-Changes 1–2 land: `file_literals` and the legend/absolutize walk. Change 3's standalone stdio `isograph lsp` loop is not the process in `docs-website/docs/design-docs/event-model.md`. The LSP adapter in the daemon calls these functions. `didOpen` / `didChange` / `didClose` become `EditorChanged`. `semanticTokens/full` is answered by the adapter reading `OpenFile` else `DiskFile`. The vscode-extension spawn of `isograph lsp` becomes the stdio proxy (`refactors/pending/event-model.md` item 6). Until that adapter exists, change 3 is not the next slice.
+Changes 1–2 land: `file_literals` and concatenating their tokens into `lsp_semantic_tokens`. Change 3's standalone stdio `isograph lsp` loop is not the process in `docs-website/docs/design-docs/event-model.md`. The LSP adapter in the daemon calls these functions. `didOpen` / `didChange` / `didClose` become `EditorChanged`. `semanticTokens/full` is answered by the adapter reading `OpenFile` else `DiskFile`. The vscode-extension spawn of `isograph lsp` becomes the stdio proxy (`refactors/pending/event-model.md` item 6). Until that adapter exists, change 3 is not the next slice.
 
 ## What the user does
 
@@ -25,14 +25,14 @@ Most important first.
 ```rust
 // from crates/isograph_lsp/src/file_literals.rs
 use isograph_compiler::{HostLanguage, IsoLiteralError};
-use isograph_parser::{IsoLiteralParse, SemanticToken, parse_iso_literal};
+use isograph_parser::{IsoLiteralParse, IsographSemanticToken, parse_iso_literal};
 use span::WithSpan;
 
 pub struct FileLiteral<'a, THostLanguage: HostLanguage> {
     pub extraction: WithSpan<(&'a str, THostLanguage::LiteralContext)>,
     pub parse: Option<WithSpan<IsoLiteralParse>>,
     pub errors: Vec<WithSpan<IsoLiteralError<THostLanguage>>>,
-    pub tokens: Vec<WithSpan<SemanticToken>>,
+    pub tokens: Vec<WithSpan<IsographSemanticToken>>,
 }
 
 pub fn file_literals<THostLanguage: HostLanguage>(
@@ -72,20 +72,9 @@ pub struct LspState<THostLanguage: HostLanguage> {
 
 Key is `uri.as_str()`. Value is the full document text from `didOpen` / `didChange`. `host` is the extraction implementor the binary passed to `start`.
 
-```rust
-// from crates/isograph_lsp/src/semantic_tokens.rs
-pub struct AbsoluteToken {
-    pub absolute_char_start: u32,
-    pub len: u32,
-    pub semantic_token: SemanticToken,
-}
-```
-
-Origin: `AbsoluteIsographSemanticToken` in isograph's `semantic_tokens.rs`. Delta: `IsographSemanticToken` is i2's `SemanticToken`.
-
 ## Change 1: `file_literals`
 
-New crate `crates/isograph_lsp`. Workspace member via `./crates/*`.
+encoding.md created `crates/isograph_lsp` with `lsp_semantic_tokens` and `semantic_token_legend`. This change adds `file_literals`. Workspace member via `./crates/*`. The `Cargo.toml` below is the crate after this change: encoding.md's deps plus `isograph_compiler`, `lsp-server`, `serde_json`, `tracing`, and the extract-typescript dev-dependency.
 
 ```toml
 # from crates/isograph_lsp/Cargo.toml
@@ -141,7 +130,7 @@ pub fn start<THostLanguage: HostLanguage>(host: THostLanguage) -> std::process::
 #[cfg(test)]
 mod tests {
     use isograph_extract_typescript::TypeScriptHostLanguage;
-    use isograph_parser::{IsoLiteralItem, SemanticToken};
+    use isograph_parser::{IsoLiteralItem, IsographSemanticToken};
     use intern::string_key::Intern;
     use prelude::Postfix;
     use span::{Span, WithSpanPostfix};
@@ -187,7 +176,7 @@ mod tests {
         assert!(
             literals[0]
                 .tokens
-                .contains(&SemanticToken::Keyword.with_span(span_of(
+                .contains(&IsographSemanticToken::Keyword.with_span(span_of(
                     literals[0].extraction.item.0,
                     "field"
                 )))
@@ -221,286 +210,85 @@ iso(`entrypoint Query.HomeRoute`)";
 
 `with_span` needs `WithSpanPostfix` in the test module.
 
-## Change 2: legend, absolutize, LSP encoding
+## Change 2: concatenate literals, call `lsp_semantic_tokens`
 
-Origin: isograph `crates/isograph_lsp/src/semantic_tokens.rs` and `crates/isograph_lang_types/src/semantic_token_legend/mod.rs`. The legend token-type list is identical, in the same order, so the indices match isograph's `LspSemanticToken(n)` constants.
-
-```rust
-// from crates/isograph_lsp/src/semantic_tokens.rs
-use isograph_parser::SemanticToken;
-use lsp_types::{
-    SemanticToken as LspSemanticToken, SemanticTokenModifier, SemanticTokenType,
-    SemanticTokensLegend,
-};
-
-pub fn semantic_token_legend() -> SemanticTokensLegend {
-    SemanticTokensLegend {
-        token_types: vec![
-            SemanticTokenType::NAMESPACE,
-            SemanticTokenType::TYPE,
-            SemanticTokenType::CLASS,
-            SemanticTokenType::ENUM,
-            SemanticTokenType::INTERFACE,
-            SemanticTokenType::STRUCT,
-            SemanticTokenType::TYPE_PARAMETER,
-            SemanticTokenType::PARAMETER,
-            SemanticTokenType::VARIABLE,
-            SemanticTokenType::PROPERTY,
-            SemanticTokenType::ENUM_MEMBER,
-            SemanticTokenType::EVENT,
-            SemanticTokenType::FUNCTION,
-            SemanticTokenType::METHOD,
-            SemanticTokenType::MACRO,
-            SemanticTokenType::KEYWORD,
-            SemanticTokenType::MODIFIER,
-            SemanticTokenType::COMMENT,
-            SemanticTokenType::STRING,
-            SemanticTokenType::NUMBER,
-            SemanticTokenType::REGEXP,
-            SemanticTokenType::OPERATOR,
-            SemanticTokenType::DECORATOR,
-        ],
-        token_modifiers: vec![
-            SemanticTokenModifier::DECLARATION,
-            SemanticTokenModifier::DEFINITION,
-            SemanticTokenModifier::READONLY,
-            SemanticTokenModifier::STATIC,
-            SemanticTokenModifier::DEPRECATED,
-            SemanticTokenModifier::ABSTRACT,
-            SemanticTokenModifier::ASYNC,
-        ],
-    }
-}
-
-const LSP_ST_TYPE: u32 = 1;
-const LSP_ST_CLASS: u32 = 2;
-const LSP_ST_PARAMETER: u32 = 7;
-const LSP_ST_VARIABLE: u32 = 8;
-const LSP_ST_PROPERTY: u32 = 9;
-const LSP_ST_KEYWORD: u32 = 15;
-const LSP_ST_COMMENT: u32 = 17;
-const LSP_ST_STRING: u32 = 18;
-const LSP_ST_NUMBER: u32 = 19;
-const LSP_ST_OPERATOR: u32 = 21;
-const LSP_ST_DECORATOR: u32 = 22;
-
-pub fn lsp_type_index(token: SemanticToken) -> u32 {
-    match token {
-        SemanticToken::Keyword => LSP_ST_KEYWORD,
-        SemanticToken::Type => LSP_ST_CLASS,
-        SemanticToken::FieldName => LSP_ST_PROPERTY,
-        SemanticToken::ObjectKey => LSP_ST_PROPERTY,
-        SemanticToken::GraphQLTypeName => LSP_ST_TYPE,
-        SemanticToken::DirectiveName => LSP_ST_DECORATOR,
-        SemanticToken::Variable => LSP_ST_VARIABLE,
-        SemanticToken::Argument => LSP_ST_PARAMETER,
-        SemanticToken::Integer => LSP_ST_NUMBER,
-        SemanticToken::String => LSP_ST_STRING,
-        SemanticToken::BooleanOrNull => LSP_ST_VARIABLE,
-        SemanticToken::Period
-        | SemanticToken::Colon
-        | SemanticToken::Equals
-        | SemanticToken::Parenthesis
-        | SemanticToken::Brace
-        | SemanticToken::Content
-        | SemanticToken::Bracket => LSP_ST_OPERATOR,
-        SemanticToken::Error => LSP_ST_COMMENT,
-    }
-}
-```
-
-Delta from isograph's per-constant `lsp_semantic_token`: i2 has one `SemanticToken` enum. `FieldName` is PROPERTY (isograph uses METHOD for `Type.name` and PROPERTY for selections). `Error` is COMMENT. `Content` is OPERATOR.
-
-Absolutize and encode, origin isograph `semantic_tokens.rs`. Delta: `text_source.span` is `extraction.location`; `IsographSemanticToken` is `SemanticToken`; no pico; no `uri_is_project_file`; `page_content` is the open file text.
+encoding.md landed `semantic_token_legend` and `lsp_semantic_tokens`. This change concatenates each `FileLiteral`'s tokens rebased with `with_offset(extraction.location.start)` and calls `lsp_semantic_tokens`. Origin concatenated by building `AbsoluteToken` via `split_inclusive('\n')` and byte-length `delta_line_delta_start`. encoding.md replaced that encoding.
 
 ```rust
 // from crates/isograph_lsp/src/semantic_tokens.rs
 use isograph_compiler::HostLanguage;
+use span::WithSpanPostfix;
 
-use crate::file_literals::{FileLiteral, file_literals};
+use crate::file_literals::file_literals;
 
 pub fn lsp_tokens_for_file<THostLanguage: HostLanguage>(
     host: &THostLanguage,
     source: &str,
-) -> Vec<LspSemanticToken> {
+) -> Vec<lsp_types::SemanticToken> {
     let literals = file_literals(host, source);
-    let absolute = concatenate_and_absolutize(literals.iter(), source);
-    convert_absolute_token_to_lsp_token(absolute, source).collect()
-}
-
-fn concatenate_and_absolutize<'a, THostLanguage: HostLanguage>(
-    literals: impl Iterator<Item = &'a FileLiteral<'a, THostLanguage>> + 'a,
-    page_content: &'a str,
-) -> impl Iterator<Item = AbsoluteToken> + 'a {
-    literals.flat_map(move |literal| {
-        let iso_literal_extraction_span = literal.extraction.location;
-        literal.tokens.iter().flat_map(move |relative_token| {
-            absolutize_relative_token(page_content, iso_literal_extraction_span, relative_token)
-        })
-    })
-}
-
-fn absolutize_relative_token<'a>(
-    page_content: &'a str,
-    iso_literal_extraction_span: span::Span,
-    relative_token: &'a WithSpan<SemanticToken>,
-) -> impl Iterator<Item = AbsoluteToken> + 'a {
-    let start = iso_literal_extraction_span.start as usize
-        + relative_token.location.start as usize;
-    let end = iso_literal_extraction_span.start as usize
-        + relative_token.location.end as usize;
-    let span_content = &page_content[start..end];
-    span_content
-        .split_inclusive('\n')
-        .scan(0, move |iterated_so_far_within_token, line_text| {
-            let token = AbsoluteToken {
-                absolute_char_start: iso_literal_extraction_span.start
-                    + relative_token.location.start
-                    + *iterated_so_far_within_token,
-                len: line_text.len() as u32,
-                semantic_token: relative_token.item,
-            };
-            *iterated_so_far_within_token += line_text.len() as u32;
-            token.wrap_some()
-        })
-}
-
-fn convert_absolute_token_to_lsp_token<'a>(
-    absolute_tokens: impl Iterator<Item = AbsoluteToken> + 'a,
-    page_content: &'a str,
-) -> impl Iterator<Item = LspSemanticToken> + 'a {
-    absolute_tokens.scan(0, |last_token_start, absolute_token| {
-        let new_token_start = absolute_token.absolute_char_start;
-        let in_between_content =
-            &page_content[(*last_token_start as usize)..(new_token_start as usize)];
-        let (delta_line, delta_start) = delta_line_delta_start(in_between_content);
-        let token = LspSemanticToken {
-            delta_line,
-            delta_start,
-            length: absolute_token.len,
-            token_type: lsp_type_index(absolute_token.semantic_token),
-            token_modifiers_bitset: 0,
-        };
-        *last_token_start = absolute_token.absolute_char_start;
-        token.wrap_some()
-    })
-}
-
-pub fn delta_line_delta_start(text: &str) -> (u32, u32) {
-    let mut last_line_break_index = 0;
-    let mut line_break_count = 0;
-    for (index, char) in text.chars().enumerate() {
-        if char == '\n' {
-            line_break_count += 1;
-            last_line_break_index = index as u32 + 1;
-        }
+    let mut tokens = Vec::new();
+    for literal in &literals {
+        tokens.extend(literal.tokens.iter().map(|token| {
+            token
+                .item
+                .with_span(token.location.with_offset(literal.extraction.location.start))
+        }));
     }
-    (line_break_count, text.len() as u32 - last_line_break_index)
+    lsp_semantic_tokens(&tokens, source)
 }
 ```
 
-Origin of `absolutize_relative_token`, `convert_absolute_token_to_lsp_token`, `delta_line_delta_start`: isograph `semantic_tokens.rs`, verbatim except the type names above.
+`tokens` after the loop are offsets into `source`, in extraction order. `lsp_semantic_tokens` asserts they are ordered, exclusive, and have text. Extraction order is source order.
 
 Tests:
 
 ```rust
 // from crates/isograph_lsp/src/semantic_tokens.rs
 #[cfg(test)]
-mod tests {
+mod file_tests {
     use isograph_extract_typescript::TypeScriptHostLanguage;
-    use isograph_parser::SemanticToken;
-    use prelude::Postfix;
 
-    use super::{
-        AbsoluteToken, concatenate_and_absolutize, delta_line_delta_start, lsp_type_index,
-        lsp_tokens_for_file,
-    };
-    use crate::file_literals::file_literals;
-
-    fn absolute_for(source: &str) -> Vec<AbsoluteToken> {
-        let literals = file_literals(&TypeScriptHostLanguage, source);
-        concatenate_and_absolutize(literals.iter(), source).collect()
-    }
-
-    fn covering<'a>(
-        tokens: &'a [AbsoluteToken],
-        source: &str,
-        pattern: &str,
-    ) -> &'a AbsoluteToken {
-        let mut occurrences = source.match_indices(pattern);
-        let (start, _) = occurrences
-            .next()
-            .expect("the pattern the test anchors on occurs in the file");
-        assert!(
-            occurrences.next().is_none(),
-            "the pattern the test anchors on occurs exactly once in the file"
-        );
-        let start = start as u32;
-        let end = start + pattern.len() as u32;
-        tokens
-            .iter()
-            .find(|token| {
-                token.absolute_char_start <= start
-                    && token.absolute_char_start + token.len >= end
-            })
-            .expect("a token covers the pattern")
-    }
+    use super::{CLASS, KEYWORD, PROPERTY, lsp_tokens_for_file};
 
     #[test]
-    fn field_keyword_is_keyword_at_its_file_offset() {
+    fn field_keyword_is_the_first_lsp_token() {
         let source = "export const fullName = iso(`field Pet.fullName { id }`)(";
-        let tokens = absolute_for(source);
-        let token = covering(&tokens, source, "field");
-        assert_eq!(token.semantic_token, SemanticToken::Keyword);
-        assert_eq!(lsp_type_index(token.semantic_token), 15);
+        let lsp = lsp_tokens_for_file(&TypeScriptHostLanguage, source);
+        let field_at = source.find("field").expect("the fixture contains field") as u32;
+        assert_eq!(lsp[0].token_type, KEYWORD);
+        assert_eq!(lsp[0].delta_line, 0);
+        assert_eq!(lsp[0].delta_start, field_at);
+        assert_eq!(lsp[0].length, 5);
+        assert_eq!(lsp[0].token_modifiers_bitset, 0);
     }
 
     #[test]
     fn pet_is_class_and_id_is_property() {
         let source = "export const fullName = iso(`field Pet.fullName { id }`)(";
-        let tokens = absolute_for(source);
-        assert_eq!(
-            covering(&tokens, source, "Pet").semantic_token,
-            SemanticToken::Type
-        );
-        assert_eq!(
-            covering(&tokens, source, "id").semantic_token,
-            SemanticToken::FieldName
-        );
-    }
-
-    #[test]
-    fn two_literals_tokens_are_file_absolute() {
-        let source = "iso(`entrypoint Query.A`)\niso(`entrypoint Query.B`)";
-        let tokens = absolute_for(source);
-        let a = covering(&tokens, source, "A");
-        let b = covering(&tokens, source, "B");
-        assert!(b.absolute_char_start > a.absolute_char_start);
-        assert_eq!(&source[a.absolute_char_start as usize..][..1], "A");
-        assert_eq!(&source[b.absolute_char_start as usize..][..1], "B");
-    }
-
-    #[test]
-    fn delta_line_delta_start_same_line() {
-        assert_eq!(delta_line_delta_start("   "), (0, 3));
-    }
-
-    #[test]
-    fn delta_line_delta_start_newline() {
-        assert_eq!(delta_line_delta_start("\n  "), (1, 2));
-    }
-
-    #[test]
-    fn lsp_tokens_for_a_file_are_nonempty() {
-        let source = "export const fullName = iso(`field Pet.fullName { id }`)(";
         let lsp = lsp_tokens_for_file(&TypeScriptHostLanguage, source);
-        assert!(!lsp.is_empty());
-        assert_eq!(lsp[0].token_modifiers_bitset, 0);
+        assert_eq!(lsp[1].token_type, CLASS);
+        assert_eq!(lsp[5].token_type, PROPERTY);
+    }
+
+    #[test]
+    fn two_literals_tokens_are_in_file_order() {
+        let source = "iso(`entrypoint Query.A`)\niso(`entrypoint Query.B`)";
+        let lsp = lsp_tokens_for_file(&TypeScriptHostLanguage, source);
+        assert_eq!(lsp.len(), 8);
+        assert_eq!(lsp[4].delta_line, 1);
+        assert_eq!(lsp[4].delta_start, 5);
+        assert_eq!(lsp[4].token_type, KEYWORD);
     }
 }
 ```
 
-`concatenate_and_absolutize` is `pub(crate)` so the tests in this module can call it. If it stays private, the tests live in the same module and call it.
+`file_tests` is a second `#[cfg(test)]` module in `semantic_tokens.rs` so encoding.md's `tests` module stays as written. `KEYWORD` / `CLASS` / `PROPERTY` are the legend indices encoding.md already defines.
+
+`field_keyword_is_the_first_lsp_token`: `field` is the first parser token in the extracted literal. `delta_start` is its file offset.
+
+`pet_is_class_and_id_is_property`: `Pet` is index 1, `id` is index 5 (`field`, `Pet`, `.`, `fullName`, `{`, `id`).
+
+`two_literals_tokens_are_in_file_order`: eight tokens. Index 4 is the second `entrypoint`. Previous piece is `A` on the previous line; `delta_line` 1, `delta_start` 5 (column of `entrypoint` after `iso(\``).
 
 ## Change 3: the server and `isograph lsp`
 
