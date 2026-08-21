@@ -2,7 +2,7 @@
 
 `Vec<WithSpan<SemanticToken>>` is literal-relative byte spans. LSP `textDocument/semanticTokens/full` wants `lsp_types::SemanticToken`: `delta_line`, `delta_start`, `length`, `token_type` index into a legend, `token_modifiers_bitset`. `delta_start` and `length` are UTF-16 code units. A token does not include a line break.
 
-`LineIndex` maps a byte offset to `(line, utf16_col)` and splits a span into nonempty single-line pieces. The encoder delta-encodes those positions: `delta_line = line - prev_line`; `delta_start` is `col - prev_col` on the same line and `col` after a line break; `length` is UTF-16 of the piece. Spans are file-absolute, mutually exclusive, ordered, in range, on char boundaries, and not strictly inside a line break. A violation is `EncodeError`. The caller rebases a literal-relative span with `with_offset` before concatenating literals. The server (lsp-semantic-tokens.md) logs the error and answers with empty tokens.
+`LineIndex` records every line-break index in `page_content` once. A `LineCursor` walks that vec as tokens are encoded (file order). `position(offset)` advances past breaks with `after <= offset`; `break_index` is the line. The encoder delta-encodes those positions: `delta_line = line - prev_line`; `delta_start` is `col - prev_col` on the same line and `col` after a line break; `length` is UTF-16 of the piece. Spans are file-absolute, mutually exclusive, ordered, in range, on char boundaries, and not strictly inside a line break. A violation is `EncodeError`. The caller rebases a literal-relative span with `with_offset` before concatenating literals. The server (lsp-semantic-tokens.md) logs the error and answers with empty tokens.
 
 Origin: `crates/isograph_lsp/src/semantic_tokens.rs` and `crates/isograph_lang_types/src/semantic_token_legend/mod.rs` in isograph. This crate is `crates/isograph_lsp`. It does not start the server. lsp-semantic-tokens.md adds `file_literals` and the stdio loop, and calls the functions here.
 
@@ -31,6 +31,7 @@ pub fn lsp_semantic_tokens(
     page_content: &str,
 ) -> Result<Vec<LspSemanticToken>, EncodeError> {
     let index = LineIndex::new(page_content);
+    let mut cursor = index.cursor();
     let mut last = Pos { line: 0, col: 0 };
     let mut last_span_end = 0u32;
     let mut encoded = Vec::new();
@@ -38,21 +39,36 @@ pub fn lsp_semantic_tokens(
         let span = token.location;
         index.check_span(span, last_span_end)?;
         last_span_end = span.end;
-        for piece in index.nonempty_pieces(span) {
-            let start = index.position(piece.start);
-            let delta_line = start.line - last.line;
-            let delta_start = match delta_line {
-                0 => start.col - last.col,
-                _ => start.col,
+        let mut piece_start = span.start;
+        while piece_start < span.end {
+            let start = cursor.position(piece_start);
+            let line_end = match cursor.break_before(span.end) {
+                Some(line_break) => line_break.start,
+                None => span.end,
             };
-            encoded.push(LspSemanticToken {
-                delta_line,
-                delta_start,
-                length: utf16_units(&page_content[piece.as_usize_range()]),
-                token_type: lsp_type_index(token.item),
-                token_modifiers_bitset: 0,
-            });
-            last = start;
+            if line_end > piece_start {
+                let delta_line = start.line - last.line;
+                encoded.push(LspSemanticToken {
+                    delta_line,
+                    delta_start: match delta_line {
+                        0 => start.col - last.col,
+                        _ => start.col,
+                    },
+                    length: utf16_units(
+                        &page_content[(piece_start as usize)..(line_end as usize)],
+                    ),
+                    token_type: lsp_type_index(token.item),
+                    token_modifiers_bitset: 0,
+                });
+                last = start;
+            }
+            match cursor.break_before(span.end) {
+                Some(line_break) => {
+                    piece_start = line_break.after;
+                    cursor.advance_break();
+                }
+                None => break,
+            }
         }
     }
     encoded.wrap_ok()
@@ -108,6 +124,12 @@ struct LineIndex<'a> {
     breaks: Vec<LineBreak>,
 }
 
+struct LineCursor<'a> {
+    text: &'a str,
+    breaks: &'a [LineBreak],
+    break_index: usize,
+}
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 struct Pos {
     line: u32,
@@ -120,18 +142,19 @@ struct LineBreak {
     after: u32,
 }
 
-struct PieceIter<'a> {
-    breaks: &'a [LineBreak],
-    end: u32,
-    piece_start: u32,
-    break_index: usize,
-}
-
 impl<'a> LineIndex<'a> {
     fn new(text: &'a str) -> Self {
         Self {
             text,
             breaks: line_breaks(text),
+        }
+    }
+
+    fn cursor(&self) -> LineCursor<'_> {
+        LineCursor {
+            text: self.text,
+            breaks: &self.breaks,
+            break_index: 0,
         }
     }
 
@@ -176,70 +199,34 @@ impl<'a> LineIndex<'a> {
         }
         ().wrap_ok()
     }
+}
 
-    fn position(&self, offset: u32) -> Pos {
-        let i = self.breaks.partition_point(|line_break| line_break.after <= offset);
-        let line_start = match i {
+impl LineCursor<'_> {
+    fn position(&mut self, offset: u32) -> Pos {
+        while self.break_index < self.breaks.len()
+            && self.breaks[self.break_index].after <= offset
+        {
+            self.break_index += 1;
+        }
+        let line_start = match self.break_index {
             0 => 0,
             n => self.breaks[n - 1].after,
         };
         Pos {
-            line: i as u32,
+            line: self.break_index as u32,
             col: utf16_units(&self.text[(line_start as usize)..(offset as usize)]),
         }
     }
 
-    fn nonempty_pieces(&self, span: Span) -> PieceIter<'_> {
-        let break_index = self
-            .breaks
-            .partition_point(|line_break| line_break.after <= span.start);
-        PieceIter {
-            breaks: &self.breaks,
-            end: span.end,
-            piece_start: span.start,
-            break_index,
-        }
+    fn break_before(&self, span_end: u32) -> Option<LineBreak> {
+        self.breaks
+            .get(self.break_index)
+            .filter(|line_break| line_break.start < span_end)
+            .copied()
     }
-}
 
-impl Iterator for PieceIter<'_> {
-    type Item = Span;
-
-    fn next(&mut self) -> Option<Span> {
-        loop {
-            if self.piece_start >= self.end {
-                return None;
-            }
-            while self.break_index < self.breaks.len()
-                && self.breaks[self.break_index].start < self.piece_start
-            {
-                self.break_index += 1;
-            }
-            match self
-                .breaks
-                .get(self.break_index)
-                .filter(|line_break| line_break.start < self.end)
-            {
-                Some(line_break) => {
-                    let start = self.piece_start;
-                    let line_end = line_break.start;
-                    self.piece_start = line_break.after;
-                    self.break_index += 1;
-                    if line_end > start {
-                        return Span::new(start, line_end).wrap_some();
-                    }
-                }
-                None => {
-                    let start = self.piece_start;
-                    let end = self.end;
-                    self.piece_start = end;
-                    if end > start {
-                        return Span::new(start, end).wrap_some();
-                    }
-                    return None;
-                }
-            }
-        }
+    fn advance_break(&mut self) {
+        self.break_index += 1;
     }
 }
 
@@ -283,11 +270,13 @@ fn utf16_units(text: &str) -> u32 {
 }
 ```
 
-`last` is the previous piece's start `Pos`. Same-line `delta_start` is `start.col - last.col` (start-to-start). After a line break it is `start.col`. A blank line inside a span is a zero-length piece; `PieceIter` skips it. The next piece's `position` counts those breaks in `line`.
+`LineIndex` holds every break index from one scan of `page_content`. `LineCursor` walks that vec: `break_index` is the first break not yet passed. `position(offset)` advances while `after <= offset` (each such advance is one line). `break_before` peeks the current break if it starts before `span.end`. `advance_break` consumes it and moves to the next line. Tokens are in file order, so the cursor only moves forward. `break_index` is the line number after those advances.
+
+`last` is the previous piece's start `Pos`. Same-line `delta_start` is `start.col - last.col`. After a line break it is `start.col`. A blank line inside a span is `line_end == piece_start`; nothing is emitted, then `advance_break` still runs, so the next `position` is on the following line.
 
 `check_span` runs before any slice. Ordered exclusive spans are not enough: `page = "a\r\nb"` with tokens `[0..1, 2..3]` is ordered and exclusive, and offset 2 sits strictly inside the break `{ start: 1, after: 3 }`. Parser leftover skips `LineBreak` tokens, so this is a caller concat bug. `EncodeError` names it instead of panicking on `page_content[3..2]`.
 
-`position` is only called on a piece start after `check_span`, so `line_start..offset` is in range and on a char boundary.
+`position` is only called on a piece start after `check_span`, so `line_start..offset` is in range and on a char boundary. Offsets passed to the cursor are non-decreasing.
 
 `utf16_units` is `text.len()` when `is_ascii`, else `encode_utf16().count()`. Almost every iso lexeme is ASCII.
 
@@ -357,11 +346,11 @@ Checked against the LSP 3.17 encoding: five integers per token; `deltaLine` is l
 
 Deltas from that extract:
 
-- `LineIndex` / `Pos` / `nonempty_pieces`. Origin materializes `AbsoluteIsographSemanticToken` then delta-encodes from `last_token_start`. There is no `AbsoluteToken`, no `last_end` / `last_len` / `GapDelta`.
+- `LineIndex` holds every break. `LineCursor` walks it forward (`break_index` is the line). Origin materializes `AbsoluteIsographSemanticToken` then delta-encodes from `last_token_start`. There is no `AbsoluteToken`, no `partition_point` per piece.
 - `token` is `&WithSpan<SemanticToken>`. Span is file-absolute. The caller applied `with_offset(extraction_span.start)` when the parse was literal-relative.
 - `token_type` is `lsp_type_index(token.item)`, not a field on the parser token. `lsp_type_index` is private.
 - Origin `split_inclusive('\n')` kept the line break in `line_text`, so `len` included `\n` and the client may discard the token. Origin also treated only `\n` as a break. `line_breaks` records `\r\n` then `\n` then `\r`; `length` is the text before the break.
-- Empty pieces emit nothing. `PieceIter` skips a zero-length piece; `position` on the next piece counts the skipped breaks in `line`.
+- Empty pieces emit nothing. `advance_break` still runs, so the next `position` is on the following line.
 - Origin `line_text.len()` is UTF-8 bytes. `length` and `col` are UTF-16: `utf16_units`, ASCII `len()` otherwise `encode_utf16().count()`.
 - Origin `delta_line_delta_start` used `chars().enumerate()` for `\n` and `text.len()` (bytes) for the last-line width. `Pos` is `(line, utf16_col)` from `LineIndex::position`.
 - Unordered, inverted, out-of-range, non-char-boundary, and CRLF-interior spans are `EncodeError`. Origin sliced `page_content[last_token_start..new_start]` and panics on a backwards range. The server logs the error and returns empty tokens.
@@ -487,7 +476,7 @@ pub use semantic_tokens::{
 };
 ```
 
-`LineIndex`, `Pos`, `LineBreak`, `PieceIter`, `line_breaks`, `utf16_units`, `lsp_type_index`, `legend_index` stay in the module. Tests in that module call them. `legend_index` `expect`s that `LEGEND_TOKEN_TYPES` lists every type the match names.
+`LineIndex`, `LineCursor`, `Pos`, `LineBreak`, `line_breaks`, `utf16_units`, `lsp_type_index`, `legend_index` stay in the module. Tests in that module call them. `legend_index` `expect`s that `LEGEND_TOKEN_TYPES` lists every type the match names.
 
 ## Tests
 
@@ -576,39 +565,39 @@ mod tests {
     #[test]
     fn position_same_line() {
         let index = LineIndex::new("   abc");
-        assert_eq!(index.position(3), Pos { line: 0, col: 3 });
+        assert_eq!(index.cursor().position(3), Pos { line: 0, col: 3 });
     }
 
     #[test]
     fn position_after_newline() {
         let index = LineIndex::new("\n  x");
-        assert_eq!(index.position(3), Pos { line: 1, col: 2 });
+        assert_eq!(index.cursor().position(3), Pos { line: 1, col: 2 });
     }
 
     #[test]
     fn position_after_crlf_and_cr() {
         let index = LineIndex::new("\r\n  ");
-        assert_eq!(index.position(4), Pos { line: 1, col: 2 });
+        assert_eq!(index.cursor().position(4), Pos { line: 1, col: 2 });
         let index = LineIndex::new("\r  ");
-        assert_eq!(index.position(3), Pos { line: 1, col: 2 });
+        assert_eq!(index.cursor().position(3), Pos { line: 1, col: 2 });
         let index = LineIndex::new("a\r\nb");
-        assert_eq!(index.position(3), Pos { line: 1, col: 0 });
+        assert_eq!(index.cursor().position(3), Pos { line: 1, col: 0 });
         let index = LineIndex::new("x\n\ny");
-        assert_eq!(index.position(4), Pos { line: 2, col: 1 });
+        assert_eq!(index.cursor().position(4), Pos { line: 2, col: 1 });
         let index = LineIndex::new("é\r\n  ");
-        assert_eq!(index.position(6), Pos { line: 1, col: 2 });
+        assert_eq!(index.cursor().position(6), Pos { line: 1, col: 2 });
         let index = LineIndex::new("é\r  ");
-        assert_eq!(index.position(5), Pos { line: 1, col: 2 });
+        assert_eq!(index.cursor().position(5), Pos { line: 1, col: 2 });
     }
 
     #[test]
     fn position_counts_utf16_on_the_line() {
         let index = LineIndex::new("é\n  ");
-        assert_eq!(index.position(5), Pos { line: 1, col: 2 });
+        assert_eq!(index.cursor().position(5), Pos { line: 1, col: 2 });
         let index = LineIndex::new("aé");
-        assert_eq!(index.position(3), Pos { line: 0, col: 2 });
+        assert_eq!(index.cursor().position(3), Pos { line: 0, col: 2 });
         let index = LineIndex::new("a😀");
-        assert_eq!(index.position(5), Pos { line: 0, col: 3 });
+        assert_eq!(index.cursor().position(5), Pos { line: 0, col: 3 });
     }
 
     #[test]
