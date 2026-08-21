@@ -22,7 +22,6 @@ repos:
         language: system
         types: [rust]
         pass_filenames: false
-      # Stricter than ci.yml's clippy job: any warning blocks the commit.
       - id: cargo-clippy
         name: cargo clippy
         entry: cargo clippy --workspace --all-targets -- -D warnings
@@ -35,4 +34,32 @@ repos:
         entry: cargo test -p prelude --lib postfix_constructors
         language: system
         files: '\.(rs|md)$'
+        pass_filenames: false
+      - id: prettier
+        name: prettier
+        entry: pnpm exec prettier --experimental-cli --cache --config-path ./.prettierrc.json --check .
+        language: system
+        pass_filenames: false
+      - id: oxlint
+        name: oxlint
+        entry: pnpm run lint --deny-warnings
+        language: system
+        pass_filenames: false
+      - id: cargo-test
+        name: cargo test
+        entry: cargo test
+        language: system
+        types: [rust]
+        pass_filenames: false
+      - id: json-schema
+        name: build json schema
+        entry: ./scripts/check-json-schema.sh
+        language: system
+        files: 'crates/isograph_config/|libs/isograph-compiler/isograph-config-schema.json'
+        pass_filenames: false
+      - id: js-ci
+        name: compile-libs, unit tests, typecheck and lint demos
+        entry: ./scripts/check-js-ci.sh
+        language: system
+        files: '\.(js|jsx|cjs|mjs|ts|tsx)$'
         pass_filenames: false
