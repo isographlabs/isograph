@@ -4,7 +4,11 @@ use clap::{CommandFactory, FromArgMatches, Parser};
 use freddie_cli::{App, Instance, NoArgs};
 use prelude::Postfix;
 
+mod daemon;
 mod discover;
+mod effect;
+mod event;
+mod state;
 
 pub fn run() -> ExitCode {
     // First, so `--help` prints and a bad flag exits before the lock is taken.
@@ -55,9 +59,7 @@ impl App for Isograph {
         match discover::config_and_instance(id.config.as_deref()) {
             Ok((path, _, _config)) => {
                 tracing::info!(config = %path.display(), "isograph daemon up");
-                loop {
-                    std::thread::park();
-                }
+                crate::daemon::run();
             }
             Err(e) => {
                 tracing::error!(error = %e, "the config went away between naming this daemon and starting it");

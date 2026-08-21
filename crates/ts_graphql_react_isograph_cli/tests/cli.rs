@@ -141,7 +141,10 @@ fn the_log_contains_the_config_path() {
     let path_in_log = path_in_json_log(path.reference());
     poll(|| {
         let log = daemon.log_text();
-        (log.contains("isograph daemon up") && log.contains(path_in_log.reference())).then_some(())
+        (log.contains("isograph daemon up")
+            && log.contains(path_in_log.reference())
+            && log.contains("hello world"))
+        .then_some(())
     });
 }
 
@@ -157,6 +160,11 @@ fn stop_then_status_reports_not_running() {
         stderr(stopped.reference())
     );
     poll(|| (!daemon.isograph(["status"].reference()).status.success()).then_some(()));
+    #[cfg(not(windows))]
+    poll(|| {
+        let log = daemon.log_text();
+        (log.contains("SIGTERM: quitting") && log.contains("kill: exiting")).then_some(())
+    });
 }
 
 #[test]

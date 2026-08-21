@@ -59,6 +59,7 @@ use prelude::Postfix;
 pub struct IsographState;
 
 impl IsographState {
+    #[expect(clippy::unused_self)]
     pub fn handle(&mut self, event: IsographEvent) -> Vec<IsographEffect> {
         match event {
             IsographEvent::HelloWorld => IsographEffect::LogHelloWorld.wrap_vec(),

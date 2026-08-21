@@ -1,0 +1,139 @@
+use std::ops::ControlFlow;
+
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
+
+use crate::effect::IsographEffect;
+use crate::event::IsographEvent;
+use crate::state::IsographState;
+
+pub fn run() {
+    let runtime = match tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(runtime) => runtime,
+        Err(e) => {
+            tracing::error!(error = %e, "could not start the tokio runtime");
+            return;
+        }
+    };
+    runtime.block_on(serve());
+}
+
+async fn serve() {
+    let (event_tx, event_rx) = unbounded_channel::<IsographEvent>();
+    let (effect_tx, effect_rx) = unbounded_channel::<IsographEffect>();
+    let _ = event_tx.send(IsographEvent::HelloWorld);
+
+    // `isograph stop` sends SIGTERM. Route it into the event channel as Quit, so the
+    // model turns it into Kill, the effect loop breaks, and serve returns.
+    //
+    // A spawned task rather than a third `select!` arm, because an arm that completed
+    // would drop the other two futures and skip the graceful path this exists to run.
+    #[cfg(unix)]
+    match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+        Ok(mut term) => {
+            let event_tx = event_tx.clone();
+            tokio::spawn(async move {
+                if term.recv().await.is_some() {
+                    tracing::info!("SIGTERM: quitting");
+                    let _ = event_tx.send(IsographEvent::Quit);
+                }
+            });
+        }
+        Err(e) => {
+            tracing::warn!(
+                error = %e,
+                "no SIGTERM handler; a terminated isograph will not run Kill"
+            );
+        }
+    }
+
+    // `select!` rather than `join!`: the effect loop ends on `Kill`, and the event
+    // loop never does, because `_hold_events` holds a sender for as long as serve runs.
+    let _hold_events = event_tx;
+    let state = IsographState;
+    tokio::select! {
+        () = run_event_loop(state, event_rx, effect_tx) => {}
+        () = run_effect_loop(effect_rx) => {}
+    }
+}
+
+pub(crate) async fn run_event_loop(
+    mut state: IsographState,
+    mut event_rx: UnboundedReceiver<IsographEvent>,
+    effect_tx: UnboundedSender<IsographEffect>,
+) {
+    while let Some(event) = event_rx.recv().await {
+        let effects = state.handle(event);
+        for effect in effects {
+            let _ = effect_tx.send(effect);
+        }
+    }
+}
+
+pub(crate) async fn run_effect_loop(mut effect_rx: UnboundedReceiver<IsographEffect>) {
+    while let Some(effect) = effect_rx.recv().await {
+        if perform(effect).is_break() {
+            break;
+        }
+    }
+}
+
+pub fn perform(effect: IsographEffect) -> ControlFlow<()> {
+    match effect {
+        IsographEffect::LogHelloWorld => {
+            tracing::info!("hello world");
+            ControlFlow::Continue(())
+        }
+        IsographEffect::Kill => {
+            tracing::info!("kill: exiting");
+            ControlFlow::Break(())
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{run_effect_loop, run_event_loop};
+    use crate::effect::IsographEffect;
+    use crate::event::IsographEvent;
+    use crate::state::IsographState;
+    use tokio::sync::mpsc::unbounded_channel;
+
+    #[tokio::test]
+    async fn sending_hello_world_emits_log_hello_world() {
+        let (event_tx, event_rx) = unbounded_channel();
+        let (effect_tx, mut effect_rx) = unbounded_channel();
+        event_tx
+            .send(IsographEvent::HelloWorld)
+            .expect("the test sends HelloWorld");
+        drop(event_tx);
+        run_event_loop(IsographState, event_rx, effect_tx).await;
+        let effect = effect_rx.recv().await.expect("handle sent one effect");
+        assert_eq!(effect, IsographEffect::LogHelloWorld);
+    }
+
+    #[tokio::test]
+    async fn sending_quit_emits_kill() {
+        let (event_tx, event_rx) = unbounded_channel();
+        let (effect_tx, mut effect_rx) = unbounded_channel();
+        event_tx
+            .send(IsographEvent::Quit)
+            .expect("the test sends Quit");
+        drop(event_tx);
+        run_event_loop(IsographState, event_rx, effect_tx).await;
+        let effect = effect_rx.recv().await.expect("handle sent one effect");
+        assert_eq!(effect, IsographEffect::Kill);
+    }
+
+    #[tokio::test]
+    async fn kill_ends_the_effect_loop() {
+        let (effect_tx, effect_rx) = unbounded_channel();
+        effect_tx
+            .send(IsographEffect::Kill)
+            .expect("the test sends Kill");
+        run_effect_loop(effect_rx).await;
+        let _hold = effect_tx;
+    }
+}

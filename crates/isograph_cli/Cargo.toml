@@ -11,6 +11,7 @@ prelude = { path = "../prelude" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = "2"
+tokio = { workspace = true, features = ["rt", "macros", "signal", "sync", "time"] }
 tracing = { workspace = true }
 
 [dev-dependencies]
