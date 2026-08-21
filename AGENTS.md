@@ -113,6 +113,12 @@ When both arms produce the same type, write `expr.unwrap_or_else(|err| ...)`. Do
 
 Do not pass a value that is used only on one arm of the `Result` or `Option` the function returns, when the caller has that same arm. Return the success side; the caller fills the other arm. `require_token(kind, expected)` is `require_token(kind)` plus `map_err(|()| cursor.expected(expected))`. Same for `require_group`.
 
+## Iterators
+
+Prefer iterator combinators over `for`, `while`, and `loop`. A walk that maps, filters, finds, folds, or collects is `.map`, `.filter`, `.filter_map`, `.find`, `.position`, `.any`, `.all`, `.fold`, `.collect`, or the matching iterator method, not a mutable accumulator and a loop.
+
+A loop is the right tool when the walk is a state machine the iterator traits do not express: a parser cursor consuming a stream, a worklist, a walk whose next step depends on mutation that is not the iterator's item. If the body is "push to a vec", "set a flag", or "return the first match", it is not that case.
+
 ## Errors
 
 Error types use `thiserror`. Derive `Error`; put the message on `#[error("...")]`. Do not write a manual `Display` or `std::error::Error` impl. Wrapping another error is `#[error("{0}")]` on that variant.
