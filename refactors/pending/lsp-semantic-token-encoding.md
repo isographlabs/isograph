@@ -26,6 +26,10 @@ use prelude::Postfix;
 use span::{Span, WithSpan};
 use thiserror::Error;
 
+/// File-absolute parser tokens as LSP semantic-token deltas.
+///
+/// Co-iterates `tokens` and the document's line breaks. Each parser span is
+/// cut at line breaks; each nonempty piece is one LSP token.
 pub fn lsp_semantic_tokens(
     tokens: &[WithSpan<SemanticToken>],
     page_content: &str,
@@ -42,6 +46,7 @@ pub fn lsp_semantic_tokens(
         let mut piece_start = span.start;
         while piece_start < span.end {
             let start = cursor.position(piece_start);
+            // An LSP token cannot include a line break.
             let line_end = match cursor.break_before(span.end) {
                 Some(line_break) => line_break.start,
                 None => span.end,
@@ -50,6 +55,7 @@ pub fn lsp_semantic_tokens(
                 let delta_line = start.line - last.line;
                 encoded.push(LspSemanticToken {
                     delta_line,
+                    // Same line: start-to-start column. Otherwise column from 0.
                     delta_start: match delta_line {
                         0 => start.col - last.col,
                         _ => start.col,
@@ -65,6 +71,7 @@ pub fn lsp_semantic_tokens(
             match cursor.break_before(span.end) {
                 Some(line_break) => {
                     piece_start = line_break.after;
+                    // Consume even when the piece was empty (a blank line in the span).
                     cursor.advance_break();
                 }
                 None => break,
@@ -74,6 +81,8 @@ pub fn lsp_semantic_tokens(
     encoded.wrap_ok()
 }
 
+/// Why `lsp_semantic_tokens` refused a span. Ordered and exclusive is not enough:
+/// a boundary strictly inside `\r\n` is still invalid.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Error)]
 pub enum EncodeError {
     #[error("semantic token spans must be mutually exclusive and ordered; got {}..{} after end {}", .0.start, .0.end, .0.previous_end)]
@@ -119,23 +128,30 @@ pub struct InsideLineBreak {
     pub after: u32,
 }
 
+/// Every line-break index in `text`, from one scan.
 struct LineIndex<'a> {
     text: &'a str,
     breaks: Vec<LineBreak>,
 }
 
+/// Two-pointer into `LineIndex.breaks`. `break_index` is the current line.
+///
+/// Offsets passed to [`LineCursor::position`] must not decrease.
 struct LineCursor<'a> {
     text: &'a str,
     breaks: &'a [LineBreak],
     break_index: usize,
 }
 
+/// LSP position: zero-based line, UTF-16 column on that line.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 struct Pos {
     line: u32,
     col: u32,
 }
 
+/// One line terminator. `start` is the first byte of `\n`, `\r`, or `\r\n`.
+/// `after` is the first byte of the next line.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 struct LineBreak {
     start: u32,
@@ -158,6 +174,7 @@ impl<'a> LineIndex<'a> {
         }
     }
 
+    /// Ordered, exclusive, in range, on a char boundary, and not strictly inside a line break.
     fn check_span(&self, span: Span, last_span_end: u32) -> Result<(), EncodeError> {
         if span.end < span.start {
             return EncodeError::Inverted(SpanEnds {
@@ -188,6 +205,7 @@ impl<'a> LineIndex<'a> {
             return EncodeError::NotCharBoundary(NotCharBoundary { offset }).wrap_err();
         }
         for line_break in &self.breaks {
+            // Strict: a span may start or end at `start` or `after`, not between `\r` and `\n`.
             if line_break.start < offset && offset < line_break.after {
                 return EncodeError::InsideLineBreak(InsideLineBreak {
                     offset,
@@ -202,6 +220,7 @@ impl<'a> LineIndex<'a> {
 }
 
 impl LineCursor<'_> {
+    /// Line and UTF-16 column of `offset`. Advances `break_index` past breaks that end at or before `offset`.
     fn position(&mut self, offset: u32) -> Pos {
         while self.break_index < self.breaks.len()
             && self.breaks[self.break_index].after <= offset
@@ -218,6 +237,7 @@ impl LineCursor<'_> {
         }
     }
 
+    /// The current break, if it starts before `span_end`. Does not consume it.
     fn break_before(&self, span_end: u32) -> Option<LineBreak> {
         self.breaks
             .get(self.break_index)
@@ -230,6 +250,7 @@ impl LineCursor<'_> {
     }
 }
 
+/// `\n`, `\r`, and `\r\n` (one break). Same set as `IsographLangTokenKind::LineBreak`.
 fn line_breaks(text: &str) -> Vec<LineBreak> {
     let bytes = text.as_bytes();
     let mut index = 0usize;
@@ -261,6 +282,7 @@ fn line_breaks(text: &str) -> Vec<LineBreak> {
     breaks
 }
 
+/// UTF-16 length. For ASCII that is `text.len()`.
 fn utf16_units(text: &str) -> u32 {
     if text.is_ascii() {
         text.len() as u32
@@ -365,6 +387,8 @@ use lsp_types::{
     SemanticTokenModifier, SemanticTokenType, SemanticTokensLegend,
 };
 
+/// Sole list of legend token types. Index in this slice is `token_type` on the wire.
+/// Unused slots keep the origin numbering.
 const LEGEND_TOKEN_TYPES: &[SemanticTokenType] = &[
     SemanticTokenType::NAMESPACE,
     SemanticTokenType::TYPE,
