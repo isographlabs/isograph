@@ -1,8 +1,8 @@
 # Filesystem events, the CLI, config globs, and the watcher
 
-Requires event-loop.md, `docs-website/docs/design-docs/event-model.md`, and config-discovery.md. The daemon already recvs, calls `handle`, and performs effects. This file adds disk facts, `isograph send`, config `includes`, `Presence`, and the watcher. Five shippable changes after event-loop.md.
+Requires event-loop.md (landed), send-events.md, `docs-website/docs/design-docs/event-model.md`, and config-discovery.md. The daemon already recvs, calls `handle`, performs effects, listens on the event socket, and `isograph send` writes one `IncomingEvent` frame. This file adds disk facts, config `includes`, `Presence`, and the watcher. Four shippable changes after send-events.md.
 
-The watcher posts in-process. It does not run `isograph send` and it does not write to the event socket. The CLI and the socket are a separate source of the same event type.
+The watcher posts in-process. It does not run `isograph send` and it does not write to the event socket. The CLI and the socket are a separate source of the same event type. `isograph send` is send-events.md.
 
 ## What the user does
 
@@ -28,19 +28,21 @@ $ isograph logs
 
 ## Change 1: one event, this path has these contents
 
-event-loop.md already recvs and performs. This change adds `DiskChanged { path, contents }` and a path-to-contents map. Tests call `handle` and also drive the socket the way figaro's `tests/external.rs` does.
+send-events.md already recvs, performs, and listens. This change adds `DiskChanged { path, contents }` and a path-to-contents map. Tests call `handle` and also drive the socket the way figaro's `tests/external.rs` does.
 
 ### Types
 
 Most important first.
 
-Origin: event-loop.md `IsographEvent`. Delta: `DiskChanged` beside `HelloWorld`.
+Origin: send-events.md `IsographEvent` / `IncomingEvent`. Delta: `DiskChanged` beside `HelloWorld`.
 
 ```rust
 // from crates/isograph_cli/src/event.rs
 use std::path::PathBuf;
 
 pub enum IsographEvent {
+    HelloWorld,
+    Quit,
     DiskChanged(DiskChanged),
 }
 
@@ -56,7 +58,9 @@ pub struct DiskChanged {
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+use crate::effect::IsographEffect;
 use crate::event::{DiskChanged, IsographEvent};
+use prelude::Postfix;
 
 pub struct IsographState {
     pub files: BTreeMap<PathBuf, String>,
@@ -69,20 +73,21 @@ impl IsographState {
         }
     }
 
-    pub fn handle(&mut self, event: IsographEvent) {
+    pub fn handle(&mut self, event: IsographEvent) -> Vec<IsographEffect> {
         match event {
-            IsographEvent::DiskChanged(change) => self.handle_disk_changed(change),
+            IsographEvent::HelloWorld => IsographEffect::LogHelloWorld.wrap_vec(),
+            IsographEvent::Quit => IsographEffect::Kill.wrap_vec(),
+            IsographEvent::DiskChanged(change) => {
+                self.files
+                    .insert(change.path.clone(), change.contents.clone());
+                Vec::new()
+            }
         }
-    }
-
-    fn handle_disk_changed(&mut self, change: &DiskChanged) {
-        self.files
-            .insert(change.path.clone(), change.contents.clone());
     }
 }
 ```
 
-`handle` returns `()`. Effects land when a performer exists. `BTreeMap` so a log of the map is sorted. A second event for the same path replaces the contents. There is no way to remove a path yet.
+Origin: send-events.md / event-loop.md `handle`. Delta: `files` and a `DiskChanged` arm. `BTreeMap` so a log of the map is sorted. A second event for the same path replaces the contents. There is no way to remove a path yet. `DiskChanged` returns no effects this change. The `disk changed` log for the e2e is change 2.
 
 ```rust
 // from crates/isograph_cli/src/external.rs
@@ -108,128 +113,9 @@ pub fn on_message(text: &str, event_tx: &UnboundedSender<IsographEvent>) {
 }
 ```
 
-`DiskChanged` derives `Deserialize`. `IsographEvent` does not.
+`DiskChanged` derives `Deserialize`. `IsographEvent` does not. The socket, `IsographArgs.port`, `listen`, the port file, and `select!` are send-events.md. This change does not replace them.
 
-```rust
-// from crates/isograph_cli/src/lib.rs
-#[derive(clap::Args, Debug)]
-struct IsographArgs {
-    /// Loopback port for the event socket. Assigned by the OS when absent.
-    #[arg(long)]
-    pub port: Option<u16>,
-}
-```
-
-`App::DaemonArgs` is `IsographArgs`. `App::Id` stays `ConfigFlag`. `port: Option<u16>` is unspecified versus specified, not a bool. There is no `Filesystem` flag yet.
-
-### Event loop
-
-```rust
-// from crates/isograph_cli/src/daemon.rs
-use prelude::Postfix;
-use tokio::sync::mpsc::unbounded_channel;
-use tracing::{error, info};
-
-use crate::discover::{self, ConfigFlag};
-use crate::event::IsographEvent;
-use crate::external::on_message;
-use crate::state::IsographState;
-use crate::IsographArgs;
-
-pub fn run(id: &ConfigFlag, args: &IsographArgs) {
-    match discover::config_and_instance(id.config.as_deref()) {
-        Ok((path, instance, _config)) => {
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build();
-            let rt = match rt {
-                Ok(rt) => rt,
-                Err(e) => {
-                    error!(error = %e, "could not start the tokio runtime");
-                    return;
-                }
-            };
-            rt.block_on(serve(path, instance, args));
-        }
-        Err(e) => {
-            error!(error = %e, "the config went away between naming this daemon and starting it");
-        }
-    }
-}
-
-async fn serve(
-    config_path: std::path::PathBuf,
-    instance: freddie_cli::Instance,
-    args: &IsographArgs,
-) {
-    let (event_tx, mut event_rx) = unbounded_channel::<IsographEvent>();
-    let bind = match args.port {
-        Some(port) => port,
-        None => 0,
-    };
-    let socket = match freddie_event_socket::listen(bind, {
-        let event_tx = event_tx.clone();
-        move |text| on_message(text, event_tx.reference())
-    }) {
-        Ok(socket) => socket,
-        Err(e) => {
-            error!(error = %e, port = bind, "could not bind the event socket");
-            return;
-        }
-    };
-    let port = socket.local_addr().port();
-    let port_file = instance.log_dir().join(format!("{}.port", instance.slug()));
-    if let Err(e) = std::fs::write(port_file.reference(), format!("{port}\n")) {
-        error!(error = %e, path = %port_file.display(), "could not write the port file");
-        return;
-    }
-    info!(
-        config = %config_path.display(),
-        port,
-        "isograph daemon up"
-    );
-    let mut state = IsographState::new();
-    while let Some(event) = event_rx.recv().await {
-        match &event {
-            IsographEvent::DiskChanged(change) => {
-                state.handle(event);
-                info!(
-                    path = %change.path.display(),
-                    file_count = state.files.len(),
-                    "disk changed"
-                );
-            }
-        }
-    }
-    drop(socket);
-}
-```
-
-`listen(0, ...)` plus `socket.local_addr().port()` is the combination. `None` for `--port` is OS-assigned. `EventSocket::local_addr` returns `SocketAddr`, not `io::Result`: the address is captured at bind, so an `EventSocket` that exists has one. That method is freddie `refactors/pending/event-socket-local-addr.md`. This change pin-revs `freddie_event_socket` to the commit that landed it. Do not fork `listen` in i2.
-
-`App::run_daemon` calls `daemon::run`.
-
-```rust
-// from crates/isograph_cli/src/lib.rs
-fn run_daemon(id: &ConfigFlag, args: &IsographArgs) {
-    daemon::run(id, args);
-}
-```
-
-Before, `run_daemon` parks. After, it runs the loop above. `ConfigFlag` stays.
-
-### Cargo
-
-`crates/isograph_cli/Cargo.toml` gains:
-
-```toml
-freddie_event_socket = { git = "https://github.com/freddiehg/freddie", rev = "af6b57df9732f42cde9bafc109bcf1b6a32f28e0" }
-tokio = { workspace = true }
-```
-
-Same rev as `freddie_cli`. After the `local_addr` prefactor, the rev is the commit that landed it. serde is already a dependency.
-
-`event.rs`, `state.rs`, `external.rs`, `daemon.rs` are new modules, declared in `lib.rs`.
+The socket, `IsographArgs.port`, `listen`, the port file, and `select!` stay as send-events.md left them.
 
 ### Tests
 
@@ -255,210 +141,57 @@ The e2e crate does not yet send; that is change 2. Existing start/status/logs/st
 
 `crates/ts_graphql_react_isograph_cli/tests/cli.rs` `the_log_contains_the_config_path` still polls for `isograph daemon up` and the config path.
 
-## Change 2: `isograph send`
+## Change 2: send `DiskChanged`
 
-A client verb. It does not start the daemon. It reads one JSON `IncomingEvent` from stdin, or from `--file`, and writes it as one websocket text frame to the event socket.
+`isograph send`, the socket, the port file, and `IncomingEvent` are send-events.md. This change adds `IncomingEvent.DiskChanged` to that vocabulary and an e2e that sends it.
+
+Origin of the verb: send-events.md. Delta: a `DiskChanged` frame instead of `HelloWorld`.
 
 ### CLI shape
 
-freddie_cli `Verb` is closed. Extra verbs sit beside it, the way figaro's launch-agent verbs do.
+Already send-events.md. `SendArgs` does not change.
 
 ```rust
-// from crates/isograph_cli/src/lib.rs
-#[derive(Parser)]
-#[command(name = "isograph", version, about = "The isograph compiler.", long_about = None)]
-struct Cli {
-    #[command(subcommand)]
-    verb: Option<CliVerb>,
-}
-
-#[derive(clap::Subcommand)]
-enum CliVerb {
-    /// start, restart, status, logs, stop, and the hidden daemon.
-    #[command(flatten)]
-    Lifecycle(freddie_cli::Verb<Isograph>),
-
-    /// Write one IncomingEvent JSON frame to the running daemon.
-    Send(SendArgs),
-}
-
-#[derive(clap::Args, Debug)]
-struct SendArgs {
-    #[command(flatten)]
-    pub id: ConfigFlag,
-
-    /// Loopback port. When absent, the daemon's port file.
-    #[arg(long)]
-    pub port: Option<u16>,
-
-    /// File containing the JSON frame. When absent, stdin.
-    #[arg(long)]
-    pub file: Option<std::path::PathBuf>,
+// from crates/isograph_cli/src/external.rs
+#[derive(serde::Deserialize, Debug)]
+#[serde(tag = "kind", content = "value")]
+pub enum IncomingEvent {
+    #[serde(rename = "IncomingEvent.HelloWorld")]
+    HelloWorld,
+    #[serde(rename = "IncomingEvent.DiskChanged")]
+    DiskChanged(DiskChanged),
 }
 ```
 
-`run` matches `CliVerb::Lifecycle` onto `run_lifecycle_verb` as today, and `CliVerb::Send` onto `send::run`. Bare `isograph` is still start.
-
 ```rust
-// from crates/isograph_cli/src/lib.rs
-pub fn run() -> ExitCode {
-    let matches = Cli::command().get_matches();
-    let cli = Cli::from_arg_matches(matches.reference())
-        .expect("the derived type matches the command it derived");
-
-    match cli.verb {
-        Some(CliVerb::Lifecycle(verb)) => {
-            freddie_cli::run_lifecycle_verb::<Isograph>(verb, matches.reference())
+// from crates/isograph_cli/src/external.rs
+pub fn on_message(text: &str, event_tx: &UnboundedSender<IsographEvent>) {
+    match serde_json::from_str::<IncomingEvent>(text) {
+        Ok(IncomingEvent::HelloWorld) => {
+            let _ = event_tx.send(IsographEvent::HelloWorld);
         }
-        Some(CliVerb::Send(args)) => send::run(args.reference()),
-        None => freddie_cli::run_lifecycle_verb::<Isograph>(
-            freddie_cli::verb_for_bare_invocation::<Isograph>(),
-            matches.reference(),
-        ),
+        Ok(IncomingEvent::DiskChanged(change)) => {
+            let _ = event_tx.send(IsographEvent::DiskChanged(change));
+        }
+        Err(e) => warn!(error = %e, frame = text, "undeserializable frame"),
     }
 }
 ```
 
-`expect` on `from_arg_matches` is the same line as today and as figaro: the derived type matches the command it derived.
-
-### Send
-
-```rust
-// from crates/isograph_cli/src/send.rs
-use std::fs;
-use std::io::{self, Read};
-use std::process::ExitCode;
-
-use prelude::Postfix;
-use tungstenite::Message;
-use tungstenite::client::connect;
-
-use crate::SendArgs;
-use crate::discover::{self, DiscoverError};
-use crate::external::IncomingEvent;
-
-#[derive(Debug)]
-struct ReadFile {
-    pub path: std::path::PathBuf,
-    pub source: io::Error,
-}
-
-#[derive(Debug)]
-struct PortFile {
-    pub path: std::path::PathBuf,
-    pub source: io::Error,
-}
-
-#[derive(Debug)]
-struct Connect {
-    pub port: u16,
-    pub source: tungstenite::Error,
-}
-
-#[derive(Debug, thiserror::Error)]
-enum SendError {
-    #[error("{0}")]
-    Discover(#[from] DiscoverError),
-    #[error("could not read {}: {}", .0.path.display(), .0.source)]
-    ReadFile(ReadFile),
-    #[error("could not read stdin: {0}")]
-    ReadStdin(io::Error),
-    #[error("the frame is not IncomingEvent JSON: {0}")]
-    NotIncoming(serde_json::Error),
-    #[error("no port file at {}; is the daemon running?", .0.display())]
-    NoPortFile(std::path::PathBuf),
-    #[error("could not read {}: {}", .0.path.display(), .0.source)]
-    PortFile(PortFile),
-    #[error("{} is not a port", .0)]
-    NotAPort(String),
-    #[error("could not connect to 127.0.0.1:{}: {}", .0.port, .0.source)]
-    Connect(Connect),
-    #[error("could not write the frame: {0}")]
-    Write(tungstenite::Error),
-}
-
-pub fn run(args: &SendArgs) -> ExitCode {
-    match run_inner(args) {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(e) => {
-            eprintln!("{e}");
-            ExitCode::FAILURE
-        }
-    }
-}
-
-fn run_inner(args: &SendArgs) -> Result<(), SendError> {
-    let (_, instance, _) = discover::config_and_instance(args.id.config.as_deref())?;
-    let port = match args.port {
-        Some(port) => port,
-        None => read_port(&instance)?,
-    };
-    let frame = match args.file.as_deref() {
-        Some(path) => fs::read_to_string(path).map_err(|source| {
-            SendError::ReadFile(ReadFile {
-                path: path.to_owned(),
-                source,
-            })
-        })?,
-        None => {
-            let mut buf = String::new();
-            io::stdin()
-                .read_to_string(&mut buf)
-                .map_err(SendError::ReadStdin)?;
-            buf
-        }
-    };
-    let frame = frame.trim();
-    let _: IncomingEvent = serde_json::from_str(frame).map_err(SendError::NotIncoming)?;
-    let (mut ws, _) = connect(format!("ws://127.0.0.1:{port}"))
-        .map_err(|source| SendError::Connect(Connect { port, source }))?;
-    ws.send(Message::Text(frame.to_owned().to()))
-        .map_err(SendError::Write)?;
-    ().wrap_ok()
-}
-
-fn read_port(instance: &freddie_cli::Instance) -> Result<u16, SendError> {
-    let path = instance.log_dir().join(format!("{}.port", instance.slug()));
-    let text = fs::read_to_string(path.reference()).map_err(|source| {
-        if source.kind() == io::ErrorKind::NotFound {
-            SendError::NoPortFile(path.clone())
-        } else {
-            SendError::PortFile(PortFile { path, source })
-        }
-    })?;
-    text.trim()
-        .parse()
-        .map_err(|_| SendError::NotAPort(text))
-}
-```
-
-Validate then send. A frame the daemon would drop is rejected at the client with a non-zero exit. The daemon still drops undeserializable frames from any other client.
-
-Blocking `tungstenite`, not tokio, on the client. The daemon already has a runtime; the client is a one-shot.
-
-```toml
-# from crates/isograph_cli/Cargo.toml
-tungstenite = { version = "0.26", default-features = false, features = ["handshake"] }
-```
-
-`Message::Text` takes `Utf8Bytes` in 0.26; `.to_owned().to()` is the conversion. If the pinned version takes `String`, the call is `Message::Text(frame.to_owned())`. Match the crate's type; do not keep both.
-
-Workspace clippy denies `print_stderr` in library crates. `send::run` is the process entry for this verb and lives in `isograph_cli`. Raise: `#[expect(clippy::print_stderr)]` on `send::run`. The function is not a library API. Do not add a tracing subscriber to avoid the expect, and do not add a freddie_cli export for this.
+Origin: send-events.md `IncomingEvent`. Delta: `DiskChanged` beside `HelloWorld`.
 
 ### Tests
 
-In `send.rs` (or a unit module): `read_port` of a file containing `53124\n` is `53124`. A missing file is `NoPortFile`. `"abc"` is `NotAPort`.
+In `external.rs`: a `IncomingEvent.DiskChanged` frame with `path` and `contents` deserializes. Quit still does not.
+
+A tokio test in `crates/isograph_cli/tests/socket.rs`: send one `DiskChanged` frame, `event_rx.try_recv()` is `DiskChanged` with that path and contents.
 
 E2E in `crates/ts_graphql_react_isograph_cli/tests/cli.rs`:
 
 - Start. `send` a frame with `path` and `contents` on stdin. Poll the log until `disk changed` and the path and `file_count` 1.
-- `send` with the daemon stopped is a non-zero exit. stderr contains `no port file` or `is the daemon running`.
-- `send` of `not json` is a non-zero exit and the log has no new `disk changed`.
-- `send --file` of a JSON file is the same as stdin.
+- `send --file` of a `DiskChanged` JSON file is the same as stdin.
 
-The harness already points `HOME` at the temp dir, so the port file is under that tree. Poll the log the way `the_log_contains_the_config_path` does.
-
-`isograph send` must run with the same `HOME` / cwd as the daemon so walk-up finds the same config and the same port file.
+send-events.md already covers a stopped daemon and `not json`. The harness already points `HOME` at the temp dir.
 
 ## Change 3: config `includes`
 
