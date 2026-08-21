@@ -29,7 +29,7 @@ The daemon handles that event. It never opens `/tmp/proj/src/a.ts`. Artifacts an
 Not a bool `--noop`. Two ways filesystem facts arrive.
 
 ```rust
-// from crates/isograph_cli/src/main.rs
+// from crates/isograph_cli/src/lib.rs
 #[derive(Clone, Copy, Debug, clap::ValueEnum)]
 enum Filesystem {
     Watch,
@@ -87,7 +87,7 @@ A workflow (or a step on `cargo-test-cli`) builds the crate, starts `isograph da
 
 HOME (and `XDG_STATE_HOME` / `LOCALAPPDATA`) point at a temp directory, same as `tests/cli.rs`.
 
-A crate integration test may do this instead of YAML: spawn `CARGO_BIN_EXE_isograph` with `daemon --filesystem injected --port 0` if the port is published, or a fixed high port. Prefer the integration test; the workflow only needs `cargo test --manifest-path crates/isograph_cli/Cargo.toml` from `cli-ci-build.md`.
+A crate integration test may do this instead of YAML: spawn `CARGO_BIN_EXE_isograph` with `daemon --filesystem injected --port 0` if the port is published, or a fixed high port. Prefer the integration test; the workflow only needs `cargo test --manifest-path crates/ts_graphql_react_isograph_cli/Cargo.toml` from `cli-ci-build.md`.
 
 ## Open
 

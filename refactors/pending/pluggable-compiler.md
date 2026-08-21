@@ -23,13 +23,13 @@ Each seam is a trait, which is the case AGENTS.md reserves traits for: a boundar
 - The literal grammar and `isograph_parser`. The language of the literal is the product; every profile parses the same literals into the same trees.
 - The compiler's own model of a project between parsing and generation: the parsed literals, the validated selections. Protocol and generation plug into that model; they do not each get their own.
 - pico sits above the seams: a seam implementor is a deterministic pure function of its inputs, so its results can live behind memoization. An implementor that reads the filesystem or the clock inside the seam breaks that; reading the world happens in the daemon's sources and effects (`event-model.md`), never inside a seam.
-- The daemon and CLI are profile-agnostic. `IsographRequest` and dispatch never name a profile; a wrapper binary gets the whole lifecycle, socket, and LSP surface by composing its profile into the same `main`.
+- The daemon and CLI library are profile-agnostic. `IsographRequest` and dispatch never name a profile; a binary gets the whole lifecycle, socket, and LSP surface by composing its profile into `isograph_cli::IsographCli::run`.
 
 ## The boundary types
 
 ### Extraction
 
-The extraction seam is `HostLanguage` in extract-iso-literals.md. `extract_iso_literals` finds iso literals in a file and returns `WithErrors` (`item` / `errors`). `item` is `WithSpan<(&str, THostLanguage::LiteralContext)>`. The first implementor is `TypeScriptHostLanguage`. File extensions for the watcher stay a later field on that trait.
+The extraction seam is `HostLanguage` in extract-iso-literals.md, in `crates/isograph_compiler`. `extract_iso_literals` finds iso literals in a file and returns `WithErrors` (`item` / `errors`). `item` is `WithSpan<(&str, THostLanguage::LiteralContext)>`. The first implementor is `TypeScriptHostLanguage` in `isograph_extract_typescript`. File extensions for the watcher stay a later field on that trait.
 
 ### NetworkProtocol
 
@@ -87,19 +87,136 @@ pub struct Profile<TExtract, TProtocol, TGenerate> {
 }
 ```
 
-Static generics, not trait objects: a binary compiles the profile it ships, monomorphized through the pipeline the way upstream threads its profile type parameter. The shipped binary's profile is `Profile { extract: TypeScriptExtractor, protocol: GraphQlProtocol, generate: TypeScriptGenerator { framework: react_bindings() } }`.
+Static generics, not trait objects: a binary compiles the profile it ships, monomorphized through the pipeline the way upstream threads its profile type parameter. The shipped binary's profile is `Profile { extract: TypeScriptHostLanguage, protocol: GraphQlProtocol, generate: TypeScriptGenerator { framework: react_bindings() } }`.
 
 ## Crates
 
-- `crates/isograph_compiler`: the seam traits, the boundary types, the fixed project model, and the pipeline. Depends on `isograph_parser`; contains no implementor.
-- `crates/isograph_extract_typescript`, `crates/isograph_protocol_graphql`, `crates/isograph_generate_typescript`: the first implementor of each seam, one crate each, none depending on another.
-- `crates/isograph_cli` composes the shipped profile into the daemon from `isograph-cli.md`.
+```
+isograph_parser
+    ^
+isograph_compiler
+    ^
+isograph_extract_typescript, isograph_protocol_graphql, isograph_generate_typescript
+    ^
+ts_graphql_react_isograph_cli
 
-A wrapper is a crate outside this repo with its own `main`: it implements whichever seams it replaces, reuses the crates for the ones it keeps, and hands its `Profile` to the same pipeline and daemon entry points. Nothing in the core knows whether it is running inside `isograph` or inside a wrapper.
+isograph_compiler
+    ^
+isograph_lsp, isograph_cli
+    ^
+ts_graphql_react_isograph_cli
+```
+
+`crates/isograph_compiler`: the seam traits, the boundary types, the fixed project model, and the pipeline. Depends on `isograph_parser`; contains no implementor. extract-iso-literals.md creates this crate with `HostLanguage` only.
+
+`crates/isograph_extract_typescript`, `crates/isograph_protocol_graphql`, `crates/isograph_generate_typescript`: the first implementor of each seam, one crate each, none depending on another.
+
+`crates/isograph_cli`: library. Bootstraps the daemon, lifecycle verbs, and LSP given a `Profile`. Depends on `isograph_compiler` and `isograph_lsp`. Does not depend on any implementor crate. Does not name TypeScript, GraphQL, or React.
+
+```rust
+// from crates/isograph_cli/src/lib.rs
+use std::process::ExitCode;
+
+use isograph_compiler::{GenerateArtifacts, HostLanguage, NetworkProtocol, Profile};
+
+pub struct IsographCli<TExtract, TProtocol, TGenerate> {
+    pub profile: Profile<TExtract, TProtocol, TGenerate>,
+}
+
+impl<TExtract, TProtocol, TGenerate> IsographCli<TExtract, TProtocol, TGenerate>
+where
+    TExtract: HostLanguage,
+    TProtocol: NetworkProtocol,
+    TGenerate: GenerateArtifacts,
+{
+    pub fn run(self) -> ExitCode {
+        // clap, freddie lifecycle verbs, `isograph lsp` -> isograph_lsp::start(self.profile.extract)
+    }
+}
+```
+
+`crates/ts_graphql_react_isograph_cli`: the first-party binary. Consumer of `isograph_cli`. This is where TypeScript, GraphQL, and React start for the product: it constructs that profile and calls `run`. Binary name is `isograph`. The no-op split (library plus this binary, `run` taking no type params) is ts-graphql-react-isograph-cli.md. Both crates are root workspace members. Integration tests that drive `CARGO_BIN_EXE_isograph` live here.
+
+```toml
+# from crates/ts_graphql_react_isograph_cli/Cargo.toml
+[package]
+name = "ts_graphql_react_isograph_cli"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+
+[[bin]]
+name = "isograph"
+path = "src/main.rs"
+
+[dependencies]
+isograph_cli = { path = "../isograph_cli" }
+isograph_compiler = { path = "../isograph_compiler" }
+isograph_extract_typescript = { path = "../isograph_extract_typescript" }
+isograph_generate_typescript = { path = "../isograph_generate_typescript" }
+isograph_protocol_graphql = { path = "../isograph_protocol_graphql" }
+
+[lints]
+workspace = true
+```
+
+```rust
+// from crates/ts_graphql_react_isograph_cli/src/main.rs
+use std::process::ExitCode;
+
+use isograph_cli::IsographCli;
+use isograph_compiler::Profile;
+use isograph_extract_typescript::TypeScriptHostLanguage;
+use isograph_generate_typescript::{TypeScriptGenerator, react_bindings};
+use isograph_protocol_graphql::GraphQlProtocol;
+
+fn main() -> ExitCode {
+    IsographCli {
+        profile: Profile {
+            extract: TypeScriptHostLanguage,
+            protocol: GraphQlProtocol,
+            generate: TypeScriptGenerator {
+                framework: react_bindings(),
+            },
+        },
+    }
+    .run()
+}
+```
+
+The crate split is ts-graphql-react-isograph-cli.md. After that doc, `isograph_cli` is a `[lib]` and `ts_graphql_react_isograph_cli` has the bin. Both are root workspace members.
+
+A wrapper outside this repo is the same shape as `ts_graphql_react_isograph_cli` with a different profile and a different `App::NAME`. Nothing in `isograph_compiler`, `isograph_cli`, or `isograph_lsp` knows whether it is running inside `ts_graphql_react_isograph_cli` or inside a wrapper.
+
+lsp-semantic-tokens.md is the first doc that needs a binary to name `TypeScriptHostLanguage`. Until `NetworkProtocol` and `GenerateArtifacts` exist, `IsographCli` is generic over `THostLanguage` only:
+
+```rust
+// from crates/isograph_cli/src/lib.rs (lsp-semantic-tokens.md)
+pub struct IsographCli<THostLanguage: HostLanguage> {
+    pub host: THostLanguage,
+}
+
+impl<THostLanguage: HostLanguage> IsographCli<THostLanguage> {
+    pub fn run(self) -> ExitCode {
+        // `isograph lsp` -> isograph_lsp::start(self.host)
+    }
+}
+```
+
+```rust
+// from crates/ts_graphql_react_isograph_cli/src/main.rs (lsp-semantic-tokens.md)
+fn main() -> ExitCode {
+    IsographCli {
+        host: TypeScriptHostLanguage,
+    }
+    .run()
+}
+```
 
 ## Open questions
 
 - Profile selection: one binary carries one profile, or a binary carries several and the config names one. One-binary-one-profile is the current position; a registry only earns its complexity if shipping multiple first-party profiles in the default binary becomes real.
+- `App::NAME` is `"isograph"` on the `Isograph` impl in `isograph_cli`. A second in-process wrapper cannot share that daemon lock. The name becomes data the binary supplies when a second binary exists.
 - `FrameworkBindings`: data on the generator (current position), a second trait, or a closed enum. Data keeps out-of-tree frameworks possible without a trait; the generation doc decides when the real fields exist.
 - Artifact kinds: whether a generator's output set is fixed per generator or independently toggleable (a user who wants readers but not entrypoints). Currently fixed per generator.
 - Whether `source_extensions` belongs on `ExtractLiterals` or file discovery moves wholly into the extraction seam (an input language where "which files" is not an extension check, like literals in markdown code fences, would force the latter).

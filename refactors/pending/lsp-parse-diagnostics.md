@@ -22,13 +22,15 @@ use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range};
 use prelude::Postfix;
 use span::Span;
 
-use isograph_extract_typescript::TypeScriptHostLanguage;
-use isograph_parser::HostLanguage;
+use isograph_compiler::HostLanguage;
 
 use crate::file_literals::{FileLiteral, file_literals};
 
-pub fn diagnostics_for_file(source: &str) -> Vec<Diagnostic> {
-    file_literals(&TypeScriptHostLanguage, source)
+pub fn diagnostics_for_file<THostLanguage: HostLanguage>(
+    host: &THostLanguage,
+    source: &str,
+) -> Vec<Diagnostic> {
+    file_literals(host, source)
         .iter()
         .flat_map(|literal| diagnostics_for_literal(source, literal))
         .collect()
@@ -89,24 +91,30 @@ mod tests {
     use lsp_types::{DiagnosticSeverity, Position};
     use prelude::Postfix;
 
+    use isograph_extract_typescript::TypeScriptHostLanguage;
+
     use super::{char_index_to_position, diagnostics_for_file};
 
     #[test]
     fn empty_file_has_no_diagnostics() {
-        assert_eq!(diagnostics_for_file(""), vec![]);
+        assert_eq!(diagnostics_for_file(&TypeScriptHostLanguage, ""), vec![]);
     }
 
     #[test]
     fn valid_literal_has_no_diagnostics() {
         assert_eq!(
-            diagnostics_for_file("iso(`entrypoint Query.HomeRoute`)"),
+            diagnostics_for_file(
+                &TypeScriptHostLanguage,
+                "iso(`entrypoint Query.HomeRoute`)",
+            ),
             vec![]
         );
     }
 
     #[test]
     fn tagged_template_is_a_host_error() {
-        let diagnostics = diagnostics_for_file("iso`entrypoint Query.HomeRoute`");
+        let diagnostics =
+            diagnostics_for_file(&TypeScriptHostLanguage, "iso`entrypoint Query.HomeRoute`");
         assert_eq!(diagnostics.len(), 1);
         assert!(diagnostics[0].message.contains("parentheses"));
     }
@@ -115,7 +123,7 @@ mod tests {
     fn incomplete_entrypoint_is_an_error_inside_the_literal() {
         let prefix = "export const Foo = iso(`";
         let source = "export const Foo = iso(`entrypoint`)(";
-        let diagnostics = diagnostics_for_file(source);
+        let diagnostics = diagnostics_for_file(&TypeScriptHostLanguage, source);
         assert!(!diagnostics.is_empty());
         let first = &diagnostics[0];
         assert_eq!(first.source.as_deref(), "isograph".wrap_some());
@@ -132,7 +140,7 @@ mod tests {
         let source = "\
 iso(`entrypoint Query.HomeRoute`)
 iso(`entrypoint`)";
-        let diagnostics = diagnostics_for_file(source);
+        let diagnostics = diagnostics_for_file(&TypeScriptHostLanguage, source);
         assert!(!diagnostics.is_empty());
         assert!(diagnostics.iter().all(|d| d.range.start.line >= 1));
     }
@@ -172,29 +180,35 @@ Need `use lsp_types::{DiagnosticSeverity, Position};` and `use prelude::Postfix;
 // from crates/isograph_lsp/src/lsp_state.rs
 use std::collections::HashMap;
 
+use isograph_compiler::HostLanguage;
 use lsp_server::Connection;
 
-pub struct LspState<'a> {
+pub struct LspState<'a, THostLanguage: HostLanguage> {
     pub open_files: HashMap<String, String>,
+    pub host: THostLanguage,
     pub sender: &'a lsp_server::Sender,
 }
 ```
 
-Before (lsp-semantic-tokens.md): `LspState { open_files }` with no lifetime. After: borrows `connection.sender`.
+Before (lsp-semantic-tokens.md): `LspState<THostLanguage> { open_files, host }` with no lifetime. After: also borrows `connection.sender`.
 
-`run` constructs `LspState { open_files: HashMap::new(), sender: &connection.sender }`.
+`run` constructs `LspState { open_files: HashMap::new(), host, sender: &connection.sender }`.
 
 ```rust
 // from crates/isograph_lsp/src/diagnostics.rs
+use isograph_compiler::HostLanguage;
 use lsp_types::{
     Uri,
     notification::{Notification, PublishDiagnostics},
     PublishDiagnosticsParams,
 };
 
-pub fn publish_diagnostics_for_uri(state: &LspState<'_>, uri: &Uri) {
+pub fn publish_diagnostics_for_uri<THostLanguage: HostLanguage>(
+    state: &LspState<'_, THostLanguage>,
+    uri: &Uri,
+) {
     let diagnostics = match state.open_files.get(uri.as_str()) {
-        Some(source) => diagnostics_for_file(source),
+        Some(source) => diagnostics_for_file(&state.host, source),
         None => Vec::new(),
     };
     let _ = state.sender.send(
@@ -217,8 +231,10 @@ Origin: isograph `publish_new_diagnostics_and_clear_old_diagnostics`. Delta: one
 
 ```rust
 // from crates/isograph_lsp/src/text_document.rs
-pub fn on_did_open_text_document(
-    state: &mut LspState<'_>,
+use isograph_compiler::HostLanguage;
+
+pub fn on_did_open_text_document<THostLanguage: HostLanguage>(
+    state: &mut LspState<'_, THostLanguage>,
     params: <DidOpenTextDocument as Notification>::Params,
 ) -> LSPRuntimeResult<()> {
     let DidOpenTextDocumentParams { text_document } = params;
@@ -228,8 +244,8 @@ pub fn on_did_open_text_document(
     ().wrap_ok()
 }
 
-pub fn on_did_close_text_document(
-    state: &mut LspState<'_>,
+pub fn on_did_close_text_document<THostLanguage: HostLanguage>(
+    state: &mut LspState<'_, THostLanguage>,
     params: <DidCloseTextDocument as Notification>::Params,
 ) -> LSPRuntimeResult<()> {
     let uri = params.text_document.uri;
@@ -238,8 +254,8 @@ pub fn on_did_close_text_document(
     ().wrap_ok()
 }
 
-pub fn on_did_change_text_document(
-    state: &mut LspState<'_>,
+pub fn on_did_change_text_document<THostLanguage: HostLanguage>(
+    state: &mut LspState<'_, THostLanguage>,
     params: <DidChangeTextDocument as Notification>::Params,
 ) -> LSPRuntimeResult<()> {
     let DidChangeTextDocumentParams {
@@ -265,7 +281,7 @@ The existing open-file tests construct `LspState` without a sender. They become:
 The tests that only check the map do not go through the handler, or they use a local channel:
 
 ```rust
-    fn state() -> (lsp_server::Connection, LspState<'static>) {
+    fn state() -> (lsp_server::Connection, LspState<'static, TypeScriptHostLanguage>) {
         // cannot borrow from a local Connection for 'static
     }
 ```
@@ -279,6 +295,7 @@ Keep the map assertions by splitting: handlers that publish need a `Connection`.
         let (server, client) = lsp_server::Connection::memory();
         let mut state = LspState {
             open_files: Default::default(),
+            host: TypeScriptHostLanguage,
             sender: &server.sender,
         };
         on_did_open_text_document(
@@ -322,14 +339,15 @@ Keep the map assertions by splitting: handlers that publish need a `Connection`.
 
 `Connection::memory` origin: `lsp-server` crate. isograph's diagnostic tests do not exist; this is the test for publish.
 
-The Change 3 tests from lsp-semantic-tokens.md that build `LspState { open_files: Default::default() }` gain `sender: &server.sender` with a memory connection in each test, including `did_open_stores_the_text`, `did_change_replaces_the_text`, `did_close_removes_the_text`, and `request_uses_the_open_file_text`. Those tests ignore the client receiver.
+The Change 3 tests from lsp-semantic-tokens.md that build `LspState { open_files: Default::default(), host: TypeScriptHostLanguage }` gain `sender: &server.sender` with a memory connection in each test, including `did_open_stores_the_text`, `did_change_replaces_the_text`, `did_close_removes_the_text`, and `request_uses_the_open_file_text`. Those tests ignore the client receiver.
 
 `start` / `run` in `server.rs` pass the sender:
 
 ```rust
-fn run(connection: Connection) {
+fn run<THostLanguage: HostLanguage>(connection: Connection, host: THostLanguage) {
     let mut state = LspState {
         open_files: HashMap::new(),
+        host,
         sender: &connection.sender,
     };
     for msg in &connection.receiver {

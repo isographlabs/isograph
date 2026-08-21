@@ -26,9 +26,8 @@ Most important first.
 
 ```rust
 // from crates/isograph_lsp/src/file_literals.rs
-use isograph_parser::{
-    HostLanguage, IsoLiteralError, IsoLiteralParse, SemanticToken, parse_iso_literal,
-};
+use isograph_compiler::{HostLanguage, IsoLiteralError};
+use isograph_parser::{IsoLiteralParse, SemanticToken, parse_iso_literal};
 use span::WithSpan;
 
 pub struct FileLiteral<'a, THostLanguage: HostLanguage> {
@@ -65,12 +64,15 @@ pub fn file_literals<THostLanguage: HostLanguage>(
 // from crates/isograph_lsp/src/lsp_state.rs
 use std::collections::HashMap;
 
-pub struct LspState {
+use isograph_compiler::HostLanguage;
+
+pub struct LspState<THostLanguage: HostLanguage> {
     pub open_files: HashMap<String, String>,
+    pub host: THostLanguage,
 }
 ```
 
-Key is `uri.as_str()`. Value is the full document text from `didOpen` / `didChange`.
+Key is `uri.as_str()`. Value is the full document text from `didOpen` / `didChange`. `host` is the extraction implementor the binary passed to `start`.
 
 ```rust
 // from crates/isograph_lsp/src/semantic_tokens.rs
@@ -98,7 +100,7 @@ license = { workspace = true }
 [dependencies]
 common_lang_types = { path = "../common_lang_types" }
 intern = { path = "../../relay-crates/intern" }
-isograph_extract_typescript = { path = "../isograph_extract_typescript", optional = true }
+isograph_compiler = { path = "../isograph_compiler" }
 isograph_parser = { path = "../isograph_parser" }
 lsp-server = { workspace = true }
 lsp-types = { workspace = true }
@@ -107,18 +109,21 @@ serde_json = { workspace = true }
 span = { path = "../span" }
 tracing = { workspace = true }
 
-[features]
-default = ["typescript"]
-typescript = ["dep:isograph_extract_typescript"]
+[dev-dependencies]
+isograph_extract_typescript = { path = "../isograph_extract_typescript" }
 
 [lints]
 workspace = true
 ```
 
+No `typescript` feature. Production `isograph_lsp` does not depend on `isograph_extract_typescript`. Tests that open a TypeScript fixture take `TypeScriptHostLanguage` through the dev-dependency.
+
 `src/lib.rs`:
 
 ```rust
 // from crates/isograph_lsp/src/lib.rs
+use isograph_compiler::HostLanguage;
+
 mod file_literals;
 mod lsp_notification_dispatch;
 mod lsp_request_dispatch;
@@ -128,10 +133,7 @@ mod semantic_tokens;
 mod server;
 mod text_document;
 
-#[cfg(feature = "typescript")]
-pub use isograph_extract_typescript::TypeScriptHostLanguage;
-
-pub fn start() -> std::process::ExitCode;
+pub fn start<THostLanguage: HostLanguage>(host: THostLanguage) -> std::process::ExitCode;
 ```
 
 `file_literals.rs` is the types above. Tests in that module:
@@ -315,13 +317,15 @@ Absolutize and encode, origin isograph `semantic_tokens.rs`. Delta: `text_source
 
 ```rust
 // from crates/isograph_lsp/src/semantic_tokens.rs
-use isograph_extract_typescript::TypeScriptHostLanguage;
-use isograph_parser::HostLanguage;
+use isograph_compiler::HostLanguage;
 
 use crate::file_literals::{FileLiteral, file_literals};
 
-pub fn lsp_tokens_for_file(source: &str) -> Vec<LspSemanticToken> {
-    let literals = file_literals(&TypeScriptHostLanguage, source);
+pub fn lsp_tokens_for_file<THostLanguage: HostLanguage>(
+    host: &THostLanguage,
+    source: &str,
+) -> Vec<LspSemanticToken> {
+    let literals = file_literals(host, source);
     let absolute = concatenate_and_absolutize(literals.iter(), source);
     convert_absolute_token_to_lsp_token(absolute, source).collect()
 }
@@ -491,7 +495,7 @@ mod tests {
     #[test]
     fn lsp_tokens_for_a_file_are_nonempty() {
         let source = "export const fullName = iso(`field Pet.fullName { id }`)(";
-        let lsp = lsp_tokens_for_file(source);
+        let lsp = lsp_tokens_for_file(&TypeScriptHostLanguage, source);
         assert!(!lsp.is_empty());
         assert_eq!(lsp[0].token_modifiers_bitset, 0);
     }
@@ -640,10 +644,12 @@ use lsp_types::{
 };
 use prelude::Postfix;
 
+use isograph_compiler::HostLanguage;
+
 use crate::{lsp_runtime_error::LSPRuntimeResult, lsp_state::LspState};
 
-pub fn on_did_open_text_document(
-    state: &mut LspState,
+pub fn on_did_open_text_document<THostLanguage: HostLanguage>(
+    state: &mut LspState<THostLanguage>,
     params: <DidOpenTextDocument as Notification>::Params,
 ) -> LSPRuntimeResult<()> {
     let DidOpenTextDocumentParams { text_document } = params;
@@ -652,8 +658,8 @@ pub fn on_did_open_text_document(
     ().wrap_ok()
 }
 
-pub fn on_did_close_text_document(
-    state: &mut LspState,
+pub fn on_did_close_text_document<THostLanguage: HostLanguage>(
+    state: &mut LspState<THostLanguage>,
     params: <DidCloseTextDocument as Notification>::Params,
 ) -> LSPRuntimeResult<()> {
     state
@@ -662,8 +668,8 @@ pub fn on_did_close_text_document(
     ().wrap_ok()
 }
 
-pub fn on_did_change_text_document(
-    state: &mut LspState,
+pub fn on_did_change_text_document<THostLanguage: HostLanguage>(
+    state: &mut LspState<THostLanguage>,
     params: <DidChangeTextDocument as Notification>::Params,
 ) -> LSPRuntimeResult<()> {
     let DidChangeTextDocumentParams {
@@ -692,10 +698,12 @@ use lsp_types::{
     request::{Request, SemanticTokensFullRequest},
 };
 
+use isograph_compiler::HostLanguage;
+
 use crate::{lsp_runtime_error::LSPRuntimeResult, lsp_state::LspState};
 
-pub fn on_semantic_token_full_request(
-    state: &LspState,
+pub fn on_semantic_token_full_request<THostLanguage: HostLanguage>(
+    state: &LspState<THostLanguage>,
     params: <SemanticTokensFullRequest as Request>::Params,
 ) -> LSPRuntimeResult<<SemanticTokensFullRequest as Request>::Result> {
     let uri = params.text_document.uri;
@@ -704,7 +712,7 @@ pub fn on_semantic_token_full_request(
     };
     LspSemanticTokensResult::Tokens(LspSemanticTokens {
         result_id: None,
-        data: lsp_tokens_for_file(source),
+        data: lsp_tokens_for_file(&state.host, source),
     })
     .wrap_some()
     .wrap_ok()
@@ -727,6 +735,7 @@ use lsp_types::{
     notification::{DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument},
     request::SemanticTokensFullRequest,
 };
+use isograph_compiler::HostLanguage;
 use prelude::Postfix;
 
 use crate::{
@@ -740,7 +749,7 @@ use crate::{
     },
 };
 
-pub fn start() -> std::process::ExitCode {
+pub fn start<THostLanguage: HostLanguage>(host: THostLanguage) -> std::process::ExitCode {
     let (connection, io_threads) = Connection::stdio();
     let capabilities = ServerCapabilities {
         text_document_sync: TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)
@@ -762,7 +771,7 @@ pub fn start() -> std::process::ExitCode {
         tracing::error!("failed to initialize the language server: {err}");
         return std::process::ExitCode::FAILURE;
     }
-    run(connection);
+    run(connection, host);
     if let Err(err) = io_threads.join() {
         tracing::error!("language server io threads: {err}");
         return std::process::ExitCode::FAILURE;
@@ -770,9 +779,10 @@ pub fn start() -> std::process::ExitCode {
     std::process::ExitCode::SUCCESS
 }
 
-fn run(connection: Connection) {
+fn run<THostLanguage: HostLanguage>(connection: Connection, host: THostLanguage) {
     let mut state = LspState {
         open_files: HashMap::new(),
+        host,
     };
     for msg in &connection.receiver {
         match msg {
@@ -793,9 +803,9 @@ fn run(connection: Connection) {
     }
 }
 
-fn dispatch_notification(
+fn dispatch_notification<THostLanguage: HostLanguage>(
     notification: lsp_server::Notification,
-    state: &mut LspState,
+    state: &mut LspState<THostLanguage>,
 ) -> ControlFlow<Option<LSPRuntimeError>, ()> {
     LSPNotificationDispatch::new(notification, state)
         .on_notification_sync::<DidOpenTextDocument>(on_did_open_text_document)?
@@ -805,7 +815,10 @@ fn dispatch_notification(
     ControlFlow::Continue(())
 }
 
-fn dispatch_request(request: lsp_server::Request, state: &LspState) -> Response {
+fn dispatch_request<THostLanguage: HostLanguage>(
+    request: lsp_server::Request,
+    state: &LspState<THostLanguage>,
+) -> Response {
     let get_response = || {
         let request = LSPRequestDispatch::new(request, state)
             .on_request_sync::<SemanticTokensFullRequest>(on_semantic_token_full_request)?
@@ -830,7 +843,7 @@ fn dispatch_request(request: lsp_server::Request, state: &LspState) -> Response 
 
 `handle_shutdown` returns `Result<bool, ProtocolError>`. `unwrap_or(false)` continues if the check itself fails. Origin isograph uses a tokio loop; this is a blocking `for` over `connection.receiver`. `Connection::handle_shutdown` is the stdio shutdown handshake.
 
-`server.rs` imports `std::collections::HashMap`. `run` holds `let mut state = LspState { open_files: HashMap::new() }`, passes `&state` to `dispatch_request` and `&mut state` to `dispatch_notification`. Prefix `&` / `&mut` stay: `reference_mut` does not exist.
+`server.rs` imports `std::collections::HashMap`. `run` holds `let mut state = LspState { open_files: HashMap::new(), host }`, passes `&state` to `dispatch_request` and `&mut state` to `dispatch_notification`. Prefix `&` / `&mut` stay: `reference_mut` does not exist.
 
 `expect` on `ServerCapabilities` serialize: the value is a struct literal in this file. `serde_json::to_value` fails only if a type in `lsp_types` refuses to serialize; the type system cannot check that.
 
@@ -850,6 +863,8 @@ mod tests {
     use super::{
         on_did_change_text_document, on_did_close_text_document, on_did_open_text_document,
     };
+    use isograph_extract_typescript::TypeScriptHostLanguage;
+
     use crate::lsp_state::LspState;
 
     fn uri() -> lsp_types::Uri {
@@ -860,6 +875,7 @@ mod tests {
     fn did_open_stores_the_text() {
         let mut state = LspState {
             open_files: Default::default(),
+            host: TypeScriptHostLanguage,
         };
         on_did_open_text_document(
             &mut state,
@@ -883,6 +899,7 @@ mod tests {
     fn did_change_replaces_the_text() {
         let mut state = LspState {
             open_files: Default::default(),
+            host: TypeScriptHostLanguage,
         };
         state
             .open_files
@@ -913,6 +930,7 @@ mod tests {
     fn did_close_removes_the_text() {
         let mut state = LspState {
             open_files: Default::default(),
+            host: TypeScriptHostLanguage,
         };
         state
             .open_files
@@ -937,6 +955,7 @@ mod tests {
     fn request_uses_the_open_file_text() {
         let mut state = LspState {
             open_files: Default::default(),
+            host: TypeScriptHostLanguage,
         };
         let uri: lsp_types::Uri = "file:///tmp/Pet.tsx"
             .parse()
@@ -969,26 +988,36 @@ mod tests {
 
 `expect` in tests names an invariant the test established.
 
-CLI. `crates/isograph_cli/Cargo.toml` gains:
+CLI. ts-graphql-react-isograph-cli.md already split the library and the binary. This change makes `run` take a host and adds `isograph lsp`. `ts_graphql_react_isograph_cli` is the crate that names `TypeScriptHostLanguage`.
 
 ```toml
+# from crates/isograph_cli/Cargo.toml
+isograph_compiler = { path = "../isograph_compiler" }
 isograph_lsp = { path = "../isograph_lsp" }
 ```
 
-`main.rs`:
+```toml
+# from crates/ts_graphql_react_isograph_cli/Cargo.toml
+isograph_extract_typescript = { path = "../isograph_extract_typescript" }
+```
 
 ```rust
-// from crates/isograph_cli/src/main.rs
+// from crates/isograph_cli/src/lib.rs
 use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{CommandFactory, FromArgMatches, Parser};
 use freddie_cli::{App, Instance, NoArgs};
+use isograph_compiler::HostLanguage;
 use prelude::Postfix;
+
+pub struct IsographCli<THostLanguage: HostLanguage> {
+    pub host: THostLanguage,
+}
 
 #[derive(Parser)]
 #[command(name = "isograph", version, about = "The isograph compiler.", long_about = None)]
-struct IsographCli {
+struct Args {
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -1008,25 +1037,44 @@ struct LspCommand {
     config: Option<PathBuf>,
 }
 
-fn main() -> ExitCode {
-    let matches = IsographCli::command().get_matches();
-    let cli = IsographCli::from_arg_matches(matches.reference())
-        .expect("the derived type matches the command it derived");
+impl<THostLanguage: HostLanguage> IsographCli<THostLanguage> {
+    pub fn run(self) -> ExitCode {
+        let matches = Args::command().get_matches();
+        let cli = Args::from_arg_matches(matches.reference())
+            .expect("the derived type matches the command it derived");
 
-    match cli.command {
-        Some(Command::Lsp(_)) => isograph_lsp::start(),
-        Some(Command::Lifecycle(verb)) => {
-            freddie_cli::run_lifecycle_verb::<Isograph>(verb, matches.reference())
+        match cli.command {
+            Some(Command::Lsp(_)) => isograph_lsp::start(self.host),
+            Some(Command::Lifecycle(verb)) => {
+                freddie_cli::run_lifecycle_verb::<Isograph>(verb, matches.reference())
+            }
+            None => freddie_cli::run_lifecycle_verb::<Isograph>(
+                freddie_cli::verb_for_bare_invocation::<Isograph>(),
+                matches.reference(),
+            ),
         }
-        None => freddie_cli::run_lifecycle_verb::<Isograph>(
-            freddie_cli::verb_for_bare_invocation::<Isograph>(),
-            matches.reference(),
-        ),
     }
 }
 ```
 
-Before: `verb: Option<freddie_cli::Verb<Isograph>>` only. `Isograph`, `IsographArgs`, and `impl App` stay.
+`Isograph`, `IsographArgs`, and `impl App` stay in `isograph_cli`. Clap type is `Args` (before, ts-graphql-react-isograph-cli.md: `Cli` with `verb` only). `run` is a method on `IsographCli<THostLanguage>` (before: `pub fn run()`).
+
+```rust
+// from crates/ts_graphql_react_isograph_cli/src/main.rs
+use std::process::ExitCode;
+
+use isograph_cli::IsographCli;
+use isograph_extract_typescript::TypeScriptHostLanguage;
+
+fn main() -> ExitCode {
+    IsographCli {
+        host: TypeScriptHostLanguage,
+    }
+    .run()
+}
+```
+
+Before (ts-graphql-react-isograph-cli.md): `fn main() -> ExitCode { isograph_cli::run() }`.
 
 `LspCommand.config` is unread. The extension in `languageClient.ts` already pushes `--config` when `pathToConfig` is set.
 
@@ -1034,4 +1082,4 @@ Before: `verb: Option<freddie_cli::Verb<Isograph>>` only. `Isograph`, `IsographA
 
 1. Change 1; crate, `file_literals`, its tests.
 2. Change 2; legend, absolutize, encoding, its tests.
-3. Change 3; dispatch, open files, server loop, `isograph lsp`, handler tests.
+3. Change 3; dispatch, open files, server loop, `isograph lsp`, `IsographCli<THostLanguage>`, handler tests.
