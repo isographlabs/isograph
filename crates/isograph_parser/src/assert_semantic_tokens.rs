@@ -10,13 +10,19 @@ pub(crate) fn assert_semantic_tokens(
     let mut search_from = 0usize;
     let mut expected_tokens = Vec::with_capacity(expected.len());
     for &(role, pattern) in expected {
-        let offset = text[search_from..]
-            .find(pattern)
-            .expect("the expected lexeme occurs in the fixture after the previous token");
-        let start = search_from + offset;
-        let end = start + pattern.len();
-        expected_tokens.push(role.with_span(Span::from_usize(start, end)));
-        search_from = end;
+        let span = loop {
+            let offset = text[search_from..]
+                .find(pattern)
+                .expect("the expected lexeme occurs as a recorded token after the previous token");
+            let start = search_from + offset;
+            let end = start + pattern.len();
+            let span = Span::from_usize(start, end);
+            search_from = end;
+            if actual.iter().any(|token| token.location == span) {
+                break span;
+            }
+        };
+        expected_tokens.push(role.with_span(span));
     }
     assert_eq!(
         actual,
@@ -32,4 +38,44 @@ fn displayed(text: &str, tokens: &[WithSpan<SemanticToken>]) -> Vec<(SemanticTok
         .iter()
         .map(|token| (token.item, text[token.location.as_usize_range()].to_owned()))
         .collect()
+}
+
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sequential_search_skips_an_unrecorded_occurrence() {
+        let text = "Pet!!";
+        let actual = [
+            SemanticToken::GraphQLTypeName.with_span(Span::from_usize(0, 3)),
+            SemanticToken::Content.with_span(Span::from_usize(4, 5)),
+        ];
+        assert_semantic_tokens(
+            text,
+            actual.as_slice(),
+            &[
+                (SemanticToken::GraphQLTypeName, "Pet"),
+                (SemanticToken::Content, "!"),
+            ],
+        );
+    }
+
+    #[test]
+    fn sequential_search_keeps_source_order_when_both_occurrences_are_recorded() {
+        let text = "aa";
+        let actual = [
+            SemanticToken::Content.with_span(Span::from_usize(0, 1)),
+            SemanticToken::Content.with_span(Span::from_usize(1, 2)),
+        ];
+        assert_semantic_tokens(
+            text,
+            actual.as_slice(),
+            &[(SemanticToken::Content, "a"), (SemanticToken::Content, "a")],
+        );
+    }
+
+    #[test]
+    fn sequential_search_accepts_an_empty_expected_list_when_nothing_was_recorded() {
+        assert_semantic_tokens("", &[], &[]);
+    }
 }
