@@ -46,7 +46,7 @@ enum Filesystem {
 ## Inner
 
 ```rust
-fn handle(state: &mut Database, event: &IsographEvent) -> Vec<IsographEffect>
+fn handle(state: &mut Database, event: IsographEvent) -> Vec<IsographEffect>
 ```
 
 The test harness calls this. It does not start a daemon, open a socket, or write a file. A test constructs a `DiskChanged` or `EditorChanged`, runs `handle`, and asserts the effects. The binary's event loop calls the same `handle` with the same types.

@@ -47,13 +47,15 @@ use prelude::Postfix;
 pub struct IsographState;
 
 impl IsographState {
-    pub fn handle(&mut self, event: &IsographEvent) -> Vec<IsographEffect> {
+    pub fn handle(&mut self, event: IsographEvent) -> Vec<IsographEffect> {
         match event {
             IsographEvent::HelloWorld => IsographEffect::LogHelloWorld.wrap_vec(),
         }
     }
 }
 ```
+
+Origin of `handle`: figaro `Figaro::handle(&mut self, event: &FigaroEvent)`. Delta: `event: IsographEvent`, owned.
 
 ```rust
 // from crates/isograph_cli/src/daemon.rs
@@ -155,7 +157,7 @@ fn run_event_loop(
     let mut state = IsographState;
     loop {
         let event = event_rx.recv()?;
-        let effects = state.handle(&event);
+        let effects = state.handle(event);
         for effect in effects {
             effect_tx.send(effect)?;
         }
@@ -198,7 +200,7 @@ mod tests {
     #[test]
     fn hello_world_returns_log_hello_world() {
         let mut state = IsographState;
-        let effects = state.handle(&IsographEvent::HelloWorld);
+        let effects = state.handle(IsographEvent::HelloWorld);
         assert_eq!(effects, IsographEffect::LogHelloWorld.wrap_vec());
     }
 }

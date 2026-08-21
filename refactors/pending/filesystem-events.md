@@ -69,7 +69,7 @@ impl IsographState {
         }
     }
 
-    pub fn handle(&mut self, event: &IsographEvent) {
+    pub fn handle(&mut self, event: IsographEvent) {
         match event {
             IsographEvent::DiskChanged(change) => self.handle_disk_changed(change),
         }
@@ -192,7 +192,7 @@ async fn serve(
     while let Some(event) = event_rx.recv().await {
         match &event {
             IsographEvent::DiskChanged(change) => {
-                state.handle(&event);
+                state.handle(event);
                 info!(
                     path = %change.path.display(),
                     file_count = state.files.len(),
