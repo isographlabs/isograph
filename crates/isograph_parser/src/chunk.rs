@@ -7,14 +7,15 @@ use span::{Span, WithSpan, WithSpanPostfix};
 use thiserror::Error;
 
 use crate::{
-    Argument, ArgumentListPath, ArgumentSlotPath, AstError, BracketItem, Bracketed, CloseBracket,
-    Expectation, ExtraChunksPath, Found, IsoLiteralItem, IsoLiteralParsePath, IsoLiteralSlotPath,
-    IsographResolutionNode, ListLiteralPath, ListLiteralValue, ListLiteralValueSlotPath,
-    ListTypeAnnotationPath, MatchedBrackets, NonBracketToken, NonBracketTokenKind, ObjectEntry,
-    ObjectEntrySlotPath, ObjectLiteralPath, OpenBracket, Selection, SelectionSetPath,
-    SelectionSlotPath, SemanticToken, VariableDeclaration, VariableDeclarationListPath,
-    VariableDeclarationSlotPath,
+    Argument, ArgumentListPath, ArgumentSlotPath, AstError, BracketItem, BracketToken, Bracketed,
+    CloseBracket, Expectation, ExtraChunksPath, Found, IsoLiteralItem, IsoLiteralParsePath,
+    IsoLiteralSlotPath, IsographResolutionNode, ListLiteralPath, ListLiteralValue,
+    ListLiteralValueSlotPath, ListTypeAnnotationPath, MatchedBrackets, NonBracketToken,
+    NonBracketTokenKind, ObjectEntry, ObjectEntrySlotPath, ObjectLiteralPath, OpenBracket,
+    Selection, SelectionSetPath, SelectionSlotPath, SemanticToken, SplitToken, VariableDeclaration,
+    VariableDeclarationListPath, VariableDeclarationSlotPath,
     chunk_stream::{ChunkStream, ItemCursor},
+    leftover_token,
 };
 
 /// One level of the chunk tree: the whole literal at the root, a group's interior
@@ -344,6 +345,69 @@ fn extra_plus_trailing_separator(
     }
 }
 
+fn record_leftover_item(
+    tokens: &mut Vec<WithSpan<SemanticToken>>,
+    item: &WithSpan<ChunkContentItem>,
+) {
+    match item.item.reference() {
+        ChunkContentItem::NonBracket(token) => {
+            record_leftover_span(
+                tokens,
+                leftover_token(SplitToken::NonBracket(token.0)),
+                item.location,
+            );
+        }
+        ChunkContentItem::Group(group) => {
+            record_leftover_span(
+                tokens,
+                leftover_token(SplitToken::Bracket(BracketToken::Open(
+                    group.opening.item.0,
+                ))),
+                group.opening.location,
+            );
+            for chunk in group.children.item.0.iter() {
+                record_leftover_chunk(tokens, chunk.item.reference());
+            }
+            record_leftover_span(
+                tokens,
+                leftover_token(SplitToken::Bracket(BracketToken::Close(
+                    group.closing.item.0,
+                ))),
+                group.closing.location,
+            );
+        }
+    }
+}
+
+fn record_leftover_chunk(tokens: &mut Vec<WithSpan<SemanticToken>>, chunk: &Chunk) {
+    for item in chunk.contents.iter() {
+        record_leftover_item(tokens, item);
+    }
+}
+
+fn record_leftover_extra(
+    tokens: &mut Vec<WithSpan<SemanticToken>>,
+    extra: &Option<WithSpan<UnparsedChunkItems>>,
+) {
+    if let Some(extra) = extra {
+        for item in extra.item.0.iter() {
+            record_leftover_item(tokens, item);
+        }
+    }
+}
+
+fn record_leftover_span(
+    tokens: &mut Vec<WithSpan<SemanticToken>>,
+    role: Option<SemanticToken>,
+    span: Span,
+) {
+    if let Some(role) = role
+        && tokens.iter().all(|recorded| recorded.location != span)
+    {
+        tokens.push(role.with_span(span));
+    }
+}
+
 fn parse_one_chunk<'a, P>(
     chunk: &'a WithSpan<Chunk>,
     mut stream: ChunkStream<'a>,
@@ -351,7 +415,7 @@ fn parse_one_chunk<'a, P>(
     parse: impl FnOnce(&mut ItemCursor<'_>) -> Result<P, WithSpan<AstError>>,
 ) -> WithSpan<Slot<P, UnparsedChunkItems>> {
     let result = stream.cursor().spanning(parse);
-    match result {
+    let slot = match result {
         Ok(item) => {
             let extra = match stream.remaining_contents() {
                 None => None,
@@ -397,7 +461,9 @@ fn parse_one_chunk<'a, P>(
             }
             .with_span(location)
         }
-    }
+    };
+    record_leftover_extra(stream.tokens(), &slot.item.extra);
+    slot
 }
 
 pub(crate) fn parse_singleton<'a, T>(
@@ -429,6 +495,11 @@ pub(crate) fn parse_singleton<'a, T>(
         let location = Span::join(rest.head.location, rest.last().location);
         ExtraChunks(rest).with_span(location)
     });
+    if let Some(extra) = extra_chunks.as_ref() {
+        for chunk in extra.item.0.iter() {
+            record_leftover_chunk(tokens, chunk.item.reference());
+        }
+    }
     Singleton { item, extra_chunks }
 }
 
@@ -1388,7 +1459,13 @@ mod tests {
     #[test]
     fn leftover_after_a_list_item_keeps_the_item() {
         let text = "foo bar";
-        let (items, errors, comma_errors) = parsed_each(text, &[(SemanticToken::FieldName, "foo")]);
+        let (items, errors, comma_errors) = parsed_each(
+            text,
+            &[
+                (SemanticToken::FieldName, "foo"),
+                (SemanticToken::Content, "bar"),
+            ],
+        );
         assert_eq!(comma_errors, vec![]);
         assert_eq!(items.len(), 1);
         assert_eq!(
@@ -1410,7 +1487,13 @@ mod tests {
     #[test]
     fn a_failed_list_chunk_is_none_and_the_next_chunk_still_parses() {
         let text = ".\nfoo";
-        let (items, errors, comma_errors) = parsed_each(text, &[(SemanticToken::FieldName, "foo")]);
+        let (items, errors, comma_errors) = parsed_each(
+            text,
+            &[
+                (SemanticToken::Content, "."),
+                (SemanticToken::FieldName, "foo"),
+            ],
+        );
         assert_eq!(comma_errors, vec![]);
         assert_eq!(items.len(), 2);
         assert!(items[0].item.item.is_none());

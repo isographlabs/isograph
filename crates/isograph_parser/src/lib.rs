@@ -58,6 +58,7 @@ pub use selections::{
     SelectionSetParent, SelectionSetPath, SelectionSlotPath,
 };
 pub use semantic_token::SemanticToken;
+pub(crate) use semantic_token::leftover_token;
 pub use variables::{
     ListTypeAnnotation, ListTypeAnnotationPath, NamedTypeAnnotation, NamedTypeAnnotationPath,
     NullTypeAnnotation, NullTypeAnnotationPath, TypeAnnotation, TypeAnnotationParent,

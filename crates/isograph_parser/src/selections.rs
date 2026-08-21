@@ -333,7 +333,15 @@ mod tests {
     #[test]
     fn an_orphaned_group_after_a_line_break_is_a_failed_selection() {
         let text = "bar\n{ baz }";
-        let (items, errors) = parsed_selections(text, &[(SemanticToken::FieldName, "bar")]);
+        let (items, errors) = parsed_selections(
+            text,
+            &[
+                (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Bracket, "{"),
+                (SemanticToken::Content, "baz"),
+                (SemanticToken::Bracket, "}"),
+            ],
+        );
         assert_eq!(items.len(), 2);
         assert_eq!(
             as_selection(items[0].item.reference()).name.location,
@@ -380,6 +388,7 @@ mod tests {
             text,
             &[
                 (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Content, "baz"),
                 (SemanticToken::FieldName, "qux"),
             ],
         );
@@ -406,7 +415,15 @@ mod tests {
     #[test]
     fn a_period_where_a_selection_should_start_is_a_selection_error() {
         let text = "...UserAvatar";
-        let (items, errors) = parsed_selections(text, &[]);
+        let (items, errors) = parsed_selections(
+            text,
+            &[
+                (SemanticToken::Content, "."),
+                (SemanticToken::Content, "."),
+                (SemanticToken::Content, "."),
+                (SemanticToken::Content, "UserAvatar"),
+            ],
+        );
         assert!(items[0].item.item.is_none());
         assert!(errors.iter().any(|error| {
             error.item
@@ -425,11 +442,14 @@ mod tests {
             text,
             &[
                 (SemanticToken::FieldName, "a"),
+                (SemanticToken::Content, "b"),
                 (SemanticToken::FieldName, "pet"),
                 (SemanticToken::Brace, "{"),
                 (SemanticToken::FieldName, "c"),
+                (SemanticToken::Content, "d"),
                 (SemanticToken::Brace, "}"),
                 (SemanticToken::FieldName, "e"),
+                (SemanticToken::Content, "f"),
             ],
         );
         assert_eq!(errors.len(), 3);

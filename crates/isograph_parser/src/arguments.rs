@@ -666,6 +666,7 @@ mod tests {
             text,
             &[
                 (SemanticToken::Argument, "a"),
+                (SemanticToken::Integer, "1"),
                 (SemanticToken::Argument, "b"),
                 (SemanticToken::Colon, ":"),
                 (SemanticToken::Integer, "2"),
@@ -710,7 +711,14 @@ mod tests {
     #[test]
     fn a_pair_that_does_not_start_with_a_name_is_an_argument_error() {
         let text = "42: 1";
-        let (items, errors) = parsed_pairs(text, &[]);
+        let (items, errors) = parsed_pairs(
+            text,
+            &[
+                (SemanticToken::Integer, "42"),
+                (SemanticToken::Content, ":"),
+                (SemanticToken::Integer, "1"),
+            ],
+        );
         assert!(items[0].item.item.is_none());
         assert!(errors.iter().any(|error| {
             error.item
@@ -732,6 +740,7 @@ mod tests {
                 (SemanticToken::Colon, ":"),
                 (SemanticToken::Variable, "$"),
                 (SemanticToken::Variable, "x"),
+                (SemanticToken::Content, "junk"),
             ],
         );
         assert_eq!(items.len(), 1);
@@ -938,7 +947,10 @@ mod tests {
             text,
             Expectation::Separator(BracketKind::Bracket),
             parse_list_literal_value,
-            &[(SemanticToken::Integer, "1")],
+            &[
+                (SemanticToken::Integer, "1"),
+                (SemanticToken::Content, "junk"),
+            ],
         );
         assert_eq!(comma_errors, vec![]);
         assert_eq!(items.len(), 1);
@@ -1061,7 +1073,11 @@ mod tests {
         let text = "a: 01";
         let (items, errors) = parsed_pairs(
             text,
-            &[(SemanticToken::Argument, "a"), (SemanticToken::Colon, ":")],
+            &[
+                (SemanticToken::Argument, "a"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Content, "01"),
+            ],
         );
         assert!(items[0].item.item.is_none());
         assert!(errors.iter().any(|error| {
@@ -1079,7 +1095,11 @@ mod tests {
         let text = "a: 1.5";
         let (items, errors) = parsed_pairs(
             text,
-            &[(SemanticToken::Argument, "a"), (SemanticToken::Colon, ":")],
+            &[
+                (SemanticToken::Argument, "a"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Content, "1.5"),
+            ],
         );
         assert!(items[0].item.item.is_none());
         assert!(errors.iter().any(|error| {
@@ -1364,7 +1384,13 @@ mod tests {
         let text = "a: (x)";
         let (items, errors) = parsed_pairs(
             text,
-            &[(SemanticToken::Argument, "a"), (SemanticToken::Colon, ":")],
+            &[
+                (SemanticToken::Argument, "a"),
+                (SemanticToken::Colon, ":"),
+                (SemanticToken::Bracket, "("),
+                (SemanticToken::Content, "x"),
+                (SemanticToken::Bracket, ")"),
+            ],
         );
         assert!(items[0].item.item.is_none());
         assert!(errors.iter().any(|error| {
@@ -1395,7 +1421,11 @@ mod tests {
         ] {
             let (items, errors) = parsed_pairs(
                 text,
-                &[(SemanticToken::Argument, "a"), (SemanticToken::Colon, ":")],
+                &[
+                    (SemanticToken::Argument, "a"),
+                    (SemanticToken::Colon, ":"),
+                    (SemanticToken::Content, pattern),
+                ],
             );
             assert!(items[0].item.item.is_none(), "for literal {text:?}");
             assert!(
@@ -1417,6 +1447,9 @@ mod tests {
                 (SemanticToken::Argument, "input"),
                 (SemanticToken::Colon, ":"),
                 (SemanticToken::Brace, "{"),
+                (SemanticToken::Integer, "1"),
+                (SemanticToken::Content, ":"),
+                (SemanticToken::Integer, "2"),
                 (SemanticToken::Brace, "}"),
             ],
         );

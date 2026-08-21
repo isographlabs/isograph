@@ -680,6 +680,7 @@ mod tests {
                     (SemanticToken::Type, "Query"),
                     (SemanticToken::Period, "."),
                     (SemanticToken::FieldName, "foo"),
+                    (SemanticToken::Content, ","),
                 ],
             );
             as_entrypoint(parse.reference());
@@ -703,6 +704,11 @@ mod tests {
                 (SemanticToken::Type, "Query"),
                 (SemanticToken::Period, "."),
                 (SemanticToken::FieldName, "foo"),
+                (SemanticToken::Content, ","),
+                (SemanticToken::Content, "field"),
+                (SemanticToken::Content, "User"),
+                (SemanticToken::Content, "."),
+                (SemanticToken::Content, "name"),
             ],
         );
         assert_eq!(
@@ -729,6 +735,10 @@ mod tests {
                 (SemanticToken::Type, "Query"),
                 (SemanticToken::Period, "."),
                 (SemanticToken::FieldName, "foo"),
+                (SemanticToken::Content, "field"),
+                (SemanticToken::Content, "User"),
+                (SemanticToken::Content, "."),
+                (SemanticToken::Content, "name"),
             ],
         );
         assert_eq!(
@@ -748,7 +758,15 @@ mod tests {
     fn a_failed_first_chunk_is_reported_even_when_a_second_exists() {
         let text = "entrypoint\nQuery.foo";
         let keyword_end = span_of(text, "entrypoint").end;
-        let (parse, errors) = parsed(text, &[(SemanticToken::Keyword, "entrypoint")]);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "entrypoint"),
+                (SemanticToken::Content, "Query"),
+                (SemanticToken::Content, "."),
+                (SemanticToken::Content, "foo"),
+            ],
+        );
         assert!(parsed_item(parse.reference()).is_none());
         assert!(errors.iter().any(|error| {
             error.item == expected(token(Identifier), Found::EndOfChunk)
@@ -769,7 +787,15 @@ mod tests {
             text,
             expected(DECLARATION_KEYWORD, Found::Token(Identifier)),
             span_of(text, "fieldd"),
-            &[(SemanticToken::Keyword, "fieldd")],
+            &[
+                (SemanticToken::Keyword, "fieldd"),
+                (SemanticToken::Content, "Query"),
+                (SemanticToken::Content, "."),
+                (SemanticToken::Content, "foo"),
+                (SemanticToken::Bracket, "{"),
+                (SemanticToken::Content, "bar"),
+                (SemanticToken::Bracket, "}"),
+            ],
         );
     }
 
@@ -780,7 +806,11 @@ mod tests {
             text,
             expected(DECLARATION_KEYWORD, Found::Group(BracketKind::Brace)),
             span_of(text, "{ bar }"),
-            &[],
+            &[
+                (SemanticToken::Bracket, "{"),
+                (SemanticToken::Content, "bar"),
+                (SemanticToken::Bracket, "}"),
+            ],
         );
     }
 
@@ -791,7 +821,17 @@ mod tests {
             text,
             expected(DECLARATION_KEYWORD, Found::Token(Identifier)),
             span_of(text, "pointer"),
-            &[(SemanticToken::Keyword, "pointer")],
+            &[
+                (SemanticToken::Keyword, "pointer"),
+                (SemanticToken::Content, "Pet"),
+                (SemanticToken::Content, "."),
+                (SemanticToken::Content, "BestFriend"),
+                (SemanticToken::Content, "to"),
+                (SemanticToken::Content, "Owner"),
+                (SemanticToken::Bracket, "{"),
+                (SemanticToken::Content, "id"),
+                (SemanticToken::Bracket, "}"),
+            ],
         );
     }
 
@@ -814,7 +854,11 @@ mod tests {
                 Found::Token(ErrorNumberLiteralTrailingInvalid),
             ),
             span_of(numeric, "42."),
-            &[(SemanticToken::Keyword, "entrypoint")],
+            &[
+                (SemanticToken::Keyword, "entrypoint"),
+                (SemanticToken::Content, "42."),
+                (SemanticToken::Content, "foo"),
+            ],
         );
 
         let dotless = "entrypoint Query foo";
@@ -825,6 +869,7 @@ mod tests {
             &[
                 (SemanticToken::Keyword, "entrypoint"),
                 (SemanticToken::Type, "Query"),
+                (SemanticToken::Content, "foo"),
             ],
         );
 
@@ -852,6 +897,7 @@ mod tests {
                 (SemanticToken::Type, "Query"),
                 (SemanticToken::Period, "."),
                 (SemanticToken::FieldName, "foo"),
+                (SemanticToken::Content, ","),
             ],
         );
         as_entrypoint(parse.reference());
@@ -871,7 +917,14 @@ mod tests {
     #[test]
     fn leftover_dollars_after_entrypoint_are_extra() {
         let text = "entrypoint $ $";
-        let (parse, errors) = parsed(text, &[(SemanticToken::Keyword, "entrypoint")]);
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "entrypoint"),
+                (SemanticToken::Content, "$"),
+                (SemanticToken::Content, "$"),
+            ],
+        );
         assert!(parsed_item(parse.reference()).is_none());
         let extra = first_slot(parse.reference())
             .extra
@@ -895,6 +948,8 @@ mod tests {
                 (SemanticToken::Type, "Query"),
                 (SemanticToken::Period, "."),
                 (SemanticToken::FieldName, "foo"),
+                (SemanticToken::Content, "bar"),
+                (SemanticToken::Content, ","),
             ],
         );
         as_entrypoint(parse.reference());
@@ -941,6 +996,8 @@ mod tests {
                 (SemanticToken::Keyword, "entrypoint"),
                 (SemanticToken::Type, "Foo"),
                 (SemanticToken::Period, "."),
+                (SemanticToken::Content, "$"),
+                (SemanticToken::Content, "asdf"),
             ],
         );
         assert!(parsed_item(parse.reference()).is_none());
@@ -965,6 +1022,7 @@ mod tests {
                 (SemanticToken::Type, "Query"),
                 (SemanticToken::Period, "."),
                 (SemanticToken::FieldName, "foo"),
+                (SemanticToken::Content, ","),
             ],
         );
         match parse.resolve((), span_of(text, ",")) {
@@ -983,6 +1041,7 @@ mod tests {
                 (SemanticToken::Type, "Query"),
                 (SemanticToken::Period, "."),
                 (SemanticToken::FieldName, "foo"),
+                (SemanticToken::Content, "bar"),
             ],
         );
         as_entrypoint(parse.reference());
@@ -1006,6 +1065,9 @@ mod tests {
                 (SemanticToken::Type, "Query"),
                 (SemanticToken::Period, "."),
                 (SemanticToken::FieldName, "foo"),
+                (SemanticToken::Bracket, "{"),
+                (SemanticToken::Content, "bar"),
+                (SemanticToken::Bracket, "}"),
             ],
         );
         as_entrypoint(parse.reference());
@@ -1205,6 +1267,8 @@ mod tests {
                 (SemanticToken::FieldName, "Foo"),
                 (SemanticToken::Brace, "{"),
                 (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Content, "@"),
+                (SemanticToken::Content, "loadable"),
                 (SemanticToken::Brace, "}"),
             ],
         );
@@ -1311,6 +1375,7 @@ mod tests {
                 (SemanticToken::Type, "Query"),
                 (SemanticToken::Period, "."),
                 (SemanticToken::FieldName, "foo"),
+                (SemanticToken::Content, "bar"),
             ],
         );
         match parse.resolve((), span_of(text, "bar")) {
@@ -1329,6 +1394,7 @@ mod tests {
                 (SemanticToken::Type, "Query"),
                 (SemanticToken::Period, "."),
                 (SemanticToken::FieldName, "foo"),
+                (SemanticToken::Content, "bar"),
             ],
         );
         let gap = Span::new(span_of(text, "foo").end, span_of(text, "bar").start);
@@ -1385,7 +1451,18 @@ mod tests {
     #[test]
     fn positions_inside_a_failed_first_chunk_resolve_through_the_cloned_chunk() {
         let text = "fieldd Query.foo { bar }";
-        let (parse, _) = parsed(text, &[(SemanticToken::Keyword, "fieldd")]);
+        let (parse, _) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "fieldd"),
+                (SemanticToken::Content, "Query"),
+                (SemanticToken::Content, "."),
+                (SemanticToken::Content, "foo"),
+                (SemanticToken::Bracket, "{"),
+                (SemanticToken::Content, "bar"),
+                (SemanticToken::Bracket, "}"),
+            ],
+        );
         match parse.resolve((), span_of(text, "bar")) {
             IsographResolutionNode::NonBracketToken(token) => {
                 assert_eq!(token.inner.0, NonBracketTokenKind::Identifier);
@@ -1397,7 +1474,18 @@ mod tests {
     #[test]
     fn the_unrecognized_keyword_resolves_as_a_token_in_the_failed_chunk() {
         let text = "fieldd Query.foo { bar }";
-        let (parse, _) = parsed(text, &[(SemanticToken::Keyword, "fieldd")]);
+        let (parse, _) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "fieldd"),
+                (SemanticToken::Content, "Query"),
+                (SemanticToken::Content, "."),
+                (SemanticToken::Content, "foo"),
+                (SemanticToken::Bracket, "{"),
+                (SemanticToken::Content, "bar"),
+                (SemanticToken::Bracket, "}"),
+            ],
+        );
         match parse.resolve((), span_of(text, "fieldd")) {
             IsographResolutionNode::Singleton(_) => {}
             node => panic!("expected the singleton, got {node:?}"),
@@ -1506,6 +1594,9 @@ mod tests {
                 (SemanticToken::Type, "Query"),
                 (SemanticToken::Period, "."),
                 (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Bracket, "{"),
+                (SemanticToken::Content, "bar"),
+                (SemanticToken::Bracket, "}"),
             ],
         );
         assert_eq!(as_selectable(parse.reference()).selection_set, None);
@@ -1531,6 +1622,7 @@ mod tests {
                 (SemanticToken::Brace, "{"),
                 (SemanticToken::FieldName, "bar"),
                 (SemanticToken::Brace, "}"),
+                (SemanticToken::Content, ","),
             ],
         );
         as_selectable(parse.reference());
@@ -1555,6 +1647,7 @@ mod tests {
                 (SemanticToken::Brace, "{"),
                 (SemanticToken::FieldName, "bar"),
                 (SemanticToken::Brace, "}"),
+                (SemanticToken::Content, "junk"),
             ],
         );
         as_selectable(parse.reference());
@@ -1656,6 +1749,7 @@ mod tests {
                 (SemanticToken::Brace, "{"),
                 (SemanticToken::FieldName, "bar"),
                 (SemanticToken::Brace, "}"),
+                (SemanticToken::String, "\"too late\""),
             ],
         );
         as_selectable(parse.reference());
@@ -1681,6 +1775,7 @@ mod tests {
                 (SemanticToken::Type, "Query"),
                 (SemanticToken::Period, "."),
                 (SemanticToken::FieldName, "foo"),
+                (SemanticToken::String, "\"nope\""),
             ],
         );
         as_entrypoint(parse.reference());
@@ -2173,6 +2268,10 @@ mod tests {
                 (SemanticToken::FieldName, "Foo"),
                 (SemanticToken::Keyword, "to"),
                 (SemanticToken::GraphQLTypeName, "Pet"),
+                (SemanticToken::Content, "!"),
+                (SemanticToken::Bracket, "{"),
+                (SemanticToken::Content, "id"),
+                (SemanticToken::Bracket, "}"),
             ],
         );
         as_selectable(parse.reference());
@@ -2448,6 +2547,9 @@ mod tests {
                 (SemanticToken::Keyword, "to"),
                 (SemanticToken::GraphQLTypeName, "["),
                 (SemanticToken::GraphQLTypeName, "]"),
+                (SemanticToken::Bracket, "{"),
+                (SemanticToken::Content, "id"),
+                (SemanticToken::Bracket, "}"),
             ],
         );
     }
@@ -2462,6 +2564,10 @@ mod tests {
                 (SemanticToken::Type, "Query"),
                 (SemanticToken::Period, "."),
                 (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Content, "Owner"),
+                (SemanticToken::Bracket, "{"),
+                (SemanticToken::Content, "id"),
+                (SemanticToken::Bracket, "}"),
             ],
         );
         as_selectable(parse.reference());
@@ -2490,6 +2596,9 @@ mod tests {
                 (SemanticToken::Period, "."),
                 (SemanticToken::FieldName, "BestFriend"),
                 (SemanticToken::Keyword, "to"),
+                (SemanticToken::Bracket, "{"),
+                (SemanticToken::Content, "id"),
+                (SemanticToken::Bracket, "}"),
             ],
         );
     }
@@ -2523,6 +2632,11 @@ mod tests {
                 (SemanticToken::Period, "."),
                 (SemanticToken::FieldName, "Foo"),
                 (SemanticToken::String, "\"x\""),
+                (SemanticToken::Content, "to"),
+                (SemanticToken::Content, "Owner"),
+                (SemanticToken::Bracket, "{"),
+                (SemanticToken::Content, "id"),
+                (SemanticToken::Bracket, "}"),
             ],
         );
         let declaration = as_selectable(parse.reference());
@@ -2551,6 +2665,7 @@ mod tests {
                 (SemanticToken::Brace, "{"),
                 (SemanticToken::FieldName, "id"),
                 (SemanticToken::Brace, "}"),
+                (SemanticToken::Content, ","),
             ],
         );
         as_selectable(parse.reference());
@@ -2704,6 +2819,7 @@ mod tests {
                 (SemanticToken::FieldName, "Foo"),
                 (SemanticToken::Brace, "{"),
                 (SemanticToken::FieldName, "bar"),
+                (SemanticToken::Content, "baz"),
                 (SemanticToken::Brace, "}"),
             ],
         );
@@ -2728,6 +2844,7 @@ mod tests {
                 (SemanticToken::Period, "."),
                 (SemanticToken::FieldName, "Foo"),
                 (SemanticToken::Brace, "{"),
+                (SemanticToken::Integer, "42"),
                 (SemanticToken::Brace, "}"),
             ],
         );
@@ -3467,9 +3584,13 @@ mod tests {
                 (SemanticToken::Parenthesis, "("),
                 (SemanticToken::Variable, "$"),
                 (SemanticToken::Variable, "a"),
+                (SemanticToken::Content, "Int"),
                 (SemanticToken::Variable, "$"),
                 (SemanticToken::Variable, "b"),
                 (SemanticToken::Colon, ":"),
+                (SemanticToken::Content, "id"),
+                (SemanticToken::Content, ":"),
+                (SemanticToken::Content, "ID"),
                 (SemanticToken::Variable, "$"),
                 (SemanticToken::Variable, "c"),
                 (SemanticToken::Colon, ":"),
@@ -3508,6 +3629,7 @@ mod tests {
                 (SemanticToken::Colon, ":"),
                 (SemanticToken::GraphQLTypeName, "["),
                 (SemanticToken::GraphQLTypeName, "Pet"),
+                (SemanticToken::Content, ","),
                 (SemanticToken::GraphQLTypeName, "]"),
                 (SemanticToken::Parenthesis, ")"),
                 (SemanticToken::Brace, "{"),
@@ -3540,6 +3662,7 @@ mod tests {
                 (SemanticToken::Colon, ":"),
                 (SemanticToken::GraphQLTypeName, "["),
                 (SemanticToken::GraphQLTypeName, "Pet"),
+                (SemanticToken::Content, "!"),
                 (SemanticToken::GraphQLTypeName, "]"),
                 (SemanticToken::Parenthesis, ")"),
                 (SemanticToken::Brace, "{"),
@@ -3869,6 +3992,11 @@ mod tests {
                 (SemanticToken::Period, "."),
                 (SemanticToken::FieldName, "Foo"),
                 (SemanticToken::String, "\"x\""),
+                (SemanticToken::Content, "@"),
+                (SemanticToken::Content, "component"),
+                (SemanticToken::Bracket, "{"),
+                (SemanticToken::Content, "bar"),
+                (SemanticToken::Bracket, "}"),
             ],
         );
         let declaration = as_selectable(parse.reference());
@@ -3892,6 +4020,11 @@ mod tests {
                 (SemanticToken::FieldName, "Foo"),
                 (SemanticToken::DirectiveName, "@"),
                 (SemanticToken::DirectiveName, "component"),
+                (SemanticToken::Content, "to"),
+                (SemanticToken::Content, "Pet"),
+                (SemanticToken::Bracket, "{"),
+                (SemanticToken::Content, "id"),
+                (SemanticToken::Bracket, "}"),
             ],
         );
         let declaration = as_selectable(parse.reference());
@@ -4068,6 +4201,11 @@ mod tests {
                 (SemanticToken::Type, "Query"),
                 (SemanticToken::Period, "."),
                 (SemanticToken::FieldName, "Foo"),
+                (SemanticToken::Content, "TO"),
+                (SemanticToken::Content, "Pet"),
+                (SemanticToken::Bracket, "{"),
+                (SemanticToken::Content, "bar"),
+                (SemanticToken::Bracket, "}"),
             ],
         );
         as_selectable(parse.reference());
@@ -4274,7 +4412,15 @@ mod tests {
             text,
             expected(DECLARATION_KEYWORD, Found::Token(Identifier)),
             span_of(text, "FIELD"),
-            &[(SemanticToken::Keyword, "FIELD")],
+            &[
+                (SemanticToken::Keyword, "FIELD"),
+                (SemanticToken::Content, "Query"),
+                (SemanticToken::Content, "."),
+                (SemanticToken::Content, "Foo"),
+                (SemanticToken::Bracket, "{"),
+                (SemanticToken::Content, "bar"),
+                (SemanticToken::Bracket, "}"),
+            ],
         );
     }
 

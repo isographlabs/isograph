@@ -92,6 +92,10 @@ impl<'a> ChunkStream<'a> {
         &mut self.0
     }
 
+    pub(crate) fn tokens(&mut self) -> &mut Vec<WithSpan<SemanticToken>> {
+        self.0.tokens
+    }
+
     #[cfg_attr(not(test), expect(dead_code))]
     pub(crate) fn require_end(&mut self) -> Result<(), ()> {
         self.0.items.peek().map_or(().wrap_ok(), |_| ().wrap_err())

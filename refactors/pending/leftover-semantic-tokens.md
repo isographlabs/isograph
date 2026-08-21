@@ -248,7 +248,7 @@ leftover-in-extra.md's `parse_one_chunk` returns a `Slot`. `extra` is unread rem
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
     pub(crate) fn tokens(&mut self) -> &mut Vec<WithSpan<SemanticToken>> {
-        &mut self.0.tokens
+        self.0.tokens
     }
 ```
 
