@@ -1,12 +1,12 @@
 # LSP semantic token encoding
 
-`Vec<WithSpan<SemanticToken>>` is literal-relative byte spans. LSP `textDocument/semanticTokens/full` wants `lsp_types::SemanticToken`: `delta_line`, `delta_start`, `length`, `token_type` index into a legend, `token_modifiers_bitset`. `delta_start` and `length` are UTF-16 code units. A token does not include a line break.
+`Vec<WithSpan<IsographSemanticToken>>` is literal-relative byte spans. LSP `textDocument/semanticTokens/full` wants `lsp_types::SemanticToken`: `delta_line`, `delta_start`, `length`, `token_type` index into a legend, `token_modifiers_bitset`. `delta_start` and `length` are UTF-16 code units. A token does not include a line break.
 
 `LineIndex` records every line-break index in `page_content` once. A `LineCursor` walks that vec as tokens are encoded (file order). `position(offset)` advances past breaks with `after <= offset`; `break_index` is the line. The encoder delta-encodes those positions: `delta_line = line - prev_line`; `delta_start` is `col - prev_col` on the same line and `col` after a line break; `length` is UTF-16 of the piece. Spans are file-absolute, mutually exclusive, ordered, in range, on char boundaries, and not strictly inside a line break. A violation is `EncodeError`. The caller rebases a literal-relative span with `with_offset` before concatenating literals. The server (lsp-semantic-tokens.md) logs the error and answers with empty tokens.
 
 Origin: `crates/isograph_lsp/src/semantic_tokens.rs` and `crates/isograph_lang_types/src/semantic_token_legend/mod.rs` in isograph. This crate is `crates/isograph_lsp`. It does not start the server. lsp-semantic-tokens.md adds `file_literals` and the stdio loop, and calls the functions here.
 
-The parser type stays `SemanticToken`. `lsp_types::SemanticToken` is `LspSemanticToken` at the use site.
+The parser type is `IsographSemanticToken`. `lsp_types::SemanticToken` is `LspSemanticToken` at the use site.
 
 One shippable change.
 
@@ -20,7 +20,7 @@ Most important first.
 
 ```rust
 // from crates/isograph_lsp/src/semantic_tokens.rs
-use isograph_parser::SemanticToken;
+use isograph_parser::IsographSemanticToken;
 use prelude::Postfix;
 use span::{Span, WithSpan};
 use thiserror::Error;
@@ -30,37 +30,35 @@ use thiserror::Error;
 /// Co-iterates `tokens` and the document's line breaks. Each parser span is
 /// cut at line breaks; each nonempty piece is one LSP token.
 pub fn lsp_semantic_tokens(
-    tokens: &[WithSpan<SemanticToken>],
+    tokens: &[WithSpan<IsographSemanticToken>],
     page_content: &str,
 ) -> Result<Vec<lsp_types::SemanticToken>, EncodeError> {
     let index = LineIndex::new(page_content);
     let mut cursor = index.cursor();
     // Start of the previous emitted piece. (0, 0) before the first.
-    let mut last = Pos { line: 0, col: 0 };
+    let mut last = Position { line: 0, col: 0 };
     let mut last_span_end = 0u32;
     let mut encoded: Vec<lsp_types::SemanticToken> = Vec::new();
     for token in tokens {
-        let span = token.location;
-        index.check_span(span, last_span_end)?;
-        last_span_end = span.end;
-        let mut piece_start = span.start;
-        while piece_start < span.end {
-            let piece_pos = cursor.position(piece_start);
+        index.check_span(token.location, last_span_end)?;
+        last_span_end = token.location.end;
+        let mut piece_start = token.location.start;
+        while piece_start < token.location.end {
+            let piece_position = cursor.position(piece_start);
             // Column of this piece on the line it starts on.
-            let offset_on_line = piece_pos.col;
-            // An LSP token cannot include a line break.
-            let piece_end = match cursor.break_before(span.end) {
+            let offset_on_line = piece_position.col;
+            let piece_end = match cursor.break_before(token.location.end) {
                 Some(line_break) => line_break.start,
-                None => span.end,
+                None => token.location.end,
             };
             if piece_end > piece_start {
                 let length = utf16_units(
                     &page_content[(piece_start as usize)..(piece_end as usize)],
                 );
                 let token_type = lsp_type_index(token.item);
-                // Same line as the previous piece: wire delta_start is start-to-start.
-                // Later line: wire delta_start is offset_on_line (column on the line we landed on).
-                let relative_to_previous = match piece_pos.line - last.line {
+                // Same line as the previous piece: `delta_start` is start-to-start.
+                // Later line: `delta_start` is offset_on_line (column on the line we landed on).
+                let relative_to_previous = match piece_position.line - last.line {
                     0 => RelativeToPrevious::SameLine(SameLine(
                         offset_on_line - last.col,
                     )),
@@ -76,9 +74,9 @@ pub fn lsp_semantic_tokens(
                 };
                 encoded.push(lsp_semantic_token.to());
                 // Next delta is from this start, not from this end.
-                last = piece_pos;
+                last = piece_position;
             }
-            match cursor.break_before(span.end) {
+            match cursor.break_before(token.location.end) {
                 Some(line_break) => {
                     piece_start = line_break.after;
                     // Consume even when the piece was empty (a blank line in the span).
@@ -99,7 +97,7 @@ struct LspSemanticToken {
 
 /// Relative to the previous piece. `SameLine` is start-to-start on this line.
 /// `MultiLine` is the previous piece on an earlier line; `offset_on_line` is this
-/// piece's UTF-16 column on the line we landed on (wire `delta_start`).
+/// piece's UTF-16 column on the line we landed on (`delta_start`).
 enum RelativeToPrevious {
     SameLine(SameLine),
     MultiLine(MultiLine),
@@ -122,7 +120,7 @@ impl From<LspSemanticToken> for lsp_types::SemanticToken {
                 delta_line,
                 offset_on_line,
             }) => {
-                // After a line change the wire measures from column 0, not from the previous start.
+                // After a line change `delta_start` is the column on the new line, not a delta from the previous start.
                 (delta_line, offset_on_line)
             }
         };
@@ -200,7 +198,7 @@ struct LineCursor<'a> {
 
 /// LSP position: zero-based line, UTF-16 column on that line.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-struct Pos {
+struct Position {
     line: u32,
     col: u32,
 }
@@ -276,7 +274,7 @@ impl<'a> LineIndex<'a> {
 
 impl LineCursor<'_> {
     /// Line and UTF-16 column of `offset`. Advances `break_index` past breaks that end at or before `offset`.
-    fn position(&mut self, offset: u32) -> Pos {
+    fn position(&mut self, offset: u32) -> Position {
         while self.break_index < self.breaks.len()
             && self.breaks[self.break_index].after <= offset
         {
@@ -286,7 +284,7 @@ impl LineCursor<'_> {
             0 => 0,
             n => self.breaks[n - 1].after,
         };
-        Pos {
+        Position {
             line: self.break_index as u32,
             col: utf16_units(&self.text[(line_start as usize)..(offset as usize)]),
         }
@@ -349,7 +347,7 @@ fn utf16_units(text: &str) -> u32 {
 
 `LineIndex` holds every break index from one scan of `page_content`. `LineCursor` walks that vec: `break_index` is the first break not yet passed. `position(offset)` advances while `after <= offset` (each such advance is one line). `break_before` peeks the current break if it starts before `span.end`. `advance_break` consumes it and moves to the next line. Tokens are in file order, so the cursor only moves forward. `break_index` is the line number after those advances.
 
-`last` is the previous piece's start `Pos`. `offset_on_line` is this piece's UTF-16 column on the line it starts on. `SameLine` subtracts `last.col` (start-to-start). `MultiLine` keeps `offset_on_line` as-is: that is the offset on the line we landed on, and `From` writes it to wire `delta_start`. `length` and `token_type` live on `LspSemanticToken`. `From` fills `delta_line: 0` on `SameLine` and `token_modifiers_bitset: 0`. A blank line inside a span is `piece_end == piece_start`; nothing is emitted, then `advance_break` still runs, so the next `position` is on the following line.
+`last` is the previous piece's start `Position`. `offset_on_line` is this piece's UTF-16 column on the line it starts on. `SameLine` subtracts `last.col` (start-to-start). `MultiLine` keeps `offset_on_line` as-is: that is the offset on the line we landed on, and `From` writes it to `delta_start`. `length` and `token_type` live on `LspSemanticToken`. `From` fills `delta_line: 0` on `SameLine` and `token_modifiers_bitset: 0`. A blank line inside a span is `piece_end == piece_start`; nothing is emitted, then `advance_break` still runs, so the next `position` is on the following line.
 
 `check_span` runs before any slice. Ordered exclusive spans are not enough: `page = "a\r\nb"` with tokens `[0..1, 2..3]` is ordered and exclusive, and offset 2 sits strictly inside the break `{ start: 1, after: 3 }`. Parser leftover skips `LineBreak` tokens, so this is a caller concat bug. `EncodeError` names it instead of panicking on `page_content[3..2]`.
 
@@ -424,12 +422,12 @@ Checked against the LSP 3.17 encoding: five integers per token; `deltaLine` is l
 Deltas from that extract:
 
 - `LineIndex` holds every break. `LineCursor` walks it forward (`break_index` is the line). Origin materializes `AbsoluteIsographSemanticToken` then delta-encodes from `last_token_start`. There is no `AbsoluteToken`, no `partition_point` per piece.
-- `token` is `&WithSpan<SemanticToken>`. Span is file-absolute. The caller applied `with_offset(extraction_span.start)` when the parse was literal-relative.
+- `token` is `&WithSpan<IsographSemanticToken>`. Span is file-absolute. The caller applied `with_offset(extraction_span.start)` when the parse was literal-relative.
 - `token_type` is `lsp_type_index(token.item)`, not a field on the parser token. `lsp_type_index` is private.
 - Origin `split_inclusive('\n')` kept the line break in `line_text`, so `len` included `\n` and the client may discard the token. Origin also treated only `\n` as a break. `line_breaks` records `\r\n` then `\n` then `\r`; `length` is the text before the break.
 - Empty pieces emit nothing. `advance_break` still runs, so the next `position` is on the following line.
 - Origin `line_text.len()` is UTF-8 bytes. `length` and `col` are UTF-16: `utf16_units`, ASCII `len()` otherwise `encode_utf16().count()`.
-- Origin `delta_line_delta_start` used `chars().enumerate()` for `\n` and `text.len()` (bytes) for the last-line width. `Pos` is `(line, utf16_col)` from `LineIndex::position`.
+- Origin `delta_line_delta_start` used `chars().enumerate()` for `\n` and `text.len()` (bytes) for the last-line width. `Position` is `(line, utf16_col)` from `LineIndex::position`.
 - Unordered, inverted, out-of-range, non-char-boundary, and CRLF-interior spans are `EncodeError`. Origin sliced `page_content[last_token_start..new_start]` and panics on a backwards range. The server logs the error and returns empty tokens.
 
 ## Legend and `lsp_type_index`
@@ -442,7 +440,7 @@ use lsp_types::{
     SemanticTokenModifier, SemanticTokenType, SemanticTokensLegend,
 };
 
-/// Sole list of legend token types. Index in this slice is `token_type` on the wire.
+/// Sole list of legend token types. Index in this slice is `token_type`.
 /// Unused slots keep the origin numbering.
 const LEGEND_TOKEN_TYPES: &[SemanticTokenType] = &[
     SemanticTokenType::NAMESPACE,
@@ -494,29 +492,29 @@ fn legend_index(ty: SemanticTokenType) -> u32 {
         .expect("LEGEND_TOKEN_TYPES lists every type lsp_type_index maps") as u32
 }
 
-fn lsp_type_index(token: SemanticToken) -> u32 {
+fn lsp_type_index(token: IsographSemanticToken) -> u32 {
     match token {
-        SemanticToken::Keyword => legend_index(SemanticTokenType::KEYWORD),
-        SemanticToken::Type => legend_index(SemanticTokenType::CLASS),
-        SemanticToken::FieldName | SemanticToken::ObjectKey => {
+        IsographSemanticToken::Keyword => legend_index(SemanticTokenType::KEYWORD),
+        IsographSemanticToken::Type => legend_index(SemanticTokenType::CLASS),
+        IsographSemanticToken::FieldName | IsographSemanticToken::ObjectKey => {
             legend_index(SemanticTokenType::PROPERTY)
         }
-        SemanticToken::GraphQLTypeName => legend_index(SemanticTokenType::TYPE),
-        SemanticToken::DirectiveName => legend_index(SemanticTokenType::DECORATOR),
-        SemanticToken::Variable | SemanticToken::BooleanOrNull => {
+        IsographSemanticToken::GraphQLTypeName => legend_index(SemanticTokenType::TYPE),
+        IsographSemanticToken::DirectiveName => legend_index(SemanticTokenType::DECORATOR),
+        IsographSemanticToken::Variable | IsographSemanticToken::BooleanOrNull => {
             legend_index(SemanticTokenType::VARIABLE)
         }
-        SemanticToken::Argument => legend_index(SemanticTokenType::PARAMETER),
-        SemanticToken::Integer => legend_index(SemanticTokenType::NUMBER),
-        SemanticToken::String => legend_index(SemanticTokenType::STRING),
-        SemanticToken::Period
-        | SemanticToken::Colon
-        | SemanticToken::Equals
-        | SemanticToken::Parenthesis
-        | SemanticToken::Brace
-        | SemanticToken::Content
-        | SemanticToken::Bracket => legend_index(SemanticTokenType::OPERATOR),
-        SemanticToken::Error => legend_index(SemanticTokenType::COMMENT),
+        IsographSemanticToken::Argument => legend_index(SemanticTokenType::PARAMETER),
+        IsographSemanticToken::Integer => legend_index(SemanticTokenType::NUMBER),
+        IsographSemanticToken::String => legend_index(SemanticTokenType::STRING),
+        IsographSemanticToken::Period
+        | IsographSemanticToken::Colon
+        | IsographSemanticToken::Equals
+        | IsographSemanticToken::Parenthesis
+        | IsographSemanticToken::Brace
+        | IsographSemanticToken::Content
+        | IsographSemanticToken::Bracket => legend_index(SemanticTokenType::OPERATOR),
+        IsographSemanticToken::Error => legend_index(SemanticTokenType::COMMENT),
     }
 }
 ```
@@ -555,7 +553,7 @@ pub use semantic_tokens::{
 };
 ```
 
-`LspSemanticToken`, `RelativeToPrevious`, `SameLine`, `MultiLine`, `LineIndex`, `LineCursor`, `Pos`, `LineBreak`, `line_breaks`, `utf16_units`, `lsp_type_index`, `legend_index` stay in the module. Tests in that module call them. `legend_index` `expect`s that `LEGEND_TOKEN_TYPES` lists every type the match names.
+`LspSemanticToken`, `RelativeToPrevious`, `SameLine`, `MultiLine`, `LineIndex`, `LineCursor`, `Position`, `LineBreak`, `line_breaks`, `utf16_units`, `lsp_type_index`, `legend_index` stay in the module. Tests in that module call them. `legend_index` `expect`s that `LEGEND_TOKEN_TYPES` lists every type the match names.
 
 ## Tests
 
@@ -565,14 +563,14 @@ Test helpers live in the test module. `encoded` parses then encodes a source tha
 // from crates/isograph_lsp/src/semantic_tokens.rs
 #[cfg(test)]
 mod tests {
-    use isograph_parser::{SemanticToken, parse_iso_literal};
+    use isograph_parser::{IsographSemanticToken, parse_iso_literal};
     use lsp_types::{SemanticToken as LspSemanticToken, SemanticTokenType};
     use prelude::Postfix;
     use span::{Span, WithSpan, WithSpanPostfix};
 
     use super::{
         EncodeError, InsideLineBreak, LineBreak, LineIndex, NotCharBoundary, OutOfRange,
-        Overlap, Pos, SpanEnds, line_breaks, lsp_semantic_tokens, lsp_type_index,
+        Overlap, Position, SpanEnds, line_breaks, lsp_semantic_tokens, lsp_type_index,
         semantic_token_legend,
     };
 
@@ -588,9 +586,9 @@ mod tests {
     }
 
     fn rebased(
-        tokens: &[WithSpan<SemanticToken>],
+        tokens: &[WithSpan<IsographSemanticToken>],
         offset: u32,
-    ) -> Vec<WithSpan<SemanticToken>> {
+    ) -> Vec<WithSpan<IsographSemanticToken>> {
         tokens
             .iter()
             .map(|token| token.item.with_span(token.location.with_offset(offset)))
@@ -598,7 +596,7 @@ mod tests {
     }
 
     fn encode_rebased(
-        tokens: &[WithSpan<SemanticToken>],
+        tokens: &[WithSpan<IsographSemanticToken>],
         offset: u32,
         page_content: &str,
     ) -> Vec<LspSemanticToken> {
@@ -612,7 +610,7 @@ mod tests {
     }
 
     fn encode(
-        tokens: &[WithSpan<SemanticToken>],
+        tokens: &[WithSpan<IsographSemanticToken>],
         page_content: &str,
     ) -> Vec<LspSemanticToken> {
         lsp_semantic_tokens(tokens, page_content).expect(
@@ -644,39 +642,39 @@ mod tests {
     #[test]
     fn position_same_line() {
         let index = LineIndex::new("   abc");
-        assert_eq!(index.cursor().position(3), Pos { line: 0, col: 3 });
+        assert_eq!(index.cursor().position(3), Position { line: 0, col: 3 });
     }
 
     #[test]
     fn position_after_newline() {
         let index = LineIndex::new("\n  x");
-        assert_eq!(index.cursor().position(3), Pos { line: 1, col: 2 });
+        assert_eq!(index.cursor().position(3), Position { line: 1, col: 2 });
     }
 
     #[test]
     fn position_after_crlf_and_cr() {
         let index = LineIndex::new("\r\n  ");
-        assert_eq!(index.cursor().position(4), Pos { line: 1, col: 2 });
+        assert_eq!(index.cursor().position(4), Position { line: 1, col: 2 });
         let index = LineIndex::new("\r  ");
-        assert_eq!(index.cursor().position(3), Pos { line: 1, col: 2 });
+        assert_eq!(index.cursor().position(3), Position { line: 1, col: 2 });
         let index = LineIndex::new("a\r\nb");
-        assert_eq!(index.cursor().position(3), Pos { line: 1, col: 0 });
+        assert_eq!(index.cursor().position(3), Position { line: 1, col: 0 });
         let index = LineIndex::new("x\n\ny");
-        assert_eq!(index.cursor().position(4), Pos { line: 2, col: 1 });
+        assert_eq!(index.cursor().position(4), Position { line: 2, col: 1 });
         let index = LineIndex::new("é\r\n  ");
-        assert_eq!(index.cursor().position(6), Pos { line: 1, col: 2 });
+        assert_eq!(index.cursor().position(6), Position { line: 1, col: 2 });
         let index = LineIndex::new("é\r  ");
-        assert_eq!(index.cursor().position(5), Pos { line: 1, col: 2 });
+        assert_eq!(index.cursor().position(5), Position { line: 1, col: 2 });
     }
 
     #[test]
     fn position_counts_utf16_on_the_line() {
         let index = LineIndex::new("é\n  ");
-        assert_eq!(index.cursor().position(5), Pos { line: 1, col: 2 });
+        assert_eq!(index.cursor().position(5), Position { line: 1, col: 2 });
         let index = LineIndex::new("aé");
-        assert_eq!(index.cursor().position(3), Pos { line: 0, col: 2 });
+        assert_eq!(index.cursor().position(3), Position { line: 0, col: 2 });
         let index = LineIndex::new("a😀");
-        assert_eq!(index.cursor().position(5), Pos { line: 0, col: 3 });
+        assert_eq!(index.cursor().position(5), Position { line: 0, col: 3 });
     }
 
     #[test]
@@ -815,7 +813,7 @@ mod tests {
             parsed
                 .tokens
                 .iter()
-                .filter(|token| token.item == SemanticToken::String)
+                .filter(|token| token.item == IsographSemanticToken::String)
                 .count(),
             1,
         );
@@ -838,7 +836,7 @@ mod tests {
             parsed
                 .tokens
                 .iter()
-                .filter(|token| token.item == SemanticToken::String)
+                .filter(|token| token.item == IsographSemanticToken::String)
                 .count(),
             1,
         );
@@ -863,7 +861,7 @@ mod tests {
             parsed
                 .tokens
                 .iter()
-                .filter(|token| token.item == SemanticToken::String)
+                .filter(|token| token.item == IsographSemanticToken::String)
                 .count(),
             1,
         );
@@ -887,7 +885,7 @@ mod tests {
             parsed
                 .tokens
                 .iter()
-                .filter(|token| token.item == SemanticToken::String)
+                .filter(|token| token.item == IsographSemanticToken::String)
                 .count(),
             1,
         );
@@ -1001,7 +999,7 @@ mod tests {
     #[test]
     fn a_multiline_leftover_token_splits_the_same_way() {
         let source = "\"\"\"\n  x";
-        let tokens = SemanticToken::Content
+        let tokens = IsographSemanticToken::Content
             .with_span(Span::from_usize(0, source.len()))
             .wrap_vec();
         let lsp = encode(&tokens, source);
@@ -1017,7 +1015,7 @@ mod tests {
     #[test]
     fn utf16_length_of_a_non_ascii_token() {
         let source = "aéb";
-        let tokens = SemanticToken::String
+        let tokens = IsographSemanticToken::String
             .with_span(Span::from_usize(1, 3))
             .wrap_vec();
         let lsp = encode(&tokens, source);
@@ -1029,7 +1027,7 @@ mod tests {
     #[test]
     fn utf16_length_of_a_surrogate_pair() {
         let source = "a😀b";
-        let tokens = SemanticToken::String
+        let tokens = IsographSemanticToken::String
             .with_span(Span::from_usize(1, 5))
             .wrap_vec();
         let lsp = encode(&tokens, source);
@@ -1042,8 +1040,8 @@ mod tests {
     fn adjacent_spans_encode() {
         let source = "ab";
         let tokens = vec![
-            SemanticToken::Keyword.with_span(Span::from_usize(0, 1)),
-            SemanticToken::Type.with_span(Span::from_usize(1, 2)),
+            IsographSemanticToken::Keyword.with_span(Span::from_usize(0, 1)),
+            IsographSemanticToken::Type.with_span(Span::from_usize(1, 2)),
         ];
         let lsp = encode(&tokens, source);
         assert_eq!(lsp.len(), 2);
@@ -1058,8 +1056,8 @@ mod tests {
     fn an_empty_span_emits_nothing() {
         let source = "a";
         let tokens = vec![
-            SemanticToken::Keyword.with_span(Span::from_usize(0, 0)),
-            SemanticToken::Type.with_span(Span::from_usize(0, 1)),
+            IsographSemanticToken::Keyword.with_span(Span::from_usize(0, 0)),
+            IsographSemanticToken::Type.with_span(Span::from_usize(0, 1)),
         ];
         let lsp = encode(&tokens, source);
         assert_eq!(lsp.len(), 1);
@@ -1072,8 +1070,8 @@ mod tests {
     fn overlapping_spans_are_an_error() {
         let source = "abcd";
         let tokens = vec![
-            SemanticToken::Keyword.with_span(Span::from_usize(0, 2)),
-            SemanticToken::Type.with_span(Span::from_usize(1, 3)),
+            IsographSemanticToken::Keyword.with_span(Span::from_usize(0, 2)),
+            IsographSemanticToken::Type.with_span(Span::from_usize(1, 3)),
         ];
         assert_eq!(
             lsp_semantic_tokens(&tokens, source),
@@ -1090,8 +1088,8 @@ mod tests {
     fn out_of_order_spans_are_an_error() {
         let source = "abcd";
         let tokens = vec![
-            SemanticToken::Keyword.with_span(Span::from_usize(2, 4)),
-            SemanticToken::Type.with_span(Span::from_usize(0, 1)),
+            IsographSemanticToken::Keyword.with_span(Span::from_usize(2, 4)),
+            IsographSemanticToken::Type.with_span(Span::from_usize(0, 1)),
         ];
         assert_eq!(
             lsp_semantic_tokens(&tokens, source),
@@ -1107,7 +1105,7 @@ mod tests {
     #[test]
     fn inverted_span_is_an_error() {
         let source = "abcd";
-        let tokens = SemanticToken::Keyword
+        let tokens = IsographSemanticToken::Keyword
             .with_span(Span { start: 3, end: 1 })
             .wrap_vec();
         assert_eq!(
@@ -1119,7 +1117,7 @@ mod tests {
     #[test]
     fn out_of_range_span_is_an_error() {
         let source = "ab";
-        let tokens = SemanticToken::Keyword
+        let tokens = IsographSemanticToken::Keyword
             .with_span(Span::from_usize(0, 5))
             .wrap_vec();
         assert_eq!(
@@ -1131,7 +1129,7 @@ mod tests {
     #[test]
     fn a_span_inside_a_multibyte_char_is_an_error() {
         let source = "aéb";
-        let tokens = SemanticToken::Keyword
+        let tokens = IsographSemanticToken::Keyword
             .with_span(Span::from_usize(2, 3))
             .wrap_vec();
         assert_eq!(
@@ -1144,8 +1142,8 @@ mod tests {
     fn a_span_strictly_inside_crlf_is_an_error() {
         let source = "a\r\nb";
         let tokens = vec![
-            SemanticToken::Keyword.with_span(Span::from_usize(0, 1)),
-            SemanticToken::Type.with_span(Span::from_usize(2, 3)),
+            IsographSemanticToken::Keyword.with_span(Span::from_usize(0, 1)),
+            IsographSemanticToken::Type.with_span(Span::from_usize(2, 3)),
         ];
         assert_eq!(
             lsp_semantic_tokens(&tokens, source),
@@ -1179,25 +1177,25 @@ mod tests {
     fn lsp_type_index_matches_the_legend() {
         let types = semantic_token_legend().token_types;
         assert_eq!(types.len(), 23);
-        assert_eq!(types[lsp_type_index(SemanticToken::Keyword) as usize], SemanticTokenType::KEYWORD);
-        assert_eq!(types[lsp_type_index(SemanticToken::Type) as usize], SemanticTokenType::CLASS);
-        assert_eq!(types[lsp_type_index(SemanticToken::FieldName) as usize], SemanticTokenType::PROPERTY);
-        assert_eq!(types[lsp_type_index(SemanticToken::ObjectKey) as usize], SemanticTokenType::PROPERTY);
-        assert_eq!(types[lsp_type_index(SemanticToken::GraphQLTypeName) as usize], SemanticTokenType::TYPE);
-        assert_eq!(types[lsp_type_index(SemanticToken::DirectiveName) as usize], SemanticTokenType::DECORATOR);
-        assert_eq!(types[lsp_type_index(SemanticToken::Variable) as usize], SemanticTokenType::VARIABLE);
-        assert_eq!(types[lsp_type_index(SemanticToken::Argument) as usize], SemanticTokenType::PARAMETER);
-        assert_eq!(types[lsp_type_index(SemanticToken::Integer) as usize], SemanticTokenType::NUMBER);
-        assert_eq!(types[lsp_type_index(SemanticToken::String) as usize], SemanticTokenType::STRING);
-        assert_eq!(types[lsp_type_index(SemanticToken::BooleanOrNull) as usize], SemanticTokenType::VARIABLE);
-        assert_eq!(types[lsp_type_index(SemanticToken::Period) as usize], SemanticTokenType::OPERATOR);
-        assert_eq!(types[lsp_type_index(SemanticToken::Colon) as usize], SemanticTokenType::OPERATOR);
-        assert_eq!(types[lsp_type_index(SemanticToken::Equals) as usize], SemanticTokenType::OPERATOR);
-        assert_eq!(types[lsp_type_index(SemanticToken::Parenthesis) as usize], SemanticTokenType::OPERATOR);
-        assert_eq!(types[lsp_type_index(SemanticToken::Brace) as usize], SemanticTokenType::OPERATOR);
-        assert_eq!(types[lsp_type_index(SemanticToken::Content) as usize], SemanticTokenType::OPERATOR);
-        assert_eq!(types[lsp_type_index(SemanticToken::Bracket) as usize], SemanticTokenType::OPERATOR);
-        assert_eq!(types[lsp_type_index(SemanticToken::Error) as usize], SemanticTokenType::COMMENT);
+        assert_eq!(types[lsp_type_index(IsographSemanticToken::Keyword) as usize], SemanticTokenType::KEYWORD);
+        assert_eq!(types[lsp_type_index(IsographSemanticToken::Type) as usize], SemanticTokenType::CLASS);
+        assert_eq!(types[lsp_type_index(IsographSemanticToken::FieldName) as usize], SemanticTokenType::PROPERTY);
+        assert_eq!(types[lsp_type_index(IsographSemanticToken::ObjectKey) as usize], SemanticTokenType::PROPERTY);
+        assert_eq!(types[lsp_type_index(IsographSemanticToken::GraphQLTypeName) as usize], SemanticTokenType::TYPE);
+        assert_eq!(types[lsp_type_index(IsographSemanticToken::DirectiveName) as usize], SemanticTokenType::DECORATOR);
+        assert_eq!(types[lsp_type_index(IsographSemanticToken::Variable) as usize], SemanticTokenType::VARIABLE);
+        assert_eq!(types[lsp_type_index(IsographSemanticToken::Argument) as usize], SemanticTokenType::PARAMETER);
+        assert_eq!(types[lsp_type_index(IsographSemanticToken::Integer) as usize], SemanticTokenType::NUMBER);
+        assert_eq!(types[lsp_type_index(IsographSemanticToken::String) as usize], SemanticTokenType::STRING);
+        assert_eq!(types[lsp_type_index(IsographSemanticToken::BooleanOrNull) as usize], SemanticTokenType::VARIABLE);
+        assert_eq!(types[lsp_type_index(IsographSemanticToken::Period) as usize], SemanticTokenType::OPERATOR);
+        assert_eq!(types[lsp_type_index(IsographSemanticToken::Colon) as usize], SemanticTokenType::OPERATOR);
+        assert_eq!(types[lsp_type_index(IsographSemanticToken::Equals) as usize], SemanticTokenType::OPERATOR);
+        assert_eq!(types[lsp_type_index(IsographSemanticToken::Parenthesis) as usize], SemanticTokenType::OPERATOR);
+        assert_eq!(types[lsp_type_index(IsographSemanticToken::Brace) as usize], SemanticTokenType::OPERATOR);
+        assert_eq!(types[lsp_type_index(IsographSemanticToken::Content) as usize], SemanticTokenType::OPERATOR);
+        assert_eq!(types[lsp_type_index(IsographSemanticToken::Bracket) as usize], SemanticTokenType::OPERATOR);
+        assert_eq!(types[lsp_type_index(IsographSemanticToken::Error) as usize], SemanticTokenType::COMMENT);
     }
 }
 ```
