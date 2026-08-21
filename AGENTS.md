@@ -117,6 +117,8 @@ Do not pass a value that is used only on one arm of the `Result` or `Option` the
 
 Prefer iterator combinators over `for`, `while`, and `loop`. A walk that maps, filters, finds, folds, or collects is `.map`, `.filter`, `.filter_map`, `.find`, `.position`, `.any`, `.all`, `.fold`, `.collect`, or the matching iterator method, not a mutable accumulator and a loop.
 
+Do not `.collect()` into a `Vec` (or other collection) unless a later step needs the owned list: random access, a stored length, ownership past the walk, or an API that takes a collection. A walk that is consumed once stays an iterator.
+
 A loop is the right tool when the walk is a state machine the iterator traits do not express: a parser cursor consuming a stream, a worklist, a walk whose next step depends on mutation that is not the iterator's item. If the body is "push to a vec", "set a flag", or "return the first match", it is not that case.
 
 ## Errors
