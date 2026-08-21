@@ -47,14 +47,14 @@ impl App for Isograph {
     const NAME: &'static str = "isograph";
 
     fn instance(id: &ConfigFlag) -> Result<Instance, Box<dyn std::error::Error + Send + Sync>> {
-        let (_, instance) = discover::config_and_instance(id.config.as_deref())?;
+        let (_, instance, _) = discover::config_and_instance(id.config.as_deref())?;
         instance.wrap_ok()
     }
 
     fn run_daemon(id: &ConfigFlag, _: &NoArgs) {
         match discover::config_and_instance(id.config.as_deref()) {
-            Ok((config, _)) => {
-                tracing::info!(config = %config.display(), "isograph daemon up");
+            Ok((path, _, _config)) => {
+                tracing::info!(config = %path.display(), "isograph daemon up");
                 loop {
                     std::thread::park();
                 }
