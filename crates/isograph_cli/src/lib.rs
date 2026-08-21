@@ -4,6 +4,8 @@ use clap::{CommandFactory, FromArgMatches, Parser};
 use freddie_cli::{App, Instance, NoArgs};
 use prelude::Postfix;
 
+mod discover;
+
 pub fn run() -> ExitCode {
     // First, so `--help` prints and a bad flag exits before the lock is taken.
     // The matches are kept beside the parse because `run_lifecycle_verb` reads what was written
@@ -28,31 +30,38 @@ struct Cli {
     verb: Option<freddie_cli::Verb<Isograph>>,
 }
 
-/// The flags the daemon takes: none yet.
-///
-/// Not [`NoArgs`], because `start` flattens [`App::Id`] and [`App::DaemonArgs`] into one clap
-/// command, and clap requires the two derived argument groups to have distinct names.
 #[derive(clap::Args, Debug)]
-struct IsographArgs;
+struct ConfigFlag {
+    /// Path to the isograph config. When absent, the nearest isograph.config.json, .js, or .ts
+    /// at or above the current directory.
+    #[arg(long)]
+    pub config: Option<std::path::PathBuf>,
+}
 
-/// isograph, to the verbs that manage it.
 struct Isograph;
 
 impl App for Isograph {
-    // One isograph daemon to a machine, so no flag names which.
-    type Id = NoArgs;
-    type DaemonArgs = IsographArgs;
+    type Id = ConfigFlag;
+    type DaemonArgs = NoArgs;
 
     const NAME: &'static str = "isograph";
 
-    fn instance(_: &NoArgs) -> Result<Instance, Box<dyn std::error::Error + Send + Sync>> {
-        Instance::global(Self::NAME)?.wrap_ok()
+    fn instance(id: &ConfigFlag) -> Result<Instance, Box<dyn std::error::Error + Send + Sync>> {
+        let (_, instance) = discover::config_and_instance(id.config.as_deref())?;
+        instance.wrap_ok()
     }
 
-    fn run_daemon(_: &NoArgs, _: &IsographArgs) {
-        tracing::info!("hello from isograph");
-        loop {
-            std::thread::park();
+    fn run_daemon(id: &ConfigFlag, _: &NoArgs) {
+        match discover::config_and_instance(id.config.as_deref()) {
+            Ok((config, _)) => {
+                tracing::info!(config = %config.display(), "isograph daemon up");
+                loop {
+                    std::thread::park();
+                }
+            }
+            Err(e) => {
+                tracing::error!(error = %e, "the config went away between naming this daemon and starting it");
+            }
         }
     }
 }

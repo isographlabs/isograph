@@ -8,7 +8,11 @@ license = { workspace = true }
 clap = { workspace = true }
 freddie_cli = { git = "https://github.com/freddiehg/freddie", rev = "c81e3782d53ca1775cbc761dab322f296d9b25a4" }
 prelude = { path = "../prelude" }
+thiserror = "2"
 tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"
 
 [lints]
 workspace = true

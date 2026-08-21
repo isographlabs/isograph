@@ -1076,6 +1076,8 @@ dependencies = [
  "clap",
  "freddie_cli",
  "prelude",
+ "tempfile",
+ "thiserror 2.0.16",
  "tracing",
 ]
 

@@ -22,6 +22,8 @@ struct Daemon {
 impl Daemon {
     fn start() -> Self {
         let dir = tempfile::tempdir().expect("a test can create a temp directory");
+        let config = dir.path().join("isograph.config.json");
+        std::fs::write(config.reference(), "{}\n").expect("a test can write a config file");
         let daemon = Self { dir };
         let output = daemon.isograph(["start"].reference());
         assert!(
@@ -29,6 +31,10 @@ impl Daemon {
             "start failed: {}",
             String::from_utf8_lossy(output.stderr.reference())
         );
+        let text = stdout(output.reference());
+        let path = config.canonicalize().expect("the fixture exists");
+        assert!(text.contains("started"), "{text}");
+        assert!(text.contains(&path.display().to_string()), "{text}");
         daemon
     }
 
@@ -95,21 +101,31 @@ fn start_then_status_reports_running() {
     let daemon = Daemon::start();
     let status = daemon.isograph(["status"].reference());
     assert!(status.status.success());
-    assert!(
-        stdout(status.reference()).contains("is running"),
-        "{}",
-        stdout(status.reference())
-    );
+    let text = stdout(status.reference());
+    let path = daemon
+        .dir
+        .path()
+        .join("isograph.config.json")
+        .canonicalize()
+        .expect("the fixture exists");
+    assert!(text.contains("is running"), "{text}");
+    assert!(text.contains(&path.display().to_string()), "{text}");
 }
 
 #[test]
-fn the_log_contains_hello_from_isograph() {
+fn the_log_contains_the_config_path() {
     let daemon = Daemon::start();
+    let path = daemon
+        .dir
+        .path()
+        .join("isograph.config.json")
+        .canonicalize()
+        .expect("the fixture exists")
+        .display()
+        .to_string();
     poll(|| {
-        daemon
-            .log_text()
-            .contains("hello from isograph")
-            .then_some(())
+        let log = daemon.log_text();
+        (log.contains("isograph daemon up") && log.contains(path.reference())).then_some(())
     });
 }
 
