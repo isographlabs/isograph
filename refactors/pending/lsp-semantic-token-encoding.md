@@ -2,7 +2,7 @@
 
 `Vec<WithSpan<IsographSemanticToken>>` is literal-relative byte spans. LSP `textDocument/semanticTokens/full` wants `lsp_types::SemanticToken`: `delta_line`, `delta_start`, `length`, `token_type` index into a legend, `token_modifiers_bitset`. `delta_start` and `length` are UTF-16 code units.
 
-A client that does not advertise `multilineTokenSupport` clips a token at the end of the line (LSP 3.17). VS Code does not advertise it. So an isograph token whose span contains a line break becomes one LSP token per line of text. `single_line_pieces` cuts one isograph token into a non-empty `Vec` of single-line spans, or `EncodeError::NoText`. `lsp_semantic_tokens` does `extend(single_line_pieces(...)?.into_iter().map(encode_piece))`.
+VS Code does not advertise `multilineTokenSupport`. A token whose length crosses a line is clipped at the line end (LSP 3.17). The only parse-produced token that contains a line break is a block string (`IsographSemanticToken::String`); an unterminated block string is leftover `Content`. `single_line_pieces` returns one piece when the span is on one line, and one piece per line of text when the span contains a line break. `lsp_semantic_tokens` maps each piece to one LSP token: `extend(single_line_pieces(...)?.into_iter().map(encode_piece))`.
 
 `LineIndex` records every line-break index in `page_content` once. Spans are offsets into `page_content`, mutually exclusive, ordered, in range, on char boundaries, and not strictly inside a line break. A violation is `EncodeError`. When concatenating literals from a file, the caller rebases each parse with `with_offset`. Tests pass a literal as the whole `page_content`. The server (lsp-semantic-tokens.md) logs the error and answers with empty tokens.
 
@@ -34,27 +34,43 @@ pub fn lsp_semantic_tokens(
 ) -> Result<Vec<lsp_types::SemanticToken>, EncodeError> {
     let index = LineIndex::new(page_content);
     let mut cursor = index.cursor();
-    // `last`: previous piece start (LSP deltas are start-to-start).
-    // `last_span_end`: previous parser token end (overlap).
-    let mut last = Position { line: 0, col: 0 };
-    let mut last_span_end = 0u32;
+    let mut last_start = Position { line: 0, col: 0 };
+    let mut previous_token_end = 0u32;
     let mut encoded: Vec<lsp_types::SemanticToken> = Vec::new();
     for token in tokens {
-        index.check_span(token.location, last_span_end)?;
-        last_span_end = token.location.end;
+        index.check_span(token.location, previous_token_end)?;
+        previous_token_end = token.location.end;
         encoded.extend(
             single_line_pieces(*token, &mut cursor)?
                 .into_iter()
-                .map(|piece| encode_piece(piece, &mut last, page_content)),
+                .map(|piece| encode_piece(piece, &mut last_start, page_content)),
         );
     }
     encoded.wrap_ok()
 }
 
-/// Cut `token` at line breaks. VS Code clips a token that crosses a line, so
-/// each item is one line of text. A break at `piece_start` is a blank line
-/// and is not an item. Nothing left is `NoText`.
+/// One piece when the span is on one line.
+/// One piece per line of text when the span contains a line break: a block
+/// string, or leftover `Content` from an unterminated block string.
 fn single_line_pieces(
+    token: WithSpan<IsographSemanticToken>,
+    cursor: &mut LineCursor,
+) -> Result<Vec<SingleLinePiece>, EncodeError> {
+    cursor.advance_to(token.location.start);
+    match cursor.current_line_break() {
+        Some(line_break) if line_break.start < token.location.end => {
+            split_at_line_breaks(token, cursor)
+        }
+        _ => SingleLinePiece {
+            token,
+            position: cursor.position(token.location.start),
+        }
+        .wrap_vec()
+        .wrap_ok(),
+    }
+}
+
+fn split_at_line_breaks(
     token: WithSpan<IsographSemanticToken>,
     cursor: &mut LineCursor,
 ) -> Result<Vec<SingleLinePiece>, EncodeError> {
@@ -80,7 +96,6 @@ fn single_line_pieces(
             Some(line_break) => line_break.start,
             None => token.location.end,
         };
-        // Position now, before `advance_break` moves the cursor past this line.
         let position = cursor.position(piece_start);
         pieces.push(SingleLinePiece {
             token: token.item.with_span(Span::new(piece_start, piece_end)),
@@ -109,24 +124,22 @@ struct SingleLinePiece {
     position: Position,
 }
 
-/// LSP deltas are from `last`, the previous piece's start, not its end.
 fn encode_piece(
     piece: SingleLinePiece,
-    last: &mut Position,
+    last_start: &mut Position,
     page_content: &str,
 ) -> lsp_types::SemanticToken {
     let length = utf16_units(&page_content[piece.token.location.as_usize_range()]);
-    // Same line: column minus `last.col`. New line: column on this line.
-    let relative_to_previous = match piece.position.line - last.line {
+    let relative_to_previous = match piece.position.line - last_start.line {
         0 => RelativeToPrevious::SameLine(SameLine(
-            piece.position.col - last.col,
+            piece.position.col - last_start.col,
         )),
         delta_line => RelativeToPrevious::MultiLine(MultiLine {
             delta_line,
             offset_on_line: piece.position.col,
         }),
     };
-    *last = piece.position;
+    *last_start = piece.position;
     convert_to_lsp_semantic_token(
         length,
         lsp_type_index(piece.token.item),
@@ -134,8 +147,8 @@ fn encode_piece(
     )
 }
 
-/// `SameLine.0` is start minus last start. `MultiLine.offset_on_line` is the
-/// column on this line, which becomes `delta_start`.
+/// `SameLine.0` is this start minus `last_start`. `MultiLine.offset_on_line` is
+/// the column on this line, which becomes `delta_start`.
 enum RelativeToPrevious {
     SameLine(SameLine),
     MultiLine(MultiLine),
@@ -263,7 +276,7 @@ impl<'a> LineIndex<'a> {
         }
     }
 
-    fn check_span(&self, span: Span, last_span_end: u32) -> Result<(), EncodeError> {
+    fn check_span(&self, span: Span, previous_token_end: u32) -> Result<(), EncodeError> {
         if span.end < span.start {
             return EncodeError::Inverted(SpanEnds {
                 start: span.start,
@@ -271,11 +284,11 @@ impl<'a> LineIndex<'a> {
             })
             .wrap_err();
         }
-        if span.start < last_span_end {
+        if span.start < previous_token_end {
             return EncodeError::Overlap(Overlap {
                 start: span.start,
                 end: span.end,
-                previous_end: last_span_end,
+                previous_end: previous_token_end,
             })
             .wrap_err();
         }
@@ -581,7 +594,7 @@ pub use semantic_tokens::{
 };
 ```
 
-`single_line_pieces`, `SingleLinePiece`, `encode_piece`, `convert_to_lsp_semantic_token`, `RelativeToPrevious`, `SameLine`, `MultiLine`, `LineIndex`, `LineCursor`, `Position`, `LineBreak`, `line_breaks`, `utf16_units`, `lsp_type_index`, `legend_index` stay in the module. Tests in that module call them. `legend_index` `expect`s that `LEGEND_TOKEN_TYPES` lists every type the match names.
+`single_line_pieces`, `split_at_line_breaks`, `SingleLinePiece`, `encode_piece`, `convert_to_lsp_semantic_token`, `RelativeToPrevious`, `SameLine`, `MultiLine`, `LineIndex`, `LineCursor`, `Position`, `LineBreak`, `line_breaks`, `utf16_units`, `lsp_type_index`, `legend_index` stay in the module. Tests in that module call them. `legend_index` `expect`s that `LEGEND_TOKEN_TYPES` lists every type the match names.
 
 ## Tests
 
@@ -652,15 +665,15 @@ mod tests {
     ) -> Vec<SingleLinePiece> {
         let index = LineIndex::new(page_content);
         let mut cursor = index.cursor();
-        let mut last_span_end = 0u32;
+        let mut previous_token_end = 0u32;
         let mut out = Vec::new();
         for token in tokens {
             index
-                .check_span(token.location, last_span_end)
+                .check_span(token.location, previous_token_end)
                 .expect(
                     "the fixture's spans are mutually exclusive, ordered, in range, on char boundaries, not inside a line break, and each contains text to highlight",
                 );
-            last_span_end = token.location.end;
+            previous_token_end = token.location.end;
             out.extend(
                 single_line_pieces(*token, &mut cursor).expect(
                     "the fixture's spans are mutually exclusive, ordered, in range, on char boundaries, not inside a line break, and each contains text to highlight",
