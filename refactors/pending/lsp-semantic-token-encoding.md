@@ -2,7 +2,7 @@
 
 `lsp_semantic_tokens` takes `&[WithSpan<IsographSemanticToken>]` whose spans are byte offsets into `page_content`, and returns `Vec<lsp_types::SemanticToken>`: `delta_line`, `delta_start`, `length`, `token_type`, `token_modifiers_bitset`. `delta_start` and `length` are UTF-16.
 
-VS Code does not advertise `multilineTokenSupport`. A token whose length crosses a line is clipped at the line end (LSP 3.17). `single_line_pieces` returns one piece for a one-line span, and one piece per line of text when the span contains a line break (a block string, or leftover `Content` from an unterminated block string). `lsp_semantic_tokens` is `tokens.iter().flat_map(single_line_pieces).fold(...)`. `encode_piece` threads `last_start` through the fold because LSP deltas are from the previous piece start.
+VS Code does not advertise `multilineTokenSupport`. A token whose length crosses a line is clipped at the line end (LSP 3.17). `single_line_pieces` returns one piece for a one-line span, and one piece per line of text when the span contains a line break (a block string, or leftover `Content` from an unterminated block string). `lsp_semantic_tokens` is `tokens.iter().scan(...).flatten().fold(...)`. `scan` threads the line cursor and `previous_token_end`. `fold` threads `last_start` because LSP deltas are from the previous piece start.
 
 A span must be in range of `page_content`, on a char boundary, not strictly inside a line break, not inverted, not empty, and not start before the previous token's end. A line-break-only span is also invalid. Those are caller bugs and `assert`. Concatenating literals uses `with_offset`. Tests pass a literal as the whole `page_content`.
 
@@ -32,15 +32,17 @@ pub fn lsp_semantic_tokens(
     page_content: &str,
 ) -> Vec<lsp_types::SemanticToken> {
     let index = LineIndex::new(page_content);
-    let mut cursor = index.cursor();
-    let mut previous_token_end = 0u32;
     tokens
         .iter()
-        .flat_map(|token| {
-            index.check_span(token.location, previous_token_end);
-            previous_token_end = token.location.end;
-            single_line_pieces(*token, &mut cursor)
-        })
+        .scan(
+            (index.cursor(), 0u32),
+            |(cursor, previous_token_end), token| {
+                index.check_span(token.location, *previous_token_end);
+                *previous_token_end = token.location.end;
+                single_line_pieces(*token, cursor).wrap_some()
+            },
+        )
+        .flatten()
         .fold(
             (Vec::new(), Position { line: 0, col: 0 }),
             |(mut encoded, last_start), piece| {
@@ -439,7 +441,7 @@ Deltas from that extract:
 - `token` is `&WithSpan<IsographSemanticToken>`. Span is an offset into `page_content`. Concatenating literals uses `with_offset(extraction_span.start)`.
 - `token_type` is `lsp_type_index(token.item)`. Private. Origin stored the index on the parser token.
 - Origin `split_inclusive('\n')` included the newline in `len`. `line_breaks` records `\r\n`, `\n`, and `\r`. `length` is the text before the break.
-- `tokens.iter().flat_map(single_line_pieces).fold(encode_piece)`. Origin's empty `split_inclusive` chunk had `len` equal to the newline. Empty or line-break-only spans `assert`.
+- `tokens.iter().scan(...).flatten().fold(encode_piece)`. Origin's empty `split_inclusive` chunk had `len` equal to the newline. Empty or line-break-only spans `assert`.
 - `length` and `col` are UTF-16 (`utf16_units`). `is_ascii` runs once on `page_content`. Origin used UTF-8 byte length.
 - `Position` is line and UTF-16 column from `LineCursor::position`. Origin used `chars().enumerate()` for `\n` and `text.len()` for last-line width.
 - Unordered, inverted, out-of-range, non-char-boundary, CRLF-interior, empty, and line-break-only spans `assert`. Origin panics on a backwards slice.
