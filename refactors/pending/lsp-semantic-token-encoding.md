@@ -2,7 +2,7 @@
 
 `Vec<WithSpan<SemanticToken>>` is literal-relative byte spans. LSP `textDocument/semanticTokens/full` wants `lsp_types::SemanticToken`: `delta_line`, `delta_start`, `length`, `token_type` index into a legend, `token_modifiers_bitset`. `delta_start` and `length` are UTF-16 code units. A token does not include a line break.
 
-The encoder is one walk over a file-absolute `tokens` slice: split each span on line breaks, encode each nonempty piece. A piece contains no line break. The next delta therefore walks only the gap after the previous piece's end, and same-line `delta_start` is the previous piece's UTF-16 length plus the gap's last-line width. Spans are mutually exclusive and ordered. A violation is a compiler bug; the walk panics. The caller rebases a literal-relative span with `with_offset` before concatenating literals.
+One scan of `page_content` records every line break. The encoder then walks a file-absolute `tokens` slice: split each span on those breaks, encode each nonempty piece. A piece contains no line break. The next delta therefore uses only the gap after the previous piece's end, and same-line `delta_start` is the previous piece's UTF-16 length plus the gap's last-line width. Spans are mutually exclusive and ordered. A violation is a compiler bug; the walk panics. The caller rebases a literal-relative span with `with_offset` before concatenating literals.
 
 Origin: `crates/isograph_lsp/src/semantic_tokens.rs` and `crates/isograph_lang_types/src/semantic_token_legend/mod.rs` in isograph. This crate is `crates/isograph_lsp`. It does not start the server. lsp-semantic-tokens.md adds `file_literals` and the stdio loop, and calls the functions here.
 
@@ -29,9 +29,11 @@ pub fn lsp_semantic_tokens(
     tokens: &[WithSpan<SemanticToken>],
     page_content: &str,
 ) -> Vec<LspSemanticToken> {
+    let breaks = line_breaks(page_content);
     let mut last_end = 0u32;
     let mut last_len = 0u32;
     let mut last_span_end = 0u32;
+    let mut break_index = 0usize;
     let mut encoded = Vec::new();
     for token in tokens {
         let span = token.location;
@@ -42,23 +44,34 @@ pub fn lsp_semantic_tokens(
             span.end,
         );
         last_span_end = span.end;
-        let mut remaining = &page_content[(span.start as usize)..(span.end as usize)];
         let mut piece_start = span.start;
-        loop {
-            let (line_text, after_break) = match next_line_break(remaining) {
-                Some((break_at, after)) => (&remaining[..break_at], after.wrap_some()),
-                None => (remaining, None),
+        while piece_start < span.end {
+            let split_index = first_break_at_or_after(&breaks, break_index, piece_start);
+            let split = if split_index < breaks.len() && breaks[split_index].start < span.end
+            {
+                breaks[split_index].wrap_some()
+            } else {
+                None
             };
+            let line_end = match split {
+                Some(line_break) => line_break.start,
+                None => span.end,
+            };
+            let line_text = &page_content[(piece_start as usize)..(line_end as usize)];
             if !line_text.is_empty() {
-                let gap = &page_content[(last_end as usize)..(piece_start as usize)];
-                let (delta_line, gap_tail) = delta_line_delta_start(gap);
-                let delta_start = match delta_line {
-                    0 => last_len + gap_tail,
-                    _ => gap_tail,
+                let gap = gap_delta(
+                    &breaks[break_index..],
+                    page_content,
+                    last_end,
+                    piece_start,
+                );
+                let delta_start = match gap.delta_line {
+                    0 => last_len + gap.tail_utf16,
+                    _ => gap.tail_utf16,
                 };
                 let length = utf16_units(line_text);
                 encoded.push(LspSemanticToken {
-                    delta_line,
+                    delta_line: gap.delta_line,
                     delta_start,
                     length,
                     token_type: lsp_type_index(token.item),
@@ -66,12 +79,10 @@ pub fn lsp_semantic_tokens(
                 });
                 last_end = piece_start + line_text.len() as u32;
                 last_len = length;
+                break_index = first_break_at_or_after(&breaks, break_index, last_end);
             }
-            match after_break {
-                Some(after) => {
-                    piece_start += after as u32;
-                    remaining = &remaining[after..];
-                }
+            match split {
+                Some(line_break) => piece_start = line_break.after,
                 None => break,
             }
         }
@@ -79,17 +90,77 @@ pub fn lsp_semantic_tokens(
     encoded
 }
 
-fn next_line_break(text: &str) -> Option<(usize, usize)> {
-    text.find(['\r', '\n']).map(|i| {
-        let after = if text.as_bytes()[i] == b'\r'
-            && matches!(text.as_bytes().get(i + 1), Some(&b'\n'))
-        {
-            i + 2
-        } else {
-            i + 1
-        };
-        (i, after)
-    })
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+struct LineBreak {
+    start: u32,
+    after: u32,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+struct GapDelta {
+    delta_line: u32,
+    tail_utf16: u32,
+}
+
+fn line_breaks(text: &str) -> Vec<LineBreak> {
+    let bytes = text.as_bytes();
+    let mut index = 0usize;
+    let mut breaks = Vec::new();
+    while index < bytes.len() {
+        match bytes[index] {
+            b'\n' => {
+                let start = index as u32;
+                index += 1;
+                breaks.push(LineBreak {
+                    start,
+                    after: index as u32,
+                });
+            }
+            b'\r' => {
+                let start = index as u32;
+                index += 1;
+                if matches!(bytes.get(index), Some(&b'\n')) {
+                    index += 1;
+                }
+                breaks.push(LineBreak {
+                    start,
+                    after: index as u32,
+                });
+            }
+            _ => index += 1,
+        }
+    }
+    breaks
+}
+
+fn first_break_at_or_after(breaks: &[LineBreak], mut index: usize, at: u32) -> usize {
+    while index < breaks.len() && breaks[index].start < at {
+        index += 1;
+    }
+    index
+}
+
+fn gap_delta(
+    breaks: &[LineBreak],
+    page_content: &str,
+    from: u32,
+    to: u32,
+) -> GapDelta {
+    let mut last_after = from;
+    let mut delta_line = 0u32;
+    for line_break in breaks {
+        if line_break.start >= to {
+            break;
+        }
+        if line_break.start >= from {
+            delta_line += 1;
+            last_after = line_break.after;
+        }
+    }
+    GapDelta {
+        delta_line,
+        tail_utf16: utf16_units(&page_content[(last_after as usize)..(to as usize)]),
+    }
 }
 
 fn utf16_units(text: &str) -> u32 {
@@ -99,27 +170,17 @@ fn utf16_units(text: &str) -> u32 {
         text.encode_utf16().count() as u32
     }
 }
-
-fn delta_line_delta_start(text: &str) -> (u32, u32) {
-    let mut rest = text;
-    let mut line_break_count = 0u32;
-    while let Some((_, after)) = next_line_break(rest) {
-        line_break_count += 1;
-        rest = &rest[after..];
-    }
-    (line_break_count, utf16_units(rest))
-}
 ```
 
 `assert!` is a panic. The input is `&[WithSpan<SemanticToken>]` with file-absolute spans; disjoint ordered spans are a parser-plus-caller invariant that type cannot hold. Adjacent spans (`end` of one equals `start` of the next) pass. `last_span_end` is the previous parser token's absolute end.
 
-`last_end` is the previous emitted piece's byte end. `last_len` is that piece's UTF-16 length. The gap is `page_content[last_end..piece_start]`. A piece contains no line break, so `delta_line` cannot change inside it: the newlines that matter live in the gap. Same-line `delta_start` is `last_len + gap_tail`. After a line break, `delta_start` is `gap_tail` (UTF-16 from column 0). Adjacent tokens have an empty gap; `delta_start` is `last_len`.
+`LineBreak.start` is the first byte of `\r\n`, `\n`, or `\r`. `after` is the first byte of the next line. Same set as `IsographLangTokenKind::LineBreak` and as VS Code / LSP line offsets. `line_breaks` walks `page_content` once. The token walk keeps `break_index` as the first break with `start >= last_end`.
 
-`next_line_break` returns `(start_of_break, after_break)` in bytes into `text`. A break is `\r\n` (one break), `\n`, or `\r`, the same set as `IsographLangTokenKind::LineBreak` and as VS Code / LSP line offsets. Split and delta both call it. `str::find` for two ASCII bytes is the walk.
+`last_end` is the previous emitted piece's byte end. `last_len` is that piece's UTF-16 length. `GapDelta` is the gap `page_content[last_end..piece_start]`: `delta_line` is how many recorded breaks fall in that range; `tail_utf16` is UTF-16 units after the last such break, or of the whole gap if there is none. A piece contains no line break, so `delta_line` cannot change inside it. Same-line `delta_start` is `last_len + tail_utf16`. After a line break, `delta_start` is `tail_utf16`. Adjacent tokens have an empty gap; `delta_start` is `last_len`.
 
 A piece's `length` is UTF-16 units of the text before the break. `utf16_units` is `text.len()` when `is_ascii`, else `encode_utf16().count()`. Almost every iso lexeme and gap is ASCII. The first token's gap is the prefix before the first literal: a file with no newline before that literal would otherwise `encode_utf16` the whole prefix.
 
-A piece that is only a break (a blank line inside a multiline token) emits nothing; `piece_start` advances by `after`. `last_end` stays at the previous emit, so those newlines sit in the next nonempty piece's gap.
+A piece that is only a break (a blank line inside a multiline token) emits nothing; `piece_start` becomes `after`. `last_end` stays at the previous emit, so those newlines sit in the next nonempty piece's gap.
 
 ## Origin
 
@@ -190,10 +251,10 @@ Deltas from that extract:
 - One walk. Origin materializes `AbsoluteIsographSemanticToken` then delta-encodes. There is no `AbsoluteToken`.
 - `token` is `&WithSpan<SemanticToken>`. Span is file-absolute. The caller applied `with_offset(extraction_span.start)` when the parse was literal-relative.
 - `token_type` is `lsp_type_index(relative_token.item)`, not a field on the parser token.
-- Origin `split_inclusive('\n')` kept the line break in `line_text`, so `len` included `\n` and the client may discard the token. Origin also treated only `\n` as a break, so `\r\n` left `\r` in `len` and a bare `\r` did not split. `next_line_break` is `\r\n` then `\n` then `\r`; `length` is the text before the break.
+- Origin `split_inclusive('\n')` kept the line break in `line_text`, so `len` included `\n` and the client may discard the token. Origin also treated only `\n` as a break, so `\r\n` left `\r` in `len` and a bare `\r` did not split. `line_breaks` records `\r\n` then `\n` then `\r`; `length` is the text before the break.
 - Empty pieces emit nothing. `last_span_end` still advances by the whole parser token. `last_end` / `last_len` do not; the skipped break is in the next gap.
 - Origin `line_text.len()` is UTF-8 bytes. `length` and `delta_start` are UTF-16: `utf16_units`, ASCII `len()` otherwise `encode_utf16().count()`.
-- Origin `delta_line_delta_start` used `chars().enumerate()` for the newline index and `text.len()` (bytes) for the last-line width. Those units disagree on any non-ASCII last line. It also counted only `\n`. Split and delta both call `next_line_break`; last-line width is `utf16_units`.
+- Origin `delta_line_delta_start` used `chars().enumerate()` for the newline index and `text.len()` (bytes) for the last-line width. Those units disagree on any non-ASCII last line. It also counted only `\n`. Split and delta read the same `LineBreak` list; last-line width is `utf16_units`.
 - Origin `last_token_start` was the previous piece's start. `in_between` was previous piece plus gap, so each piece was scanned again on the next emit to recover `length`. `last_end` / `last_len` walk only the gap.
 - Unordered or overlapping parser tokens panic. Origin sliced `page_content[last_token_start..new_start]`, which panics only when a later start is numerically before the previous start, and accepts overlap when starts still increase.
 
@@ -314,7 +375,7 @@ mod semantic_tokens;
 pub use semantic_tokens::{lsp_semantic_tokens, semantic_token_legend};
 ```
 
-`next_line_break`, `utf16_units`, `delta_line_delta_start` stay in the module. Tests in that module call them.
+`LineBreak`, `GapDelta`, `line_breaks`, `first_break_at_or_after`, `gap_delta`, `utf16_units` stay in the module. Tests in that module call them.
 
 ## Tests
 
@@ -330,7 +391,8 @@ mod tests {
     use span::{Span, WithSpan, WithSpanPostfix};
 
     use super::{
-        delta_line_delta_start, lsp_semantic_tokens, lsp_type_index, semantic_token_legend,
+        GapDelta, LineBreak, gap_delta, line_breaks, lsp_semantic_tokens, lsp_type_index,
+        semantic_token_legend,
     };
 
     const STRING: u32 = 18;
@@ -368,31 +430,122 @@ mod tests {
             .collect()
     }
 
-    #[test]
-    fn delta_line_delta_start_same_line() {
-        assert_eq!(delta_line_delta_start("   "), (0, 3));
+    fn gap(text: &str) -> GapDelta {
+        gap_delta(&line_breaks(text), text, 0, text.len() as u32)
     }
 
     #[test]
-    fn delta_line_delta_start_newline() {
-        assert_eq!(delta_line_delta_start("\n  "), (1, 2));
+    fn line_breaks_records_crlf_as_one_break() {
+        assert_eq!(
+            line_breaks("a\r\nb\nc\rd"),
+            vec![
+                LineBreak {
+                    start: 1,
+                    after: 3,
+                },
+                LineBreak {
+                    start: 4,
+                    after: 5,
+                },
+                LineBreak {
+                    start: 6,
+                    after: 7,
+                },
+            ],
+        );
     }
 
     #[test]
-    fn delta_line_delta_start_crlf_and_cr_are_one_break_each() {
-        assert_eq!(delta_line_delta_start("\r\n  "), (1, 2));
-        assert_eq!(delta_line_delta_start("\r  "), (1, 2));
-        assert_eq!(delta_line_delta_start("a\r\nb"), (1, 1));
-        assert_eq!(delta_line_delta_start("x\n\ny"), (2, 1));
-        assert_eq!(delta_line_delta_start("é\r\n  "), (1, 2));
-        assert_eq!(delta_line_delta_start("é\r  "), (1, 2));
+    fn gap_delta_same_line() {
+        assert_eq!(
+            gap("   "),
+            GapDelta {
+                delta_line: 0,
+                tail_utf16: 3,
+            },
+        );
     }
 
     #[test]
-    fn delta_line_delta_start_counts_utf16_on_the_last_line() {
-        assert_eq!(delta_line_delta_start("é\n  "), (1, 2));
-        assert_eq!(delta_line_delta_start("aé"), (0, 2));
-        assert_eq!(delta_line_delta_start("a😀"), (0, 3));
+    fn gap_delta_newline() {
+        assert_eq!(
+            gap("\n  "),
+            GapDelta {
+                delta_line: 1,
+                tail_utf16: 2,
+            },
+        );
+    }
+
+    #[test]
+    fn gap_delta_crlf_and_cr_are_one_break_each() {
+        assert_eq!(
+            gap("\r\n  "),
+            GapDelta {
+                delta_line: 1,
+                tail_utf16: 2,
+            },
+        );
+        assert_eq!(
+            gap("\r  "),
+            GapDelta {
+                delta_line: 1,
+                tail_utf16: 2,
+            },
+        );
+        assert_eq!(
+            gap("a\r\nb"),
+            GapDelta {
+                delta_line: 1,
+                tail_utf16: 1,
+            },
+        );
+        assert_eq!(
+            gap("x\n\ny"),
+            GapDelta {
+                delta_line: 2,
+                tail_utf16: 1,
+            },
+        );
+        assert_eq!(
+            gap("é\r\n  "),
+            GapDelta {
+                delta_line: 1,
+                tail_utf16: 2,
+            },
+        );
+        assert_eq!(
+            gap("é\r  "),
+            GapDelta {
+                delta_line: 1,
+                tail_utf16: 2,
+            },
+        );
+    }
+
+    #[test]
+    fn gap_delta_counts_utf16_on_the_last_line() {
+        assert_eq!(
+            gap("é\n  "),
+            GapDelta {
+                delta_line: 1,
+                tail_utf16: 2,
+            },
+        );
+        assert_eq!(
+            gap("aé"),
+            GapDelta {
+                delta_line: 0,
+                tail_utf16: 2,
+            },
+        );
+        assert_eq!(
+            gap("a😀"),
+            GapDelta {
+                delta_line: 0,
+                tail_utf16: 3,
+            },
+        );
     }
 
     #[test]
@@ -871,6 +1024,6 @@ mod tests {
 
 `an_empty_span_emits_nothing`: `0..0` records no piece; the next token at `0..1` still encodes.
 
-`delta_line_delta_start_counts_utf16_on_the_last_line`: `a😀` is 3 UTF-16 units (1 + 2).
+`gap_delta_counts_utf16_on_the_last_line`: `a😀` is 3 UTF-16 units (1 + 2).
 
 `expect` in tests names an invariant the fixture established.
