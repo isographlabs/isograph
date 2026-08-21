@@ -45,8 +45,10 @@ pub fn lsp_semantic_tokens(
     for token in tokens {
         index.check_span(token.location, last_span_end)?;
         last_span_end = token.location.end;
-        // A parser span can cross lines. LSP cannot. Walk the span left to right,
-        // cutting a piece at each line break (or at span.end when none remain).
+        // Inner loop: one line of this span per iteration. A parser span can
+        // cross lines; LSP cannot. Cut a piece at each line break (or at
+        // span.end when none remain). `push` below is per nonempty piece, not
+        // per parser token: a four-line block string pushes four times here.
         let mut piece_start = token.location.start;
         while piece_start < token.location.end {
             let piece_position = cursor.position(piece_start);
