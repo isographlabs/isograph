@@ -59,38 +59,42 @@ pub fn lsp_semantic_tokens(
                 }
                 _ => None,
             };
+            // Consecutive line breaks (a blank line in a block string) are not
+            // text. Jump past them; the next iteration is the following line.
+            match line_break_in_span {
+                Some(line_break) if line_break.start == piece_start => {
+                    piece_start = line_break.after;
+                    cursor.advance_break();
+                    continue;
+                }
+                _ => {}
+            }
             let piece_end = match line_break_in_span {
                 Some(line_break) => line_break.start,
                 None => token.location.end,
             };
-            if piece_end > piece_start {
-                let length = utf16_units(
-                    &page_content[(piece_start as usize)..(piece_end as usize)],
-                );
-                let token_type = lsp_type_index(token.item);
-                // Same line: `delta_start` is how far this start is from `last`'s start.
-                // Later line: `delta_start` is this piece's column on the line we landed on
-                // (from 0, not from `last`).
-                let relative_to_previous = match piece_position.line - last.line {
-                    0 => RelativeToPrevious::SameLine(SameLine(
-                        offset_on_line - last.col,
-                    )),
-                    delta_line => RelativeToPrevious::MultiLine(MultiLine {
-                        delta_line,
-                        offset_on_line,
-                    }),
-                };
-                encoded.push(convert_to_lsp_semantic_token(
-                    length,
-                    token_type,
-                    relative_to_previous,
-                ));
-                last = piece_position;
-            }
-            // Blank line in the span: the next line break is at `piece_start`, so
-            // `piece_end == piece_start` and the `if` above did not push. Still
-            // consume the break so the next iteration starts on the following line.
-            // No break left in the span: this token is done.
+            let length = utf16_units(
+                &page_content[(piece_start as usize)..(piece_end as usize)],
+            );
+            let token_type = lsp_type_index(token.item);
+            // Same line: `delta_start` is how far this start is from `last`'s start.
+            // Later line: `delta_start` is this piece's column on the line we landed on
+            // (from 0, not from `last`).
+            let relative_to_previous = match piece_position.line - last.line {
+                0 => RelativeToPrevious::SameLine(SameLine(
+                    offset_on_line - last.col,
+                )),
+                delta_line => RelativeToPrevious::MultiLine(MultiLine {
+                    delta_line,
+                    offset_on_line,
+                }),
+            };
+            encoded.push(convert_to_lsp_semantic_token(
+                length,
+                token_type,
+                relative_to_previous,
+            ));
+            last = piece_position;
             match line_break_in_span {
                 Some(line_break) => {
                     piece_start = line_break.after;
@@ -353,7 +357,7 @@ fn utf16_units(text: &str) -> u32 {
 
 `LineIndex` holds every break index from one scan of `page_content`. `LineCursor` walks that vec: `break_index` is the first break not yet passed. `position(offset)` advances while `after <= offset` (each such advance is one line). `current_line_break` is the break at `break_index`. The loop uses it when `start` is before the span end. `advance_break` consumes it and moves to the next line. Tokens are in file order, so the cursor only moves forward. `break_index` is the line number after those advances.
 
-`last` is the previous piece's start `Position`. `offset_on_line` is this piece's UTF-16 column on the line it starts on. `SameLine` subtracts `last.col` (start-to-start). `MultiLine` keeps `offset_on_line` as-is: that is the offset on the line we landed on, and `convert_to_lsp_semantic_token` writes it to `delta_start`. That function fills `delta_line: 0` on `SameLine` and `token_modifiers_bitset: 0`. A blank line inside a span is `piece_end == piece_start`; nothing is emitted, then `advance_break` still runs, so the next `position` is on the following line.
+`last` is the previous piece's start `Position`. `offset_on_line` is this piece's UTF-16 column on the line it starts on. `SameLine` subtracts `last.col` (start-to-start). `MultiLine` keeps `offset_on_line` as-is: that is the offset on the line we landed on, and `convert_to_lsp_semantic_token` writes it to `delta_start`. That function fills `delta_line: 0` on `SameLine` and `token_modifiers_bitset: 0`. A blank line inside a span is two consecutive line breaks. The loop jumps `piece_start` to `after` without emitting, then the next `position` is on the following line.
 
 `check_span` runs before any slice. Ordered exclusive spans are not enough: `page = "a\r\nb"` with tokens `[0..1, 2..3]` is ordered and exclusive, and offset 2 sits strictly inside the break `{ start: 1, after: 3 }`. Parser leftover skips `LineBreak` tokens, so this is a caller concat bug. `EncodeError` names it instead of panicking on `page_content[3..2]`.
 
@@ -431,7 +435,7 @@ Deltas from that extract:
 - `token` is `&WithSpan<IsographSemanticToken>`. Span is file-absolute. The caller applied `with_offset(extraction_span.start)` when the parse was literal-relative.
 - `token_type` is `lsp_type_index(token.item)`, not a field on the parser token. `lsp_type_index` is private.
 - Origin `split_inclusive('\n')` kept the line break in `line_text`, so `len` included `\n` and the client may discard the token. Origin also treated only `\n` as a break. `line_breaks` records `\r\n` then `\n` then `\r`; `length` is the text before the break.
-- Empty pieces emit nothing. `advance_break` still runs, so the next `position` is on the following line.
+- Consecutive line breaks in a span are skipped (`piece_start = after`) without emitting. Origin's empty `split_inclusive` chunk still produced a token whose `len` was the newline.
 - Origin `line_text.len()` is UTF-8 bytes. `length` and `col` are UTF-16: `utf16_units`, ASCII `len()` otherwise `encode_utf16().count()`.
 - Origin `delta_line_delta_start` used `chars().enumerate()` for `\n` and `text.len()` (bytes) for the last-line width. `Position` is `(line, utf16_col)` from `LineIndex::position`.
 - Unordered, inverted, out-of-range, non-char-boundary, and CRLF-interior spans are `EncodeError`. Origin sliced `page_content[last_token_start..new_start]` and panics on a backwards range. The server logs the error and returns empty tokens.
@@ -959,6 +963,52 @@ mod tests {
     }
 
     #[test]
+    fn two_blank_lines_in_a_block_string_do_not_emit_tokens() {
+        let strings = of_type(
+            &encoded("field Query.Foo \"\"\"\n\n\n  x\n\"\"\" { bar }"),
+            STRING,
+        );
+        assert_eq!(strings.len(), 3);
+        assert_eq!(strings[1].delta_line, 3);
+        assert_eq!(strings[1].length, 3);
+    }
+
+    #[test]
+    fn a_crlf_blank_line_in_a_block_string_does_not_emit_a_token() {
+        let strings = of_type(
+            &encoded("field Query.Foo \"\"\"\r\n\r\n  x\r\n\"\"\" { bar }"),
+            STRING,
+        );
+        assert_eq!(strings.len(), 3);
+        assert_eq!(strings[1].delta_line, 2);
+        assert_eq!(strings[1].length, 3);
+    }
+
+    #[test]
+    fn a_cr_blank_line_in_a_block_string_does_not_emit_a_token() {
+        let strings = of_type(
+            &encoded("field Query.Foo \"\"\"\r\r  x\r\"\"\" { bar }"),
+            STRING,
+        );
+        assert_eq!(strings.len(), 3);
+        assert_eq!(strings[1].delta_line, 2);
+        assert_eq!(strings[1].length, 3);
+    }
+
+    #[test]
+    fn a_block_string_ending_with_a_blank_line() {
+        let strings = of_type(
+            &encoded("field Query.Foo \"\"\"\n  x\n\n\"\"\" { bar }"),
+            STRING,
+        );
+        assert_eq!(strings.len(), 3);
+        assert_eq!(strings[1].delta_line, 1);
+        assert_eq!(strings[1].length, 3);
+        assert_eq!(strings[2].delta_line, 2);
+        assert_eq!(strings[2].length, 3);
+    }
+
+    #[test]
     fn a_crlf_block_string_splits_without_including_the_break() {
         let strings = of_type(
             &encoded("field Query.Foo \"\"\"\r\n  the home\r\n  route\r\n\"\"\" { bar }"),
@@ -1016,6 +1066,42 @@ mod tests {
         assert_eq!(lsp[1].delta_start, 0);
         assert_eq!(lsp[1].length, 3);
         assert_eq!(lsp[1].token_type, OPERATOR);
+    }
+
+    #[test]
+    fn a_multiline_leftover_with_a_blank_line() {
+        let source = "\"\"\"\n\n  x";
+        let tokens = IsographSemanticToken::Content
+            .with_span(Span::from_usize(0, source.len()))
+            .wrap_vec();
+        let lsp = encode(&tokens, source);
+        assert_eq!(lsp.len(), 2);
+        assert_eq!(lsp[0].length, 3);
+        assert_eq!(lsp[1].delta_line, 2);
+        assert_eq!(lsp[1].length, 3);
+    }
+
+    #[test]
+    fn a_span_starting_at_a_line_break_skips_it() {
+        let source = "\n  x";
+        let tokens = IsographSemanticToken::Content
+            .with_span(Span::from_usize(0, source.len()))
+            .wrap_vec();
+        let lsp = encode(&tokens, source);
+        assert_eq!(lsp.len(), 1);
+        assert_eq!(lsp[0].delta_line, 1);
+        assert_eq!(lsp[0].delta_start, 0);
+        assert_eq!(lsp[0].length, 3);
+    }
+
+    #[test]
+    fn a_span_of_only_line_breaks_emits_nothing() {
+        let source = "\n\n";
+        let tokens = IsographSemanticToken::Content
+            .with_span(Span::from_usize(0, source.len()))
+            .wrap_vec();
+        let lsp = encode(&tokens, source);
+        assert_eq!(lsp.len(), 0);
     }
 
     #[test]
@@ -1225,6 +1311,14 @@ mod tests {
 `a_non_ascii_continuation_line_of_a_block_string_is_utf16_length`: `  café` is 7 UTF-8 bytes, 6 UTF-16 units.
 
 `a_multiline_leftover_token_splits_the_same_way`: unterminated `"""` is leftover `Content`. The encoder still splits. Pieces `"""`, `  x`.
+
+`two_blank_lines_in_a_block_string_do_not_emit_tokens`: `  x` is `delta_line` 3.
+
+`a_block_string_ending_with_a_blank_line`: closing `"""` is `delta_line` 2 after `  x`.
+
+`a_span_starting_at_a_line_break_skips_it`: leftover `\n  x`. One token, `delta_line` 1, length 3.
+
+`a_span_of_only_line_breaks_emits_nothing`: leftover `\n\n`. Zero tokens.
 
 `utf16_length_of_a_surrogate_pair`: `😀` is bytes 1..5 of `a😀b`, two UTF-16 units.
 
