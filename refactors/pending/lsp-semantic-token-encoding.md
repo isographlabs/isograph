@@ -319,11 +319,14 @@ pub use semantic_tokens::{
 
 ## Tests
 
+Test helpers live in the test module. `encoded` parses then encodes a source that is the whole file. `of_type` picks LSP tokens by legend index.
+
 ```rust
 // from crates/isograph_lsp/src/semantic_tokens.rs
 #[cfg(test)]
 mod tests {
     use isograph_parser::{SemanticToken, parse_iso_literal};
+    use lsp_types::SemanticToken as LspSemanticToken;
     use prelude::Postfix;
     use span::{Span, WithSpanPostfix};
 
@@ -331,6 +334,27 @@ mod tests {
         delta_line_delta_start, lsp_semantic_tokens, lsp_semantic_tokens_for_literals,
         lsp_type_index, semantic_token_legend,
     };
+
+    const STRING: u32 = 18;
+    const KEYWORD: u32 = 15;
+    const CLASS: u32 = 2;
+    const PROPERTY: u32 = 9;
+    const OPERATOR: u32 = 21;
+
+    fn encoded(source: &str) -> Vec<LspSemanticToken> {
+        let parsed = parse_iso_literal(source);
+        lsp_semantic_tokens(
+            &parsed.tokens,
+            source,
+            Span::from_usize(0, source.len()),
+        )
+    }
+
+    fn of_type(lsp: &[LspSemanticToken], token_type: u32) -> Vec<&LspSemanticToken> {
+        lsp.iter()
+            .filter(|token| token.token_type == token_type)
+            .collect()
+    }
 
     #[test]
     fn delta_line_delta_start_same_line() {
@@ -348,41 +372,38 @@ mod tests {
         assert_eq!(delta_line_delta_start("\r  "), (1, 2));
         assert_eq!(delta_line_delta_start("a\r\nb"), (1, 1));
         assert_eq!(delta_line_delta_start("x\n\ny"), (2, 1));
+        assert_eq!(delta_line_delta_start("é\r\n  "), (1, 2));
+        assert_eq!(delta_line_delta_start("é\r  "), (1, 2));
     }
 
     #[test]
     fn delta_line_delta_start_counts_utf16_on_the_last_line() {
         assert_eq!(delta_line_delta_start("é\n  "), (1, 2));
         assert_eq!(delta_line_delta_start("aé"), (0, 2));
+        assert_eq!(delta_line_delta_start("a😀"), (0, 3));
     }
 
     #[test]
     fn entrypoint_encodes_as_keyword_class_operator_property() {
-        let source = "entrypoint Query.foo";
-        let parsed = parse_iso_literal(source);
-        let lsp = lsp_semantic_tokens(
-            &parsed.tokens,
-            source,
-            Span::from_usize(0, source.len()),
-        );
+        let lsp = encoded("entrypoint Query.foo");
         assert_eq!(lsp.len(), 4);
         assert_eq!(lsp[0].delta_line, 0);
         assert_eq!(lsp[0].delta_start, 0);
         assert_eq!(lsp[0].length, 11);
-        assert_eq!(lsp[0].token_type, 15);
+        assert_eq!(lsp[0].token_type, KEYWORD);
         assert_eq!(lsp[0].token_modifiers_bitset, 0);
         assert_eq!(lsp[1].delta_line, 0);
         assert_eq!(lsp[1].delta_start, 12);
         assert_eq!(lsp[1].length, 5);
-        assert_eq!(lsp[1].token_type, 2);
+        assert_eq!(lsp[1].token_type, CLASS);
         assert_eq!(lsp[2].delta_line, 0);
         assert_eq!(lsp[2].delta_start, 5);
         assert_eq!(lsp[2].length, 1);
-        assert_eq!(lsp[2].token_type, 21);
+        assert_eq!(lsp[2].token_type, OPERATOR);
         assert_eq!(lsp[3].delta_line, 0);
         assert_eq!(lsp[3].delta_start, 1);
         assert_eq!(lsp[3].length, 3);
-        assert_eq!(lsp[3].token_type, 9);
+        assert_eq!(lsp[3].token_type, PROPERTY);
     }
 
     #[test]
@@ -395,12 +416,37 @@ mod tests {
         let lsp = lsp_semantic_tokens(&parsed.tokens, source.reference(), extraction);
         assert_eq!(lsp[0].delta_line, 0);
         assert_eq!(lsp[0].delta_start, prefix.len() as u32);
-        assert_eq!(lsp[0].token_type, 15);
-        assert_eq!(lsp[1].token_type, 2);
-        assert_eq!(
-            &source[prefix.len()..prefix.len() + 5],
-            "field"
-        );
+        assert_eq!(lsp[0].token_type, KEYWORD);
+        assert_eq!(lsp[1].token_type, CLASS);
+        assert_eq!(&source[prefix.len()..prefix.len() + 5], "field");
+    }
+
+    #[test]
+    fn extraction_offset_after_a_newline_sets_delta_line() {
+        let prefix = "const x = iso(`\n  ";
+        let literal = "field Pet.fullName { id }";
+        let source = format!("{prefix}{literal}`)");
+        let parsed = parse_iso_literal(literal);
+        let extraction = Span::from_usize(prefix.len(), prefix.len() + literal.len());
+        let lsp = lsp_semantic_tokens(&parsed.tokens, source.reference(), extraction);
+        assert_eq!(lsp[0].delta_line, 1);
+        assert_eq!(lsp[0].delta_start, 2);
+        assert_eq!(lsp[0].token_type, KEYWORD);
+        assert_eq!(lsp[0].length, 5);
+    }
+
+    #[test]
+    fn extraction_offset_counts_utf16_in_the_prefix() {
+        let prefix = "const é = iso(`";
+        let literal = "field Pet.fullName { id }";
+        let source = format!("{prefix}{literal}`)");
+        let parsed = parse_iso_literal(literal);
+        let extraction = Span::from_usize(prefix.len(), prefix.len() + literal.len());
+        let lsp = lsp_semantic_tokens(&parsed.tokens, source.reference(), extraction);
+        assert_eq!(prefix.len(), 16);
+        assert_eq!(lsp[0].delta_line, 0);
+        assert_eq!(lsp[0].delta_start, 15);
+        assert_eq!(lsp[0].token_type, KEYWORD);
     }
 
     #[test]
@@ -425,135 +471,278 @@ mod tests {
             ],
             source,
         );
-        let last = lsp.last().expect("two literals produce tokens");
-        assert!(last.delta_line >= 1);
-        assert_eq!(last.token_type, 9);
+        assert_eq!(lsp.len(), 8);
+        assert_eq!(lsp[4].delta_line, 1);
+        assert_eq!(lsp[4].delta_start, 5);
+        assert_eq!(lsp[4].length, 11);
+        assert_eq!(lsp[4].token_type, KEYWORD);
+        assert_eq!(lsp[7].delta_line, 0);
+        assert_eq!(lsp[7].delta_start, 1);
+        assert_eq!(lsp[7].token_type, PROPERTY);
+    }
+
+    #[test]
+    fn two_literals_on_the_same_line() {
+        let source = "iso(`entrypoint Query.A`) iso(`entrypoint Query.B`)";
+        let first = "entrypoint Query.A";
+        let second = "entrypoint Query.B";
+        let first_start = source.find(first).expect("the first literal is in the file");
+        let second_start = source.find(second).expect("the second literal is in the file");
+        let parsed_a = parse_iso_literal(first);
+        let parsed_b = parse_iso_literal(second);
+        let lsp = lsp_semantic_tokens_for_literals(
+            [
+                (
+                    parsed_a.tokens.as_slice(),
+                    Span::from_usize(first_start, first_start + first.len()),
+                ),
+                (
+                    parsed_b.tokens.as_slice(),
+                    Span::from_usize(second_start, second_start + second.len()),
+                ),
+            ],
+            source,
+        );
+        assert_eq!(lsp.len(), 8);
+        assert_eq!(lsp[4].delta_line, 0);
+        assert_eq!(lsp[4].delta_start, 9);
+        assert_eq!(lsp[4].token_type, KEYWORD);
     }
 
     #[test]
     fn tokens_on_successive_lines_set_delta_line() {
-        let source = "field Query.Foo {\n  bar\n}";
-        let parsed = parse_iso_literal(source);
-        let lsp = lsp_semantic_tokens(
-            &parsed.tokens,
-            source,
-            Span::from_usize(0, source.len()),
-        );
+        let lsp = encoded("field Query.Foo {\n  bar\n}");
         assert_eq!(lsp.len(), 7);
-        assert_eq!(lsp[4].token_type, 21);
+        assert_eq!(lsp[4].token_type, OPERATOR);
         assert_eq!(lsp[4].length, 1);
         assert_eq!(lsp[5].delta_line, 1);
         assert_eq!(lsp[5].delta_start, 2);
         assert_eq!(lsp[5].length, 3);
-        assert_eq!(lsp[5].token_type, 9);
+        assert_eq!(lsp[5].token_type, PROPERTY);
         assert_eq!(lsp[6].delta_line, 1);
         assert_eq!(lsp[6].delta_start, 0);
         assert_eq!(lsp[6].length, 1);
-        assert_eq!(lsp[6].token_type, 21);
+        assert_eq!(lsp[6].token_type, OPERATOR);
+    }
+
+    #[test]
+    fn a_blank_line_between_parser_tokens_increments_delta_line() {
+        let lsp = encoded("field Query.Foo {\n\n  bar\n}");
+        assert_eq!(lsp.len(), 7);
+        assert_eq!(lsp[5].delta_line, 2);
+        assert_eq!(lsp[5].delta_start, 2);
+        assert_eq!(lsp[5].token_type, PROPERTY);
+    }
+
+    #[test]
+    fn a_quoted_string_is_one_lsp_token() {
+        let source = "field Query.Foo \"the home route\" { bar }";
+        let parsed = parse_iso_literal(source);
+        assert_eq!(
+            parsed
+                .tokens
+                .iter()
+                .filter(|token| token.item == SemanticToken::String)
+                .count(),
+            1,
+        );
+        let lsp = encoded(source);
+        let strings = of_type(&lsp, STRING);
+        assert_eq!(strings.len(), 1);
+        assert_eq!(strings[0].delta_line, 0);
+        assert_eq!(strings[0].delta_start, 4);
+        assert_eq!(strings[0].length, 16);
+        assert_eq!(lsp[5].token_type, OPERATOR);
+        assert_eq!(lsp[5].delta_line, 0);
+        assert_eq!(lsp[5].delta_start, 17);
+    }
+
+    #[test]
+    fn a_quoted_string_with_an_escaped_newline_is_one_lsp_token() {
+        let source = "field Query.Foo \"hi\\n\" { bar }";
+        let parsed = parse_iso_literal(source);
+        assert_eq!(
+            parsed
+                .tokens
+                .iter()
+                .filter(|token| token.item == SemanticToken::String)
+                .count(),
+            1,
+        );
+        let strings = of_type(&encoded(source), STRING);
+        assert_eq!(strings.len(), 1);
+        assert_eq!(strings[0].length, 6);
+        assert_eq!(strings[0].delta_line, 0);
+    }
+
+    #[test]
+    fn an_empty_quoted_string_is_one_lsp_token() {
+        let strings = of_type(&encoded("field Query.Foo \"\" { bar }"), STRING);
+        assert_eq!(strings.len(), 1);
+        assert_eq!(strings[0].length, 2);
+    }
+
+    #[test]
+    fn a_one_line_block_string_is_one_lsp_token() {
+        let source = "field Query.Foo \"\"\"hi\"\"\" { bar }";
+        let parsed = parse_iso_literal(source);
+        assert_eq!(
+            parsed
+                .tokens
+                .iter()
+                .filter(|token| token.item == SemanticToken::String)
+                .count(),
+            1,
+        );
+        let strings = of_type(&encoded(source), STRING);
+        assert_eq!(strings.len(), 1);
+        assert_eq!(strings[0].length, 8);
+    }
+
+    #[test]
+    fn an_empty_block_string_is_one_lsp_token() {
+        let strings = of_type(&encoded("field Query.Foo \"\"\"\"\"\" { bar }"), STRING);
+        assert_eq!(strings.len(), 1);
+        assert_eq!(strings[0].length, 6);
     }
 
     #[test]
     fn a_multiline_string_becomes_one_lsp_token_per_line_without_the_newline() {
         let source = "field Query.Foo \"\"\"\n  the home\n  route\n\"\"\" { bar }";
         let parsed = parse_iso_literal(source);
-        let string_tokens = parsed
-            .tokens
-            .iter()
-            .filter(|token| token.item == SemanticToken::String)
-            .count();
-        assert_eq!(string_tokens, 1);
-        let lsp = lsp_semantic_tokens(
-            &parsed.tokens,
-            source,
-            Span::from_usize(0, source.len()),
+        assert_eq!(
+            parsed
+                .tokens
+                .iter()
+                .filter(|token| token.item == SemanticToken::String)
+                .count(),
+            1,
         );
-        let string_lsp: Vec<_> = lsp
-            .iter()
-            .filter(|token| token.token_type == 18)
-            .collect();
-        assert_eq!(string_lsp.len(), 4);
-        assert_eq!(string_lsp[0].length, 3);
-        assert_eq!(string_lsp[1].delta_line, 1);
-        assert_eq!(string_lsp[1].delta_start, 0);
-        assert_eq!(string_lsp[1].length, 10);
-        assert_eq!(string_lsp[2].delta_line, 1);
-        assert_eq!(string_lsp[2].delta_start, 0);
-        assert_eq!(string_lsp[2].length, 7);
-        assert_eq!(string_lsp[3].delta_line, 1);
-        assert_eq!(string_lsp[3].delta_start, 0);
-        assert_eq!(string_lsp[3].length, 3);
+        let lsp = encoded(source);
+        let strings = of_type(&lsp, STRING);
+        assert_eq!(strings.len(), 4);
+        assert_eq!(strings[0].length, 3);
+        assert_eq!(strings[1].delta_line, 1);
+        assert_eq!(strings[1].delta_start, 0);
+        assert_eq!(strings[1].length, 10);
+        assert_eq!(strings[2].delta_line, 1);
+        assert_eq!(strings[2].delta_start, 0);
+        assert_eq!(strings[2].length, 7);
+        assert_eq!(strings[3].delta_line, 1);
+        assert_eq!(strings[3].delta_start, 0);
+        assert_eq!(strings[3].length, 3);
         assert_eq!(lsp[8].delta_line, 0);
         assert_eq!(lsp[8].delta_start, 4);
         assert_eq!(lsp[8].length, 1);
-        assert_eq!(lsp[8].token_type, 21);
+        assert_eq!(lsp[8].token_type, OPERATOR);
+    }
+
+    #[test]
+    fn a_block_string_with_content_on_the_opening_line() {
+        let source = "field Query.Foo \"\"\"the home\n  route\n\"\"\" { bar }";
+        let strings = of_type(&encoded(source), STRING);
+        assert_eq!(strings.len(), 3);
+        assert_eq!(strings[0].length, 11);
+        assert_eq!(strings[1].delta_line, 1);
+        assert_eq!(strings[1].delta_start, 0);
+        assert_eq!(strings[1].length, 7);
+        assert_eq!(strings[2].delta_line, 1);
+        assert_eq!(strings[2].delta_start, 0);
+        assert_eq!(strings[2].length, 3);
+    }
+
+    #[test]
+    fn a_block_string_with_closing_quotes_on_the_content_line() {
+        let source = "field Query.Foo \"\"\"\n  route\"\"\" { bar }";
+        let lsp = encoded(source);
+        let strings = of_type(&lsp, STRING);
+        assert_eq!(strings.len(), 2);
+        assert_eq!(strings[0].length, 3);
+        assert_eq!(strings[1].delta_line, 1);
+        assert_eq!(strings[1].delta_start, 0);
+        assert_eq!(strings[1].length, 10);
+        assert_eq!(lsp[6].delta_line, 0);
+        assert_eq!(lsp[6].delta_start, 11);
+        assert_eq!(lsp[6].token_type, OPERATOR);
     }
 
     #[test]
     fn a_blank_line_in_a_block_string_does_not_emit_a_token() {
-        let source = "field Query.Foo \"\"\"\n\n  x\n\"\"\" { bar }";
-        let parsed = parse_iso_literal(source);
-        let lsp = lsp_semantic_tokens(
-            &parsed.tokens,
-            source,
-            Span::from_usize(0, source.len()),
+        let strings = of_type(
+            &encoded("field Query.Foo \"\"\"\n\n  x\n\"\"\" { bar }"),
+            STRING,
         );
-        let string_lsp: Vec<_> = lsp
-            .iter()
-            .filter(|token| token.token_type == 18)
-            .collect();
-        assert_eq!(string_lsp.len(), 3);
-        assert_eq!(string_lsp[0].length, 3);
-        assert_eq!(string_lsp[1].delta_line, 2);
-        assert_eq!(string_lsp[1].delta_start, 0);
-        assert_eq!(string_lsp[1].length, 3);
-        assert_eq!(string_lsp[2].delta_line, 1);
-        assert_eq!(string_lsp[2].length, 3);
+        assert_eq!(strings.len(), 3);
+        assert_eq!(strings[0].length, 3);
+        assert_eq!(strings[1].delta_line, 2);
+        assert_eq!(strings[1].delta_start, 0);
+        assert_eq!(strings[1].length, 3);
+        assert_eq!(strings[2].delta_line, 1);
+        assert_eq!(strings[2].length, 3);
     }
 
     #[test]
     fn a_crlf_block_string_splits_without_including_the_break() {
-        let source = "field Query.Foo \"\"\"\r\n  the home\r\n  route\r\n\"\"\" { bar }";
-        let parsed = parse_iso_literal(source);
-        let lsp = lsp_semantic_tokens(
-            &parsed.tokens,
-            source,
-            Span::from_usize(0, source.len()),
+        let strings = of_type(
+            &encoded("field Query.Foo \"\"\"\r\n  the home\r\n  route\r\n\"\"\" { bar }"),
+            STRING,
         );
-        let string_lsp: Vec<_> = lsp
-            .iter()
-            .filter(|token| token.token_type == 18)
-            .collect();
-        assert_eq!(string_lsp.len(), 4);
-        assert_eq!(string_lsp[0].length, 3);
-        assert_eq!(string_lsp[1].delta_line, 1);
-        assert_eq!(string_lsp[1].delta_start, 0);
-        assert_eq!(string_lsp[1].length, 10);
-        assert_eq!(string_lsp[2].delta_line, 1);
-        assert_eq!(string_lsp[2].length, 7);
-        assert_eq!(string_lsp[3].delta_line, 1);
-        assert_eq!(string_lsp[3].length, 3);
+        assert_eq!(strings.len(), 4);
+        assert_eq!(strings[0].length, 3);
+        assert_eq!(strings[1].delta_line, 1);
+        assert_eq!(strings[1].delta_start, 0);
+        assert_eq!(strings[1].length, 10);
+        assert_eq!(strings[2].delta_line, 1);
+        assert_eq!(strings[2].length, 7);
+        assert_eq!(strings[3].delta_line, 1);
+        assert_eq!(strings[3].length, 3);
     }
 
     #[test]
     fn a_cr_block_string_splits_without_including_the_break() {
-        let source = "field Query.Foo \"\"\"\r  x\r\"\"\" { bar }";
-        let parsed = parse_iso_literal(source);
+        let strings = of_type(
+            &encoded("field Query.Foo \"\"\"\r  x\r\"\"\" { bar }"),
+            STRING,
+        );
+        assert_eq!(strings.len(), 3);
+        assert_eq!(strings[0].length, 3);
+        assert_eq!(strings[1].delta_line, 1);
+        assert_eq!(strings[1].delta_start, 0);
+        assert_eq!(strings[1].length, 3);
+        assert_eq!(strings[2].delta_line, 1);
+        assert_eq!(strings[2].length, 3);
+    }
+
+    #[test]
+    fn a_non_ascii_continuation_line_of_a_block_string_is_utf16_length() {
+        let strings = of_type(
+            &encoded("field Query.Foo \"\"\"\n  café\n\"\"\" { bar }"),
+            STRING,
+        );
+        assert_eq!(strings.len(), 3);
+        assert_eq!(strings[1].delta_line, 1);
+        assert_eq!(strings[1].delta_start, 0);
+        assert_eq!(strings[1].length, 6);
+    }
+
+    #[test]
+    fn a_multiline_leftover_token_splits_the_same_way() {
+        let source = "\"\"\"\n  x";
+        let tokens = SemanticToken::Content
+            .with_span(Span::from_usize(0, source.len()))
+            .wrap_vec();
         let lsp = lsp_semantic_tokens(
-            &parsed.tokens,
+            &tokens,
             source,
             Span::from_usize(0, source.len()),
         );
-        let string_lsp: Vec<_> = lsp
-            .iter()
-            .filter(|token| token.token_type == 18)
-            .collect();
-        assert_eq!(string_lsp.len(), 3);
-        assert_eq!(string_lsp[0].length, 3);
-        assert_eq!(string_lsp[1].delta_line, 1);
-        assert_eq!(string_lsp[1].delta_start, 0);
-        assert_eq!(string_lsp[1].length, 3);
-        assert_eq!(string_lsp[2].delta_line, 1);
-        assert_eq!(string_lsp[2].length, 3);
+        assert_eq!(lsp.len(), 2);
+        assert_eq!(lsp[0].token_type, OPERATOR);
+        assert_eq!(lsp[0].length, 3);
+        assert_eq!(lsp[1].delta_line, 1);
+        assert_eq!(lsp[1].delta_start, 0);
+        assert_eq!(lsp[1].length, 3);
+        assert_eq!(lsp[1].token_type, OPERATOR);
     }
 
     #[test]
@@ -570,6 +759,22 @@ mod tests {
         assert_eq!(lsp.len(), 1);
         assert_eq!(lsp[0].delta_start, 1);
         assert_eq!(lsp[0].length, 1);
+    }
+
+    #[test]
+    fn utf16_length_of_a_surrogate_pair() {
+        let source = "a😀b";
+        let tokens = SemanticToken::String
+            .with_span(Span::from_usize(1, 5))
+            .wrap_vec();
+        let lsp = lsp_semantic_tokens(
+            &tokens,
+            source,
+            Span::from_usize(0, source.len()),
+        );
+        assert_eq!(lsp.len(), 1);
+        assert_eq!(lsp[0].delta_start, 1);
+        assert_eq!(lsp[0].length, 2);
     }
 
     #[test]
@@ -590,6 +795,24 @@ mod tests {
         assert_eq!(lsp[1].delta_line, 0);
         assert_eq!(lsp[1].delta_start, 1);
         assert_eq!(lsp[1].length, 1);
+    }
+
+    #[test]
+    fn an_empty_span_emits_nothing() {
+        let source = "a";
+        let tokens = vec![
+            SemanticToken::Keyword.with_span(Span::from_usize(0, 0)),
+            SemanticToken::Type.with_span(Span::from_usize(0, 1)),
+        ];
+        let lsp = lsp_semantic_tokens(
+            &tokens,
+            source,
+            Span::from_usize(0, source.len()),
+        );
+        assert_eq!(lsp.len(), 1);
+        assert_eq!(lsp[0].delta_start, 0);
+        assert_eq!(lsp[0].length, 1);
+        assert_eq!(lsp[0].token_type, CLASS);
     }
 
     #[test]
@@ -650,45 +873,53 @@ mod tests {
     #[test]
     fn lsp_type_index_matches_the_legend() {
         assert_eq!(semantic_token_legend().token_types.len(), 23);
-        assert_eq!(lsp_type_index(SemanticToken::Keyword), 15);
-        assert_eq!(lsp_type_index(SemanticToken::Type), 2);
-        assert_eq!(lsp_type_index(SemanticToken::FieldName), 9);
-        assert_eq!(lsp_type_index(SemanticToken::ObjectKey), 9);
+        assert_eq!(lsp_type_index(SemanticToken::Keyword), KEYWORD);
+        assert_eq!(lsp_type_index(SemanticToken::Type), CLASS);
+        assert_eq!(lsp_type_index(SemanticToken::FieldName), PROPERTY);
+        assert_eq!(lsp_type_index(SemanticToken::ObjectKey), PROPERTY);
         assert_eq!(lsp_type_index(SemanticToken::GraphQLTypeName), 1);
         assert_eq!(lsp_type_index(SemanticToken::DirectiveName), 22);
         assert_eq!(lsp_type_index(SemanticToken::Variable), 8);
         assert_eq!(lsp_type_index(SemanticToken::Argument), 7);
         assert_eq!(lsp_type_index(SemanticToken::Integer), 19);
-        assert_eq!(lsp_type_index(SemanticToken::String), 18);
+        assert_eq!(lsp_type_index(SemanticToken::String), STRING);
         assert_eq!(lsp_type_index(SemanticToken::BooleanOrNull), 8);
-        assert_eq!(lsp_type_index(SemanticToken::Period), 21);
-        assert_eq!(lsp_type_index(SemanticToken::Colon), 21);
-        assert_eq!(lsp_type_index(SemanticToken::Equals), 21);
-        assert_eq!(lsp_type_index(SemanticToken::Parenthesis), 21);
-        assert_eq!(lsp_type_index(SemanticToken::Brace), 21);
-        assert_eq!(lsp_type_index(SemanticToken::Content), 21);
-        assert_eq!(lsp_type_index(SemanticToken::Bracket), 21);
+        assert_eq!(lsp_type_index(SemanticToken::Period), OPERATOR);
+        assert_eq!(lsp_type_index(SemanticToken::Colon), OPERATOR);
+        assert_eq!(lsp_type_index(SemanticToken::Equals), OPERATOR);
+        assert_eq!(lsp_type_index(SemanticToken::Parenthesis), OPERATOR);
+        assert_eq!(lsp_type_index(SemanticToken::Brace), OPERATOR);
+        assert_eq!(lsp_type_index(SemanticToken::Content), OPERATOR);
+        assert_eq!(lsp_type_index(SemanticToken::Bracket), OPERATOR);
         assert_eq!(lsp_type_index(SemanticToken::Error), 17);
     }
 }
 ```
 
-`tokens_on_successive_lines_set_delta_line`: seven parser tokens, each one line. `{` is index 4. `bar` is the next line, column 2. `}` is the next line, column 0.
+`extraction_offset_after_a_newline_sets_delta_line`: the template body starts after `` ` ``, then a newline and two spaces. `field` is `delta_line` 1, column 2.
 
-`a_multiline_string_becomes_one_lsp_token_per_line_without_the_newline`: parser still emits one `String`. Pieces are `"""`, `  the home` (10), `  route` (7), `"""`. Continuation `delta_start` is 0. `lsp[8]` is `{` on the same line as the closing `"""`, start-to-start 4.
+`extraction_offset_counts_utf16_in_the_prefix`: `const é = iso(\`` is 16 UTF-8 bytes and 15 UTF-16 units. `delta_start` is 15.
 
-`a_blank_line_in_a_block_string_does_not_emit_a_token`: pieces `"""`, skip, `  x`, `"""`. The skip is `delta_line == 2` on the next piece.
+`two_literals_are_file_absolute_and_in_order`: eight tokens. Index 4 is the second `entrypoint`. Previous token is `A`; in-between is `` A`)\niso(` ``, so `delta_line` 1, `delta_start` 5. Index 7 is `B` on the same line as that literal's `.`.
 
-`a_crlf_block_string_splits_without_including_the_break` / `a_cr_block_string_splits_without_including_the_break`: same piece counts and lengths as LF; `length` is not 4 on the opening `"""`.
+`two_literals_on_the_same_line`: in-between from `A` to the second `entrypoint` is `` A`) iso(` ``, no newline, `delta_start` 9.
 
-`adjacent_spans_encode`: `end == next.start` is ordered.
+`a_quoted_string_is_one_lsp_token`: `"the home route"` is 16 UTF-16 units. `{` is start-to-start 17 from the string (the lexeme plus one space).
 
-`overlapping_spans_panic` / `out_of_order_spans_panic` / `reversed_literals_panic`: the `assert!` message.
+`a_quoted_string_with_an_escaped_newline_is_one_lsp_token`: source `"hi\n"` is quote, `h`, `i`, backslash, `n`, quote. Length 6. Not split.
 
-`extraction_offset_shifts_the_first_delta_start`: `last_token_start` starts at 0, first token byte start is `prefix.len()`, between-text is the prefix, no newline, `delta_start` is UTF-16 units of the prefix. The prefix is ASCII, so that equals `prefix.len()`.
+`a_block_string_with_content_on_the_opening_line`: pieces `"""the home` (11), `  route` (7), `"""`.
 
-`two_literals`: second literal is on the next line, so some token after the first literal has `delta_line >= 1`. Last token is `B`, PROPERTY.
+`a_block_string_with_closing_quotes_on_the_content_line`: pieces `"""`, `  route"""` (10). `{` is start-to-start 11 from that second piece.
 
-`utf16_length_of_a_non_ascii_token`: `é` is bytes 1..3, one UTF-16 unit, column 1 after `a`.
+`a_non_ascii_continuation_line_of_a_block_string_is_utf16_length`: `  café` is 7 UTF-8 bytes, 6 UTF-16 units.
+
+`a_multiline_leftover_token_splits_the_same_way`: unterminated `"""` is leftover `Content`. The encoder still splits. Pieces `"""`, `  x`.
+
+`utf16_length_of_a_surrogate_pair`: `😀` is bytes 1..5 of `a😀b`, two UTF-16 units.
+
+`an_empty_span_emits_nothing`: `0..0` records no piece; the next token at `0..1` still encodes.
+
+`delta_line_delta_start_counts_utf16_on_the_last_line`: `a😀` is 3 UTF-16 units (1 + 2).
 
 `expect` in tests names an invariant the fixture established.
