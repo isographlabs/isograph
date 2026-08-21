@@ -27,21 +27,26 @@ use thiserror::Error;
 
 /// File-absolute parser tokens as LSP semantic-token deltas.
 ///
-/// Co-iterates `tokens` and the document's line breaks. Each parser span is
-/// cut at line breaks; each nonempty piece is one LSP token.
+/// Walks tokens and precomputed line breaks in file order. Each parser span
+/// is split at line breaks; each nonempty piece becomes one LSP token,
+/// delta-encoded from the previous piece's start.
 pub fn lsp_semantic_tokens(
     tokens: &[WithSpan<IsographSemanticToken>],
     page_content: &str,
 ) -> Result<Vec<lsp_types::SemanticToken>, EncodeError> {
     let index = LineIndex::new(page_content);
     let mut cursor = index.cursor();
-    // Start of the previous emitted piece. (0, 0) before the first.
+    // Two pieces of state, both "previous", not the same thing:
+    // `last` is the start of the last *emitted piece* (LSP deltas are start-to-start).
+    // `last_span_end` is the end of the last *parser token* (overlap check).
     let mut last = Position { line: 0, col: 0 };
     let mut last_span_end = 0u32;
     let mut encoded: Vec<lsp_types::SemanticToken> = Vec::new();
     for token in tokens {
         index.check_span(token.location, last_span_end)?;
         last_span_end = token.location.end;
+        // A parser span can cross lines. LSP cannot. Walk the span left to right,
+        // cutting a piece at each line break (or at span.end when none remain).
         let mut piece_start = token.location.start;
         while piece_start < token.location.end {
             let piece_position = cursor.position(piece_start);
@@ -61,8 +66,9 @@ pub fn lsp_semantic_tokens(
                     &page_content[(piece_start as usize)..(piece_end as usize)],
                 );
                 let token_type = lsp_type_index(token.item);
-                // Same line as the previous piece: `delta_start` is start-to-start.
-                // Later line: `delta_start` is offset_on_line (column on the line we landed on).
+                // Same line: `delta_start` is how far this start is from `last`'s start.
+                // Later line: `delta_start` is this piece's column on the line we landed on
+                // (from 0, not from `last`).
                 let relative_to_previous = match piece_position.line - last.line {
                     0 => RelativeToPrevious::SameLine(SameLine(
                         offset_on_line - last.col,
@@ -77,13 +83,14 @@ pub fn lsp_semantic_tokens(
                     token_type,
                     relative_to_previous,
                 ));
-                // Next delta is from this start, not from this end.
                 last = piece_position;
             }
+            // Advance past the break even when the piece was empty (a blank line
+            // in the span: nothing emitted, next piece is still on the following line).
+            // No break left in the span: this token is done.
             match line_break_in_span {
                 Some(line_break) => {
                     piece_start = line_break.after;
-                    // Consume even when the piece was empty (a blank line in the span).
                     cursor.advance_break();
                 }
                 None => break,
