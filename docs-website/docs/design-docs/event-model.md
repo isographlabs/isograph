@@ -184,7 +184,7 @@ struct StartAsyncWork;
 
 `Kill` ends the process.
 
-The first shipped slice (filesystem-events.md) has no effect variants. `handle` returns `()`. The loop traces. The signature becomes `Vec<IsographEffect>` when the first performer exists.
+The first shipped slice (filesystem-events.md change 1) has no effect variants and no `Absent`. `handle` returns `()`. The loop traces. `Presence` lands in that doc's change 4. The signature becomes `Vec<IsographEffect>` when the first performer exists.
 
 ## State
 

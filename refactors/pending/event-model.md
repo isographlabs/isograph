@@ -4,15 +4,21 @@ Types, dispatch, and process layout are `docs-website/docs/design-docs/event-mod
 
 Requires config-discovery.md (landed) and the design-doc.
 
-## Order
+The first section is filesystem events and a CLI that writes them. That is filesystem-events.md, in this order:
 
-1. freddie `refactors/pending/event-socket-local-addr.md`. `EventSocket::local_addr() -> SocketAddr` so `listen(0)` is usable. Pin-rev in i2 after it lands.
-2. filesystem-events.md. `DiskChanged`, `IncomingEvent.DiskChanged`, event loop, `isograph send`, config `includes`, watcher. State is a disk map. `handle` returns `()`. `IncomingEvent` in this slice has only `DiskChanged`.
-3. pico intern of `DiskFile`, replacing the map. Same `DiskChanged`. No dedicated pending doc yet.
-4. lsp-semantic-token-encoding.md. Encoder only. No server. Can overlap (2).
-5. lsp-semantic-tokens.md changes 1–2: `file_literals`, legend. Not change 3's standalone stdio `isograph lsp` loop. That loop is not the process in the design-doc. The adapter in the daemon calls `file_literals` and the encoder.
-6. LSP adapter (not written). `EditorChanged`, `IncomingEvent.EditorChanged`, `{slug}.lsp`, `isograph lsp` as the stdio proxy, `OpenFile`. Adapter is request/response; `handle` is not. `ReportDiagnostics` / `WriteArtifacts` land when they have a performer.
-7. lsp-parse-diagnostics.md, retargeted at the adapter rather than the standalone server.
-8. zed-and-vscode-extensions.md. Both editors spawn `isograph lsp`.
+1. Event loop, `handle`, socket, one event: this path has these contents. freddie `event-socket-local-addr.md` lands first so `listen(0)` reports the port.
+2. `isograph send`.
+3. Config `includes`.
+4. Created, deleted, moved: `Presence` (`Present` / `Absent`). A move is two events.
+5. Watcher. `--filesystem watch|injected`.
 
-`AsyncWorkFinished`, `StartAsyncWork`, `Quit` / `Kill` land with compilation, not with (2).
+Later, not this section:
+
+- pico intern of `DiskFile`, replacing the map. Same `DiskChanged`. No dedicated pending doc yet.
+- lsp-semantic-token-encoding.md. Encoder only. Can overlap the first section.
+- lsp-semantic-tokens.md changes 1–2: `file_literals`, legend. Not change 3's standalone stdio loop.
+- LSP adapter (not written). `EditorChanged`, `isograph lsp` proxy, `OpenFile`.
+- lsp-parse-diagnostics.md, retargeted at the adapter.
+- zed-and-vscode-extensions.md.
+
+`AsyncWorkFinished`, `StartAsyncWork`, `Quit` / `Kill` land with compilation, not with the first section.

@@ -1,23 +1,23 @@
 # Filesystem events, the CLI, config globs, and the watcher
 
-Requires `docs-website/docs/design-docs/event-model.md` and config-discovery.md. Four shippable changes. This slice implements `DiskChanged` only. `EditorChanged`, `OpenFile`, and effects are later slices in `refactors/pending/event-model.md`. After the fourth change, `isograph logs` on a watched project shows the path-to-contents map, and CI drives the same `handle` through `isograph send` without touching the watcher.
+Requires `docs-website/docs/design-docs/event-model.md` and config-discovery.md. Five shippable changes. Send is its own change. Created, deleted, and moved are not in change 1.
 
-The watcher posts in-process. It does not run `isograph send` and it does not write to the event socket. The CLI and the socket are a separate source of the same `DiskChanged` type.
+The watcher posts in-process. It does not run `isograph send` and it does not write to the event socket. The CLI and the socket are a separate source of the same event type.
 
 ## What the user does
 
+After change 2:
+
 ```
-$ isograph start --filesystem injected
+$ isograph start
 $ isograph send <<'EOF'
-{"kind":"IncomingEvent.DiskChanged","value":{"path":"/tmp/proj/src/a.ts","presence":{"Present":{"contents":"export const a = 1;\n"}}}}
+{"kind":"IncomingEvent.DiskChanged","value":{"path":"/tmp/proj/src/a.ts","contents":"export const a = 1;\n"}}
 EOF
 $ isograph logs
-{"timestamp":"...","level":"INFO","fields":{"message":"disk changed","path":"/tmp/proj/src/a.ts","presence":"present","file_count":1}}
-$ isograph send <<'EOF'
-{"kind":"IncomingEvent.DiskChanged","value":{"path":"/tmp/proj/src/a.ts","presence":"Absent"}}
-EOF
-$ isograph stop
+{"timestamp":"...","level":"INFO","fields":{"message":"disk changed","path":"/tmp/proj/src/a.ts","file_count":1}}
 ```
+
+After change 4, the same send uses `presence`. After change 5:
 
 ```
 $ isograph start --filesystem watch
@@ -26,9 +26,9 @@ $ isograph logs
 {"timestamp":"...","level":"INFO","fields":{"message":"disk changed","path":".../src/Pet.tsx","presence":"present","file_count":3}}
 ```
 
-## Change 1: `handle`, the event loop, and the socket
+## Change 1: the event loop and one event
 
-The daemon stops parking. It binds the event socket, owns `IsographState`, and dispatches `DiskChanged`. No watcher. No CLI verb. Tests call `handle` directly and also drive the socket the way figaro's `tests/external.rs` does.
+The daemon stops parking. It binds the event socket, owns `IsographState`, and dispatches one event: this path has these contents. No `Absent`. No `Filesystem` flag. No watcher. No CLI verb. Tests call `handle` directly and also drive the socket the way figaro's `tests/external.rs` does.
 
 ### Types
 
@@ -45,17 +45,6 @@ pub enum IsographEvent {
 #[derive(serde::Deserialize, Debug)]
 pub struct DiskChanged {
     pub path: PathBuf,
-    pub presence: Presence,
-}
-
-#[derive(serde::Deserialize, Debug)]
-pub enum Presence {
-    Present(Present),
-    Absent,
-}
-
-#[derive(serde::Deserialize, Debug)]
-pub struct Present {
     pub contents: String,
 }
 ```
@@ -65,7 +54,7 @@ pub struct Present {
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use crate::event::{DiskChanged, IsographEvent, Presence};
+use crate::event::{DiskChanged, IsographEvent};
 
 pub struct IsographState {
     pub files: BTreeMap<PathBuf, String>,
@@ -85,22 +74,13 @@ impl IsographState {
     }
 
     fn handle_disk_changed(&mut self, change: &DiskChanged) {
-        match &change.presence {
-            Presence::Present(present) => {
-                self.files
-                    .insert(change.path.clone(), present.contents.clone());
-            }
-            Presence::Absent => {
-                self.files.remove(change.path.reference());
-            }
-        }
+        self.files
+            .insert(change.path.clone(), change.contents.clone());
     }
 }
 ```
 
-`handle` returns `()`. Effects land when a performer exists. `BTreeMap` so a log of the map is sorted.
-
-`Absent` of a path that is not in the map is a no-op. `Present` of a path that is already in the map replaces the contents.
+`handle` returns `()`. Effects land when a performer exists. `BTreeMap` so a log of the map is sorted. A second event for the same path replaces the contents. There is no way to remove a path yet.
 
 ```rust
 // from crates/isograph_cli/src/external.rs
@@ -126,31 +106,19 @@ pub fn on_message(text: &str, event_tx: &UnboundedSender<IsographEvent>) {
 }
 ```
 
-`DiskChanged` and `Presence` derive `Deserialize` (and `Serialize` is not required). `IsographEvent` does not derive `Deserialize`.
+`DiskChanged` derives `Deserialize`. `IsographEvent` does not.
 
 ```rust
 // from crates/isograph_cli/src/lib.rs
-#[derive(Clone, Copy, Debug, clap::ValueEnum)]
-enum Filesystem {
-    Watch,
-    Injected,
-}
-
 #[derive(clap::Args, Debug)]
 struct IsographArgs {
-    /// How filesystem facts arrive. `watch` observes the OS. `injected` only accepts events.
-    #[arg(long, value_enum, default_value_t = Filesystem::Watch)]
-    pub filesystem: Filesystem,
-
     /// Loopback port for the event socket. Assigned by the OS when absent.
     #[arg(long)]
     pub port: Option<u16>,
 }
 ```
 
-`App::DaemonArgs` is `IsographArgs`. `App::Id` stays `ConfigFlag`.
-
-`port: Option<u16>` is unspecified versus specified, not a bool. `Filesystem` is the two ways facts arrive.
+`App::DaemonArgs` is `IsographArgs`. `App::Id` stays `ConfigFlag`. `port: Option<u16>` is unspecified versus specified, not a bool. There is no `Filesystem` flag yet.
 
 ### Event loop
 
@@ -161,10 +129,10 @@ use tokio::sync::mpsc::unbounded_channel;
 use tracing::{error, info};
 
 use crate::discover::{self, ConfigFlag};
-use crate::event::{IsographEvent, Presence};
+use crate::event::IsographEvent;
 use crate::external::on_message;
 use crate::state::IsographState;
-use crate::{Filesystem, IsographArgs};
+use crate::IsographArgs;
 
 pub fn run(id: &ConfigFlag, args: &IsographArgs) {
     match discover::config_and_instance(id.config.as_deref()) {
@@ -216,27 +184,15 @@ async fn serve(
     info!(
         config = %config_path.display(),
         port,
-        filesystem = ?args.filesystem,
         "isograph daemon up"
     );
-    match args.filesystem {
-        Filesystem::Watch => {
-            // Change 4 starts the watcher here with event_tx.clone().
-        }
-        Filesystem::Injected => {}
-    }
     let mut state = IsographState::new();
     while let Some(event) = event_rx.recv().await {
         match &event {
             IsographEvent::DiskChanged(change) => {
-                let presence = match change.presence {
-                    Presence::Present(_) => "present",
-                    Presence::Absent => "absent",
-                };
                 state.handle(&event);
                 info!(
                     path = %change.path.display(),
-                    presence,
                     file_count = state.files.len(),
                     "disk changed"
                 );
@@ -248,8 +204,6 @@ async fn serve(
 ```
 
 `listen(0, ...)` plus `socket.local_addr().port()` is the combination. `None` for `--port` is OS-assigned. `EventSocket::local_addr` returns `SocketAddr`, not `io::Result`: the address is captured at bind, so an `EventSocket` that exists has one. That method is freddie `refactors/pending/event-socket-local-addr.md`. This change pin-revs `freddie_event_socket` to the commit that landed it. Do not fork `listen` in i2.
-
-`Filesystem::Watch` in this change is the same as `Injected`: no watcher yet. The flag is parsed and logged so change 4 only fills the arm.
 
 `App::run_daemon` calls `daemon::run`.
 
@@ -271,7 +225,7 @@ freddie_event_socket = { git = "https://github.com/freddiehg/freddie", rev = "af
 tokio = { workspace = true }
 ```
 
-Same rev as `freddie_cli`. After the `local_addr` prefactor, the rev is the commit that landed it. serde is already a dependency. `DiskChanged` needs `Deserialize` on `PathBuf` (serde's) and on `Presence`.
+Same rev as `freddie_cli`. After the `local_addr` prefactor, the rev is the commit that landed it. serde is already a dependency.
 
 `event.rs`, `state.rs`, `external.rs`, `daemon.rs` are new modules, declared in `lib.rs`.
 
@@ -279,26 +233,23 @@ Same rev as `freddie_cli`. After the `local_addr` prefactor, the rev is the comm
 
 In `state.rs`:
 
-- `Present` inserts. `files.get(path)` is the contents.
-- A second `Present` on the same path replaces.
-- `Absent` removes.
-- `Absent` of a path that was never present leaves the map unchanged.
-- `Present` of an empty string is present, not absent. `files.get(path)` is `Some("")`.
-- Two paths are two entries. `file_count` is 2.
+- An event inserts. `files.get(path)` is the contents.
+- A second event on the same path replaces.
+- An empty string is stored. `files.get(path)` is `Some("")`.
+- Two paths are two entries.
 
 `expect` in these tests names the fixture the test inserted.
 
 In `external.rs`:
 
-- A `IncomingEvent.DiskChanged` `Present` frame deserializes and the path and contents match.
-- A `IncomingEvent.DiskChanged` `Absent` frame deserializes.
+- A `IncomingEvent.DiskChanged` frame with `path` and `contents` deserializes.
 - `{"kind":"IncomingEvent.Quit","value":null}` does not deserialize.
 - `{"kind":"IsographEvent.DiskChanged",...}` does not deserialize.
 - `"not json"` does not deserialize.
 
-A tokio test in `crates/isograph_cli/src/external.rs` or `crates/isograph_cli/tests/socket.rs`, copied from figaro `tests/external.rs` in shape: bind `listen(0, ...)`, connect with `tokio_tungstenite`, send one `Present` frame, `event_rx.try_recv()` is `DiskChanged` with that path. A bad frame then a good frame: the good one still arrives. Dev-dependency: `tokio-tungstenite`, `futures-util`.
+A tokio test in `crates/isograph_cli/tests/socket.rs`, copied from figaro `tests/external.rs` in shape: bind `listen(0, ...)`, connect with `tokio_tungstenite`, send one frame, `event_rx.try_recv()` is `DiskChanged` with that path and contents. A bad frame then a good frame: the good one still arrives. Dev-dependency: `tokio-tungstenite`, `futures-util`.
 
-The e2e crate does not yet send; that is change 2. Existing start/status/logs/stop tests still pass. `isograph daemon up` still appears in the log, now with `port` and `filesystem`.
+The e2e crate does not yet send; that is change 2. Existing start/status/logs/stop tests still pass. `isograph daemon up` still appears in the log, now with `port`.
 
 `crates/ts_graphql_react_isograph_cli/tests/cli.rs` `the_log_contains_the_config_path` still polls for `isograph daemon up` and the config path.
 
@@ -498,16 +449,12 @@ In `send.rs` (or a unit module): `read_port` of a file containing `53124\n` is `
 
 E2E in `crates/ts_graphql_react_isograph_cli/tests/cli.rs`:
 
-- Start with `--filesystem injected`. `send` a `Present` frame on stdin. Poll the log until `disk changed` and the path and `file_count` 1. `send` `Absent`. Poll until `file_count` 0.
+- Start. `send` a frame with `path` and `contents` on stdin. Poll the log until `disk changed` and the path and `file_count` 1.
 - `send` with the daemon stopped is a non-zero exit. stderr contains `no port file` or `is the daemon running`.
 - `send` of `not json` is a non-zero exit and the log has no new `disk changed`.
 - `send --file` of a JSON file is the same as stdin.
 
 The harness already points `HOME` at the temp dir, so the port file is under that tree. Poll the log the way `the_log_contains_the_config_path` does.
-
-`Daemon::start` must pass `--filesystem injected` for these tests (no watcher). Existing start tests can stay on the default `watch` once change 4 exists; until then `watch` and `injected` are the same loop.
-
-Change `Daemon::start` to write a config and start. Add `Daemon::start_injected` that passes `--filesystem injected`, used by send tests.
 
 `isograph send` must run with the same `HOME` / cwd as the daemon so walk-up finds the same config and the same port file.
 
@@ -794,7 +741,7 @@ globset = "0.4"
 ignore = "0.4"
 ```
 
-`isograph_cli` depends on `globset` and `isograph_config`. `ignore` is used in change 4. Add `ignore` to `isograph_cli` in change 4, not here, unless the scope walk is used here. Change 3 only matches paths; it does not walk. `ignore` waits.
+`isograph_cli` depends on `globset` and `isograph_config`. `ignore` is used in change 5. Add `ignore` to `isograph_cli` in change 5, not here. Change 3 only matches paths; it does not walk.
 
 ### Tests
 
@@ -827,9 +774,109 @@ Scope unit tests, paths relative to a temp `config_dir`:
 
 `load_project_config` of `{}\n` is `Unparseable`. Of a missing file, `Unreadable`. Of a valid demo-shaped JSON, `Ok` with `includes == None`.
 
-## Change 4: the watcher
+## Change 4: created, deleted, moved
+
+`DiskChanged` is one always-present file. The design-doc event is a path plus `Presence`. Created and modified are `Present`. Deleted is `Absent`. Moved is `Absent` of the old path then `Present` of the new path. There is no `Moved` variant.
+
+Before:
+
+```rust
+// from crates/isograph_cli/src/event.rs
+pub struct DiskChanged {
+    pub path: PathBuf,
+    pub contents: String,
+}
+```
+
+After:
+
+```rust
+// from crates/isograph_cli/src/event.rs
+pub struct DiskChanged {
+    pub path: PathBuf,
+    pub presence: Presence,
+}
+
+pub enum Presence {
+    Present(Present),
+    Absent,
+}
+
+pub struct Present {
+    pub contents: String,
+}
+```
+
+`handle_disk_changed`:
+
+```rust
+// from crates/isograph_cli/src/state.rs
+    fn handle_disk_changed(&mut self, change: &DiskChanged) {
+        match &change.presence {
+            Presence::Present(present) => {
+                self.files
+                    .insert(change.path.clone(), present.contents.clone());
+            }
+            Presence::Absent => {
+                self.files.remove(change.path.reference());
+            }
+        }
+    }
+```
+
+`Absent` of a path that is not in the map is a no-op.
+
+The log line gains `presence` (`present` / `absent`).
+
+Wire frames change. Change 2's `{"path","contents"}` no longer deserializes.
+
+```json
+{"kind":"IncomingEvent.DiskChanged","value":{"path":"/tmp/proj/src/a.ts","presence":{"Present":{"contents":"export const a = 1;\n"}}}}
+{"kind":"IncomingEvent.DiskChanged","value":{"path":"/tmp/proj/src/a.ts","presence":"Absent"}}
+```
+
+A move is two frames, in that order: `Absent` of `from`, `Present` of `to`.
+
+The socket test and the send e2e use the `presence` shape. Existing change 2 tests that sent `contents` at the top level are rewritten.
+
+Tests in `state.rs`:
+
+- `Present` inserts.
+- A second `Present` on the same path replaces.
+- `Absent` removes.
+- `Absent` of a path that was never present leaves the map unchanged.
+- `Present` of an empty string is present, not absent.
+- Two events `Absent` then `Present` on different paths is a move: old path gone, new path present with those contents.
+
+`on_message` still has one `IncomingEvent` arm. `Presence` derives `Deserialize`.
+
+## Change 5: the watcher
 
 A source. It walks once, then observes. Each fact is a `DiskChanged` sent on the same channel the socket uses.
+
+`IsographArgs` gains how facts arrive. Not a bool.
+
+```rust
+// from crates/isograph_cli/src/lib.rs
+#[derive(Clone, Copy, Debug, clap::ValueEnum)]
+enum Filesystem {
+    Watch,
+    Injected,
+}
+
+#[derive(clap::Args, Debug)]
+struct IsographArgs {
+    /// How filesystem facts arrive. `watch` observes the OS. `injected` only accepts events.
+    #[arg(long, value_enum, default_value_t = Filesystem::Watch)]
+    pub filesystem: Filesystem,
+
+    /// Loopback port for the event socket. Assigned by the OS when absent.
+    #[arg(long)]
+    pub port: Option<u16>,
+}
+```
+
+`Injected` does not scan and does not watch. The event socket listens in both modes. Default `Watch`.
 
 ### Start
 
@@ -862,7 +909,7 @@ In `daemon::serve`, the `Filesystem::Watch` arm:
 
 `serve` currently names `_config`. Change 3's `config_and_instance` already returns `IsographProjectConfig`. Stop discarding it: `Ok((path, instance, config))`, pass `config` into `serve`. The `Watcher` is a local that outlives the `while let Some(event)` loop; put it in an outer binding before the loop so drop order is loop, then watcher, then socket.
 
-`Injected` still does not scan and does not watch.
+`daemon up` logs `filesystem`. E2E that must not watch uses `--filesystem injected`. Add `Daemon::start_injected`.
 
 ### Watch
 
@@ -1124,7 +1171,7 @@ notify-debouncer-full = { workspace = true }
 
 ## CI
 
-No new workflow file. `cargo test --manifest-path crates/ts_graphql_react_isograph_cli/Cargo.toml --tests` already runs on every platform in `build-cli.yml`. Change 2's send tests and change 4's watch test ride that job.
+No new workflow file. `cargo test --manifest-path crates/ts_graphql_react_isograph_cli/Cargo.toml --tests` already runs on every platform in `build-cli.yml`. Change 2's send tests and change 5's watch test ride that job.
 
 `cargo test` for `isograph_cli` unit tests (handle, deserialize, scope, dispatch) rides `cargo-test` in `ci.yml` once `isograph_cli` is in the workspace test set. It is a workspace member. `cargo test` at the root includes it.
 
@@ -1137,7 +1184,7 @@ Do not launch VS Code or Zed. Editor CI is zed-and-vscode-extensions.md.
 - `run_daemon` -> `daemon::run` (change 1).
 - `CliVerb::Send` -> `send::run` (change 2).
 - `discover::load_config` -> `isograph_config::load_project_config` (change 3).
-- `Filesystem::Watch` arm -> `watch::start` (change 4).
+- `Filesystem::Watch` arm -> `watch::start` (change 5).
 - notify callback -> `dispatch` -> `event_tx.send`.
 - socket callback -> `on_message` -> `event_tx.send`.
 - event loop -> `state.handle`.
