@@ -2,7 +2,7 @@
 
 `Vec<WithSpan<SemanticToken>>` is literal-relative byte spans. LSP `textDocument/semanticTokens/full` wants `lsp_types::SemanticToken`: `delta_line`, `delta_start`, `length`, `token_type` index into a legend, `token_modifiers_bitset`. `delta_start` and `length` are UTF-16 code units. A token does not include a line break.
 
-One scan of `page_content` records every line break. The encoder then walks a file-absolute `tokens` slice: split each span on those breaks, encode each nonempty piece. A piece contains no line break. The next delta therefore uses only the gap after the previous piece's end, and same-line `delta_start` is the previous piece's UTF-16 length plus the gap's last-line width. Spans are mutually exclusive and ordered. A violation is a compiler bug; the walk panics. The caller rebases a literal-relative span with `with_offset` before concatenating literals.
+`LineIndex` maps a byte offset to `(line, utf16_col)` and splits a span into nonempty single-line pieces. The encoder delta-encodes those positions: `delta_line = line - prev_line`; `delta_start` is `col - prev_col` on the same line and `col` after a line break; `length` is UTF-16 of the piece. Spans are file-absolute, mutually exclusive, ordered, in range, on char boundaries, and not strictly inside a line break. A violation is `EncodeError`. The caller rebases a literal-relative span with `with_offset` before concatenating literals. The server (lsp-semantic-tokens.md) logs the error and answers with empty tokens.
 
 Origin: `crates/isograph_lsp/src/semantic_tokens.rs` and `crates/isograph_lang_types/src/semantic_token_legend/mod.rs` in isograph. This crate is `crates/isograph_lsp`. It does not start the server. lsp-semantic-tokens.md adds `file_literals` and the stdio loop, and calls the functions here.
 
@@ -23,71 +23,95 @@ Most important first.
 use isograph_parser::SemanticToken;
 use lsp_types::SemanticToken as LspSemanticToken;
 use prelude::Postfix;
-use span::WithSpan;
+use span::{Span, WithSpan};
+use thiserror::Error;
 
 pub fn lsp_semantic_tokens(
     tokens: &[WithSpan<SemanticToken>],
     page_content: &str,
-) -> Vec<LspSemanticToken> {
-    let breaks = line_breaks(page_content);
-    let mut last_end = 0u32;
-    let mut last_len = 0u32;
+) -> Result<Vec<LspSemanticToken>, EncodeError> {
+    let index = LineIndex::new(page_content);
+    let mut last = Pos { line: 0, col: 0 };
     let mut last_span_end = 0u32;
-    let mut break_index = 0usize;
     let mut encoded = Vec::new();
     for token in tokens {
         let span = token.location;
-        assert!(
-            span.start >= last_span_end && span.end >= span.start,
-            "semantic token spans must be mutually exclusive and ordered; got {}..{} after end {last_span_end}",
-            span.start,
-            span.end,
-        );
+        index.check_span(span, last_span_end)?;
         last_span_end = span.end;
-        let mut piece_start = span.start;
-        while piece_start < span.end {
-            let split_index = first_break_at_or_after(&breaks, break_index, piece_start);
-            let split = if split_index < breaks.len() && breaks[split_index].start < span.end
-            {
-                breaks[split_index].wrap_some()
-            } else {
-                None
+        for piece in index.nonempty_pieces(span) {
+            let start = index.position(piece.start);
+            let delta_line = start.line - last.line;
+            let delta_start = match delta_line {
+                0 => start.col - last.col,
+                _ => start.col,
             };
-            let line_end = match split {
-                Some(line_break) => line_break.start,
-                None => span.end,
-            };
-            let line_text = &page_content[(piece_start as usize)..(line_end as usize)];
-            if !line_text.is_empty() {
-                let gap = gap_delta(
-                    &breaks[break_index..],
-                    page_content,
-                    last_end,
-                    piece_start,
-                );
-                let delta_start = match gap.delta_line {
-                    0 => last_len + gap.tail_utf16,
-                    _ => gap.tail_utf16,
-                };
-                let length = utf16_units(line_text);
-                encoded.push(LspSemanticToken {
-                    delta_line: gap.delta_line,
-                    delta_start,
-                    length,
-                    token_type: lsp_type_index(token.item),
-                    token_modifiers_bitset: 0,
-                });
-                last_end = piece_start + line_text.len() as u32;
-                last_len = length;
-                break_index = first_break_at_or_after(&breaks, break_index, last_end);
-            }
-            match split {
-                Some(line_break) => piece_start = line_break.after,
-                None => break,
-            }
+            encoded.push(LspSemanticToken {
+                delta_line,
+                delta_start,
+                length: utf16_units(&page_content[piece.as_usize_range()]),
+                token_type: lsp_type_index(token.item),
+                token_modifiers_bitset: 0,
+            });
+            last = start;
         }
     }
-    encoded
+    encoded.wrap_ok()
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Error)]
+pub enum EncodeError {
+    #[error("semantic token spans must be mutually exclusive and ordered; got {}..{} after end {}", .0.start, .0.end, .0.previous_end)]
+    Overlap(Overlap),
+    #[error("semantic token span {}..{} is inverted", .0.start, .0.end)]
+    Inverted(SpanEnds),
+    #[error("byte {} is out of range for a document of length {}", .0.offset, .0.len)]
+    OutOfRange(OutOfRange),
+    #[error("byte {} is not a char boundary", .0.offset)]
+    NotCharBoundary(NotCharBoundary),
+    #[error("byte {} is strictly inside a line break {}..{}", .0.offset, .0.start, .0.after)]
+    InsideLineBreak(InsideLineBreak),
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct Overlap {
+    pub start: u32,
+    pub end: u32,
+    pub previous_end: u32,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct SpanEnds {
+    pub start: u32,
+    pub end: u32,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct OutOfRange {
+    pub offset: u32,
+    pub len: u32,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct NotCharBoundary {
+    pub offset: u32,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct InsideLineBreak {
+    pub offset: u32,
+    pub start: u32,
+    pub after: u32,
+}
+
+struct LineIndex<'a> {
+    text: &'a str,
+    breaks: Vec<LineBreak>,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+struct Pos {
+    line: u32,
+    col: u32,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -96,10 +120,127 @@ struct LineBreak {
     after: u32,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-struct GapDelta {
-    delta_line: u32,
-    tail_utf16: u32,
+struct PieceIter<'a> {
+    breaks: &'a [LineBreak],
+    end: u32,
+    piece_start: u32,
+    break_index: usize,
+}
+
+impl<'a> LineIndex<'a> {
+    fn new(text: &'a str) -> Self {
+        Self {
+            text,
+            breaks: line_breaks(text),
+        }
+    }
+
+    fn check_span(&self, span: Span, last_span_end: u32) -> Result<(), EncodeError> {
+        if span.end < span.start {
+            return EncodeError::Inverted(SpanEnds {
+                start: span.start,
+                end: span.end,
+            })
+            .wrap_err();
+        }
+        if span.start < last_span_end {
+            return EncodeError::Overlap(Overlap {
+                start: span.start,
+                end: span.end,
+                previous_end: last_span_end,
+            })
+            .wrap_err();
+        }
+        self.check_offset(span.start)?;
+        self.check_offset(span.end)?;
+        ().wrap_ok()
+    }
+
+    fn check_offset(&self, offset: u32) -> Result<(), EncodeError> {
+        let len = self.text.len() as u32;
+        if offset > len {
+            return EncodeError::OutOfRange(OutOfRange { offset, len }).wrap_err();
+        }
+        if !self.text.is_char_boundary(offset as usize) {
+            return EncodeError::NotCharBoundary(NotCharBoundary { offset }).wrap_err();
+        }
+        for line_break in &self.breaks {
+            if line_break.start < offset && offset < line_break.after {
+                return EncodeError::InsideLineBreak(InsideLineBreak {
+                    offset,
+                    start: line_break.start,
+                    after: line_break.after,
+                })
+                .wrap_err();
+            }
+        }
+        ().wrap_ok()
+    }
+
+    fn position(&self, offset: u32) -> Pos {
+        let i = self.breaks.partition_point(|line_break| line_break.after <= offset);
+        let line_start = match i {
+            0 => 0,
+            n => self.breaks[n - 1].after,
+        };
+        Pos {
+            line: i as u32,
+            col: utf16_units(&self.text[(line_start as usize)..(offset as usize)]),
+        }
+    }
+
+    fn nonempty_pieces(&self, span: Span) -> PieceIter<'_> {
+        let break_index = self
+            .breaks
+            .partition_point(|line_break| line_break.after <= span.start);
+        PieceIter {
+            breaks: &self.breaks,
+            end: span.end,
+            piece_start: span.start,
+            break_index,
+        }
+    }
+}
+
+impl Iterator for PieceIter<'_> {
+    type Item = Span;
+
+    fn next(&mut self) -> Option<Span> {
+        loop {
+            if self.piece_start >= self.end {
+                return None;
+            }
+            while self.break_index < self.breaks.len()
+                && self.breaks[self.break_index].start < self.piece_start
+            {
+                self.break_index += 1;
+            }
+            match self
+                .breaks
+                .get(self.break_index)
+                .filter(|line_break| line_break.start < self.end)
+            {
+                Some(line_break) => {
+                    let start = self.piece_start;
+                    let line_end = line_break.start;
+                    self.piece_start = line_break.after;
+                    self.break_index += 1;
+                    if line_end > start {
+                        return Span::new(start, line_end).wrap_some();
+                    }
+                }
+                None => {
+                    let start = self.piece_start;
+                    let end = self.end;
+                    self.piece_start = end;
+                    if end > start {
+                        return Span::new(start, end).wrap_some();
+                    }
+                    return None;
+                }
+            }
+        }
+    }
 }
 
 fn line_breaks(text: &str) -> Vec<LineBreak> {
@@ -133,36 +274,6 @@ fn line_breaks(text: &str) -> Vec<LineBreak> {
     breaks
 }
 
-fn first_break_at_or_after(breaks: &[LineBreak], mut index: usize, at: u32) -> usize {
-    while index < breaks.len() && breaks[index].start < at {
-        index += 1;
-    }
-    index
-}
-
-fn gap_delta(
-    breaks: &[LineBreak],
-    page_content: &str,
-    from: u32,
-    to: u32,
-) -> GapDelta {
-    let mut last_after = from;
-    let mut delta_line = 0u32;
-    for line_break in breaks {
-        if line_break.start >= to {
-            break;
-        }
-        if line_break.start >= from {
-            delta_line += 1;
-            last_after = line_break.after;
-        }
-    }
-    GapDelta {
-        delta_line,
-        tail_utf16: utf16_units(&page_content[(last_after as usize)..(to as usize)]),
-    }
-}
-
 fn utf16_units(text: &str) -> u32 {
     if text.is_ascii() {
         text.len() as u32
@@ -172,15 +283,13 @@ fn utf16_units(text: &str) -> u32 {
 }
 ```
 
-`assert!` is a panic. The input is `&[WithSpan<SemanticToken>]` with file-absolute spans; disjoint ordered spans are a parser-plus-caller invariant that type cannot hold. Adjacent spans (`end` of one equals `start` of the next) pass. `last_span_end` is the previous parser token's absolute end.
+`last` is the previous piece's start `Pos`. Same-line `delta_start` is `start.col - last.col` (start-to-start). After a line break it is `start.col`. A blank line inside a span is a zero-length piece; `PieceIter` skips it. The next piece's `position` counts those breaks in `line`.
 
-`LineBreak.start` is the first byte of `\r\n`, `\n`, or `\r`. `after` is the first byte of the next line. Same set as `IsographLangTokenKind::LineBreak` and as VS Code / LSP line offsets. `line_breaks` walks `page_content` once. The token walk keeps `break_index` as the first break with `start >= last_end`.
+`check_span` runs before any slice. Ordered exclusive spans are not enough: `page = "a\r\nb"` with tokens `[0..1, 2..3]` is ordered and exclusive, and offset 2 sits strictly inside the break `{ start: 1, after: 3 }`. Parser leftover skips `LineBreak` tokens, so this is a caller concat bug. `EncodeError` names it instead of panicking on `page_content[3..2]`.
 
-`last_end` is the previous emitted piece's byte end. `last_len` is that piece's UTF-16 length. `GapDelta` is the gap `page_content[last_end..piece_start]`: `delta_line` is how many recorded breaks fall in that range; `tail_utf16` is UTF-16 units after the last such break, or of the whole gap if there is none. A piece contains no line break, so `delta_line` cannot change inside it. Same-line `delta_start` is `last_len + tail_utf16`. After a line break, `delta_start` is `tail_utf16`. Adjacent tokens have an empty gap; `delta_start` is `last_len`.
+`position` is only called on a piece start after `check_span`, so `line_start..offset` is in range and on a char boundary.
 
-A piece's `length` is UTF-16 units of the text before the break. `utf16_units` is `text.len()` when `is_ascii`, else `encode_utf16().count()`. Almost every iso lexeme and gap is ASCII. The first token's gap is the prefix before the first literal: a file with no newline before that literal would otherwise `encode_utf16` the whole prefix.
-
-A piece that is only a break (a blank line inside a multiline token) emits nothing; `piece_start` becomes `after`. `last_end` stays at the previous emit, so those newlines sit in the next nonempty piece's gap.
+`utf16_units` is `text.len()` when `is_ascii`, else `encode_utf16().count()`. Almost every iso lexeme is ASCII.
 
 ## Origin
 
@@ -248,15 +357,14 @@ Checked against the LSP 3.17 encoding: five integers per token; `deltaLine` is l
 
 Deltas from that extract:
 
-- One walk. Origin materializes `AbsoluteIsographSemanticToken` then delta-encodes. There is no `AbsoluteToken`.
+- `LineIndex` / `Pos` / `nonempty_pieces`. Origin materializes `AbsoluteIsographSemanticToken` then delta-encodes from `last_token_start`. There is no `AbsoluteToken`, no `last_end` / `last_len` / `GapDelta`.
 - `token` is `&WithSpan<SemanticToken>`. Span is file-absolute. The caller applied `with_offset(extraction_span.start)` when the parse was literal-relative.
-- `token_type` is `lsp_type_index(relative_token.item)`, not a field on the parser token.
-- Origin `split_inclusive('\n')` kept the line break in `line_text`, so `len` included `\n` and the client may discard the token. Origin also treated only `\n` as a break, so `\r\n` left `\r` in `len` and a bare `\r` did not split. `line_breaks` records `\r\n` then `\n` then `\r`; `length` is the text before the break.
-- Empty pieces emit nothing. `last_span_end` still advances by the whole parser token. `last_end` / `last_len` do not; the skipped break is in the next gap.
-- Origin `line_text.len()` is UTF-8 bytes. `length` and `delta_start` are UTF-16: `utf16_units`, ASCII `len()` otherwise `encode_utf16().count()`.
-- Origin `delta_line_delta_start` used `chars().enumerate()` for the newline index and `text.len()` (bytes) for the last-line width. Those units disagree on any non-ASCII last line. It also counted only `\n`. Split and delta read the same `LineBreak` list; last-line width is `utf16_units`.
-- Origin `last_token_start` was the previous piece's start. `in_between` was previous piece plus gap, so each piece was scanned again on the next emit to recover `length`. `last_end` / `last_len` walk only the gap.
-- Unordered or overlapping parser tokens panic. Origin sliced `page_content[last_token_start..new_start]`, which panics only when a later start is numerically before the previous start, and accepts overlap when starts still increase.
+- `token_type` is `lsp_type_index(token.item)`, not a field on the parser token. `lsp_type_index` is private.
+- Origin `split_inclusive('\n')` kept the line break in `line_text`, so `len` included `\n` and the client may discard the token. Origin also treated only `\n` as a break. `line_breaks` records `\r\n` then `\n` then `\r`; `length` is the text before the break.
+- Empty pieces emit nothing. `PieceIter` skips a zero-length piece; `position` on the next piece counts the skipped breaks in `line`.
+- Origin `line_text.len()` is UTF-8 bytes. `length` and `col` are UTF-16: `utf16_units`, ASCII `len()` otherwise `encode_utf16().count()`.
+- Origin `delta_line_delta_start` used `chars().enumerate()` for `\n` and `text.len()` (bytes) for the last-line width. `Pos` is `(line, utf16_col)` from `LineIndex::position`.
+- Unordered, inverted, out-of-range, non-char-boundary, and CRLF-interior spans are `EncodeError`. Origin sliced `page_content[last_token_start..new_start]` and panics on a backwards range. The server logs the error and returns empty tokens.
 
 ## Legend and `lsp_type_index`
 
@@ -268,78 +376,79 @@ use lsp_types::{
     SemanticTokenModifier, SemanticTokenType, SemanticTokensLegend,
 };
 
+const LEGEND_TOKEN_TYPES: &[SemanticTokenType] = &[
+    SemanticTokenType::NAMESPACE,
+    SemanticTokenType::TYPE,
+    SemanticTokenType::CLASS,
+    SemanticTokenType::ENUM,
+    SemanticTokenType::INTERFACE,
+    SemanticTokenType::STRUCT,
+    SemanticTokenType::TYPE_PARAMETER,
+    SemanticTokenType::PARAMETER,
+    SemanticTokenType::VARIABLE,
+    SemanticTokenType::PROPERTY,
+    SemanticTokenType::ENUM_MEMBER,
+    SemanticTokenType::EVENT,
+    SemanticTokenType::FUNCTION,
+    SemanticTokenType::METHOD,
+    SemanticTokenType::MACRO,
+    SemanticTokenType::KEYWORD,
+    SemanticTokenType::MODIFIER,
+    SemanticTokenType::COMMENT,
+    SemanticTokenType::STRING,
+    SemanticTokenType::NUMBER,
+    SemanticTokenType::REGEXP,
+    SemanticTokenType::OPERATOR,
+    SemanticTokenType::DECORATOR,
+];
+
+const LEGEND_TOKEN_MODIFIERS: &[SemanticTokenModifier] = &[
+    SemanticTokenModifier::DECLARATION,
+    SemanticTokenModifier::DEFINITION,
+    SemanticTokenModifier::READONLY,
+    SemanticTokenModifier::STATIC,
+    SemanticTokenModifier::DEPRECATED,
+    SemanticTokenModifier::ABSTRACT,
+    SemanticTokenModifier::ASYNC,
+];
+
 pub fn semantic_token_legend() -> SemanticTokensLegend {
     SemanticTokensLegend {
-        token_types: vec![
-            SemanticTokenType::NAMESPACE,
-            SemanticTokenType::TYPE,
-            SemanticTokenType::CLASS,
-            SemanticTokenType::ENUM,
-            SemanticTokenType::INTERFACE,
-            SemanticTokenType::STRUCT,
-            SemanticTokenType::TYPE_PARAMETER,
-            SemanticTokenType::PARAMETER,
-            SemanticTokenType::VARIABLE,
-            SemanticTokenType::PROPERTY,
-            SemanticTokenType::ENUM_MEMBER,
-            SemanticTokenType::EVENT,
-            SemanticTokenType::FUNCTION,
-            SemanticTokenType::METHOD,
-            SemanticTokenType::MACRO,
-            SemanticTokenType::KEYWORD,
-            SemanticTokenType::MODIFIER,
-            SemanticTokenType::COMMENT,
-            SemanticTokenType::STRING,
-            SemanticTokenType::NUMBER,
-            SemanticTokenType::REGEXP,
-            SemanticTokenType::OPERATOR,
-            SemanticTokenType::DECORATOR,
-        ],
-        token_modifiers: vec![
-            SemanticTokenModifier::DECLARATION,
-            SemanticTokenModifier::DEFINITION,
-            SemanticTokenModifier::READONLY,
-            SemanticTokenModifier::STATIC,
-            SemanticTokenModifier::DEPRECATED,
-            SemanticTokenModifier::ABSTRACT,
-            SemanticTokenModifier::ASYNC,
-        ],
+        token_types: LEGEND_TOKEN_TYPES.to_vec(),
+        token_modifiers: LEGEND_TOKEN_MODIFIERS.to_vec(),
     }
 }
 
-const LSP_ST_TYPE: u32 = 1;
-const LSP_ST_CLASS: u32 = 2;
-const LSP_ST_PARAMETER: u32 = 7;
-const LSP_ST_VARIABLE: u32 = 8;
-const LSP_ST_PROPERTY: u32 = 9;
-const LSP_ST_KEYWORD: u32 = 15;
-const LSP_ST_COMMENT: u32 = 17;
-const LSP_ST_STRING: u32 = 18;
-const LSP_ST_NUMBER: u32 = 19;
-const LSP_ST_OPERATOR: u32 = 21;
-const LSP_ST_DECORATOR: u32 = 22;
+fn legend_index(ty: SemanticTokenType) -> u32 {
+    LEGEND_TOKEN_TYPES
+        .iter()
+        .position(|listed| listed == &ty)
+        .expect("LEGEND_TOKEN_TYPES lists every type lsp_type_index maps") as u32
+}
 
-pub fn lsp_type_index(token: SemanticToken) -> u32 {
+fn lsp_type_index(token: SemanticToken) -> u32 {
     match token {
-        SemanticToken::Keyword => LSP_ST_KEYWORD,
-        SemanticToken::Type => LSP_ST_CLASS,
-        SemanticToken::FieldName => LSP_ST_PROPERTY,
-        SemanticToken::ObjectKey => LSP_ST_PROPERTY,
-        SemanticToken::GraphQLTypeName => LSP_ST_TYPE,
-        SemanticToken::DirectiveName => LSP_ST_DECORATOR,
-        SemanticToken::Variable => LSP_ST_VARIABLE,
-        SemanticToken::Argument => LSP_ST_PARAMETER,
-        SemanticToken::Integer => LSP_ST_NUMBER,
-        SemanticToken::String => LSP_ST_STRING,
-        SemanticToken::BooleanOrNull => LSP_ST_VARIABLE,
+        SemanticToken::Keyword => legend_index(SemanticTokenType::KEYWORD),
+        SemanticToken::Type => legend_index(SemanticTokenType::CLASS),
+        SemanticToken::FieldName | SemanticToken::ObjectKey => {
+            legend_index(SemanticTokenType::PROPERTY)
+        }
+        SemanticToken::GraphQLTypeName => legend_index(SemanticTokenType::TYPE),
+        SemanticToken::DirectiveName => legend_index(SemanticTokenType::DECORATOR),
+        SemanticToken::Variable | SemanticToken::BooleanOrNull => {
+            legend_index(SemanticTokenType::VARIABLE)
+        }
+        SemanticToken::Argument => legend_index(SemanticTokenType::PARAMETER),
+        SemanticToken::Integer => legend_index(SemanticTokenType::NUMBER),
+        SemanticToken::String => legend_index(SemanticTokenType::STRING),
         SemanticToken::Period
         | SemanticToken::Colon
         | SemanticToken::Equals
         | SemanticToken::Parenthesis
         | SemanticToken::Brace
         | SemanticToken::Content
-        | SemanticToken::Bracket => LSP_ST_OPERATOR,
-        SemanticToken::Error => LSP_ST_COMMENT,
+        | SemanticToken::Bracket => legend_index(SemanticTokenType::OPERATOR),
+        SemanticToken::Error => legend_index(SemanticTokenType::COMMENT),
     }
 }
 ```
@@ -361,6 +470,7 @@ isograph_parser = { path = "../isograph_parser" }
 lsp-types = { workspace = true }
 prelude = { path = "../prelude" }
 span = { path = "../span" }
+thiserror = { workspace = true }
 
 [lints]
 workspace = true
@@ -372,10 +482,12 @@ Workspace member via `./crates/*`.
 // from crates/isograph_lsp/src/lib.rs
 mod semantic_tokens;
 
-pub use semantic_tokens::{lsp_semantic_tokens, semantic_token_legend};
+pub use semantic_tokens::{
+    EncodeError, lsp_semantic_tokens, semantic_token_legend,
+};
 ```
 
-`LineBreak`, `GapDelta`, `line_breaks`, `first_break_at_or_after`, `gap_delta`, `utf16_units` stay in the module. Tests in that module call them.
+`LineIndex`, `Pos`, `LineBreak`, `PieceIter`, `line_breaks`, `utf16_units`, `lsp_type_index`, `legend_index` stay in the module. Tests in that module call them. `legend_index` `expect`s that `LEGEND_TOKEN_TYPES` lists every type the match names.
 
 ## Tests
 
@@ -386,12 +498,13 @@ Test helpers live in the test module. `encoded` parses then encodes a source tha
 #[cfg(test)]
 mod tests {
     use isograph_parser::{SemanticToken, parse_iso_literal};
-    use lsp_types::SemanticToken as LspSemanticToken;
+    use lsp_types::{SemanticToken as LspSemanticToken, SemanticTokenType};
     use prelude::Postfix;
     use span::{Span, WithSpan, WithSpanPostfix};
 
     use super::{
-        GapDelta, LineBreak, gap_delta, line_breaks, lsp_semantic_tokens, lsp_type_index,
+        EncodeError, InsideLineBreak, LineBreak, LineIndex, NotCharBoundary, OutOfRange,
+        Overlap, Pos, SpanEnds, line_breaks, lsp_semantic_tokens, lsp_type_index,
         semantic_token_legend,
     };
 
@@ -403,7 +516,7 @@ mod tests {
 
     fn encoded(source: &str) -> Vec<LspSemanticToken> {
         let parsed = parse_iso_literal(source);
-        lsp_semantic_tokens(&parsed.tokens, source)
+        encode(&parsed.tokens, source)
     }
 
     fn rebased(
@@ -421,7 +534,7 @@ mod tests {
         offset: u32,
         page_content: &str,
     ) -> Vec<LspSemanticToken> {
-        lsp_semantic_tokens(&rebased(tokens, offset), page_content)
+        encode(&rebased(tokens, offset), page_content)
     }
 
     fn of_type(lsp: &[LspSemanticToken], token_type: u32) -> Vec<&LspSemanticToken> {
@@ -430,8 +543,13 @@ mod tests {
             .collect()
     }
 
-    fn gap(text: &str) -> GapDelta {
-        gap_delta(&line_breaks(text), text, 0, text.len() as u32)
+    fn encode(
+        tokens: &[WithSpan<SemanticToken>],
+        page_content: &str,
+    ) -> Vec<LspSemanticToken> {
+        lsp_semantic_tokens(tokens, page_content).expect(
+            "the fixture's spans are mutually exclusive, ordered, in range, on char boundaries, and not inside a line break",
+        )
     }
 
     #[test]
@@ -456,96 +574,41 @@ mod tests {
     }
 
     #[test]
-    fn gap_delta_same_line() {
-        assert_eq!(
-            gap("   "),
-            GapDelta {
-                delta_line: 0,
-                tail_utf16: 3,
-            },
-        );
+    fn position_same_line() {
+        let index = LineIndex::new("   abc");
+        assert_eq!(index.position(3), Pos { line: 0, col: 3 });
     }
 
     #[test]
-    fn gap_delta_newline() {
-        assert_eq!(
-            gap("\n  "),
-            GapDelta {
-                delta_line: 1,
-                tail_utf16: 2,
-            },
-        );
+    fn position_after_newline() {
+        let index = LineIndex::new("\n  x");
+        assert_eq!(index.position(3), Pos { line: 1, col: 2 });
     }
 
     #[test]
-    fn gap_delta_crlf_and_cr_are_one_break_each() {
-        assert_eq!(
-            gap("\r\n  "),
-            GapDelta {
-                delta_line: 1,
-                tail_utf16: 2,
-            },
-        );
-        assert_eq!(
-            gap("\r  "),
-            GapDelta {
-                delta_line: 1,
-                tail_utf16: 2,
-            },
-        );
-        assert_eq!(
-            gap("a\r\nb"),
-            GapDelta {
-                delta_line: 1,
-                tail_utf16: 1,
-            },
-        );
-        assert_eq!(
-            gap("x\n\ny"),
-            GapDelta {
-                delta_line: 2,
-                tail_utf16: 1,
-            },
-        );
-        assert_eq!(
-            gap("é\r\n  "),
-            GapDelta {
-                delta_line: 1,
-                tail_utf16: 2,
-            },
-        );
-        assert_eq!(
-            gap("é\r  "),
-            GapDelta {
-                delta_line: 1,
-                tail_utf16: 2,
-            },
-        );
+    fn position_after_crlf_and_cr() {
+        let index = LineIndex::new("\r\n  ");
+        assert_eq!(index.position(4), Pos { line: 1, col: 2 });
+        let index = LineIndex::new("\r  ");
+        assert_eq!(index.position(3), Pos { line: 1, col: 2 });
+        let index = LineIndex::new("a\r\nb");
+        assert_eq!(index.position(3), Pos { line: 1, col: 0 });
+        let index = LineIndex::new("x\n\ny");
+        assert_eq!(index.position(4), Pos { line: 2, col: 1 });
+        let index = LineIndex::new("é\r\n  ");
+        assert_eq!(index.position(6), Pos { line: 1, col: 2 });
+        let index = LineIndex::new("é\r  ");
+        assert_eq!(index.position(5), Pos { line: 1, col: 2 });
     }
 
     #[test]
-    fn gap_delta_counts_utf16_on_the_last_line() {
-        assert_eq!(
-            gap("é\n  "),
-            GapDelta {
-                delta_line: 1,
-                tail_utf16: 2,
-            },
-        );
-        assert_eq!(
-            gap("aé"),
-            GapDelta {
-                delta_line: 0,
-                tail_utf16: 2,
-            },
-        );
-        assert_eq!(
-            gap("a😀"),
-            GapDelta {
-                delta_line: 0,
-                tail_utf16: 3,
-            },
-        );
+    fn position_counts_utf16_on_the_line() {
+        let index = LineIndex::new("é\n  ");
+        assert_eq!(index.position(5), Pos { line: 1, col: 2 });
+        let index = LineIndex::new("aé");
+        assert_eq!(index.position(3), Pos { line: 0, col: 2 });
+        let index = LineIndex::new("a😀");
+        assert_eq!(index.position(5), Pos { line: 0, col: 3 });
     }
 
     #[test]
@@ -622,7 +685,7 @@ mod tests {
         let parsed_b = parse_iso_literal(second);
         let mut tokens = rebased(&parsed_a.tokens, first_start as u32);
         tokens.extend(rebased(&parsed_b.tokens, second_start as u32));
-        let lsp = lsp_semantic_tokens(&tokens, source);
+        let lsp = encode(&tokens, source);
         assert_eq!(lsp.len(), 8);
         assert_eq!(lsp[4].delta_line, 1);
         assert_eq!(lsp[4].delta_start, 5);
@@ -644,7 +707,7 @@ mod tests {
         let parsed_b = parse_iso_literal(second);
         let mut tokens = rebased(&parsed_a.tokens, first_start as u32);
         tokens.extend(rebased(&parsed_b.tokens, second_start as u32));
-        let lsp = lsp_semantic_tokens(&tokens, source);
+        let lsp = encode(&tokens, source);
         assert_eq!(lsp.len(), 8);
         assert_eq!(lsp[4].delta_line, 0);
         assert_eq!(lsp[4].delta_start, 9);
@@ -873,7 +936,7 @@ mod tests {
         let tokens = SemanticToken::Content
             .with_span(Span::from_usize(0, source.len()))
             .wrap_vec();
-        let lsp = lsp_semantic_tokens(&tokens, source);
+        let lsp = encode(&tokens, source);
         assert_eq!(lsp.len(), 2);
         assert_eq!(lsp[0].token_type, OPERATOR);
         assert_eq!(lsp[0].length, 3);
@@ -889,7 +952,7 @@ mod tests {
         let tokens = SemanticToken::String
             .with_span(Span::from_usize(1, 3))
             .wrap_vec();
-        let lsp = lsp_semantic_tokens(&tokens, source);
+        let lsp = encode(&tokens, source);
         assert_eq!(lsp.len(), 1);
         assert_eq!(lsp[0].delta_start, 1);
         assert_eq!(lsp[0].length, 1);
@@ -901,7 +964,7 @@ mod tests {
         let tokens = SemanticToken::String
             .with_span(Span::from_usize(1, 5))
             .wrap_vec();
-        let lsp = lsp_semantic_tokens(&tokens, source);
+        let lsp = encode(&tokens, source);
         assert_eq!(lsp.len(), 1);
         assert_eq!(lsp[0].delta_start, 1);
         assert_eq!(lsp[0].length, 2);
@@ -914,7 +977,7 @@ mod tests {
             SemanticToken::Keyword.with_span(Span::from_usize(0, 1)),
             SemanticToken::Type.with_span(Span::from_usize(1, 2)),
         ];
-        let lsp = lsp_semantic_tokens(&tokens, source);
+        let lsp = encode(&tokens, source);
         assert_eq!(lsp.len(), 2);
         assert_eq!(lsp[0].delta_start, 0);
         assert_eq!(lsp[0].length, 1);
@@ -930,7 +993,7 @@ mod tests {
             SemanticToken::Keyword.with_span(Span::from_usize(0, 0)),
             SemanticToken::Type.with_span(Span::from_usize(0, 1)),
         ];
-        let lsp = lsp_semantic_tokens(&tokens, source);
+        let lsp = encode(&tokens, source);
         assert_eq!(lsp.len(), 1);
         assert_eq!(lsp[0].delta_start, 0);
         assert_eq!(lsp[0].length, 1);
@@ -938,30 +1001,97 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "mutually exclusive and ordered")]
-    fn overlapping_spans_panic() {
+    fn overlapping_spans_are_an_error() {
         let source = "abcd";
         let tokens = vec![
             SemanticToken::Keyword.with_span(Span::from_usize(0, 2)),
             SemanticToken::Type.with_span(Span::from_usize(1, 3)),
         ];
-        let _ = lsp_semantic_tokens(&tokens, source);
+        assert_eq!(
+            lsp_semantic_tokens(&tokens, source),
+            EncodeError::Overlap(Overlap {
+                start: 1,
+                end: 3,
+                previous_end: 2,
+            })
+            .wrap_err(),
+        );
     }
 
     #[test]
-    #[should_panic(expected = "mutually exclusive and ordered")]
-    fn out_of_order_spans_panic() {
+    fn out_of_order_spans_are_an_error() {
         let source = "abcd";
         let tokens = vec![
             SemanticToken::Keyword.with_span(Span::from_usize(2, 4)),
             SemanticToken::Type.with_span(Span::from_usize(0, 1)),
         ];
-        let _ = lsp_semantic_tokens(&tokens, source);
+        assert_eq!(
+            lsp_semantic_tokens(&tokens, source),
+            EncodeError::Overlap(Overlap {
+                start: 0,
+                end: 1,
+                previous_end: 4,
+            })
+            .wrap_err(),
+        );
     }
 
     #[test]
-    #[should_panic(expected = "mutually exclusive and ordered")]
-    fn reversed_literals_panic() {
+    fn inverted_span_is_an_error() {
+        let source = "abcd";
+        let tokens = SemanticToken::Keyword
+            .with_span(Span { start: 3, end: 1 })
+            .wrap_vec();
+        assert_eq!(
+            lsp_semantic_tokens(&tokens, source),
+            EncodeError::Inverted(SpanEnds { start: 3, end: 1 }).wrap_err(),
+        );
+    }
+
+    #[test]
+    fn out_of_range_span_is_an_error() {
+        let source = "ab";
+        let tokens = SemanticToken::Keyword
+            .with_span(Span::from_usize(0, 5))
+            .wrap_vec();
+        assert_eq!(
+            lsp_semantic_tokens(&tokens, source),
+            EncodeError::OutOfRange(OutOfRange { offset: 5, len: 2 }).wrap_err(),
+        );
+    }
+
+    #[test]
+    fn a_span_inside_a_multibyte_char_is_an_error() {
+        let source = "aéb";
+        let tokens = SemanticToken::Keyword
+            .with_span(Span::from_usize(2, 3))
+            .wrap_vec();
+        assert_eq!(
+            lsp_semantic_tokens(&tokens, source),
+            EncodeError::NotCharBoundary(NotCharBoundary { offset: 2 }).wrap_err(),
+        );
+    }
+
+    #[test]
+    fn a_span_strictly_inside_crlf_is_an_error() {
+        let source = "a\r\nb";
+        let tokens = vec![
+            SemanticToken::Keyword.with_span(Span::from_usize(0, 1)),
+            SemanticToken::Type.with_span(Span::from_usize(2, 3)),
+        ];
+        assert_eq!(
+            lsp_semantic_tokens(&tokens, source),
+            EncodeError::InsideLineBreak(InsideLineBreak {
+                offset: 2,
+                start: 1,
+                after: 3,
+            })
+            .wrap_err(),
+        );
+    }
+
+    #[test]
+    fn reversed_literals_are_an_error() {
         let source = "iso(`entrypoint Query.A`)\niso(`entrypoint Query.B`)";
         let first = "entrypoint Query.A";
         let second = "entrypoint Query.B";
@@ -971,31 +1101,35 @@ mod tests {
         let parsed_b = parse_iso_literal(second);
         let mut tokens = rebased(&parsed_b.tokens, second_start as u32);
         tokens.extend(rebased(&parsed_a.tokens, first_start as u32));
-        let _ = lsp_semantic_tokens(&tokens, source);
+        assert!(matches!(
+            lsp_semantic_tokens(&tokens, source),
+            Err(EncodeError::Overlap(_)),
+        ));
     }
 
     #[test]
     fn lsp_type_index_matches_the_legend() {
-        assert_eq!(semantic_token_legend().token_types.len(), 23);
-        assert_eq!(lsp_type_index(SemanticToken::Keyword), KEYWORD);
-        assert_eq!(lsp_type_index(SemanticToken::Type), CLASS);
-        assert_eq!(lsp_type_index(SemanticToken::FieldName), PROPERTY);
-        assert_eq!(lsp_type_index(SemanticToken::ObjectKey), PROPERTY);
-        assert_eq!(lsp_type_index(SemanticToken::GraphQLTypeName), 1);
-        assert_eq!(lsp_type_index(SemanticToken::DirectiveName), 22);
-        assert_eq!(lsp_type_index(SemanticToken::Variable), 8);
-        assert_eq!(lsp_type_index(SemanticToken::Argument), 7);
-        assert_eq!(lsp_type_index(SemanticToken::Integer), 19);
-        assert_eq!(lsp_type_index(SemanticToken::String), STRING);
-        assert_eq!(lsp_type_index(SemanticToken::BooleanOrNull), 8);
-        assert_eq!(lsp_type_index(SemanticToken::Period), OPERATOR);
-        assert_eq!(lsp_type_index(SemanticToken::Colon), OPERATOR);
-        assert_eq!(lsp_type_index(SemanticToken::Equals), OPERATOR);
-        assert_eq!(lsp_type_index(SemanticToken::Parenthesis), OPERATOR);
-        assert_eq!(lsp_type_index(SemanticToken::Brace), OPERATOR);
-        assert_eq!(lsp_type_index(SemanticToken::Content), OPERATOR);
-        assert_eq!(lsp_type_index(SemanticToken::Bracket), OPERATOR);
-        assert_eq!(lsp_type_index(SemanticToken::Error), 17);
+        let types = semantic_token_legend().token_types;
+        assert_eq!(types.len(), 23);
+        assert_eq!(types[lsp_type_index(SemanticToken::Keyword) as usize], SemanticTokenType::KEYWORD);
+        assert_eq!(types[lsp_type_index(SemanticToken::Type) as usize], SemanticTokenType::CLASS);
+        assert_eq!(types[lsp_type_index(SemanticToken::FieldName) as usize], SemanticTokenType::PROPERTY);
+        assert_eq!(types[lsp_type_index(SemanticToken::ObjectKey) as usize], SemanticTokenType::PROPERTY);
+        assert_eq!(types[lsp_type_index(SemanticToken::GraphQLTypeName) as usize], SemanticTokenType::TYPE);
+        assert_eq!(types[lsp_type_index(SemanticToken::DirectiveName) as usize], SemanticTokenType::DECORATOR);
+        assert_eq!(types[lsp_type_index(SemanticToken::Variable) as usize], SemanticTokenType::VARIABLE);
+        assert_eq!(types[lsp_type_index(SemanticToken::Argument) as usize], SemanticTokenType::PARAMETER);
+        assert_eq!(types[lsp_type_index(SemanticToken::Integer) as usize], SemanticTokenType::NUMBER);
+        assert_eq!(types[lsp_type_index(SemanticToken::String) as usize], SemanticTokenType::STRING);
+        assert_eq!(types[lsp_type_index(SemanticToken::BooleanOrNull) as usize], SemanticTokenType::VARIABLE);
+        assert_eq!(types[lsp_type_index(SemanticToken::Period) as usize], SemanticTokenType::OPERATOR);
+        assert_eq!(types[lsp_type_index(SemanticToken::Colon) as usize], SemanticTokenType::OPERATOR);
+        assert_eq!(types[lsp_type_index(SemanticToken::Equals) as usize], SemanticTokenType::OPERATOR);
+        assert_eq!(types[lsp_type_index(SemanticToken::Parenthesis) as usize], SemanticTokenType::OPERATOR);
+        assert_eq!(types[lsp_type_index(SemanticToken::Brace) as usize], SemanticTokenType::OPERATOR);
+        assert_eq!(types[lsp_type_index(SemanticToken::Content) as usize], SemanticTokenType::OPERATOR);
+        assert_eq!(types[lsp_type_index(SemanticToken::Bracket) as usize], SemanticTokenType::OPERATOR);
+        assert_eq!(types[lsp_type_index(SemanticToken::Error) as usize], SemanticTokenType::COMMENT);
     }
 }
 ```
@@ -1004,17 +1138,17 @@ mod tests {
 
 `extraction_offset_counts_utf16_in_the_prefix`: `const é = iso(\`` is 16 UTF-8 bytes and 15 UTF-16 units. `delta_start` is 15.
 
-`two_literals_are_file_absolute_and_in_order`: eight tokens. Index 4 is the second `entrypoint`. Previous piece is `A`; the gap is `` `)\niso(` ``, so `delta_line` 1, `delta_start` 5. Index 7 is `B` on the same line as that literal's `.`.
+`two_literals_are_file_absolute_and_in_order`: eight tokens. Index 4 is the second `entrypoint`. Previous piece is `A` on the previous line; `delta_line` 1, `delta_start` 5 (column of `entrypoint` after `iso(\``). Index 7 is `B` on the same line as that literal's `.`.
 
-`two_literals_on_the_same_line`: gap after `A` is `` `) iso(` ``, `last_len` 1, `delta_start` 9.
+`two_literals_on_the_same_line`: same line as `A`; `delta_start` 9 is the column of the second `entrypoint`.
 
-`a_quoted_string_is_one_lsp_token`: `"the home route"` is 16 UTF-16 units. `{` is `last_len` 16 plus one space, `delta_start` 17.
+`a_quoted_string_is_one_lsp_token`: `"the home route"` is 16 UTF-16 units. `{` is one space after that lexeme, `delta_start` 17.
 
 `a_quoted_string_with_an_escaped_newline_is_one_lsp_token`: source `"hi\n"` is quote, `h`, `i`, backslash, `n`, quote. Length 6. Not split.
 
 `a_block_string_with_content_on_the_opening_line`: pieces `"""the home` (11), `  route` (7), `"""`.
 
-`a_block_string_with_closing_quotes_on_the_content_line`: pieces `"""`, `  route"""` (10). `{` is `last_len` 10 plus one space, `delta_start` 11.
+`a_block_string_with_closing_quotes_on_the_content_line`: pieces `"""`, `  route"""` (10). `{` is one space after that piece, `delta_start` 11.
 
 `a_non_ascii_continuation_line_of_a_block_string_is_utf16_length`: `  café` is 7 UTF-8 bytes, 6 UTF-16 units.
 
@@ -1024,6 +1158,10 @@ mod tests {
 
 `an_empty_span_emits_nothing`: `0..0` records no piece; the next token at `0..1` still encodes.
 
-`gap_delta_counts_utf16_on_the_last_line`: `a😀` is 3 UTF-16 units (1 + 2).
+`position_counts_utf16_on_the_line`: `a😀` is 3 UTF-16 units (1 + 2).
+
+`a_span_strictly_inside_crlf_is_an_error`: tokens `[0..1, 2..3]` on `"a\r\nb"`; offset 2 is inside `{ start: 1, after: 3 }`.
+
+`lsp_type_index_matches_the_legend`: `legend.token_types[lsp_type_index(token)]` is the `SemanticTokenType` that variant maps to. Inserting a type at the front of `LEGEND_TOKEN_TYPES` fails this test.
 
 `expect` in tests names an invariant the fixture established.
