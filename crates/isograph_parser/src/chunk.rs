@@ -510,17 +510,17 @@ pub(crate) fn chunk(
     tree: &WithSpan<MatchedBrackets>,
 ) -> (WithSpan<ChunkedLevel>, Vec<CommaWithoutItem>) {
     let mut errors = Vec::new();
-    let level = chunk_level(tree.item.reference(), &mut errors);
+    let level = chunk_level(tree.item.reference(), &mut |e| errors.push(e));
     (level.with_span(tree.location), errors)
 }
 
-fn chunk_level(level: &MatchedBrackets, errors: &mut Vec<CommaWithoutItem>) -> ChunkedLevel {
+fn chunk_level(level: &MatchedBrackets, emit: &mut impl FnMut(CommaWithoutItem)) -> ChunkedLevel {
     let mut items = level.0.iter().safe_peekable();
     let mut out = Vec::new();
-    while let Some(absorbed) = absorb_chunk(&mut items, errors) {
+    while let Some(absorbed) = absorb_chunk(&mut items, emit) {
         match absorbed {
             Absorbed::Chunk(chunk) => out.push(chunk),
-            Absorbed::CommaWithoutItem(comma) => errors.push(CommaWithoutItem(comma)),
+            Absorbed::CommaWithoutItem(comma) => emit(CommaWithoutItem(comma)),
         }
     }
     ChunkedLevel(out)
@@ -557,7 +557,7 @@ enum Absorbed {
 /// content phase's `Bracketed` arm.
 fn absorb_chunk(
     items: &mut LevelItems<'_>,
-    errors: &mut Vec<CommaWithoutItem>,
+    emit: &mut impl FnMut(CommaWithoutItem),
 ) -> Option<Absorbed> {
     let peek = loop {
         let peek = items.peek()?;
@@ -575,13 +575,13 @@ fn absorb_chunk(
     };
     let first = match peek.view().item.reference() {
         BracketItem::Raw(token) => ChunkContentItem::NonBracket(*token),
-        BracketItem::Bracketed(group) => ChunkContentItem::Group(chunk_group(group, errors)),
+        BracketItem::Bracketed(group) => ChunkContentItem::Group(chunk_group(group, emit)),
     };
     let first_location = peek.commit().location;
     let mut span = first_location;
     let mut contents = NonEmpty::new(first.with_span(first_location));
     while let Some(peek) = items.peek() {
-        let Some(content_item) = as_content(peek.view(), errors) else {
+        let Some(content_item) = as_content(peek.view(), emit) else {
             break;
         };
         let item = peek.commit();
@@ -633,7 +633,7 @@ fn absorb_chunk(
 /// chunk here.
 fn as_content(
     item: &WithSpan<BracketItem>,
-    errors: &mut Vec<CommaWithoutItem>,
+    emit: &mut impl FnMut(CommaWithoutItem),
 ) -> Option<ChunkContentItem> {
     match item.item.reference() {
         BracketItem::Raw(token) => match separator_token(token.0) {
@@ -641,7 +641,7 @@ fn as_content(
             None => ChunkContentItem::NonBracket(*token).wrap_some(),
         },
         BracketItem::Bracketed(group) => {
-            ChunkContentItem::Group(chunk_group(group, errors)).wrap_some()
+            ChunkContentItem::Group(chunk_group(group, emit)).wrap_some()
         }
     }
 }
@@ -657,10 +657,10 @@ fn drain_dropped_boundary(items: &mut LevelItems<'_>) {
     }
 }
 
-fn chunk_group(group: &Bracketed, errors: &mut Vec<CommaWithoutItem>) -> ChunkedGroup {
+fn chunk_group(group: &Bracketed, emit: &mut impl FnMut(CommaWithoutItem)) -> ChunkedGroup {
     ChunkedGroup {
         opening: group.opening,
-        children: chunk_level(group.children.item.reference(), errors)
+        children: chunk_level(group.children.item.reference(), emit)
             .with_span(group.children.location),
         closing: group.closing,
     }

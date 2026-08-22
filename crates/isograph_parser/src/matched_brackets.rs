@@ -86,7 +86,7 @@ pub(crate) fn match_brackets(
     // while a brace is on the stack, so the `}` closes the group.
     let mut enclosing_stack = Stack::new();
     let mut errors = Vec::new();
-    let mut items = parse_bracket_items(&mut tokens, &mut enclosing_stack, &mut errors);
+    let mut items = parse_bracket_items(&mut tokens, &mut enclosing_stack, &mut |e| errors.push(e));
     strip_captured_line_breaks(&mut items);
     errors.sort_by_key(|error| match error {
         BracketError::UnmatchedOpen(open) => open.location.start,
@@ -116,7 +116,7 @@ enum Emission {
 fn parse_bracket_items(
     tokens: &mut TokenStream,
     enclosing_stack: &mut Stack<BracketKind>,
-    errors: &mut Vec<BracketError>,
+    emit: &mut impl FnMut(BracketError),
 ) -> Vec<WithSpan<BracketItem>> {
     let mut items = Vec::new();
     let mut emission = Emission::Emitting;
@@ -131,7 +131,7 @@ fn parse_bracket_items(
             SplitToken::Bracket(BracketToken::Open(kind)) => {
                 let token = peek.commit();
                 let opening = OpenBracket(kind).with_span(token.location);
-                match parse_bracketed(tokens, enclosing_stack, errors, opening) {
+                match parse_bracketed(tokens, enclosing_stack, emit, opening) {
                     ParsedGroup::Closed(group) => {
                         if let Emission::Emitting = emission {
                             let span = Span::join(group.opening.location, group.closing.location);
@@ -151,7 +151,7 @@ fn parse_bracket_items(
                     break;
                 }
                 let token = peek.commit();
-                errors.push(BracketError::UnmatchedClose(
+                emit(BracketError::UnmatchedClose(
                     CloseBracket(kind).with_span(token.location),
                 ));
                 emission = Emission::Cut;
@@ -167,11 +167,11 @@ fn parse_bracket_items(
 fn parse_bracketed(
     tokens: &mut TokenStream,
     enclosing_stack: &mut Stack<BracketKind>,
-    errors: &mut Vec<BracketError>,
+    emit: &mut impl FnMut(BracketError),
     opening: WithSpan<OpenBracket>,
 ) -> ParsedGroup {
     let mut children = enclosing_stack.with_pushed(opening.item.0, |enclosing_stack| {
-        parse_bracket_items(tokens, enclosing_stack, errors)
+        parse_bracket_items(tokens, enclosing_stack, emit)
     });
     match tokens.peek() {
         Some(peek)
@@ -189,7 +189,7 @@ fn parse_bracketed(
             })
         }
         _ => {
-            errors.push(BracketError::UnmatchedOpen(opening));
+            emit(BracketError::UnmatchedOpen(opening));
             ParsedGroup::Unclosed
         }
     }
