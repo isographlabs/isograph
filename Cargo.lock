@@ -1198,6 +1198,7 @@ dependencies = [
  "clap",
  "freddie_cli",
  "freddie_event_socket",
+ "freddie_single_instance",
  "futures-util",
  "prelude",
  "serde",
@@ -1207,6 +1208,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "tracing",
+ "tungstenite",
 ]
 
 [[package]]

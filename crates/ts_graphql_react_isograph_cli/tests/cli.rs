@@ -105,6 +105,12 @@ fn path_in_json_log(path: &str) -> String {
     path.replace('\\', "\\\\")
 }
 
+fn write_frame(dir: &std::path::Path, contents: &str) -> std::path::PathBuf {
+    let path = dir.join("frame.json");
+    std::fs::write(path.reference(), contents).expect("a test can write a frame");
+    path
+}
+
 // freddie_cli's stop without --force is SIGTERM, which it does not send on Windows.
 #[cfg(windows)]
 const STOP: &[&str] = &["stop", "--force"];
@@ -146,6 +152,84 @@ fn the_log_contains_the_config_path() {
             && log.contains("\"port\":"))
         .then_some(())
     });
+    let frame = write_frame(daemon.dir.path(), "{\"kind\":\"HelloWorld\"}\n");
+    let sent = daemon.isograph(["send", "--file", frame.to_str().expect("utf-8")].reference());
+    assert!(
+        sent.status.success(),
+        "stdout: {} stderr: {}",
+        stdout(sent.reference()),
+        stderr(sent.reference())
+    );
+    poll(|| daemon.log_text().contains("hello world").then_some(()));
+    assert!(!frame.exists(), "send deletes --file");
+}
+
+#[test]
+fn send_with_the_daemon_stopped_fails() {
+    let dir = tempfile::tempdir().expect("a test can create a temp directory");
+    let config = dir.path().join("isograph.config.json");
+    std::fs::write(config.reference(), "{}\n").expect("a test can write a config file");
+    let frame = write_frame(dir.path(), "{\"kind\":\"HelloWorld\"}\n");
+    let home = dir.path().join("home");
+    std::fs::create_dir_all(home.reference()).expect("a test can create its private HOME");
+    let output = Command::new(isograph_bin())
+        .args(["send", "--file", frame.to_str().expect("utf-8")].reference())
+        .current_dir(dir.path())
+        .env("HOME", home.reference())
+        .env("XDG_STATE_HOME", home.join("state"))
+        .env("LOCALAPPDATA", home.join("appdata"))
+        .output()
+        .expect("the isograph binary runs");
+    assert!(!output.status.success());
+    let err = stderr(output.reference());
+    assert!(err.contains("not running"), "{err}");
+    assert!(!frame.exists(), "send deletes --file");
+}
+
+#[test]
+fn send_of_not_json_fails() {
+    let daemon = Daemon::start();
+    poll(|| {
+        daemon
+            .log_text()
+            .contains("isograph daemon up")
+            .then_some(())
+    });
+    let frame = write_frame(daemon.dir.path(), "not json\n");
+    let sent = daemon.isograph(["send", "--file", frame.to_str().expect("utf-8")].reference());
+    assert!(!sent.status.success());
+    let err = stderr(sent.reference());
+    assert!(err.contains("IsographEvent"), "{err}");
+    assert!(!frame.exists(), "send deletes --file");
+}
+
+#[test]
+fn send_of_unknown_kind_fails() {
+    let daemon = Daemon::start();
+    poll(|| {
+        daemon
+            .log_text()
+            .contains("isograph daemon up")
+            .then_some(())
+    });
+    let frame = write_frame(daemon.dir.path(), "{\"kind\":\"Nope\"}\n");
+    let sent = daemon.isograph(["send", "--file", frame.to_str().expect("utf-8")].reference());
+    assert!(!sent.status.success());
+    let err = stderr(sent.reference());
+    assert!(err.contains("IsographEvent"), "{err}");
+    assert!(!frame.exists(), "send deletes --file");
+}
+
+#[test]
+fn send_is_not_in_help() {
+    let output = Command::new(isograph_bin())
+        .arg("--help")
+        .output()
+        .expect("the isograph binary runs");
+    assert!(output.status.success());
+    let text = stdout(output.reference());
+    assert!(text.contains("start"), "{text}");
+    assert!(!text.contains("send"), "{text}");
 }
 
 #[test]

@@ -9,6 +9,7 @@ mod discover;
 mod effect;
 mod event;
 mod external;
+mod send;
 mod state;
 
 pub fn run() -> ExitCode {
@@ -20,7 +21,10 @@ pub fn run() -> ExitCode {
         .expect("the derived type matches the command it derived");
 
     match cli.verb {
-        Some(verb) => freddie_cli::run_lifecycle_verb::<Isograph>(verb, matches.reference()),
+        Some(CliVerb::Lifecycle(verb)) => {
+            freddie_cli::run_lifecycle_verb::<Isograph>(verb, matches.reference())
+        }
+        Some(CliVerb::Send(args)) => send::run(args.reference()),
         None => freddie_cli::run_lifecycle_verb::<Isograph>(
             freddie_cli::verb_for_bare_invocation::<Isograph>(),
             matches.reference(),
@@ -32,7 +36,28 @@ pub fn run() -> ExitCode {
 #[command(name = "isograph", version, about = "The isograph compiler.", long_about = None)]
 struct Cli {
     #[command(subcommand)]
-    verb: Option<freddie_cli::Verb<Isograph>>,
+    verb: Option<CliVerb>,
+}
+
+#[derive(clap::Subcommand)]
+enum CliVerb {
+    /// start, restart, status, logs, stop, and the hidden daemon.
+    #[command(flatten)]
+    Lifecycle(freddie_cli::Verb<Isograph>),
+
+    /// Write one IsographEvent JSON frame to the running daemon. Not for typing: tests and CI.
+    #[command(hide = true)]
+    Send(SendArgs),
+}
+
+#[derive(clap::Args, Debug)]
+struct SendArgs {
+    #[command(flatten)]
+    pub id: ConfigFlag,
+
+    /// JSON frame to send.
+    #[arg(long)]
+    pub file: std::path::PathBuf,
 }
 
 #[derive(clap::Args, Debug)]
