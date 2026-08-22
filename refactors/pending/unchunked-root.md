@@ -96,7 +96,7 @@ Empty vec is `""` / `"   "`. Otherwise every item of the unpartitioned sequence,
 // from crates/isograph_parser/src/chunk.rs
 pub enum ChunkContentItemParent<'a> {
     Root(ChunkedRootPath<'a>),
-    Chunk(ChunkPath<'a>),
+    Chunk(Box<ChunkPath<'a>>),
     Unparsed(UnparsedChunkItemsPath<'a>),
 }
 ```
