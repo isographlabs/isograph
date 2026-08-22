@@ -15,7 +15,7 @@ pub fn lsp_semantic_tokens(
     for token in tokens {
         cursor.check_span(token.location, previous_token_end);
         previous_token_end = token.location.end;
-        emit_pieces(*token, &mut cursor, &mut last_start, &mut encoded);
+        emit_pieces(*token, &mut cursor, &mut last_start, |t| encoded.push(t));
     }
     encoded
 }
@@ -24,7 +24,7 @@ fn emit_pieces(
     token: WithSpan<IsographSemanticToken>,
     cursor: &mut LineCursor,
     last_start: &mut LastStart,
-    encoded: &mut Vec<lsp_types::SemanticToken>,
+    mut emit: impl FnMut(lsp_types::SemanticToken),
 ) {
     let span = token.location;
     let mut piece_start = span.start;
@@ -35,7 +35,7 @@ fn emit_pieces(
                 piece_start = line_break.after;
             }
             Some(line_break) if line_break.start < span.end => {
-                encoded.push(lsp_semantic_token(
+                emit(lsp_semantic_token(
                     token.item,
                     piece_start,
                     line_break.start,
@@ -45,7 +45,7 @@ fn emit_pieces(
                 piece_start = line_break.after;
             }
             _ => {
-                encoded.push(lsp_semantic_token(
+                emit(lsp_semantic_token(
                     token.item,
                     piece_start,
                     span.end,

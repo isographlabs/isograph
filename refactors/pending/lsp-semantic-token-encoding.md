@@ -2,7 +2,7 @@
 
 `lsp_semantic_tokens` takes `&[WithSpan<IsographSemanticToken>]` whose spans are byte offsets into `page_content`, and returns `Vec<lsp_types::SemanticToken>`: `delta_line`, `delta_start`, `length`, `token_type`, `token_modifiers_bitset`. `delta_start` and `length` are UTF-16.
 
-VS Code does not advertise `multilineTokenSupport`. A token whose length crosses a line is clipped at the line end (LSP 3.17). `emit_pieces` pushes one `lsp_types::SemanticToken` for a one-line span, and one per line of text when the span contains a line break (a block string, or leftover `Content` from an unterminated block string). `lsp_semantic_tokens` is a `for` over `tokens`. Each iteration calls `check_span` on the walk cursor, then `emit_pieces` walks breaks and `encoded.push`es. `with_capacity(tokens.len())` is the one-line lower bound; a multiline string grows it.
+VS Code does not advertise `multilineTokenSupport`. A token whose length crosses a line is clipped at the line end (LSP 3.17). `emit_pieces` emits one `lsp_types::SemanticToken` for a one-line span, and one per line of text when the span contains a line break (a block string, or leftover `Content` from an unterminated block string). `lsp_semantic_tokens` is a `for` over `tokens`. Each iteration calls `check_span` on the walk cursor, then `emit_pieces` walks breaks and calls `emit`. The caller is `|t| encoded.push(t)`. `with_capacity(tokens.len())` is the one-line lower bound; a multiline string grows it.
 
 A span must be in range of `page_content`, on a char boundary, not strictly inside a line break, not inverted, not empty, not start before the previous token's end, and not line-break-only. Those are caller bugs and `assert`, all in `check_span` before the walk. Concatenating literals uses `with_offset`. Tests pass a literal as the whole `page_content`.
 
@@ -38,7 +38,7 @@ pub fn lsp_semantic_tokens(
     for token in tokens {
         cursor.check_span(token.location, previous_token_end);
         previous_token_end = token.location.end;
-        emit_pieces(*token, &mut cursor, &mut last_start, &mut encoded);
+        emit_pieces(*token, &mut cursor, &mut last_start, |t| encoded.push(t));
     }
     encoded
 }
@@ -47,7 +47,7 @@ fn emit_pieces(
     token: WithSpan<IsographSemanticToken>,
     cursor: &mut LineCursor,
     last_start: &mut LastStart,
-    encoded: &mut Vec<lsp_types::SemanticToken>,
+    mut emit: impl FnMut(lsp_types::SemanticToken),
 ) {
     let span = token.location;
     let mut piece_start = span.start;
@@ -58,7 +58,7 @@ fn emit_pieces(
                 piece_start = line_break.after;
             }
             Some(line_break) if line_break.start < span.end => {
-                encoded.push(lsp_semantic_token(
+                emit(lsp_semantic_token(
                     token.item,
                     piece_start,
                     line_break.start,
@@ -68,7 +68,7 @@ fn emit_pieces(
                 piece_start = line_break.after;
             }
             _ => {
-                encoded.push(lsp_semantic_token(
+                emit(lsp_semantic_token(
                     token.item,
                     piece_start,
                     span.end,
