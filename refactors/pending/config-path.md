@@ -1,6 +1,6 @@
 # Print the resolved config path
 
-Requires config-discovery.md (landed).
+Requires config-discovery.md (landed) and send-events.md (landed).
 
 `isograph config-path` prints the canonical path of the isograph config for this invocation: `--config` when given, otherwise the nearest `isograph.config.json`, `.js`, or `.ts` at or above the current directory. It does not start the daemon, take the lock, or parse the file as JSON. Exit 0 with the path on stdout. Exit 1 when there is no config.
 
@@ -33,6 +33,10 @@ enum CliVerb {
     #[command(flatten)]
     Lifecycle(freddie_cli::Verb<Isograph>),
 
+    /// Write one IsographEvent JSON frame to the running daemon. Not for typing: tests and CI.
+    #[command(hide = true)]
+    Send(SendArgs),
+
     /// Print the canonical isograph config path.
     ConfigPath(ConfigFlag),
 }
@@ -44,28 +48,29 @@ enum CliVerb {
 
 ```rust
 // from crates/isograph_cli/src/lib.rs (before)
-#[derive(Parser)]
-#[command(name = "isograph", version, about = "The isograph compiler.", long_about = None)]
-struct Cli {
-    #[command(subcommand)]
-    verb: Option<freddie_cli::Verb<Isograph>>,
-}
-```
-
-```rust
-// from crates/isograph_cli/src/lib.rs (after)
-#[derive(Parser)]
-#[command(name = "isograph", version, about = "The isograph compiler.", long_about = None)]
-struct Cli {
-    #[command(subcommand)]
-    verb: Option<CliVerb>,
-}
-
 #[derive(clap::Subcommand)]
 enum CliVerb {
     /// start, restart, status, logs, stop, and the hidden daemon.
     #[command(flatten)]
     Lifecycle(freddie_cli::Verb<Isograph>),
+
+    /// Write one IsographEvent JSON frame to the running daemon. Not for typing: tests and CI.
+    #[command(hide = true)]
+    Send(SendArgs),
+}
+```
+
+```rust
+// from crates/isograph_cli/src/lib.rs (after)
+#[derive(clap::Subcommand)]
+enum CliVerb {
+    /// start, restart, status, logs, stop, and the hidden daemon.
+    #[command(flatten)]
+    Lifecycle(freddie_cli::Verb<Isograph>),
+
+    /// Write one IsographEvent JSON frame to the running daemon. Not for typing: tests and CI.
+    #[command(hide = true)]
+    Send(SendArgs),
 
     /// Print the canonical isograph config path.
     ConfigPath(ConfigFlag),
@@ -75,7 +80,10 @@ enum CliVerb {
 ```rust
 // from crates/isograph_cli/src/lib.rs (before)
     match cli.verb {
-        Some(verb) => freddie_cli::run_lifecycle_verb::<Isograph>(verb, matches.reference()),
+        Some(CliVerb::Lifecycle(verb)) => {
+            freddie_cli::run_lifecycle_verb::<Isograph>(verb, matches.reference())
+        }
+        Some(CliVerb::Send(args)) => send::run(args.reference()),
         None => freddie_cli::run_lifecycle_verb::<Isograph>(
             freddie_cli::verb_for_bare_invocation::<Isograph>(),
             matches.reference(),
@@ -89,6 +97,7 @@ enum CliVerb {
         Some(CliVerb::Lifecycle(verb)) => {
             freddie_cli::run_lifecycle_verb::<Isograph>(verb, matches.reference())
         }
+        Some(CliVerb::Send(args)) => send::run(args.reference()),
         Some(CliVerb::ConfigPath(id)) => config_path::run(id.reference()),
         None => freddie_cli::run_lifecycle_verb::<Isograph>(
             freddie_cli::verb_for_bare_invocation::<Isograph>(),
