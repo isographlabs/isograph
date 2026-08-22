@@ -41,24 +41,24 @@ locations_of_iso_literals_in_file(path)
 
 `parsed_iso_literals_in_file` is the trees. It does not store `iso_literal_start_index`. A prepend leaves that vec `==` (same texts, relative spans). `locations_of_iso_literals_in_file` is those start indices in extract order. A prepend makes it `!=`. `lsp_semantic_tokens_for_file` reads both and the file text. If it only read the parsed vec, encoded `delta_line` / `delta_start` would not move.
 
-`locations_of_iso_literals_in_file` does not store the literal text or `LiteralContext`. Text is the parse intern. Context is host embedding, not highlighting. Path intern params are `RelativePath`. Locations is `Vec<IsoLiteralStartIndex>`.
+`locations_of_iso_literals_in_file` does not store the literal text or `LiteralContext`. Text is the parse intern. Context is host embedding, not highlighting. Path intern params are `RelativePathToSourceFile`. Locations is `Vec<IsoLiteralStartIndex>`.
 
 pico lookup of an `Option` memo is `&Option<T>`. Callers write `.as_ref()?`.
 
 ```rust
 // from crates/isograph_compiler/src/iso_literals.rs
+use common_lang_types::RelativePathToSourceFile;
 use isograph_parser::ParsedIsoLiteral;
 use pico_macros::memo;
 use prelude::Postfix;
 
 use crate::IsographState;
-use crate::RelativePath;
 use crate::host_language::{HostLanguage, IsoLiteralStartIndex};
 
 #[memo]
 pub fn parsed_iso_literals_in_file<THostLanguage: HostLanguage>(
     db: &IsographState<THostLanguage>,
-    path: RelativePath,
+    path: RelativePathToSourceFile,
 ) -> Option<Vec<ParsedIsoLiteral>> {
     let extractions = THostLanguage::extract_iso_literals(db, path).as_ref()?;
     extractions
@@ -71,7 +71,7 @@ pub fn parsed_iso_literals_in_file<THostLanguage: HostLanguage>(
 #[memo]
 pub fn locations_of_iso_literals_in_file<THostLanguage: HostLanguage>(
     db: &IsographState<THostLanguage>,
-    path: RelativePath,
+    path: RelativePathToSourceFile,
 ) -> Option<Vec<IsoLiteralStartIndex>> {
     let extractions = THostLanguage::extract_iso_literals(db, path).as_ref()?;
     extractions
@@ -89,7 +89,7 @@ A parse with errors still has leftover tokens. Use them.
 
 Tokens from different literals do not overlap: they sit inside disjoint backtick spans. `lsp_semantic_tokens` asserts that. JS between literals has no iso tokens.
 
-`path` is `RelativePath` (interned, `Copy`). It is the intern param of `parsed_iso_literals_in_file` and of `locations_of_iso_literals_in_file`. The inner parse intern is the literal text. `parsed_iso_literal` already exists.
+`path` is `RelativePathToSourceFile` (interned, `Copy`). It is the intern param of `parsed_iso_literals_in_file` and of `locations_of_iso_literals_in_file`. The inner parse intern is the literal text. `parsed_iso_literal` already exists.
 
 ```rust
 // from crates/isograph_compiler/src/lib.rs
@@ -102,7 +102,7 @@ pub use iso_literals::{
 ```rust
 // from crates/isograph_lsp/src/file_semantic_tokens.rs
 use isograph_compiler::{
-    HostLanguage, IsographState, RelativePath, locations_of_iso_literals_in_file,
+    HostLanguage, IsographState, RelativePathToSourceFile, locations_of_iso_literals_in_file,
     parsed_iso_literals_in_file,
 };
 use pico::Database;
@@ -112,7 +112,7 @@ use crate::lsp_semantic_tokens;
 
 pub fn lsp_semantic_tokens_for_file<THostLanguage: HostLanguage>(
     db: &IsographState<THostLanguage>,
-    path: RelativePath,
+    path: RelativePathToSourceFile,
 ) -> Option<Vec<lsp_types::SemanticToken>> {
     let parsed_literals = parsed_iso_literals_in_file(db, path).as_ref()?;
     let locations = locations_of_iso_literals_in_file(db, path).as_ref()?;

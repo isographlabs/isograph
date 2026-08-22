@@ -276,4 +276,4 @@ Send `DiskChanged` of `/tmp/proj/src/a.ts` against a temp-dir config still exits
 
 ## Later docs
 
-file-semantic-tokens.md, semantic-tokens-line-offset.md, and e2e-semantic-tokens.md already wrote `RelativePath`. That is `RelativePathToSourceFile`. e2e-semantic-tokens.md "same string `DiskChanged.path` interned" is wrong: `handle` diffs against the config directory first. Those docs update when they are implemented.
+file-semantic-tokens.md, semantic-tokens-line-offset.md, and e2e-semantic-tokens.md use `RelativePathToSourceFile`. e2e `--path` is an absolute `PathBuf`; `handle` converts `DiskChanged.path` against the config directory first.

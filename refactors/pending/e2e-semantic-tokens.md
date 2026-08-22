@@ -43,7 +43,7 @@ enum Query {
 
 #[derive(Debug, serde::Deserialize)]
 struct SemanticTokensQuery {
-    pub path: RelativePath,
+    pub path: RelativePathToSourceFile,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -85,7 +85,7 @@ struct SemanticTokensArgs {
     #[command(flatten)]
     pub id: ConfigFlag,
 
-    /// Absolute path of the DiskFile. Interned as `RelativePath`, same string `DiskChanged.path` interned.
+    /// Absolute path of the DiskFile. `handle` converts it to `RelativePathToSourceFile` against the config directory.
     #[arg(long)]
     pub path: std::path::PathBuf,
 }

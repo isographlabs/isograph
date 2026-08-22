@@ -6,7 +6,7 @@ Prepend JS before a literal: relative encode of that text Eq-equals; the path me
 
 Origin of relative-then-absolute: isograph issue 548 (`get_semantic_tokens` cannot reuse encoded positions after typing before the literal; the suggested fix is relative LSP tokens plus an offset at send time). Origin of encoding: landed `lsp_semantic_tokens`. Origin of start indices: `locations_of_iso_literals_in_file`. Delta: `lsp_semantic_tokens` on the literal text; path-keyed stitch; no zero-length placeholder token.
 
-One shippable change: a text-keyed encode memo and `lsp_semantic_tokens_for_file` becomes a `#[memo]` on `RelativePath`.
+One shippable change: a text-keyed encode memo and `lsp_semantic_tokens_for_file` becomes a `#[memo]` on `RelativePathToSourceFile`.
 
 ## What the user does
 
@@ -37,7 +37,7 @@ The file memo is keyed on `path`. It reads contents to turn each start index int
 ```rust
 // from crates/isograph_lsp/src/file_semantic_tokens.rs
 use isograph_compiler::{
-    HostLanguage, IsographState, RelativePath, locations_of_iso_literals_in_file,
+    HostLanguage, IsographState, RelativePathToSourceFile, locations_of_iso_literals_in_file,
     parsed_iso_literal,
 };
 use pico::Database;
@@ -58,7 +58,7 @@ pub fn encoded_iso_literal_semantic_tokens<THostLanguage: HostLanguage>(
 #[memo]
 pub fn lsp_semantic_tokens_for_file<THostLanguage: HostLanguage>(
     db: &IsographState<THostLanguage>,
-    path: RelativePath,
+    path: RelativePathToSourceFile,
 ) -> Option<Vec<lsp_types::SemanticToken>> {
     let extractions = THostLanguage::extract_iso_literals(db, path).as_ref()?;
     let locations = locations_of_iso_literals_in_file(db, path).as_ref()?;
