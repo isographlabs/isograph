@@ -121,7 +121,7 @@ fn lsp_semantic_token(
     }
 }
 
-/// Previous LSP token's line and byte start.
+/// Previous emitted piece's line and byte start.
 #[derive(Copy, Clone)]
 struct LastStart {
     line: u32,
@@ -1213,7 +1213,7 @@ mod tests {
 
 `extraction_offset_counts_utf16_in_the_prefix`: `const é = iso(\`` is 16 UTF-8 bytes and 15 UTF-16 units. `delta_start` is 15.
 
-`two_literals_in_one_page_are_in_order`: eight tokens. Index 4 is the second `entrypoint`. Previous token is `A` on the previous line; `delta_line` 1, `delta_start` 5 (column of `entrypoint` after `iso(\``). Index 7 is `B` on the same line as that literal's `.`.
+`two_literals_in_one_page_are_in_order`: eight tokens. Index 4 is the second `entrypoint`. Previous piece is `A` on the previous line; `delta_line` 1, `delta_start` 5 (column of `entrypoint` after `iso(\``). Index 7 is `B` on the same line as that literal's `.`.
 
 `two_literals_on_the_same_line`: same line as `A`; `delta_start` 9 is the column of the second `entrypoint`.
 
@@ -1221,9 +1221,9 @@ mod tests {
 
 `a_quoted_string_with_an_escaped_newline_is_one_lsp_token`: source `"hi\n"` is quote, `h`, `i`, backslash, `n`, quote. Length 6. Not split.
 
-`a_block_string_with_content_on_the_opening_line`: tokens `"""the home` (11), `  route` (7), `"""`.
+`a_block_string_with_content_on_the_opening_line`: pieces `"""the home` (11), `  route` (7), `"""`.
 
-`a_block_string_with_closing_quotes_on_the_content_line`: tokens `"""`, `  route"""` (10). `{` is one space after that token, `delta_start` 11.
+`a_block_string_with_closing_quotes_on_the_content_line`: pieces `"""`, `  route"""` (10). `{` is one space after that piece, `delta_start` 11.
 
 `a_non_ascii_continuation_line_of_a_block_string_is_utf16_length`: `  café` is 7 UTF-8 bytes, 6 UTF-16 units.
 
