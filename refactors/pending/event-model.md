@@ -5,7 +5,7 @@ Architecture is `docs-website/docs/design-docs/event-model.md`. This file is the
 Requires config-discovery.md (landed), the event-model design-doc, and `docs-website/docs/design-docs/pico.md`.
 
 1. event-loop.md (landed). tokio current-thread runtime. `HelloWorld` / `LogHelloWorld`, `Quit` / `Kill`. SIGTERM sends `Quit`. `run_event_loop`, `run_effect_loop`.
-2. send-events.md (landed). Event socket on `127.0.0.1:0`, port file next to the lock, `IsographEvent` serde JSON, `isograph send`.
+2. send-events.md (landed). Event socket on `127.0.0.1:0`, port file next to the lock, `IsographEvent` serde JSON, `isograph send`. Wire replaced by lsp-port.md.
 3. config-path.md (landed). `isograph config-path` prints the canonical config path.
 4. filesystem-events.md (landed). `IsographState` is the pico database. `DiskChanged` with `Presence` interns or removes `DiskFile`. Files arrive through `isograph send`.
 5. config-source-files.md (landed). Config field `source_files`: a `Vec` of glob strings.
@@ -13,11 +13,13 @@ Requires config-discovery.md (landed), the event-model design-doc, and `docs-web
 7. extract-iso-literals-from-file.md (landed). After 4. Extract does not parse. pico memo `HostLanguage::extract_iso_literals` (file, the whole vec), `#[memo]` on the TypeScript impl like isograph `CompilationProfile`. `IsoLiteralExtraction` with text, context, and byte start. `IsographState<THostLanguage>` lives in `isograph_compiler`.
 8. memoized-parse-iso-literal.md (landed). After 7. pico memo `parsed_iso_literal` keyed on the literal text. Host embedding errors after parse. `file_literals` on `db` + `path`.
 9. literal-id.md (landed). After 7 and 8. pico memo `literal_id_at_location` (file + `LineChar`) stores `LiteralId` (path plus 0-based extract index). pico memo `iso_literal_extraction` is keyed on `LiteralId`. No parse tree or literal string stored at `(path, LineChar)`.
-10. file-semantic-tokens.md. After 8, 9, and lsp-semantic-token-encoding.md. Path to encoded tokens. Interned-file tests. Not the daemon.
-11. lsp-semantic-token-encoding.md. Encoder only. Landed.
-12. e2e-semantic-tokens.md. After 10 and after the daemon answers LSP requests. `textDocument/semanticTokens/full` is call/response. Not a second query port.
-13. LSP adapter. Not written. `EditorChanged`, `isograph lsp` proxy, `OpenFile`. Domain requests including `semanticTokens/full`.
-14. lsp-parse-diagnostics.md, against the adapter and `file_literals` from 8.
-15. zed-and-vscode-extensions.md.
+10. file-semantic-tokens.md (landed). Path to encoded tokens. Interned-file tests. Not the daemon.
+11. lsp-semantic-token-encoding.md (landed). Encoder only.
+12. lsp-port.md. The `{slug}.port` TCP listener is LSP. Ingest (`HelloWorld`, `DiskChanged`, `Quit`) is custom requests. `isograph send` waits for the result. Watcher/SIGTERM stay `Work::Event`.
+13. lsp-tokens.md. `textDocument/semanticTokens/full` via isograph `on_request_sync`. E2E: diskChanged request then tokens.
+14. lsp-sessions.md. Per-connection `ClientCapabilities` and a writer. Drop on socket end.
+15. lsp-diagnostics.md. Change → reset debounce → `ReportDiagnostics` → `publishDiagnostics` to live sessions.
+16. lsp-proxy.md. `isograph lsp` stdio copy onto the port.
+17. zed-and-vscode-extensions.md.
 
 `AsyncWorkFinished` and `StartAsyncWork` land with compilation.
