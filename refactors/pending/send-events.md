@@ -6,7 +6,7 @@ The daemon listens on `freddie_event_socket` at `127.0.0.1:0`. The kernel assign
 
 Origin of the socket and of `on_message`: figaro `src/daemon.rs` and `src/external.rs`. Origin of `isograph send`: `refactors/pending/filesystem-events.md` change 2. Origin of writing the assigned port next to the lock: freddie `refactors/past/event-socket-local-addr.md`. Delta: the wire type is `IsographEvent`, not a separate `IncomingEvent`; figaro keeps `IncomingEvent` so keys and quit are unrepresentable on the socket; isograph events are all serde JSON, including `Quit`; tungstenite 0.24, matching `freddie_event_socket`; `listen(0)` plus `EventSocket::local_addr()` written next to the lock. Figaro binds a fixed default because it is one process per machine.
 
-Send fails unless the port file is already there. Send does not poll. Waiting is the caller's problem. `isograph start` returning means the lock is held, not that listen has run. `listen(0)` is inside `serve`, after the runtime is built.
+Send fails unless the port file is already there. Send does not poll. Waiting is the caller's problem. `isograph start` returning means the lock is held, not that listen has run. After the lock, `run_daemon` unlinks the leftover port file, then loads the config, then `listen(0)`.
 
 `send` is a hidden verb, the same `#[command(hide = true)]` as `freddie_cli::Verb::Daemon`. It is not in `--help`. Tests and CI type it.
 
@@ -146,16 +146,27 @@ The after is the `Serialize` + `Deserialize` enum in Types.
 ```rust
 // from crates/isograph_cli/src/lib.rs (after)
     fn run_daemon(id: &ConfigFlag, _: &NoArgs) {
-        match discover::config_and_instance(id.config.as_deref()) {
-            Ok((path, instance, _config)) => {
-                crate::daemon::run(path, discover::port_file(instance.lock_file()));
-            }
+        let (path, instance) = match discover::instance_for_config_path(id.config.as_deref()) {
+            Ok(pair) => pair,
             Err(e) => {
-                tracing::error!(error = %e, "the config went away between naming this daemon and starting it");
+                tracing::error!(
+                    error = %e,
+                    "the config went away between naming this daemon and starting it"
+                );
+                return;
             }
+        };
+        let port_path = discover::port_file(instance.lock_file());
+        let _ = std::fs::remove_file(port_path.reference());
+        if let Err(e) = discover::load_config(path.reference()) {
+            tracing::error!(error = %e, "could not load the config");
+            return;
         }
+        crate::daemon::run(path, port_path);
     }
 ```
+
+`run_daemon` is the first isograph code after `freddie_cli` takes the lock. It names the instance, unlinks `{slug}.port`, then loads the config, then `daemon::run`. NotFound on the unlink is the first boot; `let _ =` is not fatal. A `.ts` eval is after the leftover file is gone. The gap between `acquire_at` and this function is process setup in `freddie_cli`.
 
 ```toml
 # from crates/isograph_cli/Cargo.toml (before)
@@ -192,11 +203,49 @@ mod state;
 No `pub use`. `on_message` is `pub(crate)` in `external.rs`. `IsographEvent` stays `pub` on the enum, as today.
 
 ```rust
+// from crates/isograph_cli/src/discover.rs (before)
+pub fn config_and_instance(
+    flag: Option<&Path>,
+) -> Result<(PathBuf, Instance, IsographConfig), DiscoverError> {
+    let config_path = config_path(flag)?;
+    let config = load_config(config_path.reference()).map_err(DiscoverError::Load)?;
+    let instance = Instance::named(
+        "isograph",
+        slug(config_path.reference()),
+        config_path.display().to_string(),
+    )?;
+    (config_path, instance, config).wrap_ok()
+}
+```
+
+```rust
 // from crates/isograph_cli/src/discover.rs (after, next to slug)
 pub fn port_file(lock: &Path) -> PathBuf {
     lock.with_extension("port")
 }
+
+pub fn instance_for_config_path(
+    flag: Option<&Path>,
+) -> Result<(PathBuf, Instance), DiscoverError> {
+    let config_path = config_path(flag)?;
+    let instance = Instance::named(
+        "isograph",
+        slug(config_path.reference()),
+        config_path.display().to_string(),
+    )?;
+    (config_path, instance).wrap_ok()
+}
+
+pub fn config_and_instance(
+    flag: Option<&Path>,
+) -> Result<(PathBuf, Instance, IsographConfig), DiscoverError> {
+    let (config_path, instance) = instance_for_config_path(flag)?;
+    let config = load_config(config_path.reference()).map_err(DiscoverError::Load)?;
+    (config_path, instance, config).wrap_ok()
+}
 ```
+
+`App::instance` still calls `config_and_instance`. `run_daemon` calls `instance_for_config_path`, then unlinks, then `load_config`.
 
 ```rust
 // from crates/isograph_cli/src/daemon.rs (before)
@@ -278,7 +327,6 @@ pub fn run(config_path: PathBuf, port_path: PathBuf) {
 async fn serve(config_path: PathBuf, port_path: PathBuf) {
     let (event_tx, event_rx) = unbounded_channel::<IsographEvent>();
     let (effect_tx, effect_rx) = unbounded_channel::<IsographEffect>();
-    let _ = std::fs::remove_file(port_path.reference());
     let _socket = match freddie_event_socket::listen(0, {
         let event_tx = event_tx.clone();
         move |text| on_message(text, event_tx.reference())
@@ -338,7 +386,7 @@ async fn serve(config_path: PathBuf, port_path: PathBuf) {
 
 `_socket` is the one binding. It is in scope across `select!`. Dropping `serve` drops the listener. A write failure returns, which drops `_socket` and then `run_daemon` returns, which drops the lock. Do not bind `listen` in a block that ends before `select!`.
 
-`listen(0)` is the kernel's pick from its local/dynamic port range. `serve` unlinks the port file, then binds, then writes the assigned port, then logs it. After `select!` ends (`Kill`), `serve` unlinks the port file again, then returns, then the lock drops. `handle` and `perform` do not touch the file. NotFound on an unlink is the first boot or an already-removed file; `let _ =` is not fatal. After a crash, the leftover file is gone at the next `serve` before send can see `Held::By`. Lock held and the file absent is `NoPort`. `serve` does not send `HelloWorld`. That event arrives on the socket.
+`listen(0)` is the kernel's pick from its local/dynamic port range. `serve` binds, then writes the assigned port, then logs it. It does not unlink at the top: `run_daemon` already did that. After `select!` ends (`Kill`), `serve` unlinks the port file, then returns, then the lock drops. That is a graceful Kill. A crash still leaves the file; the next `run_daemon` unlinks it before `load_config`. `handle` and `perform` do not touch the file. Lock held and the file absent is `NoPort`. `serve` does not send `HelloWorld`. That event arrives on the socket.
 
 `EventSocket::local_addr` returns `SocketAddr`, not `io::Result`. Origin: freddie `refactors/past/event-socket-local-addr.md`. The file contents are the decimal port and a newline, `"{port}\n"`.
 
@@ -435,6 +483,18 @@ futures-util = { version = "0.3", default-features = false, features = ["sink"] 
             super::port_file(Path::new("/tmp/isograph-abcd.lock")),
             Path::new("/tmp/isograph-abcd.port")
         );
+    }
+
+    #[test]
+    fn instance_for_config_path_does_not_parse_json() {
+        let dir = temp();
+        let path = dir.path().join("isograph.config.json");
+        write_file(path.reference(), "{");
+        let (got, _) = super::instance_for_config_path(path.as_path().wrap_some())
+            .expect("the file exists");
+        let canonical = path.canonicalize().expect("the fixture file exists");
+        assert_eq!(got, canonical);
+        super::load_config(path.reference()).expect_err("truncated json is unparseable");
     }
 ```
 
@@ -539,46 +599,7 @@ struct SendArgs {
 mod send;
 ```
 
-```rust
-// from crates/isograph_cli/src/discover.rs (before)
-pub fn config_and_instance(
-    flag: Option<&Path>,
-) -> Result<(PathBuf, Instance, IsographConfig), DiscoverError> {
-    let config_path = config_path(flag)?;
-    let config = load_config(config_path.reference()).map_err(DiscoverError::Load)?;
-    let instance = Instance::named(
-        "isograph",
-        slug(config_path.reference()),
-        config_path.display().to_string(),
-    )?;
-    (config_path, instance, config).wrap_ok()
-}
-```
-
-```rust
-// from crates/isograph_cli/src/discover.rs (after)
-pub fn instance_for_config_path(
-    flag: Option<&Path>,
-) -> Result<(PathBuf, Instance), DiscoverError> {
-    let config_path = config_path(flag)?;
-    let instance = Instance::named(
-        "isograph",
-        slug(config_path.reference()),
-        config_path.display().to_string(),
-    )?;
-    (config_path, instance).wrap_ok()
-}
-
-pub fn config_and_instance(
-    flag: Option<&Path>,
-) -> Result<(PathBuf, Instance, IsographConfig), DiscoverError> {
-    let (config_path, instance) = instance_for_config_path(flag)?;
-    let config = load_config(config_path.reference()).map_err(DiscoverError::Load)?;
-    (config_path, instance, config).wrap_ok()
-}
-```
-
-`App::instance` and `run_daemon` still call `config_and_instance`. Send calls `instance_for_config_path`.
+Send calls `instance_for_config_path`. It does not call `load_config`.
 
 ```rust
 // from crates/isograph_cli/src/send.rs
@@ -701,7 +722,7 @@ fn parse_port(text: &str) -> Option<u16> {
 }
 ```
 
-Send reads the lock first. `Held::Free` is `NotRunning` and the port file is not consulted. Process death releases the lock. `serve` unlinks the port file before listen, then writes it after bind. Lock held and the file absent is `NoPort`.
+Send reads the lock first. `Held::Free` is `NotRunning` and the port file is not consulted. Process death releases the lock. `run_daemon` unlinks the leftover port file before `load_config`. `serve` writes it after bind. Lock held and the file absent is `NoPort`.
 
 `Held::Unnamed` and a missing port file are immediate errors. Send does not poll.
 
@@ -770,21 +791,6 @@ mod tests {
         assert!(matches!(err, super::SendError::NoPort));
     }
 }
-```
-
-```rust
-// from crates/isograph_cli/src/discover.rs (tests)
-    #[test]
-    fn instance_for_config_path_does_not_parse_json() {
-        let dir = temp();
-        let path = dir.path().join("isograph.config.json");
-        write_file(path.reference(), "{");
-        let (got, _) = super::instance_for_config_path(path.as_path().wrap_some())
-            .expect("the file exists");
-        let canonical = path.canonicalize().expect("the fixture file exists");
-        assert_eq!(got, canonical);
-        super::load_config(path.reference()).expect_err("truncated json is unparseable");
-    }
 ```
 
 E2E in `crates/ts_graphql_react_isograph_cli/tests/cli.rs`. Tests write a temp JSON file and pass `--file`. `Daemon::isograph` is enough.
