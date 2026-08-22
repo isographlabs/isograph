@@ -4,7 +4,7 @@ Requires filesystem-events.md (landed) and extract-iso-literals.md (landed). `Ho
 
 Origin of the memo: isograph `crates/isograph_schema/src/validated_isograph_schema/isograph_literals.rs` `extract_iso_literals_from_file_content` and `IsoLiteralExtraction`. Delta: `PathBuf` instead of `RelativePathToSourceFile`; `THostLanguage::LiteralContext` instead of four ad-hoc fields (`const_export_name`, `has_associated_js_function`, `iso_function_called_with_paren` as bools); extract does not parse (isograph extract also does not parse; i2's TypeScript implementor currently does, and this doc stops that); missing `DiskFile` is `None`, not a panic.
 
-Two shippable changes: stop parsing inside extract, then the memo.
+Three shippable changes: stop parsing inside extract, move the pico types to `isograph_compiler`, then the memo.
 
 ## What the user does
 
@@ -64,7 +64,7 @@ Tests that move to memoized-parse-iso-literal.md:
 
 `tagged_template` (the extraction test that asserts `IsoCall::TaggedTemplate`) stays.
 
-## Change 2: the database lives in `isograph_compiler`, then the memo
+## Change 2: the database lives in `isograph_compiler`
 
 filesystem-events.md puts `IsographState`, `DiskFile`, and `DiskFileMap` in `crates/isograph_cli/src/state.rs`. Memos over those sources cannot live in `isograph_compiler` if the compiler would depend on the CLI.
 
@@ -149,6 +149,25 @@ fn handle_disk_changed(state: &mut IsographState, change: DiskChanged) {
 `run_event_loop` calls `handle(&mut state, event)`. Tests that currently write `state.handle(...)` write `handle(&mut state, ...)`.
 
 `isograph_compiler` depends on `pico`, `pico_macros`, `prelude`. `isograph_cli` depends on `isograph_compiler` and drops direct `pico` / `pico_macros` unless something else in the crate needs them.
+
+```rust
+// from crates/isograph_compiler/src/lib.rs
+mod database;
+mod host_language;
+
+pub use database::{DiskFile, DiskFileMap, IsographState};
+pub use host_language::*;
+```
+
+### Tests
+
+The existing `state.rs` tests. `state.handle(...)` becomes `handle(&mut state, ...)`. `disk_file` still reads the tracked map. Same assertions.
+
+`run_event_loop` tests construct `IsographState::default()` as today.
+
+## Change 3: the memo
+
+`iso_literals.rs` in `isograph_compiler`. Callers intern a `DiskFile` the same way `handle` does.
 
 ```rust
 // from crates/isograph_compiler/src/lib.rs
@@ -251,7 +270,7 @@ The memo reads the tracked map, then `db.get(source_id)`, so a contents change i
 
 pico lookup returns `&Option<Vec<IsoLiteralExtraction<THostLanguage>>>`.
 
-## Tests
+### Tests
 
 Tests in `crates/isograph_extract_typescript/src/lib.rs` under a `memo_tests` module, using `TypeScriptHostLanguage`. That crate already depends on the compiler. `use pico::Database` in the tests module for `db.get`. Do not add a test-only `HostLanguage` to the compiler crate.
 
@@ -264,10 +283,8 @@ Tests in `crates/isograph_extract_typescript/src/lib.rs` under a `memo_tests` mo
 
 `expect` names the fixture the test interned.
 
-Tests of the trait change (no parse inside extract) are the rewritten extract tests in change 1: `iso(\`entrypoint\`)` extracts text even though it is a parse error; `iso\`...\`` extracts with `IsoCall::TaggedTemplate` and no errors on the extract result (there is no error vec).
-
 ## Call sites
 
-- `handle` -> `db.set` / `db.remove` plus the tracked map.
-- memoized-parse-iso-literal.md -> `extract_iso_literals_from_file_content`.
-- file-semantic-tokens.md -> the same memo.
+Change 2: `run_event_loop` -> `handle(&mut state, event)`. Tests intern a `DiskFile` the same way `handle` does: `db.set` plus insert into the tracked map.
+
+Change 3: memoized-parse-iso-literal.md -> `extract_iso_literals_from_file_content`. file-semantic-tokens.md -> the same memo.
