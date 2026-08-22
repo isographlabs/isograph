@@ -90,7 +90,34 @@ Compiler tests in `isograph_extract_typescript` `memo_tests` (needs `TypeScriptH
 - File with no `iso`: `Some` of empty vec.
 - `iso(\`entrypoint Query.HomeRoute\`)`. Let `start` be the byte index of `entrypoint` in the file. The first token is `Keyword` at `Span` covering `entrypoint` in file coordinates (`start..start+"entrypoint".len()`). `Query` is `Type`. The `.` is `Period`. `HomeRoute` is `FieldName`.
 - Two literals in one file. Tokens of the second start at or after the second extraction's `iso_literal_start_index`. Tokens are sorted by `location.start`.
-- Prefixing the file with `const x = 1;\n` (second `Present` of the same path) moves the keyword span by that prefix length. The parse memo of the same iso text is reused; the concat memo is not.
+- Prefixing the file with `const x = 1;\n` (second `Present` of the same path) moves the keyword span by that prefix length. The parse memo of the same iso text is reused; the concat memo is not. isograph `memoized_parse_iso_literal` takes `text_source` and comments that moving the literal breaks memoization because of that param. i2 `parsed_iso_literal` is keyed on `iso_literal_text` only. isograph `get_semantic_tokens` (issue 548) cannot reuse file-absolute encoded tokens after typing before the literal; that is this concat memo.
+- Appending `"\nconst y = 1;\n"` after the same one-literal file: keyword span is unchanged. Extract's `IsoLiteralExtraction` Eq-equals (same text, same `iso_literal_start_index`, same context). pico re-invokes extract, backdates it, and does not re-invoke concat or parse.
+
+Count reuse with test-only memos in `isograph_extract_typescript` `memo_tests`. They are not production. pico's own tests increment an `AtomicUsize` in the memo body.
+
+```rust
+// from crates/isograph_extract_typescript/src/lib.rs
+    static PARSE_BODY: AtomicUsize = AtomicUsize::new(0);
+    static CONCAT_BODY: AtomicUsize = AtomicUsize::new(0);
+
+    #[memo]
+    fn counted_parse(db: &IsographState, iso_literal_text: String) {
+        PARSE_BODY.fetch_add(1, Ordering::SeqCst);
+        let _ = parsed_iso_literal(db, iso_literal_text);
+    }
+
+    #[memo]
+    fn counted_concat(db: &IsographState, path: PathBuf) {
+        CONCAT_BODY.fetch_add(1, Ordering::SeqCst);
+        let _ = iso_literal_semantic_tokens_in_file::<TypeScriptHostLanguage>(db, path);
+    }
+```
+
+Reset both atomics to 0 at the start of each of these two tests. Intern the one-literal file. Call `counted_parse` with that literal text and `counted_concat` with that path. Both counters are 1.
+
+Append test: second `Present` with the suffix. Call both again. Both counters stay 1.
+
+Prefix test: second `Present` with the prefix (a fresh intern of the original, or the append test's sibling: do not share a `db` across these two tests). Call both again. `PARSE_BODY` stays 1. `CONCAT_BODY` is 2.
 
 LSP tests in `crates/isograph_lsp` `file_semantic_tokens.rs`:
 
