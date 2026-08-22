@@ -86,6 +86,11 @@ fn emit_pieces(
     }
 }
 
+/// One LSP token for `piece_start..piece_end` on the current line.
+///
+/// `delta_line` is this line minus `last_start.line`. If that is 0, `delta_start`
+/// is UTF-16 of `last_start.offset..piece_start`. Otherwise `delta_start` is
+/// UTF-16 from column 0 of this line. `length` is UTF-16 of the piece.
 fn emit_piece(
     token: IsographSemanticToken,
     piece_start: u32,
@@ -100,70 +105,34 @@ fn emit_piece(
         &index.text[(piece_start as usize)..(piece_end as usize)],
         index.utf16_from,
     );
-    let relative_to_previous = match line - last_start.line {
-        0 => RelativeToPrevious::SameLine(SameLine(utf16_units(
-            &index.text[(last_start.offset as usize)..(piece_start as usize)],
-            index.utf16_from,
-        ))),
-        delta_line => RelativeToPrevious::LaterLine(LaterLine {
-            delta_line,
-            offset_on_line: cursor.column(piece_start),
-        }),
+    let (delta_line, delta_start) = match line - last_start.line {
+        0 => (
+            0,
+            utf16_units(
+                &index.text[(last_start.offset as usize)..(piece_start as usize)],
+                index.utf16_from,
+            ),
+        ),
+        delta_line => (delta_line, cursor.column(piece_start)),
     };
     *last_start = LastStart {
         line,
         offset: piece_start,
     };
-    encoded.push(convert_to_lsp_semantic_token(
+    encoded.push(lsp_types::SemanticToken {
+        delta_line,
+        delta_start,
         length,
-        lsp_type_index(token),
-        relative_to_previous,
-    ));
+        token_type: lsp_type_index(token),
+        token_modifiers_bitset: 0,
+    });
 }
 
-/// `SameLine.0` is UTF-16 of `last_start.offset..piece_start`. `LaterLine.offset_on_line`
-/// is the column on this line, which becomes `delta_start`.
-enum RelativeToPrevious {
-    SameLine(SameLine),
-    LaterLine(LaterLine),
-}
-
-/// UTF-16 from the previous piece's start to this piece's start.
-struct SameLine(u32);
-
-struct LaterLine {
-    delta_line: u32,
-    /// UTF-16 from column 0 of this piece's line to this piece's start.
-    offset_on_line: u32,
-}
-
-/// Previous emitted piece's line and byte start. Same-line `delta_start` is
-/// UTF-16 of `offset..piece_start`.
+/// Previous emitted piece's line and byte start.
 #[derive(Copy, Clone)]
 struct LastStart {
     line: u32,
     offset: u32,
-}
-
-fn convert_to_lsp_semantic_token(
-    length: u32,
-    token_type: u32,
-    relative_to_previous: RelativeToPrevious,
-) -> lsp_types::SemanticToken {
-    let (delta_line, delta_start) = match relative_to_previous {
-        RelativeToPrevious::SameLine(SameLine(delta_start)) => (0, delta_start),
-        RelativeToPrevious::LaterLine(LaterLine {
-            delta_line,
-            offset_on_line,
-        }) => (delta_line, offset_on_line),
-    };
-    lsp_types::SemanticToken {
-        delta_line,
-        delta_start,
-        length,
-        token_type,
-        token_modifiers_bitset: 0,
-    }
 }
 
 #[derive(Copy, Clone)]
@@ -437,7 +406,7 @@ Deltas from that extract:
 - Origin `split_inclusive('\n')` included the newline in `len`. `line_breaks` records `\r\n`, `\n`, and `\r`. `length` is the text before the break.
 - `for token in tokens { check_span; emit_pieces }`. Origin's empty `split_inclusive` chunk had `len` equal to the newline. Empty or line-break-only spans `assert` in `check_span`.
 - `length` and `col` are UTF-16 (`utf16_units`). `is_ascii` runs once on `page_content`. Origin used UTF-8 byte length.
-- Same-line `delta_start` is UTF-16 of `last_start.offset..piece_start`. Later-line `offset_on_line` is UTF-16 from column 0. Origin used `chars().enumerate()` for `\n` and `text.len()` for last-line width.
+- Same-line `delta_start` is UTF-16 of `last_start.offset..piece_start`. Later-line `delta_start` is UTF-16 from column 0. Origin used `chars().enumerate()` for `\n` and `text.len()` for last-line width.
 - `LineCursor` is `&LineIndex` plus `break_index`. Origin had no cursor.
 - Unordered, inverted, out-of-range, non-char-boundary, CRLF-interior, empty, and line-break-only spans `assert`. Origin panics on a backwards slice.
 
@@ -561,7 +530,7 @@ mod semantic_tokens;
 pub use semantic_tokens::{lsp_semantic_tokens, semantic_token_legend};
 ```
 
-`emit_pieces`, `emit_piece`, `convert_to_lsp_semantic_token`, `RelativeToPrevious`, `SameLine`, `LaterLine`, `LastStart`, `LineIndex`, `LineCursor`, `Utf16From`, `Position`, `LineBreak`, `line_breaks`, `utf16_units`, `lsp_type_index`, `TYPE`, `CLASS`, `PARAMETER`, `VARIABLE`, `PROPERTY`, `KEYWORD`, `COMMENT`, `STRING`, `NUMBER`, `OPERATOR`, `DECORATOR` stay in the module. `check_span` `assert`s inverted, overlapping, out of range, non-char-boundary, CRLF-interior, empty, and line-break-only spans. `lsp_type_index_matches_the_legend` is `legend.token_types[index] == TYPE` for each constant; a reorder of `LEGEND_TOKEN_TYPES` fails that test.
+`emit_pieces`, `emit_piece`, `LastStart`, `LineIndex`, `LineCursor`, `Utf16From`, `Position`, `LineBreak`, `line_breaks`, `utf16_units`, `lsp_type_index`, `TYPE`, `CLASS`, `PARAMETER`, `VARIABLE`, `PROPERTY`, `KEYWORD`, `COMMENT`, `STRING`, `NUMBER`, `OPERATOR`, `DECORATOR` stay in the module. `check_span` `assert`s inverted, overlapping, out of range, non-char-boundary, CRLF-interior, empty, and line-break-only spans. `lsp_type_index_matches_the_legend` is `legend.token_types[index] == TYPE` for each constant; a reorder of `LEGEND_TOKEN_TYPES` fails that test.
 
 ## Tests
 
