@@ -239,7 +239,9 @@ fn parsed_iso_literal_at_location(
 
 The parse memo is keyed on the literal text, not on the file, not on the span in the file. Two files with the same iso text share a parse.
 
-Cursor memos intern `(path, LineChar)`. Bytes added on an earlier line, no extra newline, cursor on a later line: extract is `!=` (`iso_literal_start_index` moved), `iso_literal_text_at_location` sees the same string and backdates, `parsed_iso_literal_at_location` depends on the text memo and does not re-invoke. Inserting a newline at the top of a one-line file moves the interior to a new `LineChar`. That is a new slot. `parsed_iso_literal` of that text does not re-invoke in either case.
+Public callers pass `path` and `LineChar`. Those memos re-invoke. The first work is turning that pair into an extraction, a string, a parse tree. They short-circuit at `parsed_iso_literal(text)`: same string, parse does not re-run.
+
+Inserting a newline at the top of a one-line file is a new `LineChar` and a new cursor slot. Bytes added on an earlier line, no extra newline, cursor on a later line: extract is `!=`, `iso_literal_text_at_location` sees the same string and backdates, `parsed_iso_literal_at_location` does not re-invoke. `parsed_iso_literal` of that text does not re-invoke in either case.
 
 `ParsedIsoLiteral` stores spans relative to the literal text. File-absolute spans are applied by a later memo that already has `iso_literal_start_index`. A file-absolute span in the parse result would make parse `!=` after a prepend, and dependents of parse would re-invoke even though the tree is the same.
 
@@ -275,9 +277,9 @@ fn flattened_selectable_named(
 
 `LineChar` is the cursor: `line` is a 0-based count of `\n`, `character` is bytes since the last `\n`. The adapter has that pair.
 
-Inside hover, `parsed_iso_literal_at_location` takes `path` and `LineChar`. It calls `iso_literal_text_at_location`, which calls `iso_literal_extraction`, which calls extract-all and `find_iso_literal_extraction`. `parsed_iso_literal` takes the text. Semantic tokens for the file calls `iso_literal_semantic_tokens_in_file(path)`, which parses every extraction's text.
+Inside hover, `parsed_iso_literal_at_location` takes `path` and `LineChar` and turns that pair into the parse tree. It calls `iso_literal_text_at_location`, which calls `iso_literal_extraction`, which calls extract-all and `find_iso_literal_extraction`. `parsed_iso_literal` takes the text. Semantic tokens for the file calls `iso_literal_semantic_tokens_in_file(path)`, which parses every extraction's text.
 
-Hover fires once per cursor. Each `(path, LineChar)` is its own `parsed_iso_literal_at_location` slot, so moving the mouse across a literal executes that intern for every character. That is expected. The expensive work is `parsed_iso_literal`. Every character inside the same literal yields the same text, so that parse is one slot.
+Hover fires once per cursor. Each `(path, LineChar)` is its own `parsed_iso_literal_at_location` slot, so moving the mouse across a literal executes that intern for every character. That is expected. Those cursor memos re-invoke and short-circuit at `parsed_iso_literal`. Every character inside the same literal yields the same text, so that parse is one slot.
 
 After parse, resolve produces names. Goto definition of a selection named `Avatar` already has the parent entity and the name from the token. It calls `flattened_selectable_named(db, User, Avatar)`. That call site has names, not a file and cursor.
 
