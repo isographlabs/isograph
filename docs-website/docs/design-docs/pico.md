@@ -130,7 +130,7 @@ A memo result `T` is stored once in that slot and returned as `&T`.
 
 A value read from the database is not an argument to another function that has `db`. The argument is the identity the caller already has (`path`, `LiteralId`, `EntityName`). The inner function reads again.
 
-Source text is `DiskFile.contents` under `path`. A function that needs the file takes `path` and calls `db.disk_file(path)`. The caller does not read the file and pass `contents`. Hover is `path` and `LineChar`. Semantic tokens for a file is `path`. Neither takes the file text. `literal_id_at_location` reads the file. `lsp_semantic_tokens_for_file` reads the file. A helper they call that also takes `db` takes `path` and reads the file itself.
+Source text is `DiskFile.contents` under `path`. A function that needs the file takes `path` and calls `db.disk_file(path)`. The caller does not read the file and pass `contents`. Hover is `path` and `LineChar`. Semantic tokens for a file is `path`. Neither takes the file text. `literal_id_at_location` reads the file. `text_through_last_iso_literal` reads the file and stores bytes from the start through the last iso interior. `lsp_semantic_tokens_for_file` reads that memo, not the full `DiskFile`. A helper they call that also takes `db` takes `path` and reads the file itself.
 
 File text as a `String` memo argument is an interned owned param: a new intern per unique file, cloned on every execute. `path` is `Copy`. `db.get` records the source on the memo that uses the text. If the parent reads the file and passes the string, the child's key is the whole file (every edit is a new slot) and the child does not record a source read.
 
@@ -162,11 +162,15 @@ Semantic tokens for a file (file-semantic-tokens.md):
 ```text
 lsp_semantic_tokens_for_file(path)
   -> parsed_iso_literals_in_file(path)
-  + DiskFile contents
+  + text_through_last_iso_literal(path)
 
 parsed_iso_literals_in_file(path)
   -> THostLanguage::extract_iso_literals(path)
   + parsed_iso_literal(text) for each extraction
+
+text_through_last_iso_literal(path)
+  -> THostLanguage::extract_iso_literals(path)
+  + DiskFile contents
 ```
 
 Each item is `(IsoLiteralExtraction, ParsedIsoLiteral)`. Document-scoped LSP methods need both. There is no intern of trees without extractions.
@@ -314,10 +318,10 @@ pico re-invokes a memo when a dependency's `time_updated` is newer than this mem
 If they are equal, pico keeps the old `time_updated`. Dependents see no change and do not re-invoke. That is backdating.
 
 ```text
-syntax highlighting  ->  lsp_semantic_tokens_for_file  ->  parsed_iso_literals_in_file  ->  extract  ->  DiskFile
+syntax highlighting  ->  lsp_semantic_tokens_for_file  ->  parsed_iso_literals_in_file + text_through_last_iso_literal  ->  extract  ->  DiskFile
 ```
 
-Typing JavaScript after the last iso literal re-invokes extract. If the `Vec<IsoLiteralExtraction>` is `==` (same texts, same start indices, same context), extract is backdated. `parsed_iso_literals_in_file` does not re-invoke. `parsed_iso_literal` of the same text does not. Encoded tokens re-invoke because the file text changed, then `==` and backdate.
+Typing JavaScript after the last iso literal re-invokes extract. If the `Vec<IsoLiteralExtraction>` is `==` (same texts, same start indices, same context), extract is backdated. `parsed_iso_literals_in_file` does not re-invoke. `parsed_iso_literal` of the same text does not. `text_through_last_iso_literal` re-invokes because the file text changed, then `==` and backdates. Encoded tokens do not re-invoke.
 
 Typing JavaScript before a literal changes `iso_literal_start_index`. Extract is `!=`. `parsed_iso_literals_in_file` is `!=` (the extraction moved). Encoded file tokens change (`delta_line` / `delta_start`). The tree is relative and `==`. `parsed_iso_literal` of the same text does not re-invoke.
 

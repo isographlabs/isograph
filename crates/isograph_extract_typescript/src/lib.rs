@@ -445,7 +445,7 @@ mod memo_tests {
     use isograph_compiler::{
         HostLanguage, IsoLiteralError, IsoLiteralExtraction, IsoLiteralStartIndex, IsographState,
         LineChar, LiteralId, iso_literal_extraction, literal_id_at_location, parsed_iso_literal,
-        parsed_iso_literals_in_file,
+        parsed_iso_literals_in_file, text_through_last_iso_literal,
     };
     use isograph_parser::{
         AstError, IsoLiteralItem, IsographSemanticToken, ParseError, ParsedIsoLiteral,
@@ -1584,5 +1584,83 @@ iso(`entrypoint Query.HomeRoute`)";
         assert!(parsed_iso_literals_in_file(&db, path).is_some());
         db.remove_disk_file(path);
         assert!(parsed_iso_literals_in_file(&db, path).is_none());
+    }
+
+    fn through_last(contents: &str, interior: &str) -> String {
+        let end = contents
+            .find(interior)
+            .expect("the fixture contains the interior")
+            + interior.len();
+        contents[..end].to_owned()
+    }
+
+    #[test]
+    fn missing_disk_file_has_no_text_through_last_iso_literal() {
+        let db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        assert!(text_through_last_iso_literal(&db, path).is_none());
+    }
+
+    #[test]
+    fn present_file_with_no_iso_has_empty_text_through_last_iso_literal() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        intern_file(&mut db, path, "export const Foo = 1;");
+        let text = text_through_last_iso_literal(&db, path)
+            .as_ref()
+            .expect("the test interned this path");
+        assert_eq!(text, "");
+    }
+
+    #[test]
+    fn text_through_last_iso_literal_stops_at_the_interior_end() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        let contents = "export const Home = iso(`entrypoint Query.HomeRoute`);\nconst y = 1;\n";
+        intern_file(&mut db, path, contents);
+        let text = text_through_last_iso_literal(&db, path)
+            .as_ref()
+            .expect("the test interned this path");
+        assert_eq!(text, &through_last(contents, "entrypoint Query.HomeRoute"));
+        assert!(!text.ends_with('`'));
+    }
+
+    #[test]
+    fn two_literals_stop_at_the_second_interior_end() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        let contents = "iso(`entrypoint Query.A`)\niso(`entrypoint Query.B`)\nconst y = 1;\n";
+        intern_file(&mut db, path, contents);
+        let text = text_through_last_iso_literal(&db, path)
+            .as_ref()
+            .expect("the test interned this path");
+        assert_eq!(text, &through_last(contents, "entrypoint Query.B"));
+    }
+
+    #[test]
+    fn append_after_the_last_literal_keeps_text_through_last_iso_literal() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        let contents = "export const Home = iso(`entrypoint Query.HomeRoute`)";
+        intern_file(&mut db, path, contents);
+        let before = text_through_last_iso_literal(&db, path)
+            .as_ref()
+            .expect("the test interned this path")
+            .clone();
+        intern_file(&mut db, path, &(contents.to_owned() + "\nconst y = 1;\n"));
+        let after = text_through_last_iso_literal(&db, path)
+            .as_ref()
+            .expect("the test interned this path");
+        assert_eq!(&before, after);
+    }
+
+    #[test]
+    fn remove_disk_file_clears_text_through_last_iso_literal() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        intern_file(&mut db, path, "iso(`entrypoint Query.HomeRoute`)");
+        assert!(text_through_last_iso_literal(&db, path).is_some());
+        db.remove_disk_file(path);
+        assert!(text_through_last_iso_literal(&db, path).is_none());
     }
 }

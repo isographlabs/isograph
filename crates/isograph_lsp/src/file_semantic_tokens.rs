@@ -1,5 +1,7 @@
 use common_lang_types::RelativePathToSourceFile;
-use isograph_compiler::{HostLanguage, IsographState, parsed_iso_literals_in_file};
+use isograph_compiler::{
+    HostLanguage, IsographState, parsed_iso_literals_in_file, text_through_last_iso_literal,
+};
 use pico_macros::memo;
 use prelude::Postfix;
 
@@ -11,7 +13,7 @@ pub fn lsp_semantic_tokens_for_file<THostLanguage: HostLanguage>(
     path: RelativePathToSourceFile,
 ) -> Option<Vec<lsp_types::SemanticToken>> {
     let literals = parsed_iso_literals_in_file(db, path).as_ref()?;
-    let page_content = db.disk_file(path)?.contents.reference();
+    let page_content = text_through_last_iso_literal(db, path).as_ref()?;
     lsp_semantic_tokens(
         page_content,
         literals.iter().map(|(extraction, parsed)| {

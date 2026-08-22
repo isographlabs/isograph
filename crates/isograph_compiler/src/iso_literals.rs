@@ -45,6 +45,20 @@ pub fn parsed_iso_literals_in_file<THostLanguage: HostLanguage>(
 }
 
 #[memo]
+pub fn text_through_last_iso_literal<THostLanguage: HostLanguage>(
+    db: &IsographState<THostLanguage>,
+    path: RelativePathToSourceFile,
+) -> Option<String> {
+    let extractions = THostLanguage::extract_iso_literals(db, path).as_ref()?;
+    let contents = db.disk_file(path)?.contents.reference();
+    let end = extractions
+        .last()
+        .map(|last| last.span().as_usize_range().end)
+        .unwrap_or(0);
+    contents[..end].to_owned().wrap_some()
+}
+
+#[memo]
 pub fn literal_id_at_location<THostLanguage: HostLanguage>(
     db: &IsographState<THostLanguage>,
     path: RelativePathToSourceFile,
