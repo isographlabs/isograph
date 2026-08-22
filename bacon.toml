@@ -18,7 +18,7 @@ need_stdout = false
 
 [jobs.build-notif]
 command = [
-	"sh", "-c", 
+	"sh", "-c",
     "cargo build --color always && (osascript -e 'display notification \"Compiled succesfully\" with Title \"Isograph\"' &)"
 ]
 watch = ["crates"]
@@ -127,11 +127,3 @@ c = "job:clippy-all" # comment this to have 'c' run clippy on only the default t
 b = "job:build"
 x = "job:check"
 z = "job:check-cli"
-
-[jobs.build-swc]
-command = [
-	"cargo", "build", "-p", "swc_isograph_plugin", "--release", "--target", "wasm32-wasip1",
-	"--color", "always",
-]
-watch = ["crates"]
-need_stdout = false

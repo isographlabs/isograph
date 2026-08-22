@@ -8,18 +8,11 @@ license = { workspace = true }
 name = "build_json_schema"
 path = "src/main.rs"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-common_lang_types = { path = "../common_lang_types" }
-intern = { path = "../../relay-crates/intern" }
-pico = { path = "../pico" }
-pico_macros = { path = "../pico_macros" }
 prelude = { path = "../prelude" }
 schemars = { workspace = true }
-serde = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-tracing = { workspace = true }
 
 [lints]
 workspace = true

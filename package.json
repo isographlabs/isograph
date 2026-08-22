@@ -17,11 +17,9 @@
   },
   "scripts": {
     "watch-rs": "bacon -j build",
-    "watch-swc": "bacon -j build-swc",
     "check-rs": "bacon -j check",
     "check-cli-rs": "bacon -j check-cli",
     "build-compiler": "cargo build --color=always",
-    "build-swc": "cargo build -p swc_isograph_plugin --release --target wasm32-wasip1 && cd ./libs/isograph-swc-plugin && pnpm prepack",
     "compile-libs": "turbo compile-libs --log-order=grouped",
     "watch-libs": "turbo watch compile-libs",
     "cross": "cross build",

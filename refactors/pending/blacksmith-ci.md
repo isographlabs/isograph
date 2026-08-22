@@ -36,7 +36,7 @@ The App mints a one-hour JIT runner token per job. Linux and Windows jobs boot i
 
 Every `runs-on: ubuntu-latest` in the three workflow files becomes `runs-on: blacksmith-4vcpu-ubuntu-2404`. `cli-linux-x64` passes that tag as `os`.
 
-Jobs in `.github/workflows/ci.yml` whose `runs-on` changes: `typecheck-demos`, `build-js-packages`, `build-website`, `prettier`, `lint`, `cargo-fmt`, `cargo-clippy`, `cargo-clippy-cli`, `cargo-test`, `build-swc`, `all-checks-passed`, `deploy-website`, `main-release`, `versioned-release`.
+Jobs in `.github/workflows/ci.yml` whose `runs-on` changes: `typecheck-demos`, `build-js-packages`, `build-website`, `prettier`, `lint`, `cargo-fmt`, `cargo-clippy`, `cargo-clippy-cli`, `cargo-test`, `all-checks-passed`, `deploy-website`, `main-release`, `versioned-release`.
 
 Before:
 
@@ -76,10 +76,6 @@ Before:
 
   cargo-test:
     name: Run cargo test (excluding relay tests)
-    runs-on: ubuntu-latest
-
-  build-swc:
-    name: Build swc
     runs-on: ubuntu-latest
 
   cli-linux-x64:
@@ -163,10 +159,6 @@ After:
     name: Run cargo test (excluding relay tests)
     runs-on: blacksmith-4vcpu-ubuntu-2404
 
-  build-swc:
-    name: Build swc
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-
   cli-linux-x64:
     uses: ./.github/workflows/build-cli.yml
     with:
@@ -208,7 +200,7 @@ jobs:
     runs-on: blacksmith-4vcpu-ubuntu-2404
 ```
 
-`build-swc` and `run-cargo-bin-and-ensure-no-changes.yml` still install `musl-tools` / target `x86_64-unknown-linux-musl`. The Blacksmith Ubuntu 24.04 image is GitHub's Ubuntu 24.04 image.
+`run-cargo-bin-and-ensure-no-changes.yml` still installs `musl-tools` / target `x86_64-unknown-linux-musl`. The Blacksmith Ubuntu 24.04 image is GitHub's Ubuntu 24.04 image.
 
 `deploy-website` still uses `actions/configure-pages@v4` and `actions/deploy-pages@v4` with workflow `permissions.pages: write` and `permissions.id-token: write`.
 

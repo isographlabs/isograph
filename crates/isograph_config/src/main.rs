@@ -9,7 +9,10 @@ fn main() {
 
     fs::write(
         "./libs/isograph-compiler/isograph-config-schema.json",
-        serde_json::to_string_pretty(schema.reference()).unwrap(),
+        format!(
+            "{}\n",
+            serde_json::to_string_pretty(schema.reference()).unwrap()
+        ),
     )
     .unwrap();
 }

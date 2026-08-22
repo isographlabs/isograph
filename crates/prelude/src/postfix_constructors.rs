@@ -27,7 +27,6 @@ const RUST_ROOTS: &[&str] = &[
     "crates/scoped_stack",
     "crates/span",
     "crates/string_key_newtype",
-    "crates/swc_isograph_plugin",
     "crates/tests",
     "crates/u64_newtypes",
 ];

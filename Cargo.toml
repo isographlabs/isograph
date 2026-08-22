@@ -44,13 +44,6 @@ serde_derive = "1.0.197"
 serde_json = "1.0.108"
 sha2 = "0.10.8"
 strum = { version = "0.27.0", features = ["derive"] }
-swc_atoms = "2.0.0"
-swc_core = "3.0.0"
-swc_ecma_parser = "3.0.0"
-swc_ecma_transforms_testing = "3.0.0"
-swc_ecma_utils = "3.0.0"
-swc_plugin_macro = "=1.0.0"
-swc_trace_macro = "2.0.0"
 syn = "2.0.96"
 testing = "2.0.0"
 thiserror = "1.0.40"
@@ -60,13 +53,6 @@ tracing = "0.1.41"
 tracing-opentelemetry = "0.21"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 url = { version = "2.0.0", features = ["serde"] }
-
-[profile.release.package.swc_isograph_plugin]
-codegen-units = 1
-# Optimize for size
-opt-level = "s"
-# Strip debug symbols
-strip = "symbols"
 
 [workspace.lints.clippy]
 allow_attributes = "deny"

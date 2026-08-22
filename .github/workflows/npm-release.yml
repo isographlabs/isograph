@@ -43,7 +43,6 @@ jobs:
       - name: Build
         run: pnpm compile-libs
       - uses: ./.github/actions/install-cli-artifacts
-      - uses: ./.github/actions/build-swc
       - name: Publish to NPM
         if: inputs.kind == 'main'
         run: pnpm --filter='./libs/*' publish --no-git-checks --tag ${{ startsWith(github.ref, 'refs/heads/deploy/') && 'deploy' || 'main' }}

@@ -1,1 +1,0 @@
-const { fragmentReference } = useLazyReference(require("./__isograph/Query/HomeRoute/entrypoint.ts").default, {});

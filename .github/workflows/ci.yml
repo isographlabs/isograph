@@ -25,13 +25,8 @@ jobs:
     name: JavaScript
     uses: ./.github/workflows/js.yml
 
-  build-swc:
-    name: Build swc
-    uses: ./.github/workflows/build-swc.yml
-
   build-js-packages:
     name: Build js packages
-    needs: [build-swc]
     uses: ./.github/workflows/build-js-packages.yml
 
   build-website:
@@ -94,7 +89,6 @@ jobs:
         build-website,
         rust,
         js,
-        build-swc,
         cli-linux-x64,
         cli-linux-arm64,
         cli-macos-x64,

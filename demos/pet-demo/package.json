@@ -3,10 +3,9 @@
   "version": "0.5.3",
   "private": true,
   "scripts": {
-    "build:swc-plugin": "cd ../../libs/isograph-swc-plugin && pnpm build && cd ../../demos/pet-demo",
-    "dev": "pnpm build:swc-plugin && next dev",
-    "build": "pnpm build:swc-plugin && next build",
-    "start": "pnpm build:swc-plugin && next start",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
     "lint": "next lint",
     "backend": "node ./backend/src/index.js",
     "tsc": "tsc",
