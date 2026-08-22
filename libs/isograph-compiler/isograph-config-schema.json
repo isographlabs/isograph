@@ -3,6 +3,9 @@
   "title": "IsographProjectConfig",
   "description": "This struct is deserialized from an isograph.config.json file.",
   "type": "object",
+  "required": [
+    "source_files"
+  ],
   "properties": {
     "$schema": {
       "description": "The user may hard-code the JSON Schema for their version of the config.",
@@ -10,6 +13,13 @@
         "string",
         "null"
       ]
+    },
+    "source_files": {
+      "description": "Glob patterns relative to the config file's directory.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     }
   },
   "additionalProperties": false

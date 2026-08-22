@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use freddie_cli::Instance;
+use isograph_config::IsographProjectConfig;
 use prelude::Postfix;
-use serde::Deserialize;
 
 pub const CONFIG_FILE_NAMES: &[&str] = &[
     "isograph.config.json",
@@ -73,16 +73,13 @@ fn nearest_config(start: &Path) -> Option<PathBuf> {
     })
 }
 
-#[derive(Debug, Deserialize)]
-pub struct IsographConfig {}
-
 #[derive(Debug)]
 pub struct Unparseable {
     pub path: PathBuf,
     pub source: serde_json::Error,
 }
 
-pub fn load_config(path: &Path) -> Result<IsographConfig, LoadError> {
+pub fn load_config(path: &Path) -> Result<IsographProjectConfig, LoadError> {
     let json = config_json(path)?;
     serde_json::from_str(json.reference()).map_err(|source| {
         LoadError::Unparseable(Unparseable {
@@ -108,7 +105,7 @@ pub fn instance_for_config_path(flag: Option<&Path>) -> Result<(PathBuf, Instanc
 
 pub fn config_and_instance(
     flag: Option<&Path>,
-) -> Result<(PathBuf, Instance, IsographConfig), DiscoverError> {
+) -> Result<(PathBuf, Instance, IsographProjectConfig), DiscoverError> {
     let (config_path, instance) = instance_for_config_path(flag)?;
     let config = load_config(config_path.reference()).map_err(DiscoverError::Load)?;
     (config_path, instance, config).wrap_ok()
@@ -657,22 +654,47 @@ mod tests {
     }
 
     #[test]
-    fn load_config_empty_object() {
+    fn load_config_missing_source_files() {
         let dir = temp();
         let path = dir.path().join("isograph.config.json");
         write_file(path.reference(), "{}\n");
-        load_config(path.reference()).expect("empty object is a config");
+        let err = load_config(path.reference()).expect_err("source_files is required");
+        let LoadError::Unparseable(inner) = err else {
+            panic!("expected Unparseable, got {err}");
+        };
+        assert_eq!(inner.path, path);
+        assert!(
+            inner.source.to_string().contains("source_files"),
+            "{inner:?}"
+        );
     }
 
     #[test]
-    fn load_config_ignores_unknown_fields() {
+    fn load_config_empty_source_files() {
+        let dir = temp();
+        let path = dir.path().join("isograph.config.json");
+        write_file(path.reference(), "{\"source_files\":[]}\n");
+        let config = load_config(path.reference()).expect("empty list is a config");
+        assert!(config.source_files.is_empty());
+    }
+
+    #[test]
+    fn load_config_unknown_fields() {
         let dir = temp();
         let path = dir.path().join("isograph.config.json");
         write_file(
             path.reference(),
-            "{\"project_root\":\"./src\",\"schema\":\"./schema.graphql\"}\n",
+            "{\"source_files\":[],\"project_root\":\"./src\"}\n",
         );
-        load_config(path.reference()).expect("unknown fields are ignored");
+        let err = load_config(path.reference()).expect_err("unknown fields are denied");
+        let LoadError::Unparseable(inner) = err else {
+            panic!("expected Unparseable, got {err}");
+        };
+        assert_eq!(inner.path, path);
+        assert!(
+            inner.source.to_string().contains("project_root"),
+            "{inner:?}"
+        );
     }
 
     #[test]
@@ -716,8 +738,11 @@ mod tests {
         let dir = temp();
         let path = dir.path().join("isograph.config.json");
         write_file(path.reference(), "[]\n");
-        load_config(path.reference())
-            .expect("an empty struct deserializes from an empty JSON array");
+        let err = load_config(path.reference()).expect_err("an array is not a config object");
+        let LoadError::Unparseable(inner) = err else {
+            panic!("expected Unparseable, got {err}");
+        };
+        assert_eq!(inner.path, path);
     }
 
     #[test]

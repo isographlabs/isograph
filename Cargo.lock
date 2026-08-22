@@ -661,6 +661,7 @@ dependencies = [
  "freddie_event_socket",
  "freddie_single_instance",
  "futures-util",
+ "isograph_config",
  "pico",
  "pico_macros",
  "prelude",

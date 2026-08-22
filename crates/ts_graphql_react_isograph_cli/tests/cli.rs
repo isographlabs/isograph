@@ -23,7 +23,8 @@ impl Daemon {
     fn start() -> Self {
         let dir = tempfile::tempdir().expect("a test can create a temp directory");
         let config = dir.path().join("isograph.config.json");
-        std::fs::write(config.reference(), "{}\n").expect("a test can write a config file");
+        std::fs::write(config.reference(), "{\"source_files\":[]}\n")
+            .expect("a test can write a config file");
         let daemon = Self { dir };
         let output = daemon.isograph(["start"].reference());
         assert!(
@@ -131,6 +132,26 @@ fn start_then_status_reports_running() {
         .expect("the fixture exists");
     assert!(text.contains("is running"), "{text}");
     assert!(text.contains(&path.display().to_string()), "{text}");
+}
+
+#[test]
+fn start_with_missing_source_files_exits_1() {
+    let dir = tempfile::tempdir().expect("a test can create a temp directory");
+    let config = dir.path().join("isograph.config.json");
+    std::fs::write(config.reference(), "{}\n").expect("a test can write a config file");
+    let home = dir.path().join("home");
+    std::fs::create_dir_all(home.reference()).expect("a test can create its private HOME");
+    let output = Command::new(isograph_bin())
+        .args(["start"].reference())
+        .current_dir(dir.path())
+        .env("HOME", home.reference())
+        .env("XDG_STATE_HOME", home.join("state"))
+        .env("LOCALAPPDATA", home.join("appdata"))
+        .output()
+        .expect("the isograph binary runs");
+    assert!(!output.status.success());
+    let err = stderr(output.reference());
+    assert!(err.contains("source_files"), "{err}");
 }
 
 #[test]
