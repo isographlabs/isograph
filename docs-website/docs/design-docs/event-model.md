@@ -100,13 +100,8 @@ struct DiskChanged {
 
 #[derive(serde::Deserialize, serde::Serialize)]
 enum Presence {
-    Present(Present),
+    Present(String),
     Absent,
-}
-
-#[derive(serde::Deserialize, serde::Serialize)]
-struct Present {
-    contents: String,
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]

@@ -150,7 +150,7 @@ use prelude::Postfix;
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{info, warn};
 
-use crate::event::{DiskChanged, IsographEvent, Presence, Present};
+use crate::event::{DiskChanged, IsographEvent, Presence};
 use crate::scope::SourceScope;
 
 const DEBOUNCE: Duration = Duration::from_millis(50);
@@ -350,7 +350,7 @@ fn post_present(event_tx: &UnboundedSender<IsographEvent>, path: &Path) {
         event_tx,
         DiskChanged {
             path: path.to_owned(),
-            presence: Presence::Present(Present { contents }),
+            presence: Presence::Present(contents),
         },
     );
 }

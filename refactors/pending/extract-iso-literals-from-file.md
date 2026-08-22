@@ -121,10 +121,10 @@ pub fn handle(state: &mut IsographState, event: IsographEvent) -> Vec<IsographEf
 
 fn handle_disk_changed(state: &mut IsographState, change: DiskChanged) {
     match change.presence {
-        Presence::Present(present) => {
+        Presence::Present(contents) => {
             let source_id = state.set(DiskFile {
                 path: change.path.clone(),
-                contents: present.contents,
+                contents,
             });
             state
                 .get_disk_file_map_mut()

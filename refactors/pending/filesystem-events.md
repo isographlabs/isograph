@@ -13,7 +13,7 @@ After change 2:
 ```
 $ isograph logs
 {"timestamp":"...","level":"INFO","fields":{"message":"isograph daemon up","config":"/tmp/proj/isograph.config.json","port":53124}}
-$ printf '%s\n' '{"kind":"DiskChanged","value":{"path":"/tmp/proj/src/a.ts","presence":{"Present":{"contents":"export const a = 1;\n"}}}}' > /tmp/disk.json
+$ printf '%s\n' '{"kind":"DiskChanged","value":{"path":"/tmp/proj/src/a.ts","presence":{"Present":"export const a = 1;\n"}}}' > /tmp/disk.json
 $ isograph send --file /tmp/disk.json
 ```
 
@@ -83,10 +83,10 @@ impl IsographState {
 
     fn handle_disk_changed(&mut self, change: DiskChanged) {
         match change.presence {
-            Presence::Present(present) => {
+            Presence::Present(contents) => {
                 let source_id = self.set(DiskFile {
                     path: change.path.clone(),
-                    contents: present.contents,
+                    contents,
                 });
                 self.get_disk_file_map_mut()
                     .tracked()
@@ -134,20 +134,15 @@ pub struct DiskChanged {
 
 #[derive(Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub enum Presence {
-    Present(Present),
+    Present(String),
     Absent,
-}
-
-#[derive(Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
-pub struct Present {
-    pub contents: String,
 }
 ```
 
 Wire:
 
 ```json
-{"kind":"DiskChanged","value":{"path":"/tmp/proj/src/a.ts","presence":{"Present":{"contents":"export const a = 1;\n"}}}}
+{"kind":"DiskChanged","value":{"path":"/tmp/proj/src/a.ts","presence":{"Present":"export const a = 1;\n"}}}
 {"kind":"DiskChanged","value":{"path":"/tmp/proj/src/a.ts","presence":"Absent"}}
 ```
 
