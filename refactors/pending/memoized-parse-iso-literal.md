@@ -18,7 +18,11 @@ Those three memos are this file. `iso_literal_extraction` and `parse_iso_literal
 
 Origin of the parse memo: isograph `memoized_parse_iso_literal`. Origin of looking up one literal from a file and cursor: isograph `get_iso_literal_extraction_from_text_position_params`. Delta: parse is keyed on the literal text only, not on `TextSource` or the file path (isograph's TODO: passing `text_source` breaks memoization when the literal moves); i2 `parse_iso_literal` already takes `&str` only; host embedding errors that need the parse tree run after parse, in `host_errors_for_extraction`; every memo takes `&IsographState<THostLanguage>`.
 
-`iso_literal_text_at_location` is the backdate seam. Prefixing the file changes `iso_literal_start_index`, so `iso_literal_extraction` is `!=`. The text string is `==`, so `iso_literal_text_at_location` backdates. `parsed_iso_literal_at_location` depends on the text memo and does not re-invoke. `parsed_iso_literal` of that text does not re-run. Two files with the same literal text share `parsed_iso_literal`.
+Cursor memos intern `(path, LineChar)`. `iso_literal_text_at_location` is the backdate seam for a pair that still sits in a literal after extract becomes `!=`. Bytes added on an earlier line, no extra newline, cursor on a later line: `iso_literal_start_index` moved, extract is `!=`, the text string is `==`, the text memo backdates, `parsed_iso_literal_at_location` does not re-invoke.
+
+Inserting a newline at the top of a one-line file moves the interior to a new `LineChar`. That is a new slot. What that edit reuses is `parsed_iso_literal` of the same interned string.
+
+`parsed_iso_literal` of that text does not re-run. Two files with the same literal text share `parsed_iso_literal`.
 
 `THostLanguage` on `parsed_iso_literal` is the database type. The body does not use the host. `IsographState<A>` and `IsographState<B>` are different databases, so they do not share a parse slot.
 
@@ -148,8 +152,9 @@ Same `memo_tests` module. Intern with `intern_file`. One-line fixtures: `line` i
 - Intern `iso(\`entrypoint Query.HomeRoute\`)`. `character` is `contents.find("entrypoint")`. `iso_literal_text_at_location` is `Some` of that interior. `parsed_iso_literal_at_location` is `Some` with empty parse errors and `IsoLiteralItem::Entrypoint`. `character` 0 (`e` of `export`) is `None` for both.
 - Intern `iso(\`entrypoint\`)`. `parsed_iso_literal_at_location` at the interior has parse errors non-empty.
 - Intern two literals. A `character` inside the second literal text is the second tree. A `character` between the two backtick spans is `None`.
-- Same literal text in two files (two paths): `parsed_iso_literal` of that text is one memo. Both locations return trees that match.
-- Prefix the one-literal file with `const x = 1;\n` (second `Present` of the same path). `iso_literal_text_at_location` at the new interior `LineChar` is the same string as before the prefix. `parsed_iso_literal` of that string matches the pre-prefix tree.
+- Same literal text in two files (two paths): both locations return trees that match `parsed_iso_literal` of that text.
+- Prefix the one-literal file with `const x = 1;\n` (second `Present` of the same path). The interior is now `{ line: 1, character: same byte-on-line as before }`. `iso_literal_text_at_location` at that `LineChar` is the same string as before the prefix. `parsed_iso_literal` of that string matches the pre-prefix tree. The pre-prefix `LineChar` is `None`.
+- Intern `const x = 1;\niso(\`entrypoint Query.HomeRoute\`)`. `LineChar` is `{ line: 1, character: 5 }` (`e` of `entrypoint`). Second `Present` replaces the first line with `const x = 1; const y = 2;` (still one newline). That `LineChar` is unchanged and still inside the literal. `iso_literal_text_at_location` at it is the same string. `parsed_iso_literal` of that string matches.
 
 ## Change 3: host embedding errors
 
