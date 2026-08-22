@@ -58,7 +58,7 @@ If the new value `==` the old value, the epoch does not advance and dependents d
 
 `db.set` returns `SourceId<T>`. That id is `Copy`. Hold it and pass it to memos when the call site has it. Call sites that have a path and not a `SourceId` intern a `PathBuf` and look the source up through the map.
 
-`db.get(source_id)` returns the current value and records a read. `db.get` of a removed source panics. Presence is a separate fact: the tracked map of paths that currently have a `DiskFile`.
+`db.get(source_id)` returns the current value and records a read. Presence is a separate fact: the tracked map of paths that currently have a `DiskFile`. Looking up by path can miss and return `None`. `db.get` of a `SourceId` whose source is not in the database panics. That panic is allowed. A `SourceId<T>` for a source that does not exist is not a representable state to return from; pico's `get` is written that way.
 
 A path may have a `DiskFile`, an `OpenFile`, both, or neither. Artifact generation reads `DiskFile`. The LSP reads `OpenFile` when that path has one, otherwise `DiskFile`. Those are different memos. One overlay used by both, as isograph's `read_iso_literals_source` does, makes artifact generation depend on editor buffers.
 
