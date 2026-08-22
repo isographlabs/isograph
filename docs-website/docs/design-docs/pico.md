@@ -82,7 +82,7 @@ impl HostLanguage for TypeScriptHostLanguage {
 
 The trait writes the lookup type `&Option<Vec<IsoLiteralExtraction<Self>>>`. `#[memo]` is on the impl. pico rewrites the impl return to `&T`. First argument is `&Database`. There is no `&self`. Origin of that shape: isograph `CompilationProfile` methods in `graphql_network_protocol.rs`.
 
-The first argument is `&Database`. The rest are the key, at most eight of them. pico hashes the function identity plus those arguments. That tuple is the cache slot.
+The first argument is `&Database`. The rest are the key, at most eight of them. pico hashes the function identity (the signature text at expansion) plus those arguments. That tuple is the cache slot. A type parameter is not an argument. `iso_literal_extraction<THostLanguage>` is one slot for all `T`. i2 has one `HostLanguage` per process. isograph parameterized the database instead (`IsographDatabase<TCompilationProfile>`).
 
 The body must be a pure function of `db` reads and the arguments. No filesystem, no clock, no LSP. Reading the world is `handle` interning a source.
 
@@ -165,6 +165,27 @@ struct LineChar {
 }
 
 impl HostLanguage for TypeScriptHostLanguage {
+    fn extract_iso_literals_from_source<'a>(
+        source: &'a str,
+    ) -> Vec<WithSpan<(&'a str, TypeScriptLiteralContext)>> {
+        EXTRACT_ISO_LITERAL
+            .captures_iter(source)
+            .filter_map(|captures| {
+                if captures.name("comment").is_some() {
+                    return None;
+                }
+                let literal = captures.name("literal")?;
+                let span = Span::from_usize(literal.start(), literal.end());
+                (
+                    literal.as_str(),
+                    TypeScriptLiteralContext { /* export_name, call, associated */ },
+                )
+                    .with_span(span)
+                    .wrap_some()
+            })
+            .collect()
+    }
+
     #[memo]
     fn extract_iso_literals(
         db: &IsographState,
@@ -172,31 +193,12 @@ impl HostLanguage for TypeScriptHostLanguage {
     ) -> Option<Vec<IsoLiteralExtraction<Self>>> {
         let source_id = db.get_disk_file_map().tracked().0.get(&path).copied()?;
         let contents = db.get(source_id).contents.as_str();
-        EXTRACT_ISO_LITERAL
-            .captures_iter(contents)
-            .filter_map(|captures| {
-                if captures.name("comment").is_some() {
-                    return None;
-                }
-                let literal = captures.name("literal")?;
-                IsoLiteralExtraction {
-                    iso_literal_text: literal.as_str().to_owned(),
-                    iso_literal_start_index: literal.start(),
-                    context: TypeScriptLiteralContext {
-                        const_export_name: captures
-                            .name("export_name")
-                            .map(|m| m.as_str().intern().to()),
-                        call: match captures.name("open_paren") {
-                            Some(_) => IsoCall::FunctionCall,
-                            None => IsoCall::TaggedTemplate,
-                        },
-                        associated_js_function: match captures.name("associated") {
-                            Some(_) => AssociatedJsFunction::Present,
-                            None => AssociatedJsFunction::Absent,
-                        },
-                    },
-                }
-                .wrap_some()
+        Self::extract_iso_literals_from_source(contents)
+            .into_iter()
+            .map(|extracted| IsoLiteralExtraction {
+                iso_literal_text: extracted.item.0.to_owned(),
+                iso_literal_start_index: extracted.location.start as usize,
+                context: extracted.item.1,
             })
             .collect::<Vec<_>>()
             .wrap_some()
@@ -241,9 +243,9 @@ fn parsed_iso_literal_at_location(
 }
 ```
 
-`HostLanguage::extract_iso_literals` is a memo. The TypeScript impl runs `EXTRACT_ISO_LITERAL` and owns the captures. `parse_iso_literal` is a plain function over `&str`. `find_iso_literal_extraction` is a plain function over a cursor, file text, and the extract vec. isograph moved `parse_iso_literal` out of the database crate so the parser would not know about `IsographDatabase`.
+`HostLanguage::extract_iso_literals_from_source` is a plain function over `&str`. `HostLanguage::extract_iso_literals` is the memo: look up the `DiskFile`, call `from_source`, own the captures. `parse_iso_literal` is a plain function over `&str`. `find_iso_literal_extraction` is a plain function over a cursor, file text, and the extract vec. isograph moved `parse_iso_literal` out of the database crate so the parser would not know about `IsographDatabase`.
 
-`None` from extract is no `DiskFile`. `Some(vec![])` is a present file with no literals. `None` from `iso_literal_extraction`, `iso_literal_text_at_location`, and `parsed_iso_literal_at_location` is no file, or a cursor that is not inside any literal text (the JS around the literals, including `iso(`).
+`None` from extract is no `DiskFile`. `Some(vec![])` is a present file with no literals. `None` from `iso_literal_extraction`, `iso_literal_text_at_location`, and `parsed_iso_literal_at_location` is no file, or a cursor that is not inside any literal text (the JS around the literals, including `iso(` and the closing backtick).
 
 The parse memo is keyed on the literal text, not on the file, not on the span in the file. Two files with the same iso text share a parse. Prefixing the file with JavaScript re-invokes extract (the start index moved). `iso_literal_text_at_location` sees the same string and backdates. `parsed_iso_literal` of that text does not re-invoke. `parsed_iso_literal_at_location` depends on the text memo, so it does not re-invoke either.
 

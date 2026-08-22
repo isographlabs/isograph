@@ -29,7 +29,7 @@ Each seam is a trait, which is the case AGENTS.md reserves traits for: a boundar
 
 ### Extraction
 
-The extraction seam is `HostLanguage` in `crates/isograph_compiler` (landed). `extract_iso_literals` finds iso literals in a `&str` and returns `Vec<WithSpan<(&str, THostLanguage::LiteralContext)>>` (extract-iso-literals-from-file.md stops parsing inside extract). The first implementor is `TypeScriptHostLanguage` in `isograph_extract_typescript`. Which files are walked is config `source_files` (config-source-files.md). File extensions as a field on `HostLanguage` stay later.
+The extraction seam is `HostLanguage` in `crates/isograph_compiler` (landed). `extract_iso_literals_from_source` finds iso literals in a `&str` and returns `Vec<WithSpan<(&str, THostLanguage::LiteralContext)>>` (extract-iso-literals-from-file.md stops parsing inside extract). `extract_iso_literals(db, path)` is the pico memo over a `DiskFile` that calls that method and owns the captures. The first implementor is `TypeScriptHostLanguage` in `isograph_extract_typescript`. Which files are walked is config `source_files` (config-source-files.md). File extensions as a field on `HostLanguage` stay later.
 
 ### NetworkProtocol
 
