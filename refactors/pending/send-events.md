@@ -343,36 +343,6 @@ async fn serve(config_path: PathBuf, port_path: PathBuf) {
 
 ### Tests
 
-```rust
-// from crates/isograph_cli/src/event.rs
-#[cfg(test)]
-mod tests {
-    use super::IsographEvent;
-
-    #[test]
-    fn hello_world_round_trips() {
-        let json = r#"{"kind":"HelloWorld"}"#;
-        let event: IsographEvent =
-            serde_json::from_str(json).expect("a HelloWorld frame deserializes");
-        assert!(matches!(event, IsographEvent::HelloWorld));
-        assert_eq!(
-            serde_json::to_string(&event).expect("HelloWorld serializes"),
-            json
-        );
-    }
-
-    #[test]
-    fn quit_round_trips() {
-        let json = r#"{"kind":"Quit"}"#;
-        let event: IsographEvent = serde_json::from_str(json).expect("a Quit frame deserializes");
-        assert!(matches!(event, IsographEvent::Quit));
-        assert_eq!(serde_json::to_string(&event).expect("Quit serializes"), json);
-    }
-}
-```
-
-The wire is `{"kind":"HelloWorld"}` and `{"kind":"Quit"}`. Production send transmits the trimmed file; these tests pin the serialized form.
-
 Socket tests live in `external.rs` under `#[cfg(test)]`, next to `on_message`. They compile against the crate's `[dependencies]` tokio (`rt`, `macros`, `signal`, `sync`, `time`).
 
 ```rust
