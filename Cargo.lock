@@ -683,8 +683,10 @@ dependencies = [
  "isograph_parser",
  "pico",
  "pico_macros",
+ "prelude",
  "span",
  "thiserror 1.0.69",
+ "tracing",
 ]
 
 [[package]]
