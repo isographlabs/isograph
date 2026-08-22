@@ -76,7 +76,7 @@ Fixtures are inputs only. Expected results are assertions in the test, never che
 
 An API only tests call should not exist. A helper tests need lives in the tests crate or under `#[cfg(test)]`.
 
-Do not test another crate. pico, serde, std.
+Do not test another crate. pico, intern, serde, std. Re-invoke counts, intern identity, and `ptr::eq` of interned values are pico or intern. Assert `Eq` of the values those memos return.
 
 ## Booleans
 
