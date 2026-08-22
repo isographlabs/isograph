@@ -19,7 +19,7 @@ $ isograph logs
 {"timestamp":"...","level":"INFO","fields":{"message":"hello world"}}
 ```
 
-`isograph send` does not start the daemon. Walk-up / `--config` is the same as every other verb. `--port` skips the port file.
+`isograph send` does not start the daemon. Walk-up / `--config` is the same as every other verb. The port comes from the daemon's port file.
 
 ## Types
 
@@ -412,10 +412,6 @@ struct SendArgs {
     #[command(flatten)]
     pub id: ConfigFlag,
 
-    /// Loopback port. When absent, the daemon's port file.
-    #[arg(long)]
-    pub port: Option<u16>,
-
     /// File containing the JSON frame. When absent, stdin.
     #[arg(long)]
     pub file: Option<std::path::PathBuf>,
@@ -522,10 +518,7 @@ pub fn run(args: &SendArgs) -> ExitCode {
 
 fn run_inner(args: &SendArgs) -> Result<(), SendError> {
     let (_, instance, _) = crate::discover::config_and_instance(args.id.config.as_deref())?;
-    let port = match args.port {
-        Some(port) => port,
-        None => read_port_file(&port_path(&instance))?,
-    };
+    let port = read_port_file(&port_path(&instance))?;
     let frame = match args.file.as_deref() {
         Some(path) => fs::read_to_string(path).map_err(|source| {
             SendError::ReadFile(ReadFile {
