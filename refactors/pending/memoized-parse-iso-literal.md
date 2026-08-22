@@ -1,6 +1,6 @@
 # Memoized parse of an extracted iso literal
 
-Requires extract-iso-literals-from-file.md. Extract-all and `iso_literal_extraction(path, index)` are memos. This file parses that extraction.
+Requires extract-iso-literals-from-file.md. Extract-all, `iso_literal_index(path, LineChar)` (`Option<usize>`), and `iso_literal_extraction(path, index)` are memos. This file parses that extraction.
 
 Origin of the parse memo: isograph `memoized_parse_iso_literal`. Origin of naming one literal by file and vec index: isograph `parse_iso_literals_in_file_content` walking the extract vec by position. Delta: parse is keyed on the literal text only, not on `TextSource` or the file path (isograph's TODO: passing `text_source` breaks memoization when the literal moves); i2 `parse_iso_literal` already takes `&str` only; host embedding errors that need the parse tree run after parse, in `host_errors_for_extraction`.
 
@@ -10,7 +10,7 @@ Two shippable changes: the text-keyed parse memo, then the file+index parse memo
 
 ## What the user does
 
-No user-facing change. Tests intern a `DiskFile`, call `parsed_iso_literal_in_file` at index 0, and assert the tree (or parse errors). A field without an export reports `MissingExport` from `host_errors_for_extraction`.
+No user-facing change. Tests intern a `DiskFile`, take a row and column inside the literal (`LineChar`), get `Some(index)` from `iso_literal_index`, call `parsed_iso_literal_in_file` at that index, and assert the tree (or parse errors). A field without an export reports `MissingExport` from `host_errors_for_extraction`.
 
 ## Change 1: `parsed_iso_literal`
 
@@ -61,8 +61,8 @@ pub fn parsed_iso_literal_in_file<THostLanguage: HostLanguage>(
 ```rust
 // from crates/isograph_compiler/src/lib.rs
 pub use iso_literals::{
-    IsoLiteralExtraction, extract_iso_literals_from_file_content, iso_literal_extraction,
-    parsed_iso_literal, parsed_iso_literal_in_file,
+    IsoLiteralExtraction, LineChar, extract_iso_literals_from_file_content, iso_literal_extraction,
+    iso_literal_index, parsed_iso_literal, parsed_iso_literal_in_file,
 };
 ```
 
@@ -179,13 +179,13 @@ lsp-parse-diagnostics.md currently takes `host` and `source: &str` and calls `fi
 
 Move the extract-typescript error tests listed in extract-iso-literals-from-file.md change 1 here.
 
-- Intern `iso(\`entrypoint Query.HomeRoute\`)`. `parsed_iso_literal_in_file::<TypeScriptHostLanguage>(db, path, 0)` is `Some` with empty parse errors. `host_errors_for_extraction` is empty.
+- Intern `iso(\`entrypoint Query.HomeRoute\`)`. `iso_literal_index` at the `LineChar` of `entrypoint` is `Some(0)`. `parsed_iso_literal_in_file::<TypeScriptHostLanguage>(db, path, 0)` is `Some` with empty parse errors. `host_errors_for_extraction` is empty.
 - Intern `iso(\`entrypoint\`)`. Parse errors non-empty. Index 0 exists.
 - Intern `iso\`entrypoint Query.HomeRoute\``. Extract context is `TaggedTemplate`. `host_errors_for_extraction` is `MissingParentheses` at the extraction span.
 - Intern `iso(\`field Pet.fullName { id }\`)(`. `MissingExport`.
 - Intern `export const fullName = iso(\`field Pet.fullName { id }\`)`. `MissingAssociatedFunction`.
 - Intern `export const fullName = iso(\`field Pet.fullName { id }\`)(`. Host errors empty.
-- Intern two literals, index 1 is the second. Index 2 is `None`.
+- Intern two literals. `iso_literal_index` at a `LineChar` inside the second literal text is `Some(1)`. `parsed_iso_literal_in_file` at 1 is the second tree. Index 2 is `None`. A `LineChar` between the two literals is `iso_literal_index` `None`.
 - No `DiskFile`: `parsed_iso_literal_in_file` is `None`.
 - Same literal text in two files (two paths): `parsed_iso_literal` of that text is one memo; both indices return trees that match.
 
