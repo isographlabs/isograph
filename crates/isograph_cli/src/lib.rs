@@ -4,6 +4,7 @@ use clap::{CommandFactory, FromArgMatches, Parser};
 use freddie_cli::{App, Instance, NoArgs};
 use prelude::Postfix;
 
+mod config_path;
 mod daemon;
 mod discover;
 mod effect;
@@ -25,6 +26,7 @@ pub fn run() -> ExitCode {
             freddie_cli::run_lifecycle_verb::<Isograph>(verb, matches.reference())
         }
         Some(CliVerb::Send(args)) => send::run(args.reference()),
+        Some(CliVerb::ConfigPath(id)) => config_path::run(id.reference()),
         None => freddie_cli::run_lifecycle_verb::<Isograph>(
             freddie_cli::verb_for_bare_invocation::<Isograph>(),
             matches.reference(),
@@ -48,6 +50,9 @@ enum CliVerb {
     /// Write one IsographEvent JSON frame to the running daemon. Not for typing: tests and CI.
     #[command(hide = true)]
     Send(SendArgs),
+
+    /// Print the canonical isograph config path.
+    ConfigPath(ConfigFlag),
 }
 
 #[derive(clap::Args, Debug)]

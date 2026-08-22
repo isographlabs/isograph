@@ -263,3 +263,59 @@ fn a_second_start_adopts_the_running_daemon() {
     );
     assert!(daemon.isograph(["status"].reference()).status.success());
 }
+
+#[test]
+fn config_path_prints_the_canonical_path() {
+    let dir = tempfile::tempdir().expect("a test can create a temp directory");
+    let config = dir.path().join("isograph.config.json");
+    std::fs::write(config.reference(), "{}\n").expect("a test can write a config file");
+    let nested = dir.path().join("src");
+    std::fs::create_dir_all(nested.reference()).expect("a test can create a nested directory");
+    let output = Command::new(isograph_bin())
+        .args(["config-path"].reference())
+        .current_dir(nested.reference())
+        .output()
+        .expect("the isograph binary runs");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        stderr(output.reference())
+    );
+    let expected = config.canonicalize().expect("the fixture exists");
+    assert_eq!(
+        stdout(output.reference()).trim(),
+        expected.to_str().expect("utf-8")
+    );
+}
+
+#[test]
+fn config_path_with_flag_prints_that_file() {
+    let dir = tempfile::tempdir().expect("a test can create a temp directory");
+    let config = dir.path().join("isograph.config.json");
+    std::fs::write(config.reference(), "{}\n").expect("a test can write a config file");
+    let output = Command::new(isograph_bin())
+        .args(["config-path", "--config", config.to_str().expect("utf-8")].reference())
+        .current_dir(dir.path())
+        .output()
+        .expect("the isograph binary runs");
+    assert!(output.status.success());
+    let expected = config.canonicalize().expect("the fixture exists");
+    assert_eq!(
+        stdout(output.reference()).trim(),
+        expected.to_str().expect("utf-8")
+    );
+}
+
+#[test]
+fn config_path_with_no_config_exits_1() {
+    let dir = tempfile::tempdir().expect("a test can create a temp directory");
+    let output = Command::new(isograph_bin())
+        .args(["config-path"].reference())
+        .current_dir(dir.path())
+        .output()
+        .expect("the isograph binary runs");
+    assert!(!output.status.success());
+    assert!(stdout(output.reference()).is_empty());
+    let err = stderr(output.reference());
+    assert!(err.contains("no isograph.config.json"), "{err}");
+}
