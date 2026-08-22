@@ -1,8 +1,8 @@
 # Extract iso literals from a DiskFile
 
-Requires filesystem-events.md (landed), extract-iso-literals.md (landed), and `docs-website/docs/design-docs/pico.md`. `HostLanguage::extract_iso_literals` finds iso literals in a `&str`. This file puts that behind a pico memo over a `DiskFile`. The memos and keys are the iso-literal instance of that pico model.
+Requires filesystem-events.md (landed), extract-iso-literals.md (landed), and `docs-website/docs/design-docs/pico.md`. `HostLanguage::extract_iso_literals` is the pico memo over a `DiskFile`. Origin of a memoized trait method: isograph `CompilationProfile::deprecated_parse_type_system_documents` / `parse_nested_data_model_schema` in `crates/graphql_network_protocol/src/graphql_network_protocol.rs`. The trait writes `&T`. The impl writes `T` with `#[memo]`. First argument is `&Database`. There is no `&self`.
 
-Origin of the memo: isograph `crates/isograph_schema/src/validated_isograph_schema/isograph_literals.rs` `extract_iso_literals_from_file_content` and `IsoLiteralExtraction`. Delta: `PathBuf` instead of `RelativePathToSourceFile`; `THostLanguage::LiteralContext` instead of four ad-hoc fields (`const_export_name`, `has_associated_js_function`, `iso_function_called_with_paren` as bools); extract does not parse (isograph extract also does not parse; i2's TypeScript implementor currently does, and this doc stops that); missing `DiskFile` is `None`, not a panic.
+Origin of the extract work: isograph `crates/isograph_schema/src/validated_isograph_schema/isograph_literals.rs` `extract_iso_literals_from_file_content` and `IsoLiteralExtraction`. Delta: the memo is `HostLanguage::extract_iso_literals(db, path)`, not a free function; `PathBuf` instead of `RelativePathToSourceFile`; `THostLanguage::LiteralContext` instead of four ad-hoc fields; extract does not parse (isograph extract also does not parse; i2's TypeScript implementor currently does, and this doc stops that); missing `DiskFile` is `None`, not a panic.
 
 This slice is all extractions in a file, and the extraction at a file and `LineChar`. Parsed AST at that location is memoized-parse-iso-literal.md. Semantic tokens for a file are file-semantic-tokens.md.
 
@@ -167,36 +167,17 @@ The existing `state.rs` tests. `state.handle(...)` becomes `handle(&mut state, .
 
 `run_event_loop` tests construct `IsographState::default()` as today.
 
-## Change 3: the memo
+## Change 3: `HostLanguage::extract_iso_literals` is the memo
 
-`iso_literals.rs` in `isograph_compiler`. Callers intern a `DiskFile` the same way `handle` does.
+Callers intern a `DiskFile` the same way `handle` does. There is no free function `extract_iso_literals_from_file_content`. Callers write `THostLanguage::extract_iso_literals(db, path)`.
 
-```rust
-// from crates/isograph_compiler/src/lib.rs
-mod database;
-mod host_language;
-mod iso_literals;
-
-pub use database::{DiskFile, DiskFileMap, IsographState};
-pub use host_language::*;
-pub use iso_literals::{IsoLiteralExtraction, extract_iso_literals_from_file_content};
-```
-
-### The extraction
-
-Origin: isograph `IsoLiteralExtraction`. Delta: `context` instead of the four fields. `iso_literal_start_index` is the byte offset of the literal text in the file, same name as isograph. A cursor looks up an extraction by `LineChar`, not by vec position.
+Origin of `IsoLiteralExtraction`: isograph `IsoLiteralExtraction`. Delta: `context` instead of the four fields. `iso_literal_start_index` is the byte offset of the literal text in the file, same name as isograph. A cursor looks up an extraction by `LineChar`, not by vec position.
 
 ```rust
-// from crates/isograph_compiler/src/iso_literals.rs
+// from crates/isograph_compiler/src/host_language.rs
 use std::path::PathBuf;
 
-use pico_macros::memo;
-use prelude::Postfix;
-use span::WithSpan;
-
-use crate::host_language::HostLanguage;
 use crate::IsographState;
-use pico::Database;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IsoLiteralExtraction<THostLanguage: HostLanguage> {
@@ -213,51 +194,73 @@ impl<THostLanguage: HostLanguage> IsoLiteralExtraction<THostLanguage> {
         )
     }
 }
-```
 
-`iso_literal_start_index` offsets semantic tokens to file coordinates (file-semantic-tokens.md).
-
-`HostLanguage::LiteralContext` gains `Clone + PartialEq + Eq + Debug + 'static` so the extraction can be stored and compared. `TypeScriptLiteralContext` already is `Copy`.
-
-```rust
-// from crates/isograph_compiler/src/host_language.rs
-pub trait HostLanguage: Sized + Default + 'static {
+pub trait HostLanguage: Sized + 'static {
     type Error: std::fmt::Display + std::error::Error + Clone + PartialEq + Eq + 'static;
     type LiteralContext: Clone + PartialEq + Eq + std::fmt::Debug + 'static;
 
-    fn extract_iso_literals<'a>(
-        &self,
-        source: &'a str,
-    ) -> Vec<WithSpan<(&'a str, Self::LiteralContext)>>;
+    fn extract_iso_literals(
+        db: &IsographState,
+        path: PathBuf,
+    ) -> &Option<Vec<IsoLiteralExtraction<Self>>>;
 }
 ```
 
-`TypeScriptHostLanguage` already implements `Default`.
+`iso_literal_start_index` offsets semantic tokens to file coordinates (file-semantic-tokens.md). `LiteralContext` is stored and compared. `TypeScriptLiteralContext` already is `Copy`.
 
-### The memo
+The change 1 method (`&self`, `&str`, borrowed `WithSpan`) is deleted. `ExtractedIsoLiterals` is already gone.
+
+`isograph_extract_typescript` depends on `pico` and `pico_macros`.
 
 ```rust
-// from crates/isograph_compiler/src/iso_literals.rs
-#[memo]
-pub fn extract_iso_literals_from_file_content<THostLanguage: HostLanguage>(
-    db: &IsographState,
-    path: PathBuf,
-) -> Option<Vec<IsoLiteralExtraction<THostLanguage>>> {
-    let source_id = db.get_disk_file_map().tracked().0.get(&path).copied()?;
-    let contents = db.get(source_id).contents.reference();
-    THostLanguage::default()
-        .extract_iso_literals(contents)
-        .into_iter()
-        .map(|extracted| {
-            let (iso_literal_text, context) = extracted.item;
-            IsoLiteralExtraction {
-                iso_literal_text: iso_literal_text.to_owned(),
-                iso_literal_start_index: extracted.location.start as usize,
-                context,
-            }
-        })
-        .collect::<Vec<_>>()
-        .wrap_some()
+// from crates/isograph_extract_typescript/src/lib.rs
+use std::path::PathBuf;
+
+use isograph_compiler::{HostLanguage, IsoLiteralExtraction, IsographState};
+use pico::Database;
+use pico_macros::memo;
+use prelude::Postfix;
+
+impl HostLanguage for TypeScriptHostLanguage {
+    type LiteralContext = TypeScriptLiteralContext;
+    type Error = TypeScriptHostError;
+
+    #[memo]
+    fn extract_iso_literals(
+        db: &IsographState,
+        path: PathBuf,
+    ) -> Option<Vec<IsoLiteralExtraction<Self>>> {
+        let source_id = db.get_disk_file_map().tracked().0.get(&path).copied()?;
+        let contents = db.get(source_id).contents.reference();
+        EXTRACT_ISO_LITERAL
+            .captures_iter(contents)
+            .filter_map(|captures| {
+                if captures.name("comment").is_some() {
+                    return None;
+                }
+                let literal = captures.name("literal")?;
+                IsoLiteralExtraction {
+                    iso_literal_text: literal.as_str().to_owned(),
+                    iso_literal_start_index: literal.start(),
+                    context: TypeScriptLiteralContext {
+                        const_export_name: captures
+                            .name("export_name")
+                            .map(|m| m.as_str().intern().to()),
+                        call: match captures.name("open_paren") {
+                            Some(_) => IsoCall::FunctionCall,
+                            None => IsoCall::TaggedTemplate,
+                        },
+                        associated_js_function: match captures.name("associated") {
+                            Some(_) => AssociatedJsFunction::Present,
+                            None => AssociatedJsFunction::Absent,
+                        },
+                    },
+                }
+                .wrap_some()
+            })
+            .collect::<Vec<_>>()
+            .wrap_some()
+    }
 }
 ```
 
@@ -267,13 +270,15 @@ pub fn extract_iso_literals_from_file_content<THostLanguage: HostLanguage>(
 
 `path` is interned as an owned `PathBuf` param. Callers pass `path.clone()` when they still need the path.
 
-pico lookup returns `&Option<Vec<IsoLiteralExtraction<THostLanguage>>>`.
+pico lookup is the trait return: `&Option<Vec<IsoLiteralExtraction<Self>>>`.
+
+The change 1 tests that stayed in this crate (text, span, export name, `IsoCall`, `AssociatedJsFunction`, skip comments, two literals, nested iso) intern a `DiskFile` and call `TypeScriptHostLanguage::extract_iso_literals`.
 
 ### Tests
 
-Tests in `crates/isograph_extract_typescript/src/lib.rs` under a `memo_tests` module, using `TypeScriptHostLanguage`. That crate already depends on the compiler. `use pico::Database` in the tests module for `db.get`. Do not add a test-only `HostLanguage` to the compiler crate.
+Tests in `crates/isograph_extract_typescript/src/lib.rs` under a `memo_tests` module. `use pico::Database` in the tests module for `db.get`. Do not add a test-only `HostLanguage` to the compiler crate.
 
-- No `DiskFile` for the path: `extract_iso_literals_from_file_content::<TypeScriptHostLanguage>` is `None`.
+- No `DiskFile` for the path: `TypeScriptHostLanguage::extract_iso_literals` is `None`.
 - Present file, no `iso`: `Some` of empty vec.
 - One exported field: vec len 1, `iso_literal_text` is the interior, `iso_literal_start_index` is `source.find(text)`, `const_export_name` is `Some`, `IsoCall::FunctionCall`, `AssociatedJsFunction::Present`.
 - Two literals: vec len 2, start indices match `find`.
@@ -286,7 +291,7 @@ Tests in `crates/isograph_extract_typescript/src/lib.rs` under a `memo_tests` mo
 
 ```text
 iso_literal_extraction(path, LineChar)
-  -> extract_iso_literals_from_file_content(path)
+  -> THostLanguage::extract_iso_literals(path)
   + find_iso_literal_extraction(LineChar, file text, extract vec)
 ```
 
@@ -296,6 +301,15 @@ Origin of `LineChar` and the walk: isograph `crates/isograph_lsp/src/hover.rs` `
 
 ```rust
 // from crates/isograph_compiler/src/iso_literals.rs
+use std::path::PathBuf;
+
+use pico_macros::memo;
+use prelude::Postfix;
+
+use crate::host_language::{HostLanguage, IsoLiteralExtraction};
+use crate::IsographState;
+use pico::Database;
+
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 pub struct LineChar {
     pub line: u32,
@@ -308,8 +322,7 @@ pub fn iso_literal_extraction<THostLanguage: HostLanguage>(
     path: PathBuf,
     line_char: LineChar,
 ) -> Option<IsoLiteralExtraction<THostLanguage>> {
-    let extractions =
-        extract_iso_literals_from_file_content::<THostLanguage>(db, path.clone())?;
+    let extractions = THostLanguage::extract_iso_literals(db, path.clone())?;
     let source_id = db.get_disk_file_map().tracked().0.get(&path).copied()?;
     let content = db.get(source_id).contents.reference();
     find_iso_literal_extraction(line_char, content, extractions).cloned()
@@ -402,9 +415,10 @@ Origin of `position_in_range` and `delta_line_delta_start`: copy from isograph `
 
 ```rust
 // from crates/isograph_compiler/src/lib.rs
-pub use iso_literals::{
-    IsoLiteralExtraction, LineChar, extract_iso_literals_from_file_content, iso_literal_extraction,
-};
+mod iso_literals;
+
+pub use host_language::IsoLiteralExtraction;
+pub use iso_literals::{LineChar, iso_literal_extraction};
 ```
 
 ### Tests
@@ -413,13 +427,13 @@ Same `memo_tests` module. One-line fixtures: `line` is 0, `character` is the byt
 
 - No `DiskFile`: `iso_literal_extraction::<TypeScriptHostLanguage>(db, path, LineChar { line: 0, character: 0 })` is `None`.
 - Present file, no `iso`: any `LineChar` is `None`.
-- `export const Home = iso(\`entrypoint Query.HomeRoute\`)`. `character` is `contents.find("entrypoint")`. The function is `Some`; `iso_literal_text` and `iso_literal_start_index` match `extract_iso_literals_from_file_content` `[0]`. `character` 0 (`e` of `export`) is `None`. The `LineChar` of the first byte of the interior is `Some`. The `LineChar` of the last byte of the interior is `Some`. One past that last byte is `None`.
+- `export const Home = iso(\`entrypoint Query.HomeRoute\`)`. `character` is `contents.find("entrypoint")`. The function is `Some`; `iso_literal_text` and `iso_literal_start_index` match `TypeScriptHostLanguage::extract_iso_literals` `[0]`. `character` 0 (`e` of `export`) is `None`. The `LineChar` of the first byte of the interior is `Some`. The `LineChar` of the last byte of the interior is `Some`. One past that last byte is `None`.
 - Two literals on one line. A `character` inside the second literal text is the second extraction. A `character` between the two backtick spans is `None`.
 
 ## Call sites
 
 Change 2: `run_event_loop` -> `handle(&mut state, event)`. Tests intern a `DiskFile` the same way `handle` does: `db.set` plus insert into the tracked map.
 
-Change 3: `iso_literal_extraction` -> `extract_iso_literals_from_file_content`. file-semantic-tokens.md reads the vec for offsets.
+Change 3: `iso_literal_extraction` -> `THostLanguage::extract_iso_literals`. file-semantic-tokens.md reads the vec for offsets.
 
 Change 4: memoized-parse-iso-literal.md -> `iso_literal_extraction`.

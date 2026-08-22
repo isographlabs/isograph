@@ -27,7 +27,7 @@ iso_literal_semantic_tokens_in_file(path)
   -> parsed_iso_literals_in_file(path)
 
 parsed_iso_literals_in_file(path)
-  -> extract_iso_literals_from_file_content(path)
+  -> THostLanguage::extract_iso_literals(path)
   + parsed_iso_literal(text) for each extraction
 ```
 
@@ -44,7 +44,7 @@ pub fn parsed_iso_literals_in_file<THostLanguage: HostLanguage>(
     db: &IsographState,
     path: PathBuf,
 ) -> Option<Vec<ParsedIsoLiteral>> {
-    let extractions = extract_iso_literals_from_file_content::<THostLanguage>(db, path)?;
+    let extractions = THostLanguage::extract_iso_literals(db, path)?;
     extractions
         .iter()
         .map(|extraction| parsed_iso_literal(db, extraction.iso_literal_text.clone()).clone())
@@ -57,7 +57,7 @@ pub fn iso_literal_semantic_tokens_in_file<THostLanguage: HostLanguage>(
     db: &IsographState,
     path: PathBuf,
 ) -> Option<Vec<WithSpan<IsographSemanticToken>>> {
-    let extractions = extract_iso_literals_from_file_content::<THostLanguage>(db, path.clone())?;
+    let extractions = THostLanguage::extract_iso_literals(db, path.clone())?;
     let parsed_literals = parsed_iso_literals_in_file::<THostLanguage>(db, path)?;
     let mut tokens = Vec::new();
     for (extraction, parsed) in extractions.iter().zip(parsed_literals.iter()) {

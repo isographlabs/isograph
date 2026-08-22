@@ -71,12 +71,16 @@ A singleton has no key field. There is at most one. `CompilerConfig` and the wor
 ## Memo
 
 ```rust
-#[memo]
-fn extract_iso_literals_from_file_content(
-    db: &IsographState,
-    path: PathBuf,
-) -> Option<Vec<IsoLiteralExtraction>>;
+impl HostLanguage for TypeScriptHostLanguage {
+    #[memo]
+    fn extract_iso_literals(
+        db: &IsographState,
+        path: PathBuf,
+    ) -> Option<Vec<IsoLiteralExtraction<Self>>>;
+}
 ```
+
+The trait writes the lookup type `&Option<Vec<IsoLiteralExtraction<Self>>>`. `#[memo]` is on the impl. pico rewrites the impl return to `&T`. First argument is `&Database`. There is no `&self`. Origin of that shape: isograph `CompilationProfile` methods in `graphql_network_protocol.rs`.
 
 The first argument is `&Database`. The rest are the key, at most eight of them. pico hashes the function identity plus those arguments. That tuple is the cache slot.
 
@@ -128,7 +132,7 @@ iso_literal_text_at_location(path, LineChar)
   -> iso_literal_extraction(path, LineChar)
 
 iso_literal_extraction(path, LineChar)
-  -> extract_iso_literals_from_file_content(path)
+  -> THostLanguage::extract_iso_literals(path)
   + find_iso_literal_extraction(LineChar, file text, extract vec)
 
 parsed_iso_literal(text)
@@ -142,7 +146,7 @@ iso_literal_semantic_tokens_in_file(path)
   -> parsed_iso_literals_in_file(path)
 
 parsed_iso_literals_in_file(path)
-  -> extract_iso_literals_from_file_content(path)
+  -> THostLanguage::extract_iso_literals(path)
   + parsed_iso_literal(text) for each extraction
 ```
 
@@ -160,14 +164,43 @@ struct LineChar {
     character: u32,
 }
 
-#[memo]
-fn extract_iso_literals_from_file_content(
-    db: &IsographState,
-    path: PathBuf,
-) -> Option<Vec<IsoLiteralExtraction>> {
-    let source_id = db.get_disk_file_map().tracked().0.get(&path).copied()?;
-    let contents = db.get(source_id).contents.as_str();
-    Some(extract_iso_literals(contents))
+impl HostLanguage for TypeScriptHostLanguage {
+    #[memo]
+    fn extract_iso_literals(
+        db: &IsographState,
+        path: PathBuf,
+    ) -> Option<Vec<IsoLiteralExtraction<Self>>> {
+        let source_id = db.get_disk_file_map().tracked().0.get(&path).copied()?;
+        let contents = db.get(source_id).contents.as_str();
+        EXTRACT_ISO_LITERAL
+            .captures_iter(contents)
+            .filter_map(|captures| {
+                if captures.name("comment").is_some() {
+                    return None;
+                }
+                let literal = captures.name("literal")?;
+                IsoLiteralExtraction {
+                    iso_literal_text: literal.as_str().to_owned(),
+                    iso_literal_start_index: literal.start(),
+                    context: TypeScriptLiteralContext {
+                        const_export_name: captures
+                            .name("export_name")
+                            .map(|m| m.as_str().intern().to()),
+                        call: match captures.name("open_paren") {
+                            Some(_) => IsoCall::FunctionCall,
+                            None => IsoCall::TaggedTemplate,
+                        },
+                        associated_js_function: match captures.name("associated") {
+                            Some(_) => AssociatedJsFunction::Present,
+                            None => AssociatedJsFunction::Absent,
+                        },
+                    },
+                }
+                .wrap_some()
+            })
+            .collect::<Vec<_>>()
+            .wrap_some()
+    }
 }
 
 #[memo]
@@ -176,7 +209,7 @@ fn iso_literal_extraction(
     path: PathBuf,
     line_char: LineChar,
 ) -> Option<IsoLiteralExtraction> {
-    let extractions = extract_iso_literals_from_file_content(db, path.clone())?;
+    let extractions = TypeScriptHostLanguage::extract_iso_literals(db, path.clone())?;
     let source_id = db.get_disk_file_map().tracked().0.get(&path).copied()?;
     let content = db.get(source_id).contents.as_str();
     find_iso_literal_extraction(line_char, content, extractions).cloned()
@@ -208,7 +241,7 @@ fn parsed_iso_literal_at_location(
 }
 ```
 
-`extract_iso_literals` (the host regex) is a plain function over `&str`. `parse_iso_literal` is a plain function over `&str`. `find_iso_literal_extraction` is a plain function over a cursor, file text, and the extract vec. The memos call them. isograph moved `parse_iso_literal` out of the database crate so the parser would not know about `IsographDatabase`.
+`HostLanguage::extract_iso_literals` is a memo. The TypeScript impl runs `EXTRACT_ISO_LITERAL` and owns the captures. `parse_iso_literal` is a plain function over `&str`. `find_iso_literal_extraction` is a plain function over a cursor, file text, and the extract vec. isograph moved `parse_iso_literal` out of the database crate so the parser would not know about `IsographDatabase`.
 
 `None` from extract is no `DiskFile`. `Some(vec![])` is a present file with no literals. `None` from `iso_literal_extraction`, `iso_literal_text_at_location`, and `parsed_iso_literal_at_location` is no file, or a cursor that is not inside any literal text (the JS around the literals, including `iso(`).
 
@@ -330,7 +363,7 @@ export const Avatar = iso(`
 
 `handle` receives `DiskChanged` with those contents. It `set`s a `DiskFile` keyed by the path and inserts that `SourceId` into `disk_file_map`.
 
-`extract_iso_literals_from_file_content(db, path)` reads that source, runs the host extract, and stores a one-element vec. `iso_literal_text` is the interior of `field User.Avatar`. `iso_literal_start_index` is the byte offset of that interior in the file.
+`TypeScriptHostLanguage::extract_iso_literals(db, path)` reads that source, runs the host regex, and stores a one-element vec. `iso_literal_text` is the interior of `field User.Avatar`. `iso_literal_start_index` is the byte offset of that interior in the file.
 
 `parsed_iso_literal_at_location` at a `LineChar` on `name` loads that extraction's text and calls `parsed_iso_literal`. The parse tree is the selectable declaration. Semantic tokens on that tree are relative to the interior.
 

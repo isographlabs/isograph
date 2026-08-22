@@ -91,8 +91,8 @@ pub fn parsed_iso_literal_at_location<THostLanguage: HostLanguage>(
 ```rust
 // from crates/isograph_compiler/src/lib.rs
 pub use iso_literals::{
-    IsoLiteralExtraction, LineChar, extract_iso_literals_from_file_content, iso_literal_extraction,
-    iso_literal_text_at_location, parsed_iso_literal, parsed_iso_literal_at_location,
+    LineChar, iso_literal_extraction, iso_literal_text_at_location, parsed_iso_literal,
+    parsed_iso_literal_at_location,
 };
 ```
 
@@ -176,10 +176,7 @@ pub fn file_literals<'a>(
     db: &'a IsographState,
     path: &Path,
 ) -> Option<Vec<FileLiteral<'a>>> {
-    let extractions = extract_iso_literals_from_file_content::<TypeScriptHostLanguage>(
-        db,
-        path.to_owned(),
-    )?;
+    let extractions = TypeScriptHostLanguage::extract_iso_literals(db, path.to_owned())?;
     extractions
         .iter()
         .map(|extraction| {
@@ -225,5 +222,5 @@ Move the extract-typescript error tests listed in extract-iso-literals-from-file
 ## Call sites
 
 - Tests in this file: intern a `DiskFile`, `parsed_iso_literal_at_location` at a `LineChar`, assert the AST.
-- file-semantic-tokens.md -> `extract_iso_literals_from_file_content` and `parsed_iso_literal` for each extraction's text.
+- file-semantic-tokens.md -> `THostLanguage::extract_iso_literals` and `parsed_iso_literal` for each extraction's text.
 - lsp-parse-diagnostics.md -> `file_literals`.
