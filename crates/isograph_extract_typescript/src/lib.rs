@@ -11,7 +11,7 @@ use regex::Regex;
 use span::{Span, WithSpan, WithSpanPostfix};
 use thiserror::Error;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct TypeScriptHostLanguage;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

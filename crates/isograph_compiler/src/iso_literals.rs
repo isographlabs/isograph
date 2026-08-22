@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use pico::Database;
 use pico_macros::memo;
 use prelude::Postfix;
 
@@ -20,13 +21,13 @@ pub fn iso_literal_extraction<THostLanguage: HostLanguage>(
 ) -> Option<IsoLiteralExtraction<THostLanguage>> {
     let extractions = THostLanguage::extract_iso_literals(db, path.clone()).as_ref()?;
     let source_id = db.get_disk_file_map().tracked().0.get(&path).copied()?;
-    let content = db.get(source_id).contents.reference();
-    find_iso_literal_extraction(line_char, content, extractions).cloned()
+    let file_content = db.get(source_id).contents.reference();
+    find_iso_literal_extraction(line_char, file_content, extractions).cloned()
 }
 
 fn find_iso_literal_extraction<'a, THostLanguage: HostLanguage>(
     target_line_char: LineChar,
-    content: &str,
+    file_content: &str,
     extracted_items: &'a [IsoLiteralExtraction<THostLanguage>],
 ) -> Option<&'a IsoLiteralExtraction<THostLanguage>> {
     let mut last_iteration_end_line_count = 0;
@@ -36,7 +37,7 @@ fn find_iso_literal_extraction<'a, THostLanguage: HostLanguage>(
         let iso_literal_start_index = extract_item.iso_literal_start_index;
         let iso_literal_end_index = iso_literal_start_index + extract_item.iso_literal_text.len();
 
-        let intermediate_content = &content[max_prev_span_end..iso_literal_start_index];
+        let intermediate_content = &file_content[max_prev_span_end..iso_literal_start_index];
         let (intermediate_line, intermediate_char) = line_and_byte(intermediate_content);
 
         let start_line_count = last_iteration_end_line_count + intermediate_line;
@@ -46,7 +47,7 @@ fn find_iso_literal_extraction<'a, THostLanguage: HostLanguage>(
             last_iteration_end_char_count + intermediate_char
         };
 
-        let iso_content = &content[iso_literal_start_index..iso_literal_end_index];
+        let iso_content = &file_content[iso_literal_start_index..iso_literal_end_index];
         let (iso_line, iso_char) = line_and_byte(iso_content);
 
         let end_line_count = start_line_count + iso_line;
