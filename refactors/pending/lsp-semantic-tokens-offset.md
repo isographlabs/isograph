@@ -1,18 +1,18 @@
-# Encode relative tokens with a literal start offset
+# Encode every iso literal in the file in one walk
 
-Requires lsp-semantic-token-encoding.md (landed). `lsp_semantic_tokens` takes spans that are already byte offsets into `page_content`. Callers that have parse tokens (relative to the literal) rebase with `with_offset` first. Encoding tests do that as `rebased` / `encode_rebased`. Production must not intern a rebased copy. The encoder takes each literal’s start offset and the file text. One call handles every literal in the file. `last_start` and `previous_token_end` are file coordinates and continue across literals.
+Requires lsp-semantic-token-encoding.md (landed). `lsp_semantic_tokens` takes spans that are already byte offsets into `page_content`. Callers that have parse tokens (relative to one literal) rebase with `with_offset` first. Encoding tests do that as `rebased` / `encode_rebased`. Production must not intern a rebased copy, and must not encode one extraction by itself. LSP `semanticTokens/full` is one delta-encoded array for the document. The encoder takes the file text and every literal in extract order, each with its start offset. One `LineIndex`, one `last_start`, one `previous_token_end`, all in file coordinates. JS between literals has no iso tokens.
 
-Origin of rebase: encoding tests’ `rebased`. Origin of one document stream: LSP `semanticTokens/full`. Delta: offset is an argument; the walk adds it per token and does not collect a new vec; a sequence of `(offset, tokens)` is one encode.
+Origin of rebase: encoding tests’ `rebased`. Origin of one document stream: LSP `semanticTokens/full`. Delta: the arguments are the file and all `(offset, tokens)` pairs; the walk adds each offset per token and does not collect a rebased vec; there is no function that encodes a single extraction.
 
-file-semantic-tokens.md calls this. It does not expose file-absolute `WithSpan<IsographSemanticToken>`.
+file-semantic-tokens.md is the only production caller. It passes every parsed literal in the file.
 
 Offset is `u32`. `IsoLiteralStartIndex` stays in the compiler. Callers pass `.0 as u32`. `isograph_lsp` does not depend on `isograph_compiler` for this change.
 
-One shippable change: new `lsp_semantic_tokens` signature and tests. Existing offset-0 tests keep the same assertions.
+One shippable change: new `lsp_semantic_tokens` signature and tests. Existing assertions that used a string as both parse input and `page_content` keep treating that string as a one-interior file whose interior starts at `0`.
 
 ## What the user does
 
-No editor highlighting. Tests that encoded a literal as the whole `page_content` still pass with offset `0`. A test whose `page_content` is `export const Home = iso(\`entrypoint Query.HomeRoute\`)` and whose tokens are the parse of `entrypoint Query.HomeRoute` passes the start index of that interior as offset. The first encoded token is keyword, `length` 11, `delta_start` the UTF-16 column of `entrypoint`.
+No editor highlighting. A test whose `page_content` is `export const Home = iso(\`entrypoint Query.HomeRoute\`)` parses that interior and passes one pair: offset is the byte index of `entrypoint` in the file. The first encoded token is keyword, `length` 11, `delta_start` the UTF-16 column of `entrypoint`. A test with two `iso(\`...\`)` interiors in one string is one call with two pairs.
 
 ## Types
 
@@ -45,28 +45,31 @@ pub fn lsp_semantic_tokens<'a>(
 }
 ```
 
-`lsp_semantic_tokens_with` keeps one `LineCursor`, one `previous_token_end`, one `LastStart`, all in file coordinates. For each `(offset, tokens)` it walks `tokens` in order. Each span used for `check_span` and `emit_pieces` is `token.location.with_offset(offset)`. It does not collect a rebased vec.
+`literals` is every iso interior in `page_content`, left to right. Empty is a file with no iso tokens: `vec![]`.
 
-One literal whose text is the whole `page_content` is `lsp_semantic_tokens(page_content, [(0, tokens)])`. Existing tests that called `lsp_semantic_tokens(tokens, source)` become that. The test helper `encode` does `lsp_semantic_tokens(source, [(0, tokens)])`. Delete `rebased` and `encode_rebased`; tests that used them pass the file string as `page_content` and the literal start as offset.
+`lsp_semantic_tokens_with` keeps one `LineCursor`, one `previous_token_end`, one `LastStart`. For each `(offset, tokens)` it walks `tokens` in order. Each span used for `check_span` and `emit_pieces` is `token.location.with_offset(offset)`. It does not collect a rebased vec. It does not encode a pair in isolation and concatenate LSP arrays.
 
-Empty `literals` is `vec![]`. JS between literals has no iso tokens. A later literal whose file start is before the previous token’s file end is a caller bug; `check_span` still asserts exclusive ordered spans.
+A later literal whose file start is before the previous token’s file end is a caller bug; `check_span` still asserts exclusive ordered spans.
 
-`lib.rs` still re-exports `lsp_semantic_tokens`.
+Existing tests that called `lsp_semantic_tokens(tokens, source)` where `source` was the parse input become `lsp_semantic_tokens(source, [(0, tokens)])`: that fixture is a one-interior file. The test helper `encode` does that. Delete `rebased` and `encode_rebased`. Tests that need JS around the interior pass the file string as `page_content` and the interior’s start index as offset.
+
+`lib.rs` still re-exports `lsp_semantic_tokens`. There is no `lsp_semantic_tokens` overload that takes one token slice without the file list.
 
 ## Tests
 
-Keep every existing encoding assertion, through `encode` with offset `0`.
+Keep every existing encoding assertion, through `encode` as a one-interior file at offset `0`.
 
 Add:
 
-- `page_content` is `export const Home = iso(\`entrypoint Query.HomeRoute\`)`. Tokens are `parse_iso_literal("entrypoint Query.HomeRoute").tokens`. Offset is the byte index of `entrypoint` in `page_content`. First encoded token: `delta_line` 0, `delta_start` UTF-16 of `export const Home = iso(\``, `length` 11, `token_type` 15.
+- `page_content` is `export const Home = iso(\`entrypoint Query.HomeRoute\`)`. Tokens are `parse_iso_literal("entrypoint Query.HomeRoute").tokens`. One pair; offset is the byte index of `entrypoint` in `page_content`. First encoded token: `delta_line` 0, `delta_start` UTF-16 of `export const Home = iso(\``, `length` 11, `token_type` 15.
 - Prefix `"const x = 1;\n"` on that same `page_content`. Same tokens, offset is the new start index. First token `delta_line` 1, `delta_start` equals the previous test’s `delta_start`.
-- Two interiors in one `page_content`: `iso(\`entrypoint Query.A\`)` then later `iso(\`entrypoint Query.B\`)`. One call, two `(offset, tokens)` pairs in extract order. First token of the second pair is keyword at `B`’s `entrypoint`: its `delta_line` / `delta_start` place it on that line and column. Tokens remain ordered.
+- Two interiors in one `page_content`: `iso(\`entrypoint Query.A\`)` then later `iso(\`entrypoint Query.B\`)`. One call, two pairs in extract order. First token of the second pair is keyword at `B`’s `entrypoint`: its `delta_line` / `delta_start` place it on that line and column. Tokens remain ordered.
 - Same two pairs in reverse order `should_panic` on exclusive ordered spans.
+- Empty `literals`: `vec![]`.
 
 `expect` names the fixture string the test built.
 
 ## Call sites
 
 - Encoding tests as above.
-- file-semantic-tokens.md: `lsp_semantic_tokens_for_file` passes the file text and `(start_index.0 as u32, parsed.tokens)` per literal.
+- file-semantic-tokens.md: `lsp_semantic_tokens_for_file` passes the file text and every `(start_index.0 as u32, parsed.tokens)` in extract order. One call.
