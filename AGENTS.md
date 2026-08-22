@@ -1,12 +1,26 @@
 # i2
 
-From upstream isograph we keep pico and pico_macros (unchanged), the swc plugin and its dependency chain (isograph_config, common_lang_types, string_key_newtype, prelude), resolve_position, the relay crates, the demos, the docs website, and the build process. The new work is `crates/isograph_parser`, `crates/tests`, `crates/isograph_cli` (freddie_cli's lifecycle verbs around the daemon), and `crates/ts_graphql_react_isograph_cli` (the `isograph` binary).
+From upstream isograph we keep pico and pico_macros (unchanged), the swc plugin and its dependency chain (isograph_config, common_lang_types, string_key_newtype, prelude), resolve_position, the relay crates, the docs website, and the build process. The new work is `crates/isograph_parser`, `crates/tests`, `crates/isograph_cli` (freddie_cli's lifecycle verbs around the daemon), and `crates/ts_graphql_react_isograph_cli` (the `isograph` binary).
 
 The parser does not use pico. Parser functions are plain functions over `&str`. Memoization applies above the parser (which files changed, which literals were extracted).
 
 ## Mental model
 
 Schema data model: `docs-website/docs/design-docs/mental-model.md`. Read it before working on entities, entity declarations, wrappers, selectables, selectable declarations, selections, selection sets, or entrypoints.
+
+pico: `docs-website/docs/design-docs/pico.md`. Read it before working on sources, memos, or `IsographState`.
+
+## pico tracked maps
+
+`#[tracked]` on a database field (`disk_file_map`) gives `get_disk_file_map()` / `get_disk_file_map_mut()`. `handle` writes the map with `tracked()`; `MutView` has no `untracked()`.
+
+A memo that iterates the map (compile, every file) uses `tracked()`. That records a dependency on the whole map. Inserting or removing any key re-invokes it.
+
+A memo already keyed by the map key (a `path`) looks up that one `SourceId` with `untracked()`, then `db.get(source_id)`. `db.get` tracks the source. An unrelated insert or remove must not re-invoke. pico `tracking_field::efficiency` pins this.
+
+Do not iterate `untracked()`. A newly inserted key is not seen. pico `tracking_field::correctness` pins this.
+
+A lookup that misses did not `db.get`. If it also did not `tracked()` the map, a later insert of that key is not seen. isograph hit this: `get_iso_literal` ran untracked, returned `None`, and the next request reused that `None`. On miss, `tracked()` the map so a later `Present` of that path is seen.
 
 ## Commits
 

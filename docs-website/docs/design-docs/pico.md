@@ -166,40 +166,29 @@ struct LineChar {
 }
 
 impl HostLanguage for TypeScriptHostLanguage {
-    fn extract_iso_literals_from_source(
-        source: &str,
-    ) -> Vec<WithSpan<(&str, TypeScriptLiteralContext)>> {
-        EXTRACT_ISO_LITERAL
-            .captures_iter(source)
-            .filter_map(|captures| {
-                if captures.name("comment").is_some() {
-                    return None;
-                }
-                let literal = captures.name("literal")?;
-                let span = Span::from_usize(literal.start(), literal.end());
-                (
-                    literal.as_str(),
-                    TypeScriptLiteralContext { /* export_name, call, associated */ },
-                )
-                    .with_span(span)
-                    .wrap_some()
-            })
-            .collect()
-    }
-
     #[memo]
     fn extract_iso_literals(
         db: &IsographState<Self>,
         path: PathBuf,
     ) -> Option<Vec<IsoLiteralExtraction<Self>>> {
-        let source_id = db.get_disk_file_map().tracked().0.get(&path).copied()?;
-        let contents = db.get(source_id).contents.as_str();
-        Self::extract_iso_literals_from_source(contents)
-            .into_iter()
-            .map(|extracted| IsoLiteralExtraction {
-                iso_literal_text: extracted.item.0.to_owned(),
-                iso_literal_start_index: extracted.location.start as usize,
-                context: extracted.item.1,
+        let source_id = match db.get_disk_file_map().untracked().0.get(&path).copied() {
+            Some(source_id) => source_id,
+            None => db.get_disk_file_map().tracked().0.get(&path).copied()?,
+        };
+        let contents = db.get(source_id).contents.reference();
+        EXTRACT_ISO_LITERAL
+            .captures_iter(contents)
+            .filter_map(|captures| {
+                if captures.name("comment").is_some() {
+                    return None;
+                }
+                let literal = captures.name("literal")?;
+                IsoLiteralExtraction {
+                    iso_literal_text: literal.as_str().to_owned(),
+                    iso_literal_start_index: literal.start(),
+                    context: TypeScriptLiteralContext { /* export_name, call, associated */ },
+                }
+                .wrap_some()
             })
             .collect::<Vec<_>>()
             .wrap_some()
@@ -213,8 +202,8 @@ fn iso_literal_extraction<THostLanguage: HostLanguage>(
     line_char: LineChar,
 ) -> Option<IsoLiteralExtraction<THostLanguage>> {
     let extractions = THostLanguage::extract_iso_literals(db, path.clone()).as_ref()?;
-    let source_id = db.get_disk_file_map().tracked().0.get(&path).copied()?;
-    let content = db.get(source_id).contents.as_str();
+    let source_id = db.get_disk_file_map().untracked().0.get(&path).copied()?;
+    let content = db.get(source_id).contents.reference();
     find_iso_literal_extraction(line_char, content, extractions).cloned()
 }
 
@@ -244,7 +233,7 @@ fn parsed_iso_literal_at_location(
 }
 ```
 
-`HostLanguage::extract_iso_literals_from_source` is a plain function over `&str`. `HostLanguage::extract_iso_literals` is the memo: look up the `DiskFile`, call `from_source`, own the captures. `parse_iso_literal` is a plain function over `&str`. `find_iso_literal_extraction` is a plain function over a cursor, file text, and the extract vec. isograph moved `parse_iso_literal` out of the database crate so the parser would not know about `IsographDatabase`.
+`HostLanguage` methods are memos. The regex lives in the `extract_iso_literals` body. `parse_iso_literal` is a plain function over `&str` in the parser crate. `find_iso_literal_extraction` is a plain function over a cursor, file text, and the extract vec. isograph moved `parse_iso_literal` out of the database crate so the parser would not know about `IsographDatabase`.
 
 `None` from extract is no `DiskFile`. `Some(vec![])` is a present file with no literals. `None` from `iso_literal_extraction`, `iso_literal_text_at_location`, and `parsed_iso_literal_at_location` is no file, or a cursor that is not inside any literal text (the JS around the literals, including `iso(` and the closing backtick).
 
@@ -324,9 +313,9 @@ The map is which paths currently have a `DiskFile`. `db.set` of a `DiskFile` doe
 
 `tracked()` records a dependency on the whole map. Inserting or removing any path invalidates every memo that used `tracked()`. A memo that iterates every file (compile, "all client declarations") uses `tracked()`.
 
-`untracked()` does not record the map. It is correct when the memo is already keyed by `path`, looks up that one entry, and then `db.get(source_id)` (which tracks the source). Adding an unrelated file must not re-invoke a per-file extract. Iterating `untracked()` is wrong: a newly inserted path is not seen.
+`untracked()` does not record the map. It is correct when the memo is already keyed by `path`, looks up that one `SourceId`, and then `db.get(source_id)` (which tracks the source). Adding an unrelated file must not re-invoke a per-file extract. Iterating `untracked()` is wrong: a newly inserted path is not seen.
 
-Absence is the remaining case. A memo keyed by `path` that last time returned `None` did not `db.get` a source. If it also did not track the map, a later `Present` of that path is not seen and the memo stays `None`. isograph hit this: an autofix created a file, `get_iso_literal` ran untracked before the map insert, returned `None`, and the next request reused that `None` and panicked. Per-file memos that can miss a file therefore cannot be purely untracked. The intended dependency of a per-file memo is that file, not the set of all files.
+A lookup that misses did not `db.get`. If it also did not `tracked()` the map, a later `Present` of that path is not seen and the memo stays `None`. isograph hit this: an autofix created a file, `get_iso_literal` ran untracked, returned `None`, and the next request reused that `None` and panicked. On miss, `tracked()` the map so a later insert of that key is seen. The intended dependency of a per-file memo that hits is that file, not the set of all files.
 
 ## Intern
 
@@ -348,7 +337,7 @@ Memo slots accumulate until `run_garbage_collection`. That keeps the last 10_000
 
 ## Parser and extract
 
-The parser takes `&str`. Tests call `parse_iso_literal` with a string. Host extract takes `&str`. Tests call it with a string.
+The parser takes `&str`. Tests call `parse_iso_literal` with a string. Extract is a memo over a `DiskFile`. Tests intern a file the same way `handle` does.
 
 A caller that needs a parse tree calls the parse memo with the key it has. pico returns `&T`. The caller does not clone a whole file's AST out of the database to hand to another memo.
 
