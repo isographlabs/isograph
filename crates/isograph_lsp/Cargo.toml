@@ -5,11 +5,16 @@ edition = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+common_lang_types = { path = "../common_lang_types" }
 isograph_compiler = { path = "../isograph_compiler" }
 isograph_parser = { path = "../isograph_parser" }
 lsp-types = { workspace = true }
 prelude = { path = "../prelude" }
 span = { path = "../span" }
+
+[dev-dependencies]
+intern = { path = "../../relay-crates/intern" }
+isograph_extract_typescript = { path = "../isograph_extract_typescript" }
 
 [lints]
 workspace = true
