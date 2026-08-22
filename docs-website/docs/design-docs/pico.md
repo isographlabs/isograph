@@ -52,13 +52,17 @@ struct OpenFile {
 }
 ```
 
-The `#[key]` field is the identity of the source. `TypeId` plus that field is the storage key. Two `DiskFile` values with the same path are the same source. `db.set` of a `DiskFile` with that path replaces the previous one.
+The `#[key]` field is the identity of the source. Under the hood that identity is a `Key`: the hash of `TypeId<T>` plus the `#[key]` field. Two `DiskFile` values with the same path are the same source. `db.set` of a `DiskFile` with that path replaces the previous one.
 
 If the new value `==` the old value, the epoch does not advance and dependents do not re-invoke.
 
-`db.set` returns `SourceId<T>`. That id is `Copy`. Hold it and pass it to memos when the call site has it. Call sites that have a path and not a `SourceId` intern a `PathBuf` and look the source up through the map.
+`db.set` stores the value in a `SourceNode` (`time_updated` plus `Box<dyn DynEq>`), records `Key -> index` in a map, and returns `SourceId<T>`. That id is `Copy`: a `Key` plus `PhantomData<T>`. It is a type-level proof that a `T` exists in the database. `db.get(id)` takes that proof, looks up the `Key`, downcasts the node to `T`, records a read, and returns `&T`. There is no `Option`. A `SourceId<T>` whose source is missing is a false proof. pico panics. That panic is allowed.
 
-`db.get(source_id)` returns the current value and records a read. Presence is a separate fact: the tracked map of paths that currently have a `DiskFile`. Looking up by path can miss and return `None`. `db.get` of a `SourceId` whose source is not in the database panics. That panic is allowed. A `SourceId<T>` for a source that does not exist is not a representable state to return from; pico's `get` is written that way.
+The type system does not stop you from holding a `SourceId` after `remove`. `remove` drops the map entry, `take`s the slot, and increments the epoch. Dependents that read that source see it as changed (`source_node_changed_since` is true when the node is gone). The next `get` of the stale id panics. A memo that returns a `SourceId` after the source was removed is handing out a false proof.
+
+A path is not a proof. Looking up by path can miss and return `None`. The tracked map is `HashMap<PathBuf, SourceId<DiskFile>>`: `Option<SourceId<_>>` from the map, then `get` of the id. Call sites that have a path and not a `SourceId` intern a `PathBuf` and go through the map.
+
+`get_singleton<T>()` returns `Option<&T>`. A singleton has no `SourceId` you hold as a proof of presence. You ask by type. The config may not have been set.
 
 A path may have a `DiskFile`, an `OpenFile`, both, or neither. Artifact generation reads `DiskFile`. The LSP reads `OpenFile` when that path has one, otherwise `DiskFile`. Those are different memos. One overlay used by both, as isograph's `read_iso_literals_source` does, makes artifact generation depend on editor buffers.
 
