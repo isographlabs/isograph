@@ -1,13 +1,16 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
 use common_lang_types::ConstExportName;
 use intern::string_key::Intern;
-use isograph_compiler::{HostLanguage, IsoLiteralExtraction, IsographState};
-use isograph_parser::SelectableNameWrapper;
+use isograph_compiler::{
+    HostLanguage, IsoLiteralError, IsoLiteralExtraction, IsographState, parsed_iso_literal,
+};
+use isograph_parser::{IsoLiteralItem, IsoLiteralParse, ParsedIsoLiteral, SelectableNameWrapper};
 use pico_macros::memo;
 use prelude::Postfix;
 use regex::Regex;
+use span::WithSpanPostfix;
 use thiserror::Error;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -95,6 +98,69 @@ impl HostLanguage for TypeScriptHostLanguage {
             .collect::<Vec<_>>()
             .wrap_some()
     }
+}
+
+pub fn host_errors_for_extraction(
+    extraction: &IsoLiteralExtraction<TypeScriptHostLanguage>,
+    parsed: &ParsedIsoLiteral,
+) -> Vec<span::WithSpan<TypeScriptHostError>> {
+    let span = extraction.span();
+    let mut errors = Vec::new();
+    if let IsoCall::TaggedTemplate = extraction.context.call {
+        errors.push(TypeScriptHostError::MissingParentheses.with_span(span));
+    }
+    let parsed_item = parsed.item.as_ref().and_then(item_of);
+    if let Some(IsoLiteralItem::Selectable(selectable)) = parsed_item {
+        if extraction.context.const_export_name.is_none() {
+            errors.push(
+                TypeScriptHostError::MissingExport {
+                    suggested_name: selectable.name.item,
+                }
+                .with_span(span),
+            );
+        }
+        if let AssociatedJsFunction::Absent = extraction.context.associated_js_function {
+            errors.push(TypeScriptHostError::MissingAssociatedFunction.with_span(span));
+        }
+    }
+    errors
+}
+
+fn item_of(parse: &span::WithSpan<IsoLiteralParse>) -> Option<&IsoLiteralItem> {
+    parse.item.item.as_ref().map(|item| item.item.reference())
+}
+
+pub struct FileLiteral<'a> {
+    pub extraction: &'a IsoLiteralExtraction<TypeScriptHostLanguage>,
+    pub parsed: &'a ParsedIsoLiteral,
+    pub errors: Vec<span::WithSpan<IsoLiteralError<TypeScriptHostLanguage>>>,
+}
+
+pub fn file_literals<'a>(
+    db: &'a IsographState<TypeScriptHostLanguage>,
+    path: &Path,
+) -> Option<Vec<FileLiteral<'a>>> {
+    let extractions = TypeScriptHostLanguage::extract_iso_literals(db, path.to_owned()).as_ref()?;
+    extractions
+        .iter()
+        .map(|extraction| {
+            let parsed = parsed_iso_literal(db, extraction.iso_literal_text.clone());
+            let errors = host_errors_for_extraction(extraction, parsed)
+                .into_iter()
+                .map(|error| error.map(IsoLiteralError::Host))
+                .chain(parsed.errors.iter().map(|error| {
+                    IsoLiteralError::Parse(error.item.clone())
+                        .with_span(error.location.with_offset(extraction.span().start))
+                }))
+                .collect();
+            FileLiteral {
+                extraction,
+                parsed,
+                errors,
+            }
+        })
+        .collect::<Vec<_>>()
+        .wrap_some()
 }
 
 #[cfg(test)]
@@ -366,13 +432,19 @@ mod memo_tests {
 
     use intern::string_key::Intern;
     use isograph_compiler::{
-        HostLanguage, IsographState, LineChar, iso_literal_text_at_location, parsed_iso_literal,
-        parsed_iso_literal_at_location,
+        HostLanguage, IsoLiteralError, IsoLiteralExtraction, IsographState, LineChar,
+        iso_literal_text_at_location, parsed_iso_literal, parsed_iso_literal_at_location,
     };
-    use isograph_parser::{AstError, IsoLiteralItem, ParseError, ParsedIsoLiteral};
+    use isograph_parser::{
+        AstError, IsoLiteralItem, ParseError, ParsedIsoLiteral, SelectableNameWrapper,
+    };
     use prelude::Postfix;
+    use span::WithSpanPostfix;
 
-    use super::{AssociatedJsFunction, IsoCall, TypeScriptHostLanguage, TypeScriptLiteralContext};
+    use super::{
+        AssociatedJsFunction, IsoCall, TypeScriptHostError, TypeScriptHostLanguage,
+        TypeScriptLiteralContext, file_literals, host_errors_for_extraction,
+    };
 
     fn iso_literal_item(parsed: &ParsedIsoLiteral) -> Option<&IsoLiteralItem> {
         parsed
@@ -390,6 +462,34 @@ mod memo_tests {
 
     fn interned_export(name: &str) -> common_lang_types::ConstExportName {
         name.intern().to()
+    }
+
+    fn one_literal(
+        contents: &str,
+    ) -> (
+        IsographState<TypeScriptHostLanguage>,
+        PathBuf,
+        IsoLiteralExtraction<TypeScriptHostLanguage>,
+        ParsedIsoLiteral,
+    ) {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = PathBuf::from("/tmp/proj/src/a.ts");
+        intern_file(&mut db, path.clone(), contents);
+        let extraction = TypeScriptHostLanguage::extract_iso_literals(&db, path.clone())
+            .as_ref()
+            .expect("the test interned this path")
+            .first()
+            .expect("the fixture has one literal")
+            .clone();
+        let character = contents
+            .find(extraction.iso_literal_text.as_str())
+            .expect("the fixture contains the iso text") as u32;
+        let parsed =
+            parsed_iso_literal_at_location(&db, path.clone(), LineChar { line: 0, character })
+                .as_ref()
+                .expect("the interior is inside the literal")
+                .clone();
+        (db, path, extraction, parsed)
     }
 
     #[test]
@@ -781,6 +881,175 @@ iso(`entrypoint Query.HomeRoute`)";
         assert_eq!(
             parsed_iso_literal(&db, after),
             parsed_iso_literal(&db, before)
+        );
+    }
+
+    #[test]
+    fn tagged_template_is_missing_parentheses() {
+        let (_db, _path, extraction, parsed) = one_literal("iso`entrypoint Query.HomeRoute`");
+        assert_eq!(
+            host_errors_for_extraction(&extraction, &parsed),
+            TypeScriptHostError::MissingParentheses
+                .with_span(extraction.span())
+                .wrap_vec()
+        );
+    }
+
+    #[test]
+    fn incomplete_entrypoint_is_a_parse_error() {
+        let (db, path, extraction, parsed) = one_literal("iso(`entrypoint`)");
+        assert!(!parsed.errors.is_empty());
+        assert!(host_errors_for_extraction(&extraction, &parsed).is_empty());
+        let literals = file_literals(&db, &path).expect("the test interned this path");
+        assert!(
+            literals
+                .iter()
+                .flat_map(|literal| literal.errors.iter())
+                .any(|error| matches!(error.item, IsoLiteralError::Parse(_)))
+        );
+    }
+
+    #[test]
+    fn entrypoint_without_export_is_valid() {
+        let (_db, _path, extraction, parsed) = one_literal("iso(`entrypoint Query.HomeRoute`)");
+        assert!(host_errors_for_extraction(&extraction, &parsed).is_empty());
+    }
+
+    #[test]
+    fn field_without_export_is_missing_export() {
+        let (_db, _path, extraction, parsed) = one_literal("iso(`field Pet.fullName { id }`)(");
+        let errors = host_errors_for_extraction(&extraction, &parsed);
+        assert_eq!(errors.len(), 1);
+        assert!(matches!(
+            errors[0].item,
+            TypeScriptHostError::MissingExport { .. }
+        ));
+    }
+
+    #[test]
+    fn field_without_associated_function_is_missing_associated_function() {
+        let (_db, _path, extraction, parsed) =
+            one_literal("export const fullName = iso(`field Pet.fullName { id }`)");
+        assert_eq!(
+            host_errors_for_extraction(&extraction, &parsed),
+            TypeScriptHostError::MissingAssociatedFunction
+                .with_span(extraction.span())
+                .wrap_vec()
+        );
+    }
+
+    #[test]
+    fn exported_field_with_associated_function_is_valid() {
+        let (_db, _path, extraction, parsed) =
+            one_literal("export const fullName = iso(`field Pet.fullName { id }`)(");
+        assert!(host_errors_for_extraction(&extraction, &parsed).is_empty());
+    }
+
+    #[test]
+    fn tagged_template_field_reports_parentheses_and_export_and_associated() {
+        let (_db, _path, extraction, parsed) = one_literal("iso`field Pet.fullName { id }`");
+        let span = extraction.span();
+        assert_eq!(
+            host_errors_for_extraction(&extraction, &parsed),
+            vec![
+                TypeScriptHostError::MissingParentheses.with_span(span),
+                TypeScriptHostError::MissingExport {
+                    suggested_name: SelectableNameWrapper("fullName".intern().to()),
+                }
+                .with_span(span),
+                TypeScriptHostError::MissingAssociatedFunction.with_span(span),
+            ]
+        );
+    }
+
+    #[test]
+    fn host_error_span_is_the_extraction_span() {
+        let (_db, _path, extraction, parsed) = one_literal("iso`entrypoint Query.HomeRoute`");
+        let errors = host_errors_for_extraction(&extraction, &parsed);
+        assert_eq!(errors.len(), 1);
+        assert_eq!(errors[0].location, extraction.span());
+    }
+
+    #[test]
+    fn valid_extraction_has_no_errors() {
+        let (_db, _path, extraction, parsed) = one_literal("iso(`entrypoint Query.HomeRoute`)");
+        assert!(parsed.errors.is_empty());
+        assert!(host_errors_for_extraction(&extraction, &parsed).is_empty());
+    }
+
+    #[test]
+    fn missing_disk_file_has_no_file_literals() {
+        let db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = PathBuf::from("/tmp/proj/src/a.ts");
+        assert!(
+            parsed_iso_literal_at_location(
+                &db,
+                path.clone(),
+                LineChar {
+                    line: 0,
+                    character: 0,
+                }
+            )
+            .is_none()
+        );
+        assert!(file_literals(&db, &path).is_none());
+    }
+
+    #[test]
+    fn present_file_with_no_iso_has_empty_file_literals() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = PathBuf::from("/tmp/proj/src/a.ts");
+        intern_file(&mut db, path.clone(), "export const Foo = 1;");
+        let literals = file_literals(&db, &path).expect("the test interned this path");
+        assert!(literals.is_empty());
+    }
+
+    #[test]
+    fn file_literals_parse_error_is_file_absolute() {
+        let (db, path, extraction, _parsed) = one_literal("iso(`entrypoint`)");
+        let literals = file_literals(&db, &path).expect("the test interned this path");
+        assert_eq!(literals.len(), 1);
+        assert!(literals[0].errors.iter().any(|error| matches!(
+            error.item,
+            IsoLiteralError::Parse(_)
+        ) && error.location.start
+            >= extraction.span().start));
+        assert!(
+            literals[0]
+                .errors
+                .iter()
+                .all(|error| !matches!(error.item, IsoLiteralError::Host(_)))
+        );
+    }
+
+    #[test]
+    fn failed_field_parse_is_not_missing_export() {
+        let (_db, _path, extraction, parsed) = one_literal("iso(`field`)(");
+        assert!(!parsed.errors.is_empty());
+        assert!(host_errors_for_extraction(&extraction, &parsed).is_empty());
+    }
+
+    #[test]
+    fn tagged_template_incomplete_entrypoint_is_parentheses_only() {
+        let (db, path, extraction, parsed) = one_literal("iso`entrypoint`");
+        assert_eq!(
+            host_errors_for_extraction(&extraction, &parsed),
+            TypeScriptHostError::MissingParentheses
+                .with_span(extraction.span())
+                .wrap_vec()
+        );
+        let literals = file_literals(&db, &path).expect("the test interned this path");
+        assert!(
+            literals
+                .iter()
+                .flat_map(|literal| literal.errors.iter())
+                .any(|error| matches!(error.item, IsoLiteralError::Host(_)))
+        );
+        assert!(
+            literals
+                .iter()
+                .flat_map(|literal| literal.errors.iter())
+                .any(|error| matches!(error.item, IsoLiteralError::Parse(_)))
         );
     }
 }

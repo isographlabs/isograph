@@ -684,6 +684,7 @@ dependencies = [
  "pico_macros",
  "prelude",
  "regex",
+ "span",
  "thiserror 1.0.69",
  "tracing",
 ]

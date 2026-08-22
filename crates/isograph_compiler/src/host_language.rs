@@ -43,6 +43,15 @@ impl<THostLanguage: HostLanguage> Debug for IsoLiteralExtraction<THostLanguage> 
     }
 }
 
+impl<THostLanguage: HostLanguage> IsoLiteralExtraction<THostLanguage> {
+    pub fn span(&self) -> span::Span {
+        span::Span::from_usize(
+            self.iso_literal_start_index,
+            self.iso_literal_start_index + self.iso_literal_text.len(),
+        )
+    }
+}
+
 pub trait HostLanguage: Send + Sync + Sized + 'static {
     type Error: std::fmt::Display + std::error::Error + Clone + PartialEq + Eq + 'static;
     type LiteralContext: Clone + PartialEq + Eq + Debug + 'static;

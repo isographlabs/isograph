@@ -13,6 +13,7 @@ pico = { path = "../pico" }
 pico_macros = { path = "../pico_macros" }
 prelude = { path = "../prelude" }
 regex = { workspace = true }
+span = { path = "../span" }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
