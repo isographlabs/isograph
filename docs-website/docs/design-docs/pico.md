@@ -112,7 +112,7 @@ Public APIs take one of:
 
 Semantic tokens and file diagnostics take `path`. Hover, goto definition, and completion take `path` and `LineChar`. Entity lookup takes `EntityName`. Selectable lookup takes `EntityName` and `SelectableName`.
 
-The literal text as a parse intern is how those public functions share a parse. A vec index of a literal in a file is not an argument.
+The literal text as a parse intern is how those public functions share a parse. A vec index of a literal in a file is not a public argument. Public APIs take `path` and `LineChar`. The first intern converts that pair to `LiteralId` (the path plus the 0-based index in the extract vec). Parse is interned on the literal text, not on `LiteralId`.
 
 Arguments that are `SourceId<T>` or `MemoRef<T>` are identities already. They are `Copy`. pico never clones them. Everything else (`PathBuf`, `String`, interned names) is hashed and interned as a param.
 
@@ -122,19 +122,16 @@ A memo result `T` is stored once in that slot and returned as `&T`.
 
 ## Iso literals
 
-File text is a source. Extracting the literals in a file is a memo. The extraction at a cursor is a memo. The literal text at a cursor is a memo. Parsing that text is a memo. The parsed tree at a cursor is a memo.
+File text is a source. Extracting the literals in a file is a memo. The `LiteralId` at a `LineChar` is a memo. The extraction at a `LiteralId` is a memo. Parsing the extraction's text is a memo. There is no parse-tree memo keyed on `LineChar`.
 
 ```text
-parsed_iso_literal_at_location(path, LineChar)
-  -> iso_literal_text_at_location(path, LineChar)
-  + parsed_iso_literal(text)
-
-iso_literal_text_at_location(path, LineChar)
-  -> iso_literal_extraction(path, LineChar)
-
-iso_literal_extraction(path, LineChar)
+literal_id_at_location(path, LineChar)
   -> THostLanguage::extract_iso_literals(path)
-  + find_iso_literal_extraction(LineChar, file text, extract vec)
+  + find_iso_literal_index(LineChar, file text, extract vec)
+
+iso_literal_extraction(LiteralId)
+  -> THostLanguage::extract_iso_literals(path)
+  + vec[index]
 
 parsed_iso_literal(text)
   -> parse_iso_literal(&str)
@@ -163,6 +160,12 @@ struct IsoLiteralExtraction {
 struct LineChar {
     line: u32,
     character: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct LiteralId {
+    path: PathBuf,
+    index: usize,
 }
 
 impl HostLanguage for TypeScriptHostLanguage {
@@ -196,52 +199,47 @@ impl HostLanguage for TypeScriptHostLanguage {
 }
 
 #[memo]
-fn iso_literal_extraction<THostLanguage: HostLanguage>(
+fn literal_id_at_location<THostLanguage: HostLanguage>(
     db: &IsographState<THostLanguage>,
     path: PathBuf,
     line_char: LineChar,
-) -> Option<IsoLiteralExtraction<THostLanguage>> {
+) -> Option<LiteralId> {
     let extractions = THostLanguage::extract_iso_literals(db, path.clone()).as_ref()?;
     let source_id = db.get_disk_file_map().untracked().0.get(&path).copied()?;
     let content = db.get(source_id).contents.reference();
-    find_iso_literal_extraction(line_char, content, extractions).cloned()
+    let index = find_iso_literal_index(line_char, content, extractions)?;
+    LiteralId { path, index }.wrap_some()
 }
 
 #[memo]
-fn iso_literal_text_at_location(
-    db: &IsographState,
-    path: PathBuf,
-    line_char: LineChar,
-) -> Option<String> {
-    iso_literal_extraction(db, path, line_char)
-        .map(|extraction| extraction.iso_literal_text.clone())
+fn iso_literal_extraction<THostLanguage: HostLanguage>(
+    db: &IsographState<THostLanguage>,
+    literal_id: LiteralId,
+) -> Option<IsoLiteralExtraction<THostLanguage>> {
+    let extractions =
+        THostLanguage::extract_iso_literals(db, literal_id.path.clone()).as_ref()?;
+    extractions.get(literal_id.index).cloned()
 }
 
 #[memo]
 fn parsed_iso_literal(db: &IsographState, iso_literal_text: String) -> ParsedIsoLiteral {
     parse_iso_literal(iso_literal_text.as_str())
 }
-
-#[memo]
-fn parsed_iso_literal_at_location(
-    db: &IsographState,
-    path: PathBuf,
-    line_char: LineChar,
-) -> Option<ParsedIsoLiteral> {
-    let text = iso_literal_text_at_location(db, path, line_char)?;
-    parsed_iso_literal(db, text.clone()).clone().wrap_some()
-}
 ```
 
-`HostLanguage` methods are memos. The regex lives in the `extract_iso_literals` body. `parse_iso_literal` is a plain function over `&str` in the parser crate. `find_iso_literal_extraction` is a plain function over a cursor, file text, and the extract vec. isograph moved `parse_iso_literal` out of the database crate so the parser would not know about `IsographDatabase`.
+`HostLanguage` methods are memos. The regex lives in the `extract_iso_literals` body. `parse_iso_literal` is a plain function over `&str` in the parser crate. `find_iso_literal_index` is a plain function over a `LineChar`, file text, and the extract vec; it returns the vec index. isograph moved `parse_iso_literal` out of the database crate so the parser would not know about `IsographDatabase`.
 
-`None` from extract is no `DiskFile`. `Some(vec![])` is a present file with no literals. `None` from `iso_literal_extraction`, `iso_literal_text_at_location`, and `parsed_iso_literal_at_location` is no file, or a cursor that is not inside any literal text (the JS around the literals, including `iso(` and the closing backtick).
+`None` from extract is no `DiskFile`. `Some(vec![])` is a present file with no literals. `None` from `literal_id_at_location` is no file, or a `LineChar` that is not inside any literal text (the JS around the literals, including `iso(` and the closing backtick). `None` from `iso_literal_extraction` is no file, or `index` past the extract vec.
 
-The parse memo is keyed on the literal text, not on the file, not on the span in the file. Two files with the same iso text share a parse.
+The parse memo is keyed on the literal text, not on the file, not on the span in the file, not on `LiteralId`. Two files with the same iso text share a parse.
 
-Public callers pass `path` and `LineChar`. Those memos re-invoke. The first work is turning that pair into an extraction, a string, a parse tree. They short-circuit at `parsed_iso_literal(text)`: same string, parse does not re-run.
+Public callers pass `path` and `LineChar`. Those memos re-invoke. The first work is turning that pair into a `LiteralId`. The stored value per `LineChar` is a path and a vec index, not an extraction and not a parse tree. `iso_literal_extraction` of that `LiteralId` is one slot per literal in the file. They short-circuit at `parsed_iso_literal(text)`: same string, parse does not re-run.
 
-Inserting a newline at the top of a one-line file is a new `LineChar` and a new cursor slot. Bytes added on an earlier line, no extra newline, cursor on a later line: extract is `!=`, `iso_literal_text_at_location` sees the same string and backdates, `parsed_iso_literal_at_location` does not re-invoke. `parsed_iso_literal` of that text does not re-invoke in either case.
+A `(path, LineChar)` memo must not store a parse tree, an extraction, or other per-literal data that is the same at every position inside that literal. Store `LiteralId`. Work that can differ at every `LineChar` (hover, completion) is a later memo on `(path, LineChar)` whose body reads `LiteralId` and then the extraction and parse.
+
+Inserting a newline at the top of a one-line file is a new `LineChar` and a new `literal_id_at_location` slot. The `LiteralId` bits are the same (`index: 0`). `iso_literal_extraction` of that id is the same intern. `parsed_iso_literal` of that text does not re-invoke.
+
+Bytes added on an earlier line, no extra newline, cursor on a later line: same `LineChar`, extract is `!=` (`iso_literal_start_index` moved), `literal_id_at_location` re-invokes, `LiteralId` is `==` (`path` and `index` unchanged) and backdates. `iso_literal_extraction` of that id re-invokes and is `!=`. `parsed_iso_literal` of that text does not re-invoke.
 
 `ParsedIsoLiteral` stores spans relative to the literal text. File-absolute spans are applied by a later memo that already has `iso_literal_start_index`. A file-absolute span in the parse result would make parse `!=` after a prepend, and dependents of parse would re-invoke even though the tree is the same.
 
@@ -277,9 +275,9 @@ fn flattened_selectable_named(
 
 `LineChar` is the cursor: `line` is a 0-based count of `\n`, `character` is bytes since the last `\n`. The adapter has that pair.
 
-Inside hover, `parsed_iso_literal_at_location` takes `path` and `LineChar` and turns that pair into the parse tree. It calls `iso_literal_text_at_location`, which calls `iso_literal_extraction`, which calls extract-all and `find_iso_literal_extraction`. `parsed_iso_literal` takes the text. Semantic tokens for the file calls `iso_literal_semantic_tokens_in_file(path)`, which parses every extraction's text.
+Inside hover, `literal_id_at_location` takes `path` and `LineChar` and turns that pair into a `LiteralId`. `iso_literal_extraction` takes the id. `parsed_iso_literal` takes the extraction's text. Semantic tokens for the file calls `iso_literal_semantic_tokens_in_file(path)`, which parses every extraction's text.
 
-Hover fires once per cursor. Each `(path, LineChar)` is its own `parsed_iso_literal_at_location` slot, so moving the mouse across a literal executes that intern for every character. That is expected. Those cursor memos re-invoke and short-circuit at `parsed_iso_literal`. Every character inside the same literal yields the same text, so that parse is one slot.
+Hover fires once per `LineChar`. Each `(path, LineChar)` is its own `literal_id_at_location` slot, so moving the caret across a literal executes that intern for every character. That is expected. The stored value is a `PathBuf` and a vec index. `iso_literal_extraction` of that `LiteralId` is one slot. Every character inside the same literal yields the same text, so `parsed_iso_literal` is one slot.
 
 After parse, resolve produces names. Goto definition of a selection named `Avatar` already has the parent entity and the name from the token. It calls `flattened_selectable_named(db, User, Avatar)`. That call site has names, not a file and cursor.
 
@@ -335,7 +333,7 @@ Pass a `MemoRef` as a memo argument when later work is "this declaration," not "
 
 Sources are not garbage collected. `handle` inserts and removes them.
 
-Memo slots accumulate until `run_garbage_collection`. That keeps the last 10_000 top-level memo calls (an LRU) and everything reachable from them, plus anything `retain`ed. A top-level call is a memo invoked when no other memo is on the stack. LSP hover is top-level. Old cursor slots drop. `parsed_iso_literal` of a text stays if a recent top-level call still reaches it (a later hover in the same literal, or compile). If nothing reaches it, the next call recomputes it.
+Memo slots accumulate until `run_garbage_collection`. That keeps the last 10_000 top-level memo calls (an LRU) and everything reachable from them, plus anything `retain`ed. A top-level call is a memo invoked when no other memo is on the stack. LSP hover is top-level. Old `(path, LineChar)` slots drop. `iso_literal_extraction` of a `LiteralId` and `parsed_iso_literal` of a text stay if a recent top-level call still reaches them (a later hover in the same literal, or compile). If nothing reaches them, the next call recomputes them.
 
 `retain` marks a top-level call so the LRU will not drop it. Compile can retain the validation memo. `RetainedQuery` panics if dropped without `clear_retain` or `never_garbage_collect`.
 
@@ -343,7 +341,7 @@ Memo slots accumulate until `run_garbage_collection`. That keeps the last 10_000
 
 The parser takes `&str`. Tests call `parse_iso_literal` with a string. Extract is a memo over a `DiskFile`. Tests intern a file the same way `handle` does.
 
-A caller that needs a parse tree calls the parse memo with the key it has. pico returns `&T`. The caller does not clone a whole file's AST out of the database to hand to another memo.
+A caller that needs a parse tree calls the parse memo with the key it has. pico returns `&T`. The caller does not clone a whole file's AST out of the database to hand to another memo. A `(path, LineChar)` memo does not clone the AST into that slot either. It stores `LiteralId`.
 
 ## Example
 
@@ -361,14 +359,14 @@ export const Avatar = iso(`
 
 `TypeScriptHostLanguage::extract_iso_literals(db, path)` reads that source, runs the host regex, and stores a one-element vec. `iso_literal_text` is the interior of `field User.Avatar`. `iso_literal_start_index` is the byte offset of that interior in the file.
 
-`parsed_iso_literal_at_location` at a `LineChar` on `name` loads that extraction's text and calls `parsed_iso_literal`. The parse tree is the selectable declaration. Semantic tokens on that tree are relative to the interior.
+`literal_id_at_location` at a `LineChar` on `name` returns `LiteralId { path, index: 0 }`. `iso_literal_extraction` of that id is the one extraction. `parsed_iso_literal` of its text is the selectable declaration. Semantic tokens on that tree are relative to the interior.
 
-The LSP asks for hover at a cursor on `name`. The adapter calls `hover(db, path, line_char)`. That is the public key. Inside, `parsed_iso_literal_at_location` returns the tree. Moving the cursor along `name` executes `iso_literal_extraction` again with a new `LineChar`; the text is the same. `parsed_iso_literal` of that text is one slot and does not re-invoke. Resolve uses the offset of that cursor within the literal. Schema hover for `User.name` calls `flattened_selectable_named(db, User, name)`.
+The LSP asks for hover at a `LineChar` on `name`. The adapter calls `hover(db, path, line_char)`. That is the public key. Inside, `literal_id_at_location` returns the id. Moving the caret along `name` executes `literal_id_at_location` again with a new `LineChar`; the `LiteralId` bits are the same. `iso_literal_extraction` of that id is one slot. `parsed_iso_literal` of that text is one slot and does not re-invoke. Resolve uses the offset of that `LineChar` within the literal. Schema hover for `User.name` calls `flattened_selectable_named(db, User, name)`.
 
-The user types `const x = 1; ` at the start of the first line (no extra newline). `handle` sets a new `DiskFile`. Extract re-invokes: same text, new `iso_literal_start_index`. The `LineChar` of `name` is unchanged. `iso_literal_text_at_location` is `==` and backdates. `parsed_iso_literal` of that text does not re-invoke. File-absolute token offsets do.
+The user types `const x = 1; ` at the start of the first line (no extra newline). `handle` sets a new `DiskFile`. Extract re-invokes: same text, new `iso_literal_start_index`. The `LineChar` of `name` is unchanged. `literal_id_at_location` re-invokes, `LiteralId` is `==` (`index: 0`) and backdates. `iso_literal_extraction` of that id re-invokes and is `!=`. `parsed_iso_literal` of that text does not re-invoke. File-absolute token offsets do.
 
-The user inserts a newline at the top of the file. The `LineChar` of `name` moves. That is a new cursor slot. `parsed_iso_literal` of that text does not re-invoke. File-absolute token offsets do.
+The user inserts a newline at the top of the file. The `LineChar` of `name` moves. That is a new `literal_id_at_location` slot. The `LiteralId` is still `{ path, index: 0 }`. `parsed_iso_literal` of that text does not re-invoke. File-absolute token offsets do.
 
-The user types the same `field User.Avatar { name }` into a second file. `parsed_iso_literal` of that text is one slot. Both files' `parsed_iso_literal_at_location` entries share it.
+The user types the same `field User.Avatar { name }` into a second file. `parsed_iso_literal` of that text is one slot. The two files have different `LiteralId` paths and share the parse intern.
 
 The user adds a second iso literal at the top of the first file. Extract's vec has two elements. A `LineChar` on Avatar still finds Avatar. Callers that meant Avatar by name are using `(User, Avatar)`.
