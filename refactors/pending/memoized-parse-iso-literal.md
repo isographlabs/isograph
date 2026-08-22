@@ -112,9 +112,23 @@ Same `memo_tests` module as extract, using `TypeScriptHostLanguage`. One-line fi
 
 Origin: isograph `process_iso_literal_extraction` (paren check, then parse, then associated-function check for fields). Origin of the error types: extract-iso-literals.md `TypeScriptHostError`. Delta: takes an extraction plus `&ParsedIsoLiteral` instead of parsing inside extract.
 
+First reader of `IsoLiteralExtraction::span`. extract-iso-literals-from-file.md does not define it.
+
+```rust
+// from crates/isograph_compiler/src/host_language.rs
+impl<THostLanguage: HostLanguage> IsoLiteralExtraction<THostLanguage> {
+    pub fn span(&self) -> span::Span {
+        span::Span::from_usize(
+            self.iso_literal_start_index,
+            self.iso_literal_start_index + self.iso_literal_text.len(),
+        )
+    }
+}
+```
+
 ```rust
 // from crates/isograph_extract_typescript/src/lib.rs
-use isograph_compiler::{IsoLiteralError, WithErrors};
+use isograph_compiler::IsoLiteralError;
 use isograph_parser::{IsoLiteralItem, ParsedIsoLiteral};
 use span::WithSpanPostfix;
 
@@ -150,13 +164,7 @@ pub fn host_errors_for_extraction(
 }
 
 fn item_of(parse: &span::WithSpan<isograph_parser::IsoLiteralParse>) -> Option<&IsoLiteralItem> {
-    parse
-        .item
-        .item
-        .item
-        .item
-        .as_ref()
-        .map(|item| item.item.reference())
+    parse.item.item.as_ref().map(|item| item.item.reference())
 }
 ```
 
@@ -207,17 +215,24 @@ lsp-parse-diagnostics.md currently takes `host` and `source: &str` and calls `fi
 
 ### Tests
 
-Move the extract-typescript error tests listed in extract-iso-literals-from-file.md change 1 here.
+Same `memo_tests` intern as extract-iso-literals-from-file.md (`intern_file`). One-line fixtures: `line` is 0, `character` is the byte index of the interior (`contents.find` of the iso text). `extraction` is `TypeScriptHostLanguage::extract_iso_literals(db, path)` `[0]`. `parsed` is `parsed_iso_literal_at_location` at that `LineChar`.
 
-- Intern `iso(\`entrypoint Query.HomeRoute\`)`. `parsed_iso_literal_at_location` at the `LineChar` of `entrypoint` is `Some` with empty parse errors. `host_errors_for_extraction` is empty.
-- Intern `iso(\`entrypoint\`)`. Parse errors non-empty.
-- Intern `iso\`entrypoint Query.HomeRoute\``. Extract context is `TaggedTemplate`. `host_errors_for_extraction` is `MissingParentheses` at the extraction span.
-- Intern `iso(\`field Pet.fullName { id }\`)(`. `MissingExport`.
-- Intern `export const fullName = iso(\`field Pet.fullName { id }\`)`. `MissingAssociatedFunction`.
-- Intern `export const fullName = iso(\`field Pet.fullName { id }\`)(`. Host errors empty.
+These nine are the extract-typescript error tests extract-iso-literals-from-file.md deletes. Write them again here.
+
+- `tagged_template_is_missing_parentheses`. Intern `iso\`entrypoint Query.HomeRoute\``. `host_errors_for_extraction` is `IsoLiteralError::Host(TypeScriptHostError::MissingParentheses).wrap_vec()`.
+- `incomplete_entrypoint_is_a_parse_error`. Intern `iso(\`entrypoint\`)`. `parsed.errors` is not empty. At least one `IsoLiteralError::Parse` in `file_literals` of that path.
+- `entrypoint_without_export_is_valid`. Intern `iso(\`entrypoint Query.HomeRoute\`)`. `host_errors_for_extraction` is empty.
+- `field_without_export_is_missing_export`. Intern `iso(\`field Pet.fullName { id }\`)(`. `host_errors_for_extraction` is one error, `IsoLiteralError::Host(TypeScriptHostError::MissingExport { .. })`.
+- `field_without_associated_function_is_missing_associated_function`. Intern `export const fullName = iso(\`field Pet.fullName { id }\`)`. `host_errors_for_extraction` is `IsoLiteralError::Host(TypeScriptHostError::MissingAssociatedFunction).wrap_vec()`.
+- `exported_field_with_associated_function_is_valid`. Intern `export const fullName = iso(\`field Pet.fullName { id }\`)(`. `host_errors_for_extraction` is empty.
+- `tagged_template_field_reports_parentheses_and_export_and_associated`. Intern `iso\`field Pet.fullName { id }\``. `host_errors_for_extraction` is three errors: `MissingParentheses`, `MissingExport { .. }`, `MissingAssociatedFunction`, in that order.
+- `host_error_span_is_the_extraction_span`. Intern `iso\`entrypoint Query.HomeRoute\``. `host_errors_for_extraction` has one error. Its `location` is `extraction.span()`.
+- `valid_extraction_has_no_errors`. Intern `iso(\`entrypoint Query.HomeRoute\`)`. `parsed.errors` is empty. `host_errors_for_extraction` is empty.
+
+Also:
+
 - No `DiskFile`: `parsed_iso_literal_at_location` is `None`.
-
-`file_literals` of a file with `iso(\`entrypoint\`)`: one `FileLiteral`, `errors` contains a `Parse` at a span whose start is at least the extraction start.
+- `file_literals` of a file with `iso(\`entrypoint\`)`: one `FileLiteral`, `errors` contains a `Parse` at a span whose start is at least the extraction start.
 
 ## Call sites
 

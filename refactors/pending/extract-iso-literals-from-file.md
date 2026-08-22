@@ -88,9 +88,9 @@ impl HostLanguage for TypeScriptHostLanguage {
 
 `isograph_extract_typescript` no longer depends on `parse_iso_literal`, `IsoLiteralItem`, `IsoLiteralParse`, or `IsoLiteralError` for extract.
 
-Tests that stay in `isograph_extract_typescript` (the ones that assert text, span, `const_export_name`, `IsoCall`, `AssociatedJsFunction`, skip comments, two literals, nested iso): rewrite them off `WithErrors`. They call `extract_iso_literals` and assert the `Vec<WithSpan<(...)>>`.
+Tests that stay in `isograph_extract_typescript` (the ones that assert text, span, `const_export_name`, `IsoCall`, `AssociatedJsFunction`, skip comments, two literals, nested iso): rewrite them off `WithErrors`. They call `extract_iso_literals` and assert the `Vec<WithSpan<(...)>>`. `tagged_template` (the extraction test that asserts `IsoCall::TaggedTemplate`) stays. `missing_parentheses_displays` stays.
 
-Tests that move to memoized-parse-iso-literal.md:
+These tests are deleted here. memoized-parse-iso-literal.md writes them again:
 
 - `tagged_template_is_missing_parentheses`
 - `incomplete_entrypoint_is_a_parse_error`
@@ -101,8 +101,6 @@ Tests that move to memoized-parse-iso-literal.md:
 - `tagged_template_field_reports_parentheses_and_export_and_associated`
 - `host_error_span_is_the_extraction_span`
 - `valid_extraction_has_no_errors`
-
-`tagged_template` (the extraction test that asserts `IsoCall::TaggedTemplate`) stays.
 
 ## Change 2: the database lives in `isograph_compiler`
 
