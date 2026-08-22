@@ -6,7 +6,7 @@ File-level tokens are keyed on `path`. They do not go through `LineChar`. Cursor
 
 Origin of the pipeline: isograph `crates/isograph_lsp/src/semantic_tokens.rs` `get_semantic_tokens` / `concatenate_and_absolutize_relative_tokens`. Origin of encoding: landed `lsp_semantic_tokens`. Origin of the offset map: that concat, and the encoding tests' `rebased`. Delta: pico memos over `DiskFile` instead of `Uri` + LSP state; no `TextSource`; no multiline split here (`lsp_semantic_tokens` already splits); `with_offset` on each relative span; start indices in a memo that is not the parse vec.
 
-The LSP adapter (event-model.md, not written) will call this on `semanticTokens/full`. This slice does not start the adapter. `OpenFile` is not implemented yet; tests intern a `DiskFile` and assert tokens. Encoding is not a memo. Memoizing encoded tokens, and converting relative tokens to file-absolute with a line offset instead of `with_offset` on each span, is semantic-tokens-line-offset.md.
+The LSP adapter (event-model.md, not written) will call this on `semanticTokens/full`. This slice does not start the adapter. `OpenFile` is not implemented yet; tests intern a `DiskFile` and assert tokens. Encoding is not a memo. Memoizing encoded tokens, and converting relative tokens to file-absolute with a line offset instead of `with_offset` on each span, is semantic-tokens-line-offset.md. Whether concat remains a production intern after that slice is concat-after-line-offset.md. Not a blocker for this slice.
 
 One shippable change: three compiler memos and `lsp_semantic_tokens_for_file`. This change amends `docs-website/docs/design-docs/pico.md`.
 
