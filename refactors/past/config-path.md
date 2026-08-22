@@ -117,7 +117,6 @@ use std::process::ExitCode;
 
 use crate::ConfigFlag;
 use crate::discover;
-use prelude::Postfix;
 
 #[expect(clippy::print_stdout, clippy::print_stderr)]
 pub fn run(id: &ConfigFlag) -> ExitCode {
