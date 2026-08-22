@@ -1,6 +1,6 @@
 # Filesystem watcher
 
-Requires filesystem-events.md, config-includes.md, and `docs-website/docs/design-docs/event-model.md`. The daemon recvs `DiskChanged` and interns `DiskFile`. This file adds a source that walks once, then observes the OS, and posts `DiskChanged` on the same channel the socket uses.
+Requires filesystem-events.md, config-source-files.md, and `docs-website/docs/design-docs/event-model.md`. The daemon recvs `DiskChanged` and interns `DiskFile`. This file adds a source that walks once, then observes the OS, and posts `DiskChanged` on the same channel the socket uses.
 
 The watcher posts in-process. It does not run `isograph send` and it does not write to the event socket. `isograph send` remains a source of the same event type.
 

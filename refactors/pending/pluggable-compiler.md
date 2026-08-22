@@ -29,7 +29,7 @@ Each seam is a trait, which is the case AGENTS.md reserves traits for: a boundar
 
 ### Extraction
 
-The extraction seam is `HostLanguage` in `crates/isograph_compiler` (landed). `extract_iso_literals` finds iso literals in a `&str` and returns `Vec<WithSpan<(&str, THostLanguage::LiteralContext)>>` (extract-iso-literals-from-file.md stops parsing inside extract). The first implementor is `TypeScriptHostLanguage` in `isograph_extract_typescript`. Which files are walked is config `includes` (config-includes.md). File extensions as a field on `HostLanguage` stay later.
+The extraction seam is `HostLanguage` in `crates/isograph_compiler` (landed). `extract_iso_literals` finds iso literals in a `&str` and returns `Vec<WithSpan<(&str, THostLanguage::LiteralContext)>>` (extract-iso-literals-from-file.md stops parsing inside extract). The first implementor is `TypeScriptHostLanguage` in `isograph_extract_typescript`. Which files are walked is config `source_files` (config-source-files.md). File extensions as a field on `HostLanguage` stay later.
 
 ### NetworkProtocol
 
@@ -196,4 +196,4 @@ The daemon is the process that names the profile. The encoder (lsp-semantic-toke
 - `App::NAME` is `"isograph"` on the `Isograph` impl in `isograph_cli`. A second in-process wrapper cannot share that daemon lock. The name becomes data the binary supplies when a second binary exists.
 - `FrameworkBindings`: data on the generator (current position), a second trait, or a closed enum. Data keeps out-of-tree frameworks possible without a trait; the generation doc decides when the real fields exist.
 - Artifact kinds: whether a generator's output set is fixed per generator or independently toggleable (a user who wants readers but not entrypoints). Currently fixed per generator.
-- Whether `source_extensions` belongs on `HostLanguage` or file discovery stays wholly in config `includes` (config-includes.md). An input language where "which files" is not an extension check, like literals in markdown code fences, would force discovery into the extraction seam.
+- Whether `source_extensions` belongs on `HostLanguage` or file discovery stays wholly in config `source_files` (config-source-files.md). An input language where "which files" is not an extension check, like literals in markdown code fences, would force discovery into the extraction seam.
