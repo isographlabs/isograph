@@ -15,12 +15,9 @@ $ isograph logs
 {"timestamp":"...","level":"INFO","fields":{"message":"isograph daemon up","config":"/tmp/proj/isograph.config.json","port":53124}}
 $ printf '%s\n' '{"kind":"DiskChanged","value":{"path":"/tmp/proj/src/a.ts","presence":{"Present":{"contents":"export const a = 1;\n"}}}}' > /tmp/disk.json
 $ isograph send --file /tmp/disk.json
-$ isograph logs
-{"timestamp":"...","level":"INFO","fields":{"message":"isograph daemon up","config":"/tmp/proj/isograph.config.json","port":53124}}
-{"timestamp":"...","level":"INFO","fields":{"message":"disk changed","path":"/tmp/proj/src/a.ts","presence":"present","file_count":1}}
 ```
 
-A second send with `"presence":"Absent"` logs `presence` `absent` and `file_count` 0.
+`handle` interns that path as a `DiskFile`. A second send with `"presence":"Absent"` removes it. Neither send produces an effect.
 
 ## Change 1: pico database, DiskFile, DiskChanged
 
@@ -45,7 +42,7 @@ use pico::{Database, SourceId, Storage};
 use pico_macros::{Db, Source};
 use prelude::Postfix;
 
-use crate::effect::{IsographEffect, LogDiskChanged};
+use crate::effect::IsographEffect;
 use crate::event::{DiskChanged, IsographEvent, Presence};
 
 #[derive(Default, Debug, Db)]
@@ -77,28 +74,20 @@ impl IsographState {
         match event {
             IsographEvent::HelloWorld => IsographEffect::LogHelloWorld.wrap_vec(),
             IsographEvent::Quit => IsographEffect::Kill.wrap_vec(),
-            IsographEvent::DiskChanged(change) => self.handle_disk_changed(change),
+            IsographEvent::DiskChanged(change) => {
+                self.handle_disk_changed(change);
+                Vec::new()
+            }
         }
     }
 
-    fn handle_disk_changed(&mut self, change: DiskChanged) -> Vec<IsographEffect> {
-        let path = change.path;
+    fn handle_disk_changed(&mut self, change: DiskChanged) {
         match change.presence {
             Presence::Present(present) => {
-                self.insert_disk_file(path.clone(), present.contents);
-                IsographEffect::LogDiskPresent(LogDiskChanged {
-                    path,
-                    file_count: self.get_disk_file_map().untracked().0.len(),
-                })
-                .wrap_vec()
+                self.insert_disk_file(change.path, present.contents);
             }
             Presence::Absent => {
-                self.remove_disk_file(path.reference());
-                IsographEffect::LogDiskAbsent(LogDiskChanged {
-                    path,
-                    file_count: self.get_disk_file_map().untracked().0.len(),
-                })
-                .wrap_vec()
+                self.remove_disk_file(change.path.reference());
             }
         }
     }
@@ -124,7 +113,7 @@ impl IsographState {
 }
 ```
 
-`Present` of a path that is already in the map replaces the `DiskFile` (pico `set` on the same key) and the map entry. `Absent` of a path that is not in the map is a no-op on the database; it still returns `LogDiskAbsent` with the current `file_count`. `Present` of an empty string is present, not absent.
+`Present` of a path that is already in the map replaces the `DiskFile` (pico `set` on the same key) and the map entry. `Absent` of a path that is not in the map is a no-op. `Present` of an empty string is present, not absent. `DiskChanged` returns no effects.
 
 `handle` does not canonicalize `path`. The JSON author is the source. A relative path is stored as given.
 
@@ -171,62 +160,7 @@ A move is two frames, in that order: `Absent` of `from`, `Present` of `to`. Ther
 
 `on_message` is send-events.md: `from_str::<IsographEvent>`. No new arm. `DiskChanged` deserializes because it is a variant of that enum.
 
-The log effect does not carry file contents. Two variants so the tag is the type.
-
-Origin: event-loop.md `IsographEffect`. Delta: `LogDiskPresent` and `LogDiskAbsent`.
-
-```rust
-// from crates/isograph_cli/src/effect.rs
-use std::path::PathBuf;
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum IsographEffect {
-    LogHelloWorld,
-    LogDiskPresent(LogDiskChanged),
-    LogDiskAbsent(LogDiskChanged),
-    Kill,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct LogDiskChanged {
-    pub path: PathBuf,
-    pub file_count: usize,
-}
-```
-
-```rust
-// from crates/isograph_cli/src/daemon.rs
-pub fn perform(effect: IsographEffect) -> ControlFlow<()> {
-    match effect {
-        IsographEffect::LogHelloWorld => {
-            tracing::info!("hello world");
-            ControlFlow::Continue(())
-        }
-        IsographEffect::LogDiskPresent(log) => {
-            tracing::info!(
-                path = %log.path.display(),
-                presence = "present",
-                file_count = log.file_count,
-                "disk changed"
-            );
-            ControlFlow::Continue(())
-        }
-        IsographEffect::LogDiskAbsent(log) => {
-            tracing::info!(
-                path = %log.path.display(),
-                presence = "absent",
-                file_count = log.file_count,
-                "disk changed"
-            );
-            ControlFlow::Continue(())
-        }
-        IsographEffect::Kill => {
-            tracing::info!("kill: exiting");
-            ControlFlow::Break(())
-        }
-    }
-}
-```
+`IsographEffect` and `perform` do not change.
 
 `serve` constructs the database with `Default`. Origin: send-events.md / event-loop.md `let state = IsographState`. Delta: `IsographState::default()`.
 
@@ -266,14 +200,14 @@ fn disk_file<'a>(state: &'a IsographState, path: &Path) -> Option<&'a DiskFile> 
 
 - `HelloWorld` still returns `LogHelloWorld`. Construction is `IsographState::default()`.
 - `Quit` still returns `Kill`.
-- `Present` inserts. `disk_file(state, path).expect("the test inserted this path").contents` is the payload. The effect is `LogDiskPresent` with `file_count` 1.
-- A second `Present` on the same path replaces contents. The map has one entry. `file_count` is 1.
+- `Present` inserts. `disk_file(state, path).expect("the test inserted this path").contents` is the payload. `handle` returns `Vec::new()`.
+- A second `Present` on the same path replaces contents. The map has one entry.
 - An empty string is stored. `disk_file` is `Some` with `contents == ""`.
-- Two paths are two entries. `file_count` is 2.
-- `Absent` removes. `disk_file` is `None`. The effect is `LogDiskAbsent` with `file_count` 0.
-- `Absent` of a path that was never present leaves the map unchanged. The effect is still `LogDiskAbsent` with `file_count` 0.
+- Two paths are two entries.
+- `Absent` removes. `disk_file` is `None`. `handle` returns `Vec::new()`.
+- `Absent` of a path that was never present leaves the map unchanged. `handle` returns `Vec::new()`.
 - `Present` of an empty string is present, not absent.
-- Two events `Absent` then `Present` on different paths is a move: old path gone, new path present with those contents. `file_count` is 1.
+- Two events `Absent` then `Present` on different paths is a move: old path gone, new path present with those contents.
 
 `expect` in these tests names the fixture the test inserted.
 
@@ -298,15 +232,14 @@ Origin of the verb: send-events.md. Delta: a `DiskChanged` frame instead of `Hel
 
 E2E in `crates/ts_graphql_react_isograph_cli/tests/cli.rs`:
 
-- The log has `isograph daemon up`. Write a temp JSON file with `Present` of `/tmp/proj/src/a.ts` and contents `export const a = 1;\n`. `isograph send --file` that file. The log then has `disk changed`, that path (via `path_in_json_log`), `presence` `present`, and `file_count` 1. `--file` is unlinked.
-- A second send in the same test with `Absent` of that path: the log has `presence` `absent` and `file_count` 0.
+- The log has `isograph daemon up`. Write a temp JSON file with `Present` of `/tmp/proj/src/a.ts` and contents `export const a = 1;\n`. `isograph send --file` that file. The process exits 0. `--file` is unlinked.
+- A second send in the same test with `Absent` of that path. The process exits 0.
 
 send-events.md already covers a stopped daemon and `not json`. The harness already points `HOME` at the temp dir.
 
 ## Call sites
 
 - `run_event_loop` -> `state.handle`.
-- `IsographEvent::DiskChanged` -> `handle_disk_changed` -> `insert_disk_file` / `remove_disk_file` (`db.set` / `db.remove` plus the tracked map).
-- `handle` -> `LogDiskPresent` / `LogDiskAbsent` -> `perform` -> the `disk changed` log.
+- `IsographEvent::DiskChanged` -> `handle_disk_changed` -> `insert_disk_file` / `remove_disk_file` (`db.set` / `db.remove` plus the tracked map). No effects.
 - `CliVerb::Send` -> `send::run` (send-events.md). A `DiskChanged` frame is one `IsographEvent`.
 - socket callback -> `on_message` -> `event_tx.send`.

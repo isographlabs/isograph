@@ -126,35 +126,27 @@ impl IsographState {
 use isograph_compiler::IsographState;
 use prelude::Postfix;
 
-use crate::effect::{IsographEffect, LogDiskChanged};
+use crate::effect::IsographEffect;
 use crate::event::{DiskChanged, IsographEvent, Presence};
 
 pub fn handle(state: &mut IsographState, event: IsographEvent) -> Vec<IsographEffect> {
     match event {
         IsographEvent::HelloWorld => IsographEffect::LogHelloWorld.wrap_vec(),
         IsographEvent::Quit => IsographEffect::Kill.wrap_vec(),
-        IsographEvent::DiskChanged(change) => handle_disk_changed(state, change),
+        IsographEvent::DiskChanged(change) => {
+            handle_disk_changed(state, change);
+            Vec::new()
+        }
     }
 }
 
-fn handle_disk_changed(state: &mut IsographState, change: DiskChanged) -> Vec<IsographEffect> {
-    let path = change.path;
+fn handle_disk_changed(state: &mut IsographState, change: DiskChanged) {
     match change.presence {
         Presence::Present(present) => {
-            state.insert_disk_file(path.clone(), present.contents);
-            IsographEffect::LogDiskPresent(LogDiskChanged {
-                path,
-                file_count: state.get_disk_file_map().untracked().0.len(),
-            })
-            .wrap_vec()
+            state.insert_disk_file(change.path, present.contents);
         }
         Presence::Absent => {
-            state.remove_disk_file(path.reference());
-            IsographEffect::LogDiskAbsent(LogDiskChanged {
-                path,
-                file_count: state.get_disk_file_map().untracked().0.len(),
-            })
-            .wrap_vec()
+            state.remove_disk_file(change.path.reference());
         }
     }
 }

@@ -13,8 +13,7 @@ One shippable change.
 ```
 $ isograph start --filesystem watch
 # create, edit, rename, delete files under project_root
-$ isograph logs
-{"timestamp":"...","level":"INFO","fields":{"message":"disk changed","path":".../src/Pet.tsx","presence":"present","file_count":3}}
+# each in-scope file becomes a DiskChanged, then a DiskFile
 ```
 
 ```
@@ -383,9 +382,9 @@ Scan: write `src/a.ts` and `src/b.rs` and `node_modules/c.ts` under a temp proje
 
 Do not add a production function only the tests call. Drain the test channel.
 
-E2E: `--filesystem watch`, write `src/a.ts`, poll logs for `disk changed` and that path. Delete the file, poll for `absent`. HOME isolation as today. This is the one real-notify test. Deadline 10s, same as existing daemon tests.
+E2E: `--filesystem watch` starts, the log has `scan finished`. HOME isolation as today. Deadline 10s, same as existing daemon tests.
 
-Injected e2e from filesystem-events.md still does not start a watcher: writing a file on disk must not produce a log line. All existing `Daemon::start` tests pass `--filesystem injected`.
+Injected e2e from filesystem-events.md still does not start a watcher. All existing `Daemon::start` tests pass `--filesystem injected`.
 
 ### Cargo
 
