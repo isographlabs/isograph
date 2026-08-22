@@ -9,8 +9,11 @@ clap = { workspace = true }
 freddie_cli = { git = "https://github.com/freddiehg/freddie", rev = "2cf07439ce57fd55079b89128b2f22603ef8d1a8" }
 freddie_event_socket = { git = "https://github.com/freddiehg/freddie", rev = "2cf07439ce57fd55079b89128b2f22603ef8d1a8" }
 freddie_single_instance = { git = "https://github.com/freddiehg/freddie", rev = "2cf07439ce57fd55079b89128b2f22603ef8d1a8" }
+common_lang_types = { path = "../common_lang_types" }
+intern = { path = "../../relay-crates/intern" }
 isograph_compiler = { path = "../isograph_compiler" }
 isograph_config = { path = "../isograph_config" }
+pico = { path = "../pico" }
 prelude = { path = "../prelude" }
 tungstenite = { version = "0.24", default-features = false, features = ["handshake"] }
 serde = { workspace = true, features = ["derive"] }

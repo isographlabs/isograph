@@ -8,7 +8,7 @@ use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 use crate::effect::IsographEffect;
 use crate::event::IsographEvent;
 use crate::external::on_message;
-use crate::state::{IsographState, handle};
+use crate::state::{IsographState, handle, intern_config_directory};
 
 pub fn run<THostLanguage: HostLanguage>(config_path: PathBuf, port_path: PathBuf) {
     let runtime = match tokio::runtime::Builder::new_current_thread()
@@ -79,7 +79,8 @@ async fn serve<THostLanguage: HostLanguage>(config_path: PathBuf, port_path: Pat
     // `select!` rather than `join!`: the effect loop ends on `Kill`, and the event
     // loop never does, because `_hold_events` holds a sender for as long as serve runs.
     let _hold_events = event_tx;
-    let state = IsographState::<THostLanguage>::default();
+    let mut state = IsographState::<THostLanguage>::default();
+    intern_config_directory(&mut state, config_path.reference());
     tokio::select! {
         () = run_event_loop(state, event_rx, effect_tx) => {}
         () = run_effect_loop(effect_rx) => {}

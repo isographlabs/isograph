@@ -1,8 +1,8 @@
 use std::fmt::{self, Debug};
-use std::path::PathBuf;
 
 use thiserror::Error;
 
+use common_lang_types::RelativePathToSourceFile;
 use isograph_parser::ParseError;
 
 use crate::IsographState;
@@ -62,7 +62,7 @@ pub trait HostLanguage: Send + Sync + Sized + 'static {
 
     fn extract_iso_literals(
         db: &IsographState<Self>,
-        path: PathBuf,
+        path: RelativePathToSourceFile,
     ) -> &Option<Vec<IsoLiteralExtraction<Self>>>;
 }
 

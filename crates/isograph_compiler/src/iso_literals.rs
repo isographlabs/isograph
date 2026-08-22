@@ -1,5 +1,4 @@
-use std::path::PathBuf;
-
+use common_lang_types::RelativePathToSourceFile;
 use isograph_parser::{ParsedIsoLiteral, parse_iso_literal};
 use pico_macros::memo;
 use prelude::Postfix;
@@ -13,9 +12,9 @@ pub struct LineChar {
     pub character: u32,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct LiteralId {
-    pub path: PathBuf,
+    pub path: RelativePathToSourceFile,
     pub index: usize,
 }
 
@@ -30,10 +29,10 @@ pub fn parsed_iso_literal<THostLanguage: HostLanguage>(
 #[memo]
 pub fn literal_id_at_location<THostLanguage: HostLanguage>(
     db: &IsographState<THostLanguage>,
-    path: PathBuf,
+    path: RelativePathToSourceFile,
     line_char: LineChar,
 ) -> Option<LiteralId> {
-    let extractions = THostLanguage::extract_iso_literals(db, path.clone()).as_ref()?;
+    let extractions = THostLanguage::extract_iso_literals(db, path).as_ref()?;
     let source_id = db.get_disk_file_map().untracked().0.get(&path).copied()?;
     let file_content = db.get(source_id).contents.reference();
     let index = find_iso_literal_index(line_char, file_content, extractions)?;
@@ -45,7 +44,7 @@ pub fn iso_literal_extraction<THostLanguage: HostLanguage>(
     db: &IsographState<THostLanguage>,
     literal_id: LiteralId,
 ) -> Option<IsoLiteralExtraction<THostLanguage>> {
-    let extractions = THostLanguage::extract_iso_literals(db, literal_id.path.clone()).as_ref()?;
+    let extractions = THostLanguage::extract_iso_literals(db, literal_id.path).as_ref()?;
     extractions.get(literal_id.index).cloned()
 }
 

@@ -634,13 +634,16 @@ name = "isograph_cli"
 version = "0.5.3"
 dependencies = [
  "clap",
+ "common_lang_types",
  "freddie_cli",
  "freddie_event_socket",
  "freddie_single_instance",
  "futures-util",
+ "intern",
  "isograph_compiler",
  "isograph_config",
  "isograph_extract_typescript",
+ "pico",
  "prelude",
  "serde",
  "serde_json",
@@ -656,6 +659,8 @@ dependencies = [
 name = "isograph_compiler"
 version = "0.5.3"
 dependencies = [
+ "common_lang_types",
+ "intern",
  "isograph_parser",
  "pico",
  "pico_macros",
