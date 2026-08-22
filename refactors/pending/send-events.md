@@ -21,6 +21,15 @@ $ isograph logs
 
 `isograph send` does not start the daemon. Walk-up / `--config` is the same as every other verb. The port is the daemon process's loopback TCP listen.
 
+```
+$ isograph send <<'EOF'
+{"kind":"HelloWorld"}
+EOF
+the daemon is not running
+```
+
+That process exits 1. `Held::Free` on the lock is `SendError::NotRunning`, `run` prints it on stderr and returns `ExitCode::FAILURE`.
+
 ## Types
 
 Most important first.
