@@ -210,23 +210,6 @@ mod tests {
     }
 
     #[test]
-    fn present_of_an_empty_string_is_present_not_absent() {
-        let mut state = IsographState::default();
-        let path = PathBuf::from("/tmp/proj/src/a.ts");
-        state.handle(IsographEvent::DiskChanged(DiskChanged {
-            path: path.clone(),
-            presence: Presence::Present(String::new()),
-        }));
-        assert!(disk_file(state.reference(), path.reference()).is_some());
-        assert_eq!(
-            disk_file(state.reference(), path.reference())
-                .expect("the test inserted this path")
-                .contents,
-            ""
-        );
-    }
-
-    #[test]
     fn absent_then_present_on_different_paths_is_a_move() {
         let mut state = IsographState::default();
         let from = PathBuf::from("/tmp/proj/src/a.ts");

@@ -52,7 +52,7 @@ Origin of the Absent arm: landed `crates/isograph_cli/src/state.rs` `handle_disk
 
 ### Tests
 
-`crates/isograph_cli/src/state.rs` tests module. `disk_file` stays. Delete `present_of_an_empty_string_is_present_not_absent`; `an_empty_string_is_stored` already asserts `Some` and `contents == ""`.
+`crates/isograph_cli/src/state.rs` tests module. `disk_file` stays.
 
 ```rust
 // from crates/isograph_cli/src/state.rs (tests)
