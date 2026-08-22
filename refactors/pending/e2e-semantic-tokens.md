@@ -1,10 +1,10 @@
 # E2E: send a file, query semantic tokens
 
-Requires extract-iso-literals-from-file.md (landed), memoized-parse-iso-literal.md (landed), literal-id.md (landed), and file-semantic-tokens.md. Those add the memos and intern-a-`DiskFile` tests. This file is the daemon path: start, `isograph send` a `Present` file, `isograph semantic-tokens` prints the encoded tokens.
+Requires file-semantic-tokens.md and the daemon answering LSP requests (lsp-socket.md; domain requests are `MethodNotFound` there). `textDocument/semanticTokens/full` is call/response on that socket. This is not a second query port, not a hidden `isograph semantic-tokens` verb, and not `Work::Query`.
 
-Origin of the memos: isograph `extract_iso_literals_from_file_content`, `memoized_parse_iso_literal`, `get_semantic_tokens`. Origin of send: send-events.md. Delta: a hidden query verb; `handle` stays ingest-only; the worker answers the query by calling `lsp_semantic_tokens_for_file`. This is not the LSP adapter.
+Origin of send: send-events.md / lsp-socket.md. Origin of tokens: file-semantic-tokens.md `lsp_semantic_tokens_for_file`. Delta: a client of the LSP socket sends `textDocument/semanticTokens/full` and prints the `data` array. `handle` stays ingest-only.
 
-Parse is keyed on literal text only. isograph's `memoized_parse_iso_literal` takes `text_source: TextSource` and comments "we should not pass the text source here! Whenever the iso literal moves around the page, we break memoization, due to this parameter." i2 does not pass it. Encoded-token reuse after a prepend is semantic-tokens-line-offset.md.
+The types and tests below still describe a hidden `isograph semantic-tokens` verb and `Work::Query`. That is not this slice. Rewrite them when this file is next in the discussion.
 
 ## What the user does
 

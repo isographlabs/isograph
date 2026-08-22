@@ -197,6 +197,5 @@ LSP tests in `crates/isograph_lsp` `file_semantic_tokens.rs`. Offset arithmetic 
 
 ## Call sites
 
-- e2e-semantic-tokens.md: `isograph semantic-tokens` -> `lsp_semantic_tokens_for_file`.
-- LSP adapter `semanticTokens/full` -> `lsp_semantic_tokens_for_file`. Later document-scoped methods (`documentSymbol`, `foldingRange`, `textDocument/formatting`) read `parsed_iso_literals_in_file`.
 - Tests as above.
+- LSP adapter `semanticTokens/full` -> `lsp_semantic_tokens_for_file`. That request is call/response (lsp-socket.md). e2e-semantic-tokens.md is that request, not a second query port. Later document-scoped methods (`documentSymbol`, `foldingRange`, `textDocument/formatting`) read `parsed_iso_literals_in_file`.

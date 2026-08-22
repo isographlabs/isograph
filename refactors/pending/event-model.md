@@ -13,10 +13,10 @@ Requires config-discovery.md (landed), the event-model design-doc, and `docs-web
 7. extract-iso-literals-from-file.md (landed). After 4. Extract does not parse. pico memo `HostLanguage::extract_iso_literals` (file, the whole vec), `#[memo]` on the TypeScript impl like isograph `CompilationProfile`. `IsoLiteralExtraction` with text, context, and byte start. `IsographState<THostLanguage>` lives in `isograph_compiler`.
 8. memoized-parse-iso-literal.md (landed). After 7. pico memo `parsed_iso_literal` keyed on the literal text. Host embedding errors after parse. `file_literals` on `db` + `path`.
 9. literal-id.md (landed). After 7 and 8. pico memo `literal_id_at_location` (file + `LineChar`) stores `LiteralId` (path plus 0-based extract index). pico memo `iso_literal_extraction` is keyed on `LiteralId`. No parse tree or literal string stored at `(path, LineChar)`.
-10. file-semantic-tokens.md. After 8, 9, and lsp-semantic-token-encoding.md. Offset parse tokens to file coordinates, concatenate, encode.
+10. file-semantic-tokens.md. After 8, 9, and lsp-semantic-token-encoding.md. Path to encoded tokens. Interned-file tests. Not the daemon.
 11. lsp-semantic-token-encoding.md. Encoder only. Landed.
-12. e2e-semantic-tokens.md. After 10. Hidden `isograph semantic-tokens`. Start, send `Present`, query encoded tokens. Append does not change the JSON. Prepend shifts `delta_line`.
-13. LSP adapter. Not written. `EditorChanged`, `isograph lsp` proxy, `OpenFile`.
+12. e2e-semantic-tokens.md. After 10 and after the daemon answers LSP requests. `textDocument/semanticTokens/full` is call/response. Not a second query port.
+13. LSP adapter. Not written. `EditorChanged`, `isograph lsp` proxy, `OpenFile`. Domain requests including `semanticTokens/full`.
 14. lsp-parse-diagnostics.md, against the adapter and `file_literals` from 8.
 15. zed-and-vscode-extensions.md.
 

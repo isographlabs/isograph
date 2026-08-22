@@ -38,6 +38,6 @@ Do not encode a single interior against its own text.
 
 ## Call sites
 
-- e2e-semantic-tokens.md, later adapter `semanticTokens/full`.
+- LSP adapter `semanticTokens/full`. e2e-semantic-tokens.md is that request.
 
 Amend `docs-website/docs/design-docs/pico.md` when this lands: syntax highlighting is this memo.
