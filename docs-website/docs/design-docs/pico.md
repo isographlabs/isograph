@@ -20,17 +20,18 @@ The building blocks are `Database`, `Source`, `Memo`, and `Key`.
 ## Database
 
 ```rust
-#[derive(Default, Db)]
-struct IsographState {
+#[derive(Debug, Db)]
+struct IsographState<THostLanguage: HostLanguage> {
     storage: Storage<Self>,
     #[tracked]
     disk_file_map: DiskFileMap,
+    phantom_data: PhantomData<THostLanguage>,
 }
 ```
 
 `IsographState` is the database. `handle` writes sources into it. Memos read from it. Tests construct the same type, intern sources the same way `handle` does, and call memos.
 
-Memos take `&IsographState`. `set` and `remove` take `&mut` and panic if a memo is on the stack. Derived data is a return value. A `&mut Entity` that you write selectables into cannot sit behind a memo. isograph had to delete `server_object_entity_mut` before those reads could be memos.
+Memos take `&IsographState<THostLanguage>`. `set` and `remove` take `&mut` and panic if a memo is on the stack. Derived data is a return value. A `&mut Entity` that you write selectables into cannot sit behind a memo. isograph had to delete `server_object_entity_mut` before those reads could be memos.
 
 ## Source
 
@@ -74,7 +75,7 @@ A singleton has no key field. There is at most one. `CompilerConfig` and the wor
 impl HostLanguage for TypeScriptHostLanguage {
     #[memo]
     fn extract_iso_literals(
-        db: &IsographState,
+        db: &IsographState<Self>,
         path: PathBuf,
     ) -> Option<Vec<IsoLiteralExtraction<Self>>>;
 }
@@ -82,7 +83,7 @@ impl HostLanguage for TypeScriptHostLanguage {
 
 The trait writes the lookup type `&Option<Vec<IsoLiteralExtraction<Self>>>`. `#[memo]` is on the impl. pico rewrites the impl return to `&T`. First argument is `&Database`. There is no `&self`. Origin of that shape: isograph `CompilationProfile` methods in `graphql_network_protocol.rs`.
 
-The first argument is `&Database`. The rest are the key, at most eight of them. pico hashes the function identity (the signature text at expansion) plus those arguments. That tuple is the cache slot. A type parameter is not an argument. `iso_literal_extraction<THostLanguage>` is one slot for all `T`. i2 has one `HostLanguage` per process. isograph parameterized the database instead (`IsographDatabase<TCompilationProfile>`).
+The first argument is `&Database`. The rest are the key, at most eight of them. pico hashes the function identity (the signature text at expansion) plus those arguments. That tuple is the cache slot. A type parameter is not an argument. `IsographState<THostLanguage>` is a different database type per host, same as isograph `IsographDatabase<TCompilationProfile>`.
 
 The body must be a pure function of `db` reads and the arguments. No filesystem, no clock, no LSP. Reading the world is `handle` interning a source.
 
@@ -165,9 +166,9 @@ struct LineChar {
 }
 
 impl HostLanguage for TypeScriptHostLanguage {
-    fn extract_iso_literals_from_source<'a>(
-        source: &'a str,
-    ) -> Vec<WithSpan<(&'a str, TypeScriptLiteralContext)>> {
+    fn extract_iso_literals_from_source(
+        source: &str,
+    ) -> Vec<WithSpan<(&str, TypeScriptLiteralContext)>> {
         EXTRACT_ISO_LITERAL
             .captures_iter(source)
             .filter_map(|captures| {
@@ -188,7 +189,7 @@ impl HostLanguage for TypeScriptHostLanguage {
 
     #[memo]
     fn extract_iso_literals(
-        db: &IsographState,
+        db: &IsographState<Self>,
         path: PathBuf,
     ) -> Option<Vec<IsoLiteralExtraction<Self>>> {
         let source_id = db.get_disk_file_map().tracked().0.get(&path).copied()?;
@@ -206,12 +207,12 @@ impl HostLanguage for TypeScriptHostLanguage {
 }
 
 #[memo]
-fn iso_literal_extraction(
-    db: &IsographState,
+fn iso_literal_extraction<THostLanguage: HostLanguage>(
+    db: &IsographState<THostLanguage>,
     path: PathBuf,
     line_char: LineChar,
-) -> Option<IsoLiteralExtraction> {
-    let extractions = TypeScriptHostLanguage::extract_iso_literals(db, path.clone())?;
+) -> Option<IsoLiteralExtraction<THostLanguage>> {
+    let extractions = THostLanguage::extract_iso_literals(db, path.clone()).as_ref()?;
     let source_id = db.get_disk_file_map().tracked().0.get(&path).copied()?;
     let content = db.get(source_id).contents.as_str();
     find_iso_literal_extraction(line_char, content, extractions).cloned()

@@ -176,11 +176,12 @@ event-loop.md ships `HelloWorld` / `LogHelloWorld`, `Quit` / `Kill`, tokio `run_
 The state is a pico database. Disk files and open editor buffers are source nodes. Compilation is derived.
 
 ```rust
-#[derive(Default, Debug, Db)]
-struct IsographState {
+#[derive(Debug, Db)]
+struct IsographState<THostLanguage: HostLanguage> {
     storage: Storage<Self>,
     #[tracked]
     disk_file_map: DiskFileMap,
+    phantom_data: PhantomData<THostLanguage>,
 }
 
 struct DiskFileMap(pub HashMap<PathBuf, SourceId<DiskFile>>);
