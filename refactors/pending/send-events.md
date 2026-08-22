@@ -17,7 +17,6 @@ EOF
 $ isograph logs
 {"timestamp":"...","level":"INFO","fields":{"message":"isograph daemon up","config":"/Users/x/app/isograph.config.json","port":53124}}
 {"timestamp":"...","level":"INFO","fields":{"message":"hello world"}}
-{"timestamp":"...","level":"INFO","fields":{"message":"hello world"}}
 ```
 
 `isograph send` does not start the daemon. Walk-up / `--config` is the same as every other verb. `--port` skips the port file.
@@ -227,10 +226,9 @@ async fn serve(config_path: PathBuf, instance: Instance, args: &IsographArgs) {
         return;
     }
     tracing::info!(config = %config_path.display(), port, "isograph daemon up");
-    let _ = event_tx.send(IsographEvent::HelloWorld);
 ```
 
-The SIGTERM task, `_hold_events`, and `select!` stay. `_socket` is held across `select!` the way figaro holds the listener. Figaro panics on a busy port. `serve` logs and returns.
+The SIGTERM task, `_hold_events`, and `select!` stay. `_socket` is held across `select!` the way figaro holds the listener. Figaro panics on a busy port. `serve` logs and returns. `serve` does not send `HelloWorld`. That event arrives on the socket.
 
 `EventSocket::local_addr` returns `SocketAddr`, not `io::Result`. Origin: freddie `refactors/past/event-socket-local-addr.md`.
 
@@ -357,7 +355,22 @@ futures-util = { version = "0.3", default-features = false, features = ["sink"] 
 
 `0.24` matches `freddie_event_socket`. `Message::Text` takes `String`.
 
-`the_log_contains_the_config_path` still polls for `isograph daemon up`, the config path, and `hello world`. The record also has `port`.
+`the_log_contains_the_config_path` today polls for `hello world` because `serve` sends `HelloWorld` at boot. After this change it does not:
+
+```rust
+// from crates/ts_graphql_react_isograph_cli/tests/cli.rs (before)
+        (log.contains("isograph daemon up")
+            && log.contains(path_in_log.reference())
+            && log.contains("hello world"))
+            .then_some(())
+```
+
+```rust
+// from crates/ts_graphql_react_isograph_cli/tests/cli.rs (after)
+        (log.contains("isograph daemon up") && log.contains(path_in_log.reference())).then_some(())
+```
+
+The record also has `port`. Change 2 sends `HelloWorld` through `isograph send` and asserts `hello world`.
 
 ## Change 2: `isograph send`
 
@@ -650,10 +663,23 @@ impl Daemon {
 ```
 
 ```rust
-// from crates/ts_graphql_react_isograph_cli/tests/cli.rs
+// from crates/ts_graphql_react_isograph_cli/tests/cli.rs (after)
 #[test]
-fn send_hello_world_logs_a_second_hello_world() {
+fn the_log_contains_the_config_path() {
     let daemon = Daemon::start();
+    let path = daemon
+        .dir
+        .path()
+        .join("isograph.config.json")
+        .canonicalize()
+        .expect("the fixture exists")
+        .display()
+        .to_string();
+    let path_in_log = path_in_json_log(path.reference());
+    poll(|| {
+        let log = daemon.log_text();
+        (log.contains("isograph daemon up") && log.contains(path_in_log.reference())).then_some(())
+    });
     let sent = daemon.isograph_stdin(
         ["send"].reference(),
         "{\"kind\":\"HelloWorld\"}\n",
@@ -664,10 +690,7 @@ fn send_hello_world_logs_a_second_hello_world() {
         stdout(sent.reference()),
         stderr(sent.reference())
     );
-    poll(|| {
-        let log = daemon.log_text();
-        (log.matches("hello world").count() >= 2).then_some(())
-    });
+    poll(|| daemon.log_text().contains("hello world").then_some(()));
 }
 
 #[test]
@@ -703,7 +726,7 @@ fn send_of_not_json_fails() {
 }
 
 #[test]
-fn send_file_logs_a_second_hello_world() {
+fn send_file_logs_hello_world() {
     let daemon = Daemon::start();
     let frame = daemon.dir.path().join("frame.json");
     std::fs::write(
@@ -718,13 +741,12 @@ fn send_file_logs_a_second_hello_world() {
         stdout(sent.reference()),
         stderr(sent.reference())
     );
-    poll(|| {
-        let log = daemon.log_text();
-        (log.matches("hello world").count() >= 2).then_some(())
-    });
+    poll(|| daemon.log_text().contains("hello world").then_some(()));
 }
 ```
 
-Boot already logs one `hello world`. Send logs a second. `isograph send` must run with the same `HOME` / cwd as the daemon so walk-up finds the same config and the same port file. The harness already does that.
+Change 2 replaces `the_log_contains_the_config_path` with the version above: start, then `isograph send` of `HelloWorld`, then the log has `hello world`. One e2e covers daemon up, the config path, and the CLI.
+
+`isograph send` must run with the same `HOME` / cwd as the daemon so walk-up finds the same config and the same port file. The harness already does that.
 
 `send --file` uses `Daemon::isograph`, not stdin.
