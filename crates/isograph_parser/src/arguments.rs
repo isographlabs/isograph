@@ -1211,7 +1211,7 @@ mod tests {
     }
 
     #[test]
-    fn a_quoted_string_interns_inner_quote_characters() {
+    fn a_quoted_string_keeps_inner_quote_characters() {
         let text = r#"a: "\"hi\"""#;
         let (items, errors) = parsed_pairs(
             text,
