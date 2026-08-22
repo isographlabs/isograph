@@ -21,7 +21,6 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 isograph_extract_typescript = { path = "../isograph_extract_typescript" }
-pico = { path = "../pico" }
 tempfile = "3"
 tokio-tungstenite = "0.24"
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }

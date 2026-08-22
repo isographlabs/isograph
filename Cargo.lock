@@ -641,7 +641,6 @@ dependencies = [
  "isograph_compiler",
  "isograph_config",
  "isograph_extract_typescript",
- "pico",
  "prelude",
  "serde",
  "serde_json",
