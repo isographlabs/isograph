@@ -12,7 +12,7 @@ One shippable change: new `lsp_semantic_tokens` signature and tests. Existing as
 
 ## What the user does
 
-No editor highlighting. A test whose `page_content` is `export const Home = iso(\`entrypoint Query.HomeRoute\`)` parses that interior and passes one pair: `IsoLiteralStartIndex` of the byte index of `entrypoint` in the file. The first encoded token is keyword, `length` 11, `delta_start` the UTF-16 column of `entrypoint`. A test with two `iso(\`...\`)` interiors in one string is one call with two pairs.
+No editor highlighting. A test whose `page_content` is `export const Home = iso(\`entrypoint Query.HomeRoute\`)` parses that interior and passes one pair: `IsoLiteralStartIndex` of the byte index of `entrypoint` in the file. The first encoded token is keyword, `length` 10, `delta_start` the UTF-16 column of `entrypoint`. A test with two `iso(\`...\`)` interiors in one string is one call with two pairs.
 
 ## Types
 
@@ -63,7 +63,7 @@ Keep every existing encoding assertion, through `encode` as a one-interior file 
 
 Add:
 
-- `page_content` is `export const Home = iso(\`entrypoint Query.HomeRoute\`)`. Tokens are `parse_iso_literal("entrypoint Query.HomeRoute").tokens`. One pair; offset is `IsoLiteralStartIndex` of the byte index of `entrypoint` in `page_content`. First encoded token: `delta_line` 0, `delta_start` UTF-16 of `export const Home = iso(\``, `length` 11, `token_type` 15.
+- `page_content` is `export const Home = iso(\`entrypoint Query.HomeRoute\`)`. Tokens are `parse_iso_literal("entrypoint Query.HomeRoute").tokens`. One pair; offset is `IsoLiteralStartIndex` of the byte index of `entrypoint` in `page_content`. First encoded token: `delta_line` 0, `delta_start` UTF-16 of `export const Home = iso(\``, `length` 10, `token_type` 15.
 - Prefix `"const x = 1;\n"` on that same `page_content`. Same tokens, offset is `IsoLiteralStartIndex` of the new start. First token `delta_line` 1, `delta_start` equals the previous test’s `delta_start`.
 - Two interiors in one `page_content`: `iso(\`entrypoint Query.A\`)` then later `iso(\`entrypoint Query.B\`)`. One call, two pairs in extract order. First token of the second pair is keyword at `B`’s `entrypoint`: its `delta_line` / `delta_start` place it on that line and column. Tokens remain ordered.
 - Same two pairs in reverse order `should_panic` on exclusive ordered spans.

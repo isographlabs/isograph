@@ -698,6 +698,7 @@ dependencies = [
 name = "isograph_lsp"
 version = "0.5.3"
 dependencies = [
+ "isograph_compiler",
  "isograph_parser",
  "lsp-types",
  "prelude",

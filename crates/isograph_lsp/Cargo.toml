@@ -5,6 +5,7 @@ edition = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+isograph_compiler = { path = "../isograph_compiler" }
 isograph_parser = { path = "../isograph_parser" }
 lsp-types = { workspace = true }
 prelude = { path = "../prelude" }

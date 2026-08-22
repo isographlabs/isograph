@@ -1,35 +1,41 @@
+use isograph_compiler::IsoLiteralStartIndex;
 use isograph_parser::IsographSemanticToken;
 use lsp_types::{SemanticTokenModifier, SemanticTokenType, SemanticTokensLegend};
-use span::{Span, WithSpan};
+use span::{Span, WithSpan, WithSpanPostfix};
 
-/// Parser tokens whose spans are byte offsets into `page_content`.
-pub fn lsp_semantic_tokens(
-    tokens: &[WithSpan<IsographSemanticToken>],
+/// Parser tokens whose spans are relative to each iso interior.
+/// `literals` is every interior in `page_content`, left to right, with its file start.
+pub fn lsp_semantic_tokens<'a>(
     page_content: &str,
+    literals: impl IntoIterator<Item = (IsoLiteralStartIndex, &'a [WithSpan<IsographSemanticToken>])>,
 ) -> Vec<lsp_types::SemanticToken> {
     let index = LineIndex::new(page_content);
     if page_content.is_ascii() {
-        lsp_semantic_tokens_with(&index, tokens, |text| text.len() as u32)
+        lsp_semantic_tokens_with(&index, literals, |text| text.len() as u32)
     } else {
-        lsp_semantic_tokens_with(&index, tokens, |text| text.encode_utf16().count() as u32)
+        lsp_semantic_tokens_with(&index, literals, |text| text.encode_utf16().count() as u32)
     }
 }
 
-fn lsp_semantic_tokens_with(
+fn lsp_semantic_tokens_with<'a>(
     index: &LineIndex,
-    tokens: &[WithSpan<IsographSemanticToken>],
+    literals: impl IntoIterator<Item = (IsoLiteralStartIndex, &'a [WithSpan<IsographSemanticToken>])>,
     utf16_len: impl Fn(&str) -> u32,
 ) -> Vec<lsp_types::SemanticToken> {
     let mut cursor = index.cursor();
     let mut previous_token_end = 0u32;
     let mut last_start = LastStart { line: 0, offset: 0 };
-    let mut encoded = Vec::with_capacity(tokens.len());
-    for token in tokens {
-        cursor.check_span(token.location, previous_token_end);
-        previous_token_end = token.location.end;
-        emit_pieces(*token, &mut cursor, &mut last_start, &utf16_len, |t| {
-            encoded.push(t)
-        });
+    let mut encoded = Vec::new();
+    for (offset, tokens) in literals {
+        let offset = offset.0 as u32;
+        for token in tokens {
+            let token = token.item.with_span(token.location.with_offset(offset));
+            cursor.check_span(token.location, previous_token_end);
+            previous_token_end = token.location.end;
+            emit_pieces(token, &mut cursor, &mut last_start, &utf16_len, |t| {
+                encoded.push(t)
+            });
+        }
     }
     encoded
 }
@@ -359,6 +365,7 @@ fn lsp_type_index(token: IsographSemanticToken) -> u32 {
 
 #[cfg(test)]
 mod tests {
+    use isograph_compiler::IsoLiteralStartIndex;
     use isograph_parser::{IsographSemanticToken, parse_iso_literal};
     use lsp_types::{SemanticToken, SemanticTokenType};
     use prelude::Postfix;
@@ -375,24 +382,6 @@ mod tests {
         encode(&parsed.tokens, source)
     }
 
-    fn rebased(
-        tokens: &[WithSpan<IsographSemanticToken>],
-        offset: u32,
-    ) -> Vec<WithSpan<IsographSemanticToken>> {
-        tokens
-            .iter()
-            .map(|token| token.item.with_span(token.location.with_offset(offset)))
-            .collect()
-    }
-
-    fn encode_rebased(
-        tokens: &[WithSpan<IsographSemanticToken>],
-        offset: u32,
-        page_content: &str,
-    ) -> Vec<SemanticToken> {
-        encode(&rebased(tokens, offset), page_content)
-    }
-
     fn of_type(lsp: &[SemanticToken], token_type: u32) -> Vec<SemanticToken> {
         lsp.iter()
             .filter(|token| token.token_type == token_type)
@@ -404,7 +393,15 @@ mod tests {
         tokens: &[WithSpan<IsographSemanticToken>],
         page_content: &str,
     ) -> Vec<SemanticToken> {
-        lsp_semantic_tokens(tokens, page_content)
+        lsp_semantic_tokens(page_content, [(IsoLiteralStartIndex(0), tokens)])
+    }
+
+    fn start_of(page_content: &str, interior: &str) -> IsoLiteralStartIndex {
+        IsoLiteralStartIndex(
+            page_content
+                .find(interior)
+                .expect("the fixture contains the interior"),
+        )
     }
 
     #[test]
@@ -448,7 +445,10 @@ mod tests {
         let literal = "field Pet.fullName { id }";
         let source = format!("{prefix}{literal}`)");
         let parsed = parse_iso_literal(literal);
-        let lsp = encode_rebased(&parsed.tokens, prefix.len() as u32, source.reference());
+        let lsp = lsp_semantic_tokens(
+            source.reference(),
+            [(IsoLiteralStartIndex(prefix.len()), parsed.tokens.as_slice())],
+        );
         assert_eq!(lsp[0].delta_line, 0);
         assert_eq!(lsp[0].delta_start, prefix.len() as u32);
         assert_eq!(lsp[0].token_type, KEYWORD);
@@ -462,7 +462,10 @@ mod tests {
         let literal = "field Pet.fullName { id }";
         let source = format!("{prefix}{literal}`)");
         let parsed = parse_iso_literal(literal);
-        let lsp = encode_rebased(&parsed.tokens, prefix.len() as u32, source.reference());
+        let lsp = lsp_semantic_tokens(
+            source.reference(),
+            [(IsoLiteralStartIndex(prefix.len()), parsed.tokens.as_slice())],
+        );
         assert_eq!(lsp[0].delta_line, 1);
         assert_eq!(lsp[0].delta_start, 2);
         assert_eq!(lsp[0].token_type, KEYWORD);
@@ -475,7 +478,10 @@ mod tests {
         let literal = "field Pet.fullName { id }";
         let source = format!("{prefix}{literal}`)");
         let parsed = parse_iso_literal(literal);
-        let lsp = encode_rebased(&parsed.tokens, prefix.len() as u32, source.reference());
+        let lsp = lsp_semantic_tokens(
+            source.reference(),
+            [(IsoLiteralStartIndex(prefix.len()), parsed.tokens.as_slice())],
+        );
         assert_eq!(prefix.len(), 16);
         assert_eq!(lsp[0].delta_line, 0);
         assert_eq!(lsp[0].delta_start, 15);
@@ -495,9 +501,19 @@ mod tests {
             .expect("the second literal is in the file");
         let parsed_a = parse_iso_literal(first);
         let parsed_b = parse_iso_literal(second);
-        let mut tokens = rebased(&parsed_a.tokens, first_start as u32);
-        tokens.extend(rebased(&parsed_b.tokens, second_start as u32));
-        let lsp = encode(&tokens, source);
+        let lsp = lsp_semantic_tokens(
+            source,
+            [
+                (
+                    IsoLiteralStartIndex(first_start),
+                    parsed_a.tokens.as_slice(),
+                ),
+                (
+                    IsoLiteralStartIndex(second_start),
+                    parsed_b.tokens.as_slice(),
+                ),
+            ],
+        );
         assert_eq!(lsp.len(), 8);
         assert_eq!(lsp[4].delta_line, 1);
         assert_eq!(lsp[4].delta_start, 5);
@@ -521,13 +537,70 @@ mod tests {
             .expect("the second literal is in the file");
         let parsed_a = parse_iso_literal(first);
         let parsed_b = parse_iso_literal(second);
-        let mut tokens = rebased(&parsed_a.tokens, first_start as u32);
-        tokens.extend(rebased(&parsed_b.tokens, second_start as u32));
-        let lsp = encode(&tokens, source);
+        let lsp = lsp_semantic_tokens(
+            source,
+            [
+                (
+                    IsoLiteralStartIndex(first_start),
+                    parsed_a.tokens.as_slice(),
+                ),
+                (
+                    IsoLiteralStartIndex(second_start),
+                    parsed_b.tokens.as_slice(),
+                ),
+            ],
+        );
         assert_eq!(lsp.len(), 8);
         assert_eq!(lsp[4].delta_line, 0);
         assert_eq!(lsp[4].delta_start, 9);
         assert_eq!(lsp[4].token_type, KEYWORD);
+    }
+
+    #[test]
+    fn a_ts_file_interior_places_entrypoint_at_its_column() {
+        let page_content = "export const Home = iso(`entrypoint Query.HomeRoute`)";
+        let interior = "entrypoint Query.HomeRoute";
+        let parsed = parse_iso_literal(interior);
+        let lsp = lsp_semantic_tokens(
+            page_content,
+            [(start_of(page_content, interior), parsed.tokens.as_slice())],
+        );
+        assert_eq!(lsp[0].delta_line, 0);
+        assert_eq!(
+            lsp[0].delta_start,
+            "export const Home = iso(`".encode_utf16().count() as u32
+        );
+        assert_eq!(lsp[0].length, 10);
+        assert_eq!(lsp[0].token_type, KEYWORD);
+    }
+
+    #[test]
+    fn a_newline_prefix_increments_delta_line_and_keeps_delta_start() {
+        let original = "export const Home = iso(`entrypoint Query.HomeRoute`)";
+        let interior = "entrypoint Query.HomeRoute";
+        let parsed = parse_iso_literal(interior);
+        let without_prefix = lsp_semantic_tokens(
+            original,
+            [(start_of(original, interior), parsed.tokens.as_slice())],
+        );
+        let page_content = format!("const x = 1;\n{original}");
+        let lsp = lsp_semantic_tokens(
+            page_content.as_str(),
+            [(
+                start_of(page_content.as_str(), interior),
+                parsed.tokens.as_slice(),
+            )],
+        );
+        assert_eq!(lsp[0].delta_line, 1);
+        assert_eq!(lsp[0].delta_start, without_prefix[0].delta_start);
+        assert_eq!(lsp[0].length, 10);
+        assert_eq!(lsp[0].token_type, KEYWORD);
+    }
+
+    #[test]
+    fn empty_literals_encodes_empty() {
+        let lsp = lsp_semantic_tokens("export const Home = 1;", []);
+        assert_eq!(lsp.len(), 0);
     }
 
     #[test]
@@ -847,7 +920,7 @@ mod tests {
         let tokens = IsographSemanticToken::Content
             .with_span(Span::from_usize(0, source.len()))
             .wrap_vec();
-        lsp_semantic_tokens(&tokens, source);
+        encode(&tokens, source);
     }
 
     #[test]
@@ -857,7 +930,7 @@ mod tests {
         let tokens = IsographSemanticToken::Content
             .with_span(Span::from_usize(0, source.len()))
             .wrap_vec();
-        lsp_semantic_tokens(&tokens, source);
+        encode(&tokens, source);
     }
 
     #[test]
@@ -867,7 +940,7 @@ mod tests {
         let tokens = IsographSemanticToken::Content
             .with_span(Span::from_usize(0, source.len()))
             .wrap_vec();
-        lsp_semantic_tokens(&tokens, source);
+        encode(&tokens, source);
     }
 
     #[test]
@@ -877,7 +950,7 @@ mod tests {
         let tokens = IsographSemanticToken::Content
             .with_span(Span::from_usize(0, source.len()))
             .wrap_vec();
-        lsp_semantic_tokens(&tokens, source);
+        encode(&tokens, source);
     }
 
     #[test]
@@ -927,7 +1000,7 @@ mod tests {
         let tokens = IsographSemanticToken::Keyword
             .with_span(Span::from_usize(0, 0))
             .wrap_vec();
-        lsp_semantic_tokens(&tokens, source);
+        encode(&tokens, source);
     }
 
     #[test]
@@ -938,7 +1011,7 @@ mod tests {
             IsographSemanticToken::Keyword.with_span(Span::from_usize(0, 2)),
             IsographSemanticToken::Type.with_span(Span::from_usize(1, 3)),
         ];
-        lsp_semantic_tokens(&tokens, source);
+        encode(&tokens, source);
     }
 
     #[test]
@@ -949,17 +1022,17 @@ mod tests {
             IsographSemanticToken::Keyword.with_span(Span::from_usize(2, 4)),
             IsographSemanticToken::Type.with_span(Span::from_usize(0, 1)),
         ];
-        lsp_semantic_tokens(&tokens, source);
+        encode(&tokens, source);
     }
 
     #[test]
-    #[should_panic(expected = "is inverted")]
+    #[should_panic(expected = "should be less than or equal")]
     fn inverted_span_panics() {
         let source = "abcd";
         let tokens = IsographSemanticToken::Keyword
             .with_span(Span { start: 3, end: 1 })
             .wrap_vec();
-        lsp_semantic_tokens(&tokens, source);
+        encode(&tokens, source);
     }
 
     #[test]
@@ -969,7 +1042,7 @@ mod tests {
         let tokens = IsographSemanticToken::Keyword
             .with_span(Span::from_usize(0, 5))
             .wrap_vec();
-        lsp_semantic_tokens(&tokens, source);
+        encode(&tokens, source);
     }
 
     #[test]
@@ -979,7 +1052,7 @@ mod tests {
         let tokens = IsographSemanticToken::Keyword
             .with_span(Span::from_usize(2, 3))
             .wrap_vec();
-        lsp_semantic_tokens(&tokens, source);
+        encode(&tokens, source);
     }
 
     #[test]
@@ -990,7 +1063,7 @@ mod tests {
             IsographSemanticToken::Keyword.with_span(Span::from_usize(0, 1)),
             IsographSemanticToken::Type.with_span(Span::from_usize(2, 3)),
         ];
-        lsp_semantic_tokens(&tokens, source);
+        encode(&tokens, source);
     }
 
     #[test]
@@ -1007,9 +1080,19 @@ mod tests {
             .expect("the second literal is in the file");
         let parsed_a = parse_iso_literal(first);
         let parsed_b = parse_iso_literal(second);
-        let mut tokens = rebased(&parsed_b.tokens, second_start as u32);
-        tokens.extend(rebased(&parsed_a.tokens, first_start as u32));
-        lsp_semantic_tokens(&tokens, source);
+        lsp_semantic_tokens(
+            source,
+            [
+                (
+                    IsoLiteralStartIndex(second_start),
+                    parsed_b.tokens.as_slice(),
+                ),
+                (
+                    IsoLiteralStartIndex(first_start),
+                    parsed_a.tokens.as_slice(),
+                ),
+            ],
+        );
     }
 
     #[test]

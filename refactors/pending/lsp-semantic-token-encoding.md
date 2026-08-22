@@ -6,7 +6,7 @@ VS Code does not advertise `multilineTokenSupport`. A token whose length crosses
 
 A span must be in range of `page_content`, on a char boundary, not strictly inside a line break, not inverted, not empty, not start before the previous token's end, and not line-break-only. Those are caller bugs and `assert`, all in `check_span` before the walk. Concatenating literals uses `with_offset`. Tests pass a literal as the whole `page_content`.
 
-Origin: `crates/isograph_lsp/src/semantic_tokens.rs` and `crates/isograph_lang_types/src/semantic_token_legend/mod.rs` in isograph. This crate is `crates/isograph_lsp`. It does not start the server. The LSP adapter (event-model.md) will call the functions here. lsp-semantic-tokens-offset.md adds each literal's start offset. file-semantic-tokens.md calls that encoder.
+Origin: `crates/isograph_lsp/src/semantic_tokens.rs` and `crates/isograph_lang_types/src/semantic_token_legend/mod.rs` in isograph. This crate is `crates/isograph_lsp`. It does not start the server. The LSP adapter (event-model.md) will call the functions here. lsp-semantic-tokens-offset.md (landed) adds each literal's start offset. file-semantic-tokens.md calls that encoder.
 
 The parser type is `IsographSemanticToken`. Tests use `lsp_types::SemanticToken`.
 

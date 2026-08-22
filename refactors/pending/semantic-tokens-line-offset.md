@@ -1,6 +1,6 @@
 # Memoize encoded tokens for the file
 
-Requires file-semantic-tokens.md and lsp-semantic-tokens-offset.md. file-semantic-tokens.md encodes every iso literal in the file in one `lsp_semantic_tokens` call. That encode is not a memo. This slice makes `lsp_semantic_tokens_for_file` a `#[memo]` on `RelativePathToSourceFile`. There is no encode of one extraction. LSP `semanticTokens/full` is one stream; the intern is that stream.
+Requires file-semantic-tokens.md and lsp-semantic-tokens-offset.md (landed). file-semantic-tokens.md encodes every iso literal in the file in one `lsp_semantic_tokens` call. That encode is not a memo. This slice makes `lsp_semantic_tokens_for_file` a `#[memo]` on `RelativePathToSourceFile`. There is no encode of one extraction. LSP `semanticTokens/full` is one stream; the intern is that stream.
 
 Origin: isograph issue 548 (encoded positions after typing before the literal). Origin of the walk: lsp-semantic-tokens-offset.md. Delta: the file function is a memo; prepend makes locations and file text `!=` so the encoded vec `!=`; append makes locations `==` and if extract backdates, the encoded vec `==`.
 
