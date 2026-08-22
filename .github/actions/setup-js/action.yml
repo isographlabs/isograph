@@ -1,5 +1,5 @@
 name: Setup JS
-description: Configure pnpm and Node 22, then install workspace dependencies.
+description: Configure pnpm and Node, then install workspace dependencies.
 
 inputs:
   install-args:
@@ -10,13 +10,6 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Cache turbo
-      uses: actions/cache@v4
-      with:
-        path: .turbo
-        key: ${{ runner.os }}-turbo-${{ github.sha }}
-        restore-keys: |
-          ${{ runner.os }}-turbo-
     - uses: pnpm/action-setup@v4
     - name: Use Node.js 22
       uses: actions/setup-node@v4

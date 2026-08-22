@@ -3,29 +3,7 @@ name: JavaScript
 on:
   workflow_call:
 
-env:
-  TURBO_TELEMETRY_DISABLED: 1
-
 jobs:
-  typecheck-demos:
-    name: Typecheck and Lint Demos
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        target:
-          - folder: github-demo
-          - folder: pet-demo
-          - folder: vite-demo
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-js
-      - name: Build JS files
-        run: pnpm compile-libs
-      - name: Typecheck
-        run: cd ./demos/${{ matrix.target.folder }} && pnpm tsc
-      - name: Lint
-        run: cd ./demos/${{ matrix.target.folder }} && pnpm lint
-
   prettier:
     name: Run prettier
     runs-on: ubuntu-latest

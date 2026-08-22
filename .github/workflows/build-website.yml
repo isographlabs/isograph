@@ -3,9 +3,6 @@ name: Build website
 on:
   workflow_call:
 
-env:
-  TURBO_TELEMETRY_DISABLED: 1
-
 jobs:
   build-website:
     name: Build website
