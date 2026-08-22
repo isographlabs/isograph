@@ -96,8 +96,8 @@ let db = IsographState::<TypeScriptHostLanguage>::default();
 ```
 
 - `parsed_iso_literal(&db, "entrypoint Query.HomeRoute".to_owned())` has `errors` empty and `item` `Some` whose item is `IsoLiteralItem::Entrypoint`.
-- `"entrypoint"` has a parse error (incomplete). `item` may still be `Some` (resilient parse). `errors` is not empty.
-- `""` is `AstError::EmptyLiteral` as today.
+- `"entrypoint"` has a parse error (incomplete). `ParsedIsoLiteral.item` is `Some` (the slot). The `IsoLiteralItem` inside is `None`. `errors` is not empty.
+- `""` is `AstError::EmptyLiteral` as today. `ParsedIsoLiteral.item` is `None`.
 - Calling twice with the same text returns a pointer to the same stored value (address equality is not required; asserting the tree twice is enough). A third call after `intern_file` of an unrelated `DiskFile` still matches.
 
 Do not add a production function only the tests call.
@@ -151,8 +151,9 @@ Do not add a memo that parses every extraction in a file. file-semantic-tokens.m
 Same `memo_tests` module. Intern with `intern_file`. One-line fixtures: `line` is 0, `character` is the byte index.
 
 - No `DiskFile`: `iso_literal_text_at_location` and `parsed_iso_literal_at_location` are `None`.
-- Intern `iso(\`entrypoint Query.HomeRoute\`)`. `character` is `contents.find("entrypoint")`. `iso_literal_text_at_location` is `Some` of that interior. `parsed_iso_literal_at_location` is `Some` with empty parse errors and `IsoLiteralItem::Entrypoint`. `character` 0 (`e` of `export`) is `None` for both.
+- Intern `iso(\`entrypoint Query.HomeRoute\`)`. `character` is `contents.find("entrypoint")`. `iso_literal_text_at_location` is `Some` of that interior. `parsed_iso_literal_at_location` is `Some` with empty parse errors and `IsoLiteralItem::Entrypoint`. `character` 0 (`i` of `iso`) is `None` for both. The `LineChar` of the last byte of the interior is `Some`. One past that last byte (the closing backtick) is `None`.
 - Intern `iso(\`entrypoint\`)`. `parsed_iso_literal_at_location` at the interior has parse errors non-empty.
+- Intern `iso(\`\nentrypoint Query.HomeRoute\n\`)`. `{ line: 1, character: 0 }` (`e` of `entrypoint`) is `Some` for both. `{ line: 0, character: 0 }` (`i` of `iso`) is `None`. `{ line: 2, character: 0 }` (the closing backtick) is `None`.
 - Intern two literals. A `character` inside the second literal text is the second tree. A `character` between the two backtick spans is `None`.
 - Same literal text in two files (two paths): both locations return trees that match `parsed_iso_literal` of that text.
 - Prefix the one-literal file with `const x = 1;\n` (second `Present` of the same path). The interior is now `{ line: 1, character: same byte-on-line as before }`. `iso_literal_text_at_location` at that `LineChar` is the same string as before the prefix. `parsed_iso_literal` of that string matches the pre-prefix tree. The pre-prefix `LineChar` is `None`.
@@ -212,7 +213,7 @@ fn item_of(parse: &span::WithSpan<IsoLiteralParse>) -> Option<&IsoLiteralItem> {
 }
 ```
 
-`host_errors_for_extraction` returns host errors only. `file_literals` maps them to `IsoLiteralError::Host` and appends `Parse`. Parse errors live on `ParsedIsoLiteral.errors`. File-absolute parse error spans are `error.location.with_offset(extraction.span().start)`.
+Parentheses is a file fact. Export and associated function apply only when `item_of` is `Selectable`. A failed parse is not a field, so those two do not fire. `host_errors_for_extraction` returns host errors only. `file_literals` maps them to `IsoLiteralError::Host` and appends `Parse`. Parse errors live on `ParsedIsoLiteral.errors`. File-absolute parse error spans are `error.location.with_offset(extraction.span().start)`.
 
 A convenience that one file's diagnostics will want (lsp-parse-diagnostics.md). Define it here so that doc does not invent `file_literals`:
 
@@ -269,7 +270,7 @@ Same `memo_tests` intern as extract-iso-literals-from-file.md (`intern_file`). O
 These nine are the extract-typescript error tests extract-iso-literals-from-file.md deletes. Write them again here.
 
 - `tagged_template_is_missing_parentheses`. Intern `iso\`entrypoint Query.HomeRoute\``. `host_errors_for_extraction` is `TypeScriptHostError::MissingParentheses.with_span(extraction.span()).wrap_vec()`.
-- `incomplete_entrypoint_is_a_parse_error`. Intern `iso(\`entrypoint\`)`. `parsed.errors` is not empty. At least one `IsoLiteralError::Parse` in `file_literals` of that path.
+- `incomplete_entrypoint_is_a_parse_error`. Intern `iso(\`entrypoint\`)`. `parsed.errors` is not empty. `host_errors_for_extraction` is empty. At least one `IsoLiteralError::Parse` in `file_literals` of that path.
 - `entrypoint_without_export_is_valid`. Intern `iso(\`entrypoint Query.HomeRoute\`)`. `host_errors_for_extraction` is empty.
 - `field_without_export_is_missing_export`. Intern `iso(\`field Pet.fullName { id }\`)(`. `host_errors_for_extraction` is one error, `TypeScriptHostError::MissingExport { .. }`.
 - `field_without_associated_function_is_missing_associated_function`. Intern `export const fullName = iso(\`field Pet.fullName { id }\`)`. `host_errors_for_extraction` is `TypeScriptHostError::MissingAssociatedFunction.with_span(extraction.span()).wrap_vec()`.
@@ -281,7 +282,10 @@ These nine are the extract-typescript error tests extract-iso-literals-from-file
 Also:
 
 - No `DiskFile`: `parsed_iso_literal_at_location` is `None`. `file_literals` is `None`.
-- `file_literals` of a file with `iso(\`entrypoint\`)`: one `FileLiteral`, `errors` contains a `Parse` at a span whose start is at least the extraction start.
+- Present file, no `iso`: intern `export const Foo = 1;`. `file_literals` is `Some` of empty vec.
+- `file_literals` of a file with `iso(\`entrypoint\`)`: one `FileLiteral`, `errors` contains a `Parse` at a span whose start is at least the extraction start. No `Host`.
+- `failed_field_parse_is_not_missing_export`. Intern `iso(\`field\`)(`. `parsed.errors` is not empty. `host_errors_for_extraction` is empty.
+- `tagged_template_incomplete_entrypoint_is_parentheses_only`. Intern `iso\`entrypoint\``. `host_errors_for_extraction` is `TypeScriptHostError::MissingParentheses.with_span(extraction.span()).wrap_vec()`. `file_literals` of that path has `Host` and `Parse`.
 
 `expect` names the fixture the test interned.
 
