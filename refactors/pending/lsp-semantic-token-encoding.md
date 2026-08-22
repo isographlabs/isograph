@@ -2,7 +2,7 @@
 
 `lsp_semantic_tokens` takes `&[WithSpan<IsographSemanticToken>]` whose spans are byte offsets into `page_content`, and returns `Vec<lsp_types::SemanticToken>`: `delta_line`, `delta_start`, `length`, `token_type`, `token_modifiers_bitset`. `delta_start` and `length` are UTF-16.
 
-VS Code does not advertise `multilineTokenSupport`. A token whose length crosses a line is clipped at the line end (LSP 3.17). `emit_pieces` pushes one `lsp_types::SemanticToken` for a one-line span, and one per line of text when the span contains a line break (a block string, or leftover `Content` from an unterminated block string). `lsp_semantic_tokens` is a `for` over `tokens`. Each iteration calls `check_span`, then `emit_pieces` walks breaks and `encoded.push`es. `with_capacity(tokens.len())` is the one-line lower bound; a multiline string grows it.
+VS Code does not advertise `multilineTokenSupport`. A token whose length crosses a line is clipped at the line end (LSP 3.17). `emit_pieces` pushes one `lsp_types::SemanticToken` for a one-line span, and one per line of text when the span contains a line break (a block string, or leftover `Content` from an unterminated block string). `lsp_semantic_tokens` is a `for` over `tokens`. Each iteration calls `check_span` on the walk cursor, then `emit_pieces` walks breaks and `encoded.push`es. `with_capacity(tokens.len())` is the one-line lower bound; a multiline string grows it.
 
 A span must be in range of `page_content`, on a char boundary, not strictly inside a line break, not inverted, not empty, not start before the previous token's end, and not line-break-only. Those are caller bugs and `assert`, all in `check_span` before the walk. Concatenating literals uses `with_offset`. Tests pass a literal as the whole `page_content`.
 
@@ -36,9 +36,9 @@ pub fn lsp_semantic_tokens(
     let mut last_start = LastStart { line: 0, offset: 0 };
     let mut encoded = Vec::with_capacity(tokens.len());
     for token in tokens {
-        index.check_span(token.location, previous_token_end);
+        cursor.check_span(token.location, previous_token_end);
         previous_token_end = token.location.end;
-        emit_pieces(*token, &mut cursor, &mut last_start, &index, &mut encoded);
+        emit_pieces(*token, &mut cursor, &mut last_start, &mut encoded);
     }
     encoded
 }
@@ -47,7 +47,6 @@ fn emit_pieces(
     token: WithSpan<IsographSemanticToken>,
     cursor: &mut LineCursor,
     last_start: &mut LastStart,
-    index: &LineIndex,
     encoded: &mut Vec<lsp_types::SemanticToken>,
 ) {
     let span = token.location;
@@ -59,24 +58,22 @@ fn emit_pieces(
                 piece_start = line_break.after;
             }
             Some(line_break) if line_break.start < span.end => {
-                encoded.push(emit_piece(
+                encoded.push(lsp_semantic_token(
                     token.item,
                     piece_start,
                     line_break.start,
                     cursor,
                     last_start,
-                    index,
                 ));
                 piece_start = line_break.after;
             }
             _ => {
-                encoded.push(emit_piece(
+                encoded.push(lsp_semantic_token(
                     token.item,
                     piece_start,
                     span.end,
                     cursor,
                     last_start,
-                    index,
                 ));
                 break;
             }
@@ -89,25 +86,24 @@ fn emit_pieces(
 /// `delta_line` is this line minus `last_start.line`. If that is 0, `delta_start`
 /// is UTF-16 of `last_start.offset..piece_start`. Otherwise `delta_start` is
 /// UTF-16 from column 0 of this line. `length` is UTF-16 of the piece.
-fn emit_piece(
+fn lsp_semantic_token(
     token: IsographSemanticToken,
     piece_start: u32,
     piece_end: u32,
     cursor: &LineCursor,
     last_start: &mut LastStart,
-    index: &LineIndex,
 ) -> lsp_types::SemanticToken {
     let line = cursor.break_index as u32;
     let length = utf16_units(
-        &index.text[(piece_start as usize)..(piece_end as usize)],
-        index.utf16_from,
+        &cursor.index.text[(piece_start as usize)..(piece_end as usize)],
+        cursor.index.utf16_from,
     );
     let (delta_line, delta_start) = match line - last_start.line {
         0 => (
             0,
             utf16_units(
-                &index.text[(last_start.offset as usize)..(piece_start as usize)],
-                index.utf16_from,
+                &cursor.index.text[(last_start.offset as usize)..(piece_start as usize)],
+                cursor.index.utf16_from,
             ),
         ),
         delta_line => (delta_line, cursor.column(piece_start)),
@@ -125,7 +121,7 @@ fn emit_piece(
     }
 }
 
-/// Previous emitted piece's line and byte start.
+/// Previous LSP token's line and byte start.
 #[derive(Copy, Clone)]
 struct LastStart {
     line: u32,
@@ -148,13 +144,6 @@ struct LineIndex<'a> {
 struct LineCursor<'a> {
     index: &'a LineIndex<'a>,
     break_index: usize,
-}
-
-/// LSP position: zero-based line, UTF-16 column on that line.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-struct Position {
-    line: u32,
-    col: u32,
 }
 
 /// One line terminator. `start` is the first byte of `\n`, `\r`, or `\r\n`.
@@ -184,8 +173,10 @@ impl<'a> LineIndex<'a> {
             break_index: 0,
         }
     }
+}
 
-    fn check_span(&self, span: Span, previous_token_end: u32) {
+impl LineCursor<'_> {
+    fn check_span(&mut self, span: Span, previous_token_end: u32) {
         assert!(
             span.end >= span.start,
             "semantic token span {}..{} is inverted",
@@ -200,7 +191,9 @@ impl<'a> LineIndex<'a> {
             previous_token_end,
         );
         self.check_offset(span.start);
+        let start_index = self.break_index;
         self.check_offset(span.end);
+        self.break_index = start_index;
         assert!(
             span.start < span.end,
             "semantic token span {}..{} contains no text to highlight",
@@ -210,8 +203,8 @@ impl<'a> LineIndex<'a> {
         self.assert_has_text(span);
     }
 
-    fn check_offset(&self, offset: u32) {
-        let len = self.text.len() as u32;
+    fn check_offset(&mut self, offset: u32) {
+        let len = self.index.text.len() as u32;
         assert!(
             offset <= len,
             "byte {} is out of range for a document of length {}",
@@ -219,13 +212,12 @@ impl<'a> LineIndex<'a> {
             len,
         );
         assert!(
-            self.text.is_char_boundary(offset as usize),
+            self.index.text.is_char_boundary(offset as usize),
             "byte {} is not a char boundary",
             offset,
         );
-        let mut cursor = self.cursor();
-        cursor.advance_to(offset);
-        if let Some(line_break) = cursor.current_line_break() {
+        self.advance_to(offset);
+        if let Some(line_break) = self.current_line_break() {
             assert!(
                 !(line_break.start < offset && offset < line_break.after),
                 "byte {} is strictly inside a line break {}..{}",
@@ -236,16 +228,19 @@ impl<'a> LineIndex<'a> {
         }
     }
 
-    fn assert_has_text(&self, span: Span) {
-        let mut cursor = self.cursor();
+    fn assert_has_text(&mut self, span: Span) {
+        let start_index = self.break_index;
         let mut offset = span.start;
         while offset < span.end {
-            cursor.advance_to(offset);
-            match cursor.current_line_break() {
+            self.advance_to(offset);
+            match self.current_line_break() {
                 Some(line_break) if line_break.start == offset => {
                     offset = line_break.after;
                 }
-                _ => return,
+                _ => {
+                    self.break_index = start_index;
+                    return;
+                }
             }
         }
         panic!(
@@ -254,9 +249,7 @@ impl<'a> LineIndex<'a> {
             span.end,
         );
     }
-}
 
-impl LineCursor<'_> {
     fn advance_to(&mut self, offset: u32) {
         while self.break_index < self.index.breaks.len()
             && self.index.breaks[self.break_index].after <= offset
@@ -274,14 +267,6 @@ impl LineCursor<'_> {
             &self.index.text[(line_start as usize)..(offset as usize)],
             self.index.utf16_from,
         )
-    }
-
-    fn position(&mut self, offset: u32) -> Position {
-        self.advance_to(offset);
-        Position {
-            line: self.break_index as u32,
-            col: self.column(offset),
-        }
     }
 
     fn current_line_break(&self) -> Option<LineBreak> {
@@ -329,7 +314,7 @@ fn utf16_units(text: &str, from: Utf16From) -> u32 {
 }
 ```
 
-`leftover_token` returns `None` for `LineBreak`, so a line-break-only span is not parse output. Consume and leftover record lexer spans: non-empty, ordered, exclusive, on char boundaries, not strictly inside `\r\n`. `lsp_semantic_tokens` on `parse_iso_literal` output does not hit these asserts. Reverse concat of two literals is a caller bug; that is the `should_panic` case. `page = "a\r\nb"` with tokens `[0..1, 2..3]` is ordered and exclusive; offset 2 sits between `\r` and `\n` and `check_offset` asserts. `column` runs after `check_span` and `advance_to`, so `line_start..offset` is in range and on a char boundary. `LineIndex::new` calls `is_ascii` once. `Utf16From::ByteLen` means UTF-16 units equal byte length. `Utf16From::EncodeUtf16` means every slice uses `encode_utf16`, including ASCII slices in a page that contains a non-ASCII character. A one-line span is `emit_pieces`'s first iteration: no break in the span, emit the tail, stop. `advance_to` skips a break whose `after <= offset`.
+`leftover_token` returns `None` for `LineBreak`, so a line-break-only span is not parse output. Consume and leftover record lexer spans: non-empty, ordered, exclusive, on char boundaries, not strictly inside `\r\n`. `lsp_semantic_tokens` on `parse_iso_literal` output does not hit these asserts. Reverse concat of two literals is a caller bug; that is the `should_panic` case. Tokens are ordered, so `advance_to(span.start)` is a forward step. Interior of a break is `current.start < offset && offset < current.after`. `check_span` saves `break_index`, `advance_to(span.end)`, checks the end, restores; `emit_pieces` continues from start. `assert_has_text` is `emit_pieces`'s skip arm without the push: from the cursor already at `span.start` it only looks at breaks inside the span, then restores. `page = "a\r\nb"` with tokens `[0..1, 2..3]` is ordered and exclusive; offset 2 sits between `\r` and `\n` and `check_offset` asserts. `column` runs after `check_span` and `advance_to`, so `line_start..offset` is in range and on a char boundary. `LineIndex::new` calls `is_ascii` once. `Utf16From::ByteLen` means UTF-16 units equal byte length. `Utf16From::EncodeUtf16` means every slice uses `encode_utf16`, including ASCII slices in a page that contains a non-ASCII character. A one-line span is `emit_pieces`'s first iteration: no break in the span, push the tail, stop. `advance_to` skips a break whose `after <= offset`.
 
 ## Origin
 
@@ -403,8 +388,8 @@ Deltas from that extract:
 - Origin `split_inclusive('\n')` included the newline in `len`. `line_breaks` records `\r\n`, `\n`, and `\r`. `length` is the text before the break.
 - `for token in tokens { check_span; emit_pieces }`. Origin's empty `split_inclusive` chunk had `len` equal to the newline. Empty or line-break-only spans `assert` in `check_span`.
 - `length` and `col` are UTF-16 (`utf16_units`). `is_ascii` runs once on `page_content`. Origin used UTF-8 byte length.
-- Same-line `delta_start` is UTF-16 of `last_start.offset..piece_start`. Later-line `delta_start` is UTF-16 from column 0. Origin used `chars().enumerate()` for `\n` and `text.len()` for last-line width.
-- `LineCursor` is `&LineIndex` plus `break_index`. Origin had no cursor.
+- Same-line `delta_start` is UTF-16 of `last_start.offset..start`. Later-line `delta_start` is UTF-16 from column 0. Origin used `chars().enumerate()` for `\n` and `text.len()` for last-line width.
+- `LineCursor` is `&LineIndex` plus `break_index`. `check_span` uses the walk cursor. Origin had no cursor.
 - Unordered, inverted, out-of-range, non-char-boundary, CRLF-interior, empty, and line-break-only spans `assert`. Origin panics on a backwards slice.
 
 ## Legend and `lsp_type_index`
@@ -527,7 +512,7 @@ mod semantic_tokens;
 pub use semantic_tokens::{lsp_semantic_tokens, semantic_token_legend};
 ```
 
-`emit_pieces`, `emit_piece`, `LastStart`, `LineIndex`, `LineCursor`, `Utf16From`, `Position`, `LineBreak`, `line_breaks`, `utf16_units`, `lsp_type_index`, `TYPE`, `CLASS`, `PARAMETER`, `VARIABLE`, `PROPERTY`, `KEYWORD`, `COMMENT`, `STRING`, `NUMBER`, `OPERATOR`, `DECORATOR` stay in the module. `check_span` `assert`s inverted, overlapping, out of range, non-char-boundary, CRLF-interior, empty, and line-break-only spans. `lsp_type_index_matches_the_legend` is `legend.token_types[index] == TYPE` for each constant; a reorder of `LEGEND_TOKEN_TYPES` fails that test.
+`emit_pieces`, `lsp_semantic_token`, `LastStart`, `LineIndex`, `LineCursor`, `Utf16From`, `LineBreak`, `line_breaks`, `utf16_units`, `lsp_type_index`, `TYPE`, `CLASS`, `PARAMETER`, `VARIABLE`, `PROPERTY`, `KEYWORD`, `COMMENT`, `STRING`, `NUMBER`, `OPERATOR`, `DECORATOR` stay in the module. `check_span` `assert`s inverted, overlapping, out of range, non-char-boundary, CRLF-interior, empty, and line-break-only spans. `lsp_type_index_matches_the_legend` is `legend.token_types[index] == TYPE` for each constant; a reorder of `LEGEND_TOKEN_TYPES` fails that test.
 
 ## Tests
 
@@ -543,9 +528,9 @@ mod tests {
     use span::{Span, WithSpan, WithSpanPostfix};
 
     use super::{
-        CLASS, COMMENT, DECORATOR, KEYWORD, LineBreak, LineIndex, NUMBER, OPERATOR,
-        PARAMETER, PROPERTY, Position, STRING, TYPE, VARIABLE, line_breaks,
-        lsp_semantic_tokens, lsp_type_index, semantic_token_legend,
+        CLASS, COMMENT, DECORATOR, KEYWORD, LineBreak, NUMBER, OPERATOR, PARAMETER,
+        PROPERTY, STRING, TYPE, VARIABLE, line_breaks, lsp_semantic_tokens,
+        lsp_type_index, semantic_token_legend,
     };
 
     fn encoded(source: &str) -> Vec<SemanticToken> {
@@ -603,44 +588,6 @@ mod tests {
                 },
             ],
         );
-    }
-
-    #[test]
-    fn position_same_line() {
-        let index = LineIndex::new("   abc");
-        assert_eq!(index.cursor().position(3), Position { line: 0, col: 3 });
-    }
-
-    #[test]
-    fn position_after_newline() {
-        let index = LineIndex::new("\n  x");
-        assert_eq!(index.cursor().position(3), Position { line: 1, col: 2 });
-    }
-
-    #[test]
-    fn position_after_crlf_and_cr() {
-        let index = LineIndex::new("\r\n  ");
-        assert_eq!(index.cursor().position(4), Position { line: 1, col: 2 });
-        let index = LineIndex::new("\r  ");
-        assert_eq!(index.cursor().position(3), Position { line: 1, col: 2 });
-        let index = LineIndex::new("a\r\nb");
-        assert_eq!(index.cursor().position(3), Position { line: 1, col: 0 });
-        let index = LineIndex::new("x\n\ny");
-        assert_eq!(index.cursor().position(4), Position { line: 2, col: 1 });
-        let index = LineIndex::new("é\r\n  ");
-        assert_eq!(index.cursor().position(6), Position { line: 1, col: 2 });
-        let index = LineIndex::new("é\r  ");
-        assert_eq!(index.cursor().position(5), Position { line: 1, col: 2 });
-    }
-
-    #[test]
-    fn position_counts_utf16_on_the_line() {
-        let index = LineIndex::new("é\n  ");
-        assert_eq!(index.cursor().position(5), Position { line: 1, col: 2 });
-        let index = LineIndex::new("aé");
-        assert_eq!(index.cursor().position(3), Position { line: 0, col: 2 });
-        let index = LineIndex::new("a😀");
-        assert_eq!(index.cursor().position(5), Position { line: 0, col: 3 });
     }
 
     #[test]
@@ -1266,7 +1213,7 @@ mod tests {
 
 `extraction_offset_counts_utf16_in_the_prefix`: `const é = iso(\`` is 16 UTF-8 bytes and 15 UTF-16 units. `delta_start` is 15.
 
-`two_literals_in_one_page_are_in_order`: eight tokens. Index 4 is the second `entrypoint`. Previous piece is `A` on the previous line; `delta_line` 1, `delta_start` 5 (column of `entrypoint` after `iso(\``). Index 7 is `B` on the same line as that literal's `.`.
+`two_literals_in_one_page_are_in_order`: eight tokens. Index 4 is the second `entrypoint`. Previous token is `A` on the previous line; `delta_line` 1, `delta_start` 5 (column of `entrypoint` after `iso(\``). Index 7 is `B` on the same line as that literal's `.`.
 
 `two_literals_on_the_same_line`: same line as `A`; `delta_start` 9 is the column of the second `entrypoint`.
 
@@ -1274,9 +1221,9 @@ mod tests {
 
 `a_quoted_string_with_an_escaped_newline_is_one_lsp_token`: source `"hi\n"` is quote, `h`, `i`, backslash, `n`, quote. Length 6. Not split.
 
-`a_block_string_with_content_on_the_opening_line`: pieces `"""the home` (11), `  route` (7), `"""`.
+`a_block_string_with_content_on_the_opening_line`: tokens `"""the home` (11), `  route` (7), `"""`.
 
-`a_block_string_with_closing_quotes_on_the_content_line`: pieces `"""`, `  route"""` (10). `{` is one space after that piece, `delta_start` 11.
+`a_block_string_with_closing_quotes_on_the_content_line`: tokens `"""`, `  route"""` (10). `{` is one space after that token, `delta_start` 11.
 
 `a_non_ascii_continuation_line_of_a_block_string_is_utf16_length`: `  café` is 7 UTF-8 bytes, 6 UTF-16 units.
 
@@ -1301,8 +1248,6 @@ mod tests {
 `utf16_length_of_a_surrogate_pair`: `😀` is bytes 1..5 of `a😀b`, two UTF-16 units.
 
 `an_empty_span_panics`: `0..0` has no text.
-
-`position_counts_utf16_on_the_line`: `a😀` is 3 UTF-16 units (1 + 2).
 
 `a_span_strictly_inside_crlf_panics`: tokens `[0..1, 2..3]` on `"a\r\nb"`; offset 2 is between `\r` and `\n`.
 
