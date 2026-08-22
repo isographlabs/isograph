@@ -70,11 +70,12 @@ pub enum IsographEvent {
     Quit,
     DiskChanged(DiskChanged),
     #[serde(skip)]
+    #[from]
     Lsp(Lsp),
 }
 ```
 
-`--file` JSON is `HelloWorld` / `Quit` / `DiskChanged`. `Lsp` is not on the wire as a `kind`. `LspClientId` is monotonic per daemon process, never reused. Origin of `From`: figaro `events.rs` `FigaroTrigger`; `derive_more` 2 `From`. Also `From<DiskChanged>`. Drop `PartialEq` / `Eq` on `IsographEvent`: `lsp_server::Message` does not implement them. Tests use `matches!`.
+`--file` JSON is `HelloWorld` / `Quit` / `DiskChanged`. `Lsp` is not on the wire as a `kind`. `LspClientId` is monotonic per daemon process, never reused. Origin of `From`: `derive_more` 2. `#[from]` only on `Lsp` so there is no `From<DiskChanged>`. strum is already in the workspace; it is `Display` / `FromStr` / `FromRepr`, not `From<payload>`. `enum_derive` is unit variants only. Drop `PartialEq` / `Eq` on `IsographEvent`: `lsp_server::Message` does not implement them. Tests use `matches!`.
 
 ```rust
 // from crates/isograph_cli/src/lsp_socket.rs
