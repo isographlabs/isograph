@@ -53,15 +53,15 @@ Most important first.
 use lsp_types::notification::Notification;
 
 #[derive(Debug)]
-pub enum Event {}
+pub enum IsographEventNotification {}
 
-impl Notification for Event {
+impl Notification for IsographEventNotification {
     type Params = crate::event::IsographEvent;
     const METHOD: &'static str = "isograph/event";
 }
 ```
 
-`--file` JSON is `Event::Params`. Origin of the empty enum: `lsp-types` 0.97 `notification::Initialized`.
+`--file` JSON is `IsographEventNotification::Params`. Origin of the empty enum: `lsp-types` 0.97 `notification::Initialized`.
 
 ```rust
 // from crates/isograph_cli/src/lsp_socket.rs
@@ -160,7 +160,7 @@ fn dispatch_notification(
     notification: lsp_server::Notification,
     event_tx: &tokio::sync::mpsc::UnboundedSender<crate::event::IsographEvent>,
 ) {
-    if notification.method != Event::METHOD {
+    if notification.method != IsographEventNotification::METHOD {
         return;
     }
     match serde_json::from_value::<crate::event::IsographEvent>(notification.params) {
@@ -205,7 +205,7 @@ Origin of the loop: isograph `server.rs` `run` matching `Message::Request` / `No
     }
 ```
 
-The listen callback today is `freddie_event_socket`. Drop it. `event_tx` is cloned into `accept_loop` and `_hold_events` as today. Delete `external.rs`. `on_message` goes away; deserialize is `Event::Params`.
+The listen callback today is `freddie_event_socket`. Drop it. `event_tx` is cloned into `accept_loop` and `_hold_events` as today. Delete `external.rs`. `on_message` goes away; deserialize is `IsographEventNotification::Params`.
 
 ### `send`
 
@@ -253,7 +253,7 @@ fn notify(
         .sender
         .send(lsp_server::Message::Notification(
             lsp_server::Notification {
-                method: crate::lsp_socket::Event::METHOD.to_owned(),
+                method: crate::lsp_socket::IsographEventNotification::METHOD.to_owned(),
                 params,
             },
         ))
