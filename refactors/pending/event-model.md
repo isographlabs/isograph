@@ -15,7 +15,7 @@ Requires config-discovery.md (landed), the event-model design-doc, and `docs-web
 9. literal-id.md (landed). After 7 and 8. pico memo `literal_id_at_location` (file + `LineChar`) stores `LiteralId` (path plus 0-based extract index). pico memo `iso_literal_extraction` is keyed on `LiteralId`. No parse tree or literal string stored at `(path, LineChar)`.
 10. file-semantic-tokens.md (landed). Path to encoded tokens. Interned-file tests. Not the daemon.
 11. lsp-semantic-token-encoding.md (landed). Encoder only.
-12. lsp-port.md. The `{slug}.port` TCP listener is LSP. Ingest (`HelloWorld`, `DiskChanged`, `Quit`) is custom requests. `isograph send` waits for the result. Watcher/SIGTERM stay `Work::Event`.
+12. lsp-port.md. The `{slug}.port` TCP listener is LSP. Ingest is one request, `isograph/event`, params `IsographEvent`. `isograph send` waits for the result. Watcher/SIGTERM stay `Work::Event`.
 13. lsp-tokens.md. `textDocument/semanticTokens/full` via isograph `on_request_sync`. E2E: diskChanged request then tokens.
 14. lsp-sessions.md. Per-connection `ClientCapabilities` and a writer. Drop on socket end.
 15. lsp-diagnostics.md. Change → reset debounce → `ReportDiagnostics` → `publishDiagnostics` to live sessions.

@@ -2,7 +2,7 @@
 
 Requires lsp-port.md. `lsp_semantic_tokens_for_file` is already in `isograph_lsp`. Independent of filesystem-watcher.md.
 
-Ingest methods are still a map onto `IsographEvent`. `semanticTokens/full` is not `handle`. This is the first method that justifies isograph’s `on_request_sync` chain. An e2e client does `isograph/diskChanged` (request, waits) then `textDocument/semanticTokens/full`. Because ingest was a request, the tokens cannot be from before the file was interned.
+Ingest is one request, `isograph/event`, params `IsographEvent`. `semanticTokens/full` is not `handle`. This is the first method that justifies isograph’s `on_request_sync` chain. An e2e client does `isograph/event` with `DiskChanged` (waits) then `textDocument/semanticTokens/full`. Because ingest was a request, the tokens cannot be from before the file was interned.
 
 Origin of dispatch: isograph `lsp_request_dispatch.rs` / `server.rs` `dispatch_request`. Origin of the method: `lsp_types::request::SemanticTokensFullRequest`. Origin of the handler: isograph `on_semantic_token_full_request`. Origin of tokens: `lsp_semantic_tokens_for_file`. Origin of initialize options: isograph `server.rs` `initialize`. Delta: extract is `Result`; URI to path has no `expect`; missing `DiskFile` is `Ok(None)`; `&IsographState` not `LspState`.
 
@@ -30,7 +30,7 @@ enum Work {
 }
 ```
 
-`ingest_request`’s `None` arm (not an ingest method) becomes `Work::LspRequest` instead of `MethodNotFound`. The worker:
+`ingest_request` when `method != Ingest::METHOD` becomes `Work::LspRequest` instead of `MethodNotFound`. The worker:
 
 ```rust
             Work::LspRequest(request, reply) => {
@@ -218,7 +218,7 @@ url = { workspace = true }
 `lsp_socket.rs`:
 
 - initialize legend `tokenTypes[15]` is `keyword`
-- `isograph/diskChanged` of `/tmp/proj/src/Home.ts` with the one-literal contents (wait for `null`), then `semanticTokens/full` for `file:///tmp/proj/src/Home.ts`: first token type 15, length 10
+- `isograph/event` DiskChanged of `/tmp/proj/src/Home.ts` with the one-literal contents (wait for `null`), then `semanticTokens/full` for `file:///tmp/proj/src/Home.ts`: first token type 15, length 10
 - `full` for a URI that was never interned: `result` is JSON `null`
 - `full` with a non-file URI: `InvalidParams`
 

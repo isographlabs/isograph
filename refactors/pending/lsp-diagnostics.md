@@ -99,7 +99,7 @@ That writer thread should land in lsp-sessions.md if not already implied. lsp-se
 
 ## Tests
 
-- intern a file with `iso(\`entrypoint\`)` via `isograph/diskChanged`. After 100ms+settle, a live session with `PublishDiagnosticsCap::Yes` receives `publishDiagnostics` whose `diagnostics` is non-empty.
+- intern a file with `iso(\`entrypoint\`)` via `isograph/event` DiskChanged. After 100ms+settle, a live session with `PublishDiagnosticsCap::Yes` receives `publishDiagnostics` whose `diagnostics` is non-empty.
 - two disk changes 10ms apart: one publish, contents of the second file.
 - `PublishDiagnosticsCap::No`: no notification.
 - drop the session before the timer fires: no panic, no send to a dead socket.

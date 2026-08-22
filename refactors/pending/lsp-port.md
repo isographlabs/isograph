@@ -19,7 +19,7 @@ $ printf '%s\n' '{"kind":"HelloWorld"}' > /tmp/hello.json
 $ isograph send --file /tmp/hello.json
 ```
 
-The log has `hello world`. The socket sees `initialize`, `initialized`, `isograph/helloWorld` (request id 2), then a `null` result. Send exits 0 after that result.
+The log has `hello world`. The socket sees `initialize`, `initialized`, `isograph/event` with params `{"kind":"HelloWorld"}`, then a `null` result. Send exits 0 after that result.
 
 ```
 $ printf '%s\n' '{"kind":"DiskChanged","value":{"path":"/tmp/proj/src/a.ts","presence":{"Present":"export const a = 1;\n"}}}' > /tmp/disk.json
@@ -38,38 +38,20 @@ The result is `null`, then the daemon exits (`Kill`). Send is not in `--help`. T
 Most important first.
 
 ```rust
-// from crates/isograph_cli/src/lsp_methods.rs
+// from crates/isograph_cli/src/lsp_socket.rs
 use lsp_types::request::Request;
 
 #[derive(Debug)]
-pub enum HelloWorld {}
+pub enum Ingest {}
 
-impl Request for HelloWorld {
-    type Params = ();
+impl Request for Ingest {
+    type Params = crate::event::IsographEvent;
     type Result = ();
-    const METHOD: &'static str = "isograph/helloWorld";
-}
-
-#[derive(Debug)]
-pub enum DiskChanged {}
-
-impl Request for DiskChanged {
-    type Params = crate::event::DiskChanged;
-    type Result = ();
-    const METHOD: &'static str = "isograph/diskChanged";
-}
-
-#[derive(Debug)]
-pub enum Quit {}
-
-impl Request for Quit {
-    type Params = ();
-    type Result = ();
-    const METHOD: &'static str = "isograph/quit";
+    const METHOD: &'static str = "isograph/event";
 }
 ```
 
-Origin of the empty enum: `lsp_types::request::Shutdown`. `DiskChanged::Params` is `{path, presence}`, not `{kind, value}`.
+`--file` JSON is `Ingest::Params`. There is not a request type per variant. Origin of the empty enum: `lsp_types::request::Shutdown`.
 
 ```rust
 // from crates/isograph_cli/src/daemon.rs
@@ -79,35 +61,7 @@ enum Work {
 }
 ```
 
-`Event` is watcher and SIGTERM: no reply. `Ingest` is an LSP ingest request the session already decoded. The worker does not see `lsp_server::Request`. No `Serialize`.
-
-The session maps `HelloWorld` / `DiskChanged` / `Quit` requests onto `IsographEvent`. Those three methods all run `handle`. There is no dispatcher and no per-method handler.
-
-```rust
-// from crates/isograph_cli/src/lsp_socket.rs
-fn event_from_ingest_request(
-    request: &lsp_server::Request,
-) -> Option<Result<crate::event::IsographEvent, serde_json::Error>> {
-    if request.method == HelloWorld::METHOD {
-        return serde_json::from_value::<()>(request.params.clone())
-            .map(|()| crate::event::IsographEvent::HelloWorld)
-            .wrap_some();
-    }
-    if request.method == DiskChanged::METHOD {
-        return serde_json::from_value(request.params.clone())
-            .map(crate::event::IsographEvent::DiskChanged)
-            .wrap_some();
-    }
-    if request.method == Quit::METHOD {
-        return serde_json::from_value::<()>(request.params.clone())
-            .map(|()| crate::event::IsographEvent::Quit)
-            .wrap_some();
-    }
-    None
-}
-```
-
-`None` is not ingest (`MethodNotFound` until lsp-tokens.md). `Err` is `InvalidParams`. `Ok` is `Work::Ingest`.
+`Event` is watcher and SIGTERM: no reply. `Ingest` is the same `IsographEvent` from an `isograph/event` request, with an ack so the client can wait. The worker does not see `lsp_server::Request`. No `Serialize`.
 
 ```rust
 // from crates/isograph_cli/src/daemon.rs
@@ -181,13 +135,15 @@ fn ingest_request(
     request: lsp_server::Request,
 ) -> Step {
     let id = request.id.clone();
-    match event_from_ingest_request(request.reference()) {
-        None => Step::Reply(lsp_server::Response::new_err(
+    if request.method != Ingest::METHOD {
+        return Step::Reply(lsp_server::Response::new_err(
             id,
             lsp_server::ErrorCode::MethodNotFound as i32,
             format!("No handler registered for method '{}'", request.method),
-        )),
-        Some(Err(e)) => {
+        ));
+    }
+    match serde_json::from_value::<crate::event::IsographEvent>(request.params) {
+        Err(e) => {
             warn!(error = %e, "ingest params");
             Step::Reply(lsp_server::Response::new_err(
                 id,
@@ -195,7 +151,7 @@ fn ingest_request(
                 "invalid request params".to_owned(),
             ))
         }
-        Some(Ok(event)) => {
+        Ok(event) => {
             let (reply, rx) = tokio::sync::oneshot::channel();
             if work_tx
                 .send(crate::daemon::Work::Ingest(event, reply))
@@ -415,37 +371,16 @@ Drop `freddie_event_socket`. Delete `external.rs`.
 // from crates/isograph_cli/src/send.rs
     let event: crate::event::IsographEvent =
         serde_json::from_str(frame.trim()).map_err(SendError::NotEvent)?;
-    let request = crate::lsp_socket::request_from_event(event, lsp_server::RequestId::from(2))
-        .map_err(SendError::Encode)?;
+    let params = serde_json::to_value(&event).map_err(SendError::Encode)?;
+    let request = lsp_server::Request {
+        id: lsp_server::RequestId::from(2),
+        method: crate::lsp_socket::Ingest::METHOD.to_owned(),
+        params,
+    };
     let stream = std::net::TcpStream::connect((std::net::Ipv4Addr::LOCALHOST, port)).map_err(
         |source| SendError::Connect(Connect { port, source }),
     )?;
     handshake_and_request(stream, request)
-```
-
-```rust
-// from crates/isograph_cli/src/lsp_socket.rs
-fn request_from_event(
-    event: crate::event::IsographEvent,
-    id: lsp_server::RequestId,
-) -> Result<lsp_server::Request, serde_json::Error> {
-    match event {
-        crate::event::IsographEvent::HelloWorld => request::<HelloWorld>(id, ()),
-        crate::event::IsographEvent::DiskChanged(change) => request::<DiskChanged>(id, change),
-        crate::event::IsographEvent::Quit => request::<Quit>(id, ()),
-    }
-}
-
-fn request<R: lsp_types::request::Request>(
-    id: lsp_server::RequestId,
-    params: R::Params,
-) -> Result<lsp_server::Request, serde_json::Error> {
-    serde_json::to_value(params).map(|params| lsp_server::Request {
-        id,
-        method: R::METHOD.to_owned(),
-        params,
-    })
-}
 ```
 
 ```rust
@@ -515,7 +450,7 @@ lsp-types = { workspace = true }
 tokio = { workspace = true, features = ["rt", "macros", "signal", "sync", "time", "net"] }
 ```
 
-`lib.rs`: `mod lsp_methods; mod lsp_socket;`
+`lib.rs`: `mod lsp_socket;`
 
 ### Design doc
 
@@ -525,10 +460,10 @@ tokio = { workspace = true, features = ["rt", "macros", "signal", "sync", "time"
 
 `lsp_socket.rs`: bind `accept_loop`, 250ms settle.
 
-- initialize then `isograph/helloWorld` request: result `null`, log/effect `hello world`
-- initialize then `isograph/diskChanged` present, then absent
-- initialize then `isograph/quit`: result `null`, then `Kill`
-- hello world request before initialize: `ServerNotInitialized`
+- initialize then `isograph/event` with `{"kind":"HelloWorld"}`: result `null`, log/effect `hello world`
+- initialize then `isograph/event` DiskChanged present, then absent
+- initialize then `isograph/event` Quit: result `null`, then `Kill`
+- `isograph/event` before initialize: `ServerNotInitialized`
 - unknown request after initialize: `MethodNotFound`
 - `shutdown` then `exit` does not `Quit`; a second connection can initialize + hello world
 - malformed payload closes the connection
@@ -541,6 +476,6 @@ tokio = { workspace = true, features = ["rt", "macros", "signal", "sync", "time"
 ## Call sites
 
 - `serve` -> `Work` channel -> `accept_loop` / SIGTERM `Work::Event(Quit)` / `run_event_loop`
-- `Running` + ingest request -> `event_from_ingest_request` -> `Work::Ingest` -> `handle` -> ack -> session writes `null` -> effects
-- `isograph send` -> `request_from_event` -> `handshake_and_request`
+- `Running` + `isograph/event` -> deserialize `IsographEvent` -> `Work::Ingest` -> `handle` -> ack -> session writes `null` -> effects
+- `isograph send` -> `--file` is `Ingest::Params` -> `handshake_and_request`
 - watcher (later) -> `Work::Event(DiskChanged)` -> `handle`, never the wire
