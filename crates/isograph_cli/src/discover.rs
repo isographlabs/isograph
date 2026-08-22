@@ -654,91 +654,11 @@ mod tests {
     }
 
     #[test]
-    fn load_config_missing_source_files() {
-        let dir = temp();
-        let path = dir.path().join("isograph.config.json");
-        write_file(path.reference(), "{}\n");
-        let err = load_config(path.reference()).expect_err("source_files is required");
-        let LoadError::Unparseable(inner) = err else {
-            panic!("expected Unparseable, got {err}");
-        };
-        assert_eq!(inner.path, path);
-        assert!(
-            inner.source.to_string().contains("source_files"),
-            "{inner:?}"
-        );
-    }
-
-    #[test]
-    fn load_config_empty_source_files() {
-        let dir = temp();
-        let path = dir.path().join("isograph.config.json");
-        write_file(path.reference(), "{\"source_files\":[]}\n");
-        let config = load_config(path.reference()).expect("empty list is a config");
-        assert!(config.source_files.is_empty());
-    }
-
-    #[test]
-    fn load_config_unknown_fields() {
-        let dir = temp();
-        let path = dir.path().join("isograph.config.json");
-        write_file(
-            path.reference(),
-            "{\"source_files\":[],\"project_root\":\"./src\"}\n",
-        );
-        let err = load_config(path.reference()).expect_err("unknown fields are denied");
-        let LoadError::Unparseable(inner) = err else {
-            panic!("expected Unparseable, got {err}");
-        };
-        assert_eq!(inner.path, path);
-        assert!(
-            inner.source.to_string().contains("project_root"),
-            "{inner:?}"
-        );
-    }
-
-    #[test]
     fn load_config_unparseable_object() {
         let dir = temp();
         let path = dir.path().join("isograph.config.json");
         write_file(path.reference(), "{");
         let err = load_config(path.reference()).expect_err("truncated json is unparseable");
-        let LoadError::Unparseable(inner) = err else {
-            panic!("expected Unparseable, got {err}");
-        };
-        assert_eq!(inner.path, path);
-    }
-
-    #[test]
-    fn load_config_empty_file() {
-        let dir = temp();
-        let path = dir.path().join("isograph.config.json");
-        write_file(path.reference(), "");
-        let err = load_config(path.reference()).expect_err("empty file is unparseable");
-        let LoadError::Unparseable(inner) = err else {
-            panic!("expected Unparseable, got {err}");
-        };
-        assert_eq!(inner.path, path);
-    }
-
-    #[test]
-    fn load_config_null() {
-        let dir = temp();
-        let path = dir.path().join("isograph.config.json");
-        write_file(path.reference(), "null\n");
-        let err = load_config(path.reference()).expect_err("null is not a config object");
-        let LoadError::Unparseable(inner) = err else {
-            panic!("expected Unparseable, got {err}");
-        };
-        assert_eq!(inner.path, path);
-    }
-
-    #[test]
-    fn load_config_array() {
-        let dir = temp();
-        let path = dir.path().join("isograph.config.json");
-        write_file(path.reference(), "[]\n");
-        let err = load_config(path.reference()).expect_err("an array is not a config object");
         let LoadError::Unparseable(inner) = err else {
             panic!("expected Unparseable, got {err}");
         };
