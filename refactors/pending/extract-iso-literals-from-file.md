@@ -1,6 +1,6 @@
 # Extract iso literals from a DiskFile
 
-Requires filesystem-events.md (landed), disk-changed-absent-and-path-keys.md, and extract-iso-literals.md (landed). `HostLanguage::extract_iso_literals` finds iso literals in a `&str`. This file puts that behind a pico memo over a `DiskFile`.
+Requires filesystem-events.md (landed) and extract-iso-literals.md (landed). `HostLanguage::extract_iso_literals` finds iso literals in a `&str`. This file puts that behind a pico memo over a `DiskFile`.
 
 Origin of the memo: isograph `crates/isograph_schema/src/validated_isograph_schema/isograph_literals.rs` `extract_iso_literals_from_file_content` and `IsoLiteralExtraction`. Delta: `PathBuf` instead of `RelativePathToSourceFile`; `THostLanguage::LiteralContext` instead of four ad-hoc fields (`const_export_name`, `has_associated_js_function`, `iso_function_called_with_paren` as bools); extract does not parse (isograph extract also does not parse; i2's TypeScript implementor currently does, and this doc stops that); missing `DiskFile` is `None`, not a panic.
 
@@ -133,17 +133,12 @@ fn handle_disk_changed(state: &mut IsographState, change: DiskChanged) {
                 .insert(change.path, source_id);
         }
         Presence::Absent => {
-            if let Some(&source_id) = state
-                .get_disk_file_map()
-                .untracked()
+            if let Some(source_id) = state
+                .get_disk_file_map_mut()
+                .tracked()
                 .0
-                .get(change.path.reference())
+                .remove(&change.path)
             {
-                state
-                    .get_disk_file_map_mut()
-                    .tracked()
-                    .0
-                    .remove(change.path.reference());
                 state.remove(source_id);
             }
         }
