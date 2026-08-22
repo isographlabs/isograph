@@ -1,14 +1,14 @@
 # Semantic tokens for the iso literals in a DiskFile
 
-Requires extract-iso-literals-from-file.md (landed), memoized-parse-iso-literal.md (landed), literal-id.md (landed), lsp-semantic-token-encoding.md (landed), and lsp-semantic-tokens-offset.md (landed). Extract finds the literals. `parsed_iso_literal` records `ParsedIsoLiteral.tokens` with spans relative to the literal text. `locations_of_iso_literals_in_file` is those literals’ `IsoLiteralStartIndex` values in extract order. `lsp_semantic_tokens_for_file` passes the file text and every `(*start_index, parsed.tokens)` in extract order to one `lsp_semantic_tokens` call. It does not encode one extraction. File-absolute `WithSpan<IsographSemanticToken>` is not interned and not exported. Parse stays keyed on the literal text.
+Requires extract-iso-literals-from-file.md (landed), memoized-parse-iso-literal.md (landed), literal-id.md (landed), lsp-semantic-token-encoding.md (landed), and lsp-semantic-tokens-offset.md (landed). Extract finds the literals. `parsed_iso_literal` records `ParsedIsoLiteral.tokens` with spans relative to the literal text. `locations_of_iso_literals_in_file` is those literals’ `IsoLiteralStartIndex` values in extract order. `lsp_semantic_tokens_for_file` passes the file text and every `(*start_index, parsed.tokens.as_slice())` in extract order to one `lsp_semantic_tokens` call. It does not encode one extraction. File-absolute `WithSpan<IsographSemanticToken>` is not interned and not exported. Parse stays keyed on the literal text.
 
 File-level highlighting is keyed on `path`. It does not go through `LineChar`. Cursor APIs convert `path` and `LineChar` to `LiteralId`. This file’s parse intern is `parsed_iso_literal(text)` via `parsed_iso_literals_in_file`.
 
-Origin of the pipeline: isograph `get_semantic_tokens`. Origin of encoding: `lsp_semantic_tokens` after lsp-semantic-tokens-offset.md. Delta: pico memos over `DiskFile`; relative tokens stay relative; the encoder takes each literal offset; no concat intern.
+Origin of the pipeline: isograph `get_semantic_tokens`. Origin of encoding: landed `lsp_semantic_tokens`. Delta: pico memos over `DiskFile`; relative tokens stay relative; one encoder call for the file; no concat intern.
 
 The LSP adapter (event-model.md, not written) will call this on `semanticTokens/full`. This slice does not start the adapter. `OpenFile` is not implemented yet; tests intern a `DiskFile` and assert encoded tokens. Encoding is not a memo. Memoizing encoded tokens is semantic-tokens-line-offset.md.
 
-One shippable change: two compiler memos and `lsp_semantic_tokens_for_file`. This change amends `docs-website/docs/design-docs/pico.md`.
+One shippable change: two compiler memos and `lsp_semantic_tokens_for_file`. pico.md already has this graph and the un-memoized `lsp_semantic_tokens_for_file`. Amend that file only if the graph drifted.
 
 ## What the user does
 
@@ -45,16 +45,10 @@ locations_of_iso_literals_in_file(path)
 
 pico lookup of an `Option` memo is `&Option<T>`. Callers write `.as_ref()?`.
 
+The two memos go in `crates/isograph_compiler/src/iso_literals.rs`, next to `parsed_iso_literal`. Add `IsoLiteralStartIndex` to the existing `host_language` import. `parsed_iso_literal` is already in this module.
+
 ```rust
 // from crates/isograph_compiler/src/iso_literals.rs
-use common_lang_types::RelativePathToSourceFile;
-use isograph_parser::ParsedIsoLiteral;
-use pico_macros::memo;
-use prelude::Postfix;
-
-use crate::IsographState;
-use crate::host_language::{HostLanguage, IsoLiteralStartIndex};
-
 #[memo]
 pub fn parsed_iso_literals_in_file<THostLanguage: HostLanguage>(
     db: &IsographState<THostLanguage>,
@@ -99,11 +93,13 @@ pub use iso_literals::{
 };
 ```
 
+The existing `pub use` already names `LineChar`, `LiteralId`, `iso_literal_extraction`, `literal_id_at_location`, and `parsed_iso_literal`. Add the two new names.
+
 ```rust
 // from crates/isograph_lsp/src/file_semantic_tokens.rs
+use common_lang_types::RelativePathToSourceFile;
 use isograph_compiler::{
-    HostLanguage, IsographState, RelativePathToSourceFile, locations_of_iso_literals_in_file,
-    parsed_iso_literals_in_file,
+    HostLanguage, IsographState, locations_of_iso_literals_in_file, parsed_iso_literals_in_file,
 };
 use pico::Database;
 use prelude::Postfix;
@@ -128,7 +124,41 @@ pub fn lsp_semantic_tokens_for_file<THostLanguage: HostLanguage>(
 }
 ```
 
-`isograph_lsp` depends on `isograph_compiler` and `pico`. `lib.rs` gains `mod file_semantic_tokens` and re-exports `lsp_semantic_tokens_for_file`.
+`isograph_lsp` already depends on `isograph_compiler`. This slice adds `pico` (`Database`) and `common_lang_types` (`RelativePathToSourceFile`). Dev-dependencies: `intern` (`.intern()`) and `isograph_extract_typescript` (`TypeScriptHostLanguage`).
+
+```toml
+# from crates/isograph_lsp/Cargo.toml
+[package]
+name = "isograph_lsp"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+common_lang_types = { path = "../common_lang_types" }
+isograph_compiler = { path = "../isograph_compiler" }
+isograph_parser = { path = "../isograph_parser" }
+lsp-types = { workspace = true }
+pico = { path = "../pico" }
+prelude = { path = "../prelude" }
+span = { path = "../span" }
+
+[dev-dependencies]
+intern = { path = "../../relay-crates/intern" }
+isograph_extract_typescript = { path = "../isograph_extract_typescript" }
+
+[lints]
+workspace = true
+```
+
+```rust
+// from crates/isograph_lsp/src/lib.rs
+mod file_semantic_tokens;
+mod semantic_tokens;
+
+pub use file_semantic_tokens::lsp_semantic_tokens_for_file;
+pub use semantic_tokens::{lsp_semantic_tokens, semantic_token_legend};
+```
 
 This function is not a memo. Every call re-encodes. Parsed list `Some` means this path has a `DiskFile`; the map lookup is `untracked` the same way `literal_id_at_location` looks up a path it already resolved. A miss is `None`.
 
@@ -136,11 +166,11 @@ The adapter later: `semanticTokens/full` for a URI maps to this path, then this 
 
 ## Tests
 
-Compiler tests in `isograph_extract_typescript` `memo_tests` (needs `TypeScriptHostLanguage` and interned files). Intern with `intern_file` (`insert_disk_file`).
+Compiler tests in `isograph_extract_typescript` `memo_tests` (needs `TypeScriptHostLanguage` and interned files). Intern with the existing `intern_file` / `intern_path`. Path is `intern_path("src/a.ts")`. Add `locations_of_iso_literals_in_file` and `parsed_iso_literals_in_file` to that module’s `isograph_compiler` import.
 
 - No `DiskFile`: `parsed_iso_literals_in_file` and `locations_of_iso_literals_in_file` are `None`.
 - File with no `iso`: both are `Some` of empty vec.
-- `iso(\`entrypoint Query.HomeRoute\`)`. Let `start` be the byte index of `entrypoint` in the file. `locations_of_iso_literals_in_file` is one element, the extraction's `iso_literal_start_index`. `parsed_iso_literals_in_file` is one tree, empty parse errors, item variant `IsoLiteralItem::Entrypoint(_)`. The first parse token is `Keyword` at a relative `Span` covering `entrypoint` (`0..11` if the interior has no leading whitespace). `Query` is `Type`. The `.` is `Period`. `HomeRoute` is `FieldName`.
+- `iso(\`entrypoint Query.HomeRoute\`)`. Let `start` be the byte index of `entrypoint` in the file. `locations_of_iso_literals_in_file` is one element, the extraction's `iso_literal_start_index`. `parsed_iso_literals_in_file` is one tree, empty parse errors, item variant `IsoLiteralItem::Entrypoint(_)`. The first parse token is `Keyword` at a relative `Span` covering `entrypoint` (`0..10` if the interior has no leading whitespace). `Query` is `Type`. The `.` is `Period`. `HomeRoute` is `FieldName`.
 - `iso(\`entrypoint\`)`. Parse errors are non-empty. The first parse token is still `Keyword`.
 - `iso(\`\`)`. Extract's regex requires a non-empty interior (`[^`]+`). Both file memos are `Some` of empty vec, same as a file with no `iso`.
 - `iso(\`\n\`)`. Extract len 1. Parse errors contain `EmptyLiteral`. Parse tokens are empty (leftover `LineBreak` is not a token).
@@ -153,19 +183,16 @@ Compiler tests in `isograph_extract_typescript` `memo_tests` (needs `TypeScriptH
 - Context-only: intern `export const Home = iso(\`entrypoint Query.HomeRoute\`)`, then `export const Page = iso(\`entrypoint Query.HomeRoute\`)` (`Home` and `Page` are the same length, so `iso_literal_start_index` is unchanged). Extract is `!=` (`const_export_name`). `locations_of_iso_literals_in_file` Eq-equals. `parsed_iso_literals_in_file` Eq-equals. That is why locations is a list of start indices and not extract: host context is not highlighting.
 - Intern the one-literal file, both memos are `Some`, `remove_disk_file`, both are `None`.
 
-LSP tests in `crates/isograph_lsp` `file_semantic_tokens.rs`:
+LSP tests in `crates/isograph_lsp` `file_semantic_tokens.rs`. Offset arithmetic (prefix, two interiors, emoji) is lsp-semantic-tokens-offset.md. These tests intern a `DiskFile` and call `lsp_semantic_tokens_for_file`.
 
-- Intern the one-literal file. `lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>` is `Some`. The first encoded token has `delta_line` 0, `token_type` the legend index of keyword (`15`), `length` the UTF-16 length of `entrypoint` (`11`), and `delta_start` the UTF-16 column of `entrypoint` on that line (the UTF-16 length of `export const Home = iso(\``).
-- Multiline fixture as above. The encoded token for `name` has `delta_line` greater than 0.
-- Emoji prefix on the previous line (`const x = "😀";\n` plus the fixture). First token `delta_line` 1, `length` 11, `delta_start` equals the unprefixed fixture.
-- Emoji prefix on the same line (`const x = "😀"; ` plus the fixture). First token `delta_line` 0, `length` 11, `delta_start` is UTF-16 of that prefix plus `export const Home = iso(\``.
-- Two literals in one file. Second literal's first encoded token is placed at that literal's `entrypoint` (or first token) in the file.
+- Intern the one-literal file. `lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>` is `Some`. The first encoded token has `delta_line` 0, `token_type` the legend index of keyword (`15`), `length` 10, and `delta_start` the UTF-16 column of `entrypoint` on that line (the UTF-16 length of `export const Home = iso(\``).
+- Two `iso` interiors interned in one file. `Some`. Keyword tokens are both interiors’ `entrypoint`, in extract order.
 - Empty file (present, no iso): `Some` of empty vec.
 - Intern `iso(\` \`)`: `Some` of empty vec.
 - Intern then `remove_disk_file`: `None`.
 - No `DiskFile`: `None`.
 
-`isograph_lsp` tests intern a `DiskFile` with `insert_disk_file`, same as `handle` and `memo_tests` `intern_file`. They depend on `isograph_extract_typescript` as a dev-dependency for `TypeScriptHostLanguage`.
+`isograph_lsp` tests intern with `insert_disk_file` and `"src/a.ts".intern().to()`, same construction as `memo_tests` `intern_path`. They depend on `isograph_extract_typescript` as a dev-dependency for `TypeScriptHostLanguage`, and `intern` for `.intern()`.
 
 `expect` names the fixture the test interned.
 
