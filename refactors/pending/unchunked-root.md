@@ -1,8 +1,6 @@
 # Unchunked root
 
-Chunking partitions a group's interior. The root is not a group. `chunk` walks root items as content and calls `chunk_group` for each group; only then does `chunk_level` run.
-
-An iso literal is one declaration. Root line breaks and commas are content. The parser skips line breaks. A comma is not a line break.
+A level inside brackets is partitioned (`chunk_level`). A level that is not is an item sequence (`to_content` on each `BracketItem`). The iso literal is the latter. There is no other root-only rule.
 
 ```
 // from demos/pet-demo/src/components/HomeRoute.tsx
@@ -40,7 +38,7 @@ iso(`
 
 The description and the selection set sit on later lines than `field Query.HomeRoute @component`. Entrypoints in the same demos are one line, `iso(\`entrypoint Query.HomeRoute\`)`, with no comma in front of `entrypoint`.
 
-Root line breaks stay as `NonBracket(LineBreak)`. The parser skips them. Before `field` / `entrypoint`, a comma is `Expected(DECLARATION_KEYWORD, Comma)`.
+Line breaks in an unpartitioned sequence are `NonBracket(LineBreak)`. `skip_line_breaks` consumes them. A comma is still a comma: before `field` / `entrypoint`, `Expected(DECLARATION_KEYWORD, Comma)`.
 
 A list interior still partitions on commas and line breaks. `{ pets {` / `id` / `PetSummaryCard` } is three selections. `{ foo\n{ bar } }` is a scalar plus a failed selection. `[Pet\n!]` does not attach the bang.
 
@@ -92,7 +90,7 @@ pub struct ChunkedRoot(
 pub type ChunkedRootPath<'a> = PositionResolutionPath<&'a ChunkedRoot, ()>;
 ```
 
-Empty vec is `""` / `"   "`. Otherwise the vec is every root item, line breaks and commas included. Groups in that vec have `ChunkedLevel` interiors.
+Empty vec is `""` / `"   "`. Otherwise every item of the unpartitioned sequence, line breaks and commas included. A group in that vec has a `ChunkedLevel` interior.
 
 A `Chunk` exists only inside a `ChunkedLevel`. `ChunkParent` / `Extra` / `Root`-as-chunk-parent are gone.
 
@@ -241,8 +239,6 @@ impl<'a> From<ChunkedRootPath<'a>> for IsographResolutionNode<'a> {
 
 ## Chunk
 
-`chunk_level` runs on a group's interior. It does not run on the root.
-
 ```rust
 // from crates/isograph_parser/src/chunk.rs
 pub(crate) fn chunk(
@@ -253,12 +249,12 @@ pub(crate) fn chunk(
         .item
         .0
         .iter()
-        .map(|item| root_content(item, &mut errors).with_span(item.location))
+        .map(|item| to_content(item, &mut errors).with_span(item.location))
         .collect();
     (ChunkedRoot(contents).with_span(tree.location), errors)
 }
 
-fn root_content(
+fn to_content(
     item: &WithSpan<BracketItem>,
     errors: &mut Vec<CommaWithoutItem>,
 ) -> ChunkContentItem {
@@ -267,9 +263,39 @@ fn root_content(
         BracketItem::Bracketed(group) => ChunkContentItem::Group(chunk_group(group, errors)),
     }
 }
+
+fn as_content(
+    item: &WithSpan<BracketItem>,
+    errors: &mut Vec<CommaWithoutItem>,
+) -> Option<ChunkContentItem> {
+    match separator_of(item) {
+        Some(_) => None,
+        None => to_content(item, errors).wrap_some(),
+    }
+}
 ```
 
-`chunk_level`, `absorb_chunk`, `as_content`, `chunk_group` are unchanged. `CommaWithoutItem` is produced only inside groups.
+`chunk` converts an unpartitioned `MatchedBrackets` (the iso literal). `chunk_group` still runs `chunk_level` on `group.children`. `absorb_chunk` uses `as_content`, which is `to_content` except separators. `CommaWithoutItem` is produced only by `chunk_level`.
+
+Before, `as_content` inlined the `Raw` / `Bracketed` match and returned `None` for a separator:
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+fn as_content(
+    item: &WithSpan<BracketItem>,
+    errors: &mut Vec<CommaWithoutItem>,
+) -> Option<ChunkContentItem> {
+    match item.item.reference() {
+        BracketItem::Raw(token) => match separator_token(token.0) {
+            Some(_) => None,
+            None => ChunkContentItem::NonBracket(*token).wrap_some(),
+        },
+        BracketItem::Bracketed(group) => {
+            ChunkContentItem::Group(chunk_group(group, errors)).wrap_some()
+        }
+    }
+}
+```
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -307,11 +333,11 @@ pub(crate) fn match_brackets(
 }
 ```
 
-`strip_captured_line_breaks` stays on a group's interior in `parse_bracketed`. It does not run on the root. The newline after `iso(\`` is a root `LineBreak` token.
+`strip_captured_line_breaks` runs in `parse_bracketed` after the group closes: the opening captured those line breaks. `match_brackets` does not call it. The newline after `iso(\`` is a `LineBreak` in the unpartitioned sequence.
 
 ## `skip_line_breaks`
 
-Line breaks are not recorded. A position on a skipped line break answers the containing node.
+An unpartitioned sequence contains `LineBreak` tokens. The cursor skips them. They are not recorded. A position on a skipped line break answers the containing node.
 
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
@@ -435,7 +461,7 @@ fn parse_one_chunk<'a, P>(
 }
 ```
 
-`parse_stream` is skip, spanning, skip, leftover remaining, failed extra. `parse_one_chunk` is that plus `extra_plus_trailing_separator` when leftover is not a list `Separator`. The root is not a chunk, so it does not go through `parse_one_chunk`. List interiors have no line-break content items; the two skips are no-ops there.
+`parse_stream` parses a content slice. `parse_one_chunk` is that plus `extra_plus_trailing_separator` when leftover is not a list `Separator`. A chunk's contents is a slice; the unpartitioned sequence is a slice. Inside a partitioned level, line breaks are separators, so the two skips are no-ops.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -705,7 +731,7 @@ pub(crate) fn parse_variable_name(
 
 `parse_integer_value`, `parse_string_literal`, `parse_boolean_or_null`, `parse_list_literal_value`, `parse_object_literal`: `skip_line_breaks` then the landed body.
 
-## Parse of the root
+## Parse of the unpartitioned sequence
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -883,13 +909,13 @@ slot-stages.md's `extra_chunks` check is this: leftover after the declaration is
 
 The existing interior comma tests (`foo {,}`, `{, a }`, `{ a, }`) stay. If a root comma-without-item test has no interior twin, add one: `{, a }`, `{ a,,\nb }`, `{ a, , }`, `{,,a }`.
 
-## 2. Root is not partitioned
+## 2. Partition only group interiors
 
 One commit. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 
 ### `chunk` and matcher
 
-`chunk` / `root_content` / `ChunkedRoot` as above. `chunk_level` is only `chunk_group`. `match_brackets` does not strip the root. `parse_bracketed` still strips a group's leading line breaks.
+`chunk` / `to_content` / `as_content` / `ChunkedRoot` as above. `chunk_level` is `chunk_group` only. `strip_captured_line_breaks` stays in `parse_bracketed`.
 
 ### Types
 
@@ -918,11 +944,11 @@ Helpers in `parse_iso_literal.rs` tests:
 
 `whitespace_only_and_empty_literals_are_empty_levels`: `""` and `"   "` have `tree.item.0` empty. `"\n\n"` has two `LineBreak` items. Span is still the whole literal.
 
-`a_line_break_before_a_group_keeps_the_group_in_the_root_chunk`:
+`a_line_break_before_a_group_stays_in_the_unpartitioned_sequence`:
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
-    fn a_line_break_before_a_group_keeps_the_group_in_the_root_chunk() {
+    fn a_line_break_before_a_group_stays_in_the_unpartitioned_sequence() {
         let text = "foo\n{ bar }";
         let tree = chunked(text);
         assert_eq!(tree.item.0.len(), 3);
@@ -1231,7 +1257,7 @@ parsing-standards.md:
 - `parse_iso_literal` takes `WithSpan<ChunkedRoot>`.
 - `IsoLiteralParse = Slot<IsoLiteralItem, UnparsedChunkItems>`.
 - Extra leftover is `Slot.extra`. There are no extra chunks on the tree.
-- Chunking partitions a group's interior only. The root is a `Vec<WithSpan<ChunkContentItem>>`.
+- A level inside brackets is a `ChunkedLevel`. A level that is not is `ChunkedRoot`: `Vec<WithSpan<ChunkContentItem>>`.
 - `ItemCursor::skip_line_breaks` consumes `LineBreak` tokens and records nothing. Every `parse_*` / `consume_*` that looks at the next item calls it first. `peek` / `consume_token_if` / `consume_group_if` do not skip. A comma is not skipped.
 - `ChunkStream::new` takes a slice. `parse_stream` skips, spans, skips, leftover. `parse_one_chunk` is `parse_stream` plus trailing-separator fold for a real chunk. `parse_chunked_iso_literal` streams the root vec.
 - `parse_singleton` returns `WithSpan<Slot<T, UnparsedChunkItems>>`, one-item `ChunkedLevel` interiors only, extra chunks are `Expected(end, found)` plus leftover recording.
