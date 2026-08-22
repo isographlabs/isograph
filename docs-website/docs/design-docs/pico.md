@@ -150,16 +150,14 @@ Semantic tokens for a file (file-semantic-tokens.md):
 ```text
 lsp_semantic_tokens_for_file(path)
   -> parsed_iso_literals_in_file(path)
-  + locations_of_iso_literals_in_file(path)
   + DiskFile contents
 
 parsed_iso_literals_in_file(path)
   -> THostLanguage::extract_iso_literals(path)
   + parsed_iso_literal(text) for each extraction
-
-locations_of_iso_literals_in_file(path)
-  -> THostLanguage::extract_iso_literals(path)
 ```
+
+Each item is `(IsoLiteralExtraction, ParsedIsoLiteral)`. Document-scoped LSP methods need both. There is no intern of trees without extractions.
 
 ```rust
 struct IsoLiteralStartIndex(pub usize);
@@ -289,7 +287,7 @@ fn flattened_selectable_named(
 
 `LineChar` is the cursor: `line` is a 0-based count of `\n`, `character` is bytes since the last `\n`. The adapter has that pair.
 
-Inside hover, `literal_id_at_location` takes `path` and `LineChar` and turns that pair into a `LiteralId`. `iso_literal_extraction` takes the id. `parsed_iso_literal` takes the extraction's text. Semantic tokens for the file calls `lsp_semantic_tokens_for_file(path)`, which reads the file's parse list and start indices and encodes with each literal's offset.
+Inside hover, `literal_id_at_location` takes `path` and `LineChar` and turns that pair into a `LiteralId`. `iso_literal_extraction` takes the id. `parsed_iso_literal` takes the extraction's text. Semantic tokens for the file calls `lsp_semantic_tokens_for_file(path)`, which reads `parsed_iso_literals_in_file` and encodes with each extraction's start index.
 
 Hover fires once per `LineChar`. Each `(path, LineChar)` is its own `literal_id_at_location` slot, so moving the caret across a literal executes that intern for every character. That is expected. The stored value is a `RelativePathToSourceFile` and a vec index. `iso_literal_extraction` of that `LiteralId` is one slot. Every character inside the same literal yields the same text, so `parsed_iso_literal` is one slot.
 
@@ -304,16 +302,16 @@ pico re-invokes a memo when a dependency's `time_updated` is newer than this mem
 If they are equal, pico keeps the old `time_updated`. Dependents see no change and do not re-invoke. That is backdating.
 
 ```text
-syntax highlighting  ->  parsed literals + locations  ->  extract  ->  DiskFile
+syntax highlighting  ->  parsed_iso_literals_in_file  ->  extract  ->  DiskFile
 ```
 
-Typing JavaScript after the last iso literal re-invokes extract. If the `Vec<IsoLiteralExtraction>` is `==` (same texts, same start indices, same context), extract is backdated. Parse, locations, and syntax highlighting do not re-invoke.
+Typing JavaScript after the last iso literal re-invokes extract. If the `Vec<IsoLiteralExtraction>` is `==` (same texts, same start indices, same context), extract is backdated. `parsed_iso_literals_in_file` does not re-invoke. `parsed_iso_literal` of the same text does not.
 
-Typing JavaScript before a literal changes `iso_literal_start_index`. Extract is `!=`. Locations is `!=`. Encoded file tokens change (`delta_line` / `delta_start`). `parsed_iso_literals_in_file` re-invokes and `==` (same texts, relative spans). `parsed_iso_literal` of the same text does not.
+Typing JavaScript before a literal changes `iso_literal_start_index`. Extract is `!=`. `parsed_iso_literals_in_file` is `!=` (the extraction moved). Encoded file tokens change (`delta_line` / `delta_start`). The tree is relative and `==`. `parsed_iso_literal` of the same text does not re-invoke.
 
 If this memo was already verified in the current epoch, pico returns the stored value without walking dependencies. Two LSP requests in the same epoch (hover and semantic tokens, no edit between them) share extract and parse this way.
 
-`==` decides whether dependents re-invoke. A memo result should be equal when the downstream work should be skipped. Spans that move with the file do not belong on a value whose dependents should survive a prepend. Presence of a diagnostic does belong, because diagnostics are the output.
+`==` decides whether dependents re-invoke. A memo result should be equal when the downstream work should be skipped. `parsed_iso_literal` stores spans relative to the literal text, so a prepend does not make parse `!=`. `parsed_iso_literals_in_file` includes the extraction, so a prepend makes it `!=` and file-scoped dependents re-invoke. Presence of a diagnostic does belong, because diagnostics are the output.
 
 `db.set` of a source with `==` contents does not advance the epoch. Re-saving an unchanged file does not re-invoke anything.
 
