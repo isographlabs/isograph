@@ -8,7 +8,6 @@ use isograph_parser::SelectableNameWrapper;
 use pico_macros::memo;
 use prelude::Postfix;
 use regex::Regex;
-use span::{Span, WithSpan, WithSpanPostfix};
 use thiserror::Error;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -57,48 +56,41 @@ impl HostLanguage for TypeScriptHostLanguage {
     type LiteralContext = TypeScriptLiteralContext;
     type Error = TypeScriptHostError;
 
-    fn extract_iso_literals_from_source(
-        source: &str,
-    ) -> Vec<WithSpan<(&str, Self::LiteralContext)>> {
-        EXTRACT_ISO_LITERAL
-            .captures_iter(source)
-            .filter_map(|captures| {
-                if captures.name("comment").is_some() {
-                    return None;
-                }
-                let literal = captures.name("literal")?;
-                let span = Span::from_usize(literal.start(), literal.end());
-                let context = TypeScriptLiteralContext {
-                    const_export_name: captures
-                        .name("export_name")
-                        .map(|m| m.as_str().intern().to()),
-                    call: match captures.name("open_paren") {
-                        Some(_) => IsoCall::FunctionCall,
-                        None => IsoCall::TaggedTemplate,
-                    },
-                    associated_js_function: match captures.name("associated") {
-                        Some(_) => AssociatedJsFunction::Present,
-                        None => AssociatedJsFunction::Absent,
-                    },
-                };
-                (literal.as_str(), context).with_span(span).wrap_some()
-            })
-            .collect()
-    }
-
     #[memo]
     fn extract_iso_literals(
         db: &IsographState<Self>,
         path: PathBuf,
     ) -> Option<Vec<IsoLiteralExtraction<Self>>> {
-        let source_id = db.get_disk_file_map().tracked().0.get(&path).copied()?;
+        let source_id = match db.get_disk_file_map().untracked().0.get(&path).copied() {
+            Some(source_id) => source_id,
+            None => db.get_disk_file_map().tracked().0.get(&path).copied()?,
+        };
         let contents = db.get(source_id).contents.reference();
-        Self::extract_iso_literals_from_source(contents)
-            .into_iter()
-            .map(|extracted| IsoLiteralExtraction {
-                iso_literal_text: extracted.item.0.to_owned(),
-                iso_literal_start_index: extracted.location.start as usize,
-                context: extracted.item.1,
+        EXTRACT_ISO_LITERAL
+            .captures_iter(contents)
+            .filter_map(|captures| {
+                if captures.name("comment").is_some() {
+                    return None;
+                }
+                let literal = captures.name("literal")?;
+                IsoLiteralExtraction {
+                    iso_literal_text: literal.as_str().to_owned(),
+                    iso_literal_start_index: literal.start(),
+                    context: TypeScriptLiteralContext {
+                        const_export_name: captures
+                            .name("export_name")
+                            .map(|m| m.as_str().intern().to()),
+                        call: match captures.name("open_paren") {
+                            Some(_) => IsoCall::FunctionCall,
+                            None => IsoCall::TaggedTemplate,
+                        },
+                        associated_js_function: match captures.name("associated") {
+                            Some(_) => AssociatedJsFunction::Present,
+                            None => AssociatedJsFunction::Absent,
+                        },
+                    },
+                }
+                .wrap_some()
             })
             .collect::<Vec<_>>()
             .wrap_some()
@@ -107,18 +99,29 @@ impl HostLanguage for TypeScriptHostLanguage {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use intern::string_key::Intern;
-    use isograph_compiler::HostLanguage;
+    use isograph_compiler::{HostLanguage, IsoLiteralExtraction, IsographState};
     use prelude::Postfix;
-    use span::{Span, WithSpan, WithSpanPostfix};
 
     use super::{
         AssociatedJsFunction, IsoCall, TypeScriptHostError, TypeScriptHostLanguage,
         TypeScriptLiteralContext,
     };
 
-    fn extract(source: &str) -> Vec<WithSpan<(&str, TypeScriptLiteralContext)>> {
-        TypeScriptHostLanguage::extract_iso_literals_from_source(source)
+    fn intern_file(db: &mut IsographState<TypeScriptHostLanguage>, path: PathBuf, contents: &str) {
+        db.insert_disk_file(path, contents.to_owned());
+    }
+
+    fn extract(source: &str) -> Vec<IsoLiteralExtraction<TypeScriptHostLanguage>> {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = PathBuf::from("/tmp/proj/src/a.ts");
+        intern_file(&mut db, path.clone(), source);
+        TypeScriptHostLanguage::extract_iso_literals(&db, path)
+            .as_ref()
+            .expect("the test interned this path")
+            .clone()
     }
 
     fn interned_export(name: &str) -> common_lang_types::ConstExportName {
@@ -144,19 +147,21 @@ mod tests {
             .expect("the fixture contains the literal text");
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
+        assert_eq!(extracted[0].iso_literal_text, text);
+        assert_eq!(extracted[0].iso_literal_start_index, start);
         assert_eq!(
-            extracted[0],
-            (
-                text,
-                TypeScriptLiteralContext {
-                    const_export_name: interned_export("fullName").wrap_some(),
-                    call: IsoCall::FunctionCall,
-                    associated_js_function: AssociatedJsFunction::Present,
-                },
-            )
-                .with_span(Span::from_usize(start, start + text.len()))
+            extracted[0].context,
+            TypeScriptLiteralContext {
+                const_export_name: interned_export("fullName").wrap_some(),
+                call: IsoCall::FunctionCall,
+                associated_js_function: AssociatedJsFunction::Present,
+            }
         );
-        assert_eq!(&source[extracted[0].location.as_usize_range()], text);
+        assert_eq!(
+            &source[extracted[0].iso_literal_start_index
+                ..extracted[0].iso_literal_start_index + extracted[0].iso_literal_text.len()],
+            text
+        );
     }
 
     #[test]
@@ -164,16 +169,17 @@ mod tests {
         let source = "iso(`entrypoint Query.HomeRoute`)";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].item.1.const_export_name, None);
-        assert_eq!(extracted[0].item.0, "entrypoint Query.HomeRoute");
-        assert_eq!(extracted[0].item.1.call, IsoCall::FunctionCall);
+        assert_eq!(extracted[0].context.const_export_name, None);
+        assert_eq!(extracted[0].iso_literal_text, "entrypoint Query.HomeRoute");
+        assert_eq!(extracted[0].context.call, IsoCall::FunctionCall);
         assert_eq!(
-            extracted[0].item.1.associated_js_function,
+            extracted[0].context.associated_js_function,
             AssociatedJsFunction::Absent
         );
         assert_eq!(
-            &source[extracted[0].location.as_usize_range()],
-            extracted[0].item.0
+            &source[extracted[0].iso_literal_start_index
+                ..extracted[0].iso_literal_start_index + extracted[0].iso_literal_text.len()],
+            extracted[0].iso_literal_text
         );
     }
 
@@ -182,12 +188,12 @@ mod tests {
         let source = "iso`entrypoint Query.HomeRoute`";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].item.1.call, IsoCall::TaggedTemplate);
+        assert_eq!(extracted[0].context.call, IsoCall::TaggedTemplate);
         assert_eq!(
-            extracted[0].item.1.associated_js_function,
+            extracted[0].context.associated_js_function,
             AssociatedJsFunction::Absent
         );
-        assert_eq!(extracted[0].item.0, "entrypoint Query.HomeRoute");
+        assert_eq!(extracted[0].iso_literal_text, "entrypoint Query.HomeRoute");
     }
 
     #[test]
@@ -204,10 +210,10 @@ export const Bar = iso(`field Pet.bar { id }`)(";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
         assert_eq!(
-            extracted[0].item.1.const_export_name,
+            extracted[0].context.const_export_name,
             interned_export("Bar").wrap_some()
         );
-        assert_eq!(extracted[0].item.0, "field Pet.bar { id }");
+        assert_eq!(extracted[0].iso_literal_text, "field Pet.bar { id }");
     }
 
     #[test]
@@ -218,11 +224,11 @@ iso(`entrypoint Query.HomeRoute`)";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 2);
         assert_eq!(
-            extracted[0].item.1.const_export_name,
+            extracted[0].context.const_export_name,
             interned_export("fullName").wrap_some()
         );
-        assert_eq!(extracted[1].item.1.const_export_name, None);
-        assert_eq!(extracted[1].item.0, "entrypoint Query.HomeRoute");
+        assert_eq!(extracted[1].context.const_export_name, None);
+        assert_eq!(extracted[1].iso_literal_text, "entrypoint Query.HomeRoute");
     }
 
     #[test]
@@ -240,17 +246,17 @@ export const HomeRoute = iso(`
         let extracted = extract(source);
         assert_eq!(extracted.len(), 2);
         assert_eq!(
-            extracted[0].item.1.const_export_name,
+            extracted[0].context.const_export_name,
             interned_export("HomeRoute").wrap_some()
         );
         assert_eq!(
-            extracted[0].item.1.associated_js_function,
+            extracted[0].context.associated_js_function,
             AssociatedJsFunction::Present
         );
-        assert_eq!(extracted[1].item.1.const_export_name, None);
-        assert_eq!(extracted[1].item.0, "entrypoint Query.PetFavoritePhrase");
+        assert_eq!(extracted[1].context.const_export_name, None);
+        assert_eq!(extracted[1].iso_literal_text, "entrypoint Query.PetFavoritePhrase");
         assert_eq!(
-            extracted[1].item.1.associated_js_function,
+            extracted[1].context.associated_js_function,
             AssociatedJsFunction::Absent
         );
     }
@@ -265,7 +271,7 @@ export const HomeRoute = iso(`
         let source = "const Foo = iso(`entrypoint Query.HomeRoute`)";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].item.1.const_export_name, None);
+        assert_eq!(extracted[0].context.const_export_name, None);
     }
 
     #[test]
@@ -273,7 +279,7 @@ export const HomeRoute = iso(`
         let source = "export const Foo  = iso(`entrypoint Query.HomeRoute`)";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].item.1.const_export_name, None);
+        assert_eq!(extracted[0].context.const_export_name, None);
     }
 
     #[test]
@@ -281,7 +287,7 @@ export const HomeRoute = iso(`
         let source = "export const Foo =iso(`entrypoint Query.HomeRoute`)";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].item.1.const_export_name, None);
+        assert_eq!(extracted[0].context.const_export_name, None);
     }
 
     #[test]
@@ -289,8 +295,8 @@ export const HomeRoute = iso(`
         let source = "iso(`entrypoint Query.HomeRoute`,)";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].item.0, "entrypoint Query.HomeRoute");
-        assert_eq!(extracted[0].item.1.call, IsoCall::FunctionCall);
+        assert_eq!(extracted[0].iso_literal_text, "entrypoint Query.HomeRoute");
+        assert_eq!(extracted[0].context.call, IsoCall::FunctionCall);
     }
 
     #[test]
@@ -298,9 +304,9 @@ export const HomeRoute = iso(`
         let source = "iso(`entrypoint Query.HomeRoute`";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].item.1.call, IsoCall::FunctionCall);
+        assert_eq!(extracted[0].context.call, IsoCall::FunctionCall);
         assert_eq!(
-            extracted[0].item.1.associated_js_function,
+            extracted[0].context.associated_js_function,
             AssociatedJsFunction::Absent
         );
     }
@@ -310,7 +316,7 @@ export const HomeRoute = iso(`
         let source = "iso( `entrypoint Query.HomeRoute`)";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].item.0, "entrypoint Query.HomeRoute");
+        assert_eq!(extracted[0].iso_literal_text, "entrypoint Query.HomeRoute");
     }
 
     #[test]
@@ -318,10 +324,11 @@ export const HomeRoute = iso(`
         let source = "iso(`\nentrypoint Query.HomeRoute\n`)";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].item.0, "\nentrypoint Query.HomeRoute\n");
+        assert_eq!(extracted[0].iso_literal_text, "\nentrypoint Query.HomeRoute\n");
         assert_eq!(
-            &source[extracted[0].location.as_usize_range()],
-            extracted[0].item.0
+            &source[extracted[0].iso_literal_start_index
+                ..extracted[0].iso_literal_start_index + extracted[0].iso_literal_text.len()],
+            extracted[0].iso_literal_text
         );
     }
 
@@ -335,7 +342,7 @@ export const HomeRoute = iso(`
         let source = "//iso(`entrypoint Query.HomeRoute`)";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].item.0, "entrypoint Query.HomeRoute");
+        assert_eq!(extracted[0].iso_literal_text, "entrypoint Query.HomeRoute");
     }
 
     #[test]
@@ -370,6 +377,21 @@ mod memo_tests {
         let db = IsographState::<TypeScriptHostLanguage>::default();
         let path = PathBuf::from("/tmp/proj/src/a.ts");
         assert!(TypeScriptHostLanguage::extract_iso_literals(&db, path).is_none());
+    }
+
+    #[test]
+    fn missing_then_present_extracts() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let other = PathBuf::from("/tmp/proj/src/b.ts");
+        intern_file(&mut db, other, "export const x = 1;");
+        let path = PathBuf::from("/tmp/proj/src/a.ts");
+        assert!(TypeScriptHostLanguage::extract_iso_literals(&db, path.clone()).is_none());
+        intern_file(&mut db, path.clone(), "iso(`entrypoint Query.HomeRoute`)");
+        let extracted = TypeScriptHostLanguage::extract_iso_literals(&db, path)
+            .as_ref()
+            .expect("the test interned this path");
+        assert_eq!(extracted.len(), 1);
+        assert_eq!(extracted[0].iso_literal_text, "entrypoint Query.HomeRoute");
     }
 
     #[test]

@@ -1,7 +1,6 @@
 use std::fmt::{self, Debug};
 use std::path::PathBuf;
 
-use span::WithSpan;
 use thiserror::Error;
 
 use isograph_parser::ParseError;
@@ -47,10 +46,6 @@ impl<THostLanguage: HostLanguage> Debug for IsoLiteralExtraction<THostLanguage> 
 pub trait HostLanguage: Send + Sync + Sized + 'static {
     type Error: std::fmt::Display + std::error::Error + Clone + PartialEq + Eq + 'static;
     type LiteralContext: Clone + PartialEq + Eq + Debug + 'static;
-
-    fn extract_iso_literals_from_source(
-        source: &str,
-    ) -> Vec<WithSpan<(&str, Self::LiteralContext)>>;
 
     fn extract_iso_literals(
         db: &IsographState<Self>,

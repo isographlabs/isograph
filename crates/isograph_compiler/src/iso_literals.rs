@@ -19,7 +19,7 @@ pub fn iso_literal_extraction<THostLanguage: HostLanguage>(
     line_char: LineChar,
 ) -> Option<IsoLiteralExtraction<THostLanguage>> {
     let extractions = THostLanguage::extract_iso_literals(db, path.clone()).as_ref()?;
-    let source_id = db.get_disk_file_map().tracked().0.get(&path).copied()?;
+    let source_id = db.get_disk_file_map().untracked().0.get(&path).copied()?;
     let file_content = db.get(source_id).contents.reference();
     find_iso_literal_extraction(line_char, file_content, extractions).cloned()
 }
