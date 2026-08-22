@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use pico::Database;
 use pico_macros::memo;
 use prelude::Postfix;
 
