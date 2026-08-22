@@ -13,6 +13,12 @@ pub struct LineChar {
     pub character: u32,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct LiteralId {
+    pub path: PathBuf,
+    pub index: usize,
+}
+
 #[memo]
 pub fn parsed_iso_literal<THostLanguage: HostLanguage>(
     db: &IsographState<THostLanguage>,
@@ -22,52 +28,36 @@ pub fn parsed_iso_literal<THostLanguage: HostLanguage>(
 }
 
 #[memo]
-pub fn iso_literal_extraction<THostLanguage: HostLanguage>(
+pub fn literal_id_at_location<THostLanguage: HostLanguage>(
     db: &IsographState<THostLanguage>,
     path: PathBuf,
     line_char: LineChar,
-) -> Option<IsoLiteralExtraction<THostLanguage>> {
+) -> Option<LiteralId> {
     let extractions = THostLanguage::extract_iso_literals(db, path.clone()).as_ref()?;
     let source_id = db.get_disk_file_map().untracked().0.get(&path).copied()?;
     let file_content = db.get(source_id).contents.reference();
-    find_iso_literal_extraction(line_char, file_content, extractions).cloned()
+    let index = find_iso_literal_index(line_char, file_content, extractions)?;
+    LiteralId { path, index }.wrap_some()
 }
 
 #[memo]
-pub fn iso_literal_text_at_location<THostLanguage: HostLanguage>(
+pub fn iso_literal_extraction<THostLanguage: HostLanguage>(
     db: &IsographState<THostLanguage>,
-    path: PathBuf,
-    line_char: LineChar,
-) -> Option<String> {
-    iso_literal_extraction(db, path, line_char)
-        .as_ref()?
-        .iso_literal_text
-        .clone()
-        .wrap_some()
+    literal_id: LiteralId,
+) -> Option<IsoLiteralExtraction<THostLanguage>> {
+    let extractions = THostLanguage::extract_iso_literals(db, literal_id.path.clone()).as_ref()?;
+    extractions.get(literal_id.index).cloned()
 }
 
-#[memo]
-pub fn parsed_iso_literal_at_location<THostLanguage: HostLanguage>(
-    db: &IsographState<THostLanguage>,
-    path: PathBuf,
-    line_char: LineChar,
-) -> Option<ParsedIsoLiteral> {
-    let text = iso_literal_text_at_location(db, path, line_char)
-        .as_ref()?
-        .clone();
-    // Each (path, LineChar) intern stores a copy of the tree. Parse of `text` is one slot.
-    parsed_iso_literal(db, text).clone().wrap_some()
-}
-
-fn find_iso_literal_extraction<'a, THostLanguage: HostLanguage>(
+fn find_iso_literal_index<THostLanguage: HostLanguage>(
     target_line_char: LineChar,
     file_content: &str,
-    extracted_items: &'a [IsoLiteralExtraction<THostLanguage>],
-) -> Option<&'a IsoLiteralExtraction<THostLanguage>> {
+    extracted_items: &[IsoLiteralExtraction<THostLanguage>],
+) -> Option<usize> {
     let mut last_iteration_end_line_count = 0;
     let mut last_iteration_end_char_count = 0;
     let mut max_prev_span_end = 0;
-    for extract_item in extracted_items {
+    for (index, extract_item) in extracted_items.iter().enumerate() {
         let iso_literal_start_index = extract_item.iso_literal_start_index;
         let iso_literal_end_index = iso_literal_start_index + extract_item.iso_literal_text.len();
 
@@ -96,7 +86,7 @@ fn find_iso_literal_extraction<'a, THostLanguage: HostLanguage>(
             (end_line_count, end_char_count),
             target_line_char,
         ) {
-            return extract_item.wrap_some();
+            return index.wrap_some();
         }
 
         last_iteration_end_line_count = end_line_count;
