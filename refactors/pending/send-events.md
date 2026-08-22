@@ -278,6 +278,7 @@ pub fn run(config_path: PathBuf, port_path: PathBuf) {
 async fn serve(config_path: PathBuf, port_path: PathBuf) {
     let (event_tx, event_rx) = unbounded_channel::<IsographEvent>();
     let (effect_tx, effect_rx) = unbounded_channel::<IsographEffect>();
+    let _ = std::fs::remove_file(port_path.reference());
     let _socket = match freddie_event_socket::listen(0, {
         let event_tx = event_tx.clone();
         move |text| on_message(text, event_tx.reference())
@@ -336,11 +337,41 @@ async fn serve(config_path: PathBuf, port_path: PathBuf) {
 
 `_socket` is the one binding. It is in scope across `select!`. Dropping `serve` drops the listener. A write failure returns, which drops `_socket` and then `run_daemon` returns, which drops the lock. Do not bind `listen` in a block that ends before `select!`.
 
-`listen(0)` is the kernel's pick from its local/dynamic port range. `serve` writes the assigned port, then logs it. `serve` does not send `HelloWorld`. That event arrives on the socket.
+`listen(0)` is the kernel's pick from its local/dynamic port range. `serve` unlinks the port file, then binds, then writes the assigned port, then logs it. NotFound on the unlink is the first boot; `let _ =` is not fatal. After a crash, the leftover file is gone before send can see `Held::By`. Lock held and the file absent is `NoPort`. `serve` does not send `HelloWorld`. That event arrives on the socket.
 
 `EventSocket::local_addr` returns `SocketAddr`, not `io::Result`. Origin: freddie `refactors/past/event-socket-local-addr.md`. The file contents are the decimal port and a newline, `"{port}\n"`.
 
 ### Tests
+
+```rust
+// from crates/isograph_cli/src/event.rs
+#[cfg(test)]
+mod tests {
+    use super::IsographEvent;
+
+    #[test]
+    fn hello_world_round_trips() {
+        let json = r#"{"kind":"HelloWorld"}"#;
+        let event: IsographEvent =
+            serde_json::from_str(json).expect("a HelloWorld frame deserializes");
+        assert!(matches!(event, IsographEvent::HelloWorld));
+        assert_eq!(
+            serde_json::to_string(&event).expect("HelloWorld serializes"),
+            json
+        );
+    }
+
+    #[test]
+    fn quit_round_trips() {
+        let json = r#"{"kind":"Quit"}"#;
+        let event: IsographEvent = serde_json::from_str(json).expect("a Quit frame deserializes");
+        assert!(matches!(event, IsographEvent::Quit));
+        assert_eq!(serde_json::to_string(&event).expect("Quit serializes"), json);
+    }
+}
+```
+
+The wire is `{"kind":"HelloWorld"}` and `{"kind":"Quit"}`. Production send transmits the trimmed file; these tests pin the serialized form.
 
 Socket tests live in `external.rs` under `#[cfg(test)]`, next to `on_message`. They compile against the crate's `[dependencies]` tokio (`rt`, `macros`, `signal`, `sync`, `time`).
 
@@ -699,7 +730,7 @@ fn parse_port(text: &str) -> Option<u16> {
 }
 ```
 
-Send reads the lock first. `Held::Free` is `NotRunning` and the port file is not consulted. A leftover `{slug}.port` from a previous run is ignored. Process death releases the lock.
+Send reads the lock first. `Held::Free` is `NotRunning` and the port file is not consulted. Process death releases the lock. `serve` unlinks the port file before listen, then writes it after bind. Lock held and the file absent is `NoPort`.
 
 `Held::Unnamed` and a missing port file are immediate errors. Send does not poll.
 
@@ -758,6 +789,14 @@ mod tests {
         assert_eq!(parse_port("abc"), None);
         assert_eq!(parse_port("65536"), None);
         assert_eq!(parse_port("127.0.0.1:53124"), None);
+    }
+
+    #[test]
+    fn read_port_of_a_missing_file_is_no_port() {
+        let dir = tempfile::tempdir().expect("a test can create a temp directory");
+        let path = dir.path().join("gone.port");
+        let err = super::read_port(path.reference()).expect_err("the file is missing");
+        assert!(matches!(err, super::SendError::NoPort));
     }
 }
 ```

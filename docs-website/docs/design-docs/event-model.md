@@ -72,7 +72,7 @@ The three sources are theoretically separate daemons. They are one process becau
 
 Figaro is one process per machine, so a default port is enough. Isograph is one process per config. Two configs cannot share a port.
 
-The event socket binds `127.0.0.1:0`. The kernel assigns a port from its local/dynamic range. There is no `--port`. After bind, the daemon writes `EventSocket::local_addr().port()` (freddie `event-socket-local-addr.md`) to a sibling of its lock (`{slug}.lock` → `{slug}.port`). `isograph send` reads the lock, then that file. `Held::Free` is not running and the file is not consulted. A leftover file from a previous run is ignored. Lock held and the file absent means the daemon has taken the lock and has not bound yet; send fails. Send does not wait.
+The event socket binds `127.0.0.1:0`. The kernel assigns a port from its local/dynamic range. There is no `--port`. `serve` unlinks the leftover `{slug}.port`, then binds, then writes `EventSocket::local_addr().port()` (freddie `event-socket-local-addr.md`) to a sibling of its lock (`{slug}.lock` → `{slug}.port`). `isograph send` reads the lock, then that file. `Held::Free` is not running and the file is not consulted. Lock held and the file absent means the daemon has taken the lock and has not bound yet; send fails. Send does not wait.
 
 The LSP adapter is a second listener, `{log_dir}/{slug}.lsp`, a path, not a TCP port. The event socket is JSON frames. The adapter is LSP JSON-RPC. They are not the same protocol.
 
