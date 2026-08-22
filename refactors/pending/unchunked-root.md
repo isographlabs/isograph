@@ -608,7 +608,7 @@ Empty is `root.item.0.split_first()`. `None` is `EmptyLiteral` before the stream
 
 `""` and `"   "` are `ChunkedRoot(vec![])`. `"\n\n"` is two `LineBreak` items, `EmptyLiteral`, `None`. `",entrypoint Query.foo"`: `consume_line_breaks` does not eat the comma, fails at the comma, `Expected(DECLARATION_KEYWORD, Comma)`.
 
-`parse_stream` and `parse_one_chunk` are `pub(crate)`. The returned `WithSpan` is the whole literal.
+`parse_stream` is `pub(crate)`. `parse_one_chunk` is `pub(crate)` for `parse_bracket_interior_type`. The returned `WithSpan` of `parse_chunked_iso_literal` is the whole literal.
 
 On `Err`, extra is unread remainder when any remains, otherwise `failed_extra()` (the original contents), same as landed `parse_one_chunk`. That is two extras:
 
@@ -622,80 +622,70 @@ Leftover after a complete declaration is `Slot.extra` plus `report_error(Expecte
 
 ```rust
 // from crates/isograph_parser/src/lib.rs
-pub(crate) use chunk::{chunk, parse_singleton, parse_stream};
+pub(crate) use chunk::{chunk, chunk_level, parse_one_chunk, parse_stream, record_leftover_chunk};
 ```
 
-`parse_one_chunk` stays private in `chunk.rs` (`parse_each_chunk`, `parse_singleton`). `parse_iso_literal.rs` calls `parse_stream`.
+`parse_iso_literal.rs` calls `parse_stream`. `parse_bracket_interior_type` calls `parse_one_chunk`. `parse_singleton` and `parse_nested_singleton` are deleted.
 
 `parse_iso_literal` still match-brackets, then `chunk`, then this. `comma_errors` still become `ParseError::Comma`; they come from interiors.
 
-## `parse_singleton`
+## `[...]` type interiors
 
-One caller: `[...]` type interiors via `ItemCursor::parse_nested_singleton`. Extra chunks are an `Expected(end, found)` error and leftover-token recording. They are not a tree node.
+`[Foo!]` is a `ChunkedLevel`. There is no `Singleton` node. Empty is still the caller. Chunk 0 is `parse_one_chunk` with `parse_type_annotation`. A boundary comma and a second chunk are errors on the cursor, leftover recorded, not a tree field.
 
-```rust
-// from crates/isograph_parser/src/chunk.rs
-pub(crate) fn parse_singleton<'a, T>(
-    level: &'a WithSpan<ChunkedLevel>,
-    text: &'a str,
-    tokens: &'a mut Vec<WithSpan<IsographSemanticToken>>,
-    errors: &'a mut Vec<WithSpan<AstError>>,
-    end: Expectation,
-    parse: impl FnOnce(&mut ItemCursor<'_>) -> Result<T, WithSpan<AstError>>,
-) -> WithSpan<Slot<T, UnparsedChunkItems>> {
-    let item = parse_one_chunk(
-        &level.item.0[0],
-        level.item.0[0].item.stream(text, tokens, errors),
-        end,
-        parse,
-    );
-    if let Some(comma) = level.item.0[0].item.boundary_comma() {
-        errors.push(
-            AstError::expected(end, Found::Token(NonBracketTokenKind::Comma)).with_span(comma),
-        );
-    }
-    if let Some(extra) = level.item.0.get(1) {
-        errors.push(
-            AstError::expected(end, Found::from(extra.item.first_item().item.reference()))
-                .with_span(extra.location),
-        );
-        for chunk in level.item.0[1..].iter() {
-            record_leftover_chunk(tokens, chunk.item.reference());
-        }
-    }
-    item
-}
-```
-
-Empty is still the caller (`parse_bracket_interior_type` on `len() == 0`). The `[0]` is the same index as today.
+The free function `record_leftover_chunk` in `chunk.rs` is `pub(crate)`.
 
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
-    pub(crate) fn parse_nested_singleton<T>(
-        &mut self,
-        level: &WithSpan<ChunkedLevel>,
-        end: Expectation,
-        parse: impl FnOnce(&mut ItemCursor<'_>) -> Result<T, WithSpan<AstError>>,
-    ) -> WithSpan<Slot<T, UnparsedChunkItems>> {
-        parse_singleton(level, self.text, self.tokens, self.errors, end, parse)
+    pub(crate) fn record_leftover_chunk(&mut self, chunk: &Chunk) {
+        crate::record_leftover_chunk(self.tokens, chunk);
     }
 ```
 
 ```rust
 // from crates/isograph_parser/src/variables.rs
-    let slot = cursor.parse_nested_singleton(
-        level,
+fn parse_bracket_interior_type(
+    cursor: &mut ItemCursor<'_>,
+    level: &WithSpan<ChunkedLevel>,
+) -> Result<BracketInteriorType, WithSpan<AstError>> {
+    if level.item.len() == 0 {
+        return AstError::expected(Expectation::TypeAnnotation, Found::EndOfChunk)
+            .with_span(Span::new(level.location.end, level.location.end))
+            .wrap_err();
+    }
+    let slot = parse_one_chunk(
+        &level.item.0[0],
+        cursor.stream_chunk(&level.item.0[0].item),
         Expectation::EndOfType,
         parse_type_annotation,
     );
+    if let Some(comma) = level.item.0[0].item.boundary_comma() {
+        cursor.report_error(
+            AstError::expected(Expectation::EndOfType, Found::Token(NonBracketTokenKind::Comma))
+                .with_span(comma),
+        );
+    }
+    if let Some(extra) = level.item.0.get(1) {
+        cursor.report_error(
+            AstError::expected(
+                Expectation::EndOfType,
+                Found::from(extra.item.first_item().item.reference()),
+            )
+            .with_span(extra.location),
+        );
+        for chunk in level.item.0[1..].iter() {
+            cursor.record_leftover_chunk(chunk.item.reference());
+        }
+    }
     BracketInteriorType {
         item: slot.item.item.map(|wrapped| wrapped.item),
         extra: slot.item.extra,
     }
     .wrap_ok()
+}
 ```
 
-`T` is `WithSpan<TypeAnnotation>` because `parse_type_annotation` returns `WithSpan`. The `map` peels `parse_one_chunk`'s extra `WithSpan`, same as today.
+`T` is `WithSpan<TypeAnnotation>` because `parse_type_annotation` returns `WithSpan`. The `map` peels `parse_one_chunk`'s extra `WithSpan`, same as today. `[Foo!]` is one chunk; `!` attaches. `[Foo,]` is `Expected(EndOfType, Comma)` at the comma. `[Foo, Bar]` and `[Foo\n!]` are `Expected(EndOfType, found)` at the second chunk.
 
 ---
 
@@ -758,11 +748,11 @@ One commit. `cargo test` (workspace, no `-p`) and the clippy pre-commit hook pas
 
 Delete `Singleton`, `ExtraChunks`, `ChunkedLevelParent`, `ChunkParent`, `AstError::MultipleDeclarations`. The `ast_error_unit_variants_use_their_messages` arm for `MultipleDeclarations` goes with it.
 
-`lib.rs` `pub use` drops `ExtraChunks`, `Singleton`, `ExtraChunksPath`, `ChunkedLevelParent`, `ChunkParent`. It adds `ChunkedRoot`, `ChunkedRootPath`. There is no `IsoLiteralSlotPath`. `ChunkContentItemParent` gains `Root`. `pub(crate) use chunk::{chunk, chunk_level, parse_singleton, parse_stream}` — not `parse_one_chunk`. `chunk_level` is `pub(crate)` for `parsed_items`.
+`lib.rs` `pub use` drops `ExtraChunks`, `Singleton`, `ExtraChunksPath`, `ChunkedLevelParent`, `ChunkParent`. It adds `ChunkedRoot`, `ChunkedRootPath`. There is no `IsoLiteralSlotPath`. `ChunkContentItemParent` gains `Root`. `pub(crate) use chunk::{chunk, chunk_level, parse_one_chunk, parse_stream, record_leftover_chunk}`. `parse_singleton` / `parse_nested_singleton` are deleted. `chunk_level` is `pub(crate)` for `parsed_items`. `parse_one_chunk` is `pub(crate)` for `parse_bracket_interior_type`.
 
 ### Parse
 
-`consume_line_breaks` on `ItemCursor`, `parse_stream`, `parse_one_chunk` (Ok-only trailing fold, re-join), `parse_chunked_iso_literal`, `parsed_items`, `parsed_argument_list`, and the declaration `consume_line_breaks` listings above.
+`consume_line_breaks` on `ItemCursor`, `parse_stream`, `parse_one_chunk` (Ok-only trailing fold, re-join), `parse_chunked_iso_literal`, `parse_bracket_interior_type` (no `parse_singleton`), `parsed_items`, `parsed_argument_list`, and the declaration `consume_line_breaks` listings above.
 
 ```rust
 // from crates/isograph_extract_typescript/src/lib.rs
@@ -1540,14 +1530,14 @@ parsing-standards.md:
 - A level inside brackets is a `ChunkedLevel`. A level that is not is `ChunkedRoot`: `Vec<WithSpan<ChunkContentItem>>`.
 - `ItemCursor::consume_line_breaks` is `consume_*` of a run of `LineBreak` tokens (`advance`, no semantic token). Zero is legal. Call sites: `parse_iso_literal_item` before the keyword; `parse_selectable_declaration` before the description, before the selection set, and after the selection set; `parse_entrypoint` after directives. `peek` / `consume_token_if` / `consume_group_if` do not eat line breaks. A comma is not a line break.
 - Replace `ChunkStream::new` taking `NonEmpty` with the slice signature. `parse_stream` spans then leftover. `parse_one_chunk` is `parse_stream` plus trailing-separator fold on `Ok` only, then re-join. `parse_chunked_iso_literal` streams the unpartitioned vec.
-- `parse_singleton` returns `WithSpan<Slot<T, UnparsedChunkItems>>`, one-item `ChunkedLevel` interiors only, extra chunks are `Expected(end, found)` plus leftover recording.
-- Diagnostic: `report_error` in `parse_stream`; `errors.push` in `parse_singleton` (boundary comma, extra type chunks) and `parse_iso_literal` (`EmptyLiteral`). `parse_one_chunk` only folds extra.
+- `[...]` interiors: `parse_bracket_interior_type` calls `parse_one_chunk` on chunk 0. Boundary comma and extra chunks are `cursor.report_error` plus `record_leftover_chunk`. No `parse_singleton`.
+- Diagnostic: `report_error` in `parse_stream` and `parse_bracket_interior_type`; `errors.push` in `parse_iso_literal` (`EmptyLiteral`). `parse_one_chunk` only folds extra.
 - `ChunkedLevelParent` / `ExtraChunks` / `Singleton` / `MultipleDeclarations` listings deleted. `ChunkedRoot` listed.
 
 future-improvements.md, "Line break and comma are the same chunk separator": drop the `field Query.Foo\n{ bar }` bullet and the sentence that anyone who formats a selection set onto the next line gets a second declaration. Keep the interior bullets (`bar\n{ baz }`, `bar\n@loadable`, `[Pet\n!]`). Drop the diagnostic-rewrite sentence that assumed the brace is a second declaration.
 
 slot-stages.md later: `require_complete_literal` is `require_complete(parse)` (`Slot.extra` instead of `extra_chunks`). Do not land `require_complete_literal` in this change.
 
-parser-minor-improvements.md `parse_singleton assumes a non-empty level`: still true, still `[...]` and the `len() == 0` check in `parse_bracket_interior_type`. The unpartitioned empty check is `split_first` on the vec, or `consume_line_breaks` then `require_end` for only line breaks.
+parser-minor-improvements.md `parse_singleton assumes a non-empty level`: that function is gone. The `len() == 0` check stays in `parse_bracket_interior_type` before indexing `[0]`. The unpartitioned empty check is `split_first` on the vec, or `consume_line_breaks` then `require_end` for only line breaks.
 
 parsing-notes.md: delete the `parse_iso_literal` / `parse_singleton` nonempty note.
