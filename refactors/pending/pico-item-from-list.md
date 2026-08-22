@@ -27,7 +27,7 @@ pub fn iso_literal_extraction<THostLanguage: HostLanguage>(
     db: &IsographState<THostLanguage>,
     literal_id: LiteralId,
 ) -> Option<IsoLiteralExtraction<THostLanguage>> {
-    let extractions = THostLanguage::extract_iso_literals(db, literal_id.path.clone()).as_ref()?;
+    let extractions = THostLanguage::extract_iso_literals(db, literal_id.path).as_ref()?;
     extractions.get(literal_id.index)
 }
 ```

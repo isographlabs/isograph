@@ -43,7 +43,7 @@ enum Query {
 
 #[derive(Debug, serde::Deserialize)]
 struct SemanticTokensQuery {
-    pub path: std::path::PathBuf,
+    pub path: RelativePath,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -85,7 +85,7 @@ struct SemanticTokensArgs {
     #[command(flatten)]
     pub id: ConfigFlag,
 
-    /// Absolute path of the DiskFile. Same string `DiskChanged.path` interned.
+    /// Absolute path of the DiskFile. Interned as `RelativePath`, same string `DiskChanged.path` interned.
     #[arg(long)]
     pub path: std::path::PathBuf,
 }
@@ -122,7 +122,7 @@ fn answer(state: &IsographState, query: Query) -> QueryResult {
     match query {
         Query::SemanticTokens(SemanticTokensQuery { path }) => {
             QueryResult::SemanticTokens(SemanticTokensResult {
-                tokens: lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(state, path.reference())
+                tokens: lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(state, path)
                     .map(|tokens| {
                         tokens
                             .into_iter()

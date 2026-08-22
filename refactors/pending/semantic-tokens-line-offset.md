@@ -6,7 +6,7 @@ Prepend JS before a literal: relative encode of that text Eq-equals; the path me
 
 Origin of relative-then-absolute: isograph issue 548 (`get_semantic_tokens` cannot reuse encoded positions after typing before the literal; the suggested fix is relative LSP tokens plus an offset at send time). Origin of encoding: landed `lsp_semantic_tokens`. Origin of start indices: `locations_of_iso_literals_in_file`. Delta: `lsp_semantic_tokens` on the literal text; path-keyed stitch; no zero-length placeholder token.
 
-One shippable change: a text-keyed encode memo and `lsp_semantic_tokens_for_file` becomes a `#[memo]` on `path`.
+One shippable change: a text-keyed encode memo and `lsp_semantic_tokens_for_file` becomes a `#[memo]` on `RelativePath`.
 
 ## What the user does
 
@@ -36,10 +36,9 @@ The file memo is keyed on `path`. It reads contents to turn each start index int
 
 ```rust
 // from crates/isograph_lsp/src/file_semantic_tokens.rs
-use std::path::{Path, PathBuf};
-
 use isograph_compiler::{
-    HostLanguage, IsographState, locations_of_iso_literals_in_file, parsed_iso_literal,
+    HostLanguage, IsographState, RelativePath, locations_of_iso_literals_in_file,
+    parsed_iso_literal,
 };
 use pico::Database;
 use pico_macros::memo;
@@ -59,17 +58,17 @@ pub fn encoded_iso_literal_semantic_tokens<THostLanguage: HostLanguage>(
 #[memo]
 pub fn lsp_semantic_tokens_for_file<THostLanguage: HostLanguage>(
     db: &IsographState<THostLanguage>,
-    path: PathBuf,
+    path: RelativePath,
 ) -> Option<Vec<lsp_types::SemanticToken>> {
-    let extractions = THostLanguage::extract_iso_literals(db, path.clone()).as_ref()?;
-    let locations = locations_of_iso_literals_in_file(db, path.clone()).as_ref()?;
+    let extractions = THostLanguage::extract_iso_literals(db, path).as_ref()?;
+    let locations = locations_of_iso_literals_in_file(db, path).as_ref()?;
     let source_id = db.get_disk_file_map().untracked().0.get(&path).copied()?;
     let page_content = db.get(source_id).contents.reference();
     let mut file_line = 0u32;
     let mut file_col = 0u32;
     let mut out = Vec::new();
     for (extraction, start_index) in extractions.iter().zip(locations.iter()) {
-        let (start_line, start_col) = line_and_column(page_content, *start_index);
+        let (start_line, start_col) = line_and_column(page_content, start_index.0);
         let relative = encoded_iso_literal_semantic_tokens(
             db,
             extraction.iso_literal_text.clone(),

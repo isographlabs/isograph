@@ -41,14 +41,14 @@ A source is an input fact. Disk contents and open editor buffers are sources. Th
 #[derive(Clone, PartialEq, Eq, Source)]
 struct DiskFile {
     #[key]
-    path: PathBuf,
+    path: RelativePath,
     contents: String,
 }
 
 #[derive(Clone, PartialEq, Eq, Source)]
 struct OpenFile {
     #[key]
-    path: PathBuf,
+    path: RelativePath,
     contents: String,
 }
 ```
@@ -61,7 +61,7 @@ If the new value `==` the old value, the epoch does not advance and dependents d
 
 The type system does not stop you from holding a `SourceId` after `remove`. `remove` drops the map entry, `take`s the slot, and increments the epoch. Dependents that read that source see it as changed (`source_node_changed_since` is true when the node is gone). The next `get` of the stale id panics. A memo that returns a `SourceId` after the source was removed is handing out a false proof.
 
-A path is not a proof. Looking up by path can miss and return `None`. The tracked map is `HashMap<PathBuf, SourceId<DiskFile>>`: `Option<SourceId<_>>` from the map, then `get` of the id. Call sites that have a path and not a `SourceId` intern a `PathBuf` and go through the map.
+A path is not a proof. Looking up by path can miss and return `None`. The tracked map is `HashMap<RelativePath, SourceId<DiskFile>>`: `Option<SourceId<_>>` from the map, then `get` of the id. Call sites that have a path and not a `SourceId` intern a `RelativePath` and go through the map.
 
 `get_singleton<T>()` returns `Option<&T>`. A singleton has no `SourceId` you hold as a proof of presence. You ask by type. The config may not have been set.
 
@@ -76,7 +76,7 @@ impl HostLanguage for TypeScriptHostLanguage {
     #[memo]
     fn extract_iso_literals(
         db: &IsographState<Self>,
-        path: PathBuf,
+        path: RelativePath,
     ) -> Option<Vec<IsoLiteralExtraction<Self>>>;
 }
 ```
@@ -114,7 +114,7 @@ Semantic tokens and file diagnostics take `path`. Hover, goto definition, and co
 
 The literal text as a parse intern is how those public functions share a parse. A vec index of a literal in a file is not a public argument. Public APIs take `path` and `LineChar`. The first intern converts that pair to `LiteralId` (the path plus the 0-based index in the extract vec). Parse is interned on the literal text, not on `LiteralId`.
 
-Arguments that are `SourceId<T>` or `MemoRef<T>` are identities already. They are `Copy`. pico never clones them. Everything else (`PathBuf`, `String`, interned names) is hashed and interned as a param.
+Arguments that are `SourceId<T>` or `MemoRef<T>` are identities already. They are `Copy`. pico never clones them. `RelativePath` is an interned string and `Copy`. Everything else (`String`, interned names) is hashed and interned as a param.
 
 An interned owned param is cloned into the param store the first time that value is seen, and cloned out of the param store on every execute of the memo body. A borrowed param (`&T`) is cloned once when interned, not on execute. pico's own tests pin this.
 
@@ -170,7 +170,7 @@ struct LineChar {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct LiteralId {
-    path: PathBuf,
+    path: RelativePath,
     index: usize,
 }
 
@@ -178,7 +178,7 @@ impl HostLanguage for TypeScriptHostLanguage {
     #[memo]
     fn extract_iso_literals(
         db: &IsographState<Self>,
-        path: PathBuf,
+        path: RelativePath,
     ) -> Option<Vec<IsoLiteralExtraction<Self>>> {
         let source_id = match db.get_disk_file_map().untracked().0.get(&path).copied() {
             Some(source_id) => source_id,
@@ -207,10 +207,10 @@ impl HostLanguage for TypeScriptHostLanguage {
 #[memo]
 fn literal_id_at_location<THostLanguage: HostLanguage>(
     db: &IsographState<THostLanguage>,
-    path: PathBuf,
+    path: RelativePath,
     line_char: LineChar,
 ) -> Option<LiteralId> {
-    let extractions = THostLanguage::extract_iso_literals(db, path.clone()).as_ref()?;
+    let extractions = THostLanguage::extract_iso_literals(db, path).as_ref()?;
     let source_id = db.get_disk_file_map().untracked().0.get(&path).copied()?;
     let content = db.get(source_id).contents.reference();
     let index = find_iso_literal_index(line_char, content, extractions)?;
@@ -223,7 +223,7 @@ fn iso_literal_extraction<THostLanguage: HostLanguage>(
     literal_id: LiteralId,
 ) -> Option<IsoLiteralExtraction<THostLanguage>> {
     let extractions =
-        THostLanguage::extract_iso_literals(db, literal_id.path.clone()).as_ref()?;
+        THostLanguage::extract_iso_literals(db, literal_id.path).as_ref()?;
     extractions.get(literal_id.index).cloned()
 }
 
@@ -257,12 +257,12 @@ A public function takes a public key. Hover is `path` and `LineChar`. Semantic t
 
 ```rust
 #[memo]
-fn hover(db: &IsographState, path: PathBuf, line_char: LineChar) -> Option<Hover>;
+fn hover(db: &IsographState, path: RelativePath, line_char: LineChar) -> Option<Hover>;
 
 #[memo]
 fn iso_literal_semantic_tokens_in_file(
     db: &IsographState,
-    path: PathBuf,
+    path: RelativePath,
 ) -> Option<Vec<WithSpan<IsographSemanticToken>>>;
 
 #[memo]
@@ -283,7 +283,7 @@ fn flattened_selectable_named(
 
 Inside hover, `literal_id_at_location` takes `path` and `LineChar` and turns that pair into a `LiteralId`. `iso_literal_extraction` takes the id. `parsed_iso_literal` takes the extraction's text. Semantic tokens for the file calls `iso_literal_semantic_tokens_in_file(path)`, which reads the file's parse list and start indices and offsets each literal's relative tokens.
 
-Hover fires once per `LineChar`. Each `(path, LineChar)` is its own `literal_id_at_location` slot, so moving the caret across a literal executes that intern for every character. That is expected. The stored value is a `PathBuf` and a vec index. `iso_literal_extraction` of that `LiteralId` is one slot. Every character inside the same literal yields the same text, so `parsed_iso_literal` is one slot.
+Hover fires once per `LineChar`. Each `(path, LineChar)` is its own `literal_id_at_location` slot, so moving the caret across a literal executes that intern for every character. That is expected. The stored value is a `RelativePath` and a vec index. `iso_literal_extraction` of that `LiteralId` is one slot. Every character inside the same literal yields the same text, so `parsed_iso_literal` is one slot.
 
 After parse, resolve produces names. Goto definition of a selection named `Avatar` already has the parent entity and the name from the token. It calls `flattened_selectable_named(db, User, Avatar)`. That call site has names, not a file and cursor.
 
@@ -312,7 +312,7 @@ If this memo was already verified in the current epoch, pico returns the stored 
 ## Tracked maps
 
 ```rust
-struct DiskFileMap(pub HashMap<PathBuf, SourceId<DiskFile>>);
+struct DiskFileMap(pub HashMap<RelativePath, SourceId<DiskFile>>);
 ```
 
 The map is which paths currently have a `DiskFile`. `db.set` of a `DiskFile` does not update the map. `handle` does both: intern the source, then insert into the map. Remove is the reverse.
