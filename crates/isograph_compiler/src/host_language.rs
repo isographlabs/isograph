@@ -7,15 +7,11 @@ pub trait HostLanguage: Sized {
     type Error: std::fmt::Display + std::error::Error;
     type LiteralContext;
 
-    fn extract_iso_literals<'a>(&self, source: &'a str) -> ExtractedIsoLiterals<'a, Self>;
+    fn extract_iso_literals<'a>(
+        &self,
+        source: &'a str,
+    ) -> Vec<WithSpan<(&'a str, Self::LiteralContext)>>;
 }
-
-pub type ExtractedIsoLiterals<'a, THostLanguage> = Vec<
-    WithErrors<
-        WithSpan<(&'a str, <THostLanguage as HostLanguage>::LiteralContext)>,
-        Vec<WithSpan<IsoLiteralError<THostLanguage>>>,
-    >,
->;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WithErrors<T, E> {
