@@ -8,6 +8,7 @@ mod daemon;
 mod discover;
 mod effect;
 mod event;
+mod external;
 mod state;
 
 pub fn run() -> ExitCode {
@@ -56,14 +57,22 @@ impl App for Isograph {
     }
 
     fn run_daemon(id: &ConfigFlag, _: &NoArgs) {
-        match discover::config_and_instance(id.config.as_deref()) {
-            Ok((path, _, _config)) => {
-                tracing::info!(config = %path.display(), "isograph daemon up");
-                crate::daemon::run();
-            }
+        let (path, instance) = match discover::instance_for_config_path(id.config.as_deref()) {
+            Ok(pair) => pair,
             Err(e) => {
-                tracing::error!(error = %e, "the config went away between naming this daemon and starting it");
+                tracing::error!(
+                    error = %e,
+                    "the config went away between naming this daemon and starting it"
+                );
+                return;
             }
+        };
+        let port_path = discover::port_file(instance.lock_file());
+        let _ = std::fs::remove_file(port_path.reference());
+        if let Err(e) = discover::load_config(path.reference()) {
+            tracing::error!(error = %e, "could not load the config");
+            return;
         }
+        crate::daemon::run(path, port_path);
     }
 }

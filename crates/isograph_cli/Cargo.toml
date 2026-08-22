@@ -6,7 +6,8 @@ license = { workspace = true }
 
 [dependencies]
 clap = { workspace = true }
-freddie_cli = { git = "https://github.com/freddiehg/freddie", rev = "af6b57df9732f42cde9bafc109bcf1b6a32f28e0" }
+freddie_cli = { git = "https://github.com/freddiehg/freddie", rev = "2cf07439ce57fd55079b89128b2f22603ef8d1a8" }
+freddie_event_socket = { git = "https://github.com/freddiehg/freddie", rev = "2cf07439ce57fd55079b89128b2f22603ef8d1a8" }
 prelude = { path = "../prelude" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
@@ -16,6 +17,8 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3"
+tokio-tungstenite = "0.24"
+futures-util = { version = "0.3", default-features = false, features = ["sink"] }
 
 [lints]
 workspace = true

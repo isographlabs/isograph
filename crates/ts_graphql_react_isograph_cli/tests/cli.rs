@@ -143,7 +143,7 @@ fn the_log_contains_the_config_path() {
         let log = daemon.log_text();
         (log.contains("isograph daemon up")
             && log.contains(path_in_log.reference())
-            && log.contains("hello world"))
+            && log.contains("\"port\":"))
         .then_some(())
     });
 }

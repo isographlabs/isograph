@@ -92,16 +92,25 @@ pub fn load_config(path: &Path) -> Result<IsographConfig, LoadError> {
     })
 }
 
-pub fn config_and_instance(
-    flag: Option<&Path>,
-) -> Result<(PathBuf, Instance, IsographConfig), DiscoverError> {
+pub fn port_file(lock: &Path) -> PathBuf {
+    lock.with_extension("port")
+}
+
+pub fn instance_for_config_path(flag: Option<&Path>) -> Result<(PathBuf, Instance), DiscoverError> {
     let config_path = config_path(flag)?;
-    let config = load_config(config_path.reference()).map_err(DiscoverError::Load)?;
     let instance = Instance::named(
         "isograph",
         slug(config_path.reference()),
         config_path.display().to_string(),
     )?;
+    (config_path, instance).wrap_ok()
+}
+
+pub fn config_and_instance(
+    flag: Option<&Path>,
+) -> Result<(PathBuf, Instance, IsographConfig), DiscoverError> {
+    let (config_path, instance) = instance_for_config_path(flag)?;
+    let config = load_config(config_path.reference()).map_err(DiscoverError::Load)?;
     (config_path, instance, config).wrap_ok()
 }
 
@@ -709,5 +718,25 @@ mod tests {
         write_file(path.reference(), "[]\n");
         load_config(path.reference())
             .expect("an empty struct deserializes from an empty JSON array");
+    }
+
+    #[test]
+    fn port_file_is_the_lock_with_a_port_extension() {
+        assert_eq!(
+            super::port_file(Path::new("/tmp/isograph-abcd.lock")),
+            Path::new("/tmp/isograph-abcd.port")
+        );
+    }
+
+    #[test]
+    fn instance_for_config_path_does_not_parse_json() {
+        let dir = temp();
+        let path = dir.path().join("isograph.config.json");
+        write_file(path.reference(), "{");
+        let (got, _) =
+            super::instance_for_config_path(path.as_path().wrap_some()).expect("the file exists");
+        let canonical = path.canonicalize().expect("the fixture file exists");
+        assert_eq!(got, canonical);
+        super::load_config(path.reference()).expect_err("truncated json is unparseable");
     }
 }

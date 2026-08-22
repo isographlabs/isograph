@@ -1,12 +1,15 @@
 use std::ops::ControlFlow;
+use std::path::PathBuf;
 
+use prelude::Postfix;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 
 use crate::effect::IsographEffect;
 use crate::event::IsographEvent;
+use crate::external::on_message;
 use crate::state::IsographState;
 
-pub fn run() {
+pub fn run(config_path: PathBuf, port_path: PathBuf) {
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -17,13 +20,32 @@ pub fn run() {
             return;
         }
     };
-    runtime.block_on(serve());
+    runtime.block_on(serve(config_path, port_path));
 }
 
-async fn serve() {
+async fn serve(config_path: PathBuf, port_path: PathBuf) {
     let (event_tx, event_rx) = unbounded_channel::<IsographEvent>();
     let (effect_tx, effect_rx) = unbounded_channel::<IsographEffect>();
-    let _ = event_tx.send(IsographEvent::HelloWorld);
+    let _socket = match freddie_event_socket::listen(0, {
+        let event_tx = event_tx.clone();
+        move |text| on_message(text, event_tx.reference())
+    }) {
+        Ok(socket) => socket,
+        Err(e) => {
+            tracing::error!(error = %e, "could not bind the event socket");
+            return;
+        }
+    };
+    let port = _socket.local_addr().port();
+    if let Err(e) = std::fs::write(port_path.reference(), format!("{port}\n")) {
+        tracing::error!(
+            error = %e,
+            path = %port_path.display(),
+            "could not write the event socket port"
+        );
+        return;
+    }
+    tracing::info!(config = %config_path.display(), port, "isograph daemon up");
 
     // `isograph stop` sends SIGTERM. Route it into the event channel as Quit, so the
     // model turns it into Kill, the effect loop breaks, and serve returns.
@@ -57,6 +79,7 @@ async fn serve() {
         () = run_event_loop(state, event_rx, effect_tx) => {}
         () = run_effect_loop(effect_rx) => {}
     }
+    let _ = std::fs::remove_file(port_path.reference());
 }
 
 pub(crate) async fn run_event_loop(
