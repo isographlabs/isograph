@@ -1,10 +1,10 @@
 # Memoized parse of an extracted iso literal
 
-Requires extract-iso-literals-from-file.md and `docs-website/docs/design-docs/pico.md`. Extract-all, `iso_literal_index(path, LineChar)` (`Option<usize>`), and `iso_literal_extraction(path, index)` are memos. This file parses that extraction. Keys are the pico model: a caller that has a cursor calls `iso_literal_index`; a caller that has an index calls `iso_literal_extraction` / `parsed_iso_literal_in_file`; a caller that has the literal text calls `parsed_iso_literal`. Parse is not keyed on `LineChar`.
+Requires extract-iso-literals-from-file.md and `docs-website/docs/design-docs/pico.md`. Extract-all, `iso_literal_index(path, LineChar)` (`Option<usize>`), and `iso_literal_extraction_at_index(path, index)` are memos. This file parses that extraction. Public APIs take `path`, or `path` and `LineChar`, or names. Index and `parsed_iso_literal_in_file(path, index)` are intern. Parse is not keyed on `LineChar`.
 
 Origin of the parse memo: isograph `memoized_parse_iso_literal`. Origin of naming one literal by file and vec index: isograph `parse_iso_literals_in_file_content` walking the extract vec by position. Delta: parse is keyed on the literal text only, not on `TextSource` or the file path (isograph's TODO: passing `text_source` breaks memoization when the literal moves); i2 `parse_iso_literal` already takes `&str` only; host embedding errors that need the parse tree run after parse, in `host_errors_for_extraction`.
 
-`parsed_iso_literal_in_file` is a memo. It calls `iso_literal_extraction`, then `parsed_iso_literal` with that text. The pico cache key of the inner parse is `iso_literal_text`. Two files with the same literal text share a parse. Prepend/append that does not change the text re-invokes `iso_literal_extraction`; the inner parse does not re-run.
+`parsed_iso_literal_in_file` is a memo. It calls `iso_literal_extraction_at_index`, then `parsed_iso_literal` with that text. The pico cache key of the inner parse is `iso_literal_text`. Two files with the same literal text share a parse. Prepend/append that does not change the text re-invokes `iso_literal_extraction_at_index`; the inner parse does not re-run.
 
 Two shippable changes: the text-keyed parse memo, then the file+index parse memo and host errors.
 
@@ -51,7 +51,7 @@ pub fn parsed_iso_literal_in_file<THostLanguage: HostLanguage>(
     path: PathBuf,
     index: usize,
 ) -> Option<ParsedIsoLiteral> {
-    let extraction = iso_literal_extraction::<THostLanguage>(db, path, index)?;
+    let extraction = iso_literal_extraction_at_index::<THostLanguage>(db, path, index)?;
     parsed_iso_literal(db, extraction.iso_literal_text.clone())
         .clone()
         .wrap_some()
@@ -63,14 +63,14 @@ pub fn parsed_iso_literal_in_file<THostLanguage: HostLanguage>(
 ```rust
 // from crates/isograph_compiler/src/lib.rs
 pub use iso_literals::{
-    IsoLiteralExtraction, LineChar, extract_iso_literals_from_file_content, iso_literal_extraction,
+    IsoLiteralExtraction, LineChar, extract_iso_literals_from_file_content, iso_literal_extraction_at_index,
     iso_literal_index, parsed_iso_literal, parsed_iso_literal_in_file,
 };
 ```
 
-`iso_literal_extraction` is the intern of `(path, index)`. `parsed_iso_literal` is the intern of the text. Prefixing the file changes `iso_literal_start_index`, so `iso_literal_extraction` does not backdate and this memo's body runs again. The inner `parsed_iso_literal` sees the same text and does not re-run.
+`iso_literal_extraction_at_index` is the intern of `(path, index)`. `parsed_iso_literal` is the intern of the text. Prefixing the file changes `iso_literal_start_index`, so `iso_literal_extraction_at_index` does not backdate and this memo's body runs again. The inner `parsed_iso_literal` sees the same text and does not re-run. The adapter and schema do not take an index. Tests in this crate and other intern memos (file-semantic-tokens.md) do.
 
-Do not add a helper that parses every index into a vec unless a caller in this slice needs the whole vec. This doc ships `parsed_iso_literal_in_file` (one index).
+Do not add a helper that parses every index into a vec unless a caller in this slice needs the whole vec. This doc ships `parsed_iso_literal_in_file` (one index) as intern.
 
 ### Host errors after parse
 
