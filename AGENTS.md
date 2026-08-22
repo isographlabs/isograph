@@ -76,7 +76,7 @@ The parser never panics on any input. Malformed input is a representable state. 
 
 ## Coding standards
 
-Make impossible states unrepresentable. Use the correct representation. Extra refactoring to get the right building blocks is required. Prefer the structurally correct solution to the easy one, even when the easy one is fast. Reuse the seams the code already has.
+Make impossible states unrepresentable. Use the correct representation. Extra refactoring to get the right building blocks is required. Prefer the structurally correct solution to the easy one, even when the easy one is fast. Reuse the seams the code already has. Over-engineering is good when it constrains future agents that lack this context.
 
 We do not have anything we do not use. A token kind, field, variant, or recorded value exists only because something reads it. Tests-only is not a reader. A semantic token, span, or resolve leaf is a reader only if it carries information worth highlighting or hovering. An AST field is a reader only if resolve or a later pass uses it.
 
@@ -104,7 +104,7 @@ Do not pass a value used only on one arm of the `Result` or `Option` the functio
 
 ## `&mut T`
 
-Return values; do not thread mutable state. If a function could take `&mut T` and always does one action (e.g. push `U`), return that action instead. The caller does `t.push(u)` next to `T`'s definition.
+Return values; do not thread mutable state. If a function could take `&mut Vec<T>` and only pushes, do not pass the vec. Return `T`, or pass `impl FnOnce(T)` (or `FnMut`) that itself pushes. The caller writes `|t| vec.push(t)` next to the vec.
 
 ## Iterators
 
