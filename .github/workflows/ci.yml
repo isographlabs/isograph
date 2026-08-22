@@ -103,12 +103,9 @@ jobs:
           key: ${{ runner.os }}-turbo-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-turbo-
-      - uses: pnpm/action-setup@v2
-      - name: Use Node.js 22
-        uses: actions/setup-node@v3
+      - uses: jdx/mise-action@v3
         with:
-          node-version: 22
-          cache: 'pnpm'
+          cache: false
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Build JS files
@@ -132,12 +129,9 @@ jobs:
           key: ${{ runner.os }}-turbo-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-turbo-
-      - uses: pnpm/action-setup@v2
-      - name: Use Node.js 22
-        uses: actions/setup-node@v3
+      - uses: jdx/mise-action@v3
         with:
-          node-version: 22
-          cache: 'pnpm'
+          cache: false
       - name: Install dependencies
         # this used to be --frozen-lockfile --ignore-scripts
         # see pnpm-workspace.yaml's onlyBuildDependencies key to see which packages need scripts
@@ -160,12 +154,9 @@ jobs:
         working-directory: ./docs-website
     steps:
       - uses: actions/checkout@v3
-      - uses: pnpm/action-setup@v2
-      - name: Use Node.js 22
-        uses: actions/setup-node@v3
+      - uses: jdx/mise-action@v3
         with:
-          node-version: 22
-          cache: 'pnpm'
+          cache: false
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Build website
@@ -186,12 +177,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: pnpm/action-setup@v2
-      - name: Use Node.js 22
-        uses: actions/setup-node@v3
+      - uses: jdx/mise-action@v3
         with:
-          node-version: 22
-          cache: 'pnpm'
+          cache: false
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Run prettier
@@ -204,12 +192,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: pnpm/action-setup@v2
-      - name: Use Node.js 22
-        uses: actions/setup-node@v3
+      - uses: jdx/mise-action@v3
         with:
-          node-version: 22
-          cache: 'pnpm'
+          cache: false
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Run lint
@@ -278,12 +263,9 @@ jobs:
         with:
           packages: musl-tools # provides musl-gcc
           version: 1.0
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: jdx/mise-action@v3
         with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org/
-          cache: 'pnpm'
+          cache: false
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Build swc
@@ -322,12 +304,9 @@ jobs:
         working-directory: ./docs-website
     steps:
       - uses: actions/checkout@v3
-      - uses: pnpm/action-setup@v2
-      - name: Use Node.js 22
-        uses: actions/setup-node@v3
+      - uses: jdx/mise-action@v3
         with:
-          node-version: 22
-          cache: 'pnpm'
+          cache: false
       - name: 'Download build folder'
         uses: actions/download-artifact@v4
         with:
@@ -370,12 +349,9 @@ jobs:
           key: ${{ runner.os }}-turbo-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-turbo-
-      - uses: pnpm/action-setup@v2
-      - uses: actions/setup-node@v4
+      - uses: jdx/mise-action@v3
         with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org/
-          cache: 'pnpm'
+          cache: false
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Change package versions to commit
@@ -457,12 +433,9 @@ jobs:
           key: ${{ runner.os }}-turbo-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-turbo-
-      - uses: pnpm/action-setup@v2
-      - uses: actions/setup-node@v4
+      - uses: jdx/mise-action@v3
         with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org/
-          cache: 'pnpm'
+          cache: false
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       # - name: Change package versions to commit

@@ -12,9 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: jdx/mise-action@v3
         with:
-          node-version: 22
+          cache: false
       - run: npm ci
         working-directory: vscode-extension
       - name: Publish to Open VSX Registry

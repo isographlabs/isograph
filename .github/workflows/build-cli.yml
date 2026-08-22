@@ -37,12 +37,9 @@ jobs:
           key: ${{ runner.os }}-turbo-${{ inputs.artifact-name }}-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-turbo-${{ inputs.artifact-name }}-
-      - uses: pnpm/action-setup@v2
-      - name: Use Node.js 22
-        uses: actions/setup-node@v3
+      - uses: jdx/mise-action@v3
         with:
-          node-version: 22
-          cache: 'pnpm'
+          cache: false
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Install Rust
