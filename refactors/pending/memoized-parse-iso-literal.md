@@ -18,11 +18,13 @@ Those three memos are this file. `iso_literal_extraction` and `parse_iso_literal
 
 Origin of the parse memo: isograph `memoized_parse_iso_literal`. Origin of looking up one literal from a file and cursor: isograph `get_iso_literal_extraction_from_text_position_params`. Delta: parse is keyed on the literal text only, not on `TextSource` or the file path (isograph's TODO: passing `text_source` breaks memoization when the literal moves); i2 `parse_iso_literal` already takes `&str` only; host embedding errors that need the parse tree run after parse, in `host_errors_for_extraction`; every memo takes `&IsographState<THostLanguage>`.
 
-Cursor memos intern `(path, LineChar)`. `iso_literal_text_at_location` is the backdate seam for a pair that still sits in a literal after extract becomes `!=`. Bytes added on an earlier line, no extra newline, cursor on a later line: `iso_literal_start_index` moved, extract is `!=`, the text string is `==`, the text memo backdates, `parsed_iso_literal_at_location` does not re-invoke.
+Public callers pass `path` and `LineChar`. Those memos re-invoke: a new cursor is a new intern, and a `DiskFile` change invalidates the pair. The first work is turning that pair into the types later passes use: the extraction, the literal text, the parse tree. They short-circuit at `parsed_iso_literal(text)`. Same string, parse does not re-run. Two files with the same literal text share that slot.
 
-Inserting a newline at the top of a one-line file moves the interior to a new `LineChar`. That is a new slot. What that edit reuses is `parsed_iso_literal` of the same interned string.
+`iso_literal_text_at_location` is how the cursor pair becomes that string. Extract includes `iso_literal_start_index`. The text memo drops it, so parse is not keyed on where the literal sits in the file.
 
-`parsed_iso_literal` of that text does not re-run. Two files with the same literal text share `parsed_iso_literal`.
+Inserting a newline at the top of a one-line file moves the interior to a new `LineChar`. The cursor memos are new slots. `parsed_iso_literal` of the same string does not re-run.
+
+Bytes added on an earlier line, no extra newline, cursor on a later line: same `LineChar`, extract is `!=`, the text string is `==`, the text memo backdates, `parsed_iso_literal_at_location` does not re-invoke.
 
 `THostLanguage` on `parsed_iso_literal` is the database type. The body does not use the host. `IsographState<A>` and `IsographState<B>` are different databases, so they do not share a parse slot.
 
@@ -263,7 +265,7 @@ pub fn file_literals<'a>(
 
 lsp-parse-diagnostics.md currently takes `host` and `source: &str` and calls `file_literals(host, source)`. After this doc it takes `db` and `path`, or it keeps a `&str` entry for tests that do not intern a `DiskFile`. That doc updates when implemented. This doc ships `file_literals` on `db` + `path`.
 
-`FileLiteral` is TypeScript-shaped because host errors are TypeScript. A generic version is `extraction + parsed + Vec<WithSpan<IsoLiteralError<T>>>`. Put the generic pieces (`parsed_iso_literal`, `parsed_iso_literal_at_location`) in `isograph_compiler`. Put `host_errors_for_extraction` and `file_literals` in `isograph_extract_typescript`.
+`FileLiteral` is TypeScript-shaped because host errors are TypeScript. One host per binary. Put the generic pieces (`parsed_iso_literal`, `parsed_iso_literal_at_location`) in `isograph_compiler`. Put `host_errors_for_extraction` and `file_literals` in `isograph_extract_typescript`.
 
 ### Tests
 
