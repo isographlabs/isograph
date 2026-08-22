@@ -111,7 +111,7 @@ ts_graphql_react_isograph_cli
 
 `crates/isograph_extract_typescript`, `crates/isograph_protocol_graphql`, `crates/isograph_generate_typescript`: the first implementor of each seam, one crate each, none depending on another.
 
-`crates/isograph_cli`: library. Bootstraps the daemon, lifecycle verbs, the event socket, and the LSP adapter given a `Profile`. Depends on `isograph_compiler` and on `isograph_lsp` for `file_literals` and token encoding, not for a standalone stdio server. Does not depend on any implementor crate. Does not name TypeScript, GraphQL, or React. `isograph lsp` is a stdio proxy onto the adapter (`docs-website/docs/design-docs/event-model.md`).
+`crates/isograph_cli`: library. Bootstraps the daemon, lifecycle verbs, the event socket, and the LSP adapter given a `Profile`. Depends on `isograph_compiler` and on `isograph_lsp` for token encoding. Does not depend on any implementor crate. Does not name TypeScript, GraphQL, or React. `isograph lsp` is a stdio proxy onto the adapter (`docs-website/docs/design-docs/event-model.md`).
 
 ```rust
 // from crates/isograph_cli/src/lib.rs
@@ -188,7 +188,7 @@ The crate split is ts-graphql-react-isograph-cli.md. After that doc, `isograph_c
 
 A wrapper outside this repo is the same shape as `ts_graphql_react_isograph_cli` with a different profile and a different `App::NAME`. Nothing in `isograph_compiler`, `isograph_cli`, or `isograph_lsp` knows whether it is running inside `ts_graphql_react_isograph_cli` or inside a wrapper.
 
-The daemon is the process that names the profile. `file_literals` and the encoder (lsp-semantic-tokens.md changes 1–2, lsp-semantic-token-encoding.md) take `THostLanguage` and run inside the adapter. lsp-semantic-tokens.md change 3's standalone `isograph_lsp::start` stdio loop is not the process model. Until `NetworkProtocol` and `GenerateArtifacts` exist, the daemon is generic over `THostLanguage` only.
+The daemon is the process that names the profile. The encoder (lsp-semantic-token-encoding.md) takes `THostLanguage` and runs inside the adapter. Until `NetworkProtocol` and `GenerateArtifacts` exist, the daemon is generic over `THostLanguage` only.
 
 ## Open questions
 

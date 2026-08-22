@@ -1,8 +1,8 @@
 # LSP parse diagnostics
 
-Requires lsp-semantic-tokens.md. After a `didOpen` or `didChange`, the language server publishes parse errors for the iso literals in that file as `textDocument/publishDiagnostics`. Closing the file publishes an empty list for that URI, which clears the squiggles.
+Requires the LSP adapter (event-model.md item 6, not written). After a `didOpen` or `didChange`, the language server publishes parse errors for the iso literals in that file as `textDocument/publishDiagnostics`. Closing the file publishes an empty list for that URI, which clears the squiggles.
 
-The pipeline is `file_literals` from lsp-semantic-tokens.md. Each `FileLiteral.errors` is `Vec<WithSpan<IsoLiteralError<THostLanguage>>>` from `WithErrors.errors`, already file-absolute. This doc turns those into `lsp_types::Diagnostic`.
+The pipeline is extract-and-parse of the iso literals in the file (not specified). Each literal's errors are `Vec<WithSpan<IsoLiteralError<THostLanguage>>>` from `WithErrors.errors`, already file-absolute. This doc turns those into `lsp_types::Diagnostic`.
 
 Origin: isograph `crates/isograph_lsp/src/diagnostic_notification.rs` and the debounce-then-`validate_entire_schema` publish in `server.rs`. Delta: parse errors and host-language errors of the open file only, published on `didOpen` / `didChange` (no debounce, no schema, no file watcher). `didClose` clears. Messages are `Display` of the error types.
 
@@ -190,7 +190,7 @@ pub struct LspState<'a, THostLanguage: HostLanguage> {
 }
 ```
 
-Before (lsp-semantic-tokens.md): `LspState<THostLanguage> { open_files, host }` with no lifetime. After: also borrows `connection.sender`.
+Before: `LspState<THostLanguage> { open_files, host }` with no lifetime. After: also borrows `connection.sender`.
 
 `run` constructs `LspState { open_files: HashMap::new(), host, sender: &connection.sender }`.
 
@@ -339,7 +339,7 @@ Keep the map assertions by splitting: handlers that publish need a `Connection`.
 
 `Connection::memory` origin: `lsp-server` crate. isograph's diagnostic tests do not exist; this is the test for publish.
 
-The Change 3 tests from lsp-semantic-tokens.md that build `LspState { open_files: Default::default(), host: TypeScriptHostLanguage }` gain `sender: &server.sender` with a memory connection in each test, including `did_open_stores_the_text`, `did_change_replaces_the_text`, `did_close_removes_the_text`, and `request_uses_the_open_file_text`. Those tests ignore the client receiver.
+Tests that build `LspState { open_files: Default::default(), host: TypeScriptHostLanguage }` gain `sender: &server.sender` with a memory connection in each test, including `did_open_stores_the_text`, `did_change_replaces_the_text`, `did_close_removes_the_text`, and `request_uses_the_open_file_text`. Those tests ignore the client receiver.
 
 `start` / `run` in `server.rs` pass the sender:
 
@@ -351,7 +351,7 @@ fn run<THostLanguage: HostLanguage>(connection: Connection, host: THostLanguage)
         sender: &connection.sender,
     };
     for msg in &connection.receiver {
-        // same loop as lsp-semantic-tokens.md
+        // same loop as the adapter server
     }
 }
 ```
