@@ -1,13 +1,10 @@
-use tokio::sync::mpsc::UnboundedSender;
 use tracing::warn;
 
 use crate::event::IsographEvent;
 
-pub(crate) fn on_message(text: &str, event_tx: &UnboundedSender<IsographEvent>) {
+pub(crate) fn on_message(text: &str, emit: impl FnOnce(IsographEvent)) {
     match serde_json::from_str::<IsographEvent>(text) {
-        Ok(event) => {
-            let _ = event_tx.send(event);
-        }
+        Ok(event) => emit(event),
         Err(e) => warn!(error = %e, frame = text, "undeserializable frame"),
     }
 }
@@ -17,7 +14,6 @@ mod tests {
     use std::time::Duration;
 
     use futures_util::SinkExt;
-    use prelude::Postfix;
     use tokio::sync::mpsc::{UnboundedReceiver, unbounded_channel};
     use tokio_tungstenite::tungstenite::Message;
 
@@ -33,7 +29,9 @@ mod tests {
     ) {
         let (event_tx, event_rx) = unbounded_channel();
         let socket = freddie_event_socket::listen(0, move |text| {
-            on_message(text, event_tx.reference());
+            on_message(text, |event| {
+                let _ = event_tx.send(event);
+            });
         })
         .expect("binding port 0");
         let port = socket.local_addr().port();

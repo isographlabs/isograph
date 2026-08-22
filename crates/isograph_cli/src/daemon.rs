@@ -28,7 +28,11 @@ async fn serve(config_path: PathBuf, port_path: PathBuf) {
     let (effect_tx, effect_rx) = unbounded_channel::<IsographEffect>();
     let _socket = match freddie_event_socket::listen(0, {
         let event_tx = event_tx.clone();
-        move |text| on_message(text, event_tx.reference())
+        move |text| {
+            on_message(text, |event| {
+                let _ = event_tx.send(event);
+            })
+        }
     }) {
         Ok(socket) => socket,
         Err(e) => {
