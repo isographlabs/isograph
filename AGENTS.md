@@ -62,7 +62,7 @@ Fixtures are inputs only. Expected results are assertions in the test, never che
 
 An API only tests call should not exist. A helper tests need lives in the tests crate or under `#[cfg(test)]`.
 
-Do not test `Serialize` / `Deserialize` that serde provides. A derived round-trip is not a behavior test.
+Do not test another crate. pico's tracked counter, serde's derived round-trip, `HashMap` insert: a failure means that library is wrong, not our code. Test what we wrote. A JSON frame that arrives as `DiskChanged` because we tagged the enum is ours; that `PathBuf` hashes as `PathBuf` is not.
 
 ## Booleans
 
