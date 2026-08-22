@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "ignorePatterns": ["__isograph", "vite-demo"],
+  "ignorePatterns": ["__isograph"],
   "plugins": ["typescript", "import"],
   "env": { "node": true, "browser": true },
   "rules": {

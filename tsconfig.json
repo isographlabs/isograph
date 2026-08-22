@@ -1,9 +1,0 @@
-{
-  "extends": "./tsconfig.build.json",
-  "include": [
-    "./libs/**/*.ts",
-    "libs/isograph-react/src/index.tsx",
-    "libs/isograph-react/src/cache.tsx"
-  ],
-  "exclude": ["**/dist", "**/*.d.ts"]
-}

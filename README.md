@@ -196,7 +196,6 @@ The fields that are refetched as part of the mutation response are whatever fiel
 
 There's a lot more. These docs are threadbare.
 
-- See the sample apps in [`./demos`](./demos/).
 - Watch the [talk at GraphQL Conf](https://www.youtube.com/watch?v=gO65JJRqjuc).
 - Join the [Discord](https://discord.gg/qcHUxb6deQ).
 - [Follow the official Twitter account](https://twitter.com/isographlabs)

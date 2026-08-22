@@ -2,10 +2,9 @@
 
 ## Overview
 
-There are three major places to make changes to Isograph:
+There are two major places to make changes to Isograph:
 
 - to the Rust compiler, and thus to generated files
-- to the TypeScript runtime, which consumes the generated files, and
 - to the Rust language server
 
 ## Global setup
@@ -65,26 +64,7 @@ This starts bacon! There are several commands you can press: `b` to build, `c` f
 
 ### Running the compiler binary directly
 
-The compiler can be run with `./target/debug/isograph_cli`. For example, `pnpm build-pet-demo` runs: `./target/debug/isograph_cli --config ./demos/pet-demo/isograph.config.json`.
-
-If you are using the locally-built compiler from another folder, you should be able to run `$PATH_TO_ISOGRAPH_REPO/target/debug/isograph_cli --config $YOUR_LOCAL_CONFIG`.
-
-### Running the compiler for a specific demo
-
-We also have scripts defined in the `package.json` that make using the compiler easier for the demos:
-
-```sh
-# from the root
-pnpm build-demos
-pnpm watch-pet-demo
-pnpm build-pet-demo
-pnpm watch-github-demo
-pnpm build-github-demo
-pnpm watch-isograph-react-demo
-pnpm build-isograph-react-demo
-```
-
-The `pet-demo` is the most complete, and is probably the one you should use. (See below for more instructions.)
+The compiler can be run with `./target/debug/isograph`. If you are using the locally-built compiler from another folder, you should be able to run `$PATH_TO_ISOGRAPH_REPO/target/debug/isograph --config $YOUR_LOCAL_CONFIG`.
 
 ### Running the compiler in a project where `@isograph/compiler` was installed via `yarn`
 
@@ -116,7 +96,7 @@ Many of these tests come from the libraries that we brought in from Relay, and a
 
 To show the rustdoc, `pnpm watch-rs`, then press the `d` key.
 
-## Commands related to the runtime and JavaScript
+## Commands related to JavaScript
 
 ### Install dependencies
 
@@ -124,24 +104,6 @@ You can install everything by running the following from the root:
 
 ```sh
 pnpm i
-```
-
-### Build the Isograph JavaScript libraries for use in demos
-
-```sh
-pnpm watch-libs
-```
-
-`watch-libs` will watch the source files for changes, and rebuild everything. If you only want to do it once, you can:
-
-```sh
-pnpm compile-libs
-```
-
-### Run unit tests in the libs folder
-
-```sh
-pnpm test
 ```
 
 ### Format the code
@@ -152,29 +114,9 @@ pnpm format-prettier
 pnpm format # which also formats the Rust code
 ```
 
-## Run the pet demo
-
-```sh
-pnpm dev-pet-demo
-```
-
 ## VSCode extension
 
 ### Starting
-
-- If you haven't yet, build the Isograph javascript libraries for the demos by running the following from root:
-
-```sh
-pnpm i
-pnpm watch-libs
-```
-
-or
-
-```sh
-pnpm i
-pnpm compile-libs
-```
 
 - Open VSCode in `isograph/vscode-extension`
 - Run the following in `isograph/vscode-extension`:
@@ -185,7 +127,6 @@ npm run build-local
 ```
 
 - Open `src/extension.ts` in your editor, then open the "run and debug" sidebar and click `Run and Debug`. If given a choice, select something related to "Extension development host".
-- In this new window, open `isograph/demos/pet-demo`.
 - The VSCode extension should start when you open a JS, JSX, TS or TSX file.
 
 ### Restarting and seeing new changes
@@ -220,10 +161,4 @@ You may save yourself some time by running:
 pnpm sanity-check
 ```
 
-This will:
-
-- format the code and run the compiler, and ensure that no files are left modified in the working directory
-- build the JS libs (which typechecks etc)
-- run tests
-
-All of these are checked as part of CI.
+This will format the code, run clippy, and ensure that no files are left modified in the working directory.

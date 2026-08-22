@@ -1,6 +1,4 @@
 packages:
-  - libs/*
-  - demos/*
   - docs-website
 
 ignoredBuiltDependencies:

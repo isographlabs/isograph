@@ -38,7 +38,6 @@ pretty-duration = "0.1.1"
 proc-macro2 = "1.0.92"
 quote = "1.0.38"
 regex = "1.6.0"
-schemars = { version = "0.8.11", features = ["indexmap1"] }
 serde = "1.0.197"
 serde_derive = "1.0.197"
 serde_json = "1.0.108"

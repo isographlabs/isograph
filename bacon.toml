@@ -7,7 +7,7 @@
 
 default_job = "check"
 
-# Build and watch-libs are custom jobs, the rest of the file is from the Bacon default configuration
+# Build is a custom job, the rest of the file is from the Bacon default configuration
 [jobs.build]
 command = [
 	"cargo", "build",
@@ -23,11 +23,6 @@ command = [
 ]
 watch = ["crates"]
 need_stdout = false
-
-[jobs.watch-libs]
-command = ["pnpm", "compile-libs"]
-watch = ["libs"]
-need_stdout = true
 
 [jobs.check]
 command = ["cargo", "check", "--color", "always"]

@@ -13,12 +13,8 @@
 **/.swc/**
 **/.idea/**
 
-# the built binary is downloaded into this folder during CI
-artifacts
-
 **/out/**
 
-**/.turbo/**
 **/swc_isograph_plugin.wasm
 
 **/.claude/settings.local.json

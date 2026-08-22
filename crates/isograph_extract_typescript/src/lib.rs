@@ -254,7 +254,10 @@ export const HomeRoute = iso(`
             AssociatedJsFunction::Present
         );
         assert_eq!(extracted[1].context.const_export_name, None);
-        assert_eq!(extracted[1].iso_literal_text, "entrypoint Query.PetFavoritePhrase");
+        assert_eq!(
+            extracted[1].iso_literal_text,
+            "entrypoint Query.PetFavoritePhrase"
+        );
         assert_eq!(
             extracted[1].context.associated_js_function,
             AssociatedJsFunction::Absent
@@ -324,7 +327,10 @@ export const HomeRoute = iso(`
         let source = "iso(`\nentrypoint Query.HomeRoute\n`)";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].iso_literal_text, "\nentrypoint Query.HomeRoute\n");
+        assert_eq!(
+            extracted[0].iso_literal_text,
+            "\nentrypoint Query.HomeRoute\n"
+        );
         assert_eq!(
             &source[extracted[0].iso_literal_start_index
                 ..extracted[0].iso_literal_start_index + extracted[0].iso_literal_text.len()],

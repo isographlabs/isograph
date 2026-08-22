@@ -7,5 +7,4 @@
 **/relay-crates/**
 refactors/**
 .vscode/**
-isograph-config-schema.json
 **/tests/fixtures/**
