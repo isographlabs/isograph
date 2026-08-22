@@ -4,4 +4,4 @@ mod iso_literals;
 
 pub use database::{DiskFile, DiskFileMap, IsographState};
 pub use host_language::*;
-pub use iso_literals::{LineChar, iso_literal_extraction};
+pub use iso_literals::{LineChar, iso_literal_extraction, parsed_iso_literal};

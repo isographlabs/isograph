@@ -365,10 +365,21 @@ mod memo_tests {
     use std::path::PathBuf;
 
     use intern::string_key::Intern;
-    use isograph_compiler::{HostLanguage, IsographState};
+    use isograph_compiler::{HostLanguage, IsographState, parsed_iso_literal};
+    use isograph_parser::{AstError, IsoLiteralItem, ParseError, ParsedIsoLiteral};
     use prelude::Postfix;
 
     use super::{AssociatedJsFunction, IsoCall, TypeScriptHostLanguage, TypeScriptLiteralContext};
+
+    fn iso_literal_item(parsed: &ParsedIsoLiteral) -> Option<&IsoLiteralItem> {
+        parsed
+            .item
+            .as_ref()?
+            .item
+            .item
+            .as_ref()
+            .map(|item| item.item.reference())
+    }
 
     fn intern_file(db: &mut IsographState<TypeScriptHostLanguage>, path: PathBuf, contents: &str) {
         db.insert_disk_file(path, contents.to_owned());
@@ -491,5 +502,54 @@ iso(`entrypoint Query.HomeRoute`)";
         intern_file(&mut db, path.clone(), "iso(`entrypoint Query.HomeRoute`)");
         db.remove_disk_file(&path);
         assert!(TypeScriptHostLanguage::extract_iso_literals(&db, path).is_none());
+    }
+
+    #[test]
+    fn parsed_entrypoint_has_no_errors() {
+        let db = IsographState::<TypeScriptHostLanguage>::default();
+        let parsed = parsed_iso_literal(&db, "entrypoint Query.HomeRoute".to_owned());
+        assert!(parsed.errors.is_empty());
+        assert!(matches!(
+            iso_literal_item(parsed),
+            Some(IsoLiteralItem::Entrypoint(_))
+        ));
+    }
+
+    #[test]
+    fn incomplete_entrypoint_has_a_parse_error() {
+        let db = IsographState::<TypeScriptHostLanguage>::default();
+        let parsed = parsed_iso_literal(&db, "entrypoint".to_owned());
+        assert!(parsed.item.is_some());
+        assert!(iso_literal_item(parsed).is_none());
+        assert!(!parsed.errors.is_empty());
+    }
+
+    #[test]
+    fn empty_literal_is_empty_literal_error() {
+        let db = IsographState::<TypeScriptHostLanguage>::default();
+        let parsed = parsed_iso_literal(&db, String::new());
+        assert!(parsed.item.is_none());
+        assert!(
+            parsed
+                .errors
+                .iter()
+                .any(|error| error.item == ParseError::Ast(AstError::EmptyLiteral))
+        );
+    }
+
+    #[test]
+    fn parsed_iso_literal_of_the_same_text_matches_after_unrelated_file() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let text = "entrypoint Query.HomeRoute".to_owned();
+        let first = parsed_iso_literal(&db, text.clone()).clone();
+        let second = parsed_iso_literal(&db, text.clone()).clone();
+        assert_eq!(first, second);
+        intern_file(
+            &mut db,
+            PathBuf::from("/tmp/proj/src/other.ts"),
+            "export const x = 1;",
+        );
+        let third = parsed_iso_literal(&db, text).clone();
+        assert_eq!(first, third);
     }
 }

@@ -10,11 +10,11 @@ use crate::{
     consume_argument_list, consume_directives,
 };
 
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SelectionSetParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct SelectionSet(#[resolve_field] pub Vec<WithSpan<Slot<Selection, UnparsedChunkItems>>>);
 
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SelectionSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct Selection {
     #[resolve_field]

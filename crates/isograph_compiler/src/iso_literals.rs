@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use isograph_parser::{ParsedIsoLiteral, parse_iso_literal};
 use pico_macros::memo;
 use prelude::Postfix;
 
@@ -10,6 +11,14 @@ use crate::host_language::{HostLanguage, IsoLiteralExtraction};
 pub struct LineChar {
     pub line: u32,
     pub character: u32,
+}
+
+#[memo]
+pub fn parsed_iso_literal<THostLanguage: HostLanguage>(
+    db: &IsographState<THostLanguage>,
+    iso_literal_text: String,
+) -> ParsedIsoLiteral {
+    parse_iso_literal(iso_literal_text.as_str())
 }
 
 #[memo]

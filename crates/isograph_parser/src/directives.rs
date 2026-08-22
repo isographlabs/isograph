@@ -10,11 +10,11 @@ use crate::{
     SelectableDeclarationPath, SelectionPath, consume_argument_list,
 };
 
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = IsographFieldDirectiveListParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct IsographFieldDirectiveList(#[resolve_field] pub Vec<WithSpan<IsographFieldDirective>>);
 
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = IsographFieldDirectiveListPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct IsographFieldDirective {
     #[resolve_field]

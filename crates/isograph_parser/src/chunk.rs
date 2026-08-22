@@ -261,7 +261,7 @@ impl<'a> From<ListLiteralValueSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
 /// - Position in the slot span but in neither field: `on_unmatched_span = from_path`
 ///   returns `self.path(parent).to()`. Each pin’s `From` builds that pin’s
 ///   `ResolvedNode` variant (`IsoLiteralSlot`, `ArgumentSlot`, `ObjectEntrySlot`).
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
     resolved_node = IsographResolutionNode<'a>,
     on_unmatched_span = from_path,

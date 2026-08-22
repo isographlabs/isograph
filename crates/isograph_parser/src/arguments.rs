@@ -10,7 +10,7 @@ use crate::{
     SelectionPath, Slot, UnparsedChunkItems, VariableDeclarationPath, intern_block_string_value,
 };
 
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ArgumentListParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ArgumentList(#[resolve_field] pub Vec<WithSpan<Slot<Argument, UnparsedChunkItems>>>);
 
@@ -20,17 +20,17 @@ pub enum ArgumentListParent<'a> {
     IsographFieldDirective(IsographFieldDirectivePath<'a>),
 }
 
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ObjectLiteral(#[resolve_field] pub Vec<WithSpan<Slot<ObjectEntry, UnparsedChunkItems>>>);
 
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ListLiteral(
     #[resolve_field] pub Vec<WithSpan<Slot<ListLiteralValue, UnparsedChunkItems>>>,
 );
 
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ArgumentSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct Argument {
     #[resolve_field]
@@ -40,7 +40,7 @@ pub struct Argument {
     pub value: WithSpan<NonConstantValue>,
 }
 
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ObjectEntrySlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ObjectEntry {
     #[resolve_field]
@@ -50,7 +50,7 @@ pub struct ObjectEntry {
     pub value: WithSpan<NonConstantValue>,
 }
 
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ListLiteralValueSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ListLiteralValue {
     #[resolve_field]
@@ -58,7 +58,7 @@ pub struct ListLiteralValue {
     pub value: WithSpan<NonConstantValue>,
 }
 
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum NonConstantValue {
     Variable(VariableUse),
@@ -80,7 +80,7 @@ pub enum VariableDeclarationOrUsageParent<'a> {
     Usage(VariableUsePath<'a>),
 }
 
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct VariableUse(
     #[resolve_field]

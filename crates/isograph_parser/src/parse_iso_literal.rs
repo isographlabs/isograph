@@ -27,14 +27,14 @@ impl<'a> From<IsoLiteralParsePath<'a>> for IsographResolutionNode<'a> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum IsoLiteralItem {
     Entrypoint(EntrypointDeclaration),
     Selectable(SelectableDeclaration),
 }
 
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct EntrypointDeclaration {
     #[resolve_field]
@@ -48,7 +48,7 @@ pub struct EntrypointDeclaration {
     pub directive_set: Option<WithSpan<IsographFieldDirectiveList>>,
 }
 
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct SelectableDeclaration {
     #[resolve_field]
@@ -124,7 +124,7 @@ pub type EntityNameWrapperPath<'a> =
 pub type SelectableNameWrapperPath<'a> =
     PositionResolutionPath<&'a SelectableNameWrapper, SelectableNameWrapperParent<'a>>;
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ParsedIsoLiteral {
     pub item: Option<WithSpan<IsoLiteralParse>>,
     pub errors: Vec<WithSpan<ParseError>>,

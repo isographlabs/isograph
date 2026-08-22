@@ -11,13 +11,13 @@ use crate::{
     VariableDeclarationOrUsage, parse_name_colon, parse_non_constant_value, parse_variable_name,
 };
 
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SelectableDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct VariableDeclarationList(
     #[resolve_field] pub Vec<WithSpan<Slot<VariableDeclaration, UnparsedChunkItems>>>,
 );
 
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = VariableDeclarationSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct VariableDeclaration {
     #[resolve_field]
@@ -31,7 +31,7 @@ pub struct VariableDeclaration {
     pub default_value: Option<WithSpan<NonConstantValue>>,
 }
 
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = TypeAnnotationParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum TypeAnnotation {
     Named(NamedTypeAnnotation),
@@ -39,11 +39,11 @@ pub enum TypeAnnotation {
     Union(UnionTypeAnnotation),
 }
 
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = TypeAnnotationParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct UnionTypeAnnotation(#[resolve_field] pub Vec<WithOptionalSpan<UnionVariant>>);
 
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = UnionTypeAnnotationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum UnionVariant {
     Named(#[parent_variant(Union)] NamedTypeAnnotation),
@@ -51,7 +51,7 @@ pub enum UnionVariant {
     Null(NullTypeAnnotation),
 }
 
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
     parent_type = UnionTypeAnnotationPath<'a>,
     resolved_node = IsographResolutionNode<'a>,
@@ -59,7 +59,7 @@ pub enum UnionVariant {
 )]
 pub struct NullTypeAnnotation;
 
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = TypeAnnotationParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct NamedTypeAnnotation {
     #[resolve_field]
@@ -67,7 +67,7 @@ pub struct NamedTypeAnnotation {
     pub name: WithSpan<EntityNameWrapper>,
 }
 
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = TypeAnnotationParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ListTypeAnnotation {
     #[resolve_field]
