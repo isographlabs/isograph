@@ -44,13 +44,6 @@ pico `intern_ref` stays for "find in the list, identity is the value's bits" (`g
 
 ## Tests
 
-pico, next to `intern_ref_chain`:
-
-- List memo returns `Vec<T>`. Item memo takes an index and returns `list[index]` without cloning `T`. A `Clone` impl that increments a counter is not called from the item memo.
-- Rebuild the list with the same item at that index (`==`). A dependent of the item memo does not re-invoke.
-- Rebuild the list with a different item at that index. The dependent does re-invoke.
-- Index past the end is `None`.
-
 Compiler `memo_tests`:
 
 - No `DiskFile`: `iso_literal_extraction` is `None`.
