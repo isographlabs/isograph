@@ -15,7 +15,7 @@ Requires config-discovery.md (landed), the event-model design-doc, and `docs-web
 9. literal-id.md (landed). After 7 and 8. pico memo `literal_id_at_location` (file + `LineChar`) stores `LiteralId` (path plus 0-based extract index). pico memo `iso_literal_extraction` is keyed on `LiteralId`. No parse tree or literal string stored at `(path, LineChar)`.
 10. file-semantic-tokens.md (landed). Path to encoded tokens. Interned-file tests. Not the daemon.
 11. lsp-semantic-token-encoding.md (landed). Encoder only.
-12. lsp-port.md. The `{slug}.port` TCP listener is LSP. `isograph/event` is a notification whose params are `IsographEvent`. `isograph send` does the handshake then that notification. Requests other than initialize/shutdown are `MethodNotFound`.
+12. lsp-port.md. The `{slug}.port` TCP listener is LSP. Each TCP connection is one client and one `session`. After `initialize`, every message is `IsographEvent::Lsp` (message plus `LspClientId`). `isograph/event` params are the `--file` JSON (`HelloWorld` / `Quit` / `DiskChanged`). `isograph send` does the handshake then that notification. Requests other than initialize are `MethodNotFound` on that connection.
 13. lsp-tokens.md. Later. Domain requests (`semanticTokens/full`).
 14. lsp-sessions.md. Later. Per-connection caps and a writer.
 15. lsp-diagnostics.md. Later. Debounce then `publishDiagnostics`.
