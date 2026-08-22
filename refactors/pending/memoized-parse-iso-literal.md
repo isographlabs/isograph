@@ -1,18 +1,34 @@
 # Memoized parse of an extracted iso literal
 
-Requires extract-iso-literals-from-file.md and `docs-website/docs/design-docs/pico.md`. Extract-all, `iso_literal_index(path, LineChar)` (`Option<usize>`), and `iso_literal_extraction_at_index(path, index)` are memos. This file parses that extraction. Public APIs take `path`, or `path` and `LineChar`, or names. Index and `parsed_iso_literal_in_file(path, index)` are intern. Parse is not keyed on `LineChar`.
+Requires extract-iso-literals-from-file.md and `docs-website/docs/design-docs/pico.md`. Extract-all and `iso_literal_extraction(path, LineChar)` are memos. This file parses the literal at that location.
 
-Origin of the parse memo: isograph `memoized_parse_iso_literal`. Origin of naming one literal by file and vec index: isograph `parse_iso_literals_in_file_content` walking the extract vec by position. Delta: parse is keyed on the literal text only, not on `TextSource` or the file path (isograph's TODO: passing `text_source` breaks memoization when the literal moves); i2 `parse_iso_literal` already takes `&str` only; host embedding errors that need the parse tree run after parse, in `host_errors_for_extraction`.
+```text
+parsed_iso_literal_at_location(path, LineChar)
+  -> iso_literal_text_at_location(path, LineChar)
+  + parsed_iso_literal(text)
 
-`parsed_iso_literal_in_file` is a memo. It calls `iso_literal_extraction_at_index`, then `parsed_iso_literal` with that text. The pico cache key of the inner parse is `iso_literal_text`. Two files with the same literal text share a parse. Prepend/append that does not change the text re-invokes `iso_literal_extraction_at_index`; the inner parse does not re-run.
+iso_literal_text_at_location(path, LineChar)
+  -> iso_literal_extraction(path, LineChar)
 
-Two shippable changes: the text-keyed parse memo, then the file+index parse memo and host errors.
+parsed_iso_literal(text)
+  -> parse_iso_literal(&str)
+```
+
+Origin of the parse memo: isograph `memoized_parse_iso_literal`. Origin of looking up one literal from a file and cursor: isograph `get_iso_literal_extraction_from_text_position_params`. Delta: parse is keyed on the literal text only, not on `TextSource` or the file path (isograph's TODO: passing `text_source` breaks memoization when the literal moves); i2 `parse_iso_literal` already takes `&str` only; host embedding errors that need the parse tree run after parse, in `host_errors_for_extraction`.
+
+`iso_literal_text_at_location` is the backdate seam. Prefixing the file changes `iso_literal_start_index`, so `iso_literal_extraction` is `!=`. The text string is `==`, so `iso_literal_text_at_location` backdates. `parsed_iso_literal_at_location` depends on the text memo and does not re-invoke. `parsed_iso_literal` of that text does not re-run. Two files with the same literal text share `parsed_iso_literal`.
+
+Semantic tokens for a file are file-semantic-tokens.md: parse every extraction's text, not a cursor.
+
+Three shippable changes: the text-keyed parse memo, the text and tree at a location, then host embedding errors.
 
 ## What the user does
 
-No user-facing change. Tests intern a `DiskFile`, take a row and column inside the literal (`LineChar`), get `Some(index)` from `iso_literal_index`, call `parsed_iso_literal_in_file` at that index, and assert the tree (or parse errors). A field without an export reports `MissingExport` from `host_errors_for_extraction`.
+No user-facing change. Tests intern a `DiskFile`, take a row and column inside the literal (`LineChar`), call `parsed_iso_literal_at_location`, and assert the tree (or parse errors). A field without an export reports `MissingExport` from `host_errors_for_extraction`.
 
 ## Change 1: `parsed_iso_literal`
+
+`ParsedIsoLiteral` currently derives `Debug`. pico re-invoke compares with `==`, and `parsed_iso_literal_at_location` stores `Option<ParsedIsoLiteral>`. Add `Clone, PartialEq, Eq` to `ParsedIsoLiteral`. Add `Clone` to every type that field contains that does not have it (`Slot`, `IsoLiteralItem`, `EntrypointDeclaration`, `SelectableDeclaration`, and so on). A derive that matches an established pattern needs only the attribute change.
 
 ```rust
 // from crates/isograph_compiler/src/iso_literals.rs
@@ -26,13 +42,13 @@ pub fn parsed_iso_literal(db: &IsographState, iso_literal_text: String) -> Parse
 
 `db` is the pico database. The body does not read sources. Changing any `DiskFile` does not invalidate this memo unless the interned `iso_literal_text` param is different.
 
-pico lookup returns `&ParsedIsoLiteral`. `ParsedIsoLiteral` is `PartialEq` (pico.md: re-invoke compares with `==`). That memo does not need `Clone` on the tree until `parsed_iso_literal_in_file`, which stores `Option<ParsedIsoLiteral>` and clones the inner `&ParsedIsoLiteral` into the `Option`.
+pico lookup returns `&ParsedIsoLiteral`.
 
 `isograph_compiler` already depends on `isograph_parser`.
 
 ### Tests
 
-In `crates/isograph_extract_typescript` `memo_tests`, or in `crates/isograph_compiler` if these tests do not need a host (they do not). Put them in `crates/isograph_compiler/src/iso_literals.rs` under `#[cfg(test)]`.
+In `crates/isograph_compiler/src/iso_literals.rs` under `#[cfg(test)]`. These tests do not need a host.
 
 - `parsed_iso_literal(&db, "entrypoint Query.HomeRoute".to_owned())` has `errors` empty and `item` `Some` whose item is `IsoLiteralItem::Entrypoint`.
 - `"entrypoint"` has a parse error (incomplete). `item` may still be `Some` (resilient parse). `errors` is not empty.
@@ -41,38 +57,58 @@ In `crates/isograph_extract_typescript` `memo_tests`, or in `crates/isograph_com
 
 Do not add a production function only the tests call.
 
-## Change 2: parse at file + index, and host embedding errors
+## Change 2: text and tree at a file and `LineChar`
 
 ```rust
 // from crates/isograph_compiler/src/iso_literals.rs
 #[memo]
-pub fn parsed_iso_literal_in_file<THostLanguage: HostLanguage>(
+pub fn iso_literal_text_at_location<THostLanguage: HostLanguage>(
     db: &IsographState,
     path: PathBuf,
-    index: usize,
+    line_char: LineChar,
+) -> Option<String> {
+    iso_literal_extraction::<THostLanguage>(db, path, line_char)?
+        .iso_literal_text
+        .clone()
+        .wrap_some()
+}
+
+#[memo]
+pub fn parsed_iso_literal_at_location<THostLanguage: HostLanguage>(
+    db: &IsographState,
+    path: PathBuf,
+    line_char: LineChar,
 ) -> Option<ParsedIsoLiteral> {
-    let extraction = iso_literal_extraction_at_index::<THostLanguage>(db, path, index)?;
-    parsed_iso_literal(db, extraction.iso_literal_text.clone())
+    let text = iso_literal_text_at_location::<THostLanguage>(db, path, line_char)?;
+    parsed_iso_literal(db, text.clone())
         .clone()
         .wrap_some()
 }
 ```
 
-`None` is no `DiskFile`, or `index` past the last extraction. pico lookup returns `&Option<ParsedIsoLiteral>`.
+`None` is no `DiskFile`, or a position that is not inside any literal text. pico lookup of the text memo returns `&Option<String>`. pico lookup of the tree memo returns `&Option<ParsedIsoLiteral>`.
 
 ```rust
 // from crates/isograph_compiler/src/lib.rs
 pub use iso_literals::{
-    IsoLiteralExtraction, LineChar, extract_iso_literals_from_file_content, iso_literal_extraction_at_index,
-    iso_literal_index, parsed_iso_literal, parsed_iso_literal_in_file,
+    IsoLiteralExtraction, LineChar, extract_iso_literals_from_file_content, iso_literal_extraction,
+    iso_literal_text_at_location, parsed_iso_literal, parsed_iso_literal_at_location,
 };
 ```
 
-`iso_literal_extraction_at_index` is the intern of `(path, index)`. `parsed_iso_literal` is the intern of the text. Prefixing the file changes `iso_literal_start_index`, so `iso_literal_extraction_at_index` does not backdate and this memo's body runs again. The inner `parsed_iso_literal` sees the same text and does not re-run. The adapter and schema do not take an index. Tests in this crate and other intern memos (file-semantic-tokens.md) do.
+Do not add a memo that parses every extraction in a file. file-semantic-tokens.md does that.
 
-Do not add a helper that parses every index into a vec unless a caller in this slice needs the whole vec. This doc ships `parsed_iso_literal_in_file` (one index) as intern.
+### Tests
 
-### Host errors after parse
+Same `memo_tests` module as extract, using `TypeScriptHostLanguage`. One-line fixtures: `line` is 0, `character` is the byte index.
+
+- No `DiskFile`: `iso_literal_text_at_location` and `parsed_iso_literal_at_location` are `None`.
+- Intern `iso(\`entrypoint Query.HomeRoute\`)`. `character` is `contents.find("entrypoint")`. `iso_literal_text_at_location` is `Some` of that interior. `parsed_iso_literal_at_location` is `Some` with empty parse errors and `IsoLiteralItem::Entrypoint`. `character` 0 (`e` of `export`) is `None` for both.
+- Intern `iso(\`entrypoint\`)`. `parsed_iso_literal_at_location` at the interior has parse errors non-empty.
+- Intern two literals. A `character` inside the second literal text is the second tree. A `character` between the two backtick spans is `None`.
+- Same literal text in two files (two paths): `parsed_iso_literal` of that text is one memo. Both locations return trees that match.
+
+## Change 3: host embedding errors
 
 Origin: isograph `process_iso_literal_extraction` (paren check, then parse, then associated-function check for fields). Origin of the error types: extract-iso-literals.md `TypeScriptHostError`. Delta: takes an extraction plus `&ParsedIsoLiteral` instead of parsing inside extract.
 
@@ -146,13 +182,8 @@ pub fn file_literals<'a>(
     )?;
     extractions
         .iter()
-        .enumerate()
-        .map(|(index, extraction)| {
-            let parsed = parsed_iso_literal_in_file::<TypeScriptHostLanguage>(
-                db,
-                path.to_owned(),
-                index,
-            )?;
+        .map(|extraction| {
+            let parsed = parsed_iso_literal(db, extraction.iso_literal_text.clone());
             let mut errors = host_errors_for_extraction(extraction, parsed);
             for error in &parsed.errors {
                 errors.push(
@@ -165,36 +196,34 @@ pub fn file_literals<'a>(
                 parsed,
                 errors,
             }
-            .wrap_some()
         })
-        .collect()
+        .collect::<Vec<_>>()
+        .wrap_some()
 }
 ```
 
-`ParseError` must be `Clone` for that push. If it is not, take `error.item` by reference in `IsoLiteralError::Parse` or clone via existing derives. Check `ParseError`. If it is not `Clone`, add `Clone` as part of this change (a derive that matches an established pattern needs only the attribute).
+`ParseError` is already `Clone`.
 
 lsp-parse-diagnostics.md currently takes `host` and `source: &str` and calls `file_literals(host, source)`. After this doc it takes `db` and `path`, or it keeps a `&str` entry for tests that do not intern a `DiskFile`. That doc updates when implemented. This doc ships `file_literals` on `db` + `path`.
 
-`FileLiteral` is TypeScript-shaped because host errors are TypeScript. A generic version is `extraction + parsed + Vec<WithSpan<IsoLiteralError<T>>>`. Put the generic pieces (`parsed_iso_literal_in_file`) in `isograph_compiler`. Put `host_errors_for_extraction` and `file_literals` in `isograph_extract_typescript`.
+`FileLiteral` is TypeScript-shaped because host errors are TypeScript. A generic version is `extraction + parsed + Vec<WithSpan<IsoLiteralError<T>>>`. Put the generic pieces (`parsed_iso_literal`, `parsed_iso_literal_at_location`) in `isograph_compiler`. Put `host_errors_for_extraction` and `file_literals` in `isograph_extract_typescript`.
 
 ### Tests
 
 Move the extract-typescript error tests listed in extract-iso-literals-from-file.md change 1 here.
 
-- Intern `iso(\`entrypoint Query.HomeRoute\`)`. `iso_literal_index` at the `LineChar` of `entrypoint` is `Some(0)`. `parsed_iso_literal_in_file::<TypeScriptHostLanguage>(db, path, 0)` is `Some` with empty parse errors. `host_errors_for_extraction` is empty.
-- Intern `iso(\`entrypoint\`)`. Parse errors non-empty. Index 0 exists.
+- Intern `iso(\`entrypoint Query.HomeRoute\`)`. `parsed_iso_literal_at_location` at the `LineChar` of `entrypoint` is `Some` with empty parse errors. `host_errors_for_extraction` is empty.
+- Intern `iso(\`entrypoint\`)`. Parse errors non-empty.
 - Intern `iso\`entrypoint Query.HomeRoute\``. Extract context is `TaggedTemplate`. `host_errors_for_extraction` is `MissingParentheses` at the extraction span.
 - Intern `iso(\`field Pet.fullName { id }\`)(`. `MissingExport`.
 - Intern `export const fullName = iso(\`field Pet.fullName { id }\`)`. `MissingAssociatedFunction`.
 - Intern `export const fullName = iso(\`field Pet.fullName { id }\`)(`. Host errors empty.
-- Intern two literals. `iso_literal_index` at a `LineChar` inside the second literal text is `Some(1)`. `parsed_iso_literal_in_file` at 1 is the second tree. Index 2 is `None`. A `LineChar` between the two literals is `iso_literal_index` `None`.
-- No `DiskFile`: `parsed_iso_literal_in_file` is `None`.
-- Same literal text in two files (two paths): `parsed_iso_literal` of that text is one memo; both indices return trees that match.
+- No `DiskFile`: `parsed_iso_literal_at_location` is `None`.
 
 `file_literals` of a file with `iso(\`entrypoint\`)`: one `FileLiteral`, `errors` contains a `Parse` at a span whose start is at least the extraction start.
 
 ## Call sites
 
-- Tests in this file: intern a `DiskFile`, `parsed_iso_literal_in_file` at an index, assert the AST.
-- file-semantic-tokens.md -> `parsed_iso_literal_in_file`.
+- Tests in this file: intern a `DiskFile`, `parsed_iso_literal_at_location` at a `LineChar`, assert the AST.
+- file-semantic-tokens.md -> `extract_iso_literals_from_file_content` and `parsed_iso_literal` for each extraction's text.
 - lsp-parse-diagnostics.md -> `file_literals`.

@@ -4,11 +4,13 @@ Requires filesystem-events.md (landed), extract-iso-literals.md (landed), and `d
 
 Origin of the memo: isograph `crates/isograph_schema/src/validated_isograph_schema/isograph_literals.rs` `extract_iso_literals_from_file_content` and `IsoLiteralExtraction`. Delta: `PathBuf` instead of `RelativePathToSourceFile`; `THostLanguage::LiteralContext` instead of four ad-hoc fields (`const_export_name`, `has_associated_js_function`, `iso_function_called_with_paren` as bools); extract does not parse (isograph extract also does not parse; i2's TypeScript implementor currently does, and this doc stops that); missing `DiskFile` is `None`, not a panic.
 
-Five shippable changes: stop parsing inside extract, move the pico types to `isograph_compiler`, the extract-all memo, row and column to an optional vec index, then the extraction at that index.
+This slice is all extractions in a file, and the extraction at a file and `LineChar`. Parsed AST at that location is memoized-parse-iso-literal.md. Semantic tokens for a file are file-semantic-tokens.md.
+
+Four shippable changes: stop parsing inside extract, move the pico types to `isograph_compiler`, the extract-all memo, then the extraction at a row and column.
 
 ## What the user does
 
-No user-facing change. Tests intern a `DiskFile` and assert the extracted literals: text, span, export name, call shape, and associated function. A row and column inside a literal text is `Some(index)`; a row and column in the JS around it is `None`.
+No user-facing change. Tests intern a `DiskFile` and assert the extracted literals: text, span, export name, call shape, and associated function. A row and column inside a literal text is `Some(extraction)`; a row and column in the JS around it is `None`.
 
 ## Change 1: extract does not parse
 
@@ -182,7 +184,7 @@ pub use iso_literals::{IsoLiteralExtraction, extract_iso_literals_from_file_cont
 
 ### The extraction
 
-Origin: isograph `IsoLiteralExtraction`. Delta: `context` instead of the four fields. `iso_literal_start_index` is the byte offset of the literal text in the file, same name as isograph. The nth literal in a file is the vec index, an argument to `parsed_iso_literal_in_file`, not a field.
+Origin: isograph `IsoLiteralExtraction`. Delta: `context` instead of the four fields. `iso_literal_start_index` is the byte offset of the literal text in the file, same name as isograph. A cursor looks up an extraction by `LineChar`, not by vec position.
 
 ```rust
 // from crates/isograph_compiler/src/iso_literals.rs
@@ -213,7 +215,7 @@ impl<THostLanguage: HostLanguage> IsoLiteralExtraction<THostLanguage> {
 }
 ```
 
-`iso_literal_index` takes the file and a row and column (`LineChar`) and returns `Option<usize>`. `iso_literal_extraction_at_index` takes that index. Those two, and the index itself, are intern (pico.md). Public functions take `path`, or `path` and `LineChar`, or `EntityName`, or `EntityName` and `SelectableName`. `iso_literal_start_index` offsets semantic tokens to file coordinates (file-semantic-tokens.md).
+`iso_literal_start_index` offsets semantic tokens to file coordinates (file-semantic-tokens.md).
 
 `HostLanguage::LiteralContext` gains `Clone + PartialEq + Eq + Debug + 'static` so the extraction can be stored and compared. `TypeScriptLiteralContext` already is `Copy`.
 
@@ -280,9 +282,15 @@ Tests in `crates/isograph_extract_typescript/src/lib.rs` under a `memo_tests` mo
 
 `expect` names the fixture the test interned.
 
-## Change 4: row and column to an index
+## Change 4: the extraction at a file and `LineChar`
 
-Origin of `LineChar` and the walk: isograph `crates/isograph_lsp/src/hover.rs` `get_iso_literal_extraction_at_index_from_text_position_params` / `find_iso_literal_extraction_at_index_under_cursor`. Origin of `delta_line_delta_start`: isograph `crates/isograph_lsp/src/semantic_tokens.rs`. Delta: the memo returns `Option<usize>`, not `(IsoLiteralExtraction, u32)`. pico.md: the caller that has a cursor calls this; the caller that has an index calls `iso_literal_extraction_at_index`. Hover is one slot per `LineChar`. Returning the extraction would clone `iso_literal_text` into each of those slots. The index is `Copy`. The string lives on extract-all and on the one `iso_literal_extraction_at_index(path, index)` slot. Every character inside the first literal yields `Some(0)`, so `parsed_iso_literal_in_file(path, 0)` is one slot. `LineChar` lives in `iso_literals.rs` so the compiler intern does not take `lsp_types::Position` (that type is not `Hash`).
+```text
+iso_literal_extraction(path, LineChar)
+  -> extract_iso_literals_from_file_content(path)
+  + find_iso_literal_extraction(LineChar, file text, extract vec)
+```
+
+Origin of `LineChar` and the walk: isograph `crates/isograph_lsp/src/hover.rs` `get_iso_literal_extraction_from_text_position_params` / `find_iso_literal_extraction_under_cursor`. Origin of `delta_line_delta_start`: isograph `crates/isograph_lsp/src/semantic_tokens.rs`. Delta: the memo returns `Option<IsoLiteralExtraction>`, not `(IsoLiteralExtraction, u32)`. It does not return an offset into the literal (`get_index_of_line_char`). There is no vec index on the signature. `LineChar` lives in `iso_literals.rs` so the compiler intern does not take `lsp_types::Position` (that type is not `Hash`).
 
 `line` is 0-based count of `\n`. `character` is bytes since the last `\n`, same as isograph `delta_line_delta_start`.
 
@@ -295,31 +303,107 @@ pub struct LineChar {
 }
 
 #[memo]
-pub fn iso_literal_index<THostLanguage: HostLanguage>(
+pub fn iso_literal_extraction<THostLanguage: HostLanguage>(
     db: &IsographState,
     path: PathBuf,
     line_char: LineChar,
-) -> Option<usize> {
+) -> Option<IsoLiteralExtraction<THostLanguage>> {
     let extractions =
         extract_iso_literals_from_file_content::<THostLanguage>(db, path.clone())?;
     let source_id = db.get_disk_file_map().tracked().0.get(&path).copied()?;
     let content = db.get(source_id).contents.reference();
-    find_iso_literal_index(line_char, content, extractions)
+    find_iso_literal_extraction(line_char, content, extractions).cloned()
 }
 ```
 
-`find_iso_literal_index` is the isograph walk with `enumerate`. It returns the index of the first extraction whose line/character range contains `line_char`. Inclusive of both ends, same as isograph `position_in_range`. It does not return an offset into the literal.
+`None` is no `DiskFile`, or a position that is not inside any literal text (JS around the literals, including `iso(`). pico lookup returns `&Option<IsoLiteralExtraction<THostLanguage>>`.
 
-`None` is no `DiskFile`, or a position that is not inside any literal text (JS around the literals, including `iso(`).
+```rust
+// from crates/isograph_compiler/src/iso_literals.rs
+fn find_iso_literal_extraction<'a, THostLanguage: HostLanguage>(
+    target_line_char: LineChar,
+    content: &str,
+    extracted_items: &'a [IsoLiteralExtraction<THostLanguage>],
+) -> Option<&'a IsoLiteralExtraction<THostLanguage>> {
+    let mut last_iteration_end_line_count = 0;
+    let mut last_iteration_end_char_count = 0;
+    let mut max_prev_span_end = 0;
+    for extract_item in extracted_items {
+        let iso_literal_start_index = extract_item.iso_literal_start_index;
+        let iso_literal_end_index = iso_literal_start_index + extract_item.iso_literal_text.len();
 
-pico lookup returns `&Option<usize>`.
+        let intermediate_content = &content[max_prev_span_end..iso_literal_start_index];
+        let (intermediate_line, intermediate_char) = delta_line_delta_start(intermediate_content);
 
-Copy `delta_line_delta_start` and `position_in_range` into `iso_literals.rs`. Do not depend on `isograph_lsp`.
+        let start_line_count = last_iteration_end_line_count + intermediate_line;
+        let start_char_count = if intermediate_line > 0 {
+            intermediate_char
+        } else {
+            last_iteration_end_char_count + intermediate_char
+        };
+
+        let iso_content = &content[iso_literal_start_index..iso_literal_end_index];
+        let (iso_line, iso_char) = delta_line_delta_start(iso_content);
+
+        let end_line_count = start_line_count + iso_line;
+        let end_char_count = if iso_line > 0 {
+            iso_char
+        } else {
+            start_char_count + iso_char
+        };
+
+        if position_in_range(
+            (start_line_count, start_char_count),
+            (end_line_count, end_char_count),
+            target_line_char,
+        ) {
+            return extract_item.wrap_some();
+        }
+
+        last_iteration_end_line_count = end_line_count;
+        last_iteration_end_char_count = end_char_count;
+        max_prev_span_end = iso_literal_end_index;
+    }
+
+    None
+}
+
+fn position_in_range(start: (u32, u32), end: (u32, u32), target: LineChar) -> bool {
+    let (start_line_count, start_char_count) = start;
+    let (end_line_count, end_char_count) = end;
+
+    if target.line < start_line_count
+        || (target.line == start_line_count && target.character < start_char_count)
+        || target.line > end_line_count
+        || (target.line == end_line_count && target.character > end_char_count)
+    {
+        return false;
+    }
+
+    true
+}
+
+fn delta_line_delta_start(text: &str) -> (u32, u32) {
+    let mut last_line_break_index = 0;
+    let mut line_break_count = 0;
+    for (index, char) in text.chars().enumerate() {
+        if char == '\n' {
+            line_break_count += 1;
+            last_line_break_index = index as u32 + 1;
+        }
+    }
+    (line_break_count, text.len() as u32 - last_line_break_index)
+}
+```
+
+Origin of `find_iso_literal_extraction`: isograph `find_iso_literal_extraction_under_cursor`. Delta: returns `Option<&IsoLiteralExtraction>`, not `(IsoLiteralExtraction, u32)`. Inclusive of both ends, same as isograph `position_in_range`. The walk is a running line/char count; that is a state machine, so this is a loop.
+
+Origin of `position_in_range` and `delta_line_delta_start`: copy from isograph `hover.rs` / `semantic_tokens.rs`. `delta_line_delta_start` is the same function as `lsp-semantic-token-encoding.md`. Do not depend on `isograph_lsp`. `position_in_range` is yes or no: the cursor is inside the span.
 
 ```rust
 // from crates/isograph_compiler/src/lib.rs
 pub use iso_literals::{
-    IsoLiteralExtraction, LineChar, extract_iso_literals_from_file_content, iso_literal_index,
+    IsoLiteralExtraction, LineChar, extract_iso_literals_from_file_content, iso_literal_extraction,
 };
 ```
 
@@ -327,52 +411,15 @@ pub use iso_literals::{
 
 Same `memo_tests` module. One-line fixtures: `line` is 0, `character` is the byte index.
 
-- No `DiskFile`: `iso_literal_index::<TypeScriptHostLanguage>(db, path, LineChar { line: 0, character: 0 })` is `None`.
-- `export const Home = iso(\`entrypoint Query.HomeRoute\`)`. `character` is `contents.find("entrypoint")`. The memo is `Some(0)`. `character` 0 (`e` of `export`) is `None`.
-- Two literals on one line. A `character` inside the second literal text is `Some(1)`. A `character` between the two backtick spans is `None`.
-
-## Change 5: the extraction at an index
-
-```rust
-// from crates/isograph_compiler/src/iso_literals.rs
-#[memo]
-pub fn iso_literal_extraction_at_index<THostLanguage: HostLanguage>(
-    db: &IsographState,
-    path: PathBuf,
-    index: usize,
-) -> Option<IsoLiteralExtraction<THostLanguage>> {
-    extract_iso_literals_from_file_content::<THostLanguage>(db, path)?
-        .get(index)
-        .cloned()
-}
-```
-
-`None` is no `DiskFile`, or `index` past the last extraction. pico lookup returns `&Option<IsoLiteralExtraction<THostLanguage>>`.
-
-```rust
-// from crates/isograph_compiler/src/lib.rs
-pub use iso_literals::{
-    IsoLiteralExtraction, LineChar, extract_iso_literals_from_file_content, iso_literal_extraction_at_index,
-    iso_literal_index,
-};
-```
-
-### Tests
-
-Same `memo_tests` module. Intern the same fixtures as change 3.
-
-- No `DiskFile`: `iso_literal_extraction_at_index::<TypeScriptHostLanguage>(db, path, 0)` is `None`.
-- Present file, no `iso`: index 0 is `None`.
-- One exported field: index 0 is `Some`, same text and `iso_literal_start_index` as `extract_iso_literals_from_file_content` `[0]`. Index 1 is `None`.
-- Two literals: index 0 and 1 match the vec; index 2 is `None`.
-- The `Some(0)` from change 4's `entrypoint` `LineChar` is the same extraction as `iso_literal_extraction_at_index(..., 0)`.
+- No `DiskFile`: `iso_literal_extraction::<TypeScriptHostLanguage>(db, path, LineChar { line: 0, character: 0 })` is `None`.
+- Present file, no `iso`: any `LineChar` is `None`.
+- `export const Home = iso(\`entrypoint Query.HomeRoute\`)`. `character` is `contents.find("entrypoint")`. The function is `Some`; `iso_literal_text` and `iso_literal_start_index` match `extract_iso_literals_from_file_content` `[0]`. `character` 0 (`e` of `export`) is `None`. The `LineChar` of the first byte of the interior is `Some`. The `LineChar` of the last byte of the interior is `Some`. One past that last byte is `None`.
+- Two literals on one line. A `character` inside the second literal text is the second extraction. A `character` between the two backtick spans is `None`.
 
 ## Call sites
 
 Change 2: `run_event_loop` -> `handle(&mut state, event)`. Tests intern a `DiskFile` the same way `handle` does: `db.set` plus insert into the tracked map.
 
-Change 3: `iso_literal_index` and `iso_literal_extraction_at_index` -> `extract_iso_literals_from_file_content`. file-semantic-tokens.md reads the vec for offsets.
+Change 3: `iso_literal_extraction` -> `extract_iso_literals_from_file_content`. file-semantic-tokens.md reads the vec for offsets.
 
-Change 4: memoized-parse-iso-literal.md tests pick a `LineChar` and call `iso_literal_index`.
-
-Change 5: memoized-parse-iso-literal.md -> `iso_literal_extraction_at_index`.
+Change 4: memoized-parse-iso-literal.md -> `iso_literal_extraction`.

@@ -22,13 +22,35 @@ and assert that `entrypoint` is `Keyword` at its file offset, then that `lsp_sem
 
 Most important first.
 
-Origin of the concat memo: isograph `get_semantic_tokens` without the URI / `uri_is_project_file` checks. Delta: `Option` if there is no `DiskFile`; tokens from `ParsedIsoLiteral.tokens`; offset is `extraction.iso_literal_start_index as u32`.
+```text
+iso_literal_semantic_tokens_in_file(path)
+  -> parsed_iso_literals_in_file(path)
+
+parsed_iso_literals_in_file(path)
+  -> extract_iso_literals_from_file_content(path)
+  + parsed_iso_literal(text) for each extraction
+```
+
+Origin of the concat memo: isograph `get_semantic_tokens` without the URI / `uri_is_project_file` checks. Delta: `Option` if there is no `DiskFile`; tokens from `ParsedIsoLiteral.tokens`; offset is `extraction.iso_literal_start_index as u32`. Parse is the text-keyed memo, not a cursor.
 
 ```rust
 // from crates/isograph_compiler/src/iso_literals.rs
-use isograph_parser::IsographSemanticToken;
+use isograph_parser::{IsographSemanticToken, ParsedIsoLiteral};
 use pico_macros::memo;
 use span::{WithSpan, WithSpanPostfix};
+
+#[memo]
+pub fn parsed_iso_literals_in_file<THostLanguage: HostLanguage>(
+    db: &IsographState,
+    path: PathBuf,
+) -> Option<Vec<ParsedIsoLiteral>> {
+    let extractions = extract_iso_literals_from_file_content::<THostLanguage>(db, path)?;
+    extractions
+        .iter()
+        .map(|extraction| parsed_iso_literal(db, extraction.iso_literal_text.clone()).clone())
+        .collect::<Vec<_>>()
+        .wrap_some()
+}
 
 #[memo]
 pub fn iso_literal_semantic_tokens_in_file<THostLanguage: HostLanguage>(
@@ -36,9 +58,9 @@ pub fn iso_literal_semantic_tokens_in_file<THostLanguage: HostLanguage>(
     path: PathBuf,
 ) -> Option<Vec<WithSpan<IsographSemanticToken>>> {
     let extractions = extract_iso_literals_from_file_content::<THostLanguage>(db, path.clone())?;
+    let parsed_literals = parsed_iso_literals_in_file::<THostLanguage>(db, path)?;
     let mut tokens = Vec::new();
-    for (index, extraction) in extractions.iter().enumerate() {
-        let parsed = parsed_iso_literal_in_file::<THostLanguage>(db, path.clone(), index)?;
+    for (extraction, parsed) in extractions.iter().zip(parsed_literals.iter()) {
         let offset = extraction.iso_literal_start_index as u32;
         tokens.extend(parsed.tokens.iter().map(|token| {
             token.item.with_span(token.location.with_offset(offset))
@@ -54,7 +76,7 @@ A parse with errors still has leftover tokens. Use them.
 
 Tokens from different literals do not overlap: they sit inside disjoint backtick spans. `lsp_semantic_tokens` asserts that. JS between literals has no iso tokens.
 
-`path.clone()` is the intern param of extract and of `parsed_iso_literal_in_file`. The inner parse intern is the literal text.
+`path.clone()` is the intern param of extract and of `parsed_iso_literals_in_file`. The inner parse intern is the literal text.
 
 ```rust
 // from crates/isograph_lsp/src/file_semantic_tokens.rs
