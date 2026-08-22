@@ -1,6 +1,8 @@
 # Unchunked root
 
-An iso literal is one declaration. The root is not partitioned. Group interiors still are.
+Chunking partitions a group's interior. The root is not a group. `chunk` walks root items as content and calls `chunk_group` for each group; only then does `chunk_level` run.
+
+An iso literal is one declaration. Root line breaks and commas are content. The parser skips line breaks. A comma is not a line break.
 
 ```
 // from demos/pet-demo/src/components/HomeRoute.tsx
@@ -38,7 +40,7 @@ iso(`
 
 The description and the selection set sit on later lines than `field Query.HomeRoute @component`. Entrypoints in the same demos are one line, `iso(\`entrypoint Query.HomeRoute\`)`, with no comma in front of `entrypoint`.
 
-Root line breaks stay in the chunk as `NonBracket(LineBreak)`. The parser skips them. A comma is not a line break. Before `field` / `entrypoint`, a comma is `Expected(DECLARATION_KEYWORD, Comma)`.
+Root line breaks stay as `NonBracket(LineBreak)`. The parser skips them. Before `field` / `entrypoint`, a comma is `Expected(DECLARATION_KEYWORD, Comma)`.
 
 A list interior still partitions on commas and line breaks. `{ pets {` / `id` / `PetSummaryCard` } is three selections. `{ foo\n{ bar } }` is a scalar plus a failed selection. `[Pet\n!]` does not attach the bang.
 
@@ -84,20 +86,27 @@ pub type SelectableDeclarationPath<'a> =
 pub struct ChunkedRoot(
     #[resolve_field]
     #[parent_variant(Root)]
-    pub Option<WithSpan<Chunk>>,
+    pub Vec<WithSpan<ChunkContentItem>>,
 );
 
 pub type ChunkedRootPath<'a> = PositionResolutionPath<&'a ChunkedRoot, ()>;
 ```
 
-`None` is an empty literal (`""`, `"   "`). `Some` is the one root chunk: every root item including line breaks, `trailing_separator: None`. Groups in that chunk have `ChunkedLevel` interiors, partitioned as they are today.
+Empty vec is `""` / `"   "`. Otherwise the vec is every root item, line breaks and commas included. Groups in that vec have `ChunkedLevel` interiors.
+
+A `Chunk` exists only inside a `ChunkedLevel`. `ChunkParent` / `Extra` / `Root`-as-chunk-parent are gone.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
-#[derive(Debug)]
-pub enum ChunkParent<'a> {
+pub type ChunkPath<'a> = PositionResolutionPath<&'a Chunk, ChunkedLevelPath<'a>>;
+```
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+pub enum ChunkContentItemParent<'a> {
     Root(ChunkedRootPath<'a>),
-    Level(ChunkedLevelPath<'a>),
+    Chunk(ChunkPath<'a>),
+    Unparsed(UnparsedChunkItemsPath<'a>),
 }
 ```
 
@@ -232,7 +241,7 @@ impl<'a> From<ChunkedRootPath<'a>> for IsographResolutionNode<'a> {
 
 ## Chunk
 
-Root line breaks are content. Root commas are content. Interiors still partition on both.
+`chunk_level` runs on a group's interior. It does not run on the root.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -240,24 +249,13 @@ pub(crate) fn chunk(
     tree: &WithSpan<MatchedBrackets>,
 ) -> (WithSpan<ChunkedRoot>, Vec<CommaWithoutItem>) {
     let mut errors = Vec::new();
-    let mut contents = Vec::new();
-    for item in tree.item.0.iter() {
-        contents.push(root_content(item, &mut errors).with_span(item.location));
-    }
-    let mut items = contents.into_iter();
-    let chunk = items.next().map(|head| {
-        let contents = NonEmpty {
-            head,
-            tail: items.collect(),
-        };
-        let location = Span::join(contents.first().location, contents.last().location);
-        Chunk {
-            contents,
-            trailing_separator: None,
-        }
-        .with_span(location)
-    });
-    (ChunkedRoot(chunk).with_span(tree.location), errors)
+    let contents = tree
+        .item
+        .0
+        .iter()
+        .map(|item| root_content(item, &mut errors).with_span(item.location))
+        .collect();
+    (ChunkedRoot(contents).with_span(tree.location), errors)
 }
 
 fn root_content(
@@ -272,6 +270,21 @@ fn root_content(
 ```
 
 `chunk_level`, `absorb_chunk`, `as_content`, `chunk_group` are unchanged. `CommaWithoutItem` is produced only inside groups.
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = ChunkedLevelPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct Chunk {
+    #[resolve_field]
+    #[parent_variant(Chunk)]
+    contents: NonEmpty<WithSpan<ChunkContentItem>>,
+    #[resolve_field]
+    trailing_separator: Option<WithSpan<ChunkSeparator>>,
+}
+```
+
+`#[parent_variant(Chunk)]` is `ChunkContentItemParent::Chunk`.
 
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
@@ -302,6 +315,34 @@ Line breaks are not recorded. A position on a skipped line break answers the con
 
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
+pub(crate) struct ItemCursor<'a> {
+    items: SafePeekable<std::slice::Iter<'a, WithSpan<ChunkContentItem>>>,
+    previous_end: u32,
+    text: &'a str,
+    tokens: &'a mut Vec<WithSpan<IsographSemanticToken>>,
+    errors: &'a mut Vec<WithSpan<AstError>>,
+}
+
+impl<'a> ChunkStream<'a> {
+    pub(crate) fn new(
+        contents: &'a [WithSpan<ChunkContentItem>],
+        text: &'a str,
+        tokens: &'a mut Vec<WithSpan<IsographSemanticToken>>,
+        errors: &'a mut Vec<WithSpan<AstError>>,
+    ) -> Self {
+        ChunkStream(ItemCursor {
+            previous_end: match contents.first() {
+                Some(item) => item.location.start,
+                None => 0,
+            },
+            items: contents.iter().safe_peekable(),
+            text,
+            tokens,
+            errors,
+        })
+    }
+}
+
     pub(crate) fn skip_line_breaks(&mut self) {
         while let Some(peek) = self.peek() {
             match peek.view().item.reference() {
@@ -314,15 +355,15 @@ Line breaks are not recorded. A position on a skipped line break answers the con
     }
 ```
 
-`peek`, `consume_token_if`, and `consume_group_if` do not skip. Every `parse_*` and `consume_*` that looks at the next item calls `skip_line_breaks` first. A comma is still there.
+`Chunk::stream` is `ChunkStream::new(self.contents.as_slice(), text, tokens, errors)`. `peek`, `consume_token_if`, and `consume_group_if` do not skip. Every `parse_*` and `consume_*` that looks at the next item calls `skip_line_breaks` first. A comma is still there.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
-fn parse_one_chunk<'a, P>(
-    chunk: &'a WithSpan<Chunk>,
+pub(crate) fn parse_stream<'a, P>(
     mut stream: ChunkStream<'a>,
     leftover: Expectation,
     parse: impl FnOnce(&mut ItemCursor<'_>) -> Result<P, WithSpan<AstError>>,
+    failed_extra: impl FnOnce() -> NonEmpty<WithSpan<ChunkContentItem>>,
 ) -> WithSpan<Slot<P, UnparsedChunkItems>> {
     stream.cursor().skip_line_breaks();
     let result = stream.cursor().spanning(parse);
@@ -346,10 +387,6 @@ fn parse_one_chunk<'a, P>(
                         .wrap_some()
                 }
             };
-            let extra = match leftover {
-                Expectation::Separator(_) => extra,
-                _ => extra_plus_trailing_separator(extra, chunk.item.trailing_separator.as_ref()),
-            };
             let location = match extra.as_ref() {
                 None => item.location,
                 Some(extra) => Span::join(item.location, extra.location),
@@ -364,7 +401,7 @@ fn parse_one_chunk<'a, P>(
             stream.cursor().report_error(reason);
             let extra = match stream.remaining_contents() {
                 Some(remaining) => remaining,
-                None => chunk.item.contents.clone(),
+                None => failed_extra(),
             };
             let location = Span::join(extra.first().location, extra.last().location);
             Slot {
@@ -377,11 +414,28 @@ fn parse_one_chunk<'a, P>(
     record_leftover_extra(stream.tokens(), &slot.item.extra);
     slot
 }
+
+fn parse_one_chunk<'a, P>(
+    chunk: &'a WithSpan<Chunk>,
+    stream: ChunkStream<'a>,
+    leftover: Expectation,
+    parse: impl FnOnce(&mut ItemCursor<'_>) -> Result<P, WithSpan<AstError>>,
+) -> WithSpan<Slot<P, UnparsedChunkItems>> {
+    let mut slot = parse_stream(stream, leftover, parse, || chunk.item.contents.clone());
+    match leftover {
+        Expectation::Separator(_) => slot,
+        _ => {
+            slot.item.extra = extra_plus_trailing_separator(
+                slot.item.extra,
+                chunk.item.trailing_separator.as_ref(),
+            );
+            slot
+        }
+    }
+}
 ```
 
-Delta from landed `parse_one_chunk`: `skip_line_breaks` before `spanning`, and after `Ok` before `remaining_contents`. Trailing root newlines after `}` are not leftover. A trailing comma is leftover, `Expected(EndOfDeclaration, Comma)`.
-
-List interiors have no line-break content items (they are separators). The two skips are then no-ops.
+`parse_stream` is skip, spanning, skip, leftover remaining, failed extra. `parse_one_chunk` is that plus `extra_plus_trailing_separator` when leftover is not a list `Separator`. The root is not a chunk, so it does not go through `parse_one_chunk`. List interiors have no line-break content items; the two skips are no-ops there.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -662,37 +716,43 @@ pub(crate) fn parse_chunked_iso_literal(
     tokens: &mut Vec<WithSpan<IsographSemanticToken>>,
 ) -> Option<WithSpan<IsoLiteralParse>> {
     let location = root.location;
-    let Some(chunk) = root.item.0.as_ref() else {
+    let Some((head, tail)) = root.item.0.split_first() else {
         errors.push(AstError::EmptyLiteral.with_span(location));
         return None;
     };
-    let mut stream = chunk.item.stream(text, tokens, errors);
+    let failed_extra = NonEmpty {
+        head: head.clone(),
+        tail: tail.to_vec(),
+    };
+    let mut stream = ChunkStream::new(root.item.0.as_slice(), text, tokens, errors);
     stream.cursor().skip_line_breaks();
     if stream.require_end().is_ok() {
         errors.push(AstError::EmptyLiteral.with_span(location));
         return None;
     }
-    let slot = parse_one_chunk(
-        chunk,
+    let slot = parse_stream(
         stream,
         Expectation::EndOfDeclaration,
         parse_iso_literal_item,
+        || failed_extra,
     );
     slot.with_span(location).wrap_some()
 }
 ```
 
-`require_end` loses `#[cfg_attr(not(test), expect(dead_code))]`. After skip, a stream at end is `"\n\n"`. `parse_one_chunk` skips again (no-op, already at `field` / `entrypoint`) then spans.
+Empty is `root.item.0.split_first()`. `None` is `EmptyLiteral` before the stream. `Some((head, tail))` builds the `failed_extra` `NonEmpty` without an index.
 
-`""` and `"   "` are `ChunkedRoot(None)`. `"\n\n"` is one chunk of line breaks, `EmptyLiteral`, `None`. `",entrypoint Query.foo"` skips nothing (comma is not a line break), fails at the comma, `Expected(DECLARATION_KEYWORD, Comma)`.
+`require_end` loses `#[cfg_attr(not(test), expect(dead_code))]`. After skip, a stream at end is `"\n\n"`. `parse_stream` skips again (no-op, already at `field` / `entrypoint`) then spans.
 
-`parse_one_chunk` is `pub(crate)`. The returned `WithSpan` is the whole literal, so a position on a skipped line break or on a consumed keyword of a failed form (`fieldd`) is unmatched on the slot and answers `IsoLiteralSlot`. `item` and `extra` keep the tight spans `parse_one_chunk` assigned.
+`""` and `"   "` are `ChunkedRoot(vec![])`. `"\n\n"` is two `LineBreak` items, `EmptyLiteral`, `None`. `",entrypoint Query.foo"` skips nothing (comma is not a line break), fails at the comma, `Expected(DECLARATION_KEYWORD, Comma)`.
+
+`parse_stream` and `parse_one_chunk` are `pub(crate)`. The returned `WithSpan` is the whole literal, so a position on a skipped line break or on a consumed keyword of a failed form (`fieldd`) is unmatched on the slot and answers `IsoLiteralSlot`. `item` and `extra` keep the tight spans `parse_stream` assigned.
 
 Leftover after a complete declaration is `Slot.extra` plus `report_error(Expected(EndOfDeclaration, found))` at the first leftover item that is not a line break: a trailing comma, a second `field` / `entrypoint`.
 
 ```rust
 // from crates/isograph_parser/src/lib.rs
-pub(crate) use chunk::{chunk, parse_one_chunk, parse_singleton};
+pub(crate) use chunk::{chunk, parse_one_chunk, parse_singleton, parse_stream};
 ```
 
 `parse_iso_literal` still match-brackets, then `chunk`, then this. `comma_errors` still become `ParseError::Comma`; they come from interiors.
@@ -835,13 +895,13 @@ One commit. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 
 `ChunkedRoot`, `ChunkedRootPath`, `ChunkParent`, `ChunkedLevel` parent, `Slot` pins, `UnparsedChunkItemsParent`, `IsoLiteralParse`, `IsographResolutionNode` as above.
 
-Delete `Singleton`, `ExtraChunks`, `ChunkedLevelParent`, `AstError::MultipleDeclarations`. The `ast_error_unit_variants_use_their_messages` arm for `MultipleDeclarations` goes with it.
+Delete `Singleton`, `ExtraChunks`, `ChunkedLevelParent`, `ChunkParent`, `AstError::MultipleDeclarations`. The `ast_error_unit_variants_use_their_messages` arm for `MultipleDeclarations` goes with it.
 
-`lib.rs` `pub use` drops `ExtraChunks`, `Singleton`, `ExtraChunksPath`, `ChunkedLevelParent`. It adds `ChunkedRoot`, `ChunkedRootPath`. `IsoLiteralSlotPath` is deleted; callers use `IsoLiteralParsePath`.
+`lib.rs` `pub use` drops `ExtraChunks`, `Singleton`, `ExtraChunksPath`, `ChunkedLevelParent`, `ChunkParent`. It adds `ChunkedRoot`, `ChunkedRootPath`. `IsoLiteralSlotPath` is deleted; callers use `IsoLiteralParsePath`. `ChunkContentItemParent` gains `Root`.
 
 ### Parse
 
-`skip_line_breaks`, `parse_one_chunk`, `parse_chunked_iso_literal`, and the `parse_*` / `consume_*` listings above.
+`skip_line_breaks`, `parse_stream`, `parse_one_chunk`, `parse_chunked_iso_literal`, and the `parse_*` / `consume_*` listings above.
 
 Helpers in `parse_iso_literal.rs` tests:
 
@@ -852,11 +912,11 @@ Helpers in `parse_iso_literal.rs` tests:
     }
 ```
 
-`chunked` in both test modules returns `WithSpan<ChunkedRoot>`. `stream_of` streams `tree.item.0.as_ref().expect(...).item`.
+`chunked` in both test modules returns `WithSpan<ChunkedRoot>`. `stream_of` is `ChunkStream::new(tree.item.0.as_slice(), text, tokens, errors)`. Change 1's interior fixtures that indexed `tree.item.0[0]` as a root chunk become `as_group(&tree.item.0[0].item)` for `{ ... }` at the root.
 
 ### Chunk tests, after
 
-`whitespace_only_and_empty_literals_are_empty_levels`: `""` and `"   "` have `tree.item.0` `None`. `"\n\n"` has `Some` whose contents are two `LineBreak` tokens. Span is still the whole literal.
+`whitespace_only_and_empty_literals_are_empty_levels`: `""` and `"   "` have `tree.item.0` empty. `"\n\n"` has two `LineBreak` items. Span is still the whole literal.
 
 `a_line_break_before_a_group_keeps_the_group_in_the_root_chunk`:
 
@@ -865,35 +925,33 @@ Helpers in `parse_iso_literal.rs` tests:
     fn a_line_break_before_a_group_keeps_the_group_in_the_root_chunk() {
         let text = "foo\n{ bar }";
         let tree = chunked(text);
-        let root = tree.item.0.as_ref().expect("foo, line break, and the group");
-        assert_eq!(root.item.contents.len(), 3);
-        assert!(root.item.trailing_separator.is_none());
-        as_non_bracket(content_item(root.item.reference(), 0));
+        assert_eq!(tree.item.0.len(), 3);
+        as_non_bracket(&tree.item.0[0].item);
         assert_eq!(
-            as_non_bracket(content_item(root.item.reference(), 1)).0,
+            as_non_bracket(&tree.item.0[1].item).0,
             NonBracketTokenKind::LineBreak
         );
-        as_group(content_item(root.item.reference(), 2));
+        as_group(&tree.item.0[2].item);
     }
 ```
 
-`commas_and_line_breaks_are_equivalent_separators` at the root: `"a, b"` is one chunk, comma is content; `"a\nb"` is one chunk, identifier, line break, identifier. Interior equivalence is change 1.
+`commas_and_line_breaks_are_equivalent_separators` at the root: `"a, b"` is identifier, comma, identifier; `"a\nb"` is identifier, line break, identifier. Neither is two chunks. Interior equivalence is change 1.
 
-`captured_line_breaks_make_no_chunk` at the root: `"\n\na, b\n"` is one chunk of leading line breaks, `a`, comma, `b`, trailing line break. Interior `"foo {\n bar\n}"` is unchanged (the `{` still captures the interior leading newline).
+`captured_line_breaks_make_no_chunk` at the root: `"\n\na, b\n"` is leading line breaks, `a`, comma, `b`, trailing line break, one vec. Interior `"foo {\n bar\n}"` is unchanged (the `{` still captures the interior leading newline).
 
-Root comma-without-item tests (`"\n, a"`, `"a,\n\n,b"`, `"a,,\nb"`, `",,a"`, `"a, ,"`): no `CommaWithoutItem`. The commas and line breaks are content of the one root chunk. Interior twins from change 1 keep the errors.
+Root comma-without-item tests (`"\n, a"`, `"a,\n\n,b"`, `"a,,\nb"`, `",,a"`, `"a, ,"`): no `CommaWithoutItem`. The commas and line breaks are content of the root vec. Interior twins from change 1 keep the errors.
 
-`contents_span_stops_at_the_last_content_item` for `"foo,"`: contents include the comma, `contents_span` is `foo,`, `boundary_comma()` is `None`.
+`contents_span_stops_at_the_last_content_item` is a `Chunk` method. It still applies to interior chunks (`{ foo, }`'s `foo,`). At the root, `"foo,"` is two content items, no `trailing_separator`.
 
-`a_chunk_without_a_comma_has_no_boundary_comma` for `"foo\nbar"`: one chunk, identifier, line break, identifier.
+`a_chunk_without_a_comma_has_no_boundary_comma` for `"foo\nbar"` at the root is not a chunk. Interior `{ foo\nbar }` still has two chunks and no boundary comma on the second.
 
-`a_captured_line_break_resolves_to_its_level` at offset 0 of `"\nfoo {\n bar }"`: `NonBracketToken` (`LineBreak`) on the root chunk. The `{`'s captured interior newline is still `ChunkedLevel`.
+`a_captured_line_break_resolves_to_its_level` at offset 0 of `"\nfoo {\n bar }"`: `NonBracketToken` (`LineBreak`) with parent `ChunkContentItemParent::Root`. The `{`'s captured interior newline is still `ChunkedLevel`.
 
-`whitespace_only_resolves_to_the_root_level`: `"   "` and `""` are `ChunkedRoot`. `"\n"` is the `LineBreak` token.
+`whitespace_only_resolves_to_the_root_level`: `"   "` and `""` are `ChunkedRoot`. `"\n"` is the `LineBreak` token with parent `Root`.
 
 `a_dropped_close_and_the_text_after_it_resolve_to_the_root_level`: `ChunkedRoot`.
 
-Resolve ancestry that matched `ChunkedLevelParent::Root` on the outer level matches `ChunkParent::Root`. `ChunkedLevelParent::Interior(_)` is `ChunkedLevelPath.parent`, a `ChunkedGroupPath`.
+Resolve ancestry that matched `ChunkedLevelParent::Root` matches `ChunkContentItemParent::Root` on a root item, or `ChunkedRoot` on unmatched whitespace. A `Chunk`'s parent is a `ChunkedLevelPath`. `ChunkedLevelParent::Interior(_)` is `ChunkedLevelPath.parent`, a `ChunkedGroupPath`.
 
 ### Grammar tests, after
 
@@ -1173,8 +1231,9 @@ parsing-standards.md:
 - `parse_iso_literal` takes `WithSpan<ChunkedRoot>`.
 - `IsoLiteralParse = Slot<IsoLiteralItem, UnparsedChunkItems>`.
 - Extra leftover is `Slot.extra`. There are no extra chunks on the tree.
+- Chunking partitions a group's interior only. The root is a `Vec<WithSpan<ChunkContentItem>>`.
 - `ItemCursor::skip_line_breaks` consumes `LineBreak` tokens and records nothing. Every `parse_*` / `consume_*` that looks at the next item calls it first. `peek` / `consume_token_if` / `consume_group_if` do not skip. A comma is not skipped.
-- `parse_one_chunk` skips before `spanning` and after `Ok` before leftover. `parse_chunked_iso_literal` skips, then `require_end` is `EmptyLiteral`.
+- `ChunkStream::new` takes a slice. `parse_stream` skips, spans, skips, leftover. `parse_one_chunk` is `parse_stream` plus trailing-separator fold for a real chunk. `parse_chunked_iso_literal` streams the root vec.
 - `parse_singleton` returns `WithSpan<Slot<T, UnparsedChunkItems>>`, one-item `ChunkedLevel` interiors only, extra chunks are `Expected(end, found)` plus leftover recording.
 - Diagnostic: `report_error` in `parse_one_chunk`; `errors.push` in `parse_singleton` (boundary comma, extra type chunks) and `parse_iso_literal` (`EmptyLiteral`).
 - `ChunkedLevelParent` / `ExtraChunks` / `Singleton` / `MultipleDeclarations` listings deleted. `ChunkedRoot` listed.
@@ -1183,6 +1242,6 @@ future-improvements.md, "Line break and comma are the same chunk separator": dro
 
 slot-stages.md `require_complete_literal` is `require_complete(parse)`.
 
-parser-minor-improvements.md `parse_singleton assumes a non-empty level`: still true, still `[...]` and the `len() == 0` check in `parse_bracket_interior_type`. The root empty check is `ChunkedRoot(None)` or a root chunk of only line breaks.
+parser-minor-improvements.md `parse_singleton assumes a non-empty level`: still true, still `[...]` and the `len() == 0` check in `parse_bracket_interior_type`. The root empty check is `split_first` on the root vec, or skip-then-`require_end` for only line breaks.
 
 parsing-notes.md: delete the `parse_iso_literal` / `parse_singleton` nonempty note.
