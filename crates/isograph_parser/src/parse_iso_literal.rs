@@ -9,10 +9,10 @@ use span::{WithSpan, WithSpanPostfix};
 use crate::chunk_stream::ItemCursor;
 use crate::{
     AstError, BracketError, ChunkContentItem, ChunkedLevel, DECLARATION_KEYWORD, Expectation,
-    ExtraChunks, Found, IsographFieldDirectiveList, IsographResolutionNode,
+    ExtraChunks, Found, IsographFieldDirectiveList, IsographResolutionNode, IsographSemanticToken,
     NamedTypeAnnotationPath, NonBracketToken, NonBracketTokenKind, ParseError, SelectionSet,
-    SemanticToken, Singleton, Slot, TypeAnnotation, UnparsedChunkItems, VariableDeclarationList,
-    chunk, consume_directives, consume_selection_set, consume_variable_declaration_list,
+    Singleton, Slot, TypeAnnotation, UnparsedChunkItems, VariableDeclarationList, chunk,
+    consume_directives, consume_selection_set, consume_variable_declaration_list,
     intern_block_string_value, match_brackets, parse_singleton, parse_type_annotation, tokenize,
 };
 
@@ -132,7 +132,7 @@ pub type SelectableNameWrapperPath<'a> =
 pub struct ParsedIsoLiteral {
     pub item: Option<WithSpan<IsoLiteralParse>>,
     pub errors: Vec<WithSpan<ParseError>>,
-    pub tokens: Vec<WithSpan<SemanticToken>>,
+    pub tokens: Vec<WithSpan<IsographSemanticToken>>,
 }
 
 pub fn parse_iso_literal(text: &str) -> ParsedIsoLiteral {
@@ -172,7 +172,7 @@ pub(crate) fn parse_chunked_iso_literal(
     text: &str,
     root: WithSpan<ChunkedLevel>,
     errors: &mut Vec<WithSpan<AstError>>,
-    tokens: &mut Vec<WithSpan<SemanticToken>>,
+    tokens: &mut Vec<WithSpan<IsographSemanticToken>>,
 ) -> Option<WithSpan<IsoLiteralParse>> {
     let location = root.location;
     if root.item.len() == 0 {
@@ -195,7 +195,10 @@ fn parse_iso_literal_item(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<IsoLiteralItem, WithSpan<AstError>> {
     let keyword = cursor
-        .require_token(NonBracketTokenKind::Identifier, SemanticToken::Keyword)
+        .require_token(
+            NonBracketTokenKind::Identifier,
+            IsographSemanticToken::Keyword,
+        )
         .map_err(|()| cursor.expected(DECLARATION_KEYWORD))?;
     match keyword.text() {
         "entrypoint" => IsoLiteralItem::Entrypoint(parse_entrypoint(cursor)?).wrap_ok(),
@@ -213,13 +216,16 @@ fn parse_type_dot_name(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<(WithSpan<EntityNameWrapper>, WithSpan<SelectableName>), WithSpan<AstError>> {
     let parent_type = cursor
-        .require_token(NonBracketTokenKind::Identifier, SemanticToken::Type)
+        .require_token(NonBracketTokenKind::Identifier, IsographSemanticToken::Type)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
     cursor
-        .require_token(NonBracketTokenKind::Period, SemanticToken::Period)
+        .require_token(NonBracketTokenKind::Period, IsographSemanticToken::Period)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Period)))?;
     let name = cursor
-        .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
+        .require_token(
+            NonBracketTokenKind::Identifier,
+            IsographSemanticToken::FieldName,
+        )
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
     (
         parent_type.interned().map(EntityNameWrapper),
@@ -279,16 +285,20 @@ fn consume_to_target(
         return None.wrap_ok();
     }
     cursor
-        .require_token(NonBracketTokenKind::Identifier, SemanticToken::Keyword)
+        .require_token(
+            NonBracketTokenKind::Identifier,
+            IsographSemanticToken::Keyword,
+        )
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
     let target_type = parse_type_annotation(cursor)?;
     target_type.wrap_some().wrap_ok()
 }
 
 pub(crate) fn consume_description(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<Description>> {
-    if let Some(span) =
-        cursor.consume_token_if(NonBracketTokenKind::StringLiteral, SemanticToken::String)
-    {
+    if let Some(span) = cursor.consume_token_if(
+        NonBracketTokenKind::StringLiteral,
+        IsographSemanticToken::String,
+    ) {
         return Description(span.exclude_ends(1).interned().item)
             .with_span(span.location)
             .wrap_some();
@@ -296,7 +306,7 @@ pub(crate) fn consume_description(cursor: &mut ItemCursor<'_>) -> Option<WithSpa
     cursor
         .consume_token_if(
             NonBracketTokenKind::BlockStringLiteral,
-            SemanticToken::String,
+            IsographSemanticToken::String,
         )
         .map(|span| {
             Description(intern_block_string_value(span.exclude_ends(3).text()))
@@ -331,7 +341,7 @@ mod tests {
 
     fn parsed(
         text: &str,
-        expected_tokens: &[(SemanticToken, &str)],
+        expected_tokens: &[(IsographSemanticToken, &str)],
     ) -> (WithSpan<IsoLiteralParse>, Vec<WithSpan<AstError>>) {
         let parsed = parse_iso_literal(text);
         assert_semantic_tokens(text, &parsed.tokens, expected_tokens);
@@ -353,7 +363,7 @@ mod tests {
 
     fn parsed_with_errors(
         text: &str,
-        expected_tokens: &[(SemanticToken, &str)],
+        expected_tokens: &[(IsographSemanticToken, &str)],
     ) -> ParsedIsoLiteral {
         let parsed = parse_iso_literal(text);
         assert_semantic_tokens(text, &parsed.tokens, expected_tokens);
@@ -379,7 +389,7 @@ mod tests {
     fn stream_of<'a>(
         tree: &'a WithSpan<ChunkedLevel>,
         text: &'a str,
-        tokens: &'a mut Vec<WithSpan<SemanticToken>>,
+        tokens: &'a mut Vec<WithSpan<IsographSemanticToken>>,
         errors: &'a mut Vec<WithSpan<AstError>>,
     ) -> crate::chunk_stream::ChunkStream<'a> {
         tree.item.0[0].item.stream(text, tokens, errors)
@@ -456,7 +466,7 @@ mod tests {
         text: &str,
         reason: AstError,
         reason_span: Span,
-        expected_tokens: &[(SemanticToken, &str)],
+        expected_tokens: &[(IsographSemanticToken, &str)],
     ) {
         let (parse, errors) = parsed(text, expected_tokens);
         assert!(
@@ -477,10 +487,10 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "entrypoint"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "foo"),
+                (IsographSemanticToken::Keyword, "entrypoint"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "foo"),
             ],
         );
         let declaration = as_entrypoint(parse.reference());
@@ -508,10 +518,10 @@ mod tests {
             let (parse, errors) = parsed(
                 text,
                 &[
-                    (SemanticToken::Keyword, "entrypoint"),
-                    (SemanticToken::Type, "Query"),
-                    (SemanticToken::Period, "."),
-                    (SemanticToken::FieldName, "foo"),
+                    (IsographSemanticToken::Keyword, "entrypoint"),
+                    (IsographSemanticToken::Type, "Query"),
+                    (IsographSemanticToken::Period, "."),
+                    (IsographSemanticToken::FieldName, "foo"),
                 ],
             );
             let declaration = as_entrypoint(parse.reference());
@@ -564,10 +574,10 @@ mod tests {
             let parsed = parsed_with_errors(
                 text,
                 &[
-                    (SemanticToken::Keyword, "entrypoint"),
-                    (SemanticToken::Type, "Query"),
-                    (SemanticToken::Period, "."),
-                    (SemanticToken::FieldName, "foo"),
+                    (IsographSemanticToken::Keyword, "entrypoint"),
+                    (IsographSemanticToken::Type, "Query"),
+                    (IsographSemanticToken::Period, "."),
+                    (IsographSemanticToken::FieldName, "foo"),
                 ],
             );
             assert!(
@@ -623,10 +633,10 @@ mod tests {
             let parsed = parsed_with_errors(
                 text,
                 &[
-                    (SemanticToken::Keyword, "entrypoint"),
-                    (SemanticToken::Type, "Query"),
-                    (SemanticToken::Period, "."),
-                    (SemanticToken::FieldName, "foo"),
+                    (IsographSemanticToken::Keyword, "entrypoint"),
+                    (IsographSemanticToken::Type, "Query"),
+                    (IsographSemanticToken::Period, "."),
+                    (IsographSemanticToken::FieldName, "foo"),
                 ],
             );
             assert!(
@@ -653,10 +663,10 @@ mod tests {
         let parsed = parsed_with_errors(
             text,
             &[
-                (SemanticToken::Keyword, "entrypoint"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "foo"),
+                (IsographSemanticToken::Keyword, "entrypoint"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "foo"),
             ],
         );
         assert!(parsed.item.is_some());
@@ -676,11 +686,11 @@ mod tests {
             let (parse, errors) = parsed(
                 text,
                 &[
-                    (SemanticToken::Keyword, "entrypoint"),
-                    (SemanticToken::Type, "Query"),
-                    (SemanticToken::Period, "."),
-                    (SemanticToken::FieldName, "foo"),
-                    (SemanticToken::Content, ","),
+                    (IsographSemanticToken::Keyword, "entrypoint"),
+                    (IsographSemanticToken::Type, "Query"),
+                    (IsographSemanticToken::Period, "."),
+                    (IsographSemanticToken::FieldName, "foo"),
+                    (IsographSemanticToken::Content, ","),
                 ],
             );
             as_entrypoint(parse.reference());
@@ -700,15 +710,15 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "entrypoint"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "foo"),
-                (SemanticToken::Content, ","),
-                (SemanticToken::Content, "field"),
-                (SemanticToken::Content, "User"),
-                (SemanticToken::Content, "."),
-                (SemanticToken::Content, "name"),
+                (IsographSemanticToken::Keyword, "entrypoint"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "foo"),
+                (IsographSemanticToken::Content, ","),
+                (IsographSemanticToken::Content, "field"),
+                (IsographSemanticToken::Content, "User"),
+                (IsographSemanticToken::Content, "."),
+                (IsographSemanticToken::Content, "name"),
             ],
         );
         assert_eq!(
@@ -731,14 +741,14 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "entrypoint"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "foo"),
-                (SemanticToken::Content, "field"),
-                (SemanticToken::Content, "User"),
-                (SemanticToken::Content, "."),
-                (SemanticToken::Content, "name"),
+                (IsographSemanticToken::Keyword, "entrypoint"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "foo"),
+                (IsographSemanticToken::Content, "field"),
+                (IsographSemanticToken::Content, "User"),
+                (IsographSemanticToken::Content, "."),
+                (IsographSemanticToken::Content, "name"),
             ],
         );
         assert_eq!(
@@ -761,10 +771,10 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "entrypoint"),
-                (SemanticToken::Content, "Query"),
-                (SemanticToken::Content, "."),
-                (SemanticToken::Content, "foo"),
+                (IsographSemanticToken::Keyword, "entrypoint"),
+                (IsographSemanticToken::Content, "Query"),
+                (IsographSemanticToken::Content, "."),
+                (IsographSemanticToken::Content, "foo"),
             ],
         );
         assert!(parsed_item(parse.reference()).is_none());
@@ -788,13 +798,13 @@ mod tests {
             expected(DECLARATION_KEYWORD, Found::Token(Identifier)),
             span_of(text, "fieldd"),
             &[
-                (SemanticToken::Keyword, "fieldd"),
-                (SemanticToken::Content, "Query"),
-                (SemanticToken::Content, "."),
-                (SemanticToken::Content, "foo"),
-                (SemanticToken::Bracket, "{"),
-                (SemanticToken::Content, "bar"),
-                (SemanticToken::Bracket, "}"),
+                (IsographSemanticToken::Keyword, "fieldd"),
+                (IsographSemanticToken::Content, "Query"),
+                (IsographSemanticToken::Content, "."),
+                (IsographSemanticToken::Content, "foo"),
+                (IsographSemanticToken::Bracket, "{"),
+                (IsographSemanticToken::Content, "bar"),
+                (IsographSemanticToken::Bracket, "}"),
             ],
         );
     }
@@ -807,9 +817,9 @@ mod tests {
             expected(DECLARATION_KEYWORD, Found::Group(BracketKind::Brace)),
             span_of(text, "{ bar }"),
             &[
-                (SemanticToken::Bracket, "{"),
-                (SemanticToken::Content, "bar"),
-                (SemanticToken::Bracket, "}"),
+                (IsographSemanticToken::Bracket, "{"),
+                (IsographSemanticToken::Content, "bar"),
+                (IsographSemanticToken::Bracket, "}"),
             ],
         );
     }
@@ -822,15 +832,15 @@ mod tests {
             expected(DECLARATION_KEYWORD, Found::Token(Identifier)),
             span_of(text, "pointer"),
             &[
-                (SemanticToken::Keyword, "pointer"),
-                (SemanticToken::Content, "Pet"),
-                (SemanticToken::Content, "."),
-                (SemanticToken::Content, "BestFriend"),
-                (SemanticToken::Content, "to"),
-                (SemanticToken::Content, "Owner"),
-                (SemanticToken::Bracket, "{"),
-                (SemanticToken::Content, "id"),
-                (SemanticToken::Bracket, "}"),
+                (IsographSemanticToken::Keyword, "pointer"),
+                (IsographSemanticToken::Content, "Pet"),
+                (IsographSemanticToken::Content, "."),
+                (IsographSemanticToken::Content, "BestFriend"),
+                (IsographSemanticToken::Content, "to"),
+                (IsographSemanticToken::Content, "Owner"),
+                (IsographSemanticToken::Bracket, "{"),
+                (IsographSemanticToken::Content, "id"),
+                (IsographSemanticToken::Bracket, "}"),
             ],
         );
     }
@@ -843,7 +853,7 @@ mod tests {
             bare,
             expected(token(Identifier), Found::EndOfChunk),
             Span::new(keyword_end, keyword_end),
-            &[(SemanticToken::Keyword, "entrypoint")],
+            &[(IsographSemanticToken::Keyword, "entrypoint")],
         );
 
         let numeric = "entrypoint 42.foo";
@@ -855,9 +865,9 @@ mod tests {
             ),
             span_of(numeric, "42."),
             &[
-                (SemanticToken::Keyword, "entrypoint"),
-                (SemanticToken::Content, "42."),
-                (SemanticToken::Content, "foo"),
+                (IsographSemanticToken::Keyword, "entrypoint"),
+                (IsographSemanticToken::Content, "42."),
+                (IsographSemanticToken::Content, "foo"),
             ],
         );
 
@@ -867,9 +877,9 @@ mod tests {
             expected(token(Period), Found::Token(Identifier)),
             span_of(dotless, "foo"),
             &[
-                (SemanticToken::Keyword, "entrypoint"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Content, "foo"),
+                (IsographSemanticToken::Keyword, "entrypoint"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Content, "foo"),
             ],
         );
 
@@ -880,9 +890,9 @@ mod tests {
             expected(token(Identifier), Found::EndOfChunk),
             Span::new(dot_end, dot_end),
             &[
-                (SemanticToken::Keyword, "entrypoint"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
+                (IsographSemanticToken::Keyword, "entrypoint"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
             ],
         );
     }
@@ -893,11 +903,11 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "entrypoint"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "foo"),
-                (SemanticToken::Content, ","),
+                (IsographSemanticToken::Keyword, "entrypoint"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "foo"),
+                (IsographSemanticToken::Content, ","),
             ],
         );
         as_entrypoint(parse.reference());
@@ -920,9 +930,9 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "entrypoint"),
-                (SemanticToken::Content, "$"),
-                (SemanticToken::Content, "$"),
+                (IsographSemanticToken::Keyword, "entrypoint"),
+                (IsographSemanticToken::Content, "$"),
+                (IsographSemanticToken::Content, "$"),
             ],
         );
         assert!(parsed_item(parse.reference()).is_none());
@@ -944,12 +954,12 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "entrypoint"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "foo"),
-                (SemanticToken::Content, "bar"),
-                (SemanticToken::Content, ","),
+                (IsographSemanticToken::Keyword, "entrypoint"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "foo"),
+                (IsographSemanticToken::Content, "bar"),
+                (IsographSemanticToken::Content, ","),
             ],
         );
         as_entrypoint(parse.reference());
@@ -974,9 +984,9 @@ mod tests {
         let (parse, _) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "entrypoint"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
+                (IsographSemanticToken::Keyword, "entrypoint"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
             ],
         );
         assert!(parsed_item(parse.reference()).is_none());
@@ -993,11 +1003,11 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "entrypoint"),
-                (SemanticToken::Type, "Foo"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::Content, "$"),
-                (SemanticToken::Content, "asdf"),
+                (IsographSemanticToken::Keyword, "entrypoint"),
+                (IsographSemanticToken::Type, "Foo"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::Content, "$"),
+                (IsographSemanticToken::Content, "asdf"),
             ],
         );
         assert!(parsed_item(parse.reference()).is_none());
@@ -1018,11 +1028,11 @@ mod tests {
         let (parse, _) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "entrypoint"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "foo"),
-                (SemanticToken::Content, ","),
+                (IsographSemanticToken::Keyword, "entrypoint"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "foo"),
+                (IsographSemanticToken::Content, ","),
             ],
         );
         match parse.resolve((), span_of(text, ",")) {
@@ -1037,11 +1047,11 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "entrypoint"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "foo"),
-                (SemanticToken::Content, "bar"),
+                (IsographSemanticToken::Keyword, "entrypoint"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "foo"),
+                (IsographSemanticToken::Content, "bar"),
             ],
         );
         as_entrypoint(parse.reference());
@@ -1061,13 +1071,13 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "entrypoint"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "foo"),
-                (SemanticToken::Bracket, "{"),
-                (SemanticToken::Content, "bar"),
-                (SemanticToken::Bracket, "}"),
+                (IsographSemanticToken::Keyword, "entrypoint"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "foo"),
+                (IsographSemanticToken::Bracket, "{"),
+                (IsographSemanticToken::Content, "bar"),
+                (IsographSemanticToken::Bracket, "}"),
             ],
         );
         as_entrypoint(parse.reference());
@@ -1085,12 +1095,12 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "entrypoint"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "foo"),
-                (SemanticToken::DirectiveName, "@"),
-                (SemanticToken::DirectiveName, "lazyLoad"),
+                (IsographSemanticToken::Keyword, "entrypoint"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "foo"),
+                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::DirectiveName, "lazyLoad"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -1113,22 +1123,22 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "id"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::GraphQLTypeName, "ID"),
-                (SemanticToken::Parenthesis, ")"),
-                (SemanticToken::DirectiveName, "@"),
-                (SemanticToken::DirectiveName, "component"),
-                (SemanticToken::String, "\"the route\""),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "id"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::GraphQLTypeName, "ID"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::DirectiveName, "component"),
+                (IsographSemanticToken::String, "\"the route\""),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -1151,18 +1161,18 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Pet"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "BestFriend"),
-                (SemanticToken::Keyword, "to"),
-                (SemanticToken::GraphQLTypeName, "Owner"),
-                (SemanticToken::DirectiveName, "@"),
-                (SemanticToken::DirectiveName, "updatable"),
-                (SemanticToken::String, "\"x\""),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "id"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Pet"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "BestFriend"),
+                (IsographSemanticToken::Keyword, "to"),
+                (IsographSemanticToken::GraphQLTypeName, "Owner"),
+                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::DirectiveName, "updatable"),
+                (IsographSemanticToken::String, "\"x\""),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "id"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -1185,20 +1195,20 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::DirectiveName, "@"),
-                (SemanticToken::DirectiveName, "loadable"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Argument, "lazyLoadArtifact"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::BooleanOrNull, "true"),
-                (SemanticToken::Parenthesis, ")"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::DirectiveName, "loadable"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Argument, "lazyLoadArtifact"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::BooleanOrNull, "true"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -1229,17 +1239,17 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::DirectiveName, "@"),
-                (SemanticToken::DirectiveName, "loadable"),
-                (SemanticToken::DirectiveName, "@"),
-                (SemanticToken::DirectiveName, "updatable"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::DirectiveName, "loadable"),
+                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::DirectiveName, "updatable"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -1261,15 +1271,15 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Content, "@"),
-                (SemanticToken::Content, "loadable"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Content, "@"),
+                (IsographSemanticToken::Content, "loadable"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         let items = selections(selection_set_of(as_selectable(parse.reference())));
@@ -1292,12 +1302,12 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "entrypoint"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "foo"),
-                (SemanticToken::DirectiveName, "@"),
-                (SemanticToken::DirectiveName, "notARealDirective"),
+                (IsographSemanticToken::Keyword, "entrypoint"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "foo"),
+                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::DirectiveName, "notARealDirective"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -1324,11 +1334,11 @@ mod tests {
             expected(Expectation::Token(Identifier), Found::EndOfChunk),
             Span::new(end, end),
             &[
-                (SemanticToken::Keyword, "entrypoint"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "foo"),
-                (SemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::Keyword, "entrypoint"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "foo"),
+                (IsographSemanticToken::DirectiveName, "@"),
             ],
         );
     }
@@ -1339,15 +1349,15 @@ mod tests {
         let (parse, _) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::DirectiveName, "@"),
-                (SemanticToken::DirectiveName, "loadable"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::DirectiveName, "loadable"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         match parse.resolve((), span_of(text, "loadable")) {
@@ -1371,11 +1381,11 @@ mod tests {
         let (parse, _) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "entrypoint"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "foo"),
-                (SemanticToken::Content, "bar"),
+                (IsographSemanticToken::Keyword, "entrypoint"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "foo"),
+                (IsographSemanticToken::Content, "bar"),
             ],
         );
         match parse.resolve((), span_of(text, "bar")) {
@@ -1390,11 +1400,11 @@ mod tests {
         let (parse, _) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "entrypoint"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "foo"),
-                (SemanticToken::Content, "bar"),
+                (IsographSemanticToken::Keyword, "entrypoint"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "foo"),
+                (IsographSemanticToken::Content, "bar"),
             ],
         );
         let gap = Span::new(span_of(text, "foo").end, span_of(text, "bar").start);
@@ -1413,10 +1423,10 @@ mod tests {
         let (parse, _) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "entrypoint"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "foo"),
+                (IsographSemanticToken::Keyword, "entrypoint"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "foo"),
             ],
         );
         match parse.resolve((), span_of(text, "Query")) {
@@ -1454,13 +1464,13 @@ mod tests {
         let (parse, _) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "fieldd"),
-                (SemanticToken::Content, "Query"),
-                (SemanticToken::Content, "."),
-                (SemanticToken::Content, "foo"),
-                (SemanticToken::Bracket, "{"),
-                (SemanticToken::Content, "bar"),
-                (SemanticToken::Bracket, "}"),
+                (IsographSemanticToken::Keyword, "fieldd"),
+                (IsographSemanticToken::Content, "Query"),
+                (IsographSemanticToken::Content, "."),
+                (IsographSemanticToken::Content, "foo"),
+                (IsographSemanticToken::Bracket, "{"),
+                (IsographSemanticToken::Content, "bar"),
+                (IsographSemanticToken::Bracket, "}"),
             ],
         );
         match parse.resolve((), span_of(text, "bar")) {
@@ -1477,13 +1487,13 @@ mod tests {
         let (parse, _) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "fieldd"),
-                (SemanticToken::Content, "Query"),
-                (SemanticToken::Content, "."),
-                (SemanticToken::Content, "foo"),
-                (SemanticToken::Bracket, "{"),
-                (SemanticToken::Content, "bar"),
-                (SemanticToken::Bracket, "}"),
+                (IsographSemanticToken::Keyword, "fieldd"),
+                (IsographSemanticToken::Content, "Query"),
+                (IsographSemanticToken::Content, "."),
+                (IsographSemanticToken::Content, "foo"),
+                (IsographSemanticToken::Bracket, "{"),
+                (IsographSemanticToken::Content, "bar"),
+                (IsographSemanticToken::Bracket, "}"),
             ],
         );
         match parse.resolve((), span_of(text, "fieldd")) {
@@ -1498,14 +1508,14 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::FieldName, "baz"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::FieldName, "baz"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         let declaration = as_selectable(parse.reference());
@@ -1551,12 +1561,12 @@ mod tests {
             let (parse, errors) = parsed(
                 text,
                 &[
-                    (SemanticToken::Keyword, "field"),
-                    (SemanticToken::Type, "Query"),
-                    (SemanticToken::Period, "."),
-                    (SemanticToken::FieldName, "Foo"),
-                    (SemanticToken::Brace, "{"),
-                    (SemanticToken::Brace, "}"),
+                    (IsographSemanticToken::Keyword, "field"),
+                    (IsographSemanticToken::Type, "Query"),
+                    (IsographSemanticToken::Period, "."),
+                    (IsographSemanticToken::FieldName, "Foo"),
+                    (IsographSemanticToken::Brace, "{"),
+                    (IsographSemanticToken::Brace, "}"),
                 ],
             );
             assert_eq!(
@@ -1574,10 +1584,10 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -1590,13 +1600,13 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Bracket, "{"),
-                (SemanticToken::Content, "bar"),
-                (SemanticToken::Bracket, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Bracket, "{"),
+                (IsographSemanticToken::Content, "bar"),
+                (IsographSemanticToken::Bracket, "}"),
             ],
         );
         assert_eq!(as_selectable(parse.reference()).selection_set, None);
@@ -1615,14 +1625,14 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
-                (SemanticToken::Content, ","),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
+                (IsographSemanticToken::Content, ","),
             ],
         );
         as_selectable(parse.reference());
@@ -1640,14 +1650,14 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
-                (SemanticToken::Content, "junk"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
+                (IsographSemanticToken::Content, "junk"),
             ],
         );
         as_selectable(parse.reference());
@@ -1666,13 +1676,13 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -1685,14 +1695,14 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::String, "\"the home route\""),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::String, "\"the home route\""),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -1713,14 +1723,17 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::String, "\"\"\"\n  the home\n  route\n\"\"\""),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (
+                    IsographSemanticToken::String,
+                    "\"\"\"\n  the home\n  route\n\"\"\"",
+                ),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -1742,14 +1755,14 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
-                (SemanticToken::String, "\"too late\""),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
+                (IsographSemanticToken::String, "\"too late\""),
             ],
         );
         as_selectable(parse.reference());
@@ -1771,11 +1784,11 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "entrypoint"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "foo"),
-                (SemanticToken::String, "\"nope\""),
+                (IsographSemanticToken::Keyword, "entrypoint"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "foo"),
+                (IsographSemanticToken::String, "\"nope\""),
             ],
         );
         as_entrypoint(parse.reference());
@@ -1796,11 +1809,11 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::String, "\"the home route\""),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::String, "\"the home route\""),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -1815,13 +1828,13 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -1906,15 +1919,15 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Pet"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "BestFriend"),
-                (SemanticToken::Keyword, "to"),
-                (SemanticToken::GraphQLTypeName, "Owner"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "id"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Pet"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "BestFriend"),
+                (IsographSemanticToken::Keyword, "to"),
+                (IsographSemanticToken::GraphQLTypeName, "Owner"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "id"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -1956,22 +1969,22 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Pet"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Owner"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "limit"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::GraphQLTypeName, "Int"),
-                (SemanticToken::Parenthesis, ")"),
-                (SemanticToken::Keyword, "to"),
-                (SemanticToken::GraphQLTypeName, "Person"),
-                (SemanticToken::String, "\"the owner\""),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "name"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Pet"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Owner"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "limit"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::GraphQLTypeName, "Int"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Keyword, "to"),
+                (IsographSemanticToken::GraphQLTypeName, "Person"),
+                (IsographSemanticToken::String, "\"the owner\""),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "name"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -1997,47 +2010,47 @@ mod tests {
             ("field Query.Foo to [Pet!]! { id }", "[Pet!]"),
             ("field Query.Foo to [[Pet]] { id }", "[[Pet]]"),
         ] {
-            let expected_tokens: &[(SemanticToken, &str)] = if text.contains("[[") {
+            let expected_tokens: &[(IsographSemanticToken, &str)] = if text.contains("[[") {
                 &[
-                    (SemanticToken::Keyword, "field"),
-                    (SemanticToken::Type, "Query"),
-                    (SemanticToken::Period, "."),
-                    (SemanticToken::FieldName, "Foo"),
-                    (SemanticToken::Keyword, "to"),
-                    (SemanticToken::GraphQLTypeName, "["),
-                    (SemanticToken::GraphQLTypeName, "["),
-                    (SemanticToken::GraphQLTypeName, "Pet"),
-                    (SemanticToken::GraphQLTypeName, "]"),
-                    (SemanticToken::GraphQLTypeName, "]"),
-                    (SemanticToken::Brace, "{"),
-                    (SemanticToken::FieldName, "id"),
-                    (SemanticToken::Brace, "}"),
+                    (IsographSemanticToken::Keyword, "field"),
+                    (IsographSemanticToken::Type, "Query"),
+                    (IsographSemanticToken::Period, "."),
+                    (IsographSemanticToken::FieldName, "Foo"),
+                    (IsographSemanticToken::Keyword, "to"),
+                    (IsographSemanticToken::GraphQLTypeName, "["),
+                    (IsographSemanticToken::GraphQLTypeName, "["),
+                    (IsographSemanticToken::GraphQLTypeName, "Pet"),
+                    (IsographSemanticToken::GraphQLTypeName, "]"),
+                    (IsographSemanticToken::GraphQLTypeName, "]"),
+                    (IsographSemanticToken::Brace, "{"),
+                    (IsographSemanticToken::FieldName, "id"),
+                    (IsographSemanticToken::Brace, "}"),
                 ]
             } else if text.contains('[') {
                 &[
-                    (SemanticToken::Keyword, "field"),
-                    (SemanticToken::Type, "Query"),
-                    (SemanticToken::Period, "."),
-                    (SemanticToken::FieldName, "Foo"),
-                    (SemanticToken::Keyword, "to"),
-                    (SemanticToken::GraphQLTypeName, "["),
-                    (SemanticToken::GraphQLTypeName, "Pet"),
-                    (SemanticToken::GraphQLTypeName, "]"),
-                    (SemanticToken::Brace, "{"),
-                    (SemanticToken::FieldName, "id"),
-                    (SemanticToken::Brace, "}"),
+                    (IsographSemanticToken::Keyword, "field"),
+                    (IsographSemanticToken::Type, "Query"),
+                    (IsographSemanticToken::Period, "."),
+                    (IsographSemanticToken::FieldName, "Foo"),
+                    (IsographSemanticToken::Keyword, "to"),
+                    (IsographSemanticToken::GraphQLTypeName, "["),
+                    (IsographSemanticToken::GraphQLTypeName, "Pet"),
+                    (IsographSemanticToken::GraphQLTypeName, "]"),
+                    (IsographSemanticToken::Brace, "{"),
+                    (IsographSemanticToken::FieldName, "id"),
+                    (IsographSemanticToken::Brace, "}"),
                 ]
             } else {
                 &[
-                    (SemanticToken::Keyword, "field"),
-                    (SemanticToken::Type, "Query"),
-                    (SemanticToken::Period, "."),
-                    (SemanticToken::FieldName, "Foo"),
-                    (SemanticToken::Keyword, "to"),
-                    (SemanticToken::GraphQLTypeName, "Pet"),
-                    (SemanticToken::Brace, "{"),
-                    (SemanticToken::FieldName, "id"),
-                    (SemanticToken::Brace, "}"),
+                    (IsographSemanticToken::Keyword, "field"),
+                    (IsographSemanticToken::Type, "Query"),
+                    (IsographSemanticToken::Period, "."),
+                    (IsographSemanticToken::FieldName, "Foo"),
+                    (IsographSemanticToken::Keyword, "to"),
+                    (IsographSemanticToken::GraphQLTypeName, "Pet"),
+                    (IsographSemanticToken::Brace, "{"),
+                    (IsographSemanticToken::FieldName, "id"),
+                    (IsographSemanticToken::Brace, "}"),
                 ]
             };
             let (parse, errors) = parsed(text, expected_tokens);
@@ -2060,17 +2073,17 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Friends"),
-                (SemanticToken::Keyword, "to"),
-                (SemanticToken::GraphQLTypeName, "["),
-                (SemanticToken::GraphQLTypeName, "Pet"),
-                (SemanticToken::GraphQLTypeName, "]"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "id"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Friends"),
+                (IsographSemanticToken::Keyword, "to"),
+                (IsographSemanticToken::GraphQLTypeName, "["),
+                (IsographSemanticToken::GraphQLTypeName, "Pet"),
+                (IsographSemanticToken::GraphQLTypeName, "]"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "id"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -2099,15 +2112,15 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Keyword, "to"),
-                (SemanticToken::GraphQLTypeName, "Pet"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "id"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Keyword, "to"),
+                (IsographSemanticToken::GraphQLTypeName, "Pet"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "id"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -2142,15 +2155,15 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Keyword, "to"),
-                (SemanticToken::GraphQLTypeName, "Pet"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "id"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Keyword, "to"),
+                (IsographSemanticToken::GraphQLTypeName, "Pet"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "id"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -2173,17 +2186,17 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Keyword, "to"),
-                (SemanticToken::GraphQLTypeName, "["),
-                (SemanticToken::GraphQLTypeName, "Pet"),
-                (SemanticToken::GraphQLTypeName, "]"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "id"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Keyword, "to"),
+                (IsographSemanticToken::GraphQLTypeName, "["),
+                (IsographSemanticToken::GraphQLTypeName, "Pet"),
+                (IsographSemanticToken::GraphQLTypeName, "]"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "id"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -2228,17 +2241,17 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Keyword, "to"),
-                (SemanticToken::GraphQLTypeName, "["),
-                (SemanticToken::GraphQLTypeName, "Pet"),
-                (SemanticToken::GraphQLTypeName, "]"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "id"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Keyword, "to"),
+                (IsographSemanticToken::GraphQLTypeName, "["),
+                (IsographSemanticToken::GraphQLTypeName, "Pet"),
+                (IsographSemanticToken::GraphQLTypeName, "]"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "id"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -2262,16 +2275,16 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Keyword, "to"),
-                (SemanticToken::GraphQLTypeName, "Pet"),
-                (SemanticToken::Content, "!"),
-                (SemanticToken::Bracket, "{"),
-                (SemanticToken::Content, "id"),
-                (SemanticToken::Bracket, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Keyword, "to"),
+                (IsographSemanticToken::GraphQLTypeName, "Pet"),
+                (IsographSemanticToken::Content, "!"),
+                (IsographSemanticToken::Bracket, "{"),
+                (IsographSemanticToken::Content, "id"),
+                (IsographSemanticToken::Bracket, "}"),
             ],
         );
         as_selectable(parse.reference());
@@ -2296,19 +2309,19 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "x"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::GraphQLTypeName, "ID"),
-                (SemanticToken::Parenthesis, ")"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "x"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::GraphQLTypeName, "ID"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -2333,19 +2346,19 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "x"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::GraphQLTypeName, "ID"),
-                (SemanticToken::Parenthesis, ")"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "x"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::GraphQLTypeName, "ID"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -2362,19 +2375,19 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Keyword, "to"),
-                (SemanticToken::GraphQLTypeName, "["),
-                (SemanticToken::GraphQLTypeName, "["),
-                (SemanticToken::GraphQLTypeName, "Pet"),
-                (SemanticToken::GraphQLTypeName, "]"),
-                (SemanticToken::GraphQLTypeName, "]"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "id"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Keyword, "to"),
+                (IsographSemanticToken::GraphQLTypeName, "["),
+                (IsographSemanticToken::GraphQLTypeName, "["),
+                (IsographSemanticToken::GraphQLTypeName, "Pet"),
+                (IsographSemanticToken::GraphQLTypeName, "]"),
+                (IsographSemanticToken::GraphQLTypeName, "]"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "id"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -2449,17 +2462,17 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Keyword, "to"),
-                (SemanticToken::GraphQLTypeName, "["),
-                (SemanticToken::GraphQLTypeName, "Pet"),
-                (SemanticToken::GraphQLTypeName, "]"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "id"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Keyword, "to"),
+                (IsographSemanticToken::GraphQLTypeName, "["),
+                (IsographSemanticToken::GraphQLTypeName, "Pet"),
+                (IsographSemanticToken::GraphQLTypeName, "]"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "id"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -2493,17 +2506,17 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Keyword, "to"),
-                (SemanticToken::GraphQLTypeName, "["),
-                (SemanticToken::GraphQLTypeName, "Pet"),
-                (SemanticToken::GraphQLTypeName, "]"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "id"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Keyword, "to"),
+                (IsographSemanticToken::GraphQLTypeName, "["),
+                (IsographSemanticToken::GraphQLTypeName, "Pet"),
+                (IsographSemanticToken::GraphQLTypeName, "]"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "id"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -2540,16 +2553,16 @@ mod tests {
             expected(Expectation::TypeAnnotation, Found::EndOfChunk),
             Span::new(interior, interior),
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Keyword, "to"),
-                (SemanticToken::GraphQLTypeName, "["),
-                (SemanticToken::GraphQLTypeName, "]"),
-                (SemanticToken::Bracket, "{"),
-                (SemanticToken::Content, "id"),
-                (SemanticToken::Bracket, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Keyword, "to"),
+                (IsographSemanticToken::GraphQLTypeName, "["),
+                (IsographSemanticToken::GraphQLTypeName, "]"),
+                (IsographSemanticToken::Bracket, "{"),
+                (IsographSemanticToken::Content, "id"),
+                (IsographSemanticToken::Bracket, "}"),
             ],
         );
     }
@@ -2560,14 +2573,14 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Content, "Owner"),
-                (SemanticToken::Bracket, "{"),
-                (SemanticToken::Content, "id"),
-                (SemanticToken::Bracket, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Content, "Owner"),
+                (IsographSemanticToken::Bracket, "{"),
+                (IsographSemanticToken::Content, "id"),
+                (IsographSemanticToken::Bracket, "}"),
             ],
         );
         as_selectable(parse.reference());
@@ -2591,14 +2604,14 @@ mod tests {
             ),
             span_of(text, "{ id }"),
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Pet"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "BestFriend"),
-                (SemanticToken::Keyword, "to"),
-                (SemanticToken::Bracket, "{"),
-                (SemanticToken::Content, "id"),
-                (SemanticToken::Bracket, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Pet"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "BestFriend"),
+                (IsographSemanticToken::Keyword, "to"),
+                (IsographSemanticToken::Bracket, "{"),
+                (IsographSemanticToken::Content, "id"),
+                (IsographSemanticToken::Bracket, "}"),
             ],
         );
     }
@@ -2612,11 +2625,11 @@ mod tests {
             expected(Expectation::TypeAnnotation, Found::EndOfChunk),
             Span::new(end, end),
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Pet"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "BestFriend"),
-                (SemanticToken::Keyword, "to"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Pet"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "BestFriend"),
+                (IsographSemanticToken::Keyword, "to"),
             ],
         );
     }
@@ -2627,16 +2640,16 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::String, "\"x\""),
-                (SemanticToken::Content, "to"),
-                (SemanticToken::Content, "Owner"),
-                (SemanticToken::Bracket, "{"),
-                (SemanticToken::Content, "id"),
-                (SemanticToken::Bracket, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::String, "\"x\""),
+                (IsographSemanticToken::Content, "to"),
+                (IsographSemanticToken::Content, "Owner"),
+                (IsographSemanticToken::Bracket, "{"),
+                (IsographSemanticToken::Content, "id"),
+                (IsographSemanticToken::Bracket, "}"),
             ],
         );
         let declaration = as_selectable(parse.reference());
@@ -2656,16 +2669,16 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Pet"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "BestFriend"),
-                (SemanticToken::Keyword, "to"),
-                (SemanticToken::GraphQLTypeName, "Owner"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "id"),
-                (SemanticToken::Brace, "}"),
-                (SemanticToken::Content, ","),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Pet"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "BestFriend"),
+                (IsographSemanticToken::Keyword, "to"),
+                (IsographSemanticToken::GraphQLTypeName, "Owner"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "id"),
+                (IsographSemanticToken::Brace, "}"),
+                (IsographSemanticToken::Content, ","),
             ],
         );
         as_selectable(parse.reference());
@@ -2683,15 +2696,15 @@ mod tests {
         let (parse, _) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Pet"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "BestFriend"),
-                (SemanticToken::Keyword, "to"),
-                (SemanticToken::GraphQLTypeName, "Owner"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "id"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Pet"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "BestFriend"),
+                (IsographSemanticToken::Keyword, "to"),
+                (IsographSemanticToken::GraphQLTypeName, "Owner"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "id"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         match parse.resolve((), span_of(text, "to")) {
@@ -2752,14 +2765,14 @@ mod tests {
         let (parse, _) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::String, "\"the home route\""),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::String, "\"the home route\""),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         match parse.resolve((), span_of(text, "home")) {
@@ -2776,16 +2789,16 @@ mod tests {
         let (parse, _) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "pet"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "name"),
-                (SemanticToken::Brace, "}"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "pet"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "name"),
+                (IsographSemanticToken::Brace, "}"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         match parse.resolve((), span_of(text, "name")) {
@@ -2813,14 +2826,14 @@ mod tests {
         let (parse, _) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Content, "baz"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Content, "baz"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         match parse.resolve((), span_of(text, "baz")) {
@@ -2839,13 +2852,13 @@ mod tests {
         let (parse, _) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::Integer, "42"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::Integer, "42"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         match parse.resolve((), span_of(text, "42")) {
@@ -2866,14 +2879,14 @@ mod tests {
         let (parse, _) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::FieldName, "baz"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::FieldName, "baz"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         match parse.resolve((), span_of(text, ",")) {
@@ -2888,19 +2901,19 @@ mod tests {
         let (parse, _) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Argument, "id"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "x"),
-                (SemanticToken::Parenthesis, ")"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Argument, "id"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "x"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         match parse.resolve((), span_of(text, "id")) {
@@ -2931,19 +2944,19 @@ mod tests {
         let (parse, _) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Argument, "id"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "x"),
-                (SemanticToken::Parenthesis, ")"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Argument, "id"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "x"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         match parse.resolve((), span_of(text, "$")) {
@@ -2972,19 +2985,19 @@ mod tests {
         let (parse, _) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "id"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::GraphQLTypeName, "ID"),
-                (SemanticToken::Parenthesis, ")"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "id"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::GraphQLTypeName, "ID"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         match parse.resolve((), span_of(text, "$")) {
@@ -3020,7 +3033,7 @@ mod tests {
         assert_semantic_tokens(
             text,
             &tokens,
-            &[(SemanticToken::String, "\"the home route\"")],
+            &[(IsographSemanticToken::String, "\"the home route\"")],
         );
     }
 
@@ -3035,7 +3048,7 @@ mod tests {
             consume_description(stream.cursor()).expect("the fixture is a string description");
         assert_eq!(description.location, span_of(text, "\"\""));
         assert_eq!(description.item, Description("".intern().to()));
-        assert_semantic_tokens(text, &tokens, &[(SemanticToken::String, "\"\"")]);
+        assert_semantic_tokens(text, &tokens, &[(IsographSemanticToken::String, "\"\"")]);
     }
 
     #[test]
@@ -3060,7 +3073,10 @@ mod tests {
         assert_semantic_tokens(
             text,
             &tokens,
-            &[(SemanticToken::String, "\"\"\"\n  the home\n  route\n\"\"\"")],
+            &[(
+                IsographSemanticToken::String,
+                "\"\"\"\n  the home\n  route\n\"\"\"",
+            )],
         );
     }
 
@@ -3075,7 +3091,10 @@ mod tests {
         let cursor = stream.cursor();
         assert_eq!(
             cursor
-                .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
+                .consume_token_if(
+                    NonBracketTokenKind::Identifier,
+                    IsographSemanticToken::FieldName
+                )
                 .map(|token| token.location),
             span_of(text, "Foo").wrap_some(),
         );
@@ -3087,7 +3106,10 @@ mod tests {
         );
         assert_eq!(
             cursor
-                .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
+                .consume_token_if(
+                    NonBracketTokenKind::Identifier,
+                    IsographSemanticToken::FieldName
+                )
                 .map(|token| token.location),
             span_of(text, "Bar").wrap_some(),
         );
@@ -3095,9 +3117,12 @@ mod tests {
             text,
             &tokens,
             &[
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::String, "\"\"\"\n  the home\n  route\n\"\"\""),
-                (SemanticToken::FieldName, "Bar"),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (
+                    IsographSemanticToken::String,
+                    "\"\"\"\n  the home\n  route\n\"\"\"",
+                ),
+                (IsographSemanticToken::FieldName, "Bar"),
             ],
         );
     }
@@ -3115,7 +3140,10 @@ mod tests {
         assert_eq!(description.location, span_of(text, "\"hi\""));
         assert_eq!(
             cursor
-                .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
+                .consume_token_if(
+                    NonBracketTokenKind::Identifier,
+                    IsographSemanticToken::FieldName
+                )
                 .map(|token| token.location),
             span_of(text, "Foo").wrap_some(),
         );
@@ -3123,8 +3151,8 @@ mod tests {
             text,
             &tokens,
             &[
-                (SemanticToken::String, "\"hi\""),
-                (SemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::String, "\"hi\""),
+                (IsographSemanticToken::FieldName, "Foo"),
             ],
         );
     }
@@ -3146,11 +3174,14 @@ mod tests {
         assert_eq!(consume_description(cursor), None);
         assert_eq!(
             cursor
-                .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
+                .consume_token_if(
+                    NonBracketTokenKind::Identifier,
+                    IsographSemanticToken::FieldName
+                )
                 .map(|token| token.location),
             span_of(text, "Foo").wrap_some(),
         );
-        assert_semantic_tokens(text, &tokens, &[(SemanticToken::FieldName, "Foo")]);
+        assert_semantic_tokens(text, &tokens, &[(IsographSemanticToken::FieldName, "Foo")]);
     }
 
     #[test]
@@ -3169,14 +3200,17 @@ mod tests {
         assert_eq!(consume_description(cursor), None);
         assert_eq!(
             cursor
-                .consume_group_if(BracketKind::Brace, SemanticToken::Brace, |_, _| ())
+                .consume_group_if(BracketKind::Brace, IsographSemanticToken::Brace, |_, _| ())
                 .map(|group| group.location),
             span_of(text, "{ bar }").wrap_some(),
         );
         assert_semantic_tokens(
             text,
             &tokens,
-            &[(SemanticToken::Brace, "{"), (SemanticToken::Brace, "}")],
+            &[
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::Brace, "}"),
+            ],
         );
     }
 
@@ -3198,12 +3232,16 @@ mod tests {
             cursor
                 .consume_token_if(
                     NonBracketTokenKind::ErrorUnterminatedString,
-                    SemanticToken::Error
+                    IsographSemanticToken::Error
                 )
                 .map(|token| token.location),
             span_of(text, "\"unterminated").wrap_some(),
         );
-        assert_semantic_tokens(text, &tokens, &[(SemanticToken::Error, "\"unterminated")]);
+        assert_semantic_tokens(
+            text,
+            &tokens,
+            &[(IsographSemanticToken::Error, "\"unterminated")],
+        );
     }
 
     #[test]
@@ -3217,7 +3255,11 @@ mod tests {
             .expect("the fixture is a block-string description");
         assert_eq!(description.location, span_of(text, "\"\"\"\"\"\""));
         assert_eq!(description.item, Description("".intern().to()));
-        assert_semantic_tokens(text, &tokens, &[(SemanticToken::String, "\"\"\"\"\"\"")]);
+        assert_semantic_tokens(
+            text,
+            &tokens,
+            &[(IsographSemanticToken::String, "\"\"\"\"\"\"")],
+        );
     }
 
     #[test]
@@ -3226,19 +3268,19 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "PetCheckinListRoute"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "id"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::GraphQLTypeName, "ID"),
-                (SemanticToken::Parenthesis, ")"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "pets"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "PetCheckinListRoute"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "id"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::GraphQLTypeName, "ID"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "pets"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -3266,21 +3308,21 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "pets"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::GraphQLTypeName, "["),
-                (SemanticToken::GraphQLTypeName, "Pet"),
-                (SemanticToken::GraphQLTypeName, "]"),
-                (SemanticToken::Parenthesis, ")"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "pets"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::GraphQLTypeName, "["),
+                (IsographSemanticToken::GraphQLTypeName, "Pet"),
+                (IsographSemanticToken::GraphQLTypeName, "]"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -3306,21 +3348,21 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "limit"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::GraphQLTypeName, "Int"),
-                (SemanticToken::Equals, "="),
-                (SemanticToken::Integer, "10"),
-                (SemanticToken::Parenthesis, ")"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "limit"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::GraphQLTypeName, "Int"),
+                (IsographSemanticToken::Equals, "="),
+                (IsographSemanticToken::Integer, "10"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -3338,22 +3380,22 @@ mod tests {
         let (parse, errors) = parsed(
             shallow,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "limit"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::GraphQLTypeName, "Int"),
-                (SemanticToken::Equals, "="),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "other"),
-                (SemanticToken::Parenthesis, ")"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "limit"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::GraphQLTypeName, "Int"),
+                (IsographSemanticToken::Equals, "="),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "other"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -3368,27 +3410,27 @@ mod tests {
         let (parse, errors) = parsed(
             list,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "ids"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::GraphQLTypeName, "["),
-                (SemanticToken::GraphQLTypeName, "ID"),
-                (SemanticToken::GraphQLTypeName, "]"),
-                (SemanticToken::Equals, "="),
-                (SemanticToken::Bracket, "["),
-                (SemanticToken::Integer, "1"),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "x"),
-                (SemanticToken::Bracket, "]"),
-                (SemanticToken::Parenthesis, ")"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "ids"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::GraphQLTypeName, "["),
+                (IsographSemanticToken::GraphQLTypeName, "ID"),
+                (IsographSemanticToken::GraphQLTypeName, "]"),
+                (IsographSemanticToken::Equals, "="),
+                (IsographSemanticToken::Bracket, "["),
+                (IsographSemanticToken::Integer, "1"),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "x"),
+                (IsographSemanticToken::Bracket, "]"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -3430,26 +3472,26 @@ mod tests {
         let (parse, errors) = parsed(
             deep,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "input"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::GraphQLTypeName, "Input"),
-                (SemanticToken::Equals, "="),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::ObjectKey, "pet"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "pet"),
-                (SemanticToken::Brace, "}"),
-                (SemanticToken::Parenthesis, ")"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "input"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::GraphQLTypeName, "Input"),
+                (IsographSemanticToken::Equals, "="),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::ObjectKey, "pet"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "pet"),
+                (IsographSemanticToken::Brace, "}"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -3470,32 +3512,32 @@ mod tests {
         let (parse, errors) = parsed(
             cross,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "foo"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::GraphQLTypeName, "String"),
-                (SemanticToken::Equals, "="),
-                (SemanticToken::String, "\"foo\""),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "bar"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::GraphQLTypeName, "Input"),
-                (SemanticToken::Equals, "="),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::ObjectKey, "foo"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "foo"),
-                (SemanticToken::Brace, "}"),
-                (SemanticToken::Parenthesis, ")"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "baz"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "foo"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::GraphQLTypeName, "String"),
+                (IsographSemanticToken::Equals, "="),
+                (IsographSemanticToken::String, "\"foo\""),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "bar"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::GraphQLTypeName, "Input"),
+                (IsographSemanticToken::Equals, "="),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::ObjectKey, "foo"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "foo"),
+                (IsographSemanticToken::Brace, "}"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "baz"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -3523,22 +3565,22 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "limit"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::GraphQLTypeName, "Int"),
-                (SemanticToken::Equals, "="),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "other"),
-                (SemanticToken::Parenthesis, ")"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "limit"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::GraphQLTypeName, "Int"),
+                (IsographSemanticToken::Equals, "="),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "other"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -3577,28 +3619,28 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "a"),
-                (SemanticToken::Content, "Int"),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "b"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Content, "id"),
-                (SemanticToken::Content, ":"),
-                (SemanticToken::Content, "ID"),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "c"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::GraphQLTypeName, "Float"),
-                (SemanticToken::Parenthesis, ")"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "a"),
+                (IsographSemanticToken::Content, "Int"),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "b"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Content, "id"),
+                (IsographSemanticToken::Content, ":"),
+                (IsographSemanticToken::Content, "ID"),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "c"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::GraphQLTypeName, "Float"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         let variables = variables_of(parse.reference());
@@ -3619,22 +3661,22 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "pets"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::GraphQLTypeName, "["),
-                (SemanticToken::GraphQLTypeName, "Pet"),
-                (SemanticToken::Content, ","),
-                (SemanticToken::GraphQLTypeName, "]"),
-                (SemanticToken::Parenthesis, ")"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "pets"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::GraphQLTypeName, "["),
+                (IsographSemanticToken::GraphQLTypeName, "Pet"),
+                (IsographSemanticToken::Content, ","),
+                (IsographSemanticToken::GraphQLTypeName, "]"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         as_declared(variables_of(parse.reference()).item.0[0].item.reference());
@@ -3652,22 +3694,22 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "pets"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::GraphQLTypeName, "["),
-                (SemanticToken::GraphQLTypeName, "Pet"),
-                (SemanticToken::Content, "!"),
-                (SemanticToken::GraphQLTypeName, "]"),
-                (SemanticToken::Parenthesis, ")"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "pets"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::GraphQLTypeName, "["),
+                (IsographSemanticToken::GraphQLTypeName, "Pet"),
+                (IsographSemanticToken::Content, "!"),
+                (IsographSemanticToken::GraphQLTypeName, "]"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         let declared = as_declared(variables_of(parse.reference()).item.0[0].item.reference());
@@ -3716,21 +3758,21 @@ mod tests {
         let (parse, _) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "pets"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::GraphQLTypeName, "["),
-                (SemanticToken::GraphQLTypeName, "Pet"),
-                (SemanticToken::GraphQLTypeName, "]"),
-                (SemanticToken::Parenthesis, ")"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "pets"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::GraphQLTypeName, "["),
+                (IsographSemanticToken::GraphQLTypeName, "Pet"),
+                (IsographSemanticToken::GraphQLTypeName, "]"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         match parse.resolve((), span_of(text, "Pet")) {
@@ -3787,19 +3829,19 @@ mod tests {
         let (parse, _) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "id"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::GraphQLTypeName, "ID"),
-                (SemanticToken::Parenthesis, ")"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "id"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::GraphQLTypeName, "ID"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         match parse.resolve((), span_of(text, "!")) {
@@ -3816,15 +3858,15 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Parenthesis, ")"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -3842,12 +3884,12 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Keyword, "to"),
-                (SemanticToken::GraphQLTypeName, "Pet"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Keyword, "to"),
+                (IsographSemanticToken::GraphQLTypeName, "Pet"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -3869,15 +3911,15 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::DirectiveName, "@"),
-                (SemanticToken::DirectiveName, "component"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::DirectiveName, "component"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -3900,24 +3942,24 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Pet"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Owner"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "limit"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::GraphQLTypeName, "Int"),
-                (SemanticToken::Parenthesis, ")"),
-                (SemanticToken::Keyword, "to"),
-                (SemanticToken::GraphQLTypeName, "Person"),
-                (SemanticToken::DirectiveName, "@"),
-                (SemanticToken::DirectiveName, "updatable"),
-                (SemanticToken::String, "\"the owner\""),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "name"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Pet"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Owner"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "limit"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::GraphQLTypeName, "Int"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Keyword, "to"),
+                (IsographSemanticToken::GraphQLTypeName, "Person"),
+                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::DirectiveName, "updatable"),
+                (IsographSemanticToken::String, "\"the owner\""),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "name"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -3935,17 +3977,17 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::DirectiveName, "@"),
-                (SemanticToken::DirectiveName, "a"),
-                (SemanticToken::DirectiveName, "@"),
-                (SemanticToken::DirectiveName, "b"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::DirectiveName, "a"),
+                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::DirectiveName, "b"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -3963,14 +4005,14 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "entrypoint"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "foo"),
-                (SemanticToken::DirectiveName, "@"),
-                (SemanticToken::DirectiveName, "a"),
-                (SemanticToken::DirectiveName, "@"),
-                (SemanticToken::DirectiveName, "b"),
+                (IsographSemanticToken::Keyword, "entrypoint"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "foo"),
+                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::DirectiveName, "a"),
+                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::DirectiveName, "b"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -3987,16 +4029,16 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::String, "\"x\""),
-                (SemanticToken::Content, "@"),
-                (SemanticToken::Content, "component"),
-                (SemanticToken::Bracket, "{"),
-                (SemanticToken::Content, "bar"),
-                (SemanticToken::Bracket, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::String, "\"x\""),
+                (IsographSemanticToken::Content, "@"),
+                (IsographSemanticToken::Content, "component"),
+                (IsographSemanticToken::Bracket, "{"),
+                (IsographSemanticToken::Content, "bar"),
+                (IsographSemanticToken::Bracket, "}"),
             ],
         );
         let declaration = as_selectable(parse.reference());
@@ -4014,17 +4056,17 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::DirectiveName, "@"),
-                (SemanticToken::DirectiveName, "component"),
-                (SemanticToken::Content, "to"),
-                (SemanticToken::Content, "Pet"),
-                (SemanticToken::Bracket, "{"),
-                (SemanticToken::Content, "id"),
-                (SemanticToken::Bracket, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::DirectiveName, "component"),
+                (IsographSemanticToken::Content, "to"),
+                (IsographSemanticToken::Content, "Pet"),
+                (IsographSemanticToken::Bracket, "{"),
+                (IsographSemanticToken::Content, "id"),
+                (IsographSemanticToken::Bracket, "}"),
             ],
         );
         let declaration = as_selectable(parse.reference());
@@ -4042,16 +4084,16 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Parenthesis, ")"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         as_selectable(parse.reference());
@@ -4070,20 +4112,20 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "id"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::GraphQLTypeName, "ID"),
-                (SemanticToken::Equals, "="),
-                (SemanticToken::Parenthesis, ")"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "id"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::GraphQLTypeName, "ID"),
+                (IsographSemanticToken::Equals, "="),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         as_selectable(parse.reference());
@@ -4102,14 +4144,14 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "b"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "b"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         let items = selections(selection_set_of(as_selectable(parse.reference())));
@@ -4127,13 +4169,13 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "to"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "to"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -4150,15 +4192,15 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Keyword, "to"),
-                (SemanticToken::GraphQLTypeName, "to"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Keyword, "to"),
+                (IsographSemanticToken::GraphQLTypeName, "to"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -4197,15 +4239,15 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Content, "TO"),
-                (SemanticToken::Content, "Pet"),
-                (SemanticToken::Bracket, "{"),
-                (SemanticToken::Content, "bar"),
-                (SemanticToken::Bracket, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Content, "TO"),
+                (IsographSemanticToken::Content, "Pet"),
+                (IsographSemanticToken::Bracket, "{"),
+                (IsographSemanticToken::Content, "bar"),
+                (IsographSemanticToken::Bracket, "}"),
             ],
         );
         as_selectable(parse.reference());
@@ -4225,13 +4267,13 @@ mod tests {
             let (parse, errors) = parsed(
                 text.reference(),
                 &[
-                    (SemanticToken::Keyword, "field"),
-                    (SemanticToken::Type, "Query"),
-                    (SemanticToken::Period, "."),
-                    (SemanticToken::FieldName, "Foo"),
-                    (SemanticToken::Brace, "{"),
-                    (SemanticToken::FieldName, name),
-                    (SemanticToken::Brace, "}"),
+                    (IsographSemanticToken::Keyword, "field"),
+                    (IsographSemanticToken::Type, "Query"),
+                    (IsographSemanticToken::Period, "."),
+                    (IsographSemanticToken::FieldName, "Foo"),
+                    (IsographSemanticToken::Brace, "{"),
+                    (IsographSemanticToken::FieldName, name),
+                    (IsographSemanticToken::Brace, "}"),
                 ],
             );
             assert_eq!(errors, vec![], "for literal {text:?}");
@@ -4255,17 +4297,17 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::DirectiveName, "@"),
-                (SemanticToken::DirectiveName, "loadable"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Parenthesis, ")"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::DirectiveName, "loadable"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -4292,26 +4334,26 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "a"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Argument, "id"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "id"),
-                (SemanticToken::Parenthesis, ")"),
-                (SemanticToken::DirectiveName, "@"),
-                (SemanticToken::DirectiveName, "loadable"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "baz"),
-                (SemanticToken::Brace, "}"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "a"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Argument, "id"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "id"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::DirectiveName, "loadable"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "baz"),
+                (IsographSemanticToken::Brace, "}"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -4332,15 +4374,15 @@ mod tests {
         let (parse, _) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::DirectiveName, "@"),
-                (SemanticToken::DirectiveName, "component"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::DirectiveName, "component"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         match parse.resolve((), span_of(text, "component")) {
@@ -4360,16 +4402,16 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "id"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::GraphQLTypeName, "ID"),
-                (SemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "id"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::GraphQLTypeName, "ID"),
+                (IsographSemanticToken::Parenthesis, ")"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -4384,13 +4426,13 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "to"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "to"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -4413,13 +4455,13 @@ mod tests {
             expected(DECLARATION_KEYWORD, Found::Token(Identifier)),
             span_of(text, "FIELD"),
             &[
-                (SemanticToken::Keyword, "FIELD"),
-                (SemanticToken::Content, "Query"),
-                (SemanticToken::Content, "."),
-                (SemanticToken::Content, "Foo"),
-                (SemanticToken::Bracket, "{"),
-                (SemanticToken::Content, "bar"),
-                (SemanticToken::Bracket, "}"),
+                (IsographSemanticToken::Keyword, "FIELD"),
+                (IsographSemanticToken::Content, "Query"),
+                (IsographSemanticToken::Content, "."),
+                (IsographSemanticToken::Content, "Foo"),
+                (IsographSemanticToken::Bracket, "{"),
+                (IsographSemanticToken::Content, "bar"),
+                (IsographSemanticToken::Bracket, "}"),
             ],
         );
     }
@@ -4430,14 +4472,14 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::DirectiveName, "@"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         let items = selections(selection_set_of(as_selectable(parse.reference())));
@@ -4456,17 +4498,17 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "entrypoint"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "foo"),
-                (SemanticToken::DirectiveName, "@"),
-                (SemanticToken::DirectiveName, "lazyLoad"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Argument, "x"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Integer, "1"),
-                (SemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Keyword, "entrypoint"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "foo"),
+                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::DirectiveName, "lazyLoad"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Argument, "x"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Integer, "1"),
+                (IsographSemanticToken::Parenthesis, ")"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -4490,20 +4532,20 @@ mod tests {
         let (parse, errors) = parsed(
             text,
             &[
-                (SemanticToken::Keyword, "field"),
-                (SemanticToken::Type, "Query"),
-                (SemanticToken::Period, "."),
-                (SemanticToken::FieldName, "Foo"),
-                (SemanticToken::DirectiveName, "@"),
-                (SemanticToken::DirectiveName, "component"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Argument, "x"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Integer, "1"),
-                (SemanticToken::Parenthesis, ")"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::DirectiveName, "component"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Argument, "x"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Integer, "1"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);

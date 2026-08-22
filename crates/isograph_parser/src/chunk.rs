@@ -9,10 +9,10 @@ use thiserror::Error;
 use crate::{
     Argument, ArgumentListPath, ArgumentSlotPath, AstError, BracketItem, BracketToken, Bracketed,
     CloseBracket, Expectation, ExtraChunksPath, Found, IsoLiteralItem, IsoLiteralParsePath,
-    IsoLiteralSlotPath, IsographResolutionNode, ListLiteralPath, ListLiteralValue,
-    ListLiteralValueSlotPath, ListTypeAnnotationPath, MatchedBrackets, NonBracketToken,
-    NonBracketTokenKind, ObjectEntry, ObjectEntrySlotPath, ObjectLiteralPath, OpenBracket,
-    Selection, SelectionSetPath, SelectionSlotPath, SemanticToken, SplitToken, VariableDeclaration,
+    IsoLiteralSlotPath, IsographResolutionNode, IsographSemanticToken, ListLiteralPath,
+    ListLiteralValue, ListLiteralValueSlotPath, ListTypeAnnotationPath, MatchedBrackets,
+    NonBracketToken, NonBracketTokenKind, ObjectEntry, ObjectEntrySlotPath, ObjectLiteralPath,
+    OpenBracket, Selection, SelectionSetPath, SelectionSlotPath, SplitToken, VariableDeclaration,
     VariableDeclarationListPath, VariableDeclarationSlotPath,
     chunk_stream::{ChunkStream, ItemCursor},
     leftover_token,
@@ -130,7 +130,7 @@ impl Chunk {
     pub(crate) fn stream<'a>(
         &'a self,
         text: &'a str,
-        tokens: &'a mut Vec<WithSpan<SemanticToken>>,
+        tokens: &'a mut Vec<WithSpan<IsographSemanticToken>>,
         errors: &'a mut Vec<WithSpan<AstError>>,
     ) -> ChunkStream<'a> {
         ChunkStream::new(self.contents.reference(), text, tokens, errors)
@@ -346,7 +346,7 @@ fn extra_plus_trailing_separator(
 }
 
 fn record_leftover_item(
-    tokens: &mut Vec<WithSpan<SemanticToken>>,
+    tokens: &mut Vec<WithSpan<IsographSemanticToken>>,
     item: &WithSpan<ChunkContentItem>,
 ) {
     match item.item.reference() {
@@ -379,14 +379,14 @@ fn record_leftover_item(
     }
 }
 
-fn record_leftover_chunk(tokens: &mut Vec<WithSpan<SemanticToken>>, chunk: &Chunk) {
+fn record_leftover_chunk(tokens: &mut Vec<WithSpan<IsographSemanticToken>>, chunk: &Chunk) {
     for item in chunk.contents.iter() {
         record_leftover_item(tokens, item);
     }
 }
 
 fn record_leftover_extra(
-    tokens: &mut Vec<WithSpan<SemanticToken>>,
+    tokens: &mut Vec<WithSpan<IsographSemanticToken>>,
     extra: &Option<WithSpan<UnparsedChunkItems>>,
 ) {
     if let Some(extra) = extra {
@@ -397,8 +397,8 @@ fn record_leftover_extra(
 }
 
 fn record_leftover_span(
-    tokens: &mut Vec<WithSpan<SemanticToken>>,
-    role: Option<SemanticToken>,
+    tokens: &mut Vec<WithSpan<IsographSemanticToken>>,
+    role: Option<IsographSemanticToken>,
     span: Span,
 ) {
     if let Some(role) = role
@@ -469,7 +469,7 @@ fn parse_one_chunk<'a, P>(
 pub(crate) fn parse_singleton<'a, T>(
     level: &'a WithSpan<ChunkedLevel>,
     text: &'a str,
-    tokens: &'a mut Vec<WithSpan<SemanticToken>>,
+    tokens: &'a mut Vec<WithSpan<IsographSemanticToken>>,
     errors: &'a mut Vec<WithSpan<AstError>>,
     end: Expectation,
     extra_chunks: impl FnOnce(&'a WithSpan<Chunk>) -> WithSpan<AstError>,
@@ -673,8 +673,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        AstError, BracketError, BracketKind, Expectation, Found, NonBracketTokenKind,
-        SemanticToken,
+        AstError, BracketError, BracketKind, Expectation, Found, IsographSemanticToken,
+        NonBracketTokenKind,
         chunk_stream::ItemCursor,
         match_brackets,
         parsed_items::{ParsedItems, parsed_items, span_of},
@@ -1389,12 +1389,15 @@ mod tests {
 
     fn parse_identifier(cursor: &mut ItemCursor<'_>) -> Result<Span, WithSpan<AstError>> {
         cursor
-            .require_token(Identifier, SemanticToken::FieldName)
+            .require_token(Identifier, IsographSemanticToken::FieldName)
             .map_err(|()| cursor.expected(Expectation::Token(Identifier)))
             .map(|token| token.location)
     }
 
-    fn parsed_each(text: &str, expected_tokens: &[(SemanticToken, &str)]) -> ParsedItems<Span> {
+    fn parsed_each(
+        text: &str,
+        expected_tokens: &[(IsographSemanticToken, &str)],
+    ) -> ParsedItems<Span> {
         parsed_items(
             text,
             Separator(BracketKind::Parenthesis),
@@ -1423,8 +1426,8 @@ mod tests {
         let (items, errors, comma_errors) = parsed_each(
             text,
             &[
-                (SemanticToken::FieldName, "foo"),
-                (SemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::FieldName, "foo"),
+                (IsographSemanticToken::FieldName, "bar"),
             ],
         );
         assert_eq!(comma_errors, vec![]);
@@ -1445,7 +1448,8 @@ mod tests {
     #[test]
     fn a_list_trailing_comma_is_not_a_parse_each_chunk_diagnostic() {
         let text = "foo,";
-        let (items, errors, comma_errors) = parsed_each(text, &[(SemanticToken::FieldName, "foo")]);
+        let (items, errors, comma_errors) =
+            parsed_each(text, &[(IsographSemanticToken::FieldName, "foo")]);
         assert_eq!(comma_errors, vec![]);
         assert_eq!(errors, vec![]);
         assert_eq!(items.len(), 1);
@@ -1462,8 +1466,8 @@ mod tests {
         let (items, errors, comma_errors) = parsed_each(
             text,
             &[
-                (SemanticToken::FieldName, "foo"),
-                (SemanticToken::Content, "bar"),
+                (IsographSemanticToken::FieldName, "foo"),
+                (IsographSemanticToken::Content, "bar"),
             ],
         );
         assert_eq!(comma_errors, vec![]);
@@ -1490,8 +1494,8 @@ mod tests {
         let (items, errors, comma_errors) = parsed_each(
             text,
             &[
-                (SemanticToken::Content, "."),
-                (SemanticToken::FieldName, "foo"),
+                (IsographSemanticToken::Content, "."),
+                (IsographSemanticToken::FieldName, "foo"),
             ],
         );
         assert_eq!(comma_errors, vec![]);
@@ -1514,8 +1518,8 @@ mod tests {
         let (items, errors, comma_errors) = parsed_each(
             text,
             &[
-                (SemanticToken::FieldName, "foo"),
-                (SemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::FieldName, "foo"),
+                (IsographSemanticToken::FieldName, "bar"),
             ],
         );
         assert_eq!(comma_errors, vec![]);
@@ -1534,7 +1538,8 @@ mod tests {
     #[test]
     fn a_comma_without_item_is_chunkings_error_and_the_item_parses() {
         let text = ",foo";
-        let (items, errors, comma_errors) = parsed_each(text, &[(SemanticToken::FieldName, "foo")]);
+        let (items, errors, comma_errors) =
+            parsed_each(text, &[(IsographSemanticToken::FieldName, "foo")]);
         assert_eq!(comma_errors.len(), 1);
         assert_eq!(errors, vec![]);
         assert_eq!(items.len(), 1);

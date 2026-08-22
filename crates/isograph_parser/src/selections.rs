@@ -6,7 +6,7 @@ use span::WithSpan;
 use crate::chunk_stream::ItemCursor;
 use crate::{
     ArgumentList, AstError, BracketKind, Expectation, IsographFieldDirectiveList,
-    IsographResolutionNode, NonBracketTokenKind, SemanticToken, Slot, UnparsedChunkItems,
+    IsographResolutionNode, IsographSemanticToken, NonBracketTokenKind, Slot, UnparsedChunkItems,
     consume_argument_list, consume_directives,
 };
 
@@ -61,7 +61,7 @@ impl<'a> From<SelectionSlotPath<'a>> for IsographResolutionNode<'a> {
 pub(crate) fn consume_selection_set(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<SelectionSet>> {
     cursor.consume_group_if(
         BracketKind::Brace,
-        SemanticToken::Brace,
+        IsographSemanticToken::Brace,
         |cursor, children| {
             SelectionSet(children.item.parse_each_chunk(
                 cursor,
@@ -74,13 +74,19 @@ pub(crate) fn consume_selection_set(cursor: &mut ItemCursor<'_>) -> Option<WithS
 
 fn parse_selection(cursor: &mut ItemCursor<'_>) -> Result<Selection, WithSpan<AstError>> {
     let first = cursor
-        .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
+        .require_token(
+            NonBracketTokenKind::Identifier,
+            IsographSemanticToken::FieldName,
+        )
         .map_err(|()| cursor.expected(Expectation::Selection))?;
     let (reader_alias, name) =
-        match cursor.consume_token_if(NonBracketTokenKind::Colon, SemanticToken::Colon) {
+        match cursor.consume_token_if(NonBracketTokenKind::Colon, IsographSemanticToken::Colon) {
             Some(_) => {
                 let name = cursor
-                    .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
+                    .require_token(
+                        NonBracketTokenKind::Identifier,
+                        IsographSemanticToken::FieldName,
+                    )
                     .map_err(|()| {
                         cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier))
                     })?;
@@ -112,7 +118,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        AstError, Found, NonBracketTokenKind, SemanticToken,
+        AstError, Found, IsographSemanticToken, NonBracketTokenKind,
         parsed_items::{parsed_items, span_of},
     };
 
@@ -123,7 +129,7 @@ mod tests {
 
     fn parsed_selections(
         text: &str,
-        expected_tokens: &[(SemanticToken, &str)],
+        expected_tokens: &[(IsographSemanticToken, &str)],
     ) -> ParsedSelections {
         let (items, errors, comma_errors) = parsed_items(
             text,
@@ -148,8 +154,8 @@ mod tests {
         let (items, errors) = parsed_selections(
             text,
             &[
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::FieldName, "baz"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::FieldName, "baz"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -172,7 +178,7 @@ mod tests {
     #[test]
     fn a_single_selection_parses_without_a_trailing_separator() {
         let text = "bar";
-        let (items, errors) = parsed_selections(text, &[(SemanticToken::FieldName, "bar")]);
+        let (items, errors) = parsed_selections(text, &[(IsographSemanticToken::FieldName, "bar")]);
         assert_eq!(items.len(), 1);
         assert_eq!(
             as_selection(items[0].item.reference()).name.location,
@@ -197,7 +203,7 @@ mod tests {
             text,
             Expectation::Separator(BracketKind::Brace),
             parse_selection,
-            &[(SemanticToken::FieldName, "bar")],
+            &[(IsographSemanticToken::FieldName, "bar")],
         );
         assert_eq!(comma_errors.len(), 1);
         assert_eq!(items.len(), 1);
@@ -225,9 +231,9 @@ mod tests {
         let (items, errors) = parsed_selections(
             text,
             &[
-                (SemanticToken::FieldName, "b"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::FieldName, "b"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::FieldName, "bar"),
             ],
         );
         let scalar = as_selection(items[0].item.reference());
@@ -251,11 +257,11 @@ mod tests {
         let (items, errors) = parsed_selections(
             text,
             &[
-                (SemanticToken::FieldName, "pet"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "name"),
-                (SemanticToken::FieldName, "age"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::FieldName, "pet"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "name"),
+                (IsographSemanticToken::FieldName, "age"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         let object = as_selection(items[0].item.reference());
@@ -290,21 +296,21 @@ mod tests {
         let (items, errors) = parsed_selections(
             text,
             &[
-                (SemanticToken::FieldName, "pet"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Argument, "id"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "petId"),
-                (SemanticToken::Parenthesis, ")"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "name"),
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Argument, "shouted"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::BooleanOrNull, "true"),
-                (SemanticToken::Parenthesis, ")"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::FieldName, "pet"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Argument, "id"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "petId"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "name"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Argument, "shouted"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::BooleanOrNull, "true"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -336,10 +342,10 @@ mod tests {
         let (items, errors) = parsed_selections(
             text,
             &[
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Bracket, "{"),
-                (SemanticToken::Content, "baz"),
-                (SemanticToken::Bracket, "}"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Bracket, "{"),
+                (IsographSemanticToken::Content, "baz"),
+                (IsographSemanticToken::Bracket, "}"),
             ],
         );
         assert_eq!(items.len(), 2);
@@ -364,8 +370,8 @@ mod tests {
             Expectation::Separator(BracketKind::Brace),
             parse_selection,
             &[
-                (SemanticToken::FieldName, "a"),
-                (SemanticToken::FieldName, "b"),
+                (IsographSemanticToken::FieldName, "a"),
+                (IsographSemanticToken::FieldName, "b"),
             ],
         );
         assert_eq!(comma_errors.len(), 1);
@@ -387,9 +393,9 @@ mod tests {
         let (items, errors) = parsed_selections(
             text,
             &[
-                (SemanticToken::FieldName, "bar"),
-                (SemanticToken::Content, "baz"),
-                (SemanticToken::FieldName, "qux"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Content, "baz"),
+                (IsographSemanticToken::FieldName, "qux"),
             ],
         );
         assert_eq!(items.len(), 2);
@@ -418,10 +424,10 @@ mod tests {
         let (items, errors) = parsed_selections(
             text,
             &[
-                (SemanticToken::Content, "."),
-                (SemanticToken::Content, "."),
-                (SemanticToken::Content, "."),
-                (SemanticToken::Content, "UserAvatar"),
+                (IsographSemanticToken::Content, "."),
+                (IsographSemanticToken::Content, "."),
+                (IsographSemanticToken::Content, "."),
+                (IsographSemanticToken::Content, "UserAvatar"),
             ],
         );
         assert!(items[0].item.item.is_none());
@@ -441,15 +447,15 @@ mod tests {
         let (items, errors) = parsed_selections(
             text,
             &[
-                (SemanticToken::FieldName, "a"),
-                (SemanticToken::Content, "b"),
-                (SemanticToken::FieldName, "pet"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::FieldName, "c"),
-                (SemanticToken::Content, "d"),
-                (SemanticToken::Brace, "}"),
-                (SemanticToken::FieldName, "e"),
-                (SemanticToken::Content, "f"),
+                (IsographSemanticToken::FieldName, "a"),
+                (IsographSemanticToken::Content, "b"),
+                (IsographSemanticToken::FieldName, "pet"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "c"),
+                (IsographSemanticToken::Content, "d"),
+                (IsographSemanticToken::Brace, "}"),
+                (IsographSemanticToken::FieldName, "e"),
+                (IsographSemanticToken::Content, "f"),
             ],
         );
         assert_eq!(errors.len(), 3);

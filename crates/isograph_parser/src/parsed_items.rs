@@ -4,8 +4,8 @@ use span::{Span, WithSpan};
 use crate::assert_semantic_tokens::assert_semantic_tokens;
 use crate::chunk_stream::ItemCursor;
 use crate::{
-    AstError, CommaWithoutItem, Expectation, SemanticToken, Slot, UnparsedChunkItems, chunk,
-    match_brackets, tokenize,
+    AstError, CommaWithoutItem, Expectation, IsographSemanticToken, Slot, UnparsedChunkItems,
+    chunk, match_brackets, tokenize,
 };
 
 pub(crate) type ParsedItems<P> = (
@@ -18,7 +18,7 @@ pub(crate) fn parsed_items<P>(
     text: &str,
     leftover: Expectation,
     parse_item: impl Fn(&mut ItemCursor<'_>) -> Result<P, WithSpan<AstError>>,
-    expected_tokens: &[(SemanticToken, &str)],
+    expected_tokens: &[(IsographSemanticToken, &str)],
 ) -> ParsedItems<P> {
     let (brackets, bracket_errors) = match_brackets(tokenize(text), text.len() as u32);
     assert!(bracket_errors.is_empty(), "for literal {text:?}");

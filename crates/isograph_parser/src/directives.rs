@@ -6,8 +6,8 @@ use span::{Span, WithSpan, WithSpanPostfix};
 use crate::chunk_stream::ItemCursor;
 use crate::{
     ArgumentList, AstError, ChunkContentItem, EntrypointDeclarationPath, Expectation,
-    IsographResolutionNode, NonBracketToken, NonBracketTokenKind, SelectableDeclarationPath,
-    SelectionPath, SemanticToken, consume_argument_list,
+    IsographResolutionNode, IsographSemanticToken, NonBracketToken, NonBracketTokenKind,
+    SelectableDeclarationPath, SelectionPath, consume_argument_list,
 };
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -62,9 +62,10 @@ pub(crate) fn consume_directives(
     cursor
         .spanning(|cursor| {
             let mut directives = Vec::new();
-            while let Some(at) =
-                cursor.consume_token_if(NonBracketTokenKind::At, SemanticToken::DirectiveName)
-            {
+            while let Some(at) = cursor.consume_token_if(
+                NonBracketTokenKind::At,
+                IsographSemanticToken::DirectiveName,
+            ) {
                 directives.push(parse_directive_after_at(cursor, at.location)?);
             }
             IsographFieldDirectiveList(directives).wrap_ok()
@@ -79,7 +80,7 @@ fn parse_directive_after_at(
     let name = cursor
         .require_token(
             NonBracketTokenKind::Identifier,
-            SemanticToken::DirectiveName,
+            IsographSemanticToken::DirectiveName,
         )
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
     let arguments = consume_argument_list(cursor);

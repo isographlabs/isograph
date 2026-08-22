@@ -57,7 +57,7 @@ pub use selections::{
     Selection, SelectionNameWrapper, SelectionNameWrapperPath, SelectionPath, SelectionSet,
     SelectionSetParent, SelectionSetPath, SelectionSlotPath,
 };
-pub use semantic_token::SemanticToken;
+pub use semantic_token::IsographSemanticToken;
 pub(crate) use semantic_token::leftover_token;
 pub use variables::{
     ListTypeAnnotation, ListTypeAnnotationPath, NamedTypeAnnotation, NamedTypeAnnotationPath,

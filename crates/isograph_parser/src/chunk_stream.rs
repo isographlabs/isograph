@@ -6,7 +6,8 @@ use span::{Span, WithSpan, WithSpanPostfix};
 
 use crate::{
     AstError, BracketKind, Chunk, ChunkContentItem, ChunkedLevel, Expectation, ExtraChunks, Found,
-    NonBracketTokenKind, SemanticToken, Singleton, Slot, UnparsedChunkItems, parse_singleton,
+    IsographSemanticToken, NonBracketTokenKind, Singleton, Slot, UnparsedChunkItems,
+    parse_singleton,
 };
 
 /// Sequential reader of one chunk. Parameter of a parse function.
@@ -16,14 +17,14 @@ pub(crate) struct ItemCursor<'a> {
     /// any). An `Expected(_, EndOfChunk)` error uses this offset.
     previous_end: u32,
     text: &'a str,
-    tokens: &'a mut Vec<WithSpan<SemanticToken>>,
+    tokens: &'a mut Vec<WithSpan<IsographSemanticToken>>,
     errors: &'a mut Vec<WithSpan<AstError>>,
 }
 
 pub(crate) struct CursorPeek<'c, 'a> {
     peek: Peek<'c, &'a WithSpan<ChunkContentItem>>,
     previous_end: &'c mut u32,
-    tokens: &'c mut Vec<WithSpan<SemanticToken>>,
+    tokens: &'c mut Vec<WithSpan<IsographSemanticToken>>,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -54,7 +55,7 @@ impl<'a> TokenText<'a> {
 struct RecordGroupClose<'c, 'a> {
     cursor: &'c mut ItemCursor<'a>,
     closing: Span,
-    token: SemanticToken,
+    token: IsographSemanticToken,
 }
 
 impl<'c, 'a> RecordGroupClose<'c, 'a> {
@@ -76,7 +77,7 @@ impl<'a> ChunkStream<'a> {
     pub(crate) fn new(
         contents: &'a NonEmpty<WithSpan<ChunkContentItem>>,
         text: &'a str,
-        tokens: &'a mut Vec<WithSpan<SemanticToken>>,
+        tokens: &'a mut Vec<WithSpan<IsographSemanticToken>>,
         errors: &'a mut Vec<WithSpan<AstError>>,
     ) -> Self {
         ChunkStream(ItemCursor {
@@ -92,7 +93,7 @@ impl<'a> ChunkStream<'a> {
         &mut self.0
     }
 
-    pub(crate) fn tokens(&mut self) -> &mut Vec<WithSpan<SemanticToken>> {
+    pub(crate) fn tokens(&mut self) -> &mut Vec<WithSpan<IsographSemanticToken>> {
         self.0.tokens
     }
 
@@ -129,7 +130,7 @@ impl<'a> ItemCursor<'a> {
     pub(crate) fn consume_token_if(
         &mut self,
         kind: NonBracketTokenKind,
-        token: SemanticToken,
+        token: IsographSemanticToken,
     ) -> Option<TokenText<'a>> {
         let peek = self.peek()?;
         match peek.view().item.reference() {
@@ -147,7 +148,7 @@ impl<'a> ItemCursor<'a> {
     pub(crate) fn consume_group_if<R>(
         &mut self,
         kind: BracketKind,
-        token: SemanticToken,
+        token: IsographSemanticToken,
         parse_inside: impl FnOnce(&mut Self, &'a WithSpan<ChunkedLevel>) -> R,
     ) -> Option<WithSpan<R>> {
         let peek = self.peek()?;
@@ -179,7 +180,7 @@ impl<'a> ItemCursor<'a> {
         chunk.stream(self.text, self.tokens, self.errors)
     }
 
-    fn record(&mut self, token: SemanticToken, span: Span) {
+    fn record(&mut self, token: IsographSemanticToken, span: Span) {
         self.tokens.push(token.with_span(span));
     }
 
@@ -197,7 +198,7 @@ impl<'a> ItemCursor<'a> {
     pub(crate) fn require_token(
         &mut self,
         kind: NonBracketTokenKind,
-        token: SemanticToken,
+        token: IsographSemanticToken,
     ) -> Result<TokenText<'a>, ()> {
         self.consume_token_if(kind, token).ok_or(())
     }
@@ -205,7 +206,7 @@ impl<'a> ItemCursor<'a> {
     pub(crate) fn require_group<R>(
         &mut self,
         kind: BracketKind,
-        token: SemanticToken,
+        token: IsographSemanticToken,
         parse_inside: impl FnOnce(&mut Self, &'a WithSpan<ChunkedLevel>) -> R,
     ) -> Result<WithSpan<R>, ()> {
         self.consume_group_if(kind, token, parse_inside).ok_or(())
@@ -264,7 +265,7 @@ impl<'c, 'a> CursorPeek<'c, 'a> {
     fn take_item(
         self,
     ) -> (
-        &'c mut Vec<WithSpan<SemanticToken>>,
+        &'c mut Vec<WithSpan<IsographSemanticToken>>,
         &'a WithSpan<ChunkContentItem>,
     ) {
         let item = self.peek.commit();
@@ -276,7 +277,7 @@ impl<'c, 'a> CursorPeek<'c, 'a> {
         self.take_item().1
     }
 
-    pub(crate) fn commit(self, token: SemanticToken) -> &'a WithSpan<ChunkContentItem> {
+    pub(crate) fn commit(self, token: IsographSemanticToken) -> &'a WithSpan<ChunkContentItem> {
         let (tokens, item) = self.take_item();
         let span = match item.item.reference() {
             ChunkContentItem::NonBracket(_) => item.location,
@@ -294,8 +295,8 @@ mod tests {
 
     use super::{ChunkStream, TokenText};
     use crate::{
-        AstError, BracketKind, Chunk, ChunkedLevel, Expectation, Found, NonBracketTokenKind,
-        SemanticToken, chunk, match_brackets, parsed_items::span_of, tokenize,
+        AstError, BracketKind, Chunk, ChunkedLevel, Expectation, Found, IsographSemanticToken,
+        NonBracketTokenKind, chunk, match_brackets, parsed_items::span_of, tokenize,
     };
 
     fn chunked(text: &str) -> WithSpan<ChunkedLevel> {
@@ -328,7 +329,7 @@ mod tests {
     fn stream_of<'a>(
         tree: &'a WithSpan<ChunkedLevel>,
         text: &'a str,
-        tokens: &'a mut Vec<WithSpan<SemanticToken>>,
+        tokens: &'a mut Vec<WithSpan<IsographSemanticToken>>,
         errors: &'a mut Vec<WithSpan<AstError>>,
     ) -> ChunkStream<'a> {
         first_chunk(tree).stream(text, tokens, errors)
@@ -343,19 +344,28 @@ mod tests {
         let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
         let cursor = stream.cursor();
         assert_eq!(
-            cursor.consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
+            cursor.consume_token_if(
+                NonBracketTokenKind::Identifier,
+                IsographSemanticToken::FieldName
+            ),
             token_text(text, "foo").wrap_some(),
         );
         assert_eq!(
-            cursor.consume_token_if(NonBracketTokenKind::Period, SemanticToken::Period),
+            cursor.consume_token_if(NonBracketTokenKind::Period, IsographSemanticToken::Period),
             None
         );
         assert_eq!(
-            cursor.consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
+            cursor.consume_token_if(
+                NonBracketTokenKind::Identifier,
+                IsographSemanticToken::FieldName
+            ),
             token_text(text, "bar").wrap_some(),
         );
         assert_eq!(
-            cursor.consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
+            cursor.consume_token_if(
+                NonBracketTokenKind::Identifier,
+                IsographSemanticToken::FieldName
+            ),
             None
         );
     }
@@ -369,27 +379,30 @@ mod tests {
         let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
         let cursor = stream.cursor();
         assert_eq!(
-            cursor.consume_group_if(BracketKind::Brace, SemanticToken::Brace, |_, _| ()),
+            cursor.consume_group_if(BracketKind::Brace, IsographSemanticToken::Brace, |_, _| ()),
             None
         );
         assert_eq!(
-            cursor.consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
+            cursor.consume_token_if(
+                NonBracketTokenKind::Identifier,
+                IsographSemanticToken::FieldName
+            ),
             token_text(text, "foo").wrap_some(),
         );
         assert_eq!(
             cursor.consume_group_if(
                 BracketKind::Parenthesis,
-                SemanticToken::Parenthesis,
+                IsographSemanticToken::Parenthesis,
                 |_, _| ()
             ),
             None
         );
         let group = cursor
-            .consume_group_if(BracketKind::Brace, SemanticToken::Brace, |_, _| ())
+            .consume_group_if(BracketKind::Brace, IsographSemanticToken::Brace, |_, _| ())
             .expect("the next item is a brace group");
         assert_eq!(group.location, span_of(text, "{ bar }"));
         assert_eq!(
-            cursor.consume_group_if(BracketKind::Brace, SemanticToken::Brace, |_, _| ()),
+            cursor.consume_group_if(BracketKind::Brace, IsographSemanticToken::Brace, |_, _| ()),
             None
         );
     }
@@ -403,23 +416,32 @@ mod tests {
         let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
         let cursor = stream.cursor();
         assert_eq!(
-            cursor.require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
+            cursor.require_token(
+                NonBracketTokenKind::Identifier,
+                IsographSemanticToken::FieldName
+            ),
             ().wrap_err(),
         );
         let group = cursor
-            .require_group(BracketKind::Brace, SemanticToken::Brace, |_, _| ())
+            .require_group(BracketKind::Brace, IsographSemanticToken::Brace, |_, _| ())
             .expect("the first item is a brace group");
         assert_eq!(group.location, span_of(text, "{ bar }"));
         assert_eq!(
-            cursor.require_group(BracketKind::Brace, SemanticToken::Brace, |_, _| ()),
+            cursor.require_group(BracketKind::Brace, IsographSemanticToken::Brace, |_, _| ()),
             ().wrap_err(),
         );
         assert_eq!(
-            cursor.require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
+            cursor.require_token(
+                NonBracketTokenKind::Identifier,
+                IsographSemanticToken::FieldName
+            ),
             token_text(text, "foo").wrap_ok(),
         );
         assert_eq!(
-            cursor.require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
+            cursor.require_token(
+                NonBracketTokenKind::Identifier,
+                IsographSemanticToken::FieldName
+            ),
             ().wrap_err(),
         );
     }
@@ -441,7 +463,10 @@ mod tests {
             .with_span(span_of(text, "foo")),
         );
         cursor
-            .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
+            .consume_token_if(
+                NonBracketTokenKind::Identifier,
+                IsographSemanticToken::FieldName,
+            )
             .expect("foo is present");
         assert_eq!(
             cursor.expected(token(NonBracketTokenKind::Identifier)),
@@ -452,7 +477,7 @@ mod tests {
             .with_span(span_of(text, "{ bar }")),
         );
         cursor
-            .consume_group_if(BracketKind::Brace, SemanticToken::Brace, |_, _| ())
+            .consume_group_if(BracketKind::Brace, IsographSemanticToken::Brace, |_, _| ())
             .expect("the group is present");
         let group_end = span_of(text, "{ bar }").end;
         assert_eq!(
@@ -471,7 +496,10 @@ mod tests {
         let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
         let cursor = stream.cursor();
         cursor
-            .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
+            .consume_token_if(
+                NonBracketTokenKind::Identifier,
+                IsographSemanticToken::FieldName,
+            )
             .expect("foo is present");
         assert_eq!(
             cursor.expected(Expectation::Separator(BracketKind::Parenthesis)),
@@ -496,12 +524,18 @@ mod tests {
         assert_eq!(stream.require_end(), ().wrap_err());
         stream
             .cursor()
-            .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
+            .consume_token_if(
+                NonBracketTokenKind::Identifier,
+                IsographSemanticToken::FieldName,
+            )
             .expect("foo is present");
         assert_eq!(stream.require_end(), ().wrap_err());
         stream
             .cursor()
-            .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
+            .consume_token_if(
+                NonBracketTokenKind::Identifier,
+                IsographSemanticToken::FieldName,
+            )
             .expect("bar is present");
         assert_eq!(stream.require_end(), ().wrap_ok());
     }
@@ -522,7 +556,10 @@ mod tests {
         let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
         stream
             .cursor()
-            .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
+            .consume_token_if(
+                NonBracketTokenKind::Identifier,
+                IsographSemanticToken::FieldName,
+            )
             .expect("foo is present");
         match stream.remaining_contents() {
             Some(remaining) => {
@@ -546,10 +583,16 @@ mod tests {
             .cursor()
             .spanning(|cursor| {
                 cursor
-                    .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
+                    .require_token(
+                        NonBracketTokenKind::Identifier,
+                        IsographSemanticToken::FieldName,
+                    )
                     .map_err(|()| cursor.expected(token(NonBracketTokenKind::Identifier)))?;
                 cursor
-                    .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
+                    .require_token(
+                        NonBracketTokenKind::Identifier,
+                        IsographSemanticToken::FieldName,
+                    )
                     .map_err(|()| cursor.expected(token(NonBracketTokenKind::Identifier)))?;
                 ().wrap_ok()
             })
@@ -569,7 +612,10 @@ mod tests {
         let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
         stream
             .cursor()
-            .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
+            .consume_token_if(
+                NonBracketTokenKind::Identifier,
+                IsographSemanticToken::FieldName,
+            )
             .expect("foo is present");
         let spanned = stream
             .cursor()
@@ -590,7 +636,7 @@ mod tests {
             .cursor()
             .spanning::<()>(|cursor| {
                 cursor
-                    .require_token(NonBracketTokenKind::Period, SemanticToken::Period)
+                    .require_token(NonBracketTokenKind::Period, IsographSemanticToken::Period)
                     .map_err(|()| cursor.expected(token(NonBracketTokenKind::Period)))?;
                 ().wrap_ok()
             })
@@ -604,9 +650,10 @@ mod tests {
             .with_span(span_of(text, "foo")),
         );
         assert_eq!(
-            stream
-                .cursor()
-                .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
+            stream.cursor().consume_token_if(
+                NonBracketTokenKind::Identifier,
+                IsographSemanticToken::FieldName
+            ),
             token_text(text, "foo").wrap_some(),
         );
     }
@@ -620,7 +667,10 @@ mod tests {
         let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
         let cursor = stream.cursor();
         let foo = cursor
-            .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
+            .consume_token_if(
+                NonBracketTokenKind::Identifier,
+                IsographSemanticToken::FieldName,
+            )
             .expect("foo is present");
         assert_eq!(foo.text(), "foo");
         assert_eq!(foo.location, span_of(text, "foo"));
@@ -637,7 +687,7 @@ mod tests {
         assert_eq!(stream.require_end(), ().wrap_err());
         stream
             .cursor()
-            .require_group(BracketKind::Brace, SemanticToken::Brace, |_, _| ())
+            .require_group(BracketKind::Brace, IsographSemanticToken::Brace, |_, _| ())
             .expect("the chunk is a brace group");
         assert_eq!(stream.require_end(), ().wrap_ok());
         assert_eq!(stream.remaining_contents(), None);
@@ -646,11 +696,11 @@ mod tests {
     #[test]
     fn require_token_records_the_role_the_caller_passed() {
         for (text, token) in [
-            ("entrypoint", SemanticToken::Keyword),
-            ("Query", SemanticToken::Type),
-            ("foo", SemanticToken::FieldName),
-            ("id", SemanticToken::ObjectKey),
-            ("Foo", SemanticToken::GraphQLTypeName),
+            ("entrypoint", IsographSemanticToken::Keyword),
+            ("Query", IsographSemanticToken::Type),
+            ("foo", IsographSemanticToken::FieldName),
+            ("id", IsographSemanticToken::ObjectKey),
+            ("Foo", IsographSemanticToken::GraphQLTypeName),
         ] {
             let tree = chunked(text);
             let mut tokens = Vec::new();
@@ -680,7 +730,7 @@ mod tests {
             assert_eq!(
                 stream
                     .cursor()
-                    .require_token(NonBracketTokenKind::Period, SemanticToken::Period),
+                    .require_token(NonBracketTokenKind::Period, IsographSemanticToken::Period),
                 ().wrap_err(),
             );
         }
@@ -698,7 +748,7 @@ mod tests {
             assert_eq!(
                 stream
                     .cursor()
-                    .consume_token_if(NonBracketTokenKind::Period, SemanticToken::Period),
+                    .consume_token_if(NonBracketTokenKind::Period, IsographSemanticToken::Period),
                 None,
             );
         }
@@ -715,24 +765,30 @@ mod tests {
             let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
             let cursor = stream.cursor();
             assert_eq!(
-                cursor.consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
+                cursor.consume_token_if(
+                    NonBracketTokenKind::Identifier,
+                    IsographSemanticToken::FieldName
+                ),
                 token_text(text, "alias").wrap_some(),
             );
             assert_eq!(
-                cursor.consume_token_if(NonBracketTokenKind::Colon, SemanticToken::Colon),
+                cursor.consume_token_if(NonBracketTokenKind::Colon, IsographSemanticToken::Colon),
                 token_text(text, ":").wrap_some(),
             );
             assert_eq!(
-                cursor.consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
+                cursor.consume_token_if(
+                    NonBracketTokenKind::Identifier,
+                    IsographSemanticToken::FieldName
+                ),
                 token_text(text, "name").wrap_some(),
             );
         }
         assert_eq!(
             tokens,
             vec![
-                SemanticToken::FieldName.with_span(span_of(text, "alias")),
-                SemanticToken::Colon.with_span(span_of(text, ":")),
-                SemanticToken::FieldName.with_span(span_of(text, "name")),
+                IsographSemanticToken::FieldName.with_span(span_of(text, "alias")),
+                IsographSemanticToken::Colon.with_span(span_of(text, ":")),
+                IsographSemanticToken::FieldName.with_span(span_of(text, "name")),
             ],
         );
     }
@@ -747,14 +803,14 @@ mod tests {
                 let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
                 stream
                     .cursor()
-                    .consume_group_if(BracketKind::Brace, SemanticToken::Brace, |_, _| ())
+                    .consume_group_if(BracketKind::Brace, IsographSemanticToken::Brace, |_, _| ())
                     .expect("the chunk is a brace group");
             }
             assert_eq!(
                 tokens,
                 vec![
-                    SemanticToken::Brace.with_span(span_of(text, "{")),
-                    SemanticToken::Brace.with_span(span_of(text, "}")),
+                    IsographSemanticToken::Brace.with_span(span_of(text, "{")),
+                    IsographSemanticToken::Brace.with_span(span_of(text, "}")),
                 ],
                 "for literal {text:?}",
             );
@@ -770,9 +826,11 @@ mod tests {
         {
             let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
             assert_eq!(
-                stream
-                    .cursor()
-                    .require_group(BracketKind::Brace, SemanticToken::Brace, |_, _| ()),
+                stream.cursor().require_group(
+                    BracketKind::Brace,
+                    IsographSemanticToken::Brace,
+                    |_, _| ()
+                ),
                 ().wrap_err(),
             );
         }
@@ -821,15 +879,16 @@ mod tests {
         {
             let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
             assert_eq!(
-                stream
-                    .cursor()
-                    .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
+                stream.cursor().consume_token_if(
+                    NonBracketTokenKind::Identifier,
+                    IsographSemanticToken::FieldName
+                ),
                 token_text(text, "foo").wrap_some(),
             );
         }
         assert_eq!(
             tokens,
-            SemanticToken::FieldName
+            IsographSemanticToken::FieldName
                 .with_span(span_of(text, "foo"))
                 .wrap_vec(),
         );

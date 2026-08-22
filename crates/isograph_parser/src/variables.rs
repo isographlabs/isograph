@@ -6,9 +6,9 @@ use span::{Span, WithGenericLocation, WithOptionalSpan, WithSpan, WithSpanPostfi
 use crate::chunk_stream::ItemCursor;
 use crate::{
     AstError, BracketKind, ChunkContentItem, ChunkedLevel, EntityNameWrapper, Expectation, Found,
-    IsographResolutionNode, NonBracketToken, NonBracketTokenKind, NonConstantValue,
-    SelectableDeclarationPath, SemanticToken, Slot, UnparsedChunkItems, VariableDeclarationOrUsage,
-    parse_name_colon, parse_non_constant_value, parse_variable_name,
+    IsographResolutionNode, IsographSemanticToken, NonBracketToken, NonBracketTokenKind,
+    NonConstantValue, SelectableDeclarationPath, Slot, UnparsedChunkItems,
+    VariableDeclarationOrUsage, parse_name_colon, parse_non_constant_value, parse_variable_name,
 };
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -126,7 +126,7 @@ pub(crate) fn consume_variable_declaration_list(
 ) -> Option<WithSpan<VariableDeclarationList>> {
     cursor.consume_group_if(
         BracketKind::Parenthesis,
-        SemanticToken::Parenthesis,
+        IsographSemanticToken::Parenthesis,
         |cursor, children| {
             VariableDeclarationList(children.item.parse_each_chunk(
                 cursor,
@@ -146,7 +146,7 @@ fn parse_variable_declaration(
         parse_type_annotation,
     )?;
     let default_value =
-        match cursor.consume_token_if(NonBracketTokenKind::Equals, SemanticToken::Equals) {
+        match cursor.consume_token_if(NonBracketTokenKind::Equals, IsographSemanticToken::Equals) {
             Some(_) => parse_non_constant_value(cursor)?.wrap_some(),
             None => None,
         };
@@ -210,7 +210,7 @@ fn parse_named_or_list(
     cursor.spanning(|cursor| {
         if let Some(name) = cursor.consume_token_if(
             NonBracketTokenKind::Identifier,
-            SemanticToken::GraphQLTypeName,
+            IsographSemanticToken::GraphQLTypeName,
         ) {
             return NamedOrList::Named(NamedTypeAnnotation {
                 name: name.interned().map(EntityNameWrapper),
@@ -219,7 +219,7 @@ fn parse_named_or_list(
         }
         if let Some(parsed) = cursor.consume_group_if(
             BracketKind::Bracket,
-            SemanticToken::GraphQLTypeName,
+            IsographSemanticToken::GraphQLTypeName,
             |cursor, children| parse_bracket_interior_type(cursor, children),
         ) {
             let parsed = parsed.item?;

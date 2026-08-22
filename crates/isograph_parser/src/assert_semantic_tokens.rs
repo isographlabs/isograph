@@ -1,11 +1,11 @@
 use span::{Span, WithSpan, WithSpanPostfix};
 
-use crate::SemanticToken;
+use crate::IsographSemanticToken;
 
 pub(crate) fn assert_semantic_tokens(
     text: &str,
-    actual: &[WithSpan<SemanticToken>],
-    expected: &[(SemanticToken, &str)],
+    actual: &[WithSpan<IsographSemanticToken>],
+    expected: &[(IsographSemanticToken, &str)],
 ) {
     let mut search_from = 0usize;
     let mut expected_tokens = Vec::with_capacity(expected.len());
@@ -33,7 +33,10 @@ pub(crate) fn assert_semantic_tokens(
     );
 }
 
-fn displayed(text: &str, tokens: &[WithSpan<SemanticToken>]) -> Vec<(SemanticToken, String)> {
+fn displayed(
+    text: &str,
+    tokens: &[WithSpan<IsographSemanticToken>],
+) -> Vec<(IsographSemanticToken, String)> {
     tokens
         .iter()
         .map(|token| (token.item, text[token.location.as_usize_range()].to_owned()))
@@ -47,15 +50,15 @@ mod tests {
     fn sequential_search_skips_an_unrecorded_occurrence() {
         let text = "Pet!!";
         let actual = [
-            SemanticToken::GraphQLTypeName.with_span(Span::from_usize(0, 3)),
-            SemanticToken::Content.with_span(Span::from_usize(4, 5)),
+            IsographSemanticToken::GraphQLTypeName.with_span(Span::from_usize(0, 3)),
+            IsographSemanticToken::Content.with_span(Span::from_usize(4, 5)),
         ];
         assert_semantic_tokens(
             text,
             actual.as_slice(),
             &[
-                (SemanticToken::GraphQLTypeName, "Pet"),
-                (SemanticToken::Content, "!"),
+                (IsographSemanticToken::GraphQLTypeName, "Pet"),
+                (IsographSemanticToken::Content, "!"),
             ],
         );
     }
@@ -64,13 +67,16 @@ mod tests {
     fn sequential_search_keeps_source_order_when_both_occurrences_are_recorded() {
         let text = "aa";
         let actual = [
-            SemanticToken::Content.with_span(Span::from_usize(0, 1)),
-            SemanticToken::Content.with_span(Span::from_usize(1, 2)),
+            IsographSemanticToken::Content.with_span(Span::from_usize(0, 1)),
+            IsographSemanticToken::Content.with_span(Span::from_usize(1, 2)),
         ];
         assert_semantic_tokens(
             text,
             actual.as_slice(),
-            &[(SemanticToken::Content, "a"), (SemanticToken::Content, "a")],
+            &[
+                (IsographSemanticToken::Content, "a"),
+                (IsographSemanticToken::Content, "a"),
+            ],
         );
     }
 

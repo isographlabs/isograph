@@ -6,8 +6,8 @@ use span::{WithSpan, WithSpanPostfix};
 use crate::chunk_stream::ItemCursor;
 use crate::{
     AstError, BracketKind, ChunkContentItem, Expectation, Found, IsographFieldDirectivePath,
-    IsographResolutionNode, NonBracketToken, NonBracketTokenKind, SelectionPath, SemanticToken,
-    Slot, UnparsedChunkItems, VariableDeclarationPath, intern_block_string_value,
+    IsographResolutionNode, IsographSemanticToken, NonBracketToken, NonBracketTokenKind,
+    SelectionPath, Slot, UnparsedChunkItems, VariableDeclarationPath, intern_block_string_value,
 };
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -206,7 +206,7 @@ pub(crate) fn parse_name_colon<L, R>(
 ) -> Result<(L, R), WithSpan<AstError>> {
     let lhs = parse_lhs(cursor)?;
     cursor
-        .require_token(NonBracketTokenKind::Colon, SemanticToken::Colon)
+        .require_token(NonBracketTokenKind::Colon, IsographSemanticToken::Colon)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Colon)))?;
     let rhs = parse_rhs(cursor)?;
     (lhs, rhs).wrap_ok()
@@ -214,7 +214,7 @@ pub(crate) fn parse_name_colon<L, R>(
 
 fn require_interned_identifier<N: From<intern::string_key::StringKey>>(
     cursor: &mut ItemCursor<'_>,
-    name_token: SemanticToken,
+    name_token: IsographSemanticToken,
     missing_name: Expectation,
 ) -> Result<WithSpan<N>, WithSpan<AstError>> {
     let name = cursor
@@ -227,7 +227,11 @@ fn parse_argument(cursor: &mut ItemCursor<'_>) -> Result<Argument, WithSpan<AstE
     let (name, value) = parse_name_colon(
         cursor,
         |cursor| {
-            require_interned_identifier(cursor, SemanticToken::Argument, Expectation::Argument)
+            require_interned_identifier(
+                cursor,
+                IsographSemanticToken::Argument,
+                Expectation::Argument,
+            )
         },
         parse_non_constant_value,
     )?;
@@ -242,7 +246,11 @@ fn parse_object_entry(cursor: &mut ItemCursor<'_>) -> Result<ObjectEntry, WithSp
     let (name, value) = parse_name_colon(
         cursor,
         |cursor| {
-            require_interned_identifier(cursor, SemanticToken::ObjectKey, Expectation::ObjectEntry)
+            require_interned_identifier(
+                cursor,
+                IsographSemanticToken::ObjectKey,
+                Expectation::ObjectEntry,
+            )
         },
         parse_non_constant_value,
     )?;
@@ -256,7 +264,7 @@ fn parse_object_entry(cursor: &mut ItemCursor<'_>) -> Result<ObjectEntry, WithSp
 pub(crate) fn consume_argument_list(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<ArgumentList>> {
     cursor.consume_group_if(
         BracketKind::Parenthesis,
-        SemanticToken::Parenthesis,
+        IsographSemanticToken::Parenthesis,
         |cursor, children| {
             ArgumentList(children.item.parse_each_chunk(
                 cursor,
@@ -273,10 +281,13 @@ pub(crate) fn parse_variable_name(
 ) -> Result<WithSpan<VariableDeclarationOrUsage>, WithSpan<AstError>> {
     cursor.spanning(|cursor| {
         cursor
-            .require_token(NonBracketTokenKind::Dollar, SemanticToken::Variable)
+            .require_token(NonBracketTokenKind::Dollar, IsographSemanticToken::Variable)
             .map_err(|()| cursor.expected(missing_dollar))?;
         let name = cursor
-            .require_token(NonBracketTokenKind::Identifier, SemanticToken::Variable)
+            .require_token(
+                NonBracketTokenKind::Identifier,
+                IsographSemanticToken::Variable,
+            )
             .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
         VariableDeclarationOrUsage(name.interned().map(VariableNameWrapper)).wrap_ok()
     })
@@ -285,14 +296,15 @@ pub(crate) fn parse_variable_name(
 fn parse_string_literal(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<StringLiteralValueWrapper, WithSpan<AstError>> {
-    if let Some(span) =
-        cursor.consume_token_if(NonBracketTokenKind::StringLiteral, SemanticToken::String)
-    {
+    if let Some(span) = cursor.consume_token_if(
+        NonBracketTokenKind::StringLiteral,
+        IsographSemanticToken::String,
+    ) {
         return StringLiteralValueWrapper(span.exclude_ends(1).interned().item).wrap_ok();
     }
     if let Some(span) = cursor.consume_token_if(
         NonBracketTokenKind::BlockStringLiteral,
-        SemanticToken::String,
+        IsographSemanticToken::String,
     ) {
         return StringLiteralValueWrapper(intern_block_string_value(span.exclude_ends(3).text()))
             .wrap_ok();
@@ -304,7 +316,10 @@ fn parse_string_literal(
 
 fn parse_integer_value(cursor: &mut ItemCursor<'_>) -> Result<IntegerValue, WithSpan<AstError>> {
     let span = cursor
-        .require_token(NonBracketTokenKind::IntegerLiteral, SemanticToken::Integer)
+        .require_token(
+            NonBracketTokenKind::IntegerLiteral,
+            IsographSemanticToken::Integer,
+        )
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::IntegerLiteral)))?;
     match span.text().parse() {
         Ok(value) => IntegerValue(value).wrap_ok(),
@@ -320,7 +335,7 @@ fn parse_boolean_or_null(
     let span = cursor
         .require_token(
             NonBracketTokenKind::Identifier,
-            SemanticToken::BooleanOrNull,
+            IsographSemanticToken::BooleanOrNull,
         )
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
     match span.text() {
@@ -347,7 +362,7 @@ fn parse_object_literal(cursor: &mut ItemCursor<'_>) -> Result<ObjectLiteral, Wi
     let object = cursor
         .require_group(
             BracketKind::Brace,
-            SemanticToken::Brace,
+            IsographSemanticToken::Brace,
             |cursor, children| {
                 ObjectLiteral(children.item.parse_each_chunk(
                     cursor,
@@ -394,7 +409,7 @@ pub(crate) fn parse_non_constant_value(
         }
         if let Some(list) = cursor.consume_group_if(
             BracketKind::Bracket,
-            SemanticToken::Bracket,
+            IsographSemanticToken::Bracket,
             |cursor, children| {
                 ListLiteral(children.item.parse_each_chunk(
                     cursor,
@@ -417,7 +432,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        AstError, Found, NonBracketTokenKind, SemanticToken,
+        AstError, Found, IsographSemanticToken, NonBracketTokenKind,
         assert_semantic_tokens::assert_semantic_tokens,
         chunk, match_brackets,
         parsed_items::{parsed_items, span_of},
@@ -431,7 +446,7 @@ mod tests {
 
     type ParsedArgumentList = (Option<WithSpan<ArgumentList>>, Vec<WithSpan<AstError>>);
 
-    fn parsed_pairs(text: &str, expected_tokens: &[(SemanticToken, &str)]) -> ParsedPairs {
+    fn parsed_pairs(text: &str, expected_tokens: &[(IsographSemanticToken, &str)]) -> ParsedPairs {
         let (items, errors, comma_errors) = parsed_items(
             text,
             Expectation::Separator(BracketKind::Parenthesis),
@@ -444,7 +459,7 @@ mod tests {
 
     fn parsed_argument_list(
         text: &str,
-        expected_tokens: &[(SemanticToken, &str)],
+        expected_tokens: &[(IsographSemanticToken, &str)],
     ) -> ParsedArgumentList {
         let (brackets, bracket_errors) = match_brackets(tokenize(text), text.len() as u32);
         assert!(bracket_errors.is_empty(), "for literal {text:?}");
@@ -485,13 +500,13 @@ mod tests {
         let (items, errors) = parsed_pairs(
             text,
             &[
-                (SemanticToken::Argument, "id"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "petId"),
-                (SemanticToken::Argument, "shouted"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::BooleanOrNull, "true"),
+                (IsographSemanticToken::Argument, "id"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "petId"),
+                (IsographSemanticToken::Argument, "shouted"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::BooleanOrNull, "true"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -520,28 +535,28 @@ mod tests {
         let (items, errors) = parsed_pairs(
             text,
             &[
-                (SemanticToken::Argument, "a"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "x"),
-                (SemanticToken::Argument, "b"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::String, "\"hi\""),
-                (SemanticToken::Argument, "c"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Integer, "42"),
-                (SemanticToken::Argument, "d"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Integer, "-7"),
-                (SemanticToken::Argument, "e"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::BooleanOrNull, "true"),
-                (SemanticToken::Argument, "f"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::BooleanOrNull, "false"),
-                (SemanticToken::Argument, "g"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::BooleanOrNull, "null"),
+                (IsographSemanticToken::Argument, "a"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "x"),
+                (IsographSemanticToken::Argument, "b"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::String, "\"hi\""),
+                (IsographSemanticToken::Argument, "c"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Integer, "42"),
+                (IsographSemanticToken::Argument, "d"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Integer, "-7"),
+                (IsographSemanticToken::Argument, "e"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::BooleanOrNull, "true"),
+                (IsographSemanticToken::Argument, "f"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::BooleanOrNull, "false"),
+                (IsographSemanticToken::Argument, "g"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::BooleanOrNull, "null"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -576,20 +591,20 @@ mod tests {
         let (items, errors) = parsed_pairs(
             text,
             &[
-                (SemanticToken::Argument, "input"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::ObjectKey, "id"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Integer, "4"),
-                (SemanticToken::ObjectKey, "nested"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::ObjectKey, "on"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::BooleanOrNull, "true"),
-                (SemanticToken::Brace, "}"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Argument, "input"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::ObjectKey, "id"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Integer, "4"),
+                (IsographSemanticToken::ObjectKey, "nested"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::ObjectKey, "on"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::BooleanOrNull, "true"),
+                (IsographSemanticToken::Brace, "}"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -624,9 +639,9 @@ mod tests {
         let (items, errors) = parsed_pairs(
             text,
             &[
-                (SemanticToken::Argument, "id"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Integer, "1"),
+                (IsographSemanticToken::Argument, "id"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Integer, "1"),
             ],
         );
         assert_eq!(items.len(), 1);
@@ -643,12 +658,12 @@ mod tests {
         let (items, errors) = parsed_pairs(
             text,
             &[
-                (SemanticToken::Argument, "a"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Integer, "99999999999999999999"),
-                (SemanticToken::Argument, "b"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Integer, "1"),
+                (IsographSemanticToken::Argument, "a"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Integer, "99999999999999999999"),
+                (IsographSemanticToken::Argument, "b"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Integer, "1"),
             ],
         );
         assert!(items[0].item.item.is_none());
@@ -665,11 +680,11 @@ mod tests {
         let (items, errors) = parsed_pairs(
             text,
             &[
-                (SemanticToken::Argument, "a"),
-                (SemanticToken::Integer, "1"),
-                (SemanticToken::Argument, "b"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Integer, "2"),
+                (IsographSemanticToken::Argument, "a"),
+                (IsographSemanticToken::Integer, "1"),
+                (IsographSemanticToken::Argument, "b"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Integer, "2"),
             ],
         );
         assert!(items[0].item.item.is_none());
@@ -692,9 +707,9 @@ mod tests {
         let (items, errors) = parsed_pairs(
             text,
             &[
-                (SemanticToken::Argument, "a"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::BooleanOrNull, "yes"),
+                (IsographSemanticToken::Argument, "a"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::BooleanOrNull, "yes"),
             ],
         );
         assert!(items[0].item.item.is_none());
@@ -714,9 +729,9 @@ mod tests {
         let (items, errors) = parsed_pairs(
             text,
             &[
-                (SemanticToken::Integer, "42"),
-                (SemanticToken::Content, ":"),
-                (SemanticToken::Integer, "1"),
+                (IsographSemanticToken::Integer, "42"),
+                (IsographSemanticToken::Content, ":"),
+                (IsographSemanticToken::Integer, "1"),
             ],
         );
         assert!(items[0].item.item.is_none());
@@ -736,11 +751,11 @@ mod tests {
         let (items, errors) = parsed_pairs(
             text,
             &[
-                (SemanticToken::Argument, "id"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "x"),
-                (SemanticToken::Content, "junk"),
+                (IsographSemanticToken::Argument, "id"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "x"),
+                (IsographSemanticToken::Content, "junk"),
             ],
         );
         assert_eq!(items.len(), 1);
@@ -767,12 +782,12 @@ mod tests {
             Expectation::Separator(BracketKind::Parenthesis),
             parse_argument,
             &[
-                (SemanticToken::Argument, "a"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Integer, "1"),
-                (SemanticToken::Argument, "b"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Integer, "2"),
+                (IsographSemanticToken::Argument, "a"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Integer, "1"),
+                (IsographSemanticToken::Argument, "b"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Integer, "2"),
             ],
         );
         assert_eq!(comma_errors.len(), 1);
@@ -794,12 +809,12 @@ mod tests {
         let (list, errors) = parsed_argument_list(
             text,
             &[
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Argument, "id"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "petId"),
-                (SemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Argument, "id"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "petId"),
+                (IsographSemanticToken::Parenthesis, ")"),
             ],
         );
         let list = list.expect("the fixture opens with a paren group");
@@ -818,8 +833,8 @@ mod tests {
         let (list, errors) = parsed_argument_list(
             text,
             &[
-                (SemanticToken::Parenthesis, "("),
-                (SemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Parenthesis, ")"),
             ],
         );
         let list = list.expect("the fixture opens with a paren group");
@@ -835,10 +850,10 @@ mod tests {
             Expectation::Separator(BracketKind::Bracket),
             parse_list_literal_value,
             &[
-                (SemanticToken::Integer, "1"),
-                (SemanticToken::Variable, "$"),
-                (SemanticToken::Variable, "x"),
-                (SemanticToken::BooleanOrNull, "true"),
+                (IsographSemanticToken::Integer, "1"),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "x"),
+                (IsographSemanticToken::BooleanOrNull, "true"),
             ],
         );
         assert_eq!(comma_errors, vec![]);
@@ -866,16 +881,16 @@ mod tests {
             Expectation::Value,
             |cursor| parse_non_constant_value(cursor).map(|wrapped| wrapped.item),
             &[
-                (SemanticToken::Bracket, "["),
-                (SemanticToken::Bracket, "["),
-                (SemanticToken::Integer, "1"),
-                (SemanticToken::Bracket, "]"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::ObjectKey, "a"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Integer, "2"),
-                (SemanticToken::Brace, "}"),
-                (SemanticToken::Bracket, "]"),
+                (IsographSemanticToken::Bracket, "["),
+                (IsographSemanticToken::Bracket, "["),
+                (IsographSemanticToken::Integer, "1"),
+                (IsographSemanticToken::Bracket, "]"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::ObjectKey, "a"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Integer, "2"),
+                (IsographSemanticToken::Brace, "}"),
+                (IsographSemanticToken::Bracket, "]"),
             ],
         );
         assert_eq!(comma_errors, vec![]);
@@ -908,7 +923,10 @@ mod tests {
                 text,
                 Expectation::Value,
                 |cursor| parse_non_constant_value(cursor).map(|wrapped| wrapped.item),
-                &[(SemanticToken::Bracket, "["), (SemanticToken::Bracket, "]")],
+                &[
+                    (IsographSemanticToken::Bracket, "["),
+                    (IsographSemanticToken::Bracket, "]"),
+                ],
             );
             assert_eq!(comma_errors, vec![], "for literal {text:?}");
             assert_eq!(errors, vec![], "for literal {text:?}");
@@ -933,7 +951,7 @@ mod tests {
             text,
             Expectation::Separator(BracketKind::Bracket),
             parse_list_literal_value,
-            &[(SemanticToken::Integer, "1")],
+            &[(IsographSemanticToken::Integer, "1")],
         );
         assert_eq!(comma_errors, vec![]);
         assert_eq!(items.len(), 1);
@@ -948,8 +966,8 @@ mod tests {
             Expectation::Separator(BracketKind::Bracket),
             parse_list_literal_value,
             &[
-                (SemanticToken::Integer, "1"),
-                (SemanticToken::Content, "junk"),
+                (IsographSemanticToken::Integer, "1"),
+                (IsographSemanticToken::Content, "junk"),
             ],
         );
         assert_eq!(comma_errors, vec![]);
@@ -976,7 +994,10 @@ mod tests {
             text,
             Expectation::Separator(BracketKind::Bracket),
             parse_list_literal_value,
-            &[(SemanticToken::Integer, "1"), (SemanticToken::Integer, "2")],
+            &[
+                (IsographSemanticToken::Integer, "1"),
+                (IsographSemanticToken::Integer, "2"),
+            ],
         );
         assert_eq!(comma_errors.len(), 1);
         assert_eq!(items.len(), 2);
@@ -989,12 +1010,12 @@ mod tests {
         let (items, errors) = parsed_pairs(
             text,
             &[
-                (SemanticToken::Argument, "id"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Bracket, "["),
-                (SemanticToken::Integer, "1"),
-                (SemanticToken::Integer, "2"),
-                (SemanticToken::Bracket, "]"),
+                (IsographSemanticToken::Argument, "id"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Bracket, "["),
+                (IsographSemanticToken::Integer, "1"),
+                (IsographSemanticToken::Integer, "2"),
+                (IsographSemanticToken::Bracket, "]"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -1016,12 +1037,12 @@ mod tests {
         let (items, errors) = parsed_pairs(
             text,
             &[
-                (SemanticToken::Argument, "a"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Integer, "-99999999999999999999"),
-                (SemanticToken::Argument, "b"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Integer, "1"),
+                (IsographSemanticToken::Argument, "a"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Integer, "-99999999999999999999"),
+                (IsographSemanticToken::Argument, "b"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Integer, "1"),
             ],
         );
         assert!(items[0].item.item.is_none());
@@ -1038,9 +1059,9 @@ mod tests {
         let (items, errors) = parsed_pairs(
             text,
             &[
-                (SemanticToken::Argument, "a"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Integer, "0"),
+                (IsographSemanticToken::Argument, "a"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Integer, "0"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -1056,9 +1077,9 @@ mod tests {
         let (items, errors) = parsed_pairs(
             text,
             &[
-                (SemanticToken::Argument, "a"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Integer, "-9223372036854775808"),
+                (IsographSemanticToken::Argument, "a"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Integer, "-9223372036854775808"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -1074,9 +1095,9 @@ mod tests {
         let (items, errors) = parsed_pairs(
             text,
             &[
-                (SemanticToken::Argument, "a"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Content, "01"),
+                (IsographSemanticToken::Argument, "a"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Content, "01"),
             ],
         );
         assert!(items[0].item.item.is_none());
@@ -1096,9 +1117,9 @@ mod tests {
         let (items, errors) = parsed_pairs(
             text,
             &[
-                (SemanticToken::Argument, "a"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Content, "1.5"),
+                (IsographSemanticToken::Argument, "a"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Content, "1.5"),
             ],
         );
         assert!(items[0].item.item.is_none());
@@ -1118,10 +1139,10 @@ mod tests {
         let (items, errors) = parsed_pairs(
             text,
             &[
-                (SemanticToken::Argument, "input"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Argument, "input"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -1141,9 +1162,9 @@ mod tests {
         let (items, errors) = parsed_pairs(
             text,
             &[
-                (SemanticToken::Argument, "a"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::String, "\"hi\""),
+                (IsographSemanticToken::Argument, "a"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::String, "\"hi\""),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -1169,9 +1190,9 @@ mod tests {
         let (items, errors) = parsed_pairs(
             text,
             &[
-                (SemanticToken::Argument, "a"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::String, "\"hi\\n\""),
+                (IsographSemanticToken::Argument, "a"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::String, "\"hi\\n\""),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -1193,9 +1214,9 @@ mod tests {
         let (items, errors) = parsed_pairs(
             text,
             &[
-                (SemanticToken::Argument, "a"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::String, "\"\\\"hi\\\"\""),
+                (IsographSemanticToken::Argument, "a"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::String, "\"\\\"hi\\\"\""),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -1217,9 +1238,9 @@ mod tests {
         let (items, errors) = parsed_pairs(
             text,
             &[
-                (SemanticToken::Argument, "a"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::String, "\"\"\"hi\"\"\""),
+                (IsographSemanticToken::Argument, "a"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::String, "\"\"\"hi\"\"\""),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -1245,9 +1266,9 @@ mod tests {
         let (items, errors) = parsed_pairs(
             text,
             &[
-                (SemanticToken::Argument, "a"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::String, "\"\"\"   hi\"\"\""),
+                (IsographSemanticToken::Argument, "a"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::String, "\"\"\"   hi\"\"\""),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -1269,9 +1290,9 @@ mod tests {
         let (items, errors) = parsed_pairs(
             text,
             &[
-                (SemanticToken::Argument, "a"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Integer, "9223372036854775807"),
+                (IsographSemanticToken::Argument, "a"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Integer, "9223372036854775807"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -1287,9 +1308,9 @@ mod tests {
         let (items, errors) = parsed_pairs(
             text,
             &[
-                (SemanticToken::Argument, "a"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Integer, "-0"),
+                (IsographSemanticToken::Argument, "a"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Integer, "-0"),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -1305,9 +1326,9 @@ mod tests {
         let (items, errors) = parsed_pairs(
             text,
             &[
-                (SemanticToken::Argument, "a"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::String, "\"\""),
+                (IsographSemanticToken::Argument, "a"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::String, "\"\""),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -1323,9 +1344,9 @@ mod tests {
         let (items, errors) = parsed_pairs(
             text,
             &[
-                (SemanticToken::Argument, "a"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::String, "\"\"\"\"\"\""),
+                (IsographSemanticToken::Argument, "a"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::String, "\"\"\"\"\"\""),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -1346,7 +1367,10 @@ mod tests {
         let text = "a:";
         let (items, errors) = parsed_pairs(
             text,
-            &[(SemanticToken::Argument, "a"), (SemanticToken::Colon, ":")],
+            &[
+                (IsographSemanticToken::Argument, "a"),
+                (IsographSemanticToken::Colon, ":"),
+            ],
         );
         assert!(items[0].item.item.is_none());
         let colon_end = span_of(text, ":").end;
@@ -1362,9 +1386,9 @@ mod tests {
         let (items, errors) = parsed_pairs(
             text,
             &[
-                (SemanticToken::Argument, "a"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Variable, "$"),
+                (IsographSemanticToken::Argument, "a"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Variable, "$"),
             ],
         );
         assert!(items[0].item.item.is_none());
@@ -1385,11 +1409,11 @@ mod tests {
         let (items, errors) = parsed_pairs(
             text,
             &[
-                (SemanticToken::Argument, "a"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Bracket, "("),
-                (SemanticToken::Content, "x"),
-                (SemanticToken::Bracket, ")"),
+                (IsographSemanticToken::Argument, "a"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Bracket, "("),
+                (IsographSemanticToken::Content, "x"),
+                (IsographSemanticToken::Bracket, ")"),
             ],
         );
         assert!(items[0].item.item.is_none());
@@ -1422,9 +1446,9 @@ mod tests {
             let (items, errors) = parsed_pairs(
                 text,
                 &[
-                    (SemanticToken::Argument, "a"),
-                    (SemanticToken::Colon, ":"),
-                    (SemanticToken::Content, pattern),
+                    (IsographSemanticToken::Argument, "a"),
+                    (IsographSemanticToken::Colon, ":"),
+                    (IsographSemanticToken::Content, pattern),
                 ],
             );
             assert!(items[0].item.item.is_none(), "for literal {text:?}");
@@ -1444,13 +1468,13 @@ mod tests {
         let (items, errors) = parsed_pairs(
             text,
             &[
-                (SemanticToken::Argument, "input"),
-                (SemanticToken::Colon, ":"),
-                (SemanticToken::Brace, "{"),
-                (SemanticToken::Integer, "1"),
-                (SemanticToken::Content, ":"),
-                (SemanticToken::Integer, "2"),
-                (SemanticToken::Brace, "}"),
+                (IsographSemanticToken::Argument, "input"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::Integer, "1"),
+                (IsographSemanticToken::Content, ":"),
+                (IsographSemanticToken::Integer, "2"),
+                (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors.len(), 1);
