@@ -388,7 +388,7 @@ Deltas from that extract:
 - Origin `split_inclusive('\n')` included the newline in `len`. `line_breaks` records `\r\n`, `\n`, and `\r`. `length` is the text before the break.
 - `for token in tokens { check_span; emit_pieces }`. Origin's empty `split_inclusive` chunk had `len` equal to the newline. Empty or line-break-only spans `assert` in `check_span`.
 - `length` and `col` are UTF-16 (`utf16_units`). `is_ascii` runs once on `page_content`. Origin used UTF-8 byte length.
-- Same-line `delta_start` is UTF-16 of `last_start.offset..start`. Later-line `delta_start` is UTF-16 from column 0. Origin used `chars().enumerate()` for `\n` and `text.len()` for last-line width.
+- Same-line `delta_start` is UTF-16 of `last_start.offset..piece_start`. Later-line `delta_start` is UTF-16 from column 0. Origin used `chars().enumerate()` for `\n` and `text.len()` for last-line width.
 - `LineCursor` is `&LineIndex` plus `break_index`. `check_span` uses the walk cursor. Origin had no cursor.
 - Unordered, inverted, out-of-range, non-char-boundary, CRLF-interior, empty, and line-break-only spans `assert`. Origin panics on a backwards slice.
 
