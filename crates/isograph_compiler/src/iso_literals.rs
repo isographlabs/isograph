@@ -33,8 +33,7 @@ pub fn literal_id_at_location<THostLanguage: HostLanguage>(
     line_char: LineChar,
 ) -> Option<LiteralId> {
     let extractions = THostLanguage::extract_iso_literals(db, path).as_ref()?;
-    let source_id = db.get_disk_file_map().untracked().0.get(&path).copied()?;
-    let file_content = db.get(source_id).contents.reference();
+    let file_content = db.disk_file(path)?.contents.reference();
     let index = find_iso_literal_index(line_char, file_content, extractions)?;
     LiteralId { path, index }.wrap_some()
 }

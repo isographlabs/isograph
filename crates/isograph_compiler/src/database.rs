@@ -4,6 +4,7 @@ use std::marker::PhantomData;
 use common_lang_types::RelativePathToSourceFile;
 use pico::{Database, SourceId, Storage};
 use pico_macros::{Db, Source};
+use prelude::Postfix;
 
 use crate::HostLanguage;
 
@@ -49,17 +50,21 @@ impl<THostLanguage: HostLanguage> IsographState<THostLanguage> {
             self.remove(source_id);
         }
     }
+
+    pub fn disk_file(&self, path: RelativePathToSourceFile) -> Option<&DiskFile> {
+        let source_id = self.get_disk_file_map().untracked().0.get(&path).copied()?;
+        self.get(source_id).wrap_some()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use common_lang_types::RelativePathToSourceFile;
     use intern::string_key::Intern;
-    use pico::Database;
     use prelude::Postfix;
     use thiserror::Error;
 
-    use super::{DiskFile, IsographState};
+    use super::IsographState;
     use crate::host_language::{HostLanguage, IsoLiteralExtraction};
 
     #[derive(Clone, Debug, PartialEq, Eq, Error)]
@@ -85,25 +90,14 @@ mod tests {
         s.intern().to()
     }
 
-    fn disk_file(
-        state: &IsographState<TestHostLanguage>,
-        path: RelativePathToSourceFile,
-    ) -> Option<&DiskFile> {
-        state
-            .get_disk_file_map()
-            .untracked()
-            .0
-            .get(&path)
-            .map(|id| state.get(*id))
-    }
-
     #[test]
     fn present_inserts_a_disk_file() {
         let mut state = IsographState::<TestHostLanguage>::default();
         let path = intern_path("src/a.ts");
         state.insert_disk_file(path, "export const a = 1;\n".to_owned());
         assert_eq!(
-            disk_file(state.reference(), path)
+            state
+                .disk_file(path)
                 .expect("the test inserted this path")
                 .contents,
             "export const a = 1;\n"
@@ -117,7 +111,8 @@ mod tests {
         state.insert_disk_file(path, "first".to_owned());
         state.insert_disk_file(path, "second".to_owned());
         assert_eq!(
-            disk_file(state.reference(), path)
+            state
+                .disk_file(path)
                 .expect("the test inserted this path")
                 .contents,
             "second"
@@ -131,7 +126,8 @@ mod tests {
         let path = intern_path("src/a.ts");
         state.insert_disk_file(path, String::new());
         assert_eq!(
-            disk_file(state.reference(), path)
+            state
+                .disk_file(path)
                 .expect("the test inserted this path")
                 .contents,
             ""
@@ -146,13 +142,15 @@ mod tests {
         state.insert_disk_file(a, "a".to_owned());
         state.insert_disk_file(b, "b".to_owned());
         assert_eq!(
-            disk_file(state.reference(), a)
+            state
+                .disk_file(a)
                 .expect("the test inserted this path")
                 .contents,
             "a"
         );
         assert_eq!(
-            disk_file(state.reference(), b)
+            state
+                .disk_file(b)
                 .expect("the test inserted this path")
                 .contents,
             "b"
@@ -166,7 +164,7 @@ mod tests {
         let path = intern_path("src/a.ts");
         state.insert_disk_file(path, "export const a = 1;\n".to_owned());
         state.remove_disk_file(path);
-        assert!(disk_file(state.reference(), path).is_none());
+        assert!(state.disk_file(path).is_none());
     }
 
     #[test]
@@ -174,7 +172,7 @@ mod tests {
         let mut state = IsographState::<TestHostLanguage>::default();
         let path = intern_path("src/a.ts");
         state.remove_disk_file(path);
-        assert!(disk_file(state.reference(), path).is_none());
+        assert!(state.disk_file(path).is_none());
         assert!(state.get_disk_file_map().untracked().0.is_empty());
     }
 
@@ -186,9 +184,10 @@ mod tests {
         state.insert_disk_file(from, "export const a = 1;\n".to_owned());
         state.remove_disk_file(from);
         state.insert_disk_file(to, "export const a = 1;\n".to_owned());
-        assert!(disk_file(state.reference(), from).is_none());
+        assert!(state.disk_file(from).is_none());
         assert_eq!(
-            disk_file(state.reference(), to)
+            state
+                .disk_file(to)
                 .expect("the test inserted this path")
                 .contents,
             "export const a = 1;\n"
@@ -201,13 +200,14 @@ mod tests {
         let path = intern_path("");
         state.insert_disk_file(path, "empty".to_owned());
         assert_eq!(
-            disk_file(state.reference(), path)
+            state
+                .disk_file(path)
                 .expect("the test inserted this path")
                 .contents,
             "empty"
         );
         state.remove_disk_file(path);
-        assert!(disk_file(state.reference(), path).is_none());
+        assert!(state.disk_file(path).is_none());
     }
 
     #[test]
@@ -218,13 +218,15 @@ mod tests {
         state.insert_disk_file(a, "a".to_owned());
         state.insert_disk_file(b, "b".to_owned());
         assert_eq!(
-            disk_file(state.reference(), a)
+            state
+                .disk_file(a)
                 .expect("the test inserted this path")
                 .contents,
             "a"
         );
         assert_eq!(
-            disk_file(state.reference(), b)
+            state
+                .disk_file(b)
                 .expect("the test inserted this path")
                 .contents,
             "b"
