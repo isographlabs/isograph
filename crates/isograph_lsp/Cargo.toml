@@ -9,8 +9,11 @@ common_lang_types = { path = "../common_lang_types" }
 isograph_compiler = { path = "../isograph_compiler" }
 isograph_parser = { path = "../isograph_parser" }
 lsp-types = { workspace = true }
+pico = { path = "../pico" }
+pico_macros = { path = "../pico_macros" }
 prelude = { path = "../prelude" }
 span = { path = "../span" }
+tracing = { workspace = true }
 
 [dev-dependencies]
 intern = { path = "../../relay-crates/intern" }

@@ -704,8 +704,11 @@ dependencies = [
  "isograph_extract_typescript",
  "isograph_parser",
  "lsp-types",
+ "pico",
+ "pico_macros",
  "prelude",
  "span",
+ "tracing",
 ]
 
 [[package]]

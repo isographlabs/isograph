@@ -277,6 +277,7 @@ A public function takes a public key. Hover is `path` and `LineChar`. Semantic t
 #[memo]
 fn hover(db: &IsographState, path: RelativePathToSourceFile, line_char: LineChar) -> Option<Hover>;
 
+#[memo]
 fn lsp_semantic_tokens_for_file(
     db: &IsographState,
     path: RelativePathToSourceFile,
@@ -313,10 +314,10 @@ pico re-invokes a memo when a dependency's `time_updated` is newer than this mem
 If they are equal, pico keeps the old `time_updated`. Dependents see no change and do not re-invoke. That is backdating.
 
 ```text
-syntax highlighting  ->  parsed_iso_literals_in_file  ->  extract  ->  DiskFile
+syntax highlighting  ->  lsp_semantic_tokens_for_file  ->  parsed_iso_literals_in_file  ->  extract  ->  DiskFile
 ```
 
-Typing JavaScript after the last iso literal re-invokes extract. If the `Vec<IsoLiteralExtraction>` is `==` (same texts, same start indices, same context), extract is backdated. `parsed_iso_literals_in_file` does not re-invoke. `parsed_iso_literal` of the same text does not.
+Typing JavaScript after the last iso literal re-invokes extract. If the `Vec<IsoLiteralExtraction>` is `==` (same texts, same start indices, same context), extract is backdated. `parsed_iso_literals_in_file` does not re-invoke. `parsed_iso_literal` of the same text does not. Encoded tokens re-invoke because the file text changed, then `==` and backdate.
 
 Typing JavaScript before a literal changes `iso_literal_start_index`. Extract is `!=`. `parsed_iso_literals_in_file` is `!=` (the extraction moved). Encoded file tokens change (`delta_line` / `delta_start`). The tree is relative and `==`. `parsed_iso_literal` of the same text does not re-invoke.
 
