@@ -1,8 +1,0 @@
-{
-  "$schema": "../isograph-compiler/isograph-config-schema.json",
-  "project_root": "./src/tests",
-  "schema": "./schema.graphql",
-  "options": {
-    "on_invalid_id_type": "error"
-  }
-}

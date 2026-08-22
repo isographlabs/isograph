@@ -1,8 +1,0 @@
-{
-  "extends": "../../tsconfig.build.json",
-  "compilerOptions": {
-    "jsx": "react"
-  },
-  "include": ["**/*.ts", "**/*.tsx"],
-  "exclude": ["src/tests/**/*.ts", "src/tests/**/*.tsx"]
-}
