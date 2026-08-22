@@ -11,6 +11,7 @@ pub(crate) fn on_message(text: &str, emit: impl FnOnce(IsographEvent)) {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
     use std::time::Duration;
 
     use futures_util::SinkExt;
@@ -18,7 +19,7 @@ mod tests {
     use tokio_tungstenite::tungstenite::Message;
 
     use super::on_message;
-    use crate::event::IsographEvent;
+    use crate::event::{DiskChanged, IsographEvent, Presence};
 
     const SETTLE: Duration = Duration::from_millis(250);
 
@@ -55,6 +56,50 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_disk_changed_present_frame_arrives_as_an_event() {
+        let (_socket, port, mut event_rx) = listen_for_events();
+        let (mut ws, _) = tokio_tungstenite::connect_async(format!("ws://127.0.0.1:{port}"))
+            .await
+            .expect("connecting");
+        ws.send(Message::Text(
+            r#"{"kind":"DiskChanged","value":{"path":"/tmp/proj/src/a.ts","presence":{"Present":"export const a = 1;\n"}}}"#
+                .to_owned(),
+        ))
+        .await
+        .expect("sending");
+        tokio::time::sleep(SETTLE).await;
+        assert_eq!(
+            event_rx.try_recv().expect("an event arrived"),
+            IsographEvent::DiskChanged(DiskChanged {
+                path: PathBuf::from("/tmp/proj/src/a.ts"),
+                presence: Presence::Present("export const a = 1;\n".to_owned()),
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn a_disk_changed_absent_frame_arrives_as_an_event() {
+        let (_socket, port, mut event_rx) = listen_for_events();
+        let (mut ws, _) = tokio_tungstenite::connect_async(format!("ws://127.0.0.1:{port}"))
+            .await
+            .expect("connecting");
+        ws.send(Message::Text(
+            r#"{"kind":"DiskChanged","value":{"path":"/tmp/proj/src/a.ts","presence":"Absent"}}"#
+                .to_owned(),
+        ))
+        .await
+        .expect("sending");
+        tokio::time::sleep(SETTLE).await;
+        assert_eq!(
+            event_rx.try_recv().expect("an event arrived"),
+            IsographEvent::DiskChanged(DiskChanged {
+                path: PathBuf::from("/tmp/proj/src/a.ts"),
+                presence: Presence::Absent,
+            })
+        );
+    }
+
+    #[tokio::test]
     async fn an_unknown_frame_is_dropped_without_disturbing_the_connection() {
         let (_socket, port, mut event_rx) = listen_for_events();
         let (mut ws, _) = tokio_tungstenite::connect_async(format!("ws://127.0.0.1:{port}"))
@@ -74,6 +119,35 @@ mod tests {
         assert!(
             event_rx.try_recv().is_ok(),
             "the next good frame still arrived"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_bad_frame_then_a_disk_changed_frame_still_arrives() {
+        let (_socket, port, mut event_rx) = listen_for_events();
+        let (mut ws, _) = tokio_tungstenite::connect_async(format!("ws://127.0.0.1:{port}"))
+            .await
+            .expect("connecting");
+        ws.send(Message::Text("not json at all".to_owned()))
+            .await
+            .expect("sending");
+        tokio::time::sleep(SETTLE).await;
+        assert!(event_rx.try_recv().is_err(), "nothing was dispatched");
+        ws.send(Message::Text(
+            r#"{"kind":"DiskChanged","value":{"path":"/tmp/proj/src/a.ts","presence":{"Present":"export const a = 1;\n"}}}"#
+                .to_owned(),
+        ))
+        .await
+        .expect("the connection survived a bad frame");
+        tokio::time::sleep(SETTLE).await;
+        assert_eq!(
+            event_rx
+                .try_recv()
+                .expect("the next good frame still arrived"),
+            IsographEvent::DiskChanged(DiskChanged {
+                path: PathBuf::from("/tmp/proj/src/a.ts"),
+                presence: Presence::Present("export const a = 1;\n".to_owned()),
+            })
         );
     }
 }

@@ -78,7 +78,7 @@ async fn serve(config_path: PathBuf, port_path: PathBuf) {
     // `select!` rather than `join!`: the effect loop ends on `Kill`, and the event
     // loop never does, because `_hold_events` holds a sender for as long as serve runs.
     let _hold_events = event_tx;
-    let state = IsographState;
+    let state = IsographState::default();
     tokio::select! {
         () = run_event_loop(state, event_rx, effect_tx) => {}
         () = run_effect_loop(effect_rx) => {}
@@ -136,7 +136,7 @@ mod tests {
             .send(IsographEvent::HelloWorld)
             .expect("the test sends HelloWorld");
         drop(event_tx);
-        run_event_loop(IsographState, event_rx, effect_tx).await;
+        run_event_loop(IsographState::default(), event_rx, effect_tx).await;
         let effect = effect_rx.recv().await.expect("handle sent one effect");
         assert_eq!(effect, IsographEffect::LogHelloWorld);
     }
@@ -149,7 +149,7 @@ mod tests {
             .send(IsographEvent::Quit)
             .expect("the test sends Quit");
         drop(event_tx);
-        run_event_loop(IsographState, event_rx, effect_tx).await;
+        run_event_loop(IsographState::default(), event_rx, effect_tx).await;
         let effect = effect_rx.recv().await.expect("handle sent one effect");
         assert_eq!(effect, IsographEffect::Kill);
     }

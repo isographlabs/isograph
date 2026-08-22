@@ -1200,6 +1200,8 @@ dependencies = [
  "freddie_event_socket",
  "freddie_single_instance",
  "futures-util",
+ "pico",
+ "pico_macros",
  "prelude",
  "serde",
  "serde_json",
