@@ -1000,6 +1000,98 @@ mod tests {
     }
 
     #[test]
+    fn an_interior_splits_on_commas_and_line_breaks_the_same_way() {
+        let text = "{ a, b }";
+        let comma = chunked(text);
+        let brace = as_group(content_item(comma.item.0[0].item.reference(), 0));
+        assert_eq!(brace.children.item.0.len(), 2);
+
+        let text = "{ a\nb }";
+        let linebreak = chunked(text);
+        let brace = as_group(content_item(linebreak.item.0[0].item.reference(), 0));
+        assert_eq!(brace.children.item.0.len(), 2);
+    }
+
+    #[test]
+    fn an_interior_line_break_before_a_group_splits_the_selection() {
+        let text = "{ foo\n{ bar } }";
+        let tree = chunked(text);
+        let brace = as_group(content_item(tree.item.0[0].item.reference(), 0));
+        assert_eq!(brace.children.item.0.len(), 2);
+        as_non_bracket(content_item(brace.children.item.0[0].item.reference(), 0));
+        as_group(content_item(brace.children.item.0[1].item.reference(), 0));
+    }
+
+    #[test]
+    fn an_interior_non_separator_run_stays_in_one_chunk() {
+        let text = "{ bar, baz watttt, qux }";
+        let tree = chunked(text);
+        let brace = as_group(content_item(tree.item.0[0].item.reference(), 0));
+        assert_eq!(brace.children.item.0.len(), 3);
+        let middle = brace.children.item.0[1].item.reference();
+        assert_eq!(middle.contents.len(), 2);
+        assert_eq!(render_chunk(text, middle), "baz watttt,");
+    }
+
+    #[test]
+    fn an_interior_dropped_boundarys_line_break_goes_with_its_comma() {
+        let text = "{ a,,\nb }";
+        let (chunked, errors) = chunked_with_commas(text);
+        let commas = span_of(text, ",,");
+        assert_eq!(
+            errors,
+            CommaWithoutItem(Span::new(commas.start + 1, commas.end)).wrap_vec()
+        );
+        let brace = as_group(content_item(chunked.item.0[0].item.reference(), 0));
+        assert_eq!(brace.children.item.0.len(), 2);
+        assert_eq!(
+            render_chunk(text, brace.children.item.0[0].item.reference()),
+            "a,"
+        );
+        assert_eq!(
+            render_chunk(text, brace.children.item.0[1].item.reference()),
+            "b"
+        );
+    }
+
+    #[test]
+    fn an_interior_trailing_doubled_comma_keeps_the_item() {
+        let text = "{ a, , }";
+        let (chunked, errors) = chunked_with_commas(text);
+        let anchor = span_of(text, ", ,");
+        assert_eq!(
+            errors,
+            CommaWithoutItem(Span::new(anchor.end - 1, anchor.end)).wrap_vec()
+        );
+        let brace = as_group(content_item(chunked.item.0[0].item.reference(), 0));
+        assert_eq!(brace.children.item.0.len(), 1);
+        assert_eq!(
+            render_chunk(text, brace.children.item.0[0].item.reference()),
+            "a,"
+        );
+    }
+
+    #[test]
+    fn an_interior_doubled_leading_commas_are_two_errors_in_order() {
+        let text = "{,,a }";
+        let (chunked, errors) = chunked_with_commas(text);
+        let commas = span_of(text, ",,");
+        assert_eq!(
+            errors,
+            vec![
+                CommaWithoutItem(Span::new(commas.start, commas.start + 1)),
+                CommaWithoutItem(Span::new(commas.start + 1, commas.end)),
+            ]
+        );
+        let brace = as_group(content_item(chunked.item.0[0].item.reference(), 0));
+        assert_eq!(brace.children.item.0.len(), 1);
+        assert_eq!(
+            render_chunk(text, brace.children.item.0[0].item.reference()),
+            "a"
+        );
+    }
+
+    #[test]
     fn a_captured_line_break_resolves_to_its_level() {
         let text = "\nfoo {\n bar }";
         let tree = chunked(text);
