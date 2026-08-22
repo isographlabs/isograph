@@ -282,7 +282,7 @@ Tests in `crates/isograph_extract_typescript/src/lib.rs` under a `memo_tests` mo
 
 ## Change 4: row and column to an index
 
-Origin of `LineChar` and the walk: isograph `crates/isograph_lsp/src/hover.rs` `get_iso_literal_extraction_from_text_position_params` / `find_iso_literal_extraction_under_cursor`. Origin of `delta_line_delta_start`: isograph `crates/isograph_lsp/src/semantic_tokens.rs`. Delta: the memo returns `Option<usize>` (the vec index), not `(IsoLiteralExtraction, u32)` (the item plus an offset into the literal). `LineChar` lives in `iso_literals.rs` so the compiler intern does not take `lsp_types::Position` (that type is not `Hash`).
+Origin of `LineChar` and the walk: isograph `crates/isograph_lsp/src/hover.rs` `get_iso_literal_extraction_from_text_position_params` / `find_iso_literal_extraction_under_cursor`. Origin of `delta_line_delta_start`: isograph `crates/isograph_lsp/src/semantic_tokens.rs`. Delta: the memo returns `Option<usize>` (the vec index), not `(IsoLiteralExtraction, u32)` (the item plus an offset into the literal). Hover creates one slot per `LineChar`. Returning the extraction would clone `iso_literal_text` into each of those slots. The index is `Copy`; `iso_literal_extraction(path, index)` is the one slot that holds the string. As the cursor moves inside one literal the index stays the same, so parse keyed on that index reuses. `LineChar` lives in `iso_literals.rs` so the compiler intern does not take `lsp_types::Position` (that type is not `Hash`).
 
 `line` is 0-based count of `\n`. `character` is bytes since the last `\n`, same as isograph `delta_line_delta_start`.
 

@@ -164,11 +164,15 @@ isograph passes a file-absolute `TextSource` into the parse memo. Moving the lit
 
 The compiler walks a file's extractions in order. It has `path` and `index`. File plus index is a key it can pass without searching. `iso_literal_extraction` and `parsed_iso_literal_in_file` take that pair.
 
-The LSP has `path` and a cursor. `LineChar` is that cursor: `line` is a 0-based count of `\n`, `character` is bytes since the last `\n`. The LSP does not have `index`. `iso_literal_index` is the memo whose arguments are the coordinates the LSP has. It scans the extract vec and returns `Option<usize>`. Hover, goto definition, and completion call that, then call `parsed_iso_literal_in_file` with the index.
+The LSP has `path` and a cursor. `LineChar` is that cursor: `line` is a 0-based count of `\n`, `character` is bytes since the last `\n`. `iso_literal_index` is the memo whose arguments are those coordinates. Its result is `Option<usize>`. Hover, goto definition, and completion call that, then call `parsed_iso_literal_in_file` with the index.
 
-`iso_literal_index` is a slot per cursor position. That is cheap: a walk over a handful of spans. Parse is not a slot per cursor. Parse is keyed on the literal text. The cursor is how the LSP produces the index; the index is how a file produces an extraction; the text is how an extraction produces a parse.
+Hover fires once per cursor. Each `(path, LineChar)` is its own memo slot, so moving the mouse across a literal executes `iso_literal_index` for every character. That is expected. The body is a walk over a handful of spans. The stored value is an index, or `None`.
 
-The principle: the keys of each memo are coordinates the caller already has. A caller that has a cursor does not invent an index before calling. A caller that has an index does not invent a cursor. A caller that has the literal text does not pass the file.
+That early step exists so the expensive memos can reuse. Every character inside the first literal yields `Some(0)`. `parsed_iso_literal_in_file(path, 0)` is one slot. pico hits it. Parse is the expensive work.
+
+`iso_literal_index` does not return `IsoLiteralExtraction`. If it did, each cursor slot would store a clone of `iso_literal_text`. Hovering would copy the literal string once per character into the database. The index is `Copy`. The string lives on the extract-all memo and on the one `iso_literal_extraction(path, index)` slot.
+
+The principle: the keys of each memo are coordinates the caller already has. A caller that has a cursor calls `iso_literal_index`. A caller that has an index calls `iso_literal_extraction`. A caller that has the literal text calls `parsed_iso_literal`. The high-cardinality memo (one slot per cursor) returns a small key. The large values sit behind that key.
 
 After parse, the identity of a selectable is `(EntityName, SelectableName)`, which is in the AST. Schema memos are keyed on those names, not on files.
 
@@ -249,7 +253,7 @@ export const Avatar = iso(`
 
 `parsed_iso_literal_in_file(db, path, 0)` loads extraction `0` and calls `parsed_iso_literal` with that text. The parse tree is the selectable declaration. Semantic tokens on that tree are relative to the interior.
 
-The LSP asks for hover at a cursor on `name`. The adapter has `path` and a `LineChar`. `iso_literal_index` returns `Some(0)`. `parsed_iso_literal_in_file(db, path, 0)` is the same parse. Resolve uses the offset of that cursor within the literal. Schema hover for `User.name` is keyed by `(User, name)`, which resolve already has.
+The LSP asks for hover at a cursor on `name`. The adapter has `path` and a `LineChar`. `iso_literal_index` returns `Some(0)` and stores that `usize`. Moving the cursor along `name` executes `iso_literal_index` again with a new `LineChar`; it still returns `Some(0)`. `parsed_iso_literal_in_file(db, path, 0)` is one slot and does not re-invoke. Resolve uses the offset of that cursor within the literal. Schema hover for `User.name` is keyed by `(User, name)`, which resolve already has.
 
 The user types `const x = 1;` at the top of the file. `handle` sets a new `DiskFile`. Extract re-invokes: same text, new `iso_literal_start_index`. `parsed_iso_literal` of that text does not re-invoke. File-absolute token offsets do.
 
