@@ -1,7 +1,9 @@
+use std::marker::PhantomData;
 use std::process::ExitCode;
 
 use clap::{CommandFactory, FromArgMatches, Parser};
 use freddie_cli::{App, Instance, NoArgs};
+use isograph_compiler::HostLanguage;
 use prelude::Postfix;
 
 mod config_path;
@@ -13,22 +15,22 @@ mod external;
 mod send;
 mod state;
 
-pub fn run() -> ExitCode {
+pub fn run<THostLanguage: HostLanguage + Send + Sync + 'static>() -> ExitCode {
     // First, so `--help` prints and a bad flag exits before the lock is taken.
     // The matches are kept beside the parse because `run_lifecycle_verb` reads what was written
     // from them, to forward to the daemon it spawns.
-    let matches = Cli::command().get_matches();
-    let cli = Cli::from_arg_matches(matches.reference())
+    let matches = Cli::<THostLanguage>::command().get_matches();
+    let cli = Cli::<THostLanguage>::from_arg_matches(matches.reference())
         .expect("the derived type matches the command it derived");
 
     match cli.verb {
         Some(CliVerb::Lifecycle(verb)) => {
-            freddie_cli::run_lifecycle_verb::<Isograph>(verb, matches.reference())
+            freddie_cli::run_lifecycle_verb::<Isograph<THostLanguage>>(verb, matches.reference())
         }
         Some(CliVerb::Send(args)) => send::run(args.reference()),
         Some(CliVerb::ConfigPath(id)) => config_path::run(id.reference()),
-        None => freddie_cli::run_lifecycle_verb::<Isograph>(
-            freddie_cli::verb_for_bare_invocation::<Isograph>(),
+        None => freddie_cli::run_lifecycle_verb::<Isograph<THostLanguage>>(
+            freddie_cli::verb_for_bare_invocation::<Isograph<THostLanguage>>(),
             matches.reference(),
         ),
     }
@@ -36,16 +38,16 @@ pub fn run() -> ExitCode {
 
 #[derive(Parser)]
 #[command(name = "isograph", version, about = "The isograph compiler.", long_about = None)]
-struct Cli {
+struct Cli<THostLanguage: HostLanguage + Send + Sync + 'static> {
     #[command(subcommand)]
-    verb: Option<CliVerb>,
+    verb: Option<CliVerb<THostLanguage>>,
 }
 
 #[derive(clap::Subcommand)]
-enum CliVerb {
+enum CliVerb<THostLanguage: HostLanguage + Send + Sync + 'static> {
     /// start, restart, status, logs, stop, and the hidden daemon.
     #[command(flatten)]
-    Lifecycle(freddie_cli::Verb<Isograph>),
+    Lifecycle(freddie_cli::Verb<Isograph<THostLanguage>>),
 
     /// Write one IsographEvent JSON frame to the running daemon. Not for typing: tests and CI.
     #[command(hide = true)]
@@ -73,9 +75,9 @@ struct ConfigFlag {
     pub config: Option<std::path::PathBuf>,
 }
 
-struct Isograph;
+struct Isograph<THostLanguage>(PhantomData<THostLanguage>);
 
-impl App for Isograph {
+impl<THostLanguage: HostLanguage + Send + Sync + 'static> App for Isograph<THostLanguage> {
     type Id = ConfigFlag;
     type DaemonArgs = NoArgs;
 
@@ -103,6 +105,6 @@ impl App for Isograph {
             tracing::error!(error = %e, "could not load the config");
             return;
         }
-        crate::daemon::run(path, port_path);
+        crate::daemon::run::<THostLanguage>(path, port_path);
     }
 }

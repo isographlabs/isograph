@@ -2,6 +2,8 @@
 
 use std::process::ExitCode;
 
+use isograph_extract_typescript::TypeScriptHostLanguage;
+
 fn main() -> ExitCode {
-    isograph_cli::run()
+    isograph_cli::run::<TypeScriptHostLanguage>()
 }

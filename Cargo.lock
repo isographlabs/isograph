@@ -661,9 +661,10 @@ dependencies = [
  "freddie_event_socket",
  "freddie_single_instance",
  "futures-util",
+ "isograph_compiler",
  "isograph_config",
+ "isograph_extract_typescript",
  "pico",
- "pico_macros",
  "prelude",
  "serde",
  "serde_json",
@@ -680,6 +681,8 @@ name = "isograph_compiler"
 version = "0.5.3"
 dependencies = [
  "isograph_parser",
+ "pico",
+ "pico_macros",
  "span",
  "thiserror 1.0.69",
 ]
@@ -1644,6 +1647,7 @@ name = "ts_graphql_react_isograph_cli"
 version = "0.5.3"
 dependencies = [
  "isograph_cli",
+ "isograph_extract_typescript",
  "prelude",
  "tempfile",
 ]

@@ -6,6 +6,8 @@ license = { workspace = true }
 
 [dependencies]
 isograph_parser = { path = "../isograph_parser" }
+pico = { path = "../pico" }
+pico_macros = { path = "../pico_macros" }
 span = { path = "../span" }
 thiserror = { workspace = true }
 

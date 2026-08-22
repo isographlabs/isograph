@@ -10,6 +10,7 @@ path = "src/main.rs"
 
 [dependencies]
 isograph_cli = { path = "../isograph_cli" }
+isograph_extract_typescript = { path = "../isograph_extract_typescript" }
 
 [dev-dependencies]
 prelude = { path = "../prelude" }

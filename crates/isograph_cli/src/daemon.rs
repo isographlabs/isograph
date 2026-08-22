@@ -1,15 +1,16 @@
 use std::ops::ControlFlow;
 use std::path::PathBuf;
 
+use isograph_compiler::HostLanguage;
 use prelude::Postfix;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 
 use crate::effect::IsographEffect;
 use crate::event::IsographEvent;
 use crate::external::on_message;
-use crate::state::IsographState;
+use crate::state::{IsographState, handle};
 
-pub fn run(config_path: PathBuf, port_path: PathBuf) {
+pub fn run<THostLanguage: HostLanguage + Send + 'static>(config_path: PathBuf, port_path: PathBuf) {
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -20,10 +21,13 @@ pub fn run(config_path: PathBuf, port_path: PathBuf) {
             return;
         }
     };
-    runtime.block_on(serve(config_path, port_path));
+    runtime.block_on(serve::<THostLanguage>(config_path, port_path));
 }
 
-async fn serve(config_path: PathBuf, port_path: PathBuf) {
+async fn serve<THostLanguage: HostLanguage + Send + 'static>(
+    config_path: PathBuf,
+    port_path: PathBuf,
+) {
     let (event_tx, event_rx) = unbounded_channel::<IsographEvent>();
     let (effect_tx, effect_rx) = unbounded_channel::<IsographEffect>();
     let _socket = match freddie_event_socket::listen(0, {
@@ -78,7 +82,7 @@ async fn serve(config_path: PathBuf, port_path: PathBuf) {
     // `select!` rather than `join!`: the effect loop ends on `Kill`, and the event
     // loop never does, because `_hold_events` holds a sender for as long as serve runs.
     let _hold_events = event_tx;
-    let state = IsographState::default();
+    let state = IsographState::<THostLanguage>::default();
     tokio::select! {
         () = run_event_loop(state, event_rx, effect_tx) => {}
         () = run_effect_loop(effect_rx) => {}
@@ -86,13 +90,13 @@ async fn serve(config_path: PathBuf, port_path: PathBuf) {
     let _ = std::fs::remove_file(port_path.reference());
 }
 
-pub(crate) async fn run_event_loop(
-    mut state: IsographState,
+pub(crate) async fn run_event_loop<THostLanguage: HostLanguage>(
+    mut state: IsographState<THostLanguage>,
     mut event_rx: UnboundedReceiver<IsographEvent>,
     effect_tx: UnboundedSender<IsographEffect>,
 ) {
     while let Some(event) = event_rx.recv().await {
-        let effects = state.handle(event);
+        let effects = handle(&mut state, event);
         for effect in effects {
             let _ = effect_tx.send(effect);
         }
@@ -126,6 +130,7 @@ mod tests {
     use crate::effect::IsographEffect;
     use crate::event::IsographEvent;
     use crate::state::IsographState;
+    use isograph_extract_typescript::TypeScriptHostLanguage;
     use tokio::sync::mpsc::unbounded_channel;
 
     #[tokio::test]
@@ -136,7 +141,12 @@ mod tests {
             .send(IsographEvent::HelloWorld)
             .expect("the test sends HelloWorld");
         drop(event_tx);
-        run_event_loop(IsographState::default(), event_rx, effect_tx).await;
+        run_event_loop(
+            IsographState::<TypeScriptHostLanguage>::default(),
+            event_rx,
+            effect_tx,
+        )
+        .await;
         let effect = effect_rx.recv().await.expect("handle sent one effect");
         assert_eq!(effect, IsographEffect::LogHelloWorld);
     }
@@ -149,7 +159,12 @@ mod tests {
             .send(IsographEvent::Quit)
             .expect("the test sends Quit");
         drop(event_tx);
-        run_event_loop(IsographState::default(), event_rx, effect_tx).await;
+        run_event_loop(
+            IsographState::<TypeScriptHostLanguage>::default(),
+            event_rx,
+            effect_tx,
+        )
+        .await;
         let effect = effect_rx.recv().await.expect("handle sent one effect");
         assert_eq!(effect, IsographEffect::Kill);
     }
