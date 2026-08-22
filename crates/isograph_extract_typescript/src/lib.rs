@@ -119,13 +119,7 @@ impl HostLanguage for TypeScriptHostLanguage {
 }
 
 fn item_of(parse: &WithSpan<IsoLiteralParse>) -> Option<&IsoLiteralItem> {
-    parse
-        .item
-        .item
-        .item
-        .item
-        .as_ref()
-        .map(|item| item.item.reference())
+    parse.item.item.as_ref().map(|item| item.item.reference())
 }
 
 #[cfg(test)]

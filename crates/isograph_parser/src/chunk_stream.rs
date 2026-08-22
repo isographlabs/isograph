@@ -5,14 +5,29 @@ use safe_peekable::{IntoSafePeekable, Peek, SafePeekable};
 use span::{Span, WithSpan, WithSpanPostfix};
 
 use crate::{
-    AstError, BracketKind, Chunk, ChunkContentItem, ChunkedLevel, Expectation, ExtraChunks, Found,
-    IsographSemanticToken, NonBracketTokenKind, Singleton, Slot, UnparsedChunkItems,
-    parse_singleton,
+    AstError, BracketKind, Chunk, ChunkContentItem, ChunkedLevel, Expectation, Found,
+    IsographSemanticToken, NonBracketToken, NonBracketTokenKind,
 };
+
+enum ContentIter<'a> {
+    Slice(std::slice::Iter<'a, WithSpan<ChunkContentItem>>),
+    NonEmpty(nonempty::Iter<'a, WithSpan<ChunkContentItem>>),
+}
+
+impl<'a> Iterator for ContentIter<'a> {
+    type Item = &'a WithSpan<ChunkContentItem>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            ContentIter::Slice(iter) => iter.next(),
+            ContentIter::NonEmpty(iter) => iter.next(),
+        }
+    }
+}
 
 /// Sequential reader of one chunk. Parameter of a parse function.
 pub(crate) struct ItemCursor<'a> {
-    items: SafePeekable<nonempty::Iter<'a, WithSpan<ChunkContentItem>>>,
+    items: SafePeekable<ContentIter<'a>>,
     /// The end of the last item this cursor advanced past (the chunk's start before
     /// any). An `Expected(_, EndOfChunk)` error uses this offset.
     previous_end: u32,
@@ -75,14 +90,48 @@ pub(crate) struct ChunkStream<'a>(ItemCursor<'a>);
 
 impl<'a> ChunkStream<'a> {
     pub(crate) fn new(
+        contents: &'a [WithSpan<ChunkContentItem>],
+        text: &'a str,
+        tokens: &'a mut Vec<WithSpan<IsographSemanticToken>>,
+        errors: &'a mut Vec<WithSpan<AstError>>,
+    ) -> Self {
+        Self::from_iter(
+            ContentIter::Slice(contents.iter()),
+            match contents.first() {
+                Some(item) => item.location.start,
+                None => 0,
+            },
+            text,
+            tokens,
+            errors,
+        )
+    }
+
+    pub(crate) fn from_nonempty(
         contents: &'a NonEmpty<WithSpan<ChunkContentItem>>,
         text: &'a str,
         tokens: &'a mut Vec<WithSpan<IsographSemanticToken>>,
         errors: &'a mut Vec<WithSpan<AstError>>,
     ) -> Self {
+        Self::from_iter(
+            ContentIter::NonEmpty(contents.iter()),
+            contents.first().location.start,
+            text,
+            tokens,
+            errors,
+        )
+    }
+
+    fn from_iter(
+        items: ContentIter<'a>,
+        previous_end: u32,
+        text: &'a str,
+        tokens: &'a mut Vec<WithSpan<IsographSemanticToken>>,
+        errors: &'a mut Vec<WithSpan<AstError>>,
+    ) -> Self {
         ChunkStream(ItemCursor {
-            previous_end: contents.first().location.start,
-            items: contents.iter().safe_peekable(),
+            previous_end,
+            items: items.safe_peekable(),
             text,
             tokens,
             errors,
@@ -97,7 +146,6 @@ impl<'a> ChunkStream<'a> {
         self.0.tokens
     }
 
-    #[cfg_attr(not(test), expect(dead_code))]
     pub(crate) fn require_end(&mut self) -> Result<(), ()> {
         self.0.items.peek().map_or(().wrap_ok(), |_| ().wrap_err())
     }
@@ -118,6 +166,17 @@ impl<'a> ChunkStream<'a> {
 }
 
 impl<'a> ItemCursor<'a> {
+    pub(crate) fn consume_line_breaks(&mut self) {
+        while let Some(peek) = self.peek() {
+            match peek.view().item.reference() {
+                ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::LineBreak)) => {
+                    peek.advance();
+                }
+                _ => break,
+            }
+        }
+    }
+
     pub(crate) fn peek(&mut self) -> Option<CursorPeek<'_, 'a>> {
         CursorPeek {
             peek: self.items.peek()?,
@@ -212,22 +271,8 @@ impl<'a> ItemCursor<'a> {
         self.consume_group_if(kind, token, parse_inside).ok_or(())
     }
 
-    pub(crate) fn parse_nested_singleton<T>(
-        &mut self,
-        level: &WithSpan<ChunkedLevel>,
-        end: Expectation,
-        extra_chunks: impl FnOnce(&WithSpan<Chunk>) -> WithSpan<AstError>,
-        parse: impl FnOnce(&mut ItemCursor<'_>) -> Result<T, WithSpan<AstError>>,
-    ) -> Singleton<Slot<T, UnparsedChunkItems>, ExtraChunks> {
-        parse_singleton(
-            level,
-            self.text,
-            self.tokens,
-            self.errors,
-            end,
-            extra_chunks,
-            parse,
-        )
+    pub(crate) fn record_leftover_chunk(&mut self, chunk: &Chunk) {
+        crate::record_leftover_chunk(self.tokens, chunk);
     }
 
     pub(crate) fn text(&self) -> &'a str {
@@ -295,20 +340,16 @@ mod tests {
 
     use super::{ChunkStream, TokenText};
     use crate::{
-        AstError, BracketKind, Chunk, ChunkedLevel, Expectation, Found, IsographSemanticToken,
+        AstError, BracketKind, ChunkedRoot, Expectation, Found, IsographSemanticToken,
         NonBracketTokenKind, chunk, match_brackets, parsed_items::span_of, tokenize,
     };
 
-    fn chunked(text: &str) -> WithSpan<ChunkedLevel> {
+    fn chunked(text: &str) -> WithSpan<ChunkedRoot> {
         let (brackets, bracket_errors) = match_brackets(tokenize(text), text.len() as u32);
         assert!(bracket_errors.is_empty(), "for literal {text:?}");
         let (tree, comma_errors) = chunk(brackets.reference());
         assert_eq!(comma_errors, vec![], "for literal {text:?}");
         tree
-    }
-
-    fn first_chunk(tree: &WithSpan<ChunkedLevel>) -> &Chunk {
-        tree.item.0[0].item.reference()
     }
 
     fn token_text<'a>(text: &'a str, pattern: &str) -> TokenText<'a> {
@@ -327,12 +368,12 @@ mod tests {
     }
 
     fn stream_of<'a>(
-        tree: &'a WithSpan<ChunkedLevel>,
+        tree: &'a WithSpan<crate::ChunkedRoot>,
         text: &'a str,
         tokens: &'a mut Vec<WithSpan<IsographSemanticToken>>,
         errors: &'a mut Vec<WithSpan<AstError>>,
     ) -> ChunkStream<'a> {
-        first_chunk(tree).stream(text, tokens, errors)
+        ChunkStream::new(tree.item.0.as_slice(), text, tokens, errors)
     }
 
     #[test]

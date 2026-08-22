@@ -434,7 +434,9 @@ mod tests {
     use crate::{
         AstError, Found, IsographSemanticToken, NonBracketTokenKind,
         assert_semantic_tokens::assert_semantic_tokens,
-        chunk, match_brackets,
+        chunk,
+        chunk_stream::ChunkStream,
+        match_brackets,
         parsed_items::{parsed_items, span_of},
         tokenize,
     };
@@ -467,7 +469,7 @@ mod tests {
         assert_eq!(comma_errors, vec![], "for literal {text:?}");
         let mut errors = Vec::new();
         let mut tokens = Vec::new();
-        let mut stream = tree.item.0[0].item.stream(text, &mut tokens, &mut errors);
+        let mut stream = ChunkStream::new(tree.item.0.as_slice(), text, &mut tokens, &mut errors);
         let list = consume_argument_list(stream.cursor());
         assert_semantic_tokens(text, &tokens, expected_tokens);
         (list, errors)

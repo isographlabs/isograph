@@ -31,11 +31,10 @@ pub use arguments::{
     VariableNameWrapper, VariableNameWrapperPath, VariableUse, VariableUsePath,
 };
 pub use chunk::{
-    Chunk, ChunkContentItem, ChunkContentItemParent, ChunkParent, ChunkPath, ChunkSeparator,
-    ChunkSeparatorPath, ChunkedGroup, ChunkedGroupPath, ChunkedLevel, ChunkedLevelParent,
-    ChunkedLevelPath, CloseBracketPath, CommaWithoutItem, ExtraChunks, NonBracketTokenPath,
-    OpenBracketPath, SeparatorToken, Singleton, Slot, UnparsedChunkItems, UnparsedChunkItemsParent,
-    UnparsedChunkItemsPath,
+    Chunk, ChunkContentItem, ChunkContentItemParent, ChunkPath, ChunkSeparator, ChunkSeparatorPath,
+    ChunkedGroup, ChunkedGroupPath, ChunkedLevel, ChunkedLevelPath, ChunkedRoot, ChunkedRootPath,
+    CloseBracketPath, CommaWithoutItem, NonBracketTokenPath, OpenBracketPath, SeparatorToken, Slot,
+    UnparsedChunkItems, UnparsedChunkItemsParent, UnparsedChunkItemsPath,
 };
 pub use directives::{
     IsographDirectiveNameWrapper, IsographDirectiveNameWrapperPath, IsographFieldDirective,
@@ -48,10 +47,10 @@ pub use non_bracket_token::{BracketKind, NonBracketTokenKind};
 pub use parse_error::{AstError, Expectation, ExpectedFound, Found, ParseError};
 pub use parse_iso_literal::{
     Description, DescriptionPath, EntityNameWrapper, EntityNameWrapperParent,
-    EntityNameWrapperPath, EntrypointDeclaration, EntrypointDeclarationPath, ExtraChunksPath,
-    IsoLiteralItem, IsoLiteralParse, IsoLiteralParsePath, IsoLiteralSlotPath, ParsedIsoLiteral,
-    SelectableDeclaration, SelectableDeclarationPath, SelectableNameWrapper,
-    SelectableNameWrapperParent, SelectableNameWrapperPath, parse_iso_literal,
+    EntityNameWrapperPath, EntrypointDeclaration, EntrypointDeclarationPath, IsoLiteralItem,
+    IsoLiteralParse, IsoLiteralParsePath, ParsedIsoLiteral, SelectableDeclaration,
+    SelectableDeclarationPath, SelectableNameWrapper, SelectableNameWrapperParent,
+    SelectableNameWrapperPath, parse_iso_literal,
 };
 pub use selections::{
     Selection, SelectionNameWrapper, SelectionNameWrapperPath, SelectionPath, SelectionSet,
@@ -70,7 +69,9 @@ pub use variables::{
 pub(crate) use arguments::{
     consume_argument_list, parse_name_colon, parse_non_constant_value, parse_variable_name,
 };
-pub(crate) use chunk::{chunk, parse_singleton};
+#[cfg(test)]
+pub(crate) use chunk::chunk_level;
+pub(crate) use chunk::{chunk, parse_one_chunk, parse_stream, record_leftover_chunk};
 pub(crate) use directives::consume_directives;
 pub(crate) use matched_brackets::{BracketItem, Bracketed, MatchedBrackets, match_brackets};
 pub(crate) use non_bracket_token::{BracketToken, SplitToken};

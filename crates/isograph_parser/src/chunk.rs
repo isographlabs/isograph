@@ -8,28 +8,37 @@ use thiserror::Error;
 
 use crate::{
     Argument, ArgumentListPath, ArgumentSlotPath, AstError, BracketItem, BracketToken, Bracketed,
-    CloseBracket, Expectation, ExtraChunksPath, Found, IsoLiteralItem, IsoLiteralParsePath,
-    IsoLiteralSlotPath, IsographResolutionNode, IsographSemanticToken, ListLiteralPath,
-    ListLiteralValue, ListLiteralValueSlotPath, ListTypeAnnotationPath, MatchedBrackets,
-    NonBracketToken, NonBracketTokenKind, ObjectEntry, ObjectEntrySlotPath, ObjectLiteralPath,
-    OpenBracket, Selection, SelectionSetPath, SelectionSlotPath, SplitToken, VariableDeclaration,
-    VariableDeclarationListPath, VariableDeclarationSlotPath,
+    CloseBracket, Expectation, Found, IsoLiteralItem, IsoLiteralParsePath, IsographResolutionNode,
+    IsographSemanticToken, ListLiteralPath, ListLiteralValue, ListLiteralValueSlotPath,
+    ListTypeAnnotationPath, MatchedBrackets, NonBracketToken, NonBracketTokenKind, ObjectEntry,
+    ObjectEntrySlotPath, ObjectLiteralPath, OpenBracket, Selection, SelectionSetPath,
+    SelectionSlotPath, SplitToken, VariableDeclaration, VariableDeclarationListPath,
+    VariableDeclarationSlotPath,
     chunk_stream::{ChunkStream, ItemCursor},
     leftover_token,
 };
 
-/// One level of the chunk tree: the whole literal at the root, a group's interior
-/// below — the same role `MatchedBrackets` has on the bracket tree. Its chunks, in
-/// order, and nothing else: line breaks at a level's start were captured by the opening
-/// bracket (or the literal's start), and a comma no item precedes is a
-/// `CommaWithoutItem` error beside the tree, its boundary dropped.
+/// The iso literal: an unpartitioned item sequence. Empty vec is a whitespace-only
+/// or empty literal. A group in the vec has a `ChunkedLevel` interior.
 #[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ChunkedLevelParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ChunkedLevel(
+#[resolve_position(
+    parent_type = (),
+    resolved_node = IsographResolutionNode<'a>,
+    on_unmatched_span = from_path,
+)]
+pub struct ChunkedRoot(
     #[resolve_field]
-    #[parent_variant(Level)]
-    pub Vec<WithSpan<Chunk>>,
+    #[parent_variant(Root)]
+    pub Vec<WithSpan<ChunkContentItem>>,
 );
+
+/// One level of the chunk tree: a group's interior — the same role `MatchedBrackets`
+/// has on the bracket tree. Its chunks, in order, and nothing else: line breaks at a
+/// level's start were captured by the opening bracket, and a comma no item precedes is
+/// a `CommaWithoutItem` error beside the tree, its boundary dropped.
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = ChunkedGroupPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct ChunkedLevel(#[resolve_field] pub Vec<WithSpan<Chunk>>);
 
 /// A maximal separator-free run of a level's items — tokens and groups — plus the
 /// boundary that ended it when one did: line breaks and at most one comma, a second
@@ -39,7 +48,7 @@ pub struct ChunkedLevel(
 /// The wrapping `WithSpan`'s span runs from the first part's start to the last part's
 /// end.
 #[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ChunkParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = ChunkedLevelPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct Chunk {
     #[resolve_field]
     #[parent_variant(Chunk)]
@@ -65,7 +74,6 @@ pub struct ChunkedGroup {
     pub opening: WithSpan<OpenBracket>,
     /// The wrapping `WithSpan`'s span runs from the opening's end to the closing's start.
     #[resolve_field]
-    #[parent_variant(Interior)]
     pub children: WithSpan<ChunkedLevel>,
     #[resolve_field]
     pub closing: WithSpan<CloseBracket>,
@@ -92,29 +100,20 @@ pub enum SeparatorToken {
 pub struct CommaWithoutItem(pub Span);
 
 #[derive(Debug)]
-pub enum ChunkedLevelParent<'a> {
-    Root,
-    Interior(Box<ChunkedGroupPath<'a>>),
-}
-
-#[derive(Debug)]
-pub enum ChunkParent<'a> {
-    Level(ChunkedLevelPath<'a>),
-    Extra(ExtraChunksPath<'a>),
-}
-
-#[derive(Debug)]
 pub enum ChunkContentItemParent<'a> {
-    Chunk(ChunkPath<'a>),
+    Root(ChunkedRootPath<'a>),
+    Chunk(Box<ChunkPath<'a>>),
     Unparsed(UnparsedChunkItemsPath<'a>),
 }
 
-pub type ChunkedLevelPath<'a> = PositionResolutionPath<&'a ChunkedLevel, ChunkedLevelParent<'a>>;
-
-pub type ChunkPath<'a> = PositionResolutionPath<&'a Chunk, ChunkParent<'a>>;
+pub type ChunkedRootPath<'a> = PositionResolutionPath<&'a ChunkedRoot, ()>;
 
 pub type ChunkedGroupPath<'a> =
     PositionResolutionPath<&'a ChunkedGroup, ChunkContentItemParent<'a>>;
+
+pub type ChunkedLevelPath<'a> = PositionResolutionPath<&'a ChunkedLevel, ChunkedGroupPath<'a>>;
+
+pub type ChunkPath<'a> = PositionResolutionPath<&'a Chunk, ChunkedLevelPath<'a>>;
 
 pub type ChunkSeparatorPath<'a> = PositionResolutionPath<&'a ChunkSeparator, ChunkPath<'a>>;
 
@@ -133,7 +132,7 @@ impl Chunk {
         tokens: &'a mut Vec<WithSpan<IsographSemanticToken>>,
         errors: &'a mut Vec<WithSpan<AstError>>,
     ) -> ChunkStream<'a> {
-        ChunkStream::new(self.contents.reference(), text, tokens, errors)
+        ChunkStream::from_nonempty(self.contents.reference(), text, tokens, errors)
     }
 
     /// First content item through last content item. `WithSpan<Chunk>` also covers
@@ -196,7 +195,7 @@ pub struct UnparsedChunkItems(
 
 #[derive(Debug)]
 pub enum UnparsedChunkItemsParent<'a> {
-    IsoLiteralSlot(IsoLiteralSlotPath<'a>),
+    IsoLiteralSlot(IsoLiteralParsePath<'a>),
     ArgumentSlot(ArgumentSlotPath<'a>),
     ObjectEntrySlot(ObjectEntrySlotPath<'a>),
     SelectionSlot(SelectionSlotPath<'a>),
@@ -208,8 +207,8 @@ pub enum UnparsedChunkItemsParent<'a> {
 pub type UnparsedChunkItemsPath<'a> =
     PositionResolutionPath<&'a UnparsedChunkItems, UnparsedChunkItemsParent<'a>>;
 
-impl<'a> From<IsoLiteralSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
-    fn from(path: IsoLiteralSlotPath<'a>) -> Self {
+impl<'a> From<IsoLiteralParsePath<'a>> for UnparsedChunkItemsParent<'a> {
+    fn from(path: IsoLiteralParsePath<'a>) -> Self {
         UnparsedChunkItemsParent::IsoLiteralSlot(path)
     }
 }
@@ -250,18 +249,9 @@ impl<'a> From<ListLiteralValueSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
     }
 }
 
-/// Extra root chunks after the first.
-#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ExtraChunks(
-    #[resolve_field]
-    #[parent_variant(Extra)]
-    pub NonEmpty<WithSpan<Chunk>>,
-);
-
 /// One parse attempt: an item plus leftover tokens in the same chunk.
 ///
-/// `resolve` receives the list parent (`IsoLiteralParsePath` at the root, later
+/// `resolve` receives the list parent (`()` at the root, later
 /// `SelectionSetPath` from a second pin).
 /// Walk, given that parent:
 /// - Position in `item`: bare `#[resolve_field]` passes `self.path(parent)`, a path
@@ -276,7 +266,7 @@ pub struct ExtraChunks(
     resolved_node = IsographResolutionNode<'a>,
     on_unmatched_span = from_path,
     pins = [
-        (<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>),
+        (<IsoLiteralItem, UnparsedChunkItems>, ()),
         (<Argument, UnparsedChunkItems>, ArgumentListPath<'a>),
         (<ObjectEntry, UnparsedChunkItems>, ObjectLiteralPath<'a>),
         (<Selection, UnparsedChunkItems>, SelectionSetPath<'a>),
@@ -292,21 +282,6 @@ pub struct Slot<T, E> {
     #[resolve_field]
     #[parent_from]
     pub extra: Option<WithSpan<E>>,
-}
-
-/// One-item level.
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(
-    resolved_node = IsographResolutionNode<'a>,
-    pins = [
-        (<Slot<IsoLiteralItem, UnparsedChunkItems>, ExtraChunks>, ()),
-    ]
-)]
-pub struct Singleton<T, E> {
-    #[resolve_field]
-    pub item: WithSpan<T>,
-    #[resolve_field]
-    pub extra_chunks: Option<WithSpan<E>>,
 }
 
 fn separator_as_content(token: WithSpan<SeparatorToken>) -> WithSpan<ChunkContentItem> {
@@ -379,7 +354,10 @@ fn record_leftover_item(
     }
 }
 
-fn record_leftover_chunk(tokens: &mut Vec<WithSpan<IsographSemanticToken>>, chunk: &Chunk) {
+pub(crate) fn record_leftover_chunk(
+    tokens: &mut Vec<WithSpan<IsographSemanticToken>>,
+    chunk: &Chunk,
+) {
     for item in chunk.contents.iter() {
         record_leftover_item(tokens, item);
     }
@@ -408,11 +386,11 @@ fn record_leftover_span(
     }
 }
 
-fn parse_one_chunk<'a, P>(
-    chunk: &'a WithSpan<Chunk>,
-    mut stream: ChunkStream<'a>,
+pub(crate) fn parse_stream<'a, P>(
+    stream: &mut ChunkStream<'a>,
     leftover: Expectation,
     parse: impl FnOnce(&mut ItemCursor<'_>) -> Result<P, WithSpan<AstError>>,
+    failed_extra: impl FnOnce() -> NonEmpty<WithSpan<ChunkContentItem>>,
 ) -> WithSpan<Slot<P, UnparsedChunkItems>> {
     let result = stream.cursor().spanning(parse);
     let slot = match result {
@@ -434,10 +412,6 @@ fn parse_one_chunk<'a, P>(
                         .wrap_some()
                 }
             };
-            let extra = match leftover {
-                Expectation::Separator(_) => extra,
-                _ => extra_plus_trailing_separator(extra, chunk.item.trailing_separator.as_ref()),
-            };
             let location = match extra.as_ref() {
                 None => item.location,
                 Some(extra) => Span::join(item.location, extra.location),
@@ -452,7 +426,7 @@ fn parse_one_chunk<'a, P>(
             stream.cursor().report_error(reason);
             let extra = match stream.remaining_contents() {
                 Some(remaining) => remaining,
-                None => chunk.item.contents.clone(),
+                None => failed_extra(),
             };
             let location = Span::join(extra.first().location, extra.last().location);
             Slot {
@@ -466,55 +440,51 @@ fn parse_one_chunk<'a, P>(
     slot
 }
 
-pub(crate) fn parse_singleton<'a, T>(
-    level: &'a WithSpan<ChunkedLevel>,
-    text: &'a str,
-    tokens: &'a mut Vec<WithSpan<IsographSemanticToken>>,
-    errors: &'a mut Vec<WithSpan<AstError>>,
-    end: Expectation,
-    extra_chunks: impl FnOnce(&'a WithSpan<Chunk>) -> WithSpan<AstError>,
-    parse: impl FnOnce(&mut ItemCursor<'_>) -> Result<T, WithSpan<AstError>>,
-) -> Singleton<Slot<T, UnparsedChunkItems>, ExtraChunks> {
-    let item = parse_one_chunk(
-        &level.item.0[0],
-        level.item.0[0].item.stream(text, tokens, errors),
-        end,
-        parse,
-    );
-    if let Some(comma) = level.item.0[0].item.boundary_comma() {
-        errors.push(
-            AstError::expected(end, Found::Token(NonBracketTokenKind::Comma)).with_span(comma),
-        );
+pub(crate) fn parse_one_chunk<'a, P>(
+    chunk: &'a WithSpan<Chunk>,
+    mut stream: ChunkStream<'a>,
+    leftover: Expectation,
+    parse: impl FnOnce(&mut ItemCursor<'_>) -> Result<P, WithSpan<AstError>>,
+) -> WithSpan<Slot<P, UnparsedChunkItems>> {
+    let mut slot = parse_stream(&mut stream, leftover, parse, || chunk.item.contents.clone());
+    match leftover {
+        Expectation::Separator(_) => slot,
+        _ => match slot.item.item.as_ref() {
+            None => slot,
+            Some(_) => {
+                slot.item.extra = extra_plus_trailing_separator(
+                    slot.item.extra,
+                    chunk.item.trailing_separator.as_ref(),
+                );
+                if let Some(extra) = slot.item.extra.as_ref() {
+                    slot.location = Span::join(slot.location, extra.location);
+                }
+                record_leftover_extra(stream.tokens(), &slot.item.extra);
+                slot
+            }
+        },
     }
-    let extra_chunks = (level.item.len() > 1).then(|| {
-        errors.push(extra_chunks(&level.item.0[1]));
-        let rest = NonEmpty {
-            head: level.item.0[1].clone(),
-            tail: level.item.0[2..].to_vec(),
-        };
-        let location = Span::join(rest.head.location, rest.last().location);
-        ExtraChunks(rest).with_span(location)
-    });
-    if let Some(extra) = extra_chunks.as_ref() {
-        for chunk in extra.item.0.iter() {
-            record_leftover_chunk(tokens, chunk.item.reference());
-        }
-    }
-    Singleton { item, extra_chunks }
 }
 
-/// Chunk a matched-brackets tree. Every non-separator token lands in a chunk; a comma
-/// no item precedes is the pass's one error, returned beside the tree; no grammar is
-/// checked.
+/// Chunk a matched-brackets tree. The root is an unpartitioned item sequence. A comma
+/// no item precedes is produced only by group interiors; no grammar is checked.
 pub(crate) fn chunk(
     tree: &WithSpan<MatchedBrackets>,
-) -> (WithSpan<ChunkedLevel>, Vec<CommaWithoutItem>) {
+) -> (WithSpan<ChunkedRoot>, Vec<CommaWithoutItem>) {
     let mut errors = Vec::new();
-    let level = chunk_level(tree.item.reference(), &mut errors);
-    (level.with_span(tree.location), errors)
+    let contents = tree
+        .item
+        .0
+        .iter()
+        .map(|item| to_content(item, &mut errors).with_span(item.location))
+        .collect();
+    (ChunkedRoot(contents).with_span(tree.location), errors)
 }
 
-fn chunk_level(level: &MatchedBrackets, errors: &mut Vec<CommaWithoutItem>) -> ChunkedLevel {
+pub(crate) fn chunk_level(
+    level: &MatchedBrackets,
+    errors: &mut Vec<CommaWithoutItem>,
+) -> ChunkedLevel {
     let mut items = level.0.iter().safe_peekable();
     let mut out = Vec::new();
     while let Some(absorbed) = absorb_chunk(&mut items, errors) {
@@ -573,10 +543,7 @@ fn absorb_chunk(
             None => break peek,
         }
     };
-    let first = match peek.view().item.reference() {
-        BracketItem::Raw(token) => ChunkContentItem::NonBracket(*token),
-        BracketItem::Bracketed(group) => ChunkContentItem::Group(chunk_group(group, errors)),
-    };
+    let first = to_content(peek.view(), errors);
     let first_location = peek.commit().location;
     let mut span = first_location;
     let mut contents = NonEmpty::new(first.with_span(first_location));
@@ -629,20 +596,23 @@ fn absorb_chunk(
     .wrap_some()
 }
 
-/// The content this item contributes, `None` when it is a separator. Group interiors
-/// chunk here.
+fn to_content(
+    item: &WithSpan<BracketItem>,
+    errors: &mut Vec<CommaWithoutItem>,
+) -> ChunkContentItem {
+    match item.item.reference() {
+        BracketItem::Raw(token) => ChunkContentItem::NonBracket(*token),
+        BracketItem::Bracketed(group) => ChunkContentItem::Group(chunk_group(group, errors)),
+    }
+}
+
 fn as_content(
     item: &WithSpan<BracketItem>,
     errors: &mut Vec<CommaWithoutItem>,
 ) -> Option<ChunkContentItem> {
-    match item.item.reference() {
-        BracketItem::Raw(token) => match separator_token(token.0) {
-            Some(_) => None,
-            None => ChunkContentItem::NonBracket(*token).wrap_some(),
-        },
-        BracketItem::Bracketed(group) => {
-            ChunkContentItem::Group(chunk_group(group, errors)).wrap_some()
-        }
+    match separator_of(item) {
+        Some(_) => None,
+        None => to_content(item, errors).wrap_some(),
     }
 }
 
@@ -688,7 +658,7 @@ mod tests {
         match_brackets(tokenize(literal), literal.len() as u32)
     }
 
-    fn chunked(literal: &str) -> WithSpan<ChunkedLevel> {
+    fn chunked(literal: &str) -> WithSpan<ChunkedRoot> {
         let (brackets, bracket_errors) = tree(literal);
         assert_eq!(bracket_errors, vec![]);
         let (chunked, comma_errors) = chunk(brackets.reference());
@@ -697,7 +667,7 @@ mod tests {
     }
 
     /// For fixtures whose bracket tree is clean but whose chunking errs.
-    fn chunked_with_commas(literal: &str) -> (WithSpan<ChunkedLevel>, Vec<CommaWithoutItem>) {
+    fn chunked_with_commas(literal: &str) -> (WithSpan<ChunkedRoot>, Vec<CommaWithoutItem>) {
         let (brackets, bracket_errors) = tree(literal);
         assert_eq!(bracket_errors, vec![]);
         chunk(brackets.reference())
@@ -737,10 +707,6 @@ mod tests {
         }
     }
 
-    fn separator_kinds(separator: &ChunkSeparator) -> Vec<SeparatorToken> {
-        separator.0.iter().map(|s| s.item).collect()
-    }
-
     #[test]
     fn comma_without_item_displays() {
         assert_eq!(
@@ -753,48 +719,11 @@ mod tests {
     fn a_selection_set_splits_on_commas_and_line_breaks() {
         let text = "foo { bar, baz\nqux }";
         let tree = chunked(text);
-        assert_eq!(tree.item.0.len(), 1);
-        let top = tree.item.0[0].item.reference();
-        assert_eq!(top.contents.len(), 2);
-        assert_eq!(
-            as_non_bracket(content_item(top, 0)).0,
-            NonBracketTokenKind::Identifier
-        );
-        let brace = as_group(content_item(top, 1));
-        assert_eq!(brace.opening.item.0, Brace);
-        assert!(top.trailing_separator.is_none());
-
+        assert_eq!(tree.item.0.len(), 2);
+        as_non_bracket(&tree.item.0[0].item);
+        let brace = as_group(&tree.item.0[1].item);
         let interior = brace.children.item.0.reference();
         assert_eq!(interior.len(), 3);
-        assert_eq!(
-            as_non_bracket(content_item(interior[0].item.reference(), 0)).0,
-            NonBracketTokenKind::Identifier
-        );
-        assert_eq!(
-            separator_kinds(
-                interior[0]
-                    .item
-                    .trailing_separator
-                    .as_ref()
-                    .unwrap()
-                    .item
-                    .reference()
-            ),
-            SeparatorToken::Comma.wrap_vec()
-        );
-        assert_eq!(
-            separator_kinds(
-                interior[1]
-                    .item
-                    .trailing_separator
-                    .as_ref()
-                    .unwrap()
-                    .item
-                    .reference()
-            ),
-            SeparatorToken::LineBreak.wrap_vec()
-        );
-        assert!(interior[2].item.trailing_separator.is_none());
         assert_eq!(render_chunk(text, interior[0].item.reference()), "bar,");
         assert_eq!(render_chunk(text, interior[1].item.reference()), "baz\n");
         assert_eq!(render_chunk(text, interior[2].item.reference()), "qux");
@@ -804,18 +733,10 @@ mod tests {
     fn multiple_groups_share_one_chunk_and_empty_interiors_are_zero_chunks() {
         let text = "foo { } { }";
         let tree = chunked(text);
-        assert_eq!(tree.item.0.len(), 1);
-        let top = tree.item.0[0].item.reference();
-        assert_eq!(top.contents.len(), 3);
-        assert_eq!(
-            as_non_bracket(content_item(top, 0)).0,
-            NonBracketTokenKind::Identifier
-        );
-        let first = as_group(content_item(top, 1));
-        let second = as_group(content_item(top, 2));
-        assert_eq!(first.children.item.0.len(), 0);
-        assert_eq!(second.children.item.0.len(), 0);
-        assert!(top.trailing_separator.is_none());
+        assert_eq!(tree.item.0.len(), 3);
+        as_non_bracket(&tree.item.0[0].item);
+        assert_eq!(as_group(&tree.item.0[1].item).children.item.0.len(), 0);
+        assert_eq!(as_group(&tree.item.0[2].item).children.item.0.len(), 0);
     }
 
     #[test]
@@ -823,9 +744,7 @@ mod tests {
         let text = "{}";
         let tree = chunked(text);
         assert_eq!(tree.item.0.len(), 1);
-        let top = tree.item.0[0].item.reference();
-        assert_eq!(top.contents.len(), 1);
-        let brace = as_group(content_item(top, 0));
+        let brace = as_group(&tree.item.0[0].item);
         assert_eq!(brace.children.item.0.len(), 0);
         assert_eq!(
             brace.children.location,
@@ -837,47 +756,32 @@ mod tests {
     fn commas_and_line_breaks_are_equivalent_separators() {
         let comma = chunked("a, b");
         let linebreak = chunked("a\nb");
-        assert_eq!(comma.item.0.len(), 2);
-        assert_eq!(linebreak.item.0.len(), 2);
+        assert_eq!(comma.item.0.len(), 3);
+        assert_eq!(linebreak.item.0.len(), 3);
+        as_non_bracket(&comma.item.0[0].item);
         assert_eq!(
-            separator_kinds(
-                comma.item.0[0]
-                    .item
-                    .trailing_separator
-                    .as_ref()
-                    .unwrap()
-                    .item
-                    .reference()
-            ),
-            SeparatorToken::Comma.wrap_vec()
+            as_non_bracket(&comma.item.0[1].item).0,
+            NonBracketTokenKind::Comma
         );
+        as_non_bracket(&comma.item.0[2].item);
+        as_non_bracket(&linebreak.item.0[0].item);
         assert_eq!(
-            separator_kinds(
-                linebreak.item.0[0]
-                    .item
-                    .trailing_separator
-                    .as_ref()
-                    .unwrap()
-                    .item
-                    .reference()
-            ),
-            SeparatorToken::LineBreak.wrap_vec()
+            as_non_bracket(&linebreak.item.0[1].item).0,
+            NonBracketTokenKind::LineBreak
         );
-        assert!(comma.item.0[1].item.trailing_separator.is_none());
-        assert!(linebreak.item.0[1].item.trailing_separator.is_none());
+        as_non_bracket(&linebreak.item.0[2].item);
     }
 
     #[test]
     fn captured_line_breaks_make_no_chunk() {
         let text = "\n\na, b\n";
         let tree = chunked(text);
-        assert_eq!(tree.item.0.len(), 2);
-        assert_eq!(render_chunk(text, tree.item.0[0].item.reference()), "a,");
+        assert_eq!(tree.item.0.len(), 6);
         assert_eq!(tree.location, Span::from_usize(0, text.len()));
 
         let interior = "foo {\n bar\n}";
         let tree = chunked(interior);
-        let brace = as_group(content_item(tree.item.0[0].item.reference(), 1));
+        let brace = as_group(&tree.item.0[1].item);
         assert_eq!(brace.children.item.0.len(), 1);
         assert_eq!(
             render_chunk(interior, brace.children.item.0[0].item.reference()),
@@ -889,45 +793,42 @@ mod tests {
     fn a_comma_before_the_first_item_is_an_error() {
         let text = "\n, a";
         let (chunked, errors) = chunked_with_commas(text);
-        assert_eq!(errors, CommaWithoutItem(span_of(text, ",")).wrap_vec());
-        assert_eq!(chunked.item.0.len(), 1);
-        assert_eq!(render_chunk(text, chunked.item.0[0].item.reference()), "a");
+        assert_eq!(errors, vec![]);
+        assert_eq!(chunked.item.0.len(), 3);
+        assert_eq!(
+            as_non_bracket(&chunked.item.0[0].item).0,
+            NonBracketTokenKind::LineBreak
+        );
+        assert_eq!(
+            as_non_bracket(&chunked.item.0[1].item).0,
+            NonBracketTokenKind::Comma
+        );
+        as_non_bracket(&chunked.item.0[2].item);
     }
 
     #[test]
     fn a_second_comma_after_line_breaks_is_an_error() {
         let text = "a,\n\n,b";
         let (chunked, errors) = chunked_with_commas(text);
-        let second_comma = span_of(text, ",b");
-        assert_eq!(
-            errors,
-            CommaWithoutItem(Span::new(second_comma.start, second_comma.start + 1)).wrap_vec()
-        );
-        assert_eq!(chunked.item.0.len(), 2);
-        assert_eq!(
-            render_chunk(text, chunked.item.0[0].item.reference()),
-            "a,\n\n"
-        );
-        assert_eq!(render_chunk(text, chunked.item.0[1].item.reference()), "b");
+        assert_eq!(errors, vec![]);
+        assert_eq!(chunked.item.0.len(), 6);
     }
 
     #[test]
     fn a_dropped_boundarys_line_break_goes_with_its_comma() {
         let text = "a,,\nb";
         let (chunked, errors) = chunked_with_commas(text);
-        let commas = span_of(text, ",,");
-        assert_eq!(
-            errors,
-            CommaWithoutItem(Span::new(commas.start + 1, commas.end)).wrap_vec()
-        );
-        assert_eq!(chunked.item.0.len(), 2);
-        assert_eq!(render_chunk(text, chunked.item.0[0].item.reference()), "a,");
-        assert_eq!(render_chunk(text, chunked.item.0[1].item.reference()), "b");
-        match chunked.resolve(ChunkedLevelParent::Root, span_of(text, "\n")) {
-            IsographResolutionNode::ChunkedLevel(level) => {
-                assert!(matches!(level.parent, ChunkedLevelParent::Root));
+        assert_eq!(errors, vec![]);
+        assert_eq!(chunked.item.0.len(), 5);
+        match chunked.resolve((), span_of(text, "\n")) {
+            IsographResolutionNode::NonBracketToken(token) => {
+                assert_eq!(token.inner.0, NonBracketTokenKind::LineBreak);
+                match token.parent.reference() {
+                    ChunkContentItemParent::Root(_) => {}
+                    parent => panic!("expected a root parent, got {parent:?}"),
+                }
             }
-            node => panic!("expected the root level, got {node:?}"),
+            node => panic!("expected the line break, got {node:?}"),
         }
     }
 
@@ -935,29 +836,16 @@ mod tests {
     fn doubled_leading_commas_are_two_errors_in_order() {
         let text = ",,a";
         let (chunked, errors) = chunked_with_commas(text);
-        let commas = span_of(text, ",,");
-        assert_eq!(
-            errors,
-            vec![
-                CommaWithoutItem(Span::new(commas.start, commas.start + 1)),
-                CommaWithoutItem(Span::new(commas.start + 1, commas.end)),
-            ]
-        );
-        assert_eq!(chunked.item.0.len(), 1);
-        assert_eq!(render_chunk(text, chunked.item.0[0].item.reference()), "a");
+        assert_eq!(errors, vec![]);
+        assert_eq!(chunked.item.0.len(), 3);
     }
 
     #[test]
     fn a_trailing_doubled_comma_keeps_the_item() {
         let text = "a, ,";
         let (chunked, errors) = chunked_with_commas(text);
-        let anchor = span_of(text, ", ,");
-        assert_eq!(
-            errors,
-            CommaWithoutItem(Span::new(anchor.end - 1, anchor.end)).wrap_vec()
-        );
-        assert_eq!(chunked.item.0.len(), 1);
-        assert_eq!(render_chunk(text, chunked.item.0[0].item.reference()), "a,");
+        assert_eq!(errors, vec![]);
+        assert_eq!(chunked.item.0.len(), 3);
     }
 
     #[test]
@@ -965,13 +853,12 @@ mod tests {
         let text = "foo {,}";
         let (chunked, errors) = chunked_with_commas(text);
         assert_eq!(errors, CommaWithoutItem(span_of(text, ",")).wrap_vec());
-        let top = chunked.item.0[0].item.reference();
-        assert_eq!(top.contents.len(), 2);
-        let brace = as_group(content_item(top, 1));
+        assert_eq!(chunked.item.0.len(), 2);
+        let brace = as_group(&chunked.item.0[1].item);
         assert_eq!(brace.children.item.0.len(), 0);
-        match chunked.resolve(ChunkedLevelParent::Root, span_of(text, ",")) {
+        match chunked.resolve((), span_of(text, ",")) {
             IsographResolutionNode::ChunkedLevel(level) => {
-                assert!(matches!(level.parent, ChunkedLevelParent::Interior(_)));
+                assert_eq!(level.parent.inner.opening.item.0, Brace);
             }
             node => panic!("expected the interior level, got {node:?}"),
         }
@@ -983,7 +870,7 @@ mod tests {
         let (chunked, errors) = chunked_with_commas(text);
         assert_eq!(errors, CommaWithoutItem(span_of(text, ",")).wrap_vec());
         assert_eq!(chunked.item.0.len(), 1);
-        let brace = as_group(content_item(chunked.item.0[0].item.reference(), 0));
+        let brace = as_group(&chunked.item.0[0].item);
         assert_eq!(brace.children.item.0.len(), 1);
         assert_eq!(
             render_chunk(text, brace.children.item.0[0].item.reference()),
@@ -995,7 +882,7 @@ mod tests {
     fn a_list_trailing_comma_is_not_a_chunking_error() {
         let text = "foo { a, }";
         let chunked = chunked(text);
-        let brace = as_group(content_item(chunked.item.0[0].item.reference(), 1));
+        let brace = as_group(&chunked.item.0[1].item);
         assert_eq!(brace.children.item.0.len(), 1);
     }
 
@@ -1003,12 +890,12 @@ mod tests {
     fn an_interior_splits_on_commas_and_line_breaks_the_same_way() {
         let text = "{ a, b }";
         let comma = chunked(text);
-        let brace = as_group(content_item(comma.item.0[0].item.reference(), 0));
+        let brace = as_group(&comma.item.0[0].item);
         assert_eq!(brace.children.item.0.len(), 2);
 
         let text = "{ a\nb }";
         let linebreak = chunked(text);
-        let brace = as_group(content_item(linebreak.item.0[0].item.reference(), 0));
+        let brace = as_group(&linebreak.item.0[0].item);
         assert_eq!(brace.children.item.0.len(), 2);
     }
 
@@ -1016,7 +903,7 @@ mod tests {
     fn an_interior_line_break_before_a_group_splits_the_selection() {
         let text = "{ foo\n{ bar } }";
         let tree = chunked(text);
-        let brace = as_group(content_item(tree.item.0[0].item.reference(), 0));
+        let brace = as_group(&tree.item.0[0].item);
         assert_eq!(brace.children.item.0.len(), 2);
         as_non_bracket(content_item(brace.children.item.0[0].item.reference(), 0));
         as_group(content_item(brace.children.item.0[1].item.reference(), 0));
@@ -1026,7 +913,7 @@ mod tests {
     fn an_interior_non_separator_run_stays_in_one_chunk() {
         let text = "{ bar, baz watttt, qux }";
         let tree = chunked(text);
-        let brace = as_group(content_item(tree.item.0[0].item.reference(), 0));
+        let brace = as_group(&tree.item.0[0].item);
         assert_eq!(brace.children.item.0.len(), 3);
         let middle = brace.children.item.0[1].item.reference();
         assert_eq!(middle.contents.len(), 2);
@@ -1042,7 +929,7 @@ mod tests {
             errors,
             CommaWithoutItem(Span::new(commas.start + 1, commas.end)).wrap_vec()
         );
-        let brace = as_group(content_item(chunked.item.0[0].item.reference(), 0));
+        let brace = as_group(&chunked.item.0[0].item);
         assert_eq!(brace.children.item.0.len(), 2);
         assert_eq!(
             render_chunk(text, brace.children.item.0[0].item.reference()),
@@ -1063,7 +950,7 @@ mod tests {
             errors,
             CommaWithoutItem(Span::new(anchor.end - 1, anchor.end)).wrap_vec()
         );
-        let brace = as_group(content_item(chunked.item.0[0].item.reference(), 0));
+        let brace = as_group(&chunked.item.0[0].item);
         assert_eq!(brace.children.item.0.len(), 1);
         assert_eq!(
             render_chunk(text, brace.children.item.0[0].item.reference()),
@@ -1083,7 +970,7 @@ mod tests {
                 CommaWithoutItem(Span::new(commas.start + 1, commas.end)),
             ]
         );
-        let brace = as_group(content_item(chunked.item.0[0].item.reference(), 0));
+        let brace = as_group(&chunked.item.0[0].item);
         assert_eq!(brace.children.item.0.len(), 1);
         assert_eq!(
             render_chunk(text, brace.children.item.0[0].item.reference()),
@@ -1095,49 +982,29 @@ mod tests {
     fn a_captured_line_break_resolves_to_its_level() {
         let text = "\nfoo {\n bar }";
         let tree = chunked(text);
-        match tree.resolve(ChunkedLevelParent::Root, Span::new(0, 1)) {
-            IsographResolutionNode::ChunkedLevel(level) => {
-                assert!(matches!(level.parent, ChunkedLevelParent::Root));
+        match tree.resolve((), Span::new(0, 1)) {
+            IsographResolutionNode::NonBracketToken(token) => {
+                assert_eq!(token.inner.0, NonBracketTokenKind::LineBreak);
+                match token.parent.reference() {
+                    ChunkContentItemParent::Root(_) => {}
+                    parent => panic!("expected a root parent, got {parent:?}"),
+                }
             }
-            node => panic!("expected the root level, got {node:?}"),
-        }
-        let opening = span_of(text, "{\n");
-        match tree.resolve(
-            ChunkedLevelParent::Root,
-            Span::new(opening.start + 1, opening.end),
-        ) {
-            IsographResolutionNode::ChunkedLevel(level) => {
-                assert!(matches!(level.parent, ChunkedLevelParent::Interior(_)));
-            }
-            node => panic!("expected the interior level, got {node:?}"),
+            node => panic!("expected the line break, got {node:?}"),
         }
     }
 
     #[test]
-    fn non_separator_tokens_stay_in_one_chunk() {
-        let text = "bar, baz watttt, qux";
-        let tree = chunked(text);
-        assert_eq!(tree.item.0.len(), 3);
-        let middle = tree.item.0[1].item.reference();
-        assert_eq!(middle.contents.len(), 2);
-        assert_eq!(render_chunk(text, middle), "baz watttt,");
-    }
-
-    #[test]
-    fn a_line_break_before_a_group_splits_the_field_from_its_selection_set() {
+    fn a_line_break_before_a_group_stays_in_the_unpartitioned_sequence() {
         let text = "foo\n{ bar }";
         let tree = chunked(text);
-        assert_eq!(tree.item.0.len(), 2);
-        let first = tree.item.0[0].item.reference();
-        assert_eq!(first.contents.len(), 1);
+        assert_eq!(tree.item.0.len(), 3);
+        as_non_bracket(&tree.item.0[0].item);
         assert_eq!(
-            separator_kinds(first.trailing_separator.as_ref().unwrap().item.reference()),
-            SeparatorToken::LineBreak.wrap_vec()
+            as_non_bracket(&tree.item.0[1].item).0,
+            NonBracketTokenKind::LineBreak
         );
-        let second = tree.item.0[1].item.reference();
-        assert_eq!(second.contents.len(), 1);
-        as_group(content_item(second, 0));
-        assert!(second.trailing_separator.is_none());
+        as_group(&tree.item.0[2].item);
     }
 
     #[test]
@@ -1154,14 +1021,11 @@ mod tests {
         let (tree, comma_errors) = chunk(brackets.reference());
         assert_eq!(comma_errors, vec![]);
         assert_eq!(tree.item.0.len(), 1);
-        let top = tree.item.0[0].item.reference();
-        assert_eq!(top.contents.len(), 1);
         assert_eq!(
-            as_non_bracket(content_item(top, 0)).0,
+            as_non_bracket(&tree.item.0[0].item).0,
             NonBracketTokenKind::Identifier
         );
-        assert_eq!(top.contents[0].location, span_of(text, "a"));
-        assert_eq!(render_chunk(text, top), "a");
+        assert_eq!(tree.item.0[0].location, span_of(text, "a"));
     }
 
     #[test]
@@ -1178,30 +1042,32 @@ mod tests {
         let (tree, comma_errors) = chunk(brackets.reference());
         assert_eq!(comma_errors, vec![]);
         assert_eq!(tree.item.0.len(), 1);
-        let top = tree.item.0[0].item.reference();
-        assert_eq!(top.contents.len(), 1);
         assert_eq!(
-            as_non_bracket(content_item(top, 0)).0,
+            as_non_bracket(&tree.item.0[0].item).0,
             NonBracketTokenKind::Identifier
         );
-        assert_eq!(top.contents[0].location, span_of(text, "foo"));
-        assert_eq!(render_chunk(text, top), "foo");
+        assert_eq!(tree.item.0[0].location, span_of(text, "foo"));
     }
 
     #[test]
     fn whitespace_only_and_empty_literals_are_empty_levels() {
         for text in ["   ", "", "\n\n"] {
             let tree = chunked(text);
-            assert_eq!(tree.item.len(), 0);
+            assert_eq!(
+                tree.item.0.len(),
+                if text == "\n\n" { 2 } else { 0 },
+                "for literal {text:?}"
+            );
             assert_eq!(tree.location, Span::from_usize(0, text.len()));
         }
     }
 
     #[test]
     fn contents_span_stops_at_the_last_content_item() {
-        let text = "foo,";
+        let text = "{ foo, }";
         let tree = chunked(text);
-        let top = tree.item.0[0].item.reference();
+        let interior = as_group(&tree.item.0[0].item).children.item.0.reference();
+        let top = interior[0].item.reference();
         assert_eq!(top.contents_span(), span_of(text, "foo"));
         assert_eq!(top.boundary_comma(), span_of(text, ",").wrap_some());
         assert_eq!(top.first_item().location, span_of(text, "foo"));
@@ -1215,52 +1081,43 @@ mod tests {
 
     #[test]
     fn a_chunk_without_a_comma_has_no_boundary_comma() {
-        let text = "foo\nbar";
+        let text = "{ foo\nbar }";
         let tree = chunked(text);
-        assert_eq!(tree.item.len(), 2);
-        assert_eq!(tree.item.0[0].item.boundary_comma(), None);
-        assert_eq!(tree.item.0[1].item.boundary_comma(), None);
+        let interior = as_group(&tree.item.0[0].item).children.item.0.reference();
+        assert_eq!(interior.len(), 2);
+        assert_eq!(interior[0].item.boundary_comma(), None);
+        assert_eq!(interior[1].item.boundary_comma(), None);
     }
 
     #[test]
     fn chunk_spans_are_tight_to_their_parts() {
         let text = "foo { bar, baz }";
         let tree = chunked(text);
-        let top = tree.item.0[0].reference();
-        assert_eq!(top.location, chunk_span(top.item.reference()));
+        assert_eq!(tree.item.0[0].location, span_of(text, "foo"));
         assert_eq!(
-            top.location,
-            Span::new(span_of(text, "foo").start, span_of(text, "}").end)
+            tree.item.0[1].location,
+            Span::new(span_of(text, "{").start, span_of(text, "}").end)
         );
-        let interior = as_group(content_item(top.item.reference(), 1))
-            .children
-            .item
-            .0
-            .reference();
+        let interior = as_group(&tree.item.0[1].item).children.item.0.reference();
         assert_eq!(interior[0].location, span_of(text, "bar,"));
-        assert_eq!(
-            interior[1].location,
-            Span::new(span_of(text, "baz").start, span_of(text, "baz").end)
-        );
+        assert_eq!(interior[1].location, span_of(text, "baz"));
     }
 
     #[test]
     fn a_matched_pair_resolves_with_its_group_as_parent() {
         let text = "foo { bar }";
         let tree = chunked(text);
-        match tree.resolve(ChunkedLevelParent::Root, span_of(text, "{")) {
+        match tree.resolve((), span_of(text, "{")) {
             IsographResolutionNode::OpenBracket(open) => {
                 assert_eq!(open.parent.inner.closing.item.0, Brace);
                 match open.parent.parent.reference() {
-                    ChunkContentItemParent::Chunk(chunk) => {
-                        assert_eq!(render_chunk(text, chunk.inner), "foo { bar }");
-                    }
-                    parent => panic!("expected a chunk parent, got {parent:?}"),
+                    ChunkContentItemParent::Root(_) => {}
+                    parent => panic!("expected a root parent, got {parent:?}"),
                 }
             }
             node => panic!("expected the open bracket leaf, got {node:?}"),
         }
-        match tree.resolve(ChunkedLevelParent::Root, span_of(text, "}")) {
+        match tree.resolve((), span_of(text, "}")) {
             IsographResolutionNode::CloseBracket(close) => {
                 assert_eq!(close.parent.inner.opening.item.0, Brace);
             }
@@ -1273,7 +1130,7 @@ mod tests {
         let text = "foo { bar }";
         let tree = chunked(text);
         let straddle = Span::new(span_of(text, "{").start, span_of(text, "bar").end);
-        match tree.resolve(ChunkedLevelParent::Root, straddle) {
+        match tree.resolve((), straddle) {
             IsographResolutionNode::ChunkedGroup(group) => {
                 assert_eq!(group.inner.opening.item.0, Brace);
             }
@@ -1285,16 +1142,14 @@ mod tests {
     fn an_ordinary_token_resolves_to_its_own_leaf() {
         let text = "foo { bar }";
         let tree = chunked(text);
-        match tree.resolve(ChunkedLevelParent::Root, span_of(text, "bar")) {
+        match tree.resolve((), span_of(text, "bar")) {
             IsographResolutionNode::NonBracketToken(token) => {
                 assert_eq!(token.inner.0, NonBracketTokenKind::Identifier);
                 match token.parent.reference() {
-                    ChunkContentItemParent::Chunk(chunk) => match chunk.parent.reference() {
-                        ChunkParent::Level(level) => {
-                            assert!(matches!(level.parent, ChunkedLevelParent::Interior(_)));
-                        }
-                        parent => panic!("expected a level parent, got {parent:?}"),
-                    },
+                    ChunkContentItemParent::Chunk(chunk) => {
+                        assert_eq!(chunk.parent.inner.0.len(), 1);
+                        assert_eq!(chunk.parent.parent.inner.opening.item.0, Brace);
+                    }
                     parent => panic!("expected a chunk parent, got {parent:?}"),
                 }
             }
@@ -1307,11 +1162,9 @@ mod tests {
         let text = "foo { bar }";
         let tree = chunked(text);
         let gap = Span::new(span_of(text, "foo").end, span_of(text, "{").start);
-        match tree.resolve(ChunkedLevelParent::Root, gap) {
-            IsographResolutionNode::Chunk(chunk_path) => {
-                assert_eq!(render_chunk(text, chunk_path.inner), "foo { bar }");
-            }
-            node => panic!("expected the chunk, got {node:?}"),
+        match tree.resolve((), gap) {
+            IsographResolutionNode::ChunkedRoot(_) => {}
+            node => panic!("expected the unpartitioned sequence, got {node:?}"),
         }
     }
 
@@ -1320,29 +1173,13 @@ mod tests {
         let text = "foo { bar, baz }";
         let tree = chunked(text);
 
-        match tree.resolve(ChunkedLevelParent::Root, span_of(text, "bar")) {
+        match tree.resolve((), span_of(text, "bar")) {
             IsographResolutionNode::NonBracketToken(token) => {
                 assert_eq!(token.inner.0, NonBracketTokenKind::Identifier);
                 match token.parent.reference() {
                     ChunkContentItemParent::Chunk(chunk) => {
                         assert_eq!(render_chunk(text, chunk.inner), "bar,");
-                        match chunk.parent.reference() {
-                            ChunkParent::Level(level) => match level.parent.reference() {
-                                ChunkedLevelParent::Interior(group) => {
-                                    match group.parent.reference() {
-                                        ChunkContentItemParent::Chunk(outer) => {
-                                            assert_eq!(
-                                                render_chunk(text, outer.inner),
-                                                "foo { bar, baz }"
-                                            );
-                                        }
-                                        parent => panic!("expected a chunk parent, got {parent:?}"),
-                                    }
-                                }
-                                parent => panic!("expected an interior level, got {parent:?}"),
-                            },
-                            parent => panic!("expected a level parent, got {parent:?}"),
-                        }
+                        assert_eq!(chunk.parent.parent.inner.opening.item.0, Brace);
                     }
                     parent => panic!("expected a chunk parent, got {parent:?}"),
                 }
@@ -1350,17 +1187,15 @@ mod tests {
             node => panic!("expected the token leaf, got {node:?}"),
         }
 
-        match tree.resolve(ChunkedLevelParent::Root, span_of(text, "{")) {
+        match tree.resolve((), span_of(text, "{")) {
             IsographResolutionNode::OpenBracket(open) => match open.parent.parent.reference() {
-                ChunkContentItemParent::Chunk(chunk) => {
-                    assert_eq!(render_chunk(text, chunk.inner), "foo { bar, baz }");
-                }
-                parent => panic!("expected a chunk parent, got {parent:?}"),
+                ChunkContentItemParent::Root(_) => {}
+                parent => panic!("expected a root parent, got {parent:?}"),
             },
             node => panic!("expected the open bracket leaf, got {node:?}"),
         }
 
-        match tree.resolve(ChunkedLevelParent::Root, span_of(text, ",")) {
+        match tree.resolve((), span_of(text, ",")) {
             IsographResolutionNode::ChunkSeparator(separator) => {
                 assert_eq!(render_chunk(text, separator.parent.inner), "bar,");
                 assert_eq!(
@@ -1372,17 +1207,15 @@ mod tests {
         }
 
         let gap_in_chunk = Span::new(span_of(text, "foo").end, span_of(text, "{").start);
-        match tree.resolve(ChunkedLevelParent::Root, gap_in_chunk) {
-            IsographResolutionNode::Chunk(chunk_path) => {
-                assert_eq!(render_chunk(text, chunk_path.inner), "foo { bar, baz }");
-            }
-            node => panic!("expected the chunk, got {node:?}"),
+        match tree.resolve((), gap_in_chunk) {
+            IsographResolutionNode::ChunkedRoot(_) => {}
+            node => panic!("expected the unpartitioned sequence, got {node:?}"),
         }
 
         let gap_between = Span::new(span_of(text, "bar,").end, span_of(text, "baz").start);
-        match tree.resolve(ChunkedLevelParent::Root, gap_between) {
+        match tree.resolve((), gap_between) {
             IsographResolutionNode::ChunkedLevel(level) => {
-                assert!(matches!(level.parent, ChunkedLevelParent::Interior(_)));
+                assert_eq!(level.parent.inner.opening.item.0, Brace);
             }
             node => panic!("expected the interior level, got {node:?}"),
         }
@@ -1390,11 +1223,9 @@ mod tests {
         let text_ws = " foo { bar, baz }";
         let tree_ws = chunked(text_ws);
         let leading_ws = Span::new(0, span_of(text_ws, "foo").start);
-        match tree_ws.resolve(ChunkedLevelParent::Root, leading_ws) {
-            IsographResolutionNode::ChunkedLevel(level) => {
-                assert!(matches!(level.parent, ChunkedLevelParent::Root));
-            }
-            node => panic!("expected the root level, got {node:?}"),
+        match tree_ws.resolve((), leading_ws) {
+            IsographResolutionNode::ChunkedRoot(_) => {}
+            node => panic!("expected the unpartitioned sequence, got {node:?}"),
         }
     }
 
@@ -1406,9 +1237,9 @@ mod tests {
         let text = "foo { }";
         let tree = chunked(text);
         let space = Span::new(span_of(text, "{").end, span_of(text, "}").start);
-        match tree.resolve(ChunkedLevelParent::Root, space) {
+        match tree.resolve((), space) {
             IsographResolutionNode::ChunkedLevel(level) => {
-                assert!(matches!(level.parent, ChunkedLevelParent::Interior(_)));
+                assert_eq!(level.parent.inner.opening.item.0, Brace);
             }
             node => panic!("expected the interior level, got {node:?}"),
         }
@@ -1418,18 +1249,25 @@ mod tests {
     fn whitespace_only_resolves_to_the_root_level() {
         let text = "   ";
         let tree = chunked(text);
-        match tree.resolve(ChunkedLevelParent::Root, Span::new(1, 2)) {
-            IsographResolutionNode::ChunkedLevel(level) => {
-                assert!(matches!(level.parent, ChunkedLevelParent::Root));
-            }
-            node => panic!("expected the root level, got {node:?}"),
+        match tree.resolve((), Span::new(1, 2)) {
+            IsographResolutionNode::ChunkedRoot(_) => {}
+            node => panic!("expected ChunkedRoot, got {node:?}"),
         }
         let empty = chunked("");
-        match empty.resolve(ChunkedLevelParent::Root, Span::new(0, 0)) {
-            IsographResolutionNode::ChunkedLevel(level) => {
-                assert!(matches!(level.parent, ChunkedLevelParent::Root));
+        match empty.resolve((), Span::new(0, 0)) {
+            IsographResolutionNode::ChunkedRoot(_) => {}
+            node => panic!("expected ChunkedRoot, got {node:?}"),
+        }
+        let newline = chunked("\n");
+        match newline.resolve((), Span::new(0, 1)) {
+            IsographResolutionNode::NonBracketToken(token) => {
+                assert_eq!(token.inner.0, NonBracketTokenKind::LineBreak);
+                match token.parent.reference() {
+                    ChunkContentItemParent::Root(_) => {}
+                    parent => panic!("expected a root parent, got {parent:?}"),
+                }
             }
-            node => panic!("expected the root level, got {node:?}"),
+            node => panic!("expected the line break, got {node:?}"),
         }
     }
 
@@ -1445,17 +1283,13 @@ mod tests {
         }
         let (tree, comma_errors) = chunk(brackets.reference());
         assert_eq!(comma_errors, vec![]);
-        match tree.resolve(ChunkedLevelParent::Root, span_of(text, ")")) {
-            IsographResolutionNode::ChunkedLevel(level) => {
-                assert!(matches!(level.parent, ChunkedLevelParent::Root));
-            }
-            node => panic!("expected the root level, got {node:?}"),
+        match tree.resolve((), span_of(text, ")")) {
+            IsographResolutionNode::ChunkedRoot(_) => {}
+            node => panic!("expected ChunkedRoot, got {node:?}"),
         }
-        match tree.resolve(ChunkedLevelParent::Root, span_of(text, "b")) {
-            IsographResolutionNode::ChunkedLevel(level) => {
-                assert!(matches!(level.parent, ChunkedLevelParent::Root));
-            }
-            node => panic!("expected the root level, got {node:?}"),
+        match tree.resolve((), span_of(text, "b")) {
+            IsographResolutionNode::ChunkedRoot(_) => {}
+            node => panic!("expected ChunkedRoot, got {node:?}"),
         }
     }
 
@@ -1471,9 +1305,9 @@ mod tests {
         }
         let (tree, comma_errors) = chunk(brackets.reference());
         assert_eq!(comma_errors, vec![]);
-        match tree.resolve(ChunkedLevelParent::Root, span_of(text, "(")) {
+        match tree.resolve((), span_of(text, "(")) {
             IsographResolutionNode::ChunkedLevel(level) => {
-                assert!(matches!(level.parent, ChunkedLevelParent::Interior(_)));
+                assert_eq!(level.parent.inner.opening.item.0, Brace);
             }
             node => panic!("expected the interior level, got {node:?}"),
         }

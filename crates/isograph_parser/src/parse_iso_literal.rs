@@ -1,43 +1,41 @@
 use std::fmt;
 
 use common_lang_types::SelectableName;
+use nonempty::NonEmpty;
 use prelude::Postfix;
 use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
 use span::{WithSpan, WithSpanPostfix};
 
-use crate::chunk_stream::ItemCursor;
+use crate::chunk_stream::{ChunkStream, ItemCursor};
 use crate::{
-    AstError, BracketError, ChunkContentItem, ChunkedLevel, DECLARATION_KEYWORD, Expectation,
-    ExtraChunks, Found, IsographFieldDirectiveList, IsographResolutionNode, IsographSemanticToken,
-    NamedTypeAnnotationPath, NonBracketToken, NonBracketTokenKind, ParseError, SelectionSet,
-    Singleton, Slot, TypeAnnotation, UnparsedChunkItems, VariableDeclarationList, chunk,
-    consume_directives, consume_selection_set, consume_variable_declaration_list,
-    intern_block_string_value, match_brackets, parse_singleton, parse_type_annotation, tokenize,
+    AstError, BracketError, ChunkContentItem, ChunkedRoot, DECLARATION_KEYWORD, Expectation, Found,
+    IsographFieldDirectiveList, IsographResolutionNode, IsographSemanticToken,
+    NamedTypeAnnotationPath, NonBracketToken, NonBracketTokenKind, ParseError, SelectionSet, Slot,
+    TypeAnnotation, UnparsedChunkItems, VariableDeclarationList, chunk, consume_directives,
+    consume_selection_set, consume_variable_declaration_list, intern_block_string_value,
+    match_brackets, parse_stream, parse_type_annotation, tokenize,
 };
 
-pub type IsoLiteralParse = Singleton<Slot<IsoLiteralItem, UnparsedChunkItems>, ExtraChunks>;
+pub type IsoLiteralParse = Slot<IsoLiteralItem, UnparsedChunkItems>;
 
 pub type IsoLiteralParsePath<'a> = PositionResolutionPath<&'a IsoLiteralParse, ()>;
 
-pub type IsoLiteralSlotPath<'a> =
-    PositionResolutionPath<&'a Slot<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>>;
-
-impl<'a> From<IsoLiteralSlotPath<'a>> for IsographResolutionNode<'a> {
-    fn from(path: IsoLiteralSlotPath<'a>) -> Self {
+impl<'a> From<IsoLiteralParsePath<'a>> for IsographResolutionNode<'a> {
+    fn from(path: IsoLiteralParsePath<'a>) -> Self {
         IsographResolutionNode::IsoLiteralSlot(path)
     }
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = IsoLiteralSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum IsoLiteralItem {
     Entrypoint(EntrypointDeclaration),
     Selectable(SelectableDeclaration),
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = IsoLiteralSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct EntrypointDeclaration {
     #[resolve_field]
     #[parent_variant(EntrypointDeclaration)]
@@ -51,7 +49,7 @@ pub struct EntrypointDeclaration {
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = IsoLiteralSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct SelectableDeclaration {
     #[resolve_field]
     #[parent_variant(SelectableDeclaration)]
@@ -112,15 +110,13 @@ pub enum SelectableNameWrapperParent<'a> {
 }
 
 pub type EntrypointDeclarationPath<'a> =
-    PositionResolutionPath<&'a EntrypointDeclaration, IsoLiteralSlotPath<'a>>;
+    PositionResolutionPath<&'a EntrypointDeclaration, IsoLiteralParsePath<'a>>;
 
 pub type SelectableDeclarationPath<'a> =
-    PositionResolutionPath<&'a SelectableDeclaration, IsoLiteralSlotPath<'a>>;
+    PositionResolutionPath<&'a SelectableDeclaration, IsoLiteralParsePath<'a>>;
 
 pub type DescriptionPath<'a> =
     PositionResolutionPath<&'a Description, SelectableDeclarationPath<'a>>;
-
-pub type ExtraChunksPath<'a> = PositionResolutionPath<&'a ExtraChunks, IsoLiteralParsePath<'a>>;
 
 pub type EntityNameWrapperPath<'a> =
     PositionResolutionPath<&'a EntityNameWrapper, EntityNameWrapperParent<'a>>;
@@ -170,30 +166,38 @@ pub fn parse_iso_literal(text: &str) -> ParsedIsoLiteral {
 
 pub(crate) fn parse_chunked_iso_literal(
     text: &str,
-    root: WithSpan<ChunkedLevel>,
+    root: WithSpan<ChunkedRoot>,
     errors: &mut Vec<WithSpan<AstError>>,
     tokens: &mut Vec<WithSpan<IsographSemanticToken>>,
 ) -> Option<WithSpan<IsoLiteralParse>> {
     let location = root.location;
-    if root.item.len() == 0 {
+    let Some((head, tail)) = root.item.0.split_first() else {
+        errors.push(AstError::EmptyLiteral.with_span(location));
+        return None;
+    };
+    let failed_extra = NonEmpty {
+        head: head.clone(),
+        tail: tail.to_vec(),
+    };
+    let mut stream = ChunkStream::new(root.item.0.as_slice(), text, tokens, errors);
+    stream.cursor().consume_line_breaks();
+    if stream.require_end().is_ok() {
         errors.push(AstError::EmptyLiteral.with_span(location));
         return None;
     }
-    let singleton = parse_singleton(
-        root.reference(),
-        text,
-        tokens,
-        errors,
+    let slot = parse_stream(
+        &mut stream,
         Expectation::EndOfDeclaration,
-        |extra| AstError::MultipleDeclarations.with_span(extra.location),
         parse_iso_literal_item,
+        || failed_extra,
     );
-    singleton.with_span(location).wrap_some()
+    slot.item.with_span(location).wrap_some()
 }
 
 fn parse_iso_literal_item(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<IsoLiteralItem, WithSpan<AstError>> {
+    cursor.consume_line_breaks();
     let keyword = cursor
         .require_token(
             NonBracketTokenKind::Identifier,
@@ -239,6 +243,7 @@ fn parse_entrypoint(
 ) -> Result<EntrypointDeclaration, WithSpan<AstError>> {
     let (parent_type, name) = parse_type_dot_name(cursor)?;
     let directive_set = consume_directives(cursor)?;
+    cursor.consume_line_breaks();
     EntrypointDeclaration {
         parent_type,
         name: name.map(SelectableNameWrapper),
@@ -254,8 +259,11 @@ fn parse_selectable_declaration(
     let variable_definitions = consume_variable_declaration_list(cursor);
     let target_type = consume_to_target(cursor)?;
     let directive_set = consume_directives(cursor)?;
+    cursor.consume_line_breaks();
     let description = consume_description(cursor);
+    cursor.consume_line_breaks();
     let selection_set = consume_selection_set(cursor);
+    cursor.consume_line_breaks();
     SelectableDeclaration {
         parent_type,
         name: name.map(SelectableNameWrapper),
@@ -336,7 +344,7 @@ mod tests {
     };
     use Expectation::EndOfDeclaration;
     use NonBracketTokenKind::{
-        At, Comma, Dollar, ErrorNumberLiteralTrailingInvalid, Identifier, Period,
+        At, Comma, Dollar, ErrorNumberLiteralTrailingInvalid, Identifier, LineBreak, Period,
     };
 
     fn parsed(
@@ -378,7 +386,7 @@ mod tests {
         Expectation::Token(kind)
     }
 
-    fn chunked(text: &str) -> WithSpan<ChunkedLevel> {
+    fn chunked(text: &str) -> WithSpan<ChunkedRoot> {
         let (brackets, bracket_errors) = match_brackets(tokenize(text), text.len() as u32);
         assert!(bracket_errors.is_empty(), "for literal {text:?}");
         let (tree, comma_errors) = chunk(brackets.reference());
@@ -387,16 +395,16 @@ mod tests {
     }
 
     fn stream_of<'a>(
-        tree: &'a WithSpan<ChunkedLevel>,
+        tree: &'a WithSpan<ChunkedRoot>,
         text: &'a str,
         tokens: &'a mut Vec<WithSpan<IsographSemanticToken>>,
         errors: &'a mut Vec<WithSpan<AstError>>,
     ) -> crate::chunk_stream::ChunkStream<'a> {
-        tree.item.0[0].item.stream(text, tokens, errors)
+        crate::chunk_stream::ChunkStream::new(tree.item.0.as_slice(), text, tokens, errors)
     }
 
     fn first_slot(parse: &WithSpan<IsoLiteralParse>) -> &Slot<IsoLiteralItem, UnparsedChunkItems> {
-        parse.item.item.item.reference()
+        parse.item.reference()
     }
 
     fn parsed_item(parse: &WithSpan<IsoLiteralParse>) -> Option<&IsoLiteralItem> {
@@ -567,63 +575,68 @@ mod tests {
     }
 
     #[test]
-    fn comma_mistakes_are_chunkings_errors_and_the_declaration_still_parses() {
-        for (text, comma_error_count) in
-            [(",entrypoint Query.foo", 1), (",,entrypoint Query.foo", 2)]
-        {
-            let parsed = parsed_with_errors(
-                text,
-                &[
-                    (IsographSemanticToken::Keyword, "entrypoint"),
-                    (IsographSemanticToken::Type, "Query"),
-                    (IsographSemanticToken::Period, "."),
-                    (IsographSemanticToken::FieldName, "foo"),
-                ],
-            );
-            assert!(
-                parsed
-                    .errors
-                    .iter()
-                    .all(|error| matches!(error.item, ParseError::Comma(_))),
-                "for literal {text:?}",
-            );
-            assert_eq!(
-                parsed.errors.len(),
-                comma_error_count,
-                "for literal {text:?}"
-            );
-            let parse = parsed.item.expect("the fixture is not an empty literal");
-            let declaration = as_entrypoint(parse.reference());
-            assert_eq!(
-                declaration.parent_type.location,
-                span_of(text, "Query"),
-                "for literal {text:?}"
-            );
-        }
+    fn a_comma_before_entrypoint_is_not_skipped() {
+        let text = ",entrypoint Query.foo";
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (IsographSemanticToken::Content, ","),
+                (IsographSemanticToken::Content, "entrypoint"),
+                (IsographSemanticToken::Content, "Query"),
+                (IsographSemanticToken::Content, "."),
+                (IsographSemanticToken::Content, "foo"),
+            ],
+        );
+        assert!(parsed_item(parse.reference()).is_none());
+        assert_eq!(
+            errors,
+            expected(DECLARATION_KEYWORD, Found::Token(Comma))
+                .with_span(span_of(text, ","))
+                .wrap_vec(),
+        );
     }
 
     #[test]
-    fn a_lone_comma_is_chunkings_error_and_an_empty_literal() {
-        let text = ",";
-        let parsed = parsed_with_errors(text, &[]);
-        assert!(parsed.item.is_none());
-        assert_eq!(
-            parsed
-                .errors
-                .iter()
-                .filter(|error| matches!(error.item, ParseError::Comma(_)))
-                .count(),
-            1,
+    fn two_leading_commas_fail_at_the_first() {
+        let text = ",,entrypoint Query.foo";
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (IsographSemanticToken::Content, ","),
+                (IsographSemanticToken::Content, ","),
+                (IsographSemanticToken::Content, "entrypoint"),
+                (IsographSemanticToken::Content, "Query"),
+                (IsographSemanticToken::Content, "."),
+                (IsographSemanticToken::Content, "foo"),
+            ],
         );
-        assert!(parsed.errors.iter().any(|error| {
-            error.item == ParseError::Ast(AstError::EmptyLiteral)
-                && error.location == Span::from_usize(0, text.len())
-        }));
-        assert!(
-            parsed
-                .errors
-                .iter()
-                .all(|error| matches!(error.item, ParseError::Comma(_) | ParseError::Ast(_)))
+        assert!(parsed_item(parse.reference()).is_none());
+        assert_eq!(
+            errors,
+            expected(DECLARATION_KEYWORD, Found::Token(Comma))
+                .with_span(Span::new(0, 1))
+                .wrap_vec(),
+        );
+        assert_eq!(
+            first_slot(parse.reference())
+                .extra
+                .as_ref()
+                .expect("both commas and the rest")
+                .location,
+            Span::from_usize(0, text.len()),
+        );
+    }
+
+    #[test]
+    fn a_lone_comma_is_a_failed_declaration() {
+        let text = ",";
+        let (parse, errors) = parsed(text, &[(IsographSemanticToken::Content, ",")]);
+        assert!(parsed_item(parse.reference()).is_none());
+        assert_eq!(
+            errors,
+            expected(DECLARATION_KEYWORD, Found::Token(Comma))
+                .with_span(span_of(text, ","))
+                .wrap_vec(),
         );
     }
 
@@ -705,7 +718,7 @@ mod tests {
     }
 
     #[test]
-    fn a_comma_before_a_second_declaration_is_the_boundary_comma() {
+    fn a_comma_then_a_second_declaration_is_leftover_at_the_comma() {
         let text = "entrypoint Query.foo, field User.name";
         let (parse, errors) = parsed(
             text,
@@ -721,22 +734,25 @@ mod tests {
                 (IsographSemanticToken::Content, "name"),
             ],
         );
+        as_entrypoint(parse.reference());
         assert_eq!(
-            as_entrypoint(parse.reference()).name.location,
-            span_of(text, "foo")
+            first_slot(parse.reference())
+                .extra
+                .as_ref()
+                .expect("comma and the second declaration")
+                .location,
+            span_of(text, ", field User.name"),
         );
         assert_eq!(
             errors,
-            vec![
-                expected(EndOfDeclaration, Found::Token(Comma)).with_span(span_of(text, ",")),
-                AstError::MultipleDeclarations.with_span(span_of(text, "field User.name")),
-            ],
+            expected(EndOfDeclaration, Found::Token(Comma))
+                .with_span(span_of(text, ","))
+                .wrap_vec(),
         );
-        assert!(parse.item.extra_chunks.as_ref().is_some());
     }
 
     #[test]
-    fn a_second_contentful_chunk_is_multiple_declarations() {
+    fn a_second_declaration_on_the_next_line_is_leftover() {
         let text = "entrypoint Query.foo\nfield User.name";
         let (parse, errors) = parsed(
             text,
@@ -751,21 +767,18 @@ mod tests {
                 (IsographSemanticToken::Content, "name"),
             ],
         );
-        assert_eq!(
-            as_entrypoint(parse.reference()).name.location,
-            span_of(text, "foo")
-        );
+        as_entrypoint(parse.reference());
+        assert!(first_slot(parse.reference()).extra.is_some());
         assert_eq!(
             errors,
-            AstError::MultipleDeclarations
-                .with_span(span_of(text, "field User.name"))
+            expected(EndOfDeclaration, Found::Token(Identifier))
+                .with_span(span_of(text, "field"))
                 .wrap_vec(),
         );
-        assert!(parse.item.extra_chunks.as_ref().is_some());
     }
 
     #[test]
-    fn a_failed_first_chunk_is_reported_even_when_a_second_exists() {
+    fn entrypoint_name_on_the_next_line_fails_at_the_line_break() {
         let text = "entrypoint\nQuery.foo";
         let keyword_end = span_of(text, "entrypoint").end;
         let (parse, errors) = parsed(
@@ -778,16 +791,20 @@ mod tests {
             ],
         );
         assert!(parsed_item(parse.reference()).is_none());
-        assert!(errors.iter().any(|error| {
-            error.item == expected(token(Identifier), Found::EndOfChunk)
-                && error.location == Span::new(keyword_end, keyword_end)
-        }));
-        assert!(
-            errors
-                .iter()
-                .any(|error| error.item == AstError::MultipleDeclarations)
+        assert_eq!(
+            errors,
+            expected(token(Identifier), Found::Token(LineBreak),)
+                .with_span(Span::new(keyword_end, keyword_end + 1))
+                .wrap_vec(),
         );
-        assert!(parse.item.extra_chunks.as_ref().is_some());
+        assert_eq!(
+            first_slot(parse.reference())
+                .extra
+                .as_ref()
+                .expect("newline and Query.foo")
+                .location,
+            Span::new(keyword_end, text.len() as u32),
+        );
     }
 
     #[test]
@@ -971,10 +988,6 @@ mod tests {
         assert!(errors.iter().any(|error| {
             error.item == expected(EndOfDeclaration, Found::Token(Identifier))
                 && error.location == span_of(text, "bar")
-        }));
-        assert!(errors.iter().any(|error| {
-            error.item == expected(EndOfDeclaration, Found::Token(Comma))
-                && error.location == span_of(text, ",")
         }));
     }
 
@@ -1496,9 +1509,18 @@ mod tests {
                 (IsographSemanticToken::Bracket, "}"),
             ],
         );
+        assert!(parsed_item(parse.reference()).is_none());
+        assert_eq!(
+            first_slot(parse.reference())
+                .extra
+                .as_ref()
+                .expect("Query.foo { bar }")
+                .location,
+            span_of(text, "Query.foo { bar }"),
+        );
         match parse.resolve((), span_of(text, "fieldd")) {
-            IsographResolutionNode::Singleton(_) => {}
-            node => panic!("expected the singleton, got {node:?}"),
+            IsographResolutionNode::IsoLiteralSlot(_) => {}
+            node => panic!("expected IsoLiteralSlot, got {node:?}"),
         }
     }
 
@@ -1595,8 +1617,38 @@ mod tests {
     }
 
     #[test]
-    fn a_selection_set_on_its_own_line_is_a_second_declaration() {
-        let text = "field Query.Foo\n{ bar }";
+    fn a_description_and_selection_set_on_following_lines_attach() {
+        let text = "\n  field Query.HomeRoute @component\n  \"\"\"\n  Show a list of pets\n  \"\"\"\n  {\n    pets {\n      id\n    }\n  }\n";
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "HomeRoute"),
+                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::DirectiveName, "component"),
+                (
+                    IsographSemanticToken::String,
+                    "\"\"\"\n  Show a list of pets\n  \"\"\"",
+                ),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "pets"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "id"),
+                (IsographSemanticToken::Brace, "}"),
+                (IsographSemanticToken::Brace, "}"),
+            ],
+        );
+        assert_eq!(errors, vec![]);
+        let field = as_selectable(parse.reference());
+        assert!(field.description.is_some());
+        assert!(field.selection_set.is_some());
+    }
+
+    #[test]
+    fn to_on_the_next_line_does_not_attach() {
+        let text = "field Query.Foo\nto User { bar }";
         let (parse, errors) = parsed(
             text,
             &[
@@ -1604,6 +1656,90 @@ mod tests {
                 (IsographSemanticToken::Type, "Query"),
                 (IsographSemanticToken::Period, "."),
                 (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Content, "to"),
+                (IsographSemanticToken::Content, "User"),
+                (IsographSemanticToken::Bracket, "{"),
+                (IsographSemanticToken::Content, "bar"),
+                (IsographSemanticToken::Bracket, "}"),
+            ],
+        );
+        assert_eq!(as_selectable(parse.reference()).target_type, None);
+        assert!(first_slot(parse.reference()).extra.is_some());
+        assert!(errors.iter().any(|error| {
+            error.item == expected(EndOfDeclaration, Found::Token(Identifier))
+                && error.location == span_of(text, "to")
+        }));
+    }
+
+    #[test]
+    fn a_directive_on_the_next_line_does_not_attach() {
+        let text = "field Query.Foo\n@loadable { bar }";
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Content, "@"),
+                (IsographSemanticToken::Content, "loadable"),
+                (IsographSemanticToken::Bracket, "{"),
+                (IsographSemanticToken::Content, "bar"),
+                (IsographSemanticToken::Bracket, "}"),
+            ],
+        );
+        assert_eq!(as_selectable(parse.reference()).directive_set, None);
+        assert!(first_slot(parse.reference()).extra.is_some());
+        assert_eq!(
+            errors,
+            expected(EndOfDeclaration, Found::Token(At))
+                .with_span(span_of(text, "@"))
+                .wrap_vec(),
+        );
+    }
+
+    #[test]
+    fn variables_on_the_next_line_do_not_attach() {
+        let text = "field Query.Foo\n($id: ID) { bar }";
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Bracket, "("),
+                (IsographSemanticToken::Content, "$"),
+                (IsographSemanticToken::Content, "id"),
+                (IsographSemanticToken::Content, ":"),
+                (IsographSemanticToken::Content, "ID"),
+                (IsographSemanticToken::Bracket, ")"),
+                (IsographSemanticToken::Bracket, "{"),
+                (IsographSemanticToken::Content, "bar"),
+                (IsographSemanticToken::Bracket, "}"),
+            ],
+        );
+        assert_eq!(as_selectable(parse.reference()).variable_definitions, None);
+        assert!(first_slot(parse.reference()).extra.is_some());
+        assert_eq!(
+            errors,
+            expected(EndOfDeclaration, Found::Group(BracketKind::Parenthesis))
+                .with_span(span_of(text, "($id: ID)"))
+                .wrap_vec(),
+        );
+    }
+
+    #[test]
+    fn a_comma_between_the_name_and_the_selection_set_does_not_attach() {
+        let text = "field Query.Foo,\n{ bar }";
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Content, ","),
                 (IsographSemanticToken::Bracket, "{"),
                 (IsographSemanticToken::Content, "bar"),
                 (IsographSemanticToken::Bracket, "}"),
@@ -1612,11 +1748,60 @@ mod tests {
         assert_eq!(as_selectable(parse.reference()).selection_set, None);
         assert_eq!(
             errors,
-            AstError::MultipleDeclarations
-                .with_span(span_of(text, "{ bar }"))
+            expected(EndOfDeclaration, Found::Token(Comma))
+                .with_span(span_of(text, ","))
                 .wrap_vec(),
         );
-        assert!(parse.item.extra_chunks.as_ref().is_some());
+    }
+
+    #[test]
+    fn a_failed_keyword_that_consumed_every_item_is_extra() {
+        let text = "fieldd";
+        let (parse, _) = parsed(text, &[(IsographSemanticToken::Keyword, "fieldd")]);
+        assert!(parsed_item(parse.reference()).is_none());
+        let extra = first_slot(parse.reference())
+            .extra
+            .as_ref()
+            .expect("fieldd is extra");
+        assert_eq!(extra.location, span_of(text, "fieldd"));
+        match parse.resolve((), span_of(text, "fieldd")) {
+            IsographResolutionNode::NonBracketToken(_) => {}
+            node => panic!("expected the leftover token, got {node:?}"),
+        }
+    }
+
+    #[test]
+    fn a_failed_keyword_after_a_consumed_line_break_puts_the_line_break_in_extra() {
+        let text = "\nfieldd";
+        let (parse, _) = parsed(text, &[(IsographSemanticToken::Keyword, "fieldd")]);
+        assert!(parsed_item(parse.reference()).is_none());
+        let extra = first_slot(parse.reference())
+            .extra
+            .as_ref()
+            .expect("newline and fieldd");
+        assert_eq!(extra.location, Span::from_usize(0, text.len()));
+        match parse.resolve((), Span::new(0, 1)) {
+            IsographResolutionNode::NonBracketToken(token) => {
+                assert_eq!(token.inner.0, NonBracketTokenKind::LineBreak);
+            }
+            node => panic!("expected the leftover line break, got {node:?}"),
+        }
+    }
+
+    #[test]
+    fn consume_line_breaks_does_not_record_them() {
+        let text = "\nentrypoint Query.foo\n";
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (IsographSemanticToken::Keyword, "entrypoint"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "foo"),
+            ],
+        );
+        assert_eq!(errors, vec![]);
+        as_entrypoint(parse.reference());
     }
 
     #[test]
@@ -3084,7 +3269,7 @@ mod tests {
     fn a_block_string_with_line_breaks_does_not_split_the_chunk() {
         let text = "Foo \"\"\"\n  the home\n  route\n\"\"\" Bar";
         let tree = chunked(text);
-        assert_eq!(tree.item.0.len(), 1);
+        assert_eq!(tree.item.0.len(), 3);
         let mut tokens = Vec::new();
         let mut errors = Vec::new();
         let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);

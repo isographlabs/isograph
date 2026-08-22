@@ -57,9 +57,9 @@ pub enum BracketError {
 type TokenStream = SafePeekable<std::vec::IntoIter<WithSpan<IsographLangTokenKind>>>;
 
 /// Line breaks at the start of the items an opening leads are captured by that opening:
-/// dropped as insignificant whitespace, like the spaces the tokenizer skips. The
-/// literal's start always leads its items, and a group's opening leads them once the
-/// group closes; an unclosed group yields nothing, so no other case exists.
+/// dropped as insignificant whitespace, like the spaces the tokenizer skips. A group's
+/// opening leads them once the group closes; an unclosed group yields nothing, so no
+/// other case exists.
 fn strip_captured_line_breaks(items: &mut Vec<WithSpan<BracketItem>>) {
     let captured = items
         .iter()
@@ -86,8 +86,7 @@ pub(crate) fn match_brackets(
     // while a brace is on the stack, so the `}` closes the group.
     let mut enclosing_stack = Stack::new();
     let mut errors = Vec::new();
-    let mut items = parse_bracket_items(&mut tokens, &mut enclosing_stack, &mut |e| errors.push(e));
-    strip_captured_line_breaks(&mut items);
+    let items = parse_bracket_items(&mut tokens, &mut enclosing_stack, &mut |e| errors.push(e));
     errors.sort_by_key(|error| match error {
         BracketError::UnmatchedOpen(open) => open.location.start,
         BracketError::UnmatchedClose(close) => close.location.start,
@@ -497,12 +496,20 @@ mod tests {
     }
 
     #[test]
-    fn the_literal_start_captures_its_line_breaks() {
+    fn the_literal_start_keeps_its_line_breaks() {
         let text = "\n\nfoo";
         let tree = well_formed(text);
-        assert_eq!(tree.item.0.len(), 1);
+        assert_eq!(tree.item.0.len(), 3);
         assert_eq!(
             raw(tree.item.0.reference(), 0),
+            NonBracketToken(NonBracketTokenKind::LineBreak)
+        );
+        assert_eq!(
+            raw(tree.item.0.reference(), 1),
+            NonBracketToken(NonBracketTokenKind::LineBreak)
+        );
+        assert_eq!(
+            raw(tree.item.0.reference(), 2),
             NonBracketToken(NonBracketTokenKind::Identifier)
         );
         assert_eq!(tree.location, Span::from_usize(0, text.len()));

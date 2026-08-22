@@ -250,21 +250,36 @@ fn parse_bracket_interior_type(
             .with_span(Span::new(level.location.end, level.location.end))
             .wrap_err();
     }
-    let singleton = cursor.parse_nested_singleton(
-        level,
+    let slot = crate::parse_one_chunk(
+        &level.item.0[0],
+        cursor.stream_chunk(&level.item.0[0].item),
         Expectation::EndOfType,
-        |extra| {
+        parse_type_annotation,
+    );
+    if let Some(comma) = level.item.0[0].item.boundary_comma() {
+        cursor.report_error(
+            AstError::expected(
+                Expectation::EndOfType,
+                Found::Token(NonBracketTokenKind::Comma),
+            )
+            .with_span(comma),
+        );
+    }
+    if let Some(extra) = level.item.0.get(1) {
+        cursor.report_error(
             AstError::expected(
                 Expectation::EndOfType,
                 Found::from(extra.item.first_item().item.reference()),
             )
-            .with_span(extra.location)
-        },
-        parse_type_annotation,
-    );
+            .with_span(extra.location),
+        );
+        for chunk in level.item.0[1..].iter() {
+            cursor.record_leftover_chunk(chunk.item.reference());
+        }
+    }
     BracketInteriorType {
-        item: singleton.item.item.item.map(|wrapped| wrapped.item),
-        extra: singleton.item.item.extra,
+        item: slot.item.item.map(|wrapped| wrapped.item),
+        extra: slot.item.extra,
     }
     .wrap_ok()
 }

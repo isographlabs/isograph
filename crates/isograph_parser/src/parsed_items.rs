@@ -5,7 +5,7 @@ use crate::assert_semantic_tokens::assert_semantic_tokens;
 use crate::chunk_stream::ItemCursor;
 use crate::{
     AstError, CommaWithoutItem, Expectation, IsographSemanticToken, Slot, UnparsedChunkItems,
-    chunk, match_brackets, tokenize,
+    chunk_level, match_brackets, tokenize,
 };
 
 pub(crate) type ParsedItems<P> = (
@@ -22,20 +22,18 @@ pub(crate) fn parsed_items<P>(
 ) -> ParsedItems<P> {
     let (brackets, bracket_errors) = match_brackets(tokenize(text), text.len() as u32);
     assert!(bracket_errors.is_empty(), "for literal {text:?}");
-    let (tree, comma_errors) = chunk(brackets.reference());
+    let mut comma_errors = Vec::new();
+    let tree = chunk_level(brackets.item.reference(), &mut comma_errors);
     let mut errors = Vec::new();
     let mut tokens = Vec::new();
     let dummy = {
         let (brackets, bracket_errors) = match_brackets(tokenize("x"), 1);
         assert!(bracket_errors.is_empty());
-        let (tree, comma_errors) = chunk(brackets.reference());
-        assert_eq!(comma_errors, vec![]);
-        tree
+        let mut dummy_commas = Vec::new();
+        chunk_level(brackets.item.reference(), &mut dummy_commas)
     };
-    let mut parent = dummy.item.0[0].item.stream(text, &mut tokens, &mut errors);
-    let items = tree
-        .item
-        .parse_each_chunk(parent.cursor(), leftover, parse_item);
+    let mut parent = dummy.0[0].item.stream(text, &mut tokens, &mut errors);
+    let items = tree.parse_each_chunk(parent.cursor(), leftover, parse_item);
     assert_semantic_tokens(text, &tokens, expected_tokens);
     (items, errors, comma_errors)
 }

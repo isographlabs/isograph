@@ -6,14 +6,11 @@ These are not in the grammar-stage order. They are language-shape and leftover l
 
 These tests pin the language. They are not accidents:
 
-- `field Query.Foo\n{ bar }` is a field with no selection set plus `MultipleDeclarations` on the brace. `a_selection_set_on_its_own_line_is_a_second_declaration` in `parse_iso_literal.rs`.
 - `bar\n{ baz }` inside a set is a scalar plus a failed selection.
 - `bar\n@loadable` is a selection plus a failed selection on `@`. `a_directive_on_the_next_line_is_its_own_failed_selection`.
 - `[Pet\n!]` does not attach the bang to `Pet`. `a_line_break_inside_a_list_type_does_not_attach_bang`.
 
-Spaces do not split chunks. Newlines do. Anyone who formats a selection set or a `to` clause onto the next line gets a second declaration.
-
-The diagnostic for `field Query.Foo\n{ bar }` is `Expected nothing after the declaration. Each literal holds exactly one declaration.` If line breaks remain chunk separators, the diagnostic names the line-break rule: `expected the selection set on the same line`.
+Spaces do not split chunks. Newlines do.
 
 ## `#` comments
 

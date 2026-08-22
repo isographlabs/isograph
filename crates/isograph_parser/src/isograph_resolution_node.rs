@@ -1,8 +1,8 @@
 use crate::{
     ArgumentListPath, ArgumentNameWrapperPath, ArgumentPath, ArgumentSlotPath, BooleanValuePath,
-    ChunkPath, ChunkSeparatorPath, ChunkedGroupPath, ChunkedLevelPath, CloseBracketPath,
-    DescriptionPath, EntityNameWrapperPath, EntrypointDeclarationPath, ExtraChunksPath,
-    IntegerValuePath, IsoLiteralParsePath, IsoLiteralSlotPath, IsographDirectiveNameWrapperPath,
+    ChunkPath, ChunkSeparatorPath, ChunkedGroupPath, ChunkedLevelPath, ChunkedRootPath,
+    CloseBracketPath, DescriptionPath, EntityNameWrapperPath, EntrypointDeclarationPath,
+    IntegerValuePath, IsoLiteralParsePath, IsographDirectiveNameWrapperPath,
     IsographFieldDirectiveListPath, IsographFieldDirectivePath, ListLiteralPath,
     ListLiteralValuePath, ListLiteralValueSlotPath, ListTypeAnnotationPath,
     NamedTypeAnnotationPath, NonBracketTokenPath, NullValuePath, ObjectEntryPath,
@@ -20,15 +20,14 @@ use crate::{
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum IsographResolutionNode<'a> {
-    Singleton(IsoLiteralParsePath<'a>),
-    IsoLiteralSlot(IsoLiteralSlotPath<'a>),
+    IsoLiteralSlot(IsoLiteralParsePath<'a>),
+    ChunkedRoot(ChunkedRootPath<'a>),
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
     SelectableDeclaration(SelectableDeclarationPath<'a>),
     Description(DescriptionPath<'a>),
     EntityNameWrapper(EntityNameWrapperPath<'a>),
     SelectableNameWrapper(SelectableNameWrapperPath<'a>),
     UnparsedChunkItems(UnparsedChunkItemsPath<'a>),
-    ExtraChunks(ExtraChunksPath<'a>),
     ChunkedLevel(ChunkedLevelPath<'a>),
     /// This will be resolved for spans that contain one of the opening/closing brackets
     /// and part of the inside, e.g. "{ ba" in "foo { bar }". Single-character spans
@@ -70,4 +69,10 @@ pub enum IsographResolutionNode<'a> {
     ListLiteral(ListLiteralPath<'a>),
     ListLiteralValue(ListLiteralValuePath<'a>),
     ListLiteralValueSlot(ListLiteralValueSlotPath<'a>),
+}
+
+impl<'a> From<ChunkedRootPath<'a>> for IsographResolutionNode<'a> {
+    fn from(path: ChunkedRootPath<'a>) -> Self {
+        IsographResolutionNode::ChunkedRoot(path)
+    }
 }

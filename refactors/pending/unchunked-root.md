@@ -439,12 +439,17 @@ pub(crate) fn match_brackets(
 
 Line breaks are legal before the keyword, before the description, and before the selection set. Those three sites (plus trailing after the declaration so a final newline is not leftover) call `consume_line_breaks`. Zero is legal (`iso(\`entrypoint Query.foo\`)`). It is `consume_*`, not `require_*`: a missing run is not an error. `advance`, not `commit`. No semantic token. A position on a consumed line break answers the containing node.
 
-Today `ItemCursor.items` is `SafePeekable<nonempty::Iter<'a, WithSpan<ChunkContentItem>>>`. After it is a slice iterator. `consume_line_breaks` is a method on `ItemCursor`. `parse_iso_literal_item` calls `cursor.consume_line_breaks()`. `parse_chunked_iso_literal` calls `stream.cursor().consume_line_breaks()`.
+`consume_line_breaks` is a method on `ItemCursor`. `parse_iso_literal_item` calls `cursor.consume_line_breaks()`. `parse_chunked_iso_literal` calls `stream.cursor().consume_line_breaks()`.
 
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
+enum ContentIter<'a> {
+    Slice(std::slice::Iter<'a, WithSpan<ChunkContentItem>>),
+    NonEmpty(nonempty::Iter<'a, WithSpan<ChunkContentItem>>),
+}
+
 pub(crate) struct ItemCursor<'a> {
-    items: SafePeekable<std::slice::Iter<'a, WithSpan<ChunkContentItem>>>,
+    items: SafePeekable<ContentIter<'a>>,
     previous_end: u32,
     text: &'a str,
     tokens: &'a mut Vec<WithSpan<IsographSemanticToken>>,
@@ -470,27 +475,23 @@ impl<'a> ChunkStream<'a> {
         text: &'a str,
         tokens: &'a mut Vec<WithSpan<IsographSemanticToken>>,
         errors: &'a mut Vec<WithSpan<AstError>>,
-    ) -> Self {
-        ChunkStream(ItemCursor {
-            previous_end: match contents.first() {
-                Some(item) => item.location.start,
-                None => 0,
-            },
-            items: contents.iter().safe_peekable(),
-            text,
-            tokens,
-            errors,
-        })
-    }
+    ) -> Self;
+
+    pub(crate) fn from_nonempty(
+        contents: &'a NonEmpty<WithSpan<ChunkContentItem>>,
+        text: &'a str,
+        tokens: &'a mut Vec<WithSpan<IsographSemanticToken>>,
+        errors: &'a mut Vec<WithSpan<AstError>>,
+    ) -> Self;
 }
 ```
 
-`Chunk::stream` is `ChunkStream::new(self.contents.as_slice(), text, tokens, errors)`. `peek`, `consume_token_if`, and `consume_group_if` do not eat line breaks. A comma is still there.
+`Chunk::stream` is `ChunkStream::from_nonempty(self.contents.reference(), text, tokens, errors)`. `NonEmpty` is head plus tail, not a slice. `ItemCursor` iterates `ContentIter`: a slice at the root, `nonempty::Iter` from a chunk. `peek`, `consume_token_if`, and `consume_group_if` do not eat line breaks. A comma is still there.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
 pub(crate) fn parse_stream<'a, P>(
-    mut stream: ChunkStream<'a>,
+    stream: &mut ChunkStream<'a>,
     leftover: Expectation,
     parse: impl FnOnce(&mut ItemCursor<'_>) -> Result<P, WithSpan<AstError>>,
     failed_extra: impl FnOnce() -> NonEmpty<WithSpan<ChunkContentItem>>,
@@ -545,11 +546,11 @@ pub(crate) fn parse_stream<'a, P>(
 
 fn parse_one_chunk<'a, P>(
     chunk: &'a WithSpan<Chunk>,
-    stream: ChunkStream<'a>,
+    mut stream: ChunkStream<'a>,
     leftover: Expectation,
     parse: impl FnOnce(&mut ItemCursor<'_>) -> Result<P, WithSpan<AstError>>,
 ) -> WithSpan<Slot<P, UnparsedChunkItems>> {
-    let mut slot = parse_stream(stream, leftover, parse, || chunk.item.contents.clone());
+    let mut slot = parse_stream(&mut stream, leftover, parse, || chunk.item.contents.clone());
     match leftover {
         Expectation::Separator(_) => slot,
         _ => match slot.item.item.as_ref() {
@@ -562,6 +563,7 @@ fn parse_one_chunk<'a, P>(
                 if let Some(extra) = slot.item.extra.as_ref() {
                     slot.location = Span::join(slot.location, extra.location);
                 }
+                record_leftover_extra(stream.tokens(), &slot.item.extra);
                 slot
             }
         },
@@ -664,12 +666,12 @@ pub(crate) fn parse_chunked_iso_literal(
         return None;
     }
     let slot = parse_stream(
-        stream,
+        &mut stream,
         Expectation::EndOfDeclaration,
         parse_iso_literal_item,
         || failed_extra,
     );
-    slot.with_span(location).wrap_some()
+    slot.item.with_span(location).wrap_some()
 }
 ```
 
@@ -1598,7 +1600,7 @@ parsing-standards.md:
 - Extra leftover is `Slot.extra`. There are no extra chunks on the tree.
 - A level inside brackets is a `ChunkedLevel`. A level that is not is `ChunkedRoot`: `Vec<WithSpan<ChunkContentItem>>`.
 - `ItemCursor::consume_line_breaks` is `consume_*` of a run of `LineBreak` tokens (`advance`, no semantic token). Zero is legal. Call sites: `parse_iso_literal_item` before the keyword; `parse_selectable_declaration` before the description, before the selection set, and after the selection set; `parse_entrypoint` after directives. `peek` / `consume_token_if` / `consume_group_if` do not eat line breaks. A comma is not a line break.
-- Replace `ChunkStream::new` taking `NonEmpty` with the slice signature. `parse_stream` spans then leftover. `parse_one_chunk` is `parse_stream` plus trailing-separator fold on `Ok` only, then re-join. `parse_chunked_iso_literal` streams the unpartitioned vec.
+- `ChunkStream::new` takes a slice. `ChunkStream::from_nonempty` takes a chunk's `NonEmpty`. `ItemCursor` iterates `ContentIter`. `parse_stream` takes `&mut ChunkStream`, spans then leftover. `parse_one_chunk` is `parse_stream` plus trailing-separator fold on `Ok` only, then re-join and record leftover extra. `parse_chunked_iso_literal` streams the unpartitioned vec.
 - `[...]` interiors: `parse_bracket_interior_type` calls `parse_one_chunk` on chunk 0. Boundary comma and extra chunks are `cursor.report_error` plus `record_leftover_chunk`. No `parse_singleton`.
 - Diagnostic: `report_error` in `parse_stream` and `parse_bracket_interior_type`; `errors.push` in `parse_iso_literal` (`EmptyLiteral`). `parse_one_chunk` only folds extra.
 - Enums deleted: `ChunkedLevelParent`, `ChunkParent`. Also `Singleton`, `ExtraChunks`, `ExtraChunksPath`, `IsoLiteralSlotPath`, `parse_singleton`, `parse_nested_singleton`, `MultipleDeclarations`. `ChunkedRoot` listed.

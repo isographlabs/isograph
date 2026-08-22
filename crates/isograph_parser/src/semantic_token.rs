@@ -25,7 +25,7 @@ pub enum IsographSemanticToken {
     Error,
 }
 
-// Only leftover fill-in: extra, extra_chunks, the matcher's cut.
+// Only leftover fill-in: extra, leftover chunks, the matcher's cut.
 pub(crate) fn leftover_token(kind: SplitToken) -> Option<IsographSemanticToken> {
     match kind {
         SplitToken::NonBracket(NonBracketTokenKind::IntegerLiteral) => {

@@ -10,8 +10,6 @@ pub enum AstError {
     Expected(ExpectedFound),
     #[error("Expected a declaration. An isograph literal cannot be empty.")]
     EmptyLiteral,
-    #[error("Expected nothing after the declaration. Each literal holds exactly one declaration.")]
-    MultipleDeclarations,
     #[error("This integer does not fit in a 64-bit signed integer.")]
     IntegerDoesNotFitI64,
 }
@@ -219,10 +217,6 @@ mod tests {
         assert_eq!(
             AstError::EmptyLiteral.to_string(),
             "Expected a declaration. An isograph literal cannot be empty.",
-        );
-        assert_eq!(
-            AstError::MultipleDeclarations.to_string(),
-            "Expected nothing after the declaration. Each literal holds exactly one declaration.",
         );
         assert_eq!(
             AstError::IntegerDoesNotFitI64.to_string(),

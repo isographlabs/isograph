@@ -38,15 +38,15 @@ Call sites that read `slot.item` / `slot.extra` match on the enum. `require_comp
 
 `ListTypeAnnotation` repeats the same pair (`inner: Option`, `extra: Option`) instead of being a `Slot<TypeAnnotation, UnparsedChunkItems>`. Empty `[]` fails the whole annotation (and therefore the host declaration). `[42]` succeeds as `List { inner: None, extra: Some(...) }`. Same shape, two recovery policies. After this change `ListTypeAnnotation` is `Slot<TypeAnnotation, UnparsedChunkItems>`. Empty `[]` stays a failed annotation. `[42]` is `Slot::Failed`.
 
-## `parse_singleton` assumes a non-empty level
+## `parse_bracket_interior_type` indexes chunk 0
 
 ```rust
-// from crates/isograph_parser/src/chunk.rs
+// from crates/isograph_parser/src/variables.rs
         &level.item.0[0],
-        level.item.0[0].item.stream(text, tokens, errors),
+        cursor.stream_chunk(&level.item.0[0].item),
 ```
 
-`ChunkedLevel` is a `Vec`. Empty is legal: a whitespace-only literal, and an empty `[]` type. The two production call sites check `len() == 0` first (`parse_chunked_iso_literal`, `parse_bracket_interior_type`). The type does not. A `NonEmpty` level, or a different type for a level that has a first chunk, would make the index impossible.
+`ChunkedLevel` is a `Vec`. Empty is legal: an empty `[]` type. `parse_bracket_interior_type` checks `len() == 0` first. The unpartitioned empty check is `split_first` on the vec, or `consume_line_breaks` then `require_end` for only line breaks.
 
 ## `EndOfFile` is never emitted
 
