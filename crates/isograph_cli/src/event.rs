@@ -1,12 +1,9 @@
-#![expect(clippy::allow_attributes)]
-
 use std::path::PathBuf;
 
 #[derive(Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(tag = "kind", content = "value")]
 pub enum IsographEvent {
     HelloWorld,
-    #[allow(dead_code)]
     Quit,
     DiskChanged(DiskChanged),
 }
