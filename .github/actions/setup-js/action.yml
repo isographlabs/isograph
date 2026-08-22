@@ -1,5 +1,5 @@
 name: Setup JS
-description: Configure pnpm and Node, then install workspace dependencies.
+description: Install Node and pnpm from mise.toml, then install workspace dependencies.
 
 inputs:
   install-args:
@@ -10,13 +10,9 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: pnpm/action-setup@v4
-    - name: Use Node.js 22
-      uses: actions/setup-node@v4
+    - uses: jdx/mise-action@v3
       with:
-        node-version: 22
-        cache: pnpm
-        registry-url: https://registry.npmjs.org/
+        install_args: node pnpm
     - name: Install dependencies
       run: pnpm install ${{ inputs.install-args }}
       shell: bash
