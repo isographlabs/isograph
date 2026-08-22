@@ -6,9 +6,9 @@ File-level tokens are keyed on `path`. They do not go through `LineChar`. Cursor
 
 Origin of the pipeline: isograph `crates/isograph_lsp/src/semantic_tokens.rs` `get_semantic_tokens` / `concatenate_and_absolutize_relative_tokens`. Origin of encoding: landed `lsp_semantic_tokens`. Origin of the offset map: that concat, and the encoding tests' `rebased`. Delta: pico memos over `DiskFile` instead of `Uri` + LSP state; no `TextSource`; no multiline split here (`lsp_semantic_tokens` already splits); `with_offset` on each relative span; start indices in a memo that is not the parse vec.
 
-The LSP adapter (event-model.md, not written) will call this on `semanticTokens/full`. This slice does not start the adapter. Tests intern a `DiskFile` and assert tokens.
+The LSP adapter (event-model.md, not written) will call this on `semanticTokens/full`. This slice does not start the adapter. `OpenFile` is not implemented yet; tests intern a `DiskFile` and assert tokens. Encoding is not a memo. Memoizing encoded tokens, and converting relative tokens to file-absolute with a line offset instead of `with_offset` on each span, is semantic-tokens-line-offset.md.
 
-One shippable change: three compiler memos and `lsp_semantic_tokens_for_file`.
+One shippable change: three compiler memos and `lsp_semantic_tokens_for_file`. This change amends `docs-website/docs/design-docs/pico.md`.
 
 ## What the user does
 
@@ -47,13 +47,13 @@ pico lookup of an `Option` memo is `&Option<T>`. Callers write `.as_ref()?`.
 
 ```rust
 // from crates/isograph_compiler/src/iso_literals.rs
-use isograph_parser::{IsographSemanticToken, ParsedIsoLiteral, parse_iso_literal};
+use isograph_parser::{IsographSemanticToken, ParsedIsoLiteral};
 use pico_macros::memo;
 use prelude::Postfix;
 use span::{WithSpan, WithSpanPostfix};
 
 use crate::IsographState;
-use crate::host_language::{HostLanguage, IsoLiteralExtraction};
+use crate::host_language::HostLanguage;
 
 #[memo]
 pub fn parsed_iso_literals_in_file<THostLanguage: HostLanguage>(
@@ -144,9 +144,9 @@ pub fn lsp_semantic_tokens_for_file<THostLanguage: HostLanguage>(
 
 `isograph_lsp` depends on `isograph_compiler` and `pico`. `lib.rs` gains `mod file_semantic_tokens` and re-exports `lsp_semantic_tokens_for_file`.
 
-The map lookup is `untracked`: concat returned `Some`, so this path has a `DiskFile`. Same keyed-by-path lookup as `literal_id_at_location`. `lsp_semantic_tokens` takes `&[WithSpan<IsographSemanticToken>]`; pico lookup of concat is `&Vec<_>`.
+This function is not a memo. Every call re-encodes. Concat `Some` means this path has a `DiskFile`; the map lookup is `untracked` the same way `literal_id_at_location` looks up a path it already resolved. A miss is `None`. `lsp_semantic_tokens` takes `&[WithSpan<IsographSemanticToken>]`; pico lookup of concat is `&Vec<_>`.
 
-The adapter later: `semanticTokens/full` for a URI maps to this path, then this function. Not this doc.
+The adapter later: `semanticTokens/full` for a URI maps to this path, then this function. Not this doc. Encoded-token reuse after a prepend is semantic-tokens-line-offset.md.
 
 ## Tests
 
@@ -154,11 +154,17 @@ Compiler tests in `isograph_extract_typescript` `memo_tests` (needs `TypeScriptH
 
 - No `DiskFile`: `parsed_iso_literals_in_file`, `locations_of_iso_literals_in_file`, and `iso_literal_semantic_tokens_in_file` are `None`.
 - File with no `iso`: all three are `Some` of empty vec.
-- `iso(\`entrypoint Query.HomeRoute\`)`. Let `start` be the byte index of `entrypoint` in the file. `locations_of_iso_literals_in_file` is one element, the extraction's `iso_literal_start_index`. `parsed_iso_literals_in_file` is one tree, empty parse errors, `IsoLiteralItem::Entrypoint`. The first concat token is `Keyword` at `Span` covering `entrypoint` in file coordinates (`start..start+"entrypoint".len()`). `Query` is `Type`. The `.` is `Period`. `HomeRoute` is `FieldName`.
+- `iso(\`entrypoint Query.HomeRoute\`)`. Let `start` be the byte index of `entrypoint` in the file. `locations_of_iso_literals_in_file` is one element, the extraction's `iso_literal_start_index`. `parsed_iso_literals_in_file` is one tree, empty parse errors, item variant `IsoLiteralItem::Entrypoint(_)`. The first concat token is `Keyword` at `Span` covering `entrypoint` in file coordinates (`start..start+"entrypoint".len()`). `Query` is `Type`. The `.` is `Period`. `HomeRoute` is `FieldName`.
 - `iso(\`entrypoint\`)`. Parse errors are non-empty. The first token is still `Keyword` at the file offset of `entrypoint`.
+- `iso(\`\`)`. Extract's regex requires a non-empty interior (`[^`]+`). The three file memos are `Some` of empty vec, same as a file with no `iso`.
+- `iso(\`\n\`)`. Extract len 1. Parse errors contain `EmptyLiteral`. Concat is `Some` of empty vec (leftover `LineBreak` is not a token).
 - Two literals in one file. `locations_of_iso_literals_in_file` has two start indices, matching the two extractions. Tokens of the second start at or after the second start index. Tokens are sorted by `location.start`.
-- Prefixing the file with `const x = 1;\n` (second `intern_file` of the same path): `parsed_iso_literals_in_file` Eq-equals the pre-prefix vec. `locations_of_iso_literals_in_file[0]` is the old start plus that prefix's byte length. The keyword span moves by that length. `parsed_iso_literal` of the same iso text does not re-invoke; concat does. isograph `memoized_parse_iso_literal` takes `text_source` and comments that moving the literal breaks memoization because of that param. i2 `parsed_iso_literal` is keyed on `iso_literal_text` only. isograph `get_semantic_tokens` (issue 548) cannot reuse file-absolute encoded tokens after typing before the literal; that is this concat memo.
+- Multiline: intern `iso(\`\nfield User.Avatar {\n  name\n}\n\`)`. Concat has `Keyword` at the file offset of `field` and `FieldName` at the file offset of `name`. `name`'s `location.start` is greater than `field`'s.
+- Prefixing the file with `const x = 1;\n` (second `intern_file` of the same path): `parsed_iso_literals_in_file` Eq-equals the pre-prefix vec. `locations_of_iso_literals_in_file[0]` is the old start plus that prefix's byte length. The keyword span moves by that length. `parsed_iso_literal` of the same iso text does not re-invoke; concat does. isograph `memoized_parse_iso_literal` takes `text_source` and comments that moving the literal breaks memoization because of that param. i2 `parsed_iso_literal` is keyed on `iso_literal_text` only. File-absolute `WithSpan` tokens cannot be reused after typing before the literal; that is this concat memo. Encoded-token reuse is semantic-tokens-line-offset.md.
+- Prefixing with `const x = "😀";\n`. `iso_literal_start_index` and the keyword span start are byte offsets (`contents.find("entrypoint")`). Encoding `delta_start` is UTF-16 of the prefix of that line up to `entrypoint`.
 - Appending `"\nconst y = 1;\n"` after the same one-literal file: `locations_of_iso_literals_in_file` Eq-equals the pre-append vec. Keyword span is unchanged. Extract's `IsoLiteralExtraction` Eq-equals (same text, same `iso_literal_start_index`, same context). pico re-invokes extract, backdates it, and does not re-invoke locations, parsed-in-file, concat, or parse.
+- Context-only: intern `export const Home = iso(\`entrypoint Query.HomeRoute\`)`, then `export const Page = iso(\`entrypoint Query.HomeRoute\`)` (`Home` and `Page` are the same length, so `iso_literal_start_index` is unchanged). Extract is `!=` (`const_export_name`). `locations_of_iso_literals_in_file` Eq-equals. `parsed_iso_literals_in_file` Eq-equals. Concat does not re-invoke. That is why locations is a list of start indices and not extract: host context is not highlighting.
+- Intern the one-literal file, concat is `Some`, `remove_disk_file`, concat is `None`.
 
 Count reuse with test-only memos in `isograph_extract_typescript` `memo_tests`. They are not production. pico's own tests increment an `AtomicUsize` in the memo body. Each of these two tests has its own atomics and counted memos.
 
@@ -166,8 +172,13 @@ Count reuse with test-only memos in `isograph_extract_typescript` `memo_tests`. 
 // from crates/isograph_extract_typescript/src/lib.rs
     static APPEND_PARSE_BODY: AtomicUsize = AtomicUsize::new(0);
     static APPEND_CONCAT_BODY: AtomicUsize = AtomicUsize::new(0);
+    static APPEND_PARSED_IN_FILE_BODY: AtomicUsize = AtomicUsize::new(0);
+    static APPEND_LOCATIONS_BODY: AtomicUsize = AtomicUsize::new(0);
     static PREFIX_PARSE_BODY: AtomicUsize = AtomicUsize::new(0);
     static PREFIX_CONCAT_BODY: AtomicUsize = AtomicUsize::new(0);
+    static PREFIX_PARSED_IN_FILE_BODY: AtomicUsize = AtomicUsize::new(0);
+    static PREFIX_LOCATIONS_BODY: AtomicUsize = AtomicUsize::new(0);
+    static CONTEXT_CONCAT_BODY: AtomicUsize = AtomicUsize::new(0);
 
     #[memo]
     fn counted_parse_append(db: &IsographState<TypeScriptHostLanguage>, iso_literal_text: String) {
@@ -182,6 +193,21 @@ Count reuse with test-only memos in `isograph_extract_typescript` `memo_tests`. 
     }
 
     #[memo]
+    fn counted_parsed_in_file_append(
+        db: &IsographState<TypeScriptHostLanguage>,
+        path: PathBuf,
+    ) {
+        APPEND_PARSED_IN_FILE_BODY.fetch_add(1, Ordering::SeqCst);
+        let _ = parsed_iso_literals_in_file(db, path);
+    }
+
+    #[memo]
+    fn counted_locations_append(db: &IsographState<TypeScriptHostLanguage>, path: PathBuf) {
+        APPEND_LOCATIONS_BODY.fetch_add(1, Ordering::SeqCst);
+        let _ = locations_of_iso_literals_in_file(db, path);
+    }
+
+    #[memo]
     fn counted_parse_prefix(db: &IsographState<TypeScriptHostLanguage>, iso_literal_text: String) {
         PREFIX_PARSE_BODY.fetch_add(1, Ordering::SeqCst);
         let _ = parsed_iso_literal(db, iso_literal_text);
@@ -192,15 +218,41 @@ Count reuse with test-only memos in `isograph_extract_typescript` `memo_tests`. 
         PREFIX_CONCAT_BODY.fetch_add(1, Ordering::SeqCst);
         let _ = iso_literal_semantic_tokens_in_file(db, path);
     }
+
+    #[memo]
+    fn counted_parsed_in_file_prefix(
+        db: &IsographState<TypeScriptHostLanguage>,
+        path: PathBuf,
+    ) {
+        PREFIX_PARSED_IN_FILE_BODY.fetch_add(1, Ordering::SeqCst);
+        let _ = parsed_iso_literals_in_file(db, path);
+    }
+
+    #[memo]
+    fn counted_locations_prefix(db: &IsographState<TypeScriptHostLanguage>, path: PathBuf) {
+        PREFIX_LOCATIONS_BODY.fetch_add(1, Ordering::SeqCst);
+        let _ = locations_of_iso_literals_in_file(db, path);
+    }
+
+    #[memo]
+    fn counted_concat_context(db: &IsographState<TypeScriptHostLanguage>, path: PathBuf) {
+        CONTEXT_CONCAT_BODY.fetch_add(1, Ordering::SeqCst);
+        let _ = iso_literal_semantic_tokens_in_file(db, path);
+    }
 ```
 
-Append test: intern the one-literal file. Call `counted_parse_append` with that literal text and `counted_concat_append` with that path. Both counters are 1. Second `intern_file` with the suffix. Call both again. Both counters stay 1.
+Append test: intern the one-literal file. Call the four append counted memos. All counters are 1. Second `intern_file` with the suffix. Call all four again. All four stay 1.
 
-Prefix test: intern the one-literal file in a fresh `db`. Call `counted_parse_prefix` and `counted_concat_prefix`. Both counters are 1. Second `intern_file` with the prefix. Call both again. `PREFIX_PARSE_BODY` stays 1. `PREFIX_CONCAT_BODY` is 2.
+Prefix test: intern the one-literal file in a fresh `db`. Call the four prefix counted memos. All counters are 1. Second `intern_file` with the prefix. Call all four again. `PREFIX_PARSE_BODY` stays 1. `PREFIX_PARSED_IN_FILE_BODY` stays 1 (`parsed_iso_literals_in_file` re-invokes because extract `!=`, result `==`, backdates; the wrapper depends on that `time_updated`). `PREFIX_LOCATIONS_BODY` is 2. `PREFIX_CONCAT_BODY` is 2.
+
+Context-only test: intern `export const Home = iso(\`entrypoint Query.HomeRoute\`)` in a fresh `db`. Call `counted_concat_context`. Counter is 1. Second `intern_file` with `Page` in place of `Home`. Call again. `CONTEXT_CONCAT_BODY` stays 1.
 
 LSP tests in `crates/isograph_lsp` `file_semantic_tokens.rs`:
 
-- Intern the one-literal file. `lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>` is `Some`. The first encoded token has `delta_line` 0 and `token_type` the legend index of keyword. `length` is the UTF-16 length of `entrypoint`.
+- Intern the one-literal file. `lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>` is `Some`. The first encoded token has `delta_line` 0, `token_type` the legend index of keyword (`15`), `length` the UTF-16 length of `entrypoint` (`11`), and `delta_start` the UTF-16 column of `entrypoint` on that line (the UTF-16 length of `export const Home = iso(\``).
+- Multiline fixture as above. The encoded token for `name` has `delta_line` greater than 0.
+- Emoji prefix on the previous line (`const x = "😀";\n` plus the fixture). First token `delta_line` 1, `length` 11, `delta_start` equals the unprefixed fixture.
+- Emoji prefix on the same line (`const x = "😀"; ` plus the fixture). First token `delta_line` 0, `length` 11, `delta_start` is UTF-16 of that prefix plus `export const Home = iso(\``.
 - Empty file (present, no iso): `Some` of empty vec.
 - No `DiskFile`: `None`.
 

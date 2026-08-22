@@ -137,15 +137,19 @@ parsed_iso_literal(text)
   -> parse_iso_literal(&str)
 ```
 
-Semantic tokens for a file (file-semantic-tokens.md) are a later memo:
+Semantic tokens for a file (file-semantic-tokens.md):
 
 ```text
 iso_literal_semantic_tokens_in_file(path)
   -> parsed_iso_literals_in_file(path)
+  + locations_of_iso_literals_in_file(path)
 
 parsed_iso_literals_in_file(path)
   -> THostLanguage::extract_iso_literals(path)
   + parsed_iso_literal(text) for each extraction
+
+locations_of_iso_literals_in_file(path)
+  -> THostLanguage::extract_iso_literals(path)
 ```
 
 ```rust
@@ -275,7 +279,7 @@ fn flattened_selectable_named(
 
 `LineChar` is the cursor: `line` is a 0-based count of `\n`, `character` is bytes since the last `\n`. The adapter has that pair.
 
-Inside hover, `literal_id_at_location` takes `path` and `LineChar` and turns that pair into a `LiteralId`. `iso_literal_extraction` takes the id. `parsed_iso_literal` takes the extraction's text. Semantic tokens for the file calls `iso_literal_semantic_tokens_in_file(path)`, which parses every extraction's text.
+Inside hover, `literal_id_at_location` takes `path` and `LineChar` and turns that pair into a `LiteralId`. `iso_literal_extraction` takes the id. `parsed_iso_literal` takes the extraction's text. Semantic tokens for the file calls `iso_literal_semantic_tokens_in_file(path)`, which reads the file's parse list and start indices and offsets each literal's relative tokens.
 
 Hover fires once per `LineChar`. Each `(path, LineChar)` is its own `literal_id_at_location` slot, so moving the caret across a literal executes that intern for every character. That is expected. The stored value is a `PathBuf` and a vec index. `iso_literal_extraction` of that `LiteralId` is one slot. Every character inside the same literal yields the same text, so `parsed_iso_literal` is one slot.
 
@@ -290,12 +294,12 @@ pico re-invokes a memo when a dependency's `time_updated` is newer than this mem
 If they are equal, pico keeps the old `time_updated`. Dependents see no change and do not re-invoke. That is backdating.
 
 ```text
-syntax highlighting  ->  parsed literals  ->  extract  ->  DiskFile
+syntax highlighting  ->  parsed literals + locations  ->  extract  ->  DiskFile
 ```
 
-Typing JavaScript after the last iso literal re-invokes extract. If the `Vec<IsoLiteralExtraction>` is `==` (same texts, same start indices, same context), extract is backdated. Parse and syntax highlighting do not re-invoke.
+Typing JavaScript after the last iso literal re-invokes extract. If the `Vec<IsoLiteralExtraction>` is `==` (same texts, same start indices, same context), extract is backdated. Parse, locations, and syntax highlighting do not re-invoke.
 
-Typing JavaScript before a literal changes `iso_literal_start_index`. Extract is `!=`. The file-absolute token memo re-invokes. `parsed_iso_literal` of the same text does not.
+Typing JavaScript before a literal changes `iso_literal_start_index`. Extract is `!=`. Locations is `!=`. The file-absolute token memo re-invokes. `parsed_iso_literals_in_file` re-invokes and `==` (same texts, relative spans). `parsed_iso_literal` of the same text does not.
 
 If this memo was already verified in the current epoch, pico returns the stored value without walking dependencies. Two LSP requests in the same epoch (hover and semantic tokens, no edit between them) share extract and parse this way.
 
