@@ -165,6 +165,41 @@ fn the_log_contains_the_config_path() {
 }
 
 #[test]
+fn send_of_disk_changed_present_then_absent_exits_0() {
+    let daemon = Daemon::start();
+    poll(|| {
+        daemon
+            .log_text()
+            .contains("isograph daemon up")
+            .then_some(())
+    });
+    let present = write_frame(
+        daemon.dir.path(),
+        r#"{"kind":"DiskChanged","value":{"path":"/tmp/proj/src/a.ts","presence":{"Present":"export const a = 1;\n"}}}"#,
+    );
+    let sent = daemon.isograph(["send", "--file", present.to_str().expect("utf-8")].reference());
+    assert!(
+        sent.status.success(),
+        "stdout: {} stderr: {}",
+        stdout(sent.reference()),
+        stderr(sent.reference())
+    );
+    assert!(!present.exists(), "send deletes --file");
+    let absent = write_frame(
+        daemon.dir.path(),
+        r#"{"kind":"DiskChanged","value":{"path":"/tmp/proj/src/a.ts","presence":"Absent"}}"#,
+    );
+    let sent = daemon.isograph(["send", "--file", absent.to_str().expect("utf-8")].reference());
+    assert!(
+        sent.status.success(),
+        "stdout: {} stderr: {}",
+        stdout(sent.reference()),
+        stderr(sent.reference())
+    );
+    assert!(!absent.exists(), "send deletes --file");
+}
+
+#[test]
 fn send_with_the_daemon_stopped_fails() {
     let dir = tempfile::tempdir().expect("a test can create a temp directory");
     let config = dir.path().join("isograph.config.json");
