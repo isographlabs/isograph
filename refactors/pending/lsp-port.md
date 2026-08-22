@@ -25,7 +25,7 @@ isograph is one process per editor on stdio. i2 is one daemon per config. Send a
 - `tokio::net::TcpListener` then `into_std` + `set_nonblocking(false)`. Serve is already tokio (event loop, effect loop, SIGTERM). `into_std` streams are non-blocking; `Message::read` is not.
 - Code lives in `isograph_cli`, not `isograph_lsp`. The daemon is already `isograph_cli`. i2 `isograph_lsp` is encoding.
 - Empty `ServerCapabilities`. isograph's `initialize` advertises tokens, hover, and the rest. Those land with lsp-tokens.md / later docs.
-- No `LspState`, no `LSPNotificationDispatch` / `LSPRequestDispatch`. isograph chains many methods. This slice pumps messages onto `event_tx` and answers requests with `MethodNotFound`. Copy the dispatch types when `handle` has a chain.
+- No `LspState`, no `LSPNotificationDispatch` / `LSPRequestDispatch` in this slice. isograph's dispatch chain (`on_notification_sync` / `on_request_sync`) lands later inside `handle`'s `IsographEvent::Lsp` match, not in `session`. This slice is a `match` on the message.
 - No `bridge_crossbeam_to_tokio`. isograph bridges so one `select!` can mix LSP, watcher, and debounce. We already have `run_event_loop`. The session thread iterates `connection.receiver`.
 - `isograph/event`. isograph has no CLI event socket. send-events.md already sends `HelloWorld` / `DiskChanged` / `Quit`; the port is now LSP, so that JSON is a notification's params. The channel event is `Lsp`, not those variants.
 - Send uses `Connection::connect` (public), then writes the initialize request itself. `Connection::initialize` is server-only. There is no client initialize in `lsp-server`. `tokio-lsp` / `lsp-client-rs` / `async-lsp-client` are other stacks (stdio child process, their own runtime). A second client crate is not isograph. Do not add one.
@@ -212,6 +212,8 @@ Origin of the loop: isograph `server.rs` `run` matching `Message`. Origin of the
 ```
 
 `handle` already matches `HelloWorld` / `Quit` / `DiskChanged`. The `Lsp` arm of `isograph/event` deserializes those and calls `handle` with them. Other LSP messages are no-ops this slice. `client` is unused until a later slice writes back (lsp-tokens.md / lsp-sessions.md). Recursion does not see `Lsp`: params cannot deserialize to it.
+
+Later, this `match message` is where isograph's `LSPNotificationDispatch` / `LSPRequestDispatch` go. Not now. Not in `session`.
 
 ### `serve`
 
