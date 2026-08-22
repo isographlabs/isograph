@@ -1,47 +1,46 @@
 # Unchunked root
 
-An iso literal is one declaration. The user writes it across lines. The parser consumes the whole root as one form.
+An iso literal is one declaration. The root is not partitioned. Group interiors still are.
 
 ```
-field Query.Foo
-{
-  bar
-}
+// from demos/pet-demo/src/components/HomeRoute.tsx
+iso(`
+  field Query.HomeRoute @component
+  """
+  Show a list of pets
+  """
+  {
+    pets {
+      id
+      PetSummaryCard
+    }
+  }
+`)
 ```
 
-A selectable `Query.Foo` whose selection set is `{ bar }`.
-
 ```
-field Query.Foo
-  to User
-  @loadable
-  ($id: ID)
-  "home page"
-{
-  bar
-}
-```
-
-`to`, the directive, the variable list, the description, and the selection set attach. `entrypoint` then `Query.foo` on the next line is one entrypoint.
-
-```
-entrypoint Query.foo
-field User.name
+// from demos/vite-demo/src/components/HomePage.tsx
+iso(`
+  field Query.HomePage @component
+  """
+  Gets the first 150 pokemon, take is higher because there are alternative forms
+  returned and the offset skips a bunch of other Pokemon that aren't in the first 150
+  """
+  {
+    getAllPokemon(take: 232, offset: 93) {
+      key
+      forme
+      Pokemon
+    }
+  }
+`)
 ```
 
-The entrypoint parses. `field User.name` is leftover. `Expected(EndOfDeclaration, Identifier)` at `field`.
+The description and the selection set sit on later lines than `field Query.HomeRoute @component`. Entrypoints in the same demos are one line, `iso(\`entrypoint Query.HomeRoute\`)`, with no comma in front of `entrypoint`.
 
-```
-field Query.Foo,
-```
+Root line breaks stay in the chunk as `NonBracket(LineBreak)`. The parser skips them. A comma is not a line break. Before `field` / `entrypoint`, a comma is `Expected(DECLARATION_KEYWORD, Comma)`.
 
-The selectable parses. The comma is leftover. `Expected(EndOfDeclaration, Comma)` at the comma.
-
-`""`, `"   "`, `"\n\n"` are `EmptyLiteral` and `None`. `","` is a failed declaration: `Expected(DECLARATION_KEYWORD, Comma)` at the comma, `item: None`, extra is the comma.
-
-`,entrypoint Query.foo` is the same shape at the leading comma: the comma is the first item, the form fails there, extra is the whole contents.
-
-A list interior still partitions on commas and line breaks. `{ bar\nbaz }` is two selections. `{ foo\n{ bar } }` is a scalar plus a failed selection. `[Pet\n!]` does not attach the bang.
+A list interior still partitions on commas and line breaks. `{ pets {` / `id` / `PetSummaryCard` } is three selections. `{ foo\n{ bar } }` is a scalar plus a failed selection. `[Pet\n!]` does not attach the bang.
 
 ## Tree
 
@@ -91,7 +90,7 @@ pub struct ChunkedRoot(
 pub type ChunkedRootPath<'a> = PositionResolutionPath<&'a ChunkedRoot, ()>;
 ```
 
-`None` is an empty literal. `Some` is the one root chunk: every non-line-break root item, `trailing_separator: None`. Groups in that chunk have `ChunkedLevel` interiors, partitioned as they are today.
+`None` is an empty literal (`""`, `"   "`). `Some` is the one root chunk: every root item including line breaks, `trailing_separator: None`. Groups in that chunk have `ChunkedLevel` interiors, partitioned as they are today.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -163,7 +162,7 @@ impl<'a> From<IsoLiteralParsePath<'a>> for UnparsedChunkItemsParent<'a> {
 
 `Singleton` is gone. `ExtraChunks` is gone. `ExtraChunksPath` is gone.
 
-Delta from the landed enum: drop `Singleton` and `ExtraChunks`; add `ChunkedRoot`; `IsoLiteralSlot`'s payload is `IsoLiteralParsePath` (the slot, parent `()`). `ChunkedLevelPath`'s parent is `ChunkedGroupPath`. Every other variant is unchanged.
+Delta from the landed `IsographResolutionNode`: drop `Singleton` and `ExtraChunks`; add `ChunkedRoot`; `IsoLiteralSlot`'s payload is `IsoLiteralParsePath` (the slot, parent `()`). `ChunkedLevelPath`'s parent is `ChunkedGroupPath`. Every other variant is unchanged.
 
 ```rust
 // from crates/isograph_parser/src/isograph_resolution_node.rs
@@ -233,6 +232,8 @@ impl<'a> From<ChunkedRootPath<'a>> for IsographResolutionNode<'a> {
 
 ## Chunk
 
+Root line breaks are content. Root commas are content. Interiors still partition on both.
+
 ```rust
 // from crates/isograph_parser/src/chunk.rs
 pub(crate) fn chunk(
@@ -241,9 +242,7 @@ pub(crate) fn chunk(
     let mut errors = Vec::new();
     let mut contents = Vec::new();
     for item in tree.item.0.iter() {
-        if let Some(content) = root_content(item, &mut errors) {
-            contents.push(content.with_span(item.location));
-        }
+        contents.push(root_content(item, &mut errors).with_span(item.location));
     }
     let mut items = contents.into_iter();
     let chunk = items.next().map(|head| {
@@ -264,22 +263,395 @@ pub(crate) fn chunk(
 fn root_content(
     item: &WithSpan<BracketItem>,
     errors: &mut Vec<CommaWithoutItem>,
-) -> Option<ChunkContentItem> {
+) -> ChunkContentItem {
     match item.item.reference() {
-        BracketItem::Raw(token) if token.0 == NonBracketTokenKind::LineBreak => None,
-        BracketItem::Raw(token) => ChunkContentItem::NonBracket(*token).wrap_some(),
-        BracketItem::Bracketed(group) => {
-            ChunkContentItem::Group(chunk_group(group, errors)).wrap_some()
-        }
+        BracketItem::Raw(token) => ChunkContentItem::NonBracket(*token),
+        BracketItem::Bracketed(group) => ChunkContentItem::Group(chunk_group(group, errors)),
     }
 }
 ```
 
 `chunk_level`, `absorb_chunk`, `as_content`, `chunk_group` are unchanged. `CommaWithoutItem` is produced only inside groups.
 
-Root line breaks are dropped. A position on a dropped root line break answers `ChunkedRoot` on the chunk tree, and `IsoLiteralSlot` on the grammar tree (unmatched on the whole-literal span). Root commas are content.
+```rust
+// from crates/isograph_parser/src/matched_brackets.rs
+pub(crate) fn match_brackets(
+    tokens: Vec<WithSpan<IsographLangTokenKind>>,
+    literal_length: u32,
+) -> (WithSpan<MatchedBrackets>, Vec<BracketError>) {
+    let mut tokens = tokens.into_iter().safe_peekable();
+    let mut enclosing_stack = Stack::new();
+    let mut errors = Vec::new();
+    let items = parse_bracket_items(&mut tokens, &mut enclosing_stack, &mut errors);
+    errors.sort_by_key(|error| match error {
+        BracketError::UnmatchedOpen(open) => open.location.start,
+        BracketError::UnmatchedClose(close) => close.location.start,
+    });
+    (
+        MatchedBrackets(items).with_span(Span::new(0, literal_length)),
+        errors,
+    )
+}
+```
 
-## Parse
+`strip_captured_line_breaks` stays on a group's interior in `parse_bracketed`. It does not run on the root. The newline after `iso(\`` is a root `LineBreak` token.
+
+## `skip_line_breaks`
+
+Line breaks are not recorded. A position on a skipped line break answers the containing node.
+
+```rust
+// from crates/isograph_parser/src/chunk_stream.rs
+    pub(crate) fn skip_line_breaks(&mut self) {
+        while let Some(peek) = self.peek() {
+            match peek.view().item.reference() {
+                ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::LineBreak)) => {
+                    peek.advance();
+                }
+                _ => break,
+            }
+        }
+    }
+```
+
+`peek`, `consume_token_if`, and `consume_group_if` do not skip. Every `parse_*` and `consume_*` that looks at the next item calls `skip_line_breaks` first. A comma is still there.
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+fn parse_one_chunk<'a, P>(
+    chunk: &'a WithSpan<Chunk>,
+    mut stream: ChunkStream<'a>,
+    leftover: Expectation,
+    parse: impl FnOnce(&mut ItemCursor<'_>) -> Result<P, WithSpan<AstError>>,
+) -> WithSpan<Slot<P, UnparsedChunkItems>> {
+    stream.cursor().skip_line_breaks();
+    let result = stream.cursor().spanning(parse);
+    let slot = match result {
+        Ok(item) => {
+            stream.cursor().skip_line_breaks();
+            let extra = match stream.remaining_contents() {
+                None => None,
+                Some(remaining) => {
+                    stream.cursor().report_error(
+                        AstError::expected(
+                            leftover,
+                            Found::from(remaining.first().item.reference()),
+                        )
+                        .with_span(remaining.first().location),
+                    );
+                    let leftover_span =
+                        Span::join(remaining.first().location, remaining.last().location);
+                    UnparsedChunkItems(remaining)
+                        .with_span(leftover_span)
+                        .wrap_some()
+                }
+            };
+            let extra = match leftover {
+                Expectation::Separator(_) => extra,
+                _ => extra_plus_trailing_separator(extra, chunk.item.trailing_separator.as_ref()),
+            };
+            let location = match extra.as_ref() {
+                None => item.location,
+                Some(extra) => Span::join(item.location, extra.location),
+            };
+            Slot {
+                item: item.wrap_some(),
+                extra,
+            }
+            .with_span(location)
+        }
+        Err(reason) => {
+            stream.cursor().report_error(reason);
+            let extra = match stream.remaining_contents() {
+                Some(remaining) => remaining,
+                None => chunk.item.contents.clone(),
+            };
+            let location = Span::join(extra.first().location, extra.last().location);
+            Slot {
+                item: None,
+                extra: UnparsedChunkItems(extra).with_span(location).wrap_some(),
+            }
+            .with_span(location)
+        }
+    };
+    record_leftover_extra(stream.tokens(), &slot.item.extra);
+    slot
+}
+```
+
+Delta from landed `parse_one_chunk`: `skip_line_breaks` before `spanning`, and after `Ok` before `remaining_contents`. Trailing root newlines after `}` are not leftover. A trailing comma is leftover, `Expected(EndOfDeclaration, Comma)`.
+
+List interiors have no line-break content items (they are separators). The two skips are then no-ops.
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+fn parse_iso_literal_item(
+    cursor: &mut ItemCursor<'_>,
+) -> Result<IsoLiteralItem, WithSpan<AstError>> {
+    cursor.skip_line_breaks();
+    let keyword = cursor
+        .require_token(
+            NonBracketTokenKind::Identifier,
+            IsographSemanticToken::Keyword,
+        )
+        .map_err(|()| cursor.expected(DECLARATION_KEYWORD))?;
+    match keyword.text() {
+        "entrypoint" => IsoLiteralItem::Entrypoint(parse_entrypoint(cursor)?).wrap_ok(),
+        "field" => IsoLiteralItem::Selectable(parse_selectable_declaration(cursor)?).wrap_ok(),
+        _ => AstError::expected(
+            DECLARATION_KEYWORD,
+            Found::Token(NonBracketTokenKind::Identifier),
+        )
+        .with_span(keyword.location)
+        .wrap_err(),
+    }
+}
+
+fn parse_type_dot_name(
+    cursor: &mut ItemCursor<'_>,
+) -> Result<(WithSpan<EntityNameWrapper>, WithSpan<SelectableName>), WithSpan<AstError>> {
+    cursor.skip_line_breaks();
+    let parent_type = cursor
+        .require_token(NonBracketTokenKind::Identifier, IsographSemanticToken::Type)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+    cursor.skip_line_breaks();
+    cursor
+        .require_token(NonBracketTokenKind::Period, IsographSemanticToken::Period)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Period)))?;
+    cursor.skip_line_breaks();
+    let name = cursor
+        .require_token(
+            NonBracketTokenKind::Identifier,
+            IsographSemanticToken::FieldName,
+        )
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+    (
+        parent_type.interned().map(EntityNameWrapper),
+        name.interned(),
+    )
+        .wrap_ok()
+}
+
+fn consume_to_target(
+    cursor: &mut ItemCursor<'_>,
+) -> Result<Option<WithSpan<TypeAnnotation>>, WithSpan<AstError>> {
+    cursor.skip_line_breaks();
+    let peek = cursor.peek();
+    let Some(peek) = peek else {
+        return None.wrap_ok();
+    };
+    let item = peek.view();
+    let is_identifier = matches!(
+        item.item.reference(),
+        ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::Identifier))
+    );
+    let location = item.location;
+    if !is_identifier || &cursor.text()[location.as_usize_range()] != "to" {
+        return None.wrap_ok();
+    }
+    cursor
+        .require_token(
+            NonBracketTokenKind::Identifier,
+            IsographSemanticToken::Keyword,
+        )
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+    parse_type_annotation(cursor)?.wrap_some().wrap_ok()
+}
+
+pub(crate) fn consume_description(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<Description>> {
+    cursor.skip_line_breaks();
+    if let Some(span) = cursor.consume_token_if(
+        NonBracketTokenKind::StringLiteral,
+        IsographSemanticToken::String,
+    ) {
+        return Description(span.exclude_ends(1).interned().item)
+            .with_span(span.location)
+            .wrap_some();
+    }
+    cursor
+        .consume_token_if(
+            NonBracketTokenKind::BlockStringLiteral,
+            IsographSemanticToken::String,
+        )
+        .map(|span| {
+            Description(intern_block_string_value(span.exclude_ends(3).text()))
+                .with_span(span.location)
+        })
+}
+```
+
+`parse_entrypoint` and `parse_selectable_declaration` are the landed bodies plus `skip_line_breaks` at the start of each `consume_*` they call.
+
+```rust
+// from crates/isograph_parser/src/directives.rs
+fn next_is_at(cursor: &mut ItemCursor<'_>) -> bool {
+    cursor.skip_line_breaks();
+    matches!(
+        cursor.peek().map(|peek| peek.view().item.reference()),
+        Some(ChunkContentItem::NonBracket(NonBracketToken(
+            NonBracketTokenKind::At
+        )))
+    )
+}
+```
+
+`consume_directives` uses `next_is_at`. `parse_directive_after_at` skips before the name and before `consume_argument_list`.
+
+```rust
+// from crates/isograph_parser/src/selections.rs
+pub(crate) fn consume_selection_set(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<SelectionSet>> {
+    cursor.skip_line_breaks();
+    cursor.consume_group_if(
+        BracketKind::Brace,
+        IsographSemanticToken::Brace,
+        |cursor, children| {
+            SelectionSet(children.item.parse_each_chunk(
+                cursor,
+                Expectation::Separator(BracketKind::Brace),
+                parse_selection,
+            ))
+        },
+    )
+}
+
+fn parse_selection(cursor: &mut ItemCursor<'_>) -> Result<Selection, WithSpan<AstError>> {
+    cursor.skip_line_breaks();
+    let first = cursor
+        .require_token(
+            NonBracketTokenKind::Identifier,
+            IsographSemanticToken::FieldName,
+        )
+        .map_err(|()| cursor.expected(Expectation::Selection))?;
+    // landed alias / name / consume_argument_list / consume_directives / consume_selection_set
+}
+```
+
+```rust
+// from crates/isograph_parser/src/variables.rs
+pub(crate) fn consume_variable_declaration_list(
+    cursor: &mut ItemCursor<'_>,
+) -> Option<WithSpan<VariableDeclarationList>> {
+    cursor.skip_line_breaks();
+    cursor.consume_group_if(
+        BracketKind::Parenthesis,
+        IsographSemanticToken::Parenthesis,
+        |cursor, children| {
+            VariableDeclarationList(children.item.parse_each_chunk(
+                cursor,
+                Expectation::Separator(BracketKind::Parenthesis),
+                parse_variable_declaration,
+            ))
+        },
+    )
+}
+
+fn parse_variable_declaration(
+    cursor: &mut ItemCursor<'_>,
+) -> Result<VariableDeclaration, WithSpan<AstError>> {
+    cursor.skip_line_breaks();
+    // landed parse_name_colon / default value
+}
+
+pub(crate) fn parse_type_annotation(
+    cursor: &mut ItemCursor<'_>,
+) -> Result<WithSpan<TypeAnnotation>, WithSpan<AstError>> {
+    cursor.skip_line_breaks();
+    let core = parse_named_or_list(cursor)?;
+    cursor.skip_line_breaks();
+    if let Some(peek) = cursor.peek()
+        && matches!(
+            peek.view().item.reference(),
+            ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::Exclamation))
+        )
+    {
+        peek.advance();
+        return core
+            .item
+            .into_type_annotation()
+            .with_span(core.location)
+            .wrap_ok();
+    }
+    // landed Union([written, Null])
+}
+
+fn parse_named_or_list(
+    cursor: &mut ItemCursor<'_>,
+) -> Result<WithSpan<NamedOrList>, WithSpan<AstError>> {
+    cursor.skip_line_breaks();
+    cursor.spanning(|cursor| {
+        // landed identifier / list group
+    })
+}
+```
+
+```rust
+// from crates/isograph_parser/src/arguments.rs
+pub(crate) fn parse_name_colon<L, R>(
+    cursor: &mut ItemCursor<'_>,
+    parse_lhs: impl FnOnce(&mut ItemCursor<'_>) -> Result<L, WithSpan<AstError>>,
+    parse_rhs: impl FnOnce(&mut ItemCursor<'_>) -> Result<R, WithSpan<AstError>>,
+) -> Result<(L, R), WithSpan<AstError>> {
+    cursor.skip_line_breaks();
+    let lhs = parse_lhs(cursor)?;
+    cursor.skip_line_breaks();
+    cursor
+        .require_token(NonBracketTokenKind::Colon, IsographSemanticToken::Colon)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Colon)))?;
+    cursor.skip_line_breaks();
+    let rhs = parse_rhs(cursor)?;
+    (lhs, rhs).wrap_ok()
+}
+
+pub(crate) fn consume_argument_list(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<ArgumentList>> {
+    cursor.skip_line_breaks();
+    cursor.consume_group_if(
+        BracketKind::Parenthesis,
+        IsographSemanticToken::Parenthesis,
+        |cursor, children| {
+            ArgumentList(children.item.parse_each_chunk(
+                cursor,
+                Expectation::Separator(BracketKind::Parenthesis),
+                parse_argument,
+            ))
+        },
+    )
+}
+
+fn parse_argument(cursor: &mut ItemCursor<'_>) -> Result<Argument, WithSpan<AstError>> {
+    cursor.skip_line_breaks();
+    // landed parse_name_colon
+}
+
+fn parse_object_entry(cursor: &mut ItemCursor<'_>) -> Result<ObjectEntry, WithSpan<AstError>> {
+    cursor.skip_line_breaks();
+    // landed parse_name_colon
+}
+
+pub(crate) fn parse_non_constant_value(
+    cursor: &mut ItemCursor<'_>,
+) -> Result<WithSpan<NonConstantValue>, WithSpan<AstError>> {
+    cursor.skip_line_breaks();
+    // landed dispatch
+}
+
+pub(crate) fn parse_variable_name(
+    cursor: &mut ItemCursor<'_>,
+    missing_dollar: Expectation,
+) -> Result<WithSpan<VariableDeclarationOrUsage>, WithSpan<AstError>> {
+    cursor.spanning(|cursor| {
+        cursor.skip_line_breaks();
+        cursor
+            .require_token(NonBracketTokenKind::Dollar, IsographSemanticToken::Variable)
+            .map_err(|()| cursor.expected(missing_dollar))?;
+        cursor.skip_line_breaks();
+        // landed name
+    })
+}
+```
+
+`parse_integer_value`, `parse_string_literal`, `parse_boolean_or_null`, `parse_list_literal_value`, `parse_object_literal`: `skip_line_breaks` then the landed body.
+
+## Parse of the root
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -294,9 +666,15 @@ pub(crate) fn parse_chunked_iso_literal(
         errors.push(AstError::EmptyLiteral.with_span(location));
         return None;
     };
+    let mut stream = chunk.item.stream(text, tokens, errors);
+    stream.cursor().skip_line_breaks();
+    if stream.require_end().is_ok() {
+        errors.push(AstError::EmptyLiteral.with_span(location));
+        return None;
+    }
     let slot = parse_one_chunk(
         chunk,
-        chunk.item.stream(text, tokens, errors),
+        stream,
         Expectation::EndOfDeclaration,
         parse_iso_literal_item,
     );
@@ -304,9 +682,13 @@ pub(crate) fn parse_chunked_iso_literal(
 }
 ```
 
-`parse_one_chunk` is `pub(crate)`. The returned `WithSpan` is the whole literal, so a position on leading whitespace or on a consumed keyword of a failed form (`fieldd` in `fieldd Query.foo { bar }`) is unmatched on the slot and answers `IsoLiteralSlot`. `item` and `extra` keep the tight spans `parse_one_chunk` assigned.
+`require_end` loses `#[cfg_attr(not(test), expect(dead_code))]`. After skip, a stream at end is `"\n\n"`. `parse_one_chunk` skips again (no-op, already at `field` / `entrypoint`) then spans.
 
-Leftover after a complete declaration is `Slot.extra` plus `report_error(Expected(EndOfDeclaration, found))` at the first leftover item, including a trailing comma and a second `field` / `entrypoint` on the next line.
+`""` and `"   "` are `ChunkedRoot(None)`. `"\n\n"` is one chunk of line breaks, `EmptyLiteral`, `None`. `",entrypoint Query.foo"` skips nothing (comma is not a line break), fails at the comma, `Expected(DECLARATION_KEYWORD, Comma)`.
+
+`parse_one_chunk` is `pub(crate)`. The returned `WithSpan` is the whole literal, so a position on a skipped line break or on a consumed keyword of a failed form (`fieldd`) is unmatched on the slot and answers `IsoLiteralSlot`. `item` and `extra` keep the tight spans `parse_one_chunk` assigned.
+
+Leftover after a complete declaration is `Slot.extra` plus `report_error(Expected(EndOfDeclaration, found))` at the first leftover item that is not a line break: a trailing comma, a second `field` / `entrypoint`.
 
 ```rust
 // from crates/isograph_parser/src/lib.rs
@@ -439,85 +821,27 @@ slot-stages.md's `extra_chunks` check is this: leftover after the declaration is
     }
 ```
 
-The existing interior comma tests (`foo {,}`, `{, a }`, `{ a, }`, `a_second_comma_after_line_breaks` rewritten onto `{ a,\n\n,b }` if that fixture is not already interior) stay. If a root comma-without-item test has no interior twin, add one: `{, a }`, `{ a,,\nb }`, `{ a, , }`, `{,,a }`.
+The existing interior comma tests (`foo {,}`, `{, a }`, `{ a, }`) stay. If a root comma-without-item test has no interior twin, add one: `{, a }`, `{ a,,\nb }`, `{ a, , }`, `{,,a }`.
 
 ## 2. Root is not partitioned
 
 One commit. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 
-### `chunk`
+### `chunk` and matcher
 
-Before:
-
-```rust
-// from crates/isograph_parser/src/chunk.rs
-pub(crate) fn chunk(
-    tree: &WithSpan<MatchedBrackets>,
-) -> (WithSpan<ChunkedLevel>, Vec<CommaWithoutItem>) {
-    let mut errors = Vec::new();
-    let level = chunk_level(tree.item.reference(), &mut errors);
-    (level.with_span(tree.location), errors)
-}
-```
-
-After: the `chunk` / `root_content` / `ChunkedRoot` listings above. `chunk_level` is only `chunk_group`.
+`chunk` / `root_content` / `ChunkedRoot` as above. `chunk_level` is only `chunk_group`. `match_brackets` does not strip the root. `parse_bracketed` still strips a group's leading line breaks.
 
 ### Types
 
 `ChunkedRoot`, `ChunkedRootPath`, `ChunkParent`, `ChunkedLevel` parent, `Slot` pins, `UnparsedChunkItemsParent`, `IsoLiteralParse`, `IsographResolutionNode` as above.
 
-Delete:
-
-```rust
-// from crates/isograph_parser/src/chunk.rs
-pub struct Singleton<T, E> {
-    pub item: WithSpan<T>,
-    pub extra_chunks: Option<WithSpan<E>>,
-}
-
-pub struct ExtraChunks(
-    pub NonEmpty<WithSpan<Chunk>>,
-);
-
-pub enum ChunkedLevelParent<'a> {
-    Root,
-    Interior(Box<ChunkedGroupPath<'a>>),
-}
-```
-
-```rust
-// from crates/isograph_parser/src/parse_error.rs
-    #[error("Expected nothing after the declaration. Each literal holds exactly one declaration.")]
-    MultipleDeclarations,
-```
-
-The `ast_error_unit_variants_use_their_messages` arm for `MultipleDeclarations` goes with it.
+Delete `Singleton`, `ExtraChunks`, `ChunkedLevelParent`, `AstError::MultipleDeclarations`. The `ast_error_unit_variants_use_their_messages` arm for `MultipleDeclarations` goes with it.
 
 `lib.rs` `pub use` drops `ExtraChunks`, `Singleton`, `ExtraChunksPath`, `ChunkedLevelParent`. It adds `ChunkedRoot`, `ChunkedRootPath`. `IsoLiteralSlotPath` is deleted; callers use `IsoLiteralParsePath`.
 
 ### Parse
 
-Before:
-
-```rust
-// from crates/isograph_parser/src/parse_iso_literal.rs
-    if root.item.len() == 0 {
-        errors.push(AstError::EmptyLiteral.with_span(location));
-        return None;
-    }
-    let singleton = parse_singleton(
-        root.reference(),
-        text,
-        tokens,
-        errors,
-        Expectation::EndOfDeclaration,
-        |extra| AstError::MultipleDeclarations.with_span(extra.location),
-        parse_iso_literal_item,
-    );
-    singleton.with_span(location).wrap_some()
-```
-
-After: `parse_chunked_iso_literal` as above. `parse_singleton` / `parse_nested_singleton` / `parse_bracket_interior_type` as above.
+`skip_line_breaks`, `parse_one_chunk`, `parse_chunked_iso_literal`, and the `parse_*` / `consume_*` listings above.
 
 Helpers in `parse_iso_literal.rs` tests:
 
@@ -532,36 +856,40 @@ Helpers in `parse_iso_literal.rs` tests:
 
 ### Chunk tests, after
 
-`whitespace_only_and_empty_literals_are_empty_levels`: `tree.item.0` is `None`. Span is still the whole literal.
+`whitespace_only_and_empty_literals_are_empty_levels`: `""` and `"   "` have `tree.item.0` `None`. `"\n\n"` has `Some` whose contents are two `LineBreak` tokens. Span is still the whole literal.
 
-`a_line_break_before_a_group_splits_the_field_from_its_selection_set` becomes one root chunk whose contents are the identifier and the group:
+`a_line_break_before_a_group_keeps_the_group_in_the_root_chunk`:
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
     fn a_line_break_before_a_group_keeps_the_group_in_the_root_chunk() {
         let text = "foo\n{ bar }";
         let tree = chunked(text);
-        let root = tree.item.0.as_ref().expect("foo and the group");
-        assert_eq!(root.item.contents.len(), 2);
+        let root = tree.item.0.as_ref().expect("foo, line break, and the group");
+        assert_eq!(root.item.contents.len(), 3);
         assert!(root.item.trailing_separator.is_none());
         as_non_bracket(content_item(root.item.reference(), 0));
-        as_group(content_item(root.item.reference(), 1));
+        assert_eq!(
+            as_non_bracket(content_item(root.item.reference(), 1)).0,
+            NonBracketTokenKind::LineBreak
+        );
+        as_group(content_item(root.item.reference(), 2));
     }
 ```
 
-`commas_and_line_breaks_are_equivalent_separators` at the root: `"a, b"` is one chunk, comma is content; `"a\nb"` is one chunk, two identifiers, no comma. Interior equivalence is change 1.
+`commas_and_line_breaks_are_equivalent_separators` at the root: `"a, b"` is one chunk, comma is content; `"a\nb"` is one chunk, identifier, line break, identifier. Interior equivalence is change 1.
 
-`captured_line_breaks_make_no_chunk` at the root: `"\n\na, b\n"` is one chunk `a`, comma, `b`. Interior `"foo {\n bar\n}"` is unchanged.
+`captured_line_breaks_make_no_chunk` at the root: `"\n\na, b\n"` is one chunk of leading line breaks, `a`, comma, `b`, trailing line break. Interior `"foo {\n bar\n}"` is unchanged (the `{` still captures the interior leading newline).
 
-Root comma-without-item tests (`"\n, a"`, `"a,\n\n,b"`, `"a,,\nb"`, `",,a"`, `"a, ,"`): no `CommaWithoutItem`. The commas are content of the one root chunk. Interior twins from change 1 keep the errors.
+Root comma-without-item tests (`"\n, a"`, `"a,\n\n,b"`, `"a,,\nb"`, `",,a"`, `"a, ,"`): no `CommaWithoutItem`. The commas and line breaks are content of the one root chunk. Interior twins from change 1 keep the errors.
 
 `contents_span_stops_at_the_last_content_item` for `"foo,"`: contents include the comma, `contents_span` is `foo,`, `boundary_comma()` is `None`.
 
-`a_chunk_without_a_comma_has_no_boundary_comma` for `"foo\nbar"`: one chunk, two identifiers.
+`a_chunk_without_a_comma_has_no_boundary_comma` for `"foo\nbar"`: one chunk, identifier, line break, identifier.
 
-`a_captured_line_break_resolves_to_its_level` at offset 0 of `"\nfoo {\n bar }"`: `ChunkedRoot`. The `{`'s captured interior newline is still `ChunkedLevel`.
+`a_captured_line_break_resolves_to_its_level` at offset 0 of `"\nfoo {\n bar }"`: `NonBracketToken` (`LineBreak`) on the root chunk. The `{`'s captured interior newline is still `ChunkedLevel`.
 
-`whitespace_only_resolves_to_the_root_level`: `ChunkedRoot`.
+`whitespace_only_resolves_to_the_root_level`: `"   "` and `""` are `ChunkedRoot`. `"\n"` is the `LineBreak` token.
 
 `a_dropped_close_and_the_text_after_it_resolve_to_the_root_level`: `ChunkedRoot`.
 
@@ -571,26 +899,30 @@ Resolve ancestry that matched `ChunkedLevelParent::Root` on the outer level matc
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-    fn a_selection_set_on_the_next_line_attaches() {
-        let text = "field Query.Foo\n{ bar }";
+    fn a_description_and_selection_set_on_following_lines_attach() {
+        let text = "\n  field Query.HomeRoute @component\n  \"\"\"\n  Show a list of pets\n  \"\"\"\n  {\n    pets {\n      id\n    }\n  }\n";
         let (parse, errors) = parsed(
             text,
             &[
                 (IsographSemanticToken::Keyword, "field"),
                 (IsographSemanticToken::Type, "Query"),
                 (IsographSemanticToken::Period, "."),
-                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::FieldName, "HomeRoute"),
+                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::DirectiveName, "component"),
+                (IsographSemanticToken::String, "\"\"\"\n  Show a list of pets\n  \"\"\""),
                 (IsographSemanticToken::Brace, "{"),
-                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::FieldName, "pets"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "id"),
+                (IsographSemanticToken::Brace, "}"),
                 (IsographSemanticToken::Brace, "}"),
             ],
         );
         assert_eq!(errors, vec![]);
-        assert!(as_selectable(parse.reference()).selection_set.is_some());
-        assert_eq!(
-            selections(selection_set_of(as_selectable(parse.reference()))).len(),
-            1,
-        );
+        let field = as_selectable(parse.reference());
+        assert!(field.description.is_some());
+        assert!(field.selection_set.is_some());
     }
 
     fn to_on_the_next_line_attaches() {
@@ -655,25 +987,6 @@ Resolve ancestry that matched `ChunkedLevelParent::Root` on the outer level matc
         );
         assert_eq!(errors, vec![]);
         assert!(as_selectable(parse.reference()).variable_definitions.is_some());
-    }
-
-    fn a_description_on_the_next_line_attaches() {
-        let text = "field Query.Foo\n\"home\" { bar }";
-        let (parse, errors) = parsed(
-            text,
-            &[
-                (IsographSemanticToken::Keyword, "field"),
-                (IsographSemanticToken::Type, "Query"),
-                (IsographSemanticToken::Period, "."),
-                (IsographSemanticToken::FieldName, "Foo"),
-                (IsographSemanticToken::String, "\"home\""),
-                (IsographSemanticToken::Brace, "{"),
-                (IsographSemanticToken::FieldName, "bar"),
-                (IsographSemanticToken::Brace, "}"),
-            ],
-        );
-        assert_eq!(errors, vec![]);
-        assert!(as_selectable(parse.reference()).description.is_some());
     }
 
     fn type_dot_name_across_lines_parses() {
@@ -767,7 +1080,7 @@ Resolve ancestry that matched `ChunkedLevelParent::Root` on the outer level matc
         );
     }
 
-    fn a_leading_comma_fails_at_the_comma() {
+    fn a_comma_before_entrypoint_is_not_skipped() {
         let text = ",entrypoint Query.foo";
         let (parse, errors) = parsed(
             text,
@@ -790,21 +1103,16 @@ Resolve ancestry that matched `ChunkedLevelParent::Root` on the outer level matc
 
     fn a_lone_comma_is_a_failed_declaration() {
         let text = ",";
-        let parsed = parsed_with_errors(
+        let (parse, errors) = parsed(
             text,
             &[(IsographSemanticToken::Content, ",")],
         );
-        let parse = parsed.item.expect("the comma is a chunk");
         assert!(parsed_item(parse.reference()).is_none());
-        assert!(
-            parsed
-                .errors
-                .iter()
-                .any(|error| {
-                    error.item
-                        == ParseError::Ast(expected(DECLARATION_KEYWORD, Found::Token(Comma)))
-                        && error.location == span_of(text, ",")
-                })
+        assert_eq!(
+            errors,
+            expected(DECLARATION_KEYWORD, Found::Token(Comma))
+                .with_span(span_of(text, ","))
+                .wrap_vec(),
         );
     }
 
@@ -831,13 +1139,30 @@ Resolve ancestry that matched `ChunkedLevelParent::Root` on the outer level matc
                 .wrap_vec(),
         );
     }
+
+    fn skip_line_breaks_does_not_record_them() {
+        let text = "\nentrypoint Query.foo\n";
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (IsographSemanticToken::Keyword, "entrypoint"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "foo"),
+            ],
+        );
+        assert_eq!(errors, vec![]);
+        as_entrypoint(parse.reference());
+    }
 ```
 
-`a_selection_set_on_its_own_line_is_a_second_declaration` is `a_selection_set_on_the_next_line_attaches`. `a_second_contentful_chunk_is_multiple_declarations` is `a_second_declaration_on_the_next_line_is_leftover`. `a_failed_first_chunk_is_reported_even_when_a_second_exists` (`entrypoint\nQuery.foo`) is `entrypoint_name_on_the_next_line_parses`. `a_comma_before_a_second_declaration_is_the_boundary_comma` is `a_comma_then_a_second_declaration_is_leftover_at_the_comma`. `comma_mistakes_are_chunkings_errors_and_the_declaration_still_parses` is `a_leading_comma_fails_at_the_comma` (and `,,entrypoint Query.foo` fails at the first comma, extra is the whole contents). `a_lone_comma_is_chunkings_error_and_an_empty_literal` is `a_lone_comma_is_a_failed_declaration`.
+`a_selection_set_on_its_own_line_is_a_second_declaration` is `a_description_and_selection_set_on_following_lines_attach`. `a_second_contentful_chunk_is_multiple_declarations` is `a_second_declaration_on_the_next_line_is_leftover`. `a_failed_first_chunk_is_reported_even_when_a_second_exists` (`entrypoint\nQuery.foo`) is `entrypoint_name_on_the_next_line_parses`. `a_comma_before_a_second_declaration_is_the_boundary_comma` is `a_comma_then_a_second_declaration_is_leftover_at_the_comma`. `comma_mistakes_are_chunkings_errors_and_the_declaration_still_parses` is `a_comma_before_entrypoint_is_not_skipped`. `a_lone_comma_is_chunkings_error_and_an_empty_literal` is `a_lone_comma_is_a_failed_declaration`.
 
 `the_unrecognized_keyword_resolves_as_a_token_in_the_failed_chunk`: `IsoLiteralSlot`.
 
-`a_final_comma_after_the_selectable_declaration_is_an_error` stays: leftover comma, `Expected(EndOfDeclaration, Comma)`. The comma is content, recorded as leftover `Content` the same way.
+`a_final_comma_after_the_selectable_declaration_is_an_error` stays: leftover comma, `Expected(EndOfDeclaration, Comma)`. The comma is content, recorded as leftover `Content`.
+
+`empty_and_whitespace_only_literals_are_empty_literal_errors` still covers `""`, `"   "`, `"\n\n"`.
 
 Interior grammar tests that pin line-break splits stay: `a_directive_on_the_next_line_is_its_own_failed_selection`, `a_line_break_inside_a_list_type_does_not_attach_bang`, a selection `bar\n{ baz }`.
 
@@ -848,6 +1173,8 @@ parsing-standards.md:
 - `parse_iso_literal` takes `WithSpan<ChunkedRoot>`.
 - `IsoLiteralParse = Slot<IsoLiteralItem, UnparsedChunkItems>`.
 - Extra leftover is `Slot.extra`. There are no extra chunks on the tree.
+- `ItemCursor::skip_line_breaks` consumes `LineBreak` tokens and records nothing. Every `parse_*` / `consume_*` that looks at the next item calls it first. `peek` / `consume_token_if` / `consume_group_if` do not skip. A comma is not skipped.
+- `parse_one_chunk` skips before `spanning` and after `Ok` before leftover. `parse_chunked_iso_literal` skips, then `require_end` is `EmptyLiteral`.
 - `parse_singleton` returns `WithSpan<Slot<T, UnparsedChunkItems>>`, one-item `ChunkedLevel` interiors only, extra chunks are `Expected(end, found)` plus leftover recording.
 - Diagnostic: `report_error` in `parse_one_chunk`; `errors.push` in `parse_singleton` (boundary comma, extra type chunks) and `parse_iso_literal` (`EmptyLiteral`).
 - `ChunkedLevelParent` / `ExtraChunks` / `Singleton` / `MultipleDeclarations` listings deleted. `ChunkedRoot` listed.
@@ -856,6 +1183,6 @@ future-improvements.md, "Line break and comma are the same chunk separator": dro
 
 slot-stages.md `require_complete_literal` is `require_complete(parse)`.
 
-parser-minor-improvements.md `parse_singleton assumes a non-empty level`: still true, still `[...]` and the `len() == 0` check in `parse_bracket_interior_type`. The root empty check is `ChunkedRoot(None)`.
+parser-minor-improvements.md `parse_singleton assumes a non-empty level`: still true, still `[...]` and the `len() == 0` check in `parse_bracket_interior_type`. The root empty check is `ChunkedRoot(None)` or a root chunk of only line breaks.
 
 parsing-notes.md: delete the `parse_iso_literal` / `parse_singleton` nonempty note.
