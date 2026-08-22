@@ -6,6 +6,15 @@ A memo is a deterministic function of its arguments and of the sources and memos
 
 The parser is not in pico. `parse_iso_literal` is a function over `&str`. Memoization sits above the parser: which files exist, which literals were extracted, which text was parsed.
 
+The original pico writeup used hover as the example:
+
+```text
+hover(fileA, row: 1, column: 1) -> parse(fileA) -> file_text(fileA)
+hover(fileA, row: 1, column: 2) -> parse(fileA) -> file_text(fileA)
+```
+
+Two hovers reuse one parse. The cursor memo may run twice. Parse does not.
+
 The building blocks are `Database`, `Source`, `Memo`, and `Key`.
 
 ## Database
@@ -21,7 +30,7 @@ struct IsographState {
 
 `IsographState` is the database. `handle` writes sources into it. Memos read from it. Tests construct the same type, intern sources the same way `handle` does, and call memos.
 
-You cannot `set` or `remove` a source while a memo is running.
+Memos take `&IsographState`. `set` and `remove` take `&mut` and panic if a memo is on the stack. Derived data is a return value. A `&mut Entity` that you write selectables into cannot sit behind a memo. isograph had to delete `server_object_entity_mut` before those reads could be memos.
 
 ## Source
 
@@ -47,6 +56,8 @@ The `#[key]` field is the identity of the source. `TypeId` plus that field is th
 
 If the new value `==` the old value, the epoch does not advance and dependents do not re-invoke.
 
+`db.set` returns `SourceId<T>`. That id is `Copy`. Hold it and pass it to memos when the call site has it. Call sites that have a path and not a `SourceId` intern a `PathBuf` and look the source up through the map.
+
 `db.get(source_id)` returns the current value and records a read. `db.get` of a removed source panics. Presence is a separate fact: the tracked map of paths that currently have a `DiskFile`.
 
 A path may have a `DiskFile`, an `OpenFile`, both, or neither. Artifact generation reads `DiskFile`. The LSP reads `OpenFile` when that path has one, otherwise `DiskFile`. Those are different memos. One overlay used by both, as isograph's `read_iso_literals_source` does, makes artifact generation depend on editor buffers.
@@ -63,17 +74,21 @@ fn extract_iso_literals_from_file_content(
 ) -> Option<Vec<IsoLiteralExtraction>>;
 ```
 
-The first argument is `&Database`. The rest are the key. pico hashes the function identity plus those arguments. That tuple is the cache slot.
+The first argument is `&Database`. The rest are the key, at most eight of them. pico hashes the function identity plus those arguments. That tuple is the cache slot.
 
 The body must be a pure function of `db` reads and the arguments. No filesystem, no clock, no LSP. Reading the world is `handle` interning a source.
 
-What the body reads becomes a dependency. `db.get(source_id)` is a dependency on that source. Calling another `#[memo]` function is a dependency on that memo.
+What the body reads becomes a dependency. `db.get(source_id)` is a dependency on that source. Calling another `#[memo]` function from inside the body is a dependency on that memo. That is the edge pico records. A `MemoRef` passed in as an argument is a key. Reading its contents with `lookup` does not record a dependency; `lookup_tracked` does. isograph shipped a test where a parent took a `MemoRef`, used `lookup`, and kept a stale value when the pointed-to node changed.
 
-pico changes the written return type `T` to `&T`. The value lives in the database. `T` must be `PartialEq` so pico can compare a re-invocation to the stored value.
+pico changes the written return type `T` to `&T`. The value lives in the database. The caller does not clone it. `T` must be `PartialEq` so pico can compare a re-invocation to the stored value.
+
+The result is owned. A memo cannot return a `&str` into a `DiskFile`. The source can be replaced; the stored result has to survive that. `IsoLiteralExtraction.iso_literal_text` is a `String`. isograph made `IsoLiteralExtraction` owned for this reason.
 
 `#[memo(raw)]` returns `MemoRef<T>` instead of `&T`. Pass that `MemoRef` as an argument to another memo when the identity of the result is the key, not a copy of the value.
 
 A memo that does not return every time it is called with the same key is a bug. Cycles panic.
+
+A memo that returns the whole project schema is one slot. A change to one file invalidates it. `client_selectable_declaration(db, parent, name)` is keyed by the name the caller already has. isograph inlined a memo that returned a `Schema`.
 
 ## Key
 
@@ -81,7 +96,13 @@ A memo is looked up by the arguments you pass. There is no query that searches t
 
 Choose keys the call site has. Put the expensive work behind those keys. A coordinate the caller does not have is not a key of that work.
 
-Arguments that are `SourceId<T>` or `MemoRef<T>` are identities already. Everything else (`PathBuf`, `usize`, `String`, interned names) is hashed and interned as a param.
+Arguments that are `SourceId<T>` or `MemoRef<T>` are identities already. They are `Copy`. pico never clones them. Everything else (`PathBuf`, `usize`, `String`, interned names) is hashed and interned as a param.
+
+An interned owned param is cloned into the param store the first time that value is seen, and cloned out of the param store on every execute of the memo body. A borrowed param (`&T`) is cloned once when interned, not on execute. pico's own tests pin this.
+
+A memo result `T` is stored once in that slot and returned as `&T`.
+
+The cursor memo is called with many keys. Its result is a `Copy` index. The `String` lives in a memo that has few keys (one per file, one per index). Returning the extraction from the cursor memo would store a clone of `iso_literal_text` in every cursor slot, and would clone that string again if it were passed as an owned param into parse.
 
 ## Iso literals
 
@@ -150,7 +171,7 @@ fn parsed_iso_literal_in_file(
 }
 ```
 
-`extract_iso_literals` (the host regex) is a plain function over `&str`. `parse_iso_literal` is a plain function over `&str`. `find_iso_literal_index` is a plain function over a cursor, file text, and the extract vec. The memos call them.
+`extract_iso_literals` (the host regex) is a plain function over `&str`. `parse_iso_literal` is a plain function over `&str`. `find_iso_literal_index` is a plain function over a cursor, file text, and the extract vec. The memos call them. isograph moved `parse_iso_literal` out of the database crate so the parser would not know about `IsographDatabase`.
 
 `None` from extract is no `DiskFile`. `Some(vec![])` is a present file with no literals. `None` from `iso_literal_index` is no file, or a cursor that is not inside any literal text (the JS around the literals, including `iso(`). `None` from `iso_literal_extraction` is no file, or `index` past the last extraction.
 
@@ -189,7 +210,9 @@ fn client_selectable_declaration(
 
 ## Equality and backdating
 
-pico re-invokes a memo when a dependency's `time_updated` is newer than the last time this memo was verified. After re-invoke, it compares the new value to the stored value with `==`.
+Each source has a `time_updated` epoch. Each memo slot has `time_verified` (last epoch we checked it) and `time_updated` (last epoch its value actually changed). The database epoch increments when a source is set to a different value.
+
+pico re-invokes a memo when a dependency's `time_updated` is newer than this memo's last `time_verified`. After re-invoke, it compares the new value to the stored value with `==`.
 
 If they are equal, pico keeps the old `time_updated`. Dependents see no change and do not re-invoke. That is backdating.
 
@@ -200,6 +223,8 @@ syntax highlighting  ->  parsed literals  ->  extract  ->  DiskFile
 Typing JavaScript after the last iso literal re-invokes extract. If the `Vec<IsoLiteralExtraction>` is `==` (same texts, same start indices, same context), extract is backdated. Parse and syntax highlighting do not re-invoke.
 
 Typing JavaScript before a literal changes `iso_literal_start_index`. Extract is `!=`. The file-absolute token memo re-invokes. `parsed_iso_literal` of the same text does not.
+
+If this memo was already verified in the current epoch, pico returns the stored value without walking dependencies. Two LSP requests in the same epoch (hover and semantic tokens, no edit between them) share extract and parse this way.
 
 `==` decides whether dependents re-invoke. A memo result should be equal when the downstream work should be skipped. Spans that move with the file do not belong on a value whose dependents should survive a prepend. Presence of a diagnostic does belong, because diagnostics are the output.
 
@@ -219,15 +244,25 @@ The map is which paths currently have a `DiskFile`. `db.set` of a `DiskFile` doe
 
 `untracked()` does not record the map. It is correct when the memo is already keyed by `path`, looks up that one entry, and then `db.get(source_id)` (which tracks the source). Adding an unrelated file must not re-invoke a per-file extract. Iterating `untracked()` is wrong: a newly inserted path is not seen.
 
-Absence is the remaining case. A memo keyed by `path` that last time returned `None` did not `db.get` a source. If it also did not track the map, a later `Present` of that path is not seen and the memo stays `None`. Per-file memos that can miss a file therefore cannot be purely untracked. The intended dependency of a per-file memo is that file, not the set of all files.
+Absence is the remaining case. A memo keyed by `path` that last time returned `None` did not `db.get` a source. If it also did not track the map, a later `Present` of that path is not seen and the memo stays `None`. isograph hit this: an autofix created a file, `get_iso_literal` ran untracked before the map insert, returned `None`, and the next request reused that `None` and panicked. Per-file memos that can miss a file therefore cannot be purely untracked. The intended dependency of a per-file memo is that file, not the set of all files.
 
 ## Intern
 
-`db.intern_value(t)` stores `t` and returns `MemoRef<T>` whose identity is the hash of `t`. The same value interned twice is the same `MemoRef`. Looking up the `MemoRef` in a parent memo is a dependency on that interned node. If a producer re-interns an equal value, the `MemoRef` identity is unchanged and the parent does not re-invoke.
+`db.intern_value(t)` stores `t` and returns `MemoRef<T>` whose identity is the hash of `t`. The same value interned twice is the same `MemoRef`. `MemoRef` is `Copy`. Looking up the `MemoRef` in a parent memo with `lookup_tracked` is a dependency on that interned node. `lookup` reads the value and does not record a dependency. If a producer re-interns an equal value, the `MemoRef` identity is unchanged and a parent keyed on that `MemoRef` does not re-invoke.
 
 Pass a `MemoRef` as a memo argument when later work is "this declaration," not "whatever currently lives at this name." isograph interns a parsed field declaration and keys `add_client_scalar_selectable_to_entity` on `MemoRef<ClientFieldDeclaration>`.
 
-`db.intern_ref(&t)` is the same identity idea for a value that already lives in another memo's result, without cloning it into a new allocation as the identity. The `MemoRef` still hashes the value, not the address.
+`db.intern_ref(&t)` is the same identity idea for a value that already lives in another memo's result, without cloning it into a new allocation as the identity. The `MemoRef` hashes the value, not the address. If the same value is later interned from a new allocation (the producer re-ran), pico rewrites the pointer so lookup still works after garbage collection, and leaves `time_updated` at the first intern of that value so dependents can reuse.
+
+`intern_value` and `intern_ref` of the same bits are different identities. pico wraps one of them before hashing so a value and a reference to that value do not collide.
+
+## Garbage collection
+
+Sources are not garbage collected. `handle` inserts and removes them.
+
+Memo slots accumulate until `run_garbage_collection`. That keeps the last 10_000 top-level memo calls (an LRU) and everything reachable from them, plus anything `retain`ed. A top-level call is a memo invoked when no other memo is on the stack. LSP hover of `iso_literal_index` is top-level. Old cursor slots drop. Parse of index `0` stays if a recent top-level call still reaches it (a later hover in the same literal, or compile). If nothing reaches it, the next call recomputes it.
+
+`retain` marks a top-level call so the LRU will not drop it. Compile can retain the validation memo. `RetainedQuery` panics if dropped without `clear_retain` or `never_garbage_collect`.
 
 ## Parser and extract
 
