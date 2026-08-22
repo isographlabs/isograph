@@ -1,16 +1,16 @@
 # Memoized parse of an extracted iso literal
 
-Requires extract-iso-literals-from-file.md. Extract returns text, span, and context. This file parses one extraction.
+Requires extract-iso-literals-from-file.md. Extract-all and `iso_literal_extraction(path, index)` are memos. This file parses that extraction.
 
-Origin of the memo: isograph `memoized_parse_iso_literal`. Origin of the lookup-by-index function: isograph `parse_iso_literals_in_file_content` walking `extract_iso_literals_from_file_content` by vec position. Delta: parse is keyed on the literal text only, not on `TextSource` or the file path (isograph's TODO: passing `text_source` breaks memoization when the literal moves); i2 `parse_iso_literal` already takes `&str` only; host embedding errors that need the parse tree run after parse, in `host_errors_for_extraction`.
+Origin of the parse memo: isograph `memoized_parse_iso_literal`. Origin of naming one literal by file and vec index: isograph `parse_iso_literals_in_file_content` walking the extract vec by position. Delta: parse is keyed on the literal text only, not on `TextSource` or the file path (isograph's TODO: passing `text_source` breaks memoization when the literal moves); i2 `parse_iso_literal` already takes `&str` only; host embedding errors that need the parse tree run after parse, in `host_errors_for_extraction`.
 
-`parsed_iso_literal_in_file` takes the file and a 0-based index into that file's extract vec. That index is not the pico cache key. The cache key is `iso_literal_text`. Two files with the same literal text share a parse. Editing JavaScript around a literal re-extracts and reuses the parse.
+`parsed_iso_literal_in_file` is a memo. It calls `iso_literal_extraction`, then `parsed_iso_literal` with that text. The pico cache key of the inner parse is `iso_literal_text`. Two files with the same literal text share a parse. Prepend/append that does not change the text re-invokes `iso_literal_extraction`; the inner parse does not re-run.
 
-Two shippable changes: the text-keyed parse memo, then the file+index accessor and host errors.
+Two shippable changes: the text-keyed parse memo, then the file+index parse memo and host errors.
 
 ## What the user does
 
-No user-facing change. Tests intern a `DiskFile`, extract, parse index 0, and assert the tree (or parse errors). A field without an export reports `MissingExport` from `host_errors_for_extraction`.
+No user-facing change. Tests intern a `DiskFile`, call `parsed_iso_literal_in_file` at index 0, and assert the tree (or parse errors). A field without an export reports `MissingExport` from `host_errors_for_extraction`.
 
 ## Change 1: `parsed_iso_literal`
 
@@ -41,42 +41,34 @@ In `crates/isograph_extract_typescript` `memo_tests`, or in `crates/isograph_com
 
 Do not add a production function only the tests call.
 
-## Change 2: parse at an index, and host embedding errors
+## Change 2: parse at file + index, and host embedding errors
 
 ```rust
 // from crates/isograph_compiler/src/iso_literals.rs
-pub fn parsed_iso_literal_in_file<'a, THostLanguage: HostLanguage>(
-    db: &'a IsographState,
-    path: &Path,
+#[memo]
+pub fn parsed_iso_literal_in_file<THostLanguage: HostLanguage>(
+    db: &IsographState,
+    path: PathBuf,
     index: usize,
-) -> Option<&'a ParsedIsoLiteral> {
-    let extractions = extract_iso_literals_from_file_content::<THostLanguage>(db, path.to_owned())?;
-    let extraction = extractions.get(index)?;
+) -> Option<ParsedIsoLiteral> {
+    let extraction = iso_literal_extraction::<THostLanguage>(db, path, index)?;
     parsed_iso_literal(db, extraction.iso_literal_text.clone()).wrap_some()
 }
 ```
 
-Not a memo. The extract memo and the text-keyed parse memo are the caches. `path.to_owned()` is the intern param of extract. `iso_literal_text.clone()` is the intern param of parse.
-
-`None` is no `DiskFile`, or `index` past the last extraction.
-
-isograph walks every extraction and parses all of them (`parse_iso_literals_in_file_content`). That helper, if a later doc needs it:
+`None` is no `DiskFile`, or `index` past the last extraction. pico lookup returns `&Option<ParsedIsoLiteral>`.
 
 ```rust
-pub fn parsed_iso_literals_in_file<THostLanguage: HostLanguage>(
-    db: &IsographState,
-    path: &Path,
-) -> Option<Vec<&ParsedIsoLiteral>> {
-    let extractions = extract_iso_literals_from_file_content::<THostLanguage>(db, path.to_owned())?;
-    extractions
-        .iter()
-        .map(|extraction| parsed_iso_literal(db, extraction.iso_literal_text.clone()))
-        .collect::<Vec<_>>()
-        .wrap_some()
-}
+// from crates/isograph_compiler/src/lib.rs
+pub use iso_literals::{
+    IsoLiteralExtraction, extract_iso_literals_from_file_content, iso_literal_extraction,
+    parsed_iso_literal, parsed_iso_literal_in_file,
+};
 ```
 
-Do not add `parsed_iso_literals_in_file` unless a caller in this slice needs the whole vec. file-semantic-tokens.md is that caller; put the helper in that doc if it wants it, or have it loop `index`. This doc ships `parsed_iso_literal_in_file` (one index).
+`iso_literal_extraction` is the intern of `(path, index)`. `parsed_iso_literal` is the intern of the text. Prefixing the file changes `iso_literal_start_index`, so `iso_literal_extraction` does not backdate and this memo's body runs again. The inner `parsed_iso_literal` sees the same text and does not re-run.
+
+Do not add a helper that parses every index into a vec unless a caller in this slice needs the whole vec. This doc ships `parsed_iso_literal_in_file` (one index).
 
 ### Host errors after parse
 
@@ -152,8 +144,13 @@ pub fn file_literals<'a>(
     )?;
     extractions
         .iter()
-        .map(|extraction| {
-            let parsed = parsed_iso_literal(db, extraction.iso_literal_text.clone());
+        .enumerate()
+        .map(|(index, extraction)| {
+            let parsed = parsed_iso_literal_in_file::<TypeScriptHostLanguage>(
+                db,
+                path.to_owned(),
+                index,
+            )?;
             let mut errors = host_errors_for_extraction(extraction, parsed);
             for error in &parsed.errors {
                 errors.push(
@@ -166,9 +163,9 @@ pub fn file_literals<'a>(
                 parsed,
                 errors,
             }
+            .wrap_some()
         })
-        .collect::<Vec<_>>()
-        .wrap_some()
+        .collect()
 }
 ```
 
@@ -196,5 +193,6 @@ Move the extract-typescript error tests listed in extract-iso-literals-from-file
 
 ## Call sites
 
-- file-semantic-tokens.md -> `parsed_iso_literal` / extract + index.
+- Tests in this file: intern a `DiskFile`, `parsed_iso_literal_in_file` at an index, assert the AST.
+- file-semantic-tokens.md -> `parsed_iso_literal_in_file`.
 - lsp-parse-diagnostics.md -> `file_literals`.

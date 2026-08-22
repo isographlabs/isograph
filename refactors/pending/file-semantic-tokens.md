@@ -37,8 +37,8 @@ pub fn iso_literal_semantic_tokens_in_file<THostLanguage: HostLanguage>(
 ) -> Option<Vec<WithSpan<IsographSemanticToken>>> {
     let extractions = extract_iso_literals_from_file_content::<THostLanguage>(db, path.clone())?;
     let mut tokens = Vec::new();
-    for extraction in extractions {
-        let parsed = parsed_iso_literal(db, extraction.iso_literal_text.clone());
+    for (index, extraction) in extractions.iter().enumerate() {
+        let parsed = parsed_iso_literal_in_file::<THostLanguage>(db, path.clone(), index)?;
         let offset = extraction.iso_literal_start_index as u32;
         tokens.extend(parsed.tokens.iter().map(|token| {
             token.item.with_span(token.location.with_offset(offset))
@@ -54,7 +54,7 @@ A parse with errors still has leftover tokens. Use them.
 
 Tokens from different literals do not overlap: they sit inside disjoint backtick spans. `lsp_semantic_tokens` asserts that. JS between literals has no iso tokens.
 
-`path.clone()` is the intern param of extract. `extraction.iso_literal_text.clone()` is the intern param of parse.
+`path.clone()` is the intern param of extract and of `parsed_iso_literal_in_file`. The inner parse intern is the literal text.
 
 ```rust
 // from crates/isograph_lsp/src/file_semantic_tokens.rs

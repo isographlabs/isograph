@@ -4,7 +4,7 @@ Requires filesystem-events.md (landed) and extract-iso-literals.md (landed). `Ho
 
 Origin of the memo: isograph `crates/isograph_schema/src/validated_isograph_schema/isograph_literals.rs` `extract_iso_literals_from_file_content` and `IsoLiteralExtraction`. Delta: `PathBuf` instead of `RelativePathToSourceFile`; `THostLanguage::LiteralContext` instead of four ad-hoc fields (`const_export_name`, `has_associated_js_function`, `iso_function_called_with_paren` as bools); extract does not parse (isograph extract also does not parse; i2's TypeScript implementor currently does, and this doc stops that); missing `DiskFile` is `None`, not a panic.
 
-Three shippable changes: stop parsing inside extract, move the pico types to `isograph_compiler`, then the memo.
+Four shippable changes: stop parsing inside extract, move the pico types to `isograph_compiler`, the extract-all memo, then index into that vec.
 
 ## What the user does
 
@@ -213,7 +213,7 @@ impl<THostLanguage: HostLanguage> IsoLiteralExtraction<THostLanguage> {
 }
 ```
 
-`parsed_iso_literal_in_file` (memoized-parse-iso-literal.md) takes the file and a 0-based vec index. `iso_literal_start_index` offsets semantic tokens to file coordinates (file-semantic-tokens.md).
+`iso_literal_extraction` takes the file and a 0-based vec index. `iso_literal_start_index` offsets semantic tokens to file coordinates (file-semantic-tokens.md).
 
 `HostLanguage::LiteralContext` gains `Clone + PartialEq + Eq + Debug + 'static` so the extraction can be stored and compared. `TypeScriptLiteralContext` already is `Copy`.
 
@@ -280,8 +280,46 @@ Tests in `crates/isograph_extract_typescript/src/lib.rs` under a `memo_tests` mo
 
 `expect` names the fixture the test interned.
 
+## Change 4: index into the vec
+
+```rust
+// from crates/isograph_compiler/src/iso_literals.rs
+#[memo]
+pub fn iso_literal_extraction<THostLanguage: HostLanguage>(
+    db: &IsographState,
+    path: PathBuf,
+    index: usize,
+) -> Option<IsoLiteralExtraction<THostLanguage>> {
+    extract_iso_literals_from_file_content::<THostLanguage>(db, path)?
+        .get(index)
+        .cloned()
+}
+```
+
+`None` is no `DiskFile`, or `index` past the last extraction. pico lookup returns `&Option<IsoLiteralExtraction<THostLanguage>>`.
+
+```rust
+// from crates/isograph_compiler/src/lib.rs
+pub use iso_literals::{
+    IsoLiteralExtraction,
+    extract_iso_literals_from_file_content,
+    iso_literal_extraction,
+};
+```
+
+### Tests
+
+Same `memo_tests` module. Intern the same fixtures as change 3.
+
+- No `DiskFile`: `iso_literal_extraction::<TypeScriptHostLanguage>(db, path, 0)` is `None`.
+- Present file, no `iso`: index 0 is `None`.
+- One exported field: index 0 is `Some`, same text and `iso_literal_start_index` as `extract_iso_literals_from_file_content` `[0]`. Index 1 is `None`.
+- Two literals: index 0 and 1 match the vec; index 2 is `None`.
+
 ## Call sites
 
 Change 2: `run_event_loop` -> `handle(&mut state, event)`. Tests intern a `DiskFile` the same way `handle` does: `db.set` plus insert into the tracked map.
 
-Change 3: memoized-parse-iso-literal.md -> `extract_iso_literals_from_file_content`. file-semantic-tokens.md -> the same memo.
+Change 3: `iso_literal_extraction` -> `extract_iso_literals_from_file_content`. file-semantic-tokens.md reads the vec for offsets.
+
+Change 4: memoized-parse-iso-literal.md -> `iso_literal_extraction`.
