@@ -1,8 +1,8 @@
 # Semantic tokens for the iso literals in a DiskFile
 
-Requires extract-iso-literals-from-file.md (landed), memoized-parse-iso-literal.md (landed), and lsp-semantic-token-encoding.md (landed). Extract finds the literals. `parsed_iso_literal` records `ParsedIsoLiteral.tokens` with spans relative to the literal text. This file offsets those tokens to file coordinates, concatenates them in extract order, and encodes them with `lsp_semantic_tokens`. File-absolute spans do not live on the parse memo: `parsed_iso_literal` is keyed on the literal text, and relative spans keep that result `==` after a prepend.
+Requires extract-iso-literals-from-file.md (landed), memoized-parse-iso-literal.md (landed), literal-id.md (landed), and lsp-semantic-token-encoding.md (landed). Extract finds the literals. `parsed_iso_literal` records `ParsedIsoLiteral.tokens` with spans relative to the literal text. This file offsets those tokens to file coordinates, concatenates them in extract order, and encodes them with `lsp_semantic_tokens`. File-absolute spans do not live on the parse memo: `parsed_iso_literal` is keyed on the literal text, and relative spans keep that result `==` after a prepend.
 
-File-level tokens are keyed on `path`. They do not go through `LineChar`. Cursor APIs convert `path` and `LineChar` to `LiteralId` (the file plus the 0-based extract index). Extraction and parse hang off that id, so there is not a clone of the tree (or the extraction) per caret. `parsed_iso_literal_at_location` is deleted (literal-id.md). This file does not call it. This file's parse intern is `parsed_iso_literal(text)` via `parsed_iso_literals_in_file`.
+File-level tokens are keyed on `path`. They do not go through `LineChar`. Cursor APIs convert `path` and `LineChar` to `LiteralId` (the file plus the 0-based extract index). Extraction and parse hang off that id, so there is not a clone of the tree or the extraction per caret. This file's parse intern is `parsed_iso_literal(text)` via `parsed_iso_literals_in_file`.
 
 Origin of the pipeline: isograph `crates/isograph_lsp/src/semantic_tokens.rs` `get_semantic_tokens` / `concatenate_and_absolutize_relative_tokens`. Origin of encoding: landed `lsp_semantic_tokens`. Origin of the offset map: that concat, and the encoding tests' `rebased`. Delta: pico memos over `DiskFile` instead of `Uri` + LSP state; no `TextSource`; no multiline split here (`lsp_semantic_tokens` already splits); `with_offset` on each relative span; start indices in a memo that is not the parse vec.
 
@@ -110,7 +110,14 @@ Tokens from different literals do not overlap: they sit inside disjoint backtick
 
 `path.clone()` is the intern param of `parsed_iso_literals_in_file` and of `locations_of_iso_literals_in_file`. The inner parse intern is the literal text. `parsed_iso_literal` already exists. Concat does not call extract.
 
-Add `locations_of_iso_literals_in_file`, `parsed_iso_literals_in_file`, and `iso_literal_semantic_tokens_in_file` to the `iso_literals` re-export in `crates/isograph_compiler/src/lib.rs`. Do not call `parsed_iso_literal_at_location` or `iso_literal_text_at_location` from this file.
+```rust
+// from crates/isograph_compiler/src/lib.rs
+pub use iso_literals::{
+    LineChar, LiteralId, iso_literal_extraction, iso_literal_semantic_tokens_in_file,
+    literal_id_at_location, locations_of_iso_literals_in_file, parsed_iso_literal,
+    parsed_iso_literals_in_file,
+};
+```
 
 ```rust
 // from crates/isograph_lsp/src/file_semantic_tokens.rs
@@ -137,7 +144,7 @@ pub fn lsp_semantic_tokens_for_file<THostLanguage: HostLanguage>(
 
 `isograph_lsp` depends on `isograph_compiler` and `pico`. `lib.rs` gains `mod file_semantic_tokens` and re-exports `lsp_semantic_tokens_for_file`.
 
-The map lookup is `untracked`: concat returned `Some`, so this path has a `DiskFile`. Same keyed-by-path lookup as `iso_literal_extraction`. `lsp_semantic_tokens` takes `&[WithSpan<IsographSemanticToken>]`; pico lookup of concat is `&Vec<_>`.
+The map lookup is `untracked`: concat returned `Some`, so this path has a `DiskFile`. Same keyed-by-path lookup as `literal_id_at_location`. `lsp_semantic_tokens` takes `&[WithSpan<IsographSemanticToken>]`; pico lookup of concat is `&Vec<_>`.
 
 The adapter later: `semanticTokens/full` for a URI maps to this path, then this function. Not this doc.
 

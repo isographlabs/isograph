@@ -1,6 +1,6 @@
 # E2E: send a file, query semantic tokens
 
-Requires extract-iso-literals-from-file.md, memoized-parse-iso-literal.md, and file-semantic-tokens.md. Those add the memos and intern-a-`DiskFile` tests. This file is the daemon path: start, `isograph send` a `Present` file, `isograph semantic-tokens` prints the encoded tokens.
+Requires extract-iso-literals-from-file.md (landed), memoized-parse-iso-literal.md (landed), literal-id.md (landed), and file-semantic-tokens.md. Those add the memos and intern-a-`DiskFile` tests. This file is the daemon path: start, `isograph send` a `Present` file, `isograph semantic-tokens` prints the encoded tokens.
 
 Origin of the memos: isograph `extract_iso_literals_from_file_content`, `memoized_parse_iso_literal`, `get_semantic_tokens`. Origin of send: send-events.md. Delta: a hidden query verb; `handle` stays ingest-only; the worker answers the query by calling `lsp_semantic_tokens_for_file`. This is not the LSP adapter.
 

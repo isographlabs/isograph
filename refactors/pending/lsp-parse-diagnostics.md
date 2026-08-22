@@ -1,6 +1,6 @@
 # LSP parse diagnostics
 
-Requires the LSP adapter (event-model.md, not written) and memoized-parse-iso-literal.md. After a `didOpen` or `didChange`, the language server publishes parse errors for the iso literals in that file as `textDocument/publishDiagnostics`. Closing the file publishes an empty list for that URI, which clears the squiggles.
+Requires the LSP adapter (event-model.md, not written) and memoized-parse-iso-literal.md (landed). After a `didOpen` or `didChange`, the language server publishes parse errors for the iso literals in that file as `textDocument/publishDiagnostics`. Closing the file publishes an empty list for that URI, which clears the squiggles.
 
 The pipeline is `file_literals` from memoized-parse-iso-literal.md. Each literal's errors are `FileLiteral.errors`, already file-absolute. This doc turns those into `lsp_types::Diagnostic`.
 
