@@ -332,12 +332,13 @@ async fn serve(config_path: PathBuf, port_path: PathBuf) {
         () = run_event_loop(state, event_rx, effect_tx) => {}
         () = run_effect_loop(effect_rx) => {}
     }
+    let _ = std::fs::remove_file(port_path.reference());
 }
 ```
 
 `_socket` is the one binding. It is in scope across `select!`. Dropping `serve` drops the listener. A write failure returns, which drops `_socket` and then `run_daemon` returns, which drops the lock. Do not bind `listen` in a block that ends before `select!`.
 
-`listen(0)` is the kernel's pick from its local/dynamic port range. `serve` unlinks the port file, then binds, then writes the assigned port, then logs it. NotFound on the unlink is the first boot; `let _ =` is not fatal. After a crash, the leftover file is gone before send can see `Held::By`. Lock held and the file absent is `NoPort`. `serve` does not send `HelloWorld`. That event arrives on the socket.
+`listen(0)` is the kernel's pick from its local/dynamic port range. `serve` unlinks the port file, then binds, then writes the assigned port, then logs it. After `select!` ends (`Kill`), `serve` unlinks the port file again, then returns, then the lock drops. `handle` and `perform` do not touch the file. NotFound on an unlink is the first boot or an already-removed file; `let _ =` is not fatal. After a crash, the leftover file is gone at the next `serve` before send can see `Held::By`. Lock held and the file absent is `NoPort`. `serve` does not send `HelloWorld`. That event arrives on the socket.
 
 `EventSocket::local_addr` returns `SocketAddr`, not `io::Result`. Origin: freddie `refactors/past/event-socket-local-addr.md`. The file contents are the decimal port and a newline, `"{port}\n"`.
 
