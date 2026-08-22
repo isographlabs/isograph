@@ -1,6 +1,6 @@
 # Extract iso literals from a DiskFile
 
-Requires filesystem-events.md (landed) and extract-iso-literals.md (landed). `HostLanguage::extract_iso_literals` finds iso literals in a `&str`. This file puts that behind a pico memo over a `DiskFile`.
+Requires filesystem-events.md (landed), extract-iso-literals.md (landed), and `docs-website/docs/design-docs/pico.md`. `HostLanguage::extract_iso_literals` finds iso literals in a `&str`. This file puts that behind a pico memo over a `DiskFile`. The memos and keys are the iso-literal instance of that pico model.
 
 Origin of the memo: isograph `crates/isograph_schema/src/validated_isograph_schema/isograph_literals.rs` `extract_iso_literals_from_file_content` and `IsoLiteralExtraction`. Delta: `PathBuf` instead of `RelativePathToSourceFile`; `THostLanguage::LiteralContext` instead of four ad-hoc fields (`const_export_name`, `has_associated_js_function`, `iso_function_called_with_paren` as bools); extract does not parse (isograph extract also does not parse; i2's TypeScript implementor currently does, and this doc stops that); missing `DiskFile` is `None`, not a panic.
 
@@ -261,7 +261,7 @@ pub fn extract_iso_literals_from_file_content<THostLanguage: HostLanguage>(
 
 `None` is no `DiskFile` for that path. `Some(vec![])` is a present file with no literals.
 
-The memo reads the tracked map, then `db.get(source_id)`, so a contents change invalidates. Adding or removing any path also invalidates (tracked map). isograph does the same for `get_iso_literal`.
+`db.get(source_id)` records the file. pico.md's extract snippet looks up the path with `tracked()`. That sees a later `Present` of a path that was `None`. It also re-invokes this memo when any other path is inserted or removed. pico.md Tracked maps: a memo already keyed by `path` that then `db.get`s that source should use `untracked()` so an unrelated file does not re-invoke; a `None` that never `db.get`s cannot be purely `untracked`. This memo follows the extract snippet (`tracked()`).
 
 `path` is interned as an owned `PathBuf` param. Callers pass `path.clone()` when they still need the path.
 
@@ -282,13 +282,13 @@ Tests in `crates/isograph_extract_typescript/src/lib.rs` under a `memo_tests` mo
 
 ## Change 4: row and column to an index
 
-Origin of `LineChar` and the walk: isograph `crates/isograph_lsp/src/hover.rs` `get_iso_literal_extraction_from_text_position_params` / `find_iso_literal_extraction_under_cursor`. Origin of `delta_line_delta_start`: isograph `crates/isograph_lsp/src/semantic_tokens.rs`. Delta: the memo returns `Option<usize>` (the vec index), not `(IsoLiteralExtraction, u32)` (the item plus an offset into the literal). Hover creates one slot per `LineChar`. Returning the extraction would clone `iso_literal_text` into each of those slots. The index is `Copy`; `iso_literal_extraction(path, index)` is the one slot that holds the string. As the cursor moves inside one literal the index stays the same, so parse keyed on that index reuses. `LineChar` lives in `iso_literals.rs` so the compiler intern does not take `lsp_types::Position` (that type is not `Hash`).
+Origin of `LineChar` and the walk: isograph `crates/isograph_lsp/src/hover.rs` `get_iso_literal_extraction_from_text_position_params` / `find_iso_literal_extraction_under_cursor`. Origin of `delta_line_delta_start`: isograph `crates/isograph_lsp/src/semantic_tokens.rs`. Delta: the memo returns `Option<usize>`, not `(IsoLiteralExtraction, u32)`. pico.md: the caller that has a cursor calls this; the caller that has an index calls `iso_literal_extraction`. Hover is one slot per `LineChar`. Returning the extraction would clone `iso_literal_text` into each of those slots. The index is `Copy`. The string lives on extract-all and on the one `iso_literal_extraction(path, index)` slot. Every character inside the first literal yields `Some(0)`, so `parsed_iso_literal_in_file(path, 0)` is one slot. `LineChar` lives in `iso_literals.rs` so the compiler intern does not take `lsp_types::Position` (that type is not `Hash`).
 
 `line` is 0-based count of `\n`. `character` is bytes since the last `\n`, same as isograph `delta_line_delta_start`.
 
 ```rust
 // from crates/isograph_compiler/src/iso_literals.rs
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Copy, Clone, Hash)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 pub struct LineChar {
     pub line: u32,
     pub character: u32,

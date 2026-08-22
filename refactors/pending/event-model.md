@@ -2,7 +2,7 @@
 
 Architecture is `docs-website/docs/design-docs/event-model.md`. This file is the order implementation docs land.
 
-Requires config-discovery.md (landed) and the design-doc.
+Requires config-discovery.md (landed), the event-model design-doc, and `docs-website/docs/design-docs/pico.md`.
 
 1. event-loop.md (landed). tokio current-thread runtime. `HelloWorld` / `LogHelloWorld`, `Quit` / `Kill`. SIGTERM sends `Quit`. `run_event_loop`, `run_effect_loop`.
 2. send-events.md (landed). Event socket on `127.0.0.1:0`, port file next to the lock, `IsographEvent` serde JSON, `isograph send`.

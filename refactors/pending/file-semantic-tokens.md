@@ -1,6 +1,6 @@
 # Semantic tokens for the iso literals in a DiskFile
 
-Requires extract-iso-literals-from-file.md, memoized-parse-iso-literal.md, and lsp-semantic-token-encoding.md (landed). Extract finds the literals. Parse records `ParsedIsoLiteral.tokens` with spans relative to the literal text. This file offsets those tokens to file coordinates, concatenates them in extract order, and encodes them with `lsp_semantic_tokens`.
+Requires extract-iso-literals-from-file.md, memoized-parse-iso-literal.md, lsp-semantic-token-encoding.md (landed), and `docs-website/docs/design-docs/pico.md`. Extract finds the literals. Parse records `ParsedIsoLiteral.tokens` with spans relative to the literal text. This file offsets those tokens to file coordinates, concatenates them in extract order, and encodes them with `lsp_semantic_tokens`. File-absolute spans do not live on the parse memo (pico.md).
 
 Origin of the pipeline: isograph `crates/isograph_lsp/src/semantic_tokens.rs` `get_semantic_tokens` / `concatenate_and_absolutize_relative_tokens`. Origin of encoding: landed `lsp_semantic_tokens`. Delta: pico memos over `DiskFile` instead of `Uri` + LSP state; no `TextSource`; no multiline split here (`lsp_semantic_tokens` already splits); `with_offset` on each relative span.
 
