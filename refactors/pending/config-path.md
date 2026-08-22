@@ -4,7 +4,7 @@ Requires config-discovery.md (landed).
 
 `isograph config-path` prints the canonical path of the isograph config for this invocation: `--config` when given, otherwise the nearest `isograph.config.json`, `.js`, or `.ts` at or above the current directory. It does not start the daemon, take the lock, or parse the file as JSON. Exit 0 with the path on stdout. Exit 1 when there is no config.
 
-Origin of the walk-up: `crates/isograph_cli/src/discover.rs` `config_path`. Origin of extra verbs beside `freddie_cli::Verb`: figaro `src/cli/mod.rs`. Delta: one verb, `config-path`. This file does not depend on send-events.md. If `CliVerb` already exists, add `ConfigPath` to it. If not, the snippets introduce `CliVerb`.
+Origin of the walk-up: `crates/isograph_cli/src/discover.rs` `config_path`. Origin of extra verbs beside `freddie_cli::Verb`: figaro `src/cli/mod.rs`. Delta: one verb, `config-path`.
 
 ## What the user does
 
@@ -125,7 +125,7 @@ pub fn run(id: &ConfigFlag) -> ExitCode {
 }
 ```
 
-Workspace clippy denies `print_stdout` and `print_stderr` in library crates. `config_path::run` is the process entry for this verb. `#[expect(clippy::print_stdout, clippy::print_stderr)]` on `run`. The function is not a library API. Do not add a tracing subscriber to avoid the expect: the path is for scripts to read from stdout, and a missing config is a command-line error on stderr, the same as `send`.
+Workspace clippy denies `print_stdout` and `print_stderr` in library crates. `config_path::run` is the process entry for this verb. `#[expect(clippy::print_stdout, clippy::print_stderr)]` on `run`. The function is not a library API. Do not add a tracing subscriber to avoid the expect: the path is for scripts to read from stdout, and a missing config is a command-line error on stderr.
 
 `config_path` does not call `load_config`. A file that exists and can be canonicalized is enough.
 
