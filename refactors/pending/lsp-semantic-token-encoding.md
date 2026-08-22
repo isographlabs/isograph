@@ -59,27 +59,25 @@ fn emit_pieces(
                 piece_start = line_break.after;
             }
             Some(line_break) if line_break.start < span.end => {
-                emit_piece(
+                encoded.push(emit_piece(
                     token.item,
                     piece_start,
                     line_break.start,
                     cursor,
                     last_start,
                     index,
-                    encoded,
-                );
+                ));
                 piece_start = line_break.after;
             }
             _ => {
-                emit_piece(
+                encoded.push(emit_piece(
                     token.item,
                     piece_start,
                     span.end,
                     cursor,
                     last_start,
                     index,
-                    encoded,
-                );
+                ));
                 break;
             }
         }
@@ -98,8 +96,7 @@ fn emit_piece(
     cursor: &LineCursor,
     last_start: &mut LastStart,
     index: &LineIndex,
-    encoded: &mut Vec<lsp_types::SemanticToken>,
-) {
+) -> lsp_types::SemanticToken {
     let line = cursor.break_index as u32;
     let length = utf16_units(
         &index.text[(piece_start as usize)..(piece_end as usize)],
@@ -119,13 +116,13 @@ fn emit_piece(
         line,
         offset: piece_start,
     };
-    encoded.push(lsp_types::SemanticToken {
+    lsp_types::SemanticToken {
         delta_line,
         delta_start,
         length,
         token_type: lsp_type_index(token),
         token_modifiers_bitset: 0,
-    });
+    }
 }
 
 /// Previous emitted piece's line and byte start.
