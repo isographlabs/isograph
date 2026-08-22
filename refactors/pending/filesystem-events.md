@@ -93,7 +93,7 @@ Origin: send-events.md / event-loop.md `handle`. Delta: `files` and a `DiskChang
 
 `on_message` is send-events.md: `from_str::<IsographEvent>`. No new arm. `DiskChanged` is `Serialize` + `Deserialize`.
 
-The socket, `IsographArgs.port`, `listen`, the port file, and `select!` stay as send-events.md left them.
+The socket, `listen(0)`, and `select!` stay as send-events.md left them.
 
 ### Tests
 
@@ -119,7 +119,7 @@ The e2e crate does not yet send; that is change 2. Existing start/status/logs/st
 
 ## Change 2: send `DiskChanged`
 
-`isograph send`, the socket, and the port file are send-events.md. This change adds `DiskChanged` and an e2e that sends it.
+`isograph send` and the socket are send-events.md. This change adds `DiskChanged` and an e2e that sends it.
 
 Origin of the verb: send-events.md. Delta: a `DiskChanged` frame instead of `HelloWorld`. `on_message` does not change.
 

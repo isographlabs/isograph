@@ -72,9 +72,9 @@ The three sources are theoretically separate daemons. They are one process becau
 
 Figaro is one process per machine, so a default port is enough. Isograph is one process per config. Two configs cannot share a port.
 
-The event socket binds `127.0.0.1:port`. `port` is `--port` when given, otherwise `0` (the OS assigns). The bound port is `EventSocket::local_addr().port()` (freddie `event-socket-local-addr.md`). It is written to `{log_dir}/{slug}.port` as decimal digits and a newline. `isograph send` reads that file unless `--port` is given.
+The event socket binds `127.0.0.1:0`. The kernel assigns a port from its local/dynamic range. There is no `--port` and no port file. `isograph send` finds the daemon pid from the lock and reads that process's loopback TCP listen port. The bound port is `EventSocket::local_addr().port()` (freddie `event-socket-local-addr.md`); the daemon logs it and does not persist it.
 
-The LSP adapter is a second listener, `{log_dir}/{slug}.lsp`. The event socket is JSON frames. The adapter is LSP JSON-RPC. They are not the same protocol and not the same port.
+The LSP adapter is a second listener, `{log_dir}/{slug}.lsp`, a path, not a TCP port. The event socket is the process's only loopback TCP listen, so the pid identifies it. The event socket is JSON frames. The adapter is LSP JSON-RPC. They are not the same protocol.
 
 `freddie_event_socket` refuses web-page `Origin` headers and caps a frame at 64 KiB. Production file contents never go over the socket: the watcher reads the file and posts in-process. CI fixtures stay small.
 
