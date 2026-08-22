@@ -1,16 +1,16 @@
 # LSP as the daemon's outside protocol
 
-Requires send-events.md (landed). Independent of filesystem-watcher.md, file-semantic-tokens.md, and e2e-semantic-tokens.md.
+Requires send-events.md (landed). Independent of filesystem-watcher.md and e2e-semantic-tokens.md.
 
-The daemon's TCP port is an LSP server. Every message is a request, a response, or a notification from `lsp_server::Message`. `IsographEvent` is not on the wire. `--file` is still `IsographEvent` JSON; `isograph send` is an LSP client that encodes it as a notification. `handle` is unchanged. Same `127.0.0.1:0` port and `{slug}.port` file.
+The daemon's TCP port is an LSP server. Every message is a `lsp_server::Message`. `IsographEvent` is not on the wire. `--file` is still `IsographEvent` JSON; `isograph send` encodes it as a notification. `handle` is unchanged. Same `127.0.0.1:0` port and `{slug}.port` file.
 
-Custom methods are empty enums that implement `lsp_types::notification::Notification`, the same shape as `lsp_types` (`Initialized`, `Exit`) and as isograph's `on_notification_sync::<DidOpenTextDocument>`. Standard methods come from `lsp_types`: `request::Initialize`, `request::Shutdown`, `notification::Initialized`, `notification::Exit`. Do not string-match `"initialize"` or `"isograph/helloWorld"`.
+Notifications are dispatched the way isograph does: `LSPNotificationDispatch::new(notification, state).on_notification_sync::<T>(handler)?`. Custom methods are empty enums that implement `lsp_types::notification::Notification`, same as `Initialized` / `Exit`. Standard methods come from `lsp_types`: `request::Initialize`, `request::Shutdown`, `notification::Initialized`, `notification::Exit`.
 
-`lsp_server::Connection` IO threads `unwrap`. We never use `Connection`. We use `Message::{read,write}` and `Request::extract` / `Notification::extract`. We do not call `Notification::new`, `Request::new`, or `Response::new_ok` (`unwrap` on `to_value`). `Response::new_err` is fine.
+`lsp_server::Connection` IO threads `unwrap`. We never use `Connection`. We use `Message::{read,write}`. We do not call `Notification::new`, `Request::new`, or `Response::new_ok`. `Response::new_err` is fine. `Notification::extract` / `Request::extract` return `Result`; we match it. isograph `expect`s those; that is the delta.
 
 Whether an LSP client should report filesystem facts is later. `DiskChanged` as a notification exists because send still interns a `DiskFile` that way.
 
-Origin of bind, port file, and send: send-events.md. Origin of extra methods: `lsp-types` 0.97 `notification.rs` (`pub enum Initialized {}` + `impl Notification`). Origin of typed dispatch: isograph `crates/isograph_lsp/src/lsp_notification_dispatch.rs` `on_notification_sync`. Origin of framing: `lsp-server` 0.7.8 `Message`. Delta: replace the WebSocket of `IsographEvent` JSON; extract returns `Result`, no `expect`; `Quit` is a notification, not SIGTERM.
+Origin of bind, port file, and send: send-events.md. Origin of extra methods: `lsp-types` 0.97 `notification.rs`. Origin of dispatch: isograph `crates/isograph_lsp/src/lsp_notification_dispatch.rs` and `server.rs` `dispatch_notification`. Origin of framing: `lsp-server` 0.7.8 `Message`. Delta: TCP instead of `Connection::stdio`; extract is `Result`; postfix constructors; `Quit` is a notification.
 
 One shippable change.
 
@@ -23,7 +23,7 @@ $ printf '%s\n' '{"kind":"HelloWorld"}' > /tmp/hello.json
 $ isograph send --file /tmp/hello.json
 ```
 
-The log has `hello world`. The socket sees `initialize`, `initialized`, then `isograph/helloWorld`. It does not see `{"kind":"HelloWorld"}`.
+The log has `hello world`. The socket sees `initialize`, `initialized`, then `isograph/helloWorld`.
 
 ```
 $ printf '%s\n' '{"kind":"DiskChanged","value":{"path":"/tmp/proj/src/a.ts","presence":{"Present":"export const a = 1;\n"}}}' > /tmp/disk.json
@@ -35,7 +35,7 @@ $ printf '%s\n' '{"kind":"Quit"}' > /tmp/quit.json
 $ isograph send --file /tmp/quit.json
 ```
 
-The daemon exits. That is `isograph/quit`, the same path as `isograph stop` / SIGTERM: `IsographEvent::Quit` then `Kill`. Send is not in `--help`. The daemon not running is the same error as today.
+The daemon exits (`isograph/quit` → `IsographEvent::Quit` → `Kill`). Send is not in `--help`.
 
 ## Types
 
@@ -44,7 +44,6 @@ Most important first.
 ```rust
 // from crates/isograph_cli/src/lsp_socket.rs
 use lsp_types::notification::Notification;
-use lsp_types::request::Request;
 
 #[derive(Debug)]
 pub enum HelloWorld {}
@@ -71,7 +70,136 @@ impl Notification for Quit {
 }
 ```
 
-Origin of the empty enum: `lsp_types::notification::Initialized`. Delta: method names under `isograph/`. `HelloWorld` and `Quit` have no params. `DiskChanged::Params` is the existing event payload (`path`, `presence`), not the tagged `{kind, value}` envelope.
+Origin of the empty enum: `lsp_types::notification::Initialized`. Delta: methods under `isograph/`. `DiskChanged::Params` is the event payload (`path`, `presence`), not `{kind, value}`.
+
+```rust
+// from crates/isograph_cli/src/lsp_dispatch.rs
+use std::ops::ControlFlow;
+
+use lsp_types::notification::Notification;
+use prelude::Postfix;
+use tracing::warn;
+
+pub struct LspNotificationDispatch<'state, TState> {
+    notification: lsp_server::Notification,
+    state: &'state mut TState,
+}
+
+impl<'state, TState> LspNotificationDispatch<'state, TState> {
+    pub fn new(notification: lsp_server::Notification, state: &'state mut TState) -> Self {
+        Self {
+            notification,
+            state,
+        }
+    }
+
+    pub fn on_notification_sync<TNotification: Notification>(
+        self,
+        handler: fn(&mut TState, TNotification::Params),
+    ) -> ControlFlow<(), Self> {
+        if self.notification.method != TNotification::METHOD {
+            return ControlFlow::Continue(self);
+        }
+        match self.notification.extract(TNotification::METHOD) {
+            Ok(params) => {
+                handler(self.state, params);
+                ControlFlow::Break(())
+            }
+            Err(lsp_server::ExtractError::MethodMismatch(notification)) => {
+                ControlFlow::Continue(Self {
+                    notification,
+                    state: self.state,
+                })
+            }
+            Err(lsp_server::ExtractError::JsonError { method, error }) => {
+                warn!(method = method.as_str(), error = %error, "notification params");
+                ControlFlow::Break(())
+            }
+        }
+    }
+
+    pub fn notification(self) -> lsp_server::Notification {
+        self.notification
+    }
+}
+```
+
+Origin: isograph `lsp_notification_dispatch.rs` `LSPNotificationDispatch` verbatim except: handler returns `()` not `LSPRuntimeResult`; extract is `match` not `expect`; `JsonError` logs and counts as handled; postfix. The `?` chain is the same: first matching method runs, then `Break`.
+
+```rust
+// from crates/isograph_cli/src/lsp_socket.rs
+fn dispatch_notification(
+    notification: lsp_server::Notification,
+    event_tx: &mut tokio::sync::mpsc::UnboundedSender<crate::event::IsographEvent>,
+) {
+    let dispatch = || {
+        crate::lsp_dispatch::LspNotificationDispatch::new(notification, event_tx)
+            .on_notification_sync::<HelloWorld>(on_hello_world)?
+            .on_notification_sync::<DiskChanged>(on_disk_changed)?
+            .on_notification_sync::<Quit>(on_quit)?
+            .on_notification_sync::<lsp_types::notification::Initialized>(on_initialized)?
+            .notification();
+        ControlFlow::Continue(())
+    };
+    match dispatch() {
+        ControlFlow::Break(()) => {}
+        ControlFlow::Continue(_) => {
+            warn!("unknown notification");
+        }
+    }
+}
+
+fn on_hello_world(
+    event_tx: &mut tokio::sync::mpsc::UnboundedSender<crate::event::IsographEvent>,
+    (): (),
+) {
+    let _ = event_tx.send(crate::event::IsographEvent::HelloWorld);
+}
+
+fn on_disk_changed(
+    event_tx: &mut tokio::sync::mpsc::UnboundedSender<crate::event::IsographEvent>,
+    change: crate::event::DiskChanged,
+) {
+    let _ = event_tx.send(crate::event::IsographEvent::DiskChanged(change));
+}
+
+fn on_quit(
+    event_tx: &mut tokio::sync::mpsc::UnboundedSender<crate::event::IsographEvent>,
+    (): (),
+) {
+    let _ = event_tx.send(crate::event::IsographEvent::Quit);
+}
+
+fn on_initialized(
+    _event_tx: &mut tokio::sync::mpsc::UnboundedSender<crate::event::IsographEvent>,
+    _params: lsp_types::InitializedParams,
+) {
+}
+```
+
+Origin: isograph `server.rs` `dispatch_notification`. Delta: `TState` is the event sender; handlers push `IsographEvent`. `Initialized` is a no-op so it is not "unknown". `Exit` is not in this chain.
+
+```rust
+// from crates/isograph_cli/src/lsp_socket.rs
+fn notification_from_event(
+    event: crate::event::IsographEvent,
+) -> Result<lsp_server::Notification, serde_json::Error> {
+    match event {
+        crate::event::IsographEvent::HelloWorld => notify::<HelloWorld>(()),
+        crate::event::IsographEvent::DiskChanged(change) => notify::<DiskChanged>(change),
+        crate::event::IsographEvent::Quit => notify::<Quit>(()),
+    }
+}
+
+fn notify<N: Notification>(
+    params: N::Params,
+) -> Result<lsp_server::Notification, serde_json::Error> {
+    serde_json::to_value(params).map(|params| lsp_server::Notification {
+        method: N::METHOD.to_owned(),
+        params,
+    })
+}
+```
 
 ```rust
 // from crates/isograph_cli/src/lsp_socket.rs
@@ -89,79 +217,13 @@ enum Step {
 }
 ```
 
-`ExpectInitialize`: answer `Initialize`, drop other notifications, `ServerNotInitialized` for other requests. `Running`: domain notifications become events; `Shutdown` replies `null` and becomes `ExpectExit`; unknown requests `MethodNotFound`. `ExpectExit`: only `Exit` ends the thread. `Exit` in any state ends the thread and does not by itself send `IsographEvent::Quit`. `Quit` the notification does.
+`ExpectInitialize` is `Connection::initialize` in isograph: answer `Initialize`, drop other notifications, `ServerNotInitialized` for other requests. `Running` is the isograph server loop. `ExpectExit`: only `Exit` ends the thread. `Exit` in any state ends the thread and is not `IsographEvent::Quit`. `Quit` the notification is.
 
 ```rust
 // from crates/isograph_cli/src/lsp_socket.rs
-fn notification_from_event(
-    event: crate::event::IsographEvent,
-) -> Result<lsp_server::Notification, serde_json::Error> {
-    match event {
-        crate::event::IsographEvent::HelloWorld => notify::<HelloWorld>(()),
-        crate::event::IsographEvent::DiskChanged(change) => notify::<DiskChanged>(change),
-        crate::event::IsographEvent::Quit => notify::<Quit>(()),
-    }
-}
-
-fn notify<N: Notification>(params: N::Params) -> Result<lsp_server::Notification, serde_json::Error> {
-    serde_json::to_value(params).map(|params| lsp_server::Notification {
-        method: N::METHOD.to_owned(),
-        params,
-    })
-}
-
-fn extract<N: Notification>(
-    notification: &lsp_server::Notification,
-) -> Option<Result<N::Params, serde_json::Error>> {
-    if notification.method != N::METHOD {
-        return None;
-    }
-    serde_json::from_value(notification.params.clone()).wrap_some()
-}
-
-fn event_from_notification(
-    notification: &lsp_server::Notification,
-) -> Option<crate::event::IsographEvent> {
-    if let Some(params) = extract::<HelloWorld>(notification) {
-        return match params {
-            Ok(()) => crate::event::IsographEvent::HelloWorld.wrap_some(),
-            Err(e) => {
-                warn!(error = %e, "isograph/helloWorld params");
-                None
-            }
-        };
-    }
-    if let Some(params) = extract::<DiskChanged>(notification) {
-        return match params {
-            Ok(change) => crate::event::IsographEvent::DiskChanged(change).wrap_some(),
-            Err(e) => {
-                warn!(error = %e, "isograph/diskChanged params");
-                None
-            }
-        };
-    }
-    if let Some(params) = extract::<Quit>(notification) {
-        return match params {
-            Ok(()) => crate::event::IsographEvent::Quit.wrap_some(),
-            Err(e) => {
-                warn!(error = %e, "isograph/quit params");
-                None
-            }
-        };
-    }
-    if notification.method == lsp_types::notification::Initialized::METHOD {
-        return None;
-    }
-    warn!(method = notification.method.as_str(), "unknown notification");
-    None
-}
-```
-
-`extract` compares `N::METHOD`. `params.clone()` is a `serde_json::Value`. `Initialized` is not an event. `Exit` is handled in `step` before this function. Bad params of a known method are not an event; the connection stays up.
-
-```rust
-// from crates/isograph_cli/src/lsp_socket.rs
-fn initialize_response(id: lsp_server::RequestId) -> Result<lsp_server::Response, serde_json::Error> {
+fn initialize_response(
+    id: lsp_server::RequestId,
+) -> Result<lsp_server::Response, serde_json::Error> {
     serde_json::to_value(lsp_types::InitializeResult {
         capabilities: lsp_types::ServerCapabilities::default(),
         server_info: lsp_types::ServerInfo {
@@ -176,13 +238,9 @@ fn initialize_response(id: lsp_server::RequestId) -> Result<lsp_server::Response
         error: None,
     })
 }
-
-fn request_is<R: Request>(request: &lsp_server::Request) -> bool {
-    request.method == R::METHOD
-}
 ```
 
-Empty `ServerCapabilities`. Domain requests are later docs; they are `MethodNotFound` here.
+Empty `ServerCapabilities`. Domain requests are lsp-request.md.
 
 ```rust
 // from crates/isograph_cli/src/lsp_socket.rs
@@ -212,7 +270,7 @@ pub(crate) async fn accept_loop(
 
 fn session(
     stream: std::net::TcpStream,
-    event_tx: tokio::sync::mpsc::UnboundedSender<crate::event::IsographEvent>,
+    mut event_tx: tokio::sync::mpsc::UnboundedSender<crate::event::IsographEvent>,
 ) {
     let writer = match stream.try_clone() {
         Ok(writer) => writer,
@@ -237,7 +295,7 @@ fn session(
                 break;
             }
         };
-        match step(&mut session, message, event_tx.reference()) {
+        match step(&mut session, message, &mut event_tx) {
             Step::Continue => {}
             Step::Reply(response) => {
                 if let Err(e) = lsp_server::Message::Response(response).write(&mut writer) {
@@ -249,16 +307,11 @@ fn session(
         }
     }
 }
-```
 
-`into_std` streams are non-blocking. `Message::read` is blocking. `set_nonblocking(false)` is required. The session is a `std::thread` so a blocked read does not stall the current-thread tokio runtime.
-
-```rust
-// from crates/isograph_cli/src/lsp_socket.rs
 fn step(
     session: &mut Session,
     message: lsp_server::Message,
-    event_tx: &tokio::sync::mpsc::UnboundedSender<crate::event::IsographEvent>,
+    event_tx: &mut tokio::sync::mpsc::UnboundedSender<crate::event::IsographEvent>,
 ) -> Step {
     match (*session, message) {
         (_, lsp_server::Message::Notification(notification))
@@ -267,7 +320,7 @@ fn step(
             Step::End
         }
         (Session::ExpectInitialize, lsp_server::Message::Request(request))
-            if request_is::<lsp_types::request::Initialize>(&request) =>
+            if request.method == lsp_types::request::Initialize::METHOD =>
         {
             let id = request.id;
             match initialize_response(id.clone()) {
@@ -285,20 +338,20 @@ fn step(
                 }
             }
         }
-        (Session::ExpectInitialize, lsp_server::Message::Request(request)) => {
-            Step::Reply(lsp_server::Response::new_err(
+        (Session::ExpectInitialize, lsp_server::Message::Request(request)) => Step::Reply(
+            lsp_server::Response::new_err(
                 request.id,
                 lsp_server::ErrorCode::ServerNotInitialized as i32,
                 "server not initialized".to_owned(),
-            ))
-        }
+            ),
+        ),
         (Session::ExpectInitialize, lsp_server::Message::Notification(notification)) => {
             warn!(method = notification.method.as_str(), "notification before initialize");
             Step::Continue
         }
         (Session::ExpectInitialize, lsp_server::Message::Response(_)) => Step::Continue,
         (Session::Running, lsp_server::Message::Request(request))
-            if request_is::<lsp_types::request::Shutdown>(&request) =>
+            if request.method == lsp_types::request::Shutdown::METHOD =>
         {
             *session = Session::ExpectExit;
             Step::Reply(lsp_server::Response {
@@ -307,27 +360,25 @@ fn step(
                 error: None,
             })
         }
-        (Session::Running, lsp_server::Message::Request(request)) => {
-            Step::Reply(lsp_server::Response::new_err(
+        (Session::Running, lsp_server::Message::Request(request)) => Step::Reply(
+            lsp_server::Response::new_err(
                 request.id,
                 lsp_server::ErrorCode::MethodNotFound as i32,
-                format!("{} is not a request this server answers", request.method),
-            ))
-        }
+                format!("No handler registered for method '{}'", request.method),
+            ),
+        ),
         (Session::Running, lsp_server::Message::Notification(notification)) => {
-            if let Some(event) = event_from_notification(notification.reference()) {
-                let _ = event_tx.send(event);
-            }
+            dispatch_notification(notification, event_tx);
             Step::Continue
         }
         (Session::Running, lsp_server::Message::Response(_)) => Step::Continue,
-        (Session::ExpectExit, lsp_server::Message::Request(request)) => {
-            Step::Reply(lsp_server::Response::new_err(
+        (Session::ExpectExit, lsp_server::Message::Request(request)) => Step::Reply(
+            lsp_server::Response::new_err(
                 request.id,
                 lsp_server::ErrorCode::InvalidRequest as i32,
                 "shutdown already received".to_owned(),
-            ))
-        }
+            ),
+        ),
         (Session::ExpectExit, lsp_server::Message::Notification(notification)) => {
             warn!(method = notification.method.as_str(), "notification after shutdown");
             Step::Continue
@@ -337,11 +388,11 @@ fn step(
 }
 ```
 
-`Exit` is first so it ends the session in every state. A second `Initialize` after `Running` is `MethodNotFound`. `RequestId` is not `Copy`; clone it for `initialize_response`.
+`into_std` streams are non-blocking. `Message::read` is blocking. `set_nonblocking(false)` is required. The session is a `std::thread` so a blocked read does not stall the current-thread tokio runtime. Method strings for `Initialize` / `Shutdown` / `Exit` are `T::METHOD`, not literals. Domain request `MethodNotFound` message is isograph's `No handler registered for method '{}'`.
 
 ### `serve`
 
-Origin: `crates/isograph_cli/src/daemon.rs` `serve`. Delta: `tokio::net::TcpListener` instead of `freddie_event_socket::listen`; `accept_loop` as a third `select!` arm. Keep `intern_config_directory` as today.
+Origin: `crates/isograph_cli/src/daemon.rs` `serve`. Delta: `tokio::net::TcpListener`; `accept_loop` as a third `select!` arm. Keep `intern_config_directory`.
 
 ```rust
 // from crates/isograph_cli/src/daemon.rs
@@ -373,17 +424,18 @@ Origin: `crates/isograph_cli/src/daemon.rs` `serve`. Delta: `tokio::net::TcpList
     }
 ```
 
-Drop `freddie_event_socket` from this file. `Kill` ends the effect loop, `select!` drops `accept_loop`.
+Drop `freddie_event_socket`.
 
 ### `send`
 
-Origin: `crates/isograph_cli/src/send.rs`. Delta: `TcpStream` plus `Message`; `notification_from_event`; handshake with `Initialize` / `Initialized`.
+Origin: `crates/isograph_cli/src/send.rs`. Delta: `TcpStream` plus `Message`; `notification_from_event`; handshake with `Initialize::METHOD` / `Initialized::METHOD`.
 
 ```rust
 // from crates/isograph_cli/src/send.rs
     let event: crate::event::IsographEvent =
         serde_json::from_str(frame.trim()).map_err(SendError::NotEvent)?;
-    let notification = crate::lsp_socket::notification_from_event(event).map_err(SendError::Encode)?;
+    let notification =
+        crate::lsp_socket::notification_from_event(event).map_err(SendError::Encode)?;
     let stream = std::net::TcpStream::connect((std::net::Ipv4Addr::LOCALHOST, port)).map_err(
         |source| SendError::Connect(Connect { port, source }),
     )?;
@@ -442,7 +494,7 @@ fn wait_for_initialize_result(
 }
 ```
 
-`Connect.source` is `io::Error`. `SendError` keeps Discover / NotEvent / NotRunning / port errors, drops tungstenite, gains `Encode(serde_json::Error)`, `Write(io::Error)`, `Read(io::Error)`, `InitializeClosed`, `Initialize(String)`. `require_running`, `read_port`, `run` (unlink `--file`) stay. Send does not send `Shutdown` / `Exit`. Dropping the socket ends the session.
+`Connect.source` is `io::Error`. `SendError` keeps Discover / NotEvent / NotRunning / port errors, drops tungstenite, gains `Encode(serde_json::Error)`, `Write(io::Error)`, `Read(io::Error)`, `InitializeClosed`, `Initialize(String)`. Send does not send `Shutdown` / `Exit`.
 
 `CliVerb::Send` doc comment: `Encode one IsographEvent as an LSP notification to the running daemon. Not for typing: tests and CI.` `SendArgs.file`: `JSON IsographEvent to encode as an LSP notification.`
 
@@ -457,40 +509,40 @@ lsp-types = { workspace = true }
 tokio = { workspace = true, features = ["rt", "macros", "signal", "sync", "time", "net"] }
 ```
 
-`lib.rs`: `mod lsp_socket;`. Delete `external.rs`.
+`lib.rs`: `mod lsp_dispatch; mod lsp_socket;`. Delete `external.rs`.
 
 ### Design doc
 
-`docs-website/docs/design-docs/event-model.md` Outer / Ports: the TCP port is the LSP server; send is an LSP client of it; drop `freddie_event_socket` and the `{slug}.lsp` second listener. `isograph/quit` is `IsographEvent::Quit`. `shutdown` / `exit` close the session.
+`docs-website/docs/design-docs/event-model.md` Outer / Ports: the TCP port is the LSP server; send is an LSP client; drop `freddie_event_socket` and `{slug}.lsp`. `isograph/quit` is `IsographEvent::Quit`. `shutdown` / `exit` close the session.
 
-Landing sequence `refactors/pending/event-model.md` item 2 notes the wire is this file. Item 13 is further methods on this listener (`DidOpenTextDocument`, `SemanticTokensFullRequest`), dispatched the same way: `impl Notification` / `impl Request` already in `lsp_types`.
+Landing sequence `refactors/pending/event-model.md` item 2 notes this file. Item 13 is lsp-request.md: `LspRequestDispatch` on the worker.
 
 ## Tests
 
-`lsp_socket.rs`. Bind `accept_loop` on a tokio test runtime. `TcpStream::connect`. Write `Message`s. Drain `event_rx` after 250ms (same settle as today's `external.rs`). `expect` names the fixture.
+`lsp_dispatch.rs`: origin isograph `calls_first_matching_notification_handler`. Two handlers, first method does not match, second does, state is 2. `expect` names the fixture JSON. No `unwrap` on `to_value`; `expect` with reason.
 
-- `HelloWorld::METHOD` is `isograph/helloWorld`; `notification_from_event(HelloWorld)` uses that method
-- `DiskChanged` present params contain the path
-- `Quit` encodes as `isograph/quit`
-- initialize then `isograph/helloWorld` is `IsographEvent::HelloWorld`; initialize result has empty `capabilities`
+`lsp_socket.rs`: bind `accept_loop`, write `Message`s, drain `event_rx` after 250ms.
+
+- `HelloWorld::METHOD` is `isograph/helloWorld`
+- initialize then `isograph/helloWorld` is `IsographEvent::HelloWorld`
 - initialize then disk changed present / absent
 - initialize then `isograph/quit` is `IsographEvent::Quit`
-- hello world before initialize is not an event; then initialize + hello world on the same connection works
+- hello world before initialize is not an event
 - unknown notification after initialize is dropped; then hello world arrives
-- unknown request after initialize is `MethodNotFound` (`-32601`)
-- request before initialize is `ServerNotInitialized` (`-32002`)
-- `shutdown` then `exit` does not emit `Quit`; a second connection can still initialize + hello world
-- `exit` without `shutdown` ends the session; accept still works for a new connection
+- unknown request after initialize is `MethodNotFound`
+- request before initialize is `ServerNotInitialized`
+- `shutdown` then `exit` does not emit `Quit`; a second connection can initialize + hello world
+- `exit` without `shutdown` ends the session
 - malformed payload closes the connection
 - two connections both hello world
 
-`send.rs`: existing `parse_port` / `read_port` tests stay.
+`send.rs`: existing `parse_port` / `read_port` stay.
 
-`cli.rs`: HelloWorld, DiskChanged present then absent, daemon stopped, not json, unknown kind, not in help stay. `--file` JSON is unchanged. Add `send_of_quit_stops_the_daemon`: `--file` `{"kind":"Quit"}`, exit 0, log contains `kill: exiting`.
+`cli.rs`: HelloWorld, DiskChanged present then absent, daemon stopped, not json, unknown kind, not in help stay. Add `send_of_quit_stops_the_daemon`: `--file` `{"kind":"Quit"}`, exit 0, log contains `kill: exiting`.
 
 ## Call sites
 
 - `serve` -> bind -> port file -> `select!` `accept_loop`
-- `accept_loop` -> `session` -> `step` -> `event_from_notification` / `Message::write`
+- `Running` + notification -> `dispatch_notification` -> `on_hello_world` / `on_disk_changed` / `on_quit` -> `event_tx`
 - `isograph send` -> `notification_from_event` -> `handshake_and_notify`
 - SIGTERM / `isograph stop` / `isograph/quit` -> `IsographEvent::Quit` -> `handle` -> `Kill`
