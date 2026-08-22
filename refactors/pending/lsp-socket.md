@@ -1,6 +1,6 @@
 # LSP as the daemon's outside protocol
 
-Requires send-events.md (landed) and `docs-website/docs/design-docs/event-model.md`. The daemon's TCP port speaks LSP JSON-RPC (`Content-Length` framing). `isograph send` is an LSP client: `initialize`, `initialized`, one domain notification, then it drops the connection. Domain notifications this slice handles are `isograph/helloWorld` and `isograph/diskChanged`. `shutdown` / `exit` end that session. They do not produce `IsographEvent::Quit`. `Quit` stays SIGTERM / `isograph stop`.
+Requires send-events.md (landed). The daemon's TCP port speaks LSP JSON-RPC (`Content-Length` framing). `isograph send` is an LSP client: `initialize`, `initialized`, one domain notification, then it drops the connection. Domain notifications this slice handles are `isograph/helloWorld` and `isograph/diskChanged`. `shutdown` / `exit` end that session. They do not produce `IsographEvent::Quit`. `Quit` stays SIGTERM / `isograph stop`.
 
 Origin of the bind, port file, and `isograph send` as a hidden client: send-events.md. Origin of message types and framing: `lsp-server` 0.7.8 `Message`, `Request`, `Response`, `Notification`, `Message::read`, `Message::write`. Origin of session vs process: `docs-website/docs/design-docs/event-model.md` (several editors share one process). Delta: replace `freddie_event_socket` WebSocket text frames of `IsographEvent` JSON; the same `127.0.0.1:0` port and `{slug}.port` file; `--file` is still `IsographEvent` JSON and send encodes it; `handle` is unchanged.
 
