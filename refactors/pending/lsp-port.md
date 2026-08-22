@@ -265,6 +265,7 @@ fn notify(
     connection: &lsp_server::Connection,
     event: crate::event::IsographEvent,
 ) -> Result<(), SendError> {
+    // JSON-RPC ids are per connection. This client has one outstanding request. A second send is another connection.
     let id = lsp_server::RequestId::from(1);
     connection
         .sender
