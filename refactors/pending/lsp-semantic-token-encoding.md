@@ -94,16 +94,13 @@ fn lsp_semantic_token(
     last_start: &mut LastStart,
 ) -> lsp_types::SemanticToken {
     let line = cursor.break_index as u32;
-    let length = utf16_units(
-        &cursor.index.text[(piece_start as usize)..(piece_end as usize)],
-        cursor.index.utf16_from,
-    );
+    let length =
+        (cursor.index.utf16_len)(&cursor.index.text[(piece_start as usize)..(piece_end as usize)]);
     let (delta_line, delta_start) = match line - last_start.line {
         0 => (
             0,
-            utf16_units(
+            (cursor.index.utf16_len)(
                 &cursor.index.text[(last_start.offset as usize)..(piece_start as usize)],
-                cursor.index.utf16_from,
             ),
         ),
         delta_line => (delta_line, cursor.column(piece_start)),
@@ -128,16 +125,10 @@ struct LastStart {
     offset: u32,
 }
 
-#[derive(Copy, Clone)]
-enum Utf16From {
-    ByteLen,
-    EncodeUtf16,
-}
-
 struct LineIndex<'a> {
     text: &'a str,
     breaks: Vec<LineBreak>,
-    utf16_from: Utf16From,
+    utf16_len: fn(&str) -> u32,
 }
 
 /// `break_index` is the current line. Offsets must not go backward.
@@ -159,10 +150,10 @@ impl<'a> LineIndex<'a> {
         Self {
             text,
             breaks: line_breaks(text),
-            utf16_from: if text.is_ascii() {
-                Utf16From::ByteLen
+            utf16_len: if text.is_ascii() {
+                |text| text.len() as u32
             } else {
-                Utf16From::EncodeUtf16
+                |text| text.encode_utf16().count() as u32
             },
         }
     }
@@ -263,10 +254,7 @@ impl LineCursor<'_> {
             0 => 0,
             n => self.index.breaks[n - 1].after,
         };
-        utf16_units(
-            &self.index.text[(line_start as usize)..(offset as usize)],
-            self.index.utf16_from,
-        )
+        (self.index.utf16_len)(&self.index.text[(line_start as usize)..(offset as usize)])
     }
 
     fn current_line_break(&self) -> Option<LineBreak> {
@@ -306,15 +294,9 @@ fn line_breaks(text: &str) -> Vec<LineBreak> {
     breaks
 }
 
-fn utf16_units(text: &str, from: Utf16From) -> u32 {
-    match from {
-        Utf16From::ByteLen => text.len() as u32,
-        Utf16From::EncodeUtf16 => text.encode_utf16().count() as u32,
-    }
-}
 ```
 
-`leftover_token` returns `None` for `LineBreak`, so a line-break-only span is not parse output. Consume and leftover record lexer spans: non-empty, ordered, exclusive, on char boundaries, not strictly inside `\r\n`. `lsp_semantic_tokens` on `parse_iso_literal` output does not hit these asserts. Reverse concat of two literals is a caller bug; that is the `should_panic` case. Tokens are ordered, so `advance_to(span.start)` is a forward step. Interior of a break is `current.start < offset && offset < current.after`. `check_span` saves `break_index`, `advance_to(span.end)`, checks the end, restores; `emit_pieces` continues from start. `assert_has_text` is `emit_pieces`'s skip arm without the push: from the cursor already at `span.start` it only looks at breaks inside the span, then restores. `page = "a\r\nb"` with tokens `[0..1, 2..3]` is ordered and exclusive; offset 2 sits between `\r` and `\n` and `check_offset` asserts. `column` runs after `check_span` and `advance_to`, so `line_start..offset` is in range and on a char boundary. `LineIndex::new` calls `is_ascii` once. `Utf16From::ByteLen` means UTF-16 units equal byte length. `Utf16From::EncodeUtf16` means every slice uses `encode_utf16`, including ASCII slices in a page that contains a non-ASCII character. A one-line span is `emit_pieces`'s first iteration: no break in the span, push the tail, stop. `advance_to` skips a break whose `after <= offset`.
+`leftover_token` returns `None` for `LineBreak`, so a line-break-only span is not parse output. Consume and leftover record lexer spans: non-empty, ordered, exclusive, on char boundaries, not strictly inside `\r\n`. `lsp_semantic_tokens` on `parse_iso_literal` output does not hit these asserts. Reverse concat of two literals is a caller bug; that is the `should_panic` case. Tokens are ordered, so `advance_to(span.start)` is a forward step. Interior of a break is `current.start < offset && offset < current.after`. `check_span` saves `break_index`, `advance_to(span.end)`, checks the end, restores; `emit_pieces` continues from start. `assert_has_text` is `emit_pieces`'s skip arm without the push: from the cursor already at `span.start` it only looks at breaks inside the span, then restores. `page = "a\r\nb"` with tokens `[0..1, 2..3]` is ordered and exclusive; offset 2 sits between `\r` and `\n` and `check_offset` asserts. `column` runs after `check_span` and `advance_to`, so `line_start..offset` is in range and on a char boundary. `LineIndex::new` calls `is_ascii` once and stores `utf16_len`. An ASCII page uses `str::len`. A page with a non-ASCII character uses `encode_utf16` for every slice, including ASCII slices. A one-line span is `emit_pieces`'s first iteration: no break in the span, push the tail, stop. `advance_to` skips a break whose `after <= offset`.
 
 ## Origin
 
@@ -387,7 +369,7 @@ Deltas from that extract:
 - `token_type` is `lsp_type_index(token.item)`, a match onto legend indices. Origin stored the index on the parser token.
 - Origin `split_inclusive('\n')` included the newline in `len`. `line_breaks` records `\r\n`, `\n`, and `\r`. `length` is the text before the break.
 - `for token in tokens { check_span; emit_pieces }`. Origin's empty `split_inclusive` chunk had `len` equal to the newline. Empty or line-break-only spans `assert` in `check_span`.
-- `length` and `col` are UTF-16 (`utf16_units`). `is_ascii` runs once on `page_content`. Origin used UTF-8 byte length.
+- `length` and `col` are UTF-16 (`utf16_len`). `is_ascii` runs once on `page_content`. Origin used UTF-8 byte length.
 - Same-line `delta_start` is UTF-16 of `last_start.offset..piece_start`. Later-line `delta_start` is UTF-16 from column 0. Origin used `chars().enumerate()` for `\n` and `text.len()` for last-line width.
 - `LineCursor` is `&LineIndex` plus `break_index`. `check_span` uses the walk cursor. Origin had no cursor.
 - Unordered, inverted, out-of-range, non-char-boundary, CRLF-interior, empty, and line-break-only spans `assert`. Origin panics on a backwards slice.
@@ -512,7 +494,7 @@ mod semantic_tokens;
 pub use semantic_tokens::{lsp_semantic_tokens, semantic_token_legend};
 ```
 
-`emit_pieces`, `lsp_semantic_token`, `LastStart`, `LineIndex`, `LineCursor`, `Utf16From`, `LineBreak`, `line_breaks`, `utf16_units`, `lsp_type_index`, `TYPE`, `CLASS`, `PARAMETER`, `VARIABLE`, `PROPERTY`, `KEYWORD`, `COMMENT`, `STRING`, `NUMBER`, `OPERATOR`, `DECORATOR` stay in the module. `check_span` `assert`s inverted, overlapping, out of range, non-char-boundary, CRLF-interior, empty, and line-break-only spans. `lsp_type_index_matches_the_legend` is `legend.token_types[index] == TYPE` for each constant; a reorder of `LEGEND_TOKEN_TYPES` fails that test.
+`emit_pieces`, `lsp_semantic_token`, `LastStart`, `LineIndex`, `LineCursor`, `LineBreak`, `line_breaks`, `lsp_type_index`, `TYPE`, `CLASS`, `PARAMETER`, `VARIABLE`, `PROPERTY`, `KEYWORD`, `COMMENT`, `STRING`, `NUMBER`, `OPERATOR`, `DECORATOR` stay in the module. `check_span` `assert`s inverted, overlapping, out of range, non-char-boundary, CRLF-interior, empty, and line-break-only spans. `lsp_type_index_matches_the_legend` is `legend.token_types[index] == TYPE` for each constant; a reorder of `LEGEND_TOKEN_TYPES` fails that test.
 
 ## Tests
 

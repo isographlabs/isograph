@@ -71,16 +71,13 @@ fn lsp_semantic_token(
     last_start: &mut LastStart,
 ) -> lsp_types::SemanticToken {
     let line = cursor.break_index as u32;
-    let length = utf16_units(
-        &cursor.index.text[(piece_start as usize)..(piece_end as usize)],
-        cursor.index.utf16_from,
-    );
+    let length =
+        (cursor.index.utf16_len)(&cursor.index.text[(piece_start as usize)..(piece_end as usize)]);
     let (delta_line, delta_start) = match line - last_start.line {
         0 => (
             0,
-            utf16_units(
+            (cursor.index.utf16_len)(
                 &cursor.index.text[(last_start.offset as usize)..(piece_start as usize)],
-                cursor.index.utf16_from,
             ),
         ),
         delta_line => (delta_line, cursor.column(piece_start)),
@@ -105,16 +102,10 @@ struct LastStart {
     offset: u32,
 }
 
-#[derive(Copy, Clone)]
-enum Utf16From {
-    ByteLen,
-    EncodeUtf16,
-}
-
 struct LineIndex<'a> {
     text: &'a str,
     breaks: Vec<LineBreak>,
-    utf16_from: Utf16From,
+    utf16_len: fn(&str) -> u32,
 }
 
 /// `break_index` is the current line. Offsets must not go backward.
@@ -136,10 +127,10 @@ impl<'a> LineIndex<'a> {
         Self {
             text,
             breaks: line_breaks(text),
-            utf16_from: if text.is_ascii() {
-                Utf16From::ByteLen
+            utf16_len: if text.is_ascii() {
+                |text| text.len() as u32
             } else {
-                Utf16From::EncodeUtf16
+                |text| text.encode_utf16().count() as u32
             },
         }
     }
@@ -239,10 +230,7 @@ impl LineCursor<'_> {
             0 => 0,
             n => self.index.breaks[n - 1].after,
         };
-        utf16_units(
-            &self.index.text[(line_start as usize)..(offset as usize)],
-            self.index.utf16_from,
-        )
+        (self.index.utf16_len)(&self.index.text[(line_start as usize)..(offset as usize)])
     }
 
     fn current_line_break(&self) -> Option<LineBreak> {
@@ -280,13 +268,6 @@ fn line_breaks(text: &str) -> Vec<LineBreak> {
         }
     }
     breaks
-}
-
-fn utf16_units(text: &str, from: Utf16From) -> u32 {
-    match from {
-        Utf16From::ByteLen => text.len() as u32,
-        Utf16From::EncodeUtf16 => text.encode_utf16().count() as u32,
-    }
 }
 
 /// Index in this slice is `token_type`. Unused slots keep the origin numbering.
