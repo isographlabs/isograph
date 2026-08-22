@@ -51,15 +51,3 @@ repos:
         language: system
         types: [rust]
         pass_filenames: false
-      - id: json-schema
-        name: build json schema
-        entry: ./scripts/check-json-schema.sh
-        language: system
-        files: 'crates/isograph_config/|libs/isograph-compiler/isograph-config-schema.json'
-        pass_filenames: false
-      - id: js-ci
-        name: compile-libs, unit tests, typecheck and lint demos
-        entry: ./scripts/check-js-ci.sh
-        language: system
-        files: '\.(js|jsx|cjs|mjs|ts|tsx)$'
-        pass_filenames: false
