@@ -211,49 +211,6 @@ The SIGTERM task, `_hold_events`, and `select!` stay. `_socket` is held across `
 ### Tests
 
 ```rust
-// from crates/isograph_cli/src/event.rs
-#[cfg(test)]
-mod serde_tests {
-    use super::IsographEvent;
-
-    #[test]
-    fn hello_world_round_trips() {
-        let json = r#"{"kind":"HelloWorld"}"#;
-        let event: IsographEvent =
-            serde_json::from_str(json).expect("a HelloWorld frame deserializes");
-        assert!(matches!(event, IsographEvent::HelloWorld));
-        assert_eq!(
-            serde_json::to_string(&event).expect("HelloWorld serializes"),
-            json
-        );
-    }
-
-    #[test]
-    fn quit_round_trips() {
-        let json = r#"{"kind":"Quit"}"#;
-        let event: IsographEvent = serde_json::from_str(json).expect("a Quit frame deserializes");
-        assert!(matches!(event, IsographEvent::Quit));
-        assert_eq!(serde_json::to_string(&event).expect("Quit serializes"), json);
-    }
-
-    #[test]
-    fn garbage_does_not_deserialize() {
-        for frame in [
-            r#"{"kind":"IncomingEvent.HelloWorld"}"#,
-            r#"{"kind":"Nope"}"#,
-            "{}",
-            "not json at all",
-        ] {
-            assert!(
-                serde_json::from_str::<IsographEvent>(frame).is_err(),
-                "{frame} should not deserialize"
-            );
-        }
-    }
-}
-```
-
-```rust
 // from crates/isograph_cli/tests/socket.rs
 use std::time::Duration;
 
