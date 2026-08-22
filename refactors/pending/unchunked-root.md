@@ -92,7 +92,7 @@ pub type ChunkedRootPath<'a> = PositionResolutionPath<&'a ChunkedRoot, ()>;
 
 Empty vec is `""` / `"   "`. Otherwise every item of the unpartitioned sequence, line breaks and commas included. A group in that vec has a `ChunkedLevel` interior.
 
-A `Chunk` exists only inside a `ChunkedLevel`. `ChunkParent` / `Extra` / `Root`-as-chunk-parent are gone.
+A `Chunk` exists only inside a `ChunkedLevel`. Parent of `Chunk` is `ChunkedLevelPath`.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -182,7 +182,9 @@ impl<'a> From<IsoLiteralParsePath<'a>> for UnparsedChunkItemsParent<'a> {
 }
 ```
 
-`Singleton` is gone. `ExtraChunks` is gone. `ExtraChunksPath` is gone.
+A parent enum with one variant is the remaining path. After this change that is `ChunkedLevelParent` (`Interior` only) and `ChunkParent` (`Level` only). Both deleted. `ChunkedLevelPath` is `PositionResolutionPath<&'a ChunkedLevel, ChunkedGroupPath<'a>>`. `ChunkPath` is `PositionResolutionPath<&'a Chunk, ChunkedLevelPath<'a>>`. No other parent enum loses a variant.
+
+Deleted with them: `Singleton`, `ExtraChunks`, `ExtraChunksPath`, `IsoLiteralSlotPath`, `parse_singleton`, `parse_nested_singleton`, `AstError::MultipleDeclarations`, `IsographResolutionNode::Singleton`, `IsographResolutionNode::ExtraChunks`.
 
 Delta from the landed `IsographResolutionNode`: drop `Singleton` and `ExtraChunks`; add `ChunkedRoot`; `IsoLiteralSlot`'s payload is `IsoLiteralParsePath` (the slot, parent `()`). `ChunkedLevelPath`'s parent is `ChunkedGroupPath`. Every other variant is unchanged.
 
@@ -744,11 +746,9 @@ One commit. `cargo test` (workspace, no `-p`) and the clippy pre-commit hook pas
 
 ### Types
 
-`ChunkedRoot`, `ChunkedRootPath`, `ChunkParent`, `ChunkedLevel` parent, `Slot` pins, `UnparsedChunkItemsParent`, `IsoLiteralParse`, `IsographResolutionNode` as above.
+After as above. `ChunkedLevelParent` and `ChunkParent` would each have one variant. Delete them. Also delete `Singleton`, `ExtraChunks`, `ExtraChunksPath`, `IsoLiteralSlotPath`, `parse_singleton`, `parse_nested_singleton`, `AstError::MultipleDeclarations` (and its Display test). `IsographResolutionNode` drops `Singleton` and `ExtraChunks`, adds `ChunkedRoot`. `ChunkContentItemParent` gains `Root`.
 
-Delete `Singleton`, `ExtraChunks`, `ChunkedLevelParent`, `ChunkParent`, `AstError::MultipleDeclarations`. The `ast_error_unit_variants_use_their_messages` arm for `MultipleDeclarations` goes with it.
-
-`lib.rs` `pub use` drops `ExtraChunks`, `Singleton`, `ExtraChunksPath`, `ChunkedLevelParent`, `ChunkParent`. It adds `ChunkedRoot`, `ChunkedRootPath`. There is no `IsoLiteralSlotPath`. `ChunkContentItemParent` gains `Root`. `pub(crate) use chunk::{chunk, chunk_level, parse_one_chunk, parse_stream, record_leftover_chunk}`. `parse_singleton` / `parse_nested_singleton` are deleted. `chunk_level` is `pub(crate)` for `parsed_items`. `parse_one_chunk` is `pub(crate)` for `parse_bracket_interior_type`.
+`lib.rs` `pub use` drops those deleted names, adds `ChunkedRoot`, `ChunkedRootPath`. `pub(crate) use chunk::{chunk, chunk_level, parse_one_chunk, parse_stream, record_leftover_chunk}`. `chunk_level` is for `parsed_items`. `parse_one_chunk` is for `parse_bracket_interior_type`.
 
 ### Parse
 
@@ -1532,7 +1532,7 @@ parsing-standards.md:
 - Replace `ChunkStream::new` taking `NonEmpty` with the slice signature. `parse_stream` spans then leftover. `parse_one_chunk` is `parse_stream` plus trailing-separator fold on `Ok` only, then re-join. `parse_chunked_iso_literal` streams the unpartitioned vec.
 - `[...]` interiors: `parse_bracket_interior_type` calls `parse_one_chunk` on chunk 0. Boundary comma and extra chunks are `cursor.report_error` plus `record_leftover_chunk`. No `parse_singleton`.
 - Diagnostic: `report_error` in `parse_stream` and `parse_bracket_interior_type`; `errors.push` in `parse_iso_literal` (`EmptyLiteral`). `parse_one_chunk` only folds extra.
-- `ChunkedLevelParent` / `ExtraChunks` / `Singleton` / `MultipleDeclarations` listings deleted. `ChunkedRoot` listed.
+- Enums deleted: `ChunkedLevelParent`, `ChunkParent`. Also `Singleton`, `ExtraChunks`, `ExtraChunksPath`, `IsoLiteralSlotPath`, `parse_singleton`, `parse_nested_singleton`, `MultipleDeclarations`. `ChunkedRoot` listed.
 
 future-improvements.md, "Line break and comma are the same chunk separator": drop the `field Query.Foo\n{ bar }` bullet and the sentence that anyone who formats a selection set onto the next line gets a second declaration. Keep the interior bullets (`bar\n{ baz }`, `bar\n@loadable`, `[Pet\n!]`). Drop the diagnostic-rewrite sentence that assumed the brace is a second declaration.
 
