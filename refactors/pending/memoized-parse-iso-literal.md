@@ -1,10 +1,10 @@
 # Memoized parse of an extracted iso literal
 
-Requires extract-iso-literals-from-file.md. Extract returns text, span, context, and index. This file parses one extraction.
+Requires extract-iso-literals-from-file.md. Extract returns text, span, and context. This file parses one extraction.
 
 Origin of the memo: isograph `memoized_parse_iso_literal`. Origin of the lookup-by-index function: isograph `parse_iso_literals_in_file_content` walking `extract_iso_literals_from_file_content` by vec position. Delta: parse is keyed on the literal text only, not on `TextSource` or the file path (isograph's TODO: passing `text_source` breaks memoization when the literal moves); i2 `parse_iso_literal` already takes `&str` only; host embedding errors that need the parse tree run after parse, in `host_errors_for_extraction`.
 
-The index is the extraction's `index` (0-based in that file). It is how a caller names "the nth literal in this file". It is not the pico cache key. The cache key is `iso_literal_text`. Two files with the same literal text share a parse. Editing JavaScript around a literal re-extracts and reuses the parse.
+`parsed_iso_literal_in_file` takes the file and a 0-based index into that file's extract vec. That index is not the pico cache key. The cache key is `iso_literal_text`. Two files with the same literal text share a parse. Editing JavaScript around a literal re-extracts and reuses the parse.
 
 Two shippable changes: the text-keyed parse memo, then the file+index accessor and host errors.
 

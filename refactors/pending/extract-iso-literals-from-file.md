@@ -8,7 +8,7 @@ Three shippable changes: stop parsing inside extract, move the pico types to `is
 
 ## What the user does
 
-No user-facing change. Tests intern a `DiskFile` and assert the extracted literals: text, span, export name, call shape, associated function, and index.
+No user-facing change. Tests intern a `DiskFile` and assert the extracted literals: text, span, export name, call shape, and associated function.
 
 ## Change 1: extract does not parse
 
@@ -182,7 +182,7 @@ pub use iso_literals::{IsoLiteralExtraction, extract_iso_literals_from_file_cont
 
 ### The extraction
 
-Origin: isograph `IsoLiteralExtraction`. Delta: `context` instead of the four fields; `index` is the 0-based position in this file; `iso_literal_start_index` is the byte offset of the literal text in the file, same name as isograph.
+Origin: isograph `IsoLiteralExtraction`. Delta: `context` instead of the four fields. `iso_literal_start_index` is the byte offset of the literal text in the file, same name as isograph. The nth literal in a file is the vec index, an argument to `parsed_iso_literal_in_file`, not a field.
 
 ```rust
 // from crates/isograph_compiler/src/iso_literals.rs
@@ -198,7 +198,6 @@ use pico::Database;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IsoLiteralExtraction<THostLanguage: HostLanguage> {
-    pub index: usize,
     pub iso_literal_text: String,
     pub iso_literal_start_index: usize,
     pub context: THostLanguage::LiteralContext,
@@ -214,7 +213,7 @@ impl<THostLanguage: HostLanguage> IsoLiteralExtraction<THostLanguage> {
 }
 ```
 
-`index` is `enumerate()` over the extract vec. `parsed_iso_literal_in_file` (memoized-parse-iso-literal.md) takes that index. `iso_literal_start_index` offsets semantic tokens to file coordinates (file-semantic-tokens.md). Both are used. They are not the same number.
+`parsed_iso_literal_in_file` (memoized-parse-iso-literal.md) takes the file and a 0-based vec index. `iso_literal_start_index` offsets semantic tokens to file coordinates (file-semantic-tokens.md).
 
 `HostLanguage::LiteralContext` gains `Clone + PartialEq + Eq + Debug + 'static` so the extraction can be stored and compared. `TypeScriptLiteralContext` already is `Copy`.
 
@@ -247,11 +246,9 @@ pub fn extract_iso_literals_from_file_content<THostLanguage: HostLanguage>(
     THostLanguage::default()
         .extract_iso_literals(contents)
         .into_iter()
-        .enumerate()
-        .map(|(index, extracted)| {
+        .map(|extracted| {
             let (iso_literal_text, context) = extracted.item;
             IsoLiteralExtraction {
-                index,
                 iso_literal_text: iso_literal_text.to_owned(),
                 iso_literal_start_index: extracted.location.start as usize,
                 context,
@@ -276,8 +273,8 @@ Tests in `crates/isograph_extract_typescript/src/lib.rs` under a `memo_tests` mo
 
 - No `DiskFile` for the path: `extract_iso_literals_from_file_content::<TypeScriptHostLanguage>` is `None`.
 - Present file, no `iso`: `Some` of empty vec.
-- One exported field: vec len 1, `index == 0`, `iso_literal_text` is the interior, `iso_literal_start_index` is `source.find(text)`, `const_export_name` is `Some`, `IsoCall::FunctionCall`, `AssociatedJsFunction::Present`.
-- Two literals: indices 0 and 1, start indices match `find`.
+- One exported field: vec len 1, `iso_literal_text` is the interior, `iso_literal_start_index` is `source.find(text)`, `const_export_name` is `Some`, `IsoCall::FunctionCall`, `AssociatedJsFunction::Present`.
+- Two literals: vec len 2, start indices match `find`.
 - Second `Present` on the same path with different contents replaces: extract sees the new literals, not the old.
 - `Absent` then extract: `None`.
 
