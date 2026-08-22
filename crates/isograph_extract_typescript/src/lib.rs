@@ -445,12 +445,14 @@ mod memo_tests {
     use isograph_compiler::{
         HostLanguage, IsoLiteralError, IsoLiteralExtraction, IsoLiteralStartIndex, IsographState,
         LineChar, LiteralId, iso_literal_extraction, literal_id_at_location, parsed_iso_literal,
+        parsed_iso_literals_in_file,
     };
     use isograph_parser::{
-        AstError, IsoLiteralItem, ParseError, ParsedIsoLiteral, SelectableNameWrapper,
+        AstError, IsoLiteralItem, IsographSemanticToken, ParseError, ParsedIsoLiteral,
+        SelectableNameWrapper,
     };
     use prelude::Postfix;
-    use span::WithSpanPostfix;
+    use span::{Span, WithSpanPostfix};
 
     use super::{
         AssociatedJsFunction, IsoCall, TypeScriptHostError, TypeScriptHostLanguage,
@@ -1297,5 +1299,290 @@ iso(`entrypoint Query.HomeRoute`)";
                 .flat_map(|literal| literal.errors.iter())
                 .any(|error| matches!(error.item, IsoLiteralError::Parse(_)))
         );
+    }
+
+    #[test]
+    fn missing_disk_file_has_no_parsed_iso_literals_in_file() {
+        let db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        assert!(parsed_iso_literals_in_file(&db, path).is_none());
+    }
+
+    #[test]
+    fn present_file_with_no_iso_has_empty_parsed_iso_literals_in_file() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        intern_file(&mut db, path, "export const Foo = 1;");
+        let literals = parsed_iso_literals_in_file(&db, path)
+            .as_ref()
+            .expect("the test interned this path");
+        assert!(literals.is_empty());
+    }
+
+    #[test]
+    fn one_entrypoint_is_one_pair() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        intern_file(&mut db, path, "iso(`entrypoint Query.HomeRoute`)");
+        let extract = TypeScriptHostLanguage::extract_iso_literals(&db, path)
+            .as_ref()
+            .expect("the test interned this path");
+        let literals = parsed_iso_literals_in_file(&db, path)
+            .as_ref()
+            .expect("the test interned this path");
+        assert_eq!(literals.len(), 1);
+        assert_eq!(literals[0].0, extract[0]);
+        assert!(literals[0].1.errors.is_empty());
+        assert!(matches!(
+            iso_literal_item(&literals[0].1),
+            Some(IsoLiteralItem::Entrypoint(_))
+        ));
+        assert_eq!(literals[0].1.tokens[0].item, IsographSemanticToken::Keyword);
+        assert_eq!(literals[0].1.tokens[0].location, Span::from_usize(0, 10));
+        assert_eq!(literals[0].1.tokens[1].item, IsographSemanticToken::Type);
+        assert_eq!(literals[0].1.tokens[2].item, IsographSemanticToken::Period);
+        assert_eq!(
+            literals[0].1.tokens[3].item,
+            IsographSemanticToken::FieldName
+        );
+    }
+
+    #[test]
+    fn incomplete_entrypoint_keeps_the_keyword_token() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        intern_file(&mut db, path, "iso(`entrypoint`)");
+        let literals = parsed_iso_literals_in_file(&db, path)
+            .as_ref()
+            .expect("the test interned this path");
+        assert!(!literals[0].1.errors.is_empty());
+        assert_eq!(literals[0].1.tokens[0].item, IsographSemanticToken::Keyword);
+    }
+
+    #[test]
+    fn empty_backticks_are_empty_parsed_iso_literals_in_file() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        intern_file(&mut db, path, "iso(``)");
+        let literals = parsed_iso_literals_in_file(&db, path)
+            .as_ref()
+            .expect("the test interned this path");
+        assert!(literals.is_empty());
+    }
+
+    #[test]
+    fn newline_only_literal_is_empty_literal() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        intern_file(&mut db, path, "iso(`\n`)");
+        let extract = TypeScriptHostLanguage::extract_iso_literals(&db, path)
+            .as_ref()
+            .expect("the test interned this path");
+        assert_eq!(extract.len(), 1);
+        let literals = parsed_iso_literals_in_file(&db, path)
+            .as_ref()
+            .expect("the test interned this path");
+        assert_eq!(literals.len(), 1);
+        assert!(
+            literals[0]
+                .1
+                .errors
+                .iter()
+                .any(|error| error.item == ParseError::Ast(AstError::EmptyLiteral))
+        );
+        assert!(literals[0].1.tokens.is_empty());
+    }
+
+    #[test]
+    fn space_only_literal_is_empty_literal() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        intern_file(&mut db, path, "iso(` `)");
+        let extract = TypeScriptHostLanguage::extract_iso_literals(&db, path)
+            .as_ref()
+            .expect("the test interned this path");
+        assert_eq!(extract.len(), 1);
+        let literals = parsed_iso_literals_in_file(&db, path)
+            .as_ref()
+            .expect("the test interned this path");
+        assert_eq!(literals.len(), 1);
+        assert!(
+            literals[0]
+                .1
+                .errors
+                .iter()
+                .any(|error| error.item == ParseError::Ast(AstError::EmptyLiteral))
+        );
+        assert!(literals[0].1.tokens.is_empty());
+    }
+
+    #[test]
+    fn two_literals_are_two_pairs() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        intern_file(
+            &mut db,
+            path,
+            "iso(`entrypoint Query.HomeRoute`)\niso(`field User.Avatar { name }`)",
+        );
+        let extract = TypeScriptHostLanguage::extract_iso_literals(&db, path)
+            .as_ref()
+            .expect("the test interned this path");
+        let literals = parsed_iso_literals_in_file(&db, path)
+            .as_ref()
+            .expect("the test interned this path");
+        assert_eq!(literals.len(), 2);
+        assert_eq!(literals[0].0, extract[0]);
+        assert_eq!(literals[1].0, extract[1]);
+    }
+
+    #[test]
+    fn multiline_field_has_keyword_then_name() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        intern_file(&mut db, path, "iso(`\nfield User.Avatar {\n  name\n}\n`)");
+        let literals = parsed_iso_literals_in_file(&db, path)
+            .as_ref()
+            .expect("the test interned this path");
+        let parsed = &literals[0].1;
+        let field = parsed
+            .tokens
+            .iter()
+            .find(|token| token.item == IsographSemanticToken::Keyword)
+            .expect("field is a Keyword token");
+        let interior = &literals[0].0.iso_literal_text;
+        let name_start = interior.find("name").expect("the fixture contains name") as u32;
+        let name = parsed
+            .tokens
+            .iter()
+            .find(|token| {
+                token.item == IsographSemanticToken::FieldName && token.location.start == name_start
+            })
+            .expect("name is a FieldName token");
+        assert!(name.location.start > field.location.start);
+    }
+
+    #[test]
+    fn prefix_with_newline_moves_start_index_and_keeps_tree() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        let contents = "iso(`entrypoint Query.HomeRoute`)";
+        intern_file(&mut db, path, contents);
+        let before = parsed_iso_literals_in_file(&db, path)
+            .as_ref()
+            .expect("the test interned this path")
+            .clone();
+        let prefix = "const x = 1;\n";
+        intern_file(&mut db, path, &(prefix.to_owned() + contents));
+        let after = parsed_iso_literals_in_file(&db, path)
+            .as_ref()
+            .expect("the test interned this path")
+            .clone();
+        assert_ne!(before, after);
+        assert_eq!(
+            after[0].0.iso_literal_start_index,
+            IsoLiteralStartIndex(before[0].0.iso_literal_start_index.0 + prefix.len())
+        );
+        assert_eq!(before[0].1, after[0].1);
+        assert_eq!(
+            parsed_iso_literal(&db, after[0].0.iso_literal_text.clone()),
+            &before[0].1
+        );
+    }
+
+    #[test]
+    fn prefix_with_emoji_is_a_byte_offset() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        let contents = "iso(`entrypoint Query.HomeRoute`)";
+        intern_file(&mut db, path, contents);
+        let prefix = "const x = \"😀\";\n";
+        let prefixed = prefix.to_owned() + contents;
+        intern_file(&mut db, path, &prefixed);
+        let after = parsed_iso_literals_in_file(&db, path)
+            .as_ref()
+            .expect("the test interned this path");
+        assert_eq!(
+            after[0].0.iso_literal_start_index,
+            IsoLiteralStartIndex(
+                prefixed
+                    .find("entrypoint")
+                    .expect("the fixture contains entrypoint")
+            )
+        );
+    }
+
+    #[test]
+    fn append_after_the_literal_is_eq() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        let contents = "iso(`entrypoint Query.HomeRoute`)";
+        intern_file(&mut db, path, contents);
+        let before = parsed_iso_literals_in_file(&db, path)
+            .as_ref()
+            .expect("the test interned this path")
+            .clone();
+        intern_file(&mut db, path, &(contents.to_owned() + "\nconst y = 1;\n"));
+        let after = parsed_iso_literals_in_file(&db, path)
+            .as_ref()
+            .expect("the test interned this path");
+        assert_eq!(before.as_slice(), after.as_slice());
+        let extract = TypeScriptHostLanguage::extract_iso_literals(&db, path)
+            .as_ref()
+            .expect("the test interned this path");
+        assert_eq!(extract[0], before[0].0);
+    }
+
+    #[test]
+    fn context_only_rename_is_neq_with_same_tree() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        intern_file(
+            &mut db,
+            path,
+            "export const Home = iso(`entrypoint Query.HomeRoute`)",
+        );
+        let extract_before = TypeScriptHostLanguage::extract_iso_literals(&db, path)
+            .as_ref()
+            .expect("the test interned this path")
+            .clone();
+        let before = parsed_iso_literals_in_file(&db, path)
+            .as_ref()
+            .expect("the test interned this path")
+            .clone();
+        intern_file(
+            &mut db,
+            path,
+            "export const Page = iso(`entrypoint Query.HomeRoute`)",
+        );
+        let extract_after = TypeScriptHostLanguage::extract_iso_literals(&db, path)
+            .as_ref()
+            .expect("the test interned this path")
+            .clone();
+        let after = parsed_iso_literals_in_file(&db, path)
+            .as_ref()
+            .expect("the test interned this path")
+            .clone();
+        assert_ne!(extract_before, extract_after);
+        assert_ne!(
+            extract_before[0].context.const_export_name,
+            extract_after[0].context.const_export_name
+        );
+        assert_ne!(before, after);
+        assert_eq!(
+            before[0].0.iso_literal_start_index,
+            after[0].0.iso_literal_start_index
+        );
+        assert_eq!(before[0].1, after[0].1);
+    }
+
+    #[test]
+    fn remove_disk_file_clears_parsed_iso_literals_in_file() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        intern_file(&mut db, path, "iso(`entrypoint Query.HomeRoute`)");
+        assert!(parsed_iso_literals_in_file(&db, path).is_some());
+        db.remove_disk_file(path);
+        assert!(parsed_iso_literals_in_file(&db, path).is_none());
     }
 }

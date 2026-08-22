@@ -27,6 +27,24 @@ pub fn parsed_iso_literal<THostLanguage: HostLanguage>(
 }
 
 #[memo]
+pub fn parsed_iso_literals_in_file<THostLanguage: HostLanguage>(
+    db: &IsographState<THostLanguage>,
+    path: RelativePathToSourceFile,
+) -> Option<Vec<(IsoLiteralExtraction<THostLanguage>, ParsedIsoLiteral)>> {
+    let extractions = THostLanguage::extract_iso_literals(db, path).as_ref()?;
+    extractions
+        .iter()
+        .map(|extraction| {
+            (
+                extraction.clone(),
+                parsed_iso_literal(db, extraction.iso_literal_text.clone()).clone(),
+            )
+        })
+        .collect::<Vec<_>>()
+        .wrap_some()
+}
+
+#[memo]
 pub fn literal_id_at_location<THostLanguage: HostLanguage>(
     db: &IsographState<THostLanguage>,
     path: RelativePathToSourceFile,
