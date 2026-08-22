@@ -128,6 +128,7 @@ pub fn parsed_iso_literal_at_location<THostLanguage: HostLanguage>(
     let text = iso_literal_text_at_location(db, path, line_char)
         .as_ref()?
         .clone();
+    // Each (path, LineChar) intern stores a copy of the tree. Parse of `text` is one slot.
     parsed_iso_literal(db, text).clone().wrap_some()
 }
 ```
