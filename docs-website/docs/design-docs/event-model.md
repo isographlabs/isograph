@@ -41,7 +41,7 @@ enum Filesystem {
 }
 ```
 
-`Watch` starts a source that observes the OS and emits `DiskChanged`. `Injected` does not scan and does not watch. The event socket listens in both modes. The CLI, the LSP adapter, and the socket all submit ingested events into the same `handle`. Until a watcher lands, `DiskChanged` arrives only through `isograph send`.
+`Watch` starts a source that observes the OS and emits `DiskChanged`. `Injected` does not scan and does not watch. The event socket listens in both modes. The CLI, the LSP adapter, and the socket all submit ingested events into the same `handle`. Until filesystem-watcher.md lands, `DiskChanged` arrives only through `isograph send`. After that, `Watch` posts in-process and `Injected` still uses send.
 
 ## Inner
 

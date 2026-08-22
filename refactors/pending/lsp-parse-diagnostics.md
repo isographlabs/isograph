@@ -1,10 +1,10 @@
 # LSP parse diagnostics
 
-Requires the LSP adapter (event-model.md item 6, not written). After a `didOpen` or `didChange`, the language server publishes parse errors for the iso literals in that file as `textDocument/publishDiagnostics`. Closing the file publishes an empty list for that URI, which clears the squiggles.
+Requires the LSP adapter (event-model.md, not written) and memoized-parse-iso-literal.md. After a `didOpen` or `didChange`, the language server publishes parse errors for the iso literals in that file as `textDocument/publishDiagnostics`. Closing the file publishes an empty list for that URI, which clears the squiggles.
 
-The pipeline is extract-and-parse of the iso literals in the file (not specified). Each literal's errors are `Vec<WithSpan<IsoLiteralError<THostLanguage>>>` from `WithErrors.errors`, already file-absolute. This doc turns those into `lsp_types::Diagnostic`.
+The pipeline is `file_literals` from memoized-parse-iso-literal.md. Each literal's errors are `FileLiteral.errors`, already file-absolute. This doc turns those into `lsp_types::Diagnostic`.
 
-Origin: isograph `crates/isograph_lsp/src/diagnostic_notification.rs` and the debounce-then-`validate_entire_schema` publish in `server.rs`. Delta: parse errors and host-language errors of the open file only, published on `didOpen` / `didChange` (no debounce, no schema, no file watcher). `didClose` clears. Messages are `Display` of the error types.
+Origin: isograph `crates/isograph_lsp/src/diagnostic_notification.rs` and the debounce-then-`validate_entire_schema` publish in `server.rs`. Delta: parse errors and host-language errors of the open file only, published on `didOpen` / `didChange` (no debounce, no schema, no file watcher). `didClose` clears. Messages are `Display` of the error types. `diagnostics_for_file` takes `&IsographState` and `&Path` and maps `file_literals(db, path)` from memoized-parse-iso-literal.md, not a raw `&str`.
 
 ## What the user does
 

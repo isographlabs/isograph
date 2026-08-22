@@ -1,6 +1,6 @@
 # Zed and VS Code extensions
 
-Requires `docs-website/docs/design-docs/event-model.md`. The editors talk to the LSP adapter via `isograph lsp` (stdio proxy). This doc is what each extension is, how highlighting works in each, and what CI can assert. It does not ship before the adapter and the proxy exist (`refactors/pending/event-model.md` item 6).
+Requires `docs-website/docs/design-docs/event-model.md`. The editors talk to the LSP adapter via `isograph lsp` (stdio proxy). This doc is what each extension is, how highlighting works in each, and what CI can assert. It does not ship before the adapter and the proxy exist (`refactors/pending/event-model.md` LSP adapter item).
 
 ## What the user does
 
