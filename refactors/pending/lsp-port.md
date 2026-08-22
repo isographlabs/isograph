@@ -47,27 +47,11 @@ impl Notification for Event {
 
 `--file` JSON is `Event::Params`.
 
-```rust
-// from crates/isograph_cli/src/lsp_socket.rs
-#[derive(Copy, Clone)]
-enum Session {
-    ExpectInitialize,
-    Running,
-    ExpectExit,
-}
-
-enum Step {
-    Continue,
-    Reply(lsp_server::Response),
-    End,
-}
-```
+isograph does not have a session enum. It calls `connection.initialize(server_capabilities)` then loops on `connection.receiver`. `lsp_server::Connection::listen` accepts one connection and its IO threads `unwrap`. We accept N TCP streams ourselves. Each stream runs the same two functions isograph runs: handshake, then a recv loop.
 
 ```rust
 // from crates/isograph_cli/src/lsp_socket.rs
-fn initialize_response(
-    id: lsp_server::RequestId,
-) -> Result<lsp_server::Response, serde_json::Error> {
+fn initialize_result() -> Result<serde_json::Value, serde_json::Error> {
     serde_json::to_value(lsp_types::InitializeResult {
         capabilities: lsp_types::ServerCapabilities::default(),
         server_info: lsp_types::ServerInfo {
@@ -76,13 +60,52 @@ fn initialize_response(
         }
         .wrap_some(),
     })
-    .map(|result| lsp_server::Response {
-        id,
-        result: result.wrap_some(),
-        error: None,
-    })
 }
 
+fn handshake(
+    reader: &mut impl std::io::BufRead,
+    writer: &mut impl std::io::Write,
+) -> Result<(), std::io::Error> {
+    loop {
+        let Some(message) = lsp_server::Message::read(reader)? else {
+            return std::io::Error::from(std::io::ErrorKind::UnexpectedEof).wrap_err();
+        };
+        match message {
+            lsp_server::Message::Request(request)
+                if request.method == lsp_types::request::Initialize::METHOD =>
+            {
+                let result = initialize_result().map_err(std::io::Error::other)?;
+                lsp_server::Message::Response(lsp_server::Response {
+                    id: request.id,
+                    result: result.wrap_some(),
+                    error: None,
+                })
+                .write(writer)?;
+                return ().wrap_ok();
+            }
+            lsp_server::Message::Request(request) => {
+                lsp_server::Message::Response(lsp_server::Response::new_err(
+                    request.id,
+                    lsp_server::ErrorCode::ServerNotInitialized as i32,
+                    "expected initialize request".to_owned(),
+                ))
+                .write(writer)?;
+            }
+            lsp_server::Message::Notification(notification)
+                if notification.method == lsp_types::notification::Exit::METHOD =>
+            {
+                return std::io::Error::from(std::io::ErrorKind::ConnectionAborted).wrap_err();
+            }
+            lsp_server::Message::Notification(_) | lsp_server::Message::Response(_) => {}
+        }
+    }
+}
+```
+
+Origin: `lsp_server::Connection::initialize_start` / `initialize_finish`. Delta: `Message::read` / `write` on the stream; `Response::new_ok` unwraps, so we build `Response` with `to_value`.
+
+```rust
+// from crates/isograph_cli/src/lsp_socket.rs
 pub(crate) async fn accept_loop(
     listener: tokio::net::TcpListener,
     event_tx: tokio::sync::mpsc::UnboundedSender<crate::event::IsographEvent>,
@@ -120,7 +143,10 @@ fn session(
     };
     let mut reader = std::io::BufReader::new(stream);
     let mut writer = writer;
-    let mut session = Session::ExpectInitialize;
+    if let Err(e) = handshake(&mut reader, &mut writer) {
+        debug!(error = %e, "lsp handshake");
+        return;
+    }
     loop {
         let message = match lsp_server::Message::read(&mut reader) {
             Ok(message) => {
@@ -134,109 +160,53 @@ fn session(
                 break;
             }
         };
-        match step(&mut session, message, event_tx.reference()) {
-            Step::Continue => {}
-            Step::Reply(response) => {
-                if let Err(e) = lsp_server::Message::Response(response).write(&mut writer) {
-                    debug!(error = %e, "could not write the lsp response");
-                    break;
-                }
+        match message {
+            lsp_server::Message::Request(request)
+                if request.method == lsp_types::request::Shutdown::METHOD =>
+            {
+                let _ = lsp_server::Message::Response(lsp_server::Response {
+                    id: request.id,
+                    result: serde_json::Value::Null.wrap_some(),
+                    error: None,
+                })
+                .write(&mut writer);
+                break;
             }
-            Step::End => break,
-        }
-    }
-}
-
-fn step(
-    session: &mut Session,
-    message: lsp_server::Message,
-    event_tx: &tokio::sync::mpsc::UnboundedSender<crate::event::IsographEvent>,
-) -> Step {
-    match (*session, message) {
-        (_, lsp_server::Message::Notification(notification))
-            if notification.method == lsp_types::notification::Exit::METHOD =>
-        {
-            Step::End
-        }
-        (Session::ExpectInitialize, lsp_server::Message::Request(request))
-            if request.method == lsp_types::request::Initialize::METHOD =>
-        {
-            let id = request.id;
-            match initialize_response(id.clone()) {
-                Ok(response) => {
-                    *session = Session::Running;
-                    Step::Reply(response)
-                }
-                Err(e) => {
-                    warn!(error = %e, "could not encode initialize result");
-                    Step::Reply(lsp_server::Response::new_err(
-                        id,
-                        lsp_server::ErrorCode::InternalError as i32,
-                        "could not encode initialize result".to_owned(),
-                    ))
-                }
+            lsp_server::Message::Request(request) => {
+                let _ = lsp_server::Message::Response(lsp_server::Response::new_err(
+                    request.id,
+                    lsp_server::ErrorCode::MethodNotFound as i32,
+                    format!("No handler registered for method '{}'", request.method),
+                ))
+                .write(&mut writer);
             }
-        }
-        (Session::ExpectInitialize, lsp_server::Message::Request(request)) => Step::Reply(
-            lsp_server::Response::new_err(
-                request.id,
-                lsp_server::ErrorCode::ServerNotInitialized as i32,
-                "server not initialized".to_owned(),
-            ),
-        ),
-        (Session::ExpectInitialize, lsp_server::Message::Notification(notification)) => {
-            warn!(method = notification.method.as_str(), "notification before initialize");
-            Step::Continue
-        }
-        (Session::ExpectInitialize, lsp_server::Message::Response(_)) => Step::Continue,
-        (Session::Running, lsp_server::Message::Request(request))
-            if request.method == lsp_types::request::Shutdown::METHOD =>
-        {
-            *session = Session::ExpectExit;
-            Step::Reply(lsp_server::Response {
-                id: request.id,
-                result: serde_json::Value::Null.wrap_some(),
-                error: None,
-            })
-        }
-        (Session::Running, lsp_server::Message::Request(request)) => Step::Reply(
-            lsp_server::Response::new_err(
-                request.id,
-                lsp_server::ErrorCode::MethodNotFound as i32,
-                format!("No handler registered for method '{}'", request.method),
-            ),
-        ),
-        (Session::Running, lsp_server::Message::Notification(notification)) => {
-            if notification.method == Event::METHOD {
+            lsp_server::Message::Notification(notification)
+                if notification.method == lsp_types::notification::Exit::METHOD =>
+            {
+                break;
+            }
+            lsp_server::Message::Notification(notification)
+                if notification.method == Event::METHOD =>
+            {
                 match serde_json::from_value::<crate::event::IsographEvent>(notification.params) {
                     Ok(event) => {
                         let _ = event_tx.send(event);
                     }
                     Err(e) => warn!(error = %e, "isograph/event params"),
                 }
-            } else if notification.method != lsp_types::notification::Initialized::METHOD {
+            }
+            lsp_server::Message::Notification(notification)
+                if notification.method == lsp_types::notification::Initialized::METHOD => {}
+            lsp_server::Message::Notification(notification) => {
                 warn!(method = notification.method.as_str(), "unknown notification");
             }
-            Step::Continue
+            lsp_server::Message::Response(_) => {}
         }
-        (Session::Running, lsp_server::Message::Response(_)) => Step::Continue,
-        (Session::ExpectExit, lsp_server::Message::Request(request)) => Step::Reply(
-            lsp_server::Response::new_err(
-                request.id,
-                lsp_server::ErrorCode::InvalidRequest as i32,
-                "shutdown already received".to_owned(),
-            ),
-        ),
-        (Session::ExpectExit, lsp_server::Message::Notification(notification)) => {
-            warn!(method = notification.method.as_str(), "notification after shutdown");
-            Step::Continue
-        }
-        (Session::ExpectExit, lsp_server::Message::Response(_)) => Step::Continue,
     }
 }
 ```
 
-`into_std` streams are non-blocking. `set_nonblocking(false)` is required. `run_event_loop` still recvs `IsographEvent`. No new `Work` enum.
+Origin of the loop: isograph `server.rs` `run` matching `Message::Request` / `Notification`. Origin of shutdown: `Connection::handle_shutdown`. Delta: we do not wait 30s for `exit` after `shutdown`; we break. `initialized` may arrive after handshake returns; ignore it. `into_std` streams are non-blocking; `set_nonblocking(false)` is required. `run_event_loop` still recvs `IsographEvent`.
 
 ### `serve`
 
@@ -369,7 +339,7 @@ tokio = { workspace = true, features = ["rt", "macros", "signal", "sync", "time"
 - unknown notification after initialize: no event; then `isograph/event` HelloWorld arrives
 - unknown request after initialize: `MethodNotFound`
 - request before initialize: `ServerNotInitialized`
-- `shutdown` then `exit` does not `Quit`; a second connection can initialize + HelloWorld
+- `shutdown` ends the connection and does not `Quit`; a second connection can initialize + HelloWorld
 - malformed payload closes the connection
 - two connections both HelloWorld
 
