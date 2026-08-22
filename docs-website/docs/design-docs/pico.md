@@ -29,7 +29,7 @@ struct IsographState<THostLanguage: HostLanguage> {
 }
 ```
 
-`IsographState` is the database. `handle` writes sources into it. Memos read from it. Tests construct the same type, intern sources the same way `handle` does, and call memos.
+`IsographState` is the database. `handle` writes sources into it. Memos read from it. Tests construct the same type, intern a `RelativePathToSourceFile`, `insert_disk_file`, and call memos. `handle` converts an event `PathBuf` first, then the same insert.
 
 Memos take `&IsographState<THostLanguage>`. `set` and `remove` take `&mut` and panic if a memo is on the stack. Derived data is a return value. A `&mut Entity` that you write selectables into cannot sit behind a memo. isograph had to delete `server_object_entity_mut` before those reads could be memos.
 
@@ -37,18 +37,26 @@ Memos take `&IsographState<THostLanguage>`. `set` and `remove` take `&mut` and p
 
 A source is an input fact. Disk contents and open editor buffers are sources. The config is a singleton source.
 
+The inner model does not know about the filesystem. A `DiskFile` is a row in the database, not a path the compiler opens. The watcher, `isograph send`, and the editor adapter observe the OS and intern facts. Memos read those facts. They do not open a path, they do not call `PathBuf`, they do not know where the config file lives.
+
+`PathBuf` is an OS path. It belongs on events and in the outer process. A `PathBuf` on a source key, a tracked map, or a memo argument is a leak of the filesystem into the inner model.
+
+The identity of a source file is `RelativePathToSourceFile`: `string_key_newtype!`, an interned UTF-8 string, `Copy`. The string is the path relative to the directory that contains the config file. `"src/a.ts"` and `"src/./a.ts"` are two keys. Construction from a relative string is `"src/a.ts".intern().to()`. `handle` is the ingest seam: it converts `DiskChanged.path` (`PathBuf`, absolute) with `relative_path_from_absolute_and_working_directory` against the interned config directory, then `set`s a `DiskFile`. Compiler tests intern `"src/a.ts"` and call `insert_disk_file`. They never construct a `PathBuf`.
+
 ```rust
+string_key_newtype!(RelativePathToSourceFile);
+
 #[derive(Clone, PartialEq, Eq, Source)]
 struct DiskFile {
     #[key]
-    path: RelativePath,
+    path: RelativePathToSourceFile,
     contents: String,
 }
 
 #[derive(Clone, PartialEq, Eq, Source)]
 struct OpenFile {
     #[key]
-    path: RelativePath,
+    path: RelativePathToSourceFile,
     contents: String,
 }
 ```
@@ -61,13 +69,13 @@ If the new value `==` the old value, the epoch does not advance and dependents d
 
 The type system does not stop you from holding a `SourceId` after `remove`. `remove` drops the map entry, `take`s the slot, and increments the epoch. Dependents that read that source see it as changed (`source_node_changed_since` is true when the node is gone). The next `get` of the stale id panics. A memo that returns a `SourceId` after the source was removed is handing out a false proof.
 
-A path is not a proof. Looking up by path can miss and return `None`. The tracked map is `HashMap<RelativePath, SourceId<DiskFile>>`: `Option<SourceId<_>>` from the map, then `get` of the id. Call sites that have a path and not a `SourceId` intern a `RelativePath` and go through the map.
+A path is not a proof. Looking up by path can miss and return `None`. The tracked map is `HashMap<RelativePathToSourceFile, SourceId<DiskFile>>`: `Option<SourceId<_>>` from the map, then `get` of the id. Call sites that have a path and not a `SourceId` intern a `RelativePathToSourceFile` and go through the map.
 
 `get_singleton<T>()` returns `Option<&T>`. A singleton has no `SourceId` you hold as a proof of presence. You ask by type. The config may not have been set.
 
 A path may have a `DiskFile`, an `OpenFile`, both, or neither. Artifact generation reads `DiskFile`. The LSP reads `OpenFile` when that path has one, otherwise `DiskFile`. Those are different memos. One overlay used by both, as isograph's `read_iso_literals_source` does, makes artifact generation depend on editor buffers.
 
-A singleton has no key field. There is at most one. `CompilerConfig` and the working directory are singletons.
+A singleton has no key field. There is at most one. `CompilerConfig` and `CurrentWorkingDirectory` are singletons. `CurrentWorkingDirectory` is the parent directory of the config file, interned at process start. `handle` reads it to convert an event `PathBuf`. Memos do not. They receive `RelativePathToSourceFile` as an argument.
 
 ## Memo
 
@@ -76,7 +84,7 @@ impl HostLanguage for TypeScriptHostLanguage {
     #[memo]
     fn extract_iso_literals(
         db: &IsographState<Self>,
-        path: RelativePath,
+        path: RelativePathToSourceFile,
     ) -> Option<Vec<IsoLiteralExtraction<Self>>>;
 }
 ```
@@ -114,7 +122,7 @@ Semantic tokens and file diagnostics take `path`. Hover, goto definition, and co
 
 The literal text as a parse intern is how those public functions share a parse. A vec index of a literal in a file is not a public argument. Public APIs take `path` and `LineChar`. The first intern converts that pair to `LiteralId` (the path plus the 0-based index in the extract vec). Parse is interned on the literal text, not on `LiteralId`.
 
-Arguments that are `SourceId<T>` or `MemoRef<T>` are identities already. They are `Copy`. pico never clones them. `RelativePath` is an interned string and `Copy`. Everything else (`String`, interned names) is hashed and interned as a param.
+Arguments that are `SourceId<T>` or `MemoRef<T>` are identities already. They are `Copy`. pico never clones them. `RelativePathToSourceFile` is an interned string and `Copy`. Everything else (`String`, interned names) is hashed and interned as a param. A `PathBuf` param is the filesystem leak: pico would hash and clone an OS path on every execute.
 
 An interned owned param is cloned into the param store the first time that value is seen, and cloned out of the param store on every execute of the memo body. A borrowed param (`&T`) is cloned once when interned, not on execute. pico's own tests pin this.
 
@@ -168,9 +176,9 @@ struct LineChar {
     character: u32,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 struct LiteralId {
-    path: RelativePath,
+    path: RelativePathToSourceFile,
     index: usize,
 }
 
@@ -178,7 +186,7 @@ impl HostLanguage for TypeScriptHostLanguage {
     #[memo]
     fn extract_iso_literals(
         db: &IsographState<Self>,
-        path: RelativePath,
+        path: RelativePathToSourceFile,
     ) -> Option<Vec<IsoLiteralExtraction<Self>>> {
         let source_id = match db.get_disk_file_map().untracked().0.get(&path).copied() {
             Some(source_id) => source_id,
@@ -207,7 +215,7 @@ impl HostLanguage for TypeScriptHostLanguage {
 #[memo]
 fn literal_id_at_location<THostLanguage: HostLanguage>(
     db: &IsographState<THostLanguage>,
-    path: RelativePath,
+    path: RelativePathToSourceFile,
     line_char: LineChar,
 ) -> Option<LiteralId> {
     let extractions = THostLanguage::extract_iso_literals(db, path).as_ref()?;
@@ -257,12 +265,12 @@ A public function takes a public key. Hover is `path` and `LineChar`. Semantic t
 
 ```rust
 #[memo]
-fn hover(db: &IsographState, path: RelativePath, line_char: LineChar) -> Option<Hover>;
+fn hover(db: &IsographState, path: RelativePathToSourceFile, line_char: LineChar) -> Option<Hover>;
 
 #[memo]
 fn iso_literal_semantic_tokens_in_file(
     db: &IsographState,
-    path: RelativePath,
+    path: RelativePathToSourceFile,
 ) -> Option<Vec<WithSpan<IsographSemanticToken>>>;
 
 #[memo]
@@ -283,7 +291,7 @@ fn flattened_selectable_named(
 
 Inside hover, `literal_id_at_location` takes `path` and `LineChar` and turns that pair into a `LiteralId`. `iso_literal_extraction` takes the id. `parsed_iso_literal` takes the extraction's text. Semantic tokens for the file calls `iso_literal_semantic_tokens_in_file(path)`, which reads the file's parse list and start indices and offsets each literal's relative tokens.
 
-Hover fires once per `LineChar`. Each `(path, LineChar)` is its own `literal_id_at_location` slot, so moving the caret across a literal executes that intern for every character. That is expected. The stored value is a `RelativePath` and a vec index. `iso_literal_extraction` of that `LiteralId` is one slot. Every character inside the same literal yields the same text, so `parsed_iso_literal` is one slot.
+Hover fires once per `LineChar`. Each `(path, LineChar)` is its own `literal_id_at_location` slot, so moving the caret across a literal executes that intern for every character. That is expected. The stored value is a `RelativePathToSourceFile` and a vec index. `iso_literal_extraction` of that `LiteralId` is one slot. Every character inside the same literal yields the same text, so `parsed_iso_literal` is one slot.
 
 After parse, resolve produces names. Goto definition of a selection named `Avatar` already has the parent entity and the name from the token. It calls `flattened_selectable_named(db, User, Avatar)`. That call site has names, not a file and cursor.
 
@@ -312,7 +320,7 @@ If this memo was already verified in the current epoch, pico returns the stored 
 ## Tracked maps
 
 ```rust
-struct DiskFileMap(pub HashMap<RelativePath, SourceId<DiskFile>>);
+struct DiskFileMap(pub HashMap<RelativePathToSourceFile, SourceId<DiskFile>>);
 ```
 
 The map is which paths currently have a `DiskFile`. `db.set` of a `DiskFile` does not update the map. `handle` does both: intern the source, then insert into the map. Remove is the reverse.
@@ -345,7 +353,7 @@ Memo slots accumulate until `run_garbage_collection`. That keeps the last 10_000
 
 ## Parser and extract
 
-The parser takes `&str`. Tests call `parse_iso_literal` with a string. Extract is a memo over a `DiskFile`. Tests intern a file the same way `handle` does.
+The parser takes `&str`. Tests call `parse_iso_literal` with a string. Extract is a memo over a `DiskFile`. Tests intern `"src/a.ts"` and `insert_disk_file`. They do not pass a `PathBuf`.
 
 A caller that needs a parse tree calls the parse memo with the key it has. pico returns `&T`. The caller does not clone a whole file's AST out of the database to hand to another memo. A `(path, LineChar)` memo does not clone the AST into that slot either. It stores `LiteralId`.
 
@@ -361,7 +369,7 @@ export const Avatar = iso(`
 `)(function Avatar() { return null })
 ```
 
-`handle` receives `DiskChanged` with those contents. It `set`s a `DiskFile` keyed by the path and inserts that `SourceId` into `disk_file_map`.
+`handle` receives `DiskChanged` with those contents and an absolute `PathBuf`. It converts that path to `RelativePathToSourceFile` against the interned config directory, `set`s a `DiskFile` keyed by that interned path, and inserts the `SourceId` into `disk_file_map`. Extract and hover take the interned path. They never see the `PathBuf`.
 
 `TypeScriptHostLanguage::extract_iso_literals(db, path)` reads that source, runs the host regex, and stores a one-element vec. `iso_literal_text` is the interior of `field User.Avatar`. `iso_literal_start_index` is the byte offset of that interior in the file.
 
