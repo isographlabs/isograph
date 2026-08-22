@@ -106,7 +106,8 @@ pub fn iso_literal_text_at_location<THostLanguage: HostLanguage>(
     path: PathBuf,
     line_char: LineChar,
 ) -> Option<String> {
-    iso_literal_extraction(db, path, line_char)?
+    iso_literal_extraction(db, path, line_char)
+        .as_ref()?
         .iso_literal_text
         .clone()
         .wrap_some()
@@ -118,12 +119,14 @@ pub fn parsed_iso_literal_at_location<THostLanguage: HostLanguage>(
     path: PathBuf,
     line_char: LineChar,
 ) -> Option<ParsedIsoLiteral> {
-    let text = iso_literal_text_at_location(db, path, line_char)?;
+    let text = iso_literal_text_at_location(db, path, line_char)
+        .as_ref()?
+        .clone();
     parsed_iso_literal(db, text).clone().wrap_some()
 }
 ```
 
-`iso_literal_extraction` is the extract-iso-literals-from-file.md memo. `THostLanguage` is inferred from `db`.
+`iso_literal_extraction` is the extract-iso-literals-from-file.md memo. pico lookup is `&Option<IsoLiteralExtraction<THostLanguage>>`. `THostLanguage` is inferred from `db`.
 
 `None` is no `DiskFile`, or a position that is not inside any literal text. pico lookup of the text memo returns `&Option<String>`. pico lookup of the tree memo returns `&Option<ParsedIsoLiteral>`.
 
