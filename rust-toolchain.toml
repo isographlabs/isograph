@@ -1,0 +1,5 @@
+[toolchain]
+channel = "stable"
+components = [ "rustfmt", "rustc-dev" ]
+targets = [ "wasm32-wasip1" ]
+profile = "default"
