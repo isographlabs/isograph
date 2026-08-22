@@ -6,15 +6,17 @@ The daemon listens on `freddie_event_socket` at `127.0.0.1:0`. The kernel assign
 
 Origin of the socket and of `on_message`: figaro `src/daemon.rs` and `src/external.rs`. Origin of `isograph send`: `refactors/pending/filesystem-events.md` change 2. Origin of writing the assigned port next to the lock: freddie `refactors/past/event-socket-local-addr.md`. Delta: the wire type is `IsographEvent`, not a separate `IncomingEvent`; figaro keeps `IncomingEvent` so keys and quit are unrepresentable on the socket; isograph events are all serde JSON, including `Quit`; tungstenite 0.24, matching `freddie_event_socket`; `listen(0)` plus `EventSocket::local_addr()` written next to the lock. Figaro binds a fixed default because it is one process per machine.
 
-`isograph start` returning means the lock is held, not that listen has run. `listen(0)` is inside `serve`, after the runtime is built. Send that runs in that window, lock held and the port file absent, exits 1. Retry. The e2e polls `isograph daemon up`, which is logged after the write.
+Send fails unless the port file is already there. Send does not poll. Waiting is the caller's problem. `isograph start` returning means the lock is held, not that listen has run. `listen(0)` is inside `serve`, after the runtime is built.
+
+`send` is a hidden verb, the same `#[command(hide = true)]` as `freddie_cli::Verb::Daemon`. It is not in `--help`. Tests and CI type it.
 
 ## What the user does
 
-`--file` is a CI verb. The opener writes a temp file, passes it, and send unlinks it after the attempt, success or failure.
+The daemon is already up. The log has `isograph daemon up`, which is written after the port file. `--file` is a temp file; send unlinks it after the attempt, success or failure.
 
 ```
-$ isograph start
-/Users/x/app/isograph.config.json started (pid 12345)
+$ isograph logs
+{"timestamp":"...","level":"INFO","fields":{"message":"isograph daemon up","config":"/Users/x/app/isograph.config.json","port":53124}}
 $ printf '%s\n' '{"kind":"HelloWorld"}' > /tmp/hello.json
 $ isograph send --file /tmp/hello.json
 $ isograph logs
@@ -23,6 +25,12 @@ $ isograph logs
 ```
 
 `isograph send` does not start the daemon. Walk-up / `--config` is the same as every other verb. The port is the decimal in the port file.
+
+```
+$ isograph --help
+```
+
+The help lists start, restart, status, logs, stop. It does not list send.
 
 ```
 $ isograph send --file /tmp/hello.json
@@ -36,7 +44,7 @@ $ isograph send --file /tmp/hello.json
 the daemon has not recorded its port yet
 ```
 
-That process exits 1. The lock is held and the port file is absent: `serve` has not written it yet. Retry.
+That process exits 1. The lock is held and the port file is absent: `serve` has not written it yet. Send does not wait.
 
 ## Types
 
@@ -450,7 +458,7 @@ The record has `port`. `"port":` is the JSON field `tracing` writes for the nume
 
 ## Change 2: `isograph send`
 
-A client verb for tests and CI. It does not start the daemon. `--file` is required. It reads that file as one JSON `IsographEvent` and writes it as one websocket text frame. Then it deletes `--file`, success or failure. There is no stdin path. filesystem-events.md sends `DiskChanged` the same way: a temp file and `--file`.
+A hidden client verb for tests and CI. It does not start the daemon. `--file` is required. It reads that file as one JSON `IsographEvent` and writes it as one websocket text frame. Then it deletes `--file`, success or failure. There is no stdin path. filesystem-events.md sends `DiskChanged` the same way: a temp file and `--file`.
 
 It does not call `load_config`. A daemon that is up stays reachable if the `.ts` / `.js` config has since broken.
 
@@ -481,7 +489,8 @@ enum CliVerb {
     #[command(flatten)]
     Lifecycle(freddie_cli::Verb<Isograph>),
 
-    /// Write one IsographEvent JSON frame to the running daemon.
+    /// Write one IsographEvent JSON frame to the running daemon. Not for typing: tests and CI.
+    #[command(hide = true)]
     Send(SendArgs),
 }
 
@@ -692,7 +701,7 @@ fn parse_port(text: &str) -> Option<u16> {
 
 Send reads the lock first. `Held::Free` is `NotRunning` and the port file is not consulted. A leftover `{slug}.port` from a previous run is ignored. Process death releases the lock.
 
-`Held::Unnamed` and a missing port file are immediate errors. Send does not poll. `freddie_cli::find_daemon` waits 100ms for `Unnamed` because it needs a pid to signal. Send needs the port file, not the pid.
+`Held::Unnamed` and a missing port file are immediate errors. Send does not poll.
 
 `remove_file` runs after `run_inner`, success or failure, so a CI temp file does not remain. A failed remove does not change the exit code.
 
@@ -857,8 +866,20 @@ fn send_of_unknown_kind_fails() {
     assert!(err.contains("IsographEvent"), "{err}");
     assert!(!frame.exists(), "send deletes --file");
 }
+
+#[test]
+fn send_is_not_in_help() {
+    let output = Command::new(isograph_bin())
+        .arg("--help")
+        .output()
+        .expect("the isograph binary runs");
+    assert!(output.status.success());
+    let text = stdout(output.reference());
+    assert!(text.contains("start"), "{text}");
+    assert!(!text.contains("send"), "{text}");
+}
 ```
 
-Change 2 replaces `the_log_contains_the_config_path` with the version above: start, poll until `isograph daemon up` (the port file exists), write a frame file, `isograph send --file`, then the log has `hello world`.
+Change 2 replaces `the_log_contains_the_config_path` with the version above: start, wait until `isograph daemon up` (the port file exists), write a frame file, `isograph send --file`, then the log has `hello world`. The wait is the test, not send. Send does not wait.
 
 `isograph send` must run with the same `HOME` / cwd as the daemon so walk-up finds the same config and the same lock. The harness already does that.

@@ -9,10 +9,12 @@ The watcher posts in-process. It does not run `isograph send` and it does not wr
 After change 2:
 
 ```
-$ isograph start
+$ isograph logs
+{"timestamp":"...","level":"INFO","fields":{"message":"isograph daemon up","config":"/tmp/proj/isograph.config.json","port":53124}}
 $ printf '%s\n' '{"kind":"DiskChanged","value":{"path":"/tmp/proj/src/a.ts","contents":"export const a = 1;\n"}}' > /tmp/disk.json
 $ isograph send --file /tmp/disk.json
 $ isograph logs
+{"timestamp":"...","level":"INFO","fields":{"message":"isograph daemon up","config":"/tmp/proj/isograph.config.json","port":53124}}
 {"timestamp":"...","level":"INFO","fields":{"message":"disk changed","path":"/tmp/proj/src/a.ts","file_count":1}}
 ```
 
@@ -128,7 +130,7 @@ A `DiskChanged` frame with `path` and `contents` round-trips. A tokio test in `c
 
 E2E in `crates/ts_graphql_react_isograph_cli/tests/cli.rs`:
 
-- Start. Write a temp JSON file with `path` and `contents`. `isograph send --file` that file. Poll the log until `disk changed` and the path and `file_count` 1.
+- The log has `isograph daemon up`. Write a temp JSON file with `path` and `contents`. `isograph send --file` that file. The log then has `disk changed` and the path and `file_count` 1.
 
 send-events.md already covers a stopped daemon and `not json`. The harness already points `HOME` at the temp dir.
 
