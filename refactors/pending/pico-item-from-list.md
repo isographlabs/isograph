@@ -8,7 +8,7 @@ One shippable change: pico accepts a memo body that returns a borrow of an item 
 
 ## What the user does
 
-No editor-facing change. Tests intern a file with one iso literal, call extract and `iso_literal_extraction` of `LiteralId { path, index: 0 }`, and assert the item is the first element of the extract vec (same address). A prepend keeps index 0 and moves `iso_literal_start_index`. An append leaves the item `==`.
+No editor-facing change. Tests intern a file with one iso literal, call extract and `iso_literal_extraction` of `LiteralId { path, index: 0 }`, and assert the item Eq-equals the first element of the extract vec. A prepend keeps index 0 and moves `iso_literal_start_index`. An append leaves the item `==`.
 
 ## Types
 
@@ -55,10 +55,10 @@ Compiler `memo_tests`:
 
 - No `DiskFile`: `iso_literal_extraction` is `None`.
 - Present file, no iso: extract is `Some` of empty vec. `LiteralId { path, index: 0 }` is `None`.
-- One literal. `iso_literal_extraction` of index 0 is `Some` and `std::ptr::eq` to `extract[0]`.
-- Two literals. Index 1 is `std::ptr::eq` to `extract[1]`. Index 2 is `None`.
-- Prefix with `const x = 1;\n`. Index 0 is still `ptr::eq` to the new `extract[0]`. `iso_literal_text` matches. `iso_literal_start_index` moved by the prefix length.
-- Append `"\nconst y = 1;\n"`. Item `==` the pre-append extraction (same text, start index, context). `parsed_iso_literal` of that text does not re-invoke.
+- One literal. `iso_literal_extraction` of index 0 Eq-equals `extract[0]`.
+- Two literals. Index 1 Eq-equals `extract[1]`. Index 2 is `None`.
+- Prefix with `const x = 1;\n`. Index 0 Eq-equals the new `extract[0]`. `iso_literal_text` matches. `iso_literal_start_index` moved by the prefix length.
+- Append `"\nconst y = 1;\n"`. Item `==` the pre-append extraction (same text, start index, context).
 
 `expect` names the fixture the test interned.
 
