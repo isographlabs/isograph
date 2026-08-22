@@ -178,36 +178,30 @@ impl<THostLanguage: HostLanguage> IsoLiteralExtraction<THostLanguage> {
 
 ```rust
 // from crates/isograph_extract_typescript/src/lib.rs
-use isograph_compiler::IsoLiteralError;
 use isograph_parser::{IsoLiteralItem, IsoLiteralParse, ParsedIsoLiteral};
 use span::WithSpanPostfix;
 
 pub fn host_errors_for_extraction(
     extraction: &isograph_compiler::IsoLiteralExtraction<TypeScriptHostLanguage>,
     parsed: &ParsedIsoLiteral,
-) -> Vec<span::WithSpan<IsoLiteralError<TypeScriptHostLanguage>>> {
+) -> Vec<span::WithSpan<TypeScriptHostError>> {
     let span = extraction.span();
     let mut errors = Vec::new();
     if let IsoCall::TaggedTemplate = extraction.context.call {
-        errors.push(
-            IsoLiteralError::Host(TypeScriptHostError::MissingParentheses).with_span(span),
-        );
+        errors.push(TypeScriptHostError::MissingParentheses.with_span(span));
     }
     let parsed_item = parsed.item.as_ref().and_then(item_of);
     if let Some(IsoLiteralItem::Selectable(selectable)) = parsed_item {
         if extraction.context.const_export_name.is_none() {
             errors.push(
-                IsoLiteralError::Host(TypeScriptHostError::MissingExport {
+                TypeScriptHostError::MissingExport {
                     suggested_name: selectable.name.item,
-                })
+                }
                 .with_span(span),
             );
         }
         if let AssociatedJsFunction::Absent = extraction.context.associated_js_function {
-            errors.push(
-                IsoLiteralError::Host(TypeScriptHostError::MissingAssociatedFunction)
-                    .with_span(span),
-            );
+            errors.push(TypeScriptHostError::MissingAssociatedFunction.with_span(span));
         }
     }
     errors
@@ -218,7 +212,7 @@ fn item_of(parse: &span::WithSpan<IsoLiteralParse>) -> Option<&IsoLiteralItem> {
 }
 ```
 
-Parse errors live on `ParsedIsoLiteral.errors`. File-absolute parse error spans are `error.location.with_offset(extraction.span().start)`.
+`host_errors_for_extraction` returns host errors only. `file_literals` maps them to `IsoLiteralError::Host` and appends `Parse`. Parse errors live on `ParsedIsoLiteral.errors`. File-absolute parse error spans are `error.location.with_offset(extraction.span().start)`.
 
 A convenience that one file's diagnostics will want (lsp-parse-diagnostics.md). Define it here so that doc does not invent `file_literals`:
 
@@ -226,7 +220,7 @@ A convenience that one file's diagnostics will want (lsp-parse-diagnostics.md). 
 // from crates/isograph_extract_typescript/src/lib.rs
 use std::path::Path;
 
-use isograph_compiler::{IsographState, parsed_iso_literal};
+use isograph_compiler::{IsoLiteralError, IsographState, parsed_iso_literal};
 
 pub struct FileLiteral<'a> {
     pub extraction: &'a isograph_compiler::IsoLiteralExtraction<TypeScriptHostLanguage>,
@@ -243,13 +237,14 @@ pub fn file_literals<'a>(
         .iter()
         .map(|extraction| {
             let parsed = parsed_iso_literal(db, extraction.iso_literal_text.clone());
-            let mut errors = host_errors_for_extraction(extraction, parsed);
-            for error in &parsed.errors {
-                errors.push(
+            let errors = host_errors_for_extraction(extraction, parsed)
+                .into_iter()
+                .map(|error| error.map(IsoLiteralError::Host))
+                .chain(parsed.errors.iter().map(|error| {
                     IsoLiteralError::Parse(error.item.clone())
-                        .with_span(error.location.with_offset(extraction.span().start)),
-                );
-            }
+                        .with_span(error.location.with_offset(extraction.span().start))
+                }))
+                .collect();
             FileLiteral {
                 extraction,
                 parsed,
@@ -273,13 +268,13 @@ Same `memo_tests` intern as extract-iso-literals-from-file.md (`intern_file`). O
 
 These nine are the extract-typescript error tests extract-iso-literals-from-file.md deletes. Write them again here.
 
-- `tagged_template_is_missing_parentheses`. Intern `iso\`entrypoint Query.HomeRoute\``. `host_errors_for_extraction` is `IsoLiteralError::Host(TypeScriptHostError::MissingParentheses).wrap_vec()`.
+- `tagged_template_is_missing_parentheses`. Intern `iso\`entrypoint Query.HomeRoute\``. `host_errors_for_extraction` is `TypeScriptHostError::MissingParentheses.with_span(extraction.span()).wrap_vec()`.
 - `incomplete_entrypoint_is_a_parse_error`. Intern `iso(\`entrypoint\`)`. `parsed.errors` is not empty. At least one `IsoLiteralError::Parse` in `file_literals` of that path.
 - `entrypoint_without_export_is_valid`. Intern `iso(\`entrypoint Query.HomeRoute\`)`. `host_errors_for_extraction` is empty.
-- `field_without_export_is_missing_export`. Intern `iso(\`field Pet.fullName { id }\`)(`. `host_errors_for_extraction` is one error, `IsoLiteralError::Host(TypeScriptHostError::MissingExport { .. })`.
-- `field_without_associated_function_is_missing_associated_function`. Intern `export const fullName = iso(\`field Pet.fullName { id }\`)`. `host_errors_for_extraction` is `IsoLiteralError::Host(TypeScriptHostError::MissingAssociatedFunction).wrap_vec()`.
+- `field_without_export_is_missing_export`. Intern `iso(\`field Pet.fullName { id }\`)(`. `host_errors_for_extraction` is one error, `TypeScriptHostError::MissingExport { .. }`.
+- `field_without_associated_function_is_missing_associated_function`. Intern `export const fullName = iso(\`field Pet.fullName { id }\`)`. `host_errors_for_extraction` is `TypeScriptHostError::MissingAssociatedFunction.with_span(extraction.span()).wrap_vec()`.
 - `exported_field_with_associated_function_is_valid`. Intern `export const fullName = iso(\`field Pet.fullName { id }\`)(`. `host_errors_for_extraction` is empty.
-- `tagged_template_field_reports_parentheses_and_export_and_associated`. Intern `iso\`field Pet.fullName { id }\``. `host_errors_for_extraction` is three errors: `MissingParentheses`, `MissingExport { .. }`, `MissingAssociatedFunction`, in that order.
+- `tagged_template_field_reports_parentheses_and_export_and_associated`. Intern `iso\`field Pet.fullName { id }\``. `host_errors_for_extraction` is three errors: `MissingParentheses`, `MissingExport { .. }`, `MissingAssociatedFunction`, in that order, each at `extraction.span()`.
 - `host_error_span_is_the_extraction_span`. Intern `iso\`entrypoint Query.HomeRoute\``. `host_errors_for_extraction` has one error. Its `location` is `extraction.span()`.
 - `valid_extraction_has_no_errors`. Intern `iso(\`entrypoint Query.HomeRoute\`)`. `parsed.errors` is empty. `host_errors_for_extraction` is empty.
 
