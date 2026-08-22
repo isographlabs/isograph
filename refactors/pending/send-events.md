@@ -1,6 +1,6 @@
 # Send events to the daemon
 
-Requires event-loop.md (landed) and config-discovery.md (landed).
+Requires event-loop.md (landed), config-discovery.md (landed), and config-path.md. `--config` on send stays. Whether send should always walk up is deferred.
 
 The daemon listens on `freddie_event_socket` at `127.0.0.1:0`. The kernel assigns a port from its local/dynamic range. `isograph send` finds the config, reads the daemon pid from the lock, and discovers that process's loopback TCP listen port. Every event is `Serialize` + `Deserialize`. The wire is `serde_json`. `on_message` deserializes `IsographEvent` and sends it. There is no second event enum. There is no `--port` and no port file.
 
@@ -354,28 +354,27 @@ freddie_cli `Verb` is closed. Extra verbs sit beside it, the way figaro's launch
 
 ```rust
 // from crates/isograph_cli/src/lib.rs (before)
-#[derive(Parser)]
-#[command(name = "isograph", version, about = "The isograph compiler.", long_about = None)]
-struct Cli {
-    #[command(subcommand)]
-    verb: Option<freddie_cli::Verb<Isograph>>,
-}
-```
-
-```rust
-// from crates/isograph_cli/src/lib.rs (after)
-#[derive(Parser)]
-#[command(name = "isograph", version, about = "The isograph compiler.", long_about = None)]
-struct Cli {
-    #[command(subcommand)]
-    verb: Option<CliVerb>,
-}
-
 #[derive(clap::Subcommand)]
 enum CliVerb {
     /// start, restart, status, logs, stop, and the hidden daemon.
     #[command(flatten)]
     Lifecycle(freddie_cli::Verb<Isograph>),
+
+    /// Print the canonical isograph config path.
+    ConfigPath(ConfigFlag),
+}
+```
+
+```rust
+// from crates/isograph_cli/src/lib.rs (after)
+#[derive(clap::Subcommand)]
+enum CliVerb {
+    /// start, restart, status, logs, stop, and the hidden daemon.
+    #[command(flatten)]
+    Lifecycle(freddie_cli::Verb<Isograph>),
+
+    /// Print the canonical isograph config path.
+    ConfigPath(ConfigFlag),
 
     /// Write one IsographEvent JSON frame to the running daemon.
     Send(SendArgs),
@@ -395,7 +394,10 @@ struct SendArgs {
 ```rust
 // from crates/isograph_cli/src/lib.rs (before)
     match cli.verb {
-        Some(verb) => freddie_cli::run_lifecycle_verb::<Isograph>(verb, matches.reference()),
+        Some(CliVerb::Lifecycle(verb)) => {
+            freddie_cli::run_lifecycle_verb::<Isograph>(verb, matches.reference())
+        }
+        Some(CliVerb::ConfigPath(id)) => config_path::run(id.reference()),
         None => freddie_cli::run_lifecycle_verb::<Isograph>(
             freddie_cli::verb_for_bare_invocation::<Isograph>(),
             matches.reference(),
@@ -409,6 +411,7 @@ struct SendArgs {
         Some(CliVerb::Lifecycle(verb)) => {
             freddie_cli::run_lifecycle_verb::<Isograph>(verb, matches.reference())
         }
+        Some(CliVerb::ConfigPath(id)) => config_path::run(id.reference()),
         Some(CliVerb::Send(args)) => send::run(args.reference()),
         None => freddie_cli::run_lifecycle_verb::<Isograph>(
             freddie_cli::verb_for_bare_invocation::<Isograph>(),
