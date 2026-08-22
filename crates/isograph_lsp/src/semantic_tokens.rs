@@ -8,6 +8,18 @@ pub fn lsp_semantic_tokens(
     page_content: &str,
 ) -> Vec<lsp_types::SemanticToken> {
     let index = LineIndex::new(page_content);
+    if page_content.is_ascii() {
+        lsp_semantic_tokens_with(&index, tokens, |text| text.len() as u32)
+    } else {
+        lsp_semantic_tokens_with(&index, tokens, |text| text.encode_utf16().count() as u32)
+    }
+}
+
+fn lsp_semantic_tokens_with(
+    index: &LineIndex,
+    tokens: &[WithSpan<IsographSemanticToken>],
+    utf16_len: impl Fn(&str) -> u32,
+) -> Vec<lsp_types::SemanticToken> {
     let mut cursor = index.cursor();
     let mut previous_token_end = 0u32;
     let mut last_start = LastStart { line: 0, offset: 0 };
@@ -15,7 +27,9 @@ pub fn lsp_semantic_tokens(
     for token in tokens {
         cursor.check_span(token.location, previous_token_end);
         previous_token_end = token.location.end;
-        emit_pieces(*token, &mut cursor, &mut last_start, |t| encoded.push(t));
+        emit_pieces(*token, &mut cursor, &mut last_start, &utf16_len, |t| {
+            encoded.push(t)
+        });
     }
     encoded
 }
@@ -24,6 +38,7 @@ fn emit_pieces(
     token: WithSpan<IsographSemanticToken>,
     cursor: &mut LineCursor,
     last_start: &mut LastStart,
+    utf16_len: impl Fn(&str) -> u32,
     mut emit: impl FnMut(lsp_types::SemanticToken),
 ) {
     let span = token.location;
@@ -41,6 +56,7 @@ fn emit_pieces(
                     line_break.start,
                     cursor,
                     last_start,
+                    &utf16_len,
                 ));
                 piece_start = line_break.after;
             }
@@ -51,6 +67,7 @@ fn emit_pieces(
                     span.end,
                     cursor,
                     last_start,
+                    &utf16_len,
                 ));
                 break;
             }
@@ -69,18 +86,16 @@ fn lsp_semantic_token(
     piece_end: u32,
     cursor: &LineCursor,
     last_start: &mut LastStart,
+    utf16_len: impl Fn(&str) -> u32,
 ) -> lsp_types::SemanticToken {
     let line = cursor.break_index as u32;
-    let length =
-        (cursor.index.utf16_len)(&cursor.index.text[(piece_start as usize)..(piece_end as usize)]);
+    let length = utf16_len(&cursor.index.text[(piece_start as usize)..(piece_end as usize)]);
     let (delta_line, delta_start) = match line - last_start.line {
         0 => (
             0,
-            (cursor.index.utf16_len)(
-                &cursor.index.text[(last_start.offset as usize)..(piece_start as usize)],
-            ),
+            utf16_len(&cursor.index.text[(last_start.offset as usize)..(piece_start as usize)]),
         ),
-        delta_line => (delta_line, cursor.column(piece_start)),
+        delta_line => (delta_line, cursor.column(piece_start, &utf16_len)),
     };
     *last_start = LastStart {
         line,
@@ -105,7 +120,6 @@ struct LastStart {
 struct LineIndex<'a> {
     text: &'a str,
     breaks: Vec<LineBreak>,
-    utf16_len: fn(&str) -> u32,
 }
 
 /// `break_index` is the current line. Offsets must not go backward.
@@ -127,11 +141,6 @@ impl<'a> LineIndex<'a> {
         Self {
             text,
             breaks: line_breaks(text),
-            utf16_len: if text.is_ascii() {
-                |text| text.len() as u32
-            } else {
-                |text| text.encode_utf16().count() as u32
-            },
         }
     }
 
@@ -225,12 +234,12 @@ impl LineCursor<'_> {
         }
     }
 
-    fn column(&self, offset: u32) -> u32 {
+    fn column(&self, offset: u32, utf16_len: impl Fn(&str) -> u32) -> u32 {
         let line_start = match self.break_index {
             0 => 0,
             n => self.index.breaks[n - 1].after,
         };
-        (self.index.utf16_len)(&self.index.text[(line_start as usize)..(offset as usize)])
+        utf16_len(&self.index.text[(line_start as usize)..(offset as usize)])
     }
 
     fn current_line_break(&self) -> Option<LineBreak> {
