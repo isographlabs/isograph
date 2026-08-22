@@ -62,6 +62,8 @@ Fixtures are inputs only. Expected results are assertions in the test, never che
 
 An API only tests call should not exist. A helper tests need lives in the tests crate or under `#[cfg(test)]`.
 
+Do not test `Serialize` / `Deserialize` that serde provides. A derived round-trip is not a behavior test.
+
 ## Booleans
 
 Prefer an enum whose variants name the states. A `bool` field, parameter, or return type: question whether it is needed, default to the enum, and raise it with the user every time before it goes into a planning doc or into code. Name the `bool` and the two cases. Fall back to `bool` only when the value is a pure yes/no with no domain names.
