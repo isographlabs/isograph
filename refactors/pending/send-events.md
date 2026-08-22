@@ -11,9 +11,7 @@ Origin of the socket and of `on_message`: figaro `src/daemon.rs` and `src/extern
 ```
 $ isograph start
 /Users/x/app/isograph.config.json started (pid 12345)
-$ isograph send <<'EOF'
-{"kind":"HelloWorld"}
-EOF
+$ isograph send --file /tmp/hello.json
 $ isograph logs
 {"timestamp":"...","level":"INFO","fields":{"message":"isograph daemon up","config":"/Users/x/app/isograph.config.json","port":53124}}
 {"timestamp":"...","level":"INFO","fields":{"message":"hello world"}}
@@ -22,9 +20,7 @@ $ isograph logs
 `isograph send` does not start the daemon. Walk-up / `--config` is the same as every other verb. The port is the daemon process's loopback TCP listen.
 
 ```
-$ isograph send <<'EOF'
-{"kind":"HelloWorld"}
-EOF
+$ isograph send --file /tmp/hello.json
 the daemon is not running
 ```
 
@@ -352,7 +348,7 @@ The record also has `port`. Change 2 sends `HelloWorld` through `isograph send` 
 
 ## Change 2: `isograph send`
 
-A client verb. It does not start the daemon. It reads one JSON `IsographEvent` from stdin, or from `--file`, and writes it as one websocket text frame.
+A client verb for tests and CI. It does not start the daemon. `--file` is required. It reads that file as one JSON `IsographEvent` and writes it as one websocket text frame. There is no stdin path.
 
 freddie_cli `Verb` is closed. Extra verbs sit beside it, the way figaro's launch-agent verbs do.
 
@@ -390,9 +386,9 @@ struct SendArgs {
     #[command(flatten)]
     pub id: ConfigFlag,
 
-    /// File containing the JSON frame. When absent, stdin.
+    /// JSON frame to send.
     #[arg(long)]
-    pub file: Option<std::path::PathBuf>,
+    pub file: std::path::PathBuf,
 }
 ```
 
@@ -431,7 +427,7 @@ mod send;
 ```rust
 // from crates/isograph_cli/src/send.rs
 use std::fs;
-use std::io::{self, Read};
+use std::io;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -461,8 +457,6 @@ enum SendError {
     Discover(#[from] DiscoverError),
     #[error("could not read {}: {}", .0.path.display(), .0.source)]
     ReadFile(ReadFile),
-    #[error("could not read stdin: {0}")]
-    ReadStdin(io::Error),
     #[error("the frame is not IsographEvent JSON: {0}")]
     NotEvent(serde_json::Error),
     #[error("the daemon is not running")]
@@ -497,21 +491,12 @@ pub fn run(args: &SendArgs) -> ExitCode {
 fn run_inner(args: &SendArgs) -> Result<(), SendError> {
     let (_, instance, _) = crate::discover::config_and_instance(args.id.config.as_deref())?;
     let port = listen_port(daemon_pid(instance.lock_file())?)?;
-    let frame = match args.file.as_deref() {
-        Some(path) => fs::read_to_string(path).map_err(|source| {
-            SendError::ReadFile(ReadFile {
-                path: path.to_owned(),
-                source,
-            })
-        })?,
-        None => {
-            let mut buf = String::new();
-            io::stdin()
-                .read_to_string(&mut buf)
-                .map_err(SendError::ReadStdin)?;
-            buf
-        }
-    };
+    let frame = fs::read_to_string(args.file.reference()).map_err(|source| {
+        SendError::ReadFile(ReadFile {
+            path: args.file.clone(),
+            source,
+        })
+    })?;
     let frame = frame.trim();
     let _: IsographEvent = serde_json::from_str(frame).map_err(SendError::NotEvent)?;
     let (mut ws, _) = connect(format!("ws://127.0.0.1:{port}"))
@@ -633,40 +618,14 @@ isograph 12345 user    8u  IPv4 0x0      0t0  TCP 127.0.0.1:53124 (LISTEN)
 }
 ```
 
-E2E in `crates/ts_graphql_react_isograph_cli/tests/cli.rs`.
-
-`Daemon::isograph` today has no stdin. Add a second function, not a flag.
+E2E in `crates/ts_graphql_react_isograph_cli/tests/cli.rs`. Tests write a temp JSON file and pass `--file`. `Daemon::isograph` is enough.
 
 ```rust
 // from crates/ts_graphql_react_isograph_cli/tests/cli.rs
-use std::io::Write;
-use std::process::Stdio;
-
-impl Daemon {
-    fn isograph_stdin(&self, args: &[&str], stdin: &str) -> Output {
-        let home = self.dir.path().join("home");
-        std::fs::create_dir_all(home.reference()).expect("a test can create its private HOME");
-        let mut child = Command::new(isograph_bin())
-            .args(args)
-            .current_dir(self.dir.path())
-            .env("HOME", home.reference())
-            .env("XDG_STATE_HOME", home.join("state"))
-            .env("LOCALAPPDATA", home.join("appdata"))
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .expect("the isograph binary runs");
-        child
-            .stdin
-            .as_mut()
-            .expect("piped stdin")
-            .write_all(stdin.as_bytes())
-            .expect("the test writes the frame");
-        child
-            .wait_with_output()
-            .expect("the isograph binary exits")
-    }
+fn write_frame(dir: &std::path::Path, contents: &str) -> std::path::PathBuf {
+    let path = dir.join("frame.json");
+    std::fs::write(path.reference(), contents).expect("a test can write a frame");
+    path
 }
 ```
 
@@ -688,10 +647,8 @@ fn the_log_contains_the_config_path() {
         let log = daemon.log_text();
         (log.contains("isograph daemon up") && log.contains(path_in_log.reference())).then_some(())
     });
-    let sent = daemon.isograph_stdin(
-        ["send"].reference(),
-        "{\"kind\":\"HelloWorld\"}\n",
-    );
+    let frame = write_frame(daemon.dir.path(), "{\"kind\":\"HelloWorld\"}\n");
+    let sent = daemon.isograph(["send", "--file", frame.to_str().expect("utf-8")].reference());
     assert!(
         sent.status.success(),
         "stdout: {} stderr: {}",
@@ -706,10 +663,11 @@ fn send_with_the_daemon_stopped_fails() {
     let dir = tempfile::tempdir().expect("a test can create a temp directory");
     let config = dir.path().join("isograph.config.json");
     std::fs::write(config.reference(), "{}\n").expect("a test can write a config file");
+    let frame = write_frame(dir.path(), "{\"kind\":\"HelloWorld\"}\n");
     let home = dir.path().join("home");
     std::fs::create_dir_all(home.reference()).expect("a test can create its private HOME");
     let output = Command::new(isograph_bin())
-        .args(["send"].reference())
+        .args(["send", "--file", frame.to_str().expect("utf-8")].reference())
         .current_dir(dir.path())
         .env("HOME", home.reference())
         .env("XDG_STATE_HOME", home.join("state"))
@@ -718,43 +676,20 @@ fn send_with_the_daemon_stopped_fails() {
         .expect("the isograph binary runs");
     assert!(!output.status.success());
     let err = stderr(output.reference());
-    assert!(
-        err.contains("not running"),
-        "{err}"
-    );
+    assert!(err.contains("not running"), "{err}");
 }
 
 #[test]
 fn send_of_not_json_fails() {
     let daemon = Daemon::start();
-    let sent = daemon.isograph_stdin(["send"].reference(), "not json\n");
+    let frame = write_frame(daemon.dir.path(), "not json\n");
+    let sent = daemon.isograph(["send", "--file", frame.to_str().expect("utf-8")].reference());
     assert!(!sent.status.success());
     let err = stderr(sent.reference());
     assert!(err.contains("IsographEvent"), "{err}");
 }
-
-#[test]
-fn send_file_logs_hello_world() {
-    let daemon = Daemon::start();
-    let frame = daemon.dir.path().join("frame.json");
-    std::fs::write(
-        frame.reference(),
-        "{\"kind\":\"HelloWorld\"}\n",
-    )
-    .expect("a test can write a frame");
-    let sent = daemon.isograph(["send", "--file", frame.to_str().expect("utf-8")].reference());
-    assert!(
-        sent.status.success(),
-        "stdout: {} stderr: {}",
-        stdout(sent.reference()),
-        stderr(sent.reference())
-    );
-    poll(|| daemon.log_text().contains("hello world").then_some(()));
-}
 ```
 
-Change 2 replaces `the_log_contains_the_config_path` with the version above: start, then `isograph send` of `HelloWorld`, then the log has `hello world`. One e2e covers daemon up, the config path, and the CLI.
+Change 2 replaces `the_log_contains_the_config_path` with the version above: start, write a frame file, `isograph send --file`, then the log has `hello world`.
 
 `isograph send` must run with the same `HOME` / cwd as the daemon so walk-up finds the same config and the same lock. The harness already does that.
-
-`send --file` uses `Daemon::isograph`, not stdin.
