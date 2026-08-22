@@ -42,6 +42,7 @@ const sidebars: SidebarsConfig = {
       label: 'Design docs',
       items: [
         'design-docs/mental-model',
+        'design-docs/pico',
         'design-docs/event-model',
         'design-docs/incremental-compilation',
         'design-docs/isograph-data-model',
