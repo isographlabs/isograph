@@ -86,13 +86,9 @@ An event is something that happened, already carrying what the source knows.
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(tag = "kind", content = "value")]
 enum IsographEvent {
-    #[serde(rename = "IsographEvent.DiskChanged")]
     DiskChanged(DiskChanged),
-    #[serde(rename = "IsographEvent.EditorChanged")]
     EditorChanged(EditorChanged),
-    #[serde(rename = "IsographEvent.AsyncWorkFinished")]
     AsyncWorkFinished,
-    #[serde(rename = "IsographEvent.Quit")]
     Quit,
 }
 

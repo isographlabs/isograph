@@ -11,7 +11,7 @@ After change 2:
 ```
 $ isograph start
 $ isograph send <<'EOF'
-{"kind":"IsographEvent.DiskChanged","value":{"path":"/tmp/proj/src/a.ts","contents":"export const a = 1;\n"}}
+{"kind":"DiskChanged","value":{"path":"/tmp/proj/src/a.ts","contents":"export const a = 1;\n"}}
 EOF
 $ isograph logs
 {"timestamp":"...","level":"INFO","fields":{"message":"disk changed","path":"/tmp/proj/src/a.ts","file_count":1}}
@@ -43,11 +43,8 @@ use std::path::PathBuf;
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 #[serde(tag = "kind", content = "value")]
 pub enum IsographEvent {
-    #[serde(rename = "IsographEvent.HelloWorld")]
     HelloWorld,
-    #[serde(rename = "IsographEvent.Quit")]
     Quit,
-    #[serde(rename = "IsographEvent.DiskChanged")]
     DiskChanged(DiskChanged),
 }
 
@@ -111,8 +108,7 @@ In `state.rs`:
 
 In `external.rs`:
 
-- A `IsographEvent.DiskChanged` frame with `path` and `contents` round-trips.
-- `{"kind":"IsographEvent.DiskChanged",...}` does not deserialize.
+- A `DiskChanged` frame with `path` and `contents` round-trips.
 - `"not json"` does not deserialize.
 
 A tokio test in `crates/isograph_cli/tests/socket.rs`, copied from figaro `tests/external.rs` in shape: bind `listen(0, ...)`, connect with `tokio_tungstenite`, send one frame, `event_rx.try_recv()` is `DiskChanged` with that path and contents. A bad frame then a good frame: the good one still arrives. Dev-dependency: `tokio-tungstenite`, `futures-util`.
@@ -123,13 +119,13 @@ The e2e crate does not yet send; that is change 2. Existing start/status/logs/st
 
 ## Change 2: send `DiskChanged`
 
-`isograph send`, the socket, and the port file are send-events.md. This change adds `IsographEvent.DiskChanged` and an e2e that sends it.
+`isograph send`, the socket, and the port file are send-events.md. This change adds `DiskChanged` and an e2e that sends it.
 
 Origin of the verb: send-events.md. Delta: a `DiskChanged` frame instead of `HelloWorld`. `on_message` does not change.
 
 ### Tests
 
-A `IsographEvent.DiskChanged` frame with `path` and `contents` round-trips. A tokio test in `crates/isograph_cli/tests/socket.rs`: send one `DiskChanged` frame, `event_rx.try_recv()` is `DiskChanged` with that path and contents.
+A `DiskChanged` frame with `path` and `contents` round-trips. A tokio test in `crates/isograph_cli/tests/socket.rs`: send one `DiskChanged` frame, `event_rx.try_recv()` is `DiskChanged` with that path and contents.
 
 E2E in `crates/ts_graphql_react_isograph_cli/tests/cli.rs`:
 
@@ -511,8 +507,8 @@ The log line gains `presence` (`present` / `absent`).
 Wire frames change. Change 2's `{"path","contents"}` no longer deserializes.
 
 ```json
-{"kind":"IsographEvent.DiskChanged"},"value":{"path":"/tmp/proj/src/a.ts","presence":{"Present":{"contents":"export const a = 1;\n"}}}}
-{"kind":"IsographEvent.DiskChanged"},"value":{"path":"/tmp/proj/src/a.ts","presence":"Absent"}}
+{"kind":"DiskChanged","value":{"path":"/tmp/proj/src/a.ts","presence":{"Present":{"contents":"export const a = 1;\n"}}}}
+{"kind":"DiskChanged","value":{"path":"/tmp/proj/src/a.ts","presence":"Absent"}}
 ```
 
 A move is two frames, in that order: `Absent` of `from`, `Present` of `to`.
