@@ -1,0 +1,14 @@
+[package]
+name = "isograph_lsp"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+isograph_parser = { path = "../isograph_parser" }
+lsp-types = { workspace = true }
+prelude = { path = "../prelude" }
+span = { path = "../span" }
+
+[lints]
+workspace = true
