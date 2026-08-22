@@ -264,28 +264,28 @@ pub(crate) fn chunk(
         .item
         .0
         .iter()
-        .map(|item| to_content(item, &mut |e| errors.push(e)).with_span(item.location))
+        .map(|item| to_content(item, &mut errors).with_span(item.location))
         .collect();
     (ChunkedRoot(contents).with_span(tree.location), errors)
 }
 
 fn to_content(
     item: &WithSpan<BracketItem>,
-    emit: &mut impl FnMut(CommaWithoutItem),
+    errors: &mut Vec<CommaWithoutItem>,
 ) -> ChunkContentItem {
     match item.item.reference() {
         BracketItem::Raw(token) => ChunkContentItem::NonBracket(*token),
-        BracketItem::Bracketed(group) => ChunkContentItem::Group(chunk_group(group, emit)),
+        BracketItem::Bracketed(group) => ChunkContentItem::Group(chunk_group(group, errors)),
     }
 }
 
 fn as_content(
     item: &WithSpan<BracketItem>,
-    emit: &mut impl FnMut(CommaWithoutItem),
+    errors: &mut Vec<CommaWithoutItem>,
 ) -> Option<ChunkContentItem> {
     match separator_of(item) {
         Some(_) => None,
-        None => to_content(item, emit).wrap_some(),
+        None => to_content(item, errors).wrap_some(),
     }
 }
 ```
@@ -302,7 +302,7 @@ pub(crate) fn chunk_level(
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
-    let first = to_content(peek.view(), emit);
+    let first = to_content(peek.view(), errors);
     let first_location = peek.commit().location;
 ```
 
@@ -312,7 +312,7 @@ Before, `as_content` inlined the `Raw` / `Bracketed` match and returned `None` f
 // from crates/isograph_parser/src/chunk.rs
 fn as_content(
     item: &WithSpan<BracketItem>,
-    emit: &mut impl FnMut(CommaWithoutItem),
+    errors: &mut Vec<CommaWithoutItem>,
 ) -> Option<ChunkContentItem> {
     match item.item.reference() {
         BracketItem::Raw(token) => match separator_token(token.0) {
@@ -320,7 +320,7 @@ fn as_content(
             None => ChunkContentItem::NonBracket(*token).wrap_some(),
         },
         BracketItem::Bracketed(group) => {
-            ChunkContentItem::Group(chunk_group(group, emit)).wrap_some()
+            ChunkContentItem::Group(chunk_group(group, errors)).wrap_some()
         }
     }
 }
