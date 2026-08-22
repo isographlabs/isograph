@@ -102,6 +102,10 @@ Do not `match` a `Result` to bind the success value and return or convert the er
 
 Do not pass a value used only on one arm of the `Result` or `Option` the function returns, when the caller has that same arm. Return the success side; the caller fills the other. `require_token(kind)` plus `map_err(|()| cursor.expected(expected))`, not `require_token(kind, expected)`. Same for `require_group`.
 
+## `&mut T`
+
+Return values; do not thread mutable state. If a function could take `&mut T` and always does one action (e.g. push `U`), return that action instead. The caller does `t.push(u)` next to `T`'s definition.
+
 ## Iterators
 
 Prefer iterator combinators over `for`, `while`, and `loop`. Do not `.collect()` into a `Vec` unless a later step needs the owned list (random access, stored length, ownership past the walk, or an API that takes a collection). A once-consumed walk stays an iterator.
