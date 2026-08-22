@@ -266,7 +266,9 @@ pub struct IsoLiteralExtraction<THostLanguage: HostLanguage> {
     pub context: THostLanguage::LiteralContext,
 }
 
-pub trait HostLanguage: Sized + 'static {
+pub trait HostLanguage:
+    Copy + Clone + Debug + Eq + PartialEq + Ord + PartialOrd + Hash + Send + Sync + Sized + 'static
+{
     type Error: std::fmt::Display + std::error::Error + Clone + PartialEq + Eq + 'static;
     type LiteralContext: Clone + PartialEq + Eq + std::fmt::Debug + 'static;
 

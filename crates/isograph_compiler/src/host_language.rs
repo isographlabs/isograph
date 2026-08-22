@@ -1,9 +1,14 @@
+use std::fmt::Debug;
+use std::hash::Hash;
+
 use span::WithSpan;
 use thiserror::Error;
 
 use isograph_parser::ParseError;
 
-pub trait HostLanguage: Sized {
+pub trait HostLanguage:
+    Copy + Clone + Debug + Eq + PartialEq + Ord + PartialOrd + Hash + Send + Sync + Sized + 'static
+{
     type Error: std::fmt::Display + std::error::Error;
     type LiteralContext;
 

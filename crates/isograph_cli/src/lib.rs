@@ -15,7 +15,7 @@ mod external;
 mod send;
 mod state;
 
-pub fn run<THostLanguage: HostLanguage + Send + Sync + 'static>() -> ExitCode {
+pub fn run<THostLanguage: HostLanguage>() -> ExitCode {
     // First, so `--help` prints and a bad flag exits before the lock is taken.
     // The matches are kept beside the parse because `run_lifecycle_verb` reads what was written
     // from them, to forward to the daemon it spawns.
@@ -38,13 +38,13 @@ pub fn run<THostLanguage: HostLanguage + Send + Sync + 'static>() -> ExitCode {
 
 #[derive(Parser)]
 #[command(name = "isograph", version, about = "The isograph compiler.", long_about = None)]
-struct Cli<THostLanguage: HostLanguage + Send + Sync + 'static> {
+struct Cli<THostLanguage: HostLanguage> {
     #[command(subcommand)]
     verb: Option<CliVerb<THostLanguage>>,
 }
 
 #[derive(clap::Subcommand)]
-enum CliVerb<THostLanguage: HostLanguage + Send + Sync + 'static> {
+enum CliVerb<THostLanguage: HostLanguage> {
     /// start, restart, status, logs, stop, and the hidden daemon.
     #[command(flatten)]
     Lifecycle(freddie_cli::Verb<Isograph<THostLanguage>>),
@@ -77,7 +77,7 @@ struct ConfigFlag {
 
 struct Isograph<THostLanguage>(PhantomData<THostLanguage>);
 
-impl<THostLanguage: HostLanguage + Send + Sync + 'static> App for Isograph<THostLanguage> {
+impl<THostLanguage: HostLanguage> App for Isograph<THostLanguage> {
     type Id = ConfigFlag;
     type DaemonArgs = NoArgs;
 

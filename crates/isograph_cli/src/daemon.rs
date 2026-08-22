@@ -10,7 +10,7 @@ use crate::event::IsographEvent;
 use crate::external::on_message;
 use crate::state::{IsographState, handle};
 
-pub fn run<THostLanguage: HostLanguage + Send + 'static>(config_path: PathBuf, port_path: PathBuf) {
+pub fn run<THostLanguage: HostLanguage>(config_path: PathBuf, port_path: PathBuf) {
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -24,10 +24,7 @@ pub fn run<THostLanguage: HostLanguage + Send + 'static>(config_path: PathBuf, p
     runtime.block_on(serve::<THostLanguage>(config_path, port_path));
 }
 
-async fn serve<THostLanguage: HostLanguage + Send + 'static>(
-    config_path: PathBuf,
-    port_path: PathBuf,
-) {
+async fn serve<THostLanguage: HostLanguage>(config_path: PathBuf, port_path: PathBuf) {
     let (event_tx, event_rx) = unbounded_channel::<IsographEvent>();
     let (effect_tx, effect_rx) = unbounded_channel::<IsographEffect>();
     let _socket = match freddie_event_socket::listen(0, {

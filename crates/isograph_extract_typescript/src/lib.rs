@@ -8,7 +8,7 @@ use span::{Span, WithSpan, WithSpanPostfix};
 use std::sync::LazyLock;
 use thiserror::Error;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TypeScriptHostLanguage;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
