@@ -41,21 +41,21 @@ enum Filesystem {
 }
 ```
 
-`Watch` starts a source that observes the OS and emits `DiskChanged`. `Injected` does not scan and does not watch. The event socket listens in both modes. The CLI, the LSP adapter, and the socket all submit ingested events into the same `handle`.
+`Watch` starts a source that observes the OS and emits `DiskChanged`. `Injected` does not scan and does not watch. The event socket listens in both modes. The CLI, the LSP adapter, and the socket all submit ingested events into the same `handle`. Until a watcher lands, `DiskChanged` arrives only through `isograph send`.
 
 ## Inner
 
 ```rust
-fn handle(state: &mut Database, event: IsographEvent) -> Vec<IsographEffect>
+fn handle(state: &mut IsographState, event: IsographEvent) -> Vec<IsographEffect>
 ```
 
-The test harness calls this. It does not start a daemon, open a socket, or write a file. A test constructs a `DiskChanged` or `EditorChanged`, runs `handle`, and asserts the effects. The binary's event loop calls the same `handle` with the same types.
+`IsographState` is the pico database. The test harness calls `handle`. It does not start a daemon, open a socket, or write a file. A test constructs a `DiskChanged` or `EditorChanged`, runs `handle`, and asserts the effects and the `DiskFile` sources. The binary's event loop calls the same `handle` with the same types.
 
 `handle` does not know about globs, gitignore, or "in scope". Scope is the watcher's job. The socket and the CLI may inject any path.
 
 ## Outer
 
-The binary is the outer. Each source is outside `handle` and feeds it. One process, one channel, one worker that owns `Database`. Sources do not read state. Performers do not mutate it.
+The binary is the outer. Each source is outside `handle` and feeds it. One process, one channel, one worker that owns `IsographState`. Sources do not read state. Performers do not mutate it.
 
 - Watcher: OS notifications become `DiskChanged` (path plus contents or absent). It may read the disk to fill `Present.contents`. `handle` does not. The watcher posts in-process on the event channel. It does not run the CLI and it does not write to the event socket.
 - Event socket (`freddie_event_socket`): JSON `IsographEvent` frames (`Serialize` + `Deserialize`, `serde_json`). The CLI is a client of this socket. CI is a client of this socket.
@@ -76,7 +76,7 @@ The event socket binds `127.0.0.1:0`. The kernel assigns a port from its local/d
 
 The LSP adapter is a second listener, `{log_dir}/{slug}.lsp`, a path, not a TCP port. The event socket is JSON frames. The adapter is LSP JSON-RPC. They are not the same protocol.
 
-`freddie_event_socket` refuses web-page `Origin` headers and caps a frame at 64 KiB. Production file contents never go over the socket: the watcher reads the file and posts in-process. CI fixtures stay small.
+`freddie_event_socket` refuses web-page `Origin` headers and caps a frame at 64 KiB. A watcher (later) reads the file and posts `DiskChanged` in-process, so production contents do not go over the socket. Until that watcher exists, `isograph send` is the only source of `DiskChanged` and carries `Present.contents` on the wire. Send fixtures stay under the cap.
 
 ## Event
 
@@ -174,14 +174,25 @@ struct StartAsyncWork;
 
 `Kill` ends the effect loop. `run` returns. The process exits.
 
-event-loop.md ships `HelloWorld` / `LogHelloWorld`, `Quit` / `Kill`, tokio `run_event_loop` / `run_effect_loop`, and `handle` returning `Vec<IsographEffect>`. send-events.md ships the event socket, the port file, `Serialize` + `Deserialize` on `IsographEvent`, and `isograph send`. filesystem-events.md adds `DiskChanged`. `Presence` is that doc's created/deleted/moved change.
+event-loop.md ships `HelloWorld` / `LogHelloWorld`, `Quit` / `Kill`, tokio `run_event_loop` / `run_effect_loop`, and `handle` returning `Vec<IsographEffect>`. send-events.md ships the event socket, the port file, `Serialize` + `Deserialize` on `IsographEvent`, and `isograph send`. filesystem-events.md makes `IsographState` a pico database, adds `DiskChanged` with `Presence`, and interns `DiskFile`.
 
 ## State
 
 The state is a pico database. Disk files and open editor buffers are source nodes. Compilation is derived.
 
 ```rust
+#[derive(Default, Debug, Db)]
+struct IsographState {
+    storage: Storage<Self>,
+    #[tracked]
+    disk_file_map: DiskFileMap,
+}
+
+struct DiskFileMap(pub HashMap<PathBuf, SourceId<DiskFile>>);
+
+#[derive(Debug, Clone, PartialEq, Eq, Source)]
 struct DiskFile {
+    #[key]
     path: PathBuf,
     contents: String,
 }
@@ -192,13 +203,13 @@ struct OpenFile {
 }
 ```
 
-A path may have a `DiskFile`, an `OpenFile`, both, or neither.
+A path may have a `DiskFile`, an `OpenFile`, both, or neither. The tracked map is which paths currently have a `DiskFile`. `handle` is the only writer of `DiskFile`. `OpenFile` and its map land with the adapter.
 
 Artifact generation and watch mode read `DiskFile`. They do not read `OpenFile`.
 
 The LSP adapter reads `OpenFile` when it exists for that path, otherwise `DiskFile`. The LSP adapter does not generate artifacts.
 
-event-loop.md ships `IsographState` with no fields. filesystem-events.md adds a path-to-contents map. pico intern of `DiskFile` replaces that map; `DiskChanged` stays. `OpenFile` lands with the adapter.
+event-loop.md ships `IsographState` with no fields. filesystem-events.md makes `IsographState` the pico database and interns `DiskFile`. `OpenFile` lands with the adapter.
 
 ## Dispatch
 
