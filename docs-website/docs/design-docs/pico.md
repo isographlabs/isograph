@@ -148,9 +148,10 @@ parsed_iso_literal(text)
 Semantic tokens for a file (file-semantic-tokens.md):
 
 ```text
-iso_literal_semantic_tokens_in_file(path)
+lsp_semantic_tokens_for_file(path)
   -> parsed_iso_literals_in_file(path)
   + locations_of_iso_literals_in_file(path)
+  + DiskFile contents
 
 parsed_iso_literals_in_file(path)
   -> THostLanguage::extract_iso_literals(path)
@@ -255,7 +256,7 @@ Inserting a newline at the top of a one-line file is a new `LineChar` and a new 
 
 Bytes added on an earlier line, no extra newline, cursor on a later line: same `LineChar`, extract is `!=` (`iso_literal_start_index` moved), `literal_id_at_location` re-invokes, `LiteralId` is `==` (`path` and `index` unchanged) and backdates. `iso_literal_extraction` of that id re-invokes and is `!=`. `parsed_iso_literal` of that text does not re-invoke.
 
-`ParsedIsoLiteral` stores spans relative to the literal text. File-absolute spans are applied by a later memo that already has `iso_literal_start_index`. A file-absolute span in the parse result would make parse `!=` after a prepend, and dependents of parse would re-invoke even though the tree is the same.
+`ParsedIsoLiteral` stores spans relative to the literal text. Encoding takes each literal's `iso_literal_start_index` as an offset into the file. A file-absolute span in the parse result would make parse `!=` after a prepend, and dependents of parse would re-invoke even though the tree is the same.
 
 isograph passes a file-absolute `TextSource` into the parse memo. Moving the literal around the file changes that argument, so the parse cache does not hit.
 
@@ -267,11 +268,10 @@ A public function takes a public key. Hover is `path` and `LineChar`. Semantic t
 #[memo]
 fn hover(db: &IsographState, path: RelativePathToSourceFile, line_char: LineChar) -> Option<Hover>;
 
-#[memo]
-fn iso_literal_semantic_tokens_in_file(
+fn lsp_semantic_tokens_for_file(
     db: &IsographState,
     path: RelativePathToSourceFile,
-) -> Option<Vec<WithSpan<IsographSemanticToken>>>;
+) -> Option<Vec<lsp_types::SemanticToken>>;
 
 #[memo]
 fn flattened_entity_named(
@@ -289,7 +289,7 @@ fn flattened_selectable_named(
 
 `LineChar` is the cursor: `line` is a 0-based count of `\n`, `character` is bytes since the last `\n`. The adapter has that pair.
 
-Inside hover, `literal_id_at_location` takes `path` and `LineChar` and turns that pair into a `LiteralId`. `iso_literal_extraction` takes the id. `parsed_iso_literal` takes the extraction's text. Semantic tokens for the file calls `iso_literal_semantic_tokens_in_file(path)`, which reads the file's parse list and start indices and offsets each literal's relative tokens.
+Inside hover, `literal_id_at_location` takes `path` and `LineChar` and turns that pair into a `LiteralId`. `iso_literal_extraction` takes the id. `parsed_iso_literal` takes the extraction's text. Semantic tokens for the file calls `lsp_semantic_tokens_for_file(path)`, which reads the file's parse list and start indices and encodes with each literal's offset.
 
 Hover fires once per `LineChar`. Each `(path, LineChar)` is its own `literal_id_at_location` slot, so moving the caret across a literal executes that intern for every character. That is expected. The stored value is a `RelativePathToSourceFile` and a vec index. `iso_literal_extraction` of that `LiteralId` is one slot. Every character inside the same literal yields the same text, so `parsed_iso_literal` is one slot.
 
@@ -309,7 +309,7 @@ syntax highlighting  ->  parsed literals + locations  ->  extract  ->  DiskFile
 
 Typing JavaScript after the last iso literal re-invokes extract. If the `Vec<IsoLiteralExtraction>` is `==` (same texts, same start indices, same context), extract is backdated. Parse, locations, and syntax highlighting do not re-invoke.
 
-Typing JavaScript before a literal changes `iso_literal_start_index`. Extract is `!=`. Locations is `!=`. The file-absolute token memo re-invokes. `parsed_iso_literals_in_file` re-invokes and `==` (same texts, relative spans). `parsed_iso_literal` of the same text does not.
+Typing JavaScript before a literal changes `iso_literal_start_index`. Extract is `!=`. Locations is `!=`. Encoded file tokens change (`delta_line` / `delta_start`). `parsed_iso_literals_in_file` re-invokes and `==` (same texts, relative spans). `parsed_iso_literal` of the same text does not.
 
 If this memo was already verified in the current epoch, pico returns the stored value without walking dependencies. Two LSP requests in the same epoch (hover and semantic tokens, no edit between them) share extract and parse this way.
 
@@ -377,9 +377,9 @@ export const Avatar = iso(`
 
 The LSP asks for hover at a `LineChar` on `name`. The adapter calls `hover(db, path, line_char)`. That is the public key. Inside, `literal_id_at_location` returns the id. Moving the caret along `name` executes `literal_id_at_location` again with a new `LineChar`; the `LiteralId` bits are the same. `iso_literal_extraction` of that id is one slot. `parsed_iso_literal` of that text is one slot and does not re-invoke. Resolve uses the offset of that `LineChar` within the literal. Schema hover for `User.name` calls `flattened_selectable_named(db, User, name)`.
 
-The user types `const x = 1; ` at the start of the first line (no extra newline). `handle` sets a new `DiskFile`. Extract re-invokes: same text, new `iso_literal_start_index`. The `LineChar` of `name` is unchanged. `literal_id_at_location` re-invokes, `LiteralId` is `==` (`index: 0`) and backdates. `iso_literal_extraction` of that id re-invokes and is `!=`. `parsed_iso_literal` of that text does not re-invoke. File-absolute token offsets do.
+The user types `const x = 1; ` at the start of the first line (no extra newline). `handle` sets a new `DiskFile`. Extract re-invokes: same text, new `iso_literal_start_index`. The `LineChar` of `name` is unchanged. `literal_id_at_location` re-invokes, `LiteralId` is `==` (`index: 0`) and backdates. `iso_literal_extraction` of that id re-invokes and is `!=`. `parsed_iso_literal` of that text does not re-invoke. Encoded file tokens change.
 
-The user inserts a newline at the top of the file. The `LineChar` of `name` moves. That is a new `literal_id_at_location` slot. The `LiteralId` is still `{ path, index: 0 }`. `parsed_iso_literal` of that text does not re-invoke. File-absolute token offsets do.
+The user inserts a newline at the top of the file. The `LineChar` of `name` moves. That is a new `literal_id_at_location` slot. The `LiteralId` is still `{ path, index: 0 }`. `parsed_iso_literal` of that text does not re-invoke. Encoded file tokens change.
 
 The user types the same `field User.Avatar { name }` into a second file. `parsed_iso_literal` of that text is one slot. The two files have different `LiteralId` paths and share the parse intern.
 

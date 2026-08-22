@@ -4,7 +4,7 @@ Requires extract-iso-literals-from-file.md (landed), memoized-parse-iso-literal.
 
 Origin of the memos: isograph `extract_iso_literals_from_file_content`, `memoized_parse_iso_literal`, `get_semantic_tokens`. Origin of send: send-events.md. Delta: a hidden query verb; `handle` stays ingest-only; the worker answers the query by calling `lsp_semantic_tokens_for_file`. This is not the LSP adapter.
 
-Parse is keyed on literal text only. isograph's `memoized_parse_iso_literal` takes `text_source: TextSource` and comments "we should not pass the text source here! Whenever the iso literal moves around the page, we break memoization, due to this parameter." i2 does not pass it. File-absolute `WithSpan` tokens still change when the literal moves; that is the concat memo in file-semantic-tokens.md. Encoded-token reuse after a prepend is semantic-tokens-line-offset.md.
+Parse is keyed on literal text only. isograph's `memoized_parse_iso_literal` takes `text_source: TextSource` and comments "we should not pass the text source here! Whenever the iso literal moves around the page, we break memoization, due to this parameter." i2 does not pass it. Encoded-token reuse after a prepend is semantic-tokens-line-offset.md.
 
 ## What the user does
 

@@ -1,8 +1,8 @@
 # Encode relative tokens, then offset to the file
 
-Requires file-semantic-tokens.md. That slice offsets each `WithSpan` to file coordinates and encodes the concat against the file on every call. This slice encodes each literal against its own text (relative deltas), then a path-keyed memo translates those streams into document deltas using the line and column of each `iso_literal_start_index`.
+Requires file-semantic-tokens.md and lsp-semantic-tokens-offset.md. file-semantic-tokens.md encodes relative parse tokens against the file by passing each literal's start offset into `lsp_semantic_tokens`. That encode is not a memo. This slice encodes each literal against its own text (relative deltas), then a path-keyed memo translates those streams into document deltas using the line and column of each `iso_literal_start_index`.
 
-Prepend JS before a literal: relative encode of that text Eq-equals; the path memo's encoded tokens have a new `delta_line`. Append after the last literal: locations Eq-equals, relative encodings Eq-equals, the path memo's encoded vec Eq-equals. file-semantic-tokens.md's concat of file-absolute `WithSpan` stays for compiler assertions of file coordinates. Encoding no longer reads it.
+Prepend JS before a literal: relative encode of that text Eq-equals; the path memo's encoded tokens have a new `delta_line`. Append after the last literal: locations Eq-equals, relative encodings Eq-equals, the path memo's encoded vec Eq-equals.
 
 Origin of relative-then-absolute: isograph issue 548 (`get_semantic_tokens` cannot reuse encoded positions after typing before the literal; the suggested fix is relative LSP tokens plus an offset at send time). Origin of encoding: landed `lsp_semantic_tokens`. Origin of start indices: `locations_of_iso_literals_in_file`. Delta: `lsp_semantic_tokens` on the literal text; path-keyed stitch; no zero-length placeholder token.
 
@@ -138,9 +138,9 @@ fn offset_relative_tokens(
 
 `zip` of extract and locations is the same index space as file-semantic-tokens.md.
 
-This function is a memo. The map lookup is `untracked`: extract returned `Some`, so this path has a `DiskFile`. Same keyed-by-path lookup as `literal_id_at_location`. On miss, `tracked()` the map (pico tracked-field miss). Extract already did that miss path; concat `Some` in the current slice implied the file exists. Here extract is read first; a miss is `None` from extract.
+This function is a memo. The map lookup is `untracked`: extract returned `Some`, so this path has a `DiskFile`. Same keyed-by-path lookup as `literal_id_at_location`. On miss, `tracked()` the map (pico tracked-field miss). Extract already did that miss path. Here extract is read first; a miss is `None` from extract.
 
-`iso_literal_semantic_tokens_in_file` is unchanged. `lsp_semantic_tokens_for_file` no longer calls it.
+file-semantic-tokens.md does not intern file-absolute `WithSpan` tokens. This slice replaces `lsp_semantic_tokens_for_file`'s body: relative encode per literal text, then offset those LSP deltas.
 
 ## Tests
 
@@ -170,6 +170,6 @@ File memo, intern with `insert_disk_file`:
 - `lsp_semantic_tokens_for_file` as today: e2e-semantic-tokens.md, later adapter `semanticTokens/full`.
 - Tests as above.
 
-e2e-semantic-tokens.md's prepend assertion (`delta_line` 1, `delta_start` unchanged) stays. That file's claim that concat is the 548 fix updates: relative encode is the intern that survives a prepend; the path memo supplies the line offset.
+e2e-semantic-tokens.md's prepend assertion (`delta_line` 1, `delta_start` unchanged) stays. Relative encode is the intern that survives a prepend; the path memo supplies the line offset.
 
-Amend `docs-website/docs/design-docs/pico.md` when this lands: syntax highlighting is the path-keyed encoded memo, not the `WithSpan` concat.
+Amend `docs-website/docs/design-docs/pico.md` when this lands: syntax highlighting is the path-keyed encoded memo.
