@@ -4,7 +4,8 @@ use std::sync::LazyLock;
 use common_lang_types::ConstExportName;
 use intern::string_key::Intern;
 use isograph_compiler::{
-    HostLanguage, IsoLiteralError, IsoLiteralExtraction, IsographState, parsed_iso_literal,
+    HostLanguage, IsoLiteralError, IsoLiteralExtraction, IsoLiteralStartIndex, IsographState,
+    parsed_iso_literal,
 };
 use isograph_parser::{IsoLiteralItem, IsoLiteralParse, ParsedIsoLiteral, SelectableNameWrapper};
 use pico_macros::memo;
@@ -78,7 +79,7 @@ impl HostLanguage for TypeScriptHostLanguage {
                 let literal = captures.name("literal")?;
                 IsoLiteralExtraction {
                     iso_literal_text: literal.as_str().to_owned(),
-                    iso_literal_start_index: literal.start(),
+                    iso_literal_start_index: IsoLiteralStartIndex(literal.start()),
                     context: TypeScriptLiteralContext {
                         const_export_name: captures
                             .name("export_name")
@@ -168,7 +169,9 @@ mod tests {
     use std::path::PathBuf;
 
     use intern::string_key::Intern;
-    use isograph_compiler::{HostLanguage, IsoLiteralExtraction, IsographState};
+    use isograph_compiler::{
+        HostLanguage, IsoLiteralExtraction, IsoLiteralStartIndex, IsographState,
+    };
     use prelude::Postfix;
 
     use super::{
@@ -214,7 +217,10 @@ mod tests {
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
         assert_eq!(extracted[0].iso_literal_text, text);
-        assert_eq!(extracted[0].iso_literal_start_index, start);
+        assert_eq!(
+            extracted[0].iso_literal_start_index,
+            IsoLiteralStartIndex(start)
+        );
         assert_eq!(
             extracted[0].context,
             TypeScriptLiteralContext {
@@ -224,8 +230,8 @@ mod tests {
             }
         );
         assert_eq!(
-            &source[extracted[0].iso_literal_start_index
-                ..extracted[0].iso_literal_start_index + extracted[0].iso_literal_text.len()],
+            &source[extracted[0].iso_literal_start_index.0
+                ..extracted[0].iso_literal_start_index.0 + extracted[0].iso_literal_text.len()],
             text
         );
     }
@@ -243,8 +249,8 @@ mod tests {
             AssociatedJsFunction::Absent
         );
         assert_eq!(
-            &source[extracted[0].iso_literal_start_index
-                ..extracted[0].iso_literal_start_index + extracted[0].iso_literal_text.len()],
+            &source[extracted[0].iso_literal_start_index.0
+                ..extracted[0].iso_literal_start_index.0 + extracted[0].iso_literal_text.len()],
             extracted[0].iso_literal_text
         );
     }
@@ -398,8 +404,8 @@ export const HomeRoute = iso(`
             "\nentrypoint Query.HomeRoute\n"
         );
         assert_eq!(
-            &source[extracted[0].iso_literal_start_index
-                ..extracted[0].iso_literal_start_index + extracted[0].iso_literal_text.len()],
+            &source[extracted[0].iso_literal_start_index.0
+                ..extracted[0].iso_literal_start_index.0 + extracted[0].iso_literal_text.len()],
             extracted[0].iso_literal_text
         );
     }
@@ -432,8 +438,8 @@ mod memo_tests {
 
     use intern::string_key::Intern;
     use isograph_compiler::{
-        HostLanguage, IsoLiteralError, IsoLiteralExtraction, IsographState, LineChar, LiteralId,
-        iso_literal_extraction, literal_id_at_location, parsed_iso_literal,
+        HostLanguage, IsoLiteralError, IsoLiteralExtraction, IsoLiteralStartIndex, IsographState,
+        LineChar, LiteralId, iso_literal_extraction, literal_id_at_location, parsed_iso_literal,
     };
     use isograph_parser::{
         AstError, IsoLiteralItem, ParseError, ParsedIsoLiteral, SelectableNameWrapper,
@@ -569,7 +575,10 @@ mod memo_tests {
             .expect("the test interned this path");
         assert_eq!(extracted.len(), 1);
         assert_eq!(extracted[0].iso_literal_text, text);
-        assert_eq!(extracted[0].iso_literal_start_index, start);
+        assert_eq!(
+            extracted[0].iso_literal_start_index,
+            IsoLiteralStartIndex(start)
+        );
         assert_eq!(
             extracted[0].context,
             TypeScriptLiteralContext {
@@ -596,15 +605,19 @@ iso(`entrypoint Query.HomeRoute`)";
         assert_eq!(extracted.len(), 2);
         assert_eq!(
             extracted[0].iso_literal_start_index,
-            source
-                .find(first)
-                .expect("the fixture contains the first literal")
+            IsoLiteralStartIndex(
+                source
+                    .find(first)
+                    .expect("the fixture contains the first literal")
+            )
         );
         assert_eq!(
             extracted[1].iso_literal_start_index,
-            source
-                .find(second)
-                .expect("the fixture contains the second literal")
+            IsoLiteralStartIndex(
+                source
+                    .find(second)
+                    .expect("the fixture contains the second literal")
+            )
         );
         assert_eq!(extracted[1].iso_literal_text, second);
     }

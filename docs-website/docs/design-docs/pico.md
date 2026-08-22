@@ -153,10 +153,12 @@ locations_of_iso_literals_in_file(path)
 ```
 
 ```rust
+struct IsoLiteralStartIndex(pub usize);
+
 #[derive(Clone, PartialEq, Eq)]
 struct IsoLiteralExtraction {
     iso_literal_text: String,
-    iso_literal_start_index: usize,
+    iso_literal_start_index: IsoLiteralStartIndex,
     context: LiteralContext,
 }
 
@@ -192,7 +194,7 @@ impl HostLanguage for TypeScriptHostLanguage {
                 let literal = captures.name("literal")?;
                 IsoLiteralExtraction {
                     iso_literal_text: literal.as_str().to_owned(),
-                    iso_literal_start_index: literal.start(),
+                    iso_literal_start_index: IsoLiteralStartIndex(literal.start()),
                     context: TypeScriptLiteralContext { /* export_name, call, associated */ },
                 }
                 .wrap_some()

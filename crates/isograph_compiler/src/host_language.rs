@@ -7,9 +7,13 @@ use isograph_parser::ParseError;
 
 use crate::IsographState;
 
+/// Byte offset of the iso literal text in its file.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct IsoLiteralStartIndex(pub usize);
+
 pub struct IsoLiteralExtraction<THostLanguage: HostLanguage> {
     pub iso_literal_text: String,
-    pub iso_literal_start_index: usize,
+    pub iso_literal_start_index: IsoLiteralStartIndex,
     pub context: THostLanguage::LiteralContext,
 }
 
@@ -46,8 +50,8 @@ impl<THostLanguage: HostLanguage> Debug for IsoLiteralExtraction<THostLanguage> 
 impl<THostLanguage: HostLanguage> IsoLiteralExtraction<THostLanguage> {
     pub fn span(&self) -> span::Span {
         span::Span::from_usize(
-            self.iso_literal_start_index,
-            self.iso_literal_start_index + self.iso_literal_text.len(),
+            self.iso_literal_start_index.0,
+            self.iso_literal_start_index.0 + self.iso_literal_text.len(),
         )
     }
 }

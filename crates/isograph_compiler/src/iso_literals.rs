@@ -58,7 +58,7 @@ fn find_iso_literal_index<THostLanguage: HostLanguage>(
     let mut last_iteration_end_char_count = 0;
     let mut max_prev_span_end = 0;
     for (index, extract_item) in extracted_items.iter().enumerate() {
-        let iso_literal_start_index = extract_item.iso_literal_start_index;
+        let iso_literal_start_index = extract_item.iso_literal_start_index.0;
         let iso_literal_end_index = iso_literal_start_index + extract_item.iso_literal_text.len();
 
         let intermediate_content = &file_content[max_prev_span_end..iso_literal_start_index];
