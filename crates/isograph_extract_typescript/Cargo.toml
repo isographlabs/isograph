@@ -9,10 +9,13 @@ common_lang_types = { path = "../common_lang_types" }
 intern = { path = "../../relay-crates/intern" }
 isograph_compiler = { path = "../isograph_compiler" }
 isograph_parser = { path = "../isograph_parser" }
+pico = { path = "../pico" }
+pico_macros = { path = "../pico_macros" }
 prelude = { path = "../prelude" }
 regex = { workspace = true }
 span = { path = "../span" }
 thiserror = { workspace = true }
+tracing = { workspace = true }
 
 [lints]
 workspace = true

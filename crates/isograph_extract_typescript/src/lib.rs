@@ -1,11 +1,14 @@
+use std::path::PathBuf;
+use std::sync::LazyLock;
+
 use common_lang_types::ConstExportName;
 use intern::string_key::Intern;
-use isograph_compiler::HostLanguage;
+use isograph_compiler::{HostLanguage, IsoLiteralExtraction, IsographState};
 use isograph_parser::SelectableNameWrapper;
+use pico_macros::memo;
 use prelude::Postfix;
 use regex::Regex;
 use span::{Span, WithSpan, WithSpanPostfix};
-use std::sync::LazyLock;
 use thiserror::Error;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -54,10 +57,9 @@ impl HostLanguage for TypeScriptHostLanguage {
     type LiteralContext = TypeScriptLiteralContext;
     type Error = TypeScriptHostError;
 
-    fn extract_iso_literals<'a>(
-        &self,
-        source: &'a str,
-    ) -> Vec<WithSpan<(&'a str, Self::LiteralContext)>> {
+    fn extract_iso_literals_from_source(
+        source: &str,
+    ) -> Vec<WithSpan<(&str, Self::LiteralContext)>> {
         EXTRACT_ISO_LITERAL
             .captures_iter(source)
             .filter_map(|captures| {
@@ -83,6 +85,24 @@ impl HostLanguage for TypeScriptHostLanguage {
             })
             .collect()
     }
+
+    #[memo]
+    fn extract_iso_literals(
+        db: &IsographState<Self>,
+        path: PathBuf,
+    ) -> Option<Vec<IsoLiteralExtraction<Self>>> {
+        let source_id = db.get_disk_file_map().tracked().0.get(&path).copied()?;
+        let contents = db.get(source_id).contents.reference();
+        Self::extract_iso_literals_from_source(contents)
+            .into_iter()
+            .map(|extracted| IsoLiteralExtraction {
+                iso_literal_text: extracted.item.0.to_owned(),
+                iso_literal_start_index: extracted.location.start as usize,
+                context: extracted.item.1,
+            })
+            .collect::<Vec<_>>()
+            .wrap_some()
+    }
 }
 
 #[cfg(test)]
@@ -98,7 +118,7 @@ mod tests {
     };
 
     fn extract(source: &str) -> Vec<WithSpan<(&str, TypeScriptLiteralContext)>> {
-        TypeScriptHostLanguage.extract_iso_literals(source)
+        TypeScriptHostLanguage::extract_iso_literals_from_source(source)
     }
 
     fn interned_export(name: &str) -> common_lang_types::ConstExportName {
@@ -324,5 +344,124 @@ export const HomeRoute = iso(`
             TypeScriptHostError::MissingParentheses.to_string(),
             "You must call the iso function with parentheses. \"iso`...`\" is not supported"
         );
+    }
+}
+
+#[cfg(test)]
+mod memo_tests {
+    use std::path::PathBuf;
+
+    use intern::string_key::Intern;
+    use isograph_compiler::{HostLanguage, IsographState};
+    use prelude::Postfix;
+
+    use super::{AssociatedJsFunction, IsoCall, TypeScriptHostLanguage, TypeScriptLiteralContext};
+
+    fn intern_file(db: &mut IsographState<TypeScriptHostLanguage>, path: PathBuf, contents: &str) {
+        db.insert_disk_file(path, contents.to_owned());
+    }
+
+    fn interned_export(name: &str) -> common_lang_types::ConstExportName {
+        name.intern().to()
+    }
+
+    #[test]
+    fn missing_disk_file_is_none() {
+        let db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = PathBuf::from("/tmp/proj/src/a.ts");
+        assert!(TypeScriptHostLanguage::extract_iso_literals(&db, path).is_none());
+    }
+
+    #[test]
+    fn present_file_with_no_iso_is_empty() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = PathBuf::from("/tmp/proj/src/a.ts");
+        intern_file(&mut db, path.clone(), "export const Foo = 1;");
+        let extracted = TypeScriptHostLanguage::extract_iso_literals(&db, path)
+            .as_ref()
+            .expect("the test interned this path");
+        assert!(extracted.is_empty());
+    }
+
+    #[test]
+    fn one_exported_field() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = PathBuf::from("/tmp/proj/src/a.ts");
+        let source = "export const fullName = iso(`field Pet.fullName { id }`)(";
+        let text = "field Pet.fullName { id }";
+        let start = source
+            .find(text)
+            .expect("the fixture contains the literal text");
+        intern_file(&mut db, path.clone(), source);
+        let extracted = TypeScriptHostLanguage::extract_iso_literals(&db, path)
+            .as_ref()
+            .expect("the test interned this path");
+        assert_eq!(extracted.len(), 1);
+        assert_eq!(extracted[0].iso_literal_text, text);
+        assert_eq!(extracted[0].iso_literal_start_index, start);
+        assert_eq!(
+            extracted[0].context,
+            TypeScriptLiteralContext {
+                const_export_name: interned_export("fullName").wrap_some(),
+                call: IsoCall::FunctionCall,
+                associated_js_function: AssociatedJsFunction::Present,
+            }
+        );
+    }
+
+    #[test]
+    fn two_literals() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = PathBuf::from("/tmp/proj/src/a.ts");
+        let source = "\
+export const fullName = iso(`field Pet.fullName { id }`)(
+iso(`entrypoint Query.HomeRoute`)";
+        let first = "field Pet.fullName { id }";
+        let second = "entrypoint Query.HomeRoute";
+        intern_file(&mut db, path.clone(), source);
+        let extracted = TypeScriptHostLanguage::extract_iso_literals(&db, path)
+            .as_ref()
+            .expect("the test interned this path");
+        assert_eq!(extracted.len(), 2);
+        assert_eq!(
+            extracted[0].iso_literal_start_index,
+            source
+                .find(first)
+                .expect("the fixture contains the first literal")
+        );
+        assert_eq!(
+            extracted[1].iso_literal_start_index,
+            source
+                .find(second)
+                .expect("the fixture contains the second literal")
+        );
+        assert_eq!(extracted[1].iso_literal_text, second);
+    }
+
+    #[test]
+    fn a_second_present_replaces_literals() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = PathBuf::from("/tmp/proj/src/a.ts");
+        intern_file(
+            &mut db,
+            path.clone(),
+            "export const fullName = iso(`field Pet.fullName { id }`)(",
+        );
+        intern_file(&mut db, path.clone(), "iso(`entrypoint Query.HomeRoute`)");
+        let extracted = TypeScriptHostLanguage::extract_iso_literals(&db, path)
+            .as_ref()
+            .expect("the test interned this path");
+        assert_eq!(extracted.len(), 1);
+        assert_eq!(extracted[0].iso_literal_text, "entrypoint Query.HomeRoute");
+        assert!(extracted[0].context.const_export_name.is_none());
+    }
+
+    #[test]
+    fn absent_then_extract_is_none() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = PathBuf::from("/tmp/proj/src/a.ts");
+        intern_file(&mut db, path.clone(), "iso(`entrypoint Query.HomeRoute`)");
+        db.remove_disk_file(&path);
+        assert!(TypeScriptHostLanguage::extract_iso_literals(&db, path).is_none());
     }
 }

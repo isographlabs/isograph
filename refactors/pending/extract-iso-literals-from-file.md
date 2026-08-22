@@ -272,12 +272,12 @@ pub trait HostLanguage:
     type Error: std::fmt::Display + std::error::Error + Clone + PartialEq + Eq + 'static;
     type LiteralContext: Clone + PartialEq + Eq + std::fmt::Debug + 'static;
 
-    fn extract_iso_literals_from_source<'a>(
-        source: &'a str,
-    ) -> Vec<WithSpan<(&'a str, Self::LiteralContext)>>;
+    fn extract_iso_literals_from_source(
+        source: &str,
+    ) -> Vec<WithSpan<(&str, Self::LiteralContext)>>;
 
     fn extract_iso_literals(
-        db: &IsographState,
+        db: &IsographState<Self>,
         path: PathBuf,
     ) -> &Option<Vec<IsoLiteralExtraction<Self>>>;
 }
@@ -310,9 +310,9 @@ impl HostLanguage for TypeScriptHostLanguage {
     type LiteralContext = TypeScriptLiteralContext;
     type Error = TypeScriptHostError;
 
-    fn extract_iso_literals_from_source<'a>(
-        source: &'a str,
-    ) -> Vec<WithSpan<(&'a str, Self::LiteralContext)>> {
+    fn extract_iso_literals_from_source(
+        source: &str,
+    ) -> Vec<WithSpan<(&str, Self::LiteralContext)>> {
         EXTRACT_ISO_LITERAL
             .captures_iter(source)
             .filter_map(|captures| {
@@ -341,7 +341,7 @@ impl HostLanguage for TypeScriptHostLanguage {
 
     #[memo]
     fn extract_iso_literals(
-        db: &IsographState,
+        db: &IsographState<Self>,
         path: PathBuf,
     ) -> Option<Vec<IsoLiteralExtraction<Self>>> {
         let source_id = db.get_disk_file_map().tracked().0.get(&path).copied()?;
@@ -375,7 +375,7 @@ Tests in `crates/isograph_extract_typescript/src/lib.rs` under a `memo_tests` mo
 
 ```rust
 // from crates/isograph_extract_typescript/src/lib.rs
-fn intern_file(db: &mut IsographState, path: PathBuf, contents: &str) {
+fn intern_file(db: &mut IsographState<TypeScriptHostLanguage>, path: PathBuf, contents: &str) {
     db.insert_disk_file(path, contents.to_owned());
 }
 ```

@@ -705,10 +705,13 @@ dependencies = [
  "intern",
  "isograph_compiler",
  "isograph_parser",
+ "pico",
+ "pico_macros",
  "prelude",
  "regex",
  "span",
  "thiserror 1.0.69",
+ "tracing",
 ]
 
 [[package]]
