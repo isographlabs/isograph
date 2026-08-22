@@ -556,9 +556,10 @@ mod tests {
         encode(&rebased(tokens, offset), page_content)
     }
 
-    fn of_type(lsp: &[SemanticToken], token_type: u32) -> Vec<&SemanticToken> {
+    fn of_type(lsp: &[SemanticToken], token_type: u32) -> Vec<SemanticToken> {
         lsp.iter()
             .filter(|token| token.token_type == token_type)
+            .copied()
             .collect()
     }
 
@@ -596,11 +597,11 @@ mod tests {
         assert_eq!(lsp.len(), 4);
         assert_eq!(lsp[0].delta_line, 0);
         assert_eq!(lsp[0].delta_start, 0);
-        assert_eq!(lsp[0].length, 11);
+        assert_eq!(lsp[0].length, 10);
         assert_eq!(lsp[0].token_type, KEYWORD);
         assert_eq!(lsp[0].token_modifiers_bitset, 0);
         assert_eq!(lsp[1].delta_line, 0);
-        assert_eq!(lsp[1].delta_start, 12);
+        assert_eq!(lsp[1].delta_start, 11);
         assert_eq!(lsp[1].length, 5);
         assert_eq!(lsp[1].token_type, CLASS);
         assert_eq!(lsp[2].delta_line, 0);
@@ -668,7 +669,7 @@ mod tests {
         assert_eq!(lsp.len(), 8);
         assert_eq!(lsp[4].delta_line, 1);
         assert_eq!(lsp[4].delta_start, 5);
-        assert_eq!(lsp[4].length, 11);
+        assert_eq!(lsp[4].length, 10);
         assert_eq!(lsp[4].token_type, KEYWORD);
         assert_eq!(lsp[7].delta_line, 0);
         assert_eq!(lsp[7].delta_start, 1);
