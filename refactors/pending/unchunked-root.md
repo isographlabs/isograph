@@ -92,13 +92,6 @@ pub type ChunkedRootPath<'a> = PositionResolutionPath<&'a ChunkedRoot, ()>;
 
 Empty vec is `""` / `"   "`. Otherwise every item of the unpartitioned sequence, line breaks and commas included. A group in that vec has a `ChunkedLevel` interior.
 
-A `Chunk` exists only inside a `ChunkedLevel`. Parent of `Chunk` is `ChunkedLevelPath`.
-
-```rust
-// from crates/isograph_parser/src/chunk.rs
-pub type ChunkPath<'a> = PositionResolutionPath<&'a Chunk, ChunkedLevelPath<'a>>;
-```
-
 ```rust
 // from crates/isograph_parser/src/chunk.rs
 pub enum ChunkContentItemParent<'a> {
@@ -138,6 +131,84 @@ pub struct ChunkedGroup {
 ```
 
 `#[parent_variant(Interior)]` is gone: `ChunkedLevel`'s parent is `ChunkedGroupPath`, a path, not an enum.
+
+## Paths
+
+Resolve of the unpartitioned sequence is `tree.resolve((), position)`. Resolve of the grammar tree is `parse.resolve((), position)`.
+
+Before:
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+pub type ChunkedLevelPath<'a> = PositionResolutionPath<&'a ChunkedLevel, ChunkedLevelParent<'a>>;
+pub type ChunkPath<'a> = PositionResolutionPath<&'a Chunk, ChunkParent<'a>>;
+```
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+pub type IsoLiteralParsePath<'a> = PositionResolutionPath<&'a IsoLiteralParse, ()>;
+pub type IsoLiteralSlotPath<'a> =
+    PositionResolutionPath<&'a Slot<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>>;
+pub type EntrypointDeclarationPath<'a> =
+    PositionResolutionPath<&'a EntrypointDeclaration, IsoLiteralSlotPath<'a>>;
+pub type SelectableDeclarationPath<'a> =
+    PositionResolutionPath<&'a SelectableDeclaration, IsoLiteralSlotPath<'a>>;
+pub type ExtraChunksPath<'a> = PositionResolutionPath<&'a ExtraChunks, IsoLiteralParsePath<'a>>;
+```
+
+After:
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+pub type ChunkedRootPath<'a> = PositionResolutionPath<&'a ChunkedRoot, ()>;
+
+pub type ChunkedGroupPath<'a> =
+    PositionResolutionPath<&'a ChunkedGroup, ChunkContentItemParent<'a>>;
+
+pub type ChunkedLevelPath<'a> =
+    PositionResolutionPath<&'a ChunkedLevel, ChunkedGroupPath<'a>>;
+
+pub type ChunkPath<'a> = PositionResolutionPath<&'a Chunk, ChunkedLevelPath<'a>>;
+
+pub type ChunkSeparatorPath<'a> = PositionResolutionPath<&'a ChunkSeparator, ChunkPath<'a>>;
+
+pub type NonBracketTokenPath<'a> =
+    PositionResolutionPath<&'a NonBracketToken, ChunkContentItemParent<'a>>;
+
+pub type OpenBracketPath<'a> = PositionResolutionPath<&'a OpenBracket, ChunkedGroupPath<'a>>;
+
+pub type CloseBracketPath<'a> = PositionResolutionPath<&'a CloseBracket, ChunkedGroupPath<'a>>;
+
+pub type UnparsedChunkItemsPath<'a> =
+    PositionResolutionPath<&'a UnparsedChunkItems, UnparsedChunkItemsParent<'a>>;
+```
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+pub type IsoLiteralParsePath<'a> = PositionResolutionPath<&'a IsoLiteralParse, ()>;
+
+pub type EntrypointDeclarationPath<'a> =
+    PositionResolutionPath<&'a EntrypointDeclaration, IsoLiteralParsePath<'a>>;
+
+pub type SelectableDeclarationPath<'a> =
+    PositionResolutionPath<&'a SelectableDeclaration, IsoLiteralParsePath<'a>>;
+
+pub type DescriptionPath<'a> =
+    PositionResolutionPath<&'a Description, SelectableDeclarationPath<'a>>;
+```
+
+`parent_type` after:
+
+- `ChunkedRoot`: `()`
+- `ChunkContentItem`, `ChunkedGroup`, `NonBracketToken`: `ChunkContentItemParent<'a>`
+- `ChunkedLevel`: `ChunkedGroupPath<'a>`
+- `Chunk`: `ChunkedLevelPath<'a>`
+- `ChunkSeparator`: `ChunkPath<'a>`
+- `UnparsedChunkItems`: `UnparsedChunkItemsParent<'a>`
+- `IsoLiteralItem`, `EntrypointDeclaration`, `SelectableDeclaration`: `IsoLiteralParsePath<'a>`
+- `Description`: `SelectableDeclarationPath<'a>`
+
+`#[parent_variant(Root)]` on `ChunkedRoot`'s vec builds `ChunkContentItemParent::Root`. `#[parent_variant(Chunk)]` on `Chunk.contents` builds `ChunkContentItemParent::Chunk`. Bare `#[resolve_field]` on `ChunkedLevel`'s vec passes the `ChunkedLevelPath` as the `Chunk`'s parent. Bare `#[resolve_field]` on `ChunkedGroup.children` passes the `ChunkedGroupPath` as the `ChunkedLevel`'s parent.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -182,11 +253,9 @@ impl<'a> From<IsoLiteralParsePath<'a>> for UnparsedChunkItemsParent<'a> {
 }
 ```
 
-A parent enum with one variant is the remaining path. After this change that is `ChunkedLevelParent` (`Interior` only) and `ChunkParent` (`Level` only). Both deleted. `ChunkedLevelPath` is `PositionResolutionPath<&'a ChunkedLevel, ChunkedGroupPath<'a>>`. `ChunkPath` is `PositionResolutionPath<&'a Chunk, ChunkedLevelPath<'a>>`. No other parent enum loses a variant.
+Deleted: `ChunkedLevelParent`, `ChunkParent`, `Singleton`, `ExtraChunks`, `ExtraChunksPath`, `IsoLiteralSlotPath`, `parse_singleton`, `parse_nested_singleton`, `AstError::MultipleDeclarations`, `IsographResolutionNode::Singleton`, `IsographResolutionNode::ExtraChunks`.
 
-Deleted with them: `Singleton`, `ExtraChunks`, `ExtraChunksPath`, `IsoLiteralSlotPath`, `parse_singleton`, `parse_nested_singleton`, `AstError::MultipleDeclarations`, `IsographResolutionNode::Singleton`, `IsographResolutionNode::ExtraChunks`.
-
-Delta from the landed `IsographResolutionNode`: drop `Singleton` and `ExtraChunks`; add `ChunkedRoot`; `IsoLiteralSlot`'s payload is `IsoLiteralParsePath` (the slot, parent `()`). `ChunkedLevelPath`'s parent is `ChunkedGroupPath`. Every other variant is unchanged.
+`isograph_resolution_node.rs` use list drops `ExtraChunksPath` and `IsoLiteralSlotPath`, adds `ChunkedRootPath`. `IsoLiteralSlot`'s payload is `IsoLiteralParsePath`. Every other variant is unchanged.
 
 ```rust
 // from crates/isograph_parser/src/isograph_resolution_node.rs
