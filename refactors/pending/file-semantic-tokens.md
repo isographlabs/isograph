@@ -1,6 +1,6 @@
 # Semantic tokens for the iso literals in a DiskFile
 
-Requires extract-iso-literals-from-file.md (landed), memoized-parse-iso-literal.md (landed), literal-id.md (landed), lsp-semantic-token-encoding.md (landed), and lsp-semantic-tokens-offset.md. Extract finds the literals. `parsed_iso_literal` records `ParsedIsoLiteral.tokens` with spans relative to the literal text. `locations_of_iso_literals_in_file` is those literals’ `IsoLiteralStartIndex` values in extract order. `lsp_semantic_tokens_for_file` passes the file text and every `(start_index.0 as u32, parsed.tokens)` in extract order to one `lsp_semantic_tokens` call. It does not encode one extraction. File-absolute `WithSpan<IsographSemanticToken>` is not interned and not exported. Parse stays keyed on the literal text.
+Requires extract-iso-literals-from-file.md (landed), memoized-parse-iso-literal.md (landed), literal-id.md (landed), lsp-semantic-token-encoding.md (landed), and lsp-semantic-tokens-offset.md. Extract finds the literals. `parsed_iso_literal` records `ParsedIsoLiteral.tokens` with spans relative to the literal text. `locations_of_iso_literals_in_file` is those literals’ `IsoLiteralStartIndex` values in extract order. `lsp_semantic_tokens_for_file` passes the file text and every `(*start_index, parsed.tokens)` in extract order to one `lsp_semantic_tokens` call. It does not encode one extraction. File-absolute `WithSpan<IsographSemanticToken>` is not interned and not exported. Parse stays keyed on the literal text.
 
 File-level highlighting is keyed on `path`. It does not go through `LineChar`. Cursor APIs convert `path` and `LineChar` to `LiteralId`. This file’s parse intern is `parsed_iso_literal(text)` via `parsed_iso_literals_in_file`.
 
@@ -121,7 +121,7 @@ pub fn lsp_semantic_tokens_for_file<THostLanguage: HostLanguage>(
     lsp_semantic_tokens(
         page_content,
         parsed_literals.iter().zip(locations.iter()).map(|(parsed, start_index)| {
-            (start_index.0 as u32, parsed.tokens.as_slice())
+            (*start_index, parsed.tokens.as_slice())
         }),
     )
     .wrap_some()
