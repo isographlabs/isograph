@@ -158,6 +158,7 @@ Compiler tests in `isograph_extract_typescript` `memo_tests` (needs `TypeScriptH
 - `iso(\`entrypoint\`)`. Parse errors are non-empty. The first token is still `Keyword` at the file offset of `entrypoint`.
 - `iso(\`\`)`. Extract's regex requires a non-empty interior (`[^`]+`). The three file memos are `Some` of empty vec, same as a file with no `iso`.
 - `iso(\`\n\`)`. Extract len 1. Parse errors contain `EmptyLiteral`. Concat is `Some` of empty vec (leftover `LineBreak` is not a token).
+- `iso(\` \`)`. Spaces are skipped by the tokenizer, not leftover. Extract len 1. Parse errors contain `EmptyLiteral`. Concat is `Some` of empty vec.
 - Two literals in one file. `locations_of_iso_literals_in_file` has two start indices, matching the two extractions. Tokens of the second start at or after the second start index. Tokens are sorted by `location.start`.
 - Multiline: intern `iso(\`\nfield User.Avatar {\n  name\n}\n\`)`. Concat has `Keyword` at the file offset of `field` and `FieldName` at the file offset of `name`. `name`'s `location.start` is greater than `field`'s.
 - Prefixing the file with `const x = 1;\n` (second `intern_file` of the same path): `parsed_iso_literals_in_file` Eq-equals the pre-prefix vec. `locations_of_iso_literals_in_file[0]` is the old start plus that prefix's byte length. The keyword span moves by that length. isograph `memoized_parse_iso_literal` takes `text_source` and comments that moving the literal breaks memoization because of that param. i2 `parsed_iso_literal` is keyed on `iso_literal_text` only. File-absolute `WithSpan` tokens cannot be reused after typing before the literal; that is this concat memo. Encoded-token reuse is semantic-tokens-line-offset.md.
@@ -173,6 +174,7 @@ LSP tests in `crates/isograph_lsp` `file_semantic_tokens.rs`:
 - Emoji prefix on the previous line (`const x = "😀";\n` plus the fixture). First token `delta_line` 1, `length` 11, `delta_start` equals the unprefixed fixture.
 - Emoji prefix on the same line (`const x = "😀"; ` plus the fixture). First token `delta_line` 0, `length` 11, `delta_start` is UTF-16 of that prefix plus `export const Home = iso(\``.
 - Empty file (present, no iso): `Some` of empty vec.
+- Intern `iso(\` \`)`: `Some` of empty vec.
 - No `DiskFile`: `None`.
 
 `isograph_lsp` tests intern a `DiskFile` with `insert_disk_file`, same as `handle` and `memo_tests` `intern_file`. They depend on `isograph_extract_typescript` as a dev-dependency for `TypeScriptHostLanguage`.
@@ -181,5 +183,6 @@ LSP tests in `crates/isograph_lsp` `file_semantic_tokens.rs`:
 
 ## Call sites
 
+- e2e-semantic-tokens.md: `isograph semantic-tokens` -> `lsp_semantic_tokens_for_file`.
 - LSP adapter `semanticTokens/full` -> `lsp_semantic_tokens_for_file`.
 - Tests as above.
