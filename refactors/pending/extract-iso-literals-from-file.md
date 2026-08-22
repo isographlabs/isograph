@@ -72,14 +72,14 @@ filesystem-events.md puts `IsographState`, `DiskFile`, and `DiskFileMap` in `cra
 
 Move the pico types to `crates/isograph_compiler/src/database.rs`. `handle` stays in the CLI as a free function. That is the isograph split: `IsographDatabase` in `isograph_schema`, the event loop outside.
 
-Origin of the move: filesystem-events.md `state.rs`. Delta: crate `isograph_compiler`; `handle` is no longer a method.
+Origin of the move: filesystem-events.md `state.rs`. Delta: crate `isograph_compiler`; `handle` is no longer a method; `set` plus the map insert is `insert_disk_file` / `remove_disk_file` on `IsographState` (origin isograph `insert_iso_literal` / `remove_iso_literal`), so the CLI does not name pico.
 
 ```rust
 // from crates/isograph_compiler/src/database.rs
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use pico::{SourceId, Storage};
+use pico::{Database, SourceId, Storage};
 use pico_macros::{Db, Source};
 
 #[derive(Default, Debug, Db)]
@@ -98,17 +98,42 @@ pub struct DiskFile {
     pub path: PathBuf,
     pub contents: String,
 }
+
+impl IsographState {
+    pub fn insert_disk_file(&mut self, path: PathBuf, contents: String) {
+        let source_id = self.set(DiskFile {
+            path: path.clone(),
+            contents,
+        });
+        self.get_disk_file_map_mut()
+            .tracked()
+            .0
+            .insert(path, source_id);
+    }
+
+    pub fn remove_disk_file(&mut self, path: &Path) {
+        if let Some(source_id) = self
+            .get_disk_file_map_mut()
+            .tracked()
+            .0
+            .remove(path)
+        {
+            self.remove(source_id);
+        }
+    }
+}
 ```
 
-`handle` stays the writer. Tests intern a `DiskFile` the same way `handle` does: `db.set` plus insert into the tracked map. A `#[cfg(test)]` helper in the tests module is fine. No production method.
+`handle` stays the writer. It calls `insert_disk_file` / `remove_disk_file`. Tests intern a `DiskFile` the same way: `insert_disk_file`.
 
 ```rust
 // from crates/isograph_cli/src/state.rs
-use isograph_compiler::IsographState;
 use prelude::Postfix;
 
 use crate::effect::IsographEffect;
 use crate::event::{DiskChanged, IsographEvent, Presence};
+
+pub use isograph_compiler::IsographState;
 
 pub fn handle(state: &mut IsographState, event: IsographEvent) -> Vec<IsographEffect> {
     match event {
@@ -124,25 +149,10 @@ pub fn handle(state: &mut IsographState, event: IsographEvent) -> Vec<IsographEf
 fn handle_disk_changed(state: &mut IsographState, change: DiskChanged) {
     match change.presence {
         Presence::Present(contents) => {
-            let source_id = state.set(DiskFile {
-                path: change.path.clone(),
-                contents,
-            });
-            state
-                .get_disk_file_map_mut()
-                .tracked()
-                .0
-                .insert(change.path, source_id);
+            state.insert_disk_file(change.path, contents);
         }
         Presence::Absent => {
-            if let Some(source_id) = state
-                .get_disk_file_map_mut()
-                .tracked()
-                .0
-                .remove(&change.path)
-            {
-                state.remove(source_id);
-            }
+            state.remove_disk_file(&change.path);
         }
     }
 }
@@ -150,7 +160,34 @@ fn handle_disk_changed(state: &mut IsographState, change: DiskChanged) {
 
 `run_event_loop` calls `handle(&mut state, event)`. Tests that currently write `state.handle(...)` write `handle(&mut state, ...)`.
 
-`isograph_compiler` depends on `pico`, `pico_macros`, `prelude`. `isograph_cli` depends on `isograph_compiler` and drops direct `pico` / `pico_macros` unless something else in the crate needs them.
+`daemon.rs` keeps `use crate::state::IsographState` (re-exported) and adds `use crate::state::handle`.
+
+```rust
+// from crates/isograph_cli/src/daemon.rs
+        let effects = handle(&mut state, event);
+```
+
+```toml
+# from crates/isograph_compiler/Cargo.toml
+pico = { path = "../pico" }
+pico_macros = { path = "../pico_macros" }
+prelude = { path = "../prelude" }
+```
+
+`isograph_parser`, `span`, `thiserror` stay.
+
+```toml
+# from crates/isograph_cli/Cargo.toml
+isograph_compiler = { path = "../isograph_compiler" }
+```
+
+Drop `pico` and `pico_macros` from `[dependencies]`. `pico` moves to `[dev-dependencies]`: the `disk_file` helper and the map-len assertions use `Database::get` and `View::untracked`. Production CLI code does not.
+
+```toml
+# from crates/isograph_cli/Cargo.toml
+[dev-dependencies]
+pico = { path = "../pico" }
+```
 
 ```rust
 // from crates/isograph_compiler/src/lib.rs
@@ -163,13 +200,13 @@ pub use host_language::*;
 
 ### Tests
 
-The existing `state.rs` tests. `state.handle(...)` becomes `handle(&mut state, ...)`. `disk_file` still reads the tracked map. Same assertions.
+The existing `state.rs` tests. `state.handle(...)` becomes `handle(&mut state, ...)`. `DiskFile` is `use isograph_compiler::DiskFile`. `disk_file` still reads the tracked map (`use pico::Database` in the tests module). Same assertions.
 
 `run_event_loop` tests construct `IsographState::default()` as today.
 
 ## Change 3: `HostLanguage::extract_iso_literals` is the memo
 
-Callers intern a `DiskFile` the same way `handle` does. There is no free function `extract_iso_literals_from_file_content`. Callers write `THostLanguage::extract_iso_literals(db, path)`.
+Callers intern a `DiskFile` with `insert_disk_file`. There is no free function `extract_iso_literals_from_file_content`. Callers write `THostLanguage::extract_iso_literals(db, path)`.
 
 Origin of `IsoLiteralExtraction`: isograph `IsoLiteralExtraction`. Delta: `context` instead of the four fields. `iso_literal_start_index` is the byte offset of the literal text in the file, same name as isograph. A cursor looks up an extraction by `LineChar`, not by vec position.
 
@@ -210,7 +247,14 @@ pub trait HostLanguage: Sized + 'static {
 
 The change 1 method (`&self`, `&str`, borrowed `WithSpan`) is deleted. `ExtractedIsoLiterals` is already gone.
 
-`isograph_extract_typescript` depends on `pico` and `pico_macros`.
+`isograph_extract_typescript` depends on `pico`, `pico_macros`, and `tracing`. `#[memo]` expands to `::pico::` and `::tracing::debug_span!`. Origin `graphql_network_protocol` has the same three deps.
+
+```toml
+# from crates/isograph_extract_typescript/Cargo.toml
+pico = { path = "../pico" }
+pico_macros = { path = "../pico_macros" }
+tracing = { workspace = true }
+```
 
 ```rust
 // from crates/isograph_extract_typescript/src/lib.rs
@@ -272,11 +316,11 @@ impl HostLanguage for TypeScriptHostLanguage {
 
 pico lookup is the trait return: `&Option<Vec<IsoLiteralExtraction<Self>>>`.
 
-The change 1 tests that stayed in this crate (text, span, export name, `IsoCall`, `AssociatedJsFunction`, skip comments, two literals, nested iso) intern a `DiskFile` and call `TypeScriptHostLanguage::extract_iso_literals`.
+The change 1 tests that stayed in this crate (text, span, export name, `IsoCall`, `AssociatedJsFunction`, skip comments, two literals, nested iso) intern a `DiskFile` with `insert_disk_file` and call `TypeScriptHostLanguage::extract_iso_literals`.
 
 ### Tests
 
-Tests in `crates/isograph_extract_typescript/src/lib.rs` under a `memo_tests` module. `use pico::Database` in the tests module for `db.get`. Do not add a test-only `HostLanguage` to the compiler crate.
+Tests in `crates/isograph_extract_typescript/src/lib.rs` under a `memo_tests` module. Intern with `db.insert_disk_file(path, contents)`. Absent is `db.remove_disk_file(&path)`. Do not add a test-only `HostLanguage` to the compiler crate.
 
 - No `DiskFile` for the path: `TypeScriptHostLanguage::extract_iso_literals` is `None`.
 - Present file, no `iso`: `Some` of empty vec.
@@ -329,7 +373,7 @@ pub fn iso_literal_extraction<THostLanguage: HostLanguage>(
 }
 ```
 
-`None` is no `DiskFile`, or a position that is not inside any literal text (JS around the literals, including `iso(`). pico lookup returns `&Option<IsoLiteralExtraction<THostLanguage>>`.
+`None` is no `DiskFile`, or a position that is not inside any literal text (JS around the literals, including `iso(` and the closing backtick). pico lookup returns `&Option<IsoLiteralExtraction<THostLanguage>>`.
 
 ```rust
 // from crates/isograph_compiler/src/iso_literals.rs
@@ -388,7 +432,7 @@ fn position_in_range(start: (u32, u32), end: (u32, u32), target: LineChar) -> bo
     if target.line < start_line_count
         || (target.line == start_line_count && target.character < start_char_count)
         || target.line > end_line_count
-        || (target.line == end_line_count && target.character > end_char_count)
+        || (target.line == end_line_count && target.character >= end_char_count)
     {
         return false;
     }
@@ -409,15 +453,25 @@ fn delta_line_delta_start(text: &str) -> (u32, u32) {
 }
 ```
 
-Origin of `find_iso_literal_extraction`: isograph `find_iso_literal_extraction_under_cursor`. Delta: returns `Option<&IsoLiteralExtraction>`, not `(IsoLiteralExtraction, u32)`. Inclusive of both ends, same as isograph `position_in_range`. The walk is a running line/char count; that is a state machine, so this is a loop.
+Origin of `find_iso_literal_extraction`: isograph `find_iso_literal_extraction_under_cursor`. Delta: returns `Option<&IsoLiteralExtraction>`, not `(IsoLiteralExtraction, u32)`. Exclusive of the end. Origin `position_in_range` treats `character == end_char_count` as inside (the caret one past the last interior byte, on the closing backtick). This one treats that caret as outside, same as `iso(` and the rest of the JS around the literal. Start stays inclusive. The walk is a running line/char count; that is a state machine, so this is a loop.
 
 Origin of `position_in_range` and `delta_line_delta_start`: copy from isograph `hover.rs` / `semantic_tokens.rs`. `delta_line_delta_start` is the same function as `lsp-semantic-token-encoding.md`. Do not depend on `isograph_lsp`. `position_in_range` is yes or no: the cursor is inside the span.
 
+`isograph_compiler` gains `tracing`. `#[memo]` on `iso_literal_extraction` expands to `::tracing::debug_span!`.
+
+```toml
+# from crates/isograph_compiler/Cargo.toml
+tracing = { workspace = true }
+```
+
 ```rust
 // from crates/isograph_compiler/src/lib.rs
+mod database;
+mod host_language;
 mod iso_literals;
 
-pub use host_language::IsoLiteralExtraction;
+pub use database::{DiskFile, DiskFileMap, IsographState};
+pub use host_language::*;
 pub use iso_literals::{LineChar, iso_literal_extraction};
 ```
 
@@ -432,7 +486,7 @@ Same `memo_tests` module. One-line fixtures: `line` is 0, `character` is the byt
 
 ## Call sites
 
-Change 2: `run_event_loop` -> `handle(&mut state, event)`. Tests intern a `DiskFile` the same way `handle` does: `db.set` plus insert into the tracked map.
+Change 2: `run_event_loop` -> `handle(&mut state, event)`. Tests intern a `DiskFile` with `insert_disk_file`.
 
 Change 3: `iso_literal_extraction` -> `THostLanguage::extract_iso_literals`. file-semantic-tokens.md reads the vec for offsets.
 
