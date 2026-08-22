@@ -218,8 +218,7 @@ fn literal_id_at_location<THostLanguage: HostLanguage>(
     line_char: LineChar,
 ) -> Option<LiteralId> {
     let extractions = THostLanguage::extract_iso_literals(db, path).as_ref()?;
-    let source_id = db.get_disk_file_map().untracked().0.get(&path).copied()?;
-    let content = db.get(source_id).contents.reference();
+    let content = db.disk_file(path)?.contents.reference();
     let index = find_iso_literal_index(line_char, content, extractions)?;
     LiteralId { path, index }.wrap_some()
 }
@@ -327,7 +326,7 @@ The map is which paths currently have a `DiskFile`. `db.set` of a `DiskFile` doe
 
 `tracked()` records a dependency on the whole map. Inserting or removing any path invalidates every memo that used `tracked()`. A memo that iterates every file (compile, "all client declarations") uses `tracked()`.
 
-`untracked()` does not record the map. It is correct when the memo is already keyed by `path`, looks up that one `SourceId`, and then `db.get(source_id)` (which tracks the source). Adding an unrelated file must not re-invoke a per-file extract. Iterating `untracked()` is wrong: a newly inserted path is not seen.
+`untracked()` does not record the map. It is correct when the memo is already keyed by `path`, looks up that one `SourceId`, and then `db.get(source_id)` (which tracks the source). Adding an unrelated file must not re-invoke a per-file extract. Iterating `untracked()` is wrong: a newly inserted path is not seen. `IsographState::disk_file` is that untracked lookup. Callers that already resolved the path (extract or `parsed_iso_literals_in_file` returned `Some`) write `db.disk_file(path)`. Extract is the first lookup of a path and does not use it.
 
 A lookup that misses did not `db.get`. If it also did not `tracked()` the map, a later `Present` of that path is not seen and the memo stays `None`. isograph hit this: an autofix created a file, `get_iso_literal` ran untracked, returned `None`, and the next request reused that `None` and panicked. On miss, `tracked()` the map so a later insert of that key is seen. The intended dependency of a per-file memo that hits is that file, not the set of all files.
 

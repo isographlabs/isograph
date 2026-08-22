@@ -8,7 +8,7 @@ Origin of the pipeline: isograph `get_semantic_tokens`. Origin of encoding: land
 
 The LSP adapter (event-model.md, not written) will call this on `semanticTokens/full`. This slice does not start the adapter. `OpenFile` is not implemented yet; tests intern a `DiskFile` and assert encoded tokens. Encoding is not a memo. Memoizing encoded tokens is semantic-tokens-line-offset.md.
 
-One shippable change: one compiler memo and `lsp_semantic_tokens_for_file`. This change amends `docs-website/docs/design-docs/pico.md`.
+One shippable change: `IsographState::disk_file`, one compiler memo, and `lsp_semantic_tokens_for_file`. This change amends `docs-website/docs/design-docs/pico.md`.
 
 ## What the user does
 
@@ -82,11 +82,28 @@ pub use iso_literals::{
 
 The existing `pub use` already names `LineChar`, `LiteralId`, `iso_literal_extraction`, `literal_id_at_location`, and `parsed_iso_literal`. Add `parsed_iso_literals_in_file`.
 
+`literal_id_at_location` and this function both look up the `DiskFile` after another memo has already returned `Some` for this path. Promote the test-only `disk_file` helper in `database.rs` onto `IsographState`. A miss does not `tracked()` the map: the caller already subscribed via extract / `parsed_iso_literals_in_file`. Extract is the first lookup of a path and on miss must `tracked()` the map. It does not call `disk_file`.
+
+```rust
+// from crates/isograph_compiler/src/database.rs
+pub fn disk_file(&self, path: RelativePathToSourceFile) -> Option<&DiskFile> {
+    let source_id = self.get_disk_file_map().untracked().0.get(&path).copied()?;
+    self.get(source_id).wrap_some()
+}
+```
+
+Add it next to `insert_disk_file` / `remove_disk_file`. Add `use prelude::Postfix` to that module. Delete the test-only `fn disk_file`. Those tests call `state.disk_file(path)`.
+
+```rust
+// from crates/isograph_compiler/src/iso_literals.rs
+// in literal_id_at_location
+let file_content = db.disk_file(path)?.contents.reference();
+```
+
 ```rust
 // from crates/isograph_lsp/src/file_semantic_tokens.rs
 use common_lang_types::RelativePathToSourceFile;
 use isograph_compiler::{HostLanguage, IsographState, parsed_iso_literals_in_file};
-use pico::Database;
 use prelude::Postfix;
 
 use crate::lsp_semantic_tokens;
@@ -96,8 +113,7 @@ pub fn lsp_semantic_tokens_for_file<THostLanguage: HostLanguage>(
     path: RelativePathToSourceFile,
 ) -> Option<Vec<lsp_types::SemanticToken>> {
     let literals = parsed_iso_literals_in_file(db, path).as_ref()?;
-    let source_id = db.get_disk_file_map().untracked().0.get(&path).copied()?;
-    let page_content = db.get(source_id).contents.reference();
+    let page_content = db.disk_file(path)?.contents.reference();
     lsp_semantic_tokens(
         page_content,
         literals.iter().map(|(extraction, parsed)| {
@@ -108,7 +124,7 @@ pub fn lsp_semantic_tokens_for_file<THostLanguage: HostLanguage>(
 }
 ```
 
-`isograph_lsp` already depends on `isograph_compiler`. This slice adds `pico` (`Database`) and `common_lang_types` (`RelativePathToSourceFile`). Dev-dependencies: `intern` (`.intern()`) and `isograph_extract_typescript` (`TypeScriptHostLanguage`).
+`isograph_lsp` already depends on `isograph_compiler`. This slice adds `common_lang_types` (`RelativePathToSourceFile`). It does not add `pico`. Dev-dependencies: `intern` (`.intern()`) and `isograph_extract_typescript` (`TypeScriptHostLanguage`).
 
 ```toml
 # from crates/isograph_lsp/Cargo.toml
@@ -123,7 +139,6 @@ common_lang_types = { path = "../common_lang_types" }
 isograph_compiler = { path = "../isograph_compiler" }
 isograph_parser = { path = "../isograph_parser" }
 lsp-types = { workspace = true }
-pico = { path = "../pico" }
 prelude = { path = "../prelude" }
 span = { path = "../span" }
 
@@ -144,7 +159,7 @@ pub use file_semantic_tokens::lsp_semantic_tokens_for_file;
 pub use semantic_tokens::{lsp_semantic_tokens, semantic_token_legend};
 ```
 
-This function is not a memo. Every call re-encodes. Parsed list `Some` means this path has a `DiskFile`; the map lookup is `untracked` the same way `literal_id_at_location` looks up a path it already resolved. A miss is `None`.
+This function is not a memo. Every call re-encodes. Parsed list `Some` means this path has a `DiskFile`; `disk_file` is `untracked` the same way `literal_id_at_location` looks up a path it already resolved. A miss is `None`.
 
 The adapter later: `semanticTokens/full` for a URI maps to this path, then this function. Not this doc. Encoded-token reuse after a prepend is semantic-tokens-line-offset.md.
 
