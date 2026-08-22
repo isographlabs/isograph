@@ -237,7 +237,9 @@ fn parsed_iso_literal_at_location(
 
 `None` from extract is no `DiskFile`. `Some(vec![])` is a present file with no literals. `None` from `iso_literal_extraction`, `iso_literal_text_at_location`, and `parsed_iso_literal_at_location` is no file, or a cursor that is not inside any literal text (the JS around the literals, including `iso(` and the closing backtick).
 
-The parse memo is keyed on the literal text, not on the file, not on the span in the file. Two files with the same iso text share a parse. Prefixing the file with JavaScript re-invokes extract (the start index moved). `iso_literal_text_at_location` sees the same string and backdates. `parsed_iso_literal` of that text does not re-invoke. `parsed_iso_literal_at_location` depends on the text memo, so it does not re-invoke either.
+The parse memo is keyed on the literal text, not on the file, not on the span in the file. Two files with the same iso text share a parse.
+
+Cursor memos intern `(path, LineChar)`. Bytes added on an earlier line, no extra newline, cursor on a later line: extract is `!=` (`iso_literal_start_index` moved), `iso_literal_text_at_location` sees the same string and backdates, `parsed_iso_literal_at_location` depends on the text memo and does not re-invoke. Inserting a newline at the top of a one-line file moves the interior to a new `LineChar`. That is a new slot. `parsed_iso_literal` of that text does not re-invoke in either case.
 
 `ParsedIsoLiteral` stores spans relative to the literal text. File-absolute spans are applied by a later memo that already has `iso_literal_start_index`. A file-absolute span in the parse result would make parse `!=` after a prepend, and dependents of parse would re-invoke even though the tree is the same.
 
@@ -361,7 +363,9 @@ export const Avatar = iso(`
 
 The LSP asks for hover at a cursor on `name`. The adapter calls `hover(db, path, line_char)`. That is the public key. Inside, `parsed_iso_literal_at_location` returns the tree. Moving the cursor along `name` executes `iso_literal_extraction` again with a new `LineChar`; the text is the same. `parsed_iso_literal` of that text is one slot and does not re-invoke. Resolve uses the offset of that cursor within the literal. Schema hover for `User.name` calls `flattened_selectable_named(db, User, name)`.
 
-The user types `const x = 1;` at the top of the file. `handle` sets a new `DiskFile`. Extract re-invokes: same text, new `iso_literal_start_index`. `iso_literal_text_at_location` is `==` and backdates. `parsed_iso_literal` of that text does not re-invoke. File-absolute token offsets do.
+The user types `const x = 1; ` at the start of the first line (no extra newline). `handle` sets a new `DiskFile`. Extract re-invokes: same text, new `iso_literal_start_index`. The `LineChar` of `name` is unchanged. `iso_literal_text_at_location` is `==` and backdates. `parsed_iso_literal` of that text does not re-invoke. File-absolute token offsets do.
+
+The user inserts a newline at the top of the file. The `LineChar` of `name` moves. That is a new cursor slot. `parsed_iso_literal` of that text does not re-invoke. File-absolute token offsets do.
 
 The user types the same `field User.Avatar { name }` into a second file. `parsed_iso_literal` of that text is one slot. Both files' `parsed_iso_literal_at_location` entries share it.
 
