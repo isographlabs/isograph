@@ -2,7 +2,7 @@
 
 Requires file-semantic-tokens.md. That slice offsets each `WithSpan` to file coordinates and encodes the concat against the file on every call. This slice encodes each literal against its own text (relative deltas), then a path-keyed memo translates those streams into document deltas using the line and column of each `iso_literal_start_index`.
 
-Prepend JS before a literal does not re-encode the literal. It re-runs the offset. Append after the last literal: locations `==`, relative encodings `==`, the path memo's encoded output `==` and backdates. file-semantic-tokens.md's concat of file-absolute `WithSpan` stays for compiler assertions of file coordinates. Encoding no longer reads it.
+Prepend JS before a literal: relative encode of that text Eq-equals; the path memo's encoded tokens have a new `delta_line`. Append after the last literal: locations Eq-equals, relative encodings Eq-equals, the path memo's encoded vec Eq-equals. file-semantic-tokens.md's concat of file-absolute `WithSpan` stays for compiler assertions of file coordinates. Encoding no longer reads it.
 
 Origin of relative-then-absolute: isograph issue 548 (`get_semantic_tokens` cannot reuse encoded positions after typing before the literal; the suggested fix is relative LSP tokens plus an offset at send time). Origin of encoding: landed `lsp_semantic_tokens`. Origin of start indices: `locations_of_iso_literals_in_file`. Delta: `lsp_semantic_tokens` on the literal text; path-keyed stitch; no zero-length placeholder token.
 
@@ -16,7 +16,7 @@ No editor highlighting until the adapter. Tests intern
 export const Home = iso(`entrypoint Query.HomeRoute`)
 ```
 
-Relative encode of `entrypoint Query.HomeRoute` has first token `delta_line` 0, `delta_start` 0, `length` 11, keyword. `lsp_semantic_tokens_for_file` of that path has first token `delta_line` 0, `delta_start` the UTF-16 column of `entrypoint` on the line (`export const Home = iso(\``), `length` 11, keyword. Prefix `"const x = 1;\n"`: relative encode of that text does not re-invoke; the file memo does; first token `delta_line` is 1, `delta_start` is unchanged.
+Relative encode of `entrypoint Query.HomeRoute` has first token `delta_line` 0, `delta_start` 0, `length` 11, keyword. `lsp_semantic_tokens_for_file` of that path has first token `delta_line` 0, `delta_start` the UTF-16 column of `entrypoint` on the line (`export const Home = iso(\``), `length` 11, keyword. Prefix `"const x = 1;\n"`: relative encode of that text Eq-equals; first file token `delta_line` is 1, `delta_start` is unchanged.
 
 ## Types
 
@@ -153,18 +153,16 @@ Relative encode (`encoded_iso_literal_semantic_tokens`) in `isograph_lsp` tests,
 File memo, intern with `insert_disk_file`:
 
 - One-literal fixture. First token `delta_line` 0, `delta_start` UTF-16 of `export const Home = iso(\``, `length` 11, `token_type` 15.
-- Prefix `"const x = 1;\n"`: first token `delta_line` 1, `delta_start` equals the pre-prefix `delta_start`. Relative encode of the same iso text does not re-invoke. File memo does.
-- Append `"\nconst y = 1;\n"`: encoded vec Eq-equals the pre-append vec. File memo does not re-invoke. Relative encode does not.
-- Context-only `Home` -> `Page` (same length): relative encode does not re-invoke. File memo re-invokes (extract `!=`) and the encoded vec `==`, backdates. A counted wrapper of `lsp_semantic_tokens_for_file` stays at 1 after the second intern if we count via the wrapper's dependency `time_updated`; assert the encoded vec Eq-equals instead. Count relative encode: stays 1.
+- Prefix `"const x = 1;\n"`: first token `delta_line` 1, `delta_start` equals the pre-prefix `delta_start`. Relative encode of the same iso text Eq-equals.
+- Append `"\nconst y = 1;\n"`: encoded vec Eq-equals the pre-append vec. Relative encode Eq-equals.
+- Context-only `Home` -> `Page` (same length): relative encode Eq-equals. File memo encoded vec Eq-equals.
 - Two literals. Tokens of the second have `delta_line` / `delta_start` that place them at the second literal's `entrypoint` (or first token) in the file. Sorted in extract order.
 - Multiline `iso(\`\nfield User.Avatar {\n  name\n}\n\`)`. Relative encode of that text: `name` has `delta_line` greater than 0. File memo: `name`'s `delta_line` is the file line of `name` minus the file line of the previous token.
-- Emoji prefix on the previous line: `const x = "😀";\n` plus the one-literal fixture. First token `delta_line` 1, `delta_start` equals the unprefixed fixture's `delta_start`. Relative encode stays 1.
-- Emoji prefix on the same line: `const x = "😀"; ` plus the one-literal fixture (no extra newline). First token `delta_line` 0, `delta_start` is UTF-16 of `const x = "😀"; export const Home = iso(\``. Relative encode stays 1. File memo does re-invoke.
+- Emoji prefix on the previous line: `const x = "😀";\n` plus the one-literal fixture. First token `delta_line` 1, `delta_start` equals the unprefixed fixture's `delta_start`. Relative encode Eq-equals.
+- Emoji prefix on the same line: `const x = "😀"; ` plus the one-literal fixture (no extra newline). First token `delta_line` 0, `delta_start` is UTF-16 of `const x = "😀"; export const Home = iso(\``. Relative encode Eq-equals.
 - Empty file: `Some` of empty vec.
 - No `DiskFile`: `None`.
 - Intern then `remove_disk_file`: `None`.
-
-Count reuse with test-only memos, same shape as file-semantic-tokens.md. Relative encode counter is keyed on the iso text. File memo counter is keyed on `path`.
 
 `expect` names the fixture the test interned.
 

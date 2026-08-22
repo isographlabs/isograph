@@ -188,9 +188,9 @@ Fixture contents: `export const Home = iso(\`entrypoint Query.HomeRoute\`)`. Pat
 
 `semantic_tokens_of_a_present_iso_literal`: `Daemon::start`, poll `isograph daemon up`, send `DiskChanged` `Present` of that path and contents, `isograph semantic-tokens --path <canonical>`. Exit 0. stdout JSON: `kind` is `SemanticTokens`, `value.tokens[0].token_type` is 15, `length` is 11, `delta_line` is 0.
 
-`semantic_tokens_append_without_touching_the_literal_is_the_same_json`: after the previous send, send `Present` of contents + `"\nconst y = 1;\n"`. Query again. stdout JSON equals the first query. `iso_literal_start_index` is unchanged; extract Eq-equals and pico backdates; concat does not re-run; encoded tokens are identical.
+`semantic_tokens_append_without_touching_the_literal_is_the_same_json`: after the previous send, send `Present` of contents + `"\nconst y = 1;\n"`. Query again. stdout JSON equals the first query.
 
-`semantic_tokens_prepend_shifts_delta_line_and_keeps_keyword`: send `Present` of `"const x = 1;\n"` + original contents. Query. First `token_type` is 15, `length` is 11, `delta_line` is 1, `delta_start` equals the first query's `delta_start`. Concat re-runs because offsets changed. Parse does not: the interned literal text is the same. Asserted as values here. Execution counts are file-semantic-tokens.md.
+`semantic_tokens_prepend_shifts_delta_line_and_keeps_keyword`: send `Present` of `"const x = 1;\n"` + original contents. Query. First `token_type` is 15, `length` is 11, `delta_line` is 1, `delta_start` equals the first query's `delta_start`.
 
 `semantic_tokens_of_a_missing_path_prints_null_tokens`: start, poll up, query a canonical path that was never sent. stdout `value.tokens` is JSON `null`. Exit 0.
 
