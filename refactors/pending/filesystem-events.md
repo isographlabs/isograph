@@ -10,9 +10,8 @@ After change 2:
 
 ```
 $ isograph start
-$ isograph send <<'EOF'
-{"kind":"DiskChanged","value":{"path":"/tmp/proj/src/a.ts","contents":"export const a = 1;\n"}}
-EOF
+$ printf '%s\n' '{"kind":"DiskChanged","value":{"path":"/tmp/proj/src/a.ts","contents":"export const a = 1;\n"}}' > /tmp/disk.json
+$ isograph send --file /tmp/disk.json
 $ isograph logs
 {"timestamp":"...","level":"INFO","fields":{"message":"disk changed","path":"/tmp/proj/src/a.ts","file_count":1}}
 ```
@@ -93,7 +92,7 @@ Origin: send-events.md / event-loop.md `handle`. Delta: `files` and a `DiskChang
 
 `on_message` is send-events.md: `from_str::<IsographEvent>`. No new arm. `DiskChanged` is `Serialize` + `Deserialize`.
 
-The socket, `listen(0)`, and `select!` stay as send-events.md left them.
+The socket, `listen(0)`, the port file, and `select!` stay as send-events.md left them.
 
 ### Tests
 
@@ -111,7 +110,7 @@ In `external.rs`:
 - A `DiskChanged` frame with `path` and `contents` round-trips.
 - `"not json"` does not deserialize.
 
-A tokio test in `crates/isograph_cli/tests/socket.rs`, copied from figaro `tests/external.rs` in shape: bind `listen(0, ...)`, connect with `tokio_tungstenite`, send one frame, `event_rx.try_recv()` is `DiskChanged` with that path and contents. A bad frame then a good frame: the good one still arrives. Dev-dependency: `tokio-tungstenite`, `futures-util`.
+A tokio test in `crates/isograph_cli/src/external.rs` under `#[cfg(test)]`, copied from figaro / mercury `tests/external.rs` in shape: bind `listen(0, ...)`, connect with `tokio_tungstenite`, send one frame, `event_rx.try_recv()` is `DiskChanged` with that path and contents. A bad frame then a good frame: the good one still arrives. Dev-dependency: `tokio-tungstenite`, `futures-util`. `on_message` stays `pub(crate)`.
 
 The e2e crate does not yet send; that is change 2. Existing start/status/logs/stop tests still pass. `isograph daemon up` still appears in the log, now with `port`.
 
@@ -125,12 +124,11 @@ Origin of the verb: send-events.md. Delta: a `DiskChanged` frame instead of `Hel
 
 ### Tests
 
-A `DiskChanged` frame with `path` and `contents` round-trips. A tokio test in `crates/isograph_cli/tests/socket.rs`: send one `DiskChanged` frame, `event_rx.try_recv()` is `DiskChanged` with that path and contents.
+A `DiskChanged` frame with `path` and `contents` round-trips. A tokio test in `crates/isograph_cli/src/external.rs` under `#[cfg(test)]`: send one `DiskChanged` frame, `event_rx.try_recv()` is `DiskChanged` with that path and contents.
 
 E2E in `crates/ts_graphql_react_isograph_cli/tests/cli.rs`:
 
-- Start. `send` a frame with `path` and `contents` on stdin. Poll the log until `disk changed` and the path and `file_count` 1.
-- `send --file` of a `DiskChanged` JSON file is the same as stdin.
+- Start. Write a temp JSON file with `path` and `contents`. `isograph send --file` that file. Poll the log until `disk changed` and the path and `file_count` 1.
 
 send-events.md already covers a stopped daemon and `not json`. The harness already points `HOME` at the temp dir.
 

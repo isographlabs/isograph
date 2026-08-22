@@ -2,29 +2,41 @@
 
 Requires event-loop.md (landed) and config-discovery.md (landed).
 
-The daemon listens on `freddie_event_socket` at `127.0.0.1:0`. The kernel assigns a port from its local/dynamic range. `isograph send` finds the config, reads the daemon pid from the lock, and discovers that process's loopback TCP listen port. Every event is `Serialize` + `Deserialize`. The wire is `serde_json`. `on_message` deserializes `IsographEvent` and sends it. There is no second event enum. There is no `--port` and no port file.
+The daemon listens on `freddie_event_socket` at `127.0.0.1:0`. The kernel assigns a port from its local/dynamic range. After bind, the daemon writes `local_addr().port()` next to its lock (`{slug}.lock` → `{slug}.port`). `isograph send` finds the config path, keys the lock, and reads that file. Every event is `Serialize` + `Deserialize`. The wire is `serde_json`. `on_message` deserializes `IsographEvent` and sends it. There is no second event enum. There is no `--port`. There is no stdin path.
 
-Origin of the socket and of `on_message`: figaro `src/daemon.rs` and `src/external.rs`. Origin of `isograph send`: `refactors/pending/filesystem-events.md` change 2. Delta: the wire type is `IsographEvent`, not a separate `IncomingEvent`; figaro keeps `IncomingEvent` so keys and quit are unrepresentable on the socket; isograph events are all serde JSON, including `Quit`; tungstenite 0.24, matching `freddie_event_socket`; `listen(0)` plus `EventSocket::local_addr()`; the client discovers the port from the pid, not from a file. Figaro binds a fixed default because it is one process per machine.
+Origin of the socket and of `on_message`: figaro `src/daemon.rs` and `src/external.rs`. Origin of `isograph send`: `refactors/pending/filesystem-events.md` change 2. Origin of writing the assigned port next to the lock: freddie `refactors/past/event-socket-local-addr.md`. Delta: the wire type is `IsographEvent`, not a separate `IncomingEvent`; figaro keeps `IncomingEvent` so keys and quit are unrepresentable on the socket; isograph events are all serde JSON, including `Quit`; tungstenite 0.24, matching `freddie_event_socket`; `listen(0)` plus `EventSocket::local_addr()` written next to the lock. Figaro binds a fixed default because it is one process per machine.
+
+`isograph start` returning means the lock is held, not that listen has run. `listen(0)` is inside `serve`, after the runtime is built. Send that runs in that window, lock held and the port file absent, exits 1. Retry. The e2e polls `isograph daemon up`, which is logged after the write.
 
 ## What the user does
+
+`--file` is a CI verb. The opener writes a temp file, passes it, and send unlinks it after the attempt, success or failure.
 
 ```
 $ isograph start
 /Users/x/app/isograph.config.json started (pid 12345)
+$ printf '%s\n' '{"kind":"HelloWorld"}' > /tmp/hello.json
 $ isograph send --file /tmp/hello.json
 $ isograph logs
 {"timestamp":"...","level":"INFO","fields":{"message":"isograph daemon up","config":"/Users/x/app/isograph.config.json","port":53124}}
 {"timestamp":"...","level":"INFO","fields":{"message":"hello world"}}
 ```
 
-`isograph send` does not start the daemon. Walk-up / `--config` is the same as every other verb. The port is the daemon process's loopback TCP listen.
+`isograph send` does not start the daemon. Walk-up / `--config` is the same as every other verb. The port is the decimal in the port file.
 
 ```
 $ isograph send --file /tmp/hello.json
 the daemon is not running
 ```
 
-That process exits 1. `Held::Free` on the lock is `SendError::NotRunning`, `run` prints it on stderr and returns `ExitCode::FAILURE`.
+That process exits 1. `Held::Free` on the lock is `SendError::NotRunning`, `run` prints it on stderr and returns `ExitCode::FAILURE`. `--file` is still unlinked.
+
+```
+$ isograph send --file /tmp/hello.json
+the daemon has not recorded its port yet
+```
+
+That process exits 1. The lock is held and the port file is absent: `serve` has not written it yet. Retry.
 
 ## Types
 
@@ -49,7 +61,7 @@ use tracing::warn;
 
 use crate::event::IsographEvent;
 
-pub fn on_message(text: &str, event_tx: &UnboundedSender<IsographEvent>) {
+pub(crate) fn on_message(text: &str, event_tx: &UnboundedSender<IsographEvent>) {
     match serde_json::from_str::<IsographEvent>(text) {
         Ok(event) => {
             let _ = event_tx.send(event);
@@ -59,9 +71,37 @@ pub fn on_message(text: &str, event_tx: &UnboundedSender<IsographEvent>) {
 }
 ```
 
-A frame that is not a valid `IsographEvent` is logged and dropped. The connection stays up.
+A frame that is not a valid `IsographEvent` is logged and dropped. The connection stays up. `on_message` is `pub(crate)`. Daemon and the tests in this file call it. Nothing outside the crate does.
+
+A frame larger than 64 KiB closes that connection (`freddie_event_socket` `MAX_FRAME_BYTES`). HelloWorld is under. filesystem-events.md does not send production file contents over the socket.
 
 `App::DaemonArgs` stays `NoArgs`. `App::Id` stays `ConfigFlag`.
+
+```rust
+// from crates/isograph_cli/src/discover.rs
+pub fn port_file(lock: &Path) -> PathBuf {
+    lock.with_extension("port")
+}
+```
+
+`Instance::named` keys the lock to `{slug}.lock`. The port file is the sibling `{slug}.port`, the same relation `freddie_single_instance` uses for `{slug}.pid`.
+
+```rust
+// from crates/isograph_cli/src/discover.rs
+pub fn instance_for_config_path(
+    flag: Option<&Path>,
+) -> Result<(PathBuf, Instance), DiscoverError> {
+    let config_path = config_path(flag)?;
+    let instance = Instance::named(
+        "isograph",
+        slug(config_path.reference()),
+        config_path.display().to_string(),
+    )?;
+    (config_path, instance).wrap_ok()
+}
+```
+
+Canonical path plus `Instance::named`. It does not call `load_config`. A `.ts` / `.js` that would fail to evaluate still names the lock.
 
 ## Change 1: the daemon listens
 
@@ -99,8 +139,8 @@ The after is the `Serialize` + `Deserialize` enum in Types.
 // from crates/isograph_cli/src/lib.rs (after)
     fn run_daemon(id: &ConfigFlag, _: &NoArgs) {
         match discover::config_and_instance(id.config.as_deref()) {
-            Ok((path, _, _config)) => {
-                crate::daemon::run(path);
+            Ok((path, instance, _config)) => {
+                crate::daemon::run(path, discover::port_file(instance.lock_file()));
             }
             Err(e) => {
                 tracing::error!(error = %e, "the config went away between naming this daemon and starting it");
@@ -139,9 +179,15 @@ mod effect;
 mod event;
 mod external;
 mod state;
+```
 
-pub use event::IsographEvent;
-pub use external::on_message;
+No `pub use`. `on_message` is `pub(crate)` in `external.rs`. `IsographEvent` stays `pub` on the enum, as today.
+
+```rust
+// from crates/isograph_cli/src/discover.rs (after, next to slug)
+pub fn port_file(lock: &Path) -> PathBuf {
+    lock.with_extension("port")
+}
 ```
 
 ```rust
@@ -164,6 +210,40 @@ async fn serve() {
     let (event_tx, event_rx) = unbounded_channel::<IsographEvent>();
     let (effect_tx, effect_rx) = unbounded_channel::<IsographEffect>();
     let _ = event_tx.send(IsographEvent::HelloWorld);
+
+    // `isograph stop` sends SIGTERM. Route it into the event channel as Quit, so the
+    // model turns it into Kill, the effect loop breaks, and serve returns.
+    //
+    // A spawned task rather than a third `select!` arm, because an arm that completed
+    // would drop the other two futures and skip the graceful path this exists to run.
+    #[cfg(unix)]
+    match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+        Ok(mut term) => {
+            let event_tx = event_tx.clone();
+            tokio::spawn(async move {
+                if term.recv().await.is_some() {
+                    tracing::info!("SIGTERM: quitting");
+                    let _ = event_tx.send(IsographEvent::Quit);
+                }
+            });
+        }
+        Err(e) => {
+            tracing::warn!(
+                error = %e,
+                "no SIGTERM handler; a terminated isograph will not run Kill"
+            );
+        }
+    }
+
+    // `select!` rather than `join!`: the effect loop ends on `Kill`, and the event
+    // loop never does, because `_hold_events` holds a sender for as long as serve runs.
+    let _hold_events = event_tx;
+    let state = IsographState;
+    tokio::select! {
+        () = run_event_loop(state, event_rx, effect_tx) => {}
+        () = run_effect_loop(effect_rx) => {}
+    }
+}
 ```
 
 ```rust
@@ -173,7 +253,7 @@ use std::path::PathBuf;
 use crate::external::on_message;
 use prelude::Postfix;
 
-pub fn run(config_path: PathBuf) {
+pub fn run(config_path: PathBuf, port_path: PathBuf) {
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -184,13 +264,13 @@ pub fn run(config_path: PathBuf) {
             return;
         }
     };
-    runtime.block_on(serve(config_path));
+    runtime.block_on(serve(config_path, port_path));
 }
 
-async fn serve(config_path: PathBuf) {
+async fn serve(config_path: PathBuf, port_path: PathBuf) {
     let (event_tx, event_rx) = unbounded_channel::<IsographEvent>();
     let (effect_tx, effect_rx) = unbounded_channel::<IsographEffect>();
-    let socket = match freddie_event_socket::listen(0, {
+    let _socket = match freddie_event_socket::listen(0, {
         let event_tx = event_tx.clone();
         move |text| on_message(text, event_tx.reference())
     }) {
@@ -200,91 +280,153 @@ async fn serve(config_path: PathBuf) {
             return;
         }
     };
-    let port = socket.local_addr().port();
+    let port = _socket.local_addr().port();
+    if let Err(e) = std::fs::write(port_path.reference(), format!("{port}\n")) {
+        tracing::error!(
+            error = %e,
+            path = %port_path.display(),
+            "could not write the event socket port"
+        );
+        return;
+    }
     tracing::info!(config = %config_path.display(), port, "isograph daemon up");
+
+    // `isograph stop` sends SIGTERM. Route it into the event channel as Quit, so the
+    // model turns it into Kill, the effect loop breaks, and serve returns.
+    //
+    // A spawned task rather than a third `select!` arm, because an arm that completed
+    // would drop the other two futures and skip the graceful path this exists to run.
+    #[cfg(unix)]
+    match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+        Ok(mut term) => {
+            let event_tx = event_tx.clone();
+            tokio::spawn(async move {
+                if term.recv().await.is_some() {
+                    tracing::info!("SIGTERM: quitting");
+                    let _ = event_tx.send(IsographEvent::Quit);
+                }
+            });
+        }
+        Err(e) => {
+            tracing::warn!(
+                error = %e,
+                "no SIGTERM handler; a terminated isograph will not run Kill"
+            );
+        }
+    }
+
+    // `select!` rather than `join!`: the effect loop ends on `Kill`, and the event
+    // loop never does, because `_hold_events` holds a sender for as long as serve runs.
+    let _hold_events = event_tx;
+    let state = IsographState;
+    tokio::select! {
+        () = run_event_loop(state, event_rx, effect_tx) => {}
+        () = run_effect_loop(effect_rx) => {}
+    }
+}
 ```
 
-The SIGTERM task, `_hold_events`, and `select!` stay. `_socket` is held across `select!` the way figaro holds the listener. `listen(0)` is the kernel's pick from its local/dynamic port range. `serve` logs the assigned port and does not write it to disk. `serve` does not send `HelloWorld`. That event arrives on the socket.
+`_socket` is the one binding. It is in scope across `select!`. Dropping `serve` drops the listener. A write failure returns, which drops `_socket` and then `run_daemon` returns, which drops the lock. Do not bind `listen` in a block that ends before `select!`.
 
-`EventSocket::local_addr` returns `SocketAddr`, not `io::Result`. Origin: freddie `refactors/past/event-socket-local-addr.md`.
+`listen(0)` is the kernel's pick from its local/dynamic port range. `serve` writes the assigned port, then logs it. `serve` does not send `HelloWorld`. That event arrives on the socket.
+
+`EventSocket::local_addr` returns `SocketAddr`, not `io::Result`. Origin: freddie `refactors/past/event-socket-local-addr.md`. The file contents are the decimal port and a newline, `"{port}\n"`.
 
 ### Tests
 
+Socket tests live in `external.rs` under `#[cfg(test)]`, next to `on_message`. They compile against the crate's `[dependencies]` tokio (`rt`, `macros`, `signal`, `sync`, `time`).
+
 ```rust
-// from crates/isograph_cli/tests/socket.rs
-use std::time::Duration;
+// from crates/isograph_cli/src/external.rs
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
 
-use futures_util::SinkExt;
-use isograph_cli::{IsographEvent, on_message};
-use tokio::sync::mpsc::unbounded_channel;
-use tokio_tungstenite::tungstenite::Message;
+    use futures_util::SinkExt;
+    use prelude::Postfix;
+    use tokio::sync::mpsc::{UnboundedReceiver, unbounded_channel};
+    use tokio_tungstenite::tungstenite::Message;
 
-const SETTLE: Duration = Duration::from_millis(250);
+    use super::on_message;
+    use crate::event::IsographEvent;
 
-#[tokio::test]
-async fn a_hello_world_frame_arrives_as_an_event() {
-    let (event_tx, mut event_rx) = unbounded_channel();
-    let socket = freddie_event_socket::listen(0, move |text| {
-        on_message(text, &event_tx);
-    })
-    .expect("binding port 0");
-    let port = socket.local_addr().port();
-    let (mut ws, _) = tokio_tungstenite::connect_async(format!("ws://127.0.0.1:{port}"))
-        .await
-        .expect("connecting");
-    ws.send(Message::Text(
-        r#"{"kind":"HelloWorld"}"#.to_owned(),
-    ))
-    .await
-    .expect("sending");
-    tokio::time::sleep(SETTLE).await;
-    assert!(matches!(
-        event_rx.try_recv().expect("an event arrived"),
-        IsographEvent::HelloWorld
-    ));
-}
+    const SETTLE: Duration = Duration::from_millis(250);
 
-#[tokio::test]
-async fn an_unknown_frame_is_dropped_without_disturbing_the_connection() {
-    let (event_tx, mut event_rx) = unbounded_channel();
-    let socket = freddie_event_socket::listen(0, move |text| {
-        on_message(text, &event_tx);
-    })
-    .expect("binding port 0");
-    let port = socket.local_addr().port();
-    let (mut ws, _) = tokio_tungstenite::connect_async(format!("ws://127.0.0.1:{port}"))
-        .await
-        .expect("connecting");
-    for frame in [r#"{"kind":"Nope"}"#, "not json at all"] {
-        ws.send(Message::Text(frame.to_owned()))
+    fn listen_for_events() -> (
+        freddie_event_socket::EventSocket,
+        u16,
+        UnboundedReceiver<IsographEvent>,
+    ) {
+        let (event_tx, event_rx) = unbounded_channel();
+        let socket = freddie_event_socket::listen(0, move |text| {
+            on_message(text, event_tx.reference());
+        })
+        .expect("binding port 0");
+        let port = socket.local_addr().port();
+        (socket, port, event_rx)
+    }
+
+    #[tokio::test]
+    async fn a_hello_world_frame_arrives_as_an_event() {
+        let (_socket, port, mut event_rx) = listen_for_events();
+        let (mut ws, _) = tokio_tungstenite::connect_async(format!("ws://127.0.0.1:{port}"))
+            .await
+            .expect("connecting");
+        ws.send(Message::Text(r#"{"kind":"HelloWorld"}"#.to_owned()))
             .await
             .expect("sending");
+        tokio::time::sleep(SETTLE).await;
+        assert!(matches!(
+            event_rx.try_recv().expect("an event arrived"),
+            IsographEvent::HelloWorld
+        ));
     }
-    tokio::time::sleep(SETTLE).await;
-    assert!(event_rx.try_recv().is_err(), "nothing was dispatched");
-    ws.send(Message::Text(
-        r#"{"kind":"HelloWorld"}"#.to_owned(),
-    ))
-    .await
-    .expect("the connection survived two bad frames");
-    tokio::time::sleep(SETTLE).await;
-    assert!(
-        event_rx.try_recv().is_ok(),
-        "the next good frame still arrived"
-    );
+
+    #[tokio::test]
+    async fn an_unknown_frame_is_dropped_without_disturbing_the_connection() {
+        let (_socket, port, mut event_rx) = listen_for_events();
+        let (mut ws, _) = tokio_tungstenite::connect_async(format!("ws://127.0.0.1:{port}"))
+            .await
+            .expect("connecting");
+        for frame in [r#"{"kind":"Nope"}"#, "not json at all"] {
+            ws.send(Message::Text(frame.to_owned()))
+                .await
+                .expect("sending");
+        }
+        tokio::time::sleep(SETTLE).await;
+        assert!(event_rx.try_recv().is_err(), "nothing was dispatched");
+        ws.send(Message::Text(r#"{"kind":"HelloWorld"}"#.to_owned()))
+            .await
+            .expect("the connection survived two bad frames");
+        tokio::time::sleep(SETTLE).await;
+        assert!(
+            event_rx.try_recv().is_ok(),
+            "the next good frame still arrived"
+        );
+    }
 }
 ```
 
-Origin of the socket tests: figaro `tests/external.rs`. Delta: `listen(0)` plus `local_addr().port()` instead of a probe bind; `HelloWorld` instead of `Tab`.
+Origin of the socket tests: figaro / mercury `tests/external.rs`. Delta: `listen(0)` plus `local_addr().port()` instead of a probe bind; `HelloWorld` instead of `Tab`; the tests sit next to `on_message` so it stays `pub(crate)`.
 
 ```toml
 # from crates/isograph_cli/Cargo.toml (dev-dependencies, after)
-tempfile = "3"
 tokio-tungstenite = "0.24"
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }
 ```
 
-`0.24` matches `freddie_event_socket`. `Message::Text` takes `String`.
+`tempfile = "3"` is already in `[dev-dependencies]`. `0.24` matches `freddie_event_socket`. `Message::Text` takes `String`.
+
+```rust
+// from crates/isograph_cli/src/discover.rs (tests)
+    #[test]
+    fn port_file_is_the_lock_with_a_port_extension() {
+        assert_eq!(
+            super::port_file(Path::new("/tmp/isograph-abcd.lock")),
+            Path::new("/tmp/isograph-abcd.port")
+        );
+    }
+```
 
 `the_log_contains_the_config_path` today polls for `hello world` because `serve` sends `HelloWorld` at boot. After this change it does not:
 
@@ -298,14 +440,19 @@ futures-util = { version = "0.3", default-features = false, features = ["sink"] 
 
 ```rust
 // from crates/ts_graphql_react_isograph_cli/tests/cli.rs (after)
-        (log.contains("isograph daemon up") && log.contains(path_in_log.reference())).then_some(())
+        (log.contains("isograph daemon up")
+            && log.contains(path_in_log.reference())
+            && log.contains("\"port\":"))
+            .then_some(())
 ```
 
-The record also has `port`. Change 2 sends `HelloWorld` through `isograph send` and asserts `hello world`.
+The record has `port`. `"port":` is the JSON field `tracing` writes for the numeric `port` in `isograph daemon up`. Change 2 sends `HelloWorld` through `isograph send` and asserts `hello world`.
 
 ## Change 2: `isograph send`
 
-A client verb for tests and CI. It does not start the daemon. `--file` is required. It reads that file as one JSON `IsographEvent` and writes it as one websocket text frame. Then it deletes `--file`. There is no stdin path.
+A client verb for tests and CI. It does not start the daemon. `--file` is required. It reads that file as one JSON `IsographEvent` and writes it as one websocket text frame. Then it deletes `--file`, success or failure. There is no stdin path. filesystem-events.md sends `DiskChanged` the same way: a temp file and `--file`.
+
+It does not call `load_config`. A daemon that is up stays reachable if the `.ts` / `.js` config has since broken.
 
 freddie_cli `Verb` is closed. Extra verbs sit beside it, the way figaro's launch-agent verbs do.
 
@@ -382,9 +529,51 @@ mod send;
 ```
 
 ```rust
+// from crates/isograph_cli/src/discover.rs (before)
+pub fn config_and_instance(
+    flag: Option<&Path>,
+) -> Result<(PathBuf, Instance, IsographConfig), DiscoverError> {
+    let config_path = config_path(flag)?;
+    let config = load_config(config_path.reference()).map_err(DiscoverError::Load)?;
+    let instance = Instance::named(
+        "isograph",
+        slug(config_path.reference()),
+        config_path.display().to_string(),
+    )?;
+    (config_path, instance, config).wrap_ok()
+}
+```
+
+```rust
+// from crates/isograph_cli/src/discover.rs (after)
+pub fn instance_for_config_path(
+    flag: Option<&Path>,
+) -> Result<(PathBuf, Instance), DiscoverError> {
+    let config_path = config_path(flag)?;
+    let instance = Instance::named(
+        "isograph",
+        slug(config_path.reference()),
+        config_path.display().to_string(),
+    )?;
+    (config_path, instance).wrap_ok()
+}
+
+pub fn config_and_instance(
+    flag: Option<&Path>,
+) -> Result<(PathBuf, Instance, IsographConfig), DiscoverError> {
+    let (config_path, instance) = instance_for_config_path(flag)?;
+    let config = load_config(config_path.reference()).map_err(DiscoverError::Load)?;
+    (config_path, instance, config).wrap_ok()
+}
+```
+
+`App::instance` and `run_daemon` still call `config_and_instance`. Send calls `instance_for_config_path`.
+
+```rust
 // from crates/isograph_cli/src/send.rs
 use std::fs;
 use std::io;
+use std::num::NonZeroU16;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -398,6 +587,12 @@ use crate::event::IsographEvent;
 
 #[derive(Debug)]
 struct ReadFile {
+    pub path: PathBuf,
+    pub source: io::Error,
+}
+
+#[derive(Debug)]
+struct ReadPort {
     pub path: PathBuf,
     pub source: io::Error,
 }
@@ -422,12 +617,12 @@ enum SendError {
     Unnamed,
     #[error("{0}")]
     Lock(#[from] freddie_single_instance::LockError),
-    #[error("could not list listen ports: {0}")]
-    ListPorts(io::Error),
-    #[error("pid {0} has no loopback TCP listen")]
-    NoListen(u32),
-    #[error("pid {0} has more than one loopback TCP listen")]
-    AmbiguousListen(u32),
+    #[error("the daemon has not recorded its port yet")]
+    NoPort,
+    #[error("could not read {}: {}", .0.path.display(), .0.source)]
+    ReadPort(ReadPort),
+    #[error("the daemon's port file is not a port")]
+    BadPort,
     #[error("could not connect to 127.0.0.1:{}: {}", .0.port, .0.source)]
     Connect(Connect),
     #[error("could not write the frame: {0}")]
@@ -448,8 +643,10 @@ pub fn run(args: &SendArgs) -> ExitCode {
 }
 
 fn run_inner(args: &SendArgs) -> Result<(), SendError> {
-    let (_, instance, _) = crate::discover::config_and_instance(args.id.config.as_deref())?;
-    let port = listen_port(daemon_pid(instance.lock_file())?)?;
+    let (_, instance) =
+        crate::discover::instance_for_config_path(args.id.config.as_deref())?;
+    require_running(instance.lock_file())?;
+    let port = read_port(&crate::discover::port_file(instance.lock_file()))?;
     let frame = fs::read_to_string(args.file.reference()).map_err(|source| {
         SendError::ReadFile(ReadFile {
             path: args.file.clone(),
@@ -465,82 +662,43 @@ fn run_inner(args: &SendArgs) -> Result<(), SendError> {
     ().wrap_ok()
 }
 
-fn daemon_pid(lock: &Path) -> Result<freddie_single_instance::Pid, SendError> {
+fn require_running(lock: &Path) -> Result<(), SendError> {
     match freddie_single_instance::holder_at(lock)? {
-        freddie_single_instance::Held::By(pid) => pid.wrap_ok(),
+        freddie_single_instance::Held::By(_) => ().wrap_ok(),
         freddie_single_instance::Held::Free => SendError::NotRunning.wrap_err(),
         freddie_single_instance::Held::Unnamed => SendError::Unnamed.wrap_err(),
     }
 }
 
-fn listen_port(pid: freddie_single_instance::Pid) -> Result<u16, SendError> {
-    let ports = loopback_listens(pid)?;
-    match ports.as_slice() {
-        [port] => (*port).wrap_ok(),
-        [] => SendError::NoListen(pid.0).wrap_err(),
-        _ => SendError::AmbiguousListen(pid.0).wrap_err(),
+fn read_port(path: &Path) -> Result<u16, SendError> {
+    match fs::read_to_string(path) {
+        Ok(text) => parse_port(text.reference()).ok_or(SendError::BadPort),
+        Err(source) if source.kind() == io::ErrorKind::NotFound => SendError::NoPort.wrap_err(),
+        Err(source) => SendError::ReadPort(ReadPort {
+            path: path.to_owned(),
+            source,
+        })
+        .wrap_err(),
     }
 }
 
-#[cfg(unix)]
-fn loopback_listens(pid: freddie_single_instance::Pid) -> Result<Vec<u16>, SendError> {
-    let output = std::process::Command::new("lsof")
-        .args(["-nP", "-iTCP@127.0.0.1", "-sTCP:LISTEN", "-a", "-p"])
-        .arg(pid.to_string())
-        .output()
-        .map_err(SendError::ListPorts)?;
-    parse_lsof(&String::from_utf8_lossy(output.stdout.reference())).wrap_ok()
-}
-
-fn parse_lsof(stdout: &str) -> Vec<u16> {
-    stdout
-        .lines()
-        .filter_map(|line| {
-            let name = line.split_whitespace().last()?;
-            let addr = name.strip_suffix(" (LISTEN)")?;
-            let port = addr.rsplit_once(':')?.1;
-            port.parse().ok()
-        })
-        .collect()
-}
-
-#[cfg(windows)]
-fn loopback_listens(pid: freddie_single_instance::Pid) -> Result<Vec<u16>, SendError> {
-    let output = std::process::Command::new("netstat")
-        .args(["-ano", "-p", "TCP"])
-        .output()
-        .map_err(SendError::ListPorts)?;
-    parse_netstat(&String::from_utf8_lossy(output.stdout.reference()), pid.0).wrap_ok()
-}
-
-fn parse_netstat(stdout: &str, pid: u32) -> Vec<u16> {
-    stdout
-        .lines()
-        .filter_map(|line| {
-            let cols: Vec<&str> = line.split_whitespace().collect();
-            let addr = cols.get(1)?;
-            let state = cols.get(3)?;
-            let owner = cols.get(4)?;
-            if *state != "LISTENING" {
-                return None;
-            }
-            if owner.parse::<u32>().ok()? != pid {
-                return None;
-            }
-            let port = addr.strip_prefix("127.0.0.1:")?;
-            port.parse().ok()
-        })
-        .collect()
+fn parse_port(text: &str) -> Option<u16> {
+    text.trim()
+        .parse::<NonZeroU16>()
+        .ok()
+        .map(NonZeroU16::get)
 }
 ```
 
-Origin of a subprocess instead of an unsafe bind: `freddie_cli` `signal_pid` uses `/bin/kill`. The event socket is this process's only loopback TCP listen.
+Send reads the lock first. `Held::Free` is `NotRunning` and the port file is not consulted. A leftover `{slug}.port` from a previous run is ignored. Process death releases the lock.
+
+`Held::Unnamed` and a missing port file are immediate errors. Send does not poll. `freddie_cli::find_daemon` waits 100ms for `Unnamed` because it needs a pid to signal. Send needs the port file, not the pid.
 
 `remove_file` runs after `run_inner`, success or failure, so a CI temp file does not remain. A failed remove does not change the exit code.
 
 Validate then send. A frame the daemon would drop is rejected at the client with a non-zero exit. The daemon still drops undeserializable frames from any other client.
 
-Blocking `tungstenite`, not tokio, on the client. The daemon already has a runtime; the client is a one-shot.
+`tungstenite` 0.24 `WebSocket::send` writes then flushes. Blocking client, not tokio. The daemon already has a runtime; the client is a one-shot.
 
 ```toml
 # from crates/isograph_cli/Cargo.toml (dependencies, after)
@@ -560,23 +718,54 @@ Workspace clippy denies `print_stderr` in library crates. `send::run` is the pro
 // from crates/isograph_cli/src/send.rs
 #[cfg(test)]
 mod tests {
-    use super::parse_lsof;
+    use prelude::Postfix;
+
+    use super::parse_port;
 
     #[test]
-    fn parse_lsof_reads_the_loopback_listen_port() {
-        let stdout = "\
-COMMAND   PID USER   FD   TYPE DEVICE SIZE/OFF NODE NAME
-isograph 12345 user    8u  IPv4 0x0      0t0  TCP 127.0.0.1:53124 (LISTEN)
-";
-        assert_eq!(parse_lsof(stdout), [53124]);
+    fn parse_port_reads_a_decimal_line() {
+        assert_eq!(parse_port("53124\n"), 53124.wrap_some());
     }
 
     #[test]
-    fn parse_lsof_of_a_header_only_is_empty() {
-        let stdout = "COMMAND   PID USER   FD   TYPE DEVICE SIZE/OFF NODE NAME\n";
-        assert!(parse_lsof(stdout).is_empty());
+    fn parse_port_reads_digits_without_a_newline() {
+        assert_eq!(parse_port("53124"), 53124.wrap_some());
+    }
+
+    #[test]
+    fn parse_port_of_empty_is_none() {
+        assert_eq!(parse_port(""), None);
+        assert_eq!(parse_port("\n"), None);
+    }
+
+    #[test]
+    fn parse_port_of_zero_is_none() {
+        assert_eq!(parse_port("0"), None);
+        assert_eq!(parse_port("0\n"), None);
+    }
+
+    #[test]
+    fn parse_port_of_garbage_is_none() {
+        assert_eq!(parse_port("abc"), None);
+        assert_eq!(parse_port("65536"), None);
+        assert_eq!(parse_port("127.0.0.1:53124"), None);
     }
 }
+```
+
+```rust
+// from crates/isograph_cli/src/discover.rs (tests)
+    #[test]
+    fn instance_for_config_path_does_not_parse_json() {
+        let dir = temp();
+        let path = dir.path().join("isograph.config.json");
+        write_file(path.reference(), "{");
+        let (got, _) = super::instance_for_config_path(path.as_path().wrap_some())
+            .expect("the file exists");
+        let canonical = path.canonicalize().expect("the fixture file exists");
+        assert_eq!(got, canonical);
+        super::load_config(path.reference()).expect_err("truncated json is unparseable");
+    }
 ```
 
 E2E in `crates/ts_graphql_react_isograph_cli/tests/cli.rs`. Tests write a temp JSON file and pass `--file`. `Daemon::isograph` is enough.
@@ -606,7 +795,10 @@ fn the_log_contains_the_config_path() {
     let path_in_log = path_in_json_log(path.reference());
     poll(|| {
         let log = daemon.log_text();
-        (log.contains("isograph daemon up") && log.contains(path_in_log.reference())).then_some(())
+        (log.contains("isograph daemon up")
+            && log.contains(path_in_log.reference())
+            && log.contains("\"port\":"))
+        .then_some(())
     });
     let frame = write_frame(daemon.dir.path(), "{\"kind\":\"HelloWorld\"}\n");
     let sent = daemon.isograph(["send", "--file", frame.to_str().expect("utf-8")].reference());
@@ -645,7 +837,20 @@ fn send_with_the_daemon_stopped_fails() {
 #[test]
 fn send_of_not_json_fails() {
     let daemon = Daemon::start();
+    poll(|| daemon.log_text().contains("isograph daemon up").then_some(()));
     let frame = write_frame(daemon.dir.path(), "not json\n");
+    let sent = daemon.isograph(["send", "--file", frame.to_str().expect("utf-8")].reference());
+    assert!(!sent.status.success());
+    let err = stderr(sent.reference());
+    assert!(err.contains("IsographEvent"), "{err}");
+    assert!(!frame.exists(), "send deletes --file");
+}
+
+#[test]
+fn send_of_unknown_kind_fails() {
+    let daemon = Daemon::start();
+    poll(|| daemon.log_text().contains("isograph daemon up").then_some(()));
+    let frame = write_frame(daemon.dir.path(), "{\"kind\":\"Nope\"}\n");
     let sent = daemon.isograph(["send", "--file", frame.to_str().expect("utf-8")].reference());
     assert!(!sent.status.success());
     let err = stderr(sent.reference());
@@ -654,6 +859,6 @@ fn send_of_not_json_fails() {
 }
 ```
 
-Change 2 replaces `the_log_contains_the_config_path` with the version above: start, write a frame file, `isograph send --file`, then the log has `hello world`.
+Change 2 replaces `the_log_contains_the_config_path` with the version above: start, poll until `isograph daemon up` (the port file exists), write a frame file, `isograph send --file`, then the log has `hello world`.
 
 `isograph send` must run with the same `HOME` / cwd as the daemon so walk-up finds the same config and the same lock. The harness already does that.
