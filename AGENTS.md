@@ -4,6 +4,10 @@ From upstream isograph we keep pico and pico_macros (unchanged), the swc plugin 
 
 The parser does not use pico. Parser functions are plain functions over `&str`. Memoization applies above the parser (which files changed, which literals were extracted).
 
+## Upstream isograph
+
+Before writing a type, function, error, or pass, check the isograph checkout (`../isograph`) for the existing pattern. If isograph has a good one, use it.
+
 ## Mental model
 
 Schema data model: `docs-website/docs/design-docs/mental-model.md`. Read it before working on entities, entity declarations, wrappers, selectables, selectable declarations, selections, selection sets, or entrypoints.
