@@ -97,7 +97,7 @@ LSP tests in `crates/isograph_lsp` `file_semantic_tokens.rs`:
 - Intern the one-literal file. `lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>` is `Some`. The first encoded token has `delta_line` 0 and `token_type` the legend index of keyword. `length` is the UTF-16 length of `entrypoint`.
 - Empty file (present, no iso): `Some` of empty vec.
 
-`isograph_lsp` tests intern via `IsographState::insert_disk_file`. They depend on `isograph_extract_typescript` as a dev-dependency for `TypeScriptHostLanguage`.
+`isograph_lsp` tests intern a `DiskFile` with `db.set` plus the tracked map, same as `handle`. They depend on `isograph_extract_typescript` as a dev-dependency for `TypeScriptHostLanguage`.
 
 `expect` names the fixture the test interned.
 

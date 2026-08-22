@@ -37,7 +37,7 @@ In `crates/isograph_extract_typescript` `memo_tests`, or in `crates/isograph_com
 - `parsed_iso_literal(&db, "entrypoint Query.HomeRoute".to_owned())` has `errors` empty and `item` `Some` whose item is `IsoLiteralItem::Entrypoint`.
 - `"entrypoint"` has a parse error (incomplete). `item` may still be `Some` (resilient parse). `errors` is not empty.
 - `""` is `AstError::EmptyLiteral` as today.
-- Calling twice with the same text returns a pointer to the same stored value (address equality is not required; asserting the tree twice is enough). A third call after `insert_disk_file` of an unrelated path still matches.
+- Calling twice with the same text returns a pointer to the same stored value (address equality is not required; asserting the tree twice is enough). A third call after interning an unrelated `DiskFile` still matches.
 
 Do not add a production function only the tests call.
 

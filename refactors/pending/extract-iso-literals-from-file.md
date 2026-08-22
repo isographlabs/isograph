@@ -66,7 +66,7 @@ Tests that move to memoized-parse-iso-literal.md:
 
 ## Change 2: the database lives in `isograph_compiler`, then the memo
 
-filesystem-events.md puts `IsographState`, `DiskFile`, `DiskFileMap`, `insert_disk_file`, and `remove_disk_file` in `crates/isograph_cli/src/state.rs`. Memos over those sources cannot live in `isograph_compiler` if the compiler would depend on the CLI.
+filesystem-events.md puts `IsographState`, `DiskFile`, and `DiskFileMap` in `crates/isograph_cli/src/state.rs`. Memos over those sources cannot live in `isograph_compiler` if the compiler would depend on the CLI.
 
 Move the pico types to `crates/isograph_compiler/src/database.rs`. `handle` stays in the CLI as a free function. That is the isograph split: `IsographDatabase` in `isograph_schema`, the event loop outside.
 
@@ -75,9 +75,9 @@ Origin of the move: filesystem-events.md `state.rs`. Delta: crate `isograph_comp
 ```rust
 // from crates/isograph_compiler/src/database.rs
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-use pico::{Database, SourceId, Storage};
+use pico::{SourceId, Storage};
 use pico_macros::{Db, Source};
 
 #[derive(Default, Debug, Db)]
@@ -96,30 +96,9 @@ pub struct DiskFile {
     pub path: PathBuf,
     pub contents: String,
 }
-
-impl IsographState {
-    pub fn insert_disk_file(&mut self, path: PathBuf, contents: String) {
-        let source_id = self.set(DiskFile {
-            path: path.clone(),
-            contents,
-        });
-        self.get_disk_file_map_mut()
-            .tracked()
-            .0
-            .insert(path, source_id);
-    }
-
-    pub fn remove_disk_file(&mut self, path: &Path) -> Option<SourceId<DiskFile>> {
-        self.get_disk_file_map_mut()
-            .tracked()
-            .0
-            .remove(path)
-            .inspect(|&source_id| self.remove(source_id))
-    }
-}
 ```
 
-`insert_disk_file` / `remove_disk_file` are `pub`. The CLI `handle` is the production writer. Compiler tests intern files through these methods.
+`handle` stays the writer. Tests intern a `DiskFile` the same way `handle` does: `db.set` plus insert into the tracked map. A `#[cfg(test)]` helper in the tests module is fine. No production method.
 
 ```rust
 // from crates/isograph_cli/src/state.rs
@@ -143,10 +122,25 @@ pub fn handle(state: &mut IsographState, event: IsographEvent) -> Vec<IsographEf
 fn handle_disk_changed(state: &mut IsographState, change: DiskChanged) {
     match change.presence {
         Presence::Present(present) => {
-            state.insert_disk_file(change.path, present.contents);
+            let source_id = state.set(DiskFile {
+                path: change.path.clone(),
+                contents: present.contents,
+            });
+            state
+                .get_disk_file_map_mut()
+                .tracked()
+                .0
+                .insert(change.path, source_id);
         }
         Presence::Absent => {
-            state.remove_disk_file(change.path.reference());
+            if let Some(source_id) = state
+                .get_disk_file_map_mut()
+                .tracked()
+                .0
+                .remove(&change.path)
+            {
+                state.remove(source_id);
+            }
         }
     }
 }
@@ -274,6 +268,6 @@ Tests of the trait change (no parse inside extract) are the rewritten extract te
 
 ## Call sites
 
-- `handle` -> `insert_disk_file` / `remove_disk_file`.
+- `handle` -> `db.set` / `db.remove` plus the tracked map.
 - memoized-parse-iso-literal.md -> `extract_iso_literals_from_file_content`.
 - file-semantic-tokens.md -> the same memo.

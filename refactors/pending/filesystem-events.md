@@ -65,7 +65,7 @@ pub struct DiskFile {
 
 `disk_file_map` is private. `#[tracked]` fields must be. Generated getters are `get_disk_file_map` and `get_disk_file_map_mut`.
 
-Origin of `insert_disk_file` / `remove_disk_file`: isograph `insert_iso_literal` / `remove_iso_literal`. Delta: `PathBuf` is not `Copy`, so `insert_disk_file` clones `path` into the source and moves the original into the map; methods are private (`handle` is the only writer).
+Origin of the `Present` / `Absent` arms: isograph `insert_iso_literal` / `remove_iso_literal`, inlined in `handle`. Delta: `PathBuf` is not `Copy`, so `Present` clones `path` into the source and moves the original into the map.
 
 ```rust
 // from crates/isograph_cli/src/state.rs
@@ -84,31 +84,26 @@ impl IsographState {
     fn handle_disk_changed(&mut self, change: DiskChanged) {
         match change.presence {
             Presence::Present(present) => {
-                self.insert_disk_file(change.path, present.contents);
+                let source_id = self.set(DiskFile {
+                    path: change.path.clone(),
+                    contents: present.contents,
+                });
+                self.get_disk_file_map_mut()
+                    .tracked()
+                    .0
+                    .insert(change.path, source_id);
             }
             Presence::Absent => {
-                self.remove_disk_file(change.path.reference());
+                if let Some(source_id) = self
+                    .get_disk_file_map_mut()
+                    .tracked()
+                    .0
+                    .remove(&change.path)
+                {
+                    self.remove(source_id);
+                }
             }
         }
-    }
-
-    fn insert_disk_file(&mut self, path: PathBuf, contents: String) {
-        let source_id = self.set(DiskFile {
-            path: path.clone(),
-            contents,
-        });
-        self.get_disk_file_map_mut()
-            .tracked()
-            .0
-            .insert(path, source_id);
-    }
-
-    fn remove_disk_file(&mut self, path: &Path) -> Option<SourceId<DiskFile>> {
-        self.get_disk_file_map_mut()
-            .tracked()
-            .0
-            .remove(path)
-            .inspect(|&source_id| self.remove(source_id))
     }
 }
 ```
@@ -240,6 +235,6 @@ send-events.md already covers a stopped daemon and `not json`. The harness alrea
 ## Call sites
 
 - `run_event_loop` -> `state.handle`.
-- `IsographEvent::DiskChanged` -> `handle_disk_changed` -> `insert_disk_file` / `remove_disk_file` (`db.set` / `db.remove` plus the tracked map). No effects.
+- `IsographEvent::DiskChanged` -> `handle_disk_changed` (`db.set` / `db.remove` plus the tracked map). No effects.
 - `CliVerb::Send` -> `send::run` (send-events.md). A `DiskChanged` frame is one `IsographEvent`.
 - socket callback -> `on_message` -> `event_tx.send`.
