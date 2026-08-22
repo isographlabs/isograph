@@ -128,6 +128,18 @@ An interned owned param is cloned into the param store the first time that value
 
 A memo result `T` is stored once in that slot and returned as `&T`.
 
+A value read from the database is not an argument to another function that has `db`. The argument is the identity the caller already has (`path`, `LiteralId`, `EntityName`). The inner function reads again.
+
+Source text is `DiskFile.contents` under `path`. A function that needs the file takes `path` and calls `db.disk_file(path)`. The caller does not read the file and pass `contents`. Hover is `path` and `LineChar`. Semantic tokens for a file is `path`. Neither takes the file text. `literal_id_at_location` reads the file. `lsp_semantic_tokens_for_file` reads the file. A helper they call that also takes `db` takes `path` and reads the file itself.
+
+File text as a `String` memo argument is an interned owned param: a new intern per unique file, cloned on every execute. `path` is `Copy`. `db.get` records the source on the memo that uses the text. If the parent reads the file and passes the string, the child's key is the whole file (every edit is a new slot) and the child does not record a source read.
+
+The same for a memo result. The caller has the key. It calls the memo. It does not clone `&T` out of the database to pass as an argument. `iso_literal_extraction` takes `LiteralId` and reads extract. A `(path, LineChar)` memo stores `LiteralId`, not a cloned parse tree.
+
+`parsed_iso_literal(iso_literal_text: String)` is keyed on the literal interior so two files share a parse. That string is the intern key, not `DiskFile.contents` forwarded from a parent. DiskFile contents are never a memo argument.
+
+A function with no `db` is not in pico. `parse_iso_literal` takes `&str`. `find_iso_literal_index` takes a `LineChar`, file text, and the extract vec. `lsp_semantic_tokens` takes `&str`. The memo that has `path` reads the file and calls that function.
+
 ## Iso literals
 
 File text is a source. Extracting the literals in a file is a memo. The `LiteralId` at a `LineChar` is a memo. The extraction at a `LiteralId` is a memo. Parsing the extraction's text is a memo. There is no parse-tree memo keyed on `LineChar`.
@@ -352,7 +364,7 @@ Memo slots accumulate until `run_garbage_collection`. That keeps the last 10_000
 
 The parser takes `&str`. Tests call `parse_iso_literal` with a string. Extract is a memo over a `DiskFile`. Tests intern `"src/a.ts"` and `insert_disk_file`. They do not pass a `PathBuf`.
 
-A caller that needs a parse tree calls the parse memo with the key it has. pico returns `&T`. The caller does not clone a whole file's AST out of the database to hand to another memo. A `(path, LineChar)` memo does not clone the AST into that slot either. It stores `LiteralId`.
+A caller that needs a parse tree calls the parse memo with the key it has. pico returns `&T`. The caller does not clone a whole file's AST out of the database to hand to another memo. That is the same as source text: the inner function has the key and reads; the parent does not pass a value it already read. A `(path, LineChar)` memo does not clone the AST into that slot either. It stores `LiteralId`.
 
 ## Example
 
