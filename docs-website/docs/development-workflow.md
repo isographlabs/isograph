@@ -9,44 +9,17 @@ There are two major places to make changes to Isograph:
 
 ## Global setup
 
-### node and `pnpm`
-
-The node.js and pnpm versions used by Isograph are specified in fields `engines.node` and `packageManager` respectively in the `package.json` file.
-
-In order to ensure you are using the correct versions of these you should install `fnm` for your respective operating system by following [this](https://github.com/Schniz/fnm?tab=readme-ov-file#installation) guide. Optionally, configure fnm for your shell by following [this](https://github.com/Schniz/fnm?tab=readme-ov-file#shell-setup) guide.
-
-Now, navigate to the root directory of your Isograph repository and run the following commands:
-
-```bash
-fnm install --resolve-engines
-fnm use --resolve-engines
-# This makes sure that corepack treats npm the same way as other node package managers.
-# More information at [this link](https://github.com/nodejs/corepack?tab=readme-ov-file#corepack-enable--name)
-corepack enable npm
-corepack enable
-corepack install
-```
-
-These commands will install the appropriate node.js and pnpm version used by Isograph and configure them for your shell session.
-
-You will probably need at least node v24, which you can get via installing nvm, then:
+Install [`mise`](https://mise.jdx.dev/), activate it in your shell (`eval "$(mise activate zsh)"` or the equivalent for your shell), then from the repository root:
 
 ```sh
-nvm install v24.12.0
-nvm use v24.12.0
+mise trust
+mise install
+mise doctor
 ```
 
-### Rust
+`mise.toml` pins Node, pnpm, and bacon. `package.json` `engines.node` and `packageManager` must match those pins. `.node-version` matches the Node pin.
 
-Isograph is built (in CI) using the latest stable version. Rust is fairly stable and we don't rely on anything crazy, so it should be safe to keep your `rustc` up-to-date.
-
-You should also install [`bacon`](https://dystroy.org/bacon/) via
-
-```sh
-cargo install bacon@3.1.1
-```
-
-Versions newer than 3.6 will not work. (This is fixable, but we haven't yet needed to.)
+Rust is still latest stable via rustup. CI installs it with `actions-rust-lang/setup-rust-toolchain`. bacon versions newer than 3.6 will not work with our bacon.toml. (This is fixable, but we have not needed to.)
 
 ## Commands related to the compiler and Rust
 
