@@ -38,7 +38,7 @@ iso(`
 
 The description and the selection set sit on later lines than `field Query.HomeRoute @component`. Entrypoints in the same demos are one line, `iso(\`entrypoint Query.HomeRoute\`)`, with no comma in front of `entrypoint`.
 
-Line breaks in the unpartitioned sequence are `NonBracket(LineBreak)`. The declaration parser skips them before the keyword, before the description, and before the selection set. A comma is still a comma: before `field` / `entrypoint`, `Expected(DECLARATION_KEYWORD, Comma)`.
+Line breaks in the unpartitioned sequence are `NonBracket(LineBreak)`. The declaration parser consumes a run of them before the keyword, before the description, and before the selection set. A comma is still a comma: before `field` / `entrypoint`, `Expected(DECLARATION_KEYWORD, Comma)`.
 
 A list interior still partitions on commas and line breaks. `{ pets {` / `id` / `PetSummaryCard` } is three selections. `{ foo\n{ bar } }` is a scalar plus a failed selection. `[Pet\n!]` does not attach the bang.
 
@@ -335,9 +335,9 @@ pub(crate) fn match_brackets(
 
 `strip_captured_line_breaks` runs in `parse_bracketed` after the group closes: the opening captured those line breaks. `match_brackets` does not call it. The newline after `iso(\`` is a `LineBreak` in the unpartitioned sequence.
 
-## `skip_line_breaks`
+## `consume_line_breaks`
 
-Line breaks are legal before the keyword, before the description, and before the selection set. Those three sites (plus trailing after the declaration so a final newline is not leftover) call `skip_line_breaks`. They are not recorded. A position on a skipped line break answers the containing node.
+Line breaks are legal before the keyword, before the description, and before the selection set. Those three sites (plus trailing after the declaration so a final newline is not leftover) call `consume_line_breaks`. Zero is legal (`iso(\`entrypoint Query.foo\`)`). It is `consume_*`, not `require_*`: a missing run is not an error. `advance`, not `commit`. No semantic token. A position on a consumed line break answers the containing node.
 
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
@@ -369,7 +369,7 @@ impl<'a> ChunkStream<'a> {
     }
 }
 
-    pub(crate) fn skip_line_breaks(&mut self) {
+    pub(crate) fn consume_line_breaks(&mut self) {
         while let Some(peek) = self.peek() {
             match peek.view().item.reference() {
                 ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::LineBreak)) => {
@@ -381,7 +381,7 @@ impl<'a> ChunkStream<'a> {
     }
 ```
 
-`Chunk::stream` is `ChunkStream::new(self.contents.as_slice(), text, tokens, errors)`. `peek`, `consume_token_if`, and `consume_group_if` do not skip. A comma is still there.
+`Chunk::stream` is `ChunkStream::new(self.contents.as_slice(), text, tokens, errors)`. `peek`, `consume_token_if`, and `consume_group_if` do not eat line breaks. A comma is still there.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -459,14 +459,14 @@ fn parse_one_chunk<'a, P>(
 }
 ```
 
-`parse_stream` parses a content slice. It does not skip line breaks. `parse_one_chunk` is that plus `extra_plus_trailing_separator` when leftover is not a list `Separator`.
+`parse_stream` parses a content slice. It does not consume line breaks. `parse_one_chunk` is that plus `extra_plus_trailing_separator` when leftover is not a list `Separator`.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
 fn parse_iso_literal_item(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<IsoLiteralItem, WithSpan<AstError>> {
-    cursor.skip_line_breaks();
+    cursor.consume_line_breaks();
     let keyword = cursor
         .require_token(
             NonBracketTokenKind::Identifier,
@@ -490,7 +490,7 @@ fn parse_entrypoint(
 ) -> Result<EntrypointDeclaration, WithSpan<AstError>> {
     let (parent_type, name) = parse_type_dot_name(cursor)?;
     let directive_set = consume_directives(cursor)?;
-    cursor.skip_line_breaks();
+    cursor.consume_line_breaks();
     EntrypointDeclaration {
         parent_type,
         name: name.map(SelectableNameWrapper),
@@ -506,11 +506,11 @@ fn parse_selectable_declaration(
     let variable_definitions = consume_variable_declaration_list(cursor);
     let target_type = consume_to_target(cursor)?;
     let directive_set = consume_directives(cursor)?;
-    cursor.skip_line_breaks();
+    cursor.consume_line_breaks();
     let description = consume_description(cursor);
-    cursor.skip_line_breaks();
+    cursor.consume_line_breaks();
     let selection_set = consume_selection_set(cursor);
-    cursor.skip_line_breaks();
+    cursor.consume_line_breaks();
     SelectableDeclaration {
         parent_type,
         name: name.map(SelectableNameWrapper),
@@ -524,9 +524,9 @@ fn parse_selectable_declaration(
 }
 ```
 
-`parse_type_dot_name`, `consume_to_target`, `consume_description`, `consume_selection_set`, `consume_directives`, `consume_variable_declaration_list`, and the nested list parsers stay as landed. They do not skip line breaks.
+`parse_type_dot_name`, `consume_to_target`, `consume_description`, `consume_selection_set`, `consume_directives`, `consume_variable_declaration_list`, and the nested list parsers stay as landed. They do not call `consume_line_breaks`.
 
-The skip after `consume_selection_set` (and after an entrypoint's directives) consumes trailing line breaks after `}` so they are not leftover. `field Query.Foo\nto User` does not skip before `to`: `consume_to_target` sees the line break, not `to`. Same for a directive or variable list on the next line.
+The `consume_line_breaks` after `consume_selection_set` (and after an entrypoint's directives) eats trailing line breaks after `}` so they are not leftover. `field Query.Foo\nto User` does not consume line breaks before `to`: `consume_to_target` sees the line break, not `to`. Same for a directive or variable list on the next line.
 
 ## Parse of the unpartitioned sequence
 
@@ -548,7 +548,7 @@ pub(crate) fn parse_chunked_iso_literal(
         tail: tail.to_vec(),
     };
     let mut stream = ChunkStream::new(root.item.0.as_slice(), text, tokens, errors);
-    stream.cursor().skip_line_breaks();
+    stream.cursor().consume_line_breaks();
     if stream.require_end().is_ok() {
         errors.push(AstError::EmptyLiteral.with_span(location));
         return None;
@@ -565,11 +565,11 @@ pub(crate) fn parse_chunked_iso_literal(
 
 Empty is `root.item.0.split_first()`. `None` is `EmptyLiteral` before the stream. `Some((head, tail))` builds the `failed_extra` `NonEmpty` without an index.
 
-`require_end` loses `#[cfg_attr(not(test), expect(dead_code))]`. After skip, a stream at end is `"\n\n"`. `parse_iso_literal_item` skips again (no-op) then requires the keyword.
+`require_end` loses `#[cfg_attr(not(test), expect(dead_code))]`. After `consume_line_breaks`, a stream at end is `"\n\n"`. `parse_iso_literal_item` consumes line breaks again (no-op) then requires the keyword.
 
-`""` and `"   "` are `ChunkedRoot(vec![])`. `"\n\n"` is two `LineBreak` items, `EmptyLiteral`, `None`. `",entrypoint Query.foo"` skips nothing (comma is not a line break), fails at the comma, `Expected(DECLARATION_KEYWORD, Comma)`.
+`""` and `"   "` are `ChunkedRoot(vec![])`. `"\n\n"` is two `LineBreak` items, `EmptyLiteral`, `None`. `",entrypoint Query.foo"`: `consume_line_breaks` does not eat the comma, fails at the comma, `Expected(DECLARATION_KEYWORD, Comma)`.
 
-`parse_stream` and `parse_one_chunk` are `pub(crate)`. The returned `WithSpan` is the whole literal, so a position on a skipped line break or on a consumed keyword of a failed form (`fieldd`) is unmatched on the slot and answers `IsoLiteralSlot`. `item` and `extra` keep the tight spans `parse_stream` assigned.
+`parse_stream` and `parse_one_chunk` are `pub(crate)`. The returned `WithSpan` is the whole literal, so a position on a consumed line break or on a consumed keyword of a failed form (`fieldd`) is unmatched on the slot and answers `IsoLiteralSlot`. `item` and `extra` keep the tight spans `parse_stream` assigned.
 
 Leftover after a complete declaration is `Slot.extra` plus `report_error(Expected(EndOfDeclaration, found))` at the first leftover item that is not a line break: a trailing comma, a second `field` / `entrypoint`.
 
@@ -724,7 +724,7 @@ Delete `Singleton`, `ExtraChunks`, `ChunkedLevelParent`, `ChunkParent`, `AstErro
 
 ### Parse
 
-`skip_line_breaks`, `parse_stream`, `parse_one_chunk`, `parse_chunked_iso_literal`, and the `parse_*` / `consume_*` listings above.
+`consume_line_breaks`, `parse_stream`, `parse_one_chunk`, `parse_chunked_iso_literal`, and the `parse_*` / `consume_*` listings above.
 
 Helpers in `parse_iso_literal.rs` tests:
 
@@ -1004,7 +1004,7 @@ Resolve ancestry that matched `ChunkedLevelParent::Root` matches `ChunkContentIt
         );
     }
 
-    fn skip_line_breaks_does_not_record_them() {
+    fn consume_line_breaks_does_not_record_them() {
         let text = "\nentrypoint Query.foo\n";
         let (parse, errors) = parsed(
             text,
@@ -1020,7 +1020,7 @@ Resolve ancestry that matched `ChunkedLevelParent::Root` matches `ChunkContentIt
     }
 ```
 
-`a_selection_set_on_its_own_line_is_a_second_declaration` is `a_description_and_selection_set_on_following_lines_attach`. `a_second_contentful_chunk_is_multiple_declarations` is `a_second_declaration_on_the_next_line_is_leftover`. `entrypoint\nQuery.foo` fails at the line break: `parse_type_dot_name` does not skip. `a_comma_before_a_second_declaration_is_the_boundary_comma` is `a_comma_then_a_second_declaration_is_leftover_at_the_comma`. `comma_mistakes_are_chunkings_errors_and_the_declaration_still_parses` is `a_comma_before_entrypoint_is_not_skipped`. `a_lone_comma_is_chunkings_error_and_an_empty_literal` is `a_lone_comma_is_a_failed_declaration`.
+`a_selection_set_on_its_own_line_is_a_second_declaration` is `a_description_and_selection_set_on_following_lines_attach`. `a_second_contentful_chunk_is_multiple_declarations` is `a_second_declaration_on_the_next_line_is_leftover`. `entrypoint\nQuery.foo` fails at the line break: `parse_type_dot_name` does not call `consume_line_breaks`. `a_comma_before_a_second_declaration_is_the_boundary_comma` is `a_comma_then_a_second_declaration_is_leftover_at_the_comma`. `comma_mistakes_are_chunkings_errors_and_the_declaration_still_parses` is `a_comma_before_entrypoint_is_not_skipped`. `a_lone_comma_is_chunkings_error_and_an_empty_literal` is `a_lone_comma_is_a_failed_declaration`.
 
 `the_unrecognized_keyword_resolves_as_a_token_in_the_failed_chunk`: `IsoLiteralSlot`.
 
@@ -1038,7 +1038,7 @@ parsing-standards.md:
 - `IsoLiteralParse = Slot<IsoLiteralItem, UnparsedChunkItems>`.
 - Extra leftover is `Slot.extra`. There are no extra chunks on the tree.
 - A level inside brackets is a `ChunkedLevel`. A level that is not is `ChunkedRoot`: `Vec<WithSpan<ChunkContentItem>>`.
-- `ItemCursor::skip_line_breaks` consumes `LineBreak` tokens and records nothing. Call sites: `parse_iso_literal_item` before the keyword; `parse_selectable_declaration` before the description, before the selection set, and after the selection set; `parse_entrypoint` after directives. `peek` / `consume_token_if` / `consume_group_if` do not skip. A comma is not skipped.
+- `ItemCursor::consume_line_breaks` is `consume_*` of a run of `LineBreak` tokens (`advance`, no semantic token). Zero is legal. Call sites: `parse_iso_literal_item` before the keyword; `parse_selectable_declaration` before the description, before the selection set, and after the selection set; `parse_entrypoint` after directives. `peek` / `consume_token_if` / `consume_group_if` do not eat line breaks. A comma is not a line break.
 - `ChunkStream::new` takes a slice. `parse_stream` spans then leftover. `parse_one_chunk` is `parse_stream` plus trailing-separator fold for a real chunk. `parse_chunked_iso_literal` streams the unpartitioned vec.
 - `parse_singleton` returns `WithSpan<Slot<T, UnparsedChunkItems>>`, one-item `ChunkedLevel` interiors only, extra chunks are `Expected(end, found)` plus leftover recording.
 - Diagnostic: `report_error` in `parse_one_chunk`; `errors.push` in `parse_singleton` (boundary comma, extra type chunks) and `parse_iso_literal` (`EmptyLiteral`).
@@ -1048,6 +1048,6 @@ future-improvements.md, "Line break and comma are the same chunk separator": dro
 
 slot-stages.md `require_complete_literal` is `require_complete(parse)`.
 
-parser-minor-improvements.md `parse_singleton assumes a non-empty level`: still true, still `[...]` and the `len() == 0` check in `parse_bracket_interior_type`. The root empty check is `split_first` on the root vec, or skip-then-`require_end` for only line breaks.
+parser-minor-improvements.md `parse_singleton assumes a non-empty level`: still true, still `[...]` and the `len() == 0` check in `parse_bracket_interior_type`. The root empty check is `split_first` on the root vec, or `consume_line_breaks` then `require_end` for only line breaks.
 
 parsing-notes.md: delete the `parse_iso_literal` / `parse_singleton` nonempty note.
