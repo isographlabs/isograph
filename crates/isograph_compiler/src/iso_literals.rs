@@ -33,6 +33,32 @@ pub fn iso_literal_extraction<THostLanguage: HostLanguage>(
     find_iso_literal_extraction(line_char, file_content, extractions).cloned()
 }
 
+#[memo]
+pub fn iso_literal_text_at_location<THostLanguage: HostLanguage>(
+    db: &IsographState<THostLanguage>,
+    path: PathBuf,
+    line_char: LineChar,
+) -> Option<String> {
+    iso_literal_extraction(db, path, line_char)
+        .as_ref()?
+        .iso_literal_text
+        .clone()
+        .wrap_some()
+}
+
+#[memo]
+pub fn parsed_iso_literal_at_location<THostLanguage: HostLanguage>(
+    db: &IsographState<THostLanguage>,
+    path: PathBuf,
+    line_char: LineChar,
+) -> Option<ParsedIsoLiteral> {
+    let text = iso_literal_text_at_location(db, path, line_char)
+        .as_ref()?
+        .clone();
+    // Each (path, LineChar) intern stores a copy of the tree. Parse of `text` is one slot.
+    parsed_iso_literal(db, text).clone().wrap_some()
+}
+
 fn find_iso_literal_extraction<'a, THostLanguage: HostLanguage>(
     target_line_char: LineChar,
     file_content: &str,

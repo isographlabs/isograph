@@ -365,7 +365,10 @@ mod memo_tests {
     use std::path::PathBuf;
 
     use intern::string_key::Intern;
-    use isograph_compiler::{HostLanguage, IsographState, parsed_iso_literal};
+    use isograph_compiler::{
+        HostLanguage, IsographState, LineChar, iso_literal_text_at_location, parsed_iso_literal,
+        parsed_iso_literal_at_location,
+    };
     use isograph_parser::{AstError, IsoLiteralItem, ParseError, ParsedIsoLiteral};
     use prelude::Postfix;
 
@@ -551,5 +554,233 @@ iso(`entrypoint Query.HomeRoute`)";
         );
         let third = parsed_iso_literal(&db, text).clone();
         assert_eq!(first, third);
+    }
+
+    #[test]
+    fn missing_disk_file_has_no_text_or_tree() {
+        let db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = PathBuf::from("/tmp/proj/src/a.ts");
+        let line_char = LineChar {
+            line: 0,
+            character: 0,
+        };
+        assert!(iso_literal_text_at_location(&db, path.clone(), line_char).is_none());
+        assert!(parsed_iso_literal_at_location(&db, path, line_char).is_none());
+    }
+
+    #[test]
+    fn one_line_entrypoint_parses_at_the_interior() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = PathBuf::from("/tmp/proj/src/a.ts");
+        let contents = "iso(`entrypoint Query.HomeRoute`)";
+        intern_file(&mut db, path.clone(), contents);
+        let interior = "entrypoint Query.HomeRoute";
+        let start = contents
+            .find(interior)
+            .expect("the fixture contains the literal text") as u32;
+        let interior_line_char = LineChar {
+            line: 0,
+            character: start,
+        };
+        let text = iso_literal_text_at_location(&db, path.clone(), interior_line_char)
+            .as_ref()
+            .expect("the interior is inside the literal")
+            .clone();
+        assert_eq!(text, interior);
+        let parsed = parsed_iso_literal_at_location(&db, path.clone(), interior_line_char)
+            .as_ref()
+            .expect("the interior is inside the literal");
+        assert!(parsed.errors.is_empty());
+        assert!(matches!(
+            iso_literal_item(parsed),
+            Some(IsoLiteralItem::Entrypoint(_))
+        ));
+        let outside = LineChar {
+            line: 0,
+            character: 0,
+        };
+        assert!(iso_literal_text_at_location(&db, path.clone(), outside).is_none());
+        assert!(parsed_iso_literal_at_location(&db, path.clone(), outside).is_none());
+        let last_byte = LineChar {
+            line: 0,
+            character: start + interior.len() as u32 - 1,
+        };
+        assert!(iso_literal_text_at_location(&db, path.clone(), last_byte).is_some());
+        assert!(parsed_iso_literal_at_location(&db, path.clone(), last_byte).is_some());
+        let one_past = LineChar {
+            line: 0,
+            character: start + interior.len() as u32,
+        };
+        assert!(iso_literal_text_at_location(&db, path.clone(), one_past).is_none());
+        assert!(parsed_iso_literal_at_location(&db, path, one_past).is_none());
+    }
+
+    #[test]
+    fn incomplete_entrypoint_at_location_has_parse_errors() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = PathBuf::from("/tmp/proj/src/a.ts");
+        let contents = "iso(`entrypoint`)";
+        intern_file(&mut db, path.clone(), contents);
+        let character = contents
+            .find("entrypoint")
+            .expect("the fixture contains the literal text") as u32;
+        let parsed = parsed_iso_literal_at_location(&db, path, LineChar { line: 0, character })
+            .as_ref()
+            .expect("the interior is inside the literal");
+        assert!(!parsed.errors.is_empty());
+    }
+
+    #[test]
+    fn multiline_literal_parses_on_the_interior_line() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = PathBuf::from("/tmp/proj/src/a.ts");
+        intern_file(
+            &mut db,
+            path.clone(),
+            "iso(`\nentrypoint Query.HomeRoute\n`)",
+        );
+        let interior = LineChar {
+            line: 1,
+            character: 0,
+        };
+        assert!(iso_literal_text_at_location(&db, path.clone(), interior).is_some());
+        assert!(parsed_iso_literal_at_location(&db, path.clone(), interior).is_some());
+        let iso = LineChar {
+            line: 0,
+            character: 0,
+        };
+        assert!(iso_literal_text_at_location(&db, path.clone(), iso).is_none());
+        assert!(parsed_iso_literal_at_location(&db, path.clone(), iso).is_none());
+        let backtick = LineChar {
+            line: 2,
+            character: 0,
+        };
+        assert!(iso_literal_text_at_location(&db, path.clone(), backtick).is_none());
+        assert!(parsed_iso_literal_at_location(&db, path, backtick).is_none());
+    }
+
+    #[test]
+    fn two_literals_select_by_character() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = PathBuf::from("/tmp/proj/src/a.ts");
+        let contents = "iso(`field Pet.fullName { id }`) iso(`entrypoint Query.HomeRoute`)";
+        intern_file(&mut db, path.clone(), contents);
+        let second = "entrypoint Query.HomeRoute";
+        let parsed = parsed_iso_literal_at_location(
+            &db,
+            path.clone(),
+            LineChar {
+                line: 0,
+                character: contents
+                    .find(second)
+                    .expect("the fixture contains the second literal")
+                    as u32,
+            },
+        )
+        .as_ref()
+        .expect("the second interior is inside the second literal");
+        assert!(matches!(
+            iso_literal_item(parsed),
+            Some(IsoLiteralItem::Entrypoint(_))
+        ));
+        let between = LineChar {
+            line: 0,
+            character: contents
+                .find(") iso")
+                .expect("the fixture has JS between the literals") as u32,
+        };
+        assert!(iso_literal_text_at_location(&db, path.clone(), between).is_none());
+        assert!(parsed_iso_literal_at_location(&db, path, between).is_none());
+    }
+
+    #[test]
+    fn same_text_in_two_files_matches_parsed_iso_literal() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let a = PathBuf::from("/tmp/proj/src/a.ts");
+        let b = PathBuf::from("/tmp/proj/src/b.ts");
+        let contents = "iso(`entrypoint Query.HomeRoute`)";
+        intern_file(&mut db, a.clone(), contents);
+        intern_file(&mut db, b.clone(), contents);
+        let interior = "entrypoint Query.HomeRoute";
+        let character = contents
+            .find(interior)
+            .expect("the fixture contains the literal text") as u32;
+        let line_char = LineChar { line: 0, character };
+        let expected = parsed_iso_literal(&db, interior.to_owned());
+        assert_eq!(
+            parsed_iso_literal_at_location(&db, a, line_char)
+                .as_ref()
+                .expect("file a interior"),
+            expected
+        );
+        assert_eq!(
+            parsed_iso_literal_at_location(&db, b, line_char)
+                .as_ref()
+                .expect("file b interior"),
+            expected
+        );
+    }
+
+    #[test]
+    fn prefix_with_newline_is_a_new_line_char() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = PathBuf::from("/tmp/proj/src/a.ts");
+        let contents = "iso(`entrypoint Query.HomeRoute`)";
+        intern_file(&mut db, path.clone(), contents);
+        let interior = "entrypoint Query.HomeRoute";
+        let character = contents
+            .find(interior)
+            .expect("the fixture contains the literal text") as u32;
+        let old = LineChar { line: 0, character };
+        let before = iso_literal_text_at_location(&db, path.clone(), old)
+            .as_ref()
+            .expect("the interior is inside the literal")
+            .clone();
+        let prefix = "const x = 1;\n";
+        intern_file(&mut db, path.clone(), &(prefix.to_owned() + contents));
+        let new = LineChar { line: 1, character };
+        let after = iso_literal_text_at_location(&db, path.clone(), new)
+            .as_ref()
+            .expect("the new interior is inside the literal")
+            .clone();
+        assert_eq!(before, after);
+        assert_eq!(
+            parsed_iso_literal(&db, after.clone()),
+            parsed_iso_literal(&db, before)
+        );
+        assert!(iso_literal_text_at_location(&db, path, old).is_none());
+    }
+
+    #[test]
+    fn lengthening_an_earlier_line_keeps_the_line_char() {
+        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let path = PathBuf::from("/tmp/proj/src/a.ts");
+        intern_file(
+            &mut db,
+            path.clone(),
+            "const x = 1;\niso(`entrypoint Query.HomeRoute`)",
+        );
+        let line_char = LineChar {
+            line: 1,
+            character: 5,
+        };
+        let before = iso_literal_text_at_location(&db, path.clone(), line_char)
+            .as_ref()
+            .expect("line 1 character 5 is e of entrypoint")
+            .clone();
+        intern_file(
+            &mut db,
+            path.clone(),
+            "const x = 1; const y = 2;\niso(`entrypoint Query.HomeRoute`)",
+        );
+        let after = iso_literal_text_at_location(&db, path, line_char)
+            .as_ref()
+            .expect("the LineChar is still inside the literal")
+            .clone();
+        assert_eq!(before, after);
+        assert_eq!(
+            parsed_iso_literal(&db, after),
+            parsed_iso_literal(&db, before)
+        );
     }
 }
