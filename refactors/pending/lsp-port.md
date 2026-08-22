@@ -63,7 +63,7 @@ struct Lsp {
     message: lsp_server::Message,
 }
 
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize, derive_more::From)]
 #[serde(tag = "kind", content = "value")]
 pub enum IsographEvent {
     HelloWorld,
@@ -72,15 +72,9 @@ pub enum IsographEvent {
     #[serde(skip)]
     Lsp(Lsp),
 }
-
-impl From<Lsp> for IsographEvent {
-    fn from(lsp: Lsp) -> Self {
-        Self::Lsp(lsp)
-    }
-}
 ```
 
-`--file` JSON is `HelloWorld` / `Quit` / `DiskChanged`. `Lsp` is not on the wire as a `kind`. `LspClientId` is monotonic per daemon process, never reused. Origin of `From`: postfix `.to()`. Drop `PartialEq` / `Eq` on `IsographEvent`: `lsp_server::Message` does not implement them. Tests use `matches!`.
+`--file` JSON is `HelloWorld` / `Quit` / `DiskChanged`. `Lsp` is not on the wire as a `kind`. `LspClientId` is monotonic per daemon process, never reused. Origin of `From`: figaro `events.rs` `FigaroTrigger`; `derive_more` 2 `From`. Also `From<DiskChanged>`. Drop `PartialEq` / `Eq` on `IsographEvent`: `lsp_server::Message` does not implement them. Tests use `matches!`.
 
 ```rust
 // from crates/isograph_cli/src/lsp_socket.rs
@@ -337,6 +331,7 @@ The loop skips non-responses (`window/logMessage`, `$/` notifications). Send has
 ```toml
 # from crates/isograph_cli/Cargo.toml
 # drop freddie_event_socket, tungstenite, tokio-tungstenite, futures-util
+derive_more = { version = "2", features = ["from"] }
 lsp-server = { workspace = true }
 lsp-types = { workspace = true }
 tokio = { workspace = true, features = ["rt", "macros", "signal", "sync", "time", "net"] }
