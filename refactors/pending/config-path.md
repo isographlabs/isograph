@@ -4,9 +4,7 @@ Requires config-discovery.md (landed).
 
 `isograph config-path` prints the canonical path of the isograph config for this invocation: `--config` when given, otherwise the nearest `isograph.config.json`, `.js`, or `.ts` at or above the current directory. It does not start the daemon, take the lock, or parse the file as JSON. Exit 0 with the path on stdout. Exit 1 when there is no config.
 
-Origin of the walk-up: `crates/isograph_cli/src/discover.rs` `config_path`. Origin of extra verbs beside `freddie_cli::Verb`: figaro `src/cli/mod.rs`. Delta: one verb, `config-path`.
-
-`--config` on `isograph send` stays. Whether send should always walk up is deferred.
+Origin of the walk-up: `crates/isograph_cli/src/discover.rs` `config_path`. Origin of extra verbs beside `freddie_cli::Verb`: figaro `src/cli/mod.rs`. Delta: one verb, `config-path`. This file does not depend on send-events.md. If `CliVerb` already exists, add `ConfigPath` to it. If not, the snippets introduce `CliVerb`.
 
 ## What the user does
 

@@ -1,6 +1,6 @@
 # Send events to the daemon
 
-Requires event-loop.md (landed), config-discovery.md (landed), and config-path.md. `--config` on send stays. Whether send should always walk up is deferred.
+Requires event-loop.md (landed) and config-discovery.md (landed).
 
 The daemon listens on `freddie_event_socket` at `127.0.0.1:0`. The kernel assigns a port from its local/dynamic range. `isograph send` finds the config, reads the daemon pid from the lock, and discovers that process's loopback TCP listen port. Every event is `Serialize` + `Deserialize`. The wire is `serde_json`. `on_message` deserializes `IsographEvent` and sends it. There is no second event enum. There is no `--port` and no port file.
 
@@ -348,33 +348,34 @@ The record also has `port`. Change 2 sends `HelloWorld` through `isograph send` 
 
 ## Change 2: `isograph send`
 
-A client verb for tests and CI. It does not start the daemon. `--file` is required. It reads that file as one JSON `IsographEvent` and writes it as one websocket text frame. There is no stdin path.
+A client verb for tests and CI. It does not start the daemon. `--file` is required. It reads that file as one JSON `IsographEvent` and writes it as one websocket text frame. Then it deletes `--file`. There is no stdin path.
 
 freddie_cli `Verb` is closed. Extra verbs sit beside it, the way figaro's launch-agent verbs do.
 
 ```rust
 // from crates/isograph_cli/src/lib.rs (before)
-#[derive(clap::Subcommand)]
-enum CliVerb {
-    /// start, restart, status, logs, stop, and the hidden daemon.
-    #[command(flatten)]
-    Lifecycle(freddie_cli::Verb<Isograph>),
-
-    /// Print the canonical isograph config path.
-    ConfigPath(ConfigFlag),
+#[derive(Parser)]
+#[command(name = "isograph", version, about = "The isograph compiler.", long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    verb: Option<freddie_cli::Verb<Isograph>>,
 }
 ```
 
 ```rust
 // from crates/isograph_cli/src/lib.rs (after)
+#[derive(Parser)]
+#[command(name = "isograph", version, about = "The isograph compiler.", long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    verb: Option<CliVerb>,
+}
+
 #[derive(clap::Subcommand)]
 enum CliVerb {
     /// start, restart, status, logs, stop, and the hidden daemon.
     #[command(flatten)]
     Lifecycle(freddie_cli::Verb<Isograph>),
-
-    /// Print the canonical isograph config path.
-    ConfigPath(ConfigFlag),
 
     /// Write one IsographEvent JSON frame to the running daemon.
     Send(SendArgs),
@@ -394,10 +395,7 @@ struct SendArgs {
 ```rust
 // from crates/isograph_cli/src/lib.rs (before)
     match cli.verb {
-        Some(CliVerb::Lifecycle(verb)) => {
-            freddie_cli::run_lifecycle_verb::<Isograph>(verb, matches.reference())
-        }
-        Some(CliVerb::ConfigPath(id)) => config_path::run(id.reference()),
+        Some(verb) => freddie_cli::run_lifecycle_verb::<Isograph>(verb, matches.reference()),
         None => freddie_cli::run_lifecycle_verb::<Isograph>(
             freddie_cli::verb_for_bare_invocation::<Isograph>(),
             matches.reference(),
@@ -411,7 +409,6 @@ struct SendArgs {
         Some(CliVerb::Lifecycle(verb)) => {
             freddie_cli::run_lifecycle_verb::<Isograph>(verb, matches.reference())
         }
-        Some(CliVerb::ConfigPath(id)) => config_path::run(id.reference()),
         Some(CliVerb::Send(args)) => send::run(args.reference()),
         None => freddie_cli::run_lifecycle_verb::<Isograph>(
             freddie_cli::verb_for_bare_invocation::<Isograph>(),
@@ -482,7 +479,9 @@ enum SendError {
 
 #[expect(clippy::print_stderr)]
 pub fn run(args: &SendArgs) -> ExitCode {
-    match run_inner(args) {
+    let result = run_inner(args);
+    let _ = fs::remove_file(args.file.reference());
+    match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("{e}");
@@ -580,6 +579,8 @@ fn parse_netstat(stdout: &str, pid: u32) -> Vec<u16> {
 
 Origin of a subprocess instead of an unsafe bind: `freddie_cli` `signal_pid` uses `/bin/kill`. The event socket is this process's only loopback TCP listen.
 
+`remove_file` runs after `run_inner`, success or failure, so a CI temp file does not remain. A failed remove does not change the exit code.
+
 Validate then send. A frame the daemon would drop is rejected at the client with a non-zero exit. The daemon still drops undeserializable frames from any other client.
 
 Blocking `tungstenite`, not tokio, on the client. The daemon already has a runtime; the client is a one-shot.
@@ -659,6 +660,7 @@ fn the_log_contains_the_config_path() {
         stderr(sent.reference())
     );
     poll(|| daemon.log_text().contains("hello world").then_some(()));
+    assert!(!frame.exists(), "send deletes --file");
 }
 
 #[test]
@@ -680,6 +682,7 @@ fn send_with_the_daemon_stopped_fails() {
     assert!(!output.status.success());
     let err = stderr(output.reference());
     assert!(err.contains("not running"), "{err}");
+    assert!(!frame.exists(), "send deletes --file");
 }
 
 #[test]
@@ -690,6 +693,7 @@ fn send_of_not_json_fails() {
     assert!(!sent.status.success());
     let err = stderr(sent.reference());
     assert!(err.contains("IsographEvent"), "{err}");
+    assert!(!frame.exists(), "send deletes --file");
 }
 ```
 
