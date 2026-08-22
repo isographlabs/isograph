@@ -138,6 +138,8 @@ Error types use `thiserror`: `#[error("...")]` on the derive, `#[error("{0}")]` 
 
 A non-error type must not implement `std::error::Error`. A non-error enum that needs `Display` uses `strum::Display` (`#[strum(to_string = "...")]` on the variants).
 
+`From` for an enum variant's payload is `derive_more::From`. `#[from]` on the variants that should convert; omit it or `#[from(skip)]` on the others. Do not hand-write `impl From<T> for TheEnum`. strum is `Display` / `FromStr` / `FromRepr`, not `From<payload>`.
+
 ## Postfix wrappers
 
 Do not write prefix or constructor wrappers that `prelude::Postfix` or `span::WithSpanPostfix` already names.
