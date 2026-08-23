@@ -46,9 +46,9 @@ languages = ["JavaScript", "JSX", "TypeScript", "TSX"]
 "TSX" = "typescriptreact"
 ```
 
-The `languages` values are Zed's names for the built-in languages, matching each language's `config.toml` `name`. The extension does not define a new language. Iso literals live inside JS/TS files.
+The `languages` values are Zed's names for the built-in languages, matching each language's `config.toml` `name`. Iso literals live inside JS/TS files. This slice does not register an `isograph` language or a `.iso` file type.
 
-A language directory (`languages/isograph/config.toml`, `highlights.scm`) is only needed if we invent a standalone `.iso` file type. We do not.
+GraphQL schema files (`.graphql`) are a separate language: tree-sitter, not `isograph lsp`. That is `refactors/pending/zed-graphql-schema.md`. Do not add `languages/isograph/`.
 
 ```toml
 # from zed-extension/Cargo.toml
@@ -243,6 +243,10 @@ README: Install Dev Extension, point at `zed-extension/`. Set `semantic_tokens` 
 A test in `crates/ts_graphql_react_isograph_cli/tests/` that spawns `CARGO_BIN_EXE_isograph` with `lsp`, writes LSP headers+JSON to stdin, reads stdout. Assert initialize result has `semanticTokensProvider`. Open a document whose text is `iso(\`field Pet.fullName { id }\`)`. Request semantic tokens. Assert `data` is non-empty and the first `token_type` is 15 (KEYWORD). HOME isolation as in `tests/cli.rs`.
 
 This is the highlighting test. It does not import `vscode` or Zed.
+
+### Change 4: GraphQL schema files
+
+`refactors/pending/zed-graphql-schema.md`. Tree-sitter language for SDL. After change 1. Blocked on the GraphQL extension's language name, grammar id, and suffixes.
 
 ## Local iteration
 
