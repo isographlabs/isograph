@@ -51,7 +51,7 @@ fn handle(state: &mut IsographState, event: IsographEvent) -> Vec<IsographEffect
 
 `IsographState` is the pico database. The test harness calls `handle`. It does not start a daemon, open a socket, or write a file. A test constructs a `DiskChanged` or `EditorChanged`, runs `handle`, and asserts the effects and the `DiskFile` sources. The binary's event loop calls the same `handle` with the same types.
 
-`handle` of `LspRequest` runs isograph `LSPRequestDispatch` and returns `Vec<IsographEffect>`. This slice that is one immediate `SendLspResponse`. Leftover is `MethodNotFound`. Later a handler can return a timer plus an event; `handle` of that event is an immediate `SendLspResponse`. `handle` of `LspNotification` runs isograph `LSPNotificationDispatch`. Leftover is no effects. `handle` does not touch the socket. The effect loop writes the `Response`.
+`handle` of `LspRequest` returns `Vec<IsographEffect>`. This slice that is `method_not_found`: one immediate `SendLspResponse`. No request is dispatched. Later a handler can return a timer plus an event; `handle` of that event is an immediate `SendLspResponse`. `handle` of `LspNotification` runs isograph `LSPNotificationDispatch`. Leftover is no effects. `handle` does not touch the socket. The effect loop writes the `Response`.
 
 `handle` does not know about globs, gitignore, or "in scope". Scope is the watcher's job. `isograph send` may inject any path.
 
