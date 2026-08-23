@@ -387,7 +387,7 @@ Facts:
 
 ### Formatter metadata
 
-`SemanticToken` gains `line_behavior` and `indent_change`, the fields on upstream `IsographSemanticToken`. The formatter walks `Vec<WithSpan<SemanticToken>>` the way `crates/isograph_lsp/src/format.rs` walks the upstream vec.
+Not a field on `SemanticToken`. Consume passes a `Layout` next to the highlight role. iso-format.md.
 
 ### Cheap pass
 
