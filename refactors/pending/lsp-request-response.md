@@ -39,7 +39,7 @@ pub enum IsographEvent {
 }
 ```
 
-`--file` JSON is unchanged. `LspRequest` is not a wire kind. Drop `PartialEq` / `Eq` on `IsographEvent`: `Sender` does not implement them. Tests use `matches!` or compare `DiskChanged` fields.
+`--file` JSON is unchanged. `LspRequest` is not a wire kind. No `PartialEq` / `Eq` on `IsographEvent`. `Sender` does not implement them. Do not add a tests-only impl. Tests use `matches!` or compare `DiskChanged` fields.
 
 `reply` is `connection.sender.clone()`. Request id is `request.id`. Do not duplicate it as a field.
 
@@ -60,7 +60,7 @@ pub enum IsographEffect {
 }
 ```
 
-Drop `PartialEq` / `Eq`. `Sender` does not implement them. A `PartialEq` that is false for `LspRespond` is not reflexive. Daemon and `state.rs` tests that `assert_eq` effects become `matches!` (or `effects.is_empty()`). Tests of `LspRespond` match the variant and `response.error` code.
+No `PartialEq` / `Eq`. Nothing in production compares effects. `Sender` does not implement them. Do not add a tests-only impl. Daemon and `state.rs` tests that `assert_eq` an effect become `matches!`. Empty effects: `effects.is_empty()`. `LspRespond` tests match the variant and `response.error` code.
 
 ### `handle`
 
