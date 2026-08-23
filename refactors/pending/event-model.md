@@ -9,7 +9,7 @@ Requires config-discovery.md (landed), the event-model design-doc, and `docs-web
 3. config-path.md (landed). `isograph config-path` prints the canonical config path.
 4. filesystem-events.md (landed). `IsographState` is the pico database. `DiskChanged` with `Presence` interns or removes `DiskFile`. Files arrive through `isograph send`.
 5. config-source-files.md (landed). Config field `source_files`: a `Vec` of glob strings.
-6. filesystem-watcher.md. Later. After 4 and 5. Two changes in that file: `DiskChanged` file vs folder and `remove_disk_files_from_path`, then the OS watcher. `isograph start --filesystem watch|injected`. Default `Watch`.
+6. filesystem-watcher.md (landed). After 4 and 5. Two changes in that file: `DiskChanged` file vs folder and `remove_disk_files_from_path`, then the OS watcher. `isograph start --filesystem watch|injected`. Default `Watch`.
 7. extract-iso-literals-from-file.md (landed). After 4. Extract does not parse. pico memo `HostLanguage::extract_iso_literals` (file, the whole vec), `#[memo]` on the TypeScript impl like isograph `CompilationProfile`. `IsoLiteralExtraction` with text, context, and byte start. `IsographState<THostLanguage>` lives in `isograph_compiler`.
 8. memoized-parse-iso-literal.md (landed). After 7. pico memo `parsed_iso_literal` keyed on the literal text. Host embedding errors after parse. `file_literals` on `db` + `path`.
 9. literal-id.md (landed). After 7 and 8. pico memo `literal_id_at_location` (file + `LineChar`) stores `LiteralId` (path plus 0-based extract index). pico memo `iso_literal_extraction` is keyed on `LiteralId`. No parse tree or literal string stored at `(path, LineChar)`.

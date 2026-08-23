@@ -41,7 +41,7 @@ enum Filesystem {
 }
 ```
 
-`Watch` starts a source that observes the OS and emits `DiskChanged`. `Injected` does not scan and does not watch. The LSP port listens in both modes. The CLI and the adapter submit `Internal` events into the same `handle`. Until filesystem-watcher.md lands, `DiskChanged` arrives only through `isograph send`. After that, `Watch` posts in-process and `Injected` still uses send.
+`Watch` starts a source that observes the OS and emits `DiskChanged`. `Injected` does not scan and does not watch. The LSP port listens in both modes. The CLI and the adapter submit `Internal` events into the same `handle`. `Watch` posts in-process. `Injected` still uses `isograph send`.
 
 ## Inner
 
@@ -75,7 +75,7 @@ Figaro is one process per machine, so a default port is enough. Isograph is one 
 
 The LSP port binds `127.0.0.1:0`. The kernel assigns a port from its local/dynamic range. There is no `--port`. After the lock, `run_daemon` unlinks the leftover `{slug}.port` before loading the config, then `serve` binds and writes the port to a sibling of its lock (`{slug}.lock` → `{slug}.port`). On quit, after `Kill` ends the loops, `serve` unlinks the file, then `process::exit(0)`. Flock is released when the holder dies. `isograph send` reads the lock, then that file. `Held::Free` is not running and the file is not consulted. Lock held and the file absent means the daemon has taken the lock and has not bound yet, or is on the way out; send fails. Send does not wait.
 
-There is one listener. There is no `{slug}.lsp` and no `freddie_event_socket`. Until the watcher exists, `isograph send` is the only source of `DiskChanged` and carries `Present.contents` on the wire.
+There is one listener. There is no `{slug}.lsp` and no `freddie_event_socket`. `Watch` posts `DiskChanged` in-process. `Injected` uses `isograph send`, which carries `Present.contents` on the wire.
 
 ## Event
 
