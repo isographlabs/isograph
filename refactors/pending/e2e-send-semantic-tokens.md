@@ -1,10 +1,10 @@
 # E2E: `isograph send`, then `textDocument/semanticTokens/full`
 
-Requires lsp-tokens.md. Independent of filesystem-watcher.md (the tests use `--filesystem injected`). Independent of lsp-sessions.md, lsp-proxy.md, lsp-diagnostics.md.
+Requires lsp-tokens.md and no-poll-in-tests.md. Independent of filesystem-watcher.md (the tests use `--filesystem injected`). Independent of lsp-sessions.md, lsp-proxy.md, lsp-diagnostics.md.
 
 Origin of send: landed `cli.rs` / `isograph send`. Origin of tokens: lsp-tokens.md `semantic_tokens_response` / `lsp_semantic_tokens_for_file`. Origin of the socket helpers: `lsp_socket.rs` `connect` / `split` / `write_message` / `read_message` / `initialize`. Delta: `cli.rs` drives the built `isograph` binary. `Daemon::start` already passes `--filesystem injected`. Ingest is `isograph send` of `DiskChanged::File`. The query is a second TCP client of `{slug}.port` that sends `textDocument/semanticTokens/full`. No new verb. No production code.
 
-`isograph send` writes `isograph/event` and exits. It does not wait for `handle`. A request on a second connection immediately after send can see JSON `null`. The tests poll `semanticTokens/full` until the intern is visible (10s deadline, same `poll` as today).
+`isograph send` writes `isograph/event` and exits. It does not wait for `handle`. After send, `settle()` once, then one `semantic_tokens_full`. Tests do not poll.
 
 One shippable change.
 
@@ -154,15 +154,6 @@ JSON `null` and an omitted `result` are `None` (no `DiskFile`). `{ "data": [] }`
 
 ```rust
 // from crates/ts_graphql_react_isograph_cli/tests/cli.rs
-fn wait_until_up(daemon: &Daemon) {
-    poll(|| {
-        daemon
-            .log_text()
-            .contains("isograph daemon up")
-            .then_some(())
-    });
-}
-
 fn source_path(daemon: &Daemon, relative: &str) -> std::path::PathBuf {
     daemon
         .dir
@@ -239,22 +230,24 @@ url = { workspace = true }
 
 ## Tests
 
-`cli.rs`. `Daemon::start` (`--filesystem injected`). Do not call `start_watch`. Do not write the `.ts` path.
+`cli.rs`. `Daemon::start` (`--filesystem injected`, already settled). Do not call `start_watch`. Do not write the `.ts` path.
 
-`wait_until_up`, then `isograph send` when the case has a file to intern, then `LspClient::connect(daemon_port)` and `file_uri` of the same absolute path as the frame. Keep that connection open. After send, `poll` `semantic_tokens_full` until the intern is visible.
+`isograph send` when the case has a file to intern, `settle()`, then `LspClient::connect(daemon_port)` and `file_uri` of the same absolute path as the frame. One `semantic_tokens_full`. Keep that connection open across a second send in the absent and prefix tests.
 
 ```rust
 // from crates/ts_graphql_react_isograph_cli/tests/cli.rs
 #[test]
 fn send_of_a_present_iso_literal_returns_entrypoint_as_keyword() {
     let daemon = Daemon::start();
-    wait_until_up(daemon.reference());
     let path = source_path(daemon.reference(), "src/Home.ts");
     assert!(!path.exists(), "injected send does not write the path");
     send_json(daemon.reference(), present(path.reference(), CONTENTS));
+    settle();
     let mut client = LspClient::connect(daemon_port(daemon.reference()));
     let uri = file_uri(path.reference());
-    let tokens = poll(|| client.semantic_tokens_full(uri.as_str()));
+    let tokens = client
+        .semantic_tokens_full(uri.as_str())
+        .expect("the test interned this path");
     assert!(!path.exists(), "injected send does not write the path");
     assert_eq!(tokens[0].delta_line, 0);
     assert_eq!(tokens[0].token_type, KEYWORD);
@@ -268,7 +261,6 @@ fn send_of_a_present_iso_literal_returns_entrypoint_as_keyword() {
 #[test]
 fn send_of_a_path_never_interned_returns_null_tokens() {
     let daemon = Daemon::start();
-    wait_until_up(daemon.reference());
     let path = source_path(daemon.reference(), "src/missing.ts");
     let mut client = LspClient::connect(daemon_port(daemon.reference()));
     let uri = file_uri(path.reference());
@@ -278,40 +270,47 @@ fn send_of_a_path_never_interned_returns_null_tokens() {
 #[test]
 fn send_of_a_present_file_with_no_iso_returns_empty_data() {
     let daemon = Daemon::start();
-    wait_until_up(daemon.reference());
     let path = source_path(daemon.reference(), "src/Home.ts");
     send_json(
         daemon.reference(),
         present(path.reference(), "export const x = 1;\n"),
     );
+    settle();
     let mut client = LspClient::connect(daemon_port(daemon.reference()));
     let uri = file_uri(path.reference());
-    let tokens = poll(|| client.semantic_tokens_full(uri.as_str()));
+    let tokens = client
+        .semantic_tokens_full(uri.as_str())
+        .expect("the test interned this path");
     assert!(tokens.is_empty());
 }
 
 #[test]
 fn send_of_absent_after_present_returns_null_tokens() {
     let daemon = Daemon::start();
-    wait_until_up(daemon.reference());
     let path = source_path(daemon.reference(), "src/Home.ts");
     send_json(daemon.reference(), present(path.reference(), CONTENTS));
+    settle();
     let mut client = LspClient::connect(daemon_port(daemon.reference()));
     let uri = file_uri(path.reference());
-    let _present = poll(|| client.semantic_tokens_full(uri.as_str()));
+    let _present = client
+        .semantic_tokens_full(uri.as_str())
+        .expect("the test interned this path");
     send_json(daemon.reference(), absent(path.reference()));
-    poll(|| client.semantic_tokens_full(uri.as_str()).is_none().then_some(()));
+    settle();
+    assert!(client.semantic_tokens_full(uri.as_str()).is_none());
 }
 
 #[test]
 fn send_prefix_increments_delta_line_and_keeps_keyword() {
     let daemon = Daemon::start();
-    wait_until_up(daemon.reference());
     let path = source_path(daemon.reference(), "src/Home.ts");
     send_json(daemon.reference(), present(path.reference(), CONTENTS));
+    settle();
     let mut client = LspClient::connect(daemon_port(daemon.reference()));
     let uri = file_uri(path.reference());
-    let before = poll(|| client.semantic_tokens_full(uri.as_str()));
+    let before = client
+        .semantic_tokens_full(uri.as_str())
+        .expect("the test interned this path");
     send_json(
         daemon.reference(),
         present(
@@ -319,10 +318,11 @@ fn send_prefix_increments_delta_line_and_keeps_keyword() {
             &("const x = 1;\n".to_owned() + CONTENTS),
         ),
     );
-    let after = poll(|| {
-        let tokens = client.semantic_tokens_full(uri.as_str())?;
-        (tokens[0].delta_line == 1).then_some(tokens)
-    });
+    settle();
+    let after = client
+        .semantic_tokens_full(uri.as_str())
+        .expect("the test interned this path");
+    assert_eq!(after[0].delta_line, 1);
     assert_eq!(after[0].delta_start, before[0].delta_start);
     assert_eq!(after[0].token_type, KEYWORD);
     assert_eq!(after[0].length, 10);
@@ -330,8 +330,6 @@ fn send_prefix_increments_delta_line_and_keeps_keyword() {
 ```
 
 `send_of_a_path_never_interned_returns_null_tokens`: no send of that path. Initialize has already succeeded, so the first `full` is the answer.
-
-Prefix polls until `delta_line == 1` so a stale pre-prefix reply is not accepted.
 
 Existing send tests stay. They still do not request tokens.
 

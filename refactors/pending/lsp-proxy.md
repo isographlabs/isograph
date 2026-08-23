@@ -402,9 +402,9 @@ fn spawn(&self, args: &[&str]) -> std::process::Child {
 
 `Daemon::isograph` stays `.output()`. Existing tests are unchanged.
 
-Helper: write initialize (`capabilities: {}`, id 1, same params as `send::notify`), read the first `Message::Response` on a thread, `poll` the channel until 10s. Assert `error` is `None` and `result` is an object with a `capabilities` key. Do not send `initialized` unless a later assertion needs the session past handshake.
+Helper: write initialize (`capabilities: {}`, id 1, same params as `send::notify`), read the first `Message::Response` on a thread, `rx.recv_timeout(Duration::from_secs(10))`. Nested start can exceed `SETTLE`. Assert `error` is `None` and `result` is an object with a `capabilities` key. Do not send `initialized` unless a later assertion needs the session past handshake.
 
-After the assertion: drop stdin, `poll` `child.try_wait()`, assert the status is success. Then `status` is running. Then `STOP`. Then `status` is not running. `Daemon`'s `Drop` still `--force`s.
+After the assertion: drop stdin, `child.wait()`, assert the status is success. Then `status` is running. Then `STOP`. Then `status` is not running. `Daemon`'s `Drop` still `--force`s. Tests do not poll (no-poll-in-tests.md).
 
 If a test panics before dropping stdin, `Daemon::drop` stops the daemon, the proxy's socket EOF, `process::exit(0)`.
 
@@ -428,7 +428,9 @@ fn read_initialize_result(stdout: impl std::io::Read + Send + 'static) -> lsp_se
         let message = lsp_server::Message::read(&mut reader);
         let _ = tx.send(message);
     });
-    let message = poll(|| rx.try_recv().ok());
+    let message = rx
+        .recv_timeout(Duration::from_secs(10))
+        .expect("initialize was answered");
     let message = message
         .expect("reading an lsp message")
         .expect("the proxy stayed open");
@@ -445,7 +447,7 @@ fn read_initialize_result(stdout: impl std::io::Read + Send + 'static) -> lsp_se
 }
 ```
 
-`poll` already exists. `Message::read` blocks, so it lives on a thread.
+`Message::read` blocks, so it lives on a thread. `recv_timeout` is one wait for that message, not a poll.
 
 - `lsp_is_in_help`: `isograph --help` contains `lsp`. Does not hide it. Still does not contain `send`. `isograph lsp --help` contains `config`.
 - `lsp_with_the_daemon_stopped_starts_it`: fixture as `Daemon::start` (`{"source_files":[]}`), do not call `start` first. `spawn(["lsp"])`, write initialize, read a response with `capabilities`, drop stdin, child exits 0, `status` running, `STOP`, `status` not running. Nested start uses default `Watch`. Empty `source_files` is already a watch path (`watch_of_empty_source_files_logs_scan_finished`).
