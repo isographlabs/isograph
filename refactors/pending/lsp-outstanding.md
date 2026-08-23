@@ -35,16 +35,12 @@ pub(crate) struct Lsp {
     pub reply: crossbeam::channel::Sender<lsp_server::Message>,
 }
 
-#[derive(Debug, serde::Deserialize, serde::Serialize, derive_more::From)]
-#[serde(tag = "kind", content = "value")]
+#[derive(Debug, derive_more::From)]
 pub enum IsographEvent {
-    HelloWorld,
-    Quit,
-    DiskChanged(DiskChanged),
-    #[serde(skip)]
     #[from]
     Lsp(Lsp),
-    #[serde(skip)]
+    #[from]
+    Ingested(Ingested),
     #[from]
     LspClientGone(LspClientGone),
 }
@@ -101,9 +97,7 @@ Not pico. Not on `IsographState`. Lives in `run_event_loop`.
             IsographEvent::LspClientGone(gone) => {
                 outstanding.inner.retain(|(client, _)| *client != gone.client);
             }
-            IsographEvent::HelloWorld
-            | IsographEvent::Quit
-            | IsographEvent::DiskChanged(_) => {}
+            IsographEvent::Ingested(_) => {}
         }
         let effects = handle(&mut state, event);
         for effect in effects {

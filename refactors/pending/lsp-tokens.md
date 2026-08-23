@@ -2,7 +2,7 @@
 
 Requires lsp-request-response.md and lsp-dispatch.md. Independent of filesystem-watcher.md. Independent of lsp-sessions.md.
 
-`dispatch_lsp` request arm is `method_not_found`. This file puts `LSPRequestDispatch` around it: `.on_request_sync::<SemanticTokensFullRequest>(semantic_tokens_response)?` then leftover `method_not_found`. Do not special-case tokens in `run_session`. `isograph/event` stays a notification arm.
+`dispatch_lsp_request` is `LSPRequestDispatch` with zero `on_request_sync` calls. This file inserts `.on_request_sync::<SemanticTokensFullRequest>(semantic_tokens_response)?` before `.request()`. Do not special-case tokens in `run_session`. `isograph/event` stays a notification arm.
 
 Origin of the method: `lsp_types::request::SemanticTokensFullRequest`. Origin of the handler: isograph `on_semantic_token_full_request`. Origin of tokens: `lsp_semantic_tokens_for_file`. Origin of initialize options: isograph `server.rs` `initialize`. Origin of the dispatcher: isograph `LSPRequestDispatch`. Delta: URI to path has no `expect`; missing `DiskFile` is `Ok(None)` (JSON `null`).
 
