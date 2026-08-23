@@ -1,14 +1,14 @@
 # Outstanding LSP requests
 
-Requires lsp-request-response.md. Independent of lsp-dispatch.md, lsp-tokens.md, lsp-sessions.md.
+Requires lsp-request-response.md and lsp-sessions.md. Independent of lsp-dispatch.md and lsp-tokens.md.
 
-`handle` of `Lsp` whose message is a request always returns `SendLspResponse` in the same turn. After disconnect, `Lsp` events can still sit on `event_rx`. This slice drops those replies: a per-connection id, `Client::Gone` when the session ends, and a `HashSet<(ClientId, RequestId)>` on the event loop.
+`handle` of `Lsp` whose message is a request always returns `SendLspResponse` in the same turn. After disconnect, `Lsp` events can still sit on `event_rx`. This slice drops those replies: `ClientId` and `Client::Gone` are already on the session (lsp-sessions.md). A `HashSet<(ClientId, RequestId)>` on the event loop is this slice.
 
 JSON-RPC ids are per connection. Two clients can both use id `1`. Keys are `(ClientId, RequestId)`.
 
 `handle` stays synchronous. The set is empty except while a request is in `handle`, and for ids still on `event_rx` after `Client::Gone`. Cancel and async replies are later readers of the same table.
 
-Origin: landed `Lsp` / `SendLspResponse`. Delta: `ClientId` on the session and on `Lsp` / `SendLspResponse`, `Client::Gone`, outstanding on `run_event_loop`.
+Origin: landed `Lsp` / `SendLspResponse`; lsp-sessions.md `ClientId` / `Client::Gone`. Delta: `client` on `LspRequest` and on `SendLspResponse`, outstanding on `run_event_loop`.
 
 One shippable change. MethodNotFound bytes do not change. Send tests stay green.
 
@@ -18,42 +18,18 @@ Same as today. Dropping a client while a request is queued does not write a resp
 
 ## Types
 
-Most important first.
+Most important first. `ClientId` and `Client` are lsp-sessions.md.
 
 ```rust
 // from crates/isograph_cli/src/event.rs
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub(crate) struct ClientId(u64);
-
-#[derive(Clone, Debug)]
-pub enum Client {
-    Gone(ClientId),
-}
-
 pub struct LspRequest {
     pub client: ClientId,
     pub request: lsp_server::Request,
     pub reply: crossbeam::channel::Sender<lsp_server::Message>,
 }
-
-pub enum Lsp {
-    Request(LspRequest),
-    Notification(lsp_server::Notification),
-    Response(lsp_server::Response),
-}
-
-#[derive(Debug, derive_more::From)]
-pub enum IsographEvent {
-    #[from]
-    Lsp(Lsp),
-    #[from]
-    Internal(Internal),
-    #[from]
-    Client(Client),
-}
 ```
 
-`LspRequest` gains `client`. `#[from]` on `Client`. `Client` is not `Internal`: it is not on the `isograph/event` wire.
+`LspRequest` gains `client`. `run_session` already has `client` (sessions.md). Put it on every `Lsp::Request`.
 
 ```rust
 // from crates/isograph_cli/src/effect.rs
@@ -78,10 +54,7 @@ Lives in `run_event_loop`.
 
 ### `handle`
 
-```rust
-// from crates/isograph_cli/src/state.rs
-        IsographEvent::Client(_) => Vec::new(),
-```
+`handle` of `Client` stays the sessions.md passthrough (`IsographEffect::Client`). This slice does not change that.
 
 `method_not_found` sets `client: lsp.client` and `id` from the request on `SendLspResponse`.
 
@@ -103,6 +76,7 @@ Lives in `run_event_loop`.
             IsographEvent::Client(crate::event::Client::Gone(client)) => {
                 outstanding.inner.retain(|(id, _)| *id != *client);
             }
+            IsographEvent::Client(crate::event::Client::Started(_)) => {}
             IsographEvent::Internal(_) => {}
         }
         let effects = handle(&mut state, event);
@@ -111,7 +85,9 @@ Lives in `run_event_loop`.
                 IsographEffect::SendLspResponse(respond) => outstanding
                     .inner
                     .remove(&(respond.client, respond.id.clone())),
-                IsographEffect::LogHelloWorld | IsographEffect::Kill => true,
+                IsographEffect::LogHelloWorld
+                | IsographEffect::Kill
+                | IsographEffect::Client(_) => true,
             };
             if forward {
                 let _ = effect_tx.send(effect);
@@ -120,40 +96,26 @@ Lives in `run_event_loop`.
     }
 ```
 
-`remove` is whether the id was still open. `SendLspResponse` whose pair is absent is not forwarded.
+`remove` is whether the id was still open. `SendLspResponse` whose pair is absent is not forwarded. `Client` effects still forward.
 
 ### Session
 
-`accept_loop` assigns `ClientId` with a `mut u64` on that task (`next += 1` before `spawn`). Pass it into `session`.
+`accept_loop` already assigns `ClientId` and `session` already posts `Client::Gone` (sessions.md). `run_session` takes `client` and puts it on `Lsp::Request`.
 
 ```rust
 // from crates/isograph_cli/src/lsp_socket.rs
-fn session(
-    stream: std::net::TcpStream,
-    event_tx: tokio::sync::mpsc::UnboundedSender<crate::event::IsographEvent>,
-    client: crate::event::ClientId,
-) {
-    let (connection, io_threads) = match connection_from_stream(stream) {
-        Ok(pair) => pair,
-        Err(e) => {
-            debug!(error = %e, "lsp transport");
-            return;
-        }
-    };
-    run_session(&connection, event_tx.clone(), client);
-    let _ = event_tx.send(crate::event::Client::Gone(client).to());
-    drop(connection);
-    let _ = io_threads.join();
-}
+            lsp_server::Message::Request(request) => {
+                crate::event::Lsp::Request(crate::event::LspRequest {
+                    client,
+                    request,
+                    reply: connection.sender.clone(),
+                })
+            }
 ```
-
-`run_session` takes `client` and puts it on `Lsp`.
 
 ## Tests
 
-`handle` of `Client::Gone` is no effects.
-
-`lsp_socket.rs`: drop a connection after initialize. `event_rx` receives `Client::Gone`. A second connection HelloWorld still works. Two connections that both drop produce two `Client::Gone` with different `ClientId`s.
+`lsp_socket.rs`: drop a connection after initialize. `event_rx` receives `Client::Gone` (sessions.md). A second connection HelloWorld still works. Two connections that both drop produce two `Client::Gone` with different `ClientId`s.
 
 `handle` still returns `SendLspResponse` in the same turn as an `Lsp` request. A dropped in-flight reply is not observable until a later slice can defer the response. Do not assert it here.
 
@@ -161,7 +123,6 @@ Do not add a production API only tests call.
 
 ## Call sites
 
-- `accept_loop` -> `ClientId` -> `session`
-- `run_session` end -> `Client::Gone`
+- `run_session` -> `client` on `LspRequest`
 - `run_event_loop` -> outstanding insert / retain / remove
 - later cancel / async reply -> the same set
