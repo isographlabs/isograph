@@ -390,13 +390,13 @@ async fn serve<THostLanguage: HostLanguage>(
         () = run_event_loop(state, event_rx, effect_tx) => {}
         () = run_effect_loop(effect_rx) => {}
         () = crate::lsp_socket::accept_loop(listener, event_tx.clone()) => {}
-        () = ingest_watch_events::<THostLanguage>(watch_rx, event_tx, config_directory) => {}
+        () = run_filesystem_watcher::<THostLanguage>(watch_rx, event_tx, config_directory) => {}
     }
     let _ = std::fs::remove_file(port_path.reference());
     std::process::exit(0);
 }
 
-async fn ingest_watch_events<THostLanguage: HostLanguage>(
+async fn run_filesystem_watcher<THostLanguage: HostLanguage>(
     mut watch_rx: UnboundedReceiver<Vec<SourceFileEvent>>,
     event_tx: UnboundedSender<IsographEvent>,
     config_directory: PathBuf,
@@ -411,11 +411,11 @@ async fn ingest_watch_events<THostLanguage: HostLanguage>(
 }
 ```
 
-`let _watcher` binds until `serve` returns. `let _ = watcher` drops the debouncer immediately. `_hold_watch` keeps `ingest_watch_events` from returning on `Injected`, same as `_hold_events` for the event loop.
+`let _watcher` binds until `serve` returns. `let _ = watcher` drops the debouncer immediately. `_hold_watch` keeps `run_filesystem_watcher` from returning on `Injected`, same as `_hold_events` for the event loop.
 
 Do not log `filesystem` on `isograph daemon up`.
 
-`ingest_watch_events` is the analog of isograph's `while let Some(res) = file_system_receiver.recv().await` plus `update_sources`. It never returns while the watcher lives (`watch_tx` is held by the callback). `select!` ends on `Kill`.
+`run_filesystem_watcher` is the analog of isograph's `while let Some(res) = file_system_receiver.recv().await` plus `update_sources`. It never returns while the watcher lives (`watch_tx` is held by the callback). `select!` ends on `Kill`.
 
 ## Watch
 
@@ -1165,6 +1165,6 @@ No `ignore` crate. No `directory_walk`.
 - `isograph start --filesystem watch|injected` -> `DaemonArgs` -> `run_daemon` -> `daemon::run`.
 - `Filesystem::Watch` -> `watch::start` (watch roots, then boot walk).
 - notify callback -> `categorize_and_filter_events` -> `watch_tx`.
-- `ingest_watch_events` -> `apply` -> `event_tx.send(DiskChanged)`.
+- `run_filesystem_watcher` -> `apply` -> `event_tx.send(DiskChanged)`.
 - `Filesystem::Injected` -> no debouncer, no boot walk.
 - event loop -> `handle`. Same `handle` for watcher posts and for `isograph send`.
