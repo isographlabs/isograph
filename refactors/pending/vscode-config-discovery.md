@@ -2,13 +2,15 @@
 
 Requires vscode-extension.md. Independent of lsp-sessions.md, lsp-diagnostics.md, zed-and-vscode-extensions.md.
 
-vscode-extension.md starts one `LanguageClient`. cwd is the workspace root (or `isograph.rootDirectory`). `isograph lsp` walk-up starts there. A config in a nested package is not found. Two configs in one window cannot both be served: one process per config (event-model.md), one stdio proxy per process.
+The config is not always at the workspace root. There may be several. vscode-extension.md starts one `LanguageClient` whose cwd is the workspace root (or `isograph.rootDirectory`). `isograph lsp` walk-up starts there. A nested `apps/web/isograph.config.json` is not found. A second config in the same window has no client.
 
-This slice finds the same files `discover.rs` `nearest_config` finds, starts one client per canonical path, and gives each client a document selector that does not overlap another config.
+This slice finds every `isograph.config.json` / `.js` / `.ts` in the workspace (and, on open, by walking up from the file), and starts one client per canonical path.
 
-Origin of the walk: `crates/isograph_cli/src/discover.rs` `CONFIG_FILE_NAMES` / `nearest_config`. Origin of the client: vscode-extension.md `createAndStartLanguageClient`. Delta: walk from the file and from `workspace.findFiles`, always pass `--config`, drop `rootDirectory`, N clients.
+Origin of the walk: `crates/isograph_cli/src/discover.rs` `CONFIG_FILE_NAMES` / `nearest_config`. Origin of the client: vscode-extension.md `createAndStartLanguageClient`. Delta: search instead of assuming the repo root; N clients; always `--config`; drop `rootDirectory`.
 
 One shippable change.
+
+A config directory that contains another config directory is two `**/*` selectors on the inner files. This slice does not pick a winner. Sibling packages (`apps/web` and `apps/admin`) do not overlap.
 
 ## What the user does
 
@@ -42,25 +44,10 @@ export const CONFIG_FILE_NAMES = [
 Same names, same order as `discover.rs`. Copied. A third name is a change to both files.
 
 ```ts
-// from vscode-extension/src/discover.ts
-export type Entry =
-  | { kind: 'file'; name: string }
-  | { kind: 'directory'; name: string };
-
-export type Glob = {
-  base: string;
-  pattern: string;
-};
-```
-
-`ownedGlobs` reads a directory listing through `entries` so tests pass a tree, not `fs`.
-
-```ts
 // from vscode-extension/src/context.ts
 export type Session = {
   configPath: string;
   configDir: string;
-  globs: Glob[];
   client: LanguageClient;
 };
 
@@ -73,7 +60,7 @@ export type IsographExtensionContext = {
 };
 ```
 
-`configPath` is canonical (`fs.realpath`). `configDir` is `path.dirname(configPath)`. `binaryPath` is `isograph.pathToIsograph` when set, otherwise null and each session walks from its `configDir`. Origin `isographBinaryExecutionOptions.rootPath` was the workspace cwd hack. Drop it.
+`configPath` is canonical (`fs.realpath`). `configDir` is `path.dirname(configPath)`. `binaryPath` is `isograph.pathToIsograph` when set, otherwise null and each session walks from its `configDir`. Origin `isographBinaryExecutionOptions.rootPath` was the workspace cwd. Drop it.
 
 ```ts
 // from vscode-extension/src/config.ts
@@ -83,7 +70,7 @@ export type Config = {
 };
 ```
 
-`rootDirectory` is gone. It existed to point walk-up at a nested folder. The walk is from the file.
+`rootDirectory` is gone. It existed to point walk-up at a nested folder.
 
 ## `discover.ts`
 
@@ -99,15 +86,6 @@ export const CONFIG_FILE_NAMES = [
   'isograph.config.js',
   'isograph.config.ts',
 ] as const;
-
-export type Entry =
-  | { kind: 'file'; name: string }
-  | { kind: 'directory'; name: string };
-
-export type Glob = {
-  base: string;
-  pattern: string;
-};
 
 async function isFile(candidate: string): Promise<boolean> {
   try {
@@ -138,76 +116,9 @@ export async function nearestConfig(start: string): Promise<string | null> {
     dir = parent;
   }
 }
-
-export function isStrictDescendant(child: string, parent: string): boolean {
-  const rel = path.relative(path.resolve(parent), path.resolve(child));
-  return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
-}
-
-export function nearestDiscoveredConfig(
-  filePath: string,
-  configDirs: readonly string[],
-): string | null {
-  const fileDir = path.dirname(path.resolve(filePath));
-  const matches = configDirs.filter(
-    (configDir) =>
-      path.resolve(configDir) === fileDir ||
-      isStrictDescendant(fileDir, configDir),
-  );
-  matches.sort((a, b) => b.length - a.length);
-  return matches[0] ?? null;
-}
-
-export async function ownedGlobs(
-  configDir: string,
-  nestedConfigDirs: readonly string[],
-  entries: (dir: string) => Promise<readonly Entry[]>,
-): Promise<Glob[]> {
-  const resolved = path.resolve(configDir);
-  const nested = nestedConfigDirs
-    .map((p) => path.resolve(p))
-    .filter((p) => isStrictDescendant(p, resolved));
-  return globsFrom(resolved, nested, entries);
-}
-
-async function globsFrom(
-  dir: string,
-  nested: readonly string[],
-  entries: (dir: string) => Promise<readonly Entry[]>,
-): Promise<Glob[]> {
-  const hasNestedHere = nested.some(
-    (n) => n === dir || isStrictDescendant(n, dir),
-  );
-  if (!hasNestedHere) {
-    return [{ base: dir, pattern: '**/*' }];
-  }
-  if (nested.includes(dir)) {
-    return [];
-  }
-  const listing = await entries(dir);
-  const fromChildren = await Promise.all(
-    listing
-      .filter((e) => e.kind === 'directory')
-      .map((e) => globsFrom(path.join(dir, e.name), nested, entries)),
-  );
-  return [{ base: dir, pattern: '*' }, ...fromChildren.flat()];
-}
-
-export async function readEntries(dir: string): Promise<readonly Entry[]> {
-  const dirents = await fs.readdir(dir, { withFileTypes: true });
-  return dirents.map((d) =>
-    d.isDirectory()
-      ? { kind: 'directory', name: d.name }
-      : { kind: 'file', name: d.name },
-  );
-}
 ```
 
 `nearestConfig` is `nearest_config` plus `canonicalize`. A directory named `isograph.config.json` is not a file; the next name in that directory is tried. `isFile` is yes/no on `stat`. The walk is a parent walk.
-
-`ownedGlobs` is why two clients do not both register semantic tokens on one document. vscode `DocumentFilter` has no exclude. If config B's directory is inside config A's, A cannot use `A/**`. A gets `*` in A plus `**/*` on sibling trees; B gets `B/**`.
-
-`nearestDiscoveredConfig` is which of the already-started sessions owns a file (longest matching `configDir`). It does not walk the filesystem.
 
 ## Tests
 
@@ -215,9 +126,9 @@ export async function readEntries(dir: string): Promise<readonly Entry[]> {
 
 `@types/node` becomes `22.9.0` (engines.node). Origin `^17` has no `node:test`.
 
-`package.json` script `"test": "tsc && node --test out/discover.test.js"`. The vscode-extension CI job runs `npm test` after `typecheck` (or instead: `test` already runs `tsc`). Keep `typecheck` and add `test`.
+`package.json` script `"test": "tsc && node --test out/discover.test.js"`. The vscode-extension CI job runs `npm test` after `typecheck`. Keep `typecheck` and add `test`.
 
-Cases for `nearestConfig` (same facts as `discover.rs`):
+Cases (same facts as `discover.rs` `nearest_config_*`):
 
 - json from a nested directory
 - js when there is no json
@@ -232,27 +143,6 @@ Cases for `nearestConfig` (same facts as `discover.rs`):
 - sibling directory's config is ignored
 - realpath of a dotted path matches the real file
 
-Cases for `ownedGlobs` (in-memory `entries`):
-
-- no nested: `[{ base: configDir, pattern: '**/*' }]`
-- sibling nested configs are not descendants: each still `**/*`
-- `configDir=/repo`, nested=`/repo/apps/web`, listing `/repo` has `apps`, `src`; `/repo/apps` has `web`, `admin`:
-  - `{ base: '/repo', pattern: '*' }`
-  - `{ base: '/repo/src', pattern: '**/*' }`
-  - `{ base: '/repo/apps', pattern: '*' }`
-  - `{ base: '/repo/apps/admin', pattern: '**/*' }`
-  - nothing under `/repo/apps/web`
-- nested equal to `configDir` is not a strict descendant: `**/*`
-- empty listing and a nested child only: `{ base: dir, pattern: '*' }` plus empty from that child
-
-Cases for `nearestDiscoveredConfig`:
-
-- file under the deeper of two ancestor configs returns the deeper
-- file under none returns null
-- file in the config directory itself returns that config
-
-`isStrictDescendant('/a', '/a')` is false. `isStrictDescendant('/a/b', '/a')` is true. `isStrictDescendant('/a', '/a/b')` is false. `isStrictDescendant('/a/c', '/a/b')` is false.
-
 ## Client
 
 ```ts
@@ -261,23 +151,19 @@ export async function createAndStartLanguageClient(options: {
   binaryPath: string;
   configPath: string;
   configDir: string;
-  globs: Glob[];
   lspOutputChannel: OutputChannel;
   primaryOutputChannel: OutputChannel;
 }): Promise<LanguageClient> {
-  const languages = [
+  const documentSelector = [
     'javascript',
     'typescript',
     'typescriptreact',
     'javascriptreact',
-  ];
-  const documentSelector = options.globs.flatMap((glob) =>
-    languages.map((language) => ({
-      scheme: 'file',
-      language,
-      pattern: new RelativePattern(glob.base, glob.pattern),
-    })),
-  );
+  ].map((language) => ({
+    scheme: 'file',
+    language,
+    pattern: new RelativePattern(options.configDir, '**/*'),
+  }));
 
   const args = ['lsp', '--config', options.configPath];
 
@@ -309,11 +195,9 @@ export async function createAndStartLanguageClient(options: {
 }
 ```
 
-Always `--config` with the canonical path. cwd is the config directory (relative paths in the config). `pathToConfig` from settings is not read here; `extension.ts` resolved it already.
+Always `--config` with the canonical path. cwd is the config directory. `RelativePattern` is `vscode.RelativePattern`. Selector is that config's tree. Sibling configs do not overlap.
 
-`RelativePattern` is `vscode.RelativePattern`.
-
-When `pathToConfig` is set, `globs` is `[{ base: workspaceFolder, pattern: '**/*' }]` for each workspace folder (one daemon, whole window). Nested configs in that window are not started.
+When `pathToConfig` is set, one client, selector is the four languages with no pattern (the whole window). Search is skipped.
 
 ## `extension.ts`
 
@@ -322,15 +206,13 @@ One `IsographExtensionContext` with `sessions: []`. Activate:
 1. Output channels as today.
 2. If `pathToIsograph` is set, `binaryPath` is that. Else `binaryPath` is null and each session calls `findIsographBinaryWithWarnings(channel, configDir)`.
 3. If `pathToConfig` is set, resolve it (absolute, or relative to `workspace.workspaceFolders[0]`), `realpath`, start one session, return.
-4. Else `workspace.findFiles('**/isograph.config.{json,js,ts}', '**/{node_modules,.git}/**')`, `realpath` each, unique. Start a session per path. `ownedGlobs(configDir, otherConfigDirs, readEntries)`.
-5. `workspace.textDocuments` and `workspace.onDidOpenTextDocument`: skip non-`file` scheme. `nearestConfig(dirname(uri.fsPath))`. If null, log and skip. If a session for that path exists, `ensureGlobsCover(file)` (recompute `ownedGlobs` and restart that client if the glob list changed). If not, start a session; recompute globs for ancestor sessions (their nested set grew) and restart those whose globs changed.
-6. `createFileSystemWatcher('**/isograph.config.{json,js,ts}')` on create and delete: run step 4+5 again (stop sessions whose path vanished, start new, recompute remaining).
+4. Else `workspace.findFiles('**/isograph.config.{json,js,ts}', '**/{node_modules,.git}/**')`, `realpath` each, unique. Start a session per path.
+5. `workspace.textDocuments` and `workspace.onDidOpenTextDocument`: skip non-`file` scheme. `nearestConfig(dirname(uri.fsPath))`. If null, log and skip. If no session for that path, start one.
+6. `createFileSystemWatcher('**/isograph.config.{json,js,ts}')` on create and delete: start a session for a new path; stop a session whose path vanished.
 
 `deactivate` stops every `session.client`.
 
 Starting a session with `binaryPath == null` and no package under `configDir` logs and does not push a session. Other configs still start.
-
-Restart is `client.stop()` then `createAndStartLanguageClient` with the new globs, replace `session.client` and `session.globs`.
 
 ```ts
 // from vscode-extension/src/extension.ts
@@ -353,11 +235,11 @@ README and `docs-website/docs/development-workflow.md`: drop `rootDirectory`. Ne
 
 ## `findIsographBinary.ts`
 
-vscode-extension.md already takes `rootPath` as the walk start. Callers pass `configDir`. No further delta except `rootDirectory` is gone from `getConfig`, so this file does not read it (it already does not, after vscode-extension.md).
+vscode-extension.md already takes `rootPath` as the walk start. Callers pass `configDir`.
 
 ## Call sites
 
-- `activate` / `findFiles` / `didOpen` / config watcher -> `nearestConfig` / `ownedGlobs` -> `createAndStartLanguageClient` -> `isograph lsp --config <canonical>`
+- `activate` / `findFiles` / `didOpen` / config watcher -> `nearestConfig` -> `createAndStartLanguageClient` -> `isograph lsp --config <canonical>`
 - two sessions, two proxies, two daemons when two configs
 - `pathToConfig` set -> one session, findFiles skipped
 - Zed is unchanged (worktree cwd). zed-and-vscode-extensions.md
