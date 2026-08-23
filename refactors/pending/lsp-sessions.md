@@ -4,7 +4,7 @@ Requires lsp-port.md (landed). Independent of lsp-tokens.md.
 
 The session already exists: `Connection::initialize`, pump, `drop(connection)` then `join`. After lsp-request-response.md, requests go to `answer_request`. This slice keeps that. After `initialize`, the session stores that client's `ClientCapabilities` and registers a writer for server-to-client messages. It does not put capabilities on `IsographState`. Send is ephemeral: it stores caps for the life of the thread, then drops. An editor is the same, for the life of the window.
 
-`connection.initialize` already returns serialized `InitializeParams`. Today they are discarded. This slice keeps them.
+`connection.initialize` already returns serialized `InitializeParams`. Today they are discarded. This slice deserializes them and stores `params.capabilities`.
 
 Cleanup is the thread ending when the socket ends (`exit`, EOF, reset). No idle timeout. VS Code keeps the language client up while the window is open. A 5 minute inactivity close looks like a crash and the client will reconnect. Dead-peer TCP is socket keepalive, not an LSP timer.
 
@@ -25,16 +25,10 @@ No new CLI. Send still `initialize`s with `{"capabilities":{}}` and omits `proce
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct LspClientId(u64);
 
-#[derive(Copy, Clone)]
-enum PublishDiagnosticsCap {
-    Yes,
-    No,
-}
-
 struct LiveSession {
     id: LspClientId,
     sender: crossbeam::channel::Sender<lsp_server::Message>,
-    publish_diagnostics: PublishDiagnosticsCap,
+    capabilities: lsp_types::ClientCapabilities,
 }
 ```
 
@@ -73,7 +67,6 @@ impl Drop for SessionGuard {
             lsp_types::InitializeParams::default()
         }
     };
-    let publish_diagnostics = publish_diagnostics_cap(&params.capabilities);
     let _guard = SessionGuard {
         id: client,
         sessions: live.clone(),
@@ -83,12 +76,12 @@ impl Drop for SessionGuard {
         inner.push(LiveSession {
             id: client,
             sender: connection.sender.clone(),
-            publish_diagnostics,
+            capabilities: params.capabilities,
         });
     }
 ```
 
-`PublishDiagnosticsCap::Yes` when `capabilities.text_document` → `publish_diagnostics` is `Some`. Missing that field is `No`. `processId` is not watched.
+`processId` is not watched.
 
 `serve` creates `Arc<LiveSessions>` and passes it to `accept_loop`. lsp-diagnostics.md is the first production reader of the writers besides tests.
 
@@ -96,8 +89,8 @@ Request answering lives in `answer_request` after lsp-request-response.md. This 
 
 ## Tests
 
-- initialize with no `textDocument.publishDiagnostics`: after handshake the live set has one session, `PublishDiagnosticsCap::No`. Drop the client (and settle). The live set is empty.
-- initialize with `textDocument.publishDiagnostics: {}`: `Yes`. Drop. Set empty.
+- initialize with `{"capabilities":{}}`: after handshake the live set has one session, `capabilities == ClientCapabilities::default()`. Drop the client (and settle). The live set is empty.
+- initialize with `textDocument.publishDiagnostics: {}` and `textDocument.hover: {}`: stored `capabilities` equals the deserialized `InitializeParams.capabilities` (`publish_diagnostics` and `hover` both `Some`). Drop. Set empty.
 - two connections, drop one: set length 1, the remaining `LspClientId`.
 
 Do not add a production function only tests call. Tests use `LiveSessions` the same way `serve` does: pass `Arc` into `accept_loop`, inspect after settle.
@@ -107,4 +100,4 @@ Do not add a production function only tests call. Tests use `LiveSessions` the s
 - `accept_loop` -> `LspClientId` -> `session`
 - `initialize` -> store caps, `SessionGuard`
 - thread exit -> `Drop` removes the writer
-- lsp-diagnostics.md -> iterate `LiveSession` with `PublishDiagnosticsCap::Yes`
+- lsp-diagnostics.md -> iterate live sessions; send `publishDiagnostics` when `capabilities.text_document.publish_diagnostics` is `Some`
