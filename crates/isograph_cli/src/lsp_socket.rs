@@ -187,7 +187,7 @@ mod tests {
 
     use super::{IsographEventNotification, accept_loop};
     use crate::daemon::{run_effect_loop, run_event_loop};
-    use crate::event::{DiskChanged, IsographEvent, Presence};
+    use crate::event::{DiskChanged, DiskFileChanged, IsographEvent, Presence};
     use crate::send::notify;
     use crate::state::IsographState;
     use isograph_extract_typescript::TypeScriptHostLanguage;
@@ -317,10 +317,10 @@ mod tests {
         let (port, mut event_rx) = listen_for_events().await;
         notify(
             connect(port),
-            IsographEvent::DiskChanged(DiskChanged {
+            IsographEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
                 path: PathBuf::from("/tmp/proj/src/a.ts"),
                 presence: Presence::Present("export const a = 1;\n".to_owned()),
-            }),
+            })),
         )
         .expect("notify present returns");
         tokio::time::sleep(SETTLE).await;
@@ -330,17 +330,17 @@ mod tests {
         };
         assert_eq!(
             present,
-            DiskChanged {
+            DiskChanged::File(DiskFileChanged {
                 path: PathBuf::from("/tmp/proj/src/a.ts"),
                 presence: Presence::Present("export const a = 1;\n".to_owned()),
-            }
+            })
         );
         notify(
             connect(port),
-            IsographEvent::DiskChanged(DiskChanged {
+            IsographEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
                 path: PathBuf::from("/tmp/proj/src/a.ts"),
                 presence: Presence::Absent,
-            }),
+            })),
         )
         .expect("notify absent returns");
         tokio::time::sleep(SETTLE).await;
@@ -350,10 +350,10 @@ mod tests {
         };
         assert_eq!(
             absent,
-            DiskChanged {
+            DiskChanged::File(DiskFileChanged {
                 path: PathBuf::from("/tmp/proj/src/a.ts"),
                 presence: Presence::Absent,
-            }
+            })
         );
     }
 

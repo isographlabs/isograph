@@ -20,9 +20,20 @@ pub enum IsographEvent {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
-pub struct DiskChanged {
+pub enum DiskChanged {
+    File(DiskFileChanged),
+    FolderRemoved(FolderRemoved),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+pub struct DiskFileChanged {
     pub path: PathBuf,
     pub presence: Presence,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+pub struct FolderRemoved {
+    pub path: PathBuf,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]

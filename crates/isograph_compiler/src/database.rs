@@ -51,6 +51,19 @@ impl<THostLanguage: HostLanguage> IsographState<THostLanguage> {
         }
     }
 
+    pub fn remove_disk_files_from_path(&mut self, path: RelativePathToSourceFile) {
+        let ids: Vec<_> = self
+            .get_disk_file_map_mut()
+            .tracked()
+            .0
+            .extract_if(|key, _| key.as_ref().starts_with(path.as_ref()))
+            .map(|(_, source_id)| source_id)
+            .collect();
+        for source_id in ids {
+            self.remove(source_id);
+        }
+    }
+
     pub fn disk_file(&self, path: RelativePathToSourceFile) -> Option<&DiskFile> {
         let source_id = self.get_disk_file_map().untracked().0.get(&path).copied()?;
         self.get(source_id).wrap_some()
@@ -232,5 +245,50 @@ mod tests {
             "b"
         );
         assert_eq!(state.get_disk_file_map().untracked().0.len(), 2);
+    }
+
+    #[test]
+    fn remove_disk_files_from_path_removes_descendants_not_a_sibling_prefix() {
+        let mut state = IsographState::<TestHostLanguage>::default();
+        let a = intern_path("src/a.ts");
+        let b = intern_path("src/b.ts");
+        let c = intern_path("src2/c.ts");
+        state.insert_disk_file(a, "a".to_owned());
+        state.insert_disk_file(b, "b".to_owned());
+        state.insert_disk_file(c, "c".to_owned());
+        state.remove_disk_files_from_path(intern_path("src"));
+        assert!(state.disk_file(a).is_none());
+        assert!(state.disk_file(b).is_none());
+        assert_eq!(
+            state
+                .disk_file(c)
+                .expect("src2 is not a path prefix of src")
+                .contents,
+            "c"
+        );
+    }
+
+    #[test]
+    fn remove_disk_files_from_path_does_not_treat_a_filename_prefix_as_a_directory() {
+        let mut state = IsographState::<TestHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        state.insert_disk_file(path, "a".to_owned());
+        state.remove_disk_files_from_path(intern_path("src/a.ts.bak"));
+        assert_eq!(
+            state
+                .disk_file(path)
+                .expect("src/a.ts.bak is not a path prefix of src/a.ts")
+                .contents,
+            "a"
+        );
+    }
+
+    #[test]
+    fn remove_disk_files_from_path_of_the_empty_relative_path_removes_every_file() {
+        let mut state = IsographState::<TestHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        state.insert_disk_file(path, "a".to_owned());
+        state.remove_disk_files_from_path(intern_path(""));
+        assert!(state.disk_file(path).is_none());
     }
 }

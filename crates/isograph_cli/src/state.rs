@@ -78,13 +78,21 @@ fn handle_disk_changed<THostLanguage: HostLanguage>(
     state: &mut IsographState<THostLanguage>,
     change: DiskChanged,
 ) -> Vec<IsographEffect> {
-    let path = relative_path_to_source_file(state, &change.path);
-    match change.presence {
-        Presence::Present(contents) => {
-            state.insert_disk_file(path, contents);
+    match change {
+        DiskChanged::File(change) => {
+            let path = relative_path_to_source_file(state, &change.path);
+            match change.presence {
+                Presence::Present(contents) => {
+                    state.insert_disk_file(path, contents);
+                }
+                Presence::Absent => {
+                    state.remove_disk_file(path);
+                }
+            }
         }
-        Presence::Absent => {
-            state.remove_disk_file(path);
+        DiskChanged::FolderRemoved(folder) => {
+            let path = relative_path_to_source_file(state, &folder.path);
+            state.remove_disk_files_from_path(path);
         }
     }
     Vec::new()
@@ -102,7 +110,7 @@ mod tests {
 
     use super::{IsographState, handle, intern_config_directory};
     use crate::effect::IsographEffect;
-    use crate::event::{DiskChanged, IsographEvent, Presence};
+    use crate::event::{DiskChanged, DiskFileChanged, FolderRemoved, IsographEvent, Presence};
 
     fn interned(s: &str) -> common_lang_types::RelativePathToSourceFile {
         s.intern().to()
@@ -148,10 +156,10 @@ mod tests {
         let mut state = with_config();
         let effects = handle(
             &mut state,
-            IsographEvent::DiskChanged(DiskChanged {
+            IsographEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
                 path: PathBuf::from("/tmp/proj/src/a.ts"),
                 presence: Presence::Present("export const a = 1;\n".to_owned()),
-            }),
+            })),
         );
         assert!(effects.is_empty());
         assert_eq!(
@@ -165,10 +173,10 @@ mod tests {
         let mut state = with_config();
         let effects = handle(
             &mut state,
-            IsographEvent::DiskChanged(DiskChanged {
+            IsographEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
                 path: PathBuf::from("/tmp/other/a.ts"),
                 presence: Presence::Present("outside".to_owned()),
-            }),
+            })),
         );
         assert!(effects.is_empty());
         assert_eq!(
@@ -182,17 +190,17 @@ mod tests {
         let mut state = with_config();
         handle(
             &mut state,
-            IsographEvent::DiskChanged(DiskChanged {
+            IsographEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
                 path: PathBuf::from("/tmp/proj/src/a.ts"),
                 presence: Presence::Present("export const a = 1;\n".to_owned()),
-            }),
+            })),
         );
         let effects = handle(
             &mut state,
-            IsographEvent::DiskChanged(DiskChanged {
+            IsographEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
                 path: PathBuf::from("/tmp/proj/src/a.ts"),
                 presence: Presence::Absent,
-            }),
+            })),
         );
         assert!(effects.is_empty());
         assert!(contents(state.reference(), interned("src/a.ts")).is_none());
@@ -258,10 +266,124 @@ mod tests {
         let mut state = IsographState::<TypeScriptHostLanguage>::default();
         handle(
             &mut state,
-            IsographEvent::DiskChanged(DiskChanged {
+            IsographEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
                 path: PathBuf::from("/tmp/proj/src/a.ts"),
                 presence: Presence::Present("export const a = 1;\n".to_owned()),
-            }),
+            })),
+        );
+    }
+
+    #[test]
+    fn folder_removed_of_src_removes_files_under_src_not_src2() {
+        let mut state = with_config();
+        handle(
+            &mut state,
+            IsographEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
+                path: PathBuf::from("/tmp/proj/src/a.ts"),
+                presence: Presence::Present("a".to_owned()),
+            })),
+        );
+        handle(
+            &mut state,
+            IsographEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
+                path: PathBuf::from("/tmp/proj/src/b.ts"),
+                presence: Presence::Present("b".to_owned()),
+            })),
+        );
+        handle(
+            &mut state,
+            IsographEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
+                path: PathBuf::from("/tmp/proj/src2/c.ts"),
+                presence: Presence::Present("c".to_owned()),
+            })),
+        );
+        let effects = handle(
+            &mut state,
+            IsographEvent::DiskChanged(DiskChanged::FolderRemoved(FolderRemoved {
+                path: PathBuf::from("/tmp/proj/src"),
+            })),
+        );
+        assert!(effects.is_empty());
+        assert!(contents(state.reference(), interned("src/a.ts")).is_none());
+        assert!(contents(state.reference(), interned("src/b.ts")).is_none());
+        assert_eq!(
+            contents(state.reference(), interned("src2/c.ts")),
+            "c".wrap_some()
+        );
+    }
+
+    #[test]
+    fn folder_removed_of_the_config_directory_removes_every_interned_file() {
+        let mut state = with_config();
+        handle(
+            &mut state,
+            IsographEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
+                path: PathBuf::from("/tmp/proj/src/a.ts"),
+                presence: Presence::Present("a".to_owned()),
+            })),
+        );
+        handle(
+            &mut state,
+            IsographEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
+                path: PathBuf::from("/tmp/proj/src2/c.ts"),
+                presence: Presence::Present("c".to_owned()),
+            })),
+        );
+        let effects = handle(
+            &mut state,
+            IsographEvent::DiskChanged(DiskChanged::FolderRemoved(FolderRemoved {
+                path: PathBuf::from("/tmp/proj"),
+            })),
+        );
+        assert!(effects.is_empty());
+        assert!(contents(state.reference(), interned("src/a.ts")).is_none());
+        assert!(contents(state.reference(), interned("src2/c.ts")).is_none());
+    }
+
+    #[test]
+    fn folder_removed_of_a_never_interned_path_is_a_noop() {
+        let mut state = with_config();
+        handle(
+            &mut state,
+            IsographEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
+                path: PathBuf::from("/tmp/proj/src/a.ts"),
+                presence: Presence::Present("a".to_owned()),
+            })),
+        );
+        let effects = handle(
+            &mut state,
+            IsographEvent::DiskChanged(DiskChanged::FolderRemoved(FolderRemoved {
+                path: PathBuf::from("/tmp/proj/never"),
+            })),
+        );
+        assert!(effects.is_empty());
+        assert_eq!(
+            contents(state.reference(), interned("src/a.ts")),
+            "a".wrap_some()
+        );
+    }
+
+    #[test]
+    fn file_absent_of_a_directory_path_does_not_remove_files_under_it() {
+        let mut state = with_config();
+        handle(
+            &mut state,
+            IsographEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
+                path: PathBuf::from("/tmp/proj/src/a.ts"),
+                presence: Presence::Present("a".to_owned()),
+            })),
+        );
+        let effects = handle(
+            &mut state,
+            IsographEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
+                path: PathBuf::from("/tmp/proj/src"),
+                presence: Presence::Absent,
+            })),
+        );
+        assert!(effects.is_empty());
+        assert_eq!(
+            contents(state.reference(), interned("src/a.ts")),
+            "a".wrap_some()
         );
     }
 }
