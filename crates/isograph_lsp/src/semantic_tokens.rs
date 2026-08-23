@@ -334,6 +334,7 @@ const CLASS: u32 = 2;
 const PARAMETER: u32 = 7;
 const VARIABLE: u32 = 8;
 const PROPERTY: u32 = 9;
+const METHOD: u32 = 13;
 const KEYWORD: u32 = 15;
 const COMMENT: u32 = 17;
 const STRING: u32 = 18;
@@ -345,7 +346,8 @@ fn lsp_type_index(token: IsographSemanticToken) -> u32 {
     match token {
         IsographSemanticToken::Keyword => KEYWORD,
         IsographSemanticToken::Type => CLASS,
-        IsographSemanticToken::FieldName | IsographSemanticToken::ObjectKey => PROPERTY,
+        IsographSemanticToken::FieldName => METHOD,
+        IsographSemanticToken::ObjectKey => PROPERTY,
         IsographSemanticToken::GraphQLTypeName => TYPE,
         IsographSemanticToken::DirectiveName => DECORATOR,
         IsographSemanticToken::Variable | IsographSemanticToken::BooleanOrNull => VARIABLE,
@@ -372,8 +374,8 @@ mod tests {
     use span::{Span, WithSpan, WithSpanPostfix};
 
     use super::{
-        CLASS, COMMENT, DECORATOR, KEYWORD, LineBreak, NUMBER, OPERATOR, PARAMETER, PROPERTY,
-        STRING, TYPE, VARIABLE, line_breaks, lsp_semantic_tokens, lsp_type_index,
+        CLASS, COMMENT, DECORATOR, KEYWORD, LineBreak, METHOD, NUMBER, OPERATOR, PARAMETER,
+        PROPERTY, STRING, TYPE, VARIABLE, line_breaks, lsp_semantic_tokens, lsp_type_index,
         semantic_token_legend,
     };
 
@@ -417,7 +419,7 @@ mod tests {
     }
 
     #[test]
-    fn entrypoint_encodes_as_keyword_class_operator_property() {
+    fn entrypoint_encodes_as_keyword_class_operator_method() {
         let lsp = encoded("entrypoint Query.foo");
         assert_eq!(lsp.len(), 4);
         assert_eq!(lsp[0].delta_line, 0);
@@ -436,7 +438,7 @@ mod tests {
         assert_eq!(lsp[3].delta_line, 0);
         assert_eq!(lsp[3].delta_start, 1);
         assert_eq!(lsp[3].length, 3);
-        assert_eq!(lsp[3].token_type, PROPERTY);
+        assert_eq!(lsp[3].token_type, METHOD);
     }
 
     #[test]
@@ -521,7 +523,7 @@ mod tests {
         assert_eq!(lsp[4].token_type, KEYWORD);
         assert_eq!(lsp[7].delta_line, 0);
         assert_eq!(lsp[7].delta_start, 1);
-        assert_eq!(lsp[7].token_type, PROPERTY);
+        assert_eq!(lsp[7].token_type, METHOD);
     }
 
     #[test]
@@ -612,7 +614,7 @@ mod tests {
         assert_eq!(lsp[5].delta_line, 1);
         assert_eq!(lsp[5].delta_start, 2);
         assert_eq!(lsp[5].length, 3);
-        assert_eq!(lsp[5].token_type, PROPERTY);
+        assert_eq!(lsp[5].token_type, METHOD);
         assert_eq!(lsp[6].delta_line, 1);
         assert_eq!(lsp[6].delta_start, 0);
         assert_eq!(lsp[6].length, 1);
@@ -625,7 +627,7 @@ mod tests {
         assert_eq!(lsp.len(), 7);
         assert_eq!(lsp[5].delta_line, 2);
         assert_eq!(lsp[5].delta_start, 2);
-        assert_eq!(lsp[5].token_type, PROPERTY);
+        assert_eq!(lsp[5].token_type, METHOD);
     }
 
     #[test]
@@ -1104,6 +1106,7 @@ mod tests {
         assert_eq!(types[PARAMETER as usize], SemanticTokenType::PARAMETER);
         assert_eq!(types[VARIABLE as usize], SemanticTokenType::VARIABLE);
         assert_eq!(types[PROPERTY as usize], SemanticTokenType::PROPERTY);
+        assert_eq!(types[METHOD as usize], SemanticTokenType::METHOD);
         assert_eq!(types[KEYWORD as usize], SemanticTokenType::KEYWORD);
         assert_eq!(types[COMMENT as usize], SemanticTokenType::COMMENT);
         assert_eq!(types[STRING as usize], SemanticTokenType::STRING);
@@ -1112,7 +1115,7 @@ mod tests {
         assert_eq!(types[DECORATOR as usize], SemanticTokenType::DECORATOR);
         assert_eq!(lsp_type_index(IsographSemanticToken::Keyword), KEYWORD);
         assert_eq!(lsp_type_index(IsographSemanticToken::Type), CLASS);
-        assert_eq!(lsp_type_index(IsographSemanticToken::FieldName), PROPERTY);
+        assert_eq!(lsp_type_index(IsographSemanticToken::FieldName), METHOD);
         assert_eq!(lsp_type_index(IsographSemanticToken::ObjectKey), PROPERTY);
         assert_eq!(lsp_type_index(IsographSemanticToken::GraphQLTypeName), TYPE);
         assert_eq!(
