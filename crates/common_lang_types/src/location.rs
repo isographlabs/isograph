@@ -1,6 +1,7 @@
 use intern::string_key::{Intern, Lookup};
 use prelude::Postfix;
-use std::path::PathBuf;
+use std::borrow::Cow;
+use std::path::{Path, PathBuf};
 
 use span::Span;
 pub use span::WithGenericLocation;
@@ -90,11 +91,12 @@ impl<T> WithLocationPostfix for T {}
 
 pub fn relative_path_from_absolute_and_working_directory(
     current_working_directory: CurrentWorkingDirectory,
-    absolute_path: &PathBuf,
+    absolute_path: &Path,
 ) -> RelativePathToSourceFile {
+    let cwd = PathBuf::from(current_working_directory.lookup());
     pathdiff::diff_paths(
-        absolute_path,
-        PathBuf::from(current_working_directory.lookup()),
+        without_windows_verbatim_prefix(absolute_path),
+        without_windows_verbatim_prefix(cwd.as_path()),
     )
     .expect("Expected path to be diffable")
     .to_str()
@@ -103,4 +105,75 @@ pub fn relative_path_from_absolute_and_working_directory(
     .to()
 }
 
+fn without_windows_verbatim_prefix(path: &Path) -> Cow<'_, Path> {
+    match strip_windows_verbatim_prefix(path) {
+        Some(stripped) => Cow::Owned(stripped),
+        None => Cow::Borrowed(path),
+    }
+}
+
+fn strip_windows_verbatim_prefix(path: &Path) -> Option<PathBuf> {
+    let text = path.to_str()?;
+    if let Some(rest) = text.strip_prefix(r"\\?\UNC\") {
+        let mut unc = String::from(r"\\");
+        unc.push_str(rest);
+        return PathBuf::from(unc).wrap_some();
+    }
+    text.strip_prefix(r"\\?\").map(PathBuf::from)
+}
+
 pub type WithNoLocation<TItem> = WithGenericLocation<TItem, ()>;
+
+#[cfg(test)]
+mod tests {
+    use intern::string_key::{Intern, Lookup};
+    use prelude::Postfix;
+    use std::path::PathBuf;
+
+    use super::relative_path_from_absolute_and_working_directory;
+    use crate::CurrentWorkingDirectory;
+
+    fn cwd(s: &str) -> CurrentWorkingDirectory {
+        s.intern().to()
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn a_file_under_the_working_directory_is_the_relative_remainder() {
+        let relative = relative_path_from_absolute_and_working_directory(
+            cwd("/tmp/proj"),
+            &PathBuf::from("/tmp/proj/src/a.ts"),
+        );
+        assert_eq!(relative.lookup(), "src/a.ts");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_verbatim_working_directory_and_a_disk_path_share_the_relative_remainder() {
+        let relative = relative_path_from_absolute_and_working_directory(
+            cwd(r"\\?\C:\proj"),
+            &PathBuf::from(r"C:\proj\src\Home.ts"),
+        );
+        assert_eq!(relative.lookup(), r"src\Home.ts");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_disk_working_directory_and_a_verbatim_path_share_the_relative_remainder() {
+        let relative = relative_path_from_absolute_and_working_directory(
+            cwd(r"C:\proj"),
+            &PathBuf::from(r"\\?\C:\proj\src\Home.ts"),
+        );
+        assert_eq!(relative.lookup(), r"src\Home.ts");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_verbatim_unc_working_directory_and_a_unc_path_share_the_relative_remainder() {
+        let relative = relative_path_from_absolute_and_working_directory(
+            cwd(r"\\?\UNC\server\share"),
+            &PathBuf::from(r"\\server\share\src\Home.ts"),
+        );
+        assert_eq!(relative.lookup(), r"src\Home.ts");
+    }
+}

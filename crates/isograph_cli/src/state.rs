@@ -1,5 +1,5 @@
 use std::ops::ControlFlow;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use common_lang_types::{
     CurrentWorkingDirectory, RelativePathToSourceFile,
@@ -140,7 +140,7 @@ pub(crate) fn intern_config_directory(
 
 fn relative_path_to_source_file(
     state: &IsographState<impl HostLanguage>,
-    absolute: &PathBuf,
+    absolute: &Path,
 ) -> RelativePathToSourceFile {
     let cwd = *state
         .get_singleton::<CurrentWorkingDirectory>()

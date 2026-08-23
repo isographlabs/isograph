@@ -31,9 +31,6 @@ fn semantic_tokens<THostLanguage: HostLanguage>(
     absolute: &std::path::Path,
 ) -> Option<Vec<lsp_types::SemanticToken>> {
     let cwd = state.get_singleton::<common_lang_types::CurrentWorkingDirectory>()?;
-    let path = common_lang_types::relative_path_from_absolute_and_working_directory(
-        *cwd,
-        &absolute.to_path_buf(),
-    );
+    let path = common_lang_types::relative_path_from_absolute_and_working_directory(*cwd, absolute);
     isograph_lsp::lsp_semantic_tokens_for_file::<THostLanguage>(state, path).clone()
 }
