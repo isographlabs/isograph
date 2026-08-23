@@ -331,9 +331,13 @@ pub fn semantic_token_legend() -> SemanticTokensLegend {
 
 const TYPE: u32 = 1;
 const CLASS: u32 = 2;
+const TYPE_PARAMETER: u32 = 6;
+#[cfg_attr(not(test), expect(dead_code))]
 const PARAMETER: u32 = 7;
 const VARIABLE: u32 = 8;
+#[cfg_attr(not(test), expect(dead_code))]
 const PROPERTY: u32 = 9;
+const FUNCTION: u32 = 12;
 const METHOD: u32 = 13;
 const KEYWORD: u32 = 15;
 const COMMENT: u32 = 17;
@@ -347,11 +351,11 @@ fn lsp_type_index(token: IsographSemanticToken) -> u32 {
         IsographSemanticToken::Keyword => KEYWORD,
         IsographSemanticToken::Type => CLASS,
         IsographSemanticToken::FieldName => METHOD,
-        IsographSemanticToken::ObjectKey => PROPERTY,
+        IsographSemanticToken::ObjectKey | IsographSemanticToken::Argument => TYPE_PARAMETER,
         IsographSemanticToken::GraphQLTypeName => TYPE,
         IsographSemanticToken::DirectiveName => DECORATOR,
-        IsographSemanticToken::Variable | IsographSemanticToken::BooleanOrNull => VARIABLE,
-        IsographSemanticToken::Argument => PARAMETER,
+        IsographSemanticToken::Variable => FUNCTION,
+        IsographSemanticToken::BooleanOrNull => VARIABLE,
         IsographSemanticToken::Integer => NUMBER,
         IsographSemanticToken::String => STRING,
         IsographSemanticToken::Period
@@ -374,9 +378,9 @@ mod tests {
     use span::{Span, WithSpan, WithSpanPostfix};
 
     use super::{
-        CLASS, COMMENT, DECORATOR, KEYWORD, LineBreak, METHOD, NUMBER, OPERATOR, PARAMETER,
-        PROPERTY, STRING, TYPE, VARIABLE, line_breaks, lsp_semantic_tokens, lsp_type_index,
-        semantic_token_legend,
+        CLASS, COMMENT, DECORATOR, FUNCTION, KEYWORD, LineBreak, METHOD, NUMBER, OPERATOR,
+        PARAMETER, PROPERTY, STRING, TYPE, TYPE_PARAMETER, VARIABLE, line_breaks,
+        lsp_semantic_tokens, lsp_type_index, semantic_token_legend,
     };
 
     fn encoded(source: &str) -> Vec<SemanticToken> {
@@ -1103,9 +1107,14 @@ mod tests {
         assert_eq!(types.len(), 23);
         assert_eq!(types[TYPE as usize], SemanticTokenType::TYPE);
         assert_eq!(types[CLASS as usize], SemanticTokenType::CLASS);
+        assert_eq!(
+            types[TYPE_PARAMETER as usize],
+            SemanticTokenType::TYPE_PARAMETER
+        );
         assert_eq!(types[PARAMETER as usize], SemanticTokenType::PARAMETER);
         assert_eq!(types[VARIABLE as usize], SemanticTokenType::VARIABLE);
         assert_eq!(types[PROPERTY as usize], SemanticTokenType::PROPERTY);
+        assert_eq!(types[FUNCTION as usize], SemanticTokenType::FUNCTION);
         assert_eq!(types[METHOD as usize], SemanticTokenType::METHOD);
         assert_eq!(types[KEYWORD as usize], SemanticTokenType::KEYWORD);
         assert_eq!(types[COMMENT as usize], SemanticTokenType::COMMENT);
@@ -1116,14 +1125,20 @@ mod tests {
         assert_eq!(lsp_type_index(IsographSemanticToken::Keyword), KEYWORD);
         assert_eq!(lsp_type_index(IsographSemanticToken::Type), CLASS);
         assert_eq!(lsp_type_index(IsographSemanticToken::FieldName), METHOD);
-        assert_eq!(lsp_type_index(IsographSemanticToken::ObjectKey), PROPERTY);
+        assert_eq!(
+            lsp_type_index(IsographSemanticToken::ObjectKey),
+            TYPE_PARAMETER
+        );
         assert_eq!(lsp_type_index(IsographSemanticToken::GraphQLTypeName), TYPE);
         assert_eq!(
             lsp_type_index(IsographSemanticToken::DirectiveName),
             DECORATOR
         );
-        assert_eq!(lsp_type_index(IsographSemanticToken::Variable), VARIABLE);
-        assert_eq!(lsp_type_index(IsographSemanticToken::Argument), PARAMETER);
+        assert_eq!(lsp_type_index(IsographSemanticToken::Variable), FUNCTION);
+        assert_eq!(
+            lsp_type_index(IsographSemanticToken::Argument),
+            TYPE_PARAMETER
+        );
         assert_eq!(lsp_type_index(IsographSemanticToken::Integer), NUMBER);
         assert_eq!(lsp_type_index(IsographSemanticToken::String), STRING);
         assert_eq!(
