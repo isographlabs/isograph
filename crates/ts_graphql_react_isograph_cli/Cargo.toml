@@ -13,8 +13,12 @@ isograph_cli = { path = "../isograph_cli" }
 isograph_extract_typescript = { path = "../isograph_extract_typescript" }
 
 [dev-dependencies]
+lsp-server = { workspace = true }
+lsp-types = { workspace = true }
 prelude = { path = "../prelude" }
+serde_json = { workspace = true }
 tempfile = "3"
+url = { workspace = true }
 
 [lints]
 workspace = true

@@ -1,12 +1,22 @@
 //! Drive the built `isograph` binary. Every daemon's lock and log live under a private HOME.
 
+use std::io::{BufRead, BufReader, Write};
+use std::net::{Ipv4Addr, TcpStream};
 use std::path::PathBuf;
 use std::process::{Command, Output};
 use std::time::{Duration, Instant};
 
+use lsp_server::{Message, Request, RequestId};
+use lsp_types::notification::{Initialized, Notification};
+use lsp_types::request::{Initialize, Request as LspRequest, SemanticTokensFullRequest};
 use prelude::Postfix;
 
 const DEADLINE: Duration = Duration::from_secs(10);
+const SETTLE: Duration = Duration::from_millis(250);
+
+fn settle() {
+    std::thread::sleep(SETTLE);
+}
 
 fn isograph_bin() -> PathBuf {
     match std::env::var_os("ISOGRAPH_BIN") {
@@ -36,6 +46,12 @@ impl Daemon {
         let path = config.canonicalize().expect("the fixture exists");
         assert!(text.contains("started"), "{text}");
         assert!(text.contains(&path.display().to_string()), "{text}");
+        settle();
+        assert!(
+            daemon.log_text().contains("isograph daemon up"),
+            "{}",
+            daemon.log_text()
+        );
         daemon
     }
 
@@ -49,6 +65,12 @@ impl Daemon {
             output.status.success(),
             "start failed: {}",
             String::from_utf8_lossy(output.stderr.reference())
+        );
+        settle();
+        assert!(
+            daemon.log_text().contains("isograph daemon up"),
+            "{}",
+            daemon.log_text()
         );
         daemon
     }
@@ -612,4 +634,236 @@ fn config_path_with_no_config_exits_1() {
     assert!(stdout(output.reference()).is_empty());
     let err = stderr(output.reference());
     assert!(err.contains("no isograph.config.json"), "{err}");
+}
+
+struct LspClient {
+    writer: TcpStream,
+    reader: BufReader<TcpStream>,
+    next_id: i32,
+}
+
+impl LspClient {
+    fn connect(port: u16) -> Self {
+        let stream =
+            TcpStream::connect((Ipv4Addr::LOCALHOST, port)).expect("connecting to the daemon");
+        let writer = stream.try_clone().expect("cloning the stream");
+        let mut client = Self {
+            writer,
+            reader: BufReader::new(stream),
+            next_id: 2,
+        };
+        client.initialize();
+        client
+    }
+
+    fn initialize(&mut self) {
+        let id = RequestId::from(1);
+        write_message(
+            &mut self.writer,
+            Message::Request(Request {
+                id: id.clone(),
+                method: Initialize::METHOD.to_owned(),
+                params: serde_json::json!({ "capabilities": {} }),
+            }),
+        );
+        let response = read_response(&mut self.reader, id.reference());
+        assert!(response.error.is_none(), "{response:?}");
+        write_message(
+            &mut self.writer,
+            Message::Notification(lsp_server::Notification {
+                method: Initialized::METHOD.to_owned(),
+                params: serde_json::json!({}),
+            }),
+        );
+    }
+
+    fn semantic_tokens_full(&mut self, uri: &str) -> Option<Vec<lsp_types::SemanticToken>> {
+        let id = RequestId::from(self.next_id);
+        self.next_id += 1;
+        write_message(
+            &mut self.writer,
+            Message::Request(Request {
+                id: id.clone(),
+                method: SemanticTokensFullRequest::METHOD.to_owned(),
+                params: serde_json::json!({ "textDocument": { "uri": uri } }),
+            }),
+        );
+        tokens_from_response(read_response(&mut self.reader, id.reference()))
+    }
+}
+
+fn write_message(writer: &mut impl Write, message: Message) {
+    message.write(writer).expect("writing an lsp message");
+}
+
+fn read_message(reader: &mut impl BufRead) -> Message {
+    Message::read(reader)
+        .expect("reading an lsp message")
+        .expect("the connection stayed open")
+}
+
+fn read_response(reader: &mut impl BufRead, expected: &RequestId) -> lsp_server::Response {
+    loop {
+        let Message::Response(response) = read_message(reader) else {
+            continue;
+        };
+        assert_eq!(&response.id, expected);
+        return response;
+    }
+}
+
+fn tokens_from_response(response: lsp_server::Response) -> Option<Vec<lsp_types::SemanticToken>> {
+    assert!(response.error.is_none(), "{response:?}");
+    let value = response.result?;
+    if value.is_null() {
+        return None;
+    }
+    match serde_json::from_value(value).expect("the result is SemanticTokensResult") {
+        lsp_types::SemanticTokensResult::Tokens(tokens) => tokens.data.wrap_some(),
+        lsp_types::SemanticTokensResult::Partial(_) => {
+            panic!("the daemon does not send partial semantic tokens")
+        }
+    }
+}
+
+fn source_path(daemon: &Daemon, relative: &str) -> std::path::PathBuf {
+    daemon
+        .dir
+        .path()
+        .canonicalize()
+        .expect("the fixture exists")
+        .join(relative)
+}
+
+fn file_uri(path: &std::path::Path) -> String {
+    url::Url::from_file_path(path)
+        .expect("the path is absolute")
+        .to_string()
+}
+
+fn send_json(daemon: &Daemon, value: serde_json::Value) {
+    let frame = write_frame(daemon.dir.path(), value.to_string().as_str());
+    let sent = daemon.isograph(["send", "--file", frame.to_str().expect("utf-8")].reference());
+    assert!(
+        sent.status.success(),
+        "stdout: {} stderr: {}",
+        stdout(sent.reference()),
+        stderr(sent.reference())
+    );
+}
+
+fn present(path: &std::path::Path, contents: &str) -> serde_json::Value {
+    serde_json::json!({
+        "kind": "DiskChanged",
+        "value": {
+            "File": {
+                "path": path,
+                "presence": { "Present": contents }
+            }
+        }
+    })
+}
+
+fn absent(path: &std::path::Path) -> serde_json::Value {
+    serde_json::json!({
+        "kind": "DiskChanged",
+        "value": {
+            "File": {
+                "path": path,
+                "presence": "Absent"
+            }
+        }
+    })
+}
+
+const CONTENTS: &str = "export const Home = iso(`entrypoint Query.HomeRoute`)";
+const KEYWORD: u32 = 15;
+
+#[test]
+fn send_of_a_present_iso_literal_returns_entrypoint_as_keyword() {
+    let daemon = Daemon::start();
+    let path = source_path(daemon.reference(), "src/Home.ts");
+    assert!(!path.exists(), "injected send does not write the path");
+    send_json(daemon.reference(), present(path.reference(), CONTENTS));
+    settle();
+    let mut client = LspClient::connect(daemon_port(daemon.reference()));
+    let uri = file_uri(path.reference());
+    let tokens = client
+        .semantic_tokens_full(uri.as_str())
+        .expect("the test interned this path");
+    assert!(!path.exists(), "injected send does not write the path");
+    assert_eq!(tokens[0].delta_line, 0);
+    assert_eq!(tokens[0].token_type, KEYWORD);
+    assert_eq!(tokens[0].length, 10);
+    assert_eq!(
+        tokens[0].delta_start,
+        "export const Home = iso(`".encode_utf16().count() as u32
+    );
+}
+
+#[test]
+fn send_of_a_path_never_interned_returns_null_tokens() {
+    let daemon = Daemon::start();
+    let path = source_path(daemon.reference(), "src/missing.ts");
+    let mut client = LspClient::connect(daemon_port(daemon.reference()));
+    let uri = file_uri(path.reference());
+    assert!(client.semantic_tokens_full(uri.as_str()).is_none());
+}
+
+#[test]
+fn send_of_a_present_file_with_no_iso_returns_empty_data() {
+    let daemon = Daemon::start();
+    let path = source_path(daemon.reference(), "src/Home.ts");
+    send_json(
+        daemon.reference(),
+        present(path.reference(), "export const x = 1;\n"),
+    );
+    settle();
+    let mut client = LspClient::connect(daemon_port(daemon.reference()));
+    let uri = file_uri(path.reference());
+    let tokens = client
+        .semantic_tokens_full(uri.as_str())
+        .expect("the test interned this path");
+    assert!(tokens.is_empty());
+}
+
+#[test]
+fn send_of_absent_after_present_returns_null_tokens() {
+    let daemon = Daemon::start();
+    let path = source_path(daemon.reference(), "src/Home.ts");
+    send_json(daemon.reference(), present(path.reference(), CONTENTS));
+    settle();
+    let mut client = LspClient::connect(daemon_port(daemon.reference()));
+    let uri = file_uri(path.reference());
+    let _present = client
+        .semantic_tokens_full(uri.as_str())
+        .expect("the test interned this path");
+    send_json(daemon.reference(), absent(path.reference()));
+    settle();
+    assert!(client.semantic_tokens_full(uri.as_str()).is_none());
+}
+
+#[test]
+fn send_prefix_increments_delta_line_and_keeps_keyword() {
+    let daemon = Daemon::start();
+    let path = source_path(daemon.reference(), "src/Home.ts");
+    send_json(daemon.reference(), present(path.reference(), CONTENTS));
+    settle();
+    let mut client = LspClient::connect(daemon_port(daemon.reference()));
+    let uri = file_uri(path.reference());
+    let before = client
+        .semantic_tokens_full(uri.as_str())
+        .expect("the test interned this path");
+    send_json(
+        daemon.reference(),
+        present(path.reference(), &("const x = 1;\n".to_owned() + CONTENTS)),
+    );
+    settle();
+    let after = client
+        .semantic_tokens_full(uri.as_str())
+        .expect("the test interned this path");
+    assert_eq!(after[0].delta_line, 1);
+    assert_eq!(after[0].delta_start, before[0].delta_start);
+    assert_eq!(after[0].token_type, KEYWORD);
+    assert_eq!(after[0].length, 10);
 }

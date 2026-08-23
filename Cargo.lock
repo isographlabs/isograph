@@ -1893,8 +1893,12 @@ version = "0.5.3"
 dependencies = [
  "isograph_cli",
  "isograph_extract_typescript",
+ "lsp-server",
+ "lsp-types",
  "prelude",
+ "serde_json",
  "tempfile",
+ "url",
 ]
 
 [[package]]
