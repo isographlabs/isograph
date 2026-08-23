@@ -27,7 +27,11 @@ Deltas from those files, exhaustive:
 
 `isograph send` still intern any path. Scope is the watcher's job. `handle`, `run_event_loop`, and the session do not know whether the watcher is running.
 
-One shippable change.
+Two shippable changes. Prefactor first.
+
+Change 1 is `remove_disk_file` prefix removal. `handle` of `Absent` is already the reader. Folder-delete in change 2 needs it. It lands alone.
+
+Change 2 is the watcher: flag, globs, walk, notify, `HostLanguage::source_file_kind`. That is one chunk. `source_file_kind` with no walker is unused. `--filesystem watch` with no debouncer is a no-op. `ISOGRAPH_FOLDER` with no walk is unused. `SourceGlobs` with no ingest is unused. Do not split those into their own docs.
 
 ## What the user does
 
@@ -47,9 +51,56 @@ $ isograph start --filesystem injected
 
 Writing a file on disk does not intern. `isograph send` of `DiskChanged` still intern.
 
-Default is `Watch`. CI e2e uses `Injected`.
+Default is `Watch`. CI e2e uses `Injected`. After change 1, `isograph send` of `Absent` of a directory path removes interned files under that path.
 
-## Types
+## Change 1: descendant Absent
+
+Origin: `IsographDatabase::remove_iso_literals_from_path`. Delta: `Path::starts_with`.
+
+Before: `remove_disk_file` removes one map key.
+
+After. Add `use std::path::Path`.
+
+```rust
+// from crates/isograph_compiler/src/database.rs
+    pub fn remove_disk_file(&mut self, path: RelativePathToSourceFile) {
+        let ids: Vec<_> = self
+            .get_disk_file_map_mut()
+            .tracked()
+            .0
+            .extract_if(|key, _| key.as_ref().starts_with(path.as_ref()))
+            .map(|(_, source_id)| source_id)
+            .collect();
+        for source_id in ids {
+            self.remove(source_id);
+        }
+    }
+```
+
+`handle_disk_changed` still calls `remove_disk_file`. `Absent` of a prefix path from `isograph send` removes descendants. That is the same contract as isograph's folder remove.
+
+Empty relative path: `pathdiff` of the config directory against itself is `""`. `Path::new("src/a.ts").starts_with(Path::new(""))` is true. `Absent` of the config directory removes every interned file.
+
+`Absent` of a never-interned path that is not a prefix of any key is a no-op.
+
+### Tests
+
+`database.rs`:
+
+- intern `src/a.ts`, `src/b.ts`, `src2/c.ts`; `remove_disk_file` of `src`; `src/a.ts` and `src/b.ts` gone; `src2/c.ts` remains.
+- intern `src/a.ts`; `remove_disk_file` of `src/a.ts.bak` leaves `src/a.ts`.
+- intern `src/a.ts`; `remove_disk_file` of interned `""`; `src/a.ts` gone.
+- existing exact-path remove tests stay.
+
+`state.rs` handle, `intern_config_directory` of `/tmp/proj/isograph.config.json`:
+
+- Present `/tmp/proj/src/a.ts`, `/tmp/proj/src/b.ts`, `/tmp/proj/src2/c.ts`. `Absent` of `/tmp/proj/src`: first two gone, `src2/c.ts` remains. `handle` returns `Vec::new()`.
+- `Absent` of `/tmp/proj`: every interned file gone.
+- `Absent` of `/tmp/proj/never`: no-op.
+
+## Change 2: watcher
+
+Requires change 1. Types, start, watch, tests, cargo, and call sites below are this change.
 
 Most important first.
 
@@ -183,37 +234,7 @@ After:
 
 Drop `NoArgs` from the `freddie_cli` import.
 
-### Descendant Absent
-
-Origin: `IsographDatabase::remove_iso_literals_from_path`. Delta: `Path::starts_with`.
-
-Before: `remove_disk_file` removes one map key.
-
-After. Add `use std::path::Path`.
-
-```rust
-// from crates/isograph_compiler/src/database.rs
-    pub fn remove_disk_file(&mut self, path: RelativePathToSourceFile) {
-        let ids: Vec<_> = self
-            .get_disk_file_map_mut()
-            .tracked()
-            .0
-            .extract_if(|key, _| key.as_ref().starts_with(path.as_ref()))
-            .map(|(_, source_id)| source_id)
-            .collect();
-        for source_id in ids {
-            self.remove(source_id);
-        }
-    }
-```
-
-`handle_disk_changed` still calls `remove_disk_file`. `Absent` of a prefix path from `isograph send` removes descendants. That is the same contract as isograph's folder remove.
-
-Empty relative path: `pathdiff` of the config directory against itself is `""`. `Path::new("src/a.ts").starts_with(Path::new(""))` is true. `Absent` of the config directory removes every interned file. Test it.
-
-`Absent` of a never-interned path that is not a prefix of any key is a no-op. Test it.
-
-Non-UTF8 `Absent`: if the absolute path (or the pathdiff result) is not UTF-8, skip the post. Do not call `handle`. `relative_path_from_absolute_and_working_directory` `expect`s stringify. Present already skips non-UTF8.
+Non-UTF8 `Absent` from the watcher: if the absolute path is not UTF-8, skip the post. Do not call `handle`. `relative_path_from_absolute_and_working_directory` `expect`s stringify.
 
 ## Start
 
@@ -910,7 +931,7 @@ fn post(event_tx: &UnboundedSender<IsographEvent>, change: DiskChanged) {
 
 Posted `Present` paths are absolute and canonical. Posted `Absent` paths are absolute; canonical when canonicalize succeeded.
 
-## Tests
+## Tests (change 2)
 
 ### TypeScript `source_file_kind`
 
@@ -930,21 +951,9 @@ Equals `"__isograph"`.
 - `[]` contains nothing.
 - `static_prefix("src/**/*.ts")` is `src`. `static_prefix("**/*.ts")` is empty. `static_prefix("foo.ts")` is `foo.ts`.
 
-### `database.rs`
+### `database.rs` `TestHostLanguage`
 
-`TestHostLanguage::source_file_kind` returns `Source`. Existing insert/remove tests stay.
-
-- intern `src/a.ts`, `src/b.ts`, `src2/c.ts`; `remove_disk_file` of `src`; `src/a.ts` and `src/b.ts` gone; `src2/c.ts` remains.
-- intern `src/a.ts`; `remove_disk_file` of `src/a.ts.bak` leaves `src/a.ts`.
-- intern `src/a.ts`; `remove_disk_file` of interned `""`; `src/a.ts` gone.
-
-### `state.rs` handle
-
-`intern_config_directory` of `/tmp/proj/isograph.config.json`. Present three files under `/tmp/proj/src/a.ts`, `src/b.ts`, `src2/c.ts`. `Absent` of `/tmp/proj/src`: first two gone, `src2/c.ts` remains.
-
-`Absent` of `/tmp/proj` (the config directory): every interned file gone.
-
-`Absent` of `/tmp/proj/never`: no-op.
+`source_file_kind` returns `Source`. Existing insert/remove tests stay.
 
 ### `watch.rs`
 
