@@ -1121,7 +1121,12 @@ Unit tests of `categorize_and_filter_events` / `apply` with a fake channel. `sou
 - `visit_dirs_skipping_isograph`: `src/a.in` is visited; `src/__isograph/c.in` is not.
 - `source_files: []`: boot list is empty; `watch_roots` is empty.
 
-Live notify, same crate, one test: temp dir, `source_files: ["src/**/*.in"]`, `watch::start`, intern_config_directory, `ingest` via `apply` on recvd events. Write `src/a.in` before `start` (boot) or after (notify). `handle` the `DiskChanged`. `disk_file` of `src/a.in` is those contents. Deadline 10s. This is the test that pins intern against disk. Do not add a production API only this test calls.
+Live notify, same crate. Temp dir, `source_files: ["src/**/*.in"]`, intern_config_directory, `watch::start`, `apply` on recvd events, `handle`. Deadline 10s. Do not add a production API only these tests call.
+
+- Boot: write `src/a.in` before `start`. After `scan finished`, `disk_file` of `src/a.in` is those contents.
+- Notify: start on an empty `src/`, then write `src/a.in`. `disk_file` of `src/a.in` is those contents.
+
+The binary e2e cannot read intern (no query verb). These crate tests are the intern pin. The e2e log line `disk present` only shows the watcher posted.
 
 ### e2e `cli.rs`
 
