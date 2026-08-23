@@ -1,26 +1,30 @@
-# Per-connection LSP session state
+# Per-connection client writers
 
 Requires lsp-port.md (landed). Independent of lsp-tokens.md and lsp-outstanding.md.
 
-The session already exists: `Connection::initialize`, pump, `drop(connection)` then `join`. After lsp-request-response.md, requests go to `answer_request`. This slice keeps that. After `initialize`, the session posts `ClientEvent::Started` with that client's `ClientCapabilities` and a clone of `connection.sender`. The effect loop owns `LiveSessions`. Send is ephemeral: the map holds the row for the life of the connection, then `ClientEvent::Gone` removes it. An editor is the same, for the life of the window.
+A request already carries `LspRequest.reply`. `textDocument/publishDiagnostics` is a server-to-client notification: there is no request, so there is no reply sender on the event. After `initialize`, the session posts `ClientEvent::Started` with that client's `ClientCapabilities` and a clone of `connection.sender`. The effect loop stores the row in `LiveSessions`. When the socket ends, `ClientEvent::Gone` removes it. lsp-diagnostics.md iterates the map and sends on those senders.
 
-`connection.initialize` already returns serialized `InitializeParams`. Today they are discarded. This slice deserializes them and puts `params.capabilities` on `ClientStarted`.
-
-Cleanup is the thread ending when the socket ends (`exit`, EOF, reset). `session` posts `ClientEvent::Gone` after `run_session` returns. No idle timeout. VS Code keeps the language client up while the window is open. A 5 minute inactivity close looks like a crash and the client will reconnect. Dead-peer TCP is socket keepalive, not an LSP timer.
-
-`Kill` still unlinks the port file then `process::exit(0)`. This slice does not drain clients.
-
-Origin: LSP `InitializeParams.capabilities`; isograph `Connection::initialize` then one `connection.sender`. Delta: N connections share one daemon, so connect/disconnect are `Client` events and the effect loop holds `id -> sender + capabilities`.
+Origin of the writer: isograph one `connection.sender`; this process has N connections. Origin of the caps: LSP `InitializeParams.capabilities`. Delta: `ClientId` + `ClientEvent` / `ClientEffect`, `LiveSessions` local in `run_effect_loop`.
 
 One shippable change.
 
 ## What the user does
 
-No new CLI. Send still `initialize`s with `{"capabilities":{}}` and omits `processId`. A VS Code client that advertised `textDocument.publishDiagnostics` can later receive that notification (lsp-diagnostics.md). A send client that already dropped cannot.
+No new CLI. Send still `initialize`s with `{"capabilities":{}}`. A VS Code client that advertised `textDocument.publishDiagnostics` can later receive that notification (lsp-diagnostics.md). Dropping the editor removes that row.
 
 ## Types
 
 Most important first.
+
+```rust
+// from crates/isograph_cli/src/daemon.rs
+struct LiveSession {
+    sender: crossbeam::channel::Sender<lsp_server::Message>,
+    capabilities: lsp_types::ClientCapabilities,
+}
+
+struct LiveSessions(std::collections::HashMap<ClientId, LiveSession>);
+```
 
 ```rust
 // from crates/isograph_cli/src/event.rs
@@ -39,19 +43,7 @@ pub enum ClientEvent {
     Started(ClientStarted),
     Gone(ClientId),
 }
-
-#[derive(Clone, Debug, derive_more::From)]
-pub enum IsographEvent {
-    #[from]
-    Lsp(LspEvent),
-    #[from]
-    Internal(InternalEvent),
-    #[from]
-    Client(ClientEvent),
-}
 ```
-
-`ClientEvent` is not `InternalEvent`: it carries a `Sender` on `Started`, so it is not on the `isograph/event` wire. `LspRequest` does not gain `client`. Request replies still ride on `LspRequest.reply`.
 
 ```rust
 // from crates/isograph_cli/src/effect.rs
@@ -69,7 +61,25 @@ impl From<crate::event::ClientEvent> for ClientEffect {
         }
     }
 }
+```
 
+```rust
+// from crates/isograph_cli/src/event.rs
+#[derive(Clone, Debug, derive_more::From)]
+pub enum IsographEvent {
+    #[from]
+    Lsp(LspEvent),
+    #[from]
+    Internal(InternalEvent),
+    #[from]
+    Client(ClientEvent),
+}
+```
+
+Delta: `Client` variant.
+
+```rust
+// from crates/isograph_cli/src/effect.rs
 #[derive(Debug, derive_more::From)]
 pub enum IsographEffect {
     LogHelloWorld,
@@ -80,21 +90,7 @@ pub enum IsographEffect {
 }
 ```
 
-`handle` of `IsographEvent::Client` returns `IsographEffect::Client`. `ClientEvent::Started(...).to()` is the event. `client.to()` is the `ClientEffect`.
-
-```rust
-// from crates/isograph_cli/src/daemon.rs
-struct LiveSession {
-    sender: crossbeam::channel::Sender<lsp_server::Message>,
-    capabilities: lsp_types::ClientCapabilities,
-}
-
-struct LiveSessions(std::collections::HashMap<ClientId, LiveSession>);
-```
-
-The id is the map key. `LiveSession` does not repeat it. Clone `connection.sender` onto `ClientStarted`; that clone is how the effect loop writes notifications. The session still writes request replies on `connection.sender`.
-
-`LiveSessions` is a local in `run_effect_loop`. Session threads send on `event_tx`.
+Delta: `Client` variant and `#[from]`.
 
 ### `handle`
 
@@ -106,10 +102,6 @@ The id is the map key. `LiveSession` does not repeat it. Clone `connection.sende
             crate::effect::IsographEffect::Client(client.to()).wrap_vec()
         }
 ```
-
-### `run_event_loop`
-
-Unchanged. `handle` returns `IsographEffect::Client`; the existing loop forwards every effect.
 
 ### `run_effect_loop` / `perform`
 
@@ -158,11 +150,11 @@ pub fn perform(effect: IsographEffect, live: &mut LiveSessions) -> ControlFlow<(
 }
 ```
 
-Ids are monotonic and not reused, so `insert` cannot collide with a live row. `remove` of an unknown id is a no-op (`initialize` failed, no `ClientEvent::Started`).
+Delta: `live` local; `perform` takes `&mut LiveSessions`; `Client` arms. `remove` of an unknown id is a no-op (`initialize` failed). Ids are monotonic on `accept_loop`, so `insert` does not collide with a live row.
+
+`run_event_loop` is unchanged.
 
 ### Session
-
-`accept_loop` assigns `ClientId` with a `mut u64` on that task (`next += 1` before `spawn`). Pass it into `session`. Do not use `AtomicU64`.
 
 ```rust
 // from crates/isograph_cli/src/lsp_socket.rs
@@ -214,16 +206,22 @@ fn session(
 }
 ```
 
+Delta: `next`, `ClientId` into `session`, `ClientEvent::Gone` after `run_session`.
+
 `run_session` after successful `initialize`:
 
 ```rust
-    let params = match serde_json::from_value::<lsp_types::InitializeParams>(params) {
+    let params = match connection.initialize(capabilities) {
         Ok(params) => params,
         Err(e) => {
-            debug!(error = %e, "initialize params");
-            lsp_types::InitializeParams::default()
+            debug!(error = %e, "lsp initialize");
+            return;
         }
     };
+    let params = serde_json::from_value::<lsp_types::InitializeParams>(params).unwrap_or_else(|e| {
+        debug!(error = %e, "initialize params");
+        lsp_types::InitializeParams::default()
+    });
     let _ = event_tx.send(
         crate::event::ClientEvent::Started(crate::event::ClientStarted {
             client,
@@ -234,9 +232,7 @@ fn session(
     );
 ```
 
-`processId` is not watched. Same thread, same `event_tx`: `ClientEvent::Started` is enqueued before `ClientEvent::Gone`.
-
-Request answering lives in `answer_request` after lsp-request-response.md. This slice does not move it. `handle` stays inner. `run_session` still puts `reply: connection.sender.clone()` on `LspRequest` and does not put `client` on `Lsp`.
+Delta: keep initialize params; post `ClientEvent::Started`. `run_session` takes `client`. Same thread, same `event_tx`: `Started` is enqueued before `Gone`.
 
 ## Tests
 
@@ -251,8 +247,6 @@ Request answering lives in `answer_request` after lsp-request-response.md. This 
 - two connections: two `ClientEvent::Started` with different `ClientId`s. Drop one: one `ClientEvent::Gone`. The other connection still answers a request.
 
 `perform` of `ClientEffect::Gone` of an id that was never registered: `Continue`, no panic.
-
-Do not add a production function only tests call.
 
 ## Call sites
 
