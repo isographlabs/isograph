@@ -4,7 +4,7 @@ Requires start-returns-when-listening.md (landed).
 
 Freddie `stop` / `restart` without `--force` is SIGTERM. On Windows, `signal_pid(Terminate)` returns `graceful stop is not yet available on Windows; use --force`. `stop` and `restart` are freddie verbs: find the pid, subscribe to lock release, ask, wait. An isograph intercept of those verbs duplicates that and fights `init_client_logging` on restart.
 
-The app-specific piece is how to ask. Unix stays SIGTERM. `App::ask_to_quit` is `#[cfg(windows)]`. Isograph's impl is `send::notify` of `Internal::Quit` on the port next to the lock, the same frame `isograph send --file '{"kind":"Quit"}'` already posts. No temp file. No subprocess.
+The app-specific piece is how to ask. Unix stays SIGTERM. `App::try_to_quit` is `#[cfg(windows)]`. Isograph's impl is `send::notify` of `Internal::Quit` on the port next to the lock, the same frame `isograph send --file '{"kind":"Quit"}'` already posts. No temp file. No subprocess.
 
 `--force` stays SIGKILL / `taskkill /F`. `Daemon` drop stays `stop --force`. Mercury keeps the default `None`.
 
@@ -39,9 +39,9 @@ A daemon that does not answer the port: `stop` without `--force` exits 1, `could
 
 Unix `stop` / `restart` without `--force` is unchanged (SIGTERM). The method does not exist on unix.
 
-Mercury on Windows without `--force` still prints today's error: the default is `None`, and freddie maps that to the same string `signal_pid(Terminate)` returns today.
+Mercury on Windows without `--force` still fails: the default is `None`, and freddie maps that to `try --force or impl try_to_quit`.
 
-## Change 1: `App::ask_to_quit` in freddie
+## Change 1: `App::try_to_quit` in freddie
 
 Lands in `github.com/freddiehg/freddie`. Origin: `crates/freddie_cli/src/lib.rs` `App`, `crates/freddie_cli/src/client.rs` `stop_daemon` / `signal_pid` / `stop` / `restart`. Delta: Windows `Terminate` calls the app instead of returning that error from `signal_pid`.
 
@@ -61,18 +61,19 @@ Lands in `github.com/freddiehg/freddie`. Origin: `crates/freddie_cli/src/lib.rs`
     /// second [`instance`](Self::instance) would rediscover it.
     ///
     /// `None` if this app has no ask. `Some` is the attempt: `Ok` posted it, `Err` tried
-    /// and could not. The default is `None`.
+    /// and could not. The default is `None`, so freddie can print `try --force or impl
+    /// try_to_quit` instead of every app printing it.
     #[cfg(windows)]
-    fn ask_to_quit(
+    fn try_to_quit(
         _instance: &Instance,
     ) -> Option<Result<(), Box<dyn std::error::Error + Send + Sync>>> {
         None
     }
 ```
 
-Not `ask_to_quit_if_no_sigterm`. The cfg is that `if`. The method always asks or returns `None`; it does not test for SIGTERM. Not `windows_soft_quit`: Freddie already says "asking it to quit" on `StopArgs`.
+Not `try_to_quit_if_no_sigterm`. The cfg is that `if`. The method always asks or returns `None`; it does not test for SIGTERM. Not `windows_soft_quit`: Freddie already says "asking it to quit" on `StopArgs`.
 
-`None` is no implementation, not a successful no-op. `Result<Option<()>, _>` would make `Ok(None)` look like the ask succeeded at doing nothing. Freddie maps `None` to `graceful stop is not yet available on Windows; use --force`. `Some(Err)` is an app that has an ask and failed it (`could not signal pid N: ...`). Mercury and `TestApp` keep the default. Unix impls do not name the method.
+`None` is no implementation, not a successful no-op. Without `Option`, every app that cannot ask would have to fail with `try --force` itself. Freddie maps `None` to `try --force or impl try_to_quit`. `Some(Err)` is an app that has an ask and failed it (`could not signal pid N: ...`). Mercury and `TestApp` keep the default. Unix impls do not name the method.
 
 ### `stop_daemon` is generic and Windows `Terminate` calls the app
 
@@ -117,11 +118,8 @@ fn deliver<TApp: App>(instance: &Instance, pid: Pid, signal: Signal) -> io::Resu
             }
             #[cfg(windows)]
             {
-                match TApp::ask_to_quit(instance) {
-                    None => io::Error::other(
-                        "graceful stop is not yet available on Windows; use --force",
-                    )
-                    .wrap_err(),
+                match TApp::try_to_quit(instance) {
+                    None => io::Error::other("try --force or impl try_to_quit").wrap_err(),
                     Some(Ok(())) => ().wrap_ok(),
                     Some(Err(e)) => io::Error::other(e).wrap_err(),
                 }
@@ -131,7 +129,7 @@ fn deliver<TApp: App>(instance: &Instance, pid: Pid, signal: Signal) -> io::Resu
 }
 ```
 
-`None` and `Some(Err)` both become `Failure::Unsignalable`. `None` uses today's string. `Some(Err)` uses the app's error. `Failure::Unsignalable` still prints `could not signal pid {pid}: {error}`.
+`None` and `Some(Err)` both become `Failure::Unsignalable`. `None` is `try --force or impl try_to_quit`. `Some(Err)` uses the app's error. `Failure::Unsignalable` still prints `could not signal pid {pid}: {error}`.
 
 `stop` and `restart` already choose `Signal` from `force`. They pass `TApp` through. `stop` is not generic today; `restart` already is.
 
@@ -165,7 +163,7 @@ fn signal_pid(pid: Pid, signal: Signal) -> io::Result<()> {
             .args(["/F", "/PID"])
             .arg(pid.to_string())),
         Signal::Terminate => {
-            unreachable!("Windows Terminate is App::ask_to_quit, not signal_pid")
+            unreachable!("Windows Terminate is App::try_to_quit, not signal_pid")
         }
     }
 }
@@ -177,7 +175,7 @@ Unix `signal_pid` is unchanged.
 
 Subscribe then ask is unchanged: `watch_for_free` before `deliver`.
 
-## Change 2: isograph implements `ask_to_quit`
+## Change 2: isograph implements `try_to_quit`
 
 Bump both freddie git deps to the change-1 rev.
 
@@ -218,7 +216,7 @@ impl<THostLanguage: HostLanguage> App for Isograph<THostLanguage> {
     }
 
     #[cfg(windows)]
-    fn ask_to_quit(
+    fn try_to_quit(
         instance: &Instance,
     ) -> Option<Result<(), Box<dyn std::error::Error + Send + Sync>>> {
         (|| {
@@ -245,7 +243,7 @@ Do not add `stop.rs`. Do not intercept `Verb::Stop` / `Verb::Restart` in `lib.rs
 // from crates/isograph_cli/src/daemon.rs
     // Unix `isograph stop` without `--force` sends SIGTERM. Route it into the event
     // channel as Quit, so the model turns it into Kill, the effect loop breaks, and
-    // serve returns. Windows `stop` without `--force` is App::ask_to_quit, which posts
+    // serve returns. Windows `stop` without `--force` is App::try_to_quit, which posts
     // Internal::Quit on the socket; this task does not exist there.
     //
     // A spawned task rather than a third `select!` arm, because an arm that completed
@@ -269,7 +267,7 @@ Do not add `stop.rs`. Do not intercept `Verb::Stop` / `Verb::Restart` in `lib.rs
 
 ```rust
 // from crates/ts_graphql_react_isograph_cli/tests/cli.rs
-// Unix stop without --force is SIGTERM. Windows stop without --force is App::ask_to_quit
+// Unix stop without --force is SIGTERM. Windows stop without --force is App::try_to_quit
 // (a Quit frame on the socket). Both run Kill.
 const STOP: &[&str] = &["stop"];
 ```
@@ -336,13 +334,13 @@ fn send_of_quit_then_status_reports_not_running() {
 }
 ```
 
-`notify` of `Quit` through the hidden verb, all platforms. Windows `stop` is that same `notify` via `ask_to_quit`. No SIGTERM on this path, including unix.
+`notify` of `Quit` through the hidden verb, all platforms. Windows `stop` is that same `notify` via `try_to_quit`. No SIGTERM on this path, including unix.
 
 Keep `poll` until no-poll-in-tests.md.
 
 ## Call graph
 
 - Unix `stop` / `restart` without `--force` -> freddie `signal_pid(Terminate)` -> SIGTERM -> daemon `Quit` -> `Kill`
-- Windows `stop` / `restart` without `--force` -> freddie `App::ask_to_quit` -> isograph `notify(Quit)` -> `Kill` -> wait on lock -> `stopped` / then start
+- Windows `stop` / `restart` without `--force` -> freddie `App::try_to_quit` -> isograph `notify(Quit)` -> `Kill` -> wait on lock -> `stopped` / then start
 - `--force` -> SIGKILL / `taskkill /F` on every OS
 - `isograph send --file` of `{"kind":"Quit"}` -> `send::run` -> `notify` (already)
