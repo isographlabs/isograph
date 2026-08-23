@@ -6,37 +6,44 @@ The TCP port in `{slug}.port` is LSP JSON-RPC (`Content-Length`). Same crate iso
 
 isograph: `Connection::stdio()`, `server::initialize` (`connection.initialize(server_capabilities)`), loop on messages, unhandled requests `MethodNotFound`, then `drop(connection)` then `io_handles.join()`. That is the server. We do the same join order.
 
+`handle` is unchanged. The session deserializes `isograph/event` params the way `on_message` deserializes a frame today, and sends `HelloWorld` / `Quit` / `DiskChanged` on `event_tx`. There is no `IsographEvent::Lsp`. Later docs that put dispatch in `handle` are stale; that is those docs' problem.
+
 `isograph send` is an LSP client of that port: owned `TcpStream`, `Message::{read,write}`, initialize request, `initialized`, one notification, drop the stream. Not `Connection::connect`. `Connection::connect` builds `IoThreads` on a `try_clone`d fd; `join` waits for the writer until `sender` is dropped, and dropping `Connection` does not FIN while the reader thread still holds its clone. isograph is a long-lived stdio server, not a one-shot TCP client. Origin of the send path: `refactors/past/lsp-socket.md` `handshake_and_notify`.
 
-The notification is `isograph/event`. Its params are the same JSON as `--file` today (`HelloWorld` / `Quit` / `DiskChanged`).
+The notification is `isograph/event`. Its params are the same JSON as `--file` today.
 
 Each accepted TCP connection is one LSP client. `accept_loop` accepts forever. Each client is one `session`. Each `isograph send` is one client: connect, handshake, one notification, drop.
 
-`session` is the per-client LSP: `Connection` from the stream, `connection.initialize`, then a pump. After initialize, every `lsp_server::Message` becomes `IsographEvent::Lsp` on `event_tx` (the message plus that client's id). Requests also get `MethodNotFound` on that connection. This slice: `session` is the only writer. When dispatch grows, that `MethodNotFound` send moves with it into `handle` (writer keyed by `LspClientId`). lsp-tokens.md cannot land until the reply path is one place; two writers is two responses.
+`session` is the per-client LSP: `Connection` from the stream, `connection.initialize`, then a pump. Requests get `MethodNotFound` on that connection. This slice: `session` is the only writer. `handle` is not request/response.
 
-Not every `IsographEvent` is LSP. SIGTERM still posts `Quit` in-process. Tests and the later watcher still post `HelloWorld` / `DiskChanged` / `Quit` in-process. The wire is always `Lsp`.
+Not every `IsographEvent` is from the wire. SIGTERM still posts `Quit` in-process. Tests and the later watcher still post `HelloWorld` / `DiskChanged` / `Quit` in-process.
 
 `std::thread::spawn` session threads keep the process alive after main returns. After `Kill` ends `select!` and the port file is unlinked, `std::process::exit(0)`. Do not return from `serve` into a process that waits on those threads. Flock is released on process exit. There is no session registry this slice.
 
-One shippable change. Existing CLI send tests stay green: send owns the `TcpStream` and returns when `Message::write` of the notification returns.
+The daemon installs `freddie_cli`'s panic hook (`log_panics`) before `run_daemon`. That hook `process::abort()`s. A panic on a session or IO thread kills every client of that config. Copied `make_reader` / `make_write` must not `unwrap`. `Message::read` / `send` / `write` `Err` ends that session. `#[cfg(test)]` does not install the hook; a unit test that "survives" a bad frame is not proof the daemon survives. The production assertion is `cli.rs`.
+
+`Connection::initialize` still `unwrap`s `sender.send` inside `lsp-server`. A client that drops during handshake can still abort. Send does the handshake in order and does not hit that. This slice does not reimplement `initialize`.
+
+One shippable change. Existing CLI send tests stay green: send owns the `TcpStream` and returns when `Message::write` of the notification returns. `Message::write` flushes.
 
 ## What is not isograph
 
 isograph is one process per editor on stdio. i2 is one daemon per config. Send and later editors share the TCP port that send-events.md already binds. Everything below is that, or a later slice.
 
-- `Connection::stdio` / `Connection::listen` are one client. We accept N streams on one bind, then `Connection { sender, receiver }` from each `TcpStream`. `socket_transport` is `pub(crate)`. Copy `lsp-server` 0.7.8 `src/socket.rs` `socket_transport` / `make_reader` / `make_write` and `src/stdio.rs` `make_io_threads` / `IoThreads` into `lsp_socket.rs`. Delta: `use crate::Message` becomes `use lsp_server::Message`; both copies live in this module, so there is no `crate::stdio`. Do not change `unwrap`s. They panic a session thread, not `handle`.
+- `Connection::stdio` / `Connection::listen` are one client. We accept N streams on one bind, then `Connection { sender, receiver }` from each `TcpStream`. `socket_transport` is `pub(crate)`. Copy lives in `lsp_socket.rs` (bodies below). `lsp-server`'s `IoThreads` fields are private; constructing `lsp_server::IoThreads` from outside is impossible.
 - Session is a std thread per stream. `Connection::initialize` blocks. N of those cannot sit on the daemon's current-thread runtime.
 - `tokio::net::TcpListener`, `into_std` + `set_nonblocking(false)` on the runtime thread, then spawn `session`. Serve is already tokio. `into_std` streams are non-blocking; `Message::read` is not.
 - After `Kill`, `process::exit(0)`. isograph has no leftover TCP session threads: editor disconnect ends that process.
 - Code lives in `isograph_cli`, not `isograph_lsp`. The daemon is already `isograph_cli`. i2 `isograph_lsp` is encoding.
-- Empty `ServerCapabilities`. isograph's `initialize` advertises tokens, hover, and the rest. Those land with lsp-tokens.md / later docs.
-- No `LspState`, no `LSPNotificationDispatch` / `LSPRequestDispatch` in this slice. isograph's dispatch chain (`on_notification_sync` / `on_request_sync`) lands later inside `handle`'s `IsographEvent::Lsp` match, not in `session`. This slice is a `match` on the message.
+- Empty `ServerCapabilities`. isograph's `initialize` advertises tokens, hover, and the rest. Those land with later docs.
+- No `LspState`, no `LSPNotificationDispatch` / `LSPRequestDispatch` in this slice. This slice is a `match` on the message in `session`.
 - No `bridge_crossbeam_to_tokio`. isograph bridges so one `select!` can mix LSP, watcher, and debounce. We already have `run_event_loop`. The session thread iterates `connection.receiver`.
-- `isograph/event`. isograph has no CLI event socket. send-events.md already sends `HelloWorld` / `DiskChanged` / `Quit`; the port is now LSP, so that JSON is a notification's params. The channel event is `Lsp`, not those variants.
+- `isograph/event`. isograph has no CLI event socket. send-events.md already sends `HelloWorld` / `DiskChanged` / `Quit`; the port is now LSP, so that JSON is a notification's params. Deserialize is in `session`, same as `on_message` today.
 - Send uses `Message::{read,write}` on an owned `TcpStream`. `Connection::initialize` is server-only. There is no client initialize in `lsp-server`. `tokio-lsp` / `lsp-client-rs` / `async-lsp-client` are other stacks. A second client crate is not isograph. Do not add one.
 - No 64 KiB frame cap. `freddie_event_socket` had one. Localhost; send fixtures stay small; the watcher is later.
+- Copied IO does not `unwrap`. isograph can, because one process per editor.
 
-`shutdown` is `MethodNotFound`, same as isograph (no `handle_shutdown`). Dropping the TCP connection ends that session after `drop(connection)` then `join`. `exit` ends it because copied `make_reader` stops on `exit`. Neither `Quit`s the daemon. SIGTERM still sends `IsographEvent::Quit` in-process.
+`shutdown` is `MethodNotFound`, same as isograph (no `handle_shutdown`). Dropping the TCP connection ends that session after `drop(connection)` then `join`. `exit` ends it because `make_reader` stops on `exit`. Neither `Quit`s the daemon. SIGTERM still sends `IsographEvent::Quit` in-process.
 
 ## What the user does
 
@@ -65,31 +72,6 @@ After a send, `stop` without `--force` is SIGTERM. The log has `kill: exiting`. 
 Most important first.
 
 ```rust
-// from crates/isograph_cli/src/event.rs
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) struct LspClientId(u64);
-
-#[derive(Debug)]
-pub(crate) struct Lsp {
-    pub(crate) client: LspClientId,
-    pub(crate) message: lsp_server::Message,
-}
-
-#[derive(Debug, serde::Deserialize, serde::Serialize, derive_more::From)]
-#[serde(tag = "kind", content = "value")]
-pub enum IsographEvent {
-    HelloWorld,
-    Quit,
-    DiskChanged(DiskChanged),
-    #[serde(skip)]
-    #[from]
-    Lsp(Lsp),
-}
-```
-
-`--file` JSON is `HelloWorld` / `Quit` / `DiskChanged`. `Lsp` is not on the wire as a `kind`. `LspClientId` is monotonic per daemon process, never reused. The field exists so `IsographEvent::Lsp` is the shape later slices write back with; lsp-sessions.md is the first production reader. Tests comparing ids are not why it exists. Origin of `From`: `derive_more` 2. `#[from]` only on `Lsp` so there is no `From<DiskChanged>`. strum is already in the workspace; it is `Display` / `FromStr` / `FromRepr`, not `From<payload>`. `enum_derive` is unit variants only. Drop `PartialEq` / `Eq` on `IsographEvent`: `lsp_server::Message` does not implement them. Tests use `matches!`.
-
-```rust
 // from crates/isograph_cli/src/lsp_socket.rs
 use lsp_types::notification::Notification;
 
@@ -102,19 +84,99 @@ impl Notification for IsographEventNotification {
 }
 ```
 
-`Params` is the `--file` enum. Deserializing params never yields `Lsp` (`serde(skip)`). Origin of the empty enum: `lsp-types` 0.97 `notification::Initialized`.
+`--file` JSON is `IsographEventNotification::Params` (`HelloWorld` / `Quit` / `DiskChanged`). Origin of the empty enum: `lsp-types` 0.97 `notification::Initialized`. `IsographEvent` is unchanged (`PartialEq`, `Eq`, no `Lsp` variant).
+
+```rust
+// from crates/isograph_cli/src/lsp_socket.rs
+use std::{
+    io::{self, BufReader},
+    net::TcpStream,
+    thread,
+};
+
+use crossbeam::channel::{bounded, Receiver, Sender};
+use lsp_server::Message;
+
+fn socket_transport(
+    stream: TcpStream,
+) -> io::Result<(Sender<Message>, Receiver<Message>, IoThreads)> {
+    let (reader_receiver, reader) = make_reader(stream.try_clone()?);
+    let (writer_sender, writer) = make_write(stream);
+    let io_threads = make_io_threads(reader, writer);
+    (writer_sender, reader_receiver, io_threads).wrap_ok()
+}
+
+fn make_reader(stream: TcpStream) -> (Receiver<Message>, thread::JoinHandle<io::Result<()>>) {
+    let (reader_sender, reader_receiver) = bounded::<Message>(0);
+    let reader = thread::spawn(move || {
+        let mut buf_read = BufReader::new(stream);
+        while let Some(msg) = Message::read(&mut buf_read)? {
+            let is_exit = matches!(&msg, Message::Notification(n) if n.is_exit());
+            if reader_sender.send(msg).is_err() {
+                break;
+            }
+            if is_exit {
+                break;
+            }
+        }
+        ().wrap_ok()
+    });
+    (reader_receiver, reader)
+}
+
+fn make_write(mut stream: TcpStream) -> (Sender<Message>, thread::JoinHandle<io::Result<()>>) {
+    let (writer_sender, writer_receiver) = bounded::<Message>(0);
+    let writer = thread::spawn(move || {
+        writer_receiver
+            .into_iter()
+            .try_for_each(|it| it.write(&mut stream))
+    });
+    (writer_sender, writer)
+}
+
+fn make_io_threads(
+    reader: thread::JoinHandle<io::Result<()>>,
+    writer: thread::JoinHandle<io::Result<()>>,
+) -> IoThreads {
+    IoThreads { reader, writer }
+}
+
+struct IoThreads {
+    reader: thread::JoinHandle<io::Result<()>>,
+    writer: thread::JoinHandle<io::Result<()>>,
+}
+
+impl IoThreads {
+    fn join(self) -> io::Result<()> {
+        match self.reader.join() {
+            Ok(r) => r?,
+            Err(err) => std::panic::panic_any(err),
+        }
+        match self.writer.join() {
+            Ok(r) => r,
+            Err(err) => {
+                std::panic::panic_any(err);
+            }
+        }
+    }
+}
+```
+
+Origin: `lsp-server` 0.7.8 `src/socket.rs` `socket_transport` / `make_reader` / `make_write` and `src/stdio.rs` `make_io_threads` / `IoThreads`. Delta: `use lsp_server::Message` not `crate::Message`; `use crossbeam::channel` not `crossbeam_channel` (workspace `crossbeam`); `try_clone` is `?`; `make_reader` / `make_write` return `io::Result` on the thread (`Message::read` `?`, `send` `is_err` breaks, writer `try_for_each` with no `unwrap`); `socket_transport` returns `io::Result`. `IoThreads::join` still `panic_any` if a thread panicked. Do not panic on a bad frame.
+
+`bounded(0)` is a rendezvous. `MethodNotFound` send blocks until the writer thread takes it. Fine while the client is alive. `Connection::initialize_finish` errors if the next message is not `initialized`. Then `drop(connection)` then `join` waits on a reader still blocked on the fd until the client disconnects. Send does the handshake in order and does not hit this. A raw client that sends `initialize` then `isograph/event` with no `initialized` hangs that session until it drops the stream.
 
 ```rust
 // from crates/isograph_cli/src/lsp_socket.rs
 fn connection_from_stream(
     stream: std::net::TcpStream,
-) -> (lsp_server::Connection, IoThreads) {
-    let (sender, receiver, io_threads) = socket_transport(stream);
-    (lsp_server::Connection { sender, receiver }, io_threads)
+) -> io::Result<(lsp_server::Connection, IoThreads)> {
+    let (sender, receiver, io_threads) = socket_transport(stream)?;
+    (lsp_server::Connection { sender, receiver }, io_threads).wrap_ok()
 }
 ```
 
-Origin: `lsp-server` 0.7.8 `Connection::listen` after `accept`. Delta: the `TcpStream` is already accepted.
+Origin: `lsp-server` 0.7.8 `Connection::listen` after `accept`. Delta: the `TcpStream` is already accepted; `socket_transport` can fail.
 
 ```rust
 // from crates/isograph_cli/src/lsp_socket.rs
@@ -122,14 +184,10 @@ pub(crate) async fn accept_loop(
     listener: tokio::net::TcpListener,
     event_tx: tokio::sync::mpsc::UnboundedSender<crate::event::IsographEvent>,
 ) {
-    let next_client = std::sync::atomic::AtomicU64::new(1);
     loop {
         match listener.accept().await {
             Ok((stream, peer)) => {
                 let event_tx = event_tx.clone();
-                let client = crate::event::LspClientId(
-                    next_client.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
-                );
                 let std_stream = match stream.into_std() {
                     Ok(std_stream) => std_stream,
                     Err(e) => {
@@ -141,7 +199,7 @@ pub(crate) async fn accept_loop(
                     debug!(error = %e, %peer, "could not set the lsp stream blocking");
                     continue;
                 }
-                std::thread::spawn(move || session(std_stream, event_tx, client));
+                std::thread::spawn(move || session(std_stream, event_tx));
             }
             Err(e) => debug!(error = %e, "accept failed"),
         }
@@ -151,10 +209,15 @@ pub(crate) async fn accept_loop(
 fn session(
     stream: std::net::TcpStream,
     event_tx: tokio::sync::mpsc::UnboundedSender<crate::event::IsographEvent>,
-    client: crate::event::LspClientId,
 ) {
-    let (connection, io_threads) = connection_from_stream(stream);
-    run_session(&connection, event_tx, client);
+    let (connection, io_threads) = match connection_from_stream(stream) {
+        Ok(pair) => pair,
+        Err(e) => {
+            debug!(error = %e, "lsp transport");
+            return;
+        }
+    };
+    run_session(&connection, event_tx);
     drop(connection);
     let _ = io_threads.join();
 }
@@ -162,7 +225,6 @@ fn session(
 fn run_session(
     connection: &lsp_server::Connection,
     event_tx: tokio::sync::mpsc::UnboundedSender<crate::event::IsographEvent>,
-    client: crate::event::LspClientId,
 ) {
     let capabilities = match serde_json::to_value(lsp_types::ServerCapabilities::default()) {
         Ok(value) => value,
@@ -176,51 +238,41 @@ fn run_session(
         return;
     }
     for message in &connection.receiver {
-        if let lsp_server::Message::Request(request) = &message {
-            let _ = connection.sender.send(lsp_server::Message::Response(
-                lsp_server::Response {
-                    id: request.id.clone(),
-                    result: None,
-                    error: lsp_server::ResponseError {
-                        code: lsp_server::ErrorCode::MethodNotFound as i32,
-                        data: None,
-                        message: format!(
-                            "No handler registered for method '{}'",
-                            request.method
-                        ),
+        match message {
+            lsp_server::Message::Request(request) => {
+                let _ = connection.sender.send(lsp_server::Message::Response(
+                    lsp_server::Response {
+                        id: request.id,
+                        result: None,
+                        error: lsp_server::ResponseError {
+                            code: lsp_server::ErrorCode::MethodNotFound as i32,
+                            data: None,
+                            message: format!(
+                                "No handler registered for method '{}'",
+                                request.method
+                            ),
+                        }
+                        .wrap_some(),
+                    },
+                ));
+            }
+            lsp_server::Message::Notification(notification)
+                if notification.method == IsographEventNotification::METHOD =>
+            {
+                match serde_json::from_value::<crate::event::IsographEvent>(notification.params) {
+                    Ok(event) => {
+                        let _ = event_tx.send(event);
                     }
-                    .wrap_some(),
-                },
-            ));
+                    Err(e) => warn!(error = %e, "isograph/event params"),
+                }
+            }
+            lsp_server::Message::Notification(_) | lsp_server::Message::Response(_) => {}
         }
-        let _ = event_tx.send(crate::event::Lsp { client, message }.to());
     }
 }
 ```
 
-Origin of the loop: isograph `server.rs` `run` matching `Message`. Origin of the `MethodNotFound` body: isograph's unhandled arm. Origin of join order: isograph `lib.rs` `drop` of `connection` by moving it into `run`, then `io_handles.join()`. `ProtocolError::new` is `pub(crate)`; do not call it. `ServerCapabilities::default` failing to serialize is logged and the session returns. `initialized` is consumed by `Connection::initialize`. `run_event_loop` still recvs `IsographEvent`.
-
-```rust
-// from crates/isograph_cli/src/state.rs
-        IsographEvent::Lsp(crate::event::Lsp { message, client: _ }) => match message {
-            lsp_server::Message::Notification(notification)
-                if notification.method == crate::lsp_socket::IsographEventNotification::METHOD =>
-            {
-                match serde_json::from_value::<IsographEvent>(notification.params) {
-                    Ok(event) => handle(state, event),
-                    Err(e) => {
-                        warn!(error = %e, "isograph/event params");
-                        Vec::new()
-                    }
-                }
-            }
-            _ => Vec::new(),
-        },
-```
-
-`handle` already matches `HelloWorld` / `Quit` / `DiskChanged`. The `Lsp` arm of `isograph/event` deserializes those and calls `handle` with them. Other LSP messages are no-ops this slice. Recursion does not see `Lsp`: params cannot deserialize to it.
-
-Later, this `match message` is where isograph's `LSPNotificationDispatch` / `LSPRequestDispatch` go. Not now. Not in `session`.
+Origin of the loop: isograph `server.rs` `run` matching `Message`. Origin of the `MethodNotFound` body: isograph's unhandled arm. Origin of join order: isograph `lib.rs`. Origin of deserialize: `external.rs` `on_message`. `ProtocolError::new` is `pub(crate)`; do not call it. `ServerCapabilities::default` failing to serialize is logged and the session returns. `initialized` is consumed by `Connection::initialize`. `run_event_loop` still recvs `IsographEvent`. `handle` is not called from `session`. Accept is one task; no client id this slice.
 
 ### `serve`
 
@@ -267,11 +319,11 @@ Later, this `match message` is where isograph's `LSPNotificationDispatch` / `LSP
     std::process::exit(0);
 ```
 
-The listen callback today is `freddie_event_socket`. Drop it. Delete `external.rs`. `on_message` goes away.
+The listen callback today is `freddie_event_socket`. Drop it. Delete `external.rs`. `on_message` goes away; deserialize is in `run_session`.
 
 `_hold_events` is a clone. `accept_loop` takes the other sender. Today's code moves `event_tx` into `_hold_events` because there is no third `select!` arm.
 
-`process::exit(0)` is after the port file is unlinked. Session threads and copied IO threads must not keep the process alive. Flock is released by process exit.
+`process::exit(0)` is after the port file is unlinked. Session threads and IO threads must not keep the process alive. Flock is released by process exit.
 
 ### `send`
 
@@ -307,6 +359,8 @@ enum SendError {
     Connect(Connect),
     #[error("could not encode the event: {0}")]
     Encode(serde_json::Error),
+    #[error("could not clone the stream: {0}")]
+    Clone(io::Error),
     #[error("could not write the frame: {0}")]
     Write(io::Error),
     #[error("could not read the frame: {0}")]
@@ -336,7 +390,7 @@ pub(crate) fn notify(
     stream: std::net::TcpStream,
     event: crate::event::IsographEvent,
 ) -> Result<(), SendError> {
-    let mut writer = stream.try_clone().map_err(SendError::Write)?;
+    let mut writer = stream.try_clone().map_err(SendError::Clone)?;
     let mut reader = std::io::BufReader::new(stream);
     // JSON-RPC ids are per connection. This client has one outstanding request. A second send is another connection.
     let id = lsp_server::RequestId::from(1);
@@ -395,7 +449,7 @@ Initialize params omit `processId`. Origin: `refactors/past/lsp-socket.md` `hand
 
 The loop skips non-responses (`window/logMessage`, `$/` notifications). Send has one outstanding request, id `1`. A response with another id is a protocol bug, not a case we wait through.
 
-`CliVerb::Send` doc comment: `Encode one IsographEvent as an LSP notification to the running daemon. Not for typing: tests and CI.`
+`CliVerb::Send` doc comment: `Encode one IsographEvent as an LSP notification to the running daemon. Not for typing: tests and CI.` `SendArgs.file` stays `JSON frame to send.`
 
 ### Cargo
 
@@ -407,7 +461,7 @@ lsp-server = "0.7.8"
 ```toml
 # from crates/isograph_cli/Cargo.toml
 # drop freddie_event_socket, tungstenite, tokio-tungstenite, futures-util
-derive_more = { version = "2", features = ["from"] }
+crossbeam = { workspace = true }
 lsp-server = { workspace = true }
 lsp-types = { workspace = true }
 tokio = { workspace = true, features = ["rt", "macros", "signal", "sync", "time", "net"] }
@@ -415,45 +469,72 @@ tokio = { workspace = true, features = ["rt", "macros", "signal", "sync", "time"
 
 `lib.rs`: `mod lsp_socket;`
 
-Do not add `crossbeam-channel`. Send does not name `crossbeam_channel::Receiver`.
+Do not add `derive_more`. Do not add `crossbeam-channel`.
 
 ### Design doc
 
-`docs-website/docs/design-docs/event-model.md`:
+Replace Outer and Ports in `docs-website/docs/design-docs/event-model.md` with the text below. Inner is unchanged: `handle` has no LSP and no socket. `handle` is not request/response.
 
-- Inner: `handle` matches `IsographEvent::Lsp`.
-- Outer: drop the event-socket bullet. The TCP port is the LSP adapter. Send is an LSP client of that port. `isograph/event` params are `HelloWorld` / `Quit` / `DiskChanged`. Channel event is `Lsp`. SIGTERM, tests, and the later watcher still post non-`Lsp` variants in-process.
-- Ports: one listener, `{slug}.port`, LSP JSON-RPC. Delete `{slug}.lsp` as a second listener. Delete `freddie_event_socket` and the 64 KiB cap. On quit, unlink the port file, then `process::exit(0)`.
+```
+## Outer
+
+The binary is the outer. Each source is outside `handle` and feeds it. One process, one channel, one worker that owns `IsographState`. Sources do not read state. Performers do not mutate it.
+
+- Watcher: OS notifications become `DiskChanged` (path plus contents or absent). It may read the disk to fill `Present.contents`. `handle` does not. The watcher posts in-process on the event channel. It does not run the CLI and it does not write to the LSP port.
+- LSP port: LSP JSON-RPC on `{slug}.port`. `isograph send` is a client: initialize, `initialized`, notification `isograph/event` whose params are `HelloWorld` / `Quit` / `DiskChanged`. The session deserializes those params and posts that `IsographEvent`. An LSP request this slice is `MethodNotFound` in the session. Later, `textDocument/didOpen` / `didChange` / `didClose` become `EditorChanged`; hover and `semanticTokens/full` are request/response in the adapter. `handle` is not request/response. Effects from `handle` (`ReportDiagnostics`) become LSP notifications (`publishDiagnostics`).
+- Effect loop: performs `WriteArtifacts`, `ReportDiagnostics`, `StartAsyncWork`, `Kill`.
+
+`isograph lsp` is a stdio proxy onto the port. Walk-up / `--config` is the same as every other verb. It starts the daemon if needed, dials the port, and copies stdin/stdout. Dropping the editor drops the proxy and that connection. The daemon stays up. Several editors share one process. The vscode-extension already spawns `isograph lsp` on stdio.
+
+`isograph send` is a hidden LSP client of that port. It does not start the daemon. It is not in `--help`.
+
+The sources are theoretically separate daemons. They are one process because they share `Database` and because a socket hop on every save is the wrong latency.
+
+## Ports
+
+Figaro is one process per machine, so a default port is enough. Isograph is one process per config. Two configs cannot share a port.
+
+The LSP port binds `127.0.0.1:0`. The kernel assigns a port from its local/dynamic range. There is no `--port`. After the lock, `run_daemon` unlinks the leftover `{slug}.port` before loading the config, then `serve` binds and writes the port to a sibling of its lock (`{slug}.lock` → `{slug}.port`). On quit, after `Kill` ends the loops, `serve` unlinks the file, then `process::exit(0)`. Flock is released when the holder dies. `isograph send` reads the lock, then that file. `Held::Free` is not running and the file is not consulted. Lock held and the file absent means the daemon has taken the lock and has not bound yet, or is on the way out; send fails. Send does not wait.
+
+There is one listener. There is no `{slug}.lsp` and no `freddie_event_socket`. Until the watcher exists, `isograph send` is the only source of `DiskChanged` and carries `Present.contents` on the wire.
+```
 
 ## Tests
 
-`lsp_socket.rs`: bind `accept_loop`, 250ms settle. The test client is `TcpStream::connect`, then `crate::send::notify`.
+`lsp_socket.rs`: bind `accept_loop`, 250ms settle. Socket tests assert `event_rx` only. They do not call `handle`. `handle_disk_changed` panics without `CurrentWorkingDirectory`; that intern is `state.rs`.
 
-- initialize then `isograph/event` `HelloWorld`: `event_rx` is `Lsp` whose notification params deserialize to `HelloWorld`; `handle` of that event is `LogHelloWorld`
-- initialize then `isograph/event` DiskChanged present, then absent
-- `isograph/event` before initialize: not an event; initialize then a second HelloWorld arrives
-- unknown notification after initialize: `event_rx` is `Lsp`; `handle` of it is no effects; then `isograph/event` HelloWorld arrives
-- unknown request after initialize: `MethodNotFound` on the socket; `event_rx` is `Lsp`; then `isograph/event` HelloWorld arrives
-- request before initialize: `ServerNotInitialized`
-- `shutdown` is `MethodNotFound` and does not `Quit`; a following `isograph/event` HelloWorld arrives
-- a second connection can initialize + HelloWorld; the two `Lsp` events have different `LspClientId`s
+Happy path client is `TcpStream::connect` then `crate::send::notify`. Do not `try_recv` immediately after `notify` returns; `notify` does not wait for ingest. Sleep the settle, then `try_recv`.
+
+These cases cannot use `notify` (`notify` always sends `initialize` first). They write `Message` on the stream:
+
+- `isograph/event` before initialize: not an event; then initialize (and `initialized`) then a second HelloWorld arrives
+- request before initialize: `ServerNotInitialized` (`Connection::initialize_start`, not `handle`)
+- unknown request after initialize: `MethodNotFound` on the socket; then `isograph/event` HelloWorld on the same connection arrives as an event
+- `shutdown` after initialize is `MethodNotFound` and does not `Quit`; then `isograph/event` HelloWorld on the same connection arrives
+- truncated `Content-Length` body, or bytes that are not a JSON-RPC object: that connection ends (`Message::read` `Err`, reader thread returns, session `join`s); drop the stream so `join` is not waiting on a live fd; a second connection can initialize + HelloWorld
+- `initialize` then `isograph/event` with no `initialized`: `initialize_finish` errors; that session stays in `join` until the test drops the stream; no event
+
+`notify` cases (settle, then `event_rx`):
+
+- initialize then `isograph/event` `HelloWorld`: `event_rx` is `HelloWorld`
+- initialize then `isograph/event` DiskChanged present, then absent: `event_rx` is those two `DiskChanged` values (do not call `handle`)
+- unknown notification after initialize: no event; then `isograph/event` HelloWorld arrives
+- valid JSON-RPC `isograph/event` with params that are not `HelloWorld` / `Quit` / `DiskChanged`: connection stays; no event; a following HelloWorld arrives
+- a second connection can initialize + HelloWorld
 - two connections both HelloWorld
 - `notify` returns after `isograph/event` (does not hang)
-- two sequential `notify`s on the same daemon, then the accept loop is still alive for a third
-- valid JSON-RPC `isograph/event` with params that are not `HelloWorld` / `Quit` / `DiskChanged`: connection stays; `handle` warns; a following HelloWorld arrives
-- bytes that are not a JSON-RPC object, or a truncated `Content-Length` body: that connection ends (copied `make_reader` `unwrap`s `Message::read`, `IoThreads::join` is `panic_any`); a second connection can initialize + HelloWorld
+- two sequential `notify`s on the same listener, then a third still works
 
-`state.rs`: existing `HelloWorld` / `Quit` / `DiskChanged` in-process tests stay. Add `handle` of `Lsp` wrapping `isograph/event` HelloWorld is `LogHelloWorld`. Add `handle` of `Lsp` wrapping an unknown notification is no effects.
+`state.rs`: existing `HelloWorld` / `Quit` / `DiskChanged` in-process tests stay. No `Lsp` tests.
 
 `send.rs`: `parse_port` / `read_port` stay.
 
-`cli.rs`: HelloWorld, DiskChanged present then absent, daemon stopped, not json, unknown kind, not in help stay. Add: after a successful send, `stop` without `--force` (unix `STOP`); log has `kill: exiting`; `status` is not running. Add: two sends, then that `stop`.
+`cli.rs`: HelloWorld, DiskChanged present then absent, daemon stopped, not json, unknown kind, not in help stay. Add: after a successful send, `stop` without `--force` (unix `STOP`); log has `kill: exiting`; `status` is not running. Add: two sends, then that `stop`. Add: a raw TCP client writes a truncated body (or non-JSON-RPC bytes) to the daemon's port; a following `isograph send` HelloWorld still exits 0 and the log has `hello world`. That is the panic-hook assertion. The `lsp_socket` unit test is not it.
 
 ## Call sites
 
 - `serve` -> `event_tx` -> `accept_loop` / SIGTERM `Quit` / `run_event_loop`
-- pump -> `event_tx.send(Lsp { client, message }.to())` -> `handle`
-- `isograph/event` inside `handle` -> `HelloWorld` / `DiskChanged` / `Quit`
+- `isograph/event` in `session` -> `event_tx.send` -> `handle`
 - `isograph send` -> `TcpStream::connect` -> `notify` -> `isograph/event`
 - watcher (later) -> `event_tx.send(DiskChanged)` -> `handle`, never the wire
 - `Kill` -> unlink port file -> `process::exit(0)`
