@@ -11,7 +11,7 @@ Deltas from those files, exhaustive:
 - `Filesystem` instead of `--watch: bool`. Default `Watch`. `Injected` does not create a debouncer.
 - `source_files` is membership. isograph used `path.starts_with(project_root)`. Ordered globs, `!` excludes, last match wins. Watch/walk root for a positive glob is the static prefix before the first `*`, `?`, `[`, or `{`. `**/*.ts` watches the config directory (`max_user_watches` if that is the repo root). `[]` watches nothing and intern nothing.
 - A file glob does not match its parent directory. Folder create/delete is in scope if the path is under a watch root, not if `src` matches `src/**/*.ts`.
-- The extension check in `read_files_in_folder` is `HostLanguage::source_file_kind`. One associated function, two-variant enum. Not a memo. Not a second trait: the CLI is already generic over `THostLanguage`.
+- The extension check in `read_files_in_folder` is `HostLanguage::should_skip_source_file`. One associated function, two-variant enum (`Skip` / `Keep`). Not a memo. Not a second trait: the CLI is already generic over `THostLanguage`.
 - `__isograph` is skipped in the walker (`ISOGRAPH_FOLDER` on `isograph_config`). Not HostLanguage.
 - No schema / schema-extension / artifact-directory watches. Config-file events are `ChangedFileKind::Config` and are dropped. The daemon does not reload config.
 - Watch, then boot-walk. isograph compiled then watched and missed the gap.
@@ -184,20 +184,20 @@ Origin: the extension match in `read_files_in_folder`.
 use std::path::Path;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SourceFileKind {
-    Source,
-    NotSource,
+pub enum SkipSourceFile {
+    Skip,
+    Keep,
 }
 ```
 
-Add `fn source_file_kind(relative_path: &Path) -> SourceFileKind` to `HostLanguage`. TypeScript:
+Add `fn should_skip_source_file(relative_path: &Path) -> SkipSourceFile` to `HostLanguage`. TypeScript:
 
 ```rust
 // from crates/isograph_extract_typescript/src/lib.rs
-    fn source_file_kind(relative_path: &Path) -> SourceFileKind {
+    fn should_skip_source_file(relative_path: &Path) -> SkipSourceFile {
         match relative_path.extension().and_then(|e| e.to_str()) {
-            Some("ts" | "tsx" | "js" | "jsx") => SourceFileKind::Source,
-            _ => SourceFileKind::NotSource,
+            Some("ts" | "tsx" | "js" | "jsx") => SkipSourceFile::Keep,
+            _ => SkipSourceFile::Skip,
         }
     }
 ```
@@ -363,21 +363,21 @@ pub fn apply<THostLanguage: HostLanguage>(
 
 Copy `update_sources`. `SourceFile` create/modify reads the file and posts `DiskChanged::File` `Present` (absolute canonical path, UTF-8 contents). `SourceFile` remove posts `File` `Absent`. `SourceFile` rename is `File` `Absent` of from then `Present` of to. `SourceFolder` create/modify walks the folder and posts file `Present`s. `SourceFolder` remove/rename-from posts `FolderRemoved`. `Config` is ignored.
 
-`source_file_kind` runs when posting a file `Present`. Failed read of a path that was interned posts `File` `Absent`. Skip non-regular files. Skip non-UTF8 paths; do not call `handle`.
+`should_skip_source_file` runs when posting a file `Present`. `Skip` drops the file. Failed read of a path that was interned posts `File` `Absent`. Skip non-regular files. Skip non-UTF8 paths; do not call `handle`.
 
 Posted `File` `Present` paths are absolute and canonical. `File` `Absent` and `FolderRemoved` are absolute; canonical when canonicalize succeeded.
 
 ### Tests
 
-TypeScript `source_file_kind`: `ts` / `tsx` / `js` / `jsx` (including `a.ts`, `src/a.d.ts`) are `Source`. `rs` / `json` / `mjs` / `mts` / `graphql` / empty path are `NotSource`. `node_modules/pkg/index.ts` and `src/__isograph/foo.ts` are `Source` by extension.
+TypeScript `should_skip_source_file`: `ts` / `tsx` / `js` / `jsx` (including `a.ts`, `src/a.d.ts`) are `Keep`. `rs` / `json` / `mjs` / `mts` / `graphql` / empty path are `Skip`. `node_modules/pkg/index.ts` and `src/__isograph/foo.ts` are `Keep` by extension.
 
 `ISOGRAPH_FOLDER` is `"__isograph"`.
 
 Globs: `["src/**/*.ts"]` contains `src/a.ts`, not `src/a.tsx`, not `lib/a.ts`. `["src/**/*.ts", "!src/**/*.test.ts"]` contains `src/a.ts`, not `src/a.test.ts`. `[]` contains nothing. `["src/**/*.in"]` contains `src/a.in`, not `src`. `watch_roots` of that list is `src`. `categorize_folder` of `src` is `SourceFolder`.
 
-`database.rs` `TestHostLanguage::source_file_kind` returns `Source`.
+`database.rs` `TestHostLanguage::should_skip_source_file` returns `Keep`.
 
-`watch.rs` tests a host where `source_file_kind` is `Source` iff the extension is `in`. Fake channel. Config `["src/**/*.in"]` or `["**/*.in"]` as the case needs.
+`watch.rs` tests a host where `should_skip_source_file` is `Keep` iff the extension is `in`. Fake channel. Config `["src/**/*.in"]` or `["**/*.in"]` as the case needs.
 
 Behavior, not notify internals:
 
