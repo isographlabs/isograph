@@ -15,6 +15,7 @@ mod event;
 mod lsp_notification_dispatch;
 mod lsp_socket;
 mod send;
+mod start;
 mod state;
 mod watch;
 
@@ -27,12 +28,18 @@ pub fn run<THostLanguage: HostLanguage>() -> ExitCode {
         .expect("the derived type matches the command it derived");
 
     match cli.verb {
-        Some(CliVerb::Lifecycle(verb)) => {
-            freddie_cli::run_lifecycle_verb::<Isograph<THostLanguage>>(verb, matches.reference())
-        }
+        Some(CliVerb::Lifecycle(verb)) => match verb {
+            freddie_cli::Verb::Start(_) | freddie_cli::Verb::Restart(_) => {
+                crate::start::run::<THostLanguage>(verb, matches.reference())
+            }
+            verb => freddie_cli::run_lifecycle_verb::<Isograph<THostLanguage>>(
+                verb,
+                matches.reference(),
+            ),
+        },
         Some(CliVerb::Send(args)) => send::run(args.reference()),
         Some(CliVerb::ConfigPath(id)) => config_path::run(id.reference()),
-        None => freddie_cli::run_lifecycle_verb::<Isograph<THostLanguage>>(
+        None => crate::start::run::<THostLanguage>(
             freddie_cli::verb_for_bare_invocation::<Isograph<THostLanguage>>(),
             matches.reference(),
         ),

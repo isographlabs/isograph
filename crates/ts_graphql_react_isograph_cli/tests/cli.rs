@@ -46,12 +46,6 @@ impl Daemon {
         let path = config.canonicalize().expect("the fixture exists");
         assert!(text.contains("started"), "{text}");
         assert!(text.contains(&path.display().to_string()), "{text}");
-        settle();
-        assert!(
-            daemon.log_text().contains("isograph daemon up"),
-            "{}",
-            daemon.log_text()
-        );
         daemon
     }
 
@@ -65,12 +59,6 @@ impl Daemon {
             output.status.success(),
             "start failed: {}",
             String::from_utf8_lossy(output.stderr.reference())
-        );
-        settle();
-        assert!(
-            daemon.log_text().contains("isograph daemon up"),
-            "{}",
-            daemon.log_text()
         );
         daemon
     }
@@ -148,7 +136,7 @@ fn write_frame(dir: &std::path::Path, contents: &str) -> std::path::PathBuf {
     path
 }
 
-fn daemon_port(daemon: &Daemon) -> u16 {
+fn port_file_path(daemon: &Daemon) -> PathBuf {
     let home = daemon.dir.path().join("home");
     let mut stack = home.wrap_vec();
     while let Some(dir) = stack.pop() {
@@ -160,12 +148,16 @@ fn daemon_port(daemon: &Daemon) -> u16 {
             if path.is_dir() {
                 stack.push(path);
             } else if path.extension().is_some_and(|e| e == "port") {
-                let text = std::fs::read_to_string(path.reference()).expect("the port file");
-                return text.trim().parse().expect("the port file is a port");
+                return path;
             }
         }
     }
     panic!("the daemon wrote a port file");
+}
+
+fn daemon_port(daemon: &Daemon) -> u16 {
+    let text = std::fs::read_to_string(port_file_path(daemon).reference()).expect("the port file");
+    text.trim().parse().expect("the port file is a port")
 }
 
 // freddie_cli's stop without --force is SIGTERM, which it does not send on Windows.
@@ -188,6 +180,94 @@ fn start_then_status_reports_running() {
         .expect("the fixture exists");
     assert!(text.contains("is running"), "{text}");
     assert!(text.contains(&path.display().to_string()), "{text}");
+}
+
+#[test]
+fn send_after_start_needs_no_extra_wait() {
+    let daemon = Daemon::start();
+    let frame = write_frame(daemon.dir.path(), "{\"kind\":\"HelloWorld\"}\n");
+    let sent = daemon.isograph(["send", "--file", frame.to_str().expect("utf-8")].reference());
+    assert!(
+        sent.status.success(),
+        "stdout: {} stderr: {}",
+        stdout(sent.reference()),
+        stderr(sent.reference())
+    );
+}
+
+#[test]
+fn send_after_restart_needs_no_extra_wait() {
+    let daemon = Daemon::start();
+    let restarted = daemon.isograph(["restart", "--filesystem", "injected"].reference());
+    assert!(
+        restarted.status.success(),
+        "stdout: {} stderr: {}",
+        stdout(restarted.reference()),
+        stderr(restarted.reference())
+    );
+    let frame = write_frame(daemon.dir.path(), "{\"kind\":\"HelloWorld\"}\n");
+    let sent = daemon.isograph(["send", "--file", frame.to_str().expect("utf-8")].reference());
+    assert!(
+        sent.status.success(),
+        "stdout: {} stderr: {}",
+        stdout(sent.reference()),
+        stderr(sent.reference())
+    );
+}
+
+#[test]
+fn start_with_a_garbage_leftover_port_file_then_send() {
+    let daemon = Daemon::start();
+    let path = port_file_path(daemon.reference());
+    let _ = daemon.isograph(STOP);
+    std::fs::write(path.reference(), "not-a-port\n")
+        .expect("a test can write a leftover port file");
+    let started = daemon.isograph(["start", "--filesystem", "injected"].reference());
+    assert!(
+        started.status.success(),
+        "stdout: {} stderr: {}",
+        stdout(started.reference()),
+        stderr(started.reference())
+    );
+    let frame = write_frame(daemon.dir.path(), "{\"kind\":\"HelloWorld\"}\n");
+    let sent = daemon.isograph(["send", "--file", frame.to_str().expect("utf-8")].reference());
+    assert!(
+        sent.status.success(),
+        "stdout: {} stderr: {}",
+        stdout(sent.reference()),
+        stderr(sent.reference())
+    );
+}
+
+#[test]
+fn start_with_a_closed_leftover_port_then_send() {
+    let daemon = Daemon::start();
+    let path = port_file_path(daemon.reference());
+    let _ = daemon.isograph(STOP);
+    let listener = std::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
+        .expect("binding an ephemeral port");
+    let port = listener
+        .local_addr()
+        .expect("the leftover listener has an address")
+        .port();
+    drop(listener);
+    std::fs::write(path.reference(), format!("{port}\n"))
+        .expect("a test can write a leftover port file");
+    let started = daemon.isograph(["start", "--filesystem", "injected"].reference());
+    assert!(
+        started.status.success(),
+        "stdout: {} stderr: {}",
+        stdout(started.reference()),
+        stderr(started.reference())
+    );
+    let frame = write_frame(daemon.dir.path(), "{\"kind\":\"HelloWorld\"}\n");
+    let sent = daemon.isograph(["send", "--file", frame.to_str().expect("utf-8")].reference());
+    assert!(
+        sent.status.success(),
+        "stdout: {} stderr: {}",
+        stdout(sent.reference()),
+        stderr(sent.reference())
+    );
 }
 
 #[test]
@@ -538,6 +618,14 @@ fn a_second_start_adopts_the_running_daemon() {
         stdout(again.reference())
     );
     assert!(daemon.isograph(["status"].reference()).status.success());
+    let frame = write_frame(daemon.dir.path(), "{\"kind\":\"HelloWorld\"}\n");
+    let sent = daemon.isograph(["send", "--file", frame.to_str().expect("utf-8")].reference());
+    assert!(
+        sent.status.success(),
+        "stdout: {} stderr: {}",
+        stdout(sent.reference()),
+        stderr(sent.reference())
+    );
 }
 
 #[test]

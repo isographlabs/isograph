@@ -1,7 +1,6 @@
 use std::fs;
 use std::io;
 use std::net::Ipv4Addr;
-use std::num::NonZeroU16;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -162,7 +161,7 @@ fn require_running(lock: &Path) -> Result<(), SendError> {
 
 fn read_port(path: &Path) -> Result<u16, SendError> {
     match fs::read_to_string(path) {
-        Ok(text) => parse_port(text.reference()).ok_or(SendError::BadPort),
+        Ok(text) => crate::discover::parse_port(text.reference()).ok_or(SendError::BadPort),
         Err(source) if source.kind() == io::ErrorKind::NotFound => SendError::NoPort.wrap_err(),
         Err(source) => SendError::ReadPort(ReadPort {
             path: path.to_owned(),
@@ -172,44 +171,9 @@ fn read_port(path: &Path) -> Result<u16, SendError> {
     }
 }
 
-fn parse_port(text: &str) -> Option<u16> {
-    text.trim().parse::<NonZeroU16>().ok().map(NonZeroU16::get)
-}
-
 #[cfg(test)]
 mod tests {
     use prelude::Postfix;
-
-    use super::parse_port;
-
-    #[test]
-    fn parse_port_reads_a_decimal_line() {
-        assert_eq!(parse_port("53124\n"), 53124.wrap_some());
-    }
-
-    #[test]
-    fn parse_port_reads_digits_without_a_newline() {
-        assert_eq!(parse_port("53124"), 53124.wrap_some());
-    }
-
-    #[test]
-    fn parse_port_of_empty_is_none() {
-        assert_eq!(parse_port(""), None);
-        assert_eq!(parse_port("\n"), None);
-    }
-
-    #[test]
-    fn parse_port_of_zero_is_none() {
-        assert_eq!(parse_port("0"), None);
-        assert_eq!(parse_port("0\n"), None);
-    }
-
-    #[test]
-    fn parse_port_of_garbage_is_none() {
-        assert_eq!(parse_port("abc"), None);
-        assert_eq!(parse_port("65536"), None);
-        assert_eq!(parse_port("127.0.0.1:53124"), None);
-    }
 
     #[test]
     fn read_port_of_a_missing_file_is_no_port() {

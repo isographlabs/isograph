@@ -64,6 +64,15 @@ async fn serve<THostLanguage: HostLanguage>(
             return;
         }
     };
+    if let Err(e) = std::fs::write(port_path.reference(), format!("{port}\n")) {
+        tracing::error!(
+            error = %e,
+            path = %port_path.display(),
+            "could not write the event socket port"
+        );
+        return;
+    }
+    tracing::info!(config = %config_path.display(), port, "isograph daemon up");
 
     let mut state = IsographState::<THostLanguage>::default();
     intern_config_directory(&mut state, config_path.reference());
@@ -85,16 +94,6 @@ async fn serve<THostLanguage: HostLanguage>(
             return;
         }
     };
-
-    if let Err(e) = std::fs::write(port_path.reference(), format!("{port}\n")) {
-        tracing::error!(
-            error = %e,
-            path = %port_path.display(),
-            "could not write the event socket port"
-        );
-        return;
-    }
-    tracing::info!(config = %config_path.display(), port, "isograph daemon up");
 
     // `isograph stop` sends SIGTERM. Route it into the event channel as Quit, so the
     // model turns it into Kill, the effect loop breaks, and serve returns.

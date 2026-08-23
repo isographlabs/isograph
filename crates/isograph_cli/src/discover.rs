@@ -1,4 +1,5 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
+use std::num::NonZeroU16;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -91,6 +92,10 @@ pub fn load_config(path: &Path) -> Result<IsographProjectConfig, LoadError> {
 
 pub fn port_file(lock: &Path) -> PathBuf {
     lock.with_extension("port")
+}
+
+pub(crate) fn parse_port(text: &str) -> Option<u16> {
+    text.trim().parse::<NonZeroU16>().ok().map(NonZeroU16::get)
 }
 
 pub fn instance_for_config_path(flag: Option<&Path>) -> Result<(PathBuf, Instance), DiscoverError> {
@@ -683,5 +688,34 @@ mod tests {
         let canonical = path.canonicalize().expect("the fixture file exists");
         assert_eq!(got, canonical);
         super::load_config(path.reference()).expect_err("truncated json is unparseable");
+    }
+
+    #[test]
+    fn parse_port_reads_a_decimal_line() {
+        assert_eq!(super::parse_port("53124\n"), 53124.wrap_some());
+    }
+
+    #[test]
+    fn parse_port_reads_digits_without_a_newline() {
+        assert_eq!(super::parse_port("53124"), 53124.wrap_some());
+    }
+
+    #[test]
+    fn parse_port_of_empty_is_none() {
+        assert_eq!(super::parse_port(""), None);
+        assert_eq!(super::parse_port("\n"), None);
+    }
+
+    #[test]
+    fn parse_port_of_zero_is_none() {
+        assert_eq!(super::parse_port("0"), None);
+        assert_eq!(super::parse_port("0\n"), None);
+    }
+
+    #[test]
+    fn parse_port_of_garbage_is_none() {
+        assert_eq!(super::parse_port("abc"), None);
+        assert_eq!(super::parse_port("65536"), None);
+        assert_eq!(super::parse_port("127.0.0.1:53124"), None);
     }
 }
