@@ -6,13 +6,13 @@ isograph's server loop runs `LSPRequestDispatch` and `LSPNotificationDispatch` t
 
 Those structs already exist. This slice puts them in `isograph_lsp` and calls them from `handle`. It does not write a second dispatcher.
 
-After lsp-port.md, the session special-cases `isograph/event` and ignores every other notification. After lsp-request-response.md, `IsographEvent` has `HelloWorld` / `Quit` / `DiskChanged` / `LspRequest`. This slice makes `IsographEvent` two variants: `Lsp` and `Ingested`. `Lsp` holds `lsp_server::Message` (`Request` / `Notification` / `Response`) plus a clone of `connection.sender`. `Ingested` is `HelloWorld` / `Quit` / `DiskChanged` (the `--file` JSON). The session posts every message after initialize as `Lsp`. `handle` of `Lsp` is isograph's server-loop match: `dispatch_lsp_request` / `dispatch_lsp_notification` / ignore response. `dispatch_lsp_request` is `LSPRequestDispatch` with no `on_request_sync`; leftover is `method_not_found`. `dispatch_lsp_notification` can return effects; it does not return `SendLspResponse` (a notification has no id). Tokens adds the first `.on_request_sync`.
+After lsp-port.md, the session special-cases `isograph/event` and ignores every other notification. After lsp-request-response.md, `IsographEvent` has `HelloWorld` / `Quit` / `DiskChanged` / `LspRequest`. This slice makes `IsographEvent` two variants: `Lsp` and `Internal`. `Lsp` holds `lsp_server::Message` (`Request` / `Notification` / `Response`) plus a clone of `connection.sender`. `Internal` is `HelloWorld` / `Quit` / `DiskChanged` (the `--file` JSON). The session posts every message after initialize as `Lsp`. `handle` of `Lsp` is isograph's server-loop match: `dispatch_lsp_request` / `dispatch_lsp_notification` / ignore response. `dispatch_lsp_request` is `LSPRequestDispatch` with no `on_request_sync`; leftover is `method_not_found`. `dispatch_lsp_notification` can return effects; it does not return `SendLspResponse` (a notification has no id). Tokens adds the first `.on_request_sync`.
 
-Origin: isograph `crates/isograph_lsp/src/lsp_request_dispatch.rs`, `lsp_notification_dispatch.rs`, `lsp_runtime_error.rs`, `server.rs` `dispatch_request` / `dispatch_notification`. Delta on the three files: none. They are copied into `crates/isograph_lsp/src/` under the same names, including `#[cfg(test)]`. `lib.rs` has `pub mod` for all three (isograph's `lsp_request_dispatch` is `mod`; the call site here is `isograph_cli`). Call-site delta: `TState` is `IsographState` not `LspState`; `IsographEvent` is `Lsp` | `Ingested`; `handle` of `Lsp` matches `lsp_server::Message` the way isograph's server loop does; `dispatch_lsp_request` is the `LSPRequestDispatch` `?` chain with zero handlers, Continue `method_not_found` returning `Vec<IsographEffect>` (one immediate `SendLspResponse`); `dispatch_lsp_notification` returns `Vec<IsographEffect>` and never `SendLspResponse`; notification `TState` is `(&mut IsographState, &mut Vec<IsographEffect>)` because the existing handler returns `LSPRuntimeResult<()>`. `--file` / `isograph/event` params are `Ingested` (same JSON as today's `IsographEvent` kinds).
+Origin: isograph `crates/isograph_lsp/src/lsp_request_dispatch.rs`, `lsp_notification_dispatch.rs`, `lsp_runtime_error.rs`, `server.rs` `dispatch_request` / `dispatch_notification`. Delta on the three files: none. They are copied into `crates/isograph_lsp/src/` under the same names, including `#[cfg(test)]`. `lib.rs` has `pub mod` for all three (isograph's `lsp_request_dispatch` is `mod`; the call site here is `isograph_cli`). Call-site delta: `TState` is `IsographState` not `LspState`; `IsographEvent` is `Lsp` | `Internal`; `handle` of `Lsp` matches `lsp_server::Message` the way isograph's server loop does; `dispatch_lsp_request` is the `LSPRequestDispatch` `?` chain with zero handlers, Continue `method_not_found` returning `Vec<IsographEffect>` (one immediate `SendLspResponse`); `dispatch_lsp_notification` returns `Vec<IsographEffect>` and never `SendLspResponse`; notification `TState` is `(&mut IsographState, &mut Vec<IsographEffect>)` because the existing handler returns `LSPRuntimeResult<()>`. `--file` / `isograph/event` params are `Internal` (same JSON as today's `IsographEvent` kinds).
 
 One shippable change. Unknown requests are still `MethodNotFound`. `isograph send` still initialize + `isograph/event`. Existing CLI send tests stay green.
 
-`docs-website/docs/design-docs/event-model.md` Inner: `IsographEvent` is `Lsp` | `Ingested`. `handle` of `Lsp` matches `lsp_server::Message` and runs isograph request/notification dispatch. A request leftover is `method_not_found` (`Vec<IsographEffect>`, one immediate `SendLspResponse`). A notification leftover is no effects. A notification that matches can return effects other than `SendLspResponse`. A response is no effects. `Ingested` is `HelloWorld` / `Quit` / `DiskChanged`. The session does not interpret methods after `initialize`.
+`docs-website/docs/design-docs/event-model.md` Inner: `IsographEvent` is `Lsp` | `Internal`. `handle` of `Lsp` matches `lsp_server::Message` and runs isograph request/notification dispatch. A request leftover is `method_not_found` (`Vec<IsographEffect>`, one immediate `SendLspResponse`). A notification leftover is no effects. A notification that matches can return effects other than `SendLspResponse`. A response is no effects. `Internal` is `HelloWorld` / `Quit` / `DiskChanged`. The session does not interpret methods after `initialize`.
 
 ## What the user does
 
@@ -110,7 +110,7 @@ pub struct Lsp {
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize, derive_more::From)]
 #[serde(tag = "kind", content = "value")]
-pub enum Ingested {
+pub enum Internal {
     HelloWorld,
     Quit,
     DiskChanged(DiskChanged),
@@ -121,34 +121,34 @@ pub enum IsographEvent {
     #[from]
     Lsp(Lsp),
     #[from]
-    Ingested(Ingested),
+    Internal(Internal),
 }
 ```
 
-`IsographEvent` is not on the wire. `--file` and `isograph/event` params are `Ingested` (same JSON as today's `{"kind":"HelloWorld"}` / `DiskChanged` / `Quit`). `Lsp.message` is `lsp_server::Message`: `Request`, `Notification`, `Response`. `reply` is `connection.sender.clone()` on every message.
+`IsographEvent` is not on the wire. `--file` and `isograph/event` params are `Internal` (same JSON as today's `{"kind":"HelloWorld"}` / `DiskChanged` / `Quit`). `Lsp.message` is `lsp_server::Message`: `Request`, `Notification`, `Response`. `reply` is `connection.sender.clone()` on every message.
 
 ```rust
 // from crates/isograph_cli/src/lsp_socket.rs
 impl Notification for IsographEventNotification {
-    type Params = crate::event::Ingested;
+    type Params = crate::event::Internal;
     const METHOD: &'static str = "isograph/event";
 }
 ```
 
 ```rust
 // from crates/isograph_cli/src/send.rs
-    let ingested: crate::event::Ingested =
+    let internal: crate::event::Internal =
         serde_json::from_str(frame.trim()).map_err(SendError::NotEvent)?;
 ```
 
-`notify` takes `Ingested`. SIGTERM sends `Ingested::Quit`.
+`notify` takes `Internal`. SIGTERM sends `Internal::Quit`.
 
 ### `handle`
 
 ```rust
 // from crates/isograph_cli/src/state.rs
         IsographEvent::Lsp(lsp) => dispatch_lsp(state, lsp),
-        IsographEvent::Ingested(ingested) => handle_ingested(state, ingested),
+        IsographEvent::Internal(internal) => handle_internal(state, internal),
 
 fn dispatch_lsp<THostLanguage: HostLanguage>(
     state: &mut IsographState<THostLanguage>,
@@ -212,14 +212,14 @@ fn method_not_found(
     .wrap_vec()
 }
 
-fn handle_ingested<THostLanguage: HostLanguage>(
+fn handle_internal<THostLanguage: HostLanguage>(
     state: &mut IsographState<THostLanguage>,
-    ingested: crate::event::Ingested,
+    internal: crate::event::Internal,
 ) -> Vec<IsographEffect> {
-    match ingested {
-        crate::event::Ingested::HelloWorld => IsographEffect::LogHelloWorld.wrap_vec(),
-        crate::event::Ingested::Quit => IsographEffect::Kill.wrap_vec(),
-        crate::event::Ingested::DiskChanged(change) => {
+    match internal {
+        crate::event::Internal::HelloWorld => IsographEffect::LogHelloWorld.wrap_vec(),
+        crate::event::Internal::Quit => IsographEffect::Kill.wrap_vec(),
+        crate::event::Internal::DiskChanged(change) => {
             handle_disk_changed(state, change);
             Vec::new()
         }
@@ -256,16 +256,16 @@ fn on_isograph_event<THostLanguage: HostLanguage>(
         &mut IsographState<THostLanguage>,
         &mut Vec<IsographEffect>,
     ),
-    ingested: crate::event::Ingested,
+    internal: crate::event::Internal,
 ) -> isograph_lsp::lsp_runtime_error::LSPRuntimeResult<()> {
-    effects.extend(handle_ingested(state, ingested));
+    effects.extend(handle_internal(state, internal));
     ().wrap_ok()
 }
 ```
 
 `dispatch_lsp` is isograph `server.rs` `match` on the message. `dispatch_lsp_request` / `dispatch_notification` are isograph `dispatch_request` / `dispatch_notification`. This slice `dispatch_lsp_request` has zero `on_request_sync` calls. Continue is `method_not_found`, which returns `Vec<IsographEffect>`: one immediate `SendLspResponse`. Tokens inserts `.on_request_sync::<SemanticTokensFullRequest>(...)?` before `.request()`. Notification leftover is `ControlFlow::Continue(())`; `dispatch_lsp_notification` returns the effects the handler pushed. Those effects are not `SendLspResponse`: a notification has no request id.
 
-The notification chain has `isograph/event`. Params are `Ingested`. `on_isograph_event` calls `handle_ingested`. `Lsp` is not a `--file` / `isograph/event` payload.
+The notification chain has `isograph/event`. Params are `Internal`. `on_isograph_event` calls `handle_internal`. `Lsp` is not a `--file` / `isograph/event` payload.
 
 The existing notification handler is `fn(&mut TState, Params) -> LSPRuntimeResult<()>`. It cannot return effects. `TState` is therefore `(&mut IsographState, &mut Vec<IsographEffect>)`. Request `TState` is `&IsographState`, same as isograph's `&LspState`.
 
@@ -338,9 +338,9 @@ The session does not match methods. `Connection::initialize` still consumes `ini
 
 `handle` of `Lsp` whose message is a `Response`: no effects.
 
-Do not `handle` an `isograph/event` whose params fail to deserialize. `extract_notification_params` `expect`s; that is a panic. `bad_event_params_are_not_an_event` stays on `listen_for_events` (no `handle`): the session posts `Lsp`; params do not deserialize as `Ingested`; then `HelloWorld` on the same connection is a second `Lsp` whose params are `HelloWorld`.
+Do not `handle` an `isograph/event` whose params fail to deserialize. `extract_notification_params` `expect`s; that is a panic. `bad_event_params_are_not_an_event` stays on `listen_for_events` (no `handle`): the session posts `Lsp`; params do not deserialize as `Internal`; then `HelloWorld` on the same connection is a second `Lsp` whose params are `HelloWorld`.
 
-`lsp_socket.rs`: `listen_for_events` sees `Lsp`, not `Ingested::HelloWorld` / `DiskChanged` / `Quit`. Assert the message is a notification, `method` is `IsographEventNotification::METHOD`, and `serde_json::from_value::<Ingested>(params)` is that event. Same for the existing HelloWorld / DiskChanged present-then-absent / multi-connection tests.
+`lsp_socket.rs`: `listen_for_events` sees `Lsp`, not `Internal::HelloWorld` / `DiskChanged` / `Quit`. Assert the message is a notification, `method` is `IsographEventNotification::METHOD`, and `serde_json::from_value::<Internal>(params)` is that event. Same for the existing HelloWorld / DiskChanged present-then-absent / multi-connection tests.
 
 `unknown_notification_is_not_an_event`: `window/logMessage` arrives as `Lsp`. Then `HelloWorld` as today.
 
@@ -350,11 +350,11 @@ MethodNotFound / shutdown / ServerNotInitialized tests stay. After hover MethodN
 
 `daemon.rs` existing tests stay. They do not send `Lsp`.
 
-`send.rs`: `--file` deserializes as `Ingested`. Same JSON as today.
+`send.rs`: `--file` deserializes as `Internal`. Same JSON as today.
 
-`cli.rs` unchanged. SIGTERM sends `Ingested::Quit`.
+`cli.rs` unchanged. SIGTERM sends `Internal::Quit`.
 
-`state.rs` existing `HelloWorld` / `Quit` / `DiskChanged` tests construct `IsographEvent::Ingested(...)`.
+`state.rs` existing `HelloWorld` / `Quit` / `DiskChanged` tests construct `IsographEvent::Internal(...)`.
 
 The copied `#[cfg(test)]` modules in `isograph_lsp` stay. They are isograph's tests of those structs.
 
@@ -365,7 +365,7 @@ Do not add a production API only tests call.
 - `run_session` any message -> `Lsp` -> `handle` -> `dispatch_lsp` (isograph server-loop match)
 - request -> `LSPRequestDispatch` (zero handlers) -> Continue `method_not_found` -> `[SendLspResponse]`
 - notification -> `LSPNotificationDispatch` -> effects, never `SendLspResponse`
-- notification `isograph/event` -> `on_isograph_event` -> `handle_ingested`
-- `isograph send --file` -> `Ingested` JSON -> `isograph/event`
+- notification `isograph/event` -> `on_isograph_event` -> `handle_internal`
+- `isograph send --file` -> `Internal` JSON -> `isograph/event`
 - lsp-tokens.md -> `.on_request_sync::<SemanticTokensFullRequest>(...)?` on `LSPRequestDispatch`
 - later didOpen / didChange / didClose -> `.on_notification_sync` on `LSPNotificationDispatch`

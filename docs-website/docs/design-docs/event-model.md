@@ -4,7 +4,7 @@ Two layers, one `handle`.
 
 Inner: `handle(state, event) -> Vec<IsographEffect>`. No filesystem, no LSP, no socket. The test harness calls this function. The running binary calls this same function. There is not a second copy for tests.
 
-Outer: the real process. It listens to the filesystem, speaks LSP, and performs effects. Every path into the process becomes an ingested event, then `handle`, then effects.
+Outer: the real process. It listens to the filesystem, speaks LSP, and performs effects. Every path into the process becomes an event, then `handle`, then effects.
 
 The process does not read the filesystem inside `handle`. Facts about files arrive as events: a path is present with these contents, or a path is absent. Writing files is an effect.
 
@@ -41,7 +41,7 @@ enum Filesystem {
 }
 ```
 
-`Watch` starts a source that observes the OS and emits `DiskChanged`. `Injected` does not scan and does not watch. The LSP port listens in both modes. The CLI and the adapter submit ingested events into the same `handle`. Until filesystem-watcher.md lands, `DiskChanged` arrives only through `isograph send`. After that, `Watch` posts in-process and `Injected` still uses send.
+`Watch` starts a source that observes the OS and emits `DiskChanged`. `Injected` does not scan and does not watch. The LSP port listens in both modes. The CLI and the adapter submit `Internal` events into the same `handle`. Until filesystem-watcher.md lands, `DiskChanged` arrives only through `isograph send`. After that, `Watch` posts in-process and `Injected` still uses send.
 
 ## Inner
 
@@ -51,7 +51,7 @@ fn handle(state: &mut IsographState, event: IsographEvent) -> Vec<IsographEffect
 
 `IsographState` is the pico database. The test harness calls `handle`. It does not start a daemon, open a socket, or write a file. A test constructs a `DiskChanged` or `EditorChanged`, runs `handle`, and asserts the effects and the `DiskFile` sources. The binary's event loop calls the same `handle` with the same types.
 
-`IsographEvent` is `Lsp` | `Ingested`. `handle` of `Lsp` matches `lsp_server::Message` and runs isograph request/notification dispatch. A request leftover is `method_not_found`: one immediate `SendLspResponse`. Later a handler can return a timer plus an event; `handle` of that event is an immediate `SendLspResponse`. A notification leftover is no effects. A notification that matches can return effects other than `SendLspResponse`. A response is no effects. `handle` of `Ingested` is `HelloWorld` / `Quit` / `DiskChanged`. `handle` does not touch the socket. The effect loop writes the `Response`.
+`IsographEvent` is `Lsp` | `Internal`. `handle` of `Lsp` matches `lsp_server::Message` and runs isograph request/notification dispatch. A request leftover is `method_not_found`: one immediate `SendLspResponse`. Later a handler can return a timer plus an event; `handle` of that event is an immediate `SendLspResponse`. A notification leftover is no effects. A notification that matches can return effects other than `SendLspResponse`. A response is no effects. `handle` of `Internal` is `HelloWorld` / `Quit` / `DiskChanged`. `handle` does not touch the socket. The effect loop writes the `Response`.
 
 `handle` does not know about globs, gitignore, or "in scope". Scope is the watcher's job. `isograph send` may inject any path.
 
@@ -60,7 +60,7 @@ fn handle(state: &mut IsographState, event: IsographEvent) -> Vec<IsographEffect
 The binary is the outer. Each source is outside `handle` and feeds it. One process, one channel, one worker that owns `IsographState`. Sources do not read state. Performers do not mutate it.
 
 - Watcher: OS notifications become `DiskChanged` (path plus contents or absent). It may read the disk to fill `Present.contents`. `handle` does not. The watcher posts in-process on the event channel. It does not run the CLI and it does not write to the LSP port.
-- LSP port: LSP JSON-RPC on `{slug}.port`. `isograph send` is a client: initialize, `initialized`, notification `isograph/event` whose params are `Ingested` (`HelloWorld` / `Quit` / `DiskChanged`). After initialize the session posts every message as `Lsp` (the `lsp_server::Message` plus a clone of that connection's writer). It does not interpret methods. `handle` of `Lsp` is isograph's server-loop match. A request leftover is `MethodNotFound`. A notification leftover is no effects. `isograph/event` is the first notification arm and runs `handle` of `Ingested`. Later, `textDocument/didOpen` / `didChange` / `didClose` are notification arms; hover and `semanticTokens/full` are request arms. Effects from `handle` (`ReportDiagnostics`) become LSP notifications (`publishDiagnostics`).
+- LSP port: LSP JSON-RPC on `{slug}.port`. `isograph send` is a client: initialize, `initialized`, notification `isograph/event` whose params are `Internal` (`HelloWorld` / `Quit` / `DiskChanged`). After initialize the session posts every message as `Lsp` (the `lsp_server::Message` plus a clone of that connection's writer). It does not interpret methods. `handle` of `Lsp` is isograph's server-loop match. A request leftover is `MethodNotFound`. A notification leftover is no effects. `isograph/event` is the first notification arm and runs `handle` of `Internal`. Later, `textDocument/didOpen` / `didChange` / `didClose` are notification arms; hover and `semanticTokens/full` are request arms. Effects from `handle` (`ReportDiagnostics`) become LSP notifications (`publishDiagnostics`).
 - Effect loop: performs `WriteArtifacts`, `ReportDiagnostics`, `StartAsyncWork`, `SendLspResponse`, `Kill`.
 
 `isograph lsp` is a stdio proxy onto the port. Walk-up / `--config` is the same as every other verb. It starts the daemon if needed, dials the port, and copies stdin/stdout. Dropping the editor drops the proxy and that connection. The daemon stays up. Several editors share one process. The vscode-extension already spawns `isograph lsp` on stdio.
@@ -84,12 +84,12 @@ An event is something that happened, already carrying what the source knows.
 ```rust
 enum IsographEvent {
     Lsp(Lsp),
-    Ingested(Ingested),
+    Internal(Internal),
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(tag = "kind", content = "value")]
-enum Ingested {
+enum Internal {
     DiskChanged(DiskChanged),
     EditorChanged(EditorChanged),
     AsyncWorkFinished,
@@ -136,9 +136,9 @@ enum Buffer {
 
 `File` `Present` is create or modify or the destination of a move of a file. `File` `Absent` is delete or the source of a move of a file. `FolderRemoved` is delete or the source of a move of a directory: notify does not deliver one `Remove` per child. There is no `Moved` variant. A rename the watcher sees becomes `FolderRemoved` then file `Present`s, or file `Absent` then file `Present`. pico sources are keyed by path; a rename is remove old plus intern new. A directory is not a `DiskFile`.
 
-Ingested events come from outside `handle`: `DiskChanged`, `EditorChanged`. The CLI submits `Ingested`. The watcher submits `DiskChanged`. The LSP adapter submits `EditorChanged`. `Lsp` is not ingested; the session posts it from the socket.
+`Internal` events come from outside `handle`: `DiskChanged`, `EditorChanged`. The CLI submits `Internal`. The watcher submits `DiskChanged`. The LSP adapter submits `EditorChanged`. `Lsp` is not `Internal`; the session posts it from the socket.
 
-The wire is `serde_json` of `Ingested`. A frame that is not a valid `Ingested` is logged and dropped. The connection stays up. `Lsp` is not a wire kind.
+The wire is `serde_json` of `Internal`. A frame that is not a valid `Internal` is logged and dropped. The connection stays up. `Lsp` is not a wire kind.
 
 `DiskChanged` is a filesystem fact. `File` `Present` carries the contents. `handle` does not open the path. Boot scan is a burst of `File` `Present`. Injected mode has no such burst. `FolderRemoved` is a directory gone from disk.
 

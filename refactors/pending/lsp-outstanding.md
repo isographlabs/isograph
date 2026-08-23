@@ -40,7 +40,7 @@ pub enum IsographEvent {
     #[from]
     Lsp(Lsp),
     #[from]
-    Ingested(Ingested),
+    Internal(Internal),
     #[from]
     LspClientGone(LspClientGone),
 }
@@ -97,7 +97,7 @@ Not pico. Not on `IsographState`. Lives in `run_event_loop`.
             IsographEvent::LspClientGone(gone) => {
                 outstanding.inner.retain(|(client, _)| *client != gone.client);
             }
-            IsographEvent::Ingested(_) => {}
+            IsographEvent::Internal(_) => {}
         }
         let effects = handle(&mut state, event);
         for effect in effects {
