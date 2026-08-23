@@ -20,7 +20,7 @@ Requires config-discovery.md (landed), the event-model design-doc, and `docs-web
 14. lsp-dispatch.md (landed). isograph `LSPRequestDispatch` / `LSPRuntimeError` copied into `isograph_lsp`, except extract `Err` uses the request id not `"default-lsp-id"`. `LSPNotificationDispatch` lives in `isograph_cli` (handler returns `Vec<IsographEffect>`; extract is `Result`). `IsographEvent` is `Lsp` | `Internal`. `Lsp` is `Request` (plus reply) / `Notification` / `Response`. Session posts `Lsp`. `handle` of `Lsp` is isograph's server-loop match. Request chain has zero handlers; Continue is `method_not_found`. Notification chain is `isograph/event`; bad params are leftover. `--file` is `Internal`.
 15. no-poll-in-tests.md. Now. Delete `cli.rs` `poll`. `SETTLE` then assert. Independent of lsp-tokens.md.
 16. lsp-tokens.md (landed). `.on_request_sync::<SemanticTokensFullRequest>`. Advertise the legend on `initialize`. Independent of sessions.
-17. e2e-send-semantic-tokens.md. After 16 and 15. `cli.rs`: `Daemon::start` (`--filesystem injected`), `isograph send` DiskChanged Present, `settle`, one `textDocument/semanticTokens/full` on the daemon port. No watcher. No new verb.
+17. e2e-send-semantic-tokens.md (landed). After 16 and 15. `cli.rs`: `Daemon::start` (`--filesystem injected`), `isograph send` DiskChanged Present, `settle`, one `textDocument/semanticTokens/full` on the daemon port. No watcher. No new verb.
 18. lsp-outstanding.md. Later. `LspClientId`, `LspClientGone`, outstanding `(LspClientId, RequestId)`. For disconnect/cancel/async, not for highlighting.
 19. lsp-sessions.md. Later. `ClientCapabilities` from `initialize` and a writer map for `publishDiagnostics`.
 20. lsp-diagnostics.md. Later. Debounce then `publishDiagnostics`. Requires 19.
