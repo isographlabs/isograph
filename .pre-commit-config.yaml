@@ -51,3 +51,9 @@ repos:
         language: system
         types: [rust]
         pass_filenames: false
+      - id: precommit-in-worktree-test
+        name: precommit-in-worktree-test
+        entry: ./scripts/precommit-in-worktree-test.sh
+        language: system
+        pass_filenames: false
+        always_run: true

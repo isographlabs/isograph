@@ -381,7 +381,7 @@ After: git runs `/Users/rbalicki/code/i2/githooks/pre-commit` because `core.hook
 
 New file, executable. Creates throwaway git repos under `mktemp -d`, does not use this clone. Asserts facts about the invoking tree. `pre-commit` and `pnpm` on `PATH` are mocks in a bindir the test prepends; the script appends Homebrew and mise shims, so the mocks stay first.
 
-The test `cd`s into each throwaway repo before invoking the script. `$wt` is derived from that repo's common dir: if the repo is `$root/ok/repo`, `$wt` is `$root/ok/repo-precommit`. That is not `/Users/rbalicki/code/i2-precommit`. `trap` `rm -rf "$root"` removes both.
+The test unsets git's hook env (`GIT_DIR`, `GIT_INDEX_FILE`, ...) at startup so `git -C` of a throwaway repo does not talk to the invoking clone. It `cd`s into each throwaway repo before invoking the script. `$wt` is derived from that repo's common dir: if the repo is `$root/ok/repo`, `$wt` is `$root/ok/repo-precommit`. That is not `/Users/rbalicki/code/i2-precommit`. `trap` `rm -rf "$root"` removes both.
 
 Each case that expects the script to create `$wt` starts with an initial commit unless the case is unborn `HEAD`.
 
@@ -407,6 +407,7 @@ set -euo pipefail
 
 script_dir=$(cd "$(dirname "$0")" && pwd)
 under_test="$script_dir/precommit-in-worktree.sh"
+unset $(git rev-parse --local-env-vars)
 
 fail() {
   echo "precommit-in-worktree-test: $*" >&2
