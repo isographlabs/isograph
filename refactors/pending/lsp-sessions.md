@@ -2,11 +2,11 @@
 
 Requires lsp-port.md (landed). Independent of lsp-tokens.md and lsp-outstanding.md.
 
-The session already exists: `Connection::initialize`, pump, `drop(connection)` then `join`. After lsp-request-response.md, requests go to `answer_request`. This slice keeps that. After `initialize`, the session posts `Client::Started` with that client's `ClientCapabilities` and a clone of `connection.sender`. The effect loop owns `LiveSessions`. Send is ephemeral: the map holds the row for the life of the connection, then `Client::Gone` removes it. An editor is the same, for the life of the window.
+The session already exists: `Connection::initialize`, pump, `drop(connection)` then `join`. After lsp-request-response.md, requests go to `answer_request`. This slice keeps that. After `initialize`, the session posts `ClientEvent::Started` with that client's `ClientCapabilities` and a clone of `connection.sender`. The effect loop owns `LiveSessions`. Send is ephemeral: the map holds the row for the life of the connection, then `ClientEvent::Gone` removes it. An editor is the same, for the life of the window.
 
 `connection.initialize` already returns serialized `InitializeParams`. Today they are discarded. This slice deserializes them and puts `params.capabilities` on `ClientStarted`.
 
-Cleanup is the thread ending when the socket ends (`exit`, EOF, reset). `session` posts `Client::Gone` after `run_session` returns. No idle timeout. VS Code keeps the language client up while the window is open. A 5 minute inactivity close looks like a crash and the client will reconnect. Dead-peer TCP is socket keepalive, not an LSP timer.
+Cleanup is the thread ending when the socket ends (`exit`, EOF, reset). `session` posts `ClientEvent::Gone` after `run_session` returns. No idle timeout. VS Code keeps the language client up while the window is open. A 5 minute inactivity close looks like a crash and the client will reconnect. Dead-peer TCP is socket keepalive, not an LSP timer.
 
 `Kill` still unlinks the port file then `process::exit(0)`. This slice does not drain clients.
 
@@ -35,7 +35,7 @@ pub struct ClientStarted {
 }
 
 #[derive(Clone, Debug)]
-pub enum Client {
+pub enum ClientEvent {
     Started(ClientStarted),
     Gone(ClientId),
 }
@@ -43,15 +43,15 @@ pub enum Client {
 #[derive(Clone, Debug, derive_more::From)]
 pub enum IsographEvent {
     #[from]
-    Lsp(Lsp),
+    Lsp(LspEvent),
     #[from]
-    Internal(Internal),
+    Internal(InternalEvent),
     #[from]
-    Client(Client),
+    Client(ClientEvent),
 }
 ```
 
-`Client` is not `Internal`: it carries a `Sender` on `Started`, so it is not on the `isograph/event` wire. `LspRequest` does not gain `client`. Request replies still ride on `LspRequest.reply`.
+`ClientEvent` is not `InternalEvent`: it carries a `Sender` on `Started`, so it is not on the `isograph/event` wire. `LspRequest` does not gain `client`. Request replies still ride on `LspRequest.reply`.
 
 ```rust
 // from crates/isograph_cli/src/effect.rs
@@ -61,17 +61,26 @@ pub enum ClientEffect {
     Gone(crate::event::ClientId),
 }
 
+impl From<crate::event::ClientEvent> for ClientEffect {
+    fn from(client: crate::event::ClientEvent) -> Self {
+        match client {
+            crate::event::ClientEvent::Started(started) => Self::Started(started),
+            crate::event::ClientEvent::Gone(client) => Self::Gone(client),
+        }
+    }
+}
+
 #[derive(Debug, derive_more::From)]
 pub enum IsographEffect {
     LogHelloWorld,
     Kill,
-    SendLspResponseEffect(Box<SendLspResponseEffect>),
+    SendLspResponse(Box<SendLspResponseEffect>),
     #[from]
-    ClientEffect(ClientEffect),
+    Client(ClientEffect),
 }
 ```
 
-`handle` of `IsographEvent::Client` returns `IsographEffect::ClientEffect` with the matching variant. `#[from]` on the effect variant: `ClientEffect::Started(...).to()` is the effect. `Client::Started(...).to()` is the event.
+`handle` of `IsographEvent::Client` returns `IsographEffect::Client`. `ClientEvent::Started(...).to()` is the event. `client.to()` is the `ClientEffect`.
 
 ```rust
 // from crates/isograph_cli/src/daemon.rs
@@ -93,20 +102,14 @@ The id is the map key. `LiveSession` does not repeat it. Clone `connection.sende
 // from crates/isograph_cli/src/state.rs
         IsographEvent::Lsp(lsp) => dispatch_lsp(state, lsp),
         IsographEvent::Internal(internal) => handle_internal(state, internal),
-        IsographEvent::Client(client) => crate::effect::IsographEffect::ClientEffect(
-            match client {
-                crate::event::Client::Started(started) => {
-                    crate::effect::ClientEffect::Started(started)
-                }
-                crate::event::Client::Gone(client) => crate::effect::ClientEffect::Gone(client),
-            },
-        )
-        .wrap_vec(),
+        IsographEvent::Client(client) => {
+            crate::effect::IsographEffect::Client(client.to()).wrap_vec()
+        }
 ```
 
 ### `run_event_loop`
 
-Unchanged. `handle` returns `IsographEffect::ClientEffect`; the existing loop forwards every effect.
+Unchanged. `handle` returns `IsographEffect::Client`; the existing loop forwards every effect.
 
 ### `run_effect_loop` / `perform`
 
@@ -131,13 +134,13 @@ pub fn perform(effect: IsographEffect, live: &mut LiveSessions) -> ControlFlow<(
             tracing::info!("kill: exiting");
             ControlFlow::Break(())
         }
-        IsographEffect::SendLspResponseEffect(respond) => {
+        IsographEffect::SendLspResponse(respond) => {
             let _ = respond
                 .reply
                 .send(lsp_server::Message::Response(respond.response));
             ControlFlow::Continue(())
         }
-        IsographEffect::ClientEffect(crate::effect::ClientEffect::Started(started)) => {
+        IsographEffect::Client(crate::effect::ClientEffect::Started(started)) => {
             live.0.insert(
                 started.client,
                 LiveSession {
@@ -147,7 +150,7 @@ pub fn perform(effect: IsographEffect, live: &mut LiveSessions) -> ControlFlow<(
             );
             ControlFlow::Continue(())
         }
-        IsographEffect::ClientEffect(crate::effect::ClientEffect::Gone(client)) => {
+        IsographEffect::Client(crate::effect::ClientEffect::Gone(client)) => {
             live.0.remove(&client);
             ControlFlow::Continue(())
         }
@@ -155,7 +158,7 @@ pub fn perform(effect: IsographEffect, live: &mut LiveSessions) -> ControlFlow<(
 }
 ```
 
-Ids are monotonic and not reused, so `insert` cannot collide with a live row. `remove` of an unknown id is a no-op (`initialize` failed, no `Client::Started`).
+Ids are monotonic and not reused, so `insert` cannot collide with a live row. `remove` of an unknown id is a no-op (`initialize` failed, no `ClientEvent::Started`).
 
 ### Session
 
@@ -205,7 +208,7 @@ fn session(
         }
     };
     run_session(&connection, event_tx.clone(), client);
-    let _ = event_tx.send(crate::event::Client::Gone(client).to());
+    let _ = event_tx.send(crate::event::ClientEvent::Gone(client).to());
     drop(connection);
     let _ = io_threads.join();
 }
@@ -222,7 +225,7 @@ fn session(
         }
     };
     let _ = event_tx.send(
-        crate::event::Client::Started(crate::event::ClientStarted {
+        crate::event::ClientEvent::Started(crate::event::ClientStarted {
             client,
             sender: connection.sender.clone(),
             capabilities: params.capabilities,
@@ -231,21 +234,21 @@ fn session(
     );
 ```
 
-`processId` is not watched. Same thread, same `event_tx`: `Client::Started` is enqueued before `Client::Gone`.
+`processId` is not watched. Same thread, same `event_tx`: `ClientEvent::Started` is enqueued before `ClientEvent::Gone`.
 
 Request answering lives in `answer_request` after lsp-request-response.md. This slice does not move it. `handle` stays inner. `run_session` still puts `reply: connection.sender.clone()` on `LspRequest` and does not put `client` on `Lsp`.
 
 ## Tests
 
-`handle` of `Client::Started`: one `IsographEffect::ClientEffect(ClientEffect::Started(_))` with that `client` and `capabilities`. Dummy sender from `crossbeam::channel::unbounded()`.
+`handle` of `ClientEvent::Started`: one `IsographEffect::Client(ClientEffect::Started(_))` with that `client` and `capabilities`. Dummy sender from `crossbeam::channel::unbounded()`.
 
-`handle` of `Client::Gone`: one `IsographEffect::ClientEffect(ClientEffect::Gone(id))` with that `ClientId`.
+`handle` of `ClientEvent::Gone`: one `IsographEffect::Client(ClientEffect::Gone(id))` with that `ClientId`.
 
 `lsp_socket.rs` (`listen_for_events`):
 
-- initialize with `{"capabilities":{}}`: `event_rx` receives `Client::Started` whose `capabilities == ClientCapabilities::default()`. Drop the client. `Client::Gone` for that `ClientId`.
+- initialize with `{"capabilities":{}}`: `event_rx` receives `ClientEvent::Started` whose `capabilities == ClientCapabilities::default()`. Drop the client. `ClientEvent::Gone` for that `ClientId`.
 - initialize with `textDocument.publishDiagnostics: {}` and `textDocument.hover: {}`: `ClientStarted.capabilities` equals the deserialized `InitializeParams.capabilities` (`publish_diagnostics` and `hover` both `Some`). Drop.
-- two connections: two `Client::Started` with different `ClientId`s. Drop one: one `Client::Gone`. The other connection still answers a request.
+- two connections: two `ClientEvent::Started` with different `ClientId`s. Drop one: one `ClientEvent::Gone`. The other connection still answers a request.
 
 `perform` of `ClientEffect::Gone` of an id that was never registered: `Continue`, no panic.
 
@@ -254,9 +257,9 @@ Do not add a production function only tests call.
 ## Call sites
 
 - `accept_loop` -> `ClientId` -> `session`
-- `run_session` after `initialize` -> `Client::Started`
-- `session` end -> `Client::Gone`
-- `handle` -> `IsographEffect::ClientEffect`
+- `run_session` after `initialize` -> `ClientEvent::Started`
+- `session` end -> `ClientEvent::Gone`
+- `handle` -> `IsographEffect::Client`
 - `perform` -> `HashMap` insert / remove
 - lsp-diagnostics.md -> iterate `live.0.values()`; send `publishDiagnostics` when `capabilities.text_document.publish_diagnostics` is `Some`
-- lsp-outstanding.md -> `ClientId` on `LspRequest` / `SendLspResponseEffect`; `Client::Gone` drops outstanding ids
+- lsp-outstanding.md -> `ClientId` on `LspRequest` / `SendLspResponseEffect`; `ClientEvent::Gone` drops outstanding ids

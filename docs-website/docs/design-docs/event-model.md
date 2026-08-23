@@ -51,7 +51,7 @@ fn handle(state: &mut IsographState, event: IsographEvent) -> Vec<IsographEffect
 
 `IsographState` is the pico database. The test harness calls `handle`. It does not start a daemon, open a socket, or write a file. A test constructs a `DiskChanged` or `EditorChanged`, runs `handle`, and asserts the effects and the `DiskFile` sources. The binary's event loop calls the same `handle` with the same types.
 
-`IsographEvent` is `Lsp` | `Internal`. `Lsp` is `Request` (request plus reply) / `Notification` / `Response`. `handle` of `Lsp` matches those and runs isograph request/notification dispatch. A request leftover is `method_not_found`: one immediate `SendLspResponseEffect`. Later a handler can return a timer plus an event; `handle` of that event is an immediate `SendLspResponseEffect`. A notification leftover is no effects. A notification that matches returns `Vec<IsographEffect>` and not `SendLspResponseEffect`. Bad `isograph/event` params are leftover (empty effects). A response is no effects. `handle` of `Internal` is `HelloWorld` / `Quit` / `DiskChanged`. `handle` does not touch the socket. The effect loop writes the `Response`.
+`IsographEvent` is `Lsp(LspEvent)` | `Internal(InternalEvent)`. `LspEvent` is `Request` (request plus reply) / `Notification` / `Response`. `handle` of `Lsp` matches those and runs isograph request/notification dispatch. A request leftover is `method_not_found`: one immediate `SendLspResponseEffect`. Later a handler can return a timer plus an event; `handle` of that event is an immediate `SendLspResponseEffect`. A notification leftover is no effects. A notification that matches returns `Vec<IsographEffect>` and not `SendLspResponseEffect`. Bad `isograph/event` params are leftover (empty effects). A response is no effects. `handle` of `Internal` is `HelloWorld` / `Quit` / `DiskChanged`. `handle` does not touch the socket. The effect loop writes the `Response`.
 
 `handle` does not know about globs, gitignore, or "in scope". Scope is the watcher's job. `isograph send` may inject any path.
 
@@ -60,7 +60,7 @@ fn handle(state: &mut IsographState, event: IsographEvent) -> Vec<IsographEffect
 The binary is the outer. Each source is outside `handle` and feeds it. One process, one channel, one worker that owns `IsographState`. Sources do not read state. Performers do not mutate it.
 
 - Watcher: OS notifications become `DiskChanged` (path plus contents or absent). It may read the disk to fill `Present.contents`. `handle` does not. The watcher posts in-process on the event channel. It does not run the CLI and it does not write to the LSP port.
-- LSP port: LSP JSON-RPC on `{slug}.port`. `isograph send` is a client: initialize, `initialized`, notification `isograph/event` whose params are `Internal` (`HelloWorld` / `Quit` / `DiskChanged`). After initialize the session posts every message as `Lsp`. It clones the writer only for requests. It does not interpret methods. `handle` of `Lsp` is isograph's server-loop match. A request leftover is `MethodNotFound`. A notification leftover is no effects. `isograph/event` is the first notification arm and runs `handle` of `Internal`. Bad `isograph/event` params do not kill the daemon. Later, `textDocument/didOpen` / `didChange` / `didClose` are notification arms; hover and `semanticTokens/full` are request arms. Effects from `handle` (`ReportDiagnostics`) become LSP notifications (`publishDiagnostics`).
+- LSP port: LSP JSON-RPC on `{slug}.port`. `isograph send` is a client: initialize, `initialized`, notification `isograph/event` whose params are `InternalEvent` (`HelloWorld` / `Quit` / `DiskChanged`). After initialize the session posts every message as `Lsp`. It clones the writer only for requests. It does not interpret methods. `handle` of `Lsp` is isograph's server-loop match. A request leftover is `MethodNotFound`. A notification leftover is no effects. `isograph/event` is the first notification arm and runs `handle` of `Internal`. Bad `isograph/event` params do not kill the daemon. Later, `textDocument/didOpen` / `didChange` / `didClose` are notification arms; hover and `semanticTokens/full` are request arms. Effects from `handle` (`ReportDiagnostics`) become LSP notifications (`publishDiagnostics`).
 - Effect loop: performs `WriteArtifacts`, `ReportDiagnostics`, `StartAsyncWork`, `SendLspResponseEffect`, `Kill`.
 
 `isograph lsp` is a stdio proxy onto the port. Walk-up / `--config` is the same as every other verb. It starts the daemon if needed, dials the port, and copies stdin/stdout. Dropping the editor drops the proxy and that connection. The daemon stays up. Several editors share one process. The vscode-extension already spawns `isograph lsp` on stdio.
@@ -83,11 +83,11 @@ An event is something that happened, already carrying what the source knows.
 
 ```rust
 enum IsographEvent {
-    Lsp(Lsp),
-    Internal(Internal),
+    Lsp(LspEvent),
+    Internal(InternalEvent),
 }
 
-enum Lsp {
+enum LspEvent {
     Request(LspRequest),
     Notification(lsp_server::Notification),
     Response(lsp_server::Response),
@@ -100,7 +100,7 @@ struct LspRequest {
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(tag = "kind", content = "value")]
-enum Internal {
+enum InternalEvent {
     DiskChanged(DiskChanged),
     EditorChanged(EditorChanged),
     AsyncWorkFinished,
@@ -147,9 +147,9 @@ enum Buffer {
 
 `File` `Present` is create or modify or the destination of a move of a file. `File` `Absent` is delete or the source of a move of a file. `FolderRemoved` is delete or the source of a move of a directory: notify does not deliver one `Remove` per child. There is no `Moved` variant. A rename the watcher sees becomes `FolderRemoved` then file `Present`s, or file `Absent` then file `Present`. pico sources are keyed by path; a rename is remove old plus intern new. A directory is not a `DiskFile`.
 
-`Internal` events come from outside `handle`: `DiskChanged`, `EditorChanged`. The CLI submits `Internal`. The watcher submits `DiskChanged`. The LSP adapter submits `EditorChanged`. `Lsp` is not `Internal`; the session posts it from the socket.
+`InternalEvent` values come from outside `handle`: `DiskChanged`, `EditorChanged`. The CLI submits `Internal`. The watcher submits `DiskChanged`. The LSP adapter submits `EditorChanged`. `Lsp` is not `Internal`; the session posts it from the socket.
 
-The wire is `serde_json` of `Internal`. A frame that is not a valid `Internal` is logged and dropped. The connection stays up. `Lsp` is not a wire kind.
+The wire is `serde_json` of `InternalEvent`. A frame that is not a valid `InternalEvent` is logged and dropped. The connection stays up. `Lsp` is not a wire kind.
 
 `DiskChanged` is a filesystem fact. `File` `Present` carries the contents. `handle` does not open the path. Boot scan is a burst of `File` `Present`. Injected mode has no such burst. `FolderRemoved` is a directory gone from disk.
 
