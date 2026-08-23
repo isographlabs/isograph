@@ -184,7 +184,7 @@ pub fn perform(effect: IsographEffect) -> ControlFlow<()> {
             tracing::info!("kill: exiting");
             ControlFlow::Break(())
         }
-        IsographEffect::SendLspResponse(respond) => {
+        IsographEffect::SendLspResponseEffect(respond) => {
             let _ = respond
                 .reply
                 .send(lsp_server::Message::Response(respond.response));

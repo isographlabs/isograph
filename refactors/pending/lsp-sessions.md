@@ -59,7 +59,7 @@ pub enum IsographEvent {
 pub enum IsographEffect {
     LogHelloWorld,
     Kill,
-    SendLspResponse(Box<SendLspResponse>),
+    SendLspResponseEffect(Box<SendLspResponseEffect>),
     Client(crate::event::Client),
 }
 ```
@@ -118,7 +118,7 @@ pub fn perform(effect: IsographEffect, live: &mut LiveSessions) -> ControlFlow<(
             tracing::info!("kill: exiting");
             ControlFlow::Break(())
         }
-        IsographEffect::SendLspResponse(respond) => {
+        IsographEffect::SendLspResponseEffect(respond) => {
             let _ = respond
                 .reply
                 .send(lsp_server::Message::Response(respond.response));
@@ -246,4 +246,4 @@ Do not add a production function only tests call.
 - `handle` -> `IsographEffect::Client`
 - `perform` -> `HashMap` insert / remove
 - lsp-diagnostics.md -> iterate `live.0.values()`; send `publishDiagnostics` when `capabilities.text_document.publish_diagnostics` is `Some`
-- lsp-outstanding.md -> `ClientId` on `LspRequest` / `SendLspResponse`; `Client::Gone` drops outstanding ids
+- lsp-outstanding.md -> `ClientId` on `LspRequest` / `SendLspResponseEffect`; `Client::Gone` drops outstanding ids

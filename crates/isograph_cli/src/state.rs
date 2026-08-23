@@ -52,8 +52,8 @@ fn dispatch_lsp_request<THostLanguage: HostLanguage>(
         ControlFlow::Continue(request)
     };
     match get_response() {
-        ControlFlow::Break(response) => crate::effect::IsographEffect::SendLspResponse(
-            crate::effect::SendLspResponse { reply, response }.boxed(),
+        ControlFlow::Break(response) => crate::effect::IsographEffect::SendLspResponseEffect(
+            crate::effect::SendLspResponseEffect { reply, response }.boxed(),
         )
         .wrap_vec(),
         ControlFlow::Continue(request) => {
@@ -63,10 +63,10 @@ fn dispatch_lsp_request<THostLanguage: HostLanguage>(
 }
 
 fn method_not_found(incoming: crate::event::LspRequest) -> Vec<IsographEffect> {
-    // Immediate SendLspResponse this slice. Async later: a timer plus an event; handle of
-    // that event is an immediate SendLspResponse.
-    crate::effect::IsographEffect::SendLspResponse(
-        crate::effect::SendLspResponse {
+    // Immediate SendLspResponseEffect this slice. Async later: a timer plus an event; handle of
+    // that event is an immediate SendLspResponseEffect.
+    crate::effect::IsographEffect::SendLspResponseEffect(
+        crate::effect::SendLspResponseEffect {
             reply: incoming.reply,
             response: lsp_server::Response {
                 id: incoming.request.id,
@@ -309,8 +309,8 @@ mod tests {
             .into_iter()
             .next()
             .expect("handle returned one effect");
-        let crate::effect::IsographEffect::SendLspResponse(send) = effect else {
-            panic!("handle of LspRequest returns SendLspResponse");
+        let crate::effect::IsographEffect::SendLspResponseEffect(send) = effect else {
+            panic!("handle of LspRequest returns SendLspResponseEffect");
         };
         assert_eq!(send.response.id, id);
         assert!(send.response.result.is_none());
@@ -324,7 +324,7 @@ mod tests {
             error.message,
             "No handler registered for method 'textDocument/hover'"
         );
-        let _ = crate::daemon::perform(crate::effect::IsographEffect::SendLspResponse(send));
+        let _ = crate::daemon::perform(crate::effect::IsographEffect::SendLspResponseEffect(send));
         let lsp_server::Message::Response(response) = rx.recv().expect("perform sends on reply")
         else {
             panic!("perform sends Message::Response");

@@ -81,8 +81,8 @@ If lsp-open-files.md already has a `TextDocumentSyncOptions` with `open_close` a
 
 ## Call sites
 
-- `Lsp::Request` `textDocument/formatting` -> `formatting_response` -> `SendLspResponse` with `[]`
-- `Lsp::Request` `textDocument/willSaveWaitUntil` -> `will_save_wait_until_response` -> `SendLspResponse` with `[]`
+- `Lsp::Request` `textDocument/formatting` -> `formatting_response` -> `SendLspResponseEffect` with `[]`
+- `Lsp::Request` `textDocument/willSaveWaitUntil` -> `will_save_wait_until_response` -> `SendLspResponseEffect` with `[]`
 - vscode-languageclient sends `willSaveWaitUntil` on save
 - iso-format.md replaces the two handler bodies
 
