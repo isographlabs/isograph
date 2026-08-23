@@ -33,6 +33,6 @@ Requires config-discovery.md (landed), the event-model design-doc, and `docs-web
 27. iso-format-lsp.md. After lsp-tokens.md. Advertise `documentFormattingProvider` and `willSaveWaitUntil`; both requests return `[]`. No `autoformatIsoLiterals` setting.
 28. iso-format.md. After 27. Layout at consume, printer, those handlers return iso-interior edits. `{` breaks; `(` does not.
 29. iso-format-later.md. After 28. Broken `(` lists, width, trailing commas. No impl in that file.
-30. windows-graceful-stop.md. After 21. Windows `stop` / `restart` without `--force` posts `Internal::Quit` on the socket (`send::notify`). Unix stays SIGTERM. `--force` stays freddie.
+30. windows-graceful-stop.md. After 21. `#[cfg(windows)] App::ask_to_quit`. Windows `stop` / `restart` without `--force` call it; isograph posts `Internal::Quit` on the socket. Unix stays SIGTERM. `--force` stays SIGKILL / `taskkill /F`.
 
 `AsyncWorkFinished` and `StartAsyncWork` land with compilation.

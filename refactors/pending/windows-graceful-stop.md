@@ -4,7 +4,7 @@ Requires start-returns-when-listening.md (landed).
 
 Freddie `stop` / `restart` without `--force` is SIGTERM. On Windows, `signal_pid(Terminate)` returns `graceful stop is not yet available on Windows; use --force`. `stop` and `restart` are freddie verbs: find the pid, subscribe to lock release, ask, wait. An isograph intercept of those verbs duplicates that and fights `init_client_logging` on restart.
 
-The app-specific piece is how to ask. Unix stays SIGTERM. Windows calls `App::ask_to_quit`. Isograph's impl is `send::notify` of `Internal::Quit` on the port next to the lock, the same frame `isograph send --file '{"kind":"Quit"}'` already posts. No temp file. No subprocess.
+The app-specific piece is how to ask. Unix stays SIGTERM. `App::ask_to_quit` is `#[cfg(windows)]`. Isograph's impl is `send::notify` of `Internal::Quit` on the port next to the lock, the same frame `isograph send --file '{"kind":"Quit"}'` already posts. No temp file. No subprocess.
 
 `--force` stays SIGKILL / `taskkill /F`. `Daemon` drop stays `stop --force`. Mercury keeps the default `None`.
 
@@ -37,7 +37,7 @@ A daemon that is not running: `stop` exits 0 and prints `is not running`, same a
 
 A daemon that does not answer the port: `stop` without `--force` exits 1, `could not signal pid N: ...`. `--force` still destroys it.
 
-Unix `stop` / `restart` without `--force` is unchanged (SIGTERM). `isograph` still implements `ask_to_quit`; freddie does not call it on unix.
+Unix `stop` / `restart` without `--force` is unchanged (SIGTERM). The method does not exist on unix.
 
 Mercury on Windows without `--force` still prints today's error: the default is `None`, and freddie maps that to the same string `signal_pid(Terminate)` returns today.
 
@@ -51,7 +51,7 @@ Lands in `github.com/freddiehg/freddie`. Origin: `crates/freddie_cli/src/lib.rs`
 // from crates/freddie_cli/src/lib.rs (freddie)
     fn run_daemon(id: &Self::Id, args: &Self::DaemonArgs);
 
-    /// Ask the running daemon to quit, on platforms that have no SIGTERM.
+    /// Ask the running daemon to quit. Windows only.
     ///
     /// [`stop`](Verb::Stop) without `--force` is SIGTERM on unix. Windows has none: `taskkill`
     /// without `/F` posts `WM_CLOSE`, which a daemon with no window never sees. This is that
@@ -61,7 +61,8 @@ Lands in `github.com/freddiehg/freddie`. Origin: `crates/freddie_cli/src/lib.rs`
     /// second [`instance`](Self::instance) would rediscover it.
     ///
     /// `None` if this app has no ask. `Some` is the attempt: `Ok` posted it, `Err` tried
-    /// and could not. The default is `None`. Unix never calls this.
+    /// and could not. The default is `None`.
+    #[cfg(windows)]
     fn ask_to_quit(
         _instance: &Instance,
     ) -> Option<Result<(), Box<dyn std::error::Error + Send + Sync>>> {
@@ -69,9 +70,9 @@ Lands in `github.com/freddiehg/freddie`. Origin: `crates/freddie_cli/src/lib.rs`
     }
 ```
 
-Not `windows_soft_quit`. Freddie already says "asking it to quit" on `StopArgs`. The call site is Windows; the method is the ask. Mercury can implement it later without the name being wrong.
+Not `ask_to_quit_if_no_sigterm`. The cfg is that `if`. The method always asks or returns `None`; it does not test for SIGTERM. Not `windows_soft_quit`: Freddie already says "asking it to quit" on `StopArgs`.
 
-`None` is no implementation, not a successful no-op. `Result<Option<()>, _>` would make `Ok(None)` look like the ask succeeded at doing nothing. Freddie maps `None` to `graceful stop is not yet available on Windows; use --force`. `Some(Err)` is an app that has an ask and failed it (`could not signal pid N: ...`). Mercury and `TestApp` keep the default.
+`None` is no implementation, not a successful no-op. `Result<Option<()>, _>` would make `Ok(None)` look like the ask succeeded at doing nothing. Freddie maps `None` to `graceful stop is not yet available on Windows; use --force`. `Some(Err)` is an app that has an ask and failed it (`could not signal pid N: ...`). Mercury and `TestApp` keep the default. Unix impls do not name the method.
 
 ### `stop_daemon` is generic and Windows `Terminate` calls the app
 
@@ -216,6 +217,7 @@ impl<THostLanguage: HostLanguage> App for Isograph<THostLanguage> {
         crate::daemon::run::<THostLanguage>(path, port_path, args.filesystem, config);
     }
 
+    #[cfg(windows)]
     fn ask_to_quit(
         instance: &Instance,
     ) -> Option<Result<(), Box<dyn std::error::Error + Send + Sync>>> {
@@ -231,7 +233,7 @@ impl<THostLanguage: HostLanguage> App for Isograph<THostLanguage> {
 }
 ```
 
-No `#[cfg(windows)]` on the impl. `notify` of `Quit` is the same on every OS. Freddie only calls this on Windows. Always `Some`: isograph has an ask. Connect/`notify` failure is `Some(Err)`, not `None`.
+Always `Some`: isograph has an ask. Connect/`notify` failure is `Some(Err)`, not `None`. `notify` of `Quit` still exists on unix as `isograph send`; unix `stop` does not go through this method.
 
 `PortError` and `SendError` already implement `std::error::Error`. `?` into the box.
 
