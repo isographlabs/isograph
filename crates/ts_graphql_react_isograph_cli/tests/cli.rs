@@ -244,70 +244,30 @@ fn the_log_contains_the_config_path() {
 #[test]
 fn send_of_disk_changed_present_then_absent_exits_0() {
     let daemon = Daemon::start();
-    poll(|| {
-        daemon
-            .log_text()
-            .contains("isograph daemon up")
-            .then_some(())
-    });
-    let present = write_frame(
-        daemon.dir.path(),
-        r#"{"kind":"DiskChanged","value":{"File":{"path":"/tmp/proj/src/a.ts","presence":{"Present":"export const a = 1;\n"}}}}"#,
+    let path = source_path(daemon.reference(), "src/a.ts");
+    send_json(
+        daemon.reference(),
+        present(path.reference(), "export const a = 1;\n"),
     );
-    let sent = daemon.isograph(["send", "--file", present.to_str().expect("utf-8")].reference());
-    assert!(
-        sent.status.success(),
-        "stdout: {} stderr: {}",
-        stdout(sent.reference()),
-        stderr(sent.reference())
-    );
-    assert!(!present.exists(), "send deletes --file");
-    let absent = write_frame(
-        daemon.dir.path(),
-        r#"{"kind":"DiskChanged","value":{"File":{"path":"/tmp/proj/src/a.ts","presence":"Absent"}}}"#,
-    );
-    let sent = daemon.isograph(["send", "--file", absent.to_str().expect("utf-8")].reference());
-    assert!(
-        sent.status.success(),
-        "stdout: {} stderr: {}",
-        stdout(sent.reference()),
-        stderr(sent.reference())
-    );
-    assert!(!absent.exists(), "send deletes --file");
+    send_json(daemon.reference(), absent(path.reference()));
 }
 
 #[test]
 fn send_of_folder_removed_exits_0() {
     let daemon = Daemon::start();
-    poll(|| {
-        daemon
-            .log_text()
-            .contains("isograph daemon up")
-            .then_some(())
-    });
-    let present = write_frame(
-        daemon.dir.path(),
-        r#"{"kind":"DiskChanged","value":{"File":{"path":"/tmp/proj/src/a.ts","presence":{"Present":"export const a = 1;\n"}}}}"#,
+    let path = source_path(daemon.reference(), "src/a.ts");
+    send_json(
+        daemon.reference(),
+        present(path.reference(), "export const a = 1;\n"),
     );
-    let sent = daemon.isograph(["send", "--file", present.to_str().expect("utf-8")].reference());
-    assert!(
-        sent.status.success(),
-        "stdout: {} stderr: {}",
-        stdout(sent.reference()),
-        stderr(sent.reference())
+    let folder = source_path(daemon.reference(), "src");
+    send_json(
+        daemon.reference(),
+        serde_json::json!({
+            "kind": "DiskChanged",
+            "value": { "FolderRemoved": { "path": folder } }
+        }),
     );
-    let removed = write_frame(
-        daemon.dir.path(),
-        r#"{"kind":"DiskChanged","value":{"FolderRemoved":{"path":"/tmp/proj/src"}}}"#,
-    );
-    let sent = daemon.isograph(["send", "--file", removed.to_str().expect("utf-8")].reference());
-    assert!(
-        sent.status.success(),
-        "stdout: {} stderr: {}",
-        stdout(sent.reference()),
-        stderr(sent.reference())
-    );
-    assert!(!removed.exists(), "send deletes --file");
 }
 
 #[test]
