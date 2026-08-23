@@ -572,6 +572,7 @@ dependencies = [
  "clap",
  "common_lang_types",
  "crossbeam",
+ "derive_more",
  "freddie_cli",
  "freddie_single_instance",
  "intern",

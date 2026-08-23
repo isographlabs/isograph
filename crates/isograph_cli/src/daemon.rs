@@ -124,6 +124,12 @@ pub fn perform(effect: IsographEffect) -> ControlFlow<()> {
             tracing::info!("kill: exiting");
             ControlFlow::Break(())
         }
+        IsographEffect::SendLspResponse(respond) => {
+            let _ = respond
+                .reply
+                .send(lsp_server::Message::Response(respond.response));
+            ControlFlow::Continue(())
+        }
     }
 }
 
@@ -151,7 +157,7 @@ mod tests {
         )
         .await;
         let effect = effect_rx.recv().await.expect("handle sent one effect");
-        assert_eq!(effect, IsographEffect::LogHelloWorld);
+        assert!(matches!(effect, IsographEffect::LogHelloWorld));
     }
 
     #[tokio::test]
@@ -169,7 +175,7 @@ mod tests {
         )
         .await;
         let effect = effect_rx.recv().await.expect("handle sent one effect");
-        assert_eq!(effect, IsographEffect::Kill);
+        assert!(matches!(effect, IsographEffect::Kill));
     }
 
     #[tokio::test]

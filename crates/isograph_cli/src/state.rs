@@ -25,7 +25,31 @@ pub fn handle<THostLanguage: HostLanguage>(
             handle_disk_changed(state, change);
             Vec::new()
         }
+        IsographEvent::LspRequest(request) => method_not_found(request).wrap_vec(),
     }
+}
+
+fn method_not_found(request: crate::event::LspRequest) -> IsographEffect {
+    let id = request.request.id.clone();
+    IsographEffect::SendLspResponse(
+        crate::effect::SendLspResponse {
+            reply: request.reply,
+            response: lsp_server::Response {
+                id,
+                result: None,
+                error: lsp_server::ResponseError {
+                    code: lsp_server::ErrorCode::MethodNotFound as i32,
+                    data: None,
+                    message: format!(
+                        "No handler registered for method '{}'",
+                        request.request.method
+                    ),
+                }
+                .wrap_some(),
+            },
+        }
+        .boxed(),
+    )
 }
 
 pub(crate) fn intern_config_directory(
@@ -108,14 +132,17 @@ mod tests {
     fn hello_world_returns_log_hello_world() {
         let mut state = IsographState::<TypeScriptHostLanguage>::default();
         let effects = handle(&mut state, IsographEvent::HelloWorld);
-        assert_eq!(effects, IsographEffect::LogHelloWorld.wrap_vec());
+        assert!(matches!(
+            effects.as_slice(),
+            [IsographEffect::LogHelloWorld]
+        ));
     }
 
     #[test]
     fn quit_returns_kill() {
         let mut state = IsographState::<TypeScriptHostLanguage>::default();
         let effects = handle(&mut state, IsographEvent::Quit);
-        assert_eq!(effects, IsographEffect::Kill.wrap_vec());
+        assert!(matches!(effects.as_slice(), [IsographEffect::Kill]));
     }
 
     #[test]
@@ -128,7 +155,7 @@ mod tests {
                 presence: Presence::Present("export const a = 1;\n".to_owned()),
             }),
         );
-        assert_eq!(effects, Vec::new());
+        assert!(effects.is_empty());
         assert_eq!(
             contents(state.reference(), interned("src/a.ts")),
             "export const a = 1;\n".wrap_some()
@@ -145,7 +172,7 @@ mod tests {
                 presence: Presence::Present("outside".to_owned()),
             }),
         );
-        assert_eq!(effects, Vec::new());
+        assert!(effects.is_empty());
         assert_eq!(
             contents(state.reference(), interned("../other/a.ts")),
             "outside".wrap_some()
@@ -169,8 +196,60 @@ mod tests {
                 presence: Presence::Absent,
             }),
         );
-        assert_eq!(effects, Vec::new());
+        assert!(effects.is_empty());
         assert!(contents(state.reference(), interned("src/a.ts")).is_none());
+    }
+
+    #[test]
+    fn lsp_request_returns_method_not_found() {
+        let mut state = IsographState::<TypeScriptHostLanguage>::default();
+        let (reply, rx) = crossbeam::channel::unbounded();
+        let id = lsp_server::RequestId::from(1);
+        let effects = handle(
+            &mut state,
+            crate::event::LspRequest {
+                request: lsp_server::Request {
+                    id: id.clone(),
+                    method: "textDocument/hover".to_owned(),
+                    params: serde_json::json!({}),
+                },
+                reply,
+            }
+            .to(),
+        );
+        assert_eq!(effects.len(), 1);
+        let effect = effects
+            .into_iter()
+            .next()
+            .expect("handle returned one effect");
+        let crate::effect::IsographEffect::SendLspResponse(send) = effect else {
+            panic!("handle of LspRequest returns SendLspResponse");
+        };
+        assert_eq!(send.response.id, id);
+        assert!(send.response.result.is_none());
+        let error = send
+            .response
+            .error
+            .as_ref()
+            .expect("MethodNotFound is an error");
+        assert_eq!(error.code, lsp_server::ErrorCode::MethodNotFound as i32);
+        assert_eq!(
+            error.message,
+            "No handler registered for method 'textDocument/hover'"
+        );
+        let _ = crate::daemon::perform(crate::effect::IsographEffect::SendLspResponse(send));
+        let lsp_server::Message::Response(response) = rx.recv().expect("perform sends on reply")
+        else {
+            panic!("perform sends Message::Response");
+        };
+        assert_eq!(response.id, id);
+        assert!(response.result.is_none());
+        let error = response.error.as_ref().expect("MethodNotFound is an error");
+        assert_eq!(error.code, lsp_server::ErrorCode::MethodNotFound as i32);
+        assert_eq!(
+            error.message,
+            "No handler registered for method 'textDocument/hover'"
+        );
     }
 
     #[test]

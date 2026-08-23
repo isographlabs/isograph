@@ -106,7 +106,9 @@ fn respond(
     reply: crossbeam::channel::Sender<lsp_server::Message>,
     response: lsp_server::Response,
 ) -> crate::effect::IsographEffect {
-    crate::effect::IsographEffect::SendLspResponse(crate::effect::SendLspResponse { reply, response })
+    crate::effect::IsographEffect::SendLspResponse(
+        crate::effect::SendLspResponse { reply, response }.boxed(),
+    )
 }
 ```
 

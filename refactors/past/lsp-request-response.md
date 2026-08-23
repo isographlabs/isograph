@@ -22,12 +22,15 @@ Most important first.
 
 ```rust
 // from crates/isograph_cli/src/event.rs
-pub(crate) struct LspRequest {
+use lsp_server::Message;
+
+#[derive(Clone, Debug)]
+pub struct LspRequest {
     pub request: lsp_server::Request,
-    pub reply: crossbeam::channel::Sender<lsp_server::Message>,
+    pub reply: crossbeam::channel::Sender<Message>,
 }
 
-#[derive(Debug, serde::Deserialize, serde::Serialize, derive_more::From)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize, derive_more::From)]
 #[serde(tag = "kind", content = "value")]
 pub enum IsographEvent {
     HelloWorld,
@@ -39,6 +42,8 @@ pub enum IsographEvent {
 }
 ```
 
+`LspRequest` is `pub`: it is a payload of `pub enum IsographEvent` (E0446 otherwise).
+
 `--file` JSON is unchanged. `LspRequest` is not a wire kind. No `PartialEq` / `Eq` on `IsographEvent`. `Sender` does not implement them. Do not add a tests-only impl. Tests use `matches!` or compare `DiskChanged` fields.
 
 `reply` is `connection.sender.clone()`. Request id is `request.id`. Do not duplicate it as a field.
@@ -47,8 +52,11 @@ pub enum IsographEvent {
 
 ```rust
 // from crates/isograph_cli/src/effect.rs
-pub(crate) struct SendLspResponse {
-    pub reply: crossbeam::channel::Sender<lsp_server::Message>,
+use lsp_server::Message;
+
+#[derive(Debug)]
+pub struct SendLspResponse {
+    pub reply: crossbeam::channel::Sender<Message>,
     pub response: lsp_server::Response,
 }
 
@@ -56,9 +64,11 @@ pub(crate) struct SendLspResponse {
 pub enum IsographEffect {
     LogHelloWorld,
     Kill,
-    SendLspResponse(SendLspResponse),
+    SendLspResponse(Box<SendLspResponse>),
 }
 ```
+
+`SendLspResponse` is `pub`: it is a payload of `pub enum IsographEffect`. The variant is `Box`: clippy `large_enum_variant`. Construction is `.boxed()`.
 
 No `PartialEq` / `Eq`. Nothing in production compares effects. `Sender` does not implement them. Do not add a tests-only impl. Existing `assert_eq` on `LogHelloWorld` / `Kill` become `matches!`. Empty effects: `effects.is_empty()`.
 
@@ -70,22 +80,25 @@ No `PartialEq` / `Eq`. Nothing in production compares effects. `Sender` does not
 
 fn method_not_found(request: crate::event::LspRequest) -> IsographEffect {
     let id = request.request.id.clone();
-    IsographEffect::SendLspResponse(crate::effect::SendLspResponse {
-        reply: request.reply,
-        response: lsp_server::Response {
-            id,
-            result: None,
-            error: lsp_server::ResponseError {
-                code: lsp_server::ErrorCode::MethodNotFound as i32,
-                data: None,
-                message: format!(
-                    "No handler registered for method '{}'",
-                    request.request.method
-                ),
-            }
-            .wrap_some(),
-        },
-    })
+    IsographEffect::SendLspResponse(
+        crate::effect::SendLspResponse {
+            reply: request.reply,
+            response: lsp_server::Response {
+                id,
+                result: None,
+                error: lsp_server::ResponseError {
+                    code: lsp_server::ErrorCode::MethodNotFound as i32,
+                    data: None,
+                    message: format!(
+                        "No handler registered for method '{}'",
+                        request.request.method
+                    ),
+                }
+                .wrap_some(),
+            },
+        }
+        .boxed(),
+    )
 }
 ```
 
@@ -134,6 +147,8 @@ derive_more = { workspace = true }
 ## Tests
 
 `lsp_socket.rs`: existing MethodNotFound / shutdown / ServerNotInitialized / HelloWorld tests stay. `ServerNotInitialized` is still `Connection::initialize`.
+
+MethodNotFound after initialize goes through `handle` and `perform`. Those tests run the event and effect loops (`listen_and_reply`). `IsographState` is not `Send`, so the loops run on a std thread with a current-thread runtime. Ingest-only tests keep `listen_for_events` and do not run `handle`: `DiskChanged` panics without a cwd. `listen_and_reply` tees non-`LspRequest` events to the test channel.
 
 Add: initialize, hover, `MethodNotFound`, then `isograph/event` HelloWorld on the same connection arrives.
 

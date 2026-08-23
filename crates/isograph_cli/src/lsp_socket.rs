@@ -149,22 +149,13 @@ fn run_session(
     for message in &connection.receiver {
         match message {
             lsp_server::Message::Request(request) => {
-                let _ =
-                    connection
-                        .sender
-                        .send(lsp_server::Message::Response(lsp_server::Response {
-                            id: request.id,
-                            result: None,
-                            error: lsp_server::ResponseError {
-                                code: lsp_server::ErrorCode::MethodNotFound as i32,
-                                data: None,
-                                message: format!(
-                                    "No handler registered for method '{}'",
-                                    request.method
-                                ),
-                            }
-                            .wrap_some(),
-                        }));
+                let _ = event_tx.send(
+                    crate::event::LspRequest {
+                        request,
+                        reply: connection.sender.clone(),
+                    }
+                    .to(),
+                );
             }
             lsp_server::Message::Notification(notification)
                 if notification.method == IsographEventNotification::METHOD =>
@@ -195,8 +186,11 @@ mod tests {
     use tokio::sync::mpsc::{UnboundedReceiver, unbounded_channel};
 
     use super::{IsographEventNotification, accept_loop};
+    use crate::daemon::{run_effect_loop, run_event_loop};
     use crate::event::{DiskChanged, IsographEvent, Presence};
     use crate::send::notify;
+    use crate::state::IsographState;
+    use isograph_extract_typescript::TypeScriptHostLanguage;
 
     const SETTLE: Duration = Duration::from_millis(250);
 
@@ -214,6 +208,47 @@ mod tests {
         tokio::spawn(accept_loop(listener, event_tx));
         tokio::time::sleep(SETTLE).await;
         (port, event_rx)
+    }
+
+    async fn listen_and_reply() -> (u16, UnboundedReceiver<IsographEvent>) {
+        let listener = tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
+            .await
+            .expect("binding port 0");
+        let port = listener
+            .local_addr()
+            .expect("the listener has an address")
+            .port();
+        let (session_tx, mut session_rx) = unbounded_channel();
+        let (test_tx, test_rx) = unbounded_channel();
+        let (loop_tx, loop_rx) = unbounded_channel();
+        let (effect_tx, effect_rx) = unbounded_channel();
+        tokio::spawn(accept_loop(listener, session_tx));
+        tokio::spawn(async move {
+            while let Some(event) = session_rx.recv().await {
+                if !matches!(event, IsographEvent::LspRequest(_)) {
+                    let _ = test_tx.send(event.clone());
+                }
+                let _ = loop_tx.send(event);
+            }
+        });
+        std::thread::spawn(move || {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("a test can start a tokio runtime");
+            runtime.block_on(async {
+                tokio::select! {
+                    () = run_event_loop(
+                        IsographState::<TypeScriptHostLanguage>::default(),
+                        loop_rx,
+                        effect_tx,
+                    ) => {}
+                    () = run_effect_loop(effect_rx) => {}
+                }
+            });
+        });
+        tokio::time::sleep(SETTLE).await;
+        (port, test_rx)
     }
 
     fn connect(port: u16) -> TcpStream {
@@ -289,12 +324,16 @@ mod tests {
         )
         .expect("notify present returns");
         tokio::time::sleep(SETTLE).await;
+        let IsographEvent::DiskChanged(present) = event_rx.try_recv().expect("present arrived")
+        else {
+            panic!("present is DiskChanged");
+        };
         assert_eq!(
-            event_rx.try_recv().expect("present arrived"),
-            IsographEvent::DiskChanged(DiskChanged {
+            present,
+            DiskChanged {
                 path: PathBuf::from("/tmp/proj/src/a.ts"),
                 presence: Presence::Present("export const a = 1;\n".to_owned()),
-            })
+            }
         );
         notify(
             connect(port),
@@ -305,12 +344,16 @@ mod tests {
         )
         .expect("notify absent returns");
         tokio::time::sleep(SETTLE).await;
+        let IsographEvent::DiskChanged(absent) = event_rx.try_recv().expect("absent arrived")
+        else {
+            panic!("absent is DiskChanged");
+        };
         assert_eq!(
-            event_rx.try_recv().expect("absent arrived"),
-            IsographEvent::DiskChanged(DiskChanged {
+            absent,
+            DiskChanged {
                 path: PathBuf::from("/tmp/proj/src/a.ts"),
                 presence: Presence::Absent,
-            })
+            }
         );
     }
 
@@ -356,7 +399,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn unknown_request_after_initialize_is_method_not_found_then_hello_world() {
-        let (port, mut event_rx) = listen_for_events().await;
+        let (port, mut event_rx) = listen_and_reply().await;
         let stream = connect(port);
         let (mut writer, mut reader) = split(stream);
         initialize(&mut writer, &mut reader);
@@ -385,7 +428,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn shutdown_is_method_not_found_and_does_not_quit() {
-        let (port, mut event_rx) = listen_for_events().await;
+        let (port, mut event_rx) = listen_and_reply().await;
         let stream = connect(port);
         let (mut writer, mut reader) = split(stream);
         initialize(&mut writer, &mut reader);

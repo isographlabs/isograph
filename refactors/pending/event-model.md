@@ -16,7 +16,7 @@ Requires config-discovery.md (landed), the event-model design-doc, and `docs-web
 10. file-semantic-tokens.md (landed). Path to encoded tokens. Interned-file tests. Not the daemon.
 11. lsp-semantic-token-encoding.md (landed). Encoder only.
 12. lsp-port.md (landed). The `{slug}.port` TCP listener is LSP. Each TCP connection is one client and one `session`. `isograph/event` params are the `--file` JSON; the session deserializes them and posts that `IsographEvent`. `handle` is unchanged. `isograph send` does the handshake then that notification. Requests other than initialize are `MethodNotFound` on that connection. `Kill` unlinks the port file then `process::exit(0)`.
-13. lsp-request-response.md. Session posts `IsographEvent::LspRequest` (request, `connection.sender` clone). `handle` returns `SendLspResponse`. Effect loop writes the `Response`. No client id. No outstanding set.
+13. lsp-request-response.md (landed). Session posts `IsographEvent::LspRequest` (request, `connection.sender` clone). `handle` returns `SendLspResponse`. Effect loop writes the `Response`. No client id. No outstanding set.
 14. lsp-dispatch.md. Later. isograph `on_request_sync` chain in `handle`. Continue is `method_not_found`.
 15. lsp-tokens.md. Later. `.on_request_sync::<SemanticTokensFullRequest>`. Advertise the legend on `initialize`. Independent of sessions.
 16. lsp-outstanding.md. Later. `LspClientId`, `LspClientGone`, outstanding `(LspClientId, RequestId)`. For disconnect/cancel/async, not for highlighting.
