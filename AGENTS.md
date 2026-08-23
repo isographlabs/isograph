@@ -94,6 +94,16 @@ A regular file does not become readable through `epoll`/`kqueue` when it grows. 
 
 Absence has no edge of its own. Inject a later event that will fire, wait for that, and assert the forbidden thing did not arrive first.
 
+## Shared state and interior mutability
+
+`Arc`, `Rc`, `Mutex`, `RwLock`, `Cell`, `RefCell`, `OnceCell`/`OnceLock`, `lazy_static`, `thread_local!`, and atomics are almost always the wrong reach. `handle` is a pure function of `IsographState` and event on one thread; the state lives in one place, and a caller that wants a value already holds it. A primitive that shares or mutates through a lock is papering over a design that put the value in the wrong place. Question whether it is needed, default to the version that does not need it, and raise it with the user every time before it goes into a planning doc or into code. Name the primitive, what it is sharing, and why the non-shared version does not work.
+
+The preferred way to move data between threads is a channel whose sender is freely `Send` and cloneable while the receiver stays pinned to one thread. Sending an event to the worker that owns `IsographState` beats reaching into that state across a lock. If a design reaches for `Arc<Mutex<_>>`, the first question is what channel would carry that data instead.
+
+Ambient state the program itself owns belongs on `IsographState` or a local on the task that owns it, not in a `static` or a `thread_local!`. A process-wide counter, a next-id source, anything `handle` reads or advances: make it a field and thread it to where it is used, so the value it hands out is a function of state. A `static NEXT: AtomicU64` is the shape to avoid: it is ambient, it makes the `handle` that reads it impure, and it is usually `Sync` only to satisfy `static` rather than because two threads touch it.
+
+This is distinct from state the outside world owns. Disk files and editor buffers arrive as events (`DiskChanged`, `EditorChanged`); they are external truth mirrored into the database, not ambient state the program invented. The test is who mints the value. If the program mints it, it is a field on state. If the OS or the editor owns it, it arrives as an event.
+
 ## Booleans
 
 Prefer an enum whose variants name the states. A `bool` field, parameter, or return type: question whether it is needed, default to the enum, and raise it with the user every time before it goes into a planning doc or into code. Name the `bool` and the two cases. Fall back to `bool` only when the value is a pure yes/no with no domain names.
