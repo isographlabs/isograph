@@ -1,14 +1,16 @@
-# Windows `stop` without `--force` sends `Quit` on the socket
+# Windows `stop` without `--force` asks the app to quit
 
 Requires start-returns-when-listening.md (landed).
 
-Freddie `stop` / `restart` without `--force` is SIGTERM. `signal_pid` on Windows returns `graceful stop is not yet available on Windows; use --force`. The daemon already turns `Internal::Quit` into `Kill` from the socket. `isograph send` already posts that frame. Unix stays SIGTERM. Windows graceful stop is that same `Quit` frame, in-process, not a subprocess and not a temp `--file`.
+Freddie `stop` / `restart` without `--force` is SIGTERM. On Windows, `signal_pid(Terminate)` returns `graceful stop is not yet available on Windows; use --force`. `stop` and `restart` are freddie verbs: find the pid, subscribe to lock release, ask, wait. An isograph intercept of those verbs duplicates that and fights `init_client_logging` on restart.
 
-`--force` stays freddie: `taskkill /F` on Windows, SIGKILL on unix. `Daemon` drop stays `stop --force`.
+The app-specific piece is how to ask. Unix stays SIGTERM. Windows calls `App::ask_to_quit`. Isograph's impl is `send::notify` of `Internal::Quit` on the port next to the lock, the same frame `isograph send --file '{"kind":"Quit"}'` already posts. No temp file. No subprocess.
 
-Do not bump freddie. Do not add a Windows SIGTERM analog. Do not add a bool. `--force` is clap's existing flag on `StopArgs` / `RestartArgs`; this slice matches it.
+`--force` stays SIGKILL / `taskkill /F`. `Daemon` drop stays `stop --force`. Mercury keeps the default `None`.
 
-One shippable change.
+Two shippable changes. Freddie first, then isograph bumps the rev. Same git rev for `freddie_cli` and `freddie_single_instance`, as today.
+
+Do not add a bool. `--force` is clap's existing flag.
 
 ## What the user does
 
@@ -25,259 +27,224 @@ Windows, no `--force`. The log has `kill: exiting`. It does not have `SIGTERM: q
 
 ```
 $ isograph restart --filesystem injected
+C:\Users\x\app\isograph.config.json stopped (pid 4100)
 C:\Users\x\app\isograph.config.json started (pid 4101)
 ```
 
-Exits 0. The old process is gone. The new port accepts. Unix still prints `stopped` then `started`; Windows restart prints `started` only. The daemon log of the old process has `kill: exiting`.
+Same two lines as unix. The old process is gone. The new port accepts.
 
 A daemon that is not running: `stop` exits 0 and prints `is not running`, same as unix.
 
-A daemon that does not answer the port: `stop` without `--force` exits 1 and says to use `--force`. `--force` still destroys it.
+A daemon that does not answer the port: `stop` without `--force` exits 1, `could not signal pid N: ...`. `--force` still destroys it.
 
-Unix `stop` / `restart` without `--force` is unchanged (SIGTERM).
+Unix `stop` / `restart` without `--force` is unchanged (SIGTERM). `isograph` still implements `ask_to_quit`; freddie does not call it on unix.
 
-## Types
+Mercury on Windows without `--force` still prints today's error: the default is `None`, and freddie maps that to the same string `signal_pid(Terminate)` returns today.
 
-Most important first.
+## Change 1: `App::ask_to_quit` in freddie
+
+Lands in `github.com/freddiehg/freddie`. Origin: `crates/freddie_cli/src/lib.rs` `App`, `crates/freddie_cli/src/client.rs` `stop_daemon` / `signal_pid` / `stop` / `restart`. Delta: Windows `Terminate` calls the app instead of returning that error from `signal_pid`.
+
+### Trait
 
 ```rust
-// from crates/isograph_cli/src/stop.rs
-use std::process::ExitCode;
-use std::sync::mpsc;
-use std::thread;
-use std::time::Duration;
+// from crates/freddie_cli/src/lib.rs (freddie)
+    fn run_daemon(id: &Self::Id, args: &Self::DaemonArgs);
 
-use clap::error::ErrorKind;
-use freddie_cli::{App, Instance};
-use freddie_single_instance::{Held, LockError, Pid};
-use isograph_compiler::HostLanguage;
-use prelude::Postfix;
-use thiserror::Error;
-
-use crate::Isograph;
-use crate::event::Internal;
-use crate::send::{SendError, notify};
-
-const STOP_TIMEOUT: Duration = Duration::from_secs(5);
-
-pub(crate) enum GracefulStop {
-    Stopped(Pid),
-    NotRunning,
-}
-
-#[derive(Debug, Error)]
-pub(crate) enum StopError {
-    #[error("{0}")]
-    Lock(#[from] LockError),
-    #[error(
-        "something holds the lock but recorded no pid; --force destroys it"
-    )]
-    Unnamed,
-    #[error("{0}; --force destroys it")]
-    Port(#[from] crate::discover::PortError),
-    #[error("{0}; --force destroys it")]
-    Notify(SendError),
-    #[error("pid {0} still holds the lock; --force destroys it")]
-    Ignored(Pid),
-}
+    /// Ask the running daemon to quit, on platforms that have no SIGTERM.
+    ///
+    /// [`stop`](Verb::Stop) without `--force` is SIGTERM on unix. Windows has none: `taskkill`
+    /// without `/F` posts `WM_CLOSE`, which a daemon with no window never sees. This is that
+    /// ask. Freddie still finds the pid, still waits on the lock, still prints `stopped`.
+    ///
+    /// Takes [`Instance`], not [`Id`](Self::Id). `stop` has already resolved the daemon; a
+    /// second [`instance`](Self::instance) would rediscover it.
+    ///
+    /// `None` if this app has no ask. `Some` is the attempt: `Ok` posted it, `Err` tried
+    /// and could not. The default is `None`. Unix never calls this.
+    fn ask_to_quit(
+        _instance: &Instance,
+    ) -> Option<Result<(), Box<dyn std::error::Error + Send + Sync>>> {
+        None
+    }
 ```
 
-`GracefulStop` is whether there was a process. Not a bool. `Stopped` is `Held::By`. `NotRunning` is `Held::Free`. `Unnamed` is an error, same as freddie: a graceful stop needs a running daemon that can take `Quit`.
+Not `windows_soft_quit`. Freddie already says "asking it to quit" on `StopArgs`. The call site is Windows; the method is the ask. Mercury can implement it later without the name being wrong.
 
-`StopError` does not `From<SendError>`: `notify` is the only `SendError` source, and `SendError` also has `NotRunning` / `ReadFile` / `NotEvent` which this function does not produce. Map with `StopError::Notify`.
+`None` is no implementation, not a successful no-op. `Result<Option<()>, _>` would make `Ok(None)` look like the ask succeeded at doing nothing. Freddie maps `None` to `graceful stop is not yet available on Windows; use --force`. `Some(Err)` is an app that has an ask and failed it (`could not signal pid N: ...`). Mercury and `TestApp` keep the default.
 
-`STOP_TIMEOUT` is freddie `client.rs` `STOP_TIMEOUT`.
-
-### `quit_and_await_free`
+### `stop_daemon` is generic and Windows `Terminate` calls the app
 
 ```rust
-// from crates/isograph_cli/src/stop.rs
-pub(crate) fn quit_and_await_free(instance: &Instance) -> Result<GracefulStop, StopError> {
-    let pid = match freddie_single_instance::holder_at(instance.lock_file())? {
-        Held::Free => return GracefulStop::NotRunning.wrap_ok(),
-        Held::Unnamed => return StopError::Unnamed.wrap_err(),
-        Held::By(pid) => pid,
+// from crates/freddie_cli/src/client.rs (freddie)
+fn stop_daemon<TApp: App>(instance: &Instance, signal: Signal) -> Result<Option<Pid>, Failure> {
+    let pid = match find_daemon(instance) {
+        Ok(Target::Running(pid)) => pid,
+        Ok(Target::NotRunning) => return None.wrap_ok(),
+        Ok(Target::Anonymous) => {
+            debug!("the lock is held by a holder that recorded no pid");
+            return Failure::Anonymous(instance.lock_file().to_owned()).wrap_err();
+        }
+        Err(error) => {
+            debug!(%error, "could not read the lock");
+            return Failure::Unreadable(error).wrap_err();
+        }
     };
-    let lock = instance.lock_file().to_owned();
-    let (tx, rx) = mpsc::channel();
-    thread::spawn(move || {
-        let _ = tx.send(freddie_single_instance::await_free_at(&lock));
-    });
-    let stream =
-        crate::discover::connect_to_daemon(&crate::discover::port_file(instance.lock_file()))?;
-    notify(stream, Internal::Quit).map_err(StopError::Notify)?;
-    match rx.recv_timeout(STOP_TIMEOUT) {
-        Ok(Ok(())) => GracefulStop::Stopped(pid).wrap_ok(),
-        Ok(Err(e)) => e.to(),
-        Err(_) => StopError::Ignored(pid).wrap_err(),
+    // Before the ask, so the wait cannot miss a daemon that exits between the two.
+    let freed = watch_for_free(instance);
+    debug!(daemon = %pid, ?signal, "signalling the daemon");
+    if let Err(error) = deliver::<TApp>(instance, pid, signal) {
+        debug!(daemon = %pid, %error, "could not signal the daemon");
+        return Failure::Unsignalable(SignalFailure { pid, error }).wrap_err();
+    }
+    if matches!(freed.recv_timeout(STOP_TIMEOUT), Ok(Ok(()))) {
+        debug!(daemon = %pid, "the daemon released the lock");
+        pid.wrap_some().wrap_ok()
+    } else {
+        debug!(daemon = %pid, ?signal, timeout = ?STOP_TIMEOUT, "the daemon still holds the lock");
+        Failure::Ignored(SignalIgnored { pid, signal }).wrap_err()
     }
 }
-```
 
-Subscribe (`await_free_at` on a thread) then produce (`notify` `Quit`). A subscribe after `notify` can miss the free. `await_free_at` parks on flock. The timeout is `recv_timeout` on that thread, the same shape as freddie `watch_for_free`. Abandoning the thread on connect/`notify` failure is what freddie does when `signal_pid` fails.
-
-Do not write a frame file. Do not call `send::run`. Do not spawn `isograph send`. `notify` is the handshake plus `isograph/event` with params `{"kind":"Quit"}`.
-
-`Internal::Quit` already reaches `handle` from the socket. `handle` returns `Kill`. `perform` logs `kill: exiting`. `process::exit(0)` unlinks the port file and drops the lock. No new daemon event.
-
-### `run` is the `stop` verb on Windows without `--force`
-
-```rust
-// from crates/isograph_cli/src/stop.rs
-pub(crate) fn run<THostLanguage: HostLanguage>(
-    args: &freddie_cli::StopArgs<crate::ConfigFlag>,
-) -> ExitCode {
-    let instance = match Isograph::<THostLanguage>::instance(&args.id) {
-        Ok(instance) => instance,
-        Err(e) => clap::Error::raw(ErrorKind::ValueValidation, format!("{e}\n")).exit(),
-    };
-    freddie_cli::init_client_logging(&instance);
-    match quit_and_await_free(&instance) {
-        Ok(GracefulStop::Stopped(pid)) => {
-            tracing::info!("{} stopped (pid {pid})", instance.display_name());
-            ExitCode::SUCCESS
-        }
-        Ok(GracefulStop::NotRunning) => {
-            tracing::info!("{} is not running", instance.display_name());
-            ExitCode::SUCCESS
-        }
-        Err(e) => {
-            tracing::warn!("{}: {e}", instance.display_name());
-            ExitCode::FAILURE
+fn deliver<TApp: App>(instance: &Instance, pid: Pid, signal: Signal) -> io::Result<()> {
+    match signal {
+        Signal::Kill => signal_pid(pid, Signal::Kill),
+        Signal::Terminate => {
+            #[cfg(unix)]
+            {
+                signal_pid(pid, Signal::Terminate)
+            }
+            #[cfg(windows)]
+            {
+                match TApp::ask_to_quit(instance) {
+                    None => io::Error::other(
+                        "graceful stop is not yet available on Windows; use --force",
+                    )
+                    .wrap_err(),
+                    Some(Ok(())) => ().wrap_ok(),
+                    Some(Err(e)) => io::Error::other(e).wrap_err(),
+                }
+            }
         }
     }
 }
 ```
 
-`init_client_logging` is the public hook freddie documents for app verbs. `info!` is stdout, `warn!` is stderr, same as freddie `stop`. Do not `init_client_logging` from `start.rs`: a second `run_lifecycle_verb` would panic on a second subscriber.
+`None` and `Some(Err)` both become `Failure::Unsignalable`. `None` uses today's string. `Some(Err)` uses the app's error. `Failure::Unsignalable` still prints `could not signal pid {pid}: {error}`.
 
-`ExitCode` is not `Eq`. This function constructs `SUCCESS` / `FAILURE`. Callers of `quit_and_await_free` match `Result`.
+`stop` and `restart` already choose `Signal` from `force`. They pass `TApp` through. `stop` is not generic today; `restart` already is.
 
-`ConfigFlag` stays in `lib.rs`. `StopArgs` fields are `pub`. `stop.rs` is `#[cfg(windows)]` only.
+```rust
+// from crates/freddie_cli/src/client.rs (freddie)
+pub(crate) fn stop<TApp: App>(instance: &Instance, force: bool) -> ExitCode {
+```
 
-## Dispatch
+```rust
+// from crates/freddie_cli/src/client.rs (freddie)
+    match stop_daemon::<TApp>(instance, signal) {
+```
+
+in both `stop` and `restart`.
+
+```rust
+// from crates/freddie_cli/src/lib.rs (freddie)
+        Verb::Stop(args) => client::stop::<TApp>(instance, args.force),
+```
+
+### Windows `signal_pid` is Kill only
+
+```rust
+// from crates/freddie_cli/src/client.rs (freddie)
+#[cfg(windows)]
+fn signal_pid(pid: Pid, signal: Signal) -> io::Result<()> {
+    match signal {
+        // `taskkill /F` terminates the process, which is SIGKILL. `taskkill` without it posts
+        // WM_CLOSE, which a daemon with no window never sees, so there is no gentle taskkill.
+        Signal::Kill => ran(Command::new("taskkill")
+            .args(["/F", "/PID"])
+            .arg(pid.to_string())),
+        Signal::Terminate => {
+            unreachable!("Windows Terminate is App::ask_to_quit, not signal_pid")
+        }
+    }
+}
+```
+
+`deliver` never passes `Terminate` to `signal_pid` on Windows. The arm is the type of `Signal` remaining exhaustive. `unreachable!` is the invariant `deliver` already established: `Terminate` on Windows does not enter `signal_pid`. Name that in the string.
+
+Unix `signal_pid` is unchanged.
+
+Subscribe then ask is unchanged: `watch_for_free` before `deliver`.
+
+## Change 2: isograph implements `ask_to_quit`
+
+Bump both freddie git deps to the change-1 rev.
 
 ```rust
 // from crates/isograph_cli/src/lib.rs
-mod send;
-mod start;
-#[cfg(windows)]
-mod stop;
-mod state;
-mod watch;
+impl<THostLanguage: HostLanguage> App for Isograph<THostLanguage> {
+    type Id = ConfigFlag;
+    type DaemonArgs = IsographArgs;
 
-pub fn run<THostLanguage: HostLanguage>() -> ExitCode {
-    // First, so `--help` prints and a bad flag exits before the lock is taken.
-    // The matches are kept beside the parse because `run_lifecycle_verb` reads what was written
-    // from them, to forward to the daemon it spawns.
-    let matches = Cli::<THostLanguage>::command().get_matches();
-    let cli = Cli::<THostLanguage>::from_arg_matches(matches.reference())
-        .expect("the derived type matches the command it derived");
+    const NAME: &'static str = "isograph";
 
-    match cli.verb {
-        Some(CliVerb::Lifecycle(verb)) => match verb {
-            freddie_cli::Verb::Start(_) | freddie_cli::Verb::Restart(_) => {
-                crate::start::run::<THostLanguage>(verb, matches.reference())
-            }
-            #[cfg(windows)]
-            freddie_cli::Verb::Stop(ref args) if !args.force => {
-                crate::stop::run::<THostLanguage>(args)
-            }
-            verb => freddie_cli::run_lifecycle_verb::<Isograph<THostLanguage>>(
-                verb,
-                matches.reference(),
-            ),
-        },
-        Some(CliVerb::Send(args)) => send::run(args.reference()),
-        Some(CliVerb::ConfigPath(id)) => config_path::run(id.reference()),
-        Some(CliVerb::Lsp(args)) => lsp_stdio::run(args.reference()),
-        None => crate::start::run::<THostLanguage>(
-            freddie_cli::verb_for_bare_invocation::<Isograph<THostLanguage>>(),
-            matches.reference(),
-        ),
+    fn instance(id: &ConfigFlag) -> Result<Instance, Box<dyn std::error::Error + Send + Sync>> {
+        let (_, instance, _) = discover::config_and_instance(id.config.as_deref())?;
+        instance.wrap_ok()
     }
-}
-```
 
-`args.force` is freddie's clap flag, not a new field. Without `--force` is this slice. With `--force` falls through to freddie (`taskkill /F`). Unix has no `Stop` arm here.
-
-### Restart without `--force` on Windows becomes Start after `Quit`
-
-`TypedArgs::of` reads `matches.subcommand()`, not the `Verb` variant. `isograph restart --filesystem injected` still forwards `--filesystem` if the verb we pass to `run_lifecycle_verb` is `Start`. Passing `Verb::Restart` after `Quit` would SIGTERM the new nothing and fail. Convert to `Start`.
-
-```rust
-// from crates/isograph_cli/src/start.rs
-use clap::ArgMatches;
-use clap::error::ErrorKind;
-use freddie_cli::{App, StartArgs, Verb};
-use isograph_compiler::HostLanguage;
-use prelude::Postfix;
-
-use crate::Isograph;
-use crate::discover;
-
-#[expect(clippy::print_stderr)]
-pub fn run<THostLanguage: HostLanguage>(
-    verb: Verb<Isograph<THostLanguage>>,
-    matches: &ArgMatches,
-) -> ExitCode {
-    let id = match &verb {
-        Verb::Start(args) => &args.id,
-        Verb::Restart(args) => &args.id,
-        _ => {
-            return freddie_cli::run_lifecycle_verb::<Isograph<THostLanguage>>(verb, matches);
-        }
-    };
-    let instance = match Isograph::<THostLanguage>::instance(id) {
-        Ok(instance) => instance,
-        Err(e) => clap::Error::raw(ErrorKind::ValueValidation, format!("{e}\n")).exit(),
-    };
-    let verb = match verb {
-        #[cfg(windows)]
-        Verb::Restart(args) if !args.force => match crate::stop::quit_and_await_free(&instance) {
-            Ok(_) => Verb::Start(StartArgs {
-                id: args.id,
-                app: args.app,
-            }),
+    fn run_daemon(id: &ConfigFlag, args: &IsographArgs) {
+        let (path, instance) = match discover::instance_for_config_path(id.config.as_deref()) {
+            Ok(pair) => pair,
             Err(e) => {
-                eprintln!("{}: not restarting: {e}", instance.display_name());
-                return ExitCode::FAILURE;
+                tracing::error!(
+                    error = %e,
+                    "the config went away between naming this daemon and starting it"
+                );
+                return;
             }
-        },
-        verb => verb,
-    };
-    let port_path = discover::port_file(instance.lock_file());
-    let code = freddie_cli::run_lifecycle_verb::<Isograph<THostLanguage>>(verb, matches);
-    match freddie_single_instance::holder_at(instance.lock_file()) {
-        Ok(freddie_single_instance::Held::By(_)) | Ok(freddie_single_instance::Held::Unnamed) => {}
-        Ok(freddie_single_instance::Held::Free) | Err(_) => return ExitCode::FAILURE,
+        };
+        let port_path = discover::port_file(instance.lock_file());
+        let _ = std::fs::remove_file(port_path.reference());
+        let config = match discover::load_config(path.reference()) {
+            Ok(config) => config,
+            Err(e) => {
+                tracing::error!(error = %e, "could not load the config");
+                return;
+            }
+        };
+        crate::daemon::run::<THostLanguage>(path, port_path, args.filesystem, config);
     }
-    match wait_until_listening(port_path.reference(), instance.lock_file()) {
-        Ok(()) => code,
-        Err(e) => {
-            eprintln!("{e}");
-            ExitCode::FAILURE
-        }
+
+    fn ask_to_quit(
+        instance: &Instance,
+    ) -> Option<Result<(), Box<dyn std::error::Error + Send + Sync>>> {
+        (|| {
+            let stream = crate::discover::connect_to_daemon(&crate::discover::port_file(
+                instance.lock_file(),
+            ))?;
+            crate::send::notify(stream, crate::event::Internal::Quit)?;
+            ().wrap_ok()
+        })()
+        .wrap_some()
     }
 }
 ```
 
-Do not `init_client_logging` here. `run_lifecycle_verb` of `Start` inits once and prints `started`. Restart's quit half does not print `stopped` on Windows. A quit error uses `eprintln` with the `not restarting:` prefix freddie uses, under the `print_stderr` expect already on `run`.
+No `#[cfg(windows)]` on the impl. `notify` of `Quit` is the same on every OS. Freddie only calls this on Windows. Always `Some`: isograph has an ask. Connect/`notify` failure is `Some(Err)`, not `None`.
 
-`--force` restart is still `Verb::Restart` into freddie, then wait until listening.
+`PortError` and `SendError` already implement `std::error::Error`. `?` into the box.
 
-`wait_until_listening` is unchanged.
+Do not add `stop.rs`. Do not intercept `Verb::Stop` / `Verb::Restart` in `lib.rs` or `start.rs`. `start.rs` wait-until-listening is unchanged.
 
-## Daemon comment
-
-Unix SIGTERM task stays. Windows has none; this slice is the client.
+### Daemon comment
 
 ```rust
 // from crates/isograph_cli/src/daemon.rs
     // Unix `isograph stop` without `--force` sends SIGTERM. Route it into the event
     // channel as Quit, so the model turns it into Kill, the effect loop breaks, and
-    // serve returns. Windows `stop` without `--force` posts Internal::Quit on the
-    // socket instead (stop.rs); this task does not exist there.
+    // serve returns. Windows `stop` without `--force` is App::ask_to_quit, which posts
+    // Internal::Quit on the socket; this task does not exist there.
     //
     // A spawned task rather than a third `select!` arm, because an arm that completed
     // would drop the other two futures and skip the graceful path this exists to run.
@@ -285,7 +252,7 @@ Unix SIGTERM task stays. Windows has none; this slice is the client.
     match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
 ```
 
-## Event model
+### Event model
 
 ```text
 // from docs-website/docs/design-docs/event-model.md
@@ -300,8 +267,8 @@ Unix SIGTERM task stays. Windows has none; this slice is the client.
 
 ```rust
 // from crates/ts_graphql_react_isograph_cli/tests/cli.rs
-// freddie_cli's stop without --force is SIGTERM on unix. Windows stop without
-// --force posts Quit on the socket. Both run Kill.
+// Unix stop without --force is SIGTERM. Windows stop without --force is App::ask_to_quit
+// (a Quit frame on the socket). Both run Kill.
 const STOP: &[&str] = &["stop"];
 ```
 
@@ -346,7 +313,7 @@ The three tests that `poll` for `SIGTERM: quitting` && `kill: exiting` wait for 
     });
 ```
 
-Same replacement in `stop_after_send_exits_without_force`, `two_sends_then_stop_exits_without_force`, and `stop_then_status_reports_not_running`. Those names are true on Windows.
+Same replacement in `stop_after_send_exits_without_force`, `two_sends_then_stop_exits_without_force`, and `stop_then_status_reports_not_running`.
 
 ```rust
 // from crates/ts_graphql_react_isograph_cli/tests/cli.rs
@@ -367,14 +334,13 @@ fn send_of_quit_then_status_reports_not_running() {
 }
 ```
 
-This is `notify` of `Quit` through the hidden verb, all platforms. Windows `stop` is that same `notify` without the file. No SIGTERM on this path, including unix.
+`notify` of `Quit` through the hidden verb, all platforms. Windows `stop` is that same `notify` via `ask_to_quit`. No SIGTERM on this path, including unix.
 
-Keep `poll` until no-poll-in-tests.md. Do not add `await_containing` here.
+Keep `poll` until no-poll-in-tests.md.
 
 ## Call graph
 
-- Windows `isograph stop` without `--force` -> `lib.rs` -> `stop::run` -> `init_client_logging` -> `quit_and_await_free` -> `notify(Quit)` -> stdout `stopped` / `is not running`
-- Windows `isograph restart` without `--force` -> `start::run` -> `quit_and_await_free` -> `Verb::Start` -> freddie start -> `wait_until_listening`
-- Windows `stop --force` / `restart --force` -> freddie
-- Unix stop / restart -> freddie
+- Unix `stop` / `restart` without `--force` -> freddie `signal_pid(Terminate)` -> SIGTERM -> daemon `Quit` -> `Kill`
+- Windows `stop` / `restart` without `--force` -> freddie `App::ask_to_quit` -> isograph `notify(Quit)` -> `Kill` -> wait on lock -> `stopped` / then start
+- `--force` -> SIGKILL / `taskkill /F` on every OS
 - `isograph send --file` of `{"kind":"Quit"}` -> `send::run` -> `notify` (already)
