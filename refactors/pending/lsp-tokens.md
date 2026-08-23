@@ -4,7 +4,7 @@ Requires lsp-request-response.md and lsp-dispatch.md. Independent of filesystem-
 
 `dispatch_lsp_request` is `LSPRequestDispatch` with zero `on_request_sync` calls. This file inserts `.on_request_sync::<SemanticTokensFullRequest>(semantic_tokens_response)?` before `.request()`. Do not special-case tokens in `run_session`. `isograph/event` stays a notification arm.
 
-Origin of the method: `lsp_types::request::SemanticTokensFullRequest`. Origin of the handler: isograph `on_semantic_token_full_request`. Origin of tokens: `lsp_semantic_tokens_for_file`. Origin of initialize options: isograph `server.rs` `initialize`. Origin of the dispatcher: isograph `LSPRequestDispatch`. Delta: URI to path has no `expect`; missing `DiskFile` is `Ok(None)` (JSON `null`).
+Origin of the method: `lsp_types::request::SemanticTokensFullRequest`. Origin of the handler: isograph `on_semantic_token_full_request`. Origin of tokens: `lsp_semantic_tokens_for_file`. Origin of initialize options: isograph `server.rs` `initialize`. Origin of the dispatcher: isograph `LSPRequestDispatch`. Delta: URI to path has no `expect`; missing `DiskFile` is `Ok(None)` (JSON `null`). Extract `JsonError` uses the request id, not `"default-lsp-id"`.
 
 One shippable change. An e2e that notifies DiskChanged and immediately asks for tokens can race; that is later.
 
@@ -135,6 +135,7 @@ url = { workspace = true }
 - `notify` DiskChanged of `/tmp/proj/src/Home.ts` with the one-literal contents, settle, then `semanticTokens/full` for `file:///tmp/proj/src/Home.ts` on a second connection that has initialized: first token type 15, length 10
 - `full` for a URI that was never interned: `result` is JSON `null`
 - `full` with a non-file URI: `UnknownErrorCode`, message `textDocument.uri is not a file path`
+- `full` with params `{}`: extract fails; response `id` is the request id, not `"default-lsp-id"`
 - unknown request is still `MethodNotFound`
 
 `state.rs` is unchanged. No `handle` of a tokens event.

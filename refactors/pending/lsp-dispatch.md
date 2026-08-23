@@ -8,7 +8,9 @@ After lsp-port.md, the session special-cases `isograph/event` and ignores every 
 
 Origin: isograph `crates/isograph_lsp/src/lsp_request_dispatch.rs`, `lsp_notification_dispatch.rs`, `lsp_runtime_error.rs`, `server.rs` `dispatch_request` / `dispatch_notification`.
 
-Delta on `lsp_runtime_error.rs` and `lsp_request_dispatch.rs`: none. Copy into `crates/isograph_lsp/src/` under the same names, including `#[cfg(test)]`. `lib.rs` has `pub mod` for all three (isograph's request dispatch is `mod`; the call site here is `isograph_cli`).
+Delta on `lsp_runtime_error.rs`: none. Copy into `crates/isograph_lsp/src/lsp_runtime_error.rs`, including `From<LSPRuntimeError> for Option<lsp_server::ResponseError>`.
+
+Delta on `lsp_request_dispatch.rs`: copy into `crates/isograph_lsp/src/lsp_request_dispatch.rs` including `convert_to_lsp_response`, `extract_request_params`, and `#[cfg(test)]`, except the extract `Err` arm. Clone `self.request.id` before `extract_request_params` consumes the request. That arm is `convert_to_lsp_response(id, ...)`, not `RequestId::from("default-lsp-id")`. isograph loses the id because extract takes `self.request` by value. `lib.rs` `pub mod lsp_request_dispatch` and `pub mod lsp_runtime_error` (isograph's request dispatch is `mod`; the call site here is `isograph_cli`).
 
 Delta on `lsp_notification_dispatch.rs`: extract is `Result` (isograph `expect`s); handler returns `Vec<IsographEffect>` (isograph returns `LSPRuntimeResult<()>`); `JsonError` logs and `Break`s with an empty vec; leftover is empty vec. `TState` is `&mut IsographState`. Do not thread a `Vec` of effects through `TState`. isograph's notification params are protocol-typed; ours include `isograph/event`, a JSON DSL the session already recovers. Socket-supplied JSON is a typed error or a recovered region. `expect` on extract is neither.
 
@@ -75,7 +77,7 @@ pub enum LSPRuntimeError {
 }
 ```
 
-Copied from isograph `crates/isograph_lsp/src/lsp_runtime_error.rs`, including `From<LSPRuntimeError> for Option<lsp_server::ResponseError>` and the `#[cfg(test)]` modules of the request file. Hand-written `From`, no `thiserror`. Request extract failure answers with id `"default-lsp-id"` (copied isograph bug). No request handler this slice calls extract.
+Copied from isograph `crates/isograph_lsp/src/lsp_runtime_error.rs`, including `From<LSPRuntimeError> for Option<lsp_server::ResponseError>` and the `#[cfg(test)]` modules of the request file. Hand-written `From`, no `thiserror`.
 
 ```rust
 // from crates/isograph_lsp/src/lsp_request_dispatch.rs
@@ -96,7 +98,16 @@ impl<'state, TState> LSPRequestDispatch<'state, TState> {
 }
 ```
 
-Copied from isograph `crates/isograph_lsp/src/lsp_request_dispatch.rs` including `convert_to_lsp_response`, `extract_request_params`, and `#[cfg(test)]`.
+Copied from isograph `crates/isograph_lsp/src/lsp_request_dispatch.rs` including `convert_to_lsp_response`, `extract_request_params`, and `#[cfg(test)]`, except:
+
+```rust
+// from crates/isograph_lsp/src/lsp_request_dispatch.rs
+        if self.request.method == TRequest::METHOD {
+            let id = self.request.id.clone();
+            match extract_request_params::<TRequest>(self.request) {
+```
+
+The extract `Err` arm passes `id` to `convert_to_lsp_response`. Do not construct `"default-lsp-id"`. No request handler this slice calls extract. Tokens does.
 
 ```rust
 // from crates/isograph_cli/src/lsp_notification_dispatch.rs
