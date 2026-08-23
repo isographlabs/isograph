@@ -11,7 +11,7 @@ mod daemon;
 mod discover;
 mod effect;
 mod event;
-mod external;
+mod lsp_socket;
 mod send;
 mod state;
 
@@ -49,7 +49,7 @@ enum CliVerb<THostLanguage: HostLanguage> {
     #[command(flatten)]
     Lifecycle(freddie_cli::Verb<Isograph<THostLanguage>>),
 
-    /// Write one IsographEvent JSON frame to the running daemon. Not for typing: tests and CI.
+    /// Encode one IsographEvent as an LSP notification to the running daemon. Not for typing: tests and CI.
     #[command(hide = true)]
     Send(SendArgs),
 

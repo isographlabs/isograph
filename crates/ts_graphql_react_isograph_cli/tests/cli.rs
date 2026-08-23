@@ -112,6 +112,26 @@ fn write_frame(dir: &std::path::Path, contents: &str) -> std::path::PathBuf {
     path
 }
 
+fn daemon_port(daemon: &Daemon) -> u16 {
+    let home = daemon.dir.path().join("home");
+    let mut stack = home.wrap_vec();
+    while let Some(dir) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(dir.reference()) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if path.extension().is_some_and(|e| e == "port") {
+                let text = std::fs::read_to_string(path.reference()).expect("the port file");
+                return text.trim().parse().expect("the port file is a port");
+            }
+        }
+    }
+    panic!("the daemon wrote a port file");
+}
+
 // freddie_cli's stop without --force is SIGTERM, which it does not send on Windows.
 #[cfg(windows)]
 const STOP: &[&str] = &["stop", "--force"];
@@ -286,6 +306,104 @@ fn send_is_not_in_help() {
     let text = stdout(output.reference());
     assert!(text.contains("start"), "{text}");
     assert!(!text.contains("send"), "{text}");
+}
+
+#[test]
+fn stop_after_send_exits_without_force() {
+    let daemon = Daemon::start();
+    poll(|| {
+        daemon
+            .log_text()
+            .contains("isograph daemon up")
+            .then_some(())
+    });
+    let frame = write_frame(daemon.dir.path(), "{\"kind\":\"HelloWorld\"}\n");
+    let sent = daemon.isograph(["send", "--file", frame.to_str().expect("utf-8")].reference());
+    assert!(
+        sent.status.success(),
+        "stdout: {} stderr: {}",
+        stdout(sent.reference()),
+        stderr(sent.reference())
+    );
+    poll(|| daemon.log_text().contains("hello world").then_some(()));
+    let stopped = daemon.isograph(STOP);
+    assert!(
+        stopped.status.success(),
+        "stdout: {} stderr: {}",
+        stdout(stopped.reference()),
+        stderr(stopped.reference())
+    );
+    poll(|| (!daemon.isograph(["status"].reference()).status.success()).then_some(()));
+    #[cfg(not(windows))]
+    poll(|| {
+        let log = daemon.log_text();
+        (log.contains("SIGTERM: quitting") && log.contains("kill: exiting")).then_some(())
+    });
+}
+
+#[test]
+fn two_sends_then_stop_exits_without_force() {
+    let daemon = Daemon::start();
+    poll(|| {
+        daemon
+            .log_text()
+            .contains("isograph daemon up")
+            .then_some(())
+    });
+    for _ in 0..2 {
+        let frame = write_frame(daemon.dir.path(), "{\"kind\":\"HelloWorld\"}\n");
+        let sent = daemon.isograph(["send", "--file", frame.to_str().expect("utf-8")].reference());
+        assert!(
+            sent.status.success(),
+            "stdout: {} stderr: {}",
+            stdout(sent.reference()),
+            stderr(sent.reference())
+        );
+    }
+    poll(|| daemon.log_text().contains("hello world").then_some(()));
+    let stopped = daemon.isograph(STOP);
+    assert!(
+        stopped.status.success(),
+        "stdout: {} stderr: {}",
+        stdout(stopped.reference()),
+        stderr(stopped.reference())
+    );
+    poll(|| (!daemon.isograph(["status"].reference()).status.success()).then_some(()));
+    #[cfg(not(windows))]
+    poll(|| {
+        let log = daemon.log_text();
+        (log.contains("SIGTERM: quitting") && log.contains("kill: exiting")).then_some(())
+    });
+}
+
+#[test]
+fn truncated_body_does_not_kill_the_daemon() {
+    use std::io::Write;
+
+    let daemon = Daemon::start();
+    poll(|| {
+        daemon
+            .log_text()
+            .contains("isograph daemon up")
+            .then_some(())
+    });
+    let port = daemon_port(daemon.reference());
+    {
+        let mut stream = std::net::TcpStream::connect((std::net::Ipv4Addr::LOCALHOST, port))
+            .expect("connecting to the daemon");
+        stream
+            .write_all(b"Content-Length: 100\r\n\r\n{")
+            .expect("writing a truncated body");
+    }
+    let frame = write_frame(daemon.dir.path(), "{\"kind\":\"HelloWorld\"}\n");
+    let sent = daemon.isograph(["send", "--file", frame.to_str().expect("utf-8")].reference());
+    assert!(
+        sent.status.success(),
+        "stdout: {} stderr: {}",
+        stdout(sent.reference()),
+        stderr(sent.reference())
+    );
+    poll(|| daemon.log_text().contains("hello world").then_some(()));
 }
 
 #[test]

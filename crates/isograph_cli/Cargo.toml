@@ -6,27 +6,26 @@ license = { workspace = true }
 
 [dependencies]
 clap = { workspace = true }
+crossbeam = { workspace = true }
 freddie_cli = { git = "https://github.com/freddiehg/freddie", rev = "2cf07439ce57fd55079b89128b2f22603ef8d1a8" }
-freddie_event_socket = { git = "https://github.com/freddiehg/freddie", rev = "2cf07439ce57fd55079b89128b2f22603ef8d1a8" }
 freddie_single_instance = { git = "https://github.com/freddiehg/freddie", rev = "2cf07439ce57fd55079b89128b2f22603ef8d1a8" }
 common_lang_types = { path = "../common_lang_types" }
 intern = { path = "../../relay-crates/intern" }
 isograph_compiler = { path = "../isograph_compiler" }
 isograph_config = { path = "../isograph_config" }
+lsp-server = { workspace = true }
+lsp-types = { workspace = true }
 pico = { path = "../pico" }
 prelude = { path = "../prelude" }
-tungstenite = { version = "0.24", default-features = false, features = ["handshake"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = "2"
-tokio = { workspace = true, features = ["rt", "macros", "signal", "sync", "time"] }
+tokio = { workspace = true, features = ["rt", "macros", "signal", "sync", "time", "net"] }
 tracing = { workspace = true }
 
 [dev-dependencies]
 isograph_extract_typescript = { path = "../isograph_extract_typescript" }
 tempfile = "3"
-tokio-tungstenite = "0.24"
-futures-util = { version = "0.3", default-features = false, features = ["sink"] }
 
 [lints]
 workspace = true

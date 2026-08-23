@@ -4,7 +4,7 @@ Two layers, one `handle`.
 
 Inner: `handle(state, event) -> Vec<IsographEffect>`. No filesystem, no LSP, no socket. The test harness calls this function. The running binary calls this same function. There is not a second copy for tests.
 
-Outer: the real process. It listens to the filesystem, speaks LSP, accepts CLI frames, and performs effects. Every path into the process becomes an ingested event, then `handle`, then effects.
+Outer: the real process. It listens to the filesystem, speaks LSP, and performs effects. Every path into the process becomes an ingested event, then `handle`, then effects.
 
 The process does not read the filesystem inside `handle`. Facts about files arrive as events: a path is present with these contents, or a path is absent. Writing files is an effect.
 
@@ -41,7 +41,7 @@ enum Filesystem {
 }
 ```
 
-`Watch` starts a source that observes the OS and emits `DiskChanged`. `Injected` does not scan and does not watch. The event socket listens in both modes. The CLI, the LSP adapter, and the socket all submit ingested events into the same `handle`. Until filesystem-watcher.md lands, `DiskChanged` arrives only through `isograph send`. After that, `Watch` posts in-process and `Injected` still uses send.
+`Watch` starts a source that observes the OS and emits `DiskChanged`. `Injected` does not scan and does not watch. The LSP port listens in both modes. The CLI and the adapter submit ingested events into the same `handle`. Until filesystem-watcher.md lands, `DiskChanged` arrives only through `isograph send`. After that, `Watch` posts in-process and `Injected` still uses send.
 
 ## Inner
 
@@ -51,32 +51,29 @@ fn handle(state: &mut IsographState, event: IsographEvent) -> Vec<IsographEffect
 
 `IsographState` is the pico database. The test harness calls `handle`. It does not start a daemon, open a socket, or write a file. A test constructs a `DiskChanged` or `EditorChanged`, runs `handle`, and asserts the effects and the `DiskFile` sources. The binary's event loop calls the same `handle` with the same types.
 
-`handle` does not know about globs, gitignore, or "in scope". Scope is the watcher's job. The socket and the CLI may inject any path.
+`handle` does not know about globs, gitignore, or "in scope". Scope is the watcher's job. `isograph send` may inject any path.
 
 ## Outer
 
 The binary is the outer. Each source is outside `handle` and feeds it. One process, one channel, one worker that owns `IsographState`. Sources do not read state. Performers do not mutate it.
 
-- Watcher: OS notifications become `DiskChanged` (path plus contents or absent). It may read the disk to fill `Present.contents`. `handle` does not. The watcher posts in-process on the event channel. It does not run the CLI and it does not write to the event socket.
-- Event socket (`freddie_event_socket`): JSON `IsographEvent` frames (`Serialize` + `Deserialize`, `serde_json`). The CLI is a client of this socket. CI is a client of this socket.
-- LSP adapter: an LSP notification (`textDocument/didOpen`, `didChange`, `didClose`) becomes `EditorChanged`. An LSP request (hover, `semanticTokens/full`, …) is request/response in the adapter: it reads `OpenFile` if present else `DiskFile`, computes, replies. `handle` is not request/response. Effects from `handle` (`ReportDiagnostics`) become LSP notifications (`publishDiagnostics`).
+- Watcher: OS notifications become `DiskChanged` (path plus contents or absent). It may read the disk to fill `Present.contents`. `handle` does not. The watcher posts in-process on the event channel. It does not run the CLI and it does not write to the LSP port.
+- LSP port: LSP JSON-RPC on `{slug}.port`. `isograph send` is a client: initialize, `initialized`, notification `isograph/event` whose params are `HelloWorld` / `Quit` / `DiskChanged`. The session deserializes those params and posts that `IsographEvent`. An LSP request other than initialize is `MethodNotFound` in the session until domain requests land. Later, `textDocument/didOpen` / `didChange` / `didClose` become `EditorChanged`; hover and `semanticTokens/full` are request/response in the adapter. `handle` is not request/response. Effects from `handle` (`ReportDiagnostics`) become LSP notifications (`publishDiagnostics`).
 - Effect loop: performs `WriteArtifacts`, `ReportDiagnostics`, `StartAsyncWork`, `Kill`.
 
-`isograph lsp` is a stdio proxy onto the adapter. Walk-up / `--config` is the same as every other verb. It starts the daemon if needed, dials the adapter, and copies stdin/stdout. Dropping the editor drops the proxy and that connection. The daemon stays up. Several editors share one process. The vscode-extension already spawns `isograph lsp` on stdio.
+`isograph lsp` is a stdio proxy onto the port. Walk-up / `--config` is the same as every other verb. It starts the daemon if needed, dials the port, and copies stdin/stdout. Dropping the editor drops the proxy and that connection. The daemon stays up. Several editors share one process. The vscode-extension already spawns `isograph lsp` on stdio.
 
-`isograph send` is a hidden client of the event socket. It does not start the daemon. It is not in `--help`.
+`isograph send` is a hidden LSP client of that port. It does not start the daemon. It is not in `--help`.
 
-The three sources are theoretically separate daemons. They are one process because they share `Database` and because a socket hop on every save is the wrong latency.
+The sources are theoretically separate daemons. They are one process because they share `Database` and because a socket hop on every save is the wrong latency.
 
 ## Ports
 
 Figaro is one process per machine, so a default port is enough. Isograph is one process per config. Two configs cannot share a port.
 
-The event socket binds `127.0.0.1:0`. The kernel assigns a port from its local/dynamic range. There is no `--port`. After the lock, `run_daemon` unlinks the leftover `{slug}.port` before loading the config, then `serve` binds and writes `EventSocket::local_addr().port()` (freddie `event-socket-local-addr.md`) to a sibling of its lock (`{slug}.lock` → `{slug}.port`). On quit, after `Kill` ends the loops, `serve` unlinks the file, then returns, then the lock drops. `isograph send` reads the lock, then that file. `Held::Free` is not running and the file is not consulted. Lock held and the file absent means the daemon has taken the lock and has not bound yet, or is on the way out; send fails. Send does not wait.
+The LSP port binds `127.0.0.1:0`. The kernel assigns a port from its local/dynamic range. There is no `--port`. After the lock, `run_daemon` unlinks the leftover `{slug}.port` before loading the config, then `serve` binds and writes the port to a sibling of its lock (`{slug}.lock` → `{slug}.port`). On quit, after `Kill` ends the loops, `serve` unlinks the file, then `process::exit(0)`. Flock is released when the holder dies. `isograph send` reads the lock, then that file. `Held::Free` is not running and the file is not consulted. Lock held and the file absent means the daemon has taken the lock and has not bound yet, or is on the way out; send fails. Send does not wait.
 
-The LSP adapter is a second listener, `{log_dir}/{slug}.lsp`, a path, not a TCP port. The event socket is JSON frames. The adapter is LSP JSON-RPC. They are not the same protocol.
-
-`freddie_event_socket` refuses web-page `Origin` headers and caps a frame at 64 KiB. A watcher (later) reads the file and posts `DiskChanged` in-process, so production contents do not go over the socket. Until that watcher exists, `isograph send` is the only source of `DiskChanged` and carries `Present.contents` on the wire. Send fixtures stay under the cap.
+There is one listener. There is no `{slug}.lsp` and no `freddie_event_socket`. Until the watcher exists, `isograph send` is the only source of `DiskChanged` and carries `Present.contents` on the wire.
 
 ## Event
 

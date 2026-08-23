@@ -7,7 +7,6 @@ use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 
 use crate::effect::IsographEffect;
 use crate::event::IsographEvent;
-use crate::external::on_message;
 use crate::state::{IsographState, handle, intern_config_directory};
 
 pub fn run<THostLanguage: HostLanguage>(config_path: PathBuf, port_path: PathBuf) {
@@ -27,21 +26,25 @@ pub fn run<THostLanguage: HostLanguage>(config_path: PathBuf, port_path: PathBuf
 async fn serve<THostLanguage: HostLanguage>(config_path: PathBuf, port_path: PathBuf) {
     let (event_tx, event_rx) = unbounded_channel::<IsographEvent>();
     let (effect_tx, effect_rx) = unbounded_channel::<IsographEffect>();
-    let _socket = match freddie_event_socket::listen(0, {
-        let event_tx = event_tx.clone();
-        move |text| {
-            on_message(text, |event| {
-                let _ = event_tx.send(event);
-            })
-        }
-    }) {
-        Ok(socket) => socket,
+    let listener = match tokio::net::TcpListener::bind(std::net::SocketAddr::from((
+        std::net::Ipv4Addr::LOCALHOST,
+        0,
+    )))
+    .await
+    {
+        Ok(listener) => listener,
         Err(e) => {
-            tracing::error!(error = %e, "could not bind the event socket");
+            tracing::error!(error = %e, "could not bind the lsp socket");
             return;
         }
     };
-    let port = _socket.local_addr().port();
+    let port = match listener.local_addr() {
+        Ok(addr) => addr.port(),
+        Err(e) => {
+            tracing::error!(error = %e, "could not read the lsp socket address");
+            return;
+        }
+    };
     if let Err(e) = std::fs::write(port_path.reference(), format!("{port}\n")) {
         tracing::error!(
             error = %e,
@@ -78,14 +81,16 @@ async fn serve<THostLanguage: HostLanguage>(config_path: PathBuf, port_path: Pat
 
     // `select!` rather than `join!`: the effect loop ends on `Kill`, and the event
     // loop never does, because `_hold_events` holds a sender for as long as serve runs.
-    let _hold_events = event_tx;
+    let _hold_events = event_tx.clone();
     let mut state = IsographState::<THostLanguage>::default();
     intern_config_directory(&mut state, config_path.reference());
     tokio::select! {
         () = run_event_loop(state, event_rx, effect_tx) => {}
         () = run_effect_loop(effect_rx) => {}
+        () = crate::lsp_socket::accept_loop(listener, event_tx) => {}
     }
     let _ = std::fs::remove_file(port_path.reference());
+    std::process::exit(0);
 }
 
 pub(crate) async fn run_event_loop<THostLanguage: HostLanguage>(

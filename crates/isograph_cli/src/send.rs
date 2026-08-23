@@ -1,37 +1,39 @@
 use std::fs;
 use std::io;
+use std::net::Ipv4Addr;
 use std::num::NonZeroU16;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+use lsp_types::notification::{Initialized, Notification};
+use lsp_types::request::{Initialize, Request};
 use prelude::Postfix;
-use tungstenite::Message;
-use tungstenite::client::connect;
 
 use crate::SendArgs;
 use crate::discover::DiscoverError;
 use crate::event::IsographEvent;
+use crate::lsp_socket::IsographEventNotification;
 
 #[derive(Debug)]
-struct ReadFile {
+pub(crate) struct ReadFile {
     pub path: PathBuf,
     pub source: io::Error,
 }
 
 #[derive(Debug)]
-struct ReadPort {
+pub(crate) struct ReadPort {
     pub path: PathBuf,
     pub source: io::Error,
 }
 
 #[derive(Debug)]
-struct Connect {
+pub(crate) struct Connect {
     pub port: u16,
-    pub source: Box<tungstenite::Error>,
+    pub source: io::Error,
 }
 
 #[derive(Debug, thiserror::Error)]
-enum SendError {
+pub(crate) enum SendError {
     #[error("{0}")]
     Discover(#[from] DiscoverError),
     #[error("could not read {}: {}", .0.path.display(), .0.source)]
@@ -52,8 +54,18 @@ enum SendError {
     BadPort,
     #[error("could not connect to 127.0.0.1:{}: {}", .0.port, .0.source)]
     Connect(Connect),
+    #[error("could not encode the event: {0}")]
+    Encode(serde_json::Error),
+    #[error("could not clone the stream: {0}")]
+    Clone(io::Error),
     #[error("could not write the frame: {0}")]
-    Write(Box<tungstenite::Error>),
+    Write(io::Error),
+    #[error("could not read the frame: {0}")]
+    Read(io::Error),
+    #[error("the lsp connection closed")]
+    Closed,
+    #[error("{0}")]
+    Lsp(String),
 }
 
 #[expect(clippy::print_stderr)]
@@ -79,17 +91,65 @@ fn run_inner(args: &SendArgs) -> Result<(), SendError> {
             source,
         })
     })?;
-    let frame = frame.trim();
-    let _: IsographEvent = serde_json::from_str(frame).map_err(SendError::NotEvent)?;
-    let (mut ws, _) = connect(format!("ws://127.0.0.1:{port}")).map_err(|source| {
-        SendError::Connect(Connect {
-            port,
-            source: source.boxed(),
-        })
-    })?;
-    ws.send(Message::Text(frame.to_owned()))
-        .map_err(|e| SendError::Write(e.boxed()))?;
+    let event: IsographEvent = serde_json::from_str(frame.trim()).map_err(SendError::NotEvent)?;
+    let stream = std::net::TcpStream::connect((Ipv4Addr::LOCALHOST, port))
+        .map_err(|source| SendError::Connect(Connect { port, source }))?;
+    notify(stream, event)
+}
+
+pub(crate) fn notify(stream: std::net::TcpStream, event: IsographEvent) -> Result<(), SendError> {
+    let mut writer = stream.try_clone().map_err(SendError::Clone)?;
+    let mut reader = std::io::BufReader::new(stream);
+    // JSON-RPC ids are per connection. This client has one outstanding request. A second send is another connection.
+    let id = lsp_server::RequestId::from(1);
+    lsp_server::Message::Request(lsp_server::Request {
+        id: id.clone(),
+        method: Initialize::METHOD.to_owned(),
+        params: serde_json::json!({ "capabilities": {} }),
+    })
+    .write(&mut writer)
+    .map_err(SendError::Write)?;
+    wait_for_initialize_result(&mut reader, id.reference())?;
+    lsp_server::Message::Notification(lsp_server::Notification {
+        method: Initialized::METHOD.to_owned(),
+        params: serde_json::json!({}),
+    })
+    .write(&mut writer)
+    .map_err(SendError::Write)?;
+    let params = serde_json::to_value(&event).map_err(SendError::Encode)?;
+    lsp_server::Message::Notification(lsp_server::Notification {
+        method: IsographEventNotification::METHOD.to_owned(),
+        params,
+    })
+    .write(&mut writer)
+    .map_err(SendError::Write)?;
     ().wrap_ok()
+}
+
+fn wait_for_initialize_result(
+    reader: &mut impl std::io::BufRead,
+    expected: &lsp_server::RequestId,
+) -> Result<(), SendError> {
+    loop {
+        let message = lsp_server::Message::read(reader).map_err(SendError::Read)?;
+        let Some(message) = message else {
+            return SendError::Closed.wrap_err();
+        };
+        let lsp_server::Message::Response(response) = message else {
+            continue;
+        };
+        if &response.id != expected {
+            return SendError::Lsp(format!(
+                "initialize response id {} wanted {}",
+                response.id, expected
+            ))
+            .wrap_err();
+        }
+        match response.error {
+            None => return ().wrap_ok(),
+            Some(error) => return SendError::Lsp(error.message).wrap_err(),
+        }
+    }
 }
 
 fn require_running(lock: &Path) -> Result<(), SendError> {
