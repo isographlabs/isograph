@@ -10,7 +10,7 @@ Zed: install the Isograph extension from the extensions page (or Install Dev Ext
 
 ## VS Code extension
 
-vscode-extension.md. Spawn `isograph lsp`, document selector the four JS/TS languages, settings `pathToIsograph` / `pathToConfig` / `rootDirectory`. No format-on-save. No `GraphQL.vscode-graphql-syntax`. Publish remains `publish-isograph-extension.yml`.
+vscode-extension.md, then vscode-config-discovery.md. Spawn `isograph lsp`, document selector the four JS/TS languages, settings `pathToIsograph` / `pathToConfig`. No format-on-save. No `GraphQL.vscode-graphql-syntax`. Publish remains `publish-isograph-extension.yml`.
 
 ## What a Zed extension is
 
@@ -139,7 +139,7 @@ Spawn:
 
 Finding the binary:
 
-- VS Code: walk `node_modules/@isograph/compiler` from `rootDirectory`, or `isograph.pathToIsograph`.
+- VS Code: `isograph.pathToIsograph`, or walk `node_modules/@isograph/compiler` from the config directory (vscode-config-discovery.md).
 - Zed: `worktree.which("isograph")`, or `node_modules/@isograph/compiler/artifacts/<platform>/isograph_cli`. Wasm cannot use `std::fs` the way the VS Code code does; `Worktree` and `current_platform` are the API.
 
 Which files:

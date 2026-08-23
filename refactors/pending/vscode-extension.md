@@ -1,6 +1,6 @@
 # VS Code extension
 
-Requires lsp-proxy.md and lsp-tokens.md. Independent of lsp-sessions.md, lsp-diagnostics.md, zed-and-vscode-extensions.md.
+Requires lsp-proxy.md and lsp-tokens.md. Independent of lsp-sessions.md, lsp-diagnostics.md, zed-and-vscode-extensions.md. Later: vscode-config-discovery.md replaces workspace-root cwd, `rootDirectory`, and the single client.
 
 `vscode-extension/` is a verbatim copy of isograph `vscode-extension/`. This slice is the i2 extension: spawn `isograph lsp`, color iso literals. It is not a second highlighter. It is not hover, format, completion, or GraphQL tag coloring.
 
