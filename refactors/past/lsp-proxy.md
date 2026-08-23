@@ -109,9 +109,8 @@ pub(crate) enum PortError {
 
 pub(crate) fn connect_to_daemon(path: &Path) -> Result<TcpStream, PortError> {
     let port = read_port(path)?;
-    TcpStream::connect((Ipv4Addr::LOCALHOST, port)).map_err(|source| {
-        PortError::Connect(Connect { port, source })
-    })
+    TcpStream::connect((Ipv4Addr::LOCALHOST, port))
+        .map_err(|source| PortError::Connect(Connect { port, source }))
 }
 
 pub(crate) fn read_port(path: &Path) -> Result<u16, PortError> {
@@ -132,8 +131,7 @@ pub(crate) fn read_port(path: &Path) -> Result<u16, PortError> {
 ```rust
 // from crates/isograph_cli/src/send.rs
     #[error("{0}")]
-    #[from]
-    Port(crate::discover::PortError),
+    Port(#[from] crate::discover::PortError),
 ```
 
 Drop `SendError::NoPort` / `ReadPort` / `BadPort` / `Connect` and the `ReadPort` / `Connect` structs from `send.rs`. `run_inner` after `require_running`:
@@ -170,8 +168,7 @@ enum LspError {
     #[error("could not spawn isograph start: {0}")]
     Spawn(io::Error),
     #[error("{0}")]
-    #[from]
-    Port(crate::discover::PortError),
+    Port(#[from] crate::discover::PortError),
     #[error("could not clone the stream: {0}")]
     Clone(io::Error),
 }
@@ -311,7 +308,7 @@ fn read_initialize_result(stdout: &mut impl std::io::BufRead) -> lsp_server::Res
 
 Keep `ChildStdout` as `BufReader` until after `child.wait()`. Dropping the pipe early is SIGPIPE on the next daemon write. After initialize: drop stdin, `child.wait()` success, `status` running, `STOP`, `status` not running. `write_initialize` does not send `initialized`. That is enough to prove the copy and that `started` is not on stdout.
 
-- `lsp_is_in_help`: `--help` contains `lsp`. `lsp --help` contains `config`, does not contain `stdio`.
+- `lsp_is_in_help`: `--help` contains `lsp`. `lsp --help` contains `config`, does not contain `--stdio`.
 - `lsp_with_the_daemon_stopped_starts_it`: fixture `{"source_files":[]}`, do not call `start` first. `spawn(["lsp"])`, initialize, drop stdin, wait 0, `status` running, `STOP`.
 - `lsp_with_the_daemon_already_running_dials_it`: `Daemon::start()` (injected). Record `status` stdout. `spawn(["lsp"])`, initialize, drop stdin, wait 0. `status` stdout equals the recorded line. Nested start without `--filesystem` is Watch; this is adopt, not replace.
 - `lsp_with_no_config_exits_1`: empty cwd, `.output()`, exit 1, stderr contains `no isograph.config`, stdout empty.
