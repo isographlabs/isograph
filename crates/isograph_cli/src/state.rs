@@ -21,10 +21,7 @@ pub fn handle<THostLanguage: HostLanguage>(
     match event {
         IsographEvent::HelloWorld => IsographEffect::LogHelloWorld.wrap_vec(),
         IsographEvent::Quit => IsographEffect::Kill.wrap_vec(),
-        IsographEvent::DiskChanged(change) => {
-            handle_disk_changed(state, change);
-            Vec::new()
-        }
+        IsographEvent::DiskChanged(change) => handle_disk_changed(state, change),
         IsographEvent::LspRequest(request) => method_not_found(request).wrap_vec(),
     }
 }
@@ -80,7 +77,7 @@ fn relative_path_to_source_file(
 fn handle_disk_changed<THostLanguage: HostLanguage>(
     state: &mut IsographState<THostLanguage>,
     change: DiskChanged,
-) {
+) -> Vec<IsographEffect> {
     let path = relative_path_to_source_file(state, &change.path);
     match change.presence {
         Presence::Present(contents) => {
@@ -90,6 +87,7 @@ fn handle_disk_changed<THostLanguage: HostLanguage>(
             state.remove_disk_file(path);
         }
     }
+    Vec::new()
 }
 
 #[cfg(test)]
