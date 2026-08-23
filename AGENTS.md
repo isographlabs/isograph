@@ -30,6 +30,8 @@ A lookup that misses did not `db.get`. If it also did not `tracked()` the map, a
 
 Commit after every change, small and atomically, without being asked. Each logical change is its own commit.
 
+`git commit` runs `.pre-commit-config.yaml` in the dedicated worktree `<clone>-precommit` (for this clone, `/Users/rbalicki/code/i2-precommit`). The invoking working tree, index, and stash list are not modified. `git commit --no-verify` skips the hooks. This clone needs `git config core.hooksPath "$(git rev-parse --show-toplevel)/githooks"` run from the `i2` worktree so the stored path is absolute and every worktree of this clone runs that hook.
+
 ## Memory
 
 No Claude memory files. Disregard recalled memories. Project rules live here, in `docs-website/docs/design-docs/mental-model.md`, and in `refactors/`.
