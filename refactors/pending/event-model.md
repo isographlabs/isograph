@@ -21,8 +21,8 @@ Requires config-discovery.md (landed), the event-model design-doc, and `docs-web
 15. no-poll-in-tests.md. Now. Tests park on a channel, a log line, or a lock. Delete `cli.rs` `poll` and `lsp_socket.rs` `SETTLE` then `try_recv`. Independent of lsp-tokens.md.
 16. lsp-tokens.md (landed). `.on_request_sync::<SemanticTokensFullRequest>`. Advertise the legend on `initialize`. Independent of sessions.
 17. e2e-send-semantic-tokens.md (landed). `cli.rs`: `Daemon::start` (`--filesystem injected`), `isograph send` DiskChanged Present, `textDocument/semanticTokens/full`. The wait is no-poll-in-tests.md (`await_containing` `disk present`), not `settle`.
-18. lsp-outstanding.md. Later. `LspClientId`, `LspClientGone`, outstanding `(LspClientId, RequestId)`. For disconnect/cancel/async, not for highlighting.
-19. lsp-sessions.md. Later. After outstanding. `LspClientStarted` from `initialize` (`ClientCapabilities` plus a sender clone). Effect loop owns `HashMap<LspClientId, LiveSession>`. Writer map for `publishDiagnostics`.
+18. lsp-outstanding.md. Later. `ClientId`, `Client::Gone`, outstanding `(ClientId, RequestId)`. For disconnect/cancel/async, not for highlighting.
+19. lsp-sessions.md. Later. After outstanding. `Client::Started` from `initialize` (`ClientCapabilities` plus a sender clone). Effect loop owns `HashMap<ClientId, LiveSession>`. Writer map for `publishDiagnostics`.
 20. lsp-diagnostics.md. Later. Debounce then `publishDiagnostics`. Requires 19.
 21. start-returns-when-listening.md (landed). Before lsp-proxy. Port file is written after bind, before the watcher. `isograph start` / `restart` / the bare binary do not return until `TcpStream::connect` to `{slug}.port` succeeds. Failed restart still fails.
 22. lsp-proxy.md (landed). Later. `isograph lsp` stdio copy onto the port. Nested start, shared `connect_to_daemon`, flush-on-write stdout, `process::exit(0)` from whichever copy ends first.
