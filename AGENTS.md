@@ -86,7 +86,11 @@ An API only tests call should not exist. A helper tests need lives in the tests 
 
 Do not test another crate. pico, intern, serde, std. Re-invoke counts, intern identity, and `ptr::eq` of interned values are pico or intern. Assert `Eq` of the values those memos return.
 
-Tests park on a wake. A poll is a loop that retries a predicate until it holds or a deadline fires, including `sleep` then `try_recv`. The consumer waits on the channel, the log follow, or the lock that will fire. Capture the position first (subscribe, open the follow) then send, so a wake cannot be lost if it races the wait. Following a regular file is the exception: no platform reports a regular file growing through a readiness primitive, so `read_line` then an idle sleep at EOF is the same exception `tail -F` takes. A timeout is only for asserting that nothing arrived, which has no edge.
+## Wake on events
+
+No polling. An idle process is parked, not waking every N milliseconds to look. Work arrives by waking whatever the consumer is blocked on: the channel it `recv`s, the socket it `read`s, the flock wait, the OS watcher. A loop that retries a predicate until a deadline fires is polling, including `sleep` then `try_recv`. Capture the position first (subscribe, open the follow) then produce the event, so a wake cannot be lost if it races the wait. `select!` or a woken channel is the shape.
+
+Following a regular file is the exception: no platform reports a regular file growing through a readiness primitive, so `read_line` then an idle sleep at EOF is the same exception `tail -F` takes. A bare timeout is a last resort the code justifies, and the justification for tests is asserting that nothing arrived, which has no edge.
 
 ## Booleans
 
