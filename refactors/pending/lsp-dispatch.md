@@ -2,23 +2,101 @@
 
 Requires lsp-request-response.md (landed). Independent of lsp-sessions.md, filesystem-watcher.md. lsp-tokens.md is the first domain request arm. didOpen / didChange / didClose are later notification arms.
 
-isograph's server loop treats request and notification the same: `LSPRequestDispatch` / `LSPNotificationDispatch` chains, `?` until the first match, leftover is MethodNotFound (request) or drop (notification). `initialize` / `initialized` / `exit` stay outside those chains (`Connection::initialize`, reader stop on `Exit`).
+isograph's server loop runs `LSPRequestDispatch` and `LSPNotificationDispatch` the same way: `?` chain, first match wins, leftover is MethodNotFound (request) or drop (notification). `initialize` / `initialized` / `exit` stay outside (`Connection::initialize`, reader stop on `Exit`).
 
-After lsp-port.md, the session special-cases `isograph/event` (deserialize, post `HelloWorld` / `Quit` / `DiskChanged`) and ignores every other notification. After lsp-request-response.md, a request is `LspRequest` and `handle` is `method_not_found`. This slice copies both isograph dispatchers onto `handle` and makes the session a pump: every request is `LspRequest`, every notification is `LspNotification`. `isograph/event` is the first notification arm. The request chain is empty. Tokens adds one `.on_request_sync`.
+Those structs already exist. This slice puts them in `isograph_lsp` and calls them from `handle`. It does not write a second dispatcher.
 
-Origin: isograph `crates/isograph_lsp/src/lsp_request_dispatch.rs`, `lsp_notification_dispatch.rs`, `server.rs` `dispatch_request` / `dispatch_notification`. Delta: extract is `Result` (isograph `expect`s; request extract is also `catch_unwind`); no `LSPRuntimeError`; request handler returns `Result<TRequest::Result, lsp_server::ResponseError>`; notification handler returns `Vec<IsographEffect>` (isograph returns `LSPRuntimeResult<()>`; i2's `handle` returns effects); request `JsonError` uses the real id (isograph `"default-lsp-id"`); the dispatcher holds `lsp_server::Request` / `lsp_server::Notification`, not the reply sender; `handle` wraps a request `Response` as `SendLspResponse`.
+After lsp-port.md, the session special-cases `isograph/event` and ignores every other notification. After lsp-request-response.md, a request is `LspRequest` and `handle` is `method_not_found`. This slice makes the session a pump: every request is `LspRequest`, every notification is `LspNotification`. `handle` of `LspRequest` is isograph `dispatch_request`. `handle` of `LspNotification` is isograph `dispatch_notification`. The request chain is empty. The notification chain has `isograph/event`. Tokens adds one `.on_request_sync`.
+
+Origin: isograph `crates/isograph_lsp/src/lsp_request_dispatch.rs`, `lsp_notification_dispatch.rs`, `lsp_runtime_error.rs`, `server.rs` `dispatch_request` / `dispatch_notification`. Delta on the three files: none. They are copied into `crates/isograph_lsp/src/` under the same names, including `#[cfg(test)]`. `lib.rs` has `pub mod` for all three (isograph's `lsp_request_dispatch` is `mod`; the call site here is `isograph_cli`). Call-site delta: `TState` is `IsographState` not `LspState`; request leftover is `method_not_found`; notification `TState` is `(&mut IsographState, &mut Vec<IsographEffect>)` because the existing handler returns `LSPRuntimeResult<()>` and `handle` returns effects; `handle` wraps the request `Response` as `SendLspResponse`.
 
 One shippable change. Unknown requests are still `MethodNotFound`. `isograph send` still initialize + `isograph/event`. Existing CLI send tests stay green.
 
-`docs-website/docs/design-docs/event-model.md` Inner: `handle` of `LspRequest` runs the request chain; leftover is `MethodNotFound`. `handle` of `LspNotification` runs the notification chain; leftover is no effects. The session does not interpret methods after `initialize`.
+`docs-website/docs/design-docs/event-model.md` Inner: `handle` of `LspRequest` runs `LSPRequestDispatch`; leftover is `MethodNotFound`. `handle` of `LspNotification` runs `LSPNotificationDispatch`; leftover is no effects. The session does not interpret methods after `initialize`.
 
 ## What the user does
 
-Same as after lsp-request-response.md. `isograph send` still initialize + `isograph/event`. An unknown request after initialize is still `MethodNotFound`. An unknown notification is still dropped.
+Same as after lsp-request-response.md.
 
 ## Types
 
 Most important first.
+
+Copy these isograph files into `crates/isograph_lsp/src/` under the same names, including `#[cfg(test)]` modules and doc comments. Byte-for-byte with the origin besides path. Do not edit them. Do not reimplement `on_request_sync` / `on_notification_sync` / `convert_to_lsp_response` / `extract_request_params` / `extract_notification_params` / `LSPRuntimeError` in `isograph_cli`.
+
+- `crates/isograph_lsp/src/lsp_runtime_error.rs` from isograph `crates/isograph_lsp/src/lsp_runtime_error.rs`
+- `crates/isograph_lsp/src/lsp_request_dispatch.rs` from isograph `crates/isograph_lsp/src/lsp_request_dispatch.rs`
+- `crates/isograph_lsp/src/lsp_notification_dispatch.rs` from isograph `crates/isograph_lsp/src/lsp_notification_dispatch.rs`
+
+`crates/prelude/src/postfix_constructors.rs` `walk_rust` skips those three filenames. They use `Ok` / `Err` / `Some` / `.into()` as isograph wrote them.
+
+```rust
+// from crates/isograph_lsp/src/lsp_runtime_error.rs
+pub type LSPRuntimeResult<T> = std::result::Result<T, LSPRuntimeError>;
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum LSPRuntimeError {
+    ExpectedError,
+    UnexpectedError(String),
+}
+```
+
+`From<LSPRuntimeError> for Option<lsp_server::ResponseError>` is in that file.
+
+```rust
+// from crates/isograph_lsp/src/lsp_request_dispatch.rs
+pub struct LSPRequestDispatch<'state, TState> {
+    request: lsp_server::Request,
+    state: &'state TState,
+}
+
+impl<'state, TState> LSPRequestDispatch<'state, TState> {
+    pub fn new(request: lsp_server::Request, state: &'state TState) -> Self;
+
+    pub fn on_request_sync<TRequest: lsp_types::request::Request>(
+        self,
+        handler: fn(&TState, TRequest::Params) -> LSPRuntimeResult<TRequest::Result>,
+    ) -> ControlFlow<lsp_server::Response, Self>;
+
+    pub fn request(self) -> lsp_server::Request;
+}
+
+pub(crate) fn convert_to_lsp_response(
+    id: lsp_server::RequestId,
+    result: LSPRuntimeResult<serde_json::Value>,
+) -> lsp_server::Response;
+
+fn extract_request_params<R: lsp_types::request::Request>(
+    req: lsp_server::Request,
+) -> LSPRuntimeResult<(lsp_server::RequestId, R::Params)>;
+```
+
+```rust
+// from crates/isograph_lsp/src/lsp_notification_dispatch.rs
+pub struct LSPNotificationDispatch<'state, TState> {
+    notification: lsp_server::Notification,
+    state: &'state mut TState,
+}
+
+impl<'state, TState> LSPNotificationDispatch<'state, TState> {
+    pub fn new(notification: lsp_server::Notification, state: &'state mut TState) -> Self;
+
+    pub fn on_notification_sync<TNotification: lsp_types::notification::Notification>(
+        self,
+        handler: fn(&mut TState, TNotification::Params) -> LSPRuntimeResult<()>,
+    ) -> ControlFlow<Option<LSPRuntimeError>, Self>;
+
+    pub fn notification(self) -> lsp_server::Notification;
+}
+
+fn extract_notification_params<N: lsp_types::notification::Notification>(
+    notification: lsp_server::Notification,
+) -> N::Params;
+```
+
+`extract_notification_params` `expect`s. A notification whose method matched and whose params fail to deserialize panics. Same as isograph. Request extract `catch_unwind`s that panic and returns `UnexpectedError` with id `"default-lsp-id"`. Same as isograph.
+
+Do not copy `lsp_command_dispatch.rs`. That is `ExecuteCommand` later.
 
 ```rust
 // from crates/isograph_cli/src/event.rs
@@ -50,129 +128,6 @@ pub enum IsographEvent {
 
 `LspNotification` is a newtype: one field. `LspRequest` stays a struct because of `reply`. Neither is a `--file` kind.
 
-```rust
-// from crates/isograph_cli/src/lsp_dispatch.rs
-use std::ops::ControlFlow;
-
-use lsp_server::ExtractError;
-use lsp_types::request::Request;
-use prelude::Postfix;
-use tracing::warn;
-
-pub struct LspRequestDispatch<'state, TState> {
-    request: lsp_server::Request,
-    state: &'state TState,
-}
-
-impl<'state, TState> LspRequestDispatch<'state, TState> {
-    pub fn new(request: lsp_server::Request, state: &'state TState) -> Self {
-        Self { request, state }
-    }
-
-    pub fn on_request_sync<TRequest: Request>(
-        self,
-        handler: fn(&TState, TRequest::Params) -> Result<TRequest::Result, lsp_server::ResponseError>,
-    ) -> ControlFlow<lsp_server::Response, Self> {
-        if self.request.method != TRequest::METHOD {
-            return ControlFlow::Continue(self);
-        }
-        let id = self.request.id.clone();
-        match self.request.extract::<TRequest::Params>(TRequest::METHOD) {
-            Ok((_, params)) => {
-                let response = match handler(self.state, params) {
-                    Ok(result) => match serde_json::to_value(result) {
-                        Ok(value) => lsp_server::Response {
-                            id,
-                            result: value.wrap_some(),
-                            error: None,
-                        },
-                        Err(e) => {
-                            warn!(error = %e, "could not encode request result");
-                            lsp_server::Response::new_err(
-                                id,
-                                lsp_server::ErrorCode::InternalError as i32,
-                                "could not encode request result".to_owned(),
-                            )
-                        }
-                    },
-                    Err(error) => lsp_server::Response {
-                        id,
-                        result: None,
-                        error: error.wrap_some(),
-                    },
-                };
-                ControlFlow::Break(response)
-            }
-            Err(ExtractError::MethodMismatch(request)) => ControlFlow::Continue(Self {
-                request,
-                state: self.state,
-            }),
-            Err(ExtractError::JsonError { method, error }) => {
-                warn!(method = method.as_str(), error = %error, "request params");
-                ControlFlow::Break(lsp_server::Response::new_err(
-                    id,
-                    lsp_server::ErrorCode::InvalidParams as i32,
-                    "invalid request params".to_owned(),
-                ))
-            }
-        }
-    }
-
-    pub fn request(self) -> lsp_server::Request {
-        self.request
-    }
-}
-```
-
-Origin: isograph `LSPRequestDispatch::on_request_sync` and `convert_to_lsp_response`. Delta: extract is `Result`; no `LSPRuntimeError`, no `catch_unwind`, no `"default-lsp-id"`; `JsonError` is `InvalidParams` with the real `id` cloned before `extract` consumes the request; postfix. `Break` is `lsp_server::Response`, same as isograph. After the method-string check, `extract` returning `MethodMismatch` is restore-and-Continue. Do not `unwrap`.
-
-```rust
-// from crates/isograph_cli/src/lsp_dispatch.rs
-use lsp_types::notification::Notification;
-
-pub struct LspNotificationDispatch<'state, TState> {
-    notification: lsp_server::Notification,
-    state: &'state mut TState,
-}
-
-impl<'state, TState> LspNotificationDispatch<'state, TState> {
-    pub fn new(notification: lsp_server::Notification, state: &'state mut TState) -> Self {
-        Self {
-            notification,
-            state,
-        }
-    }
-
-    pub fn on_notification_sync<TNotification: Notification>(
-        self,
-        handler: fn(&mut TState, TNotification::Params) -> Vec<crate::effect::IsographEffect>,
-    ) -> ControlFlow<Vec<crate::effect::IsographEffect>, Self> {
-        if self.notification.method != TNotification::METHOD {
-            return ControlFlow::Continue(self);
-        }
-        match self.notification.extract::<TNotification::Params>(TNotification::METHOD) {
-            Ok(params) => ControlFlow::Break(handler(self.state, params)),
-            Err(ExtractError::MethodMismatch(notification)) => ControlFlow::Continue(Self {
-                notification,
-                state: self.state,
-            }),
-            Err(ExtractError::JsonError { method, error }) => {
-                warn!(method = method.as_str(), error = %error, "notification params");
-                ControlFlow::Break(Vec::new())
-            }
-        }
-    }
-
-    pub fn notification(self) -> lsp_server::Notification {
-        self.notification
-    }
-}
-```
-
-Origin: isograph `LSPNotificationDispatch::on_notification_sync`. Delta: extract is `Result`; handler returns `Vec<IsographEffect>` not `LSPRuntimeResult<()>` (`handle` returns effects; isograph mutates `LspState` and has no effect layer); `JsonError` logs and `Break`s with no effects (isograph `expect`s); postfix. `&mut TState` is isograph. `Break` carries the handler's effects instead of `Option<LSPRuntimeError>`.
-
-Do not copy `LspIsographCommandDispatch`. That is `ExecuteCommand` later.
-
 ### `handle`
 
 ```rust
@@ -197,7 +152,8 @@ fn dispatch_lsp_request<THostLanguage: HostLanguage>(
     request: lsp_server::Request,
 ) -> lsp_server::Response {
     let get_response = || {
-        let request = crate::lsp_dispatch::LspRequestDispatch::new(request, state).request();
+        let request =
+            isograph_lsp::lsp_request_dispatch::LSPRequestDispatch::new(request, state).request();
         ControlFlow::Continue(request)
     };
     match get_response() {
@@ -226,37 +182,84 @@ fn dispatch_lsp_notification<THostLanguage: HostLanguage>(
     state: &mut IsographState<THostLanguage>,
     notification: lsp_server::Notification,
 ) -> Vec<IsographEffect> {
-    let dispatch = || {
-        crate::lsp_dispatch::LspNotificationDispatch::new(notification, state)
-            .on_notification_sync::<crate::lsp_socket::IsographEventNotification>(
-                on_isograph_event::<THostLanguage>,
-            )?
-            .notification();
-        ControlFlow::Continue(())
-    };
-    match dispatch() {
-        ControlFlow::Break(effects) => effects,
-        ControlFlow::Continue(()) => Vec::new(),
-    }
+    let mut effects = Vec::new();
+    let _ = dispatch_notification(state, &mut effects, notification);
+    effects
+}
+
+fn dispatch_notification<THostLanguage: HostLanguage>(
+    state: &mut IsographState<THostLanguage>,
+    effects: &mut Vec<IsographEffect>,
+    notification: lsp_server::Notification,
+) -> ControlFlow<Option<isograph_lsp::lsp_runtime_error::LSPRuntimeError>, ()> {
+    isograph_lsp::lsp_notification_dispatch::LSPNotificationDispatch::new(
+        notification,
+        &mut (state, effects),
+    )
+    .on_notification_sync::<crate::lsp_socket::IsographEventNotification>(
+        on_isograph_event::<THostLanguage>,
+    )?
+    .notification();
+    ControlFlow::Continue(())
 }
 
 fn on_isograph_event<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
+    (state, effects): &mut (
+        &mut IsographState<THostLanguage>,
+        &mut Vec<IsographEffect>,
+    ),
     event: crate::event::IsographEvent,
-) -> Vec<IsographEffect> {
-    handle(state, event)
+) -> isograph_lsp::lsp_runtime_error::LSPRuntimeResult<()> {
+    effects.extend(handle(state, event));
+    ().wrap_ok()
 }
 ```
 
-`dispatch_request` / `dispatch_notification` are isograph `server.rs`. Request leftover is MethodNotFound (same text). Notification leftover is no effects (isograph `ControlFlow::Continue(())`).
+`dispatch_lsp_request` / `dispatch_notification` are isograph `server.rs`. Request leftover is MethodNotFound (same text). Notification leftover is `ControlFlow::Continue(())`; `dispatch_lsp_notification` then returns the effects the handler pushed.
 
 This slice the request chain has zero `on_request_sync` calls. Tokens inserts `.on_request_sync::<SemanticTokensFullRequest>(...)?` before `.request()`.
 
 The notification chain has `isograph/event`. `on_isograph_event` calls `handle` with the extracted event (`HelloWorld` / `Quit` / `DiskChanged`). `LspRequest` / `LspNotification` are `#[serde(skip)]`, so they are not a `--file` / `isograph/event` payload. One-level re-entry.
 
-`method_not_found` returns `Response`. `handle` wraps it with `incoming.reply` as `SendLspResponse`. The dispatcher does not hold the reply sender.
+The existing notification handler is `fn(&mut TState, Params) -> LSPRuntimeResult<()>`. It cannot return effects. `TState` is therefore `(&mut IsographState, &mut Vec<IsographEffect>)`. Request `TState` is `&IsographState`, same as isograph's `&LspState`.
 
-`lib.rs`: `mod lsp_dispatch;`
+`method_not_found` returns `Response`. `handle` wraps it with `incoming.reply` as `SendLspResponse`.
+
+No `crates/isograph_cli/src/lsp_dispatch.rs`.
+
+```rust
+// from crates/isograph_lsp/src/lib.rs
+pub mod lsp_notification_dispatch;
+pub mod lsp_request_dispatch;
+pub mod lsp_runtime_error;
+```
+
+```toml
+# from crates/isograph_lsp/Cargo.toml
+lsp-server = { workspace = true }
+serde_json = { workspace = true }
+```
+
+```toml
+# from crates/isograph_cli/Cargo.toml
+isograph_lsp = { path = "../isograph_lsp" }
+```
+
+```rust
+// from crates/prelude/src/postfix_constructors.rs
+            } else if path.extension().is_some_and(|e| e == "rs") {
+                let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                if matches!(
+                    name,
+                    "lsp_request_dispatch.rs"
+                        | "lsp_notification_dispatch.rs"
+                        | "lsp_runtime_error.rs"
+                ) {
+                    continue;
+                }
+                lint_rust_file(path.reference(), hits);
+            }
+```
 
 ### Session
 
@@ -291,11 +294,9 @@ The session does not match `IsographEventNotification::METHOD`. `Connection::ini
 
 `handle` of `LspNotification` whose method is `window/logMessage`: no effects.
 
-`handle` of `LspNotification` whose method is `isograph/event` and params are `{"kind":"Nope"}`: no effects.
+Do not `handle` an `isograph/event` whose params fail to deserialize. `extract_notification_params` `expect`s; that is a panic. `bad_event_params_are_not_an_event` stays on `listen_for_events` (no `handle`): the session posts `LspNotification`; params do not deserialize as `IsographEvent`; then `HelloWorld` on the same connection is a second `LspNotification` whose params are `HelloWorld`.
 
 `lsp_socket.rs`: `listen_for_events` sees `LspNotification`, not `HelloWorld` / `DiskChanged` / `Quit`. Assert `notification.0.method` is `IsographEventNotification::METHOD` and `serde_json::from_value::<IsographEvent>(notification.0.params)` is that event. Same for the existing HelloWorld / DiskChanged present-then-absent / multi-connection tests.
-
-`bad_event_params_are_not_an_event`: the session posts `LspNotification`. Params do not deserialize as `IsographEvent`. Then `HelloWorld` on the same connection is a second `LspNotification` whose params are `HelloWorld`.
 
 `unknown_notification_is_not_an_event`: `window/logMessage` arrives as `LspNotification`. Then `HelloWorld` as today.
 
@@ -307,11 +308,13 @@ MethodNotFound / shutdown / ServerNotInitialized tests stay. `listen_and_reply` 
 
 `cli.rs` unchanged.
 
+The copied `#[cfg(test)]` modules in `isograph_lsp` stay. They are isograph's tests of those structs.
+
 Do not add a production API only tests call.
 
 ## Call sites
 
-- `run_session` Request -> `LspRequest` -> `handle` -> `dispatch_lsp_request` -> Continue `method_not_found` or Break `Response` -> `SendLspResponse` -> `perform`
-- `run_session` Notification -> `LspNotification` -> `handle` -> `dispatch_lsp_notification` -> `isograph/event` `on_isograph_event` -> `handle` of `HelloWorld` / `Quit` / `DiskChanged`, or leftover empty
-- lsp-tokens.md -> `.on_request_sync::<SemanticTokensFullRequest>(semantic_tokens_response)?`
-- later didOpen / didChange / didClose -> `.on_notification_sync` on the same chain
+- `run_session` Request -> `LspRequest` -> `handle` -> `LSPRequestDispatch` -> Continue `method_not_found` or Break `Response` -> `SendLspResponse` -> `perform`
+- `run_session` Notification -> `LspNotification` -> `handle` -> `LSPNotificationDispatch` -> `isograph/event` `on_isograph_event` -> `handle` of `HelloWorld` / `Quit` / `DiskChanged`, or leftover empty
+- lsp-tokens.md -> `.on_request_sync::<SemanticTokensFullRequest>(...)?` on `LSPRequestDispatch`
+- later didOpen / didChange / didClose -> `.on_notification_sync` on `LSPNotificationDispatch`

@@ -4,7 +4,7 @@ Requires lsp-request-response.md and lsp-dispatch.md. Independent of filesystem-
 
 `dispatch_lsp_request` has an empty `on_request_sync` chain. This file adds `.on_request_sync::<SemanticTokensFullRequest>(semantic_tokens_response)?` before `.request()`. Do not special-case tokens in `run_session`. `isograph/event` stays a notification arm.
 
-Origin of the method: `lsp_types::request::SemanticTokensFullRequest`. Origin of the handler: isograph `on_semantic_token_full_request`. Origin of tokens: `lsp_semantic_tokens_for_file`. Origin of initialize options: isograph `server.rs` `initialize`. Delta: extract is `Result`; URI to path has no `expect`; missing `DiskFile` is JSON `null`.
+Origin of the method: `lsp_types::request::SemanticTokensFullRequest`. Origin of the handler: isograph `on_semantic_token_full_request`. Origin of tokens: `lsp_semantic_tokens_for_file`. Origin of initialize options: isograph `server.rs` `initialize`. Origin of the dispatcher: isograph `LSPRequestDispatch`. Delta: URI to path has no `expect`; missing `DiskFile` is `Ok(None)` (JSON `null`).
 
 One shippable change. An e2e that notifies DiskChanged and immediately asks for tokens can race; that is later.
 
@@ -23,34 +23,36 @@ Send notifies `isograph/event` and exits. Then `textDocument/semanticTokens/full
 
 ```rust
 // from crates/isograph_cli/src/state.rs
-        let request = crate::lsp_dispatch::LspRequestDispatch::new(request, state)
+        let request = isograph_lsp::lsp_request_dispatch::LSPRequestDispatch::new(request, state)
             .on_request_sync::<lsp_types::request::SemanticTokensFullRequest>(
                 semantic_tokens_response::<THostLanguage>,
             )?
             .request();
 ```
 
-`semantic_tokens_response` takes `&IsographState`, `SemanticTokensParams`, returns `Result<Option<lsp_types::SemanticTokens>, lsp_server::ResponseError>`. Missing file is `Ok(None)` (JSON `null`). Non-file URI is `Err` `InvalidParams`.
+`semantic_tokens_response` takes `&IsographState`, `SemanticTokensParams`, returns `isograph_lsp::lsp_runtime_error::LSPRuntimeResult<<lsp_types::request::SemanticTokensFullRequest as lsp_types::request::Request>::Result>`. Missing file is `Ok(None)` (JSON `null`). Non-file URI is `Err(LSPRuntimeError::UnexpectedError(...))`.
 
 ```rust
 // from crates/isograph_cli/src/adapter.rs
 fn semantic_tokens_response<THostLanguage: isograph_compiler::HostLanguage>(
     state: &isograph_compiler::IsographState<THostLanguage>,
     params: lsp_types::SemanticTokensParams,
-) -> Result<Option<lsp_types::SemanticTokens>, lsp_server::ResponseError> {
+) -> isograph_lsp::lsp_runtime_error::LSPRuntimeResult<
+    <lsp_types::request::SemanticTokensFullRequest as lsp_types::request::Request>::Result,
+> {
     let Some(absolute) = file_path(params.text_document.uri.reference()) else {
-        return lsp_server::ResponseError {
-            code: lsp_server::ErrorCode::InvalidParams as i32,
-            message: "textDocument.uri is not a file path".to_owned(),
-            data: None,
-        }
+        return isograph_lsp::lsp_runtime_error::LSPRuntimeError::UnexpectedError(
+            "textDocument.uri is not a file path".to_owned(),
+        )
         .wrap_err();
     };
     let tokens = semantic_tokens(state, absolute.reference());
     tokens
-        .map(|data| lsp_types::SemanticTokens {
-            result_id: None,
-            data,
+        .map(|data| {
+            lsp_types::SemanticTokensResult::Tokens(lsp_types::SemanticTokens {
+                result_id: None,
+                data,
+            })
         })
         .wrap_ok()
 }
@@ -112,7 +114,7 @@ url = { workspace = true }
 - initialize legend `tokenTypes[15]` is `keyword`
 - `notify` DiskChanged of `/tmp/proj/src/Home.ts` with the one-literal contents, settle, then `semanticTokens/full` for `file:///tmp/proj/src/Home.ts` on a second connection that has initialized: first token type 15, length 10
 - `full` for a URI that was never interned: `result` is JSON `null`
-- `full` with a non-file URI: `InvalidParams`
+- `full` with a non-file URI: `UnknownErrorCode`, message `textDocument.uri is not a file path`
 - unknown request is still `MethodNotFound`
 
 `state.rs` is unchanged. No `handle` of a tokens event.
