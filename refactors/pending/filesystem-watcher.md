@@ -9,14 +9,13 @@ The notify callback categorizes and sends `SourceFileEvent`. `run_filesystem_wat
 Deltas from those files, exhaustive:
 
 - `Filesystem` instead of `--watch: bool`. Default `Watch`. `Injected` does not create a debouncer.
-- `source_files` is membership. isograph used `path.starts_with(project_root)`. Ordered globs, `!` excludes, last match wins. Watch/walk root for a positive glob is the static prefix before the first `*`, `?`, `[`, or `{`. `**/*.ts` watches the config directory (`max_user_watches` if that is the repo root). `[]` watches nothing and intern nothing.
-- A file glob does not match its parent directory. Folder create/delete is in scope if the path is under a watch root, not if `src` matches `src/**/*.ts`.
+- `source_files` is which files intern. isograph used `path.starts_with(project_root)` plus an extension check. Ordered globs, `!` excludes, last match wins. The watch/walk root is the config directory, isograph's `project_root` analog. Folder events under that directory are in scope even when the folder path itself does not match a file glob (`src` vs `src/**/*.ts`). `[]` intern nothing. Watching the config directory when it is the repo root is the `max_user_watches` case isograph avoided by pointing `project_root` at `./src`.
 - The extension check in `read_files_in_folder` is `HostLanguage::should_skip_source_file`. One associated function, two-variant enum (`Skip` / `Keep`). Not a memo. Not a second trait: the CLI is already generic over `THostLanguage`.
 - `__isograph` is skipped in the walker (`ISOGRAPH_FOLDER` on `isograph_config`). Not HostLanguage.
 - No schema / schema-extension / artifact-directory watches. Config-file events are `ChangedFileKind::Config` and are dropped. The daemon does not reload config.
 - Watch, then boot-walk. isograph compiled then watched and missed the gap.
-- Copy `categorize_and_filter_events` / `process_create_event` / `process_modify_event` / `process_remove_event`. Then: `CreateKind::Folder` scans; `RenameMode::From` / `To`; `EventKind::Any` and `ModifyKind::Any` (not `Name`) like isograph's `RenameMode::Any`; `need_rescan()` re-walks every watch root; no panic on path count (`paths.first()` / `paths.get(1)`).
-- `RemoveKind::File` uses the file glob after the path is gone. `RemoveKind::Folder` uses watch-root membership.
+- Copy `categorize_and_filter_events` / `process_create_event` / `process_modify_event` / `process_remove_event`. Then: `CreateKind::Folder` scans; `RenameMode::From` / `To`; `EventKind::Any` and `ModifyKind::Any` (not `Name`) like isograph's `RenameMode::Any`; `need_rescan()` re-walks the config directory; no panic on path count (`paths.first()` / `paths.get(1)`).
+- `RemoveKind::File` uses the file glob after the path is gone. `RemoveKind::Folder` is in scope if the path is under the config directory.
 - `apply` is `update_sources`: `SourceFile` -> `DiskChanged::File`, `SourceFolder` remove/rename-from -> `FolderRemoved`. Failed read of an interned file posts `File` `Absent`. Skip non-regular files and non-UTF8 paths; do not call `handle` with a path that will not stringify.
 - `Path::starts_with` in `remove_disk_files_from_path`. isograph uses string `starts_with`.
 - Unbounded send from the notify thread. isograph `channel(1)` plus `Handle::spawn`. `watch()` errors are `WatchError`, not `expect`.
@@ -322,7 +321,7 @@ async fn run_filesystem_watcher<THostLanguage: HostLanguage>(
 
 ### Watch
 
-Copy `create_debounced_file_watcher`: `new_debouncer` 100ms, `RecommendedWatcher`, `RecommendedCache`, `watch()` each root. Callback: `categorize_and_filter_events`, `watch_tx.send`. Then boot-walk each root with `visit_dirs_skipping_isograph` and send those `SourceFile` creates.
+Copy `create_debounced_file_watcher`: `new_debouncer` 100ms, `RecommendedWatcher`, `RecommendedCache`, recursive `watch()` of the config directory. Callback: `categorize_and_filter_events`, `watch_tx.send`. Then boot-walk that directory with `visit_dirs_skipping_isograph` and send those `SourceFile` creates.
 
 ```rust
 // from crates/isograph_cli/src/watch.rs
@@ -337,20 +336,11 @@ pub fn start<THostLanguage: HostLanguage>(
 ) -> Result<Watcher, WatchError>;
 ```
 
-`WatchError`: failed `new_debouncer`, failed `watch()` of a root (path plus `notify::Error`), invalid glob.
+`WatchError`: failed `new_debouncer`, failed `watch()` of the config directory (path plus `notify::Error`), invalid glob.
 
-`source_files` membership is `SourceGlobs`: compile each glob with `globset`, `!` is exclude, last match wins. `watch_roots` maps each include pattern through `static_prefix` and joins onto the config directory.
+`source_files` membership is `SourceGlobs`: compile each glob with `globset`, `!` is exclude, last match wins. Copy `visit_dirs_skipping_isograph` from isograph (`ISOGRAPH_FOLDER`). Warn and skip a `read_dir` error. A directory symlink to an ancestor loops; isograph does not detect that.
 
-```rust
-fn static_prefix(glob: &str) -> PathBuf {
-    let end = glob.find(['*', '?', '[', '{']).unwrap_or(glob.len());
-    PathBuf::from(glob[..end].trim_end_matches('/'))
-}
-```
-
-`static_prefix("src/**/*.ts")` is `src`. `static_prefix("**/*.ts")` is empty (config directory). Copy `visit_dirs_skipping_isograph` from isograph (`ISOGRAPH_FOLDER`). Warn and skip a `read_dir` error. A directory symlink to an ancestor loops; isograph does not detect that.
-
-Copy `categorize_and_filter_events` and the `process_*` functions from isograph `watch.rs`. Membership is `source_files` plus watch-root for folders, not `project_root` / schema / artifacts. Deltas are the bullet list at the top of this file. Do not re-implement notify's event matrix from scratch.
+Copy `categorize_and_filter_events` and the `process_*` functions from isograph `watch.rs`. Files are in scope if `source_files` matches. Folders are in scope if they are under the config directory. Deltas are the bullet list at the top of this file. Do not re-implement notify's event matrix from scratch.
 
 ```rust
 // from crates/isograph_cli/src/watch.rs
@@ -373,7 +363,7 @@ TypeScript `should_skip_source_file`: `ts` / `tsx` / `js` / `jsx` (including `a.
 
 `ISOGRAPH_FOLDER` is `"__isograph"`.
 
-Globs: `["src/**/*.ts"]` contains `src/a.ts`, not `src/a.tsx`, not `lib/a.ts`. `["src/**/*.ts", "!src/**/*.test.ts"]` contains `src/a.ts`, not `src/a.test.ts`. `[]` contains nothing. `["src/**/*.in"]` contains `src/a.in`, not `src`. `watch_roots` of that list is `src`. `categorize_folder` of `src` is `SourceFolder`.
+Globs: `["src/**/*.ts"]` contains `src/a.ts`, not `src/a.tsx`, not `lib/a.ts`. `["src/**/*.ts", "!src/**/*.test.ts"]` contains `src/a.ts`, not `src/a.test.ts`. `[]` contains nothing. `["src/**/*.in"]` contains `src/a.in`, not `src`. Folder `src` under the config directory is still `SourceFolder`.
 
 `database.rs` `TestHostLanguage::should_skip_source_file` returns `Keep`.
 
@@ -386,10 +376,10 @@ Behavior, not notify internals:
 - Create of folder `src` intern `src/a.in` even though `src` does not match the glob.
 - Remove of file `src/a.in` is `File` `Absent`. Remove of folder `src` is `FolderRemoved`; after `handle`, `src/a.in` is gone.
 - Rename file: `File` `Absent` of from, `Present` of to. Rename folder: `FolderRemoved` of from, then `Present` of files under to.
-- Empty `source_files`: no watch roots, boot posts nothing.
+- Empty `source_files`: boot posts nothing.
 - Walk skips `__isograph`.
 - Failed read after a successful `Present` posts `File` `Absent`; after `handle` the interned file is gone.
-- `need_rescan` re-walks watch roots and intern matching files again.
+- `need_rescan` re-walks the config directory and intern matching files again.
 
 Live notify, same crate. Temp dir, intern_config_directory, `start`, `apply`, `handle`. Deadline 10s.
 
