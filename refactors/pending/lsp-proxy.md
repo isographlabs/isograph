@@ -64,7 +64,7 @@ Not hidden. `ConfigFlag` is `--config`. Do not add `IsographArgs`.
 
 `freddie_cli::client::start` is `pub(crate)` and writes "started" / "already running" on stdout. Stdout of this process is LSP. Nested `Command::new(current_exe())` `start`: stdin and stdout `Stdio::null()`, stderr inherit, cwd and `HOME` / `XDG_STATE_HOME` / `LOCALAPPDATA` inherited. Forward `--config` when the flag was set. Always invoke start. Start adopts if the lock is held.
 
-`isograph start` returning is lock held, not listen done. `run_daemon` unlinks `{slug}.port` after the lock, then binds, then writes the file. Loop until connect succeeds or 10s.
+`isograph start` returning is lock held, not listen done. `run_daemon` unlinks `{slug}.port` after the lock, then binds, then writes the file. Subscribe to the parent directory first, then start, then connect. A regular file does not wake `read`. Do not `sleep`.
 
 ```rust
 // from crates/isograph_cli/src/lsp_stdio.rs
@@ -77,13 +77,13 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
 
+use notify::Watcher;
 use prelude::Postfix;
 
 use crate::ConfigFlag;
 use crate::discover::DiscoverError;
 
 const PORT_DEADLINE: Duration = Duration::from_secs(10);
-const POLL: Duration = Duration::from_millis(50);
 
 #[derive(Debug)]
 struct ReadPort {
@@ -115,6 +115,13 @@ enum LspError {
     Clone(io::Error),
     #[error("could not connect to 127.0.0.1:{}: {}", .0.port, .0.source)]
     Connect(Connect),
+    #[error("could not watch the port file: {0}")]
+    Watch(notify::Error),
+}
+
+struct PortWatch {
+    events: mpsc::Receiver<()>,
+    _watcher: notify::RecommendedWatcher,
 }
 ```
 
@@ -135,8 +142,10 @@ pub fn run(id: &ConfigFlag) -> ExitCode {
 
 fn run_inner(id: &ConfigFlag) -> Result<(), LspError> {
     let (_, instance) = crate::discover::instance_for_config_path(id.config.as_deref())?;
+    let port_path = crate::discover::port_file(instance.lock_file());
+    let watch = watch_port_parent(port_path.reference())?;
     start_daemon(id)?;
-    let stream = connect_to_daemon(&crate::discover::port_file(instance.lock_file()))?;
+    let stream = connect_to_daemon(port_path.reference(), watch.reference())?;
     copy_stdio(stream)
 }
 
@@ -159,8 +168,27 @@ fn start_daemon(id: &ConfigFlag) -> Result<(), LspError> {
     }
 }
 
-fn connect_to_daemon(path: &Path) -> Result<TcpStream, LspError> {
-    let start = Instant::now();
+fn watch_port_parent(path: &Path) -> Result<PortWatch, LspError> {
+    let parent = path
+        .parent()
+        .expect("a port file path has a parent directory");
+    let (tx, events) = mpsc::channel();
+    let mut watcher = notify::recommended_watcher(move |_| {
+        let _ = tx.send(());
+    })
+    .map_err(LspError::Watch)?;
+    watcher
+        .watch(parent, notify::RecursiveMode::NonRecursive)
+        .map_err(LspError::Watch)?;
+    PortWatch {
+        events,
+        _watcher: watcher,
+    }
+    .wrap_ok()
+}
+
+fn connect_to_daemon(path: &Path, watch: &PortWatch) -> Result<TcpStream, LspError> {
+    let deadline = Instant::now() + PORT_DEADLINE;
     let mut last_connect = None;
     loop {
         match fs::read_to_string(path) {
@@ -181,13 +209,18 @@ fn connect_to_daemon(path: &Path) -> Result<TcpStream, LspError> {
                 .wrap_err();
             }
         }
-        if start.elapsed() >= PORT_DEADLINE {
-            return match last_connect {
-                Some(connect) => LspError::Connect(connect).wrap_err(),
-                None => LspError::NoPort.wrap_err(),
-            };
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            break;
         }
-        thread::sleep(POLL);
+        match watch.events.recv_timeout(remaining) {
+            Ok(()) => {}
+            Err(mpsc::RecvTimeoutError::Timeout | mpsc::RecvTimeoutError::Disconnected) => break,
+        }
+    }
+    match last_connect {
+        Some(connect) => LspError::Connect(connect).wrap_err(),
+        None => LspError::NoPort.wrap_err(),
     }
 }
 

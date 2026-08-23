@@ -24,9 +24,10 @@ Requires config-discovery.md (landed), the event-model design-doc, and `docs-web
 18. lsp-outstanding.md. Later. `LspClientId`, `LspClientGone`, outstanding `(LspClientId, RequestId)`. For disconnect/cancel/async, not for highlighting.
 19. lsp-sessions.md. Later. `ClientCapabilities` from `initialize` and a writer map for `publishDiagnostics`.
 20. lsp-diagnostics.md. Later. Debounce then `publishDiagnostics`. Requires 19.
-21. lsp-proxy.md. Later. `isograph lsp` stdio copy onto the port.
-22. vscode-extension.md (landed). After 16 and 21. VS Code extension; highlighting only.
-23. vscode-config-discovery.md. After 22. One LanguageClient per config; walk-up from the file.
-24. zed-and-vscode-extensions.md.
+21. start-returns-when-listening.md. Before lsp-proxy. `isograph start` / `restart` / the bare binary do not return until `TcpStream::connect` to `{slug}.port` succeeds.
+22. lsp-proxy.md. Later. `isograph lsp` stdio copy onto the port. Nested start, one connect, `std::io::copy`.
+23. vscode-extension.md (landed). After 16 and 22. VS Code extension; highlighting only.
+24. vscode-config-discovery.md. After 23. One LanguageClient per config; walk-up from the file.
+25. zed-and-vscode-extensions.md.
 
 `AsyncWorkFinished` and `StartAsyncWork` land with compilation.
