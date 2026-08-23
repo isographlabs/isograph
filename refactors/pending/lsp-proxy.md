@@ -1,6 +1,6 @@
 # `isograph lsp` stdio proxy
 
-Requires lsp-port.md (landed) and no-poll-in-tests.md. Independent of lsp-tokens.md, lsp-sessions.md, lsp-diagnostics.md. The daemon port is already LSP JSON-RPC. This verb is a byte copy, not a second handshake.
+Requires lsp-port.md (landed). Independent of lsp-tokens.md, lsp-sessions.md, lsp-diagnostics.md, no-poll-in-tests.md. The daemon port is already LSP JSON-RPC. This verb is a byte copy, not a second handshake.
 
 VS Code and Zed spawn a process on stdio. They do not dial `{slug}.port`. `isograph lsp` is that process: the same walk-up / `--config` as every verb, start the daemon if needed, dial the LSP port, copy stdin/stdout. Dropping the editor drops the proxy. The daemon stays up.
 
@@ -396,7 +396,7 @@ Drop `parse_port` from `send.rs`. Drop `use std::num::NonZeroU16` if nothing els
 
 ## Tests
 
-`cli.rs`. HOME isolation as today. Do not bring up VS Code. Do not assert semantic tokens (lsp-tokens.md). Do not add a production function only tests call. Tests do not poll (no-poll-in-tests.md). Nested start can take `START_TIMEOUT` (5s) plus `PORT_DEADLINE` (10s) before a byte is copied. Do not put a 10s timeout on the initialize read that is shorter than that. Block on `Message::read` and on `child.wait()`.
+`cli.rs`. HOME isolation as today. Do not bring up VS Code. Do not assert semantic tokens (lsp-tokens.md). Do not add a production function only tests call. Nested start can take `START_TIMEOUT` (5s) plus `PORT_DEADLINE` (10s) before a byte is copied. Block on `Message::read` and on `child.wait()`. Do not `sleep` and then hope the response is there.
 
 `ts_graphql_react_isograph_cli` tests write and read `lsp_server::Message` the way `send.rs` does. Do not hand-roll `Content-Length`.
 
