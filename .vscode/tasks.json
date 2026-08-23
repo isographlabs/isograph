@@ -3,9 +3,11 @@
   "tasks": [
     {
       "label": "vscode-extension: esbuild",
-      "type": "npm",
-      "script": "esbuild",
-      "path": "vscode-extension/",
+      "type": "shell",
+      "command": "npm run esbuild",
+      "options": {
+        "cwd": "${workspaceFolder}/vscode-extension"
+      },
       "problemMatcher": []
     }
   ]
