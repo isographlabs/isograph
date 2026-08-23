@@ -256,7 +256,7 @@ Intern `CurrentWorkingDirectory` before any `DiskChanged`. Bind, intern, start t
 
 `discover` hands a canonical config file path. A file path has a parent. The type system does not. Same `expect` as `intern_config_directory`.
 
-`serve` does not match on `Filesystem`.
+`serve` does not match on `Filesystem`. `start_if_watching` does.
 
 ```rust
 // from crates/isograph_cli/src/watch.rs
@@ -278,6 +278,33 @@ pub fn start_if_watching<THostLanguage: HostLanguage>(
 
 ```rust
 // from crates/isograph_cli/src/daemon.rs
+pub fn run<THostLanguage: HostLanguage>(
+    config_path: PathBuf,
+    port_path: PathBuf,
+    filesystem: Filesystem,
+    config: IsographProjectConfig,
+) {
+    // runtime as today
+    runtime.block_on(serve::<THostLanguage>(
+        config_path,
+        port_path,
+        filesystem,
+        config,
+    ));
+}
+
+async fn serve<THostLanguage: HostLanguage>(
+    config_path: PathBuf,
+    port_path: PathBuf,
+    filesystem: Filesystem,
+    config: IsographProjectConfig,
+) {
+    let (event_tx, event_rx) = unbounded_channel::<IsographEvent>();
+    let (effect_tx, effect_rx) = unbounded_channel::<IsographEffect>();
+    let (watch_tx, watch_rx) = unbounded_channel::<Vec<SourceFileEvent>>();
+    // bind listener, read port, as today
+
+    let mut state = IsographState::<THostLanguage>::default();
     intern_config_directory(&mut state, config_path.reference());
     let config_directory = config_path
         .parent()
@@ -296,12 +323,20 @@ pub fn start_if_watching<THostLanguage: HostLanguage>(
             return;
         }
     };
-```
 
-`let _watcher` outlives `select!`. `_hold_watch` keeps `run_filesystem_watcher` from returning on `Injected`. Do not log `filesystem` on `isograph daemon up`.
+    // write port file, "isograph daemon up", SIGTERM, as today
 
-```rust
-// from crates/isograph_cli/src/daemon.rs
+    let _hold_events = event_tx.clone();
+    tokio::select! {
+        () = run_event_loop(state, event_rx, effect_tx) => {}
+        () = run_effect_loop(effect_rx) => {}
+        () = crate::lsp_socket::accept_loop(listener, event_tx.clone()) => {}
+        () = run_filesystem_watcher::<THostLanguage>(watch_rx, event_tx, config_directory) => {}
+    }
+    let _ = std::fs::remove_file(port_path.reference());
+    std::process::exit(0);
+}
+
 async fn run_filesystem_watcher<THostLanguage: HostLanguage>(
     mut watch_rx: UnboundedReceiver<Vec<SourceFileEvent>>,
     event_tx: UnboundedSender<IsographEvent>,
@@ -317,7 +352,11 @@ async fn run_filesystem_watcher<THostLanguage: HostLanguage>(
 }
 ```
 
-`daemon::run` takes `filesystem` and `config` and passes them into `serve`. Channels, bind, port file, SIGTERM, `select!` of event loop / effect loop / accept_loop / `run_filesystem_watcher` stay as in the current `serve`, plus the watcher lines above.
+`let _watcher` outlives `select!`. `let _ = watcher` drops the debouncer immediately. `_hold_watch` keeps `run_filesystem_watcher` from returning on `Injected`, same as `_hold_events` for the event loop. Do not log `filesystem` on `isograph daemon up`.
+
+`run_filesystem_watcher` is the analog of isograph's `while let Some(res) = file_system_receiver.recv().await` plus `update_sources`. It never returns while the watcher lives (`watch_tx` is held by the callback). `select!` ends on `Kill`. `accept_loop` takes `event_tx.clone()` because `run_filesystem_watcher` takes the other sender.
+
+`run_daemon` passes `args.filesystem` and the loaded `IsographProjectConfig` into `daemon::run`.
 
 ### Watch
 
