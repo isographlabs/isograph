@@ -44,8 +44,11 @@ fn dispatch_lsp_request<THostLanguage: HostLanguage>(
 ) -> Vec<IsographEffect> {
     let crate::event::LspRequest { request, reply } = incoming;
     let get_response = || {
-        let request =
-            isograph_lsp::lsp_request_dispatch::LSPRequestDispatch::new(request, state).request();
+        let request = isograph_lsp::lsp_request_dispatch::LSPRequestDispatch::new(request, state)
+            .on_request_sync::<lsp_types::request::SemanticTokensFullRequest>(
+                crate::adapter::semantic_tokens_response::<THostLanguage>,
+            )?
+            .request();
         ControlFlow::Continue(request)
     };
     match get_response() {

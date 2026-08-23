@@ -28,6 +28,7 @@ serde_json = { workspace = true }
 thiserror = "2"
 tokio = { workspace = true, features = ["rt", "macros", "signal", "sync", "time", "net"] }
 tracing = { workspace = true }
+url = { workspace = true }
 
 [dev-dependencies]
 isograph_extract_typescript = { path = "../isograph_extract_typescript" }

@@ -135,7 +135,19 @@ fn run_session(
     connection: &lsp_server::Connection,
     event_tx: tokio::sync::mpsc::UnboundedSender<crate::event::IsographEvent>,
 ) {
-    let capabilities = match serde_json::to_value(lsp_types::ServerCapabilities::default()) {
+    let capabilities = match serde_json::to_value(lsp_types::ServerCapabilities {
+        semantic_tokens_provider:
+            lsp_types::SemanticTokensServerCapabilities::SemanticTokensOptions(
+                lsp_types::SemanticTokensOptions {
+                    work_done_progress_options: lsp_types::WorkDoneProgressOptions::default(),
+                    legend: isograph_lsp::semantic_token_legend(),
+                    range: None,
+                    full: lsp_types::SemanticTokensFullOptions::Bool(true).wrap_some(),
+                },
+            )
+            .wrap_some(),
+        ..Default::default()
+    }) {
         Ok(value) => value,
         Err(e) => {
             debug!(error = %e, "server capabilities");
@@ -172,7 +184,9 @@ mod tests {
 
     use lsp_server::{ErrorCode, Message, Request, RequestId};
     use lsp_types::notification::{Initialized, Notification};
-    use lsp_types::request::{Initialize, Request as LspRequest, Shutdown};
+    use lsp_types::request::{
+        Initialize, Request as LspRequest, SemanticTokensFullRequest, Shutdown,
+    };
     use prelude::Postfix;
     use tokio::sync::mpsc::{UnboundedReceiver, unbounded_channel};
 
@@ -227,13 +241,14 @@ mod tests {
                 .enable_all()
                 .build()
                 .expect("a test can start a tokio runtime");
+            let mut state = IsographState::<TypeScriptHostLanguage>::default();
+            crate::state::intern_config_directory(
+                &mut state,
+                std::path::Path::new("/tmp/proj/isograph.config.json"),
+            );
             runtime.block_on(async {
                 tokio::select! {
-                    () = run_event_loop(
-                        IsographState::<TypeScriptHostLanguage>::default(),
-                        loop_rx,
-                        effect_tx,
-                    ) => {}
+                    () = run_event_loop(state, loop_rx, effect_tx) => {}
                     () = run_effect_loop(effect_rx) => {}
                 }
             });
@@ -261,7 +276,7 @@ mod tests {
             .expect("the connection stayed open")
     }
 
-    fn initialize(writer: &mut impl Write, reader: &mut impl BufRead) {
+    fn initialize(writer: &mut impl Write, reader: &mut impl BufRead) -> serde_json::Value {
         let id = RequestId::from(1);
         write_message(
             writer,
@@ -283,6 +298,29 @@ mod tests {
                 params: serde_json::json!({}),
             }),
         );
+        response.result.expect("initialize result")
+    }
+
+    fn semantic_tokens_full(
+        writer: &mut impl Write,
+        reader: &mut impl BufRead,
+        id: i32,
+        params: serde_json::Value,
+    ) -> lsp_server::Response {
+        let id = RequestId::from(id);
+        write_message(
+            writer,
+            Message::Request(Request {
+                id: id.clone(),
+                method: SemanticTokensFullRequest::METHOD.to_owned(),
+                params,
+            }),
+        );
+        let Message::Response(response) = read_message(reader) else {
+            panic!("a request is answered with a response");
+        };
+        assert_eq!(response.id, id);
+        response
     }
 
     fn hello_world() -> lsp_server::Notification {
@@ -598,5 +636,119 @@ mod tests {
                 "event {i}"
             );
         }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn initialize_legend_token_type_15_is_keyword() {
+        let (port, _event_rx) = listen_for_events().await;
+        let stream = connect(port);
+        let (mut writer, mut reader) = split(stream);
+        let result = initialize(&mut writer, &mut reader);
+        assert_eq!(
+            result["capabilities"]["semanticTokensProvider"]["legend"]["tokenTypes"][15],
+            "keyword"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn semantic_tokens_full_of_an_interned_file_starts_with_entrypoint() {
+        let (port, _event_rx) = listen_and_reply().await;
+        notify(
+            connect(port),
+            Internal::DiskChanged(DiskChanged::File(DiskFileChanged {
+                path: PathBuf::from("/tmp/proj/src/Home.ts"),
+                presence: Presence::Present(
+                    "export const Home = iso(`entrypoint Query.HomeRoute`)".to_owned(),
+                ),
+            })),
+        )
+        .expect("notify DiskChanged");
+        tokio::time::sleep(SETTLE).await;
+        let stream = connect(port);
+        let (mut writer, mut reader) = split(stream);
+        initialize(&mut writer, &mut reader);
+        let response = semantic_tokens_full(
+            &mut writer,
+            &mut reader,
+            2,
+            serde_json::json!({
+                "textDocument": { "uri": "file:///tmp/proj/src/Home.ts" }
+            }),
+        );
+        assert!(response.error.is_none(), "{response:?}");
+        let tokens: lsp_types::SemanticTokensResult =
+            serde_json::from_value(response.result.expect("tokens result"))
+                .expect("SemanticTokensResult");
+        let lsp_types::SemanticTokensResult::Tokens(tokens) = tokens else {
+            panic!("full is Tokens");
+        };
+        assert_eq!(tokens.data[0].token_type, 15);
+        assert_eq!(tokens.data[0].length, 10);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn semantic_tokens_full_of_a_never_interned_uri_is_null() {
+        let (port, _event_rx) = listen_and_reply().await;
+        let stream = connect(port);
+        let (mut writer, mut reader) = split(stream);
+        initialize(&mut writer, &mut reader);
+        let response = semantic_tokens_full(
+            &mut writer,
+            &mut reader,
+            2,
+            serde_json::json!({
+                "textDocument": { "uri": "file:///tmp/proj/src/never.ts" }
+            }),
+        );
+        assert!(response.error.is_none(), "{response:?}");
+        assert!(
+            response.result.is_none()
+                || response.result.as_ref() == serde_json::Value::Null.reference().wrap_some(),
+            "{response:?}"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn semantic_tokens_full_of_a_non_file_uri_is_null() {
+        let (port, _event_rx) = listen_and_reply().await;
+        let stream = connect(port);
+        let (mut writer, mut reader) = split(stream);
+        initialize(&mut writer, &mut reader);
+        let response = semantic_tokens_full(
+            &mut writer,
+            &mut reader,
+            2,
+            serde_json::json!({
+                "textDocument": { "uri": "https://example.net/foo.ts" }
+            }),
+        );
+        assert!(response.error.is_none(), "{response:?}");
+        assert!(
+            response.result.is_none()
+                || response.result.as_ref() == serde_json::Value::Null.reference().wrap_some(),
+            "{response:?}"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn semantic_tokens_full_with_empty_params_keeps_the_request_id() {
+        let (port, _event_rx) = listen_and_reply().await;
+        let stream = connect(port);
+        let (mut writer, mut reader) = split(stream);
+        initialize(&mut writer, &mut reader);
+        let id = RequestId::from(2);
+        write_message(
+            &mut writer,
+            Message::Request(Request {
+                id: id.clone(),
+                method: SemanticTokensFullRequest::METHOD.to_owned(),
+                params: serde_json::json!({}),
+            }),
+        );
+        let Message::Response(response) = read_message(&mut reader) else {
+            panic!("a request is answered with a response");
+        };
+        assert_eq!(response.id, id);
+        assert_ne!(response.id, RequestId::from("default-lsp-id".to_owned()));
     }
 }

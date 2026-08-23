@@ -6,6 +6,7 @@ use freddie_cli::{App, Instance};
 use isograph_compiler::HostLanguage;
 use prelude::Postfix;
 
+mod adapter;
 mod config_path;
 mod daemon;
 mod discover;
