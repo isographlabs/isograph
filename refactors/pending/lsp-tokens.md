@@ -1,8 +1,8 @@
 # `textDocument/semanticTokens/full`
 
-Requires lsp-request-response.md. Independent of filesystem-watcher.md. Independent of lsp-sessions.md.
+Requires lsp-request-response.md and lsp-dispatch.md. Independent of filesystem-watcher.md. Independent of lsp-sessions.md.
 
-`answer_request` is `MethodNotFound` for every method. This file adds `textDocument/semanticTokens/full`. The session already forwards every request; do not special-case tokens in `run_session`. `isograph/event` stays a notification. `handle` does not grow an LSP arm.
+`dispatch_lsp_request` has an empty `on_request_sync` chain. This file adds `.on_request_sync::<SemanticTokensFullRequest>(semantic_tokens_response)?`. Do not special-case tokens in `run_session`. `isograph/event` stays a notification.
 
 Origin of the method: `lsp_types::request::SemanticTokensFullRequest`. Origin of the handler: isograph `on_semantic_token_full_request`. Origin of tokens: `lsp_semantic_tokens_for_file`. Origin of initialize options: isograph `server.rs` `initialize`. Delta: extract is `Result`; URI to path has no `expect`; missing `DiskFile` is JSON `null`.
 
@@ -22,74 +22,37 @@ Send notifies `isograph/event` and exits. Then `textDocument/semanticTokens/full
 ## Types
 
 ```rust
-// from crates/isograph_cli/src/daemon.rs
-fn answer_request<THostLanguage: HostLanguage>(
-    state: &IsographState<THostLanguage>,
-    request: lsp_server::Request,
-) -> lsp_server::Response {
-    if request.method == lsp_types::request::SemanticTokensFullRequest::METHOD {
-        return semantic_tokens_response(state, request);
-    }
-    lsp_server::Response {
-        id: request.id,
-        result: None,
-        error: lsp_server::ResponseError {
-            code: lsp_server::ErrorCode::MethodNotFound as i32,
-            data: None,
-            message: format!("No handler registered for method '{}'", request.method),
-        }
-        .wrap_some(),
-    }
-}
+// from crates/isograph_cli/src/state.rs
+        let request = crate::lsp_dispatch::LspRequestDispatch::new(request, state)
+            .on_request_sync::<lsp_types::request::SemanticTokensFullRequest>(
+                semantic_tokens_response::<THostLanguage>,
+            )?
+            .request();
 ```
 
-Do not copy isograph `LSPRequestDispatch` until a second domain request exists. One method is an `if`.
+`semantic_tokens_response` takes `&IsographState`, `SemanticTokensParams`, returns `Result<Option<lsp_types::SemanticTokens>, lsp_server::ResponseError>`. Missing file is `Ok(None)` (JSON `null`). Non-file URI is `Err` `InvalidParams`.
 
 ```rust
 // from crates/isograph_cli/src/adapter.rs
 fn semantic_tokens_response<THostLanguage: isograph_compiler::HostLanguage>(
     state: &isograph_compiler::IsographState<THostLanguage>,
-    request: lsp_server::Request,
-) -> lsp_server::Response {
-    let id = request.id.clone();
-    let params = match serde_json::from_value::<lsp_types::SemanticTokensParams>(request.params) {
-        Ok(params) => params,
-        Err(e) => {
-            warn!(error = %e, "semanticTokens params");
-            return lsp_server::Response::new_err(
-                id,
-                lsp_server::ErrorCode::InvalidParams as i32,
-                "invalid request params".to_owned(),
-            );
-        }
-    };
+    params: lsp_types::SemanticTokensParams,
+) -> Result<Option<lsp_types::SemanticTokens>, lsp_server::ResponseError> {
     let Some(absolute) = file_path(params.text_document.uri.reference()) else {
-        return lsp_server::Response::new_err(
-            id,
-            lsp_server::ErrorCode::InvalidParams as i32,
-            "textDocument.uri is not a file path".to_owned(),
-        );
+        return lsp_server::ResponseError {
+            code: lsp_server::ErrorCode::InvalidParams as i32,
+            message: "textDocument.uri is not a file path".to_owned(),
+            data: None,
+        }
+        .wrap_err();
     };
     let tokens = semantic_tokens(state, absolute.reference());
-    let result = tokens.map(|data| lsp_types::SemanticTokens {
-        result_id: None,
-        data,
-    });
-    match serde_json::to_value(result) {
-        Ok(result) => lsp_server::Response {
-            id,
-            result: result.wrap_some(),
-            error: None,
-        },
-        Err(e) => {
-            warn!(error = %e, "could not encode tokens");
-            lsp_server::Response::new_err(
-                id,
-                lsp_server::ErrorCode::InternalError as i32,
-                "could not encode request result".to_owned(),
-            )
-        }
-    }
+    tokens
+        .map(|data| lsp_types::SemanticTokens {
+            result_id: None,
+            data,
+        })
+        .wrap_ok()
 }
 
 fn file_path(uri: &lsp_types::Uri) -> Option<std::path::PathBuf> {
@@ -109,7 +72,7 @@ fn semantic_tokens<THostLanguage: isograph_compiler::HostLanguage>(
 }
 ```
 
-`file_path` is a function, not a trait. Missing cwd or `DiskFile`: JSON `null`. Present file with no iso: `Some` empty `data`. This path does not call `handle`.
+`file_path` is a function, not a trait. Missing cwd or `DiskFile`: JSON `null`. Present file with no iso: `Some` empty `data`.
 
 ### `initialize` legend
 
@@ -156,5 +119,5 @@ url = { workspace = true }
 
 ## Call sites
 
-- `run_session` Request -> `LspRequest` (already) -> `answer_request` -> `semantic_tokens_response` -> `lsp_semantic_tokens_for_file`
-- other requests -> `MethodNotFound` in `answer_request`, as after lsp-request-response.md
+- `handle` `LspRequest` -> `on_request_sync::<SemanticTokensFullRequest>` -> `semantic_tokens_response` -> `lsp_semantic_tokens_for_file` -> `LspRespond`
+- other requests -> Continue -> `method_not_found`
