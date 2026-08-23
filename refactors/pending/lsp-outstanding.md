@@ -54,7 +54,7 @@ Lives in `run_event_loop`.
 
 ### `handle`
 
-`handle` of `Client` stays the sessions.md passthrough (`IsographEffect::Client`). This slice does not change that.
+`handle` of `Client` stays the sessions.md map to `IsographEffect::ClientEffect`. This slice does not change that.
 
 `method_not_found` sets `client: lsp.client` and `id` from the request on `SendLspResponseEffect`.
 
@@ -87,7 +87,7 @@ Lives in `run_event_loop`.
                     .remove(&(respond.client, respond.id.clone())),
                 IsographEffect::LogHelloWorld
                 | IsographEffect::Kill
-                | IsographEffect::Client(_) => true,
+                | IsographEffect::ClientEffect(_) => true,
             };
             if forward {
                 let _ = effect_tx.send(effect);
@@ -96,7 +96,7 @@ Lives in `run_event_loop`.
     }
 ```
 
-`remove` is whether the id was still open. `SendLspResponseEffect` whose pair is absent is not forwarded. `Client` effects still forward.
+`remove` is whether the id was still open. `SendLspResponseEffect` whose pair is absent is not forwarded. `ClientEffect` still forwards.
 
 ### Session
 

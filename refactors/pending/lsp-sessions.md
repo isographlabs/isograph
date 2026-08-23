@@ -56,15 +56,22 @@ pub enum IsographEvent {
 ```rust
 // from crates/isograph_cli/src/effect.rs
 #[derive(Debug)]
+pub enum ClientEffect {
+    Started(crate::event::ClientStarted),
+    Gone(crate::event::ClientId),
+}
+
+#[derive(Debug, derive_more::From)]
 pub enum IsographEffect {
     LogHelloWorld,
     Kill,
     SendLspResponseEffect(Box<SendLspResponseEffect>),
-    Client(crate::event::Client),
+    #[from]
+    ClientEffect(ClientEffect),
 }
 ```
 
-`handle` of `IsographEvent::Client` returns `IsographEffect::Client` with the same payload. No `#[from]` on the effect variant: `Client::Started(...).to()` is the event.
+`handle` of `IsographEvent::Client` returns `IsographEffect::ClientEffect` with the matching variant. `#[from]` on the effect variant: `ClientEffect::Started(...).to()` is the effect. `Client::Started(...).to()` is the event.
 
 ```rust
 // from crates/isograph_cli/src/daemon.rs
@@ -86,14 +93,20 @@ The id is the map key. `LiveSession` does not repeat it. Clone `connection.sende
 // from crates/isograph_cli/src/state.rs
         IsographEvent::Lsp(lsp) => dispatch_lsp(state, lsp),
         IsographEvent::Internal(internal) => handle_internal(state, internal),
-        IsographEvent::Client(client) => {
-            crate::effect::IsographEffect::Client(client).wrap_vec()
-        }
+        IsographEvent::Client(client) => crate::effect::IsographEffect::ClientEffect(
+            match client {
+                crate::event::Client::Started(started) => {
+                    crate::effect::ClientEffect::Started(started)
+                }
+                crate::event::Client::Gone(client) => crate::effect::ClientEffect::Gone(client),
+            },
+        )
+        .wrap_vec(),
 ```
 
 ### `run_event_loop`
 
-Unchanged. `handle` returns `IsographEffect::Client`; the existing loop forwards every effect.
+Unchanged. `handle` returns `IsographEffect::ClientEffect`; the existing loop forwards every effect.
 
 ### `run_effect_loop` / `perform`
 
@@ -124,7 +137,7 @@ pub fn perform(effect: IsographEffect, live: &mut LiveSessions) -> ControlFlow<(
                 .send(lsp_server::Message::Response(respond.response));
             ControlFlow::Continue(())
         }
-        IsographEffect::Client(crate::event::Client::Started(started)) => {
+        IsographEffect::ClientEffect(crate::effect::ClientEffect::Started(started)) => {
             live.0.insert(
                 started.client,
                 LiveSession {
@@ -134,7 +147,7 @@ pub fn perform(effect: IsographEffect, live: &mut LiveSessions) -> ControlFlow<(
             );
             ControlFlow::Continue(())
         }
-        IsographEffect::Client(crate::event::Client::Gone(client)) => {
+        IsographEffect::ClientEffect(crate::effect::ClientEffect::Gone(client)) => {
             live.0.remove(&client);
             ControlFlow::Continue(())
         }
@@ -224,9 +237,9 @@ Request answering lives in `answer_request` after lsp-request-response.md. This 
 
 ## Tests
 
-`handle` of `Client::Started`: one `IsographEffect::Client(Client::Started(_))` with that `client` and `capabilities`. Dummy sender from `crossbeam::channel::unbounded()`.
+`handle` of `Client::Started`: one `IsographEffect::ClientEffect(ClientEffect::Started(_))` with that `client` and `capabilities`. Dummy sender from `crossbeam::channel::unbounded()`.
 
-`handle` of `Client::Gone`: one `IsographEffect::Client(Client::Gone(id))` with that `ClientId`.
+`handle` of `Client::Gone`: one `IsographEffect::ClientEffect(ClientEffect::Gone(id))` with that `ClientId`.
 
 `lsp_socket.rs` (`listen_for_events`):
 
@@ -234,7 +247,7 @@ Request answering lives in `answer_request` after lsp-request-response.md. This 
 - initialize with `textDocument.publishDiagnostics: {}` and `textDocument.hover: {}`: `ClientStarted.capabilities` equals the deserialized `InitializeParams.capabilities` (`publish_diagnostics` and `hover` both `Some`). Drop.
 - two connections: two `Client::Started` with different `ClientId`s. Drop one: one `Client::Gone`. The other connection still answers a request.
 
-`perform` of `Client::Gone` of an id that was never registered: `Continue`, no panic.
+`perform` of `ClientEffect::Gone` of an id that was never registered: `Continue`, no panic.
 
 Do not add a production function only tests call.
 
@@ -243,7 +256,7 @@ Do not add a production function only tests call.
 - `accept_loop` -> `ClientId` -> `session`
 - `run_session` after `initialize` -> `Client::Started`
 - `session` end -> `Client::Gone`
-- `handle` -> `IsographEffect::Client`
+- `handle` -> `IsographEffect::ClientEffect`
 - `perform` -> `HashMap` insert / remove
 - lsp-diagnostics.md -> iterate `live.0.values()`; send `publishDiagnostics` when `capabilities.text_document.publish_diagnostics` is `Some`
 - lsp-outstanding.md -> `ClientId` on `LspRequest` / `SendLspResponseEffect`; `Client::Gone` drops outstanding ids
