@@ -2,7 +2,7 @@
 
 Requires lsp-port.md (landed). Independent of lsp-tokens.md.
 
-The session already exists: `Connection::initialize`, pump, `MethodNotFound` on the session thread, `drop(connection)` then `join`. This slice keeps that. After `initialize`, the session stores that client's `ClientCapabilities` and registers a writer for server-to-client messages. It does not put capabilities on `IsographState`. Send is ephemeral: it stores caps for the life of the thread, then drops. An editor is the same, for the life of the window.
+The session already exists: `Connection::initialize`, pump, `drop(connection)` then `join`. After lsp-request-response.md, requests go to `answer_request`. This slice keeps that. After `initialize`, the session stores that client's `ClientCapabilities` and registers a writer for server-to-client messages. It does not put capabilities on `IsographState`. Send is ephemeral: it stores caps for the life of the thread, then drops. An editor is the same, for the life of the window.
 
 `connection.initialize` already returns serialized `InitializeParams`. Today they are discarded. This slice keeps them.
 
@@ -38,7 +38,7 @@ struct LiveSession {
 }
 ```
 
-Clone `connection.sender` into `LiveSession`. Session still uses `connection.sender` for `MethodNotFound`. The clone is how the effect loop writes notifications.
+Clone `connection.sender` into `LiveSession`. The session still writes request replies on `connection.sender`. The clone is how the effect loop writes notifications.
 
 ```rust
 // from crates/isograph_cli/src/lsp_socket.rs
@@ -92,7 +92,7 @@ impl Drop for SessionGuard {
 
 `serve` creates `Arc<LiveSessions>` and passes it to `accept_loop`. lsp-diagnostics.md is the first production reader of the writers besides tests.
 
-`MethodNotFound` stays in `run_session` this slice. Domain request dispatch (lsp-tokens.md) stays in the session too: the session owns the writer. `handle` stays inner.
+Request answering lives in `answer_request` after lsp-request-response.md. This slice does not move it. `handle` stays inner.
 
 ## Tests
 

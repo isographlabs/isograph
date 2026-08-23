@@ -16,10 +16,11 @@ Requires config-discovery.md (landed), the event-model design-doc, and `docs-web
 10. file-semantic-tokens.md (landed). Path to encoded tokens. Interned-file tests. Not the daemon.
 11. lsp-semantic-token-encoding.md (landed). Encoder only.
 12. lsp-port.md (landed). The `{slug}.port` TCP listener is LSP. Each TCP connection is one client and one `session`. `isograph/event` params are the `--file` JSON; the session deserializes them and posts that `IsographEvent`. `handle` is unchanged. `isograph send` does the handshake then that notification. Requests other than initialize are `MethodNotFound` on that connection. `Kill` unlinks the port file then `process::exit(0)`.
-13. lsp-sessions.md. Later. `ClientCapabilities` from `initialize` and a writer (`connection.sender` clone) per live session. `MethodNotFound` stays in the session.
-14. lsp-tokens.md. Later. `semanticTokens/full` in the session. An adapter query channel on `run_event_loop` (outer, not `handle`) reads `DiskFile`. Independent of 13.
-15. lsp-diagnostics.md. Later. Debounce then `publishDiagnostics`.
-16. lsp-proxy.md. Later. `isograph lsp` stdio copy onto the port.
-17. zed-and-vscode-extensions.md.
+13. lsp-request-response.md. Session forwards each LSP request to `run_event_loop`; the reply is written on `connection.sender`. `answer_request` is `MethodNotFound`. `handle` is unchanged. Independent of sessions.
+14. lsp-tokens.md. Later. `semanticTokens/full` is an arm in `answer_request`. Advertise the legend on `initialize`. Independent of sessions.
+15. lsp-sessions.md. Later. `ClientCapabilities` from `initialize` and a writer (`connection.sender` clone) per live session. For `publishDiagnostics`, not for request/response.
+16. lsp-diagnostics.md. Later. Debounce then `publishDiagnostics`. Requires 15.
+17. lsp-proxy.md. Later. `isograph lsp` stdio copy onto the port.
+18. zed-and-vscode-extensions.md.
 
 `AsyncWorkFinished` and `StartAsyncWork` land with compilation.

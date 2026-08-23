@@ -1,12 +1,10 @@
 # `textDocument/semanticTokens/full`
 
-Requires lsp-port.md (landed). Independent of filesystem-watcher.md. Independent of lsp-sessions.md: the session thread already writes responses on `connection.sender`. lsp-sessions.md is for server-to-client notifications to N clients, not this request.
+Requires lsp-request-response.md. Independent of filesystem-watcher.md. Independent of lsp-sessions.md.
 
-`run_session` answers every request with `MethodNotFound`. This file adds `textDocument/semanticTokens/full`. `isograph/event` stays a notification deserialized in the session. `handle` does not grow an LSP arm. Event-model: an LSP request is request/response in the adapter; `handle` is not request/response.
+`answer_request` is `MethodNotFound` for every method. This file adds `textDocument/semanticTokens/full`. The session already forwards every request; do not special-case tokens in `run_session`. `isograph/event` stays a notification. `handle` does not grow an LSP arm.
 
-`IsographState` is owned by `run_event_loop`. The session thread does not hold it. The adapter sends a query on a channel that `run_event_loop` recvs next to `IsographEvent`. The query is not an `IsographEvent`. The reply is a `lsp_server::Response` on a `std::sync::mpsc::sync_channel(0)`. The session blocks on that recv, then `connection.sender.send`. That is the outer adapter, not `handle`.
-
-Origin of dispatch: isograph `lsp_request_dispatch.rs` / `server.rs` `dispatch_request`. Origin of the method: `lsp_types::request::SemanticTokensFullRequest`. Origin of the handler: isograph `on_semantic_token_full_request`. Origin of tokens: `lsp_semantic_tokens_for_file`. Origin of initialize options: isograph `server.rs` `initialize`. Delta: extract is `Result`; URI to path has no `expect`; missing `DiskFile` is `Ok(None)`; query is outer, not `handle`.
+Origin of the method: `lsp_types::request::SemanticTokensFullRequest`. Origin of the handler: isograph `on_semantic_token_full_request`. Origin of tokens: `lsp_semantic_tokens_for_file`. Origin of initialize options: isograph `server.rs` `initialize`. Delta: extract is `Result`; URI to path has no `expect`; missing `DiskFile` is JSON `null`.
 
 One shippable change. An e2e that notifies DiskChanged and immediately asks for tokens can race; that is later.
 
@@ -24,104 +22,48 @@ Send notifies `isograph/event` and exits. Then `textDocument/semanticTokens/full
 ## Types
 
 ```rust
-// from crates/isograph_cli/src/adapter.rs
-pub(crate) enum AdapterQuery {
-    SemanticTokens(SemanticTokensQuery),
-}
-
-pub(crate) struct SemanticTokensQuery {
-    pub uri: lsp_types::Uri,
-    pub id: lsp_server::RequestId,
-    pub reply: std::sync::mpsc::SyncSender<lsp_server::Response>,
-}
-```
-
-```rust
 // from crates/isograph_cli/src/daemon.rs
-pub(crate) async fn run_event_loop<THostLanguage: HostLanguage>(
-    mut state: IsographState<THostLanguage>,
-    mut event_rx: UnboundedReceiver<IsographEvent>,
-    mut query_rx: UnboundedReceiver<AdapterQuery>,
-    effect_tx: UnboundedSender<IsographEffect>,
-) {
-    loop {
-        tokio::select! {
-            event = event_rx.recv() => {
-                let Some(event) = event else { break; };
-                for effect in handle(&mut state, event) {
-                    let _ = effect_tx.send(effect);
-                }
-            }
-            query = query_rx.recv() => {
-                let Some(query) = query else { break; };
-                answer_query(&state, query);
-            }
-        }
-    }
-}
-
-fn answer_query<THostLanguage: HostLanguage>(
+fn answer_request<THostLanguage: HostLanguage>(
     state: &IsographState<THostLanguage>,
-    query: AdapterQuery,
-) {
-    match query {
-        AdapterQuery::SemanticTokens(SemanticTokensQuery { uri, id, reply }) => {
-            let response = semantic_tokens_response(state, uri, id);
-            let _ = reply.send(response);
+    request: lsp_server::Request,
+) -> lsp_server::Response {
+    if request.method == lsp_types::request::SemanticTokensFullRequest::METHOD {
+        return semantic_tokens_response(state, request);
+    }
+    lsp_server::Response {
+        id: request.id,
+        result: None,
+        error: lsp_server::ResponseError {
+            code: lsp_server::ErrorCode::MethodNotFound as i32,
+            data: None,
+            message: format!("No handler registered for method '{}'", request.method),
         }
+        .wrap_some(),
     }
 }
 ```
 
-`serve` creates the query channel. `accept_loop` / `session` / `run_session` take `query_tx: UnboundedSender<AdapterQuery>`. `_hold_events` still holds `event_tx`. Clone `query_tx` into each session. Dropping `query_tx` on `Kill` is fine: `process::exit(0)` follows.
-
-```rust
-// from crates/isograph_cli/src/lsp_socket.rs
-            lsp_server::Message::Request(request)
-                if request.method == lsp_types::request::SemanticTokensFullRequest::METHOD =>
-            {
-                let id = request.id.clone();
-                match serde_json::from_value::<lsp_types::SemanticTokensParams>(request.params) {
-                    Ok(params) => {
-                        let (reply, rx) = std::sync::mpsc::sync_channel(0);
-                        let _ = query_tx.send(AdapterQuery::SemanticTokens(SemanticTokensQuery {
-                            uri: params.text_document.uri,
-                            id,
-                            reply,
-                        }));
-                        if let Ok(response) = rx.recv() {
-                            let _ = connection.sender.send(lsp_server::Message::Response(response));
-                        }
-                    }
-                    Err(e) => {
-                        warn!(error = %e, "semanticTokens params");
-                        let _ = connection.sender.send(lsp_server::Message::Response(
-                            lsp_server::Response::new_err(
-                                id,
-                                lsp_server::ErrorCode::InvalidParams as i32,
-                                "invalid request params".to_owned(),
-                            ),
-                        ));
-                    }
-                }
-            }
-            lsp_server::Message::Request(request) => {
-                // MethodNotFound as today
-            }
-```
-
-`bounded(0)` / `sync_channel(0)`: session send of the query does not block on the event loop forever if the loop is in `handle`; the unbounded query channel does not block. `rx.recv` waits for `answer_query`. Fine: the session is a std thread.
-
-Do not copy isograph `LSPRequestDispatch` until a second domain request exists. One method is a `match`.
+Do not copy isograph `LSPRequestDispatch` until a second domain request exists. One method is an `if`.
 
 ```rust
 // from crates/isograph_cli/src/adapter.rs
 fn semantic_tokens_response<THostLanguage: isograph_compiler::HostLanguage>(
     state: &isograph_compiler::IsographState<THostLanguage>,
-    uri: lsp_types::Uri,
-    id: lsp_server::RequestId,
+    request: lsp_server::Request,
 ) -> lsp_server::Response {
-    let Some(absolute) = file_path(uri.reference()) else {
+    let id = request.id.clone();
+    let params = match serde_json::from_value::<lsp_types::SemanticTokensParams>(request.params) {
+        Ok(params) => params,
+        Err(e) => {
+            warn!(error = %e, "semanticTokens params");
+            return lsp_server::Response::new_err(
+                id,
+                lsp_server::ErrorCode::InvalidParams as i32,
+                "invalid request params".to_owned(),
+            );
+        }
+    };
+    let Some(absolute) = file_path(params.text_document.uri.reference()) else {
         return lsp_server::Response::new_err(
             id,
             lsp_server::ErrorCode::InvalidParams as i32,
@@ -167,7 +109,7 @@ fn semantic_tokens<THostLanguage: isograph_compiler::HostLanguage>(
 }
 ```
 
-`file_path` is a function, not a trait. Missing cwd or `DiskFile`: JSON `null` (`Option::None` serializes). Present file with no iso: `Some` empty `data`. This path does not call `handle`.
+`file_path` is a function, not a trait. Missing cwd or `DiskFile`: JSON `null`. Present file with no iso: `Some` empty `data`. This path does not call `handle`.
 
 ### `initialize` legend
 
@@ -214,5 +156,5 @@ url = { workspace = true }
 
 ## Call sites
 
-- `run_session` Request `semanticTokens/full` -> `query_tx` -> `answer_query` -> `lsp_semantic_tokens_for_file` -> `connection.sender`
-- other requests -> `MethodNotFound` on the session, as today
+- `run_session` Request -> `LspRequest` (already) -> `answer_request` -> `semantic_tokens_response` -> `lsp_semantic_tokens_for_file`
+- other requests -> `MethodNotFound` in `answer_request`, as after lsp-request-response.md
