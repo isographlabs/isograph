@@ -58,19 +58,9 @@ pub enum IsographEffect {
     Kill,
     LspRespond(LspRespond),
 }
-
-impl PartialEq for IsographEffect {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::LogHelloWorld, Self::LogHelloWorld) => true,
-            (Self::Kill, Self::Kill) => true,
-            _ => false,
-        }
-    }
-}
 ```
 
-`Eq` is not derived. Daemon unit tests keep `assert_eq` on `LogHelloWorld` / `Kill`. Tests of `LspRespond` match the variant and `response.error` code.
+Drop `PartialEq` / `Eq`. `Sender` does not implement them. A `PartialEq` that is false for `LspRespond` is not reflexive. Daemon and `state.rs` tests that `assert_eq` effects become `matches!` (or `effects.is_empty()`). Tests of `LspRespond` match the variant and `response.error` code.
 
 ### `handle`
 
