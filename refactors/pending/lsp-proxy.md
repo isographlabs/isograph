@@ -1,10 +1,10 @@
 # `isograph lsp`
 
-Requires lsp-port.md (landed). Independent of lsp-tokens.md, lsp-sessions.md, lsp-diagnostics.md.
+Requires start-returns-when-listening.md. Independent of lsp-tokens.md, lsp-sessions.md, lsp-diagnostics.md.
 
-VS Code and Zed spawn a process on stdio. They do not dial `{slug}.port`. `isograph lsp` is that process: the same walk-up / `--config` as every other verb, `isograph start`, dial the port, copy stdin/stdout. Dropping the editor drops the proxy. The daemon stays up.
+VS Code and Zed spawn a process on stdio. They do not dial `{slug}.port`. `isograph lsp` is that process: `--config` / walk-up as every other verb, `isograph start`, `TcpStream::connect`, `std::io::copy` both ways. Dropping the editor drops the proxy. The daemon stays up.
 
-Origin: `docs-website/docs/design-docs/event-model.md`. Origin of spawn args: `vscode-extension/src/languageClient.ts`. Origin of start: nested `isograph start`, not an in-process call. Origin of the port file: `send.rs` `parse_port` / `read_port`. Delta: the binary has the verb; the daemon is already the LSP server; this process does not parse LSP; `parse_port` moves to `discover.rs` so send and the proxy share it.
+Origin: `docs-website/docs/design-docs/event-model.md`. Origin of spawn args: `vscode-extension/src/languageClient.ts`. Origin of start: nested `isograph start`. Origin of connect: `send.rs` `read_port` / `TcpStream::connect`. Origin of the copy: `std::io::copy`. Delta: the binary has the verb; it does not parse LSP; start already waited until the port accepts, so connect is once.
 
 ```ts
 // from vscode-extension/src/languageClient.ts
@@ -62,28 +62,21 @@ Not hidden. `ConfigFlag` is `--config`. Do not add `IsographArgs`.
 
 `lib.rs`: `mod lsp_stdio;`.
 
-`freddie_cli::client::start` is `pub(crate)` and writes "started" / "already running" on stdout. Stdout of this process is LSP. Nested `Command::new(current_exe())` `start`: stdin and stdout `Stdio::null()`, stderr inherit, cwd and `HOME` / `XDG_STATE_HOME` / `LOCALAPPDATA` inherited. Forward `--config` when the flag was set. Always invoke start. Start adopts if the lock is held.
-
-`isograph start` returning is lock held, not listen done. `run_daemon` unlinks `{slug}.port` after the lock, then binds, then writes the file. Subscribe to the parent directory first, then start, then connect. A regular file does not wake `read`. Do not `sleep`.
+`freddie_cli::client::start` writes "started" on stdout. Stdout of this process is LSP. Nested `Command::new(current_exe())` `start`: stdin and stdout `Stdio::null()`, stderr inherit, cwd and `HOME` / `XDG_STATE_HOME` / `LOCALAPPDATA` inherited. Forward `--config` when the flag was set. Always invoke start. Start adopts if the lock is held. After start-returns-when-listening.md, that nested start does not return until the port accepts.
 
 ```rust
 // from crates/isograph_cli/src/lsp_stdio.rs
 use std::fs;
-use std::io::{self, Read, Write};
+use std::io::{self, copy};
 use std::net::{Ipv4Addr, TcpStream};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::{Command, ExitCode, Stdio};
-use std::sync::mpsc;
 use std::thread;
-use std::time::{Duration, Instant};
 
-use notify::Watcher;
 use prelude::Postfix;
 
 use crate::ConfigFlag;
 use crate::discover::DiscoverError;
-
-const PORT_DEADLINE: Duration = Duration::from_secs(10);
 
 #[derive(Debug)]
 struct ReadPort {
@@ -115,17 +108,10 @@ enum LspError {
     Clone(io::Error),
     #[error("could not connect to 127.0.0.1:{}: {}", .0.port, .0.source)]
     Connect(Connect),
-    #[error("could not watch the port file: {0}")]
-    Watch(notify::Error),
-}
-
-struct PortWatch {
-    events: mpsc::Receiver<()>,
-    _watcher: notify::RecommendedWatcher,
 }
 ```
 
-`ReadPort` / `Connect` / `NoPort` are send's payloads and wording.
+`ReadPort` / `Connect` / `NoPort` are send's payloads and wording. `parse_port` already lives in `discover.rs` after start-returns-when-listening.md.
 
 ```rust
 // from crates/isograph_cli/src/lsp_stdio.rs
@@ -142,10 +128,17 @@ pub fn run(id: &ConfigFlag) -> ExitCode {
 
 fn run_inner(id: &ConfigFlag) -> Result<(), LspError> {
     let (_, instance) = crate::discover::instance_for_config_path(id.config.as_deref())?;
-    let port_path = crate::discover::port_file(instance.lock_file());
-    let watch = watch_port_parent(port_path.reference())?;
     start_daemon(id)?;
-    let stream = connect_to_daemon(port_path.reference(), watch.reference())?;
+    let path = crate::discover::port_file(instance.lock_file());
+    let text = fs::read_to_string(path.reference()).map_err(|source| {
+        LspError::ReadPort(ReadPort {
+            path: path.clone(),
+            source,
+        })
+    })?;
+    let port = crate::discover::parse_port(text.reference()).ok_or(LspError::NoPort)?;
+    let stream = TcpStream::connect((Ipv4Addr::LOCALHOST, port))
+        .map_err(|source| LspError::Connect(Connect { port, source }))?;
     copy_stdio(stream)
 }
 
@@ -168,123 +161,22 @@ fn start_daemon(id: &ConfigFlag) -> Result<(), LspError> {
     }
 }
 
-fn watch_port_parent(path: &Path) -> Result<PortWatch, LspError> {
-    let parent = path
-        .parent()
-        .expect("a port file path has a parent directory");
-    let (tx, events) = mpsc::channel();
-    let mut watcher = notify::recommended_watcher(move |_| {
-        let _ = tx.send(());
-    })
-    .map_err(LspError::Watch)?;
-    watcher
-        .watch(parent, notify::RecursiveMode::NonRecursive)
-        .map_err(LspError::Watch)?;
-    PortWatch {
-        events,
-        _watcher: watcher,
-    }
-    .wrap_ok()
-}
-
-fn connect_to_daemon(path: &Path, watch: &PortWatch) -> Result<TcpStream, LspError> {
-    let deadline = Instant::now() + PORT_DEADLINE;
-    let mut last_connect = None;
-    loop {
-        match fs::read_to_string(path) {
-            Ok(text) => {
-                if let Some(port) = crate::discover::parse_port(text.reference()) {
-                    match TcpStream::connect((Ipv4Addr::LOCALHOST, port)) {
-                        Ok(stream) => return stream.wrap_ok(),
-                        Err(source) => last_connect = Connect { port, source }.wrap_some(),
-                    }
-                }
-            }
-            Err(source) if source.kind() == io::ErrorKind::NotFound => {}
-            Err(source) => {
-                return LspError::ReadPort(ReadPort {
-                    path: path.to_owned(),
-                    source,
-                })
-                .wrap_err();
-            }
-        }
-        let remaining = deadline.saturating_duration_since(Instant::now());
-        if remaining.is_zero() {
-            break;
-        }
-        match watch.events.recv_timeout(remaining) {
-            Ok(()) => {}
-            Err(mpsc::RecvTimeoutError::Timeout | mpsc::RecvTimeoutError::Disconnected) => break,
-        }
-    }
-    match last_connect {
-        Some(connect) => LspError::Connect(connect).wrap_err(),
-        None => LspError::NoPort.wrap_err(),
-    }
-}
-
 fn copy_stdio(stream: TcpStream) -> Result<(), LspError> {
     let mut to_daemon = stream.try_clone().map_err(LspError::Clone)?;
     let mut from_daemon = stream.try_clone().map_err(LspError::Clone)?;
-    let (done_tx, done_rx) = mpsc::channel();
-    let incoming_done = done_tx.clone();
     thread::spawn(move || {
-        let mut stdin = io::stdin();
-        let _ = copy_flush(&mut stdin, &mut to_daemon);
-        let _ = incoming_done.send(());
+        let _ = copy(&mut io::stdin(), &mut to_daemon);
     });
-    thread::spawn(move || {
-        let mut stdout = io::stdout();
-        let _ = copy_flush(&mut from_daemon, &mut stdout);
-        let _ = done_tx.send(());
-    });
-    let _ = done_rx.recv();
+    let _ = copy(&mut from_daemon, &mut io::stdout());
     std::process::exit(0);
 }
-
-fn copy_flush(reader: &mut impl Read, writer: &mut impl Write) -> io::Result<u64> {
-    let mut buf = [0u8; 8192];
-    let mut total = 0u64;
-    loop {
-        let n = match reader.read(&mut buf) {
-            Ok(0) => return total.wrap_ok(),
-            Ok(n) => n,
-            Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
-            Err(e) => return e.wrap_err(),
-        };
-        writer.write_all(&buf[..n])?;
-        writer.flush()?;
-        total += n as u64;
-    }
-}
 ```
 
-Do not parse LSP. No `Message::read`. No `initialize`. Flush after every write: pipe stdout is block-buffered and `std::io::copy` can hold an initialize result. Either direction finishing `process::exit(0)` so a thread blocked on stdin dies with the process. After a successful connect, copy errors are exit 0. `run`'s `Ok` arm is for the type; the success path does not reach it.
+`read_port` is `pub(crate)` (today `fn` in `send.rs`). Map `SendError::NoPort` / `ReadPort` / `BadPort` onto `LspError` in `port_error`. Do not parse LSP. No `Message::read`. No `initialize`. `std::io::copy` is the copy. `process::exit(0)` when the daemon-to-stdout copy finishes, so a thread blocked on stdin dies. After a successful connect, copy errors are exit 0.
 
-No tokio. No `Connection`.
+Stdout of this process is a pipe. Rust block-buffers pipes, so `copy` can hold the initialize result until 8KiB. Flush after each write to stdout (a tiny `Write` wrapper around `io::stdout()`, not a second copy implementation).
 
-### `parse_port` moves to `discover.rs`
-
-Origin: `send.rs` `parse_port` and its tests. Delta: `pub(crate)`. `send.rs` `read_port` calls `crate::discover::parse_port`. The `parse_port_*` tests move with it. `read_port_of_a_missing_file_is_no_port` stays in `send.rs`.
-
-```rust
-// from crates/isograph_cli/src/discover.rs
-use std::num::NonZeroU16;
-
-pub(crate) fn parse_port(text: &str) -> Option<u16> {
-    text.trim().parse::<NonZeroU16>().ok().map(NonZeroU16::get)
-}
-```
-
-```rust
-// from crates/isograph_cli/src/send.rs
-        Ok(text) => crate::discover::parse_port(text.reference()).ok_or(SendError::BadPort),
-```
-
-Drop `parse_port` from `send.rs`. Drop `use std::num::NonZeroU16` if unused.
-
-`crates/isograph_cli/Cargo.toml` is unchanged. The tests crate already has `lsp-server` / `lsp-types` / `serde_json`.
+No tokio. No `Connection`. No `notify`. `crates/isograph_cli/Cargo.toml` is unchanged.
 
 ## Tests
 
@@ -308,8 +200,6 @@ fn spawn(&self, args: &[&str]) -> std::process::Child {
         .expect("the isograph binary runs")
 }
 ```
-
-stderr inherit so a nested start cannot fill an unread stderr pipe.
 
 ```rust
 // from crates/ts_graphql_react_isograph_cli/tests/cli.rs
@@ -341,7 +231,7 @@ fn read_initialize_result(stdout: &mut impl std::io::BufRead) -> lsp_server::Res
 }
 ```
 
-Keep `ChildStdout` as `BufReader` until after `child.wait()`. After initialize: drop stdin, `child.wait()` success, `status` running, `STOP`, `status` not running. `Daemon`'s `Drop` still `--force`s.
+Keep `ChildStdout` as `BufReader` until after `child.wait()`. After initialize: drop stdin, `child.wait()` success, `status` running, `STOP`, `status` not running.
 
 - `lsp_is_in_help`: `--help` contains `lsp`, not `send`. `lsp --help` contains `config`.
 - `lsp_with_the_daemon_stopped_starts_it`: fixture `{"source_files":[]}`, do not call `start` first. `spawn(["lsp"])`, initialize, drop stdin, wait 0, `status` running, `STOP`.
@@ -352,8 +242,10 @@ Keep `ChildStdout` as `BufReader` until after `child.wait()`. After initialize: 
 - `lsp_two_proxies_share_one_daemon`: `Daemon::start()`, two `spawn(["lsp"])`, both initialize, both wait 0, `status` unchanged, `STOP`.
 - `lsp_forwards_config_to_nested_start`: config in a sibling of cwd. `spawn(["lsp", "--config", path])`, initialize, wait 0, `status` running.
 
+The tests crate already has `lsp-server` / `lsp-types` / `serde_json`.
+
 ## Call sites
 
-- VS Code `args = ['lsp']` plus optional `--config` -> nested `isograph start` -> `{slug}.port` -> copy stdin/stdout
+- VS Code `args = ['lsp']` plus optional `--config` -> nested `isograph start` -> one `TcpStream::connect` -> `io::copy` both ways
 - Zed `args: "lsp"` (zed-and-vscode-extensions.md)
-- editor stdin EOF or daemon gone -> `process::exit(0)` -> TCP close -> session `Drop` -> daemon stays
+- editor stdin EOF or daemon gone -> `process::exit(0)` -> session `Drop` -> daemon stays
