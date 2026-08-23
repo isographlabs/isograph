@@ -7,4 +7,5 @@
 **/relay-crates/**
 refactors/**
 .vscode/**
+vscode-extension/**
 **/tests/fixtures/**

@@ -66,6 +66,23 @@ jobs:
       artifact-file: isograph_cli.exe
       longpaths: true
 
+  vscode-extension:
+    name: vscode-extension typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.9.0'
+      - run: npm ci
+        working-directory: vscode-extension
+      - run: npm run typecheck
+        working-directory: vscode-extension
+      - run: npm run lint
+        working-directory: vscode-extension
+      - run: npm run prettier-check
+        working-directory: vscode-extension
+
   all-checks-passed:
     name: All checks passed
     runs-on: ubuntu-latest
@@ -79,6 +96,7 @@ jobs:
         cli-macos-x64,
         cli-macos-arm64,
         cli-win-x64,
+        vscode-extension,
       ]
     steps:
       - name: Do nothing

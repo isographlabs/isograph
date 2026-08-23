@@ -5,7 +5,6 @@ export type Config = {
   rootDirectory: string | null;
   pathToIsograph: string | null;
   pathToConfig: string | null;
-  autoformatIsoLiterals: boolean;
 };
 
 export function getConfig(scope?: ConfigurationScope): Config {
@@ -14,6 +13,5 @@ export function getConfig(scope?: ConfigurationScope): Config {
     rootDirectory: configuration.rootDirectory,
     pathToIsograph: configuration.pathToIsograph,
     pathToConfig: configuration.pathToConfig,
-    autoformatIsoLiterals: configuration.autoformatIsoLiterals,
   };
 }

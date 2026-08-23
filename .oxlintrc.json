@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "ignorePatterns": ["__isograph"],
+  "ignorePatterns": ["__isograph", "vscode-extension"],
   "plugins": ["typescript", "import"],
   "env": { "node": true, "browser": true },
   "rules": {

@@ -1,3 +1,4 @@
+import * as path from 'path';
 import type { ExtensionContext } from 'vscode';
 import { window, workspace } from 'vscode';
 import { getConfig } from './config';
@@ -5,13 +6,13 @@ import type { IsographExtensionContext } from './context';
 import { createAndStartLanguageClient } from './languageClient';
 import { findIsographBinaryWithWarnings } from './utils/findIsographBinary';
 
-import path = require('path');
-
 let isographExtensionContext: IsographExtensionContext | null = null;
 
-export async function activate(extensionContext: ExtensionContext) {
-  const config = getConfig();
+function workspaceRoot(): string {
+  return workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+}
 
+export async function activate(extensionContext: ExtensionContext) {
   isographExtensionContext =
     await buildIsographExtensionContext(extensionContext);
 
@@ -20,7 +21,7 @@ export async function activate(extensionContext: ExtensionContext) {
       'Starting the Isograph extension...',
     );
 
-    createAndStartLanguageClient(isographExtensionContext);
+    await createAndStartLanguageClient(isographExtensionContext);
   }
 }
 
@@ -35,12 +36,15 @@ async function buildIsographExtensionContext(
   extensionContext.subscriptions.push(lspOutputChannel);
   extensionContext.subscriptions.push(primaryOutputChannel);
 
-  let rootPath = workspace.rootPath ?? process.cwd();
+  let rootPath = workspaceRoot();
   if (config.rootDirectory != null) {
     rootPath = path.join(rootPath, config.rootDirectory);
   }
 
-  const binary = await findIsographBinaryWithWarnings(primaryOutputChannel);
+  const binary = await findIsographBinaryWithWarnings(
+    primaryOutputChannel,
+    rootPath,
+  );
 
   if (binary != null) {
     return {
@@ -48,11 +52,9 @@ async function buildIsographExtensionContext(
       extensionContext,
       lspOutputChannel,
       primaryOutputChannel,
-      compilerTerminal: null,
       isographBinaryExecutionOptions: {
         rootPath,
         binaryPath: binary.path,
-        binaryVersion: binary.version,
       },
     };
   }

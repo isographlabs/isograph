@@ -91,25 +91,24 @@ pnpm format # which also formats the Rust code
 
 ### Starting
 
-- Open VSCode in `isograph/vscode-extension`
-- Run the following in `isograph/vscode-extension`:
+From the repo root:
 
 ```sh
+cd vscode-extension
 npm i
-npm run build-local
+npm run esbuild
 ```
 
-- Open `src/extension.ts` in your editor, then open the "run and debug" sidebar and click `Run and Debug`. If given a choice, select something related to "Extension development host".
-- The VSCode extension should start when you open a JS, JSX, TS or TSX file.
+Set `isograph.pathToIsograph` to the absolute path of `target/debug/isograph` in the workspace that contains the Isograph config. Run and Debug: `Isograph VS Code extension`. In the Extension Development Host, open that project. The extension starts when you open a JS, JSX, TS, or TSX file.
 
 ### Restarting and seeing new changes
 
-- Run `pnpm watch-rs` to ensure that the latest binary is being built
-- Restart the "Extension development host" window to use the latest language server binary.
+- Run `pnpm watch-rs` to rebuild the `isograph` binary.
+- Reload the Extension Development Host to use the new binary or a new `out/extension.js`.
 
 ### Logs etc.
 
-You can see logs by going to `Show output channel` and selecting `Isograph` or `Isograph LSP Logs`. `Isograph` is the output of the VSCode extension. It is not very interesting. `Isograph LSP Logs` shows the output of the language server binary and the traffic. This is interesting. `eprintln`'s in your Rust code will show up here.
+Show output channel: `Isograph` or `Isograph LSP Logs`. `Isograph` is the extension. `Isograph LSP Logs` is the language client and the `isograph lsp` process. `eprintln` in Rust shows up there.
 
 ## How to release a new "main" version of Isograph
 

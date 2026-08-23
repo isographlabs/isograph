@@ -1,4 +1,4 @@
-import type { ExtensionContext, OutputChannel, Terminal } from 'vscode';
+import type { ExtensionContext, OutputChannel } from 'vscode';
 import type { LanguageClient } from 'vscode-languageclient/node';
 
 export type IsographExtensionContext = {
@@ -6,10 +6,8 @@ export type IsographExtensionContext = {
   lspOutputChannel: OutputChannel;
   extensionContext: ExtensionContext;
   primaryOutputChannel: OutputChannel;
-  compilerTerminal: Terminal | null;
   isographBinaryExecutionOptions: {
     rootPath: string;
     binaryPath: string;
-    binaryVersion?: string;
   };
 };

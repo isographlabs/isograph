@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Isograph VS Code extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/vscode-extension"
+      ],
+      "outFiles": ["${workspaceFolder}/vscode-extension/out/**/*.js"],
+      "preLaunchTask": "vscode-extension: esbuild"
+    }
+  ]
+}

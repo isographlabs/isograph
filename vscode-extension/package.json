@@ -20,11 +20,7 @@
     "onLanguage:typescript",
     "onLanguage:typescriptreact"
   ],
-  "extensionDependencies": [
-    "GraphQL.vscode-graphql-syntax"
-  ],
   "contributes": {
-    "commands": [],
     "configuration": {
       "type": "object",
       "title": "Isograph",
@@ -36,7 +32,7 @@
             "string",
             "null"
           ],
-          "description": "Absolute path to the isograph binary. If not provided, the extension will look in the nearest node_modules directory"
+          "description": "Absolute path to the isograph binary. If not provided, the extension will look in the nearest node_modules/@isograph/compiler"
         },
         "isograph.pathToConfig": {
           "scope": "workspace",
@@ -45,7 +41,7 @@
             "string",
             "null"
           ],
-          "description": "Path to a isograph config relative to the `rootDirectory`. Without this, the compiler will search for your config. This is helpful if your isograph project is in a nested directory."
+          "description": "Path to an isograph config relative to rootDirectory. Without this, the compiler searches for your config."
         },
         "isograph.rootDirectory": {
           "scope": "workspace",
@@ -54,18 +50,10 @@
             "string",
             "null"
           ],
-          "description": "A path relative to the root of your VSCode project for the extension to work from. The default value is the root of your project. This will change where we start looking for the isograph-compiler node module. This will also affect where the LSP server is started, therefore affecting how the isograph config is found. This is helpful if your project is in a nested directory."
-        },
-        "isograph.autoformatIsoLiterals": {
-          "scope": "workspace",
-          "default": true,
-          "type": [
-            "boolean"
-          ]
+          "description": "Path relative to the VS Code workspace. Default is the workspace root. Changes where the extension looks for @isograph/compiler and the cwd of isograph lsp (and therefore config walk-up)."
         }
       }
-    },
-    "jsonValidation": []
+    }
   },
   "scripts": {
     "typecheck": "tsc",
@@ -75,8 +63,8 @@
     "vscode:prepublish": "rimraf tsconfig.tsbuildinfo && rimraf out && npm run esbuild-base -- --minify",
     "build-local": "vsce package",
     "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node",
-    "esbuild": "npm run esbuild-base --sourcemap",
-    "esbuild-watch": "npm run esbuild-base --sourcemap --watch"
+    "esbuild": "npm run esbuild-base -- --sourcemap",
+    "esbuild-watch": "npm run esbuild-base -- --sourcemap --watch"
   },
   "engines": {
     "node": "22.9.0",
@@ -84,12 +72,10 @@
   },
   "packageManager": "npm@10.8.3",
   "dependencies": {
-    "semver": "^7.3.7",
     "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {
     "@types/node": "^17.0.23",
-    "@types/semver": "^7.3.9",
     "@types/vscode": "^1.60.0",
     "@typescript-eslint/eslint-plugin": "^5.13.0",
     "@typescript-eslint/parser": "^5.0.0",
@@ -100,6 +86,7 @@
     "eslint-config-airbnb-typescript": "^17.0.0",
     "eslint-plugin-import": "^2.26.0",
     "prettier": "^3.7.4",
+    "rimraf": "^5.0.10",
     "typescript": "5.6.3"
   }
 }
