@@ -144,7 +144,7 @@ Finding the binary:
 
 Which files:
 
-- VS Code: `documentSelector` four language ids.
+- VS Code: `documentSelector` four language ids, then per-config globs (vscode-config-discovery.md).
 - Zed: `languages = ["JavaScript", "JSX", "TypeScript", "TSX"]` on the language server. Zed already has those languages (tree-sitter + vtsls). Isograph is an additional language server on them, the way Deno or ESLint is. Users who list `language_servers` without `"..."` will not get it. Default is `"..."` which includes newly registered servers.
 
 Highlighting:
