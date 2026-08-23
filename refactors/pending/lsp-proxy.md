@@ -1,6 +1,6 @@
 # `isograph lsp`
 
-Requires start-returns-when-listening.md. Independent of lsp-tokens.md, lsp-sessions.md, lsp-diagnostics.md.
+Requires start-returns-when-listening.md (landed). Independent of lsp-tokens.md, lsp-sessions.md, lsp-diagnostics.md.
 
 VS Code and Zed spawn a process on stdio. They do not dial `{slug}.port`. `isograph lsp` is that process: discover, `isograph start`, one `connect_to_daemon`, copy bytes, die. Do not parse LSP. Do not become the daemon. Dropping the editor drops the proxy. The daemon stays up.
 

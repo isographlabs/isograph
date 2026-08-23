@@ -30,9 +30,10 @@ A `restart` that cannot stop still exits nonzero. It does not report success bec
             freddie_cli::Verb::Start(_) | freddie_cli::Verb::Restart(_) => {
                 crate::start::run::<THostLanguage>(verb, matches.reference())
             }
-            verb => {
-                freddie_cli::run_lifecycle_verb::<Isograph<THostLanguage>>(verb, matches.reference())
-            }
+            verb => freddie_cli::run_lifecycle_verb::<Isograph<THostLanguage>>(
+                verb,
+                matches.reference(),
+            ),
         },
         Some(CliVerb::Send(args)) => send::run(args.reference()),
         Some(CliVerb::ConfigPath(id)) => config_path::run(id.reference()),
@@ -95,7 +96,9 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use clap::ArgMatches;
+use clap::error::ErrorKind;
 use freddie_cli::{App, Verb};
+use isograph_compiler::HostLanguage;
 use prelude::Postfix;
 
 use crate::Isograph;
@@ -105,21 +108,25 @@ const DEADLINE: Duration = Duration::from_secs(5);
 const SLEEP: Duration = Duration::from_millis(10);
 
 #[expect(clippy::print_stderr)]
-pub fn run<THostLanguage: isograph_compiler::HostLanguage>(
+pub fn run<THostLanguage: HostLanguage>(
     verb: Verb<Isograph<THostLanguage>>,
     matches: &ArgMatches,
 ) -> ExitCode {
-    let instance = match Isograph::<THostLanguage>::instance(verb.id()) {
-        Ok(instance) => instance,
-        Err(e) => {
-            clap::Error::raw(clap::error::ErrorKind::ValueValidation, format!("{e}\n")).exit()
+    let id = match &verb {
+        Verb::Start(args) => &args.id,
+        Verb::Restart(args) => &args.id,
+        _ => {
+            return freddie_cli::run_lifecycle_verb::<Isograph<THostLanguage>>(verb, matches);
         }
+    };
+    let instance = match Isograph::<THostLanguage>::instance(id) {
+        Ok(instance) => instance,
+        Err(e) => clap::Error::raw(ErrorKind::ValueValidation, format!("{e}\n")).exit(),
     };
     let port_path = discover::port_file(instance.lock_file());
     let code = freddie_cli::run_lifecycle_verb::<Isograph<THostLanguage>>(verb, matches);
     match freddie_single_instance::holder_at(instance.lock_file()) {
-        Ok(freddie_single_instance::Held::By(_))
-        | Ok(freddie_single_instance::Held::Unnamed) => {}
+        Ok(freddie_single_instance::Held::By(_)) | Ok(freddie_single_instance::Held::Unnamed) => {}
         Ok(freddie_single_instance::Held::Free) | Err(_) => return ExitCode::FAILURE,
     }
     match wait_until_listening(port_path.reference(), instance.lock_file()) {
@@ -146,12 +153,11 @@ fn wait_until_listening(port_path: &Path, lock: &Path) -> Result<(), WaitError> 
             }
             Ok(_) => {}
         }
-        if let Ok(text) = fs::read_to_string(port_path) {
-            if let Some(port) = discover::parse_port(text.reference()) {
-                if let Ok(_stream) = TcpStream::connect((Ipv4Addr::LOCALHOST, port)) {
-                    return ().wrap_ok();
-                }
-            }
+        if let Ok(text) = fs::read_to_string(port_path)
+            && let Some(port) = discover::parse_port(text.reference())
+            && let Ok(_stream) = TcpStream::connect((Ipv4Addr::LOCALHOST, port))
+        {
+            return ().wrap_ok();
         }
         if Instant::now() >= deadline {
             return WaitError::NotListening.wrap_err();
@@ -161,7 +167,7 @@ fn wait_until_listening(port_path: &Path, lock: &Path) -> Result<(), WaitError> 
 }
 ```
 
-Same 5s / 10ms as freddie `wait_until_held`. `ExitCode` is not `Eq`; do not compare it to `SUCCESS`. Held after a failed restart is the old daemon: wait connects, then return `code` (failure). Freddie SUCCESS then child dead is `Free`: return `FAILURE`, do not sit 10s. During the wait, `Free` fails immediately.
+Same 5s / 10ms as freddie `wait_until_held`. `Verb::id` is `pub(crate)` in freddie, so start matches `Start` / `Restart` `args.id`. `ExitCode` is not `Eq`; do not compare it to `SUCCESS`. Held after a failed restart is the old daemon: wait connects, then return `code` (failure). Freddie SUCCESS then child dead is `Free`: return `FAILURE`, do not sit 10s. During the wait, `Free` fails immediately.
 
 `TcpStream::connect` then drop is one `accept_loop` session that hits EOF before initialize and returns. Do not send initialize. Do not treat "file exists" as ready. `if let Ok(_stream)` is whether the port accepted.
 
@@ -235,7 +241,8 @@ fn start_with_a_garbage_leftover_port_file_then_send() {
     let daemon = Daemon::start();
     let path = port_file_path(daemon.reference());
     let _ = daemon.isograph(STOP);
-    std::fs::write(path.reference(), "not-a-port\n").expect("a test can write a leftover port file");
+    std::fs::write(path.reference(), "not-a-port\n")
+        .expect("a test can write a leftover port file");
     let started = daemon.isograph(["start", "--filesystem", "injected"].reference());
     assert!(
         started.status.success(),
