@@ -30,7 +30,7 @@ Insert before `.request()` in lsp-dispatch.md `dispatch_lsp_request`:
             )?
 ```
 
-`semantic_tokens_response` takes `&IsographState`, `SemanticTokensParams`, returns `isograph_lsp::lsp_runtime_error::LSPRuntimeResult<<lsp_types::request::SemanticTokensFullRequest as lsp_types::request::Request>::Result>`. Missing file is `Ok(None)` (JSON `null`). Non-file URI is `Err(LSPRuntimeError::UnexpectedError(...))`.
+`semantic_tokens_response` takes `&IsographState`, `SemanticTokensParams`, returns `isograph_lsp::lsp_runtime_error::LSPRuntimeResult<<lsp_types::request::SemanticTokensFullRequest as lsp_types::request::Request>::Result>`. Missing file is `Ok(None)` (JSON `null`). Non-file URI is `ExpectedError` (JSON `null`).
 
 ```rust
 // from crates/isograph_cli/src/adapter.rs
@@ -41,10 +41,7 @@ fn semantic_tokens_response<THostLanguage: isograph_compiler::HostLanguage>(
     <lsp_types::request::SemanticTokensFullRequest as lsp_types::request::Request>::Result,
 > {
     let Some(absolute) = file_path(params.text_document.uri.reference()) else {
-        return isograph_lsp::lsp_runtime_error::LSPRuntimeError::UnexpectedError(
-            "textDocument.uri is not a file path".to_owned(),
-        )
-        .wrap_err();
+        return isograph_lsp::lsp_runtime_error::LSPRuntimeError::ExpectedError.wrap_err();
     };
     let tokens = semantic_tokens(state, absolute.reference());
     tokens
@@ -129,7 +126,7 @@ notify(
 - initialize legend `tokenTypes[15]` is `keyword`
 - `notify` that `DiskChanged::File`, settle, then `semanticTokens/full` for `file:///tmp/proj/src/Home.ts` on a second connection that has initialized: first token type 15, length 10
 - `full` for a URI that was never interned: `result` is JSON `null`
-- `full` with a non-file URI: `UnknownErrorCode`, message `textDocument.uri is not a file path`
+- `full` with a non-file URI: `result` is JSON `null`
 - `full` with params `{}`: extract fails; response `id` is the request id, not `"default-lsp-id"`
 - unknown request is still `MethodNotFound`
 

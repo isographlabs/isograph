@@ -34,6 +34,10 @@ Commit after every change, small and atomically, without being asked. Each logic
 
 No Claude memory files. Disregard recalled memories. Project rules live here, in `docs-website/docs/design-docs/mental-model.md`, and in `refactors/`.
 
+## Quiescent codebase
+
+A quiescent codebase is one in which, over the last 5 minutes, there are no changes to files other than planning docs: no commits and no working-dir changes.
+
 ## Refactor docs
 
 Plan in `refactors/`. Move `refactors/pending` to `refactors/past` when we will not work on it again. Do not modify `refactors/past/`.
