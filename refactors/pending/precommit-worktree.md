@@ -45,8 +45,14 @@ if [[ -f "$git_dir/MERGE_HEAD" ]]; then
     parents+=(-p "$p")
   done <"$git_dir/MERGE_HEAD"
 fi
-snapshot=$(git commit-tree --no-gpg-sign "$tree" "${parents[@]}" -m "precommit snapshot")
+if [[ ${#parents[@]} -gt 0 ]]; then
+  snapshot=$(git commit-tree --no-gpg-sign "$tree" "${parents[@]}" -m "precommit snapshot")
+else
+  snapshot=$(git commit-tree --no-gpg-sign "$tree" -m "precommit snapshot")
+fi
 ```
+
+macOS `/bin/bash` is 3.2: `"${parents[@]}"` with `set -u` is unbound when the array is empty (unborn `HEAD`). Skip the expansion in that case.
 
 `--files .` is present so pre-commit does not enter `staged_files_only` (`stash = not args.all_files and not args.files`). The file list still comes from `--from-ref` / `--to-ref` when both are set. On an unborn branch `--all-files` is the same: no `staged_files_only`.
 
@@ -295,7 +301,11 @@ if [[ -f "$git_dir/MERGE_HEAD" ]]; then
     parents+=(-p "$p")
   done <"$git_dir/MERGE_HEAD"
 fi
-snapshot=$(git commit-tree --no-gpg-sign "$tree" "${parents[@]}" -m "precommit snapshot")
+if [[ ${#parents[@]} -gt 0 ]]; then
+  snapshot=$(git commit-tree --no-gpg-sign "$tree" "${parents[@]}" -m "precommit snapshot")
+else
+  snapshot=$(git commit-tree --no-gpg-sign "$tree" -m "precommit snapshot")
+fi
 
 unset $local_env_vars
 
@@ -379,8 +389,8 @@ Degenerate cases the test establishes:
 
 - staged file plus a dirty unstaged file: after a successful mock, the unstaged contents are the pre-hook contents, `git stash list` is empty, the index still has the staged blob; mock cwd is `$wt`; mock args contain `--from-ref`, `--to-ref HEAD`, `--files .`
 - mock exits 1: the script exits 1, same three invoking-tree invariants
-- mock writes a file in its cwd and exits 1: script stderr contains `Hooks modified the snapshot. Those fixes were not copied back.`; the invoking tree does not have that file
-- mock `git add`s another file in the invoking index (path captured when writing the mock, not `GIT_INDEX_FILE` from the environment, which the script unsets before running `pre-commit`): the script exits 1, message `index changed while pre-commit ran; aborting commit`
+- mock overwrites a tracked file in its cwd and exits 1: script stderr contains `Hooks modified the snapshot. Those fixes were not copied back.`; the invoking tree's copy of that file is unchanged
+- mock `git add`s another file in the invoking index (index path, git dir, and work tree captured when writing the mock, not `GIT_INDEX_FILE` from the environment, which the script unsets before running `pre-commit`; cwd is `$wt` so `--work-tree` is the invoking repo): the script exits 1, message `index changed while pre-commit ran; aborting commit`
 - `GIT_INDEX_FILE` pointing at a temp index whose tree is not the default index: the script exits 0 (post-check uses the temp index)
 - unmerged path: script exits 1 without creating `$wt`
 - `git add -N` file: script exits 1 without creating `$wt`, stderr names the path
@@ -517,7 +527,7 @@ bindir="$root/fixer/bin"
 init_with_head "$repo"
 stage_and_dirty "$repo"
 make_mocks "$bindir"
-write_precommit_mock "$bindir" "echo patched > patched.txt
+write_precommit_mock "$bindir" "echo patched > file.txt
 exit 1"
 set +e
 (cd "$repo" && PATH="$bindir:$PATH" "$under_test") >"$root/fixer/out" 2>&1
@@ -525,9 +535,7 @@ status=$?
 set -e
 assert_eq "$status" "1" "fixer exit"
 assert_contains "$(cat "$root/fixer/out")" "Hooks modified the snapshot. Those fixes were not copied back." "fixer message"
-if [[ -e "$repo/patched.txt" ]]; then
-  fail "patched.txt was copied to the invoking tree"
-fi
+assert_eq "$(cat "$repo/file.txt")" "base" "invoking tree file.txt"
 
 # index changed while hooks ran
 repo="$root/idx/repo"
@@ -538,7 +546,7 @@ echo extra > "$repo/extra.txt"
 make_mocks "$bindir"
 idx=$(git -C "$repo" rev-parse --path-format=absolute --git-path index)
 gdir=$(git -C "$repo" rev-parse --path-format=absolute --git-dir)
-write_precommit_mock "$bindir" "GIT_INDEX_FILE='$idx' git --git-dir='$gdir' add extra.txt
+write_precommit_mock "$bindir" "GIT_INDEX_FILE='$idx' git --git-dir='$gdir' --work-tree='$repo' add extra.txt
 exit 0"
 set +e
 (cd "$repo" && PATH="$bindir:$PATH" "$under_test") >"$root/idx/out" 2>&1
