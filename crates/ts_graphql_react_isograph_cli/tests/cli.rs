@@ -203,11 +203,16 @@ fn read_initialize_result(stdout: &mut impl std::io::BufRead) -> lsp_server::Res
     response
 }
 
-// freddie_cli's stop without --force is SIGTERM, which it does not send on Windows.
+// freddie_cli's stop and restart without --force is SIGTERM, which it does not send on Windows.
 #[cfg(windows)]
 const STOP: &[&str] = &["stop", "--force"];
 #[cfg(not(windows))]
 const STOP: &[&str] = &["stop"];
+
+#[cfg(windows)]
+const RESTART: &[&str] = &["restart", "--force", "--filesystem", "injected"];
+#[cfg(not(windows))]
+const RESTART: &[&str] = &["restart", "--filesystem", "injected"];
 
 #[test]
 fn start_then_status_reports_running() {
@@ -241,7 +246,7 @@ fn send_after_start_needs_no_extra_wait() {
 #[test]
 fn send_after_restart_needs_no_extra_wait() {
     let daemon = Daemon::start();
-    let restarted = daemon.isograph(["restart", "--filesystem", "injected"].reference());
+    let restarted = daemon.isograph(RESTART);
     assert!(
         restarted.status.success(),
         "stdout: {} stderr: {}",
