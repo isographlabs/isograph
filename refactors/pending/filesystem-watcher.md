@@ -2,7 +2,7 @@
 
 Requires filesystem-events.md (landed), interned-source-path.md (landed), config-source-files.md (landed), lsp-port.md (landed), and `docs-website/docs/design-docs/event-model.md`.
 
-This is isograph's watcher. Copy `crates/isograph_compiler/src/watch.rs`, `read_files.rs` `visit_dirs_skipping_isograph` / `read_files_in_folder`, and `source_files.rs` `update_sources`. It lives in `isograph_cli` because i2 posts `DiskChanged` instead of writing the db from the notify thread.
+This is isograph's watcher. Copy `crates/isograph_compiler/src/watch.rs` and `source_files.rs` `update_sources`. It lives in `isograph_cli` because i2 posts `DiskChanged` instead of writing the db from the notify thread.
 
 The notify callback categorizes and sends `SourceFileEvent`. `run_filesystem_watcher` reads file bytes and posts `DiskChanged`. That is isograph's callback-then-`update_sources` split.
 
@@ -11,7 +11,7 @@ Deltas from those files, exhaustive:
 - `Filesystem` instead of `--watch: bool`. Default `Watch`. `Injected` does not create a debouncer.
 - `source_files` is which files intern. isograph used `path.starts_with(project_root)` plus an extension check. Ordered globs, `!` excludes, last match wins. The watch/walk root is the config directory, isograph's `project_root` analog. Folder events under that directory are in scope even when the folder path itself does not match a file glob (`src` vs `src/**/*.ts`). `[]` intern nothing. Watching the config directory when it is the repo root is the `max_user_watches` case isograph avoided by pointing `project_root` at `./src`.
 - The extension check in `read_files_in_folder` is `HostLanguage::should_skip_source_file`. One associated function, two-variant enum (`Skip` / `Keep`). Not a memo. Not a second trait: the CLI is already generic over `THostLanguage`.
-- `__isograph` is skipped in the walker (`ISOGRAPH_FOLDER` on `isograph_config`). Not HostLanguage.
+- Drop `{config_directory}/__isograph` (`ISOGRAPH_FOLDER`). Relative path `__isograph` or under it is out of scope. Not a HostLanguage concern. Not isograph's `visit_dirs_skipping_isograph` (that skips every nested `__isograph`).
 - No schema / schema-extension / artifact-directory watches. Config-file events are `ChangedFileKind::Config` and are dropped. The daemon does not reload config.
 - Watch, then boot-walk. isograph compiled then watched and missed the gap.
 - Copy `categorize_and_filter_events` / `process_create_event` / `process_modify_event` / `process_remove_event`. Then: `CreateKind::Folder` scans; `RenameMode::From` / `To`; `EventKind::Any` and `ModifyKind::Any` (not `Name`) like isograph's `RenameMode::Any`; `need_rescan()` re-walks the config directory; no panic on path count (`paths.first()` / `paths.get(1)`).
@@ -321,7 +321,7 @@ async fn run_filesystem_watcher<THostLanguage: HostLanguage>(
 
 ### Watch
 
-Copy `create_debounced_file_watcher`: `new_debouncer` 100ms, `RecommendedWatcher`, `RecommendedCache`, recursive `watch()` of the config directory. Callback: `categorize_and_filter_events`, `watch_tx.send`. Then boot-walk that directory with `visit_dirs_skipping_isograph` and send those `SourceFile` creates.
+Copy `create_debounced_file_watcher`: `new_debouncer` 100ms, `RecommendedWatcher`, `RecommendedCache`, recursive `watch()` of the config directory. Callback: `categorize_and_filter_events`, `watch_tx.send`. Then boot-walk that directory, skip `{config_directory}/__isograph`, and send those `SourceFile` creates.
 
 ```rust
 // from crates/isograph_cli/src/watch.rs
@@ -338,7 +338,7 @@ pub fn start<THostLanguage: HostLanguage>(
 
 `WatchError`: failed `new_debouncer`, failed `watch()` of the config directory (path plus `notify::Error`), invalid glob.
 
-`source_files` membership is `SourceGlobs`: compile each glob with `globset`, `!` is exclude, last match wins. Copy `visit_dirs_skipping_isograph` from isograph (`ISOGRAPH_FOLDER`). Warn and skip a `read_dir` error. A directory symlink to an ancestor loops; isograph does not detect that.
+`source_files` membership is `SourceGlobs`: compile each glob with `globset`, `!` is exclude, last match wins. Boot-walk is a recursive `read_dir` of the config directory that does not enter `__isograph`. The same relative-prefix check drops notify events under `__isograph`. Warn and skip a `read_dir` error. A directory symlink to an ancestor loops; isograph does not detect that.
 
 Copy `categorize_and_filter_events` and the `process_*` functions from isograph `watch.rs`. Files are in scope if `source_files` matches. Folders are in scope if they are under the config directory. Deltas are the bullet list at the top of this file. Do not re-implement notify's event matrix from scratch.
 
@@ -359,7 +359,7 @@ Posted `File` `Present` paths are absolute and canonical. `File` `Absent` and `F
 
 ### Tests
 
-TypeScript `should_skip_source_file`: `ts` / `tsx` / `js` / `jsx` (including `a.ts`, `src/a.d.ts`) are `Keep`. `rs` / `json` / `mjs` / `mts` / `graphql` / empty path are `Skip`. `node_modules/pkg/index.ts` and `src/__isograph/foo.ts` are `Keep` by extension.
+TypeScript `should_skip_source_file`: `ts` / `tsx` / `js` / `jsx` (including `a.ts`, `src/a.d.ts`) are `Keep`. `rs` / `json` / `mjs` / `mts` / `graphql` / empty path are `Skip`. `node_modules/pkg/index.ts` is `Keep` by extension. `__isograph/foo.ts` is out of scope as root `__isograph`, not because of HostLanguage. `src/__isograph/foo.ts` is not that path.
 
 `ISOGRAPH_FOLDER` is `"__isograph"`.
 
@@ -377,7 +377,7 @@ Behavior, not notify internals:
 - Remove of file `src/a.in` is `File` `Absent`. Remove of folder `src` is `FolderRemoved`; after `handle`, `src/a.in` is gone.
 - Rename file: `File` `Absent` of from, `Present` of to. Rename folder: `FolderRemoved` of from, then `Present` of files under to.
 - Empty `source_files`: boot posts nothing.
-- Walk skips `__isograph`.
+- `{config_directory}/__isograph` is out of scope. `src/__isograph` is not.
 - Failed read after a successful `Present` posts `File` `Absent`; after `handle` the interned file is gone.
 - `need_rescan` re-walks the config directory and intern matching files again.
 
