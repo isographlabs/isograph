@@ -2,7 +2,7 @@
 
 Requires lsp-request-response.md and lsp-dispatch.md. Independent of filesystem-watcher.md. Independent of lsp-sessions.md.
 
-`dispatch_lsp_request` has an empty `on_request_sync` chain. This file adds `.on_request_sync::<SemanticTokensFullRequest>(semantic_tokens_response)?`. Do not special-case tokens in `run_session`. `isograph/event` stays a notification.
+`dispatch_lsp_request` has an empty `on_request_sync` chain. This file adds `.on_request_sync::<SemanticTokensFullRequest>(semantic_tokens_response)?` before `.request()`. Do not special-case tokens in `run_session`. `isograph/event` stays a notification arm.
 
 Origin of the method: `lsp_types::request::SemanticTokensFullRequest`. Origin of the handler: isograph `on_semantic_token_full_request`. Origin of tokens: `lsp_semantic_tokens_for_file`. Origin of initialize options: isograph `server.rs` `initialize`. Delta: extract is `Result`; URI to path has no `expect`; missing `DiskFile` is JSON `null`.
 
