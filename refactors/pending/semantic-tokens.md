@@ -387,7 +387,7 @@ Facts:
 
 ### Formatter metadata
 
-Not a field on `SemanticToken`. Consume passes a `Layout` next to the highlight role. iso-format.md.
+Consume passes a `Layout` next to the highlight role. iso-format.md.
 
 ### Cheap pass
 
