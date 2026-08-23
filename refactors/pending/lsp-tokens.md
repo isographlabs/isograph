@@ -2,7 +2,7 @@
 
 Requires lsp-request-response.md and lsp-dispatch.md. Independent of filesystem-watcher.md. Independent of lsp-sessions.md.
 
-`dispatch_lsp_request` is `method_not_found`. This file puts `LSPRequestDispatch` around it: `.on_request_sync::<SemanticTokensFullRequest>(semantic_tokens_response)?` then leftover `method_not_found`. Do not special-case tokens in `run_session`. `isograph/event` stays a notification arm.
+`dispatch_lsp` request arm is `method_not_found`. This file puts `LSPRequestDispatch` around it: `.on_request_sync::<SemanticTokensFullRequest>(semantic_tokens_response)?` then leftover `method_not_found`. Do not special-case tokens in `run_session`. `isograph/event` stays a notification arm.
 
 Origin of the method: `lsp_types::request::SemanticTokensFullRequest`. Origin of the handler: isograph `on_semantic_token_full_request`. Origin of tokens: `lsp_semantic_tokens_for_file`. Origin of initialize options: isograph `server.rs` `initialize`. Origin of the dispatcher: isograph `LSPRequestDispatch`. Delta: URI to path has no `expect`; missing `DiskFile` is `Ok(None)` (JSON `null`).
 
@@ -23,34 +23,27 @@ Send notifies `isograph/event` and exits. Then `textDocument/semanticTokens/full
 
 ```rust
 // from crates/isograph_cli/src/state.rs
+        lsp_server::Message::Request(request) => dispatch_lsp_request(state, lsp.reply, request),
+
 fn dispatch_lsp_request<THostLanguage: HostLanguage>(
     state: &IsographState<THostLanguage>,
-    incoming: crate::event::LspRequest,
+    reply: crossbeam::channel::Sender<lsp_server::Message>,
+    request: lsp_server::Request,
 ) -> Vec<IsographEffect> {
     let get_response = || {
-        let request = isograph_lsp::lsp_request_dispatch::LSPRequestDispatch::new(
-            incoming.request,
-            state,
-        )
-        .on_request_sync::<lsp_types::request::SemanticTokensFullRequest>(
-            semantic_tokens_response::<THostLanguage>,
-        )?
-        .request();
+        let request = isograph_lsp::lsp_request_dispatch::LSPRequestDispatch::new(request, state)
+            .on_request_sync::<lsp_types::request::SemanticTokensFullRequest>(
+                semantic_tokens_response::<THostLanguage>,
+            )?
+            .request();
         ControlFlow::Continue(request)
     };
     match get_response() {
         ControlFlow::Break(response) => crate::effect::IsographEffect::SendLspResponse(
-            crate::effect::SendLspResponse {
-                reply: incoming.reply,
-                response,
-            }
-            .boxed(),
+            crate::effect::SendLspResponse { reply, response }.boxed(),
         )
         .wrap_vec(),
-        ControlFlow::Continue(request) => method_not_found(crate::event::LspRequest {
-            request,
-            reply: incoming.reply,
-        }),
+        ControlFlow::Continue(request) => method_not_found(reply, request),
     }
 }
 ```
@@ -146,5 +139,5 @@ url = { workspace = true }
 
 ## Call sites
 
-- `handle` `LspRequest` -> `on_request_sync::<SemanticTokensFullRequest>` -> `semantic_tokens_response` -> `lsp_semantic_tokens_for_file` -> `SendLspResponse`
+- `handle` `Lsp` request -> `on_request_sync::<SemanticTokensFullRequest>` -> `semantic_tokens_response` -> `lsp_semantic_tokens_for_file` -> `SendLspResponse`
 - other requests -> Continue -> `method_not_found`

@@ -6,13 +6,13 @@ isograph's server loop runs `LSPRequestDispatch` and `LSPNotificationDispatch` t
 
 Those structs already exist. This slice puts them in `isograph_lsp` and calls them from `handle`. It does not write a second dispatcher.
 
-After lsp-port.md, the session special-cases `isograph/event` and ignores every other notification. After lsp-request-response.md, a request is `LspRequest` and `handle` is `method_not_found`. This slice makes the session a pump: every request is `LspRequest`, every notification is `LspNotification`. `handle` of `LspRequest` is `method_not_found` (no `on_request_sync`). `handle` of `LspNotification` is isograph `dispatch_notification`. The notification chain has `isograph/event`. Tokens adds the first `.on_request_sync`.
+After lsp-port.md, the session special-cases `isograph/event` and ignores every other notification. After lsp-request-response.md, a request is `LspRequest` and `handle` is `method_not_found`. This slice replaces `LspRequest` with one `Lsp` variant: the LSP message plus a clone of `connection.sender`. The session posts every message after initialize as `Lsp`. `handle` of `Lsp` matches the message. A request is `method_not_found` (no `on_request_sync`). A notification is isograph `dispatch_notification` (`isograph/event` is the first arm). A response is no effects. Tokens adds the first `.on_request_sync`.
 
-Origin: isograph `crates/isograph_lsp/src/lsp_request_dispatch.rs`, `lsp_notification_dispatch.rs`, `lsp_runtime_error.rs`, `server.rs` `dispatch_request` / `dispatch_notification`. Delta on the three files: none. They are copied into `crates/isograph_lsp/src/` under the same names, including `#[cfg(test)]`. `lib.rs` has `pub mod` for all three (isograph's `lsp_request_dispatch` is `mod`; the call site here is `isograph_cli`). Call-site delta: `TState` is `IsographState` not `LspState`; this slice there is no `on_request_sync`; `dispatch_lsp_request` is `method_not_found`, which returns `Vec<IsographEffect>` (one immediate `SendLspResponse`); notification `TState` is `(&mut IsographState, &mut Vec<IsographEffect>)` because the existing handler returns `LSPRuntimeResult<()>` and `handle` returns effects.
+Origin: isograph `crates/isograph_lsp/src/lsp_request_dispatch.rs`, `lsp_notification_dispatch.rs`, `lsp_runtime_error.rs`, `server.rs` `dispatch_request` / `dispatch_notification`. Delta on the three files: none. They are copied into `crates/isograph_lsp/src/` under the same names, including `#[cfg(test)]`. `lib.rs` has `pub mod` for all three (isograph's `lsp_request_dispatch` is `mod`; the call site here is `isograph_cli`). Call-site delta: `TState` is `IsographState` not `LspState`; one `IsographEvent::Lsp` (message plus reply sender) replaces `LspRequest`; this slice there is no `on_request_sync`; a request is `method_not_found`, which returns `Vec<IsographEffect>` (one immediate `SendLspResponse`); notification `TState` is `(&mut IsographState, &mut Vec<IsographEffect>)` because the existing handler returns `LSPRuntimeResult<()>` and `handle` returns effects.
 
 One shippable change. Unknown requests are still `MethodNotFound`. `isograph send` still initialize + `isograph/event`. Existing CLI send tests stay green.
 
-`docs-website/docs/design-docs/event-model.md` Inner: `handle` of `LspRequest` is `method_not_found`, which returns `Vec<IsographEffect>` (one immediate `SendLspResponse`). No request is dispatched this slice. `handle` of `LspNotification` runs `LSPNotificationDispatch`; leftover is no effects. The session does not interpret methods after `initialize`.
+`docs-website/docs/design-docs/event-model.md` Inner: `handle` of `Lsp` matches the message. A request is `method_not_found`, which returns `Vec<IsographEffect>` (one immediate `SendLspResponse`). No request is dispatched this slice. A notification runs `LSPNotificationDispatch`; leftover is no effects. A response is no effects. The session does not interpret methods after `initialize`.
 
 ## What the user does
 
@@ -103,13 +103,10 @@ Do not copy `lsp_command_dispatch.rs`. That is `ExecuteCommand` later.
 use lsp_server::Message;
 
 #[derive(Clone, Debug)]
-pub struct LspRequest {
-    pub request: lsp_server::Request,
+pub struct Lsp {
+    pub message: Message,
     pub reply: crossbeam::channel::Sender<Message>,
 }
-
-#[derive(Clone, Debug)]
-pub struct LspNotification(pub lsp_server::Notification);
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize, derive_more::From)]
 #[serde(tag = "kind", content = "value")]
@@ -119,45 +116,49 @@ pub enum IsographEvent {
     DiskChanged(DiskChanged),
     #[serde(skip)]
     #[from]
-    LspRequest(LspRequest),
-    #[serde(skip)]
-    #[from]
-    LspNotification(LspNotification),
+    Lsp(Lsp),
 }
 ```
 
-`LspNotification` is a newtype: one field. `LspRequest` stays a struct because of `reply`. Neither is a `--file` kind.
+`Lsp` replaces landed `LspRequest`. `reply` is `connection.sender.clone()` on every message. `Lsp` is not a `--file` kind.
 
 ### `handle`
 
 ```rust
 // from crates/isograph_cli/src/state.rs
-        IsographEvent::LspRequest(incoming) => dispatch_lsp_request(incoming),
-        IsographEvent::LspNotification(incoming) => {
-            dispatch_lsp_notification(state, incoming.0)
-        }
-```
+        IsographEvent::Lsp(lsp) => dispatch_lsp(state, lsp),
 
-```rust
-fn dispatch_lsp_request(incoming: crate::event::LspRequest) -> Vec<IsographEffect> {
-    method_not_found(incoming)
+fn dispatch_lsp<THostLanguage: HostLanguage>(
+    state: &mut IsographState<THostLanguage>,
+    lsp: crate::event::Lsp,
+) -> Vec<IsographEffect> {
+    match lsp.message {
+        lsp_server::Message::Request(request) => method_not_found(lsp.reply, request),
+        lsp_server::Message::Notification(notification) => {
+            dispatch_lsp_notification(state, notification)
+        }
+        lsp_server::Message::Response(_) => Vec::new(),
+    }
 }
 
-fn method_not_found(incoming: crate::event::LspRequest) -> Vec<IsographEffect> {
+fn method_not_found(
+    reply: crossbeam::channel::Sender<lsp_server::Message>,
+    request: lsp_server::Request,
+) -> Vec<IsographEffect> {
     // Immediate SendLspResponse this slice. Async later: a timer plus an event; handle of
     // that event is an immediate SendLspResponse.
     crate::effect::IsographEffect::SendLspResponse(
         crate::effect::SendLspResponse {
-            reply: incoming.reply,
+            reply,
             response: lsp_server::Response {
-                id: incoming.request.id,
+                id: request.id,
                 result: None,
                 error: lsp_server::ResponseError {
                     code: lsp_server::ErrorCode::MethodNotFound as i32,
                     data: None,
                     message: format!(
                         "No handler registered for method '{}'",
-                        incoming.request.method
+                        request.method
                     ),
                 }
                 .wrap_some(),
@@ -205,9 +206,9 @@ fn on_isograph_event<THostLanguage: HostLanguage>(
 }
 ```
 
-`dispatch_notification` is isograph `server.rs`. `dispatch_lsp_request` this slice has no `on_request_sync`. The only request handler is `method_not_found`, which returns `Vec<IsographEffect>`: one immediate `SendLspResponse`. Tokens inserts the `LSPRequestDispatch` `?` chain and keeps `method_not_found` as Continue. Notification leftover is `ControlFlow::Continue(())`; `dispatch_lsp_notification` then returns the effects the handler pushed.
+`dispatch_notification` is isograph `server.rs`. `dispatch_lsp` this slice has no `on_request_sync`. The only request handler is `method_not_found`, which returns `Vec<IsographEffect>`: one immediate `SendLspResponse`. Tokens inserts the `LSPRequestDispatch` `?` chain and keeps `method_not_found` as Continue. Notification leftover is `ControlFlow::Continue(())`; `dispatch_lsp_notification` then returns the effects the handler pushed.
 
-The notification chain has `isograph/event`. `on_isograph_event` calls `handle` with the extracted event (`HelloWorld` / `Quit` / `DiskChanged`). `LspRequest` / `LspNotification` are `#[serde(skip)]`, so they are not a `--file` / `isograph/event` payload. One-level re-entry.
+The notification chain has `isograph/event`. `on_isograph_event` calls `handle` with the extracted event (`HelloWorld` / `Quit` / `DiskChanged`). `Lsp` is `#[serde(skip)]`, so it is not a `--file` / `isograph/event` payload. One-level re-entry.
 
 The existing notification handler is `fn(&mut TState, Params) -> LSPRuntimeResult<()>`. It cannot return effects. `TState` is therefore `(&mut IsographState, &mut Vec<IsographEffect>)`. Request `TState` is `&IsographState`, same as isograph's `&LspState`.
 
@@ -253,46 +254,44 @@ isograph_lsp = { path = "../isograph_lsp" }
 
 ```rust
 // from crates/isograph_cli/src/lsp_socket.rs
-            lsp_server::Message::Request(request) => {
-                let _ = event_tx.send(
-                    crate::event::LspRequest {
-                        request,
-                        reply: connection.sender.clone(),
-                    }
-                    .to(),
-                );
+    for message in &connection.receiver {
+        let _ = event_tx.send(
+            crate::event::Lsp {
+                message,
+                reply: connection.sender.clone(),
             }
-            lsp_server::Message::Notification(notification) => {
-                let _ = event_tx.send(crate::event::LspNotification(notification).to());
-            }
-            lsp_server::Message::Response(_) => {}
+            .to(),
+        );
+    }
 ```
 
-The session does not match `IsographEventNotification::METHOD`. `Connection::initialize` still consumes `initialize` and `initialized`. The reader still stops on `Exit`. Those stay outside dispatch, same as isograph.
+The session does not match methods. `Connection::initialize` still consumes `initialize` and `initialized`. The reader still stops on `Exit`. Those stay outside dispatch, same as isograph.
 
 ## Tests
 
-`state.rs`: `handle` of `LspRequest` (hover) is still `SendLspResponse` / `MethodNotFound`. Same assertion as lsp-request-response.md (`id`, `result` `None`, code, message, `perform` delivers that `Response`). Do not add a tests-only request handler.
+`state.rs`: `handle` of `Lsp` whose message is a hover request is still `SendLspResponse` / `MethodNotFound`. Same assertion as lsp-request-response.md (`id`, `result` `None`, code, message, `perform` delivers that `Response`). Do not add a tests-only request handler.
 
-`handle` of `LspNotification` whose method is `isograph/event` and params are `HelloWorld`: `[LogHelloWorld]`.
+`handle` of `Lsp` whose message is notification `isograph/event` and params are `HelloWorld`: `[LogHelloWorld]`.
 
-`handle` of `LspNotification` whose method is `isograph/event` and params are `Quit`: `[Kill]`.
+`handle` of `Lsp` whose message is notification `isograph/event` and params are `Quit`: `[Kill]`.
 
-`handle` of `LspNotification` whose method is `isograph/event` and params are `DiskChanged` Present, with a config directory interned: no effects, file interned. Same facts as the existing `DiskChanged` test.
+`handle` of `Lsp` whose message is notification `isograph/event` and params are `DiskChanged` Present, with a config directory interned: no effects, file interned. Same facts as the existing `DiskChanged` test.
 
-`handle` of `LspNotification` whose method is `window/logMessage`: no effects.
+`handle` of `Lsp` whose message is notification `window/logMessage`: no effects.
 
-Do not `handle` an `isograph/event` whose params fail to deserialize. `extract_notification_params` `expect`s; that is a panic. `bad_event_params_are_not_an_event` stays on `listen_for_events` (no `handle`): the session posts `LspNotification`; params do not deserialize as `IsographEvent`; then `HelloWorld` on the same connection is a second `LspNotification` whose params are `HelloWorld`.
+`handle` of `Lsp` whose message is a `Response`: no effects.
 
-`lsp_socket.rs`: `listen_for_events` sees `LspNotification`, not `HelloWorld` / `DiskChanged` / `Quit`. Assert `notification.0.method` is `IsographEventNotification::METHOD` and `serde_json::from_value::<IsographEvent>(notification.0.params)` is that event. Same for the existing HelloWorld / DiskChanged present-then-absent / multi-connection tests.
+Do not `handle` an `isograph/event` whose params fail to deserialize. `extract_notification_params` `expect`s; that is a panic. `bad_event_params_are_not_an_event` stays on `listen_for_events` (no `handle`): the session posts `Lsp`; params do not deserialize as `IsographEvent`; then `HelloWorld` on the same connection is a second `Lsp` whose params are `HelloWorld`.
 
-`unknown_notification_is_not_an_event`: `window/logMessage` arrives as `LspNotification`. Then `HelloWorld` as today.
+`lsp_socket.rs`: `listen_for_events` sees `Lsp`, not `HelloWorld` / `DiskChanged` / `Quit`. Assert the message is a notification, `method` is `IsographEventNotification::METHOD`, and `serde_json::from_value::<IsographEvent>(params)` is that event. Same for the existing HelloWorld / DiskChanged present-then-absent / multi-connection tests.
 
-MethodNotFound / shutdown / ServerNotInitialized tests stay. `listen_and_reply` tees non-`LspRequest` events. After hover MethodNotFound, `isograph/event` HelloWorld is `LspNotification` on that tee; the loops still run `handle`.
+`unknown_notification_is_not_an_event`: `window/logMessage` arrives as `Lsp`. Then `HelloWorld` as today.
 
-`ServerNotInitialized` is still `Connection::initialize`. A request before initialize is not `LspRequest`.
+MethodNotFound / shutdown / ServerNotInitialized tests stay. After hover MethodNotFound, `isograph/event` HelloWorld is `Lsp` on the tee; the loops still run `handle`.
 
-`daemon.rs` existing tests stay. They do not send `LspRequest` / `LspNotification`.
+`ServerNotInitialized` is still `Connection::initialize`. A request before initialize is not `Lsp`.
+
+`daemon.rs` existing tests stay. They do not send `Lsp`.
 
 `cli.rs` unchanged.
 
@@ -302,7 +301,7 @@ Do not add a production API only tests call.
 
 ## Call sites
 
-- `run_session` Request -> `LspRequest` -> `handle` -> `method_not_found` -> `[SendLspResponse]` -> `perform`
-- `run_session` Notification -> `LspNotification` -> `handle` -> `LSPNotificationDispatch` -> `isograph/event` `on_isograph_event` -> `handle` of `HelloWorld` / `Quit` / `DiskChanged`, or leftover empty
+- `run_session` any message -> `Lsp` -> `handle` -> request `method_not_found` / notification `LSPNotificationDispatch` / response empty
+- notification `isograph/event` -> `on_isograph_event` -> `handle` of `HelloWorld` / `Quit` / `DiskChanged`, or leftover empty
 - lsp-tokens.md -> `.on_request_sync::<SemanticTokensFullRequest>(...)?` on `LSPRequestDispatch`
 - later didOpen / didChange / didClose -> `.on_notification_sync` on `LSPNotificationDispatch`
