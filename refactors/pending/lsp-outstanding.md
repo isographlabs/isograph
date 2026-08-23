@@ -29,10 +29,16 @@ pub(crate) struct LspClientGone {
     pub client: LspClientId,
 }
 
-pub(crate) struct Lsp {
+pub struct LspRequest {
     pub client: LspClientId,
-    pub message: lsp_server::Message,
+    pub request: lsp_server::Request,
     pub reply: crossbeam::channel::Sender<lsp_server::Message>,
+}
+
+pub enum Lsp {
+    Request(LspRequest),
+    Notification(lsp_server::Notification),
+    Response(lsp_server::Response),
 }
 
 #[derive(Debug, derive_more::From)]
@@ -46,7 +52,7 @@ pub enum IsographEvent {
 }
 ```
 
-`Lsp` gains `client`. `#[from]` on `LspClientGone` as well.
+`LspRequest` gains `client`. `#[from]` on `LspClientGone` as well.
 
 ```rust
 // from crates/isograph_cli/src/effect.rs
@@ -87,13 +93,12 @@ Not pico. Not on `IsographState`. Lives in `run_event_loop`.
     };
     while let Some(event) = event_rx.recv().await {
         match &event {
-            IsographEvent::Lsp(lsp) => {
-                if let lsp_server::Message::Request(request) = &lsp.message {
-                    outstanding
-                        .inner
-                        .insert((lsp.client, request.id.clone()));
-                }
+            IsographEvent::Lsp(crate::event::Lsp::Request(request)) => {
+                outstanding
+                    .inner
+                    .insert((request.client, request.request.id.clone()));
             }
+            IsographEvent::Lsp(_) => {}
             IsographEvent::LspClientGone(gone) => {
                 outstanding.inner.retain(|(client, _)| *client != gone.client);
             }

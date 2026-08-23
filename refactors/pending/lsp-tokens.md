@@ -23,13 +23,13 @@ Send notifies `isograph/event` and exits. Then `textDocument/semanticTokens/full
 
 ```rust
 // from crates/isograph_cli/src/state.rs
-        lsp_server::Message::Request(request) => dispatch_lsp_request(state, lsp.reply, request),
+        crate::event::Lsp::Request(incoming) => dispatch_lsp_request(state, incoming),
 
 fn dispatch_lsp_request<THostLanguage: HostLanguage>(
     state: &IsographState<THostLanguage>,
-    reply: crossbeam::channel::Sender<lsp_server::Message>,
-    request: lsp_server::Request,
+    incoming: crate::event::LspRequest,
 ) -> Vec<IsographEffect> {
+    let crate::event::LspRequest { request, reply } = incoming;
     let get_response = || {
         let request = isograph_lsp::lsp_request_dispatch::LSPRequestDispatch::new(request, state)
             .on_request_sync::<lsp_types::request::SemanticTokensFullRequest>(
@@ -43,7 +43,9 @@ fn dispatch_lsp_request<THostLanguage: HostLanguage>(
             crate::effect::SendLspResponse { reply, response }.boxed(),
         )
         .wrap_vec(),
-        ControlFlow::Continue(request) => method_not_found(reply, request),
+        ControlFlow::Continue(request) => {
+            method_not_found(crate::event::LspRequest { request, reply })
+        }
     }
 }
 ```

@@ -51,7 +51,7 @@ fn handle(state: &mut IsographState, event: IsographEvent) -> Vec<IsographEffect
 
 `IsographState` is the pico database. The test harness calls `handle`. It does not start a daemon, open a socket, or write a file. A test constructs a `DiskChanged` or `EditorChanged`, runs `handle`, and asserts the effects and the `DiskFile` sources. The binary's event loop calls the same `handle` with the same types.
 
-`IsographEvent` is `Lsp` | `Internal`. `handle` of `Lsp` matches `lsp_server::Message` and runs isograph request/notification dispatch. A request leftover is `method_not_found`: one immediate `SendLspResponse`. Later a handler can return a timer plus an event; `handle` of that event is an immediate `SendLspResponse`. A notification leftover is no effects. A notification that matches can return effects other than `SendLspResponse`. A response is no effects. `handle` of `Internal` is `HelloWorld` / `Quit` / `DiskChanged`. `handle` does not touch the socket. The effect loop writes the `Response`.
+`IsographEvent` is `Lsp` | `Internal`. `Lsp` is `Request` (request plus reply) / `Notification` / `Response`. `handle` of `Lsp` matches those and runs isograph request/notification dispatch. A request leftover is `method_not_found`: one immediate `SendLspResponse`. Later a handler can return a timer plus an event; `handle` of that event is an immediate `SendLspResponse`. A notification leftover is no effects. A notification that matches returns `Vec<IsographEffect>` and not `SendLspResponse`. Bad `isograph/event` params are leftover (empty effects). A response is no effects. `handle` of `Internal` is `HelloWorld` / `Quit` / `DiskChanged`. `handle` does not touch the socket. The effect loop writes the `Response`.
 
 `handle` does not know about globs, gitignore, or "in scope". Scope is the watcher's job. `isograph send` may inject any path.
 
@@ -60,7 +60,7 @@ fn handle(state: &mut IsographState, event: IsographEvent) -> Vec<IsographEffect
 The binary is the outer. Each source is outside `handle` and feeds it. One process, one channel, one worker that owns `IsographState`. Sources do not read state. Performers do not mutate it.
 
 - Watcher: OS notifications become `DiskChanged` (path plus contents or absent). It may read the disk to fill `Present.contents`. `handle` does not. The watcher posts in-process on the event channel. It does not run the CLI and it does not write to the LSP port.
-- LSP port: LSP JSON-RPC on `{slug}.port`. `isograph send` is a client: initialize, `initialized`, notification `isograph/event` whose params are `Internal` (`HelloWorld` / `Quit` / `DiskChanged`). After initialize the session posts every message as `Lsp` (the `lsp_server::Message` plus a clone of that connection's writer). It does not interpret methods. `handle` of `Lsp` is isograph's server-loop match. A request leftover is `MethodNotFound`. A notification leftover is no effects. `isograph/event` is the first notification arm and runs `handle` of `Internal`. Later, `textDocument/didOpen` / `didChange` / `didClose` are notification arms; hover and `semanticTokens/full` are request arms. Effects from `handle` (`ReportDiagnostics`) become LSP notifications (`publishDiagnostics`).
+- LSP port: LSP JSON-RPC on `{slug}.port`. `isograph send` is a client: initialize, `initialized`, notification `isograph/event` whose params are `Internal` (`HelloWorld` / `Quit` / `DiskChanged`). After initialize the session posts every message as `Lsp`. It clones the writer only for requests. It does not interpret methods. `handle` of `Lsp` is isograph's server-loop match. A request leftover is `MethodNotFound`. A notification leftover is no effects. `isograph/event` is the first notification arm and runs `handle` of `Internal`. Bad `isograph/event` params do not kill the daemon. Later, `textDocument/didOpen` / `didChange` / `didClose` are notification arms; hover and `semanticTokens/full` are request arms. Effects from `handle` (`ReportDiagnostics`) become LSP notifications (`publishDiagnostics`).
 - Effect loop: performs `WriteArtifacts`, `ReportDiagnostics`, `StartAsyncWork`, `SendLspResponse`, `Kill`.
 
 `isograph lsp` is a stdio proxy onto the port. Walk-up / `--config` is the same as every other verb. It starts the daemon if needed, dials the port, and copies stdin/stdout. Dropping the editor drops the proxy and that connection. The daemon stays up. Several editors share one process. The vscode-extension already spawns `isograph lsp` on stdio.
@@ -85,6 +85,17 @@ An event is something that happened, already carrying what the source knows.
 enum IsographEvent {
     Lsp(Lsp),
     Internal(Internal),
+}
+
+enum Lsp {
+    Request(LspRequest),
+    Notification(lsp_server::Notification),
+    Response(lsp_server::Response),
+}
+
+struct LspRequest {
+    request: lsp_server::Request,
+    reply: crossbeam::channel::Sender<lsp_server::Message>,
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
