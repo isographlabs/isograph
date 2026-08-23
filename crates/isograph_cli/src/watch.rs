@@ -613,7 +613,7 @@ fn post_folder_removed(event_tx: &UnboundedSender<IsographEvent>, path: &Path) {
 }
 
 fn post(event_tx: &UnboundedSender<IsographEvent>, change: DiskChanged) {
-    let _ = event_tx.send(IsographEvent::DiskChanged(change));
+    let _ = event_tx.send(crate::event::Internal::DiskChanged(change).to());
 }
 
 #[cfg(test)]

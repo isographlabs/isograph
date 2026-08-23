@@ -11,7 +11,7 @@ use prelude::Postfix;
 
 use crate::SendArgs;
 use crate::discover::DiscoverError;
-use crate::event::IsographEvent;
+use crate::event::Internal;
 use crate::lsp_socket::IsographEventNotification;
 
 #[derive(Debug)]
@@ -38,7 +38,7 @@ pub(crate) enum SendError {
     Discover(#[from] DiscoverError),
     #[error("could not read {}: {}", .0.path.display(), .0.source)]
     ReadFile(ReadFile),
-    #[error("the frame is not IsographEvent JSON: {0}")]
+    #[error("the frame is not Internal JSON: {0}")]
     NotEvent(serde_json::Error),
     #[error("the daemon is not running")]
     NotRunning,
@@ -91,13 +91,13 @@ fn run_inner(args: &SendArgs) -> Result<(), SendError> {
             source,
         })
     })?;
-    let event: IsographEvent = serde_json::from_str(frame.trim()).map_err(SendError::NotEvent)?;
+    let internal: Internal = serde_json::from_str(frame.trim()).map_err(SendError::NotEvent)?;
     let stream = std::net::TcpStream::connect((Ipv4Addr::LOCALHOST, port))
         .map_err(|source| SendError::Connect(Connect { port, source }))?;
-    notify(stream, event)
+    notify(stream, internal)
 }
 
-pub(crate) fn notify(stream: std::net::TcpStream, event: IsographEvent) -> Result<(), SendError> {
+pub(crate) fn notify(stream: std::net::TcpStream, event: Internal) -> Result<(), SendError> {
     let mut writer = stream.try_clone().map_err(SendError::Clone)?;
     let mut reader = std::io::BufReader::new(stream);
     // JSON-RPC ids are per connection. This client has one outstanding request. A second send is another connection.

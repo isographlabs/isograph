@@ -108,7 +108,7 @@ async fn serve<THostLanguage: HostLanguage>(
             tokio::spawn(async move {
                 if term.recv().await.is_some() {
                     tracing::info!("SIGTERM: quitting");
-                    let _ = event_tx.send(IsographEvent::Quit);
+                    let _ = event_tx.send(crate::event::Internal::Quit.to());
                 }
             });
         }
@@ -198,9 +198,10 @@ pub fn perform(effect: IsographEffect) -> ControlFlow<()> {
 mod tests {
     use super::{run_effect_loop, run_event_loop};
     use crate::effect::IsographEffect;
-    use crate::event::IsographEvent;
+    use crate::event::Internal;
     use crate::state::IsographState;
     use isograph_extract_typescript::TypeScriptHostLanguage;
+    use prelude::Postfix;
     use tokio::sync::mpsc::unbounded_channel;
 
     #[tokio::test]
@@ -208,7 +209,7 @@ mod tests {
         let (event_tx, event_rx) = unbounded_channel();
         let (effect_tx, mut effect_rx) = unbounded_channel();
         event_tx
-            .send(IsographEvent::HelloWorld)
+            .send(Internal::HelloWorld.to())
             .expect("the test sends HelloWorld");
         drop(event_tx);
         run_event_loop(
@@ -226,7 +227,7 @@ mod tests {
         let (event_tx, event_rx) = unbounded_channel();
         let (effect_tx, mut effect_rx) = unbounded_channel();
         event_tx
-            .send(IsographEvent::Quit)
+            .send(Internal::Quit.to())
             .expect("the test sends Quit");
         drop(event_tx);
         run_event_loop(

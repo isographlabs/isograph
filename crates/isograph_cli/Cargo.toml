@@ -18,6 +18,7 @@ common_lang_types = { path = "../common_lang_types" }
 intern = { path = "../../relay-crates/intern" }
 isograph_compiler = { path = "../isograph_compiler" }
 isograph_config = { path = "../isograph_config" }
+isograph_lsp = { path = "../isograph_lsp" }
 lsp-server = { workspace = true }
 lsp-types = { workspace = true }
 pico = { path = "../pico" }

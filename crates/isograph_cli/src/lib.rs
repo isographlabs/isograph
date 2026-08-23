@@ -11,6 +11,7 @@ mod daemon;
 mod discover;
 mod effect;
 mod event;
+mod lsp_notification_dispatch;
 mod lsp_socket;
 mod send;
 mod state;

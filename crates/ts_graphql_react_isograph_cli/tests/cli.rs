@@ -323,7 +323,7 @@ fn send_of_not_json_fails() {
     let sent = daemon.isograph(["send", "--file", frame.to_str().expect("utf-8")].reference());
     assert!(!sent.status.success());
     let err = stderr(sent.reference());
-    assert!(err.contains("IsographEvent"), "{err}");
+    assert!(err.contains("Internal"), "{err}");
     assert!(!frame.exists(), "send deletes --file");
 }
 
@@ -340,7 +340,7 @@ fn send_of_unknown_kind_fails() {
     let sent = daemon.isograph(["send", "--file", frame.to_str().expect("utf-8")].reference());
     assert!(!sent.status.success());
     let err = stderr(sent.reference());
-    assert!(err.contains("IsographEvent"), "{err}");
+    assert!(err.contains("Internal"), "{err}");
     assert!(!frame.exists(), "send deletes --file");
 }
 

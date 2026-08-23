@@ -8,7 +8,9 @@ license = { workspace = true }
 common_lang_types = { path = "../common_lang_types" }
 isograph_compiler = { path = "../isograph_compiler" }
 isograph_parser = { path = "../isograph_parser" }
+lsp-server = { workspace = true }
 lsp-types = { workspace = true }
+serde_json = { workspace = true }
 pico = { path = "../pico" }
 pico_macros = { path = "../pico_macros" }
 prelude = { path = "../prelude" }

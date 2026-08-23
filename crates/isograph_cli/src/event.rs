@@ -8,15 +8,27 @@ pub struct LspRequest {
     pub reply: crossbeam::channel::Sender<Message>,
 }
 
+#[derive(Clone, Debug)]
+pub enum Lsp {
+    Request(LspRequest),
+    Notification(lsp_server::Notification),
+    Response(lsp_server::Response),
+}
+
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize, derive_more::From)]
 #[serde(tag = "kind", content = "value")]
-pub enum IsographEvent {
+pub enum Internal {
     HelloWorld,
     Quit,
     DiskChanged(DiskChanged),
-    #[serde(skip)]
+}
+
+#[derive(Clone, Debug, derive_more::From)]
+pub enum IsographEvent {
     #[from]
-    LspRequest(LspRequest),
+    Lsp(Lsp),
+    #[from]
+    Internal(Internal),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
