@@ -64,7 +64,9 @@ struct ReportDiagnostics {
         }
 ```
 
-`debounce` is a `tokio::time::Sleep` pinned in `serve`’s `select!`, or a task the effect loop owns. 100ms, same as isograph `SHORT_DEBOUNCE_TIME`. Firing sends `Work::Event(DiagnosticsDebounceFired)` on `work_tx`. A new `ResetDiagnosticsDebounce` before fire drops that sleep.
+`debounce` is a `tokio::time::Sleep` pinned in `serve`'s `select!`, or a task the effect loop owns. 100ms, same as isograph `SHORT_DEBOUNCE_TIME`. Firing sends `IsographEvent::DiagnosticsDebounceFired` on `event_tx`. A new `ResetDiagnosticsDebounce` before fire drops that sleep.
+
+The session already writes responses on `connection.sender`. Server-to-client `publishDiagnostics` uses the writer registered in lsp-sessions.md (`LiveSession.sender`). Do not add a second writer thread here if lsp-sessions.md already clones `connection.sender`; `Message::Notification` on that sender is enough. `bounded(0)` on the IO writer still applies: send blocks until the writer thread takes the message.
 
 ```rust
 // from crates/isograph_cli/src/lsp_socket.rs

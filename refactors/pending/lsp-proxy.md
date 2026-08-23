@@ -1,6 +1,6 @@
 # `isograph lsp` stdio proxy
 
-Requires lsp-port.md. Independent of lsp-tokens.md, lsp-sessions.md, lsp-diagnostics.md.
+Requires lsp-port.md (landed). Independent of lsp-tokens.md, lsp-sessions.md, lsp-diagnostics.md. The daemon port is already LSP JSON-RPC. This verb is a byte copy, not a second handshake.
 
 VS Code and Zed spawn a process on stdio. They do not dial `{slug}.port`. `isograph lsp` is that process: the same walk-up / `--config` as every verb, start the daemon if needed, dial the LSP port, copy stdin/stdout. Dropping the editor drops the proxy. The daemon stays up.
 
