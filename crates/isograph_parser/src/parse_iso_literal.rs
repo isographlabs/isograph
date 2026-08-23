@@ -1,5 +1,3 @@
-use std::fmt;
-
 use common_lang_types::SelectableName;
 use nonempty::NonEmpty;
 use prelude::Postfix;
@@ -20,12 +18,6 @@ use crate::{
 pub type IsoLiteralParse = Slot<IsoLiteralItem, UnparsedChunkItems>;
 
 pub type IsoLiteralParsePath<'a> = PositionResolutionPath<&'a IsoLiteralParse, ()>;
-
-impl<'a> From<IsoLiteralParsePath<'a>> for IsographResolutionNode<'a> {
-    fn from(path: IsoLiteralParsePath<'a>) -> Self {
-        IsographResolutionNode::IsoLiteralSlot(path)
-    }
-}
 
 #[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
@@ -78,18 +70,12 @@ pub struct SelectableDeclaration {
 pub struct EntityNameWrapper(pub common_lang_types::EntityName);
 
 /// The name of an entrypoint or selectable, `foo` in `entrypoint Query.foo`.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, derive_more::Display, ResolvePosition)]
 #[resolve_position(
     parent_type = SelectableNameWrapperParent<'a>,
     resolved_node = IsographResolutionNode<'a>
 )]
 pub struct SelectableNameWrapper(pub common_lang_types::SelectableName);
-
-impl fmt::Display for SelectableNameWrapper {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
-    }
-}
 
 /// The interned interior of a description, quotes excluded.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]

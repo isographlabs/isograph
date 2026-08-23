@@ -52,12 +52,6 @@ pub type SelectionPath<'a> = PositionResolutionPath<&'a Selection, SelectionSlot
 pub type SelectionNameWrapperPath<'a> =
     PositionResolutionPath<&'a SelectionNameWrapper, SelectionPath<'a>>;
 
-impl<'a> From<SelectionSlotPath<'a>> for IsographResolutionNode<'a> {
-    fn from(path: SelectionSlotPath<'a>) -> Self {
-        IsographResolutionNode::SelectionSlot(path)
-    }
-}
-
 pub(crate) fn consume_selection_set(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<SelectionSet>> {
     cursor.consume_group_if(
         BracketKind::Brace,

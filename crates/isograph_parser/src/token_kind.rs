@@ -1,5 +1,3 @@
-use std::fmt;
-
 use logos::{Lexer, Logos};
 use prelude::Postfix;
 
@@ -8,72 +6,96 @@ pub struct TokenKindExtras {
     pub(crate) error_token: Option<IsographLangTokenKind>,
 }
 
-#[derive(Logos, Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Logos, Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, strum::Display)]
 #[logos(extras = TokenKindExtras)]
 pub enum IsographLangTokenKind {
     // TODO don't skip comments and spaces, since we want to auto-format etc
     #[regex(r"[ \t\f\ufeff]+", logos::skip)]
     #[error]
+    #[strum(to_string = "error")]
     Error,
 
     /// One line break: `\r\n`, `\n`, or `\r`. A blank line is two of these.
     #[regex(r"\r\n|\n|\r")]
+    #[strum(to_string = "line break")]
     LineBreak,
 
+    #[strum(to_string = "unterminated string")]
     ErrorUnterminatedString,
+    #[strum(to_string = "unsupported character in string")]
     ErrorUnsupportedStringCharacter,
+    #[strum(to_string = "unterminated block string")]
     ErrorUnterminatedBlockString,
 
     // Valid tokens
     #[token("@")]
+    #[strum(to_string = "at symbol ('@')")]
     At,
     #[token("}")]
+    #[strum(to_string = "closing brace ('}}')")]
     CloseBrace,
 
     #[token("]")]
+    #[strum(to_string = "closing bracket (']')")]
     CloseBracket,
     #[token(")")]
+    #[strum(to_string = "closing parenthesis (')')")]
     CloseParenthesis,
     #[token(":")]
+    #[strum(to_string = "colon (':')")]
     Colon,
     #[token("$")]
+    #[strum(to_string = "dollar ('$')")]
     Dollar,
+    #[strum(to_string = "end of file")]
     EndOfFile,
 
     #[token("=")]
+    #[strum(to_string = "equals ('=')")]
     Equals,
 
     #[token("!")]
+    #[strum(to_string = "exclamation mark ('!')")]
     Exclamation,
 
     // IntegerPart:    -?(0|[1-9][0-9]*)
     // FractionalPart: \\.[0-9]+
     // ExponentPart:   [eE][+-]?[0-9]+
     #[regex("-?(0|[1-9][0-9]*)(\\.[0-9]+[eE][+-]?[0-9]+|\\.[0-9]+|[eE][+-]?[0-9]+)")]
+    #[strum(to_string = "floating point value (e.g. '3.14')")]
     FloatLiteral,
 
     #[regex("[a-zA-Z_][a-zA-Z0-9_]*")]
+    #[strum(to_string = "non-variable identifier (e.g. 'x' or 'Foo')")]
     Identifier,
 
     #[regex("-?(0|[1-9][0-9]*)")]
+    #[strum(to_string = "integer value (e.g. '0' or '42')")]
     IntegerLiteral,
     #[regex("-?0[0-9]+(\\.[0-9]+[eE][+-]?[0-9]+|\\.[0-9]+|[eE][+-]?[0-9]+)?")]
+    #[strum(to_string = "unsupported number (int or float) literal")]
     ErrorNumberLiteralLeadingZero,
 
     #[regex("-?(0|[1-9][0-9]*)(\\.[0-9]+[eE][+-]?[0-9]+|\\.[0-9]+|[eE][+-]?[0-9]+)?[.a-zA-Z_]")]
+    #[strum(to_string = "unsupported number (int or float) literal")]
     ErrorNumberLiteralTrailingInvalid,
 
     #[regex("-?(\\.[0-9]+[eE][+-]?[0-9]+|\\.[0-9]+)")]
+    #[strum(to_string = "unsupported number (int or float) literal")]
     ErrorFloatLiteralMissingZero,
 
     #[token("{")]
+    #[strum(to_string = "open brace ('{{')")]
     OpenBrace,
 
     #[token("[")]
+    #[strum(to_string = "open bracket ('[')")]
     OpenBracket,
     #[token("(")]
+    #[strum(to_string = "open parenthesis ('(')")]
     OpenParenthesis,
     #[token(".")]
+    #[strum(to_string = "period ('.')")]
     Period,
     // #[token("..")]
     // PeriodPeriod,
@@ -89,12 +111,15 @@ pub enum IsographLangTokenKind {
     // SingleLineComment,
     // Whitespace
     #[token(",")]
+    #[strum(to_string = "comma (',')")]
     Comma,
 
     #[token("\"", lex_string)]
+    #[strum(to_string = "string literal (e.g. '\"...\"')")]
     StringLiteral,
 
     #[token("\"\"\"", lex_block_string)]
+    #[strum(to_string = "block string (e.g. '\"\"\"hi\"\"\"')")]
     BlockStringLiteral,
 }
 
@@ -183,55 +208,6 @@ fn fail_with(
     lexer.bump(n);
     lexer.extras.error_token = kind.wrap_some();
     false
-}
-
-impl fmt::Display for IsographLangTokenKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let message = match self {
-            // IsographLangTokenKind::Ampersand => "ampersand ('&')",
-            IsographLangTokenKind::At => "at symbol ('@')",
-            IsographLangTokenKind::CloseBrace => "closing brace ('}')",
-            IsographLangTokenKind::CloseBracket => "closing bracket (']')",
-            IsographLangTokenKind::CloseParenthesis => "closing parenthesis (')')",
-            // IsographLangTokenKind::Colon => "colon (':')",
-            IsographLangTokenKind::Dollar => "dollar ('$')",
-            IsographLangTokenKind::EndOfFile => "end of file",
-            IsographLangTokenKind::Equals => "equals ('=')",
-            IsographLangTokenKind::Exclamation => "exclamation mark ('!')",
-            IsographLangTokenKind::FloatLiteral => "floating point value (e.g. '3.14')",
-            IsographLangTokenKind::Identifier => "non-variable identifier (e.g. 'x' or 'Foo')",
-            IsographLangTokenKind::LineBreak => "line break",
-            IsographLangTokenKind::IntegerLiteral => "integer value (e.g. '0' or '42')",
-            IsographLangTokenKind::OpenBrace => "open brace ('{')",
-            IsographLangTokenKind::OpenBracket => "open bracket ('[')",
-            IsographLangTokenKind::OpenParenthesis => "open parenthesis ('(')",
-            IsographLangTokenKind::Period => "period ('.')",
-            // IsographLangTokenKind::PeriodPeriod => "double period ('..')",
-            // IsographLangTokenKind::Pipe => "pipe ('|')",
-            // IsographLangTokenKind::Spread => "spread ('...')",
-            IsographLangTokenKind::BlockStringLiteral => "block string (e.g. '\"\"\"hi\"\"\"')",
-            IsographLangTokenKind::Error => "error",
-            IsographLangTokenKind::ErrorFloatLiteralMissingZero => {
-                "unsupported number (int or float) literal"
-            }
-            IsographLangTokenKind::ErrorNumberLiteralLeadingZero => {
-                "unsupported number (int or float) literal"
-            }
-            IsographLangTokenKind::ErrorNumberLiteralTrailingInvalid => {
-                "unsupported number (int or float) literal"
-            }
-            IsographLangTokenKind::Comma => "comma (',')",
-            IsographLangTokenKind::Colon => "colon (':')",
-            IsographLangTokenKind::StringLiteral => "string literal (e.g. '\"...\"')",
-            IsographLangTokenKind::ErrorUnterminatedString => "unterminated string",
-            IsographLangTokenKind::ErrorUnsupportedStringCharacter => {
-                "unsupported character in string"
-            }
-            IsographLangTokenKind::ErrorUnterminatedBlockString => "unterminated block string",
-            // IsographLangTokenKind::Empty => "missing expected kind",
-        };
-        f.write_str(message)
-    }
 }
 
 fn lex_block_string(lexer: &mut Lexer<'_, IsographLangTokenKind>) -> bool {

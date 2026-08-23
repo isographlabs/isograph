@@ -109,12 +109,6 @@ pub type UnionTypeAnnotationPath<'a> =
 pub type NullTypeAnnotationPath<'a> =
     PositionResolutionPath<&'a NullTypeAnnotation, UnionTypeAnnotationPath<'a>>;
 
-impl<'a> From<VariableDeclarationSlotPath<'a>> for IsographResolutionNode<'a> {
-    fn from(path: VariableDeclarationSlotPath<'a>) -> Self {
-        IsographResolutionNode::VariableDeclarationSlot(path)
-    }
-}
-
 impl<'a> From<NullTypeAnnotationPath<'a>> for IsographResolutionNode<'a> {
     fn from(path: NullTypeAnnotationPath<'a>) -> Self {
         IsographResolutionNode::UnionTypeAnnotation(path.parent)

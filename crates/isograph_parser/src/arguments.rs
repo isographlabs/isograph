@@ -181,24 +181,6 @@ pub type VariableDeclarationOrUsagePath<'a> =
 pub type VariableNameWrapperPath<'a> =
     PositionResolutionPath<&'a VariableNameWrapper, VariableDeclarationOrUsagePath<'a>>;
 
-impl<'a> From<ArgumentSlotPath<'a>> for IsographResolutionNode<'a> {
-    fn from(path: ArgumentSlotPath<'a>) -> Self {
-        IsographResolutionNode::ArgumentSlot(path)
-    }
-}
-
-impl<'a> From<ObjectEntrySlotPath<'a>> for IsographResolutionNode<'a> {
-    fn from(path: ObjectEntrySlotPath<'a>) -> Self {
-        IsographResolutionNode::ObjectEntrySlot(path)
-    }
-}
-
-impl<'a> From<ListLiteralValueSlotPath<'a>> for IsographResolutionNode<'a> {
-    fn from(path: ListLiteralValueSlotPath<'a>) -> Self {
-        IsographResolutionNode::ListLiteralValueSlot(path)
-    }
-}
-
 pub(crate) fn parse_name_colon<L, R>(
     cursor: &mut ItemCursor<'_>,
     parse_lhs: impl FnOnce(&mut ItemCursor<'_>) -> Result<L, WithSpan<AstError>>,

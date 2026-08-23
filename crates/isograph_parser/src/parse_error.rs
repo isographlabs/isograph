@@ -24,16 +24,11 @@ pub enum ParseError {
     Comma(#[from] CommaWithoutItem),
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, derive_more::Display)]
+#[display("Expected {expected}, found {found}.")]
 pub struct ExpectedFound {
     pub expected: Expectation,
     pub found: Found,
-}
-
-impl fmt::Display for ExpectedFound {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Expected {}, found {}.", self.expected, self.found)
-    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

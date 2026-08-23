@@ -17,10 +17,12 @@ use crate::{
 /// What a position resolves to: the leaves of the newest tree. Each parsing stage
 /// modifies these variants in place; today they are the grammar tree's, with the chunk
 /// tree's still surfacing inside unparsed regions.
-#[derive(Debug)]
+#[derive(Debug, derive_more::From)]
 #[non_exhaustive]
 pub enum IsographResolutionNode<'a> {
+    #[from]
     IsoLiteralSlot(IsoLiteralParsePath<'a>),
+    #[from]
     ChunkedRoot(ChunkedRootPath<'a>),
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
     SelectableDeclaration(SelectableDeclarationPath<'a>),
@@ -38,7 +40,9 @@ pub enum IsographResolutionNode<'a> {
     NonBracketToken(NonBracketTokenPath<'a>),
     OpenBracket(OpenBracketPath<'a>),
     CloseBracket(CloseBracketPath<'a>),
+    #[from]
     ArgumentSlot(ArgumentSlotPath<'a>),
+    #[from]
     ObjectEntrySlot(ObjectEntrySlotPath<'a>),
     ArgumentList(ArgumentListPath<'a>),
     ObjectLiteral(ObjectLiteralPath<'a>),
@@ -49,6 +53,7 @@ pub enum IsographResolutionNode<'a> {
     VariableUse(VariableUsePath<'a>),
     VariableNameWrapper(VariableNameWrapperPath<'a>),
     VariableDeclarationOrUsage(VariableDeclarationOrUsagePath<'a>),
+    #[from]
     VariableDeclarationSlot(VariableDeclarationSlotPath<'a>),
     VariableDeclarationList(VariableDeclarationListPath<'a>),
     VariableDeclaration(VariableDeclarationPath<'a>),
@@ -56,6 +61,7 @@ pub enum IsographResolutionNode<'a> {
     IntegerValue(IntegerValuePath<'a>),
     BooleanValue(BooleanValuePath<'a>),
     NullValue(NullValuePath<'a>),
+    #[from]
     SelectionSlot(SelectionSlotPath<'a>),
     SelectionSet(SelectionSetPath<'a>),
     Selection(SelectionPath<'a>),
@@ -68,11 +74,6 @@ pub enum IsographResolutionNode<'a> {
     IsographDirectiveNameWrapper(IsographDirectiveNameWrapperPath<'a>),
     ListLiteral(ListLiteralPath<'a>),
     ListLiteralValue(ListLiteralValuePath<'a>),
+    #[from]
     ListLiteralValueSlot(ListLiteralValueSlotPath<'a>),
-}
-
-impl<'a> From<ChunkedRootPath<'a>> for IsographResolutionNode<'a> {
-    fn from(path: ChunkedRootPath<'a>) -> Self {
-        IsographResolutionNode::ChunkedRoot(path)
-    }
 }

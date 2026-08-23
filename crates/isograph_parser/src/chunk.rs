@@ -193,7 +193,7 @@ pub struct UnparsedChunkItems(
     pub NonEmpty<WithSpan<ChunkContentItem>>,
 );
 
-#[derive(Debug)]
+#[derive(Debug, derive_more::From)]
 pub enum UnparsedChunkItemsParent<'a> {
     IsoLiteralSlot(IsoLiteralParsePath<'a>),
     ArgumentSlot(ArgumentSlotPath<'a>),
@@ -206,48 +206,6 @@ pub enum UnparsedChunkItemsParent<'a> {
 
 pub type UnparsedChunkItemsPath<'a> =
     PositionResolutionPath<&'a UnparsedChunkItems, UnparsedChunkItemsParent<'a>>;
-
-impl<'a> From<IsoLiteralParsePath<'a>> for UnparsedChunkItemsParent<'a> {
-    fn from(path: IsoLiteralParsePath<'a>) -> Self {
-        UnparsedChunkItemsParent::IsoLiteralSlot(path)
-    }
-}
-
-impl<'a> From<ArgumentSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
-    fn from(path: ArgumentSlotPath<'a>) -> Self {
-        UnparsedChunkItemsParent::ArgumentSlot(path)
-    }
-}
-
-impl<'a> From<ObjectEntrySlotPath<'a>> for UnparsedChunkItemsParent<'a> {
-    fn from(path: ObjectEntrySlotPath<'a>) -> Self {
-        UnparsedChunkItemsParent::ObjectEntrySlot(path)
-    }
-}
-
-impl<'a> From<SelectionSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
-    fn from(path: SelectionSlotPath<'a>) -> Self {
-        UnparsedChunkItemsParent::SelectionSlot(path)
-    }
-}
-
-impl<'a> From<VariableDeclarationSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
-    fn from(path: VariableDeclarationSlotPath<'a>) -> Self {
-        UnparsedChunkItemsParent::VariableDeclarationSlot(path)
-    }
-}
-
-impl<'a> From<ListTypeAnnotationPath<'a>> for UnparsedChunkItemsParent<'a> {
-    fn from(path: ListTypeAnnotationPath<'a>) -> Self {
-        UnparsedChunkItemsParent::ListTypeAnnotation(path)
-    }
-}
-
-impl<'a> From<ListLiteralValueSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
-    fn from(path: ListLiteralValueSlotPath<'a>) -> Self {
-        UnparsedChunkItemsParent::ListLiteralValueSlot(path)
-    }
-}
 
 /// One parse attempt: an item plus leftover tokens in the same chunk.
 ///
