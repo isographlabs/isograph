@@ -11,7 +11,7 @@ Deltas from those files, exhaustive:
 - The notify callback sends `SourceFileEvent`. A loop in `serve` reads contents and posts `DiskChanged` on `event_tx`. `handle` intern. isograph's callback sends, then `update_sources` writes the db on the recv loop. Same split, `DiskChanged` instead of `db.insert_iso_literal`.
 - `Filesystem` instead of `--watch: bool`. Default `Watch`. `Injected` does not create a debouncer.
 - `source_files` is membership. isograph used `path.starts_with(project_root)`. A relative path is in scope if the ordered glob list says so (`!` excludes, last match wins). The watch/walk root for a positive glob is the static prefix before the first `*`, `?`, `[`, or `{` (the analog of `project_root`). `**/*.ts` has an empty prefix and watches the config directory. `[]` watches nothing and intern nothing.
-- The extension check in `read_files_in_folder` is `HostLanguage::source_file_kind`. One associated function, two-variant enum. Not a memo. Not a second trait. The CLI is already generic over `THostLanguage` and does not depend on `isograph_extract_typescript`.
+- The extension check in `read_files_in_folder` is `HostLanguage::source_file_kind`. One associated function, two-variant enum. Not a memo. The CLI is already generic over `THostLanguage` and does not depend on `isograph_extract_typescript`. A second trait in `isograph_compiler` would be the same `&Path` on the compiler crate with another name. The method is not a pico memo and does not take the db. `extract_iso_literals` stays the memo over interned paths.
 - `__isograph` is skipped in the walker, as `visit_dirs_skipping_isograph`. Not a HostLanguage concern. `ISOGRAPH_FOLDER` lives on `isograph_config` as in isograph.
 - No `schema` / `schema_extensions` / `artifact_directory` watches. i2 has none of those fields. Config-file events are `ChangedFileKind::Config` and are dropped. The daemon does not reload config.
 - Watch, then boot-walk. isograph compiled from the walk, then watched. A file created in that gap was missed. Watch first; a Create that races with the walk is `Present` twice with the same bytes; pico does not advance the epoch.
@@ -213,6 +213,8 @@ pub trait HostLanguage: Send + Sync + Sized + 'static {
 ```
 
 Before, the trait ends at `extract_iso_literals`. After, it has `source_file_kind`. No `directory_walk`. The walker skips `__isograph`. The globs skip `node_modules` when the user did not write a glob that includes it.
+
+`HostLanguage` is the host seam the CLI is already generic over. Pico forbids `PathBuf` on source keys and memo arguments. This method is neither: the outer walker calls it with a relative `Path` before intern. Putting the same function on a new trait next to `HostLanguage` duplicates the bound `isograph_cli` already threads.
 
 TypeScript, copied from `read_files_in_folder`:
 
@@ -637,7 +639,9 @@ fn static_prefix(glob: &str) -> PathBuf {
 
 `contains` last match wins. `["src/**/*.ts", "!src/**/*.test.ts"]`: `src/a.ts` true, `src/a.test.ts` false. Empty list: `fold` starts false, nothing intern.
 
-Do not use HostLanguage to skip `node_modules`. A glob that does not include `node_modules` does not intern those files and does not watch them unless the static prefix is the config directory (`**/*.ts`).
+A file glob does not match the directory that contains the files. `src` does not match `src/**/*.ts`. Folder create/delete uses watch-root membership, not `contains`. Otherwise deleting `src` is dropped and interned `src/a.ts` stays.
+
+Do not use HostLanguage to skip `node_modules`. A glob that does not include `node_modules` does not intern those files and does not watch them unless the static prefix is the config directory (`**/*.ts`). That last glob is the Linux `max_user_watches` case isograph avoided by watching `project_root` (usually `./src`). The user wrote that glob; the daemon watches the config directory. `watch()` returning `Err` still fails start before the port file.
 
 ### categorize
 
@@ -778,12 +782,14 @@ fn process_remove_event(
     remove_kind: RemoveKind,
     paths: &[PathBuf],
 ) -> Option<SourceFileEvent> {
-    match remove_kind {
-        RemoveKind::File | RemoveKind::Folder | RemoveKind::Any => {
-            paths.first().and_then(|path| process_remove_path(globs, config_path, path))
-        }
-        RemoveKind::Other => None,
-    }
+    let path = paths.first()?;
+    let kind = match remove_kind {
+        RemoveKind::File => categorize_file(path, globs, config_path)?,
+        RemoveKind::Folder => categorize_folder(path, globs, config_path)?,
+        RemoveKind::Any => categorize_path(path, globs, config_path)?,
+        RemoveKind::Other => return None,
+    };
+    (SourceEventKind::Remove(path.clone()), kind).wrap_some()
 }
 ```
 
@@ -811,25 +817,56 @@ fn categorize_path(
     globs: &SourceGlobs,
     config_path: &Path,
 ) -> Option<ChangedFileKind> {
+    if path.is_file() {
+        categorize_file(path, globs, config_path)
+    } else {
+        categorize_folder(path, globs, config_path)
+    }
+}
+
+fn categorize_file(
+    path: &Path,
+    globs: &SourceGlobs,
+    config_path: &Path,
+) -> Option<ChangedFileKind> {
     if path == config_path {
         return ChangedFileKind::Config.wrap_some();
     }
     let config_directory = config_path.parent()?;
     let relative = pathdiff::diff_paths(path, config_directory)?;
-    if !globs.contains(relative.reference()) {
-        return None;
-    }
-    if path.is_file() {
+    if globs.contains(relative.reference()) {
         ChangedFileKind::SourceFile.wrap_some()
     } else {
+        None
+    }
+}
+
+fn categorize_folder(
+    path: &Path,
+    globs: &SourceGlobs,
+    config_path: &Path,
+) -> Option<ChangedFileKind> {
+    if path == config_path {
+        return ChangedFileKind::Config.wrap_some();
+    }
+    let config_directory = config_path.parent()?;
+    if globs
+        .watch_roots(config_directory)
+        .iter()
+        .any(|root| path.starts_with(root))
+    {
         ChangedFileKind::SourceFolder.wrap_some()
+    } else {
+        None
     }
 }
 ```
 
-`categorize_path` does not call `source_file_kind`. isograph's categorize does not check extensions; `read_files_in_folder` does. `apply` / the boot walk call `source_file_kind` when reading a file.
+`categorize_file` / `categorize_folder` do not call `source_file_kind`. isograph's categorize does not check extensions; `read_files_in_folder` does. `apply` / the boot walk call `source_file_kind` when reading a file.
 
-Config events: `apply` ignores `ChangedFileKind::Config`. No reload.
+`RemoveKind::File` uses `categorize_file` even though the path is already gone (`is_file()` is false). `RemoveKind::Folder` uses `categorize_folder` even though `src` does not match `src/**/*.ts`. `RemoveKind::Any` still uses `is_file()`: a vanished file is treated as a folder; `FolderRemoved` of `src/a.ts` then `remove_disk_files_from_path` drops that key and nothing else (`src/a.ts.bak` is a different last component). That is isograph's post-delete `is_file()` branch, with `Path::starts_with` instead of string prefix.
+
+Config events: `apply` ignores `ChangedFileKind::Config`. The daemon does not reload config. An implementer does not invent a rescan on `isograph.config.json` Data.
 
 ### Walk
 
@@ -1051,6 +1088,7 @@ Equals `"__isograph"`.
 - `["src/**/*.ts", "!src/**/*.test.ts"]` contains `src/a.ts`, not `src/a.test.ts`.
 - `[]` contains nothing.
 - `static_prefix("src/**/*.ts")` is `src`. `static_prefix("**/*.ts")` is empty. `static_prefix("foo.ts")` is `foo.ts`.
+- `["src/**/*.in"]` `contains` `src/a.in`, not `src`. `watch_roots` is `src`. `categorize_folder` of `src` is `SourceFolder`.
 
 ### `database.rs` `TestHostLanguage`
 
