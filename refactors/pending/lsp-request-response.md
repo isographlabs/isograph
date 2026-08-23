@@ -56,6 +56,8 @@ pub enum IsographEvent {
 
 `reply` is `connection.sender.clone()`. The effect loop sends on it. Request id is `request.id`. Do not duplicate it as a field.
 
+`request.params` is `serde_json::Value`. The event does not have a per-method typed enum. Dispatch (`extract::<TRequest::Params>`) is what types them.
+
 ```rust
 // from crates/isograph_cli/src/effect.rs
 pub(crate) struct LspRespond {
