@@ -6,7 +6,7 @@ Requires lsp-dispatch.md. Independent of filesystem-watcher.md. Independent of l
 
 Origin of the method: `lsp_types::request::SemanticTokensFullRequest`. Origin of the handler: isograph `on_semantic_token_full_request`. Origin of tokens: `lsp_semantic_tokens_for_file`. Origin of initialize options: isograph `server.rs` `initialize`. Origin of the dispatcher: landed `LSPRequestDispatch`. Delta: URI to path has no `expect`; missing `DiskFile` is `Ok(None)` (JSON `null`). Extract `JsonError` uses the request id, not `"default-lsp-id"`.
 
-One shippable change. An e2e that notifies DiskChanged and immediately asks for tokens can race; that is later.
+One shippable change. An e2e that uses `isograph send` then `semanticTokens/full` is e2e-send-semantic-tokens.md. Send does not wait for ingest; that e2e polls.
 
 ## What the user does
 

@@ -19,10 +19,11 @@ Requires config-discovery.md (landed), the event-model design-doc, and `docs-web
 13. lsp-request-response.md (landed). Session posts `IsographEvent::LspRequest` (request, `connection.sender` clone). `handle` returns `SendLspResponse`. Effect loop writes the `Response`. No client id. No outstanding set.
 14. lsp-dispatch.md. Later. isograph `LSPRequestDispatch` / `LSPRuntimeError` copied into `isograph_lsp`, except extract `Err` uses the request id not `"default-lsp-id"`. `LSPNotificationDispatch` lives in `isograph_cli` (handler returns `Vec<IsographEffect>`; extract is `Result`). `IsographEvent` is `Lsp` | `Internal`. `Lsp` is `Request` (plus reply) / `Notification` / `Response`. Session posts `Lsp`. `handle` of `Lsp` is isograph's server-loop match. Request chain has zero handlers; Continue is `method_not_found`. Notification chain is `isograph/event`; bad params are leftover. `--file` is `Internal`.
 15. lsp-tokens.md. Later. `.on_request_sync::<SemanticTokensFullRequest>`. Advertise the legend on `initialize`. Independent of sessions.
-16. lsp-outstanding.md. Later. `LspClientId`, `LspClientGone`, outstanding `(LspClientId, RequestId)`. For disconnect/cancel/async, not for highlighting.
-17. lsp-sessions.md. Later. `ClientCapabilities` from `initialize` and a writer map for `publishDiagnostics`.
-18. lsp-diagnostics.md. Later. Debounce then `publishDiagnostics`. Requires 17.
-19. lsp-proxy.md. Later. `isograph lsp` stdio copy onto the port.
-20. zed-and-vscode-extensions.md.
+16. e2e-send-semantic-tokens.md. After 15. `cli.rs`: `Daemon::start` (`--filesystem injected`), `isograph send` DiskChanged Present, poll `textDocument/semanticTokens/full` on the daemon port. No watcher. No new verb.
+17. lsp-outstanding.md. Later. `LspClientId`, `LspClientGone`, outstanding `(LspClientId, RequestId)`. For disconnect/cancel/async, not for highlighting.
+18. lsp-sessions.md. Later. `ClientCapabilities` from `initialize` and a writer map for `publishDiagnostics`.
+19. lsp-diagnostics.md. Later. Debounce then `publishDiagnostics`. Requires 18.
+20. lsp-proxy.md. Later. `isograph lsp` stdio copy onto the port.
+21. zed-and-vscode-extensions.md.
 
 `AsyncWorkFinished` and `StartAsyncWork` land with compilation.
