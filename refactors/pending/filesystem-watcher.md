@@ -29,7 +29,7 @@ Deltas from those files, exhaustive:
 
 Two shippable changes. Prefactor first.
 
-Change 1 is `remove_disk_file` prefix removal. `handle` of `Absent` is already the reader. Folder-delete in change 2 needs it. It lands alone.
+Change 1 is file vs folder on `DiskChanged`, and two remove functions. `apply` already knows `SourceFile` vs `SourceFolder`. `handle` has to know too. `remove_disk_file` stays exact. `remove_disk_files_from_path` is isograph's `remove_iso_literals_from_path`. `isograph send` of `FolderRemoved` is the reader so the new function is not unused.
 
 Change 2 is the watcher: flag, globs, walk, notify, `HostLanguage::source_file_kind`. That is one chunk. `source_file_kind` with no walker is unused. `--filesystem watch` with no debouncer is a no-op. `ISOGRAPH_FOLDER` with no walk is unused. `SourceGlobs` with no ingest is unused. Do not split those into their own docs.
 
@@ -51,19 +51,100 @@ $ isograph start --filesystem injected
 
 Writing a file on disk does not intern. `isograph send` of `DiskChanged` still intern.
 
-Default is `Watch`. CI e2e uses `Injected`. After change 1, `isograph send` of `Absent` of a directory path removes interned files under that path.
+Default is `Watch`. CI e2e uses `Injected`. After change 1, `isograph send` of `FolderRemoved` of a directory path removes interned files under that path. File `Absent` still removes one key.
 
-## Change 1: descendant Absent
+## Change 1: file vs folder on DiskChanged
 
-Origin: `IsographDatabase::remove_iso_literals_from_path`. Delta: `Path::starts_with`.
+`apply` (change 2) and isograph `update_sources` already branch file vs folder. A directory is not a `DiskFile`. Notify of a folder delete is one `Remove`, not one per child. `handle` must see that distinction. `remove_disk_file` is the wrong name for the folder case and the wrong function.
 
-Before: `remove_disk_file` removes one map key.
+Origin of two methods: isograph `remove_iso_literal` and `remove_iso_literals_from_path`. Origin of `DiskChanged` as path plus `Presence`: event-model.md / filesystem-events.md. Delta: `DiskChanged` is an enum; `FolderRemoved` cannot carry contents; `remove_disk_files_from_path` uses `Path::starts_with` (isograph uses string `starts_with`, which treats `src` as a prefix of `src2`).
 
-After. Add `use std::path::Path`.
+Before:
+
+```rust
+// from crates/isograph_cli/src/event.rs
+pub struct DiskChanged {
+    pub path: PathBuf,
+    pub presence: Presence,
+}
+
+pub enum Presence {
+    Present(String),
+    Absent,
+}
+```
+
+After:
+
+```rust
+// from crates/isograph_cli/src/event.rs
+#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+pub enum DiskChanged {
+    File(DiskFileChanged),
+    FolderRemoved(FolderRemoved),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+pub struct DiskFileChanged {
+    pub path: PathBuf,
+    pub presence: Presence,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+pub struct FolderRemoved {
+    pub path: PathBuf,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+pub enum Presence {
+    Present(String),
+    Absent,
+}
+```
+
+Wire. Existing send frames break; update them.
+
+```json
+{"kind":"DiskChanged","value":{"File":{"path":"/tmp/proj/src/a.ts","presence":{"Present":"export const a = 1;\n"}}}}
+{"kind":"DiskChanged","value":{"File":{"path":"/tmp/proj/src/a.ts","presence":"Absent"}}}
+{"kind":"DiskChanged","value":{"FolderRemoved":{"path":"/tmp/proj/src"}}}
+```
+
+`lsp_socket.rs` tests that construct `DiskChanged { path, presence }` become `DiskChanged::File(DiskFileChanged { ... })`.
+
+Before `handle_disk_changed` matches `change.presence`. After:
+
+```rust
+// from crates/isograph_cli/src/state.rs
+fn handle_disk_changed<THostLanguage: HostLanguage>(
+    state: &mut IsographState<THostLanguage>,
+    change: DiskChanged,
+) {
+    match change {
+        DiskChanged::File(change) => {
+            let path = relative_path_to_source_file(state, &change.path);
+            match change.presence {
+                Presence::Present(contents) => {
+                    state.insert_disk_file(path, contents);
+                }
+                Presence::Absent => {
+                    state.remove_disk_file(path);
+                }
+            }
+        }
+        DiskChanged::FolderRemoved(folder) => {
+            let path = relative_path_to_source_file(state, &folder.path);
+            state.remove_disk_files_from_path(path);
+        }
+    }
+}
+```
+
+`remove_disk_file` is unchanged: one map key.
 
 ```rust
 // from crates/isograph_compiler/src/database.rs
-    pub fn remove_disk_file(&mut self, path: RelativePathToSourceFile) {
+    pub fn remove_disk_files_from_path(&mut self, path: RelativePathToSourceFile) {
         let ids: Vec<_> = self
             .get_disk_file_map_mut()
             .tracked()
@@ -77,26 +158,26 @@ After. Add `use std::path::Path`.
     }
 ```
 
-`handle_disk_changed` still calls `remove_disk_file`. `Absent` of a prefix path from `isograph send` removes descendants. That is the same contract as isograph's folder remove.
-
-Empty relative path: `pathdiff` of the config directory against itself is `""`. `Path::new("src/a.ts").starts_with(Path::new(""))` is true. `Absent` of the config directory removes every interned file.
-
-`Absent` of a never-interned path that is not a prefix of any key is a no-op.
+Add `use std::path::Path`. Empty relative path: `pathdiff` of the config directory against itself is `""`. `Path::new("src/a.ts").starts_with(Path::new(""))` is true. `FolderRemoved` of the config directory removes every interned file. `FolderRemoved` of a never-interned path that is not a prefix of any key is a no-op. File `Absent` of `/tmp/proj/src` removes only interned `src`, not `src/a.ts`.
 
 ### Tests
 
-`database.rs`:
+`database.rs`: existing `remove_disk_file` tests stay exact. Add `remove_disk_files_from_path`:
 
-- intern `src/a.ts`, `src/b.ts`, `src2/c.ts`; `remove_disk_file` of `src`; `src/a.ts` and `src/b.ts` gone; `src2/c.ts` remains.
-- intern `src/a.ts`; `remove_disk_file` of `src/a.ts.bak` leaves `src/a.ts`.
-- intern `src/a.ts`; `remove_disk_file` of interned `""`; `src/a.ts` gone.
-- existing exact-path remove tests stay.
+- intern `src/a.ts`, `src/b.ts`, `src2/c.ts`; `remove_disk_files_from_path` of `src`; `src/a.ts` and `src/b.ts` gone; `src2/c.ts` remains.
+- intern `src/a.ts`; `remove_disk_files_from_path` of `src/a.ts.bak` leaves `src/a.ts`.
+- intern `src/a.ts`; `remove_disk_files_from_path` of interned `""`; `src/a.ts` gone.
 
-`state.rs` handle, `intern_config_directory` of `/tmp/proj/isograph.config.json`:
+`state.rs` handle, `intern_config_directory` of `/tmp/proj/isograph.config.json`. Existing Present / Absent tests use `DiskChanged::File`. Add:
 
-- Present `/tmp/proj/src/a.ts`, `/tmp/proj/src/b.ts`, `/tmp/proj/src2/c.ts`. `Absent` of `/tmp/proj/src`: first two gone, `src2/c.ts` remains. `handle` returns `Vec::new()`.
-- `Absent` of `/tmp/proj`: every interned file gone.
-- `Absent` of `/tmp/proj/never`: no-op.
+- File Present of three files, `FolderRemoved` of `/tmp/proj/src`: `src/a.ts` and `src/b.ts` gone, `src2/c.ts` remains. `handle` returns `Vec::new()`.
+- `FolderRemoved` of `/tmp/proj`: every interned file gone.
+- `FolderRemoved` of `/tmp/proj/never`: no-op.
+- File `Absent` of `/tmp/proj/src` after Present of `/tmp/proj/src/a.ts`: `src/a.ts` remains.
+
+`cli.rs` send Present then Absent: the new File JSON. Add send of `FolderRemoved` of `/tmp/proj/src` after Present of a file under it: exit 0.
+
+`docs-website/docs/design-docs/event-model.md` `DiskChanged` struct becomes this enum. Dispatch: `File` Present intern, `File` Absent `remove_disk_file`, `FolderRemoved` `remove_disk_files_from_path`.
 
 ## Change 2: watcher
 
@@ -353,7 +434,7 @@ use prelude::Postfix;
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{debug, info, warn};
 
-use crate::event::{DiskChanged, IsographEvent, Presence};
+use crate::event::{DiskChanged, DiskFileChanged, FolderRemoved, IsographEvent, Presence};
 
 const DEBOUNCE: Duration = Duration::from_millis(100);
 
@@ -805,11 +886,11 @@ pub fn apply<THostLanguage: HostLanguage>(
                     post_file::<THostLanguage>(event_tx, config_directory, path.reference());
                 }
                 SourceEventKind::Rename((from, to)) => {
-                    post_absent(event_tx, from.reference());
+                    post_file_absent(event_tx, from.reference());
                     post_file::<THostLanguage>(event_tx, config_directory, to.reference());
                 }
                 SourceEventKind::Remove(path) => {
-                    post_absent(event_tx, path.reference());
+                    post_file_absent(event_tx, path.reference());
                 }
             },
             ChangedFileKind::SourceFolder => match kind {
@@ -817,11 +898,11 @@ pub fn apply<THostLanguage: HostLanguage>(
                     scan_folder::<THostLanguage>(event_tx, config_directory, folder.reference());
                 }
                 SourceEventKind::Rename((from, to)) => {
-                    post_absent(event_tx, from.reference());
+                    post_folder_removed(event_tx, from.reference());
                     scan_folder::<THostLanguage>(event_tx, config_directory, to.reference());
                 }
                 SourceEventKind::Remove(path) => {
-                    post_absent(event_tx, path.reference());
+                    post_folder_removed(event_tx, path.reference());
                 }
             },
         }
@@ -851,7 +932,7 @@ fn post_file<THostLanguage: HostLanguage>(
         Ok(path) => path,
         Err(e) => {
             warn!(error = %e, path = %path.display(), "could not canonicalize");
-            post_absent(event_tx, path);
+            post_file_absent(event_tx, path);
             return;
         }
     };
@@ -859,7 +940,7 @@ fn post_file<THostLanguage: HostLanguage>(
         Ok(metadata) => metadata,
         Err(e) => {
             warn!(error = %e, path = %path.display(), "could not stat");
-            post_absent(event_tx, path.reference());
+            post_file_absent(event_tx, path.reference());
             return;
         }
     };
@@ -882,17 +963,17 @@ fn post_file<THostLanguage: HostLanguage>(
         Ok(contents) => contents,
         Err(e) => {
             warn!(error = %e, path = %path.display(), "could not read");
-            post_absent(event_tx, path.reference());
+            post_file_absent(event_tx, path.reference());
             return;
         }
     };
     debug!(path = %path.display(), "disk present");
     post(
         event_tx,
-        DiskChanged {
+        DiskChanged::File(DiskFileChanged {
             path,
             presence: Presence::Present(contents),
-        },
+        }),
     );
 }
 ```
@@ -900,27 +981,47 @@ fn post_file<THostLanguage: HostLanguage>(
 A fifo named `a.ts`: `metadata.is_file()` is false on Unix. Skip. Do not `read_to_string`.
 
 ```rust
-fn post_absent(event_tx: &UnboundedSender<IsographEvent>, path: &Path) {
-    let path = match path.canonicalize() {
-        Ok(path) => path,
+fn gone_path(path: &Path) -> Option<PathBuf> {
+    match path.canonicalize() {
+        Ok(path) => path.wrap_some(),
         Err(_) => {
             if path.is_absolute() {
-                path.to_owned()
+                path.to_owned().wrap_some()
             } else {
-                return;
+                None
             }
         }
-    };
-    if path.to_str().is_none() {
-        warn!(path = %path.display(), "skipping non-UTF8 path");
-        return;
     }
+    .and_then(|path| {
+        if path.to_str().is_none() {
+            warn!(path = %path.display(), "skipping non-UTF8 path");
+            None
+        } else {
+            path.wrap_some()
+        }
+    })
+}
+
+fn post_file_absent(event_tx: &UnboundedSender<IsographEvent>, path: &Path) {
+    let Some(path) = gone_path(path) else {
+        return;
+    };
     post(
         event_tx,
-        DiskChanged {
+        DiskChanged::File(DiskFileChanged {
             path,
             presence: Presence::Absent,
-        },
+        }),
+    );
+}
+
+fn post_folder_removed(event_tx: &UnboundedSender<IsographEvent>, path: &Path) {
+    let Some(path) = gone_path(path) else {
+        return;
+    };
+    post(
+        event_tx,
+        DiskChanged::FolderRemoved(FolderRemoved { path }),
     );
 }
 
@@ -929,7 +1030,7 @@ fn post(event_tx: &UnboundedSender<IsographEvent>, change: DiskChanged) {
 }
 ```
 
-Posted `Present` paths are absolute and canonical. Posted `Absent` paths are absolute; canonical when canonicalize succeeded.
+Posted `File` `Present` paths are absolute and canonical. Posted `File` `Absent` and `FolderRemoved` paths are absolute; canonical when canonicalize succeeded.
 
 ## Tests (change 2)
 
@@ -967,17 +1068,18 @@ Unit tests of `categorize_and_filter_events` / `apply` with a fake channel. `sou
 - `CreateKind::Folder` of a dir containing `a.in` and `b.rs`: one `Present` of `a.in`.
 - `ModifyKind::Data` of a directory: no event.
 - `ModifyKind::Data` of `src/a.in`: `Present`.
-- `RemoveKind::File` of a path: `Absent`.
-- `RemoveKind::Folder` of a path: `Absent`.
-- `RenameMode::Both`: `Absent` of from, `Present` of to.
-- `RenameMode::Any` exists: `Present`. does not exist: `Absent`.
-- `EventKind::Any` exists `Source` file: `Present`. missing: `Absent`.
+- `RemoveKind::File` of a path: `DiskChanged::File` `Absent`.
+- `RemoveKind::Folder` of a path: `DiskChanged::FolderRemoved`.
+- `RenameMode::Both` of files: `File` `Absent` of from, `File` `Present` of to.
+- `RenameMode::Both` of folders: `FolderRemoved` of from, then `Present` of files under to.
+- `RenameMode::Any` exists: `Present`. does not exist: `File` `Absent` or `FolderRemoved` from `categorize_path` (`!is_file` is folder).
+- `EventKind::Any` exists `Source` file: `Present`. missing: `FolderRemoved` if `categorize` yields `SourceFolder`.
 - `ModifyKind::Any` same.
 - `Flag::Rescan`: `apply` walks each watch root; `a.in` is `Present` again.
 - Empty `paths`: no event.
 - Empty file: `Present` of `""`.
-- Missing path on `CreateKind::File`: `categorize` may still yield `SourceFolder` (`!is_file`). `apply` `post_file` stats, fails, posts `Absent`.
-- Failed `read_to_string`: chmod 0 on a matching file if the user is not root; otherwise skip this case on that platform. After a successful Present, a second CreateOrModify that cannot be read posts `Absent`. The interned file is gone after `handle`.
+- Missing path on `CreateKind::File`: `is_file` is false, `SourceFolder`, `scan_folder` of a missing dir walks nothing.
+- Failed `read_to_string`: after a successful `File` `Present`, a second CreateOrModify that cannot be read posts `File` `Absent`. The interned file is gone after `handle`. chmod 0 if the user is not root; otherwise skip this case on that platform.
 - `visit_dirs_skipping_isograph`: `src/a.in` is visited; `src/__isograph/c.in` is not.
 - `source_files: []`: boot list is empty; `watch_roots` is empty.
 

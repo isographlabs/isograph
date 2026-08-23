@@ -92,9 +92,20 @@ enum IsographEvent {
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
-struct DiskChanged {
+enum DiskChanged {
+    File(DiskFileChanged),
+    FolderRemoved(FolderRemoved),
+}
+
+#[derive(serde::Deserialize, serde::Serialize)]
+struct DiskFileChanged {
     path: PathBuf,
     presence: Presence,
+}
+
+#[derive(serde::Deserialize, serde::Serialize)]
+struct FolderRemoved {
+    path: PathBuf,
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -116,15 +127,15 @@ enum Buffer {
 }
 ```
 
-`path` is absolute and canonical. A relative path is resolved by the source that constructed the event, never by `handle`.
+`DiskFileChanged.path` and `FolderRemoved.path` are absolute and canonical. A relative path is resolved by the source that constructed the event, never by `handle`.
 
-`Present` is create or modify or the destination of a move. `Absent` is delete or the source of a move. There is no `Moved` variant. A rename the watcher sees becomes `Absent` then `Present`. pico sources are keyed by path; a rename is remove old plus intern new.
+`File` `Present` is create or modify or the destination of a move of a file. `File` `Absent` is delete or the source of a move of a file. `FolderRemoved` is delete or the source of a move of a directory: notify does not deliver one `Remove` per child. There is no `Moved` variant. A rename the watcher sees becomes `FolderRemoved` then file `Present`s, or file `Absent` then file `Present`. pico sources are keyed by path; a rename is remove old plus intern new. A directory is not a `DiskFile`.
 
 Ingested events come from outside `handle`: `DiskChanged`, `EditorChanged`. The CLI can submit any `IsographEvent`. The watcher submits `DiskChanged`. The LSP adapter submits `EditorChanged`.
 
 The wire is `serde_json` of `IsographEvent`. Every event is `Serialize` + `Deserialize`. There is no second enum. A frame that is not a valid `IsographEvent` is logged and dropped. The connection stays up.
 
-`DiskChanged` is a filesystem fact. `Present` carries the contents. `handle` does not open the path. Boot scan is a burst of `DiskChanged` from the watcher; Injected mode has no such burst.
+`DiskChanged` is a filesystem fact. `File` `Present` carries the contents. `handle` does not open the path. Boot scan is a burst of `File` `Present`. Injected mode has no such burst. `FolderRemoved` is a directory gone from disk.
 
 `EditorChanged` is an editor-buffer fact. The LSP adapter produces it from `didOpen` / `didChange` / `didClose`. The CLI can produce the same event without an editor.
 
@@ -208,7 +219,7 @@ event-loop.md ships `IsographState` with no fields. filesystem-events.md makes `
 
 ## Dispatch
 
-`DiskChanged` with `Present` sets `DiskFile` from the payload. `DiskChanged` with `Absent` removes it. `EditorChanged` with `Open` sets `OpenFile`. `EditorChanged` with `Closed` removes it. `AsyncWorkFinished` records the result. `Quit` returns `Kill`.
+`DiskChanged::File` with `Present` sets `DiskFile` from the payload. `DiskChanged::File` with `Absent` calls `remove_disk_file`. `DiskChanged::FolderRemoved` calls `remove_disk_files_from_path`. `EditorChanged` with `Open` sets `OpenFile`. `EditorChanged` with `Closed` removes it. `AsyncWorkFinished` records the result. `Quit` returns `Kill`.
 
 ## Watch and batch
 

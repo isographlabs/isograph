@@ -41,7 +41,7 @@ The inner model does not know about the filesystem. A `DiskFile` is a row in the
 
 `PathBuf` is an OS path. It belongs on events and in the outer process. A `PathBuf` on a source key, a tracked map, or a memo argument is a leak of the filesystem into the inner model.
 
-The identity of a source file is `RelativePathToSourceFile`: `string_key_newtype!`, an interned UTF-8 string, `Copy`. The string is the path relative to the directory that contains the config file. `"src/a.ts"` and `"src/./a.ts"` are two keys. Construction from a relative string is `"src/a.ts".intern().to()`. `handle` is the ingest seam: it converts `DiskChanged.path` (`PathBuf`, absolute) with `relative_path_from_absolute_and_working_directory` against the interned config directory, then `set`s a `DiskFile`. Compiler tests intern `"src/a.ts"` and call `insert_disk_file`. They never construct a `PathBuf`.
+The identity of a source file is `RelativePathToSourceFile`: `string_key_newtype!`, an interned UTF-8 string, `Copy`. The string is the path relative to the directory that contains the config file. `"src/a.ts"` and `"src/./a.ts"` are two keys. Construction from a relative string is `"src/a.ts".intern().to()`. `handle` is the ingest seam: it converts `DiskFileChanged.path` or `FolderRemoved.path` (`PathBuf`, absolute) with `relative_path_from_absolute_and_working_directory` against the interned config directory, then `set`s or removes `DiskFile`s. Compiler tests intern `"src/a.ts"` and call `insert_disk_file`. They never construct a `PathBuf`.
 
 ```rust
 string_key_newtype!(RelativePathToSourceFile);
