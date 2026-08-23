@@ -1,39 +1,16 @@
 # Zed and VS Code extensions
 
-Requires `docs-website/docs/design-docs/event-model.md`. The editors talk to the LSP adapter via `isograph lsp` (stdio proxy). This doc is what each extension is, how highlighting works in each, and what CI can assert. It does not ship before the adapter and the proxy exist (`refactors/pending/event-model.md` LSP adapter item).
+Requires `docs-website/docs/design-docs/event-model.md` and vscode-extension.md. The editors talk to the LSP adapter via `isograph lsp` (stdio proxy). VS Code is vscode-extension.md. This file is the Zed extension, how highlighting differs in each editor, and Zed CI. It does not ship before the adapter and the proxy exist (`refactors/pending/event-model.md` LSP adapter item).
 
 ## What the user does
 
-VS Code: install the Isograph extension. Open a `.ts` / `.tsx` / `.js` / `.jsx` file that contains `iso(\`field Pet.fullName { id }\`)`. `field` is a keyword, `Pet` a class, `fullName` and `id` properties. Output channels `Isograph` and `Isograph LSP Logs` exist.
+VS Code: vscode-extension.md.
 
 Zed: install the Isograph extension from the extensions page (or Install Dev Extension while iterating). Open the same file. Same coloring, after the user has set `semantic_tokens` to `combined` or `full` for TypeScript and TSX. Without that setting, Zed does not request semantic tokens and the iso literal stays a string.
 
-## VS Code extension as it is
+## VS Code extension
 
-Directory `vscode-extension/`. Node, `vscode-languageclient`, esbuild bundle to `out/extension.js`.
-
-Activation: `onLanguage:javascript`, `javascriptreact`, `typescript`, `typescriptreact`.
-
-On activate (`src/extension.ts`):
-
-- Read `isograph.pathToIsograph`, `isograph.pathToConfig`, `isograph.rootDirectory`, `isograph.autoformatIsoLiterals`.
-- Walk from `rootDirectory` or the workspace root looking for `node_modules/@isograph/compiler`, then the platform artifact (`artifacts/macos-arm64/isograph_cli`, and the other four). `isograph.pathToIsograph` skips the walk.
-- Spawn that binary with args `['lsp']`, plus `--config` when `pathToConfig` is set. cwd is the root.
-- `LanguageClient` document selector is those four languages, scheme `file`.
-- If `autoformatIsoLiterals`, `onWillSaveTextDocument` sends `textDocument/formatting`.
-
-The i2 binary has no `lsp` verb. The spawn fails. Highlighting does not run.
-
-`extensionDependencies` includes `GraphQL.vscode-graphql-syntax`. That colors `graphql` tagged templates. `iso(\`...\`)` is a function-call template, not a graphql tag. It does not color iso literals. Iso coloring is LSP semantic tokens from `isograph lsp`.
-
-Settings, from `package.json`:
-
-- `isograph.pathToIsograph`: absolute path to the binary, or null.
-- `isograph.pathToConfig`: config path relative to `rootDirectory`, or null.
-- `isograph.rootDirectory`: path relative to the VS Code workspace, or null.
-- `isograph.autoformatIsoLiterals`: whether to request formatting on save. This is a bool. The two cases are "request formatting on will-save" and "do not". An enum `OnSaveFormat { Request, Skip }` is the replacement. Existing setting, existing default `true`. Changing it is a later extension change, not this doc. Raise: it is a bool on a shipped setting.
-
-Publish: `.github/workflows/publish-isograph-extension.yml` packages `vscode-extension` to Open VSX and the Marketplace. No tests in that job.
+vscode-extension.md. Spawn `isograph lsp`, document selector the four JS/TS languages, settings `pathToIsograph` / `pathToConfig` / `rootDirectory`. No format-on-save. No `GraphQL.vscode-graphql-syntax`. Publish remains `publish-isograph-extension.yml`.
 
 ## What a Zed extension is
 
@@ -222,7 +199,7 @@ What we can assert without an editor:
 
 - `handle` and `isograph send` (filesystem-events.md). Already on `cargo test` / `build-cli.yml`.
 - LSP: spawn `isograph lsp`, speak JSON-RPC, assert `initialize` capabilities include semantic tokens, `textDocument/didOpen` of a fixture, `textDocument/semanticTokens/full` returns a non-empty `data` whose first token_type is KEYWORD for a `field` literal. No VS Code, no Zed. This lands with the LSP adapter (`refactors/pending/event-model.md` item 6). Encoding unit tests already live in lsp-semantic-token-encoding.md.
-- VS Code extension: `npm run typecheck`, `npm run lint`, `npm run prettier-check` in `vscode-extension/`. Add a `ci.yml` job. Do not add `@vscode/test-electron`: it downloads Electron, needs a display, and tests the editor instead of the protocol.
+- VS Code extension: vscode-extension.md (`npm run typecheck` / `lint` / `prettier-check`).
 - Zed extension: `cargo check --target wasm32-wasip2 --manifest-path zed-extension/Cargo.toml`. Add the target in that job. This proves the wasm crate compiles. It does not prove Zed loads it.
 
 What we cannot assert in CI:
@@ -232,45 +209,17 @@ What we cannot assert in CI:
 
 Do not run Zed or VS Code in GitHub Actions as the primary test of highlighting. The LSP fixture is the test. The wasm compile is the test of the Zed crate. The VS Code typecheck is the test of the Node crate.
 
-## Ordered changes (after `isograph lsp` exists)
+## Ordered changes (after `isograph lsp` and vscode-extension.md)
 
-Each is independently shippable.
+Each is independently shippable. VS Code is vscode-extension.md.
 
-### Change 1: `isograph lsp` as the stdio proxy
-
-Specified in `docs-website/docs/design-docs/event-model.md`. The vscode-extension spawn starts working for whatever the adapter answers (semantic tokens first). No extension code change required if args stay `['lsp']` and optional `--config`.
-
-### Change 2: VS Code CI job
-
-```yaml
-# from .github/workflows/ci.yml
-  vscode-extension:
-    name: vscode-extension typecheck
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22.9.0"
-      - run: npm ci
-        working-directory: vscode-extension
-      - run: npm run typecheck
-        working-directory: vscode-extension
-      - run: npm run lint
-        working-directory: vscode-extension
-      - run: npm run prettier-check
-        working-directory: vscode-extension
-```
-
-`all-checks-passed.needs` appends `vscode-extension`.
-
-### Change 3: the Zed extension crate
+### Change 1: the Zed extension crate
 
 `zed-extension/` as above: `extension.toml`, `Cargo.toml`, `src/lib.rs` with `language_server_command` that finds `isograph` and passes `lsp`. Not a workspace member.
 
 README: Install Dev Extension, point at `zed-extension/`. Set `semantic_tokens` combined for TypeScript and TSX. Open a demo.
 
-### Change 4: Zed CI job
+### Change 2: Zed CI job
 
 ```yaml
 # from .github/workflows/ci.yml
@@ -289,7 +238,7 @@ README: Install Dev Extension, point at `zed-extension/`. Set `semantic_tokens` 
 
 `all-checks-passed.needs` appends `zed-extension`.
 
-### Change 5: LSP protocol tests
+### Change 3: LSP protocol tests
 
 A test in `crates/ts_graphql_react_isograph_cli/tests/` that spawns `CARGO_BIN_EXE_isograph` with `lsp`, writes LSP headers+JSON to stdin, reads stdout. Assert initialize result has `semanticTokensProvider`. Open a document whose text is `iso(\`field Pet.fullName { id }\`)`. Request semantic tokens. Assert `data` is non-empty and the first `token_type` is 15 (KEYWORD). HOME isolation as in `tests/cli.rs`.
 
@@ -297,6 +246,6 @@ This is the highlighting test. It does not import `vscode` or Zed.
 
 ## Local iteration
 
-VS Code: `vscode-extension/README.md` already. `npm run build-local`, Extension Development Host, open a project with a config. `watch-rs` for the binary.
+VS Code: vscode-extension.md.
 
 Zed: Install Dev Extension on `zed-extension/`. `zed --foreground` for wasm logs. Restart the language server after a Rust binary rebuild (`editor: restart language server`). The wasm extension itself reloads when Zed rebuilds it on install; re-install the dev extension after `src/lib.rs` changes.

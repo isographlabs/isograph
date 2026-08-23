@@ -24,6 +24,7 @@ Requires config-discovery.md (landed), the event-model design-doc, and `docs-web
 18. lsp-sessions.md. Later. `ClientCapabilities` from `initialize` and a writer map for `publishDiagnostics`.
 19. lsp-diagnostics.md. Later. Debounce then `publishDiagnostics`. Requires 18.
 20. lsp-proxy.md. Later. `isograph lsp` stdio copy onto the port.
-21. zed-and-vscode-extensions.md.
+21. vscode-extension.md. After 15 and 20. VS Code extension; highlighting only.
+22. zed-and-vscode-extensions.md.
 
 `AsyncWorkFinished` and `StartAsyncWork` land with compilation.
