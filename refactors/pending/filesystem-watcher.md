@@ -1,32 +1,53 @@
 # Filesystem watcher
 
-Requires filesystem-events.md (landed), interned-source-path.md (landed), config-source-files.md (landed), lsp-port.md (landed), and `docs-website/docs/design-docs/event-model.md`. The daemon recvs `DiskChanged` and interns `DiskFile`. This file adds a source that walks once, then observes the OS, and posts `DiskChanged` on the same `event_tx` the LSP session uses.
+Requires filesystem-events.md (landed), interned-source-path.md (landed), config-source-files.md (landed), lsp-port.md (landed), and `docs-website/docs/design-docs/event-model.md`.
 
-The watcher posts in-process. It does not run `isograph send` and it does not write to the LSP port. `isograph send` remains a source of the same event type. `handle`, `run_event_loop`, and the session do not know whether the watcher is running. Tests construct `DiskChanged` or send it. CI e2e starts the daemon without the watcher and sends events.
+This is isograph's watcher. The code is `crates/isograph_compiler/src/watch.rs`, `read_files.rs`, and the `update_sources` match in `source_files.rs`. It lives in `isograph_cli` because i2 posts `DiskChanged` instead of mutating the db on the notify thread.
 
-Origin of the notify loop: isograph `crates/isograph_compiler/src/watch.rs` `create_debounced_file_watcher` and `categorize_and_filter_events`. Origin of the boot walk: isograph `crates/isograph_compiler/src/read_files.rs` `read_files_in_folder` / `visit_dirs_skipping_isograph`. Origin of posting `DiskChanged` rather than mutating the db: `docs-website/docs/design-docs/event-model.md`. Origin of `--watch` as a CLI switch: isograph `crates/isograph_cli/src/opt.rs` `CompileCommand.watch`. Origin of `Filesystem::Watch` / `Filesystem::Injected`: event-model.md. Origin of folder-delete removing every interned path under that prefix: isograph `IsographDatabase::remove_iso_literals_from_path`.
+Origin of the notify loop: `create_debounced_file_watcher` and `categorize_and_filter_events`. Origin of the boot walk: `read_files_in_folder` / `visit_dirs_skipping_isograph`. Origin of folder delete: `remove_iso_literals_from_path`. Origin of ingest: `update_sources` / `handle_update_source_file` / `handle_update_source_folder`. Origin of `--watch`: isograph `CompileCommand.watch`. Origin of `Filesystem::Watch` / `Filesystem::Injected`: event-model.md.
 
-Delta: OS events become `DiskChanged` with `Presence`; `handle` interns; no `ChangedFileKind`; no compile-on-change; `Filesystem` instead of isograph's `--watch` bool; the watcher lives in `isograph_cli` (outer), not `isograph_compiler`; which files are interned is `HostLanguage::source_file_kind`, not config globs and not a hardcoded extension list in the walker; which directories the boot walk enters is `HostLanguage::directory_walk`; one recursive watch on the config file's parent (isograph watches `config_location`, `project_root`, `schema`, and schema extensions); `UnboundedSender::send` from the notify thread (isograph uses a bounded tokio channel and `Handle::spawn` because its send is async); no panic on a notify payload (isograph panics if a create/modify/remove does not contain exactly one path, or a Both-rename exactly two); `Path::starts_with` for descendant removal (isograph uses string `starts_with`, which treats `src` as a prefix of `src2`); `Create(_)` of a directory scans that directory (isograph ignores `CreateKind::Folder`); `RenameMode::From` / `To` are handled (isograph ignores them).
+Deltas from those files, exhaustive:
 
-Config `source_files` is not read. Glob matching from that field is later. This slice's filter is a host-language function of a path relative to the config directory.
+- The notify callback sends `SourceFileEvent`. A loop in `serve` reads contents and posts `DiskChanged` on `event_tx`. `handle` intern. isograph's callback sends, then `update_sources` writes the db on the recv loop. Same split, `DiskChanged` instead of `db.insert_iso_literal`.
+- `Filesystem` instead of `--watch: bool`. Default `Watch`. `Injected` does not create a debouncer.
+- `source_files` is membership. isograph used `path.starts_with(project_root)`. A relative path is in scope if the ordered glob list says so (`!` excludes, last match wins). The watch/walk root for a positive glob is the static prefix before the first `*`, `?`, `[`, or `{` (the analog of `project_root`). `**/*.ts` has an empty prefix and watches the config directory. `[]` watches nothing and intern nothing.
+- The extension check in `read_files_in_folder` is `HostLanguage::source_file_kind`. One associated function, two-variant enum. Not a memo. Not a second trait. The CLI is already generic over `THostLanguage` and does not depend on `isograph_extract_typescript`.
+- `__isograph` is skipped in the walker, as `visit_dirs_skipping_isograph`. Not a HostLanguage concern. `ISOGRAPH_FOLDER` lives on `isograph_config` as in isograph.
+- No `schema` / `schema_extensions` / `artifact_directory` watches. i2 has none of those fields. Config-file events are `ChangedFileKind::Config` and are dropped. The daemon does not reload config.
+- Watch, then boot-walk. isograph compiled from the walk, then watched. A file created in that gap was missed. Watch first; a Create that races with the walk is `Present` twice with the same bytes; pico does not advance the epoch.
+- `CreateKind::Folder` scans that folder. isograph ignores it (comment in `process_create_event`).
+- `RenameMode::From` / `To` are handled. isograph ignores them (`_ => None`).
+- `EventKind::Any` and `ModifyKind::Any` (not `Name`) do exists-then-Present else Absent, same as isograph's `RenameMode::Any`. isograph drops them. notify 7 Windows emits `EventKind::Any` and `ModifyKind::Any`; kqueue emits `ModifyKind::Any` for `Vnode::Link`.
+- `EventKind::Other` with `Flag::Rescan` re-walks every watch root. isograph drops it. inotify and FSEvents emit it when events were lost.
+- No panic on path count. Take `paths.first()` / `paths.get(1)` and skip.
+- `Path::starts_with` for descendant removal. isograph uses string `starts_with`, which treats `src` as a prefix of `src2`.
+- Failed `read_to_string` / non-UTF8 / non-regular file posts `Absent`, not a silent keep of the old `DiskFile`.
+- `UnboundedSender::send` from the notify thread. isograph uses `channel(1)` and `Handle::spawn` because that send is async.
+- `let _ = event_tx.send`. isograph `expect`s the debouncer and each `watch()`.
+
+`isograph send` still intern any path. Scope is the watcher's job. `handle`, `run_event_loop`, and the session do not know whether the watcher is running.
 
 One shippable change.
 
 ## What the user does
 
 ```
+$ cat isograph.config.json
+{"source_files":["src/**/*.ts","src/**/*.tsx","!src/**/*.test.ts"]}
 $ isograph start
-# create, edit, rename, delete TypeScript files under the config directory
-# each file HostLanguage::source_file_kind names Source becomes a DiskChanged, then a DiskFile
+# create src/a.ts -> intern
+# create src/a.test.ts -> not intern
+# create src/a.rs -> not intern
+# create lib/b.ts -> not intern
 ```
 
 ```
 $ isograph start --filesystem injected
 ```
 
-Writing a file on disk does not intern. `isograph send` of `DiskChanged` still intern. The event loop, `handle`, and the LSP session are the same in both modes.
+Writing a file on disk does not intern. `isograph send` of `DiskChanged` still intern.
 
-Default is `Watch`. `Injected` is how tests that must not watch start the daemon.
+Default is `Watch`. CI e2e uses `Injected`.
 
 ## Types
 
@@ -34,39 +55,16 @@ Most important first.
 
 ### HostLanguage filter
 
-Origin of a per-language file filter: isograph `read_files_in_folder` (extensions `ts` / `tsx` / `js` / `jsx`, skip paths containing `__isograph`) plus `visit_dirs_skipping_isograph`. Delta: the policy is two associated functions on `HostLanguage`, not a walk inside `isograph_compiler`. They are not memos. They do not take the database. The argument is a path relative to the config directory, not interned (`RelativePathToSourceFile` is handle's job) and not the absolute OS path (later glob matching is relative to the config directory). A file name without its parent components cannot skip `node_modules/pkg/index.ts`.
-
-The two cases of `source_file_kind`: intern this path as a `DiskFile`, or do not. The two cases of `directory_walk`: the boot walk descends into this directory, or it does not. Not a `bool`.
-
-Before:
+Origin: the extension match in `read_files_in_folder`. Delta: an associated function on `HostLanguage` instead of a hardcoded list in the walker.
 
 ```rust
 // from crates/isograph_compiler/src/host_language.rs
-pub trait HostLanguage: Send + Sync + Sized + 'static {
-    type Error: std::fmt::Display + std::error::Error + Clone + PartialEq + Eq + 'static;
-    type LiteralContext: Clone + PartialEq + Eq + Debug + 'static;
+use std::path::Path;
 
-    fn extract_iso_literals(
-        db: &IsographState<Self>,
-        path: RelativePathToSourceFile,
-    ) -> &Option<Vec<IsoLiteralExtraction<Self>>>;
-}
-```
-
-After. Add `use std::path::Path`.
-
-```rust
-// from crates/isograph_compiler/src/host_language.rs
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SourceFileKind {
     Source,
     NotSource,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DirectoryWalk {
-    Descend,
-    Skip,
 }
 
 pub trait HostLanguage: Send + Sync + Sized + 'static {
@@ -79,57 +77,59 @@ pub trait HostLanguage: Send + Sync + Sized + 'static {
     ) -> &Option<Vec<IsoLiteralExtraction<Self>>>;
 
     fn source_file_kind(relative_path: &Path) -> SourceFileKind;
-
-    fn directory_walk(relative_path: &Path) -> DirectoryWalk;
 }
 ```
 
-`source_file_kind` is consulted for files (boot walk and notify Present). `directory_walk` is consulted for child directories during the boot walk and during a directory Present (create or rename-to of a folder). The config directory itself is always walked and always watched. `directory_walk` of the empty relative path is not consulted.
+Before, the trait ends at `extract_iso_literals`. After, it has `source_file_kind`. No `directory_walk`. The walker skips `__isograph`. The globs skip `node_modules` when the user did not write a glob that includes it.
 
-Notify still fires for files under a `Skip` directory because the OS watch is recursive on the config directory. `source_file_kind` drops those Present events. `directory_walk` exists so the boot walk does not read `node_modules`. A `yarn install` still produces a burst of dropped notify events. Excluding `Skip` trees from the OS watch is later.
-
-`handle` does not call these. `isograph send` may inject any path. Scope is the watcher's job.
-
-### TypeScript policy
-
-Origin: isograph `read_files_in_folder` extension match and `__isograph` skip. Delta: also `NotSource` / `Skip` when any path component is `node_modules`. isograph watches `project_root` (typically `./src`), so `node_modules` is outside that watch. This slice watches the config directory.
-
-Add `use std::path::Path` and `use isograph_compiler::{DirectoryWalk, SourceFileKind}` at the top of that file. Add these two methods to the existing `impl HostLanguage for TypeScriptHostLanguage`.
+TypeScript, copied from `read_files_in_folder`:
 
 ```rust
 // from crates/isograph_extract_typescript/src/lib.rs
     fn source_file_kind(relative_path: &Path) -> SourceFileKind {
-        if path_has_skipped_component(relative_path) {
-            return SourceFileKind::NotSource;
-        }
         match relative_path.extension().and_then(|e| e.to_str()) {
             Some("ts" | "tsx" | "js" | "jsx") => SourceFileKind::Source,
             _ => SourceFileKind::NotSource,
         }
     }
-
-    fn directory_walk(relative_path: &Path) -> DirectoryWalk {
-        if path_has_skipped_component(relative_path) {
-            DirectoryWalk::Skip
-        } else {
-            DirectoryWalk::Descend
-        }
-    }
-
-fn path_has_skipped_component(relative_path: &Path) -> bool {
-    relative_path
-        .components()
-        .any(|c| matches!(c.as_os_str().to_str(), Some("node_modules" | "__isograph")))
-}
 ```
 
-`path_has_skipped_component` is private to that file. Do not put `node_modules` or `__isograph` in `isograph_cli`.
+`isograph.config.ts` is `Source` by extension. The watcher still does not intern it: `categorize` returns `ChangedFileKind::Config` when `path == config_path`, copied from isograph's `path == config.config_location`.
 
-`.d.ts` is `Source` (extension `ts`). `.mjs` / `.cjs` / `.mts` / `.json` / `.graphql` / `.rs` are `NotSource`. The empty relative path (the config directory itself) is `NotSource` as a file and would be `Descend` as a directory. A file `a.ts` at the config directory is `Source`.
+### ISOGRAPH_FOLDER
+
+```rust
+// from crates/isograph_config/src/compilation_options.rs
+pub static ISOGRAPH_FOLDER: &str = "__isograph";
+```
+
+Origin: isograph `isograph_config::ISOGRAPH_FOLDER`. `isograph_config` already re-exports `compilation_options::*`.
+
+### SourceFileEvent
+
+Copied from `watch.rs`. Delta: no Schema / SchemaExtension. `JavaScriptSourceFile` / `JavaScriptSourceFolder` renamed `SourceFile` / `SourceFolder` because HostLanguage is not JavaScript.
+
+```rust
+// from crates/isograph_cli/src/watch.rs
+#[derive(Debug, Clone)]
+pub enum SourceEventKind {
+    CreateOrModify(PathBuf),
+    Rename((PathBuf, PathBuf)),
+    Remove(PathBuf),
+}
+
+pub enum ChangedFileKind {
+    Config,
+    SourceFile,
+    SourceFolder,
+}
+
+pub type SourceFileEvent = (SourceEventKind, ChangedFileKind);
+```
 
 ### Filesystem CLI
 
-`IsographArgs` is `App::DaemonArgs`. Origin: event-loop.md / config-discovery.md `NoArgs`. Delta: `Filesystem`. `start`, `restart`, and `daemon` flatten `DaemonArgs`. `status` / `logs` / `stop` do not. clap requires `Id` and `DaemonArgs` to have distinct group names. `ConfigFlag` and `IsographArgs` are different types.
+`IsographArgs` is `App::DaemonArgs`. Origin: `NoArgs`. Delta: `Filesystem`. clap groups: `ConfigFlag` vs `IsographArgs`.
 
 ```rust
 // from crates/isograph_cli/src/lib.rs
@@ -147,32 +147,9 @@ struct IsographArgs {
 }
 ```
 
-Before:
+`run_daemon` passes `args.filesystem` and the `IsographProjectConfig` from `load_config`. It does not discard the config.
 
-```rust
-// from crates/isograph_cli/src/lib.rs
-    type DaemonArgs = NoArgs;
-
-    fn run_daemon(id: &ConfigFlag, _: &NoArgs) {
-        let (path, instance) = match discover::instance_for_config_path(id.config.as_deref()) {
-            Ok(pair) => pair,
-            Err(e) => {
-                tracing::error!(
-                    error = %e,
-                    "the config went away between naming this daemon and starting it"
-                );
-                return;
-            }
-        };
-        let port_path = discover::port_file(instance.lock_file());
-        let _ = std::fs::remove_file(port_path.reference());
-        if let Err(e) = discover::load_config(path.reference()) {
-            tracing::error!(error = %e, "could not load the config");
-            return;
-        }
-        crate::daemon::run::<THostLanguage>(path, port_path);
-    }
-```
+Before: `type DaemonArgs = NoArgs` and `daemon::run::<THostLanguage>(path, port_path)` after `load_config` whose value is ignored.
 
 After:
 
@@ -193,36 +170,24 @@ After:
         };
         let port_path = discover::port_file(instance.lock_file());
         let _ = std::fs::remove_file(port_path.reference());
-        if let Err(e) = discover::load_config(path.reference()) {
-            tracing::error!(error = %e, "could not load the config");
-            return;
-        }
-        crate::daemon::run::<THostLanguage>(path, port_path, args.filesystem);
+        let config = match discover::load_config(path.reference()) {
+            Ok(config) => config,
+            Err(e) => {
+                tracing::error!(error = %e, "could not load the config");
+                return;
+            }
+        };
+        crate::daemon::run::<THostLanguage>(path, port_path, args.filesystem, config);
     }
 ```
 
-`load_config` still runs and still discards the value. A bad config still refuses to start. The watcher does not read `IsographProjectConfig`. Do not stash the config in `IsographState`.
-
-Drop `NoArgs` from `use freddie_cli::{App, Instance, NoArgs}`.
-
-`Injected` does not scan and does not watch. The LSP port listens in both modes. `event_tx` is the same channel.
+Drop `NoArgs` from the `freddie_cli` import.
 
 ### Descendant Absent
 
-Origin: isograph `remove_iso_literals_from_path`. Delta: `Path::starts_with` (whole components), so interned `src` does not remove interned `src2`. One method: `Absent` of a path means that path is gone from the filesystem, so the interned key and every interned key under it go away. File delete of `src/a.ts` removes that key and would remove `src/a.ts/foo` if one existed. Directory delete of `src` removes `src` and `src/a.ts`.
+Origin: `IsographDatabase::remove_iso_literals_from_path`. Delta: `Path::starts_with`.
 
-This changes `isograph send` of `Absent` for a prefix path: `Absent` of `/tmp/proj/src` removes every interned file under `src`. `Absent` of `/tmp/proj/src/a.ts` still removes only that file (`src/a.ts.bak` is a different last component).
-
-Before:
-
-```rust
-// from crates/isograph_compiler/src/database.rs
-    pub fn remove_disk_file(&mut self, path: RelativePathToSourceFile) {
-        if let Some(source_id) = self.get_disk_file_map_mut().tracked().0.remove(&path) {
-            self.remove(source_id);
-        }
-    }
-```
+Before: `remove_disk_file` removes one map key.
 
 After. Add `use std::path::Path`.
 
@@ -242,70 +207,69 @@ After. Add `use std::path::Path`.
     }
 ```
 
-`AsRef<Path>` is on `RelativePathToSourceFile` via `string_key_newtype!`. Do not add `intern` as a production dependency of `isograph_compiler`. Collect then `remove` because `extract_if` already borrows the map. `handle_disk_changed` still calls `remove_disk_file`. Existing exact-path tests still pass.
+`handle_disk_changed` still calls `remove_disk_file`. `Absent` of a prefix path from `isograph send` removes descendants. That is the same contract as isograph's folder remove.
 
-### Start
+Empty relative path: `pathdiff` of the config directory against itself is `""`. `Path::new("src/a.ts").starts_with(Path::new(""))` is true. `Absent` of the config directory removes every interned file. Test it.
 
-`run_daemon` already has the canonical config path. Pass `filesystem` into `serve`. Intern `CurrentWorkingDirectory` before `watch::start` posts `DiskChanged`. Start the watcher after intern and after the LSP bind, before writing the port file, so a watch failure does not leave a port file.
+`Absent` of a never-interned path that is not a prefix of any key is a no-op. Test it.
 
-The watch root is `config_path.parent()`, the same path `intern_config_directory` intern. Do not canonicalize that parent again. `config_path` is already canonical from `discover`. Posted `Present` paths are canonicalized in `post_present` so they pathdiff against that interned directory.
+Non-UTF8 `Absent`: if the absolute path (or the pathdiff result) is not UTF-8, skip the post. Do not call `handle`. `relative_path_from_absolute_and_working_directory` `expect`s stringify. Present already skips non-UTF8.
+
+## Start
+
+Intern `CurrentWorkingDirectory` before any `DiskChanged` is posted. Bind the LSP socket, intern, start the watcher (watch roots, then boot walk), write the port file.
+
+`discover` hands a canonical config file path. A file path has a parent. The type system does not. Same `expect` as `intern_config_directory`.
 
 ```rust
 // from crates/isograph_cli/src/daemon.rs
+use isograph_config::IsographProjectConfig;
+
+use crate::watch::SourceFileEvent;
 use crate::Filesystem;
 
 pub fn run<THostLanguage: HostLanguage>(
     config_path: PathBuf,
     port_path: PathBuf,
     filesystem: Filesystem,
+    config: IsographProjectConfig,
 ) {
-    let runtime = match tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-    {
-        Ok(runtime) => runtime,
-        Err(e) => {
-            tracing::error!(error = %e, "could not start the tokio runtime");
-            return;
-        }
-    };
-    runtime.block_on(serve::<THostLanguage>(config_path, port_path, filesystem));
+    // runtime as today
+    runtime.block_on(serve::<THostLanguage>(
+        config_path,
+        port_path,
+        filesystem,
+        config,
+    ));
 }
 
 async fn serve<THostLanguage: HostLanguage>(
     config_path: PathBuf,
     port_path: PathBuf,
     filesystem: Filesystem,
+    config: IsographProjectConfig,
 ) {
     let (event_tx, event_rx) = unbounded_channel::<IsographEvent>();
     let (effect_tx, effect_rx) = unbounded_channel::<IsographEffect>();
-    let listener = match tokio::net::TcpListener::bind(std::net::SocketAddr::from((
-        std::net::Ipv4Addr::LOCALHOST,
-        0,
-    )))
-    .await
-    {
-        Ok(listener) => listener,
-        Err(e) => {
-            tracing::error!(error = %e, "could not bind the lsp socket");
-            return;
-        }
-    };
-    let port = match listener.local_addr() {
-        Ok(addr) => addr.port(),
-        Err(e) => {
-            tracing::error!(error = %e, "could not read the lsp socket address");
-            return;
-        }
-    };
+    let (watch_tx, watch_rx) = unbounded_channel::<Vec<SourceFileEvent>>();
+    // bind listener, read port, as today
 
     let mut state = IsographState::<THostLanguage>::default();
     intern_config_directory(&mut state, config_path.reference());
+    let config_directory = config_path
+        .parent()
+        .expect("a config file path has a parent directory")
+        .to_owned();
+    let _hold_watch = watch_tx.clone();
 
     let _watcher = match filesystem {
         Filesystem::Injected => None,
         Filesystem::Watch => {
-            match crate::watch::start::<THostLanguage>(event_tx.clone(), config_path.reference()) {
+            match crate::watch::start::<THostLanguage>(
+                watch_tx,
+                config_path.reference(),
+                config.source_files.as_slice(),
+            ) {
                 Ok(watcher) => watcher.wrap_some(),
                 Err(e) => {
                     tracing::error!(error = %e, "could not start the watcher");
@@ -315,55 +279,58 @@ async fn serve<THostLanguage: HostLanguage>(
         }
     };
 
-    if let Err(e) = std::fs::write(port_path.reference(), format!("{port}\n")) {
-        tracing::error!(
-            error = %e,
-            path = %port_path.display(),
-            "could not write the event socket port"
-        );
-        return;
-    }
-    tracing::info!(config = %config_path.display(), port, "isograph daemon up");
-
-    // SIGTERM task as today
+    // write port file, "isograph daemon up", SIGTERM, as today
 
     let _hold_events = event_tx.clone();
     tokio::select! {
         () = run_event_loop(state, event_rx, effect_tx) => {}
         () = run_effect_loop(effect_rx) => {}
-        () = crate::lsp_socket::accept_loop(listener, event_tx) => {}
+        () = crate::lsp_socket::accept_loop(listener, event_tx.clone()) => {}
+        () = ingest_watch_events::<THostLanguage>(watch_rx, event_tx, config_directory) => {}
     }
     let _ = std::fs::remove_file(port_path.reference());
     std::process::exit(0);
 }
+
+async fn ingest_watch_events<THostLanguage: HostLanguage>(
+    mut watch_rx: UnboundedReceiver<Vec<SourceFileEvent>>,
+    event_tx: UnboundedSender<IsographEvent>,
+    config_directory: PathBuf,
+) {
+    while let Some(events) = watch_rx.recv().await {
+        crate::watch::apply::<THostLanguage>(
+            event_tx.reference(),
+            config_directory.reference(),
+            events,
+        );
+    }
+}
 ```
 
-Scan posts onto `event_tx` before `select!` recvs. Those frames sit in the unbounded channel. `intern_config_directory` has already run. `handle` of `DiskChanged` on a default database panics; that is why intern is before `start`.
+`let _watcher` binds until `serve` returns. `let _ = watcher` drops the debouncer immediately. `_hold_watch` keeps `ingest_watch_events` from returning on `Injected`, same as `_hold_events` for the event loop.
 
-`let _watcher` binds until the end of `serve`. `let _ = watcher` would drop the debouncer immediately and stop notify. Drop order after `select!` ends is reverse declaration: loops have finished, then `_hold_events`, then `_watcher`.
+Do not log `filesystem` on `isograph daemon up`.
 
-Do not log `filesystem` on `isograph daemon up`. Existing e2e asserts that line, `config`, and `port`. Whether the watcher started is not part of that record.
+`ingest_watch_events` is the analog of isograph's `while let Some(res) = file_system_receiver.recv().await` plus `update_sources`. It never returns while the watcher lives (`watch_tx` is held by the callback). `select!` ends on `Kill`.
 
-`run_event_loop` does not change. `handle` does not change except `remove_disk_file` as above. `lsp_socket` does not change.
+## Watch
 
-Existing `Daemon::start` becomes `start` with `--filesystem injected`. Add `Daemon::start_watch` for the watch e2e.
-
-### Watch
-
-`notify_debouncer_full::DebouncedEvent` Deref to `notify::Event`, so `event.kind` and `event.paths` are the notify fields. Same as isograph.
+Copied from `create_debounced_file_watcher`. Delta: `watch_tx` is unbounded; send is sync; watch roots come from `source_files`; boot walk after `watch()`; errors are `WatchError` not `expect`.
 
 ```rust
 // from crates/isograph_cli/src/watch.rs
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use isograph_compiler::{DirectoryWalk, HostLanguage, SourceFileKind};
-use notify::event::{ModifyKind, RenameMode};
+use globset::Glob;
+use isograph_compiler::{HostLanguage, SourceFileKind};
+use isograph_config::ISOGRAPH_FOLDER;
+use notify::event::{CreateKind, ModifyKind, RemoveKind, RenameMode};
 use notify::{EventKind, RecommendedWatcher, RecursiveMode};
 use notify_debouncer_full::{DebounceEventResult, Debouncer, RecommendedCache, new_debouncer};
 use prelude::Postfix;
 use tokio::sync::mpsc::UnboundedSender;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 use crate::event::{DiskChanged, IsographEvent, Presence};
 
@@ -381,6 +348,11 @@ pub enum WatchError {
     Watch(WatchRoot),
     #[error("could not start the notify watcher: {0}")]
     Notify(notify::Error),
+    #[error("invalid source_files glob {glob}: {source}")]
+    Glob {
+        glob: String,
+        source: globset::Error,
+    },
 }
 
 pub struct Watcher {
@@ -388,31 +360,27 @@ pub struct Watcher {
 }
 
 pub fn start<THostLanguage: HostLanguage>(
-    event_tx: UnboundedSender<IsographEvent>,
+    watch_tx: UnboundedSender<Vec<SourceFileEvent>>,
     config_path: &Path,
+    source_files: &[String],
 ) -> Result<Watcher, WatchError> {
     let config_directory = config_path
         .parent()
         .expect("a config file path has a parent directory");
-    let mut paths = scan_files::<THostLanguage>(config_directory, config_directory);
-    paths.sort();
-    paths.dedup();
-    info!(n = paths.len(), "scan finished");
-    for path in paths {
-        post_present(event_tx.reference(), path.reference());
-    }
-    let tx = event_tx.clone();
-    let config_directory_for_events = config_directory.to_owned();
+    let globs = SourceGlobs::parse(source_files)?;
+    let roots = globs.watch_roots(config_directory);
+    let tx = watch_tx.clone();
+    let globs_for_events = globs.clone();
+    let config_path_for_events = config_path.to_owned();
     let mut debouncer = new_debouncer(DEBOUNCE, None, move |result: DebounceEventResult| {
         match result {
             Ok(events) => {
-                for event in events {
-                    dispatch::<THostLanguage>(
-                        tx.reference(),
-                        config_directory_for_events.reference(),
-                        event.kind,
-                        event.paths.as_slice(),
-                    );
+                if let Some(source_file_events) = categorize_and_filter_events(
+                    events.as_slice(),
+                    globs_for_events.reference(),
+                    config_path_for_events.reference(),
+                ) {
+                    let _ = tx.send(source_file_events);
                 }
             }
             Err(errors) => {
@@ -423,14 +391,51 @@ pub fn start<THostLanguage: HostLanguage>(
         }
     })
     .map_err(WatchError::Notify)?;
-    debouncer
-        .watch(config_directory, RecursiveMode::Recursive)
-        .map_err(|source| {
+    for root in &roots {
+        let mode = if root.is_file() {
+            RecursiveMode::NonRecursive
+        } else {
+            RecursiveMode::Recursive
+        };
+        debouncer.watch(root.reference(), mode).map_err(|source| {
             WatchError::Watch(WatchRoot {
-                path: config_directory.to_owned(),
+                path: root.clone(),
                 source,
             })
         })?;
+    }
+    let mut paths = Vec::new();
+    for root in &roots {
+        if root.is_dir() {
+            visit_dirs_skipping_isograph(root.reference(), &mut |entry| {
+                paths.push(entry.path());
+            });
+        } else if root.is_file() {
+            paths.push(root.clone());
+        }
+    }
+    let boot: Vec<SourceFileEvent> = paths
+        .into_iter()
+        .filter_map(|path| {
+            categorize_path(
+                path.reference(),
+                globs.reference(),
+                config_path,
+            )
+            .and_then(|kind| match kind {
+                ChangedFileKind::SourceFile => (
+                    SourceEventKind::CreateOrModify(path),
+                    ChangedFileKind::SourceFile,
+                )
+                    .wrap_some(),
+                _ => None,
+            })
+        })
+        .collect();
+    info!(n = boot.len(), "scan finished");
+    if !boot.is_empty() {
+        let _ = watch_tx.send(boot);
+    }
     Watcher {
         _debouncer: debouncer,
     }
@@ -438,181 +443,457 @@ pub fn start<THostLanguage: HostLanguage>(
 }
 ```
 
-The parent `expect` is the same invariant as `intern_config_directory`. The type system does not require a config `Path` to have a parent. `discover` hands `start` a canonical config file path; that path has a parent.
+`new_debouncer(timeout, tick_rate, cb)` with `tick_rate: None` is the crate default. 100ms as in isograph. `DebouncedEvent` Deref to `notify::Event`.
 
-`new_debouncer(timeout, tick_rate, cb)` with `tick_rate: None` is the crate default. Workspace already pins `notify` 7 and `notify-debouncer-full` 0.4. isograph uses 100ms. The `Debouncer` type arguments are `RecommendedWatcher` and `RecommendedCache` as in isograph `create_debounced_file_watcher`. If inference can fill the field, omit the arguments.
-
-The notify callback is not on the tokio runtime. `UnboundedSender::send` is not async. Do not `Handle::current().spawn`. That is the delta from isograph's bounded channel.
-
-`HostLanguage` methods are associated functions. The move closure calls `THostLanguage::source_file_kind` / `directory_walk`. `HostLanguage` is `'static`. The host value is not cloned.
-
-Scan then watch. A file created in that gap is missed until a later event. isograph compiles from its boot walk, then starts the watcher; same gap.
-
-### Scan
-
-Origin: isograph `visit_dirs_skipping_isograph` plus the extension filter in `read_files_in_folder`. Delta: skip and filter go through `HostLanguage`; the walk is in `isograph_cli`; return the file paths, then `start` / directory Present posts.
+### source_files globs
 
 ```rust
 // from crates/isograph_cli/src/watch.rs
-fn scan_files<THostLanguage: HostLanguage>(
-    config_directory: &Path,
-    dir: &Path,
-) -> Vec<PathBuf> {
+#[derive(Clone)]
+struct SourceGlobs {
+    patterns: Vec<GlobPattern>,
+}
+
+#[derive(Clone)]
+struct GlobPattern {
+    raw: String,
+    exclude: ExcludeGlob,
+    matcher: globset::GlobMatcher,
+}
+
+#[derive(Clone, Copy)]
+enum ExcludeGlob {
+    Include,
+    Exclude,
+}
+
+impl SourceGlobs {
+    fn parse(source_files: &[String]) -> Result<Self, WatchError> {
+        let patterns = source_files
+            .iter()
+            .map(|raw| {
+                let (exclude, glob_str) = match raw.strip_prefix('!') {
+                    Some(rest) => (ExcludeGlob::Exclude, rest),
+                    None => (ExcludeGlob::Include, raw.as_str()),
+                };
+                let matcher = Glob::new(glob_str)
+                    .map_err(|source| WatchError::Glob {
+                        glob: raw.clone(),
+                        source,
+                    })?
+                    .compile_matcher();
+                GlobPattern {
+                    raw: glob_str.to_owned(),
+                    exclude,
+                    matcher,
+                }
+                .wrap_ok()
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        SourceGlobs { patterns }.wrap_ok()
+    }
+
+    fn contains(&self, relative: &Path) -> bool {
+        self.patterns
+            .iter()
+            .fold(false, |allowed, pattern| {
+                if pattern.matcher.is_match(relative) {
+                    match pattern.exclude {
+                        ExcludeGlob::Include => true,
+                        ExcludeGlob::Exclude => false,
+                    }
+                } else {
+                    allowed
+                }
+            })
+    }
+
+    fn watch_roots(&self, config_directory: &Path) -> Vec<PathBuf> {
+        let mut roots: Vec<PathBuf> = self
+            .patterns
+            .iter()
+            .filter_map(|pattern| match pattern.exclude {
+                ExcludeGlob::Exclude => None,
+                ExcludeGlob::Include => config_directory
+                    .join(static_prefix(pattern.raw.as_str()))
+                    .wrap_some(),
+            })
+            .collect();
+        roots.sort();
+        roots.dedup();
+        roots
+    }
+}
+
+fn static_prefix(glob: &str) -> PathBuf {
+    let end = glob.find(['*', '?', '[', '{']).unwrap_or(glob.len());
+    PathBuf::from(glob[..end].trim_end_matches('/'))
+}
+```
+
+`static_prefix("src/**/*.ts")` is `src`. `static_prefix("**/*.ts")` is `""`, and `config_directory.join("")` is `config_directory`. `static_prefix("foo.ts")` is `foo.ts`.
+
+`contains` last match wins. `["src/**/*.ts", "!src/**/*.test.ts"]`: `src/a.ts` true, `src/a.test.ts` false. Empty list: `fold` starts false, nothing intern.
+
+Do not use HostLanguage to skip `node_modules`. A glob that does not include `node_modules` does not intern those files and does not watch them unless the static prefix is the config directory (`**/*.ts`).
+
+### categorize
+
+Copied from `categorize_and_filter_events` / `process_create_event` / `process_modify_event` / `process_remove_event` / `categorize_changed_file_and_filter_changes_in_artifact_directory`. Deltas named in the opening list.
+
+```rust
+// from crates/isograph_cli/src/watch.rs
+fn categorize_and_filter_events(
+    events: &[notify_debouncer_full::DebouncedEvent],
+    globs: &SourceGlobs,
+    config_path: &Path,
+) -> Option<Vec<SourceFileEvent>> {
+    if events.iter().any(|event| event.need_rescan()) {
+        let config_directory = config_path.parent()?;
+        let roots = globs.watch_roots(config_directory);
+        if roots.is_empty() {
+            return None;
+        }
+        return roots
+            .into_iter()
+            .map(|root| {
+                (
+                    SourceEventKind::CreateOrModify(root),
+                    ChangedFileKind::SourceFolder,
+                )
+            })
+            .collect::<Vec<_>>()
+            .wrap_some();
+    }
+    let source_file_events: Vec<_> = events
+        .iter()
+        .filter_map(|event| match event.kind {
+            EventKind::Create(create_kind) => {
+                process_create_event(globs, config_path, create_kind, event.paths.as_slice())
+            }
+            EventKind::Modify(modify_kind) => {
+                process_modify_event(globs, config_path, modify_kind, event.paths.as_slice())
+            }
+            EventKind::Remove(remove_kind) => {
+                process_remove_event(globs, config_path, remove_kind, event.paths.as_slice())
+            }
+            EventKind::Any => event.paths.first().and_then(|path| {
+                if path.exists() {
+                    process_create_or_modify(globs, config_path, path)
+                } else {
+                    process_remove_path(globs, config_path, path)
+                }
+            }),
+            _ => None,
+        })
+        .collect();
+    if source_file_events.is_empty() {
+        None
+    } else {
+        source_file_events.wrap_some()
+    }
+}
+```
+
+`DebouncedEvent` Deref to `notify::Event`. `need_rescan` is that method.
+
+```rust
+fn process_create_event(
+    globs: &SourceGlobs,
+    config_path: &Path,
+    create_kind: CreateKind,
+    paths: &[PathBuf],
+) -> Option<SourceFileEvent> {
+    match create_kind {
+        CreateKind::File => paths
+            .first()
+            .and_then(|path| process_create_or_modify(globs, config_path, path)),
+        CreateKind::Folder => paths.first().and_then(|path| {
+            categorize_path(path, globs, config_path).map(|kind| {
+                (SourceEventKind::CreateOrModify(path.clone()), kind)
+            })
+        }),
+        _ => None,
+    }
+}
+
+fn process_modify_event(
+    globs: &SourceGlobs,
+    config_path: &Path,
+    modify_kind: ModifyKind,
+    paths: &[PathBuf],
+) -> Option<SourceFileEvent> {
+    match modify_kind {
+        ModifyKind::Data(_) => {
+            let path = paths.first()?;
+            if path.is_file() {
+                process_create_or_modify(globs, config_path, path)
+            } else {
+                None
+            }
+        }
+        ModifyKind::Any => {
+            let path = paths.first()?;
+            if path.exists() {
+                process_create_or_modify(globs, config_path, path)
+            } else {
+                process_remove_path(globs, config_path, path)
+            }
+        }
+        ModifyKind::Name(RenameMode::Any) => {
+            let path = paths.first()?;
+            if path.exists() {
+                process_create_or_modify(globs, config_path, path)
+            } else {
+                process_remove_path(globs, config_path, path)
+            }
+        }
+        ModifyKind::Name(RenameMode::Both) => {
+            let from = paths.first()?;
+            let to = paths.get(1)?;
+            categorize_path(to, globs, config_path).map(|kind| {
+                (
+                    SourceEventKind::Rename((from.clone(), to.clone())),
+                    kind,
+                )
+            })
+        }
+        ModifyKind::Name(RenameMode::From) => {
+            paths.first().and_then(|path| process_remove_path(globs, config_path, path))
+        }
+        ModifyKind::Name(RenameMode::To) => {
+            paths
+                .first()
+                .and_then(|path| process_create_or_modify(globs, config_path, path))
+        }
+        _ => None,
+    }
+}
+
+fn process_remove_event(
+    globs: &SourceGlobs,
+    config_path: &Path,
+    remove_kind: RemoveKind,
+    paths: &[PathBuf],
+) -> Option<SourceFileEvent> {
+    match remove_kind {
+        RemoveKind::File | RemoveKind::Folder | RemoveKind::Any => {
+            paths.first().and_then(|path| process_remove_path(globs, config_path, path))
+        }
+        RemoveKind::Other => None,
+    }
+}
+```
+
+```rust
+fn process_create_or_modify(
+    globs: &SourceGlobs,
+    config_path: &Path,
+    path: &Path,
+) -> Option<SourceFileEvent> {
+    categorize_path(path, globs, config_path)
+        .map(|kind| (SourceEventKind::CreateOrModify(path.to_owned()), kind))
+}
+
+fn process_remove_path(
+    globs: &SourceGlobs,
+    config_path: &Path,
+    path: &Path,
+) -> Option<SourceFileEvent> {
+    categorize_path(path, globs, config_path)
+        .map(|kind| (SourceEventKind::Remove(path.to_owned()), kind))
+}
+
+fn categorize_path(
+    path: &Path,
+    globs: &SourceGlobs,
+    config_path: &Path,
+) -> Option<ChangedFileKind> {
+    if path == config_path {
+        return ChangedFileKind::Config.wrap_some();
+    }
+    let config_directory = config_path.parent()?;
+    let relative = pathdiff::diff_paths(path, config_directory)?;
+    if !globs.contains(relative.reference()) {
+        return None;
+    }
+    if path.is_file() {
+        ChangedFileKind::SourceFile.wrap_some()
+    } else {
+        ChangedFileKind::SourceFolder.wrap_some()
+    }
+}
+```
+
+`categorize_path` does not call `source_file_kind`. isograph's categorize does not check extensions; `read_files_in_folder` does. `apply` / the boot walk call `source_file_kind` when reading a file.
+
+Config events: `apply` ignores `ChangedFileKind::Config`. No reload.
+
+### Walk
+
+Copied from `visit_dirs_skipping_isograph`. Warn on `read_dir` error instead of returning `io::Result` up to a diagnostic.
+
+```rust
+// from crates/isograph_cli/src/watch.rs
+fn visit_dirs_skipping_isograph(dir: &Path, cb: &mut dyn FnMut(&std::fs::DirEntry)) {
     let entries = match std::fs::read_dir(dir) {
         Ok(entries) => entries,
         Err(e) => {
             warn!(error = %e, path = %dir.display(), "walk");
-            return Vec::new();
+            return;
         }
     };
-    entries
-        .filter_map(|entry| match entry {
-            Ok(entry) => entry.wrap_some(),
+    for entry in entries {
+        let entry = match entry {
+            Ok(entry) => entry,
             Err(e) => {
                 warn!(error = %e, path = %dir.display(), "walk");
-                None
+                continue;
             }
-        })
-        .flat_map(|entry| {
-            let path = entry.path();
-            let relative = match relative_to_config(config_directory, path.reference()) {
-                Some(relative) => relative,
-                None => return Vec::new(),
-            };
-            if path.is_dir() {
-                match THostLanguage::directory_walk(relative.reference()) {
-                    DirectoryWalk::Descend => {
-                        scan_files::<THostLanguage>(config_directory, path.reference())
-                    }
-                    DirectoryWalk::Skip => Vec::new(),
-                }
-            } else {
-                match THostLanguage::source_file_kind(relative.reference()) {
-                    SourceFileKind::Source => path.wrap_vec(),
-                    SourceFileKind::NotSource => Vec::new(),
-                }
+        };
+        let path = entry.path();
+        if path.is_dir() {
+            if !dir.ends_with(ISOGRAPH_FOLDER) {
+                visit_dirs_skipping_isograph(path.reference(), cb);
             }
-        })
-        .collect()
-}
-
-fn relative_to_config(config_directory: &Path, absolute: &Path) -> Option<PathBuf> {
-    pathdiff::diff_paths(absolute, config_directory)
+        } else {
+            cb(&entry);
+        }
+    }
 }
 ```
 
-`is_dir` / `is_file` / `exists` / `is_absolute` are std. `clippy::match_bool` is deny, so these are `if` / `else`, not `match`.
+A directory symlink to an ancestor loops. isograph does not detect that. Same here.
 
-`scan_files` returns the paths `read_dir` produced. It does not canonicalize. `start` sorts and dedups before posting so the boot burst is stable. `n` in `scan finished` is the deduped length. `post_present` canonicalizes before posting.
+### apply
 
-A gitignored file that `source_file_kind` names `Source` is posted. There is no `ignore` crate. isograph does not consult gitignore either.
-
-Symlinks: `is_dir` / `is_file` follow. A directory symlink to an ancestor loops. isograph does not detect that. Same here.
-
-### Dispatch
+Copied from `update_sources`. Reads files here, not in the notify callback. Posts `DiskChanged`.
 
 ```rust
 // from crates/isograph_cli/src/watch.rs
-fn dispatch<THostLanguage: HostLanguage>(
+pub fn apply<THostLanguage: HostLanguage>(
     event_tx: &UnboundedSender<IsographEvent>,
     config_directory: &Path,
-    kind: EventKind,
-    paths: &[PathBuf],
+    events: Vec<SourceFileEvent>,
 ) {
-    match kind {
-        EventKind::Create(_) | EventKind::Modify(ModifyKind::Data(_)) => {
-            if let Some(path) = paths.first() {
-                on_maybe_present::<THostLanguage>(event_tx, config_directory, path);
-            }
-        }
-        EventKind::Remove(_) => {
-            if let Some(path) = paths.first() {
-                on_maybe_absent(event_tx, config_directory, path);
-            }
-        }
-        EventKind::Modify(ModifyKind::Name(RenameMode::Both)) => {
-            if let Some(from) = paths.first() {
-                on_maybe_absent(event_tx, config_directory, from);
-            }
-            if let Some(to) = paths.get(1) {
-                on_maybe_present::<THostLanguage>(event_tx, config_directory, to);
-            }
-        }
-        EventKind::Modify(ModifyKind::Name(RenameMode::From)) => {
-            if let Some(from) = paths.first() {
-                on_maybe_absent(event_tx, config_directory, from);
-            }
-        }
-        EventKind::Modify(ModifyKind::Name(RenameMode::To)) => {
-            if let Some(to) = paths.first() {
-                on_maybe_present::<THostLanguage>(event_tx, config_directory, to);
-            }
-        }
-        EventKind::Modify(ModifyKind::Name(RenameMode::Any)) => {
-            if let Some(path) = paths.first() {
-                if path.exists() {
-                    on_maybe_present::<THostLanguage>(event_tx, config_directory, path);
-                } else {
-                    on_maybe_absent(event_tx, config_directory, path);
+    for (kind, changed) in events {
+        match changed {
+            ChangedFileKind::Config => {}
+            ChangedFileKind::SourceFile => match kind {
+                SourceEventKind::CreateOrModify(path) => {
+                    post_file::<THostLanguage>(event_tx, config_directory, path.reference());
                 }
-            }
+                SourceEventKind::Rename((from, to)) => {
+                    post_absent(event_tx, from.reference());
+                    post_file::<THostLanguage>(event_tx, config_directory, to.reference());
+                }
+                SourceEventKind::Remove(path) => {
+                    post_absent(event_tx, path.reference());
+                }
+            },
+            ChangedFileKind::SourceFolder => match kind {
+                SourceEventKind::CreateOrModify(folder) => {
+                    scan_folder::<THostLanguage>(event_tx, config_directory, folder.reference());
+                }
+                SourceEventKind::Rename((from, to)) => {
+                    post_absent(event_tx, from.reference());
+                    scan_folder::<THostLanguage>(event_tx, config_directory, to.reference());
+                }
+                SourceEventKind::Remove(path) => {
+                    post_absent(event_tx, path.reference());
+                }
+            },
         }
-        _ => {}
     }
 }
 
-fn on_maybe_present<THostLanguage: HostLanguage>(
+fn scan_folder<THostLanguage: HostLanguage>(
+    event_tx: &UnboundedSender<IsographEvent>,
+    config_directory: &Path,
+    folder: &Path,
+) {
+    let mut paths = Vec::new();
+    visit_dirs_skipping_isograph(folder, &mut |entry| {
+        paths.push(entry.path());
+    });
+    for path in paths {
+        post_file::<THostLanguage>(event_tx, config_directory, path.reference());
+    }
+}
+
+fn post_file<THostLanguage: HostLanguage>(
     event_tx: &UnboundedSender<IsographEvent>,
     config_directory: &Path,
     path: &Path,
 ) {
     let path = match path.canonicalize() {
         Ok(path) => path,
-        Err(_) => return,
+        Err(e) => {
+            warn!(error = %e, path = %path.display(), "could not canonicalize");
+            post_absent(event_tx, path);
+            return;
+        }
     };
-    if path.is_dir() {
-        let relative = match relative_to_config(config_directory, path.reference()) {
-            Some(relative) => relative,
-            None => return,
-        };
-        match THostLanguage::directory_walk(relative.reference()) {
-            DirectoryWalk::Skip => {}
-            DirectoryWalk::Descend => {
-                let mut paths = scan_files::<THostLanguage>(config_directory, path.reference());
-                paths.sort();
-                paths.dedup();
-                for path in paths {
-                    post_present(event_tx, path.reference());
-                }
-            }
+    let metadata = match std::fs::metadata(path.reference()) {
+        Ok(metadata) => metadata,
+        Err(e) => {
+            warn!(error = %e, path = %path.display(), "could not stat");
+            post_absent(event_tx, path.reference());
+            return;
         }
-    } else if path.is_file() {
-        let relative = match relative_to_config(config_directory, path.reference()) {
-            Some(relative) => relative,
-            None => return,
-        };
-        match THostLanguage::source_file_kind(relative.reference()) {
-            SourceFileKind::NotSource => {}
-            SourceFileKind::Source => post_present(event_tx, path.reference()),
-        }
+    };
+    if !metadata.is_file() {
+        return;
     }
+    let relative = match pathdiff::diff_paths(path.reference(), config_directory) {
+        Some(relative) => relative,
+        None => return,
+    };
+    match THostLanguage::source_file_kind(relative.reference()) {
+        SourceFileKind::NotSource => return,
+        SourceFileKind::Source => {}
+    }
+    if path.to_str().is_none() {
+        warn!(path = %path.display(), "skipping non-UTF8 path");
+        return;
+    }
+    let contents = match std::fs::read_to_string(path.reference()) {
+        Ok(contents) => contents,
+        Err(e) => {
+            warn!(error = %e, path = %path.display(), "could not read");
+            post_absent(event_tx, path.reference());
+            return;
+        }
+    };
+    debug!(path = %path.display(), "disk present");
+    post(
+        event_tx,
+        DiskChanged {
+            path,
+            presence: Presence::Present(contents),
+        },
+    );
 }
+```
 
-fn on_maybe_absent(
-    event_tx: &UnboundedSender<IsographEvent>,
-    config_directory: &Path,
-    path: &Path,
-) {
+A fifo named `a.ts`: `metadata.is_file()` is false on Unix. Skip. Do not `read_to_string`.
+
+```rust
+fn post_absent(event_tx: &UnboundedSender<IsographEvent>, path: &Path) {
     let path = match path.canonicalize() {
         Ok(path) => path,
         Err(_) => {
             if path.is_absolute() {
                 path.to_owned()
             } else {
-                config_directory.join(path)
+                return;
             }
         }
     };
+    if path.to_str().is_none() {
+        warn!(path = %path.display(), "skipping non-UTF8 path");
+        return;
+    }
     post(
         event_tx,
         DiskChanged {
@@ -622,151 +903,119 @@ fn on_maybe_absent(
     );
 }
 
-fn post_present(event_tx: &UnboundedSender<IsographEvent>, path: &Path) {
-    let path = match path.canonicalize() {
-        Ok(path) => path,
-        Err(e) => {
-            warn!(error = %e, path = %path.display(), "could not canonicalize");
-            return;
-        }
-    };
-    if path.to_str().is_none() {
-        warn!(path = %path.display(), "skipping non-UTF8 path");
-        return;
-    }
-    let contents = match std::fs::read_to_string(path.reference()) {
-        Ok(contents) => contents,
-        Err(e) => {
-            warn!(error = %e, path = %path.display(), "could not read");
-            return;
-        }
-    };
-    post(
-        event_tx,
-        DiskChanged {
-            path,
-            presence: Presence::Present(contents),
-        },
-    );
-}
-
 fn post(event_tx: &UnboundedSender<IsographEvent>, change: DiskChanged) {
     let _ = event_tx.send(IsographEvent::DiskChanged(change));
 }
 ```
 
-`dispatch` and `scan_files` stay private. Tests live in `watch.rs` as a child module and call `super::`.
+Posted `Present` paths are absolute and canonical. Posted `Absent` paths are absolute; canonical when canonicalize succeeded.
 
-Present is scoped: `NotSource` creates do not enter the map. Absent is not scoped: a deleted path often fails canonicalize, a directory has no extension so `source_file_kind` would be `NotSource`, and filtering Absent through `source_file_kind` would miss directory deletes. An Absent of a path that was never interned is a no-op in `handle`. Failed canonicalize after `Create` (vanished during debounce) drops the event; the following `Remove` posts `Absent`. `ModifyKind::Metadata` is ignored. Directory `Create` scans that directory. `RenameMode::From` / `To` are handled. `RenameMode::Any` copies isograph: exists then Present, else Absent.
+## Tests
 
-Take `paths.first()` / `paths.get(1)` and skip. No panic on any notify payload.
+### TypeScript `source_file_kind`
 
-Posted `Present` paths are absolute and canonical. Posted `Absent` paths are absolute; they are canonical when canonicalize succeeded. event-model.md says the event path is absolute and canonical. A vanished path cannot be canonicalized. Joining a relative notify path onto `config_directory` is the source resolving a relative path, never `handle`.
-
-Non-UTF8 paths: `handle` `expect`s the relative path to stringify. Skip `post_present` when `path.to_str()` is `None`.
-
-### Tests
-
-#### TypeScript
-
-In `crates/isograph_extract_typescript/src/lib.rs`:
-
-- `src/a.ts`, `src/a.tsx`, `src/a.js`, `src/a.jsx` are `Source`.
-- `a.ts` is `Source`.
-- `src/a.d.ts` is `Source`.
+- `src/a.ts`, `src/a.tsx`, `src/a.js`, `src/a.jsx`, `a.ts`, `src/a.d.ts` are `Source`.
 - `src/a.rs`, `src/a.json`, `src/a.mjs`, `src/a.mts`, `src/a.graphql`, empty path are `NotSource`.
-- `node_modules/pkg/index.ts` is `NotSource`.
-- `src/node_modules/pkg/index.ts` is `NotSource`.
-- `src/__isograph/foo.ts` is `NotSource`.
-- `__isograph/foo.ts` is `NotSource`.
-- `src` is `Descend`. Empty path is `Descend`.
-- `node_modules`, `src/node_modules`, `__isograph`, `src/__isograph` are `Skip`.
-- `src/components` is `Descend`.
+- `node_modules/pkg/index.ts` is `Source` (extension `ts`). The glob, not HostLanguage, keeps it out.
+- `src/__isograph/foo.ts` is `Source` by extension. The walker does not visit `__isograph`.
 
-#### `database.rs` `TestHostLanguage`
+### `ISOGRAPH_FOLDER`
 
-Implement the two new methods. `source_file_kind` returns `Source`. `directory_walk` returns `Descend`. The existing insert/remove tests do not call them.
+Equals `"__isograph"`.
 
-Add:
+### Globs
 
-- intern `src/a.ts` and `src/b.ts` and `src2/c.ts`; `remove_disk_file` of `src`; `src/a.ts` and `src/b.ts` gone; `src2/c.ts` remains; interned `src` itself gone if it was interned.
-- intern `src/a.ts`; `remove_disk_file` of `src/a.ts`; that key gone. This is the existing test, still valid.
-- intern `src/a.ts`; `remove_disk_file` of `src/a.ts.bak` (never present) leaves `src/a.ts`.
+- `["src/**/*.ts"]` contains `src/a.ts`, not `src/a.tsx`, not `lib/a.ts`, not `src/a.test.ts` unless that glob includes it.
+- `["src/**/*.ts", "!src/**/*.test.ts"]` contains `src/a.ts`, not `src/a.test.ts`.
+- `[]` contains nothing.
+- `static_prefix("src/**/*.ts")` is `src`. `static_prefix("**/*.ts")` is empty. `static_prefix("foo.ts")` is `foo.ts`.
 
-#### `state.rs` handle
+### `database.rs`
 
-`intern_config_directory` of `/tmp/proj/isograph.config.json`. Present `/tmp/proj/src/a.ts` and `/tmp/proj/src/b.ts` and `/tmp/proj/src2/c.ts`. Absent of `/tmp/proj/src`. `src/a.ts` and `src/b.ts` gone. `src2/c.ts` remains. `handle` returns `Vec::new()`.
+`TestHostLanguage::source_file_kind` returns `Source`. Existing insert/remove tests stay.
 
-#### `watch.rs`
+- intern `src/a.ts`, `src/b.ts`, `src2/c.ts`; `remove_disk_file` of `src`; `src/a.ts` and `src/b.ts` gone; `src2/c.ts` remains.
+- intern `src/a.ts`; `remove_disk_file` of `src/a.ts.bak` leaves `src/a.ts`.
+- intern `src/a.ts`; `remove_disk_file` of interned `""`; `src/a.ts` gone.
 
-A `#[cfg(test)]` host in that tests module. `source_file_kind` is `Source` iff the extension is `in`. `directory_walk` is `Skip` iff the last component is `skip`. `extract_iso_literals` returns `&NONE` as `database.rs` `TestHostLanguage` does. `Error` is a `thiserror` unit. `LiteralContext` is `()`.
+### `state.rs` handle
 
-Unit tests of `dispatch` with a fake channel and a temp tree. Drain the test channel. `config_directory` is the temp dir. Notify paths in these tests are absolute. `Create` uses `EventKind::Create(CreateKind::File)` for files and `EventKind::Create(CreateKind::Folder)` for directories. Write the file (or directory) to disk before a Present case, because `on_maybe_present` canonicalizes and stats.
+`intern_config_directory` of `/tmp/proj/isograph.config.json`. Present three files under `/tmp/proj/src/a.ts`, `src/b.ts`, `src2/c.ts`. `Absent` of `/tmp/proj/src`: first two gone, `src2/c.ts` remains.
 
-- `Create` of `src/a.in` that exists: one `Present` with those contents. Canonical path.
-- `Create` of `src/b.rs` that exists: no event.
-- `Create` with an empty `paths` slice: no event.
-- `Remove` of an absolute path: one `Absent`. The file may already be gone.
-- `Remove` of a directory path: one `Absent` of that path.
-- `RenameMode::Both` with two paths: `Absent` of from, `Present` of to (`to` exists and is `Source`).
-- `RenameMode::Both` out of scope to in scope: `Absent` of from is posted and `Present` of to; the test asserts the pair.
-- `RenameMode::From` of a path: one `Absent`.
-- `RenameMode::To` of a `Source` file that exists: one `Present`.
-- `RenameMode::Any` of a path that exists and is `Source`: `Present`.
-- `RenameMode::Any` of a path that does not exist: `Absent`.
-- Empty file: `Present` with `contents == ""`.
-- `Create` of a path that does not exist: no event (canonicalize fails).
-- `Create` of a directory that contains `a.in` and `b.rs`: one `Present` of `a.in`.
-- `Create` of a `skip/` directory that contains `c.in`: no event.
+`Absent` of `/tmp/proj` (the config directory): every interned file gone.
 
-Scan: write `src/a.in`, `src/b.rs`, `skip/c.in`. `node_modules` is not special for this host (not named `skip`). Give `scan_files` the config directory. Assert the returned paths, after canonicalize, are exactly the canonical `src/a.in`. `b.rs` and `skip/c.in` are absent. `scan_files` itself does not sort; the test may sort.
+`Absent` of `/tmp/proj/never`: no-op.
 
-Do not start a real `notify` watcher in unit tests.
+### `watch.rs`
 
-#### e2e `cli.rs`
+A `#[cfg(test)]` host: `source_file_kind` is `Source` iff the extension is `in`.
 
-`--filesystem injected` on every existing `Daemon::start`. `isograph send` of `DiskChanged` is how those tests intern files. They do not watch.
+Unit tests of `categorize_and_filter_events` / `apply` with a fake channel. `source_files: ["**/*.in"]`. Config path is `temp/isograph.config.json`. Write files to disk for Present cases.
+
+- `CreateKind::File` of `src/a.in`: after `apply`, one `Present` with those contents.
+- `CreateKind::File` of `src/b.rs`: no event (`**/*.in` does not match; also `NotSource`).
+- `CreateKind::File` of `isograph.config.json` at the config path: no `DiskChanged` (`Config`).
+- `CreateKind::Folder` of a dir containing `a.in` and `b.rs`: one `Present` of `a.in`.
+- `ModifyKind::Data` of a directory: no event.
+- `ModifyKind::Data` of `src/a.in`: `Present`.
+- `RemoveKind::File` of a path: `Absent`.
+- `RemoveKind::Folder` of a path: `Absent`.
+- `RenameMode::Both`: `Absent` of from, `Present` of to.
+- `RenameMode::Any` exists: `Present`. does not exist: `Absent`.
+- `EventKind::Any` exists `Source` file: `Present`. missing: `Absent`.
+- `ModifyKind::Any` same.
+- `Flag::Rescan`: `apply` walks each watch root; `a.in` is `Present` again.
+- Empty `paths`: no event.
+- Empty file: `Present` of `""`.
+- Missing path on `CreateKind::File`: `categorize` may still yield `SourceFolder` (`!is_file`). `apply` `post_file` stats, fails, posts `Absent`.
+- Failed `read_to_string`: chmod 0 on a matching file if the user is not root; otherwise skip this case on that platform. After a successful Present, a second CreateOrModify that cannot be read posts `Absent`. The interned file is gone after `handle`.
+- `visit_dirs_skipping_isograph`: `src/a.in` is visited; `src/__isograph/c.in` is not.
+- `source_files: []`: boot list is empty; `watch_roots` is empty.
+
+Live notify, same crate, one test: temp dir, `source_files: ["src/**/*.in"]`, `watch::start`, intern_config_directory, `ingest` via `apply` on recvd events. Write `src/a.in` before `start` (boot) or after (notify). `handle` the `DiskChanged`. `disk_file` of `src/a.in` is those contents. Deadline 10s. This is the test that pins intern against disk. Do not add a production API only this test calls.
+
+### e2e `cli.rs`
+
+Every existing `Daemon::start` passes `--filesystem injected`.
 
 ```rust
 // from crates/ts_graphql_react_isograph_cli/tests/cli.rs
         let output = daemon.isograph(["start", "--filesystem", "injected"].reference());
 ```
 
-`Daemon::start_watch` is the same fixture except the argv is `["start"]` (default `Watch`). One test: that start, the log has `scan finished` and `isograph daemon up`. HOME isolation as today. Deadline 10s. The fixture's config is `{"source_files":[]}` and no `.ts` files, so `n` is 0.
+`Daemon::start_watch(source_files_json: &str)` writes that config and runs `["start"]`.
 
-`isograph start --help` contains `filesystem`. Do not assert the flag on top-level `--help`; DaemonArgs are flattened onto `start` / `restart` / `daemon`.
+- Empty `source_files`, Watch: log has `scan finished` and `isograph daemon up`. `n` is 0.
+- Config `{"source_files":["src/**/*.ts"]}`. Write `src/Home.ts` with `export const Home = iso(\`entrypoint Query.HomeRoute\`)` before start. Watch. Log contains `scan finished` and `disk present` and `Home.ts`. Then write `src/Other.ts` the same way. Log contains `Other.ts` within 10s. Then write `src/skip.rs`. Log does not gain a `disk present` for `skip.rs` within the poll. Then write `src/Home.test.ts` if the glob is `src/**/*.ts` with no negation: it will intern (extension `ts`). Use `["src/**/*.ts","!src/**/*.test.ts"]` and assert `Home.test.ts` is not logged as `disk present`.
 
-`a_second_start_adopts_the_running_daemon` still calls `["start"]` without the flag against an Injected daemon. The running daemon is adopted. DaemonArgs of the second invocation do not take effect (freddie_cli).
+`isograph start --help` contains `filesystem`.
 
-### Cargo
+`a_second_start_adopts_the_running_daemon` still calls `["start"]` against an Injected daemon.
+
+## Cargo
 
 ```toml
 # from crates/isograph_cli/Cargo.toml
+globset = "0.3"
 notify = { workspace = true }
 notify-debouncer-full = { workspace = true }
 pathdiff = { workspace = true }
 ```
 
-```rust
-// from crates/isograph_cli/src/lib.rs
-mod config_path;
-mod daemon;
-mod discover;
-mod effect;
-mod event;
-mod lsp_socket;
-mod send;
-mod state;
+```toml
+# from crates/isograph_cli/src/lib.rs (modules)
 mod watch;
 ```
 
-No `ignore` crate.
+`isograph_cli` already depends on `isograph_config`. Use `ISOGRAPH_FOLDER` from there.
+
+No `ignore` crate. No `directory_walk`.
 
 ## Call sites
 
-- `isograph start --filesystem watch|injected` -> `App::DaemonArgs` -> `run_daemon` -> `daemon::run`.
-- `Filesystem::Watch` arm -> `watch::start`.
-- `Filesystem::Injected` arm -> no scan, no notify.
-- notify callback -> `dispatch` -> `event_tx.send`.
-- scan -> `post_present` -> `event_tx.send`.
-- event loop -> `handle` (filesystem-events.md). Same `handle` for watcher posts and for `isograph send`.
+- `isograph start --filesystem watch|injected` -> `DaemonArgs` -> `run_daemon` -> `daemon::run`.
+- `Filesystem::Watch` -> `watch::start` (watch roots, then boot walk).
+- notify callback -> `categorize_and_filter_events` -> `watch_tx`.
+- `ingest_watch_events` -> `apply` -> `event_tx.send(DiskChanged)`.
+- `Filesystem::Injected` -> no debouncer, no boot walk.
+- event loop -> `handle`. Same `handle` for watcher posts and for `isograph send`.
