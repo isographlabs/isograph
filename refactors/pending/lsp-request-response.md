@@ -37,7 +37,7 @@ pub(crate) struct LspClientGone {
     pub client: LspClientId,
 }
 
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize, derive_more::From)]
 #[serde(tag = "kind", content = "value")]
 pub enum IsographEvent {
     HelloWorld,
