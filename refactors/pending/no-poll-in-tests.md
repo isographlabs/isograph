@@ -4,7 +4,7 @@ Requires send-events.md (landed). Independent of lsp-tokens.md. `isograph send` 
 
 A poll is a loop that retries a predicate until it holds or a deadline fires (`cli.rs` `poll`, the `watch_rx.try_recv` loop, `lsp_socket.rs` `sleep(SETTLE)` then `try_recv`). Tests do not do that. The consumer parks on the thing that will wake it.
 
-Origin of the wake: figaro `src/daemon.rs` `event_rx.recv().await`, and freddie `AGENTS.md` "No polling; wake on events." Origin of following a log file: freddie `crates/freddie_cli/src/client.rs` `follow`. Origin of waiting for a lock release: freddie `watch_for_free` / `await_free_at`. Delta: isograph tests park the same way. Figaro `tests/external.rs` sleeps `SETTLE` then `try_recv`; `lsp_socket.rs` copied that. This slice deletes it.
+Origin of the wake: figaro `src/daemon.rs` `event_rx.recv().await`, and `AGENTS.md` "Wake on events." Origin of the follow cursor: freddie `crates/freddie_cli/src/client.rs` `follow`. Origin of waiting for a lock release: freddie `watch_for_free` / `await_free_at`. Origin of the log wake: `notify` on the log file. Delta: isograph parks; it does not copy freddie's idle sleep at EOF. Figaro `tests/external.rs` sleeps `SETTLE` then `try_recv`; `lsp_socket.rs` copied that. This slice deletes it.
 
 `isograph send` still writes `isograph/event` and exits. The wait is the test, parked on a log line, a channel, or a lock.
 
@@ -12,7 +12,7 @@ One shippable change.
 
 ## What the user does
 
-Same verbs. `cargo test` still drives the binary. A test that used to spin on `log_text()` or sleep 250ms now blocks until the record, the event, or the lock arrives.
+Same verbs. `cargo test` still drives the binary. A test that used to spin on `log_text()` now blocks until the record, the event, or the lock arrives.
 
 ## Types
 
@@ -20,7 +20,7 @@ Most important first.
 
 ### In-process: the channel
 
-`lsp_socket.rs` tests are already `#[tokio::test]`. After `notify`, `event_rx.recv().await`. Delete `const SETTLE` except the absence case below. Delete `tokio::time::sleep(SETTLE)` after bind: the listener is bound before `accept_loop` is spawned, so the kernel queues `connect`.
+`lsp_socket.rs` tests are already `#[tokio::test]`. After `notify`, `event_rx.recv().await`. Delete `const SETTLE` and every `tokio::time::sleep`. The listener is bound before `accept_loop` is spawned, so the kernel queues `connect`.
 
 ```rust
 // from crates/isograph_cli/src/lsp_socket.rs
@@ -35,15 +35,9 @@ Most important first.
     }
 ```
 
-Every `sleep(SETTLE)` then `try_recv().expect("an event arrived")` becomes `recv().await.expect("an event arrived")`. Same for `listen_and_reply` tests that then wait for HelloWorld.
+Every `sleep(SETTLE)` then `try_recv().expect("an event arrived")` becomes `recv().await.expect("an event arrived")`. Same for `listen_and_reply` tests that then wait for HelloWorld. Delete `const SETTLE` and every `tokio::time::sleep`.
 
-Absence of an event has no edge. `timeout` then `recv` is the last resort freddie names, justified only there:
-
-```rust
-// from crates/isograph_cli/src/lsp_socket.rs
-    let arrived = tokio::time::timeout(Duration::from_millis(250), event_rx.recv()).await;
-    assert!(arrived.is_err(), "nothing was dispatched");
-```
+Absence has no edge. Send HelloWorld after the dropped frame, `recv().await`, assert that event is HelloWorld. If the dropped frame had posted, it would have arrived first.
 
 `watch.rs` `notify_interns_a_file_written_after_start` is sync. `UnboundedReceiver::blocking_recv` parks on the same channel the notify thread sends on.
 
@@ -61,7 +55,12 @@ Delete the 10s `try_recv` loop. `boot_interns_a_file_written_before_start` stays
 
 ### CLI: the log file
 
-A test that needs a daemon fact already in the log follows the file until that line. Origin: freddie `follow`. Delta: stop when the line contains the needle; do not print. The follow is a cursor on `Daemon`, opened once after the start verb, so a second `disk present` cannot match the first. Capture the position before send; a seek-to-end after send can miss the line.
+A test that needs a daemon fact already in the log follows the file until that line. Origin of the follow cursor: freddie `follow`. Origin of the wake: `notify` (already a workspace dep; isograph_cli uses `notify-debouncer-full` for source files). Delta: stop when the line contains the needle; do not print; park on the watcher, never `sleep`. The follow is a cursor on `Daemon`, opened once after the start verb, so a second `disk present` cannot match the first. Capture the position before send; a seek-to-end after send can miss the line.
+
+```toml
+# from crates/ts_graphql_react_isograph_cli/Cargo.toml
+notify = { workspace = true }
+```
 
 ```rust
 // from crates/ts_graphql_react_isograph_cli/tests/cli.rs
@@ -73,43 +72,44 @@ struct Daemon {
 struct LogFollow {
     reader: std::io::BufReader<std::fs::File>,
     line: String,
+    rx: std::sync::mpsc::Receiver<Result<notify::Event, notify::Error>>,
+    _watcher: notify::RecommendedWatcher,
 }
-
-/// How long to wait before looking for more, once a read has come up empty.
-///
-/// A poll, and the exception the "never poll" rule allows: no platform reports a regular file
-/// growing through a readiness primitive. `epoll` and `kqueue` both call a regular file always
-/// ready and return zero bytes, and `tail -F` polls for the same reason.
-const IDLE: Duration = Duration::from_millis(200);
-
-const DEADLINE: Duration = Duration::from_secs(10);
 
 impl LogFollow {
     fn open(path: &std::path::Path) -> Self {
-        let deadline = std::time::Instant::now() + DEADLINE;
+        let parent = path.parent().expect("a log path has a parent");
+        let (tx, rx) = std::sync::mpsc::channel();
+        let mut watcher =
+            notify::recommended_watcher(tx).expect("a test can watch the log directory");
+        watcher
+            .watch(parent, notify::RecursiveMode::NonRecursive)
+            .expect("a test can watch the log directory");
         let file = loop {
             match std::fs::File::open(path) {
                 Ok(file) => break file,
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                    assert!(std::time::Instant::now() < deadline, "deadline passed");
-                    std::thread::sleep(IDLE);
+                    let _ = rx.recv().expect("the log directory is watched");
                 }
                 Err(error) => panic!("opening the log: {error}"),
             }
         };
+        watcher
+            .watch(path, notify::RecursiveMode::NonRecursive)
+            .expect("a test can watch the log file");
         Self {
             reader: std::io::BufReader::new(file),
             line: String::new(),
+            rx,
+            _watcher: watcher,
         }
     }
 
     fn await_containing(&mut self, needle: &str) {
-        let deadline = std::time::Instant::now() + DEADLINE;
         loop {
             match self.reader.read_line(&mut self.line) {
                 Ok(0) => {
-                    assert!(std::time::Instant::now() < deadline, "deadline passed");
-                    std::thread::sleep(IDLE);
+                    let _ = self.rx.recv().expect("the log file is watched");
                 }
                 Ok(_) if self.line.ends_with('\n') => {
                     let hit = self.line.contains(needle);
@@ -119,8 +119,7 @@ impl LogFollow {
                     }
                 }
                 Ok(_) => {
-                    assert!(std::time::Instant::now() < deadline, "deadline passed");
-                    std::thread::sleep(IDLE);
+                    let _ = self.rx.recv().expect("the log file is watched");
                 }
                 Err(error) => panic!("reading the log: {error}"),
             }
@@ -129,9 +128,9 @@ impl LogFollow {
 }
 ```
 
-`log_path` is the one `.log` under the private HOME that `log_text` already finds. Extract it; `log_text` still concatenates for assertions that read the whole file.
+`log_path` is the one `.log` under the private HOME that `log_text` already finds. Extract it; `log_text` still concatenates for assertions that read the whole file. Directory events for other files are spurious wakes: `read_line` returns 0 and the next `recv` parks again.
 
-Delete `poll`. Delete `settle`.
+Delete `poll`. Delete `settle`. Delete `DEADLINE`. Delete `IDLE`.
 
 `Daemon::start` / `start_watch` open `LogFollow` after the start verb succeeds, then `log.await_containing("isograph daemon up")`. `isograph start` returning still means the lock is held, not that listen has run. Tests that wait on a later line call `daemon.log.await_containing(...)`. `await_containing` needs `&mut Daemon`; tests that today pass `daemon.reference()` into send helpers stay `&Daemon` for send.
 
@@ -175,7 +174,7 @@ After `STOP`: `daemon.log.await_containing("kill: exiting")`, then `assert!(!dae
 
 `watch_of_empty_source_files_logs_scan_finished`: `start_watch` awaited daemon up. `daemon.log.await_containing("scan finished")`.
 
-`watch_interns_matching_files_and_skips_the_rest`: after start, `daemon.log.await_containing("Home.ts")` (the intern log names the absolute path). Write `Other.ts`, `daemon.log.await_containing("Other.ts")`. Write `skip.rs` and `Home.test.ts`. Absence has no edge: `timeout` 250ms, then `log_text()` does not contain those paths. Delete `Duration::from_millis(500)`.
+`watch_interns_matching_files_and_skips_the_rest`: after start, `daemon.log.await_containing("Home.ts")` (the intern log names the absolute path). Write `Other.ts`, `daemon.log.await_containing("Other.ts")`. Write `skip.rs` and `Home.test.ts`. Write `src/Keep.ts` with an iso literal (matches the glob). `await_containing("Keep.ts")`. Then `log_text()` does not contain `skip.rs` or `Home.test.ts`. If those had interned, their lines would have arrived before `Keep.ts`. Delete `Duration::from_millis(500)`.
 
 `send_of_disk_changed_present_then_absent_exits_0`, `send_of_folder_removed_exits_0`: after present send, `daemon.log.await_containing("disk present")`. After absent / folder removed, `await_containing` `disk absent` / `disk folder removed`. Those tests today only assert send exits 0; they grow the await so the intern is the fact, not the client return.
 
@@ -183,7 +182,7 @@ After `STOP`: `daemon.log.await_containing("kill: exiting")`, then `assert!(!dae
 
 `send_of_not_json_fails`, `send_of_unknown_kind_fails`: only the daemon-up wait moves into `start`.
 
-lsp-proxy.md tests already park: `Message::read` and `child.wait()`. No change beyond not calling `poll`. The production port-file loop in `lsp_stdio.rs` is unchanged.
+lsp-proxy.md tests already park: `Message::read` and `child.wait()`. No change beyond not calling `poll`. The production port-file wait watches the port file (or its directory, for create) with the OS watcher, then reads. It does not poll and does not `sleep`.
 
 ## Call sites
 

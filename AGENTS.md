@@ -88,9 +88,11 @@ Do not test another crate. pico, intern, serde, std. Re-invoke counts, intern id
 
 ## Wake on events
 
-No polling. An idle process is parked, not waking every N milliseconds to look. Work arrives by waking whatever the consumer is blocked on: the channel it `recv`s, the socket it `read`s, the flock wait, the OS watcher. A loop that retries a predicate until a deadline fires is polling, including `sleep` then `try_recv`. Capture the position first (subscribe, open the follow) then produce the event, so a wake cannot be lost if it races the wait. `select!` or a woken channel is the shape.
+No polling. No sleeping. An idle process is parked, not waking every N milliseconds to look. Work arrives by waking whatever the consumer is blocked on: the channel it `recv`s, the socket it `read`s, the flock wait, the OS watcher. A loop that retries a predicate until a deadline fires is polling, including `sleep` then `try_recv`. Capture the position first (subscribe, open the follow) then produce the event, so a wake cannot be lost if it races the wait. `select!` or a woken channel is the shape.
 
-Following a regular file is the exception: no platform reports a regular file growing through a readiness primitive, so `read_line` then an idle sleep at EOF is the same exception `tail -F` takes. A bare timeout is a last resort the code justifies, and the justification for tests is asserting that nothing arrived, which has no edge.
+A regular file does not become readable through `epoll`/`kqueue` when it grows. Watch the file (the directory, for create) with the OS watcher, then read. Do not `sleep` at EOF.
+
+Absence has no edge of its own. Inject a later event that will fire, wait for that, and assert the forbidden thing did not arrive first.
 
 ## Booleans
 
