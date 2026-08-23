@@ -1,4 +1,7 @@
+use std::fs;
 use std::hash::{DefaultHasher, Hash, Hasher};
+use std::io;
+use std::net::{Ipv4Addr, TcpStream};
 use std::num::NonZeroU16;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -96,6 +99,48 @@ pub fn port_file(lock: &Path) -> PathBuf {
 
 pub(crate) fn parse_port(text: &str) -> Option<u16> {
     text.trim().parse::<NonZeroU16>().ok().map(NonZeroU16::get)
+}
+
+#[derive(Debug)]
+pub(crate) struct ReadPort {
+    pub path: PathBuf,
+    pub source: io::Error,
+}
+
+#[derive(Debug)]
+pub(crate) struct Connect {
+    pub port: u16,
+    pub source: io::Error,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum PortError {
+    #[error("the daemon has not recorded its port yet")]
+    NoPort,
+    #[error("the daemon's port file is not a port")]
+    BadPort,
+    #[error("could not read {}: {}", .0.path.display(), .0.source)]
+    ReadPort(ReadPort),
+    #[error("could not connect to 127.0.0.1:{}: {}", .0.port, .0.source)]
+    Connect(Connect),
+}
+
+pub(crate) fn connect_to_daemon(path: &Path) -> Result<TcpStream, PortError> {
+    let port = read_port(path)?;
+    TcpStream::connect((Ipv4Addr::LOCALHOST, port))
+        .map_err(|source| PortError::Connect(Connect { port, source }))
+}
+
+pub(crate) fn read_port(path: &Path) -> Result<u16, PortError> {
+    match fs::read_to_string(path) {
+        Ok(text) => parse_port(text.reference()).ok_or(PortError::BadPort),
+        Err(source) if source.kind() == io::ErrorKind::NotFound => PortError::NoPort.wrap_err(),
+        Err(source) => PortError::ReadPort(ReadPort {
+            path: path.to_owned(),
+            source,
+        })
+        .wrap_err(),
+    }
 }
 
 pub fn instance_for_config_path(flag: Option<&Path>) -> Result<(PathBuf, Instance), DiscoverError> {

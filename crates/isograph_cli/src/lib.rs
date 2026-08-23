@@ -14,6 +14,7 @@ mod effect;
 mod event;
 mod lsp_notification_dispatch;
 mod lsp_socket;
+mod lsp_stdio;
 mod send;
 mod start;
 mod state;
@@ -39,6 +40,7 @@ pub fn run<THostLanguage: HostLanguage>() -> ExitCode {
         },
         Some(CliVerb::Send(args)) => send::run(args.reference()),
         Some(CliVerb::ConfigPath(id)) => config_path::run(id.reference()),
+        Some(CliVerb::Lsp(args)) => lsp_stdio::run(args.reference()),
         None => crate::start::run::<THostLanguage>(
             freddie_cli::verb_for_bare_invocation::<Isograph<THostLanguage>>(),
             matches.reference(),
@@ -65,6 +67,19 @@ enum CliVerb<THostLanguage: HostLanguage> {
 
     /// Print the canonical isograph config path.
     ConfigPath(ConfigFlag),
+
+    /// Speak LSP on stdio with the daemon for this config.
+    Lsp(LspArgs),
+}
+
+#[derive(clap::Args, Debug)]
+struct LspArgs {
+    #[command(flatten)]
+    pub id: ConfigFlag,
+
+    /// Ignored. vscode-languageclient appends this when the transport is stdio.
+    #[arg(long, hide = true)]
+    pub stdio: bool,
 }
 
 #[derive(clap::Args, Debug)]

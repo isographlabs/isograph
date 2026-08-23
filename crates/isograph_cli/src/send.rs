@@ -1,6 +1,5 @@
 use std::fs;
 use std::io;
-use std::net::Ipv4Addr;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -19,18 +18,6 @@ pub(crate) struct ReadFile {
     pub source: io::Error,
 }
 
-#[derive(Debug)]
-pub(crate) struct ReadPort {
-    pub path: PathBuf,
-    pub source: io::Error,
-}
-
-#[derive(Debug)]
-pub(crate) struct Connect {
-    pub port: u16,
-    pub source: io::Error,
-}
-
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum SendError {
     #[error("{0}")]
@@ -45,14 +32,8 @@ pub(crate) enum SendError {
     Unnamed,
     #[error("{0}")]
     Lock(#[from] freddie_single_instance::LockError),
-    #[error("the daemon has not recorded its port yet")]
-    NoPort,
-    #[error("could not read {}: {}", .0.path.display(), .0.source)]
-    ReadPort(ReadPort),
-    #[error("the daemon's port file is not a port")]
-    BadPort,
-    #[error("could not connect to 127.0.0.1:{}: {}", .0.port, .0.source)]
-    Connect(Connect),
+    #[error("{0}")]
+    Port(#[from] crate::discover::PortError),
     #[error("could not encode the event: {0}")]
     Encode(serde_json::Error),
     #[error("could not clone the stream: {0}")]
@@ -83,7 +64,8 @@ pub fn run(args: &SendArgs) -> ExitCode {
 fn run_inner(args: &SendArgs) -> Result<(), SendError> {
     let (_, instance) = crate::discover::instance_for_config_path(args.id.config.as_deref())?;
     require_running(instance.lock_file())?;
-    let port = read_port(&crate::discover::port_file(instance.lock_file()))?;
+    let stream =
+        crate::discover::connect_to_daemon(&crate::discover::port_file(instance.lock_file()))?;
     let frame = fs::read_to_string(args.file.reference()).map_err(|source| {
         SendError::ReadFile(ReadFile {
             path: args.file.clone(),
@@ -91,8 +73,6 @@ fn run_inner(args: &SendArgs) -> Result<(), SendError> {
         })
     })?;
     let internal: Internal = serde_json::from_str(frame.trim()).map_err(SendError::NotEvent)?;
-    let stream = std::net::TcpStream::connect((Ipv4Addr::LOCALHOST, port))
-        .map_err(|source| SendError::Connect(Connect { port, source }))?;
     notify(stream, internal)
 }
 
@@ -159,18 +139,6 @@ fn require_running(lock: &Path) -> Result<(), SendError> {
     }
 }
 
-fn read_port(path: &Path) -> Result<u16, SendError> {
-    match fs::read_to_string(path) {
-        Ok(text) => crate::discover::parse_port(text.reference()).ok_or(SendError::BadPort),
-        Err(source) if source.kind() == io::ErrorKind::NotFound => SendError::NoPort.wrap_err(),
-        Err(source) => SendError::ReadPort(ReadPort {
-            path: path.to_owned(),
-            source,
-        })
-        .wrap_err(),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use prelude::Postfix;
@@ -179,7 +147,12 @@ mod tests {
     fn read_port_of_a_missing_file_is_no_port() {
         let dir = tempfile::tempdir().expect("a test can create a temp directory");
         let path = dir.path().join("gone.port");
-        let err = super::read_port(path.reference()).expect_err("the file is missing");
-        assert!(matches!(err, super::SendError::NoPort));
+        let err = crate::discover::read_port(path.reference())
+            .map_err(super::SendError::from)
+            .expect_err("the file is missing");
+        assert!(matches!(
+            err,
+            super::SendError::Port(crate::discover::PortError::NoPort)
+        ));
     }
 }

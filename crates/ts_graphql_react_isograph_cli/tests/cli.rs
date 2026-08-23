@@ -3,7 +3,7 @@
 use std::io::{BufRead, BufReader, Write};
 use std::net::{Ipv4Addr, TcpStream};
 use std::path::PathBuf;
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
 use std::time::{Duration, Instant};
 
 use lsp_server::{Message, Request, RequestId};
@@ -73,6 +73,22 @@ impl Daemon {
             .env("XDG_STATE_HOME", home.join("state"))
             .env("LOCALAPPDATA", home.join("appdata"))
             .output()
+            .expect("the isograph binary runs")
+    }
+
+    fn spawn(&self, args: &[&str]) -> std::process::Child {
+        let home = self.dir.path().join("home");
+        std::fs::create_dir_all(home.reference()).expect("a test can create its private HOME");
+        Command::new(isograph_bin())
+            .args(args)
+            .current_dir(self.dir.path())
+            .env("HOME", home.reference())
+            .env("XDG_STATE_HOME", home.join("state"))
+            .env("LOCALAPPDATA", home.join("appdata"))
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .spawn()
             .expect("the isograph binary runs")
     }
 
@@ -158,6 +174,33 @@ fn port_file_path(daemon: &Daemon) -> PathBuf {
 fn daemon_port(daemon: &Daemon) -> u16 {
     let text = std::fs::read_to_string(port_file_path(daemon).reference()).expect("the port file");
     text.trim().parse().expect("the port file is a port")
+}
+
+fn write_initialize(stdin: &mut impl std::io::Write) {
+    lsp_server::Message::Request(lsp_server::Request {
+        id: lsp_server::RequestId::from(1),
+        method: lsp_types::request::Initialize::METHOD.to_owned(),
+        params: serde_json::json!({ "capabilities": {} }),
+    })
+    .write(stdin)
+    .expect("writing initialize");
+    stdin.flush().expect("flushing initialize");
+}
+
+fn read_initialize_result(stdout: &mut impl std::io::BufRead) -> lsp_server::Response {
+    let message = lsp_server::Message::read(stdout)
+        .expect("reading an lsp message")
+        .expect("the proxy stayed open");
+    let lsp_server::Message::Response(response) = message else {
+        panic!("initialize must be answered with a response, got {message:?}");
+    };
+    assert!(response.error.is_none(), "{response:?}");
+    let result = response
+        .result
+        .as_ref()
+        .expect("initialize result is present");
+    assert!(result.get("capabilities").is_some(), "{result}");
+    response
 }
 
 // freddie_cli's stop without --force is SIGTERM, which it does not send on Windows.
@@ -416,6 +459,195 @@ fn send_is_not_in_help() {
     let text = stdout(output.reference());
     assert!(text.contains("start"), "{text}");
     assert!(!text.contains("send"), "{text}");
+}
+
+fn daemon_with_empty_source_files() -> Daemon {
+    let dir = tempfile::tempdir().expect("a test can create a temp directory");
+    let config = dir.path().join("isograph.config.json");
+    std::fs::write(config.reference(), "{\"source_files\":[]}\n")
+        .expect("a test can write a config file");
+    Daemon { dir }
+}
+
+fn initialize_then_eof(child: &mut std::process::Child) {
+    let mut stdin = child.stdin.take().expect("the child has stdin");
+    let mut stdout = BufReader::new(child.stdout.take().expect("the child has stdout"));
+    write_initialize(&mut stdin);
+    read_initialize_result(&mut stdout);
+    drop(stdin);
+    let status = child.wait().expect("the proxy exits");
+    assert!(status.success(), "proxy exit: {status}");
+    drop(stdout);
+}
+
+#[test]
+fn lsp_is_in_help() {
+    let output = Command::new(isograph_bin())
+        .arg("--help")
+        .output()
+        .expect("the isograph binary runs");
+    assert!(output.status.success());
+    let text = stdout(output.reference());
+    assert!(text.contains("lsp"), "{text}");
+    let lsp_help = Command::new(isograph_bin())
+        .args(["lsp", "--help"].reference())
+        .output()
+        .expect("the isograph binary runs");
+    assert!(lsp_help.status.success());
+    let text = stdout(lsp_help.reference());
+    assert!(text.contains("config"), "{text}");
+    assert!(!text.contains("--stdio"), "{text}");
+}
+
+#[test]
+fn lsp_with_the_daemon_stopped_starts_it() {
+    let daemon = daemon_with_empty_source_files();
+    let mut child = daemon.spawn(["lsp"].reference());
+    initialize_then_eof(&mut child);
+    assert!(daemon.isograph(["status"].reference()).status.success());
+    let _ = daemon.isograph(STOP);
+}
+
+#[test]
+fn lsp_with_the_daemon_already_running_dials_it() {
+    let daemon = Daemon::start();
+    let recorded = stdout(daemon.isograph(["status"].reference()).reference());
+    let mut child = daemon.spawn(["lsp"].reference());
+    initialize_then_eof(&mut child);
+    assert_eq!(
+        stdout(daemon.isograph(["status"].reference()).reference()),
+        recorded
+    );
+}
+
+#[test]
+fn lsp_with_no_config_exits_1() {
+    let dir = tempfile::tempdir().expect("a test can create a temp directory");
+    let output = Command::new(isograph_bin())
+        .args(["lsp"].reference())
+        .current_dir(dir.path())
+        .output()
+        .expect("the isograph binary runs");
+    assert!(!output.status.success());
+    assert!(stdout(output.reference()).is_empty());
+    let err = stderr(output.reference());
+    assert!(err.contains("no isograph.config"), "{err}");
+}
+
+#[test]
+fn lsp_with_an_empty_object_config_exits_1() {
+    let dir = tempfile::tempdir().expect("a test can create a temp directory");
+    let config = dir.path().join("isograph.config.json");
+    std::fs::write(config.reference(), "{}\n").expect("a test can write a config file");
+    let home = dir.path().join("home");
+    std::fs::create_dir_all(home.reference()).expect("a test can create its private HOME");
+    let output = Command::new(isograph_bin())
+        .args(["lsp"].reference())
+        .current_dir(dir.path())
+        .env("HOME", home.reference())
+        .env("XDG_STATE_HOME", home.join("state"))
+        .env("LOCALAPPDATA", home.join("appdata"))
+        .output()
+        .expect("the isograph binary runs");
+    assert!(!output.status.success());
+    let err = stderr(output.reference());
+    assert!(err.contains("source_files"), "{err}");
+    assert!(!err.contains("could not start the daemon"), "{err}");
+}
+
+#[test]
+fn lsp_with_empty_stdin_exits_0_and_leaves_the_daemon() {
+    let daemon = daemon_with_empty_source_files();
+    let mut child = daemon.spawn(["lsp"].reference());
+    drop(child.stdin.take());
+    let stdout = child.stdout.take();
+    let status = child.wait().expect("the proxy exits");
+    assert!(status.success(), "proxy exit: {status}");
+    drop(stdout);
+    assert!(daemon.isograph(["status"].reference()).status.success());
+    let _ = daemon.isograph(STOP);
+}
+
+#[test]
+fn lsp_two_proxies_share_one_daemon() {
+    let daemon = Daemon::start();
+    let recorded = stdout(daemon.isograph(["status"].reference()).reference());
+    let mut first = daemon.spawn(["lsp"].reference());
+    let mut second = daemon.spawn(["lsp"].reference());
+    let mut first_in = first.stdin.take().expect("the child has stdin");
+    let mut second_in = second.stdin.take().expect("the child has stdin");
+    let mut first_out = BufReader::new(first.stdout.take().expect("the child has stdout"));
+    let mut second_out = BufReader::new(second.stdout.take().expect("the child has stdout"));
+    write_initialize(&mut first_in);
+    write_initialize(&mut second_in);
+    read_initialize_result(&mut first_out);
+    read_initialize_result(&mut second_out);
+    drop(first_in);
+    drop(second_in);
+    assert!(first.wait().expect("the proxy exits").success());
+    assert!(second.wait().expect("the proxy exits").success());
+    drop(first_out);
+    drop(second_out);
+    assert_eq!(
+        stdout(daemon.isograph(["status"].reference()).reference()),
+        recorded
+    );
+    let _ = daemon.isograph(STOP);
+}
+
+#[test]
+fn lsp_forwards_config_to_nested_start() {
+    let dir = tempfile::tempdir().expect("a test can create a temp directory");
+    let cwd = dir.path().join("cwd");
+    std::fs::create_dir_all(cwd.reference()).expect("a test can create cwd");
+    let config = dir.path().join("other/isograph.config.json");
+    std::fs::create_dir_all(config.parent().expect("the config has a parent"))
+        .expect("a test can create the config directory");
+    std::fs::write(config.reference(), "{\"source_files\":[]}\n")
+        .expect("a test can write a config file");
+    let home = dir.path().join("home");
+    std::fs::create_dir_all(home.reference()).expect("a test can create its private HOME");
+    let config_flag = config.to_str().expect("utf-8");
+    let mut child = Command::new(isograph_bin())
+        .args(["lsp", "--config", config_flag].reference())
+        .current_dir(cwd.reference())
+        .env("HOME", home.reference())
+        .env("XDG_STATE_HOME", home.join("state"))
+        .env("LOCALAPPDATA", home.join("appdata"))
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .expect("the isograph binary runs");
+    initialize_then_eof(&mut child);
+    let status = Command::new(isograph_bin())
+        .args(["status", "--config", config_flag].reference())
+        .current_dir(cwd.reference())
+        .env("HOME", home.reference())
+        .env("XDG_STATE_HOME", home.join("state"))
+        .env("LOCALAPPDATA", home.join("appdata"))
+        .output()
+        .expect("the isograph binary runs");
+    assert!(
+        status.status.success(),
+        "stdout: {} stderr: {}",
+        stdout(status.reference()),
+        stderr(status.reference())
+    );
+    let _ = Command::new(isograph_bin())
+        .args(["stop", "--force", "--config", config_flag].reference())
+        .current_dir(cwd.reference())
+        .env("HOME", home.reference())
+        .env("XDG_STATE_HOME", home.join("state"))
+        .env("LOCALAPPDATA", home.join("appdata"))
+        .output();
+}
+
+#[test]
+fn lsp_stdio_flag_is_ignored() {
+    let daemon = Daemon::start();
+    let mut child = daemon.spawn(["lsp", "--stdio"].reference());
+    initialize_then_eof(&mut child);
 }
 
 #[test]
