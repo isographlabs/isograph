@@ -6,11 +6,11 @@ Today `run_session` writes `MethodNotFound` on `connection.sender`. Domain reque
 
 The session does not block. It posts the event and keeps pumping. The effect carries a clone of `connection.sender`. The effect loop writes `Message::Response`. No writer map. No client id. No outstanding set. Those are lsp-outstanding.md.
 
-Origin of MethodNotFound text: isograph `server.rs` unhandled arm. Origin of `handle` / effects: landed event loop. Delta: `IsographEvent::LspRequest`, `IsographEffect::LspRespond`.
+Origin of MethodNotFound text: isograph `server.rs` unhandled arm. Origin of `handle` / effects: landed event loop. Delta: `IsographEvent::LspRequest`, `IsographEffect::SendLspResponse`.
 
 One shippable change. Existing CLI send tests stay green. Existing `lsp_socket` MethodNotFound tests stay green (the bytes do not change).
 
-`docs-website/docs/design-docs/event-model.md` Inner: `handle` matches `LspRequest` and returns `LspRespond`. It still does not touch the socket. The effect loop writes.
+`docs-website/docs/design-docs/event-model.md` Inner: `handle` matches `LspRequest` and returns `SendLspResponse`. It still does not touch the socket. The effect loop writes.
 
 ## What the user does
 
@@ -47,7 +47,7 @@ pub enum IsographEvent {
 
 ```rust
 // from crates/isograph_cli/src/effect.rs
-pub(crate) struct LspRespond {
+pub(crate) struct SendLspResponse {
     pub reply: crossbeam::channel::Sender<lsp_server::Message>,
     pub response: lsp_server::Response,
 }
@@ -56,7 +56,7 @@ pub(crate) struct LspRespond {
 pub enum IsographEffect {
     LogHelloWorld,
     Kill,
-    LspRespond(LspRespond),
+    SendLspResponse(SendLspResponse),
 }
 ```
 
@@ -70,7 +70,7 @@ No `PartialEq` / `Eq`. Nothing in production compares effects. `Sender` does not
 
 fn method_not_found(request: crate::event::LspRequest) -> IsographEffect {
     let id = request.request.id.clone();
-    IsographEffect::LspRespond(crate::effect::LspRespond {
+    IsographEffect::SendLspResponse(crate::effect::SendLspResponse {
         reply: request.reply,
         response: lsp_server::Response {
             id,
@@ -91,13 +91,13 @@ fn method_not_found(request: crate::event::LspRequest) -> IsographEffect {
 
 Dispatch (`on_request_sync`) is lsp-dispatch.md. This slice is one function.
 
-`run_event_loop` is unchanged except it already calls `handle` and sends every effect. `LspRespond` goes through that same path.
+`run_event_loop` is unchanged except it already calls `handle` and sends every effect. `SendLspResponse` goes through that same path.
 
 ### `perform`
 
 ```rust
 // from crates/isograph_cli/src/daemon.rs
-        IsographEffect::LspRespond(respond) => {
+        IsographEffect::SendLspResponse(respond) => {
             let _ = respond
                 .reply
                 .send(lsp_server::Message::Response(respond.response));
@@ -137,7 +137,7 @@ derive_more = { workspace = true }
 
 Add: initialize, hover, `MethodNotFound`, then `isograph/event` HelloWorld on the same connection arrives.
 
-Add: `handle` of `LspRequest`. `reply` is a `crossbeam` channel the test owns. One effect. Match `LspRespond`. Compare `response.id` to the request id, `result` is `None`, `error.code` is `MethodNotFound`, `error.message` is `No handler registered for method 'textDocument/hover'`. `perform` that effect; `reply`'s receiver gets `Message::Response` with that same id, code, and message.
+Add: `handle` of `LspRequest`. `reply` is a `crossbeam` channel the test owns. One effect. Match `SendLspResponse`. Compare `response.id` to the request id, `result` is `None`, `error.code` is `MethodNotFound`, `error.message` is `No handler registered for method 'textDocument/hover'`. `perform` that effect; `reply`'s receiver gets `Message::Response` with that same id, code, and message.
 
 `state.rs` existing in-process tests stay. They construct `HelloWorld` / `Quit` / `DiskChanged` only.
 
@@ -147,7 +147,7 @@ Add: `handle` of `LspRequest`. `reply` is a `crossbeam` channel the test owns. O
 
 ## Call sites
 
-- `run_session` Request -> `IsographEvent::LspRequest` -> `handle` -> `LspRespond` -> `perform` -> `reply.send`
+- `run_session` Request -> `IsographEvent::LspRequest` -> `handle` -> `SendLspResponse` -> `perform` -> `reply.send`
 - `run_session` `isograph/event` -> `event_tx` -> `handle` (unchanged)
 - lsp-dispatch.md -> replaces `method_not_found` with `LSPRequestDispatch`
 - lsp-outstanding.md -> client id, `LspClientGone`, outstanding set

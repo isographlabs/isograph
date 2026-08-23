@@ -4,7 +4,7 @@ Requires lsp-request-response.md. Independent of lsp-sessions.md, filesystem-wat
 
 `handle` of `LspRequest` is `method_not_found`. This slice replaces that call with isograph's `on_request_sync` chain. The Continue arm is `method_not_found`. No new LSP method. Tokens adds one `.on_request_sync` call.
 
-Origin: isograph `crates/isograph_lsp/src/lsp_request_dispatch.rs` and `server.rs` `dispatch_request`. Delta: extract is `Result` (isograph `expect`s); no `LSPRuntimeError`; handler returns `Result<TRequest::Result, lsp_server::ResponseError>`; Break is `IsographEffect::LspRespond`.
+Origin: isograph `crates/isograph_lsp/src/lsp_request_dispatch.rs` and `server.rs` `dispatch_request`. Delta: extract is `Result` (isograph `expect`s); no `LSPRuntimeError`; handler returns `Result<TRequest::Result, lsp_server::ResponseError>`; Break is `IsographEffect::SendLspResponse`.
 
 One shippable change. Unknown requests are still `MethodNotFound`. Existing MethodNotFound tests stay green.
 
@@ -106,7 +106,7 @@ fn respond(
     reply: crossbeam::channel::Sender<lsp_server::Message>,
     response: lsp_server::Response,
 ) -> crate::effect::IsographEffect {
-    crate::effect::IsographEffect::LspRespond(crate::effect::LspRespond { reply, response })
+    crate::effect::IsographEffect::SendLspResponse(crate::effect::SendLspResponse { reply, response })
 }
 ```
 
@@ -137,11 +137,11 @@ This slice the chain has zero `on_request_sync` calls. `method_not_found` stays 
 
 ## Tests
 
-`state.rs`: `handle` of `LspRequest` (hover) is still `LspRespond` / `MethodNotFound`. Same assertion as lsp-request-response.md. Do not add a tests-only handler.
+`state.rs`: `handle` of `LspRequest` (hover) is still `SendLspResponse` / `MethodNotFound`. Same assertion as lsp-request-response.md. Do not add a tests-only handler.
 
 `lsp_socket.rs` MethodNotFound tests stay.
 
 ## Call sites
 
-- `handle` `LspRequest` -> `LspRequestDispatch` -> Continue `method_not_found` or Break `LspRespond`
+- `handle` `LspRequest` -> `LspRequestDispatch` -> Continue `method_not_found` or Break `SendLspResponse`
 - lsp-tokens.md -> `.on_request_sync::<SemanticTokensFullRequest>(semantic_tokens_response)?`

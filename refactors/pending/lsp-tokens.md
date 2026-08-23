@@ -119,5 +119,5 @@ url = { workspace = true }
 
 ## Call sites
 
-- `handle` `LspRequest` -> `on_request_sync::<SemanticTokensFullRequest>` -> `semantic_tokens_response` -> `lsp_semantic_tokens_for_file` -> `LspRespond`
+- `handle` `LspRequest` -> `on_request_sync::<SemanticTokensFullRequest>` -> `semantic_tokens_response` -> `lsp_semantic_tokens_for_file` -> `SendLspResponse`
 - other requests -> Continue -> `method_not_found`
