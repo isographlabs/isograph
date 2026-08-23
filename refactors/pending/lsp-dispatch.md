@@ -219,10 +219,7 @@ fn handle_internal<THostLanguage: HostLanguage>(
     match internal {
         crate::event::Internal::HelloWorld => IsographEffect::LogHelloWorld.wrap_vec(),
         crate::event::Internal::Quit => IsographEffect::Kill.wrap_vec(),
-        crate::event::Internal::DiskChanged(change) => {
-            handle_disk_changed(state, change);
-            Vec::new()
-        }
+        crate::event::Internal::DiskChanged(change) => handle_disk_changed(state, change),
     }
 }
 
@@ -269,7 +266,26 @@ The notification chain has `isograph/event`. Params are `Internal`. `on_isograph
 
 The existing notification handler is `fn(&mut TState, Params) -> LSPRuntimeResult<()>`. It cannot return effects. `TState` is therefore `(&mut IsographState, &mut Vec<IsographEffect>)`. Request `TState` is `&IsographState`, same as isograph's `&LspState`.
 
-`method_not_found` returns `Vec<IsographEffect>`.
+`method_not_found` returns `Vec<IsographEffect>`. `handle_disk_changed` returns `Vec<IsographEffect>` (intern or remove, then this slice an empty vec).
+
+```rust
+// from crates/isograph_cli/src/state.rs
+fn handle_disk_changed<THostLanguage: HostLanguage>(
+    state: &mut IsographState<THostLanguage>,
+    change: DiskChanged,
+) -> Vec<IsographEffect> {
+    let path = relative_path_to_source_file(state, &change.path);
+    match change.presence {
+        Presence::Present(contents) => {
+            state.insert_disk_file(path, contents);
+        }
+        Presence::Absent => {
+            state.remove_disk_file(path);
+        }
+    }
+    Vec::new()
+}
+```
 
 No `crates/isograph_cli/src/lsp_dispatch.rs`.
 
