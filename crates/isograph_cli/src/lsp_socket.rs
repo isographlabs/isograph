@@ -14,7 +14,7 @@ use tracing::debug;
 pub enum IsographEventNotification {}
 
 impl Notification for IsographEventNotification {
-    type Params = crate::event::Internal;
+    type Params = crate::event::InternalEvent;
     const METHOD: &'static str = "isograph/event";
 }
 
@@ -161,15 +161,15 @@ fn run_session(
     for message in &connection.receiver {
         let event = match message {
             lsp_server::Message::Request(request) => {
-                crate::event::Lsp::Request(crate::event::LspRequest {
+                crate::event::LspEvent::Request(crate::event::LspRequest {
                     request,
                     reply: connection.sender.clone(),
                 })
             }
             lsp_server::Message::Notification(notification) => {
-                crate::event::Lsp::Notification(notification)
+                crate::event::LspEvent::Notification(notification)
             }
-            lsp_server::Message::Response(response) => crate::event::Lsp::Response(response),
+            lsp_server::Message::Response(response) => crate::event::LspEvent::Response(response),
         };
         let _ = event_tx.send(event.to());
     }
@@ -192,7 +192,7 @@ mod tests {
 
     use super::{IsographEventNotification, accept_loop};
     use crate::daemon::{run_effect_loop, run_event_loop};
-    use crate::event::{DiskChanged, DiskFileChanged, Internal, IsographEvent, Presence};
+    use crate::event::{DiskChanged, DiskFileChanged, InternalEvent, IsographEvent, Presence};
     use crate::send::notify;
     use crate::state::IsographState;
     use isograph_extract_typescript::TypeScriptHostLanguage;
@@ -230,7 +230,7 @@ mod tests {
         tokio::spawn(accept_loop(listener, session_tx));
         tokio::spawn(async move {
             while let Some(event) = session_rx.recv().await {
-                if !matches!(event, IsographEvent::Lsp(crate::event::Lsp::Request(_))) {
+                if !matches!(event, IsographEvent::Lsp(crate::event::LspEvent::Request(_))) {
                     let _ = test_tx.send(event.clone());
                 }
                 let _ = loop_tx.send(event);
@@ -326,12 +326,12 @@ mod tests {
     fn hello_world() -> lsp_server::Notification {
         lsp_server::Notification {
             method: IsographEventNotification::METHOD.to_owned(),
-            params: serde_json::to_value(Internal::HelloWorld).expect("HelloWorld serializes"),
+            params: serde_json::to_value(InternalEvent::HelloWorld).expect("HelloWorld serializes"),
         }
     }
 
-    fn posted_internal(event: IsographEvent) -> Internal {
-        let IsographEvent::Lsp(crate::event::Lsp::Notification(notification)) = event else {
+    fn posted_internal(event: IsographEvent) -> InternalEvent {
+        let IsographEvent::Lsp(crate::event::LspEvent::Notification(notification)) = event else {
             panic!("session posts Lsp::Notification");
         };
         assert_eq!(notification.method, IsographEventNotification::METHOD);
@@ -341,11 +341,11 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn notify_hello_world_arrives_as_an_event() {
         let (port, mut event_rx) = listen_for_events().await;
-        notify(connect(port), Internal::HelloWorld).expect("notify returns");
+        notify(connect(port), InternalEvent::HelloWorld).expect("notify returns");
         tokio::time::sleep(SETTLE).await;
         assert!(matches!(
             posted_internal(event_rx.try_recv().expect("an event arrived")),
-            Internal::HelloWorld
+            InternalEvent::HelloWorld
         ));
     }
 
@@ -354,14 +354,14 @@ mod tests {
         let (port, mut event_rx) = listen_for_events().await;
         notify(
             connect(port),
-            Internal::DiskChanged(DiskChanged::File(DiskFileChanged {
+            InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
                 path: PathBuf::from("/tmp/proj/src/a.ts"),
                 presence: Presence::Present("export const a = 1;\n".to_owned()),
             })),
         )
         .expect("notify present returns");
         tokio::time::sleep(SETTLE).await;
-        let Internal::DiskChanged(present) =
+        let InternalEvent::DiskChanged(present) =
             posted_internal(event_rx.try_recv().expect("present arrived"))
         else {
             panic!("present is DiskChanged");
@@ -375,14 +375,14 @@ mod tests {
         );
         notify(
             connect(port),
-            Internal::DiskChanged(DiskChanged::File(DiskFileChanged {
+            InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
                 path: PathBuf::from("/tmp/proj/src/a.ts"),
                 presence: Presence::Absent,
             })),
         )
         .expect("notify absent returns");
         tokio::time::sleep(SETTLE).await;
-        let Internal::DiskChanged(absent) =
+        let InternalEvent::DiskChanged(absent) =
             posted_internal(event_rx.try_recv().expect("absent arrived"))
         else {
             panic!("absent is DiskChanged");
@@ -409,7 +409,7 @@ mod tests {
         tokio::time::sleep(SETTLE).await;
         assert!(matches!(
             posted_internal(event_rx.try_recv().expect("the later HelloWorld arrived")),
-            Internal::HelloWorld
+            InternalEvent::HelloWorld
         ));
     }
 
@@ -461,7 +461,7 @@ mod tests {
         tokio::time::sleep(SETTLE).await;
         assert!(matches!(
             posted_internal(event_rx.try_recv().expect("HelloWorld arrived")),
-            Internal::HelloWorld
+            InternalEvent::HelloWorld
         ));
     }
 
@@ -490,7 +490,7 @@ mod tests {
         tokio::time::sleep(SETTLE).await;
         assert!(matches!(
             posted_internal(event_rx.try_recv().expect("HelloWorld arrived")),
-            Internal::HelloWorld
+            InternalEvent::HelloWorld
         ));
         assert!(event_rx.try_recv().is_err(), "shutdown is not Quit");
     }
@@ -505,11 +505,11 @@ mod tests {
                 .expect("writing a truncated body");
         }
         tokio::time::sleep(SETTLE).await;
-        notify(connect(port), Internal::HelloWorld).expect("a second connection works");
+        notify(connect(port), InternalEvent::HelloWorld).expect("a second connection works");
         tokio::time::sleep(SETTLE).await;
         assert!(matches!(
             posted_internal(event_rx.try_recv().expect("HelloWorld arrived")),
-            Internal::HelloWorld
+            InternalEvent::HelloWorld
         ));
     }
 
@@ -548,7 +548,7 @@ mod tests {
             }),
         );
         tokio::time::sleep(SETTLE).await;
-        let IsographEvent::Lsp(crate::event::Lsp::Notification(unknown)) =
+        let IsographEvent::Lsp(crate::event::LspEvent::Notification(unknown)) =
             event_rx.try_recv().expect("logMessage arrived")
         else {
             panic!("session posts Lsp::Notification");
@@ -558,7 +558,7 @@ mod tests {
         tokio::time::sleep(SETTLE).await;
         assert!(matches!(
             posted_internal(event_rx.try_recv().expect("HelloWorld arrived")),
-            Internal::HelloWorld
+            InternalEvent::HelloWorld
         ));
     }
 
@@ -576,7 +576,7 @@ mod tests {
             }),
         );
         tokio::time::sleep(SETTLE).await;
-        let IsographEvent::Lsp(crate::event::Lsp::Notification(bad)) =
+        let IsographEvent::Lsp(crate::event::LspEvent::Notification(bad)) =
             event_rx.try_recv().expect("Nope arrived")
         else {
             panic!("session posts Lsp::Notification");
@@ -587,51 +587,51 @@ mod tests {
         tokio::time::sleep(SETTLE).await;
         assert!(matches!(
             posted_internal(event_rx.try_recv().expect("HelloWorld arrived")),
-            Internal::HelloWorld
+            InternalEvent::HelloWorld
         ));
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn a_second_connection_can_hello_world() {
         let (port, mut event_rx) = listen_for_events().await;
-        notify(connect(port), Internal::HelloWorld).expect("first notify");
+        notify(connect(port), InternalEvent::HelloWorld).expect("first notify");
         tokio::time::sleep(SETTLE).await;
         assert!(matches!(
             posted_internal(event_rx.try_recv().expect("first HelloWorld")),
-            Internal::HelloWorld
+            InternalEvent::HelloWorld
         ));
-        notify(connect(port), Internal::HelloWorld).expect("second notify");
+        notify(connect(port), InternalEvent::HelloWorld).expect("second notify");
         tokio::time::sleep(SETTLE).await;
         assert!(matches!(
             posted_internal(event_rx.try_recv().expect("second HelloWorld")),
-            Internal::HelloWorld
+            InternalEvent::HelloWorld
         ));
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn two_connections_both_hello_world() {
         let (port, mut event_rx) = listen_for_events().await;
-        notify(connect(port), Internal::HelloWorld).expect("first notify");
-        notify(connect(port), Internal::HelloWorld).expect("second notify");
+        notify(connect(port), InternalEvent::HelloWorld).expect("first notify");
+        notify(connect(port), InternalEvent::HelloWorld).expect("second notify");
         tokio::time::sleep(SETTLE).await;
         let first = posted_internal(event_rx.try_recv().expect("one HelloWorld"));
         let second = posted_internal(event_rx.try_recv().expect("the other HelloWorld"));
-        assert!(matches!(first, Internal::HelloWorld));
-        assert!(matches!(second, Internal::HelloWorld));
+        assert!(matches!(first, InternalEvent::HelloWorld));
+        assert!(matches!(second, InternalEvent::HelloWorld));
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn two_sequential_notifys_then_a_third() {
         let (port, mut event_rx) = listen_for_events().await;
-        notify(connect(port), Internal::HelloWorld).expect("first");
-        notify(connect(port), Internal::HelloWorld).expect("second");
-        notify(connect(port), Internal::HelloWorld).expect("third");
+        notify(connect(port), InternalEvent::HelloWorld).expect("first");
+        notify(connect(port), InternalEvent::HelloWorld).expect("second");
+        notify(connect(port), InternalEvent::HelloWorld).expect("third");
         tokio::time::sleep(SETTLE).await;
         for i in 1..=3 {
             assert!(
                 matches!(
                     posted_internal(event_rx.try_recv().unwrap_or_else(|_| panic!("event {i}"))),
-                    Internal::HelloWorld
+                    InternalEvent::HelloWorld
                 ),
                 "event {i}"
             );
@@ -655,7 +655,7 @@ mod tests {
         let (port, _event_rx) = listen_and_reply().await;
         notify(
             connect(port),
-            Internal::DiskChanged(DiskChanged::File(DiskFileChanged {
+            InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
                 path: PathBuf::from("/tmp/proj/src/Home.ts"),
                 presence: Presence::Present(
                     "export const Home = iso(`entrypoint Query.HomeRoute`)".to_owned(),

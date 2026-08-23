@@ -11,7 +11,7 @@ use pico::Database;
 use prelude::Postfix;
 
 use crate::effect::IsographEffect;
-use crate::event::{DiskChanged, Internal, IsographEvent, Presence};
+use crate::event::{DiskChanged, InternalEvent, IsographEvent, Presence};
 
 pub use isograph_compiler::IsographState;
 
@@ -27,14 +27,14 @@ pub fn handle<THostLanguage: HostLanguage>(
 
 fn dispatch_lsp<THostLanguage: HostLanguage>(
     state: &mut IsographState<THostLanguage>,
-    lsp: crate::event::Lsp,
+    lsp: crate::event::LspEvent,
 ) -> Vec<IsographEffect> {
     match lsp {
-        crate::event::Lsp::Request(incoming) => dispatch_lsp_request(state, incoming),
-        crate::event::Lsp::Notification(notification) => {
+        crate::event::LspEvent::Request(incoming) => dispatch_lsp_request(state, incoming),
+        crate::event::LspEvent::Notification(notification) => {
             dispatch_lsp_notification(state, notification)
         }
-        crate::event::Lsp::Response(_response) => Vec::new(),
+        crate::event::LspEvent::Response(_response) => Vec::new(),
     }
 }
 
@@ -52,7 +52,7 @@ fn dispatch_lsp_request<THostLanguage: HostLanguage>(
         ControlFlow::Continue(request)
     };
     match get_response() {
-        ControlFlow::Break(response) => crate::effect::IsographEffect::SendLspResponseEffect(
+        ControlFlow::Break(response) => crate::effect::IsographEffect::SendLspResponse(
             crate::effect::SendLspResponseEffect { reply, response }.boxed(),
         )
         .wrap_vec(),
@@ -65,7 +65,7 @@ fn dispatch_lsp_request<THostLanguage: HostLanguage>(
 fn method_not_found(incoming: crate::event::LspRequest) -> Vec<IsographEffect> {
     // Immediate SendLspResponseEffect this slice. Async later: a timer plus an event; handle of
     // that event is an immediate SendLspResponseEffect.
-    crate::effect::IsographEffect::SendLspResponseEffect(
+    crate::effect::IsographEffect::SendLspResponse(
         crate::effect::SendLspResponseEffect {
             reply: incoming.reply,
             response: lsp_server::Response {
@@ -89,12 +89,12 @@ fn method_not_found(incoming: crate::event::LspRequest) -> Vec<IsographEffect> {
 
 fn handle_internal<THostLanguage: HostLanguage>(
     state: &mut IsographState<THostLanguage>,
-    internal: Internal,
+    internal: InternalEvent,
 ) -> Vec<IsographEffect> {
     match internal {
-        Internal::HelloWorld => IsographEffect::LogHelloWorld.wrap_vec(),
-        Internal::Quit => IsographEffect::Kill.wrap_vec(),
-        Internal::DiskChanged(change) => handle_disk_changed(state, change),
+        InternalEvent::HelloWorld => IsographEffect::LogHelloWorld.wrap_vec(),
+        InternalEvent::Quit => IsographEffect::Kill.wrap_vec(),
+        InternalEvent::DiskChanged(change) => handle_disk_changed(state, change),
     }
 }
 
@@ -118,7 +118,7 @@ fn dispatch_lsp_notification<THostLanguage: HostLanguage>(
 
 fn on_isograph_event<THostLanguage: HostLanguage>(
     state: &mut IsographState<THostLanguage>,
-    internal: Internal,
+    internal: InternalEvent,
 ) -> Vec<IsographEffect> {
     handle_internal(state, internal)
 }
@@ -186,7 +186,8 @@ mod tests {
     use super::{IsographState, handle, intern_config_directory};
     use crate::effect::IsographEffect;
     use crate::event::{
-        DiskChanged, DiskFileChanged, FolderRemoved, Internal, IsographEvent, Lsp, Presence,
+        DiskChanged, DiskFileChanged, FolderRemoved, InternalEvent, IsographEvent, LspEvent,
+        Presence,
     };
 
     fn interned(s: &str) -> common_lang_types::RelativePathToSourceFile {
@@ -214,7 +215,7 @@ mod tests {
     #[test]
     fn hello_world_returns_log_hello_world() {
         let mut state = IsographState::<TypeScriptHostLanguage>::default();
-        let effects = handle(&mut state, Internal::HelloWorld.to());
+        let effects = handle(&mut state, InternalEvent::HelloWorld.to());
         assert!(matches!(
             effects.as_slice(),
             [IsographEffect::LogHelloWorld]
@@ -224,7 +225,7 @@ mod tests {
     #[test]
     fn quit_returns_kill() {
         let mut state = IsographState::<TypeScriptHostLanguage>::default();
-        let effects = handle(&mut state, Internal::Quit.to());
+        let effects = handle(&mut state, InternalEvent::Quit.to());
         assert!(matches!(effects.as_slice(), [IsographEffect::Kill]));
     }
 
@@ -233,7 +234,7 @@ mod tests {
         let mut state = with_config();
         let effects = handle(
             &mut state,
-            Internal::DiskChanged(DiskChanged::File(DiskFileChanged {
+            InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
                 path: PathBuf::from("/tmp/proj/src/a.ts"),
                 presence: Presence::Present("export const a = 1;\n".to_owned()),
             }))
@@ -251,7 +252,7 @@ mod tests {
         let mut state = with_config();
         let effects = handle(
             &mut state,
-            Internal::DiskChanged(DiskChanged::File(DiskFileChanged {
+            InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
                 path: PathBuf::from("/tmp/other/a.ts"),
                 presence: Presence::Present("outside".to_owned()),
             }))
@@ -269,7 +270,7 @@ mod tests {
         let mut state = with_config();
         handle(
             &mut state,
-            Internal::DiskChanged(DiskChanged::File(DiskFileChanged {
+            InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
                 path: PathBuf::from("/tmp/proj/src/a.ts"),
                 presence: Presence::Present("export const a = 1;\n".to_owned()),
             }))
@@ -277,7 +278,7 @@ mod tests {
         );
         let effects = handle(
             &mut state,
-            Internal::DiskChanged(DiskChanged::File(DiskFileChanged {
+            InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
                 path: PathBuf::from("/tmp/proj/src/a.ts"),
                 presence: Presence::Absent,
             }))
@@ -294,7 +295,7 @@ mod tests {
         let id = lsp_server::RequestId::from(1);
         let effects = handle(
             &mut state,
-            Lsp::Request(crate::event::LspRequest {
+            LspEvent::Request(crate::event::LspRequest {
                 request: lsp_server::Request {
                     id: id.clone(),
                     method: "textDocument/hover".to_owned(),
@@ -309,7 +310,7 @@ mod tests {
             .into_iter()
             .next()
             .expect("handle returned one effect");
-        let crate::effect::IsographEffect::SendLspResponseEffect(send) = effect else {
+        let crate::effect::IsographEffect::SendLspResponse(send) = effect else {
             panic!("handle of LspRequest returns SendLspResponseEffect");
         };
         assert_eq!(send.response.id, id);
@@ -324,7 +325,7 @@ mod tests {
             error.message,
             "No handler registered for method 'textDocument/hover'"
         );
-        let _ = crate::daemon::perform(crate::effect::IsographEffect::SendLspResponseEffect(send));
+        let _ = crate::daemon::perform(crate::effect::IsographEffect::SendLspResponse(send));
         let lsp_server::Message::Response(response) = rx.recv().expect("perform sends on reply")
         else {
             panic!("perform sends Message::Response");
@@ -347,7 +348,7 @@ mod tests {
         let mut state = IsographState::<TypeScriptHostLanguage>::default();
         handle(
             &mut state,
-            Internal::DiskChanged(DiskChanged::File(DiskFileChanged {
+            InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
                 path: PathBuf::from("/tmp/proj/src/a.ts"),
                 presence: Presence::Present("export const a = 1;\n".to_owned()),
             }))
@@ -360,7 +361,7 @@ mod tests {
         let mut state = with_config();
         handle(
             &mut state,
-            Internal::DiskChanged(DiskChanged::File(DiskFileChanged {
+            InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
                 path: PathBuf::from("/tmp/proj/src/a.ts"),
                 presence: Presence::Present("a".to_owned()),
             }))
@@ -368,7 +369,7 @@ mod tests {
         );
         handle(
             &mut state,
-            Internal::DiskChanged(DiskChanged::File(DiskFileChanged {
+            InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
                 path: PathBuf::from("/tmp/proj/src/b.ts"),
                 presence: Presence::Present("b".to_owned()),
             }))
@@ -376,7 +377,7 @@ mod tests {
         );
         handle(
             &mut state,
-            Internal::DiskChanged(DiskChanged::File(DiskFileChanged {
+            InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
                 path: PathBuf::from("/tmp/proj/src2/c.ts"),
                 presence: Presence::Present("c".to_owned()),
             }))
@@ -384,7 +385,7 @@ mod tests {
         );
         let effects = handle(
             &mut state,
-            Internal::DiskChanged(DiskChanged::FolderRemoved(FolderRemoved {
+            InternalEvent::DiskChanged(DiskChanged::FolderRemoved(FolderRemoved {
                 path: PathBuf::from("/tmp/proj/src"),
             }))
             .to(),
@@ -403,7 +404,7 @@ mod tests {
         let mut state = with_config();
         handle(
             &mut state,
-            Internal::DiskChanged(DiskChanged::File(DiskFileChanged {
+            InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
                 path: PathBuf::from("/tmp/proj/src/a.ts"),
                 presence: Presence::Present("a".to_owned()),
             }))
@@ -411,7 +412,7 @@ mod tests {
         );
         handle(
             &mut state,
-            Internal::DiskChanged(DiskChanged::File(DiskFileChanged {
+            InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
                 path: PathBuf::from("/tmp/proj/src2/c.ts"),
                 presence: Presence::Present("c".to_owned()),
             }))
@@ -419,7 +420,7 @@ mod tests {
         );
         let effects = handle(
             &mut state,
-            Internal::DiskChanged(DiskChanged::FolderRemoved(FolderRemoved {
+            InternalEvent::DiskChanged(DiskChanged::FolderRemoved(FolderRemoved {
                 path: PathBuf::from("/tmp/proj"),
             }))
             .to(),
@@ -434,7 +435,7 @@ mod tests {
         let mut state = with_config();
         handle(
             &mut state,
-            Internal::DiskChanged(DiskChanged::File(DiskFileChanged {
+            InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
                 path: PathBuf::from("/tmp/proj/src/a.ts"),
                 presence: Presence::Present("a".to_owned()),
             }))
@@ -442,7 +443,7 @@ mod tests {
         );
         let effects = handle(
             &mut state,
-            Internal::DiskChanged(DiskChanged::FolderRemoved(FolderRemoved {
+            InternalEvent::DiskChanged(DiskChanged::FolderRemoved(FolderRemoved {
                 path: PathBuf::from("/tmp/proj/never"),
             }))
             .to(),
@@ -459,7 +460,7 @@ mod tests {
         let mut state = with_config();
         handle(
             &mut state,
-            Internal::DiskChanged(DiskChanged::File(DiskFileChanged {
+            InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
                 path: PathBuf::from("/tmp/proj/src/a.ts"),
                 presence: Presence::Present("a".to_owned()),
             }))
@@ -467,7 +468,7 @@ mod tests {
         );
         let effects = handle(
             &mut state,
-            Internal::DiskChanged(DiskChanged::File(DiskFileChanged {
+            InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
                 path: PathBuf::from("/tmp/proj/src"),
                 presence: Presence::Absent,
             }))
@@ -481,7 +482,7 @@ mod tests {
     }
 
     fn event_notification(params: serde_json::Value) -> IsographEvent {
-        Lsp::Notification(lsp_server::Notification {
+        LspEvent::Notification(lsp_server::Notification {
             method: crate::lsp_socket::IsographEventNotification::METHOD.to_owned(),
             params,
         })
@@ -493,7 +494,7 @@ mod tests {
         let mut state = IsographState::<TypeScriptHostLanguage>::default();
         let effects = handle(
             &mut state,
-            event_notification(serde_json::to_value(Internal::HelloWorld).expect("serializes")),
+            event_notification(serde_json::to_value(InternalEvent::HelloWorld).expect("serializes")),
         );
         assert!(matches!(
             effects.as_slice(),
@@ -506,7 +507,7 @@ mod tests {
         let mut state = IsographState::<TypeScriptHostLanguage>::default();
         let effects = handle(
             &mut state,
-            event_notification(serde_json::to_value(Internal::Quit).expect("serializes")),
+            event_notification(serde_json::to_value(InternalEvent::Quit).expect("serializes")),
         );
         assert!(matches!(effects.as_slice(), [IsographEffect::Kill]));
     }
@@ -517,7 +518,7 @@ mod tests {
         let effects = handle(
             &mut state,
             event_notification(
-                serde_json::to_value(Internal::DiskChanged(DiskChanged::File(DiskFileChanged {
+                serde_json::to_value(InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
                     path: PathBuf::from("/tmp/proj/src/a.ts"),
                     presence: Presence::Present("export const a = 1;\n".to_owned()),
                 })))
@@ -536,7 +537,7 @@ mod tests {
         let mut state = IsographState::<TypeScriptHostLanguage>::default();
         let effects = handle(
             &mut state,
-            Lsp::Notification(lsp_server::Notification {
+            LspEvent::Notification(lsp_server::Notification {
                 method: "window/logMessage".to_owned(),
                 params: serde_json::json!({}),
             })
@@ -550,7 +551,7 @@ mod tests {
         let mut state = IsographState::<TypeScriptHostLanguage>::default();
         let effects = handle(
             &mut state,
-            Lsp::Response(lsp_server::Response {
+            LspEvent::Response(lsp_server::Response {
                 id: lsp_server::RequestId::from(1),
                 result: None,
                 error: None,

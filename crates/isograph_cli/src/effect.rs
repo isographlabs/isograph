@@ -10,5 +10,5 @@ pub struct SendLspResponseEffect {
 pub enum IsographEffect {
     LogHelloWorld,
     Kill,
-    SendLspResponseEffect(Box<SendLspResponseEffect>),
+    SendLspResponse(Box<SendLspResponseEffect>),
 }

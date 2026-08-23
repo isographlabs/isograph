@@ -9,7 +9,7 @@ pub struct LspRequest {
 }
 
 #[derive(Clone, Debug)]
-pub enum Lsp {
+pub enum LspEvent {
     Request(LspRequest),
     Notification(lsp_server::Notification),
     Response(lsp_server::Response),
@@ -17,7 +17,7 @@ pub enum Lsp {
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize, derive_more::From)]
 #[serde(tag = "kind", content = "value")]
-pub enum Internal {
+pub enum InternalEvent {
     HelloWorld,
     Quit,
     DiskChanged(DiskChanged),
@@ -26,9 +26,9 @@ pub enum Internal {
 #[derive(Clone, Debug, derive_more::From)]
 pub enum IsographEvent {
     #[from]
-    Lsp(Lsp),
+    Lsp(LspEvent),
     #[from]
-    Internal(Internal),
+    Internal(InternalEvent),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
