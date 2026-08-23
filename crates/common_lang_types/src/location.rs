@@ -28,14 +28,9 @@ pub struct EmbeddedLocation {
     pub span: Span,
 }
 
-impl From<EmbeddedLocation> for Location {
-    fn from(value: EmbeddedLocation) -> Self {
-        Location::Embedded(value)
-    }
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, derive_more::From)]
 pub enum Location {
+    #[from]
     Embedded(EmbeddedLocation),
     Generated,
 }

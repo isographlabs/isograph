@@ -12,6 +12,7 @@ string_key_newtype = { path = "../string_key_newtype" }
 pico = { path = "../pico" }
 prelude = { path = "../prelude" }
 colored = { workspace = true }
+derive_more = { workspace = true }
 pathdiff = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
