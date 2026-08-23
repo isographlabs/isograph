@@ -21,36 +21,14 @@ Send notifies `isograph/event` (`Internal`) and exits. Then `textDocument/semant
 
 ## Types
 
+Insert before `.request()` in lsp-dispatch.md `dispatch_lsp_request`:
+
 ```rust
 // from crates/isograph_cli/src/state.rs
-        crate::event::Lsp::Request(incoming) => dispatch_lsp_request(state, incoming),
-
-fn dispatch_lsp_request<THostLanguage: HostLanguage>(
-    state: &IsographState<THostLanguage>,
-    incoming: crate::event::LspRequest,
-) -> Vec<IsographEffect> {
-    let crate::event::LspRequest { request, reply } = incoming;
-    let get_response = || {
-        let request = isograph_lsp::lsp_request_dispatch::LSPRequestDispatch::new(request, state)
             .on_request_sync::<lsp_types::request::SemanticTokensFullRequest>(
                 semantic_tokens_response::<THostLanguage>,
             )?
-            .request();
-        ControlFlow::Continue(request)
-    };
-    match get_response() {
-        ControlFlow::Break(response) => crate::effect::IsographEffect::SendLspResponse(
-            crate::effect::SendLspResponse { reply, response }.boxed(),
-        )
-        .wrap_vec(),
-        ControlFlow::Continue(request) => {
-            method_not_found(crate::event::LspRequest { request, reply })
-        }
-    }
-}
 ```
-
-That is lsp-dispatch.md `dispatch_lsp_request` with one `.on_request_sync` inserted. `method_not_found` is unchanged.
 
 `semantic_tokens_response` takes `&IsographState`, `SemanticTokensParams`, returns `isograph_lsp::lsp_runtime_error::LSPRuntimeResult<<lsp_types::request::SemanticTokensFullRequest as lsp_types::request::Request>::Result>`. Missing file is `Ok(None)` (JSON `null`). Non-file URI is `Err(LSPRuntimeError::UnexpectedError(...))`.
 
@@ -155,7 +133,7 @@ notify(
 - `full` with params `{}`: extract fails; response `id` is the request id, not `"default-lsp-id"`
 - unknown request is still `MethodNotFound`
 
-`state.rs` is unchanged except the one `.on_request_sync` in `dispatch_lsp_request`. No `handle` of a tokens event.
+`state.rs` is otherwise unchanged. No `handle` of a tokens event.
 
 ## Call sites
 
