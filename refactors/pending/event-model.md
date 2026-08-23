@@ -31,5 +31,6 @@ Requires config-discovery.md (landed), the event-model design-doc, and `docs-web
 25. zed-and-vscode-extensions.md.
 26. zed-graphql-schema.md. After 25. Tree-sitter language for GraphQL schema files. Blocked on the GraphQL extension's language name, grammar id, and suffixes.
 27. iso-format.md. After lsp-tokens.md. Layout at consume, printer, `willSaveWaitUntil` on save. No `autoformatIsoLiterals` setting.
+28. windows-graceful-stop.md. After 21. Windows `stop` / `restart` without `--force` posts `Internal::Quit` on the socket (`send::notify`). Unix stays SIGTERM. `--force` stays freddie.
 
 `AsyncWorkFinished` and `StartAsyncWork` land with compilation.
