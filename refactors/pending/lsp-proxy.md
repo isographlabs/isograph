@@ -1,10 +1,10 @@
 # `isograph lsp` stdio proxy
 
-Requires lsp-port.md (landed). Independent of lsp-tokens.md, lsp-sessions.md, lsp-diagnostics.md. The daemon port is already LSP JSON-RPC. This verb is a byte copy, not a second handshake.
+Requires lsp-port.md (landed) and no-poll-in-tests.md. Independent of lsp-tokens.md, lsp-sessions.md, lsp-diagnostics.md. The daemon port is already LSP JSON-RPC. This verb is a byte copy, not a second handshake.
 
 VS Code and Zed spawn a process on stdio. They do not dial `{slug}.port`. `isograph lsp` is that process: the same walk-up / `--config` as every verb, start the daemon if needed, dial the LSP port, copy stdin/stdout. Dropping the editor drops the proxy. The daemon stays up.
 
-Origin: `docs-website/docs/design-docs/event-model.md` (`isograph lsp` as stdio proxy). Origin of spawn args: `vscode-extension/src/languageClient.ts` (verbatim below). Origin of start: `freddie_cli` `client::start` via a nested `isograph start` (not an in-process call). Origin of the port file: `crates/isograph_cli/src/send.rs` `parse_port` / `read_port`. Origin of `process::exit(0)` after the session is done: `crates/isograph_cli/src/daemon.rs` after `Kill`. Delta: the binary actually has the verb; the daemon is already the LSP server; the proxy does not parse LSP; `parse_port` moves to `discover.rs` so send and the proxy share it.
+Origin: `docs-website/docs/design-docs/event-model.md` (`isograph lsp` as stdio proxy). Origin of spawn args: `vscode-extension/src/languageClient.ts` (verbatim below). Origin of start: `freddie_cli` `client::start` via a nested `isograph start` (not an in-process call). Origin of the port file: `crates/isograph_cli/src/send.rs` `parse_port` / `read_port`. Origin of `process::exit(0)` when the daemon side is gone and stdin is still open: `crates/isograph_cli/src/daemon.rs` after `Kill`. Delta: the binary actually has the verb; the daemon is already the LSP server; the proxy does not parse LSP; `parse_port` moves to `discover.rs` so send and the proxy share it; connect retries until the live port accepts, because `start` returning is lock-held not listen-done.
 
 ```ts
 // from vscode-extension/src/languageClient.ts
@@ -26,7 +26,7 @@ One shippable change.
 $ isograph lsp
 ```
 
-With a config at or above cwd, the daemon is running (or this process starts it the way `isograph start` does), and stdio is LSP. The process stays until stdin EOF or the TCP connection ends, then exits 0. `isograph status` is still running. `isograph stop` ends the daemon.
+With a config at or above cwd, the daemon is running (or this process starts it the way `isograph start` does), and stdio is LSP. The process stays until stdin EOF (then it drains daemon-to-stdout and returns 0) or the TCP connection ends (then `process::exit(0)`). `isograph status` is still running. `isograph stop` ends the daemon.
 
 ```
 $ isograph --help
@@ -59,7 +59,9 @@ Do not bring up VS Code.
 
 Always invoke start. Start adopts if the lock is held (`a_second_start_adopts_the_running_daemon`). Do not re-read `Held` in the proxy.
 
-`isograph start` returning means the lock is held, not that the port file exists (`run_daemon` unlinks it, `serve` writes it after bind and after the watcher starts). Send does not wait. The proxy must: the editor is about to send `initialize`. Poll the port file for 10s, same deadline as `cli.rs`. Then `TcpStream::connect((Ipv4Addr::LOCALHOST, port))`.
+`isograph start` returning means the lock is held, not that listen has run. The lock is taken at the start of `run_in_foreground`. `run_daemon` unlinks `{slug}.port` after that, then loads the config, binds, starts the watcher, and writes the file. A kill -9 leftover port file is still there when start returns. Send never hits this: it checks `Held` first and `Free` is `NotRunning`. The proxy started the daemon, so it must not treat a parseable port file as ready.
+
+One loop until `PORT_DEADLINE` (10s, same as today's `cli.rs` wait): read the port file, `TcpStream::connect((Ipv4Addr::LOCALHOST, port))`. Connection refused / reset / timed out: sleep `POLL` and retry. First successful connect wins. Never a parseable file: `NoPort`. Retries exhausted after at least one connect error: that `Connect`. Permission errors on the file fail now. Send's `read_port` stays fail-fast.
 
 ## Types
 
@@ -170,6 +172,16 @@ struct Connect {
     pub source: io::Error,
 }
 
+enum ConnectRetry {
+    Retry,
+    Fail,
+}
+
+enum CopyEnd {
+    Stdin,
+    Socket,
+}
+
 #[derive(Debug, thiserror::Error)]
 enum LspError {
     #[error("{0}")]
@@ -193,6 +205,8 @@ enum LspError {
 
 `ReadPort` / `Connect` / `NoPort` wording matches send. `Start` is a nested start that exited nonzero; that child's stderr is already inherited. Still print `LspError` on stderr, same `run` shape as send.
 
+`ConnectRetry` is whether a failed `connect` is "the port file is leftover / the listener is not up yet" (`ConnectionRefused`, `ConnectionReset`, `TimedOut`) or a hard failure. `CopyEnd` is which copy direction finished: stdin EOF vs the TCP connection.
+
 ```rust
 // from crates/isograph_cli/src/lsp_stdio.rs
 #[expect(clippy::print_stderr)]
@@ -209,9 +223,7 @@ pub fn run(id: &ConfigFlag) -> ExitCode {
 fn run_inner(id: &ConfigFlag) -> Result<(), LspError> {
     let (_, instance) = crate::discover::instance_for_config_path(id.config.as_deref())?;
     start_daemon(id)?;
-    let port = wait_for_port(&crate::discover::port_file(instance.lock_file()))?;
-    let stream = TcpStream::connect((Ipv4Addr::LOCALHOST, port))
-        .map_err(|source| LspError::Connect(Connect { port, source }))?;
+    let stream = connect_to_daemon(&crate::discover::port_file(instance.lock_file()))?;
     copy_stdio(stream)
 }
 
@@ -233,19 +245,34 @@ fn start_daemon(id: &ConfigFlag) -> Result<(), LspError> {
         LspError::Start.wrap_err()
     }
 }
-```
 
-`instance_for_config_path` does not parse the config as JSON. Nested start does. `--config` is the path the user typed, not the canonical one. Absent flag: nested start walk-up from the same cwd.
+fn connect_retry(source: &io::Error) -> ConnectRetry {
+    match source.kind() {
+        io::ErrorKind::ConnectionRefused
+        | io::ErrorKind::ConnectionReset
+        | io::ErrorKind::TimedOut => ConnectRetry::Retry,
+        _ => ConnectRetry::Fail,
+    }
+}
 
-```rust
-// from crates/isograph_cli/src/lsp_stdio.rs
-fn wait_for_port(path: &Path) -> Result<u16, LspError> {
+fn connect_to_daemon(path: &Path) -> Result<TcpStream, LspError> {
     let start = Instant::now();
+    let mut last_connect = None;
     loop {
         match fs::read_to_string(path) {
             Ok(text) => {
                 if let Some(port) = crate::discover::parse_port(text.reference()) {
-                    return port.wrap_ok();
+                    match TcpStream::connect((Ipv4Addr::LOCALHOST, port)) {
+                        Ok(stream) => return stream.wrap_ok(),
+                        Err(source) => match connect_retry(source.reference()) {
+                            ConnectRetry::Retry => {
+                                last_connect = Connect { port, source }.wrap_some();
+                            }
+                            ConnectRetry::Fail => {
+                                return LspError::Connect(Connect { port, source }).wrap_err();
+                            }
+                        },
+                    }
                 }
             }
             Err(source) if source.kind() == io::ErrorKind::NotFound => {}
@@ -258,22 +285,31 @@ fn wait_for_port(path: &Path) -> Result<u16, LspError> {
             }
         }
         if start.elapsed() >= PORT_DEADLINE {
-            return LspError::NoPort.wrap_err();
+            return match last_connect {
+                Some(connect) => LspError::Connect(connect).wrap_err(),
+                None => LspError::NoPort.wrap_err(),
+            };
         }
         thread::sleep(POLL);
     }
 }
 ```
 
-NotFound or a file `parse_port` rejects: keep polling until the deadline. Permission errors fail now. Send's `read_port` is still fail-fast (`BadPort` / `NoPort` with no loop). The loop is the wait send refuses; lock held is not listen done.
+`instance_for_config_path` does not parse the config as JSON. Nested start does. `--config` is the path the user typed, not the canonical one. Absent flag: nested start walk-up from the same cwd.
+
+The connect loop is a state machine (deadline + leftover file + not-yet-listening). Send's `read_port` is still fail-fast (`BadPort` / `NoPort` with no loop).
 
 ### Byte copy
 
-Do not parse LSP. No `Message::read`. No `initialize`. `processId` in the editor's `initialize` is the editor, not the proxy. We still do not watch `processId` on the daemon (lsp-sessions.md). When the editor dies, stdin EOF, proxy exits, TCP closes, session `Drop`.
+Do not parse LSP. No `Message::read`. No `initialize`. `processId` in the editor's `initialize` is the editor, not the proxy. We still do not watch `processId` on the daemon (lsp-sessions.md).
 
-Stdout of this process is often a pipe (VS Code `LanguageClient`, the test). Rust block-buffers pipe stdout. `std::io::copy` can hold an `initialize` result until 8KiB more arrives. Flush after every write both directions. `set_nodelay(true)` is best-effort; ignore its error.
+Stdout of this process is often a pipe (VS Code `LanguageClient`, the test). Rust block-buffers pipe stdout. `std::io::copy` can hold an `initialize` result until 8KiB more arrives. Flush after every write both directions. `set_nodelay(true)` is best-effort; ignore its error. Drop the original `TcpStream` after the two clones.
 
-Either direction finishing ends the process. Daemon gone: the stdin-to-socket thread is blocked on stdin, not on the socket, so joining both hangs until the editor closes stdin. First of the two copy threads to finish `process::exit(0)`. Origin: `daemon.rs` after `Kill`. The other thread and its fds die with the process. After a successful connect, copy errors (broken pipe) are still exit 0.
+The two copy directions are not symmetric.
+
+Stdin EOF is the editor finishing (`shutdown` / `exit` / close). vscode-languageclient sends `shutdown`, waits for the response, sends `exit`, then closes stdin. `Shutdown::Write` (half-close). Join the socket-to-stdout thread so the last daemon writes, including that `shutdown` result, reach the editor. Then return 0. `run`'s `Ok` arm is this path.
+
+Socket EOF is the daemon gone. The stdin-to-socket thread is blocked on stdin, not on the socket, so joining it hangs until the editor closes stdin. `process::exit(0)`. Origin: `daemon.rs` after `Kill`. After a successful connect, copy errors (broken pipe) are still exit 0.
 
 ```rust
 // from crates/isograph_cli/src/lsp_stdio.rs
@@ -281,22 +317,28 @@ fn copy_stdio(stream: TcpStream) -> Result<(), LspError> {
     let _ = stream.set_nodelay(true);
     let mut to_daemon = stream.try_clone().map_err(LspError::Clone)?;
     let mut from_daemon = stream.try_clone().map_err(LspError::Clone)?;
+    drop(stream);
     let (done_tx, done_rx) = mpsc::channel();
-    let incoming_done = done_tx.clone();
+    let stdin_done = done_tx.clone();
     thread::spawn(move || {
         let mut stdin = io::stdin();
         let _ = copy_flush(&mut stdin, &mut to_daemon);
-        let _ = to_daemon.shutdown(Shutdown::Both);
-        let _ = incoming_done.send(());
+        let _ = to_daemon.shutdown(Shutdown::Write);
+        let _ = stdin_done.send(CopyEnd::Stdin);
     });
-    thread::spawn(move || {
+    let outgoing = thread::spawn(move || {
         let mut stdout = io::stdout();
-        let _ = copy_flush(&mut from_daemon, &mut stdout);
-        let _ = from_daemon.shutdown(Shutdown::Both);
-        let _ = done_tx.send(());
+        let result = copy_flush(&mut from_daemon, &mut stdout);
+        let _ = done_tx.send(CopyEnd::Socket);
+        result
     });
-    let _ = done_rx.recv();
-    std::process::exit(0);
+    match done_rx.recv() {
+        Ok(CopyEnd::Stdin) => {
+            let _ = outgoing.join();
+            ().wrap_ok()
+        }
+        Ok(CopyEnd::Socket) | Err(_) => std::process::exit(0),
+    }
 }
 
 fn copy_flush(reader: &mut impl Read, writer: &mut impl Write) -> io::Result<u64> {
@@ -315,8 +357,6 @@ fn copy_flush(reader: &mut impl Read, writer: &mut impl Write) -> io::Result<u64
     }
 }
 ```
-
-`copy_stdio`'s only return is `process::exit(0)` (`!` coerces to `Result<(), LspError>`). `run`'s `Ok` arm exists for the type; the success path does not reach it.
 
 No tokio. No `Connection`. No `init_client_logging`.
 
@@ -356,7 +396,7 @@ Drop `parse_port` from `send.rs`. Drop `use std::num::NonZeroU16` if nothing els
 
 ## Tests
 
-`cli.rs`. HOME isolation as today. Deadline 10s. Do not bring up VS Code. Do not assert semantic tokens (lsp-tokens.md). Do not add a production function only tests call.
+`cli.rs`. HOME isolation as today. Do not bring up VS Code. Do not assert semantic tokens (lsp-tokens.md). Do not add a production function only tests call. Tests do not poll (no-poll-in-tests.md). Nested start can take `START_TIMEOUT` (5s) plus `PORT_DEADLINE` (10s) before a byte is copied. Do not put a 10s timeout on the initialize read that is shorter than that. Block on `Message::read` and on `child.wait()`.
 
 `ts_graphql_react_isograph_cli` tests write and read `lsp_server::Message` the way `send.rs` does. Do not hand-roll `Content-Length`.
 
@@ -377,9 +417,9 @@ serde_json = { workspace = true }
 tempfile = "3"
 ```
 
-`cli.rs` already imports `Command`. Add `Stdio`.
+`cli.rs` already imports `Command`. Add `Stdio` and `BufReader`.
 
-Add `Daemon::spawn` next to `Daemon::isograph`. Same env, cwd, binary. stdin/stdout/stderr piped. Tests that need the child's stderr on failure read `child.stderr`.
+Add `Daemon::spawn` next to `Daemon::isograph`. Same env, cwd, binary. stdin and stdout piped. stderr inherit so a nested start cannot fill an unread stderr pipe and deadlock, and so a failure is on the test output.
 
 ```rust
 // from crates/ts_graphql_react_isograph_cli/tests/cli.rs
@@ -394,7 +434,7 @@ fn spawn(&self, args: &[&str]) -> std::process::Child {
         .env("LOCALAPPDATA", home.join("appdata"))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::inherit())
         .spawn()
         .expect("the isograph binary runs")
 }
@@ -402,9 +442,11 @@ fn spawn(&self, args: &[&str]) -> std::process::Child {
 
 `Daemon::isograph` stays `.output()`. Existing tests are unchanged.
 
-Helper: write initialize (`capabilities: {}`, id 1, same params as `send::notify`), read the first `Message::Response` on a thread, `rx.recv_timeout(Duration::from_secs(10))`. Nested start can exceed `SETTLE`. Assert `error` is `None` and `result` is an object with a `capabilities` key. Do not send `initialized` unless a later assertion needs the session past handshake.
+Keep `ChildStdout` in the test as `BufReader` until after `child.wait()`. Do not move it into a thread that drops it after one message: that closes the pipe and kills the proxy with broken pipe, so a later stdin drop does not test stdin EOF.
 
-After the assertion: drop stdin, `child.wait()`, assert the status is success. Then `status` is running. Then `STOP`. Then `status` is not running. `Daemon`'s `Drop` still `--force`s. Tests do not poll (no-poll-in-tests.md).
+Helper: write initialize (`capabilities: {}`, id 1, same params as `send::notify`). Read the first `Message::Response` on the test thread from `&mut impl BufRead`. Assert `error` is `None` and `result` is an object with a `capabilities` key. Do not send `initialized` unless a later assertion needs the session past handshake.
+
+After the assertion: drop stdin, `child.wait()`, assert the status is success. Then `status` is running. Then `STOP`. Then `status` is not running. `Daemon`'s `Drop` still `--force`s.
 
 If a test panics before dropping stdin, `Daemon::drop` stops the daemon, the proxy's socket EOF, `process::exit(0)`.
 
@@ -421,17 +463,8 @@ fn write_initialize(stdin: &mut impl std::io::Write) {
     stdin.flush().expect("flushing initialize");
 }
 
-fn read_initialize_result(stdout: impl std::io::Read + Send + 'static) -> lsp_server::Response {
-    let (tx, rx) = std::sync::mpsc::channel();
-    std::thread::spawn(move || {
-        let mut reader = std::io::BufReader::new(stdout);
-        let message = lsp_server::Message::read(&mut reader);
-        let _ = tx.send(message);
-    });
-    let message = rx
-        .recv_timeout(Duration::from_secs(10))
-        .expect("initialize was answered");
-    let message = message
+fn read_initialize_result(stdout: &mut impl std::io::BufRead) -> lsp_server::Response {
+    let message = lsp_server::Message::read(stdout)
         .expect("reading an lsp message")
         .expect("the proxy stayed open");
     let lsp_server::Message::Response(response) = message else {
@@ -447,24 +480,21 @@ fn read_initialize_result(stdout: impl std::io::Read + Send + 'static) -> lsp_se
 }
 ```
 
-`Message::read` blocks, so it lives on a thread. `recv_timeout` is one wait for that message, not a poll.
-
 - `lsp_is_in_help`: `isograph --help` contains `lsp`. Does not hide it. Still does not contain `send`. `isograph lsp --help` contains `config`.
-- `lsp_with_the_daemon_stopped_starts_it`: fixture as `Daemon::start` (`{"source_files":[]}`), do not call `start` first. `spawn(["lsp"])`, write initialize, read a response with `capabilities`, drop stdin, child exits 0, `status` running, `STOP`, `status` not running. Nested start uses default `Watch`. Empty `source_files` is already a watch path (`watch_of_empty_source_files_logs_scan_finished`).
-- `lsp_with_the_daemon_already_running_dials_it`: `Daemon::start()` (injected), then `spawn(["lsp"])`, initialize, drop stdin, child exits 0, `status` still running. One daemon. The nested start adopts.
+- `lsp_with_the_daemon_stopped_starts_it`: fixture as `Daemon::start` (`{"source_files":[]}`), do not call `start` first. `spawn(["lsp"])`, write initialize, read a response with `capabilities`, drop stdin, `child.wait()` success, `status` running, `STOP`, `status` not running. Nested start uses default `Watch`. Empty `source_files` is already a watch path (`watch_of_empty_source_files_logs_scan_finished`).
+- `lsp_with_the_daemon_already_running_dials_it`: `Daemon::start()` (injected). Record `status` stdout (includes the pid). Then `spawn(["lsp"])`, initialize, drop stdin, `child.wait()` success. `status` stdout equals the recorded line. The nested start adopts.
 - `lsp_with_no_config_exits_1`: empty cwd, HOME isolation, `isograph lsp` as `.output()`, exit 1, stderr contains `no isograph.config`, stdout empty, `status` not running.
 - `lsp_with_an_empty_object_config_exits_1`: `{}` config, same as `start_with_missing_source_files_exits_1`. Discover succeeds (the file exists). Nested start fails. Exit 1, stderr contains `source_files`. `status` not running.
-- `lsp_with_empty_stdin_exits_0_and_leaves_the_daemon`: fixture with `source_files`, `spawn(["lsp"])`, drop stdin without writing, child exits 0, `status` running, then `STOP`.
-- `lsp_two_proxies_share_one_daemon`: `Daemon::start()`, two `spawn(["lsp"])`, both initialize, both drop stdin and exit 0, `status` running once, `STOP`.
-
-`--config` on lsp: covered by walk-up in the stopped-starts-it fixture (cwd is the config dir). A flag path is the same `ConfigFlag` as config-path; do not add a third discover test.
+- `lsp_with_empty_stdin_exits_0_and_leaves_the_daemon`: fixture with `source_files`, `spawn(["lsp"])`, drop stdin without writing, `child.wait()` success, `status` running, then `STOP`.
+- `lsp_two_proxies_share_one_daemon`: `Daemon::start()`, record `status` stdout. Two `spawn(["lsp"])`, both initialize, both drop stdin and `wait` success. `status` stdout equals the recorded line. `STOP`.
+- `lsp_forwards_config_to_nested_start`: write `{"source_files":[]}` at a path that walk-up from cwd would not find (cwd is an empty sibling directory). `spawn(["lsp", "--config", path])`, initialize, drop stdin, `wait` success, `status` running. Walk-up without the flag is the no-config failure.
 
 Existing send / start / stop tests stay green.
 
 ## Call sites
 
-- VS Code `languageClient.ts` `args = ['lsp']` plus optional `--config` -> `isograph lsp` -> nested `isograph start` if needed -> `{slug}.port` -> `TcpStream::connect` -> `accept_loop` -> `session`
+- VS Code `languageClient.ts` `args = ['lsp']` plus optional `--config` -> `isograph lsp` -> nested `isograph start` if needed -> `{slug}.port` -> `connect_to_daemon` -> `accept_loop` -> `session`
 - Zed `language_server_command` `args: "lsp"` (zed-and-vscode-extensions.md, after this lands)
 - `isograph send` does not use this verb
-- editor stdin EOF -> proxy `process::exit(0)` -> TCP close -> session `Drop` -> daemon stays
+- editor stdin EOF -> `Shutdown::Write` -> join daemon-to-stdout -> return 0 -> session `Drop` -> daemon stays
 - `isograph stop` ends the daemon; a still-running proxy sees socket EOF and `process::exit(0)`
