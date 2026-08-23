@@ -1,10 +1,11 @@
+use std::path::Path;
 use std::sync::LazyLock;
 
 use common_lang_types::{ConstExportName, RelativePathToSourceFile};
 use intern::string_key::Intern;
 use isograph_compiler::{
     HostLanguage, IsoLiteralError, IsoLiteralExtraction, IsoLiteralStartIndex, IsographState,
-    parsed_iso_literal,
+    SkipSourceFile, parsed_iso_literal,
 };
 use isograph_parser::{IsoLiteralItem, IsoLiteralParse, ParsedIsoLiteral, SelectableNameWrapper};
 use pico_macros::memo;
@@ -97,6 +98,13 @@ impl HostLanguage for TypeScriptHostLanguage {
             })
             .collect::<Vec<_>>()
             .wrap_some()
+    }
+
+    fn should_skip_source_file(relative_path: &Path) -> SkipSourceFile {
+        match relative_path.extension().and_then(|e| e.to_str()) {
+            Some("ts" | "tsx" | "js" | "jsx") => SkipSourceFile::Keep,
+            _ => SkipSourceFile::Skip,
+        }
     }
 }
 
@@ -1662,5 +1670,43 @@ iso(`entrypoint Query.HomeRoute`)";
         assert!(text_through_last_iso_literal(&db, path).is_some());
         db.remove_disk_file(path);
         assert!(text_through_last_iso_literal(&db, path).is_none());
+    }
+
+    #[test]
+    fn should_skip_source_file_keeps_ts_tsx_js_jsx() {
+        use std::path::Path;
+
+        use isograph_compiler::SkipSourceFile;
+
+        for path in [
+            "src/a.ts",
+            "src/a.tsx",
+            "src/a.js",
+            "src/a.jsx",
+            "a.ts",
+            "src/a.d.ts",
+            "node_modules/pkg/index.ts",
+            "src/__isograph/foo.ts",
+        ] {
+            assert_eq!(
+                TypeScriptHostLanguage::should_skip_source_file(Path::new(path)),
+                SkipSourceFile::Keep,
+                "{path}"
+            );
+        }
+        for path in [
+            "src/a.rs",
+            "src/a.json",
+            "src/a.mjs",
+            "src/a.mts",
+            "src/a.graphql",
+            "",
+        ] {
+            assert_eq!(
+                TypeScriptHostLanguage::should_skip_source_file(Path::new(path)),
+                SkipSourceFile::Skip,
+                "{path}"
+            );
+        }
     }
 }

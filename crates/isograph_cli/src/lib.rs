@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use std::process::ExitCode;
 
 use clap::{CommandFactory, FromArgMatches, Parser};
-use freddie_cli::{App, Instance, NoArgs};
+use freddie_cli::{App, Instance};
 use isograph_compiler::HostLanguage;
 use prelude::Postfix;
 
@@ -14,6 +14,7 @@ mod event;
 mod lsp_socket;
 mod send;
 mod state;
+mod watch;
 
 pub fn run<THostLanguage: HostLanguage>() -> ExitCode {
     // First, so `--help` prints and a bad flag exits before the lock is taken.
@@ -75,11 +76,24 @@ struct ConfigFlag {
     pub config: Option<std::path::PathBuf>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
+enum Filesystem {
+    Watch,
+    Injected,
+}
+
+#[derive(clap::Args, Debug)]
+struct IsographArgs {
+    /// How filesystem facts arrive. `watch` observes the OS. `injected` only accepts events.
+    #[arg(long, value_enum, default_value_t = Filesystem::Watch)]
+    pub filesystem: Filesystem,
+}
+
 struct Isograph<THostLanguage>(PhantomData<THostLanguage>);
 
 impl<THostLanguage: HostLanguage> App for Isograph<THostLanguage> {
     type Id = ConfigFlag;
-    type DaemonArgs = NoArgs;
+    type DaemonArgs = IsographArgs;
 
     const NAME: &'static str = "isograph";
 
@@ -88,7 +102,7 @@ impl<THostLanguage: HostLanguage> App for Isograph<THostLanguage> {
         instance.wrap_ok()
     }
 
-    fn run_daemon(id: &ConfigFlag, _: &NoArgs) {
+    fn run_daemon(id: &ConfigFlag, args: &IsographArgs) {
         let (path, instance) = match discover::instance_for_config_path(id.config.as_deref()) {
             Ok(pair) => pair,
             Err(e) => {
@@ -101,10 +115,13 @@ impl<THostLanguage: HostLanguage> App for Isograph<THostLanguage> {
         };
         let port_path = discover::port_file(instance.lock_file());
         let _ = std::fs::remove_file(port_path.reference());
-        if let Err(e) = discover::load_config(path.reference()) {
-            tracing::error!(error = %e, "could not load the config");
-            return;
-        }
-        crate::daemon::run::<THostLanguage>(path, port_path);
+        let config = match discover::load_config(path.reference()) {
+            Ok(config) => config,
+            Err(e) => {
+                tracing::error!(error = %e, "could not load the config");
+                return;
+            }
+        };
+        crate::daemon::run::<THostLanguage>(path, port_path, args.filesystem, config);
     }
 }

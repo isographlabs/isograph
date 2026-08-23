@@ -8,6 +8,10 @@ license = { workspace = true }
 clap = { workspace = true }
 crossbeam = { workspace = true }
 derive_more = { workspace = true }
+globset = "0.3"
+notify = { workspace = true }
+notify-debouncer-full = { workspace = true }
+pathdiff = { workspace = true }
 freddie_cli = { git = "https://github.com/freddiehg/freddie", rev = "2cf07439ce57fd55079b89128b2f22603ef8d1a8" }
 freddie_single_instance = { git = "https://github.com/freddiehg/freddie", rev = "2cf07439ce57fd55079b89128b2f22603ef8d1a8" }
 common_lang_types = { path = "../common_lang_types" }

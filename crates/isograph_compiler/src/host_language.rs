@@ -1,4 +1,5 @@
 use std::fmt::{self, Debug};
+use std::path::Path;
 
 use thiserror::Error;
 
@@ -56,6 +57,12 @@ impl<THostLanguage: HostLanguage> IsoLiteralExtraction<THostLanguage> {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SkipSourceFile {
+    Skip,
+    Keep,
+}
+
 pub trait HostLanguage: Send + Sync + Sized + 'static {
     type Error: std::fmt::Display + std::error::Error + Clone + PartialEq + Eq + 'static;
     type LiteralContext: Clone + PartialEq + Eq + Debug + 'static;
@@ -64,6 +71,8 @@ pub trait HostLanguage: Send + Sync + Sized + 'static {
         db: &IsographState<Self>,
         path: RelativePathToSourceFile,
     ) -> &Option<Vec<IsoLiteralExtraction<Self>>>;
+
+    fn should_skip_source_file(relative_path: &Path) -> SkipSourceFile;
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

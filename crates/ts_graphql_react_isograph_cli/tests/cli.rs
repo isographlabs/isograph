@@ -26,7 +26,7 @@ impl Daemon {
         std::fs::write(config.reference(), "{\"source_files\":[]}\n")
             .expect("a test can write a config file");
         let daemon = Self { dir };
-        let output = daemon.isograph(["start"].reference());
+        let output = daemon.isograph(["start", "--filesystem", "injected"].reference());
         assert!(
             output.status.success(),
             "start failed: {}",
@@ -36,6 +36,20 @@ impl Daemon {
         let path = config.canonicalize().expect("the fixture exists");
         assert!(text.contains("started"), "{text}");
         assert!(text.contains(&path.display().to_string()), "{text}");
+        daemon
+    }
+
+    fn start_watch(source_files: &str) -> Self {
+        let dir = tempfile::tempdir().expect("a test can create a temp directory");
+        let config = dir.path().join("isograph.config.json");
+        std::fs::write(config.reference(), source_files).expect("a test can write a config file");
+        let daemon = Self { dir };
+        let output = daemon.isograph(["start"].reference());
+        assert!(
+            output.status.success(),
+            "start failed: {}",
+            String::from_utf8_lossy(output.stderr.reference())
+        );
         daemon
     }
 
@@ -457,6 +471,78 @@ fn stop_then_status_reports_not_running() {
         let log = daemon.log_text();
         (log.contains("SIGTERM: quitting") && log.contains("kill: exiting")).then_some(())
     });
+}
+
+#[test]
+fn start_help_contains_filesystem() {
+    let output = Command::new(isograph_bin())
+        .args(["start", "--help"].reference())
+        .output()
+        .expect("the isograph binary runs");
+    assert!(output.status.success());
+    let text = stdout(output.reference());
+    assert!(text.contains("filesystem"), "{text}");
+}
+
+#[test]
+fn watch_of_empty_source_files_logs_scan_finished() {
+    let daemon = Daemon::start_watch("{\"source_files\":[]}\n");
+    poll(|| {
+        let log = daemon.log_text();
+        (log.contains("scan finished") && log.contains("isograph daemon up")).then_some(())
+    });
+}
+
+#[test]
+fn watch_interns_matching_files_and_skips_the_rest() {
+    let daemon = {
+        let dir = tempfile::tempdir().expect("a test can create a temp directory");
+        let config = dir.path().join("isograph.config.json");
+        std::fs::write(
+            config.reference(),
+            r#"{"source_files":["src/**/*.ts","!src/**/*.test.ts"]}"#,
+        )
+        .expect("a test can write a config file");
+        let src = dir.path().join("src");
+        std::fs::create_dir_all(src.reference()).expect("a test can create src");
+        std::fs::write(
+            src.join("Home.ts"),
+            "export const Home = iso(`entrypoint Query.HomeRoute`)\n",
+        )
+        .expect("a test can write Home.ts");
+        let daemon = Daemon { dir };
+        let output = daemon.isograph(["start"].reference());
+        assert!(
+            output.status.success(),
+            "start failed: {}",
+            String::from_utf8_lossy(output.stderr.reference())
+        );
+        daemon
+    };
+    poll(|| {
+        let log = daemon.log_text();
+        (log.contains("disk present") && log.contains("Home.ts")).then_some(())
+    });
+    let src = daemon.dir.path().join("src");
+    std::fs::write(
+        src.join("Other.ts"),
+        "export const Other = iso(`entrypoint Query.Other`)\n",
+    )
+    .expect("a test can write Other.ts");
+    poll(|| daemon.log_text().contains("Other.ts").then_some(()));
+    std::fs::write(src.join("skip.rs"), "fn skip() {}\n").expect("a test can write skip.rs");
+    std::fs::write(
+        src.join("Home.test.ts"),
+        "export const HomeTest = iso(`entrypoint Query.HomeTest`)\n",
+    )
+    .expect("a test can write Home.test.ts");
+    std::thread::sleep(Duration::from_millis(500));
+    let log = daemon.log_text();
+    assert!(!log.contains("skip.rs"), "skip.rs should not intern: {log}");
+    assert!(
+        !log.contains("Home.test.ts"),
+        "Home.test.ts should not intern: {log}"
+    );
 }
 
 #[test]

@@ -2,14 +2,22 @@ use std::ops::ControlFlow;
 use std::path::PathBuf;
 
 use isograph_compiler::HostLanguage;
+use isograph_config::IsographProjectConfig;
 use prelude::Postfix;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 
+use crate::Filesystem;
 use crate::effect::IsographEffect;
 use crate::event::IsographEvent;
 use crate::state::{IsographState, handle, intern_config_directory};
+use crate::watch::SourceFileEvent;
 
-pub fn run<THostLanguage: HostLanguage>(config_path: PathBuf, port_path: PathBuf) {
+pub fn run<THostLanguage: HostLanguage>(
+    config_path: PathBuf,
+    port_path: PathBuf,
+    filesystem: Filesystem,
+    config: IsographProjectConfig,
+) {
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -20,12 +28,23 @@ pub fn run<THostLanguage: HostLanguage>(config_path: PathBuf, port_path: PathBuf
             return;
         }
     };
-    runtime.block_on(serve::<THostLanguage>(config_path, port_path));
+    runtime.block_on(serve::<THostLanguage>(
+        config_path,
+        port_path,
+        filesystem,
+        config,
+    ));
 }
 
-async fn serve<THostLanguage: HostLanguage>(config_path: PathBuf, port_path: PathBuf) {
+async fn serve<THostLanguage: HostLanguage>(
+    config_path: PathBuf,
+    port_path: PathBuf,
+    filesystem: Filesystem,
+    config: IsographProjectConfig,
+) {
     let (event_tx, event_rx) = unbounded_channel::<IsographEvent>();
     let (effect_tx, effect_rx) = unbounded_channel::<IsographEffect>();
+    let (watch_tx, watch_rx) = unbounded_channel::<Vec<SourceFileEvent>>();
     let listener = match tokio::net::TcpListener::bind(std::net::SocketAddr::from((
         std::net::Ipv4Addr::LOCALHOST,
         0,
@@ -45,6 +64,28 @@ async fn serve<THostLanguage: HostLanguage>(config_path: PathBuf, port_path: Pat
             return;
         }
     };
+
+    let mut state = IsographState::<THostLanguage>::default();
+    intern_config_directory(&mut state, config_path.reference());
+    let config_directory = config_path
+        .parent()
+        .expect("a config file path has a parent directory")
+        .to_owned();
+    let source_files = config.source_files.clone();
+    let _hold_watch = watch_tx.clone();
+    let _watcher = match crate::watch::start_if_watching::<THostLanguage>(
+        filesystem,
+        watch_tx,
+        config_path.reference(),
+        config.source_files.as_slice(),
+    ) {
+        Ok(watcher) => watcher,
+        Err(e) => {
+            tracing::error!(error = %e, "could not start the watcher");
+            return;
+        }
+    };
+
     if let Err(e) = std::fs::write(port_path.reference(), format!("{port}\n")) {
         tracing::error!(
             error = %e,
@@ -82,15 +123,35 @@ async fn serve<THostLanguage: HostLanguage>(config_path: PathBuf, port_path: Pat
     // `select!` rather than `join!`: the effect loop ends on `Kill`, and the event
     // loop never does, because `_hold_events` holds a sender for as long as serve runs.
     let _hold_events = event_tx.clone();
-    let mut state = IsographState::<THostLanguage>::default();
-    intern_config_directory(&mut state, config_path.reference());
     tokio::select! {
         () = run_event_loop(state, event_rx, effect_tx) => {}
         () = run_effect_loop(effect_rx) => {}
-        () = crate::lsp_socket::accept_loop(listener, event_tx) => {}
+        () = crate::lsp_socket::accept_loop(listener, event_tx.clone()) => {}
+        () = run_filesystem_watcher::<THostLanguage>(
+            watch_rx,
+            event_tx,
+            config_directory,
+            source_files,
+        ) => {}
     }
     let _ = std::fs::remove_file(port_path.reference());
     std::process::exit(0);
+}
+
+async fn run_filesystem_watcher<THostLanguage: HostLanguage>(
+    mut watch_rx: UnboundedReceiver<Vec<SourceFileEvent>>,
+    event_tx: UnboundedSender<IsographEvent>,
+    config_directory: PathBuf,
+    source_files: Vec<String>,
+) {
+    while let Some(events) = watch_rx.recv().await {
+        crate::watch::apply::<THostLanguage>(
+            event_tx.reference(),
+            config_directory.reference(),
+            events,
+            source_files.as_slice(),
+        );
+    }
 }
 
 pub(crate) async fn run_event_loop<THostLanguage: HostLanguage>(

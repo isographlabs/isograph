@@ -77,8 +77,10 @@ mod tests {
     use prelude::Postfix;
     use thiserror::Error;
 
+    use std::path::Path;
+
     use super::IsographState;
-    use crate::host_language::{HostLanguage, IsoLiteralExtraction};
+    use crate::host_language::{HostLanguage, IsoLiteralExtraction, SkipSourceFile};
 
     #[derive(Clone, Debug, PartialEq, Eq, Error)]
     #[error("test host")]
@@ -96,6 +98,10 @@ mod tests {
         ) -> &Option<Vec<IsoLiteralExtraction<Self>>> {
             const NONE: Option<Vec<IsoLiteralExtraction<TestHostLanguage>>> = None;
             &NONE
+        }
+
+        fn should_skip_source_file(_relative_path: &Path) -> SkipSourceFile {
+            SkipSourceFile::Keep
         }
     }
 
