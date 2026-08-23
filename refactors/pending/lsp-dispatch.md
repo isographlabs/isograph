@@ -42,18 +42,12 @@ impl<'state, TState> LspRequestDispatch<'state, TState> {
         if self.incoming.request.method != TRequest::METHOD {
             return ControlFlow::Continue(self);
         }
-        let crate::event::LspRequest {
-            client,
-            request,
-            reply,
-        } = self.incoming;
+        let crate::event::LspRequest { request, reply } = self.incoming;
         let id = request.id.clone();
         let effect = match request.extract::<TRequest::Params>(TRequest::METHOD) {
             Ok((_, params)) => match handler(self.state, params) {
                 Ok(result) => match serde_json::to_value(result) {
                     Ok(value) => respond(
-                        client,
-                        id.clone(),
                         reply,
                         lsp_server::Response {
                             id,
@@ -64,8 +58,6 @@ impl<'state, TState> LspRequestDispatch<'state, TState> {
                     Err(e) => {
                         warn!(error = %e, "could not encode request result");
                         respond(
-                            client,
-                            id.clone(),
                             reply,
                             lsp_server::Response::new_err(
                                 id,
@@ -76,8 +68,6 @@ impl<'state, TState> LspRequestDispatch<'state, TState> {
                     }
                 },
                 Err(error) => respond(
-                    client,
-                    id.clone(),
                     reply,
                     lsp_server::Response {
                         id,
@@ -88,19 +78,13 @@ impl<'state, TState> LspRequestDispatch<'state, TState> {
             },
             Err(ExtractError::MethodMismatch(request)) => {
                 return ControlFlow::Continue(Self {
-                    incoming: crate::event::LspRequest {
-                        client,
-                        request,
-                        reply,
-                    },
+                    incoming: crate::event::LspRequest { request, reply },
                     state: self.state,
                 });
             }
             Err(ExtractError::JsonError { method, error }) => {
                 warn!(method = method.as_str(), error = %error, "request params");
                 respond(
-                    client,
-                    id.clone(),
                     reply,
                     lsp_server::Response::new_err(
                         id,
@@ -119,17 +103,10 @@ impl<'state, TState> LspRequestDispatch<'state, TState> {
 }
 
 fn respond(
-    client: crate::event::LspClientId,
-    id: lsp_server::RequestId,
     reply: crossbeam::channel::Sender<lsp_server::Message>,
     response: lsp_server::Response,
 ) -> crate::effect::IsographEffect {
-    crate::effect::IsographEffect::LspRespond(crate::effect::LspRespond {
-        client,
-        id,
-        reply,
-        response,
-    })
+    crate::effect::IsographEffect::LspRespond(crate::effect::LspRespond { reply, response })
 }
 ```
 
