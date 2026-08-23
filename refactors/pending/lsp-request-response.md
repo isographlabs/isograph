@@ -60,7 +60,7 @@ pub enum IsographEffect {
 }
 ```
 
-No `PartialEq` / `Eq`. Nothing in production compares effects. `Sender` does not implement them. Do not add a tests-only impl. Daemon and `state.rs` tests that `assert_eq` an effect become `matches!`. Empty effects: `effects.is_empty()`. `LspRespond` tests match the variant and `response.error` code.
+No `PartialEq` / `Eq`. Nothing in production compares effects. `Sender` does not implement them. Do not add a tests-only impl. Existing `assert_eq` on `LogHelloWorld` / `Kill` become `matches!`. Empty effects: `effects.is_empty()`.
 
 ### `handle`
 
@@ -135,9 +135,9 @@ derive_more = { workspace = true }
 
 `lsp_socket.rs`: existing MethodNotFound / shutdown / ServerNotInitialized / HelloWorld tests stay. `ServerNotInitialized` is still `Connection::initialize`.
 
-Add: initialize, hover, `MethodNotFound`, then `isograph/event` HelloWorld on the same connection arrives. Proves a request event did not eat the notification path.
+Add: initialize, hover, `MethodNotFound`, then `isograph/event` HelloWorld on the same connection arrives.
 
-Add: `handle` of `LspRequest` (a `crossbeam` channel as `reply`) returns one `LspRespond` whose error code is `MethodNotFound`.
+Add: `handle` of `LspRequest`. `reply` is a `crossbeam` channel the test owns. One effect. Match `LspRespond`. Compare `response.id` to the request id, `result` is `None`, `error.code` is `MethodNotFound`, `error.message` is `No handler registered for method 'textDocument/hover'`. `perform` that effect; `reply`'s receiver gets `Message::Response` with that same id, code, and message.
 
 `state.rs` existing in-process tests stay. They construct `HelloWorld` / `Quit` / `DiskChanged` only.
 
