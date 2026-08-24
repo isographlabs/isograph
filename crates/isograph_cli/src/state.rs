@@ -27,7 +27,7 @@ pub fn handle<THostLanguage: HostLanguage>(
     event: IsographEvent,
 ) -> Vec<IsographEffect> {
     match event {
-        IsographEvent::Lsp(lsp) => dispatch_lsp(&mut state.db, lsp),
+        IsographEvent::Lsp(lsp) => dispatch_lsp(state, lsp),
         IsographEvent::Internal(internal) => handle_internal(&mut state.db, internal),
         IsographEvent::ClientConnection(client) => handle_client_connection(state, client),
     }
@@ -53,13 +53,18 @@ fn handle_client_connection<THostLanguage: HostLanguage>(
 }
 
 fn dispatch_lsp<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
+    state: &mut State<THostLanguage>,
     lsp: crate::event::LspEvent,
 ) -> Vec<IsographEffect> {
     match lsp {
-        crate::event::LspEvent::Request(incoming) => dispatch_lsp_request(state, incoming),
+        crate::event::LspEvent::Request(incoming) => {
+            let Some(reply) = state.live_sessions.reply(incoming.client) else {
+                return Vec::new();
+            };
+            dispatch_lsp_request(&state.db, incoming, reply)
+        }
         crate::event::LspEvent::Notification(notification) => {
-            dispatch_lsp_notification(state, notification)
+            dispatch_lsp_notification(&mut state.db, notification)
         }
         crate::event::LspEvent::Response(_response) => Vec::new(),
     }
@@ -68,8 +73,9 @@ fn dispatch_lsp<THostLanguage: HostLanguage>(
 fn dispatch_lsp_request<THostLanguage: HostLanguage>(
     state: &IsographState<THostLanguage>,
     incoming: crate::event::LspRequest,
+    reply: crossbeam::channel::Sender<lsp_server::Message>,
 ) -> Vec<IsographEffect> {
-    let crate::event::LspRequest { request, reply } = incoming;
+    let request = incoming.request;
     let get_response = || {
         let request = isograph_lsp::lsp_request_dispatch::LSPRequestDispatch::new(request, state)
             .on_request_sync::<lsp_types::request::SemanticTokensFullRequest>(
@@ -85,39 +91,38 @@ fn dispatch_lsp_request<THostLanguage: HostLanguage>(
         ControlFlow::Continue(request)
     };
     match get_response() {
-        ControlFlow::Break(response) => crate::effect::IsographEffect::SendLspResponse(
-            crate::effect::SendLspResponseEffect { reply, response }.boxed(),
-        )
-        .wrap_vec(),
-        ControlFlow::Continue(request) => {
-            method_not_found(crate::event::LspRequest { request, reply })
-        }
+        ControlFlow::Break(response) => send_lsp_response(reply, response),
+        ControlFlow::Continue(request) => method_not_found(reply, request),
     }
 }
 
-fn method_not_found(incoming: crate::event::LspRequest) -> Vec<IsographEffect> {
-    // Immediate SendLspResponseEffect this slice. Async later: a timer plus an event; handle of
-    // that event is an immediate SendLspResponseEffect.
+fn send_lsp_response(
+    reply: crossbeam::channel::Sender<lsp_server::Message>,
+    response: lsp_server::Response,
+) -> Vec<IsographEffect> {
     crate::effect::IsographEffect::SendLspResponse(
-        crate::effect::SendLspResponseEffect {
-            reply: incoming.reply,
-            response: lsp_server::Response {
-                id: incoming.request.id,
-                result: None,
-                error: lsp_server::ResponseError {
-                    code: lsp_server::ErrorCode::MethodNotFound as i32,
-                    data: None,
-                    message: format!(
-                        "No handler registered for method '{}'",
-                        incoming.request.method
-                    ),
-                }
-                .wrap_some(),
-            },
-        }
-        .boxed(),
+        crate::effect::SendLspResponseEffect { reply, response }.boxed(),
     )
     .wrap_vec()
+}
+
+fn method_not_found(
+    reply: crossbeam::channel::Sender<lsp_server::Message>,
+    request: lsp_server::Request,
+) -> Vec<IsographEffect> {
+    send_lsp_response(
+        reply,
+        lsp_server::Response {
+            id: request.id,
+            result: None,
+            error: lsp_server::ResponseError {
+                code: lsp_server::ErrorCode::MethodNotFound as i32,
+                data: None,
+                message: format!("No handler registered for method '{}'", request.method),
+            }
+            .wrap_some(),
+        },
+    )
 }
 
 fn handle_internal<THostLanguage: HostLanguage>(
@@ -211,6 +216,7 @@ mod tests {
 
     use intern::string_key::Intern;
     use lsp_types::notification::Notification;
+    use lsp_types::request::Request;
     use pico::Database;
     use prelude::Postfix;
 
@@ -329,22 +335,60 @@ mod tests {
         assert!(contents(state.reference(), interned("src/a.ts")).is_none());
     }
 
+    fn start_client(
+        state: &mut State<TypeScriptHostLanguage>,
+        client: ClientId,
+        sender: crossbeam::channel::Sender<lsp_server::Message>,
+    ) {
+        handle(
+            state,
+            ClientConnectionEvent::Started(ClientStartedEvent {
+                client,
+                session: dummy_session(sender, lsp_types::ClientCapabilities::default()),
+            })
+            .to(),
+        );
+    }
+
+    fn lsp_request(
+        client: ClientId,
+        id: lsp_server::RequestId,
+        method: &str,
+        params: serde_json::Value,
+    ) -> IsographEvent {
+        LspEvent::Request(crate::event::LspRequest {
+            client,
+            request: lsp_server::Request {
+                id,
+                method: method.to_owned(),
+                params,
+            },
+        })
+        .to()
+    }
+
+    fn formatting_params() -> serde_json::Value {
+        serde_json::json!({
+            "textDocument": { "uri": "file:///tmp/proj/src/x.ts" },
+            "options": { "tabSize": 2, "insertSpaces": true }
+        })
+    }
+
     #[test]
     fn lsp_request_returns_method_not_found() {
         let mut state = empty();
-        let (reply, rx) = crossbeam::channel::unbounded();
+        let client = ClientId(1);
+        let (tx, rx) = crossbeam::channel::unbounded();
+        start_client(&mut state, client, tx);
         let id = lsp_server::RequestId::from(1);
         let effects = handle(
             &mut state,
-            LspEvent::Request(crate::event::LspRequest {
-                request: lsp_server::Request {
-                    id: id.clone(),
-                    method: "textDocument/hover".to_owned(),
-                    params: serde_json::json!({}),
-                },
-                reply,
-            })
-            .to(),
+            lsp_request(
+                client,
+                id.clone(),
+                "textDocument/hover",
+                serde_json::json!({}),
+            ),
         );
         assert_eq!(effects.len(), 1);
         let effect = effects
@@ -379,6 +423,108 @@ mod tests {
             error.message,
             "No handler registered for method 'textDocument/hover'"
         );
+    }
+
+    #[test]
+    fn lsp_formatting_of_a_live_client_returns_an_empty_array() {
+        let mut state = empty();
+        let client = ClientId(1);
+        let (tx, rx) = crossbeam::channel::unbounded();
+        start_client(&mut state, client, tx);
+        let id = lsp_server::RequestId::from(1);
+        let effects = handle(
+            &mut state,
+            lsp_request(
+                client,
+                id.clone(),
+                lsp_types::request::Formatting::METHOD,
+                formatting_params(),
+            ),
+        );
+        assert_eq!(effects.len(), 1);
+        let effect = effects
+            .into_iter()
+            .next()
+            .expect("handle returned one effect");
+        let crate::effect::IsographEffect::SendLspResponse(send) = effect else {
+            panic!("handle of Formatting returns SendLspResponseEffect");
+        };
+        assert_eq!(send.response.id, id);
+        assert_eq!(send.response.result, serde_json::json!([]).wrap_some());
+        let _ = crate::daemon::perform(crate::effect::IsographEffect::SendLspResponse(send));
+        let lsp_server::Message::Response(response) = rx.recv().expect("perform sends on reply")
+        else {
+            panic!("perform sends Message::Response");
+        };
+        assert_eq!(response.result, serde_json::json!([]).wrap_some());
+    }
+
+    #[test]
+    fn lsp_request_without_a_live_session_returns_no_effects() {
+        let mut state = empty();
+        let effects = handle(
+            &mut state,
+            lsp_request(
+                ClientId(1),
+                lsp_server::RequestId::from(1),
+                "textDocument/hover",
+                serde_json::json!({}),
+            ),
+        );
+        assert!(effects.is_empty());
+    }
+
+    #[test]
+    fn lsp_request_from_a_sibling_client_returns_no_effects() {
+        let mut state = empty();
+        let (tx, rx) = crossbeam::channel::unbounded();
+        start_client(&mut state, ClientId(1), tx);
+        let effects = handle(
+            &mut state,
+            lsp_request(
+                ClientId(2),
+                lsp_server::RequestId::from(1),
+                "textDocument/hover",
+                serde_json::json!({}),
+            ),
+        );
+        assert!(effects.is_empty());
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn lsp_request_after_gone_returns_no_effects() {
+        let mut state = empty();
+        let client = ClientId(1);
+        let (tx, rx) = crossbeam::channel::unbounded();
+        start_client(&mut state, client, tx);
+        handle(&mut state, ClientConnectionEvent::Gone(client).to());
+        let effects = handle(
+            &mut state,
+            lsp_request(
+                client,
+                lsp_server::RequestId::from(1),
+                "textDocument/hover",
+                serde_json::json!({}),
+            ),
+        );
+        assert!(effects.is_empty());
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn lsp_formatting_from_a_client_that_is_not_live_returns_no_effects() {
+        let mut state = empty();
+        let effects = handle(
+            &mut state,
+            lsp_request(
+                ClientId(1),
+                lsp_server::RequestId::from(1),
+                lsp_types::request::Formatting::METHOD,
+                formatting_params(),
+            ),
+        );
+        assert!(effects.is_empty());
     }
 
     #[test]

@@ -1,11 +1,9 @@
 use std::path::PathBuf;
 
-use lsp_server::Message;
-
 #[derive(Clone, Debug)]
 pub struct LspRequest {
+    pub client: ClientId,
     pub request: lsp_server::Request,
-    pub reply: crossbeam::channel::Sender<Message>,
 }
 
 #[derive(Clone, Debug)]
@@ -28,7 +26,6 @@ pub(crate) struct ClientId(pub u64);
 
 #[derive(Clone, Debug)]
 pub struct LiveSession {
-    #[cfg_attr(not(test), expect(dead_code))]
     pub sender: crossbeam::channel::Sender<lsp_server::Message>,
     #[cfg_attr(not(test), expect(dead_code))]
     pub capabilities: lsp_types::ClientCapabilities,
@@ -36,6 +33,15 @@ pub struct LiveSession {
 
 #[derive(Debug, Default)]
 pub struct LiveSessions(pub std::collections::HashMap<ClientId, LiveSession>);
+
+impl LiveSessions {
+    pub fn reply(
+        &self,
+        client: ClientId,
+    ) -> Option<crossbeam::channel::Sender<lsp_server::Message>> {
+        self.0.get(&client).map(|session| session.sender.clone())
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct ClientStartedEvent {

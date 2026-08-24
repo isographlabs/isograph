@@ -195,10 +195,7 @@ fn run_session(
     for message in &connection.receiver {
         let event = match message {
             lsp_server::Message::Request(request) => {
-                crate::event::LspEvent::Request(crate::event::LspRequest {
-                    request,
-                    reply: connection.sender.clone(),
-                })
+                crate::event::LspEvent::Request(crate::event::LspRequest { client, request })
             }
             lsp_server::Message::Notification(notification) => {
                 crate::event::LspEvent::Notification(notification)
@@ -471,6 +468,13 @@ mod tests {
 
     fn take_gone(event_rx: &mut UnboundedReceiver<IsographEvent>) -> ClientId {
         client_gone(event_rx.try_recv().expect("Gone arrived"))
+    }
+
+    fn take_request(event_rx: &mut UnboundedReceiver<IsographEvent>) -> crate::event::LspRequest {
+        match event_rx.try_recv().expect("Request arrived") {
+            IsographEvent::Lsp(crate::event::LspEvent::Request(incoming)) => incoming,
+            other => panic!("expected LspEvent::Request, got {other:?}"),
+        }
     }
 
     fn drain(event_rx: &mut UnboundedReceiver<IsographEvent>) -> Vec<IsographEvent> {
@@ -1177,6 +1181,69 @@ mod tests {
             event_rx.try_recv().is_err(),
             "the remaining connection is still live"
         );
+        drop(writer2);
+        drop(reader2);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn hover_request_carries_the_started_client() {
+        let (port, mut event_rx) = listen_for_events().await;
+        let stream = connect(port);
+        let (mut writer, mut reader) = split(stream);
+        initialize(&mut writer, &mut reader);
+        write_message(
+            &mut writer,
+            Message::Request(Request {
+                id: RequestId::from(2),
+                method: "textDocument/hover".to_owned(),
+                params: serde_json::json!({}),
+            }),
+        );
+        tokio::time::sleep(SETTLE).await;
+        let started = take_started(&mut event_rx);
+        let incoming = take_request(&mut event_rx);
+        assert_eq!(incoming.client, started.client);
+        assert_eq!(incoming.request.method, "textDocument/hover");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn two_connections_hover_requests_carry_their_started_clients() {
+        let (port, mut event_rx) = listen_for_events().await;
+        let stream1 = connect(port);
+        let (mut writer1, mut reader1) = split(stream1);
+        initialize(&mut writer1, &mut reader1);
+        write_message(
+            &mut writer1,
+            Message::Request(Request {
+                id: RequestId::from(2),
+                method: "textDocument/hover".to_owned(),
+                params: serde_json::json!({}),
+            }),
+        );
+        tokio::time::sleep(SETTLE).await;
+        let started1 = take_started(&mut event_rx);
+        let incoming1 = take_request(&mut event_rx);
+        assert_eq!(incoming1.client, started1.client);
+
+        let stream2 = connect(port);
+        let (mut writer2, mut reader2) = split(stream2);
+        initialize(&mut writer2, &mut reader2);
+        write_message(
+            &mut writer2,
+            Message::Request(Request {
+                id: RequestId::from(2),
+                method: "textDocument/hover".to_owned(),
+                params: serde_json::json!({}),
+            }),
+        );
+        tokio::time::sleep(SETTLE).await;
+        let started2 = take_started(&mut event_rx);
+        let incoming2 = take_request(&mut event_rx);
+        assert_eq!(incoming2.client, started2.client);
+        assert_ne!(started1.client, started2.client);
+
+        drop(writer1);
+        drop(reader1);
         drop(writer2);
         drop(reader2);
     }
