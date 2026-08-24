@@ -172,15 +172,16 @@ pub(crate) async fn run_event_loop<THostLanguage: HostLanguage>(
 }
 
 pub(crate) async fn run_effect_loop(mut effect_rx: UnboundedReceiver<IsographEffect>) {
+    let token = crate::effect::SideEffectToken::mint();
     while let Some(effect) = effect_rx.recv().await {
         tracing::debug!(?effect, "effect");
-        if perform(effect).is_break() {
+        if perform(token.reference(), effect).is_break() {
             break;
         }
     }
 }
 
-pub fn perform(effect: IsographEffect) -> ControlFlow<()> {
+pub fn perform(token: &crate::effect::SideEffectToken, effect: IsographEffect) -> ControlFlow<()> {
     match effect {
         IsographEffect::LogHelloWorld => {
             tracing::info!("hello world");
@@ -191,9 +192,7 @@ pub fn perform(effect: IsographEffect) -> ControlFlow<()> {
             ControlFlow::Break(())
         }
         IsographEffect::SendLspResponse(respond) => {
-            let _ = respond
-                .reply
-                .send(lsp_server::Message::Response(respond.response));
+            (respond.send)(token);
             ControlFlow::Continue(())
         }
     }

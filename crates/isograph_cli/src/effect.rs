@@ -1,9 +1,23 @@
-use lsp_server::Message;
+pub struct SideEffectToken {
+    _not_send: std::marker::PhantomData<*const ()>,
+}
 
-#[derive(Debug)]
+impl SideEffectToken {
+    pub(crate) fn mint() -> Self {
+        Self {
+            _not_send: std::marker::PhantomData,
+        }
+    }
+}
+
 pub struct SendLspResponseEffect {
-    pub reply: crossbeam::channel::Sender<Message>,
-    pub response: lsp_server::Response,
+    pub send: Box<dyn FnOnce(&SideEffectToken) + Send>,
+}
+
+impl std::fmt::Debug for SendLspResponseEffect {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("SendLspResponseEffect")
+    }
 }
 
 #[derive(Debug)]

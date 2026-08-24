@@ -58,10 +58,15 @@ fn dispatch_lsp<THostLanguage: HostLanguage>(
 ) -> Vec<IsographEffect> {
     match lsp {
         crate::event::LspEvent::Request(incoming) => {
-            let Some(reply) = state.live_sessions.reply(incoming.client) else {
-                return Vec::new();
-            };
-            dispatch_lsp_request(&state.db, incoming, reply)
+            let client = incoming.client;
+            let id = incoming.request.id.clone();
+            {
+                let Some(session) = state.live_sessions.0.get_mut(&client) else {
+                    return Vec::new();
+                };
+                session.outstanding.insert(id.clone());
+            }
+            dispatch_lsp_request(state, incoming, id)
         }
         crate::event::LspEvent::Notification(notification) => {
             dispatch_lsp_notification(&mut state.db, notification)
@@ -71,47 +76,63 @@ fn dispatch_lsp<THostLanguage: HostLanguage>(
 }
 
 fn dispatch_lsp_request<THostLanguage: HostLanguage>(
-    state: &IsographState<THostLanguage>,
+    state: &mut State<THostLanguage>,
     incoming: crate::event::LspRequest,
-    reply: crossbeam::channel::Sender<lsp_server::Message>,
+    id: lsp_server::RequestId,
 ) -> Vec<IsographEffect> {
-    let request = incoming.request;
+    let crate::event::LspRequest { client, request } = incoming;
     let get_response = || {
-        let request = isograph_lsp::lsp_request_dispatch::LSPRequestDispatch::new(request, state)
-            .on_request_sync::<lsp_types::request::SemanticTokensFullRequest>(
-                crate::adapter::semantic_tokens_response::<THostLanguage>,
-            )?
-            .on_request_sync::<lsp_types::request::Formatting>(
-                crate::adapter::formatting_response::<THostLanguage>,
-            )?
-            .on_request_sync::<lsp_types::request::WillSaveWaitUntil>(
-                crate::adapter::will_save_wait_until_response::<THostLanguage>,
-            )?
-            .request();
+        let request =
+            isograph_lsp::lsp_request_dispatch::LSPRequestDispatch::new(request, &state.db)
+                .on_request_sync::<lsp_types::request::SemanticTokensFullRequest>(
+                    crate::adapter::semantic_tokens_response::<THostLanguage>,
+                )?
+                .on_request_sync::<lsp_types::request::Formatting>(
+                    crate::adapter::formatting_response::<THostLanguage>,
+                )?
+                .on_request_sync::<lsp_types::request::WillSaveWaitUntil>(
+                    crate::adapter::will_save_wait_until_response::<THostLanguage>,
+                )?
+                .request();
         ControlFlow::Continue(request)
     };
     match get_response() {
-        ControlFlow::Break(response) => send_lsp_response(reply, response),
-        ControlFlow::Continue(request) => method_not_found(reply, request),
+        ControlFlow::Break(response) => send_lsp_response(state, client, id, response),
+        ControlFlow::Continue(request) => method_not_found(state, client, id, request),
     }
 }
 
-fn send_lsp_response(
-    reply: crossbeam::channel::Sender<lsp_server::Message>,
+fn send_lsp_response<THostLanguage: HostLanguage>(
+    state: &mut State<THostLanguage>,
+    client: crate::event::ClientId,
+    id: lsp_server::RequestId,
     response: lsp_server::Response,
 ) -> Vec<IsographEffect> {
+    let Some(send) = state.live_sessions.take_reply(client, id) else {
+        return Vec::new();
+    };
     crate::effect::IsographEffect::SendLspResponse(
-        crate::effect::SendLspResponseEffect { reply, response }.boxed(),
+        crate::effect::SendLspResponseEffect {
+            send: (move |token: &crate::effect::SideEffectToken| {
+                send(token, lsp_server::Message::Response(response))
+            })
+            .boxed(),
+        }
+        .boxed(),
     )
     .wrap_vec()
 }
 
-fn method_not_found(
-    reply: crossbeam::channel::Sender<lsp_server::Message>,
+fn method_not_found<THostLanguage: HostLanguage>(
+    state: &mut State<THostLanguage>,
+    client: crate::event::ClientId,
+    id: lsp_server::RequestId,
     request: lsp_server::Request,
 ) -> Vec<IsographEffect> {
     send_lsp_response(
-        reply,
+        state,
+        client,
+        id,
         lsp_server::Response {
             id: request.id,
             result: None,
@@ -395,22 +416,11 @@ mod tests {
             .into_iter()
             .next()
             .expect("handle returned one effect");
-        let crate::effect::IsographEffect::SendLspResponse(send) = effect else {
-            panic!("handle of LspRequest returns SendLspResponseEffect");
-        };
-        assert_eq!(send.response.id, id);
-        assert!(send.response.result.is_none());
-        let error = send
-            .response
-            .error
-            .as_ref()
-            .expect("MethodNotFound is an error");
-        assert_eq!(error.code, lsp_server::ErrorCode::MethodNotFound as i32);
-        assert_eq!(
-            error.message,
-            "No handler registered for method 'textDocument/hover'"
+        assert!(
+            matches!(effect, crate::effect::IsographEffect::SendLspResponse(_)),
+            "handle of LspRequest returns SendLspResponseEffect"
         );
-        let _ = crate::daemon::perform(crate::effect::IsographEffect::SendLspResponse(send));
+        let _ = crate::daemon::perform(&crate::effect::SideEffectToken::mint(), effect);
         let lsp_server::Message::Response(response) = rx.recv().expect("perform sends on reply")
         else {
             panic!("perform sends Message::Response");
@@ -422,6 +432,15 @@ mod tests {
         assert_eq!(
             error.message,
             "No handler registered for method 'textDocument/hover'"
+        );
+        assert!(
+            state
+                .live_sessions
+                .0
+                .get(&client)
+                .expect("the client is live")
+                .outstanding
+                .is_empty()
         );
     }
 
@@ -446,17 +465,26 @@ mod tests {
             .into_iter()
             .next()
             .expect("handle returned one effect");
-        let crate::effect::IsographEffect::SendLspResponse(send) = effect else {
-            panic!("handle of Formatting returns SendLspResponseEffect");
-        };
-        assert_eq!(send.response.id, id);
-        assert_eq!(send.response.result, serde_json::json!([]).wrap_some());
-        let _ = crate::daemon::perform(crate::effect::IsographEffect::SendLspResponse(send));
+        assert!(
+            matches!(effect, crate::effect::IsographEffect::SendLspResponse(_)),
+            "handle of Formatting returns SendLspResponseEffect"
+        );
+        let _ = crate::daemon::perform(&crate::effect::SideEffectToken::mint(), effect);
         let lsp_server::Message::Response(response) = rx.recv().expect("perform sends on reply")
         else {
             panic!("perform sends Message::Response");
         };
+        assert_eq!(response.id, id);
         assert_eq!(response.result, serde_json::json!([]).wrap_some());
+        assert!(
+            state
+                .live_sessions
+                .0
+                .get(&client)
+                .expect("the client is live")
+                .outstanding
+                .is_empty()
+        );
     }
 
     #[test]
@@ -769,6 +797,7 @@ mod tests {
         LiveSession {
             sender,
             capabilities,
+            outstanding: std::collections::HashSet::new(),
         }
     }
 
@@ -882,5 +911,42 @@ mod tests {
             "the second sender receives the notification"
         );
         assert!(rx1.try_recv().is_err(), "the first session was replaced");
+        assert!(session.outstanding.is_empty());
+    }
+
+    #[test]
+    fn take_reply_of_an_id_that_is_not_outstanding_is_none() {
+        let mut sessions = LiveSessions::default();
+        let (tx, _rx) = crossbeam::channel::unbounded();
+        let client = ClientId(1);
+        sessions.0.insert(
+            client,
+            dummy_session(tx, lsp_types::ClientCapabilities::default()),
+        );
+        assert!(
+            sessions
+                .take_reply(client, lsp_server::RequestId::from(1))
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn take_reply_of_an_outstanding_id_is_some_once() {
+        let mut sessions = LiveSessions::default();
+        let (tx, _rx) = crossbeam::channel::unbounded();
+        let client = ClientId(1);
+        let id = lsp_server::RequestId::from(1);
+        sessions.0.insert(
+            client,
+            dummy_session(tx, lsp_types::ClientCapabilities::default()),
+        );
+        sessions
+            .0
+            .get_mut(&client)
+            .expect("the test inserted the session")
+            .outstanding
+            .insert(id.clone());
+        assert!(sessions.take_reply(client, id.clone()).is_some());
+        assert!(sessions.take_reply(client, id).is_none());
     }
 }

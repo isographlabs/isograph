@@ -188,6 +188,7 @@ fn run_session(
             session: crate::event::LiveSession {
                 sender: connection.sender.clone(),
                 capabilities: params.capabilities,
+                outstanding: std::collections::HashSet::new(),
             },
         })
         .to(),

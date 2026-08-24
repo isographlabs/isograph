@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use prelude::Postfix;
+
 #[derive(Clone, Debug)]
 pub struct LspRequest {
     pub client: ClientId,
@@ -29,17 +31,29 @@ pub struct LiveSession {
     pub sender: crossbeam::channel::Sender<lsp_server::Message>,
     #[cfg_attr(not(test), expect(dead_code))]
     pub capabilities: lsp_types::ClientCapabilities,
+    pub outstanding: std::collections::HashSet<lsp_server::RequestId>,
 }
 
 #[derive(Debug, Default)]
 pub struct LiveSessions(pub std::collections::HashMap<ClientId, LiveSession>);
 
 impl LiveSessions {
-    pub fn reply(
-        &self,
+    pub fn take_reply(
+        &mut self,
         client: ClientId,
-    ) -> Option<crossbeam::channel::Sender<lsp_server::Message>> {
-        self.0.get(&client).map(|session| session.sender.clone())
+        id: lsp_server::RequestId,
+    ) -> Option<
+        impl for<'a> FnOnce(&'a crate::effect::SideEffectToken, lsp_server::Message) + Send + use<>,
+    > {
+        let session = self.0.get_mut(&client)?;
+        if !session.outstanding.remove(&id) {
+            return None;
+        }
+        let sender = session.sender.clone();
+        (move |_token: &crate::effect::SideEffectToken, message| {
+            let _ = sender.send(message);
+        })
+        .wrap_some()
     }
 }
 
