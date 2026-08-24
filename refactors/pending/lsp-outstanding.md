@@ -6,7 +6,7 @@ Requires lsp-request-response.md and lsp-sessions.md (both landed). Independent 
 
 JSON-RPC ids are per connection. Two clients can both use id `1`. Keys are `(ClientId, RequestId)`.
 
-A request whose `client` is not in `live_sessions` returns no effects. A live client's request inserts `(client, id)`, then this slice's handlers still reply in the same turn and remove that pair. `handle` of `Gone` removes the session and every outstanding pair for that client. Cancel and async replies are later readers of the same set: they take a pair and emit `SendLspResponseEffect` only if it was still there.
+A request whose `client` is not in `live_sessions` returns no effects. A live client's request inserts `(client, id)`, then this slice's handlers still reply in the same turn and `send_lsp_response` removes that pair. `remove` returning false is `LSPRuntimeError::UnexpectedError`: `send_lsp_response` runs only after that insert in the same `handle`. `handle` of `Gone` removes the session and every outstanding pair for that client. Cancel and async replies are later readers of the same set: they do not call `send_lsp_response` if the pair is already gone.
 
 Origin: landed `LspRequest` / `SendLspResponseEffect`; sessions.md `ClientId` / `LiveSessions` / `ClientConnectionEvent::Gone` / CLI `State`. Delta: `client` on `LspRequest`, `OutstandingLspRequests` on `State`, `handle` of request and of `Gone` write the set. `SendLspResponseEffect` is unchanged (`response.id` is the request id). `run_event_loop` is unchanged. `perform` is unchanged.
 
@@ -136,7 +136,18 @@ fn send_lsp_response<THostLanguage: HostLanguage>(
     reply: crossbeam::channel::Sender<lsp_server::Message>,
     response: lsp_server::Response,
 ) -> Vec<IsographEffect> {
-    state.outstanding.0.remove(&(client, id));
+    let response = if state.outstanding.0.remove(&(client, id.clone())) {
+        response
+    } else {
+        lsp_server::Response {
+            id,
+            result: None,
+            error: isograph_lsp::lsp_runtime_error::LSPRuntimeError::UnexpectedError(
+                "send_lsp_response of a pair that was not outstanding".to_owned(),
+            )
+            .to(),
+        }
+    };
     crate::effect::IsographEffect::SendLspResponse(
         crate::effect::SendLspResponseEffect { reply, response }.boxed(),
     )
@@ -170,7 +181,7 @@ fn method_not_found<THostLanguage: HostLanguage>(
 }
 ```
 
-Delta: `dispatch_lsp` takes `&mut State`. `dispatch_lsp_request` takes `&mut State` and `&state.db` into `LSPRequestDispatch`. A request whose client is not live returns no effects and does not insert. A live request inserts, then `send_lsp_response` removes and returns `SendLspResponseEffect`. `handle` of `Gone` also retains outstanding. `dispatch_lsp_notification` / `handle_internal` still take `&mut IsographState`.
+Delta: `dispatch_lsp` takes `&mut State`. `dispatch_lsp_request` takes `&mut State` and `&state.db` into `LSPRequestDispatch`. A request whose client is not live returns no effects and does not insert. A live request inserts, then `send_lsp_response` removes and returns `SendLspResponseEffect`. `remove` of a missing pair is `LSPRuntimeError::UnexpectedError` (LSP error response), not a panic. `handle` of `Gone` also retains outstanding. `dispatch_lsp_notification` / `handle_internal` still take `&mut IsographState`.
 
 `SendLspResponseEffect` does not gain `client`. `perform` still sends on `reply`.
 
@@ -232,5 +243,5 @@ Existing `lsp_request_returns_method_not_found` `Started`s first.
 - `handle` of `Lsp` request -> insert / `send_lsp_response` remove
 - `handle` of `Gone` -> `live_sessions` remove and outstanding retain
 - `serve` / `empty` / `empty_state` / `listen_and_reply` / watch `Harness` -> `State { .., outstanding }`
-- later cancel / async reply -> take a pair from `state.outstanding`; emit `SendLspResponseEffect` only if it was present
+- later cancel / async reply -> if the pair is still in `state.outstanding`, then `send_lsp_response`; if `Gone` or cancel already dropped it, do not call `send_lsp_response`
 - lsp-open-files.md -> `client` already on `LspRequest`; notifications still need `client`
