@@ -77,10 +77,7 @@ fn run_inner(args: &SendArgs) -> Result<(), SendError> {
     notify(stream, internal)
 }
 
-pub(crate) fn notify(
-    stream: std::net::TcpStream,
-    event: InternalEvent,
-) -> Result<(), SendError> {
+pub(crate) fn notify(stream: std::net::TcpStream, event: InternalEvent) -> Result<(), SendError> {
     let mut writer = stream.try_clone().map_err(SendError::Clone)?;
     let mut reader = std::io::BufReader::new(stream);
     // JSON-RPC ids are per connection. This client has one outstanding request. A second send is another connection.

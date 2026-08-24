@@ -34,3 +34,21 @@ fn semantic_tokens<THostLanguage: HostLanguage>(
     let path = common_lang_types::relative_path_from_absolute_and_working_directory(*cwd, absolute);
     isograph_lsp::lsp_semantic_tokens_for_file::<THostLanguage>(state, path).clone()
 }
+
+pub(crate) fn formatting_response<THostLanguage: isograph_compiler::HostLanguage>(
+    _state: &isograph_compiler::IsographState<THostLanguage>,
+    _params: lsp_types::DocumentFormattingParams,
+) -> isograph_lsp::lsp_runtime_error::LSPRuntimeResult<
+    <lsp_types::request::Formatting as lsp_types::request::Request>::Result,
+> {
+    Vec::new().wrap_some().wrap_ok()
+}
+
+pub(crate) fn will_save_wait_until_response<THostLanguage: isograph_compiler::HostLanguage>(
+    _state: &isograph_compiler::IsographState<THostLanguage>,
+    _params: lsp_types::WillSaveTextDocumentParams,
+) -> isograph_lsp::lsp_runtime_error::LSPRuntimeResult<
+    <lsp_types::request::WillSaveWaitUntil as lsp_types::request::Request>::Result,
+> {
+    Vec::new().wrap_some().wrap_ok()
+}

@@ -406,7 +406,7 @@ fn relative_from_uri<THostLanguage: HostLanguage>(
 
 ### `initialize` advertises full sync
 
-Before: `ServerCapabilities` with only `semantic_tokens_provider`. After, also:
+Before: `ServerCapabilities` with `semantic_tokens_provider`, `document_formatting_provider`, and `textDocumentSync.willSaveWaitUntil` (iso-format-lsp.md). After, the same `TextDocumentSyncOptions` also has `open_close` and `change`:
 
 ```rust
 // from crates/isograph_cli/src/lsp_socket.rs
@@ -414,6 +414,7 @@ Before: `ServerCapabilities` with only `semantic_tokens_provider`. After, also:
                 lsp_types::TextDocumentSyncOptions {
                     open_close: true.wrap_some(),
                     change: lsp_types::TextDocumentSyncKind::FULL.wrap_some(),
+                    will_save_wait_until: true.wrap_some(),
                     ..Default::default()
                 },
             )

@@ -10,7 +10,7 @@ Zed: install the Isograph extension from the extensions page (or Install Dev Ext
 
 ## VS Code extension
 
-vscode-extension.md, then vscode-config-discovery.md. Spawn `isograph lsp`, document selector the four JS/TS languages, settings `pathToIsograph` / `pathToConfig`. No format-on-save. No `GraphQL.vscode-graphql-syntax`. Publish remains `publish-isograph-extension.yml`.
+vscode-extension.md, then vscode-config-discovery.md. Spawn `isograph lsp`, document selector the four JS/TS languages, settings `pathToIsograph` / `pathToConfig`. The language server answers `textDocument/formatting` and `textDocument/willSaveWaitUntil` (iso-format-lsp.md); both return `[]`. vscode-languageclient sends `willSaveWaitUntil` from that advertise. No `GraphQL.vscode-graphql-syntax`. Publish remains `publish-isograph-extension.yml`.
 
 ## What a Zed extension is
 

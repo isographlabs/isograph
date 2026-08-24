@@ -146,6 +146,14 @@ fn run_session(
                 },
             )
             .wrap_some(),
+        document_formatting_provider: lsp_types::OneOf::Left(true).wrap_some(),
+        text_document_sync: lsp_types::TextDocumentSyncCapability::Options(
+            lsp_types::TextDocumentSyncOptions {
+                will_save_wait_until: true.wrap_some(),
+                ..Default::default()
+            },
+        )
+        .wrap_some(),
         ..Default::default()
     }) {
         Ok(value) => value,
@@ -185,7 +193,8 @@ mod tests {
     use lsp_server::{ErrorCode, Message, Request, RequestId};
     use lsp_types::notification::{Initialized, Notification};
     use lsp_types::request::{
-        Initialize, Request as LspRequest, SemanticTokensFullRequest, Shutdown,
+        Formatting, Initialize, Request as LspRequest, SemanticTokensFullRequest, Shutdown,
+        WillSaveWaitUntil,
     };
     use prelude::Postfix;
     use tokio::sync::mpsc::{UnboundedReceiver, unbounded_channel};
@@ -230,7 +239,10 @@ mod tests {
         tokio::spawn(accept_loop(listener, session_tx));
         tokio::spawn(async move {
             while let Some(event) = session_rx.recv().await {
-                if !matches!(event, IsographEvent::Lsp(crate::event::LspEvent::Request(_))) {
+                if !matches!(
+                    event,
+                    IsographEvent::Lsp(crate::event::LspEvent::Request(_))
+                ) {
                     let _ = test_tx.send(event.clone());
                 }
                 let _ = loop_tx.send(event);
@@ -301,10 +313,11 @@ mod tests {
         response.result.expect("initialize result")
     }
 
-    fn semantic_tokens_full(
+    fn request_response(
         writer: &mut impl Write,
         reader: &mut impl BufRead,
         id: i32,
+        method: &str,
         params: serde_json::Value,
     ) -> lsp_server::Response {
         let id = RequestId::from(id);
@@ -312,7 +325,7 @@ mod tests {
             writer,
             Message::Request(Request {
                 id: id.clone(),
-                method: SemanticTokensFullRequest::METHOD.to_owned(),
+                method: method.to_owned(),
                 params,
             }),
         );
@@ -321,6 +334,65 @@ mod tests {
         };
         assert_eq!(response.id, id);
         response
+    }
+
+    fn semantic_tokens_full(
+        writer: &mut impl Write,
+        reader: &mut impl BufRead,
+        id: i32,
+        params: serde_json::Value,
+    ) -> lsp_server::Response {
+        request_response(
+            writer,
+            reader,
+            id,
+            SemanticTokensFullRequest::METHOD,
+            params,
+        )
+    }
+
+    fn formatting(
+        writer: &mut impl Write,
+        reader: &mut impl BufRead,
+        id: i32,
+        params: serde_json::Value,
+    ) -> lsp_server::Response {
+        request_response(writer, reader, id, Formatting::METHOD, params)
+    }
+
+    fn will_save_wait_until(
+        writer: &mut impl Write,
+        reader: &mut impl BufRead,
+        id: i32,
+        params: serde_json::Value,
+    ) -> lsp_server::Response {
+        request_response(writer, reader, id, WillSaveWaitUntil::METHOD, params)
+    }
+
+    fn formatting_params(uri: &str) -> serde_json::Value {
+        serde_json::json!({
+            "textDocument": { "uri": uri },
+            "options": { "tabSize": 2, "insertSpaces": true }
+        })
+    }
+
+    fn will_save_wait_until_params(uri: &str) -> serde_json::Value {
+        serde_json::json!({
+            "textDocument": { "uri": uri },
+            "reason": 1
+        })
+    }
+
+    async fn intern_iso_field(port: u16) {
+        notify(
+            connect(port),
+            InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
+                path: PathBuf::from("/tmp/proj/src/x.ts"),
+                presence: Presence::Present("iso(`field Query.x{id}`)".to_owned()),
+            })),
+        )
+        .expect("notify DiskChanged");
+        tokio::time::sleep(SETTLE).await;
     }
 
     fn hello_world() -> lsp_server::Notification {
@@ -750,5 +822,120 @@ mod tests {
         };
         assert_eq!(response.id, id);
         assert_ne!(response.id, RequestId::from("default-lsp-id".to_owned()));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn initialize_advertises_formatting_and_will_save_wait_until() {
+        let (port, _event_rx) = listen_for_events().await;
+        let stream = connect(port);
+        let (mut writer, mut reader) = split(stream);
+        let result = initialize(&mut writer, &mut reader);
+        assert_eq!(
+            result["capabilities"]["documentFormattingProvider"],
+            serde_json::json!(true)
+        );
+        assert_eq!(
+            result["capabilities"]["textDocumentSync"]["willSaveWaitUntil"],
+            serde_json::json!(true)
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn formatting_of_an_interned_iso_literal_is_an_empty_array() {
+        let (port, _event_rx) = listen_and_reply().await;
+        intern_iso_field(port).await;
+        let stream = connect(port);
+        let (mut writer, mut reader) = split(stream);
+        initialize(&mut writer, &mut reader);
+        let response = formatting(
+            &mut writer,
+            &mut reader,
+            2,
+            formatting_params("file:///tmp/proj/src/x.ts"),
+        );
+        assert!(response.error.is_none(), "{response:?}");
+        assert_eq!(response.result, serde_json::json!([]).wrap_some());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn will_save_wait_until_of_an_interned_iso_literal_is_an_empty_array() {
+        let (port, _event_rx) = listen_and_reply().await;
+        intern_iso_field(port).await;
+        let stream = connect(port);
+        let (mut writer, mut reader) = split(stream);
+        initialize(&mut writer, &mut reader);
+        let response = will_save_wait_until(
+            &mut writer,
+            &mut reader,
+            2,
+            will_save_wait_until_params("file:///tmp/proj/src/x.ts"),
+        );
+        assert!(response.error.is_none(), "{response:?}");
+        assert_eq!(response.result, serde_json::json!([]).wrap_some());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn formatting_of_a_never_interned_uri_is_an_empty_array() {
+        let (port, _event_rx) = listen_and_reply().await;
+        let stream = connect(port);
+        let (mut writer, mut reader) = split(stream);
+        initialize(&mut writer, &mut reader);
+        let response = formatting(
+            &mut writer,
+            &mut reader,
+            2,
+            formatting_params("file:///tmp/proj/src/never.ts"),
+        );
+        assert!(response.error.is_none(), "{response:?}");
+        assert_eq!(response.result, serde_json::json!([]).wrap_some());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn semantic_tokens_of_an_interned_field_literal_encodes_field_as_keyword() {
+        let (port, _event_rx) = listen_and_reply().await;
+        intern_iso_field(port).await;
+        let stream = connect(port);
+        let (mut writer, mut reader) = split(stream);
+        initialize(&mut writer, &mut reader);
+        let response = semantic_tokens_full(
+            &mut writer,
+            &mut reader,
+            2,
+            serde_json::json!({
+                "textDocument": { "uri": "file:///tmp/proj/src/x.ts" }
+            }),
+        );
+        assert!(response.error.is_none(), "{response:?}");
+        let tokens: lsp_types::SemanticTokensResult =
+            serde_json::from_value(response.result.expect("tokens result"))
+                .expect("SemanticTokensResult");
+        let lsp_types::SemanticTokensResult::Tokens(tokens) = tokens else {
+            panic!("full is Tokens");
+        };
+        assert_eq!(tokens.data[0].token_type, 15);
+        assert_eq!(tokens.data[0].length, 5);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn unknown_request_is_still_method_not_found() {
+        let (port, _event_rx) = listen_and_reply().await;
+        let stream = connect(port);
+        let (mut writer, mut reader) = split(stream);
+        initialize(&mut writer, &mut reader);
+        write_message(
+            &mut writer,
+            Message::Request(Request {
+                id: RequestId::from(2),
+                method: "textDocument/hover".to_owned(),
+                params: serde_json::json!({}),
+            }),
+        );
+        let Message::Response(response) = read_message(&mut reader) else {
+            panic!("a request is answered with a response");
+        };
+        assert_eq!(
+            response.error.expect("an error").code,
+            ErrorCode::MethodNotFound as i32
+        );
     }
 }

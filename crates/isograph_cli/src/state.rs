@@ -48,6 +48,12 @@ fn dispatch_lsp_request<THostLanguage: HostLanguage>(
             .on_request_sync::<lsp_types::request::SemanticTokensFullRequest>(
                 crate::adapter::semantic_tokens_response::<THostLanguage>,
             )?
+            .on_request_sync::<lsp_types::request::Formatting>(
+                crate::adapter::formatting_response::<THostLanguage>,
+            )?
+            .on_request_sync::<lsp_types::request::WillSaveWaitUntil>(
+                crate::adapter::will_save_wait_until_response::<THostLanguage>,
+            )?
             .request();
         ControlFlow::Continue(request)
     };
@@ -494,7 +500,9 @@ mod tests {
         let mut state = IsographState::<TypeScriptHostLanguage>::default();
         let effects = handle(
             &mut state,
-            event_notification(serde_json::to_value(InternalEvent::HelloWorld).expect("serializes")),
+            event_notification(
+                serde_json::to_value(InternalEvent::HelloWorld).expect("serializes"),
+            ),
         );
         assert!(matches!(
             effects.as_slice(),
@@ -518,10 +526,12 @@ mod tests {
         let effects = handle(
             &mut state,
             event_notification(
-                serde_json::to_value(InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
-                    path: PathBuf::from("/tmp/proj/src/a.ts"),
-                    presence: Presence::Present("export const a = 1;\n".to_owned()),
-                })))
+                serde_json::to_value(InternalEvent::DiskChanged(DiskChanged::File(
+                    DiskFileChanged {
+                        path: PathBuf::from("/tmp/proj/src/a.ts"),
+                        presence: Presence::Present("export const a = 1;\n".to_owned()),
+                    },
+                )))
                 .expect("serializes"),
             ),
         );
