@@ -136,7 +136,7 @@ pub enum IsographSemanticToken {
         }
 ```
 
-That arm exists only if `NonBracketTokenKind` has the variant. Trivia (comments stripped before match-brackets) does not add the variant to `NonBracketTokenKind`. `IsographLangTokenKind::SingleLineComment` exists in every strategy.
+Every strategy adds `NonBracketTokenKind::SingleLineComment` and both `From` arms. `From<IsographLangTokenKind> for SplitToken` is exhaustive; without the arm it does not compile. Trivia still drops comment tokens before `match_brackets`, so the variant does not appear in the chunk tree. leftover_token still needs the arm.
 
 `NoSemanticTokens::record` ignores comments. The compile path does not highlight.
 
@@ -144,47 +144,77 @@ Tests: `tokenize("# asdf\nx")` is `SingleLineComment`, `LineBreak`, `Identifier`
 
 ## Recording and format
 
-Until iso-format.md, `ItemCursor::record` pushes `IsographSemanticToken::Comment` at the comment's span into `tokens`. After iso-format.md:
+iso-format.md `Recorded` is `Token(WithSpan<IsographSemanticToken>)` | `Comma`. There is no `Layout`, no `Gap`, no `Recorded::Token { layout }`. `commit` still takes only the highlight role. `Comma` prints `,` then a line break. Space after `Keyword` / `Colon` / `Equals`. Space before `Keyword` / `Equals` / `Brace` / `At`. Everything else glues. List-group `{` `(` `[` indent and break. Empty open-then-close is `{}` `()` `[]`. Descriptions are `IsographSemanticToken::Description`, own line. The handler does not call `format_recorded` when `errors` is non-empty.
 
-Own-line comments: `Layout::OWN_LINE`.
+Until iso-format.md, `ItemCursor::record` pushes `IsographSemanticToken::Comment` at the comment's span into the current `Vec<WithSpan<IsographSemanticToken>>`. After iso-format.md, comments are `Recorded::Token` with role `Comment`. Leftover fill-in of a missed comment is still `Recorded::Token` (iso-format.md already says this).
 
-Trailing comments of a list item: recorded after the item's last consume token and before `Recorded::Comma`, with `Layout { before: Gap::Space, after: Gap::None, indent: Indent::None }`. `Recorded::Comma` stays `Layout { before: Gap::None, after: Gap::Line, indent: Indent::None }` as iso-format.md has it. Printer `max`:
+`#` to end of line makes `a: b # yo,` not idempotent. Reparse of that line, the comment token is `# yo,`. The next format prints that slice plus another comma. The `)` of a packed one-line group on that same line is also comment text, and the `(` is unclosed. Do not print a comma (or a close bracket) on the same line after a comment.
 
-- value `GLUE` (`after: None`) then comment (`before: Space`) is `Space`: `b # yo`
-- comment (`after: None`) then comma (`before: None`) is `None`: `# yo,`
-- comma `after: Line` then next item: new line
+The idempotent same-line form is `a: b, # yo` then a line break: the comma is a token before `#`. iso-format.md's `Comma` always line-breaks, so `Token(Comment)` immediately after `Comma` would print
 
-Print is `a: b # yo,` then the next line. `Recorded::Comma` does not grow a comment list. Comma has no span; the highlighter walks `Recorded::Token`.
+```
+a: b,
+  # yo
+```
 
-Recording the comment after the comma instead yields `max(comma.after: Line, comment.before: Space) = Line`, so `a: b,\n  # yo`. That is not the target. iso-format.md has no `lineSuffix`. Do not add one for this.
+which is also idempotent. Same-line `a: b, # yo` needs a printer extension: when `Comma` is followed by a trailing comment, print `, ` then the comment slice then a line break, and do not emit a second break. Own-line comments are a different placement: after that break, at the current indent, then another break.
 
-iso-format.md already breaks `(` / `{` / value `[` and indents interiors. Own-line `# asdf` is not a successful item, so no synthetic comma after it. The formatted motivating example is:
+```rust
+// from crates/isograph_parser/src/semantic_token.rs
+pub enum CommentPlacement {
+    Trailing,
+    OwnLine,
+}
+
+pub enum Recorded {
+    Token(WithSpan<IsographSemanticToken>),
+    Comma,
+    Comment(WithSpan<CommentPlacement>),
+}
+```
+
+Highlighter walks `Token` and `Comment`. `Comment` is `COMMENT`. `Comma` has no span.
+
+Printer, extending iso-format.md, not replacing it with `Gap`:
+
+- `Comma` then `Comment(Trailing)`: `, ` + slice + line break. Skip that `Comment`.
+- `Comma` not followed by `Comment(Trailing)`: `,` + line break as today.
+- `Comment(OwnLine)`: if not already at the start of a line, line break; then indent + slice + line break.
+- `Comment(Trailing)` not after `Comma`: space + slice (root trailing, or trailing of a declaration that is not a list item).
+
+Do not record a trailing comment before `Comma`. Skip inside a mixed chunk buffers comments and does not push them. `parse_each_chunk` after a successful item pushes `Comma`, then flushes same-line trailing comments as `Comment(Trailing)`. Own-line comment-only chunks record `Comment(OwnLine)` and do not push `Comma`.
+
+The formatted motivating example:
 
 ```
 foo(
   # asdf
-  a: b # yo,
+  a: b, # yo
 )
 ```
 
-Empty-of-slots with recorded comments (`foo(\n# asdf\n)`) is not the In/Out `Gap::None` packed `()`. Output is the broken group with the comments inside, no synthetic `Comma`.
+Empty-of-slots with recorded comments (`foo(\n# asdf\n)`) is not packed `()`. `Comment(OwnLine)` between open and close clears the empty-group case. No synthetic `Comma`.
 
-A comment-only literal `# only` is not `EmptyLiteral` (there is a token). `require_token(Identifier)` fails. `errors` is not empty. Format refuses. Same for a comment with no declaration.
+`# only` as the whole literal is a comment token, not whitespace. `parse_chunked_iso_literal` currently treats leftover-empty after `consume_line_breaks` as `EmptyLiteral`. Skip must not sit on that `require_end`. Empty is line-breaks only. `# only` reaches `parse_iso_literal_item`, skip then `require_token(Identifier)` fails, `Expected` declaration keyword at the comment. Format refuses. Hover: `parse_stream` still builds a failed slot whose extra spans the comment; the `IsoLiteralParse` wrapper is the whole literal.
 
 `willSaveWaitUntil` and `textDocument/formatting` both call `format_iso_literals`. A poisoned parse means save does not format that literal.
 
-iso-format-later.md packs a group when the packed line is under the width. An `OWN_LINE` comment is a recorded `Gap::Line`, so the group does not pack. Trailing-only comments (`foo(a: b # yo)`) do not by themselves prevent packing; the packed form is `foo(a: b # yo,)`.
+iso-format-later.md packs a group when the packed line is under the width. `Comment(OwnLine)` is a line break, so the group does not pack. A trailing comment on the last item is `, # yo` then a line break, then `)` / `}` on the next line. Packed `foo(a: b # yo,)` is not a format output: `)` cannot share a line with `#`.
 
-Descriptions are string tokens with `OWN_LINE`, not `#`.
+Descriptions are `Description`, not `#`. `field Query.x\n"""desc""" # note\n{ id }`: trivia trailing of the string, or skip at root after the description. The printer already puts a description on its own line; `# note` is `Comment(Trailing)` on that line (`"""desc""", # note` is wrong: descriptions are not list items and have no synthetic comma) or `Comment(OwnLine)` after the description. Trailing of the description token: `"desc" # note` then the brace on the next line. Reparse: `# note` does not eat `{` because `{` is on the next line.
 
-Blank lines in source collapse: `Gap` has no blank-line variant. Two own-line comments in a row are one line between them.
+Blank lines in source collapse. Two `Comment(OwnLine)` in a row are one line between them.
+
+iso-format.md is amended: `Recorded` grows `Comment(WithSpan<CommentPlacement>)`. The highlighter walks it. The printer arms above are this file. `Description` stays iso-format.md.
 
 ## Strategy: trivia
 
-Comments never reach match-brackets, chunking, or grammar. After tokenize, a pass attaches each comment to an adjacent remaining token and drops the comment from the vec. `require_token` does not skip comments. `parse_each_chunk` is unchanged. Grammar functions are unchanged. `NonBracketToken`, `OpenBracket`, and `CloseBracket` stay `Copy` newtypes. Trivia is not a field on those nodes: a field the tree carries and nothing on the tree reads is unused.
+Comments never reach match-brackets, chunking, or grammar. After tokenize, a pass attaches each comment to an adjacent remaining token and drops the comment from the vec. `require_token` does not skip comments. Grammar functions are unchanged. `parse_each_chunk`'s item loop is unchanged except flushing comma trivia after `Comma`. `NonBracketToken`, `OpenBracket`, and `CloseBracket` stay `Copy` newtypes. Trivia is not a field on those nodes: a field the tree carries and nothing on the tree reads is unused.
 
 ```rust
 // from crates/isograph_parser/src/trivia.rs
+use std::collections::HashMap;
+
 pub struct Comment {
     pub span: Span,
 }
@@ -198,20 +228,20 @@ pub fn attach_trivia(
     tokens: Vec<WithSpan<IsographLangTokenKind>>,
 ) -> (
     Vec<WithSpan<IsographLangTokenKind>>,
-    Vec<(Span, TokenTrivia)>,
+    HashMap<Span, TokenTrivia>,
 )
 ```
 
-Callers: `parse_iso_literal` runs `tokenize`, then `attach_trivia`, then `match_brackets` on the filtered vec. The second return is keyed by the surviving token's span. `commit` looks up that span, emits leading `Comment` with `OWN_LINE`, then the token, then trailing `Comment` with `{ before: Space, after: None, indent: None }`.
+Callers: `parse_iso_literal` runs `tokenize`, then `attach_trivia`, then `match_brackets` on the filtered vec. `Span` is `Hash`. `ItemCursor` holds the map. `commit` looks up the surviving token's span, emits leading `Comment(OwnLine)`, then the token, then trailing `Comment(Trailing)`. `parse_each_chunk` looks up `chunk.boundary_comma()`: trailing trivia of a source comma is flushed after the synthetic `Comma` as `Comment(Trailing)`.
 
-`IsographLangTokenKind::SingleLineComment` exists. `NonBracketTokenKind` does not gain it.
+`IsographLangTokenKind::SingleLineComment` exists. `NonBracketTokenKind` has it too (exhaustive `SplitToken::from`).
 
 Host rules:
 
 - If there is no `LineBreak` between the previous surviving token and the comment, the comment is trailing of that token. `a: b # yo` puts `# yo` on `b`. `a: b, # yo` puts `# yo` on the comma.
 - Else if there is a later surviving non-`LineBreak` token, the comment is leading of the next such token. `LineBreak` tokens are not hosts. `# asdf\na` puts `# asdf` on `a`. The line break after the comment stays a line-break token unless absorb (below) takes it.
 - Else the comment is trailing of the last surviving token, including across line breaks at EOF.
-- Filtered vec empty (`# only`): no host. `parse_chunked_iso_literal` still fails the keyword. Format refuses.
+- Filtered vec empty (`# only`): no host. The root vec is empty. `EmptyLiteral`, `parse_chunked_iso_literal` returns `None`. Format refuses. There is no `IsoLiteralParse` for hover. Skip strategies instead fail the keyword with a slot whose extra is the comment.
 
 The line break after `(` is still stripped by the matcher. Interior of
 
@@ -222,7 +252,7 @@ a: b # yo
 )
 ```
 
-is: `a` (leading `# asdf`), `:`, `b` (trailing `# yo`). One chunk. `parse_argument` sees `a: b`. Both comments sit on tokens `commit` already emits. Trailing trivia of a source comma: iso-format synthesizes `Recorded::Comma` and does not print the source comma. `parse_each_chunk`, when it records that `Comma`, must also emit trailing trivia of the source comma that ended the chunk, still before the synthetic comma if we want `b # yo,`, or the comma token's trailing trivia is copied onto `b` at attach time when the comment follows `b` not the comma. `a: b # yo` attaches to `b`. `a: b, # yo` attaches to the comma. The second needs `parse_each_chunk` to pull trivia off the boundary comma when recording `Recorded::Comma`.
+is: `a` (leading `# asdf`), `:`, `b` (trailing `# yo`). One chunk. `parse_argument` sees `a: b`. Both comments sit on tokens `commit` already emits. Trailing trivia of `b` is flushed after the synthetic `Comma` as `Comment(Trailing)` so print is `a: b, # yo`. Trailing trivia of a source comma (`a: b, # yo`) is the same flush, keyed on `chunk.boundary_comma()`. Do not emit a comment before `Comma`.
 
 ```
 {
@@ -233,7 +263,7 @@ is: `a` (leading `# asdf`), `:`, `b` (trailing `# yo`). One chunk. `parse_argume
 
 `foo` trailing `# c`, line break, `bar`. Two chunks. Language unchanged.
 
-`{ # c\n}`: `# c` is leading of `}`. Printer: leading comments of `CLOSE_BRACE` emit before `}` at inner indent.
+`{ # c\n}`: `# c` is leading of `}`. `commit` of `}` emits leading `Comment(OwnLine)` before the close.
 
 Optional absorb: if the host of a trailing comment is `Colon` or `Equals`, and the next token is `LineBreak`, drop that `LineBreak` from the vec. Then `a: # what\ntrue` is one chunk. `foo # c\nbar` does not absorb: host is `Identifier`. `[Pet # c\n!]` does not. `foo @#c\nloadable` does not. `bar\n{ baz }` is unchanged. `$x: # c\nInt` would parse. `a: # c\n{ b: 1 }` would parse. `alias: # c\nname` would parse. `$x: Int = # c\n1` would parse. This is a language-shape change for those two token kinds only. It is not implied by trivia itself. It does not peek the next chunk.
 
@@ -282,13 +312,17 @@ pub(crate) fn parse_each_chunk<P>(
 ) -> Vec<WithSpan<Slot<P, UnparsedChunkItems>>>
 ```
 
-Callers unchanged. Body: walk `self.0`. If every content item is `NonBracket(NonBracketToken(SingleLineComment))`, classify against the previous content chunk, record `IsographSemanticToken::Comment` (own-line: `OWN_LINE`; same-line trailing: `{ before: Space, after: None, indent: None }`) into `parent`'s token vec, produce no slot. Else `parse_one_chunk` as today. After the last content chunk, remaining comments record as dangling into the token vec, no list field.
+Callers unchanged. Body: walk `self.0` with peekable. If the chunk is comment-only and same-line trailing of the previous content chunk, buffer it. If comment-only and own-line, record `Comment(OwnLine)`, no slot. Else `parse_one_chunk`. Skip inside that parse buffers mixed-chunk trailing comments on the cursor and does not push them. After a successful item, push `Recorded::Comma`, then flush same-line buffered comments (cursor buffer plus following same-line comment-only chunks) as `Comment(Trailing)`. After a failed item, flush comments as `Comment(OwnLine)` without a comma; format already refuses. After the last content chunk, remaining own-line comments record as `Comment(OwnLine)`, no list field.
+
+Same-line test: the previous chunk's last non-`LineBreak` token (content or a `Comma` in `trailing_separator`) through the comment's start, `text` contains no `\n` or `\r`. `ItemCursor::text` is the literal.
 
 Comment-only chunks remain in the chunk tree and do not become slots. The `Vec<Slot>` is shorter than the chunk list. Positions on those comments answer the enclosing group.
 
-Within a mixed chunk, skip (below) records the trailing comment and `require_end` succeeds. `parse_argument` does not mention comments.
+`parse_argument` does not mention comments.
 
-Root is not `parse_each_chunk`. `skip_comments` plus `consume_line_breaks` at the existing call sites, including `parse_chunked_iso_literal` before `require_end`, covers leading comments. `remaining_contents` that skips comments covers trailing comments after the one declaration. A second declaration is still leftover.
+Root is not `parse_each_chunk`. Skip at `parse_iso_literal_item` / `parse_entrypoint` / `parse_selectable_declaration` next to the existing `consume_line_breaks` sites covers leading comments. `remaining_contents` that skips comments covers trailing comments after the one declaration. A second declaration is still leftover.
+
+Type lists are not `parse_each_chunk`. `parse_bracket_interior_type` takes chunk 0 with `Expectation::EndOfType`, which folds `trailing_separator` into extra. `[# c\nFoo]` is a comment-only first chunk: failed type under a naive `parse_one_chunk` of chunk 0. `[Foo # c]` folds the comment into extra: leftover, highlighted, not printed. Either skip comment-only chunks in `parse_bracket_interior_type` the same way (and record them), or type-list comments error here and parse under trivia. Write the tests either way.
 
 `NonBracketTokenKind::SingleLineComment` exists. `SplitToken::from` / `From<NonBracketTokenKind>` gain the arm.
 
@@ -298,6 +332,11 @@ Do not make `ItemCursor::peek` advance. `require_end`, `expected`, `spanning`, a
 
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
+pub(crate) struct ItemCursor<'a> {
+    buffered_comments: Vec<Comment>,
+    // existing fields
+}
+
 impl ItemCursor<'_> {
     fn skip_comments(&mut self) {
         while let Some(peek) = self.items.peek() {
@@ -306,7 +345,9 @@ impl ItemCursor<'_> {
                     NonBracketTokenKind::SingleLineComment,
                 )) => {
                     let item = peek.commit();
-                    self.record(IsographSemanticToken::Comment, item.location);
+                    self.buffered_comments.push(Comment {
+                        span: item.location,
+                    });
                     self.previous_end = item.location.end;
                 }
                 _ => break,
@@ -316,13 +357,17 @@ impl ItemCursor<'_> {
 }
 ```
 
-After iso-format.md, that `record` takes `Layout { before: Gap::Space, after: Gap::None, indent: Indent::None }` (in-chunk comments are trailing). Own-line comments are recorded by `parse_each_chunk`, not skip, with `Layout::OWN_LINE`.
+Do not push to the token vec here. `parse_each_chunk` flushes `buffered_comments` after `Comma`. leftover fill-in span-dedup is the backstop if a path forgets to flush.
 
-Call `skip_comments` at the start of `peek`, `require_end`, `expected`, `spanning`, `remaining_contents`, and `consume_line_breaks`. One record, on this commit. leftover fill-in span-dedup is the backstop. `spanning` skips first so the item span starts at the first non-comment. Trailing skip in `remaining_contents` runs after `spanning` returns, so the item span does not include the trailing comment. The enclosing group's span still covers it.
+Call `skip_comments` at the start of `peek`, `expected`, `spanning`, and `remaining_contents`. Do not call it from `require_end`. Do not call it from `consume_line_breaks`. Empty-literal detection in `parse_chunked_iso_literal` is: every root item is a `LineBreak`. Then `parse_stream`. `parse_iso_literal_item` calls `skip_comments` then `consume_line_breaks` then `require_token(Identifier)`. `# only` is `Expected` the declaration keyword at the comment, not `EmptyLiteral`.
+
+If `peek` skips comments, `consume_line_breaks` that uses `peek` will skip comments too. The empty check must not use that `peek`. Line-breaks-only is decided on the root vec before the stream.
+
+`spanning` skips first so the item span starts at the first non-comment. Trailing skip in `remaining_contents` runs after `spanning` returns, so the item span does not include the trailing comment. The enclosing group's span still covers it.
 
 `chunk.rs` `absorb_chunk` uses a different iterator. Skip does not touch it.
 
-This skip is required for specific locations (mixed-chunk trailing comments) and for skippable content. Trivia does not use it. Comments-as-separators does not use it inside chunked interiors; it still needs it at root (unchunked).
+This skip is required for specific locations (mixed-chunk trailing comments) and for skippable content. Trivia does not use it. Comments-as-separators does not use it inside chunked interiors; it still needs it at root (unchunked), called from `parse_iso_literal_item` not from `require_end`.
 
 ## Strategy: skippable content
 
@@ -357,13 +402,23 @@ a: b,\n# yo\nc: d    trailing_separator: Comma, LineBreak, Comment, LineBreak
 a: b\n# yo\nc: d     trailing_separator: LineBreak, Comment, LineBreak
 ```
 
-Printing that separator in order yields `a: b, # yo` or a newline then `# yo` without a same-line test.
+`parse_one_chunk` for `Expectation::Separator(_)` (every list) does not fold `trailing_separator` into extra. All `parse_each_chunk` callers pass `Expectation::Separator`. Recording reads `chunk.trailing_separator` in `parse_each_chunk` after a successful item: emit `Recorded::Comma` at the source comma (or the synthetic comma if the boundary had no comma), and `Comment(Trailing)` at each `SeparatorToken::Comment` that sits on the same line as the last non-line-break of that boundary, `Comment(OwnLine)` at each comment after a line break in that boundary. Do not record during `absorb_chunk`. Failed items have no synthetic comma; format already refuses.
 
-`parse_one_chunk` for `Expectation::Separator(_)` (every list) does not fold `trailing_separator` into extra. Recording must read `chunk.trailing_separator` in `parse_each_chunk` after a successful item, emit each `Comment` from it (and the synthetic `Comma` in the same relative order as the source comma in that separator). Failed items have no synthetic comma; still record comments from that chunk's contents-as-comments (there should be none if comments are separators) and from its trailing separator.
+`separator_as_content` gains `SeparatorToken::Comment => NonBracketTokenKind::SingleLineComment` so extra-fold on non-list `parse_one_chunk` (`Expectation::EndOfType`) can hold comments.
 
-Leading comments at a level: after `strip_captured_line_breaks`, a group can still open with `Comment` then `LineBreak`. `absorb_chunk` currently drops leading line breaks and errors on leading commas. Leading comments must not be dropped and must not be `CommaWithoutItem`. Record them as `OWN_LINE` as they are absorbed, attached to the first content chunk if one exists, otherwise dangling of the empty level (`foo(\n# asdf\n)`).
+Leading comments at a level: after `strip_captured_line_breaks`, a group can still open with `Comment` then `LineBreak`. `absorb_chunk` currently drops leading line breaks and errors on leading commas. The first-item loop needs a `SeparatorToken::Comment` arm that does not drop and does not `CommaWithoutItem`. Store them on the level; record in `parse_each_chunk`.
 
-Root is unchunked. `chunk()` maps `to_content` over the root vec. `absorb_chunk` / `SeparatorToken` do not run at root. `# leading\nfield Query.x { id }` is a comment content item, then line break, then `field`. Comments-as-separators cannot leave `ItemCursor` unchanged: root still needs `skip_comments` at the existing `consume_line_breaks` / `require_end` sites.
+```rust
+// from crates/isograph_parser/src/chunk.rs
+pub struct ChunkedLevel {
+    pub leading_comments: Vec<Comment>,
+    pub chunks: Vec<WithSpan<Chunk>>,
+}
+```
+
+`ChunkedLevel` is a newtype `ChunkedLevel(pub Vec<WithSpan<Chunk>>)` today. Two fields. `parse_each_chunk` records `leading_comments` as `Comment(OwnLine)` first. If the level has no content chunks, those are dangling of the empty group (`foo(\n# asdf\n)`).
+
+Root is unchunked. `chunk()` maps `to_content` over the root vec. `absorb_chunk` / `SeparatorToken` do not run at root. `# leading\nfield Query.x { id }` is a comment content item, then line break, then `field`. Comments-as-separators cannot leave `ItemCursor` unchanged: root still needs `skip_comments` from `parse_iso_literal_item`.
 
 `NonBracketTokenKind::SingleLineComment` exists so match-brackets can hand the token to chunking as a separator. It is not a `ChunkContentItem` after `absorb_chunk`. `separator_token` gains the `Comment` arm.
 
@@ -377,33 +432,35 @@ Cost: `absorb_chunk` leading-comment behavior, `SeparatorToken`, recording from 
 
 `parse_selection`, `parse_argument`, `parse_name_colon`, `parse_non_constant_value`, `parse_iso_literal_item`, and the other grammar functions do not mention comments in any strategy. They call `require_token` / `peek` / `consume_group_if`.
 
-Trivia: those functions, `ItemCursor`, `parse_each_chunk`, chunking, match-brackets unchanged aside from `commit` consulting the trivia table. New: tokenize token, `attach_trivia`, printer/record of trivia.
+Trivia: those functions, `ItemCursor` skip, `parse_each_chunk` item loop, chunking, match-brackets unchanged aside from `commit` consulting the trivia map and `parse_each_chunk` flushing comma trivia after `Comma`. New: tokenize token, `attach_trivia`, printer arms for `Recorded::Comment`.
 
-Specific locations: those grammar functions, chunking, match-brackets unchanged. Changed: `skip_comments` and the four cursor methods that must call it, `parse_each_chunk` for comment-only chunks, `NonBracketTokenKind`.
+Specific locations: those grammar functions, chunking, match-brackets unchanged. Changed: `skip_comments` (not on `require_end`), `parse_each_chunk` for comment-only chunks and comma-then-trailing-comment order, `parse_bracket_interior_type` or documented type-list errors, `NonBracketTokenKind`, printer arms.
 
-Comments-as-separators: grammar functions and in-chunk cursor unchanged. Changed: `SeparatorToken`, `absorb_chunk`, `parse_each_chunk` recording from separators, root skip, `NonBracketTokenKind`.
+Comments-as-separators: grammar functions and in-chunk cursor unchanged. Changed: `SeparatorToken`, `absorb_chunk` first-item `Comment` arm, `ChunkedLevel` leading comments, `parse_each_chunk` recording from separators, root skip from `parse_iso_literal_item`, `NonBracketTokenKind`, printer arms.
 
 None of the strategies is zero parser-crate changes. The claim that holds is: grammar productions stay comment-free.
 
 ## Tests (behavior, once a strategy is chosen)
 
-- `foo(\n# asdf\na: b # yo\n)` parses one argument `a: b`, errors empty, recorded comments at `# asdf` and `# yo`. Format contains both comment texts. Close paren is not inside a comment.
-- `{ foo # c\nbar }` is two selections, errors empty, `# c` kept on `foo`.
-- `{ foo, # c\nbar }` is two selections, `# c` kept on `foo` (not on `bar`).
-- `{ foo,\n# c\nbar }` is two selections, `# c` on its own line between them (trailing separator of `foo` or leading of `bar`; print is a line with `# c` between the two items).
-- `{ foo\n, # c\nbar }` is two selections, `# c` kept on `foo`.
-- `{ # c\n}` errors empty, format keeps `# c` inside the braces.
-- `foo(\n# asdf\n)` errors empty as a list of zero arguments with a dangling comment (not packed `()`).
-- `# leading\nfield Query.x { id }` parses the field, `# leading` kept.
+- `foo(\n# asdf\na: b # yo\n)` parses one argument `a: b`, errors empty, recorded `Comment(OwnLine)` at `# asdf` and `Comment(Trailing)` at `# yo`. Format is `foo(\n  # asdf\n  a: b, # yo\n)`. Close paren is not inside a comment. Reparse comment slices equal the previous parse's comment slices.
+- `{ foo # c\nbar }` is two selections, errors empty, format keeps `# c` on the `foo` line as `foo, # c` then `bar,`.
+- `{ foo, # c\nbar }` is two selections, `# c` trailing of `foo`.
+- `{ foo,\n# c\nbar }` is two selections, `# c` own-line between them.
+- `{ foo\n, # c\nbar }` is two selections, `# c` trailing of `foo`.
+- `{ # c\n}` errors empty, format keeps `# c` inside the braces, not packed `{}`.
+- `foo(\n# asdf\n)` errors empty as a list of zero arguments with a dangling comment, not packed `()`.
+- `# leading\nfield Query.x { id }` parses the field, `# leading` kept own-line before `field`.
 - `foo(# { bar }\n)` is not a brace group; `)` closes the paren.
 - `foo(# { bar })` is an unclosed `(`.
 - `{ # c }` is an unclosed `{`.
 - `a: # what true` (same line): missing value. `true` is inside the comment.
 - `a: # what\ntrue`: two chunks, not one argument, unless trivia absorb on `Colon` is in. `{ foo # c\nbar }` stays two selections even with that absorb.
 - `id # c @loadable`: selection `id`, no directive.
-- `id @ # c\nloadable`: `@` without a name, then a failed selection on `loadable`.
-- `# only` as the whole literal: not empty of tokens, declaration fails, format refuses.
+- `id @ # c\nloadable`: first slot fails (`@` without a name), second slot is selection `loadable`, errors not empty, format refuses.
+- `# only`: not `EmptyLiteral`; `Expected` declaration keyword at the comment; format refuses.
 - `tokenize` / leftover / highlight: `Comment` role on the `#...` span, not `Error` plus `Content`.
 - Nested `{ {\n# c\n} }`: inner empty set keeps `# c`.
 - Comment after a description: `field Query.x\n"""desc""" # note\n{ id }` keeps `# note`.
-- Unclosed `foo(\n# c` and unmatched `foo { bar ) # c\n}`: comments still recorded; format refuses because of the bracket error.
+- Unclosed `foo(\n# c`: the matcher cuts the unclosed group; the comment is not in a chunk. Recorded only once leftover fill-in walks `tokenize` (semantic-tokens.md). Format refuses on the bracket error.
+- `[# c\nFoo]` and `[Foo\n# c]` and `[Foo # c]`: type-list behavior as chosen above (skip and keep, or error).
+- A group whose last line is a `#` comment always has `)` / `}` on the next line.
