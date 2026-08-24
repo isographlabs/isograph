@@ -42,7 +42,7 @@ A quiescent codebase is one in which, over the last 5 minutes, there are no chan
 
 ## Refactor docs
 
-Plan in `refactors/`. Move `refactors/pending` to `refactors/past` when we will not work on it again. Do not modify `refactors/past/`.
+Plan in `refactors/`. Docs for a specific project can be grouped: `refactors/pending/project/foo.md` and `refactors/past/project/foo.md`. Move a doc from `refactors/pending` to the same relative path under `refactors/past` when we will not work on it again. Do not modify `refactors/past/`.
 
 An actively worked doc:
 
