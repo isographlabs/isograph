@@ -36,7 +36,7 @@ Mercury on Windows without `--force` prints `graceful stop is not yet available 
 Origin: `crates/freddie_cli/src/lib.rs` `App`, `crates/freddie_cli/src/client.rs` `stop_daemon` / `signal_pid` / `stop` / `restart`. Delta: `#[cfg(windows)] App::ask_to_quit`; Windows `Terminate` calls it; Windows Kill is `kill_pid`; `stop_daemon` is generic and the existing `debug!` records `TApp::NAME`; `stop` is generic.
 
 ```rust
-// external crates/freddie_cli/src/lib.rs
+// external freddie/crates/freddie_cli/src/lib.rs
     fn run_daemon(id: &Self::Id, args: &Self::DaemonArgs);
 
     /// Ask the running daemon to quit. Windows only.
@@ -58,7 +58,7 @@ Origin: `crates/freddie_cli/src/lib.rs` `App`, `crates/freddie_cli/src/client.rs
 ```
 
 ```rust
-// external crates/freddie_cli/src/client.rs
+// external freddie/crates/freddie_cli/src/client.rs
 fn stop_daemon<TApp: App>(instance: &Instance, signal: Signal) -> Result<Option<Pid>, Failure> {
     let pid = match find_daemon(instance) {
         Ok(Target::Running(pid)) => pid,
@@ -110,7 +110,7 @@ fn stop_daemon<TApp: App>(instance: &Instance, signal: Signal) -> Result<Option<
 ```
 
 ```rust
-// external crates/freddie_cli/src/client.rs
+// external freddie/crates/freddie_cli/src/client.rs
 #[cfg(windows)]
 fn kill_pid(pid: Pid) -> io::Result<()> {
     // `taskkill /F` terminates the process, which is SIGKILL. `taskkill` without it posts
@@ -124,19 +124,19 @@ fn kill_pid(pid: Pid) -> io::Result<()> {
 Unix `signal_pid` is unchanged.
 
 ```rust
-// external crates/freddie_cli/src/client.rs
+// external freddie/crates/freddie_cli/src/client.rs
 pub(crate) fn stop<TApp: App>(instance: &Instance, force: bool) -> ExitCode {
 ```
 
 ```rust
-// external crates/freddie_cli/src/client.rs
+// external freddie/crates/freddie_cli/src/client.rs
     match stop_daemon::<TApp>(instance, signal) {
 ```
 
 in `stop` and `restart`.
 
 ```rust
-// external crates/freddie_cli/src/lib.rs
+// external freddie/crates/freddie_cli/src/lib.rs
         Verb::Stop(args) => client::stop::<TApp>(instance, args.force),
 ```
 
@@ -145,7 +145,7 @@ in `stop` and `restart`.
 `#[cfg(test)]` in `client.rs`. Three apps: `NoArgs`, `Instance::global`, empty `run_daemon`. `ask_to_quit` overrides are `#[cfg(windows)]`.
 
 ```rust
-// external crates/freddie_cli/src/client.rs
+// external freddie/crates/freddie_cli/src/client.rs
     struct Silent;
 
     impl App for Silent {
