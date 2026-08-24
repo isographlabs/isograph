@@ -18,7 +18,7 @@ comments.md. A comment token is a language-shape change. It is not mixed into le
 
 ## Commented-out grammar in `token_kind.rs`
 
-Spread, `Pipe`, and `PeriodPeriod` sit as comments in the token enum, plus `TODO don't skip comments and spaces`. `SingleLineComment` is comments.md (that regex is uncommented there, not deleted). The crate rule is that a comment must not describe what was not done. Display has the matching commented-out arms (`Ampersand`, `PeriodPeriod`, `Pipe`, `Spread`).
+Spread, `Pipe`, and `PeriodPeriod` sit as comments in the token enum, plus `TODO don't skip comments and spaces`. `SingleLineComment` is comments.md (that regex is uncommented there, not deleted). The crate rule is that a comment must not describe what was not done.
 
 ```rust
 // from crates/isograph_parser/src/token_kind.rs
@@ -32,4 +32,4 @@ Spread, `Pipe`, and `PeriodPeriod` sit as comments in the token enum, plus `TODO
     // Spread,
 ```
 
-Delete those commented-out variants, the TODO on the skip regex, and the commented-out Display arms (`Ampersand`, `PeriodPeriod`, `Pipe`, `Spread`). The commented-out `SingleLineComment` regex is comments.md, not this deletion.
+Delete those commented-out variants and the TODO on the skip regex. The commented-out `SingleLineComment` regex is comments.md, not this deletion. `token_kind.rs` uses `strum::Display`; there are no handwritten Display arms.
