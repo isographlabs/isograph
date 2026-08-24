@@ -1,22 +1,38 @@
-# Side-effect token and reply as `FnOnce`
+# Side-effect token and take_reply
 
 Requires lsp-outstanding.md. Independent of lsp-tokens.md and timer-effects.md.
 
-`LiveSessions::reply` returns a `Sender`. `send_lsp_response` puts that sender on `SendLspResponseEffect`. `handle` could send on it. This slice makes `reply` return an `FnOnce` that takes `&SideEffectToken`. `handle` does not have a token. `run_effect_loop` mints one and passes it to `perform`. The send runs only there.
+`LiveSessions::reply(client)` yields a send capability for that connection, not for a request id. `handle` can still respond for an id that was cancelled, already answered, or never inserted. The token only gates *when* the send runs.
+
+This slice puts outstanding ids on `LiveSession`. The only way to obtain a send `FnOnce` is `take_reply(client, id)`, which removes that id. Missing id is `None`. `Gone` drops the session, so the ids go with it. The `FnOnce` takes `&SideEffectToken`. `run_effect_loop` mints the token and passes it to `perform`. `handle` does not have a token.
 
 `run_event_loop` and `run_effect_loop` share one current-thread tokio runtime (`select!`). There is not a second OS thread. `SideEffectToken` is a capability of `perform`, not thread affinity. It is not a field on `State`. It is not an argument of `handle`.
 
-Origin: outstanding.md `LiveSessions::reply` / `send_lsp_response`; landed `SendLspResponseEffect` / `perform`. Delta: `SideEffectToken`, `reply` returns `FnOnce`, `SendLspResponseEffect.send`, `perform(&SideEffectToken, IsographEffect)`.
+Origin: outstanding.md `LiveSessions::reply` / `send_lsp_response`; landed `LiveSession` / `SendLspResponseEffect` / `perform`. Delta: `outstanding` on `LiveSession`, `take_reply` replaces `reply`, `SideEffectToken`, `SendLspResponseEffect.send`, `perform(&SideEffectToken, IsographEffect)`.
 
 One shippable change. MethodNotFound bytes do not change.
 
 ## What the user does
 
-Same verbs. Hover is still MethodNotFound. A not-live request is still no effects.
+Same verbs. Hover is still MethodNotFound. A not-live request is still no effects. A second send for the same id, or a send after `Gone` / cancel has removed the id, is no effects.
 
 ## Types
 
 Most important first.
+
+```rust
+// from crates/isograph_cli/src/event.rs
+#[derive(Clone, Debug)]
+pub struct LiveSession {
+    pub sender: crossbeam::channel::Sender<lsp_server::Message>,
+    pub capabilities: lsp_types::ClientCapabilities,
+    pub outstanding: std::collections::HashSet<lsp_server::RequestId>,
+}
+```
+
+Delta: `outstanding`. `Gone` is still `live_sessions.0.remove(&client)`. `Started` twice replaces the session and drops that client's ids. No second map on `State`.
+
+`run_session` `Started` payload and handle-test dummy sessions gain `outstanding: std::collections::HashSet::new()`. Drop `#[cfg_attr(not(test), expect(dead_code))]` on `sender`.
 
 ```rust
 // from crates/isograph_cli/src/effect.rs
@@ -38,12 +54,16 @@ impl SideEffectToken {
 ```rust
 // from crates/isograph_cli/src/event.rs
 impl LiveSessions {
-    pub fn reply(
-        &self,
+    pub fn take_reply(
+        &mut self,
         client: ClientId,
-    ) -> Option<impl FnOnce(&crate::effect::SideEffectToken, lsp_server::Message) + Send>
-    {
-        let sender = self.0.get(&client)?.sender.clone();
+        id: lsp_server::RequestId,
+    ) -> Option<impl FnOnce(&crate::effect::SideEffectToken, lsp_server::Message) + Send> {
+        let session = self.0.get_mut(&client)?;
+        if !session.outstanding.remove(&id) {
+            return None;
+        }
+        let sender = session.sender.clone();
         (move |_token, message| {
             let _ = sender.send(message);
         })
@@ -52,7 +72,7 @@ impl LiveSessions {
 }
 ```
 
-Delta: the return is an `FnOnce`, not a `Sender`. The token is unused in the body except as proof that `perform` is running.
+Delta: replaces `reply`. No `FnOnce` unless that id was in the session's set. Later cancel removes the id and does not send. Later async always calls `send_lsp_response`; `None` is no effects.
 
 ```rust
 // from crates/isograph_cli/src/effect.rs
@@ -78,9 +98,16 @@ Delta: no `reply`, no `response` on the struct. Those are captured in `send`. Ma
 
 ```rust
 // from crates/isograph_cli/src/state.rs
-    let Some(send) = state.live_sessions.reply(client) else {
+fn dispatch_lsp_request<THostLanguage: HostLanguage>(
+    state: &mut State<THostLanguage>,
+    incoming: crate::event::LspRequest,
+) -> Vec<IsographEffect> {
+    let crate::event::LspRequest { client, request } = incoming;
+    let id = request.id.clone();
+    let Some(session) = state.live_sessions.0.get_mut(&client) else {
         return Vec::new();
     };
+    session.outstanding.insert(id.clone());
     let get_response = || {
         let request =
             isograph_lsp::lsp_request_dispatch::LSPRequestDispatch::new(request, &state.db)
@@ -97,14 +124,20 @@ Delta: no `reply`, no `response` on the struct. Those are captured in `send`. Ma
         ControlFlow::Continue(request)
     };
     match get_response() {
-        ControlFlow::Break(response) => send_lsp_response(send, response),
-        ControlFlow::Continue(request) => method_not_found(send, request),
+        ControlFlow::Break(response) => send_lsp_response(state, client, id, response),
+        ControlFlow::Continue(request) => method_not_found(state, client, id, request),
     }
+}
 
-fn send_lsp_response(
-    send: impl FnOnce(&crate::effect::SideEffectToken, lsp_server::Message) + Send + 'static,
+fn send_lsp_response<THostLanguage: HostLanguage>(
+    state: &mut State<THostLanguage>,
+    client: crate::event::ClientId,
+    id: lsp_server::RequestId,
     response: lsp_server::Response,
 ) -> Vec<IsographEffect> {
+    let Some(send) = state.live_sessions.take_reply(client, id) else {
+        return Vec::new();
+    };
     crate::effect::IsographEffect::SendLspResponse(
         crate::effect::SendLspResponseEffect {
             send: (move |token| send(token, lsp_server::Message::Response(response))).boxed(),
@@ -114,12 +147,16 @@ fn send_lsp_response(
     .wrap_vec()
 }
 
-fn method_not_found(
-    send: impl FnOnce(&crate::effect::SideEffectToken, lsp_server::Message) + Send + 'static,
+fn method_not_found<THostLanguage: HostLanguage>(
+    state: &mut State<THostLanguage>,
+    client: crate::event::ClientId,
+    id: lsp_server::RequestId,
     request: lsp_server::Request,
 ) -> Vec<IsographEffect> {
     send_lsp_response(
-        send,
+        state,
+        client,
+        id,
         lsp_server::Response {
             id: request.id,
             result: None,
@@ -137,7 +174,9 @@ fn method_not_found(
 }
 ```
 
-Delta: `reply(client)` still runs before `get_response`. `None` returns. `Some(send)` is the `FnOnce`. `send_lsp_response` boxes `|token| send(token, Message::Response(response))`.
+Delta: `dispatch_lsp_request` takes `&mut State`. `get_mut(&client)` is the not-live return before `get_response`, and the insert. After dispatch, `send_lsp_response` always `take_reply`s. `None` is no effects. No `UnexpectedError`. Later readers call `send_lsp_response` the same way.
+
+`get_response` uses `&state.db`. The `get_mut` borrow of `live_sessions` ends before that.
 
 ```rust
 // from crates/isograph_cli/src/daemon.rs
@@ -171,13 +210,19 @@ pub fn perform(token: &crate::effect::SideEffectToken, effect: IsographEffect) -
 
 Delta: one token for the loop. `perform` takes `&SideEffectToken`. `run_event_loop` is unchanged.
 
+HashSet `insert` of an id that is already present collapses. Sequential same-id requests in this slice take before the next insert. Two in-flight requests with the same id are not distinguished.
+
 ## Tests
 
-Outstanding.md handle tests that `Started` then hover and `perform`: `perform(&SideEffectToken::mint(), effect)`. The dummy receiver still gets MethodNotFound.
+`handle` of hover for a live client: MethodNotFound bytes unchanged. `perform(&SideEffectToken::mint(), effect)`: dummy receiver gets the response. That client's `outstanding` is empty.
 
-`Formatting` for a live client: same, `result` is `[]`.
+`handle` of `Formatting` for that live client: `result` is `[]`. `outstanding` empty.
 
 Never `Started`, `Started(A)` then request from `B`, `Started` then `Gone` then request, `Formatting` from a not-live client: empty effects. No `perform`.
+
+`LiveSessions::take_reply` of a live client whose set does not contain `id`: `None`. After `insert` of that `id`, `take_reply` is `Some`; a second `take_reply` of the same id is `None`.
+
+`Started` twice for the same `ClientId`: one row, the second session, outstanding empty.
 
 `run_effect_loop` still ends on `Kill`. `run_event_loop` HelloWorld still emits `LogHelloWorld`.
 
@@ -185,8 +230,11 @@ Do not add a production API only tests call. `mint` is the same function `run_ef
 
 ## Call sites
 
-- `LiveSessions::reply` -> `FnOnce(&SideEffectToken, Message)`
-- `send_lsp_response` -> box `|token| send(token, Message::Response(response))`
+- `run_session` / dummy `LiveSession` -> `outstanding: HashSet::new()`
+- `dispatch_lsp_request` -> `get_mut` insert before `get_response`; `send_lsp_response` after
+- `send_lsp_response` -> `take_reply`; `None` is no effects
+- later cancel -> `session.outstanding.remove(&id)` only
+- later async reply -> `send_lsp_response` (always)
 - `run_effect_loop` -> `SideEffectToken::mint`, `perform(&token, effect)`
 - `perform` of `SendLspResponse` -> `(respond.send)(token)`
 - handle tests that call `perform` -> `perform(&SideEffectToken::mint(), effect)`
