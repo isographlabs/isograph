@@ -1,10 +1,10 @@
 # `freddie_timer`
 
-Freddie + figaro refactor. The two halves leave `freddie` for their own crate. Figaro keeps importing from `freddie`, which re-exports. Arming takes a payload and an event constructor. The payload is readable only through `trigger_if_matching`.
+Freddie + figaro refactor. The two halves leave `freddie` for their own crate. Figaro keeps importing from `freddie`, which re-exports. Arming takes a payload. `TimerEffect<P>` and `TimerFired<P>` share `P`. The payload is readable only through `trigger_if_matching`. The consumer's event enum is not `P`: `perform` posts `Event::Timer(timer.event)`.
 
 timer-effects.md is the i2 incorporation. It requires this.
 
-Origin: `freddie/crates/freddie/src/timer.rs`, `drop_guard.rs`, `always_equal.rs`. Origin of the two halves: freddie `docs-website/docs/architecture/timers.md`. Origin of figaro arming: `figaro_model` overlay / windows / typing. Delta: crate `freddie_timer`; `TimerFired<P = ()>`; `timer_effect_and_guard(delay, payload, event)`; `TimerTrigger` behind `bind`; figaro `(), FigaroEvent::Timer`.
+Origin: `freddie/crates/freddie/src/timer.rs`, `drop_guard.rs`, `always_equal.rs`. Origin of the two halves: freddie `docs-website/docs/architecture/timers.md`. Origin of figaro arming: `figaro_model` overlay / windows / typing. Delta: crate `freddie_timer`; `TimerFired<P = ()>` and `TimerEffect<P = ()>` share `P`; `timer_effect_and_guard(delay, payload)`; `TimerTrigger` behind `bind`; figaro `timer_effect_and_guard(delay, ())`.
 
 Two changes. Crate in the freddie repo (`mercury_model` is the in-tree consumer, same arming delta, same commit). Then figaro (path dep) in lockstep.
 
@@ -14,9 +14,9 @@ Figaro is unchanged at the keys. Overlay still hides on its dwell. A placement s
 
 ## Types
 
-The crate is `freddie_timer`. Two halves from one call. `timer_effect_and_guard` mints the id, builds the oneshot pair, puts the sender in the guard and the receiver in the effect, wraps `payload` into `TimerFired`, and hands `TimerFired` to `event` so the effect carries whatever the consumer's event enum is.
+The crate is `freddie_timer`. Two halves from one call. `timer_effect_and_guard` mints the id, builds the oneshot pair, puts the sender in the guard and the receiver in the effect, and stores `TimerFired { id, payload }` on the effect. `P` is shared: `TimerFired<P>` and `TimerEffect<P>`.
 
-Copy: `TimerId`, `TimerTrigger`, `TimerFired<P>` when `P: Copy`. Not Copy: `DropGuard` (owns `oneshot::Sender`), `TimerGuard` (owns `DropGuard`), `AlwaysEqual<T>` (owns the cancel receiver), `TimerEffect<E>` (owns delay, event, cancel receiver). None of the non-Copy types are `Clone`. The guard and the effect are each used once. Overwrite of a guard field is drop of the old one.
+Copy: `TimerId`, `TimerTrigger`, `TimerFired<P>` when `P: Copy`. Not Copy: `DropGuard` (owns `oneshot::Sender`), `TimerGuard` (owns `DropGuard`), `AlwaysEqual<T>` (owns the cancel receiver), `TimerEffect<P>` (owns delay, firing, cancel receiver). None of the non-Copy types are `Clone`. The guard and the effect are each used once. Overwrite of a guard field is drop of the old one.
 
 `schedule_timer` is not in this crate. The consumer's effect loop performs `TimerEffect`.
 
@@ -24,25 +24,24 @@ Copy: `TimerId`, `TimerTrigger`, `TimerFired<P>` when `P: Copy`. Not Copy: `Drop
 
 ```rust
 // external freddie/crates/freddie_timer/src/timer.rs
-pub fn timer_effect_and_guard<P, E>(
+pub fn timer_effect_and_guard<P>(
     delay: Duration,
     payload: P,
-    event: impl FnOnce(TimerFired<P>) -> E,
-) -> (TimerGuard, TimerEffect<E>) {
+) -> (TimerGuard, TimerEffect<P>) {
     let (guard, receiver) = drop_guard();
     let id = TimerId::mint();
     (
         TimerGuard { id, guard },
         TimerEffect {
             delay,
-            event: event(TimerFired { id, payload }),
+            event: TimerFired { id, payload },
             cancel: AlwaysEqual(receiver),
         },
     )
 }
 ```
 
-Figaro: `timer_effect_and_guard(OVERLAY_DWELL, (), FigaroEvent::Timer)`. The enum variant is `fn(TimerFired<P>) -> Event`.
+Figaro: `timer_effect_and_guard(OVERLAY_DWELL, ())`. `perform` posts `FigaroEvent::Timer(timer.event)`.
 
 `TimerFired` is not constructed outside this function. There is no public `new`.
 
@@ -80,14 +79,14 @@ Figaro bind uses `trigger()`.
 // external freddie/crates/freddie_timer/src/timer.rs
 #[cfg_attr(feature = "testing", derive(PartialEq, Eq))]
 #[derive(Debug)]
-pub struct TimerEffect<E> {
+pub struct TimerEffect<P = ()> {
     pub delay: Duration,
-    pub event: E,
+    pub event: TimerFired<P>,
     pub cancel: AlwaysEqual<oneshot::Receiver<()>>,
 }
 ```
 
-Not Copy. Not Clone. Used once: the effect loop moves it into `schedule_timer`. Under `testing`, equality is delay and event; `AlwaysEqual` makes the receiver compare equal.
+Not Copy. Not Clone. Used once: the effect loop moves it into `schedule_timer`. Under `testing`, equality is delay and firing; `AlwaysEqual` makes the receiver compare equal. `P` is the payload, the same `P` as `TimerFired`.
 
 ### `TimerFired`
 
@@ -273,7 +272,7 @@ testing = ["freddie_timer/testing"]
 
 ## Change 2: figaro
 
-Figaro keeps the `freddie` dep. Bind lines are unchanged. `schedule_timer` is unchanged.
+Figaro keeps the `freddie` dep. Bind lines are unchanged.
 
 ```rust
 // external figaro/figaro_model/src/events.rs
@@ -283,17 +282,20 @@ Figaro keeps the `freddie` dep. Bind lines are unchanged. `schedule_timer` is un
 `TimerFired` is `TimerFired<()>`. Bind still passes `&TimerFired`. `TimerFired` is Copy, so those handlers take `#[expect(clippy::trivially_copy_pass_by_ref)]`.
 
 ```rust
-// external figaro/figaro_model/src/model/mod.rs (before)
-            timer_effect_and_guard(OVERLAY_DWELL, |id| FigaroEvent::Timer(TimerFired(id)));
+// external figaro/figaro_model/src/effect.rs
+    Timer(TimerEffect),
 ```
 
 ```rust
 // external figaro/figaro_model/src/model/mod.rs (after)
-            timer_effect_and_guard(OVERLAY_DWELL, (), FigaroEvent::Timer);
+            timer_effect_and_guard(OVERLAY_DWELL, ());
 ```
 
-Same replacement at `windows.rs` `PLACEMENT_SETTLE` and `typing/mod.rs` `arm_window`.
+Same at `windows.rs` `PLACEMENT_SETTLE` and `typing/mod.rs` `arm_window`.
 
-Tests: `fired` / `timer_id` cannot read a private id. A test that needs the firing uses the `event` on the `Timer` effect it just got (`m.handle(&timer.event)`), not a reconstructed `TimerFired(id)`. Delete `fired` and `timer_id`. Every `m.handle(&fired(timer_id(&fx)))` becomes that.
+```rust
+// external figaro/src/daemon.rs
+            () = tokio::time::sleep(delay) => { let _ = event_tx.send(FigaroEvent::Timer(event)); }
+```
 
-`mercury_model` in the freddie repo does the same arming and test change, in the crate commit.
+Tests: a firing is `FigaroEvent::Timer(timer.event)`. `mercury_model` does the same arming, effect type, and `schedule_timer` wrap, in the crate commit.

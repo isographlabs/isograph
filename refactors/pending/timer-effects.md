@@ -48,11 +48,11 @@ pub enum IsographEffect {
     SendLspResponse(Box<SendLspResponseEffect>),
     /// Arm a timer. The effect loop schedules it; it fires its event after the delay unless the
     /// guard held by the state that asked for it drops first.
-    Timer(TimerEffect<IsographEvent>),
+    Timer(TimerEffect<TimerPayload>),
 }
 ```
 
-Origin of the variant: figaro `FigaroEffect::Timer(TimerEffect<FigaroEvent>)`. Delta: the event type is `IsographEvent`; the crate is `freddie_timer`.
+`TimerFired<TimerPayload>` and `TimerEffect<TimerPayload>` share `TimerPayload`. `perform` posts `IsographEvent::Timer(timer.event)`.
 
 ```rust
 // from crates/isograph_cli/src/state.rs
@@ -70,7 +70,6 @@ Arming is figaro's pair:
         let (guard, effect) = freddie_timer::timer_effect_and_guard(
             Duration::ZERO,
             TimerPayload::HelloWorldDebounced,
-            IsographEvent::Timer,
         );
         state.hello_world_debounce = guard.wrap_some();
         IsographEffect::Timer(effect).wrap_vec()
@@ -125,7 +124,6 @@ fn handle_hello_world<THostLanguage: HostLanguage>(
     let (guard, effect) = freddie_timer::timer_effect_and_guard(
         Duration::ZERO,
         TimerPayload::HelloWorldDebounced,
-        IsographEvent::Timer,
     );
     state.hello_world_debounce = guard.wrap_some();
     IsographEffect::Timer(effect).wrap_vec()
@@ -200,7 +198,7 @@ pub fn perform(
 ///
 /// Fire-and-forget on the runtime, so a pending sleep runs off the effect loop.
 fn schedule_timer(
-    timer: TimerEffect<IsographEvent>,
+    timer: TimerEffect<TimerPayload>,
     event_tx: &UnboundedSender<IsographEvent>,
 ) {
     let TimerEffect {
@@ -216,7 +214,7 @@ fn schedule_timer(
     let event_tx = event_tx.clone();
     tokio::spawn(async move {
         tokio::select! {
-            () = tokio::time::sleep(delay) => { let _ = event_tx.send(event); }
+            () = tokio::time::sleep(delay) => { let _ = event_tx.send(IsographEvent::Timer(event)); }
             _ = cancel => {}
         }
     });
@@ -284,8 +282,7 @@ Park on `event_rx.recv().await`. Absence of a firing has no edge: inject `Quit` 
         else {
             panic!("HelloWorld returns Timer");
         };
-        let event = timer.event;
-        let effects = handle(&mut state, event);
+        let effects = handle(&mut state, IsographEvent::Timer(timer.event));
         assert!(matches!(
             effects.as_slice(),
             [IsographEffect::LogHelloWorld]
@@ -305,7 +302,7 @@ Park on `event_rx.recv().await`. Absence of a firing has no edge: inject `Quit` 
             panic!("HelloWorld returns Timer");
         };
         state.hello_world_debounce = None;
-        let effects = handle(&mut state, timer.event);
+        let effects = handle(&mut state, IsographEvent::Timer(timer.event));
         assert!(effects.is_empty());
     }
 
@@ -321,7 +318,7 @@ Park on `event_rx.recv().await`. Absence of a firing has no edge: inject `Quit` 
         else {
             panic!("HelloWorld returns Timer");
         };
-        let effects = handle(&mut state, timer.event);
+        let effects = handle(&mut state, IsographEvent::Timer(timer.event));
         assert!(effects.is_empty());
     }
 ```
@@ -337,7 +334,6 @@ The matching test does not `perform` the timer: it feeds `timer.event` to `handl
             freddie_timer::timer_effect_and_guard(
                 Duration::ZERO,
                 TimerPayload::HelloWorldDebounced,
-                IsographEvent::Timer,
             );
         assert!(perform(IsographEffect::Timer(timer), event_tx.reference()).is_continue());
         let event = event_rx.recv().await.expect("the timer fired");
@@ -357,7 +353,6 @@ The matching test does not `perform` the timer: it feeds `timer.event` to `handl
             freddie_timer::timer_effect_and_guard(
                 Duration::ZERO,
                 TimerPayload::HelloWorldDebounced,
-                IsographEvent::Timer,
             );
         drop(guard);
         let _ = perform(IsographEffect::Timer(timer), event_tx.reference());
@@ -377,7 +372,6 @@ The matching test does not `perform` the timer: it feeds `timer.event` to `handl
         let (guard, timer) = freddie_timer::timer_effect_and_guard(
             Duration::from_secs(60),
             TimerPayload::HelloWorldDebounced,
-            IsographEvent::Timer,
         );
         let _ = perform(IsographEffect::Timer(timer), event_tx.reference());
         drop(guard);

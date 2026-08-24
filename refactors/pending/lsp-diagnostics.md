@@ -51,7 +51,6 @@ struct ReportDiagnostics {
             let (guard, effect) = freddie_timer::timer_effect_and_guard(
                 DIAGNOSTICS_DEBOUNCE,
                 TimerPayload::DiagnosticsDebounce,
-                IsographEvent::Timer,
             );
             state.diagnostics_debounce = guard.wrap_some();
             IsographEffect::Timer(effect).wrap_vec()
