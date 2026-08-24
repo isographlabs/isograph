@@ -159,12 +159,23 @@ fn lint_markdown_file(path: &Path, hits: &mut Vec<String>) {
             None => break,
         };
         let body = &rest[..end];
-        if matches!(lang, "rust" | "rs") {
+        if matches!(lang, "rust" | "rs") && snippet_origin_is_in_workspace(body) {
             lint_rust_snippet(display.reference(), line, body, hits);
         }
         line += body.bytes().filter(|&b| b == b'\n').count();
         rest = &rest[end + 3..];
     }
+}
+
+fn snippet_origin_is_in_workspace(body: &str) -> bool {
+    let Some(line) = body.lines().find(|line| !line.trim().is_empty()) else {
+        return true;
+    };
+    let Some(from) = line.trim().strip_prefix("// from ") else {
+        return true;
+    };
+    let path = from.split([' ', '(']).next().unwrap_or(from);
+    workspace_root().join(path).is_file()
 }
 
 fn lint_rust_snippet(path: &str, start_line: usize, body: &str, hits: &mut Vec<String>) {
