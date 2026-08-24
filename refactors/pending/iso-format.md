@@ -120,13 +120,60 @@ cursor.require_token(
 
 ```rust
 // from crates/isograph_parser/src/format.rs
-pub fn format_recorded(text: &str, tokens: &[Recorded]) -> String
-```
+pub fn format_recorded(text: &str, tokens: &[Recorded]) -> String {
+    let mut out = String::new();
+    let mut indent = 0_usize;
+    let mut last: Option<Last> = None;
+    for (i, recorded) in tokens.iter().enumerate() {
+        match recorded {
+            Recorded::Comma => {
+                out.push(',');
+                last = Last::Comma.wrap_some();
+            }
+            Recorded::Token(token) => {
+                let lexeme = lexeme(text, token);
+                let role = token.item;
+                let delta = list_indent(role, lexeme);
+                let empty_open = delta > 0
+                    && matches!(
+                        tokens.get(i + 1),
+                        Some(Recorded::Token(next))
+                            if list_indent(next.item, lexeme(text, next)) < 0
+                    );
+                if delta < 0 {
+                    indent = indent.saturating_sub(1);
+                }
+                apply_gap(&mut out, gap(last, role, lexeme), indent);
+                out.push_str(lexeme);
+                if delta > 0 && !empty_open {
+                    indent += 1;
+                    apply_gap(&mut out, Gap::Line, indent);
+                    last = Last::Newline.wrap_some();
+                } else {
+                    last = Last::Token(role).wrap_some();
+                }
+            }
+        }
+    }
+    out
+}
 
-Each role prints its lexeme. List-group `{` `(` `[` (`Brace` / `Parenthesis` / `Bracket`) indent in and break; the matching close indents out and breaks. Type-list `[` `]` are `GraphQLTypeName` and do not indent. `Comma` prints `,` and a line break. Open immediately followed by its close is `{}` `()` `[]`. `Description` is its own line. Space after `Keyword` / `Colon` / `Equals`. Space before `Keyword` / `Equals` / `Brace` / `At`. Everything else glues: `Query.x`, `user(`, `$id`, `@loadable`, `[Foo!]`, `id:`.
+fn lexeme<'a>(text: &'a str, token: &WithSpan<IsographSemanticToken>) -> &'a str {
+    &text[token.location.as_usize_range()]
+}
 
-```rust
-// from crates/isograph_parser/src/format.rs
+enum Last {
+    Token(IsographSemanticToken),
+    Comma,
+    Newline,
+}
+
+enum Gap {
+    None,
+    Space,
+    Line,
+}
+
 fn list_indent(role: IsographSemanticToken, lexeme: &str) -> i8 {
     match (role, lexeme) {
         (IsographSemanticToken::Brace, "{")
@@ -138,9 +185,58 @@ fn list_indent(role: IsographSemanticToken, lexeme: &str) -> i8 {
         _ => 0,
     }
 }
+
+fn gap(last: Option<Last>, role: IsographSemanticToken, lexeme: &str) -> Gap {
+    match last {
+        None | Some(Last::Newline) => Gap::None,
+        Some(Last::Comma) => Gap::Line,
+        Some(Last::Token(prev)) => {
+            if role == IsographSemanticToken::Description
+                || prev == IsographSemanticToken::Description
+            {
+                Gap::Line
+            } else if space_after(prev) || space_before(role, lexeme) {
+                Gap::Space
+            } else {
+                Gap::None
+            }
+        }
+    }
+}
+
+fn space_after(role: IsographSemanticToken) -> bool {
+    matches!(
+        role,
+        IsographSemanticToken::Keyword
+            | IsographSemanticToken::Colon
+            | IsographSemanticToken::Equals
+    )
+}
+
+fn space_before(role: IsographSemanticToken, lexeme: &str) -> bool {
+    matches!(
+        role,
+        IsographSemanticToken::Keyword
+            | IsographSemanticToken::Equals
+            | IsographSemanticToken::At
+    ) || lexeme == "{"
+}
+
+fn apply_gap(out: &mut String, gap: Gap, indent: usize) {
+    match gap {
+        Gap::None => {}
+        Gap::Space => out.push(' '),
+        Gap::Line => {
+            out.push('\n');
+            for _ in 0..indent {
+                out.push_str("  ");
+            }
+        }
+    }
+}
 ```
 
-Width is 2 spaces. A parse failure of a literal is not passed to `format_recorded`.
+Type-list `[` `]` are `GraphQLTypeName`; `list_indent` is 0. Width is 2 spaces. A parse failure of a literal is not passed to `format_recorded`.
 
 ## Target shape
 
