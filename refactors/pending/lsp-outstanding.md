@@ -2,17 +2,15 @@
 
 Requires lsp-request-response.md and lsp-sessions.md (both landed). Independent of lsp-tokens.md.
 
-`LspRequest` carries `reply`, a clone of `connection.sender` minted on the session thread. That clone still sends after `Gone`. `LiveSession` owns the writer. `Gone` drops it. This slice puts `client` on `LspRequest`, drops `reply` from the event, and has `send_lsp_response` clone the sender from `LiveSessions::reply`. After `Gone`, that is `None` and there is no `SendLspResponseEffect`.
+`LspRequest` carries `reply`, a clone of `connection.sender` minted on the session thread. That clone still sends after `Gone`. This slice puts `client` on `LspRequest`, drops `reply` from the event, and has `send_lsp_response` clone the sender from `LiveSessions::reply`. A request whose `client` is not live returns no effects before `get_response`.
 
-An outstanding id set is not this slice. It belongs on `LiveSession` when a handler first returns without sending, so `Gone` dropping the session drops the ids. `send_lsp_response` then takes the id and sends if it was present, otherwise `Vec::new()`. Later readers always call it. That function is not this slice.
-
-Origin: landed `LspRequest.reply`; sessions.md `LiveSession.sender` / `handle_client_connection`. Delta: `client` on `LspRequest`, no `reply` on `LspRequest`, `LiveSessions::reply`, `dispatch_lsp` takes `&mut State`.
+Origin: landed `LspRequest.reply`; sessions.md `LiveSession.sender` / `handle_client_connection`. Delta: `client` on `LspRequest`, no `reply` on `LspRequest`, `LiveSessions::reply`, `dispatch_lsp` takes `&mut State`, not-live returns before `get_response`.
 
 One shippable change. MethodNotFound bytes do not change.
 
 ## What the user does
 
-Same verbs. A request `handle`d after that client is `Gone` does not write a response. The session posts every request before `Gone`, so the production channel does not deliver that order; `handle` does not depend on it. A request `handle`d while the client is still live still replies; `perform` ignores a failed `reply.send` if the TCP side is already down.
+Same verbs. A request `handle`d after that client is `Gone` does not write a response. The session posts every request before `Gone`, so the production channel does not deliver that order; `handle` does not depend on it.
 
 ## Types
 
@@ -27,7 +25,7 @@ pub struct LspRequest {
 }
 ```
 
-Delta: `client`; no `reply`. `Clone` and `Debug` stay (`IsographEvent` is both; `listen_and_reply` clones events; `run_event_loop` logs `?event`). Notifications stay a bare `lsp_server::Notification`.
+Delta: `client`; no `reply`. Notifications stay a bare `lsp_server::Notification`.
 
 ```rust
 // from crates/isograph_cli/src/event.rs
@@ -74,6 +72,9 @@ fn dispatch_lsp_request<THostLanguage: HostLanguage>(
     incoming: crate::event::LspRequest,
 ) -> Vec<IsographEffect> {
     let crate::event::LspRequest { client, request } = incoming;
+    if state.live_sessions.reply(client).is_none() {
+        return Vec::new();
+    }
     let get_response = || {
         let request =
             isograph_lsp::lsp_request_dispatch::LSPRequestDispatch::new(request, &state.db)
@@ -136,7 +137,7 @@ fn method_not_found<THostLanguage: HostLanguage>(
 }
 ```
 
-Delta: `handle` of `Lsp` is `dispatch_lsp(state, lsp)`. `send_lsp_response` is the only place a request handler obtains a sender. Missing client is no effects. `handle_client_connection` is unchanged. `dispatch_lsp_notification` / `handle_internal` still take `&mut IsographState`. `SendLspResponseEffect` still has `reply`. `perform` is unchanged. `run_event_loop` is unchanged.
+Delta: `handle` of `Lsp` is `dispatch_lsp(state, lsp)`. Not-live returns before `get_response`. `send_lsp_response` clones the sender from `LiveSessions::reply`. `handle_client_connection` is unchanged. `dispatch_lsp_notification` / `handle_internal` still take `&mut IsographState`. `SendLspResponseEffect` still has `reply`. `perform` is unchanged. `run_event_loop` is unchanged.
 
 ```rust
 // from crates/isograph_cli/src/lsp_socket.rs
@@ -170,6 +171,7 @@ Existing `lsp_request_returns_method_not_found` `Started`s first. The dummy `(tx
 ## Call sites
 
 - `run_session` -> `client` on `LspRequest`; no `reply`
+- `dispatch_lsp_request` -> not-live return before `get_response`
 - `send_lsp_response` -> `LiveSessions::reply`
 - `handle` of `Lsp` -> `dispatch_lsp(state, lsp)`
 - existing `LspRequest { request, reply }` constructions (handle tests) -> `Started` plus `LspRequest { client, request }`
