@@ -71,7 +71,7 @@ The `iso(\`` and closing backtick stay. A parsed literal in the same file as a f
 
 Most important first.
 
-`ParsedIsoLiteral.tokens` is `Vec<WithOptionalSpan<IsographSemanticToken>>`. Consume has `Some(span)`. `parse_each_chunk` after a successful item always records `Comma` with `location: None` (after the last item too). Empty level: no comma. Failed item: no comma. Source commas are ignored: `leftover_token` on `Comma` is `None`, same as `LineBreak`.
+`ParsedIsoLiteral.tokens` is `Vec<WithOptionalSpan<IsographSemanticToken>>`. Consume has `Some(span)` because the highlighter needs file positions and the printer needs the source lexeme (`fullName`, `Query`, `{`). `Comma` has `location: None`: it is not in the source. `parse_each_chunk` after a successful item always records that `Comma` (after the last item too). Empty level: no comma. Failed item: no comma. Source commas are ignored: `leftover_token` on `Comma` is `None`, same as `LineBreak`.
 
 Depth is a counter over list-group open and close. `ResolvePosition` does not enter `None`. The highlighter skips `Comma`. The handler does not call `format_recorded` when there are errors.
 
@@ -306,15 +306,308 @@ Two independently shippable changes.
 
 ### Change 1: `WithOptionalSpan`, `Comma` after list items, `Description` / `At` / `Exclamation`
 
-`ParsedIsoLiteral.tokens` is `Vec<WithOptionalSpan<IsographSemanticToken>>`. `commit` pushes `Some(span)`. `parse_each_chunk` after every successful item, including the last, pushes `Comma` with `None`. `leftover_token` on `Comma` is `None`. Description consume is `Description`. `@` is `At`, the identifier is `DirectiveName`. `!` is `Exclamation`.
+#### `crates/isograph_parser/src/semantic_token.rs`
 
-Tests: a `field Query.x { id, name }` parse records `Keyword`, `Type`, `Period`, `FieldName`, `Brace`, `FieldName`, `Comma`, `FieldName`, `Comma`, `Brace`. `Comma` entries have `location: None`. `field Query.x { id }` records `Comma` after `id`. `field Query.x {}` has no `Comma`. `user(a: 1, b: 2)` records `Comma` after each argument; both parens are `Parenthesis`. `[Foo!]` records `GraphQLTypeName`, `GraphQLTypeName`, `Exclamation`, `GraphQLTypeName`. Failed `require_token` records nothing. `field Pet.x "desc" { id }` records `Description`. `id @loadable` records `At` then `DirectiveName`. Compile `NoSemanticTokens` still compiles.
+Add `Description`, `At`, `Exclamation`, `Comma` to `IsographSemanticToken`.
 
-Highlighting tests skip `Comma`. iso-format-lsp.md tests still get `[]`.
+Before:
+
+```rust
+// from crates/isograph_parser/src/semantic_token.rs
+        SplitToken::NonBracket(NonBracketTokenKind::LineBreak | NonBracketTokenKind::EndOfFile) => {
+            None
+        }
+        SplitToken::NonBracket(_) => IsographSemanticToken::Content.wrap_some(),
+```
+
+After: same, and `NonBracketTokenKind::Comma` is `None` (match it with `LineBreak | EndOfFile | Comma`). Today `Comma` falls through to `Content`.
+
+#### `crates/isograph_parser/src/chunk_stream.rs`
+
+Every `Vec<WithSpan<IsographSemanticToken>>` (ItemCursor, CursorPeek, constructors, `tokens()`, `take_item`) becomes `Vec<WithOptionalSpan<IsographSemanticToken>>`.
+
+Before:
+
+```rust
+// from crates/isograph_parser/src/chunk_stream.rs
+    fn record(&mut self, token: IsographSemanticToken, span: Span) {
+        self.tokens.push(token.with_span(span));
+    }
+```
+
+```rust
+// from crates/isograph_parser/src/chunk_stream.rs
+        tokens.push(token.with_span(span));
+```
+
+After both:
+
+```rust
+        self.tokens
+            .push(WithGenericLocation::new(token, span.wrap_some()));
+```
+
+(`commit` uses the second.)
+
+#### `crates/isograph_parser/src/chunk.rs`
+
+Same vec type on `stream`, `record_leftover_item`, `record_leftover_chunk`, `record_leftover_extra`, `record_leftover_span`.
+
+Before:
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+        && tokens.iter().all(|recorded| recorded.location != span)
+    {
+        tokens.push(role.with_span(span));
+```
+
+After:
+
+```rust
+        && tokens
+            .iter()
+            .all(|recorded| recorded.location != span.wrap_some())
+    {
+        tokens.push(WithGenericLocation::new(role, span.wrap_some()));
+```
+
+Before:
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+        self.0
+            .iter()
+            .map(|chunk| {
+                parse_one_chunk(
+                    chunk,
+                    parent.stream_chunk(&chunk.item),
+                    leftover,
+                    &parse_item,
+                )
+            })
+            .collect()
+```
+
+After:
+
+```rust
+        self.0
+            .iter()
+            .map(|chunk| {
+                let slot = parse_one_chunk(
+                    chunk,
+                    parent.stream_chunk(&chunk.item),
+                    leftover,
+                    &parse_item,
+                );
+                if slot.item.item.is_some() {
+                    parent.tokens().push(WithGenericLocation::new(
+                        IsographSemanticToken::Comma,
+                        None,
+                    ));
+                }
+                slot
+            })
+            .collect()
+```
+
+#### `crates/isograph_parser/src/parse_iso_literal.rs`
+
+`ParsedIsoLiteral.tokens` and `parse_chunked_iso_literal`'s `tokens` param: `Vec<WithOptionalSpan<IsographSemanticToken>>`.
+
+Before:
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+        IsographSemanticToken::String,
+```
+
+in `consume_description` (both string and block string). After: `IsographSemanticToken::Description`.
+
+#### `crates/isograph_parser/src/directives.rs`
+
+Before:
+
+```rust
+// from crates/isograph_parser/src/directives.rs
+            while let Some(at) = cursor.consume_token_if(
+                NonBracketTokenKind::At,
+                IsographSemanticToken::DirectiveName,
+            ) {
+```
+
+After: `IsographSemanticToken::At`. The identifier `require_token` stays `DirectiveName`.
+
+#### `crates/isograph_parser/src/variables.rs`
+
+Before:
+
+```rust
+// from crates/isograph_parser/src/variables.rs
+        peek.advance();
+```
+
+After: replace `peek.advance()` with
+
+```rust
+        cursor.consume_token_if(
+            NonBracketTokenKind::Exclamation,
+            IsographSemanticToken::Exclamation,
+        );
+```
+
+and keep the `if` on that `Option` (drop the separate `peek` match).
+
+#### `crates/isograph_parser/src/assert_semantic_tokens.rs`
+
+`actual` is `&[WithOptionalSpan<IsographSemanticToken>]`. Skip `Comma`. Compare `location` to `span.wrap_some()`. `displayed` skips `Comma` and does not read `None`.
+
+#### `crates/isograph_parser/src/lib.rs`
+
+`IsographSemanticToken` variants and `ParsedIsoLiteral.tokens` type. `mod format` and `pub use format::format_recorded` land in Change 2.
+
+#### Tests that read `.location` as `Span`
+
+`crates/isograph_extract_typescript/src/lib.rs` `one_entrypoint_is_one_pair`: `tokens[0].location` is `Span::from_usize(0, 10).wrap_some()`. Same for any other `.location` compared to a `Span`.
+
+Directive and description highlighting tests that expect `(DirectiveName, "@")` become `(At, "@")`. Description strings become `Description`. `!` tests that expected leftover `Content` for a consumed `!` become `Exclamation`.
+
+`parse_each_chunk_parses_one_identifier_per_chunk` and other `assert_semantic_tokens` callers: helper skips `Comma`, so expected lists stay as they are except `@` / description / `!` as above.
+
+Facts:
+
+- `field Query.x { id, name }` records `Keyword`, `Type`, `Period`, `FieldName`, `Brace`, `FieldName`, `Comma`, `FieldName`, `Comma`, `Brace`. `Comma` has `location: None`.
+- `field Query.x { id }` records `Comma` after `id`.
+- `field Query.x {}` has no `Comma`.
+- `user(a: 1, b: 2)` records `Comma` after each argument.
+- `[Foo!]` records `GraphQLTypeName`, `GraphQLTypeName`, `Exclamation`, `GraphQLTypeName`.
+- Failed `require_token` records nothing.
+- `field Pet.x "desc" { id }` records `Description`.
+- `id @loadable` records `At` then `DirectiveName`.
+- iso-format-lsp.md tests still get `[]`.
 
 ### Change 2: `format_recorded` and the handler body
 
-Printer tests (string equality):
+#### `crates/isograph_parser/src/format.rs`
+
+New file. The `format_recorded` body in Printer, exactly.
+
+#### `crates/isograph_parser/src/lib.rs`
+
+```rust
+mod format;
+pub use format::format_recorded;
+```
+
+#### `crates/isograph_lsp/src/semantic_tokens.rs`
+
+`lsp_semantic_tokens` / `lsp_semantic_tokens_with` / `encode` take `&[WithOptionalSpan<IsographSemanticToken>]`.
+
+Before:
+
+```rust
+// from crates/isograph_lsp/src/semantic_tokens.rs
+        for token in tokens {
+            let token = token.item.with_span(token.location.with_offset(offset));
+```
+
+After:
+
+```rust
+        for token in tokens {
+            if token.item == IsographSemanticToken::Comma {
+                continue;
+            }
+            let Some(location) = token.location else {
+                continue;
+            };
+            let token = token.item.with_span(location.with_offset(offset));
+```
+
+`lsp_type_index`: `Description => STRING`, `At => DECORATOR`, `Exclamation => OPERATOR`. `Comma` is not reached.
+
+Tests that pass `&[WithSpan<...>]` to `encode` construct `WithGenericLocation::new(role, span.wrap_some())` instead of `role.with_span(span)`.
+
+#### `crates/isograph_cli/src/adapter.rs`
+
+Before: `formatting_response` / `will_save_wait_until_response` return `Vec::new().wrap_some()`.
+
+After: the handler bodies in Handlers, plus:
+
+```rust
+// from crates/isograph_cli/src/adapter.rs
+fn format_iso_literals<THostLanguage: HostLanguage>(
+    state: &isograph_compiler::IsographState<THostLanguage>,
+    uri: &lsp_types::Uri,
+) -> Option<Vec<lsp_types::TextEdit>> {
+    let absolute = file_path(uri)?;
+    let cwd = *state.get_singleton::<common_lang_types::CurrentWorkingDirectory>()?;
+    let path = common_lang_types::relative_path_from_absolute_and_working_directory(cwd, &absolute);
+    let literals = isograph_compiler::parsed_iso_literals_in_file(state, path).as_ref()?;
+    let page_content = isograph_compiler::text_through_last_iso_literal(state, path).as_ref()?;
+    literals
+        .iter()
+        .filter_map(|(extraction, parsed)| {
+            if !parsed.errors.is_empty() {
+                return None;
+            }
+            let start = extraction.iso_literal_start_index.0 as u32;
+            let end = start + extraction.iso_literal_text.len() as u32;
+            lsp_types::TextEdit {
+                range: isograph_lsp::lsp_range_for_byte_range(page_content, start, end),
+                new_text: isograph_parser::format_recorded(
+                    extraction.iso_literal_text.as_str(),
+                    parsed.tokens.as_slice(),
+                ),
+            }
+            .wrap_some()
+        })
+        .collect::<Vec<_>>()
+        .wrap_some()
+}
+```
+
+Missing file: `file_path` or cwd or the literals memo is `None` → `format_iso_literals` returns `None` → JSON `null`. No iso literals: `Some(vec![])`.
+
+#### `crates/isograph_lsp/src/semantic_tokens.rs` (range helper)
+
+```rust
+// from crates/isograph_lsp/src/semantic_tokens.rs
+pub fn lsp_range_for_byte_range(page_content: &str, start: u32, end: u32) -> lsp_types::Range {
+    let index = LineIndex::new(page_content);
+    let utf16_len = |text: &str| {
+        if page_content.is_ascii() {
+            text.len() as u32
+        } else {
+            text.encode_utf16().count() as u32
+        }
+    };
+    let mut cursor = index.cursor();
+    cursor.advance_to(start);
+    let start_pos = lsp_types::Position {
+        line: cursor.break_index as u32,
+        character: cursor.column(start, &utf16_len),
+    };
+    cursor.advance_to(end);
+    let end_pos = lsp_types::Position {
+        line: cursor.break_index as u32,
+        character: cursor.column(end, &utf16_len),
+    };
+    lsp_types::Range {
+        start: start_pos,
+        end: end_pos,
+    }
+}
+```
+
+`advance_to` and `column` stay `fn`. Export `lsp_range_for_byte_range` from `crates/isograph_lsp/src/lib.rs`.
+
+#### `crates/isograph_cli/Cargo.toml`
+
+Add `isograph_parser = { path = "../isograph_parser" }`.
+
+Printer tests (string equality) in `format.rs`:
 
 - `field Query.x{id}` → `field Query.x {\n  id,\n}`
 - `field Query.x { id, name }` and `field Query.x { id name }` and `field Query.x { id, name, }` → `field Query.x {\n  id,\n  name,\n}`
