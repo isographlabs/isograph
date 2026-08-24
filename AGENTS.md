@@ -116,9 +116,11 @@ Prefer an enum whose variants name the states. A `bool` field, parameter, or ret
 
 A field that exists only when a flag is set is `Option<T>` or an enum with a payload-bearing variant, not `flag: bool` plus `payload: Option<T>`. Two booleans that cannot both be true are one enum.
 
-## unwrap, unreachable, Infallible
+## Panic and UnexpectedError
 
-`unwrap`, `expect`, `unreachable!`, `panic!`, `todo!`, `unimplemented!`, and `Infallible` (including `Result<T, Infallible>`) are almost always the wrong reach. An `Option` or `Result` the body will always unwrap should not have been optional. A match arm that is always unreachable is a state the function should never have been handed. An `Infallible` error type is a `Result` that should not be a `Result`. Question whether it is needed, default to types that do not need it, and raise it with the user every time before it goes into a planning doc or into code. Name the construct, the invariant, and why the type system cannot express it.
+A broken programmer invariant the type system cannot express is `LSPRuntimeError::UnexpectedError` or a panic (`panic!`, `assert!`, `expect`, `unwrap`, `unreachable!`, `todo!`, `unimplemented!`). `UnexpectedError` surfaces to the user (an LSP error response). Usually `UnexpectedError`. Panic is the other choice. Do not pick panic because you did not look up `UnexpectedError`.
+
+An `Option` or `Result` the body will always unwrap should not have been optional. A match arm that is always unreachable is a state the function should never have been handed. An `Infallible` error type (including `Result<T, Infallible>`) is a `Result` that should not be a `Result`. Question whether it is needed, default to types that do not need it, and raise a panic with the user every time before it goes into a planning doc or into code. Name the construct, the invariant, and why the type system cannot express it.
 
 The parser never panics on any input. Malformed input is a representable state. Parses of user-supplied text, file reads, and socket reads return a typed error or a recovered region.
 
