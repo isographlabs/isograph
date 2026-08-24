@@ -2,7 +2,7 @@
 
 From upstream isograph we keep pico and pico_macros (unchanged), the swc plugin and its dependency chain (isograph_config, common_lang_types, string_key_newtype, prelude), resolve_position, the relay crates, the docs website, and the build process. The new work is `crates/isograph_parser`, `crates/tests`, `crates/isograph_cli` (freddie_cli's lifecycle verbs around the daemon), and `crates/ts_graphql_react_isograph_cli` (the `isograph` binary).
 
-The parser does not use pico. Parser functions are plain functions over `&str`. Memoization applies above the parser (which files changed, which literals were extracted). Parsers are this pipeline: tokenize, match brackets, chunk, grammar consume. We do not add tree-sitter, a tree-sitter grammar, or a tree-sitter crate.
+The parser does not use pico. Parser functions are plain functions over `&str`. Memoization applies above the parser (which files changed, which literals were extracted). The iso parser is tokenize, match brackets, chunk, grammar consume. The GraphQL schema parser is tokenize, then grammar consume. We do not add tree-sitter, a tree-sitter grammar, or a tree-sitter crate.
 
 ## Upstream isograph
 
@@ -197,5 +197,5 @@ An audit fixes the whole class, not the quoted instance. Sweep every file the st
 
 ## Invariants - do not work around these
 
-- No tree-sitter. Parsers are tokenize, match brackets, chunk, grammar consume, in our crates. A highlighting or schema-parse need is that pipeline, not a grammar.js.
+- No tree-sitter. Parsers are tokenize and grammar consume in our crates (the iso parser also match-brackets and chunks). A highlighting or schema-parse need is that pipeline, not a grammar.js.
 - No manual `ResolvePosition` impls. If one seems needed, that is a missing feature in `resolve_position`; add it as a prefactor first.
