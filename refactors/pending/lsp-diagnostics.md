@@ -20,15 +20,9 @@ An editor that advertised `publishDiagnostics` has a file interned (send or, lat
 
 ```rust
 // from crates/isograph_cli/src/event.rs
+#[derive(Clone, Copy, Debug)]
 pub enum TimerPayload {
     DiagnosticsDebounce,
-}
-
-fn diagnostics_debounced(id: freddie_timer::TimerId) -> IsographEvent {
-    IsographEvent::Timer(freddie_timer::TimerFired::new(
-        id,
-        TimerPayload::DiagnosticsDebounce,
-    ))
 }
 ```
 
@@ -56,7 +50,8 @@ struct ReportDiagnostics {
             handle_disk_changed(&mut state.db, change);
             let (guard, effect) = freddie_timer::timer_effect_and_guard(
                 DIAGNOSTICS_DEBOUNCE,
-                diagnostics_debounced,
+                TimerPayload::DiagnosticsDebounce,
+                IsographEvent::Timer,
             );
             state.diagnostics_debounce = guard.wrap_some();
             IsographEffect::Timer(effect).wrap_vec()

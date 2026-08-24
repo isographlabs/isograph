@@ -8,7 +8,7 @@ That code lives in `freddie` (`timer.rs`, `drop_guard.rs`, `always_equal.rs`) an
 
 Two shippable changes. Freddie first, then isograph bumps the git rev and wires `schedule_timer`.
 
-Origin: figaro `figaro_model/src/effect.rs` `FigaroEffect::Timer`, `figaro_model/src/events.rs` `FigaroEvent::Timer`, `figaro/src/daemon.rs` `schedule_timer`, `freddie/crates/freddie/src/timer.rs`. Origin of reset by overwrite: freddie `docs-website/docs/architecture/timers.md`. Delta: crate `freddie_timer`; `TimerFired<P>` with private fields; `trigger_if_matching` instead of bind `TimerTrigger`; i2 payload `HelloWorldDebounced` (deleted when lsp-diagnostics.md lands).
+Origin: figaro `figaro_model/src/effect.rs` `FigaroEffect::Timer`, `figaro_model/src/events.rs` `FigaroEvent::Timer`, `figaro/src/daemon.rs` `schedule_timer`, `freddie/crates/freddie/src/timer.rs`. Origin of reset by overwrite: freddie `docs-website/docs/architecture/timers.md`. Delta: crate `freddie_timer` (Types); figaro and mercury arm with `(), Event::Timer`; i2 payload `HelloWorldDebounced` (deleted when lsp-diagnostics.md lands).
 
 ## What the user does
 
@@ -16,20 +16,92 @@ Same verbs. `isograph send` of HelloWorld still logs `hello world`. The log arri
 
 ## Types
 
-Most important first.
+The crate is `freddie_timer`. Two halves from one call. `timer_effect_and_guard` mints the id, builds the oneshot pair, puts the sender in the guard and the receiver in the effect, wraps `payload` into `TimerFired`, and hands `TimerFired` to `event` so the effect carries whatever the consumer's event enum is.
+
+Copy: `TimerId`, `TimerTrigger`, `TimerFired<P>` when `P: Copy`. Not Copy: `DropGuard` (owns `oneshot::Sender`), `TimerGuard` (owns `DropGuard`), `AlwaysEqual<T>` (owns the cancel receiver), `TimerEffect<E>` (owns delay, event, cancel receiver). None of the non-Copy types are `Clone`. The guard and the effect are each used once. Overwrite of a guard field is drop of the old one.
+
+`schedule_timer` is not in this crate. The consumer's effect loop performs `TimerEffect`.
+
+### `timer_effect_and_guard`
 
 ```rust
 // external freddie/crates/freddie_timer/src/timer.rs
-pub struct TimerFired<P> {
+pub fn timer_effect_and_guard<P, E>(
+    delay: Duration,
+    payload: P,
+    event: impl FnOnce(TimerFired<P>) -> E,
+) -> (TimerGuard, TimerEffect<E>) {
+    let (guard, receiver) = drop_guard();
+    let id = TimerId::mint();
+    (
+        TimerGuard { id, guard },
+        TimerEffect {
+            delay,
+            event: event(TimerFired { id, payload }),
+            cancel: AlwaysEqual(receiver),
+        },
+    )
+}
+```
+
+Figaro: `timer_effect_and_guard(OVERLAY_DWELL, (), FigaroEvent::Timer)`. i2: `timer_effect_and_guard(Duration::ZERO, TimerPayload::HelloWorldDebounced, IsographEvent::Timer)`. The enum variant is `fn(TimerFired<P>) -> Event`.
+
+`TimerFired` is not constructed outside this function. There is no public `new`.
+
+### `TimerGuard`
+
+```rust
+// external freddie/crates/freddie_timer/src/timer.rs
+#[must_use = "dropping the guard cancels the timer immediately"]
+#[derive(Debug)]
+pub struct TimerGuard {
+    id: TimerId,
+    #[expect(dead_code)]
+    guard: DropGuard,
+}
+```
+
+Not Copy. Not Clone. Drop closes the oneshot, which completes the cancel branch of `schedule_timer`. `id` is private.
+
+```rust
+// external freddie/crates/freddie_timer/src/timer.rs
+impl TimerGuard {
+    #[must_use]
+    #[cfg(feature = "bind")]
+    pub const fn trigger(&self) -> TimerTrigger {
+        TimerTrigger(self.id)
+    }
+}
+```
+
+Figaro bind uses `trigger()`. i2 does not enable `bind`.
+
+### `TimerEffect`
+
+```rust
+// external freddie/crates/freddie_timer/src/timer.rs
+#[cfg_attr(feature = "testing", derive(PartialEq, Eq))]
+#[derive(Debug)]
+pub struct TimerEffect<E> {
+    pub delay: Duration,
+    pub event: E,
+    pub cancel: AlwaysEqual<oneshot::Receiver<()>>,
+}
+```
+
+Not Copy. Not Clone. Used once: the effect loop moves it into `schedule_timer`. Under `testing`, equality is delay and event; `AlwaysEqual` makes the receiver compare equal.
+
+### `TimerFired`
+
+```rust
+// external freddie/crates/freddie_timer/src/timer.rs
+#[derive(Clone, Copy, Debug)]
+pub struct TimerFired<P = ()> {
     id: TimerId,
     payload: P,
 }
 
 impl<P> TimerFired<P> {
-    pub const fn new(id: TimerId, payload: P) -> Self {
-        Self { id, payload }
-    }
-
     pub fn trigger_if_matching<'a>(&'a self, guard: Option<&TimerGuard>) -> Option<&'a P> {
         guard
             .is_some_and(|guard| guard.id == self.id)
@@ -38,7 +110,122 @@ impl<P> TimerFired<P> {
 }
 ```
 
-No getter for `payload`. No getter for `id`. Construction is `new`. Matching is `trigger_if_matching`. `TimerGuard.id` is visible here because both types live in this crate.
+Copy when `P: Copy`. `()` is Copy, so figaro's `TimerFired` is Copy. `id` and `payload` are private. The only read of `payload` is this method. Default `P = ()` so figaro writes `TimerFired` and `FigaroEvent::Timer(TimerFired)`.
+
+```rust
+// external freddie/crates/freddie_timer/src/timer.rs
+#[cfg(feature = "testing")]
+impl<P> PartialEq for TimerFired<P> {
+    fn eq(&self, _other: &Self) -> bool {
+        true
+    }
+}
+
+#[cfg(feature = "testing")]
+impl<P> Eq for TimerFired<P> {}
+```
+
+A test that rebuilds an expected `Timer` effect cannot know the minted id. Equality ignores it and the payload. A test that cares about a firing uses the `event` on the effect that set the timer, or `trigger_if_matching`.
+
+### `TimerId`
+
+```rust
+// external freddie/crates/freddie_timer/src/timer.rs
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct TimerId(u64);
+
+impl TimerId {
+    fn mint() -> Self {
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        Self(NEXT.fetch_add(1, Ordering::Relaxed))
+    }
+}
+```
+
+Copy. The field is private. The only mint is inside `timer_effect_and_guard`.
+
+### `DropGuard`
+
+```rust
+// external freddie/crates/freddie_timer/src/drop_guard.rs
+#[must_use = "dropping the guard cancels immediately"]
+pub struct DropGuard(#[expect(dead_code)] oneshot::Sender<()>);
+
+impl std::fmt::Debug for DropGuard {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("DropGuard")
+    }
+}
+
+pub fn drop_guard() -> (DropGuard, oneshot::Receiver<()>) {
+    let (sender, receiver) = oneshot::channel();
+    (DropGuard(sender), receiver)
+}
+```
+
+Not Copy. Not Clone. Timer's cancel mechanism; not timer-specific besides that.
+
+### `AlwaysEqual`
+
+```rust
+// external freddie/crates/freddie_timer/src/always_equal.rs
+pub struct AlwaysEqual<T>(pub T);
+
+impl<T> std::fmt::Debug for AlwaysEqual<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("AlwaysEqual")
+    }
+}
+
+#[cfg(feature = "testing")]
+impl<T> PartialEq for AlwaysEqual<T> {
+    fn eq(&self, _other: &Self) -> bool {
+        true
+    }
+}
+
+#[cfg(feature = "testing")]
+impl<T> Eq for AlwaysEqual<T> {}
+```
+
+Not Copy. Not Clone unless `T` is and we add those derives; we do not. The cancel receiver is not data.
+
+### `TimerTrigger`
+
+```rust
+// external freddie/crates/freddie_timer/src/timer.rs
+#[cfg(feature = "bind")]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct TimerTrigger(TimerId);
+
+#[cfg(feature = "bind")]
+impl EventTrigger for TimerTrigger {
+    type Event = TimerFired;
+    fn is_matching(&self, ev: &TimerFired) -> bool {
+        self.0 == ev.id
+    }
+}
+```
+
+Copy. `TimerFired` here is `TimerFired<()>` via the default. Figaro bind: `|path| path.overlay_timer().map(TimerGuard::trigger)`. i2 does not compile this.
+
+### Crate root
+
+```rust
+// external freddie/crates/freddie_timer/src/lib.rs
+pub mod always_equal;
+pub mod drop_guard;
+pub mod timer;
+
+pub use always_equal::AlwaysEqual;
+pub use drop_guard::{DropGuard, drop_guard};
+pub use timer::{TimerEffect, TimerFired, TimerGuard, TimerId, timer_effect_and_guard};
+
+#[cfg(feature = "bind")]
+pub use timer::TimerTrigger;
+```
+
+i2 events:
 
 ```rust
 // from crates/isograph_cli/src/event.rs
@@ -47,16 +234,6 @@ pub enum TimerPayload {
     HelloWorldDebounced,
 }
 
-fn hello_world_debounced(id: freddie_timer::TimerId) -> IsographEvent {
-    IsographEvent::Timer(freddie_timer::TimerFired::new(
-        id,
-        TimerPayload::HelloWorldDebounced,
-    ))
-}
-```
-
-```rust
-// from crates/isograph_cli/src/event.rs
 #[derive(Clone, Debug, derive_more::From)]
 pub enum IsographEvent {
     #[from]
@@ -69,7 +246,7 @@ pub enum IsographEvent {
 }
 ```
 
-`TimerFired<P>` derives `Clone` when `P: Clone`, `Copy` when `P: Copy`, `Debug` when `P: Debug`. `Timer` is not on `InternalEvent`. The wire is unchanged.
+`Timer` is not on `InternalEvent`. The wire is unchanged. `TimerFired<TimerPayload>` is Copy.
 
 ```rust
 // from crates/isograph_cli/src/effect.rs
@@ -101,8 +278,11 @@ Arming is figaro's pair:
 
 ```rust
 // from crates/isograph_cli/src/state.rs
-        let (guard, effect) =
-            freddie_timer::timer_effect_and_guard(Duration::ZERO, hello_world_debounced);
+        let (guard, effect) = freddie_timer::timer_effect_and_guard(
+            Duration::ZERO,
+            TimerPayload::HelloWorldDebounced,
+            IsographEvent::Timer,
+        );
         state.hello_world_debounce = guard.wrap_some();
         IsographEffect::Timer(effect).wrap_vec()
 ```
@@ -111,7 +291,7 @@ Overwrite assigns a new guard onto the field. That drops the old one, so `select
 
 ## Change 1: `freddie_timer`
 
-New crate `crates/freddie_timer`. Workspace member. Copies `always_equal.rs`, `drop_guard.rs`, `timer.rs` from `crates/freddie/src/`. `crates/freddie` depends on it and re-exports `TimerGuard`, `TimerEffect`, `timer_effect_and_guard`, `TimerFired`, `TimerId`. Figaro and mercury keep importing from `freddie`. The `TimerFired` type change is a compile break in both; the call sites are below.
+New crate `crates/freddie_timer`. Workspace member. The three files are Types. `crates/freddie` depends on it and re-exports. Figaro and mercury keep importing from `freddie`. Arming and tests in both are this change.
 
 ```toml
 # external freddie/crates/freddie_timer/Cargo.toml
@@ -136,17 +316,32 @@ workspace = true
 
 i2 does not enable `bind`. `crates/freddie` does (`features = ["bind"]`, and `testing` on its `testing` feature).
 
-`timer.rs` copied from `crates/freddie/src/timer.rs`. Delta: `TimerFired<P>` as in Types; `TimerFired::new`; `trigger_if_matching`; `#[derive(Clone, Copy, Debug)]` on `TimerFired` with `P: Clone + Copy + Debug` via the bounds on the impls / derive. The `testing` `PartialEq` that always returns true stays, on `TimerFired<P>`.
+The three files are Types. Delta from today's `freddie` copies: `TimerFired<P = ()>`; `trigger_if_matching`; `timer_effect_and_guard` takes `payload` and `FnOnce(TimerFired<P>) -> E`; `TimerTrigger` behind `bind`.
 
-`TimerTrigger` and `impl EventTrigger for TimerTrigger` move behind `#[cfg(feature = "bind")]`. `type Event = TimerFired<()>` so a firing with unit payload still matches `TimerGuard::trigger()`.
+Figaro keeps `freddie` as the dep and writes:
 
-Figaro and mercury arm with `|id| Event::Timer(TimerFired(id))` today. That becomes `|id| Event::Timer(TimerFired::new(id, ()))`. Handlers that take `_ev: &TimerFired` take `_ev: &TimerFired<()>`. Tests that reconstruct a firing or read `TimerFired(id)` off an effect do the same.
+```rust
+// external figaro/figaro_model/src/events.rs
+    Timer(TimerFired),
+```
 
-Figaro (`figaro_model`, path dep on `freddie`): `events.rs` `FigaroEvent::Timer(TimerFired)`; `model/mod.rs` overlay; `model/windows.rs` settle; `model/typing/mod.rs` `arm_window`; handlers in `overlay.rs` / `windows.rs` / `typing/mod.rs`; `tests/transitions.rs` `fired` / `timer_id`. Figaro still depends on `freddie`, which re-exports. It does not add a `freddie_timer` dep.
+`TimerFired` is `TimerFired<()>`. Handlers stay `_ev: &TimerFired`.
 
-Mercury (`mercury_model` in the freddie repo): the same `TimerFired(id)` / `&TimerFired` sites. Lands in the same change 1 commit as the crate.
+```rust
+// external figaro/figaro_model/src/model/mod.rs (before)
+            timer_effect_and_guard(OVERLAY_DWELL, |id| FigaroEvent::Timer(TimerFired(id)));
+```
 
-`timer_effect_and_guard` is unchanged: `(delay, impl FnOnce(TimerId) -> E)`.
+```rust
+// external figaro/figaro_model/src/model/mod.rs (after)
+            timer_effect_and_guard(OVERLAY_DWELL, (), FigaroEvent::Timer);
+```
+
+Same replacement at `windows.rs` `PLACEMENT_SETTLE` and `typing/mod.rs` `arm_window`. Bind lines are unchanged (`TimerGuard::trigger()`). `schedule_timer` is unchanged.
+
+Tests: `fired` / `timer_id` cannot read a private id. A test that needs the firing uses the `event` on the `Timer` effect it just got (`m.handle(&timer.event)`), not a reconstructed `TimerFired(id)`. Delete `fired` and `timer_id`. Every `m.handle(&fired(timer_id(&fx)))` becomes that.
+
+Mercury in the freddie repo: the same arming and test change, same commit as the crate.
 
 ```rust
 // external freddie/crates/freddie/src/lib.rs
@@ -218,8 +413,11 @@ The rev is the commit that landed change 1, all three equal. No `bind` dep. No `
 fn handle_hello_world<THostLanguage: HostLanguage>(
     state: &mut State<THostLanguage>,
 ) -> Vec<IsographEffect> {
-    let (guard, effect) =
-        freddie_timer::timer_effect_and_guard(Duration::ZERO, hello_world_debounced);
+    let (guard, effect) = freddie_timer::timer_effect_and_guard(
+        Duration::ZERO,
+        TimerPayload::HelloWorldDebounced,
+        IsographEvent::Timer,
+    );
     state.hello_world_debounce = guard.wrap_some();
     IsographEffect::Timer(effect).wrap_vec()
 }
@@ -238,7 +436,7 @@ fn handle_timer_fired<THostLanguage: HostLanguage>(
 }
 ```
 
-`state.rs` gains `use std::time::Duration` and `use crate::event::{TimerPayload, hello_world_debounced}`.
+`state.rs` gains `use std::time::Duration` and `use crate::event::TimerPayload`.
 
 Origin of `schedule_timer` and of `perform` taking `event_tx`: figaro `src/daemon.rs`. Delta: `IsographEvent` / `IsographEffect`; crate `freddie_timer`; i2's `perform` gains `event_tx`.
 
@@ -427,7 +625,11 @@ The matching test does not `perform` the timer: it feeds `timer.event` to `handl
     async fn a_timer_effect_fires_its_event_after_a_zero_delay() {
         let (event_tx, mut event_rx) = unbounded_channel();
         let (guard, timer) =
-            freddie_timer::timer_effect_and_guard(Duration::ZERO, hello_world_debounced);
+            freddie_timer::timer_effect_and_guard(
+                Duration::ZERO,
+                TimerPayload::HelloWorldDebounced,
+                IsographEvent::Timer,
+            );
         assert!(perform(IsographEffect::Timer(timer), event_tx.reference()).is_continue());
         let event = event_rx.recv().await.expect("the timer fired");
         let IsographEvent::Timer(fired) = event else {
@@ -443,7 +645,11 @@ The matching test does not `perform` the timer: it feeds `timer.event` to `handl
     async fn dropping_the_guard_before_perform_does_not_fire() {
         let (event_tx, mut event_rx) = unbounded_channel();
         let (guard, timer) =
-            freddie_timer::timer_effect_and_guard(Duration::ZERO, hello_world_debounced);
+            freddie_timer::timer_effect_and_guard(
+                Duration::ZERO,
+                TimerPayload::HelloWorldDebounced,
+                IsographEvent::Timer,
+            );
         drop(guard);
         let _ = perform(IsographEffect::Timer(timer), event_tx.reference());
         event_tx
@@ -461,7 +667,8 @@ The matching test does not `perform` the timer: it feeds `timer.event` to `handl
         let (event_tx, mut event_rx) = unbounded_channel();
         let (guard, timer) = freddie_timer::timer_effect_and_guard(
             Duration::from_secs(60),
-            hello_world_debounced,
+            TimerPayload::HelloWorldDebounced,
+            IsographEvent::Timer,
         );
         let _ = perform(IsographEffect::Timer(timer), event_tx.reference());
         drop(guard);
@@ -476,7 +683,7 @@ The matching test does not `perform` the timer: it feeds `timer.event` to `handl
     }
 ```
 
-`Duration::ZERO` is the degenerate delay. The 60s delay is only to make a late fire lose to `Quit` if cancel failed. `daemon.rs` tests gain `use super::perform`, `use std::time::Duration`, `IsographEvent`, `TimerPayload`, `hello_world_debounced`. `lsp_isograph_event_hello_world_returns_log_hello_world` becomes a timer, same as `hello_world_returns_a_timer`.
+`Duration::ZERO` is the degenerate delay. The 60s delay is only to make a late fire lose to `Quit` if cancel failed. `daemon.rs` tests gain `use super::perform`, `use std::time::Duration`, `IsographEvent`, `TimerPayload`. `lsp_isograph_event_hello_world_returns_log_hello_world` becomes a timer, same as `hello_world_returns_a_timer`.
 
 Keep `guard` alive until after `trigger_if_matching` in the fire test.
 
