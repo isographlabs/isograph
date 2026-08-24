@@ -4,7 +4,9 @@ Requires event-loop.md (landed), freddie-timer.md, and lsp-outstanding.md. lsp-o
 
 Incorporation of `freddie_timer` into i2. HelloWorld arms a `Duration::ZERO` timer with payload `HelloWorldDebounced`. `handle` of the matching fire returns `LogHelloWorld`. lsp-diagnostics.md deletes that payload and the guard field.
 
-`isograph send` of HelloWorld is `Lsp(Notification { method: isograph/event, params: HelloWorld })`, not `IsographEvent::Internal(HelloWorld)`. After lsp-outstanding, that path is `handle` -> `dispatch_lsp(&mut State)` -> `dispatch_lsp_notification(&mut IsographState)` -> `on_isograph_event` -> `handle_internal`. This slice points the notification path at `&mut State` and has `on_isograph_event` call `handle(state, internal.to())`, so send and in-process Internal share the HelloWorld arm.
+`IsographState` is the pico database in `isograph_compiler`. `State` is the CLI process wrapper (`db`, `live_sessions`, and this slice's guard). The guard is not a pico source. It is RAII over a oneshot that cancels a tokio sleep. It lives on `State`. `handle_internal` stays on `&mut IsographState` (Quit, DiskChanged). HelloWorld and `TimerFired` are matched on `handle` because they write that field.
+
+`isograph send` of HelloWorld is `Lsp(Notification { method: isograph/event, params: HelloWorld })`, not `IsographEvent::Internal(HelloWorld)`. After lsp-outstanding, that path is `handle` -> `dispatch_lsp(&mut State)` -> `dispatch_lsp_notification(&mut IsographState)` -> `on_isograph_event` -> `handle_internal`. This slice points the notification path at `&mut State` and has `on_isograph_event` call `handle(state, internal.to())`, so send hits `handle`'s HelloWorld arm. `handle_internal` does not take `State`.
 
 Origin: figaro `src/daemon.rs` `schedule_timer` / `perform_effect` taking `event_tx`. Origin of the halves: freddie-timer.md. Delta: `IsographEvent::Timer` / `IsographEffect::Timer`; `perform` gains `event_tx` and the Timer arm returns `ControlFlow::Continue`; payload `HelloWorldDebounced`; notification dispatch takes `State` and re-enters `handle`.
 
@@ -122,15 +124,14 @@ After lsp-outstanding, `handle` and `dispatch_lsp` already take `&mut State`. `d
 // from crates/isograph_cli/src/state.rs (after)
     match event {
         IsographEvent::Lsp(lsp) => dispatch_lsp(state, lsp),
-        IsographEvent::Internal(internal) => handle_internal(state, internal),
+        IsographEvent::Internal(InternalEvent::HelloWorld) => handle_hello_world(state),
+        IsographEvent::Internal(internal) => handle_internal(&mut state.db, internal),
         IsographEvent::Timer(fired) => handle_timer_fired(state, fired),
         IsographEvent::ClientConnection(client) => handle_client_connection(state, client),
     }
 ```
 
-Matching `Internal(HelloWorld)` only on `handle` and deleting that variant from `handle_internal` does not compile: `handle_internal` takes `InternalEvent`, which rustc does not narrow. `handle_internal` takes `&mut State`. Its HelloWorld arm is `handle_hello_world`. `handle`'s Internal arm is `handle_internal(state, internal)`. That is one arm.
-
-Do not leave HelloWorld on `handle_internal` as `LogHelloWorld`. CLI tests send HelloWorld over LSP and wait for `hello world` in the log. If the LSP path still calls `handle_internal` on `&mut IsographState` and that arm is `LogHelloWorld`, send skips the timer, the in-process Internal tests pass, and the log still appears.
+`handle_internal` still takes `&mut IsographState`. rustc does not narrow `InternalEvent`, so that match still names HelloWorld. That arm is `Vec::new()`, not `LogHelloWorld`. The send path is `handle`'s HelloWorld arm. If `on_isograph_event` still called `handle_internal` and that arm were `LogHelloWorld`, send would skip the timer, the in-process Internal tests would pass, and the log would still appear.
 
 ```rust
 // from crates/isograph_cli/src/state.rs (before)
@@ -215,13 +216,13 @@ fn on_isograph_event<THostLanguage: HostLanguage>(
 }
 
 fn handle_internal<THostLanguage: HostLanguage>(
-    state: &mut State<THostLanguage>,
+    state: &mut IsographState<THostLanguage>,
     internal: InternalEvent,
 ) -> Vec<IsographEffect> {
     match internal {
-        InternalEvent::HelloWorld => handle_hello_world(state),
+        InternalEvent::HelloWorld => Vec::new(),
         InternalEvent::Quit => IsographEffect::Kill.wrap_vec(),
-        InternalEvent::DiskChanged(change) => handle_disk_changed(&mut state.db, change),
+        InternalEvent::DiskChanged(change) => handle_disk_changed(state, change),
     }
 }
 
@@ -252,7 +253,7 @@ fn handle_timer_fired<THostLanguage: HostLanguage>(
 
 `state.rs` gains `use std::time::Duration` and `use crate::event::TimerPayload`. Payload is readable only through `trigger_if_matching`.
 
-`on_isograph_event` re-enters `handle` with `Internal`, not `Lsp`. `handle` of that Internal is `handle_internal`. There is no recursion through `Lsp`.
+`on_isograph_event` re-enters `handle` with `Internal`, not `Lsp`. HelloWorld is `handle_hello_world`. Quit and DiskChanged are `handle_internal`. There is no recursion through `Lsp`.
 
 Origin of `schedule_timer` and of `perform` taking `event_tx`: figaro `src/daemon.rs`. Figaro's `perform_effect` matches, then returns `Continue` after the match (`Kill` is `return Break`). i2's `perform` returns from each arm. `schedule_timer` is `-> ()`. `IsographEffect::Timer(timer) => schedule_timer(timer, event_tx)` is a type error. The Timer arm calls `schedule_timer` then returns `Continue`.
 
@@ -592,7 +593,7 @@ CLI tests in `crates/ts_graphql_react_isograph_cli/tests/cli.rs` send HelloWorld
 
 ## Call sites
 
-- `handle` of HelloWorld (`Internal` or LSP `isograph/event`) -> `Timer` effect plus guard
+- `handle` of HelloWorld (`Internal` or LSP `isograph/event` re-entering `handle`) -> `Timer` effect plus guard
 - `handle` of `TimerFired` -> `trigger_if_matching` -> `LogHelloWorld` or empty
 - `perform` of `Timer` -> `schedule_timer` -> wrap as `IsographEvent::Timer` on `event_tx.send`, or cancel
 - `serve` / `listen_and_reply` / `kill_ends_the_effect_loop` pass `event_tx` into `run_effect_loop`
