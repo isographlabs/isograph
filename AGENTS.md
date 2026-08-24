@@ -96,6 +96,10 @@ A regular file does not become readable through `epoll`/`kqueue` when it grows. 
 
 Absence has no edge of its own. Inject a later event that will fire, wait for that, and assert the forbidden thing did not arrive first.
 
+## Event loop
+
+`run_event_loop` recvs an event, calls `handle`, and sends the returned effects. It does not grow more logic. It does not match on the event. It does not match on the effect. It does not keep a table, filter, or other interpretation of what arrived or of what `handle` returned. That work is `handle` (a field on state) or `perform` (the effect).
+
 ## Shared state and interior mutability
 
 `Arc`, `Rc`, `Mutex`, `RwLock`, `Cell`, `RefCell`, `OnceCell`/`OnceLock`, `lazy_static`, `thread_local!`, and atomics are almost always the wrong reach. `handle` is a pure function of `IsographState` and event on one thread; the state lives in one place, and a caller that wants a value already holds it. A primitive that shares or mutates through a lock is papering over a design that put the value in the wrong place. Question whether it is needed, default to the version that does not need it, and raise it with the user every time before it goes into a planning doc or into code. Name the primitive, what it is sharing, and why the non-shared version does not work.
@@ -200,3 +204,4 @@ An audit fixes the whole class, not the quoted instance. Sweep every file the st
 
 - No tree-sitter. Parsers are tokenize and grammar consume in our crates (the iso parser also match-brackets and chunks). A highlighting or schema-parse need is that pipeline, not a grammar.js.
 - No manual `ResolvePosition` impls. If one seems needed, that is a missing feature in `resolve_position`; add it as a prefactor first.
+- `run_event_loop` is recv, `handle`, send those effects. It does not match on the event or the effect. New behavior is an event `handle` interprets, a field on state `handle` writes, or an effect `perform` runs.
