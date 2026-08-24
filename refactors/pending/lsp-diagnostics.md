@@ -2,7 +2,7 @@
 
 Requires lsp-port.md, lsp-sessions.md, and timer-effects.md. Independent of lsp-tokens.md.
 
-A change that should refresh squiggles arms a 100ms timer (timer-effects.md) and stores the guard. Another change before it fires overwrites the guard, which cancels the earlier sleep. `handle` of the matching `TimerFired` reads parse/host errors and returns `ReportDiagnostics`. The effect loop sends `textDocument/publishDiagnostics` to live sessions whose `PublishDiagnosticsCap` is `Yes`.
+A change that should refresh squiggles arms a 100ms timer (timer-effects.md) and stores the guard. Another change before it fires overwrites the guard, which cancels the earlier sleep. `handle` of `TimerFired` whose `trigger_if_matching` yields `TimerPayload::DiagnosticsDebounce` reads parse/host errors and returns `ReportDiagnostics`. The effect loop sends `textDocument/publishDiagnostics` to live sessions whose `PublishDiagnosticsCap` is `Yes`. This slice deletes `HelloWorldDebounced` and `hello_world_debounce`. HelloWorld returns `LogHelloWorld` again.
 
 `handle` does not sleep. HelloWorld and Quit are not this kind of change. `isograph send` is usually already gone; it does not receive the notification.
 
@@ -16,18 +16,32 @@ An editor that advertised `publishDiagnostics` has a file interned (send or, lat
 
 ## Types
 
-`IsographEvent::Timer` and `IsographEffect::Timer` are timer-effects.md. This slice adds the guard field and `ReportDiagnostics`.
+`IsographEvent::Timer` and `IsographEffect::Timer` are timer-effects.md. This slice adds `TimerPayload::DiagnosticsDebounce`, the guard field, and `ReportDiagnostics`. Delete `HelloWorldDebounced` and `hello_world_debounce`; HelloWorld returns `LogHelloWorld` again.
+
+```rust
+// from crates/isograph_cli/src/event.rs
+pub enum TimerPayload {
+    DiagnosticsDebounce,
+}
+
+fn diagnostics_debounced(id: freddie_timer::TimerId) -> IsographEvent {
+    IsographEvent::Timer(freddie_timer::TimerFired::new(
+        id,
+        TimerPayload::DiagnosticsDebounce,
+    ))
+}
+```
 
 ```rust
 // from crates/isograph_cli/src/state.rs
 pub struct State<THostLanguage: HostLanguage> {
     pub db: IsographState<THostLanguage>,
     pub live_sessions: LiveSessions,
-    pub debounce: Option<freddie::TimerGuard>,
+    diagnostics_debounce: Option<freddie_timer::TimerGuard>,
 }
 ```
 
-`State` is lsp-sessions.md. Delta: `debounce`. 100ms, same as isograph `SHORT_DEBOUNCE_TIME`.
+100ms, same as isograph `SHORT_DEBOUNCE_TIME`.
 
 ```rust
 // from crates/isograph_cli/src/effect.rs
@@ -39,30 +53,24 @@ struct ReportDiagnostics {
 ```rust
 // from crates/isograph_cli/src/state.rs
         IsographEvent::Internal(InternalEvent::DiskChanged(change)) => {
-            handle_disk_changed(state, change);
-            let (guard, effect) = freddie::timer_effect_and_guard(
+            handle_disk_changed(&mut state.db, change);
+            let (guard, effect) = freddie_timer::timer_effect_and_guard(
                 DIAGNOSTICS_DEBOUNCE,
-                crate::event::timer_fired,
+                diagnostics_debounced,
             );
-            state.debounce = guard.wrap_some();
+            state.diagnostics_debounce = guard.wrap_some();
             IsographEffect::Timer(effect).wrap_vec()
         }
         IsographEvent::Timer(fired) => {
-            if state
-                .debounce
-                .as_ref()
-                .map(freddie::TimerGuard::trigger)
-                .is_matching(&fired)
-            {
-                state.debounce = None;
-                report_diagnostics(state).wrap_vec()
-            } else {
-                Vec::new()
+            match fired.trigger_if_matching(state.diagnostics_debounce.as_ref()) {
+                Some(&TimerPayload::DiagnosticsDebounce) => {
+                    state.diagnostics_debounce = None;
+                    report_diagnostics(state).wrap_vec()
+                }
+                None => Vec::new(),
             }
         }
 ```
-
-`use bind::EventTrigger` is at the top of `state.rs` (`bind` git dep, `default-features = false`, same rev as `freddie`).
 
 `report_diagnostics` walks interned `DiskFile`s, maps `file_literals` errors to `lsp_types::Diagnostic` (origin lsp-parse-diagnostics.md, now this file). URI from config directory + relative path (`file://`). Empty diagnostic list for a URI that had errors last time and has none now is required so the client clears squiggles. Keep the previous URI set on `IsographState` or on `LiveSessions`. A `HashSet<Uri>` on a new tracked field is compiler state; put it on a session-less `DiagnosticsUris` singleton source, or compute the clear set in the effect loop from the last `ReportDiagnostics`. Last published URIs on `LiveSessions` is enough: effect loop remembers `last: HashSet<Uri>`, new report, send empty lists for `last - new`.
 
@@ -118,5 +126,5 @@ That writer thread should land in lsp-sessions.md if not already implied. lsp-se
 
 ## Call sites
 
-- `DiskChanged` -> `Timer` effect plus guard -> matching `TimerFired` -> `ReportDiagnostics` -> `publish`
+- `DiskChanged` -> `Timer` effect plus guard -> `TimerFired` / `DiagnosticsDebounce` -> `ReportDiagnostics` -> `publish`
 - session writer thread -> socket
