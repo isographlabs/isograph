@@ -2,9 +2,9 @@
 
 Requires lsp-port.md (landed). Independent of lsp-tokens.md and lsp-outstanding.md.
 
-A request already carries `LspRequest.reply`. `textDocument/publishDiagnostics` is a server-to-client notification: there is no request, so there is no reply sender on the event. After `initialize`, the session posts `ClientEvent::Started`. `handle` stores `LiveSession` on CLI `State`. When the socket ends, `ClientEvent::Gone` removes it. handle of the later diagnostics event clones senders whose caps include `publishDiagnostics` onto that effect. `perform` writes the notification and does not see `LiveSessions`.
+A request already carries `LspRequest.reply`. `textDocument/publishDiagnostics` is a server-to-client notification: there is no request, so there is no reply sender on the event. After `initialize`, the session posts `ClientConnectionEvent::Started`. `handle` stores `LiveSession` on CLI `State`. When the socket ends, `ClientConnectionEvent::Gone` removes it. handle of the later diagnostics event clones senders whose caps include `publishDiagnostics` onto that effect. `perform` writes the notification and does not see `LiveSessions`.
 
-Delta: `ClientId`, `LiveSession`, `LiveSessions`, `ClientEvent`, CLI `State` (`db` + `live_sessions`), handle writes the map and returns no effects.
+Delta: `ClientId`, `LiveSession`, `LiveSessions`, `ClientConnectionEvent`, CLI `State` (`db` + `live_sessions`), handle writes the map and returns no effects.
 
 One shippable change.
 
@@ -37,7 +37,7 @@ pub struct ClientStartedEvent {
 }
 
 #[derive(Clone, Debug)]
-pub enum ClientEvent {
+pub enum ClientConnectionEvent {
     Started(ClientStartedEvent),
     Gone(ClientId),
 }
@@ -49,7 +49,7 @@ pub enum IsographEvent {
     #[from]
     Internal(InternalEvent),
     #[from]
-    Client(ClientEvent),
+    Client(ClientConnectionEvent),
 }
 ```
 
@@ -69,11 +69,11 @@ pub fn handle<THostLanguage: HostLanguage>(
     match event {
         IsographEvent::Lsp(lsp) => dispatch_lsp(&mut state.db, lsp),
         IsographEvent::Internal(internal) => handle_internal(&mut state.db, internal),
-        IsographEvent::Client(ClientEvent::Started(started)) => {
+        IsographEvent::Client(ClientConnectionEvent::Started(started)) => {
             state.live_sessions.0.insert(started.client, started.session);
             Vec::new()
         }
-        IsographEvent::Client(ClientEvent::Gone(client)) => {
+        IsographEvent::Client(ClientConnectionEvent::Gone(client)) => {
             state.live_sessions.0.remove(&client);
             Vec::new()
         }
@@ -151,7 +151,7 @@ fn session(
         }
     };
     run_session(&connection, event_tx.clone(), client);
-    let _ = event_tx.send(crate::event::ClientEvent::Gone(client).to());
+    let _ = event_tx.send(crate::event::ClientConnectionEvent::Gone(client).to());
     drop(connection);
     let _ = io_threads.join();
 }
@@ -200,7 +200,7 @@ fn run_session(
         }
     };
     let _ = event_tx.send(
-        crate::event::ClientEvent::Started(crate::event::ClientStartedEvent {
+        crate::event::ClientConnectionEvent::Started(crate::event::ClientStartedEvent {
             client,
             session: crate::event::LiveSession {
                 sender: connection.sender.clone(),
@@ -229,21 +229,21 @@ fn run_session(
 
 Delta: `client` argument; `Started` after a successful parse of `InitializeParams`; message loop unchanged (`LspRequest` has no `client` field). Deserialize failure returns without `Started`. `session` still posts `Gone`. Same thread, same `event_tx`: `Started` is enqueued before `Gone`.
 
-Existing `listen_for_events` tests that `initialize` then `try_recv`: first event is `ClientEvent::Started`. Then the Lsp event the test already asserted. On drop, `ClientEvent::Gone`. Tests that asserted no events after a failed handshake (`initialize_then_event_without_initialized_is_not_an_event`, `truncated_body_ends_that_connection`) receive `Gone` and no `Started`.
+Existing `listen_for_events` tests that `initialize` then `try_recv`: first event is `ClientConnectionEvent::Started`. Then the Lsp event the test already asserted. On drop, `ClientConnectionEvent::Gone`. Tests that asserted no events after a failed handshake (`initialize_then_event_without_initialized_is_not_an_event`, `truncated_body_ends_that_connection`) receive `Gone` and no `Started`.
 
 ## Tests
 
-`handle` of `ClientEvent::Started`: `state.live_sessions` has one row at that `client` with those `capabilities`. Dummy `(tx, rx)` from `crossbeam::channel::unbounded()`. Send `Message::Notification` on the stored sender; `rx` receives it. Empty effects.
+`handle` of `ClientConnectionEvent::Started`: `state.live_sessions` has one row at that `client` with those `capabilities`. Dummy `(tx, rx)` from `crossbeam::channel::unbounded()`. Send `Message::Notification` on the stored sender; `rx` receives it. Empty effects.
 
-`handle` of `ClientEvent::Gone`: that `client` is absent. Empty effects.
+`handle` of `ClientConnectionEvent::Gone`: that `client` is absent. Empty effects.
 
-`handle` of `ClientEvent::Gone` of an id that was never registered: empty effects, no panic.
+`handle` of `ClientConnectionEvent::Gone` of an id that was never registered: empty effects, no panic.
 
-`handle` of `ClientEvent::Started` twice for the same `ClientId`: one row, the second `session`.
+`handle` of `ClientConnectionEvent::Started` twice for the same `ClientId`: one row, the second `session`.
 
 `lsp_socket.rs` (`listen_for_events`):
 
-- initialize with `{"capabilities":{}}`: `event_rx` receives `ClientEvent::Started` whose `session.capabilities == ClientCapabilities::default()`. Drop. `ClientEvent::Gone` for that `ClientId`.
+- initialize with `{"capabilities":{}}`: `event_rx` receives `ClientConnectionEvent::Started` whose `session.capabilities == ClientCapabilities::default()`. Drop. `ClientConnectionEvent::Gone` for that `ClientId`.
 - initialize with `textDocument.publishDiagnostics: {}` and `textDocument.hover: {}`: stored `capabilities` equals the deserialized `InitializeParams.capabilities` (`publish_diagnostics` and `hover` both `Some`). Drop.
 - initialize whose params JSON is not `InitializeParams`: `Gone`, no `Started`.
 - drop the TCP stream before initialize: `Gone`, no `Started`.
@@ -254,9 +254,9 @@ Existing `listen_for_events` tests that `initialize` then `try_recv`: first even
 ## Call sites
 
 - `accept_loop` -> `ClientId` -> `session`
-- `run_session` after `initialize` -> `ClientEvent::Started`
-- `session` end -> `ClientEvent::Gone` then `drop(connection)` then `join`
+- `run_session` after `initialize` -> `ClientConnectionEvent::Started`
+- `session` end -> `ClientConnectionEvent::Gone` then `drop(connection)` then `join`
 - `handle` -> `live_sessions.0.insert` / `remove`
 - `serve` / `run_event_loop` / `handle` tests -> `State { db, live_sessions }`
 - lsp-diagnostics.md -> handle clones senders onto the report effect; `perform` does not take `LiveSessions`
-- lsp-outstanding.md -> `ClientId` on `LspRequest` / `SendLspResponseEffect`; `ClientEvent::Gone` drops outstanding ids. handle of `Client` is empty effects.
+- lsp-outstanding.md -> `ClientId` on `LspRequest` / `SendLspResponseEffect`; `ClientConnectionEvent::Gone` drops outstanding ids. handle of `Client` is empty effects.

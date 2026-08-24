@@ -2,13 +2,13 @@
 
 Requires lsp-request-response.md and lsp-sessions.md. Independent of lsp-dispatch.md and lsp-tokens.md.
 
-`handle` of `Lsp` whose message is a request always returns `SendLspResponseEffect` in the same turn. After disconnect, `Lsp` events can still sit on `event_rx`. This slice drops those replies: `ClientId` and `ClientEvent::Gone` are already on the session (lsp-sessions.md). A `HashSet<(ClientId, RequestId)>` on the event loop is this slice.
+`handle` of `Lsp` whose message is a request always returns `SendLspResponseEffect` in the same turn. After disconnect, `Lsp` events can still sit on `event_rx`. This slice drops those replies: `ClientId` and `ClientConnectionEvent::Gone` are already on the session (lsp-sessions.md). A `HashSet<(ClientId, RequestId)>` on the event loop is this slice.
 
 JSON-RPC ids are per connection. Two clients can both use id `1`. Keys are `(ClientId, RequestId)`.
 
-`handle` stays synchronous. The set is empty except while a request is in `handle`, and for ids still on `event_rx` after `ClientEvent::Gone`. Cancel and async replies are later readers of the same table.
+`handle` stays synchronous. The set is empty except while a request is in `handle`, and for ids still on `event_rx` after `ClientConnectionEvent::Gone`. Cancel and async replies are later readers of the same table.
 
-Origin: landed `Lsp` / `SendLspResponseEffect`; lsp-sessions.md `ClientId` / `ClientEvent::Gone`. Delta: `client` on `LspRequest` and on `SendLspResponseEffect`, outstanding on `run_event_loop`.
+Origin: landed `Lsp` / `SendLspResponseEffect`; lsp-sessions.md `ClientId` / `ClientConnectionEvent::Gone`. Delta: `client` on `LspRequest` and on `SendLspResponseEffect`, outstanding on `run_event_loop`.
 
 One shippable change. MethodNotFound bytes do not change. Send tests stay green.
 
@@ -73,10 +73,10 @@ Lives in `run_event_loop`.
                     .insert((request.client, request.request.id.clone()));
             }
             IsographEvent::Lsp(_) => {}
-            IsographEvent::Client(crate::event::ClientEvent::Gone(client)) => {
+            IsographEvent::Client(crate::event::ClientConnectionEvent::Gone(client)) => {
                 outstanding.inner.retain(|(id, _)| *id != *client);
             }
-            IsographEvent::Client(crate::event::ClientEvent::Started(_)) => {}
+            IsographEvent::Client(crate::event::ClientConnectionEvent::Started(_)) => {}
             IsographEvent::Internal(_) => {}
         }
         let effects = handle(&mut state, event);
@@ -100,7 +100,7 @@ Lives in `run_event_loop`.
 
 ### Session
 
-`accept_loop` already assigns `ClientId` and `session` already posts `ClientEvent::Gone` (sessions.md). `run_session` takes `client` and puts it on `LspEvent::Request`.
+`accept_loop` already assigns `ClientId` and `session` already posts `ClientConnectionEvent::Gone` (sessions.md). `run_session` takes `client` and puts it on `LspEvent::Request`.
 
 ```rust
 // from crates/isograph_cli/src/lsp_socket.rs
@@ -115,7 +115,7 @@ Lives in `run_event_loop`.
 
 ## Tests
 
-`lsp_socket.rs`: drop a connection after initialize. `event_rx` receives `ClientEvent::Gone` (sessions.md). A second connection HelloWorld still works. Two connections that both drop produce two `ClientEvent::Gone` with different `ClientId`s.
+`lsp_socket.rs`: drop a connection after initialize. `event_rx` receives `ClientConnectionEvent::Gone` (sessions.md). A second connection HelloWorld still works. Two connections that both drop produce two `ClientConnectionEvent::Gone` with different `ClientId`s.
 
 `handle` still returns `SendLspResponseEffect` in the same turn as an `Lsp` request. A dropped in-flight reply is not observable until a later slice can defer the response. Do not assert it here.
 
