@@ -71,7 +71,7 @@ The `iso(\`` and closing backtick stay. A parsed literal in the same file as a f
 
 Most important first.
 
-`ParsedIsoLiteral.tokens` is `Vec<WithOptionalSpan<IsographSemanticToken>>`. Consume has `Some(span)` because the highlighter needs file positions and the printer needs the source lexeme (`fullName`, `Query`, `{`). `Comma` has `location: None`: it is not in the source. `parse_each_chunk` after a successful item always records that `Comma` (after the last item too). Empty level: no comma. Failed item: no comma. Source commas are ignored: `leftover_token` on `Comma` is `None`, same as `LineBreak`.
+`ParsedIsoLiteral.tokens` is `Vec<WithOptionalSpan<IsographSemanticToken>>`. Consume has `Some(span)` because the highlighter needs file positions and the printer needs the source lexeme (`fullName`, `Query`, `{`). `Comma` has `location: None`: it is not in the source. `parse_each_chunk` after a successful item always records that `Comma` (after the last item too). Empty level: no comma. Failed item: no comma. List source commas stay on `trailing_separator` and are not leftover-filled. `leftover_token` is unchanged.
 
 Depth is a counter over list-group open and close. `ResolvePosition` does not enter `None`. The highlighter skips `Comma`.
 
@@ -394,33 +394,7 @@ pub(crate) fn leftover_token(kind: SplitToken) -> Option<IsographSemanticToken> 
 }
 ```
 
-After: the enum in Recording. `leftover_token`:
-
-```rust
-// from crates/isograph_parser/src/semantic_token.rs
-pub(crate) fn leftover_token(kind: SplitToken) -> Option<IsographSemanticToken> {
-    match kind {
-        SplitToken::NonBracket(NonBracketTokenKind::IntegerLiteral) => {
-            IsographSemanticToken::Integer.wrap_some()
-        }
-        SplitToken::NonBracket(
-            NonBracketTokenKind::StringLiteral | NonBracketTokenKind::BlockStringLiteral,
-        ) => IsographSemanticToken::String.wrap_some(),
-        SplitToken::NonBracket(NonBracketTokenKind::Error) => {
-            IsographSemanticToken::Error.wrap_some()
-        }
-        SplitToken::NonBracket(
-            NonBracketTokenKind::LineBreak
-                | NonBracketTokenKind::EndOfFile
-                | NonBracketTokenKind::Comma,
-        ) => None,
-        SplitToken::NonBracket(_) => IsographSemanticToken::Content.wrap_some(),
-        SplitToken::Bracket(_) => IsographSemanticToken::Bracket.wrap_some(),
-    }
-}
-```
-
-Delta: four variants on the enum. `Comma` grouped with `LineBreak | EndOfFile`.
+After: the enum in Recording. `leftover_token` is unchanged. Delta: four variants on the enum.
 
 #### `crates/isograph_parser/src/chunk_stream.rs`
 
@@ -1382,7 +1356,6 @@ Leftover remaining contents report an error, so this covers leftover too. The ha
 - description → `commit(Description)`
 - `@` → `commit(At)`; directive identifier → `commit(DirectiveName)`
 - `!` after a type → `commit(Exclamation)`
-- `leftover_token` on `Comma` → `None`
 - `formatting_response` / `will_save_wait_until_response` → `format_iso_literals` → `format_recorded` → `TextEdit`s
 - vscode-languageclient → `willSaveWaitUntil` on save
 - highlighter → `.item`, skip `Comma`
@@ -1391,7 +1364,7 @@ Leftover remaining contents report an error, so this covers leftover too. The ha
 
 iso-format-lsp.md: the two handlers return the edits from `format_iso_literals`.
 
-semantic-tokens.md: `Description`, `At`, `Exclamation`, `Comma`. `DirectiveName` is the identifier only. `String` is a value. `!` is recorded. `leftover_token` on `Comma` is `None`. Tokens vec is `Vec<WithOptionalSpan<IsographSemanticToken>>`. This file.
+semantic-tokens.md: `Description`, `At`, `Exclamation`, `Comma`. `DirectiveName` is the identifier only. `String` is a value. `!` is recorded. Tokens vec is `Vec<WithOptionalSpan<IsographSemanticToken>>`. `leftover_token` is unchanged. This file.
 
 lsp-open-files.md: format reads `lsp_file_contents` once that exists.
 
