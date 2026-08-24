@@ -14,20 +14,11 @@ Spaces do not split chunks. Newlines do.
 
 ## `#` comments
 
-`#` comments are an `Error` token for `#` plus identifiers for the rest of the line. There is no comment token. The skip regex skips only `[ \t\f\ufeff]+`.
-
-```rust
-// from crates/isograph_parser/src/token_kind.rs
-    #[regex(r"[ \t\f\ufeff]+", logos::skip)]
-    #[error]
-    Error,
-```
-
-A comment token is a language-shape change. It is not mixed into leftover-semantic-tokens.md leftover fill-in.
+comments.md. A comment token is a language-shape change. It is not mixed into leftover-semantic-tokens.md leftover fill-in.
 
 ## Commented-out grammar in `token_kind.rs`
 
-Spread, comments, `Pipe`, and `PeriodPeriod` sit as comments in the token enum, plus `TODO don't skip comments and spaces`. The crate rule is that a comment must not describe what was not done. Display has the matching commented-out arms (`Ampersand`, `PeriodPeriod`, `Pipe`, `Spread`).
+Spread, `Pipe`, and `PeriodPeriod` sit as comments in the token enum, plus `TODO don't skip comments and spaces`. `SingleLineComment` is comments.md (that regex is uncommented there, not deleted). The crate rule is that a comment must not describe what was not done. Display has the matching commented-out arms (`Ampersand`, `PeriodPeriod`, `Pipe`, `Spread`).
 
 ```rust
 // from crates/isograph_parser/src/token_kind.rs
@@ -39,10 +30,6 @@ Spread, comments, `Pipe`, and `PeriodPeriod` sit as comments in the token enum, 
 
     // #[token("...")]
     // Spread,
-
-    // Comments
-    // #[regex("#[^\n\r]*")]
-    // SingleLineComment,
 ```
 
-Delete those commented-out variants, the TODO on the skip regex, and the commented-out Display arms.
+Delete those commented-out variants, the TODO on the skip regex, and the commented-out Display arms (`Ampersand`, `PeriodPeriod`, `Pipe`, `Spread`). The commented-out `SingleLineComment` regex is comments.md, not this deletion.
