@@ -111,7 +111,7 @@ Overwrite assigns a new guard onto the field. That drops the old one, so `select
 
 ## Change 1: `freddie_timer`
 
-New crate `crates/freddie_timer`. Workspace member. Copies `always_equal.rs`, `drop_guard.rs`, `timer.rs` from `crates/freddie/src/`. `crates/freddie` depends on it and re-exports so mercury/figaro keep `freddie::TimerGuard` and friends.
+New crate `crates/freddie_timer`. Workspace member. Copies `always_equal.rs`, `drop_guard.rs`, `timer.rs` from `crates/freddie/src/`. `crates/freddie` depends on it and re-exports `TimerGuard`, `TimerEffect`, `timer_effect_and_guard`, `TimerFired`, `TimerId`. Figaro and mercury keep importing from `freddie`. The `TimerFired` type change is a compile break in both; the call sites are below.
 
 ```toml
 # external freddie/crates/freddie_timer/Cargo.toml
@@ -138,7 +138,13 @@ i2 does not enable `bind`. `crates/freddie` does (`features = ["bind"]`, and `te
 
 `timer.rs` copied from `crates/freddie/src/timer.rs`. Delta: `TimerFired<P>` as in Types; `TimerFired::new`; `trigger_if_matching`; `#[derive(Clone, Copy, Debug)]` on `TimerFired` with `P: Clone + Copy + Debug` via the bounds on the impls / derive. The `testing` `PartialEq` that always returns true stays, on `TimerFired<P>`.
 
-`TimerTrigger` and `impl EventTrigger for TimerTrigger` move behind `#[cfg(feature = "bind")]`. `type Event = TimerFired<()>` so mercury's `FigaroEvent::Timer(TimerFired::new(id, ()))` still matches `TimerGuard::trigger()`. `TimerFired<()>` is mercury's firing. Mercury arming sites that today write `|id| Event::Timer(TimerFired(id))` write `|id| Event::Timer(TimerFired::new(id, ()))`.
+`TimerTrigger` and `impl EventTrigger for TimerTrigger` move behind `#[cfg(feature = "bind")]`. `type Event = TimerFired<()>` so a firing with unit payload still matches `TimerGuard::trigger()`.
+
+Figaro and mercury arm with `|id| Event::Timer(TimerFired(id))` today. That becomes `|id| Event::Timer(TimerFired::new(id, ()))`. Handlers that take `_ev: &TimerFired` take `_ev: &TimerFired<()>`. Tests that reconstruct a firing or read `TimerFired(id)` off an effect do the same.
+
+Figaro (`figaro_model`, path dep on `freddie`): `events.rs` `FigaroEvent::Timer(TimerFired)`; `model/mod.rs` overlay; `model/windows.rs` settle; `model/typing/mod.rs` `arm_window`; handlers in `overlay.rs` / `windows.rs` / `typing/mod.rs`; `tests/transitions.rs` `fired` / `timer_id`. Figaro still depends on `freddie`, which re-exports. It does not add a `freddie_timer` dep.
+
+Mercury (`mercury_model` in the freddie repo): the same `TimerFired(id)` / `&TimerFired` sites. Lands in the same change 1 commit as the crate.
 
 `timer_effect_and_guard` is unchanged: `(delay, impl FnOnce(TimerId) -> E)`.
 
