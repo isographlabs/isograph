@@ -2,9 +2,9 @@
 
 Requires iso-format-lsp.md. Independent of lsp-diagnostics.md. Uses open-file contents when lsp-open-files.md change 3 has landed; until then, disk, same as tokens.
 
-iso-format-lsp.md's `textDocument/formatting` and `textDocument/willSaveWaitUntil` handlers return `[]`. This slice records layout at consume, prints from that stream, and those handlers return the edits.
+iso-format-lsp.md's `textDocument/formatting` and `textDocument/willSaveWaitUntil` handlers return `[]`. This slice records a printable stream at consume, prints from that stream, and those handlers return the edits.
 
-A list group (`{` of a selection set or object, `(` of arguments or variables, `[` of a value list) breaks: line break plus indent after the opener, each successful item on its own line ending with a comma, line break plus dedent before the closer. Empty groups stay `{}` `()` `[]`. Type-list `[String]` does not break. A description occupies its own line (`before` and `after` are `Line`), so `{` after a description is on the next line.
+A list group (`{` of a selection set or object, `(` of arguments or variables, `[` of a value list) indents: line break after the opener, line break before the closer. Each successful chunk ends with a comma and a line break. Empty groups stay `{}` `()` `[]`. Type-list `[Foo!]` does not indent: those brackets are `GraphQLTypeName`, glued, including `!`. A description occupies its own line, so `{` after a description is on the next line.
 
 ```
 user(
@@ -67,165 +67,45 @@ The `iso(\`` and closing backtick stay. A parsed literal in the same file as a f
 
 `willSaveWaitUntil` (advertised in iso-format-lsp.md) returns those edits. `textDocument/formatting` returns the same edits.
 
-## Layout
+## Recording
 
 Most important first.
 
-```rust
-// from crates/isograph_parser/src/layout.rs
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub enum Gap {
-    None,
-    Space,
-    Line,
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-pub enum Indent {
-    None,
-    In,
-    Out,
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-pub struct Layout {
-    pub before: Gap,
-    pub after: Gap,
-    pub indent: Indent,
-}
-```
-
-`Gap` orders `None < Space < Line`. The gap between two adjacent recorded tokens is `max(prev.after, next.before)`.
-
-`Indent::In` applies after the token (open of a list group). `Indent::Out` applies before the token (the matching close). Type-list `[` / `]` use `Indent::None`.
-
-```rust
-impl Layout {
-    pub const GLUE: Layout = Layout {
-        before: Gap::None,
-        after: Gap::None,
-        indent: Indent::None,
-    };
-    pub const SPACE: Layout = Layout {
-        before: Gap::Space,
-        after: Gap::Space,
-        indent: Indent::None,
-    };
-    pub const SPACE_AFTER: Layout = Layout {
-        before: Gap::None,
-        after: Gap::Space,
-        indent: Indent::None,
-    };
-    pub const OWN_LINE: Layout = Layout {
-        before: Gap::Line,
-        after: Gap::Line,
-        indent: Indent::None,
-    };
-    pub const OPEN_BRACE: Layout = Layout {
-        before: Gap::Space,
-        after: Gap::Line,
-        indent: Indent::In,
-    };
-    pub const OPEN_PAREN: Layout = Layout {
-        before: Gap::None,
-        after: Gap::Line,
-        indent: Indent::In,
-    };
-    pub const CLOSE_BRACE: Layout = Layout {
-        before: Gap::Line,
-        after: Gap::None,
-        indent: Indent::Out,
-    };
-    pub const AT: Layout = Layout {
-        before: Gap::Space,
-        after: Gap::None,
-        indent: Indent::None,
-    };
-    pub const COMMA: Layout = Layout {
-        before: Gap::None,
-        after: Gap::Line,
-        indent: Indent::None,
-    };
-}
-```
-
-`OPEN_BRACE` / `CLOSE_BRACE` are `{` / `}` of a selection set or object literal. `OPEN_PAREN` / `CLOSE_BRACE` are `(` / `)` of an argument or variable list and `[` / `]` of a value list. Type-list `[String]` is `GLUE`.
-
-An `In` token immediately followed by the matching `Out` with nothing recorded between them uses `Gap::None` between those two: `{}` `()` `[]`. Consume sites pass the open/close pair either way.
-
-## Recording
-
-`commit` takes the highlight role and the layout.
+The tokens vec on `ParsedIsoLiteral` is `Vec<Recorded>`. `commit` still takes only the highlight role. `require_token` / `require_group` signatures do not change.
 
 ```rust
 // from crates/isograph_parser/src/semantic_token.rs
 pub enum Recorded {
-    Token(RecordedToken),
-    Comma(Layout),
+    Consume(RecordedToken),
+    Leftover(RecordedToken),
+    Comma,
 }
 
 pub struct RecordedToken {
     pub span: Span,
     pub token: IsographSemanticToken,
-    pub layout: Option<Layout>,
 }
 ```
 
-`RecordedToken.layout` `Some` is consume. `None` is leftover fill-in. The printer walks consume tokens and `Comma`. The highlighter walks `Recorded::Token`. `Comma` has no span. `ResolvePosition` does not enter it.
+`commit` pushes `Consume`. Leftover fill-in pushes `Leftover`. `parse_each_chunk` after a successfully parsed item pushes `Comma`, including after the last item of the level. A failed item has no comma. An empty level has no comma. A trailing source comma is leftover fill-in.
 
-`parse_each_chunk` after a successfully parsed item records `Recorded::Comma(Layout::COMMA)`, including after the last item of the level. A failed item has no comma. An empty level has no comma. A trailing source comma is leftover fill-in.
+The highlighter walks `Consume` and `Leftover`, reads `.token`, skips `Comma`. The printer walks `Consume` and `Comma`. `Comma` has no span. `ResolvePosition` does not enter it.
+
+`!` after a type is `peek.advance()` today and is not recorded. Consume it with `IsographSemanticToken::Content` so it prints, glued, in `[Foo!]`.
 
 ```rust
 cursor.require_token(
     NonBracketTokenKind::Period,
     IsographSemanticToken::Period,
-    Layout::GLUE,
 )
 cursor.require_group(
     BracketKind::Brace,
     IsographSemanticToken::Brace,
-    Layout::OPEN_BRACE,
-    Layout::CLOSE_BRACE,
     parse_inside,
 )
 ```
 
-`require_group` / `consume_group_if` take two layouts. Open and close share one highlight role. `RecordGroupClose` stores the close layout. Argument and variable lists and value lists pass `Layout::OPEN_PAREN`, `Layout::CLOSE_BRACE`. Type-list brackets pass `Layout::GLUE`, `Layout::GLUE`.
-
-`!` is consumed with `IsographSemanticToken::Content` and `Layout::GLUE`.
-
-`NoSemanticTokens::record` ignores layout and commas.
-
-## Consume sites
-
-- Declaration keyword (`entrypoint`, `field`): `SPACE_AFTER`
-- Type in `Type.name`: `GLUE`
-- `.`: `GLUE`
-- Selectable name in `Type.name`: `GLUE`
-- `to`: `SPACE`
-- Type-annotation identifier: `GLUE`
-- Type-list `[` / `]`: `GLUE`
-- `!`: `GLUE`, `Content`
-- Description string / block string: `OWN_LINE`
-- Selection name or alias (first identifier of a selection): `GLUE`
-- `:` of `alias: name`, of `name: Type`, of `name: value`: `SPACE_AFTER`
-- Name after `alias:`: `GLUE`
-- Selection-set `{` / `}`: `OPEN_BRACE` / `CLOSE_BRACE`
-- Object literal `{` / `}`: `OPEN_BRACE` / `CLOSE_BRACE`
-- Argument list `(` / `)`: `OPEN_PAREN` / `CLOSE_BRACE`
-- Variable declaration list `(` / `)`: `OPEN_PAREN` / `CLOSE_BRACE`
-- Value list `[` / `]`: `OPEN_PAREN` / `CLOSE_BRACE`
-- Argument name / object key: `GLUE`
-- `$` and the variable identifier, declaration or usage: `GLUE`
-- `=`: `SPACE`
-- Integer / string / boolean / null as values: `GLUE`
-- `@`: `AT`
-- Directive identifier: `GLUE`
-- Comma after every successful list item, including the last: `Recorded::Comma(Layout::COMMA)`, from `parse_each_chunk`
-
-`max(description.after=Line, brace.before=Space)` is `Line`.
-
-Tests in `chunk_stream.rs` that call `require_token` / `consume_group_if` pass `Layout::GLUE` unless they assert layout.
+`NoSemanticTokens::record` ignores commas.
 
 ## Printer
 
@@ -234,30 +114,48 @@ Tests in `chunk_stream.rs` that call `require_token` / `consume_group_if` pass `
 pub fn format_recorded(text: &str, tokens: &[Recorded]) -> String
 ```
 
-Walk `Recorded::Token` whose `layout` is `Some`, and `Recorded::Comma`. A comma's text is `","`.
+A list-group open is a `Consume` whose token is `Brace` / `Parenthesis` / `Bracket` and whose source char is `{` / `(` / `[`. A list-group close is the same roles with `}` / `)` / `]`. Type-list `[` `]` are `GraphQLTypeName` and are not list-group brackets.
+
+A description is a `Consume` `String` whose previous `Consume` is not `Colon` and not `Equals`.
 
 ```
 indent = 0
-last_after = Gap::None
+pending_line = false
+open_awaiting_close = false
+last: Option<RecordedToken>
 output empty
 
-for each printable:
-    if layout.indent is Out: indent = indent - 1, not below 0
-    if this token is Out and the previous emitted token was In
-        with no printable between them:
-        gap = Gap::None
+for each Consume token or Comma:
+    if Comma:
+        push ','
+        pending_line = true
+        open_awaiting_close = false
+        continue
+    if list-group close: indent = indent - 1, not below 0
+    empty = list-group close and open_awaiting_close
+    if empty:
+        gap is none
+    else if pending_line or list-group close or this token is a description or last is a description:
+        push '\n' then "  " repeated indent times
+    else if last is Some(prev) and space_between(prev, this, text):
+        push ' '
+    push source slice
+    last = this token
+    if list-group open:
+        indent = indent + 1
+        pending_line = true
+        open_awaiting_close = true
     else:
-        gap = max(last_after, layout.before)
-    if gap is Space: push ' '
-    if gap is Line: push '\n' then "  " repeated indent times
-    push text (source slice, or "," for Comma)
-    last_after = layout.after
-    if layout.indent is In: indent = indent + 1
-
-if last_after is Line: push '\n'
+        pending_line = false
+        open_awaiting_close = false
 ```
 
-Matching In: previous emitted token had `Indent::In` and this token has `Indent::Out`.
+`space_between(prev, next, text)` is true when `space_after(prev)` or `space_before(next, text)`:
+
+- `space_after`: `Keyword`, `Colon`, `Equals`
+- `space_before`: `Keyword`, `Equals`, `Brace`, and `DirectiveName` whose source text is `@`
+
+Everything else glues: `Query.x`, `user(`, `$id`, `@loadable`, `[Foo!]`, `id:`.
 
 Width is 2 spaces.
 
@@ -340,13 +238,13 @@ Missing file is `Ok(None)` JSON `null`.
 
 Two independently shippable changes.
 
-### Change 1: `Layout` at consume, commas after list items
+### Change 1: `Recorded`, commas after list items, record `!`
 
-`layout.rs`, `Recorded`, `commit` / `require_token` / `require_group` take layout, leftover `layout: None`. `parse_each_chunk` records `Recorded::Comma(Layout::COMMA)` after every successful item, including the last. Catalog above at every consume.
+`ParsedIsoLiteral.tokens` is `Vec<Recorded>`. `commit` pushes `Consume`. Leftover fill-in pushes `Leftover`. `parse_each_chunk` pushes `Comma` after every successful item, including the last. Consume `!` with `Content`.
 
-Tests: a `field Query.x { id, name }` parse records `Keyword SPACE_AFTER`, `Type GLUE`, `Period GLUE`, `FieldName GLUE`, `Brace OPEN_BRACE`, `FieldName GLUE`, `Comma COMMA`, `FieldName GLUE`, `Comma COMMA`, `Brace CLOSE_BRACE`. `field Query.x { id }` records `Comma` after `id`. `field Query.x {}` has no `Comma`. `user(a: 1, b: 2)` records `Comma` after each argument; both parens are `OPEN_PAREN` / `CLOSE_BRACE`. Failed `require_token` records nothing. `!` is recorded. A description records `OWN_LINE`. Compile `NoSemanticTokens` still compiles.
+Tests: a `field Query.x { id, name }` parse records `Keyword`, `Type`, `Period`, `FieldName`, `Brace`, `FieldName`, `Comma`, `FieldName`, `Comma`, `Brace`. `field Query.x { id }` records `Comma` after `id`. `field Query.x {}` has no `Comma`. `user(a: 1, b: 2)` records `Comma` after each argument; both parens are `Parenthesis`. `[Foo!]` records `GraphQLTypeName`, `GraphQLTypeName`, `Content`, `GraphQLTypeName`. Failed `require_token` records nothing. A description is `String`. Compile `NoSemanticTokens` still compiles.
 
-Highlighting tests read `.token` on `Recorded::Token` and skip `Recorded::Comma`. iso-format-lsp.md tests still get `[]`.
+Highlighting tests read `.token` on `Consume` and `Leftover` and skip `Comma`. iso-format-lsp.md tests still get `[]`.
 
 ### Change 2: `format_recorded` and the handler body
 
@@ -355,14 +253,15 @@ Printer tests (string equality):
 - `field Query.x{id}` → `field Query.x {\n  id,\n}`
 - `field Query.x { id, name }` and `field Query.x { id name }` and `field Query.x { id, name, }` → `field Query.x {\n  id,\n  name,\n}`
 - `field Query.x {}` → `field Query.x {}`
-- `user()` → `user()`
-- `foo(x: [1, 2])` → `foo(\n  x: [\n    1,\n    2,\n  ],\n)`
+- `field Query.x { user() }` → `field Query.x {\n  user(),\n}`
+- `field Query.x { foo(x: [1, 2]) }` → `field Query.x {\n  foo(\n    x: [\n      1,\n      2,\n    ],\n  ),\n}`
+- `field Query.x($y: [Foo!]) { id }` → `field Query.x(\n  $y: [Foo!],\n) {\n  id,\n}`
 - `entrypoint Query.HomeRoute` → itself
 - `field Pet.x to Image { id }` → `field Pet.x to Image {\n  id,\n}`
-- `user(arg: { b: true }, c: false)` → `user(\n  arg: {\n    b: true,\n  },\n  c: false,\n)`
+- `field Query.x { user(arg: { b: true }, c: false) }` → `field Query.x {\n  user(\n    arg: {\n      b: true,\n    },\n    c: false,\n  ),\n}`
 - `field Query.user($id:ID,$x:Int){id}` → `field Query.user(\n  $id: ID,\n  $x: Int,\n) {\n  id,\n}`
 - `field Pet.x\n\"desc\"\n{id}` → `field Pet.x\n\"desc\"\n{\n  id,\n}`
-- `id @loadable` inside a set: space before `@`
+- `field Query.x { id @loadable }`: space before `@`
 - `Query.x` keeps the dot glued
 - leftover-only tokens do not appear as extra words
 - a lone close still emits (indent stays at 0)
@@ -376,19 +275,22 @@ Printer tests (string equality):
 
 ## Call sites
 
-- grammar consume → `commit(token, layout)`
+- grammar consume → `commit(token)` → `Recorded::Consume`
+- leftover fill-in → `Recorded::Leftover`
 - `parse_each_chunk` after each successful item → `Recorded::Comma`
-- leftover fill-in → `Recorded::Token { layout: None, ... }`
+- `!` after a type → `commit(Content)`
 - `formatting_response` / `will_save_wait_until_response` → `format_iso_literals` → `format_recorded` → `TextEdit`s
 - vscode-languageclient → `willSaveWaitUntil` on save
-- highlighter → `Recorded::Token.token`
+- highlighter → `RecordedToken.token` on `Consume` and `Leftover`
 
 ## Docs this change amends
 
 iso-format-lsp.md: the two handlers return the edits from `format_iso_literals`.
 
-semantic-tokens.md "Formatter metadata": consume passes a `Layout` next to the highlight role. This file.
+semantic-tokens.md "Formatter metadata": no `Layout` on consume. List groups are `Brace` / `Parenthesis` / `Bracket`. Type-list `[` is `GraphQLTypeName`. Commas are `Recorded::Comma`. This file.
 
 lsp-open-files.md: format reads `lsp_file_contents` once that exists.
 
 iso-format-later.md: packing a group onto one line when it fits the width.
+
+comments.md: leftover is `Recorded::Leftover`, not `layout: None`. Descriptions are own-line in the printer, not a consume `Layout`.

@@ -387,7 +387,7 @@ Facts:
 
 ### Formatter metadata
 
-Consume passes a `Layout` next to the highlight role. iso-format.md.
+No layout on consume. List-group brackets are `Brace` / `Parenthesis` / `Bracket`; type-list `[` is `GraphQLTypeName`. iso-format.md records `Recorded::Comma` after each successful chunk and prints from that stream.
 
 ### Cheap pass
 

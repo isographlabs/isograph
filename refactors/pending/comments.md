@@ -45,7 +45,7 @@ fn strip_captured_line_breaks(items: &mut Vec<WithSpan<BracketItem>>)
 
 and again by `absorb_chunk` if any leak. Root is unchunked (`ChunkedRoot`): line breaks there are content, and `consume_line_breaks` skips them at the declaration sites listed in parsing-standards.md. Interiors are chunked. One chunk is one grammar item (`parse_one_chunk` / `parse_each_chunk`).
 
-iso-format.md records consume tokens plus a synthetic comma after every successful list item, and prints that stream. Leftover is `layout: None` and is not printed. A literal with any parse error is not passed to `format_recorded`.
+iso-format.md records consume tokens plus a synthetic comma after every successful list item, and prints that stream. Leftover is `Recorded::Leftover` and is not printed. A literal with any parse error is not passed to `format_recorded`.
 
 `a: b # yo` today: the argument parses, `#` and `yo` are leftover, `parse_stream` reports `Expected(separator, ...)`. The literal has errors. Format will refuse it.
 
@@ -178,12 +178,12 @@ true
 
 Optional absorb: if the host of a trailing comment is `Colon` or `Equals`, fold the immediately following line break into that trailing trivia and drop the line-break token. Then `a: # what\ntrue` is one chunk. `foo # c\nbar` does not absorb: the host is `Identifier`. `[Pet # c\n!]` does not absorb: host is `Identifier`; bang still does not attach. `foo\n@loadable` is unchanged (no comment). `bar\n{ baz }` is unchanged. `$x: # c\nInt` would parse. `a: # c\n{ b: 1 }` would parse. This rule is a language-shape change for those two token kinds only. It is not implied by trivia itself.
 
-`TokenTrivia` on every token is a field the grammar does not read. The readers are highlighting and format. Recording: when `commit` records a token, emit each leading `Trivia::Comment` as `IsographSemanticToken::Comment` with `Layout::OWN_LINE` before the token, and each trailing comment as `Comment` with `before: Space, after: None` after the token. Comma tokens that are separators are not `commit`ted (iso-format synthesizes `Recorded::Comma`). Trailing trivia of a source comma, or of the last content token when there is no source comma, must still enter the Recorded stream. Two ways:
+`TokenTrivia` on every token is a field the grammar does not read. The readers are highlighting and format. Recording: when `commit` records a token, emit each leading `Trivia::Comment` as `IsographSemanticToken::Comment` on its own line before the token, and each trailing comment as `Comment` with a space before and glue after. Comma tokens that are separators are not `commit`ted (iso-format synthesizes `Recorded::Comma`). Trailing trivia of a source comma, or of the last content token when there is no source comma, must still enter the Recorded stream. Two ways:
 
 - `parse_each_chunk` after a successful item, before `Recorded::Comma`, records trailing comments of the chunk's last content token; after the comma, records trailing comments of the boundary comma if the source comma carried them.
 - Or the printer, when emitting a token, also walks that token's trivia. Then `RecordedToken` carries `TokenTrivia`, and separator commas need trivia too (`Recorded::Comma` grows a comment list, or source commas become printable).
 
-The first keeps trivia off `Recorded` and puts comments in the stream as `Comment` tokens. The second keeps comments on the tokens. Either way the printer sees them. iso-format.md currently prints `Recorded::Token` with `layout: Some` and `Recorded::Comma`. Trivia that never becomes a printable `Recorded` is dropped. That is the "formatter kills comments" failure again.
+The first keeps trivia off `Recorded` and puts comments in the stream as `Comment` tokens. The second keeps comments on the tokens. Either way the printer sees them. iso-format.md currently prints `Recorded::Consume` and `Recorded::Comma`. Trivia that never becomes a printable `Recorded` is dropped. That is the "formatter kills comments" failure again.
 
 Leading trivia of the first token of a list item prints as own-line comments at the current indent before the item. Trailing trivia prints on the same line after the item. Print order relative to the synthetic comma:
 
@@ -349,9 +349,9 @@ This variant fits "comments only at item boundaries" tightly. It fights "comment
 
 ## Formatting
 
-iso-format.md prints consume tokens and synthetic commas. Comments that are not in that stream are killed. Every strategy has to put comments into that stream (as `IsographSemanticToken::Comment` with a `Layout`, or as trivia the printer walks). Leftover-only is not enough: leftover is not printed, and leftover is an error, and errors refuse the literal.
+iso-format.md prints consume tokens and synthetic commas. Comments that are not in that stream are killed. Every strategy has to put comments into that stream (as `IsographSemanticToken::Comment`, or as trivia the printer walks). Leftover-only is not enough: leftover is not printed, and leftover is an error, and errors refuse the literal.
 
-Own-line comment layout is `OWN_LINE` (`before: Line, after: Line`). Trailing comment layout is `before: Space, after: None`, then the next `Gap::Line` (from `CLOSE_BRACE`, from `COMMA.after`, or from the next item's `OWN_LINE`) ends the line. Trailing comments must not use `after: Line` if that would insert a blank line before the next item; `max(comment.after, next.before)` would become `Line` anyway when the next item is own-line.
+Own-line comments use a line break on both sides. Trailing comments use a space before and glue after; the next line break (list-group close, comma, or the next own-line comment) ends the line. Trailing comments must not force an extra blank line before the next item.
 
 Blank lines: a comment does not eat an extra line break beyond the one that ended its source line. Two comments in a row:
 
@@ -361,13 +361,13 @@ Blank lines: a comment does not eat an extra line break beyond the one that ende
 id
 ```
 
-two `OWN_LINE` comments, then `id`. `max(Line, Line)` is one line between them, not a blank line. A blank line in source (`# a\n\n# b`) is two line breaks; we do not have a `Gap::BlankLine`. Those collapse to one line. Preserving blank lines is not in iso-format.md and is not part of comments.
+two own-line comments, then `id`. Adjacent own-line comments share one line break, not a blank line. A blank line in source (`# a\n\n# b`) is two line breaks and collapses to one line. Preserving blank lines is not in iso-format.md and is not part of comments.
 
 `format_recorded` of a failed parse still does not run. If a strategy leaves a comment as a failed slot, the user writes a comment and save no longer formats the literal. That is the acceptance bar for the motivating example: both comments, parse errors empty, format runs, both comments in `new_text`.
 
 iso-format.md always breaks `(`. Trailing-only comments (`foo(a: b # yo)`) still sit on the item line: `foo(\n  a: b, # yo\n)`. Pick the comma-then-comment order so a trailing comment does not sit between value and comma. Packing a short list back onto one line is iso-format-later.md.
 
-Descriptions are string tokens with `OWN_LINE`, not comments. `#` is not a description. A description and a comment on a field:
+Descriptions are string tokens the printer already puts on their own line, not comments. `#` is not a description. A description and a comment on a field:
 
 ```
 field Query.x
