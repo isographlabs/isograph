@@ -76,20 +76,15 @@ The tokens vec on `ParsedIsoLiteral` is `Vec<Recorded>`. `commit` still takes on
 ```rust
 // from crates/isograph_parser/src/semantic_token.rs
 pub enum Recorded {
-    Consume(RecordedToken),
-    Leftover(RecordedToken),
+    Consume(WithSpan<IsographSemanticToken>),
+    Leftover(WithSpan<IsographSemanticToken>),
     Comma,
-}
-
-pub struct RecordedToken {
-    pub span: Span,
-    pub token: IsographSemanticToken,
 }
 ```
 
 `commit` pushes `Consume`. Leftover fill-in pushes `Leftover`. `parse_each_chunk` after a successfully parsed item pushes `Comma`, including after the last item of the level. A failed item has no comma. An empty level has no comma. A trailing source comma is leftover fill-in.
 
-The highlighter walks `Consume` and `Leftover`, reads `.token`, skips `Comma`. The printer walks `Consume` and `Comma`. `Comma` has no span. `ResolvePosition` does not enter it.
+The highlighter walks `Consume` and `Leftover`, reads `.item`, skips `Comma`. The printer walks `Consume` and `Comma`. `Comma` has no span. `ResolvePosition` does not enter it.
 
 `!` after a type is `peek.advance()` today and is not recorded. Consume it with `IsographSemanticToken::Content` so it prints, glued, in `[Foo!]`.
 
@@ -122,7 +117,7 @@ A description is a `Consume` `String` whose previous `Consume` is not `Colon` an
 indent = 0
 pending_line = false
 open_awaiting_close = false
-last: Option<RecordedToken>
+last: Option<WithSpan<IsographSemanticToken>>
 output empty
 
 for each Consume token or Comma:
@@ -244,7 +239,7 @@ Two independently shippable changes.
 
 Tests: a `field Query.x { id, name }` parse records `Keyword`, `Type`, `Period`, `FieldName`, `Brace`, `FieldName`, `Comma`, `FieldName`, `Comma`, `Brace`. `field Query.x { id }` records `Comma` after `id`. `field Query.x {}` has no `Comma`. `user(a: 1, b: 2)` records `Comma` after each argument; both parens are `Parenthesis`. `[Foo!]` records `GraphQLTypeName`, `GraphQLTypeName`, `Content`, `GraphQLTypeName`. Failed `require_token` records nothing. A description is `String`. Compile `NoSemanticTokens` still compiles.
 
-Highlighting tests read `.token` on `Consume` and `Leftover` and skip `Comma`. iso-format-lsp.md tests still get `[]`.
+Highlighting tests read `.item` on `Consume` and `Leftover` and skip `Comma`. iso-format-lsp.md tests still get `[]`.
 
 ### Change 2: `format_recorded` and the handler body
 
@@ -281,7 +276,7 @@ Printer tests (string equality):
 - `!` after a type → `commit(Content)`
 - `formatting_response` / `will_save_wait_until_response` → `format_iso_literals` → `format_recorded` → `TextEdit`s
 - vscode-languageclient → `willSaveWaitUntil` on save
-- highlighter → `RecordedToken.token` on `Consume` and `Leftover`
+- highlighter → `.item` on `Consume` and `Leftover`
 
 ## Docs this change amends
 
