@@ -11,17 +11,35 @@ use pico::Database;
 use prelude::Postfix;
 
 use crate::effect::IsographEffect;
-use crate::event::{DiskChanged, InternalEvent, IsographEvent, Presence};
+use crate::event::{
+    ClientConnectionEvent, DiskChanged, InternalEvent, IsographEvent, LiveSessions, Presence,
+};
 
 pub use isograph_compiler::IsographState;
 
+pub struct State<THostLanguage: HostLanguage> {
+    pub db: IsographState<THostLanguage>,
+    pub live_sessions: LiveSessions,
+}
+
 pub fn handle<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
+    state: &mut State<THostLanguage>,
     event: IsographEvent,
 ) -> Vec<IsographEffect> {
     match event {
-        IsographEvent::Lsp(lsp) => dispatch_lsp(state, lsp),
-        IsographEvent::Internal(internal) => handle_internal(state, internal),
+        IsographEvent::Lsp(lsp) => dispatch_lsp(&mut state.db, lsp),
+        IsographEvent::Internal(internal) => handle_internal(&mut state.db, internal),
+        IsographEvent::Client(ClientConnectionEvent::Started(started)) => {
+            state
+                .live_sessions
+                .0
+                .insert(started.client, started.session);
+            Vec::new()
+        }
+        IsographEvent::Client(ClientConnectionEvent::Gone(client)) => {
+            state.live_sessions.0.remove(&client);
+            Vec::new()
+        }
     }
 }
 
@@ -189,38 +207,46 @@ mod tests {
 
     use isograph_extract_typescript::TypeScriptHostLanguage;
 
-    use super::{IsographState, handle, intern_config_directory};
+    use super::{IsographState, State, handle, intern_config_directory};
     use crate::effect::IsographEffect;
     use crate::event::{
-        DiskChanged, DiskFileChanged, FolderRemoved, InternalEvent, IsographEvent, LspEvent,
-        Presence,
+        ClientConnectionEvent, ClientId, ClientStartedEvent, DiskChanged, DiskFileChanged,
+        FolderRemoved, InternalEvent, IsographEvent, LiveSession, LiveSessions, LspEvent, Presence,
     };
 
     fn interned(s: &str) -> common_lang_types::RelativePathToSourceFile {
         s.intern().to()
     }
 
-    fn with_config() -> IsographState<TypeScriptHostLanguage> {
-        let mut state = IsographState::<TypeScriptHostLanguage>::default();
-        intern_config_directory(&mut state, Path::new("/tmp/proj/isograph.config.json"));
+    fn empty() -> State<TypeScriptHostLanguage> {
+        State {
+            db: IsographState::<TypeScriptHostLanguage>::default(),
+            live_sessions: LiveSessions::default(),
+        }
+    }
+
+    fn with_config() -> State<TypeScriptHostLanguage> {
+        let mut state = empty();
+        intern_config_directory(&mut state.db, Path::new("/tmp/proj/isograph.config.json"));
         state
     }
 
     fn contents(
-        state: &IsographState<TypeScriptHostLanguage>,
+        state: &State<TypeScriptHostLanguage>,
         path: common_lang_types::RelativePathToSourceFile,
     ) -> Option<&str> {
         state
+            .db
             .get_disk_file_map()
             .untracked()
             .0
             .get(&path)
-            .map(|id| state.get(*id).contents.as_str())
+            .map(|id| state.db.get(*id).contents.as_str())
     }
 
     #[test]
     fn hello_world_returns_log_hello_world() {
-        let mut state = IsographState::<TypeScriptHostLanguage>::default();
+        let mut state = empty();
         let effects = handle(&mut state, InternalEvent::HelloWorld.to());
         assert!(matches!(
             effects.as_slice(),
@@ -230,7 +256,7 @@ mod tests {
 
     #[test]
     fn quit_returns_kill() {
-        let mut state = IsographState::<TypeScriptHostLanguage>::default();
+        let mut state = empty();
         let effects = handle(&mut state, InternalEvent::Quit.to());
         assert!(matches!(effects.as_slice(), [IsographEffect::Kill]));
     }
@@ -296,7 +322,7 @@ mod tests {
 
     #[test]
     fn lsp_request_returns_method_not_found() {
-        let mut state = IsographState::<TypeScriptHostLanguage>::default();
+        let mut state = empty();
         let (reply, rx) = crossbeam::channel::unbounded();
         let id = lsp_server::RequestId::from(1);
         let effects = handle(
@@ -351,7 +377,7 @@ mod tests {
         expected = "CurrentWorkingDirectory is interned from the config path before DiskChanged"
     )]
     fn disk_changed_without_a_config_directory_panics() {
-        let mut state = IsographState::<TypeScriptHostLanguage>::default();
+        let mut state = empty();
         handle(
             &mut state,
             InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
@@ -497,7 +523,7 @@ mod tests {
 
     #[test]
     fn lsp_isograph_event_hello_world_returns_log_hello_world() {
-        let mut state = IsographState::<TypeScriptHostLanguage>::default();
+        let mut state = empty();
         let effects = handle(
             &mut state,
             event_notification(
@@ -512,7 +538,7 @@ mod tests {
 
     #[test]
     fn lsp_isograph_event_quit_returns_kill() {
-        let mut state = IsographState::<TypeScriptHostLanguage>::default();
+        let mut state = empty();
         let effects = handle(
             &mut state,
             event_notification(serde_json::to_value(InternalEvent::Quit).expect("serializes")),
@@ -544,7 +570,7 @@ mod tests {
 
     #[test]
     fn lsp_unknown_notification_returns_no_effects() {
-        let mut state = IsographState::<TypeScriptHostLanguage>::default();
+        let mut state = empty();
         let effects = handle(
             &mut state,
             LspEvent::Notification(lsp_server::Notification {
@@ -558,7 +584,7 @@ mod tests {
 
     #[test]
     fn lsp_response_returns_no_effects() {
-        let mut state = IsographState::<TypeScriptHostLanguage>::default();
+        let mut state = empty();
         let effects = handle(
             &mut state,
             LspEvent::Response(lsp_server::Response {
@@ -573,11 +599,133 @@ mod tests {
 
     #[test]
     fn lsp_isograph_event_bad_params_returns_no_effects() {
-        let mut state = IsographState::<TypeScriptHostLanguage>::default();
+        let mut state = empty();
         let effects = handle(
             &mut state,
             event_notification(serde_json::json!({"kind":"Nope"})),
         );
         assert!(effects.is_empty());
+    }
+
+    fn dummy_session(
+        sender: crossbeam::channel::Sender<lsp_server::Message>,
+        capabilities: lsp_types::ClientCapabilities,
+    ) -> LiveSession {
+        LiveSession {
+            sender,
+            capabilities,
+        }
+    }
+
+    #[test]
+    fn client_started_stores_the_session() {
+        let mut state = empty();
+        let client = ClientId(1);
+        let (tx, rx) = crossbeam::channel::unbounded();
+        let capabilities = lsp_types::ClientCapabilities::default();
+        let effects = handle(
+            &mut state,
+            ClientConnectionEvent::Started(ClientStartedEvent {
+                client,
+                session: dummy_session(tx, capabilities.clone()),
+            })
+            .to(),
+        );
+        assert!(effects.is_empty());
+        let session = state
+            .live_sessions
+            .0
+            .get(&client)
+            .expect("Started inserts a row");
+        assert_eq!(session.capabilities, capabilities);
+        session
+            .sender
+            .send(lsp_server::Message::Notification(
+                lsp_server::Notification {
+                    method: "textDocument/publishDiagnostics".to_owned(),
+                    params: serde_json::json!({}),
+                },
+            ))
+            .expect("the stored sender is live");
+        let lsp_server::Message::Notification(received) =
+            rx.recv().expect("the test receives the notification")
+        else {
+            panic!("the stored sender carries Message::Notification");
+        };
+        assert_eq!(received.method, "textDocument/publishDiagnostics");
+        assert_eq!(received.params, serde_json::json!({}));
+    }
+
+    #[test]
+    fn client_gone_removes_the_session() {
+        let mut state = empty();
+        let client = ClientId(1);
+        let (tx, _rx) = crossbeam::channel::unbounded();
+        handle(
+            &mut state,
+            ClientConnectionEvent::Started(ClientStartedEvent {
+                client,
+                session: dummy_session(tx, lsp_types::ClientCapabilities::default()),
+            })
+            .to(),
+        );
+        let effects = handle(&mut state, ClientConnectionEvent::Gone(client).to());
+        assert!(effects.is_empty());
+        assert!(!state.live_sessions.0.contains_key(&client));
+    }
+
+    #[test]
+    fn client_gone_of_an_unknown_id_is_a_noop() {
+        let mut state = empty();
+        let effects = handle(&mut state, ClientConnectionEvent::Gone(ClientId(1)).to());
+        assert!(effects.is_empty());
+        assert!(state.live_sessions.0.is_empty());
+    }
+
+    #[test]
+    fn client_started_twice_for_the_same_id_keeps_the_second_session() {
+        let mut state = empty();
+        let client = ClientId(1);
+        let (tx1, rx1) = crossbeam::channel::unbounded();
+        let (tx2, rx2) = crossbeam::channel::unbounded();
+        handle(
+            &mut state,
+            ClientConnectionEvent::Started(ClientStartedEvent {
+                client,
+                session: dummy_session(tx1, lsp_types::ClientCapabilities::default()),
+            })
+            .to(),
+        );
+        let effects = handle(
+            &mut state,
+            ClientConnectionEvent::Started(ClientStartedEvent {
+                client,
+                session: dummy_session(tx2, lsp_types::ClientCapabilities::default()),
+            })
+            .to(),
+        );
+        assert!(effects.is_empty());
+        assert_eq!(state.live_sessions.0.len(), 1);
+        let session = state
+            .live_sessions
+            .0
+            .get(&client)
+            .expect("Started twice keeps one row");
+        let notification = lsp_server::Message::Notification(lsp_server::Notification {
+            method: "textDocument/publishDiagnostics".to_owned(),
+            params: serde_json::json!({}),
+        });
+        session
+            .sender
+            .send(notification)
+            .expect("the second sender is stored");
+        assert!(
+            matches!(
+                rx2.recv().expect("the second session receives"),
+                lsp_server::Message::Notification(_)
+            ),
+            "the second sender receives the notification"
+        );
+        assert!(rx1.try_recv().is_err(), "the first session was replaced");
     }
 }

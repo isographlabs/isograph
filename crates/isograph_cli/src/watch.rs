@@ -632,8 +632,8 @@ mod tests {
         ChangedFileKind, SourceEventKind, SourceGlobs, apply, categorize_and_filter_events,
         categorize_folder, start,
     };
-    use crate::event::IsographEvent;
-    use crate::state::{handle, intern_config_directory};
+    use crate::event::{IsographEvent, LiveSessions};
+    use crate::state::{State, handle, intern_config_directory};
 
     #[derive(Clone, Debug, PartialEq, Eq, Error)]
     #[error("in host")]
@@ -665,8 +665,9 @@ mod tests {
         s.intern().to()
     }
 
-    fn contents(state: &IsographState<InHost>, path: &str) -> Option<String> {
+    fn contents(state: &State<InHost>, path: &str) -> Option<String> {
         state
+            .db
             .disk_file(interned(path))
             .map(|file| file.contents.clone())
     }
@@ -675,7 +676,7 @@ mod tests {
         _dir: tempfile::TempDir,
         config_path: PathBuf,
         config_directory: PathBuf,
-        state: IsographState<InHost>,
+        state: State<InHost>,
         event_tx: tokio::sync::mpsc::UnboundedSender<IsographEvent>,
         event_rx: tokio::sync::mpsc::UnboundedReceiver<IsographEvent>,
         source_files: Vec<String>,
@@ -687,8 +688,8 @@ mod tests {
             let config_path = dir.path().join("isograph.config.json");
             std::fs::write(config_path.reference(), "{}\n").expect("a test can write a config");
             let config_path = config_path.canonicalize().expect("the config exists");
-            let mut state = IsographState::<InHost>::default();
-            intern_config_directory(&mut state, config_path.reference());
+            let mut db = IsographState::<InHost>::default();
+            intern_config_directory(&mut db, config_path.reference());
             let config_directory = config_path
                 .parent()
                 .expect("a config file path has a parent directory")
@@ -698,7 +699,10 @@ mod tests {
                 _dir: dir,
                 config_path,
                 config_directory,
-                state,
+                state: State {
+                    db,
+                    live_sessions: LiveSessions::default(),
+                },
                 event_tx,
                 event_rx,
                 source_files: source_files.iter().map(|s| (*s).to_owned()).collect(),
@@ -800,7 +804,7 @@ mod tests {
             )
                 .wrap_vec(),
         );
-        assert!(h.state.get_disk_file_map().untracked().0.is_empty());
+        assert!(h.state.db.get_disk_file_map().untracked().0.is_empty());
     }
 
     #[test]

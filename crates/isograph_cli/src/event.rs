@@ -23,12 +23,42 @@ pub enum InternalEvent {
     DiskChanged(DiskChanged),
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub(crate) struct ClientId(pub u64);
+
+#[derive(Clone, Debug)]
+pub struct LiveSession {
+    #[cfg_attr(not(test), expect(dead_code))]
+    pub sender: crossbeam::channel::Sender<lsp_server::Message>,
+    #[cfg_attr(not(test), expect(dead_code))]
+    pub capabilities: lsp_types::ClientCapabilities,
+}
+
+#[derive(Debug, Default)]
+pub struct LiveSessions(pub std::collections::HashMap<ClientId, LiveSession>);
+
+#[derive(Clone, Debug)]
+pub struct ClientStartedEvent {
+    pub client: ClientId,
+    pub session: LiveSession,
+}
+
+#[derive(Clone, Debug)]
+#[expect(clippy::large_enum_variant)]
+pub enum ClientConnectionEvent {
+    Started(ClientStartedEvent),
+    Gone(ClientId),
+}
+
 #[derive(Clone, Debug, derive_more::From)]
+#[expect(clippy::large_enum_variant)]
 pub enum IsographEvent {
     #[from]
     Lsp(LspEvent),
     #[from]
     Internal(InternalEvent),
+    #[from]
+    Client(ClientConnectionEvent),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]

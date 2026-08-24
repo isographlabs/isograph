@@ -93,9 +93,12 @@ pub(crate) async fn accept_loop(
     listener: tokio::net::TcpListener,
     event_tx: tokio::sync::mpsc::UnboundedSender<crate::event::IsographEvent>,
 ) {
+    let mut next = 1u64;
     loop {
         match listener.accept().await {
             Ok((stream, peer)) => {
+                let client = crate::event::ClientId(next);
+                next += 1;
                 let event_tx = event_tx.clone();
                 let std_stream = match stream.into_std() {
                     Ok(std_stream) => std_stream,
@@ -108,7 +111,7 @@ pub(crate) async fn accept_loop(
                     debug!(error = %e, %peer, "could not set the lsp stream blocking");
                     continue;
                 }
-                std::thread::spawn(move || session(std_stream, event_tx));
+                std::thread::spawn(move || session(std_stream, event_tx, client));
             }
             Err(e) => debug!(error = %e, "accept failed"),
         }
@@ -118,6 +121,7 @@ pub(crate) async fn accept_loop(
 fn session(
     stream: std::net::TcpStream,
     event_tx: tokio::sync::mpsc::UnboundedSender<crate::event::IsographEvent>,
+    client: crate::event::ClientId,
 ) {
     let (connection, io_threads) = match connection_from_stream(stream) {
         Ok(pair) => pair,
@@ -126,7 +130,8 @@ fn session(
             return;
         }
     };
-    run_session(&connection, event_tx);
+    run_session(&connection, event_tx.clone(), client);
+    let _ = event_tx.send(crate::event::ClientConnectionEvent::Gone(client).to());
     drop(connection);
     let _ = io_threads.join();
 }
@@ -134,6 +139,7 @@ fn session(
 fn run_session(
     connection: &lsp_server::Connection,
     event_tx: tokio::sync::mpsc::UnboundedSender<crate::event::IsographEvent>,
+    client: crate::event::ClientId,
 ) {
     let capabilities = match serde_json::to_value(lsp_types::ServerCapabilities {
         semantic_tokens_provider:
@@ -162,10 +168,30 @@ fn run_session(
             return;
         }
     };
-    if let Err(e) = connection.initialize(capabilities) {
-        debug!(error = %e, "lsp initialize");
-        return;
-    }
+    let params = match connection.initialize(capabilities) {
+        Ok(params) => params,
+        Err(e) => {
+            debug!(error = %e, "lsp initialize");
+            return;
+        }
+    };
+    let params = match serde_json::from_value::<lsp_types::InitializeParams>(params) {
+        Ok(params) => params,
+        Err(e) => {
+            debug!(error = %e, "initialize params");
+            return;
+        }
+    };
+    let _ = event_tx.send(
+        crate::event::ClientConnectionEvent::Started(crate::event::ClientStartedEvent {
+            client,
+            session: crate::event::LiveSession {
+                sender: connection.sender.clone(),
+                capabilities: params.capabilities,
+            },
+        })
+        .to(),
+    );
     for message in &connection.receiver {
         let event = match message {
             lsp_server::Message::Request(request) => {
@@ -201,9 +227,12 @@ mod tests {
 
     use super::{IsographEventNotification, accept_loop};
     use crate::daemon::{run_effect_loop, run_event_loop};
-    use crate::event::{DiskChanged, DiskFileChanged, InternalEvent, IsographEvent, Presence};
+    use crate::event::{
+        ClientConnectionEvent, ClientId, ClientStartedEvent, DiskChanged, DiskFileChanged,
+        InternalEvent, IsographEvent, LiveSessions, Presence,
+    };
     use crate::send::notify;
-    use crate::state::IsographState;
+    use crate::state::{IsographState, State};
     use isograph_extract_typescript::TypeScriptHostLanguage;
 
     const SETTLE: Duration = Duration::from_millis(250);
@@ -253,11 +282,15 @@ mod tests {
                 .enable_all()
                 .build()
                 .expect("a test can start a tokio runtime");
-            let mut state = IsographState::<TypeScriptHostLanguage>::default();
+            let mut db = IsographState::<TypeScriptHostLanguage>::default();
             crate::state::intern_config_directory(
-                &mut state,
+                &mut db,
                 std::path::Path::new("/tmp/proj/isograph.config.json"),
             );
+            let state = State {
+                db,
+                live_sessions: LiveSessions::default(),
+            };
             runtime.block_on(async {
                 tokio::select! {
                     () = run_event_loop(state, loop_rx, effect_tx) => {}
@@ -289,13 +322,21 @@ mod tests {
     }
 
     fn initialize(writer: &mut impl Write, reader: &mut impl BufRead) -> serde_json::Value {
+        initialize_with(writer, reader, serde_json::json!({ "capabilities": {} }))
+    }
+
+    fn initialize_with(
+        writer: &mut impl Write,
+        reader: &mut impl BufRead,
+        params: serde_json::Value,
+    ) -> serde_json::Value {
         let id = RequestId::from(1);
         write_message(
             writer,
             Message::Request(Request {
                 id: id.clone(),
                 method: Initialize::METHOD.to_owned(),
-                params: serde_json::json!({ "capabilities": {} }),
+                params,
             }),
         );
         let Message::Response(response) = read_message(reader) else {
@@ -410,15 +451,43 @@ mod tests {
         serde_json::from_value(notification.params).expect("Internal params")
     }
 
+    fn client_started(event: IsographEvent) -> ClientStartedEvent {
+        match event {
+            IsographEvent::Client(ClientConnectionEvent::Started(started)) => started,
+            other => panic!("expected ClientConnectionEvent::Started, got {other:?}"),
+        }
+    }
+
+    fn client_gone(event: IsographEvent) -> ClientId {
+        match event {
+            IsographEvent::Client(ClientConnectionEvent::Gone(client)) => client,
+            other => panic!("expected ClientConnectionEvent::Gone, got {other:?}"),
+        }
+    }
+
+    fn take_started(event_rx: &mut UnboundedReceiver<IsographEvent>) -> ClientStartedEvent {
+        client_started(event_rx.try_recv().expect("Started arrived"))
+    }
+
+    fn take_gone(event_rx: &mut UnboundedReceiver<IsographEvent>) -> ClientId {
+        client_gone(event_rx.try_recv().expect("Gone arrived"))
+    }
+
+    fn drain(event_rx: &mut UnboundedReceiver<IsographEvent>) -> Vec<IsographEvent> {
+        std::iter::from_fn(|| event_rx.try_recv().ok()).collect()
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     async fn notify_hello_world_arrives_as_an_event() {
         let (port, mut event_rx) = listen_for_events().await;
         notify(connect(port), InternalEvent::HelloWorld).expect("notify returns");
         tokio::time::sleep(SETTLE).await;
+        let started = take_started(&mut event_rx);
         assert!(matches!(
-            posted_internal(event_rx.try_recv().expect("an event arrived")),
+            posted_internal(event_rx.try_recv().expect("HelloWorld arrived")),
             InternalEvent::HelloWorld
         ));
+        assert_eq!(take_gone(&mut event_rx), started.client);
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -433,6 +502,7 @@ mod tests {
         )
         .expect("notify present returns");
         tokio::time::sleep(SETTLE).await;
+        let started = take_started(&mut event_rx);
         let InternalEvent::DiskChanged(present) =
             posted_internal(event_rx.try_recv().expect("present arrived"))
         else {
@@ -445,6 +515,7 @@ mod tests {
                 presence: Presence::Present("export const a = 1;\n".to_owned()),
             })
         );
+        assert_eq!(take_gone(&mut event_rx), started.client);
         notify(
             connect(port),
             InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
@@ -454,6 +525,7 @@ mod tests {
         )
         .expect("notify absent returns");
         tokio::time::sleep(SETTLE).await;
+        let started = take_started(&mut event_rx);
         let InternalEvent::DiskChanged(absent) =
             posted_internal(event_rx.try_recv().expect("absent arrived"))
         else {
@@ -466,6 +538,7 @@ mod tests {
                 presence: Presence::Absent,
             })
         );
+        assert_eq!(take_gone(&mut event_rx), started.client);
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -479,6 +552,7 @@ mod tests {
         initialize(&mut writer, &mut reader);
         write_message(&mut writer, Message::Notification(hello_world()));
         tokio::time::sleep(SETTLE).await;
+        let _started = take_started(&mut event_rx);
         assert!(matches!(
             posted_internal(event_rx.try_recv().expect("the later HelloWorld arrived")),
             InternalEvent::HelloWorld
@@ -531,6 +605,7 @@ mod tests {
         );
         write_message(&mut writer, Message::Notification(hello_world()));
         tokio::time::sleep(SETTLE).await;
+        let _started = take_started(&mut event_rx);
         assert!(matches!(
             posted_internal(event_rx.try_recv().expect("HelloWorld arrived")),
             InternalEvent::HelloWorld
@@ -560,6 +635,7 @@ mod tests {
         );
         write_message(&mut writer, Message::Notification(hello_world()));
         tokio::time::sleep(SETTLE).await;
+        let _started = take_started(&mut event_rx);
         assert!(matches!(
             posted_internal(event_rx.try_recv().expect("HelloWorld arrived")),
             InternalEvent::HelloWorld
@@ -577,12 +653,24 @@ mod tests {
                 .expect("writing a truncated body");
         }
         tokio::time::sleep(SETTLE).await;
+        let _gone = take_gone(&mut event_rx);
+        assert!(
+            drain(&mut event_rx).iter().all(|event| {
+                !matches!(
+                    event,
+                    IsographEvent::Client(ClientConnectionEvent::Started(_))
+                )
+            }),
+            "truncated handshake posts Gone and no Started"
+        );
         notify(connect(port), InternalEvent::HelloWorld).expect("a second connection works");
         tokio::time::sleep(SETTLE).await;
+        let started = take_started(&mut event_rx);
         assert!(matches!(
             posted_internal(event_rx.try_recv().expect("HelloWorld arrived")),
             InternalEvent::HelloWorld
         ));
+        assert_eq!(take_gone(&mut event_rx), started.client);
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -603,7 +691,16 @@ mod tests {
         drop(writer);
         drop(reader);
         tokio::time::sleep(SETTLE).await;
-        assert!(event_rx.try_recv().is_err(), "nothing was dispatched");
+        let _gone = take_gone(&mut event_rx);
+        assert!(
+            drain(&mut event_rx).iter().all(|event| {
+                !matches!(
+                    event,
+                    IsographEvent::Client(ClientConnectionEvent::Started(_))
+                )
+            }),
+            "failed handshake posts Gone and no Started"
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -620,6 +717,7 @@ mod tests {
             }),
         );
         tokio::time::sleep(SETTLE).await;
+        let _started = take_started(&mut event_rx);
         let IsographEvent::Lsp(crate::event::LspEvent::Notification(unknown)) =
             event_rx.try_recv().expect("logMessage arrived")
         else {
@@ -648,6 +746,7 @@ mod tests {
             }),
         );
         tokio::time::sleep(SETTLE).await;
+        let _started = take_started(&mut event_rx);
         let IsographEvent::Lsp(crate::event::LspEvent::Notification(bad)) =
             event_rx.try_recv().expect("Nope arrived")
         else {
@@ -668,16 +767,20 @@ mod tests {
         let (port, mut event_rx) = listen_for_events().await;
         notify(connect(port), InternalEvent::HelloWorld).expect("first notify");
         tokio::time::sleep(SETTLE).await;
+        let first = take_started(&mut event_rx);
         assert!(matches!(
             posted_internal(event_rx.try_recv().expect("first HelloWorld")),
             InternalEvent::HelloWorld
         ));
+        assert_eq!(take_gone(&mut event_rx), first.client);
         notify(connect(port), InternalEvent::HelloWorld).expect("second notify");
         tokio::time::sleep(SETTLE).await;
+        let second = take_started(&mut event_rx);
         assert!(matches!(
             posted_internal(event_rx.try_recv().expect("second HelloWorld")),
             InternalEvent::HelloWorld
         ));
+        assert_eq!(take_gone(&mut event_rx), second.client);
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -686,10 +789,26 @@ mod tests {
         notify(connect(port), InternalEvent::HelloWorld).expect("first notify");
         notify(connect(port), InternalEvent::HelloWorld).expect("second notify");
         tokio::time::sleep(SETTLE).await;
-        let first = posted_internal(event_rx.try_recv().expect("one HelloWorld"));
-        let second = posted_internal(event_rx.try_recv().expect("the other HelloWorld"));
-        assert!(matches!(first, InternalEvent::HelloWorld));
-        assert!(matches!(second, InternalEvent::HelloWorld));
+        let (started, hellos, gone) =
+            drain(&mut event_rx)
+                .iter()
+                .fold((0, 0, 0), |acc, event| match event {
+                    IsographEvent::Client(ClientConnectionEvent::Started(_)) => {
+                        (acc.0 + 1, acc.1, acc.2)
+                    }
+                    IsographEvent::Client(ClientConnectionEvent::Gone(_)) => {
+                        (acc.0, acc.1, acc.2 + 1)
+                    }
+                    IsographEvent::Lsp(crate::event::LspEvent::Notification(_)) => {
+                        assert!(matches!(
+                            posted_internal(event.clone()),
+                            InternalEvent::HelloWorld
+                        ));
+                        (acc.0, acc.1 + 1, acc.2)
+                    }
+                    other => panic!("unexpected event {other:?}"),
+                });
+        assert_eq!((started, hellos, gone), (2, 2, 2));
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -699,15 +818,26 @@ mod tests {
         notify(connect(port), InternalEvent::HelloWorld).expect("second");
         notify(connect(port), InternalEvent::HelloWorld).expect("third");
         tokio::time::sleep(SETTLE).await;
-        for i in 1..=3 {
-            assert!(
-                matches!(
-                    posted_internal(event_rx.try_recv().unwrap_or_else(|_| panic!("event {i}"))),
-                    InternalEvent::HelloWorld
-                ),
-                "event {i}"
-            );
-        }
+        let (started, hellos, gone) =
+            drain(&mut event_rx)
+                .iter()
+                .fold((0, 0, 0), |acc, event| match event {
+                    IsographEvent::Client(ClientConnectionEvent::Started(_)) => {
+                        (acc.0 + 1, acc.1, acc.2)
+                    }
+                    IsographEvent::Client(ClientConnectionEvent::Gone(_)) => {
+                        (acc.0, acc.1, acc.2 + 1)
+                    }
+                    IsographEvent::Lsp(crate::event::LspEvent::Notification(_)) => {
+                        assert!(matches!(
+                            posted_internal(event.clone()),
+                            InternalEvent::HelloWorld
+                        ));
+                        (acc.0, acc.1 + 1, acc.2)
+                    }
+                    other => panic!("unexpected event {other:?}"),
+                });
+        assert_eq!((started, hellos, gone), (3, 3, 3));
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -931,6 +1061,147 @@ mod tests {
             }),
         );
         let Message::Response(response) = read_message(&mut reader) else {
+            panic!("a request is answered with a response");
+        };
+        assert_eq!(
+            response.error.expect("an error").code,
+            ErrorCode::MethodNotFound as i32
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn initialize_posts_started_with_default_capabilities_then_gone_on_drop() {
+        let (port, mut event_rx) = listen_for_events().await;
+        let stream = connect(port);
+        let (mut writer, mut reader) = split(stream);
+        initialize(&mut writer, &mut reader);
+        tokio::time::sleep(SETTLE).await;
+        let started = take_started(&mut event_rx);
+        assert_eq!(
+            started.session.capabilities,
+            lsp_types::ClientCapabilities::default()
+        );
+        drop(writer);
+        drop(reader);
+        tokio::time::sleep(SETTLE).await;
+        assert_eq!(take_gone(&mut event_rx), started.client);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn initialize_stores_publish_diagnostics_and_hover_capabilities() {
+        let (port, mut event_rx) = listen_for_events().await;
+        let stream = connect(port);
+        let (mut writer, mut reader) = split(stream);
+        let params = serde_json::json!({
+            "capabilities": {
+                "textDocument": {
+                    "publishDiagnostics": {},
+                    "hover": {}
+                }
+            }
+        });
+        let expected: lsp_types::InitializeParams =
+            serde_json::from_value(params.clone()).expect("InitializeParams");
+        initialize_with(&mut writer, &mut reader, params);
+        tokio::time::sleep(SETTLE).await;
+        let started = take_started(&mut event_rx);
+        assert_eq!(started.session.capabilities, expected.capabilities);
+        let text_document = started
+            .session
+            .capabilities
+            .text_document
+            .as_ref()
+            .expect("textDocument");
+        assert!(text_document.publish_diagnostics.is_some());
+        assert!(text_document.hover.is_some());
+        drop(writer);
+        drop(reader);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn initialize_params_that_are_not_initialize_params_are_gone_without_started() {
+        let (port, mut event_rx) = listen_for_events().await;
+        let stream = connect(port);
+        let (mut writer, mut reader) = split(stream);
+        initialize_with(&mut writer, &mut reader, serde_json::json!(null));
+        drop(writer);
+        drop(reader);
+        tokio::time::sleep(SETTLE).await;
+        let _gone = take_gone(&mut event_rx);
+        assert!(
+            drain(&mut event_rx).iter().all(|event| {
+                !matches!(
+                    event,
+                    IsographEvent::Client(ClientConnectionEvent::Started(_))
+                )
+            }),
+            "bad InitializeParams posts Gone and no Started"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn drop_before_initialize_is_gone_without_started() {
+        let (port, mut event_rx) = listen_for_events().await;
+        drop(connect(port));
+        tokio::time::sleep(SETTLE).await;
+        let _gone = take_gone(&mut event_rx);
+        assert!(
+            drain(&mut event_rx).iter().all(|event| {
+                !matches!(
+                    event,
+                    IsographEvent::Client(ClientConnectionEvent::Started(_))
+                )
+            }),
+            "drop before initialize posts Gone and no Started"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn two_connections_get_different_ids_and_dropping_one_posts_one_gone() {
+        let (port, mut event_rx) = listen_for_events().await;
+        let stream1 = connect(port);
+        let (mut writer1, mut reader1) = split(stream1);
+        initialize(&mut writer1, &mut reader1);
+        let stream2 = connect(port);
+        let (mut writer2, mut reader2) = split(stream2);
+        initialize(&mut writer2, &mut reader2);
+        tokio::time::sleep(SETTLE).await;
+        let started1 = take_started(&mut event_rx);
+        let started2 = take_started(&mut event_rx);
+        assert_ne!(started1.client, started2.client);
+        drop(writer1);
+        drop(reader1);
+        tokio::time::sleep(SETTLE).await;
+        assert_eq!(take_gone(&mut event_rx), started1.client);
+        assert!(
+            event_rx.try_recv().is_err(),
+            "the remaining connection is still live"
+        );
+        drop(writer2);
+        drop(reader2);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn dropping_one_connection_leaves_the_other_able_to_hover() {
+        let (port, _event_rx) = listen_and_reply().await;
+        let stream1 = connect(port);
+        let (mut writer1, mut reader1) = split(stream1);
+        initialize(&mut writer1, &mut reader1);
+        let stream2 = connect(port);
+        let (mut writer2, mut reader2) = split(stream2);
+        initialize(&mut writer2, &mut reader2);
+        drop(writer1);
+        drop(reader1);
+        tokio::time::sleep(SETTLE).await;
+        write_message(
+            &mut writer2,
+            Message::Request(Request {
+                id: RequestId::from(2),
+                method: "textDocument/hover".to_owned(),
+                params: serde_json::json!({}),
+            }),
+        );
+        let Message::Response(response) = read_message(&mut reader2) else {
             panic!("a request is answered with a response");
         };
         assert_eq!(

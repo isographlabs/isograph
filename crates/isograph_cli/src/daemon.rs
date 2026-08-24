@@ -8,8 +8,8 @@ use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 
 use crate::Filesystem;
 use crate::effect::IsographEffect;
-use crate::event::IsographEvent;
-use crate::state::{IsographState, handle, intern_config_directory};
+use crate::event::{IsographEvent, LiveSessions};
+use crate::state::{IsographState, State, handle, intern_config_directory};
 use crate::watch::SourceFileEvent;
 
 pub fn run<THostLanguage: HostLanguage>(
@@ -74,8 +74,11 @@ async fn serve<THostLanguage: HostLanguage>(
     }
     tracing::info!(config = %config_path.display(), port, "isograph daemon up");
 
-    let mut state = IsographState::<THostLanguage>::default();
-    intern_config_directory(&mut state, config_path.reference());
+    let mut state = State {
+        db: IsographState::<THostLanguage>::default(),
+        live_sessions: LiveSessions::default(),
+    };
+    intern_config_directory(&mut state.db, config_path.reference());
     let config_directory = config_path
         .parent()
         .expect("a config file path has a parent directory")
@@ -155,7 +158,7 @@ async fn run_filesystem_watcher<THostLanguage: HostLanguage>(
 }
 
 pub(crate) async fn run_event_loop<THostLanguage: HostLanguage>(
-    mut state: IsographState<THostLanguage>,
+    mut state: crate::state::State<THostLanguage>,
     mut event_rx: UnboundedReceiver<IsographEvent>,
     effect_tx: UnboundedSender<IsographEffect>,
 ) {
@@ -200,11 +203,18 @@ pub fn perform(effect: IsographEffect) -> ControlFlow<()> {
 mod tests {
     use super::{run_effect_loop, run_event_loop};
     use crate::effect::IsographEffect;
-    use crate::event::InternalEvent;
-    use crate::state::IsographState;
+    use crate::event::{InternalEvent, LiveSessions};
+    use crate::state::{IsographState, State};
     use isograph_extract_typescript::TypeScriptHostLanguage;
     use prelude::Postfix;
     use tokio::sync::mpsc::unbounded_channel;
+
+    fn empty_state() -> State<TypeScriptHostLanguage> {
+        State {
+            db: IsographState::<TypeScriptHostLanguage>::default(),
+            live_sessions: LiveSessions::default(),
+        }
+    }
 
     #[tokio::test]
     async fn sending_hello_world_emits_log_hello_world() {
@@ -214,12 +224,7 @@ mod tests {
             .send(InternalEvent::HelloWorld.to())
             .expect("the test sends HelloWorld");
         drop(event_tx);
-        run_event_loop(
-            IsographState::<TypeScriptHostLanguage>::default(),
-            event_rx,
-            effect_tx,
-        )
-        .await;
+        run_event_loop(empty_state(), event_rx, effect_tx).await;
         let effect = effect_rx.recv().await.expect("handle sent one effect");
         assert!(matches!(effect, IsographEffect::LogHelloWorld));
     }
@@ -232,12 +237,7 @@ mod tests {
             .send(InternalEvent::Quit.to())
             .expect("the test sends Quit");
         drop(event_tx);
-        run_event_loop(
-            IsographState::<TypeScriptHostLanguage>::default(),
-            event_rx,
-            effect_tx,
-        )
-        .await;
+        run_event_loop(empty_state(), event_rx, effect_tx).await;
         let effect = effect_rx.recv().await.expect("handle sent one effect");
         assert!(matches!(effect, IsographEffect::Kill));
     }
