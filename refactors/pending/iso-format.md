@@ -4,17 +4,17 @@ Requires iso-format-lsp.md. Independent of lsp-diagnostics.md. Uses open-file co
 
 iso-format-lsp.md's `textDocument/formatting` and `textDocument/willSaveWaitUntil` handlers return `[]`. This slice records layout at consume, prints from that stream, and those handlers return the edits.
 
-A line break plus indent is `{`. `}` starts a new line and dedents. A description occupies its own line (`before` and `after` are `Line`), so `{` after a description is on the next line. Every list (selection set, argument list, variable list, object literal, value list) has a comma between adjacent items, with a space after the comma.
+A line break plus indent is `{`. `}` starts a new line and dedents. Every `{` does this, including a one-item set and a nested object. A description occupies its own line (`before` and `after` are `Line`), so `{` after a description is on the next line. Every list (selection set, argument list, variable list, object literal, value list) has a comma after every successful item, including the last, with a space after the comma. `(` and type-list `[` do not break.
 
 ```
 user(arg: {
-  b: true
-}, c: false)
+  b: true,
+}, c: false,)
 ```
 
 ```
 field Pet.fullName {
-  firstName, lastName
+  firstName, lastName,
 }
 ```
 
@@ -22,16 +22,16 @@ field Pet.fullName {
 field Pet.fullName
 "a pet's name"
 {
-  firstName, lastName
+  firstName, lastName,
 }
 ```
 
 ```
-field Query.user($id: ID, $x: Int) {
+field Query.user($id: ID, $x: Int,) {
   user(id: $id, extra: {
-    b: true
-  }) {
-    id, name
+    b: true,
+  },) {
+    id, name,
   }
 }
 ```
@@ -46,7 +46,7 @@ Save. The interior is:
 
 ```
 field Query.HomeRoute {
-  id, name
+  id, name,
 }
 ```
 
@@ -155,7 +155,7 @@ pub struct RecordedToken {
 
 `RecordedToken.layout` `Some` is consume. `None` is leftover fill-in. The printer walks consume tokens and `Comma`. The highlighter walks `Recorded::Token`. `Comma` has no span. `ResolvePosition` does not enter it.
 
-`parse_each_chunk` after a successfully parsed item that is not the last item of the level records `Recorded::Comma(Layout::COMMA)`. A failed item has no comma. A trailing source comma is leftover fill-in.
+`parse_each_chunk` after a successfully parsed item records `Recorded::Comma(Layout::COMMA)`, including after the last item of the level. A failed item has no comma. An empty level has no comma. A trailing source comma is leftover fill-in.
 
 ```rust
 cursor.require_token(
@@ -203,7 +203,7 @@ cursor.require_group(
 - Integer / string / boolean / null as values: `GLUE`
 - `@`: `AT`
 - Directive identifier: `GLUE`
-- Comma between list items: `Recorded::Comma(Layout::COMMA)`, from `parse_each_chunk`
+- Comma after every successful list item, including the last: `Recorded::Comma(Layout::COMMA)`, from `parse_each_chunk`
 
 `max(description.after=Line, brace.before=Space)` is `Line`.
 
@@ -251,25 +251,25 @@ A parse failure of a literal is not passed to `format_recorded`.
 entrypoint Query.HomeRoute
 
 field Pet.fullName {
-  firstName, lastName
+  firstName, lastName,
 }
 
-field Query.user($id: ID, $x: Int) {
+field Query.user($id: ID, $x: Int,) {
   user(id: $id, extra: {
-    b: true
-  }, c: false) {
-    id
+    b: true,
+  }, c: false,) {
+    id,
   }
 }
 
 field Pet.Avatar to Image {
-  url
+  url,
 }
 
 field Pet.fullName
 "a pet's name"
 {
-  firstName, lastName
+  firstName, lastName,
 }
 ```
 
@@ -313,11 +313,11 @@ Missing file is `Ok(None)` JSON `null`.
 
 Two independently shippable changes.
 
-### Change 1: `Layout` at consume, commas between list items
+### Change 1: `Layout` at consume, commas after list items
 
-`layout.rs`, `Recorded`, `commit` / `require_token` / `require_group` take layout, leftover `layout: None`. `parse_each_chunk` records `Recorded::Comma(Layout::COMMA)` between successful items. Catalog above at every consume.
+`layout.rs`, `Recorded`, `commit` / `require_token` / `require_group` take layout, leftover `layout: None`. `parse_each_chunk` records `Recorded::Comma(Layout::COMMA)` after every successful item, including the last. Catalog above at every consume.
 
-Tests: a `field Query.x { id, name }` parse records `Keyword SPACE_AFTER`, `Type GLUE`, `Period GLUE`, `FieldName GLUE`, `Brace OPEN_BRACE`, `FieldName GLUE`, `Comma COMMA`, `FieldName GLUE`, `Brace CLOSE_BRACE`. `field Query.x { id }` has no `Comma`. `user(a: 1, b: 2)` records `Comma` between the two arguments; both parens are `GLUE`. Failed `require_token` records nothing. `!` is recorded. A description records `OWN_LINE`. Compile `NoSemanticTokens` still compiles.
+Tests: a `field Query.x { id, name }` parse records `Keyword SPACE_AFTER`, `Type GLUE`, `Period GLUE`, `FieldName GLUE`, `Brace OPEN_BRACE`, `FieldName GLUE`, `Comma COMMA`, `FieldName GLUE`, `Comma COMMA`, `Brace CLOSE_BRACE`. `field Query.x { id }` records `Comma` after `id`. `field Query.x {}` has no `Comma`. `user(a: 1, b: 2)` records `Comma` after each argument; both parens are `GLUE`. Failed `require_token` records nothing. `!` is recorded. A description records `OWN_LINE`. Compile `NoSemanticTokens` still compiles.
 
 Highlighting tests read `.token` on `Recorded::Token` and skip `Recorded::Comma`. iso-format-lsp.md tests still get `[]`.
 
@@ -325,14 +325,14 @@ Highlighting tests read `.token` on `Recorded::Token` and skip `Recorded::Comma`
 
 Printer tests (string equality):
 
-- `field Query.x{id}` → `field Query.x {\n  id\n}`
-- `field Query.x { id, name }` and `field Query.x { id name }` and `field Query.x { id, name, }` → `field Query.x {\n  id, name\n}`
+- `field Query.x{id}` → `field Query.x {\n  id,\n}`
+- `field Query.x { id, name }` and `field Query.x { id name }` and `field Query.x { id, name, }` → `field Query.x {\n  id, name,\n}`
 - `field Query.x {}` → `field Query.x {}`
 - `entrypoint Query.HomeRoute` → itself
-- `field Pet.x to Image { id }` → `field Pet.x to Image {\n  id\n}`
-- `user(arg: { b: true }, c: false)` → `user(arg: {\n  b: true\n}, c: false)`
-- `field Query.user($id:ID,$x:Int){id}` → `field Query.user($id: ID, $x: Int) {\n  id\n}`
-- `field Pet.x\n\"desc\"\n{id}` → `field Pet.x\n\"desc\"\n{\n  id\n}`
+- `field Pet.x to Image { id }` → `field Pet.x to Image {\n  id,\n}`
+- `user(arg: { b: true }, c: false)` → `user(arg: {\n  b: true,\n}, c: false,)`
+- `field Query.user($id:ID,$x:Int){id}` → `field Query.user($id: ID, $x: Int,) {\n  id,\n}`
+- `field Pet.x\n\"desc\"\n{id}` → `field Pet.x\n\"desc\"\n{\n  id,\n}`
 - `id @loadable` inside a set: space before `@`
 - `Query.x` keeps the dot glued
 - leftover-only tokens do not appear as extra words
@@ -348,7 +348,7 @@ Printer tests (string equality):
 ## Call sites
 
 - grammar consume → `commit(token, layout)`
-- `parse_each_chunk` between items → `Recorded::Comma`
+- `parse_each_chunk` after each successful item → `Recorded::Comma`
 - leftover fill-in → `Recorded::Token { layout: None, ... }`
 - `formatting_response` / `will_save_wait_until_response` → `format_iso_literals` → `format_recorded` → `TextEdit`s
 - vscode-languageclient → `willSaveWaitUntil` on save
@@ -362,4 +362,4 @@ semantic-tokens.md "Formatter metadata": consume passes a `Layout` next to the h
 
 lsp-open-files.md: format reads `lsp_file_contents` once that exists.
 
-iso-format-later.md: next shapes for `(` lists, width, and trailing commas.
+iso-format-later.md: next shapes for `(` lists, width, and one-item-per-line `{` groups. Trailing commas are this file.
