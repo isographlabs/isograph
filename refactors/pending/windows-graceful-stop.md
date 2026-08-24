@@ -109,6 +109,25 @@ fn stop_daemon<TApp: App>(instance: &Instance, signal: Signal) -> Result<Option<
 }
 ```
 
+Origin Windows `signal_pid` takes `(pid, Signal)` and matches `Kill` to `taskkill /F` and `Terminate` to the error string. Delta: `Terminate` is `ask_to_quit` in `stop_daemon`. The Kill arm is the whole Windows function, so it takes `Pid` and is named `kill_pid`. Unix `signal_pid` is unchanged.
+
+```rust
+// external freddie/crates/freddie_cli/src/client.rs
+#[cfg(windows)]
+fn signal_pid(pid: Pid, signal: Signal) -> io::Result<()> {
+    match signal {
+        // `taskkill /F` terminates the process, which is SIGKILL. `taskkill` without it posts
+        // WM_CLOSE, which a daemon with no window never sees, so there is no gentle taskkill.
+        Signal::Kill => ran(Command::new("taskkill")
+            .args(["/F", "/PID"])
+            .arg(pid.to_string())),
+        Signal::Terminate => Err(io::Error::other(
+            "graceful stop is not yet available on Windows; use --force",
+        )),
+    }
+}
+```
+
 ```rust
 // external freddie/crates/freddie_cli/src/client.rs
 #[cfg(windows)]
@@ -120,8 +139,6 @@ fn kill_pid(pid: Pid) -> io::Result<()> {
         .arg(pid.to_string()))
 }
 ```
-
-Unix `signal_pid` is unchanged.
 
 ```rust
 // external freddie/crates/freddie_cli/src/client.rs
