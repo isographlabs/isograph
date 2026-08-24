@@ -29,14 +29,23 @@ pub fn handle<THostLanguage: HostLanguage>(
     match event {
         IsographEvent::Lsp(lsp) => dispatch_lsp(&mut state.db, lsp),
         IsographEvent::Internal(internal) => handle_internal(&mut state.db, internal),
-        IsographEvent::Client(ClientConnectionEvent::Started(started)) => {
+        IsographEvent::Client(client) => handle_client(state, client),
+    }
+}
+
+fn handle_client<THostLanguage: HostLanguage>(
+    state: &mut State<THostLanguage>,
+    event: ClientConnectionEvent,
+) -> Vec<IsographEffect> {
+    match event {
+        ClientConnectionEvent::Started(started) => {
             state
                 .live_sessions
                 .0
                 .insert(started.client, started.session);
             Vec::new()
         }
-        IsographEvent::Client(ClientConnectionEvent::Gone(client)) => {
+        ClientConnectionEvent::Gone(client) => {
             state.live_sessions.0.remove(&client);
             Vec::new()
         }
