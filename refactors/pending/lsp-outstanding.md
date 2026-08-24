@@ -72,9 +72,9 @@ fn dispatch_lsp_request<THostLanguage: HostLanguage>(
     incoming: crate::event::LspRequest,
 ) -> Vec<IsographEffect> {
     let crate::event::LspRequest { client, request } = incoming;
-    if state.live_sessions.reply(client).is_none() {
+    let Some(reply) = state.live_sessions.reply(client) else {
         return Vec::new();
-    }
+    };
     let get_response = || {
         let request =
             isograph_lsp::lsp_request_dispatch::LSPRequestDispatch::new(request, &state.db)
@@ -91,44 +91,36 @@ fn dispatch_lsp_request<THostLanguage: HostLanguage>(
         ControlFlow::Continue(request)
     };
     match get_response() {
-        ControlFlow::Break(response) => send_lsp_response(state, client, response),
-        ControlFlow::Continue(request) => method_not_found(
-            state,
-            crate::event::LspRequest { client, request },
-        ),
+        ControlFlow::Break(response) => send_lsp_response(reply, response),
+        ControlFlow::Continue(request) => method_not_found(reply, request),
     }
 }
 
-fn send_lsp_response<THostLanguage: HostLanguage>(
-    state: &State<THostLanguage>,
-    client: crate::event::ClientId,
+fn send_lsp_response(
+    reply: crossbeam::channel::Sender<lsp_server::Message>,
     response: lsp_server::Response,
 ) -> Vec<IsographEffect> {
-    let Some(reply) = state.live_sessions.reply(client) else {
-        return Vec::new();
-    };
     crate::effect::IsographEffect::SendLspResponse(
         crate::effect::SendLspResponseEffect { reply, response }.boxed(),
     )
     .wrap_vec()
 }
 
-fn method_not_found<THostLanguage: HostLanguage>(
-    state: &State<THostLanguage>,
-    incoming: crate::event::LspRequest,
+fn method_not_found(
+    reply: crossbeam::channel::Sender<lsp_server::Message>,
+    request: lsp_server::Request,
 ) -> Vec<IsographEffect> {
     send_lsp_response(
-        state,
-        incoming.client,
+        reply,
         lsp_server::Response {
-            id: incoming.request.id,
+            id: request.id,
             result: None,
             error: lsp_server::ResponseError {
                 code: lsp_server::ErrorCode::MethodNotFound as i32,
                 data: None,
                 message: format!(
                     "No handler registered for method '{}'",
-                    incoming.request.method
+                    request.method
                 ),
             }
             .wrap_some(),
@@ -137,7 +129,7 @@ fn method_not_found<THostLanguage: HostLanguage>(
 }
 ```
 
-Delta: `handle` of `Lsp` is `dispatch_lsp(state, lsp)`. Not-live returns before `get_response`. `send_lsp_response` clones the sender from `LiveSessions::reply`. `handle_client_connection` is unchanged. `dispatch_lsp_notification` / `handle_internal` still take `&mut IsographState`. `SendLspResponseEffect` still has `reply`. `perform` is unchanged. `run_event_loop` is unchanged.
+Delta: `handle` of `Lsp` is `dispatch_lsp(state, lsp)`. `LiveSessions::reply` runs before `get_response`. `None` returns. `Some(reply)` is passed to `send_lsp_response` / `method_not_found`. `handle_client_connection` is unchanged. `dispatch_lsp_notification` / `handle_internal` still take `&mut IsographState`. `SendLspResponseEffect` still has `reply`. `perform` is unchanged. `run_event_loop` is unchanged.
 
 ```rust
 // from crates/isograph_cli/src/lsp_socket.rs
@@ -171,8 +163,8 @@ Existing `lsp_request_returns_method_not_found` `Started`s first. The dummy `(tx
 ## Call sites
 
 - `run_session` -> `client` on `LspRequest`; no `reply`
-- `dispatch_lsp_request` -> not-live return before `get_response`
-- `send_lsp_response` -> `LiveSessions::reply`
+- `dispatch_lsp_request` -> `LiveSessions::reply` before `get_response`; `None` returns; `Some(reply)` is passed through
+- `send_lsp_response` -> the `reply` already obtained
 - `handle` of `Lsp` -> `dispatch_lsp(state, lsp)`
 - existing `LspRequest { request, reply }` constructions (handle tests) -> `Started` plus `LspRequest { client, request }`
 - lsp-open-files.md -> `client` already on `LspRequest`; notifications still need `client`
