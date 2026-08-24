@@ -71,19 +71,11 @@ The `iso(\`` and closing backtick stay. A parsed literal in the same file as a f
 
 Most important first.
 
-The tokens vec is enough to print, plus chunk boundaries. Depth is not recorded; the printer counts list-group open and close. Source commas are chunk separators and are not consume tokens. `parse_each_chunk` after a successful item pushes a spanless `Comma` (after the last item too). Empty level: no comma. Failed item: no comma.
+`ParsedIsoLiteral.tokens` is `Vec<WithOptionalSpan<IsographSemanticToken>>`. Consume has `Some(span)`. `parse_each_chunk` after a successful item always records `Comma` with `location: None` (after the last item too). Empty level: no comma. Failed item: no comma. Source commas are ignored: `leftover_token` on `Comma` is `None`, same as `LineBreak`.
 
-```rust
-// from crates/isograph_parser/src/semantic_token.rs
-pub enum Recorded {
-    Token(WithSpan<IsographSemanticToken>),
-    Comma,
-}
-```
+Depth is a counter over list-group open and close. `ResolvePosition` does not enter `None`. The highlighter skips `Comma`. The handler does not call `format_recorded` when there are errors.
 
-`commit` and leftover fill-in push `Token`. The highlighter reads `.item` on `Token` and skips `Comma`. List-item commas live on `Chunk::trailing_separator` and are not leftover-filled (`parse_each_chunk`'s leftover is `Expectation::Separator`). The printer sees those as `Recorded::Comma` only. `Comma` has no span. `ResolvePosition` does not enter it. The handler does not call `format_recorded` when there are errors.
-
-`require_token` / `require_group` signatures do not change.
+`require_token` / `require_group` signatures do not change. `commit` pushes `WithGenericLocation::new(token, span.wrap_some())`.
 
 Roles that would format two ways are split on `IsographSemanticToken`:
 
@@ -92,11 +84,13 @@ Roles that would format two ways are split on `IsographSemanticToken`:
     Description,
     At,
     Exclamation,
+    Comma,
 ```
 
 - `Description`: the declaration description. Own line. `String` stays a string value (`name: "x"`).
 - `At`: `@`. Space before, glued to `DirectiveName`. `DirectiveName` is the identifier only. `FieldName` is already the selectable name.
 - `Exclamation`: `!` after a type. Glued. Today `peek.advance()` records nothing, so `[Foo!]` would drop `!`.
+- `Comma`: recorded only by `parse_each_chunk`. Prints `,` and a line break.
 
 ```rust
 cursor.require_token(
@@ -120,52 +114,47 @@ cursor.require_token(
 
 ```rust
 // from crates/isograph_parser/src/format.rs
-pub fn format_recorded(text: &str, tokens: &[Recorded]) -> String {
+pub fn format_recorded(
+    text: &str,
+    tokens: &[WithOptionalSpan<IsographSemanticToken>],
+) -> String {
     let mut out = String::new();
     let mut indent = 0_usize;
-    let mut last: Option<Last> = None;
-    for (i, recorded) in tokens.iter().enumerate() {
-        match recorded {
-            Recorded::Comma => {
-                out.push(',');
-                last = Last::Comma.wrap_some();
-            }
-            Recorded::Token(token) => {
-                let lexeme = lexeme(text, token);
-                let role = token.item;
-                let delta = list_indent(role, lexeme);
-                let empty_open = delta > 0
-                    && matches!(
-                        tokens.get(i + 1),
-                        Some(Recorded::Token(next))
-                            if list_indent(next.item, lexeme(text, next)) < 0
-                    );
-                if delta < 0 {
-                    indent = indent.saturating_sub(1);
-                }
-                apply_gap(&mut out, gap(last, role, lexeme), indent);
-                out.push_str(lexeme);
-                if delta > 0 && !empty_open {
-                    indent += 1;
-                    apply_gap(&mut out, Gap::Line, indent);
-                    last = Last::Newline.wrap_some();
-                } else {
-                    last = Last::Token(role).wrap_some();
-                }
-            }
+    let mut last: Option<IsographSemanticToken> = None;
+    for (i, token) in tokens.iter().enumerate() {
+        if token.item == IsographSemanticToken::Comma {
+            out.push(',');
+            last = IsographSemanticToken::Comma.wrap_some();
+            continue;
         }
+        let Some(lexeme) = lexeme(text, token) else {
+            continue;
+        };
+        let role = token.item;
+        let delta = list_indent(role, lexeme);
+        let empty_open = delta > 0
+            && tokens
+                .get(i + 1)
+                .and_then(|next| lexeme(text, next))
+                .is_some_and(|next_lexeme| list_indent(tokens[i + 1].item, next_lexeme) < 0);
+        if delta < 0 {
+            indent = indent.saturating_sub(1);
+        }
+        apply_gap(&mut out, gap(last, role, lexeme), indent);
+        out.push_str(lexeme);
+        if delta > 0 && !empty_open {
+            indent += 1;
+            apply_gap(&mut out, Gap::Line, indent);
+        }
+        last = role.wrap_some();
     }
     out
 }
 
-fn lexeme<'a>(text: &'a str, token: &WithSpan<IsographSemanticToken>) -> &'a str {
-    &text[token.location.as_usize_range()]
-}
-
-enum Last {
-    Token(IsographSemanticToken),
-    Comma,
-    Newline,
+fn lexeme<'a>(text: &'a str, token: &WithOptionalSpan<IsographSemanticToken>) -> Option<&'a str> {
+    token
+        .location
+        .map(|span| &text[span.as_usize_range()])
 }
 
 enum Gap {
@@ -186,11 +175,11 @@ fn list_indent(role: IsographSemanticToken, lexeme: &str) -> i8 {
     }
 }
 
-fn gap(last: Option<Last>, role: IsographSemanticToken, lexeme: &str) -> Gap {
+fn gap(last: Option<IsographSemanticToken>, role: IsographSemanticToken, lexeme: &str) -> Gap {
     match last {
-        None | Some(Last::Newline) => Gap::None,
-        Some(Last::Comma) => Gap::Line,
-        Some(Last::Token(prev)) => {
+        None => Gap::None,
+        Some(IsographSemanticToken::Comma) => Gap::Line,
+        Some(prev) => {
             if role == IsographSemanticToken::Description
                 || prev == IsographSemanticToken::Description
             {
@@ -236,7 +225,7 @@ fn apply_gap(out: &mut String, gap: Gap, indent: usize) {
 }
 ```
 
-Type-list `[` `]` are `GraphQLTypeName`; `list_indent` is 0. Width is 2 spaces. A parse failure of a literal is not passed to `format_recorded`.
+After a list open the printer already wrote a line break, so `last` is the open bracket and the next item glues onto that new line. Type-list `[` `]` are `GraphQLTypeName`; `list_indent` is 0. Width is 2 spaces. A parse failure of a literal is not passed to `format_recorded`.
 
 ## Target shape
 
@@ -315,13 +304,13 @@ Missing file is `Ok(None)` JSON `null`.
 
 Two independently shippable changes.
 
-### Change 1: `Recorded`, commas after list items, `Description` / `At` / `Exclamation`
+### Change 1: `WithOptionalSpan`, `Comma` after list items, `Description` / `At` / `Exclamation`
 
-`ParsedIsoLiteral.tokens` is `Vec<Recorded>`. `commit` and leftover fill-in push `Token`. `parse_each_chunk` pushes `Comma` after every successful item, including the last. Description consume is `Description`. `@` is `At`, the identifier is `DirectiveName`. `!` is `Exclamation`.
+`ParsedIsoLiteral.tokens` is `Vec<WithOptionalSpan<IsographSemanticToken>>`. `commit` pushes `Some(span)`. `parse_each_chunk` after every successful item, including the last, pushes `Comma` with `None`. `leftover_token` on `Comma` is `None`. Description consume is `Description`. `@` is `At`, the identifier is `DirectiveName`. `!` is `Exclamation`.
 
-Tests: a `field Query.x { id, name }` parse records `Keyword`, `Type`, `Period`, `FieldName`, `Brace`, `FieldName`, `Comma`, `FieldName`, `Comma`, `Brace`. `field Query.x { id }` records `Comma` after `id`. `field Query.x {}` has no `Comma`. `user(a: 1, b: 2)` records `Comma` after each argument; both parens are `Parenthesis`. `[Foo!]` records `GraphQLTypeName`, `GraphQLTypeName`, `Exclamation`, `GraphQLTypeName`. Failed `require_token` records nothing. `field Pet.x "desc" { id }` records `Description`. `id @loadable` records `At` then `DirectiveName`. Compile `NoSemanticTokens` still compiles.
+Tests: a `field Query.x { id, name }` parse records `Keyword`, `Type`, `Period`, `FieldName`, `Brace`, `FieldName`, `Comma`, `FieldName`, `Comma`, `Brace`. `Comma` entries have `location: None`. `field Query.x { id }` records `Comma` after `id`. `field Query.x {}` has no `Comma`. `user(a: 1, b: 2)` records `Comma` after each argument; both parens are `Parenthesis`. `[Foo!]` records `GraphQLTypeName`, `GraphQLTypeName`, `Exclamation`, `GraphQLTypeName`. Failed `require_token` records nothing. `field Pet.x "desc" { id }` records `Description`. `id @loadable` records `At` then `DirectiveName`. Compile `NoSemanticTokens` still compiles.
 
-Highlighting tests read `.item` on `Token` and skip `Comma`. iso-format-lsp.md tests still get `[]`.
+Highlighting tests skip `Comma`. iso-format-lsp.md tests still get `[]`.
 
 ### Change 2: `format_recorded` and the handler body
 
@@ -352,24 +341,25 @@ Printer tests (string equality):
 
 ## Call sites
 
-- grammar consume → `commit(token)` → `Recorded::Token`
-- leftover fill-in → `Recorded::Token`
-- `parse_each_chunk` after each successful item → `Recorded::Comma`
+- grammar consume → `commit(token)` → `WithGenericLocation::new(token, span.wrap_some())`
+- leftover fill-in → same, `Some(span)`
+- `parse_each_chunk` after each successful item → `WithGenericLocation::new(IsographSemanticToken::Comma, None)`
 - description → `commit(Description)`
 - `@` → `commit(At)`; directive identifier → `commit(DirectiveName)`
 - `!` after a type → `commit(Exclamation)`
+- `leftover_token` on `Comma` → `None`
 - `formatting_response` / `will_save_wait_until_response` → `format_iso_literals` → `format_recorded` → `TextEdit`s
 - vscode-languageclient → `willSaveWaitUntil` on save
-- highlighter → `Token.item`
+- highlighter → `.item`, skip `Comma`
 
 ## Docs this change amends
 
 iso-format-lsp.md: the two handlers return the edits from `format_iso_literals`.
 
-semantic-tokens.md: `Description`, `At`, `Exclamation`. `DirectiveName` is the identifier only. `String` is a value. `!` is recorded. Formatter metadata: list groups are `Brace` / `Parenthesis` / `Bracket`; type-list `[` is `GraphQLTypeName`; chunk commas are `Recorded::Comma`. This file.
+semantic-tokens.md: `Description`, `At`, `Exclamation`, `Comma`. `DirectiveName` is the identifier only. `String` is a value. `!` is recorded. `leftover_token` on `Comma` is `None`. Tokens vec is `Vec<WithOptionalSpan<IsographSemanticToken>>`. This file.
 
 lsp-open-files.md: format reads `lsp_file_contents` once that exists.
 
 iso-format-later.md: packing a group onto one line when it fits the width.
 
-comments.md: leftover fill-in is still `Recorded::Token`. Descriptions are `Description`.
+comments.md: tokens vec is `WithOptionalSpan`. Descriptions are `Description`. Chunk commas are `Comma` with `None`.

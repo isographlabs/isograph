@@ -2,7 +2,7 @@
 
 Requires the `SingleLineComment` token in `token_kind.rs` (Shared lexer). Independent of lsp-diagnostics.md. GraphQL schema parsing skips comments at the lexer (`logos::skip`) and is a different language (newlines are not separators); do not copy that skip into iso.
 
-iso-format.md is pending. Until it lands, comments are recorded into the current `Vec<WithSpan<IsographSemanticToken>>`. After it lands, they are `Recorded::Token`. A literal is formatted only when `errors.is_empty()`. Leftover is an error (`parse_stream` reports `Expected` on remaining contents). A comment that is leftover therefore refuses format. Preservation means comments are recorded at consume or attachment, not leftover.
+iso-format.md is pending. Until it lands, comments are recorded into the current `Vec<WithSpan<IsographSemanticToken>>`. After it lands, they are `WithOptionalSpan<IsographSemanticToken>`. A literal is formatted only when `errors.is_empty()`. Leftover is an error (`parse_stream` reports `Expected` on remaining contents). A comment that is leftover therefore refuses format. Preservation means comments are recorded at consume or attachment, not leftover.
 
 This is a strategy discussion. It does not pick one. A later pass, with permission, turns one strategy into the implementation plan.
 
@@ -144,9 +144,9 @@ Tests: `tokenize("# asdf\nx")` is `SingleLineComment`, `LineBreak`, `Identifier`
 
 ## Recording and format
 
-iso-format.md `Recorded` is `Token(WithSpan<IsographSemanticToken>)` | `Comma`. There is no `Layout`, no `Gap`, no `Recorded::Token { layout }`. `commit` still takes only the highlight role. `Comma` prints `,` then a line break. Space after `Keyword` / `Colon` / `Equals`. Space before `Keyword` / `Equals` / `Brace` / `At`. Everything else glues. List-group `{` `(` `[` indent and break. Empty open-then-close is `{}` `()` `[]`. Descriptions are `IsographSemanticToken::Description`, own line. The handler does not call `format_recorded` when `errors` is non-empty.
+iso-format.md tokens are `Vec<WithOptionalSpan<IsographSemanticToken>>`. There is no `Recorded` enum. `commit` still takes only the highlight role. `parse_each_chunk` records `Comma` with `location: None`. Source commas are not leftover-filled. `Comma` prints `,` then a line break. Space after `Keyword` / `Colon` / `Equals`. Space before `Keyword` / `Equals` / `Brace` / `At`. Everything else glues. List-group `{` `(` `[` indent and break. Empty open-then-close is `{}` `()` `[]`. Descriptions are `IsographSemanticToken::Description`, own line. The handler does not call `format_recorded` when `errors` is non-empty.
 
-Until iso-format.md, `ItemCursor::record` pushes `IsographSemanticToken::Comment` at the comment's span into the current `Vec<WithSpan<IsographSemanticToken>>`. After iso-format.md, comments are `Recorded::Token` with role `Comment`. Leftover fill-in of a missed comment is still `Recorded::Token` (iso-format.md already says this).
+Until iso-format.md, `ItemCursor::record` pushes `IsographSemanticToken::Comment` at the comment's span into the current `Vec<WithSpan<IsographSemanticToken>>`. After iso-format.md, comments are `WithOptionalSpan` with role `Comment` and `Some(span)`.
 
 `#` to end of line makes `a: b # yo,` not idempotent. Reparse of that line, the comment token is `# yo,`. The next format prints that slice plus another comma. The `)` of a packed one-line group on that same line is also comment text, and the `(` is unclosed. Do not print a comma (or a close bracket) on the same line after a comment.
 

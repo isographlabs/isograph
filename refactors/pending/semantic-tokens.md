@@ -379,7 +379,7 @@ pub(crate) fn leftover_token(kind: SplitToken) -> Option<SemanticToken> {
 
 Facts:
 
-- `leftover_token` on `Identifier`, `At`, `Exclamation`, `Dollar`, `Period`, `Colon`, `Equals`, and `Comma` is `Content`.
+- `leftover_token` on `Identifier`, `At`, `Exclamation`, `Dollar`, `Period`, `Colon`, and `Equals` is `Content`. iso-format.md: `leftover_token` on `Comma` is `None`.
 - `leftover_token` on `IntegerLiteral` is `Integer`. On `StringLiteral` and `BlockStringLiteral` is `String`. On `Error` is `Error`.
 - `leftover_token` on each `BracketToken` is `Bracket`.
 - `leftover_token` on `LineBreak` and `EndOfFile` is `None`.
@@ -387,7 +387,7 @@ Facts:
 
 ### Formatter metadata
 
-The token role is enough to print, except chunk commas (`Recorded::Comma`, no span) and indent (a counter over list-group `{` `(` `[`). Type-list `[` is `GraphQLTypeName`. iso-format.md.
+The token role is enough to print. Chunk commas are `IsographSemanticToken::Comma` with `location: None`. Indent is a counter over list-group `{` `(` `[`. Type-list `[` is `GraphQLTypeName`. iso-format.md.
 
 ### Cheap pass
 
