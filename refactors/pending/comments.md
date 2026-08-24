@@ -191,7 +191,7 @@ Leading trivia of the first token of a list item prints as own-line comments at 
 a: b, # yo
 ```
 
-records the comma, then the trailing comment (`lineSuffix` in prettier: the comment flushes before the next line break). The other order, `a: b # yo,`, puts the comment between the value and the comma. The target for the motivating example, once `(` groups break (iso-format-later.md) and indent, is:
+records the comma, then the trailing comment (`lineSuffix` in prettier: the comment flushes before the next line break). The other order, `a: b # yo,`, puts the comment between the value and the comma. The target for the motivating example, once `(` groups break and indent (iso-format.md), is:
 
 ```
 foo(
@@ -199,17 +199,6 @@ foo(
   a: b, # yo
 )
 ```
-
-Until iso-format-later.md, `(` is `GLUE` / `Indent::None`, so the same comments still force a line break (own-line layout is `Gap::Line`) but do not indent:
-
-```
-foo(
-# asdf
-a: b, # yo
-)
-```
-
-An own-line comment's `before: Line` is enough to break a `(` group in the printer even without iso-format-later.md. iso-format-later.md's "interior already contains a line break" then puts each argument on its own line; a recorded `Gap::Line` from a comment counts.
 
 Dangling comments in `{\n# c\n}`: no content token to attach to. The close brace is the next remaining token; `# c` is leading trivia of `}`. Printer: `CLOSE_BRACE` has `before: Line`, leading comments emit before `}` at the inner indent. Empty `{ # c }` on one line: `# c` is trailing of `{` or leading of `}`; either prints inside.
 
@@ -362,7 +351,7 @@ This variant fits "comments only at item boundaries" tightly. It fights "comment
 
 iso-format.md prints consume tokens and synthetic commas. Comments that are not in that stream are killed. Every strategy has to put comments into that stream (as `IsographSemanticToken::Comment` with a `Layout`, or as trivia the printer walks). Leftover-only is not enough: leftover is not printed, and leftover is an error, and errors refuse the literal.
 
-Own-line comment layout is `OWN_LINE` (`before: Line, after: Line`). Trailing comment layout is `before: Space, after: None`, then the next `Gap::Line` (from `CLOSE_BRACE` or from the next item's `OWN_LINE` or from iso-format-later.md's broken `(`) ends the line. Trailing comments must not use `after: Line` if that would insert a blank line before the next item; `max(comment.after, next.before)` would become `Line` anyway when the next item is own-line.
+Own-line comment layout is `OWN_LINE` (`before: Line, after: Line`). Trailing comment layout is `before: Space, after: None`, then the next `Gap::Line` (from `CLOSE_BRACE`, from `COMMA.after`, or from the next item's `OWN_LINE`) ends the line. Trailing comments must not use `after: Line` if that would insert a blank line before the next item; `max(comment.after, next.before)` would become `Line` anyway when the next item is own-line.
 
 Blank lines: a comment does not eat an extra line break beyond the one that ended its source line. Two comments in a row:
 
@@ -376,7 +365,7 @@ two `OWN_LINE` comments, then `id`. `max(Line, Line)` is one line between them, 
 
 `format_recorded` of a failed parse still does not run. If a strategy leaves a comment as a failed slot, the user writes a comment and save no longer formats the literal. That is the acceptance bar for the motivating example: both comments, parse errors empty, format runs, both comments in `new_text`.
 
-iso-format-later.md breaks `(` when the interior already contains a line break. A recorded own-line comment is such a line break. Trailing-only comments (`foo(a: b # yo)`) do not force a break; the packed form is `foo(a: b, # yo)` or `foo(a: b # yo,)`. Pick the comma-then-comment order so a trailing comment does not sit between value and comma.
+iso-format.md always breaks `(`. Trailing-only comments (`foo(a: b # yo)`) still sit on the item line: `foo(\n  a: b, # yo\n)`. Pick the comma-then-comment order so a trailing comment does not sit between value and comma. Packing a short list back onto one line is iso-format-later.md.
 
 Descriptions are string tokens with `OWN_LINE`, not comments. `#` is not a description. A description and a comment on a field:
 

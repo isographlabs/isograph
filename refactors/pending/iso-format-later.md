@@ -2,17 +2,8 @@
 
 Requires iso-format.md. Independent of lsp-diagnostics.md.
 
-Shapes after iso-format.md. iso-format.md already puts a comma after every list item and always breaks `{`. A `(` group whose interior already contains a line break, or whose packed single line is longer than the width, breaks: arguments (and variable lists, value lists) sit one per line. A `{` group whose interior already contains a nested broken `{`, or whose packed `{ firstName, lastName, ... }` line is longer than the width, puts each selection on its own line.
+Shapes after iso-format.md. iso-format.md always one item per line with a trailing comma, and always breaks `{` `(` and value `[`. When a group's packed single line is shorter than the width, it packs onto one line. A nested group that itself packs can sit on that line.
 
 ## What the user does
 
-Save of `user(arg: { b: true }, c: false)` yields:
-
-```
-user(
-  arg: {
-    b: true,
-  },
-  c: false,
-)
-```
+Save of `user(arg: { b: true })` yields `user(arg: { b: true, },)` when that packed line is under the width. Longer lists stay the broken form from iso-format.md.

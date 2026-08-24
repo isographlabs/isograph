@@ -4,17 +4,21 @@ Requires iso-format-lsp.md. Independent of lsp-diagnostics.md. Uses open-file co
 
 iso-format-lsp.md's `textDocument/formatting` and `textDocument/willSaveWaitUntil` handlers return `[]`. This slice records layout at consume, prints from that stream, and those handlers return the edits.
 
-A line break plus indent is `{`. `}` starts a new line and dedents. Every `{` does this, including a one-item set and a nested object. A description occupies its own line (`before` and `after` are `Line`), so `{` after a description is on the next line. Every list (selection set, argument list, variable list, object literal, value list) has a comma after every successful item, including the last, with a space after the comma. `(` and type-list `[` do not break.
+A list group (`{` of a selection set or object, `(` of arguments or variables, `[` of a value list) breaks: line break plus indent after the opener, each successful item on its own line ending with a comma, line break plus dedent before the closer. Empty groups stay `{}` `()` `[]`. Type-list `[String]` does not break. A description occupies its own line (`before` and `after` are `Line`), so `{` after a description is on the next line.
 
 ```
-user(arg: {
-  b: true,
-}, c: false,)
+user(
+  arg: {
+    b: true,
+  },
+  c: false,
+)
 ```
 
 ```
 field Pet.fullName {
-  firstName, lastName,
+  firstName,
+  lastName,
 }
 ```
 
@@ -22,16 +26,24 @@ field Pet.fullName {
 field Pet.fullName
 "a pet's name"
 {
-  firstName, lastName,
+  firstName,
+  lastName,
 }
 ```
 
 ```
-field Query.user($id: ID, $x: Int,) {
-  user(id: $id, extra: {
-    b: true,
-  },) {
-    id, name,
+field Query.user(
+  $id: ID,
+  $x: Int,
+) {
+  user(
+    id: $id,
+    extra: {
+      b: true,
+    },
+  ) {
+    id,
+    name,
   }
 }
 ```
@@ -46,7 +58,8 @@ Save. The interior is:
 
 ```
 field Query.HomeRoute {
-  id, name,
+  id,
+  name,
 }
 ```
 
@@ -84,7 +97,7 @@ pub struct Layout {
 
 `Gap` orders `None < Space < Line`. The gap between two adjacent recorded tokens is `max(prev.after, next.before)`.
 
-`Indent::In` applies after the token (open `{` of a selection set or object literal). `Indent::Out` applies before the token (the matching `}`). `(` / `)` / type-list `[` / `]` use `Indent::None`.
+`Indent::In` applies after the token (open of a list group). `Indent::Out` applies before the token (the matching close). Type-list `[` / `]` use `Indent::None`.
 
 ```rust
 impl Layout {
@@ -113,6 +126,11 @@ impl Layout {
         after: Gap::Line,
         indent: Indent::In,
     };
+    pub const OPEN_PAREN: Layout = Layout {
+        before: Gap::None,
+        after: Gap::Line,
+        indent: Indent::In,
+    };
     pub const CLOSE_BRACE: Layout = Layout {
         before: Gap::Line,
         after: Gap::None,
@@ -125,15 +143,15 @@ impl Layout {
     };
     pub const COMMA: Layout = Layout {
         before: Gap::None,
-        after: Gap::Space,
+        after: Gap::Line,
         indent: Indent::None,
     };
 }
 ```
 
-`OPEN_BRACE` / `CLOSE_BRACE` are `{` / `}` of a selection set or object literal. Type-list `[String]` and `(` `)` are `GLUE`.
+`OPEN_BRACE` / `CLOSE_BRACE` are `{` / `}` of a selection set or object literal. `OPEN_PAREN` / `CLOSE_BRACE` are `(` / `)` of an argument or variable list and `[` / `]` of a value list. Type-list `[String]` is `GLUE`.
 
-An `In` token immediately followed by the matching `Out` with nothing recorded between them uses `Gap::None` between those two: `{}`. Consume sites pass `OPEN_BRACE` / `CLOSE_BRACE` either way.
+An `In` token immediately followed by the matching `Out` with nothing recorded between them uses `Gap::None` between those two: `{}` `()` `[]`. Consume sites pass the open/close pair either way.
 
 ## Recording
 
@@ -172,7 +190,7 @@ cursor.require_group(
 )
 ```
 
-`require_group` / `consume_group_if` take two layouts. Open and close share one highlight role. `RecordGroupClose` stores the close layout. Parenthesis groups and type-list brackets pass `Layout::GLUE`, `Layout::GLUE`.
+`require_group` / `consume_group_if` take two layouts. Open and close share one highlight role. `RecordGroupClose` stores the close layout. Argument and variable lists and value lists pass `Layout::OPEN_PAREN`, `Layout::CLOSE_BRACE`. Type-list brackets pass `Layout::GLUE`, `Layout::GLUE`.
 
 `!` is consumed with `IsographSemanticToken::Content` and `Layout::GLUE`.
 
@@ -194,9 +212,9 @@ cursor.require_group(
 - Name after `alias:`: `GLUE`
 - Selection-set `{` / `}`: `OPEN_BRACE` / `CLOSE_BRACE`
 - Object literal `{` / `}`: `OPEN_BRACE` / `CLOSE_BRACE`
-- Argument list `(` / `)`: `GLUE` / `GLUE`
-- Variable declaration list `(` / `)`: `GLUE` / `GLUE`
-- Value list `[` / `]`: `GLUE` / `GLUE`
+- Argument list `(` / `)`: `OPEN_PAREN` / `CLOSE_BRACE`
+- Variable declaration list `(` / `)`: `OPEN_PAREN` / `CLOSE_BRACE`
+- Value list `[` / `]`: `OPEN_PAREN` / `CLOSE_BRACE`
 - Argument name / object key: `GLUE`
 - `$` and the variable identifier, declaration or usage: `GLUE`
 - `=`: `SPACE`
@@ -251,13 +269,21 @@ A parse failure of a literal is not passed to `format_recorded`.
 entrypoint Query.HomeRoute
 
 field Pet.fullName {
-  firstName, lastName,
+  firstName,
+  lastName,
 }
 
-field Query.user($id: ID, $x: Int,) {
-  user(id: $id, extra: {
-    b: true,
-  }, c: false,) {
+field Query.user(
+  $id: ID,
+  $x: Int,
+) {
+  user(
+    id: $id,
+    extra: {
+      b: true,
+    },
+    c: false,
+  ) {
     id,
   }
 }
@@ -269,7 +295,8 @@ field Pet.Avatar to Image {
 field Pet.fullName
 "a pet's name"
 {
-  firstName, lastName,
+  firstName,
+  lastName,
 }
 ```
 
@@ -317,7 +344,7 @@ Two independently shippable changes.
 
 `layout.rs`, `Recorded`, `commit` / `require_token` / `require_group` take layout, leftover `layout: None`. `parse_each_chunk` records `Recorded::Comma(Layout::COMMA)` after every successful item, including the last. Catalog above at every consume.
 
-Tests: a `field Query.x { id, name }` parse records `Keyword SPACE_AFTER`, `Type GLUE`, `Period GLUE`, `FieldName GLUE`, `Brace OPEN_BRACE`, `FieldName GLUE`, `Comma COMMA`, `FieldName GLUE`, `Comma COMMA`, `Brace CLOSE_BRACE`. `field Query.x { id }` records `Comma` after `id`. `field Query.x {}` has no `Comma`. `user(a: 1, b: 2)` records `Comma` after each argument; both parens are `GLUE`. Failed `require_token` records nothing. `!` is recorded. A description records `OWN_LINE`. Compile `NoSemanticTokens` still compiles.
+Tests: a `field Query.x { id, name }` parse records `Keyword SPACE_AFTER`, `Type GLUE`, `Period GLUE`, `FieldName GLUE`, `Brace OPEN_BRACE`, `FieldName GLUE`, `Comma COMMA`, `FieldName GLUE`, `Comma COMMA`, `Brace CLOSE_BRACE`. `field Query.x { id }` records `Comma` after `id`. `field Query.x {}` has no `Comma`. `user(a: 1, b: 2)` records `Comma` after each argument; both parens are `OPEN_PAREN` / `CLOSE_BRACE`. Failed `require_token` records nothing. `!` is recorded. A description records `OWN_LINE`. Compile `NoSemanticTokens` still compiles.
 
 Highlighting tests read `.token` on `Recorded::Token` and skip `Recorded::Comma`. iso-format-lsp.md tests still get `[]`.
 
@@ -326,12 +353,14 @@ Highlighting tests read `.token` on `Recorded::Token` and skip `Recorded::Comma`
 Printer tests (string equality):
 
 - `field Query.x{id}` → `field Query.x {\n  id,\n}`
-- `field Query.x { id, name }` and `field Query.x { id name }` and `field Query.x { id, name, }` → `field Query.x {\n  id, name,\n}`
+- `field Query.x { id, name }` and `field Query.x { id name }` and `field Query.x { id, name, }` → `field Query.x {\n  id,\n  name,\n}`
 - `field Query.x {}` → `field Query.x {}`
+- `user()` → `user()`
+- `foo(x: [1, 2])` → `foo(\n  x: [\n    1,\n    2,\n  ],\n)`
 - `entrypoint Query.HomeRoute` → itself
 - `field Pet.x to Image { id }` → `field Pet.x to Image {\n  id,\n}`
-- `user(arg: { b: true }, c: false)` → `user(arg: {\n  b: true,\n}, c: false,)`
-- `field Query.user($id:ID,$x:Int){id}` → `field Query.user($id: ID, $x: Int,) {\n  id,\n}`
+- `user(arg: { b: true }, c: false)` → `user(\n  arg: {\n    b: true,\n  },\n  c: false,\n)`
+- `field Query.user($id:ID,$x:Int){id}` → `field Query.user(\n  $id: ID,\n  $x: Int,\n) {\n  id,\n}`
 - `field Pet.x\n\"desc\"\n{id}` → `field Pet.x\n\"desc\"\n{\n  id,\n}`
 - `id @loadable` inside a set: space before `@`
 - `Query.x` keeps the dot glued
@@ -362,4 +391,4 @@ semantic-tokens.md "Formatter metadata": consume passes a `Layout` next to the h
 
 lsp-open-files.md: format reads `lsp_file_contents` once that exists.
 
-iso-format-later.md: next shapes for `(` lists, width, and one-item-per-line `{` groups. Trailing commas are this file.
+iso-format-later.md: packing a group onto one line when it fits the width.
