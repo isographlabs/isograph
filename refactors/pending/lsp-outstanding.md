@@ -1,106 +1,199 @@
 # Outstanding LSP requests
 
-Requires lsp-request-response.md and lsp-sessions.md. Independent of lsp-dispatch.md and lsp-tokens.md.
+Requires lsp-request-response.md and lsp-sessions.md (both landed). Independent of lsp-tokens.md.
 
-`handle` of `Lsp` whose message is a request always returns `SendLspResponseEffect` in the same turn. After disconnect, `Lsp` events can still sit on `event_rx`. This slice drops those replies: `ClientId` and `ClientConnectionEvent::Gone` are already on the session (lsp-sessions.md). A `HashSet<(ClientId, RequestId)>` on the event loop is this slice.
+`run_event_loop` is recv, `handle`, send effects. It does not match on the event. It does not match on the effect. Outstanding lives on CLI `State` next to `live_sessions`. `handle` writes it.
 
 JSON-RPC ids are per connection. Two clients can both use id `1`. Keys are `(ClientId, RequestId)`.
 
-`handle` stays synchronous. The set is empty except while a request is in `handle`, and for ids still on `event_rx` after `ClientConnectionEvent::Gone`. Cancel and async replies are later readers of the same table.
+A request whose `client` is not in `live_sessions` returns no effects. A live client's request inserts `(client, id)`, then this slice's handlers still reply in the same turn and remove that pair. `handle` of `Gone` removes the session and every outstanding pair for that client. Cancel and async replies are later readers of the same set: they take a pair and emit `SendLspResponseEffect` only if it was still there.
 
-Origin: landed `Lsp` / `SendLspResponseEffect`; lsp-sessions.md `ClientId` / `ClientConnectionEvent::Gone`. Delta: `client` on `LspRequest` and on `SendLspResponseEffect`, outstanding on `run_event_loop`.
+Origin: landed `LspRequest` / `SendLspResponseEffect`; sessions.md `ClientId` / `LiveSessions` / `ClientConnectionEvent::Gone` / CLI `State`. Delta: `client` on `LspRequest`, `OutstandingLspRequests` on `State`, `handle` of request and of `Gone` write the set. `SendLspResponseEffect` is unchanged (`response.id` is the request id). `run_event_loop` is unchanged. `perform` is unchanged.
 
-One shippable change. MethodNotFound bytes do not change. Send tests stay green.
+One shippable change. MethodNotFound bytes do not change.
 
 ## What the user does
 
-Same as today. Dropping a client while a request is queued does not write a response on a dead socket.
+Same verbs. A request handled after that client is `Gone` does not write a response. The session posts every request before `Gone`, so the production channel does not deliver that order; `handle` does not depend on it.
 
 ## Types
 
-Most important first. `ClientId` and `Client` are lsp-sessions.md.
+Most important first.
 
 ```rust
 // from crates/isograph_cli/src/event.rs
 pub struct LspRequest {
     pub client: ClientId,
     pub request: lsp_server::Request,
-    pub reply: crossbeam::channel::Sender<lsp_server::Message>,
+    pub reply: crossbeam::channel::Sender<Message>,
 }
 ```
 
-`LspRequest` gains `client`. `run_session` already has `client` (sessions.md). Put it on every `Lsp::Request`.
+Delta: `client`. `run_session` already has `client` (sessions.md). Put it on every `Lsp::Request`. Notifications stay a bare `lsp_server::Notification`.
 
 ```rust
-// from crates/isograph_cli/src/effect.rs
-pub(crate) struct SendLspResponseEffect {
-    pub client: ClientId,
-    pub id: lsp_server::RequestId,
-    pub reply: crossbeam::channel::Sender<lsp_server::Message>,
-    pub response: lsp_server::Response,
+// from crates/isograph_cli/src/event.rs
+#[derive(Debug, Default)]
+pub struct OutstandingLspRequests(
+    pub std::collections::HashSet<(ClientId, lsp_server::RequestId)>,
+);
+```
+
+```rust
+// from crates/isograph_cli/src/state.rs
+pub struct State<THostLanguage: HostLanguage> {
+    pub db: IsographState<THostLanguage>,
+    pub live_sessions: LiveSessions,
+    pub outstanding: OutstandingLspRequests,
 }
 ```
 
-`method_not_found` fills `client` and `id` from the request. If lsp-dispatch.md has landed, `respond` in `lsp_dispatch.rs` gains the same two fields.
+Delta: `outstanding`. `serve`, `empty`, `empty_state`, `listen_and_reply`, and the watch `Harness` pass `OutstandingLspRequests::default()`.
 
 ```rust
-// from crates/isograph_cli/src/daemon.rs
-struct OutstandingLspRequests {
-    inner: std::collections::HashSet<(ClientId, lsp_server::RequestId)>,
-}
-```
-
-Lives in `run_event_loop`.
-
-### `handle`
-
-`handle` of `Client` stays the sessions.md map to `IsographEffect::Client` (`ClientEffect`). This slice does not change that.
-
-`method_not_found` sets `client: lsp.client` and `id` from the request on `SendLspResponseEffect`.
-
-### `run_event_loop`
-
-```rust
-// from crates/isograph_cli/src/daemon.rs
-    let mut outstanding = OutstandingLspRequests {
-        inner: std::collections::HashSet::new(),
-    };
-    while let Some(event) = event_rx.recv().await {
-        match &event {
-            IsographEvent::Lsp(crate::event::LspEvent::Request(request)) => {
-                outstanding
-                    .inner
-                    .insert((request.client, request.request.id.clone()));
-            }
-            IsographEvent::Lsp(_) => {}
-            IsographEvent::Client(crate::event::ClientConnectionEvent::Gone(client)) => {
-                outstanding.inner.retain(|(id, _)| *id != *client);
-            }
-            IsographEvent::Client(crate::event::ClientConnectionEvent::Started(_)) => {}
-            IsographEvent::Internal(_) => {}
+// from crates/isograph_cli/src/state.rs
+pub fn handle<THostLanguage: HostLanguage>(
+    state: &mut State<THostLanguage>,
+    event: IsographEvent,
+) -> Vec<IsographEffect> {
+    match event {
+        IsographEvent::Lsp(lsp) => dispatch_lsp(state, lsp),
+        IsographEvent::Internal(internal) => handle_internal(&mut state.db, internal),
+        IsographEvent::Client(ClientConnectionEvent::Started(started)) => {
+            state
+                .live_sessions
+                .0
+                .insert(started.client, started.session);
+            Vec::new()
         }
-        let effects = handle(&mut state, event);
-        for effect in effects {
-            let forward = match &effect {
-                IsographEffect::SendLspResponse(respond) => outstanding
-                    .inner
-                    .remove(&(respond.client, respond.id.clone())),
-                IsographEffect::LogHelloWorld
-                | IsographEffect::Kill
-                | IsographEffect::Client(_) => true,
-            };
-            if forward {
-                let _ = effect_tx.send(effect);
-            }
+        IsographEvent::Client(ClientConnectionEvent::Gone(client)) => {
+            state.live_sessions.0.remove(&client);
+            state.outstanding.0.retain(|(id, _)| *id != client);
+            Vec::new()
         }
     }
+}
+
+fn dispatch_lsp<THostLanguage: HostLanguage>(
+    state: &mut State<THostLanguage>,
+    lsp: crate::event::LspEvent,
+) -> Vec<IsographEffect> {
+    match lsp {
+        crate::event::LspEvent::Request(incoming) => dispatch_lsp_request(state, incoming),
+        crate::event::LspEvent::Notification(notification) => {
+            dispatch_lsp_notification(&mut state.db, notification)
+        }
+        crate::event::LspEvent::Response(_response) => Vec::new(),
+    }
+}
+
+fn dispatch_lsp_request<THostLanguage: HostLanguage>(
+    state: &mut State<THostLanguage>,
+    incoming: crate::event::LspRequest,
+) -> Vec<IsographEffect> {
+    let crate::event::LspRequest {
+        client,
+        request,
+        reply,
+    } = incoming;
+    if !state.live_sessions.0.contains_key(&client) {
+        return Vec::new();
+    }
+    let id = request.id.clone();
+    state.outstanding.0.insert((client, id.clone()));
+    let get_response = || {
+        let request =
+            isograph_lsp::lsp_request_dispatch::LSPRequestDispatch::new(request, &state.db)
+                .on_request_sync::<lsp_types::request::SemanticTokensFullRequest>(
+                    crate::adapter::semantic_tokens_response::<THostLanguage>,
+                )?
+                .on_request_sync::<lsp_types::request::Formatting>(
+                    crate::adapter::formatting_response::<THostLanguage>,
+                )?
+                .on_request_sync::<lsp_types::request::WillSaveWaitUntil>(
+                    crate::adapter::will_save_wait_until_response::<THostLanguage>,
+                )?
+                .request();
+        ControlFlow::Continue(request)
+    };
+    match get_response() {
+        ControlFlow::Break(response) => send_lsp_response(state, client, id, reply, response),
+        ControlFlow::Continue(request) => method_not_found(
+            state,
+            crate::event::LspRequest {
+                client,
+                request,
+                reply,
+            },
+        ),
+    }
+}
+
+fn send_lsp_response<THostLanguage: HostLanguage>(
+    state: &mut State<THostLanguage>,
+    client: crate::event::ClientId,
+    id: lsp_server::RequestId,
+    reply: crossbeam::channel::Sender<lsp_server::Message>,
+    response: lsp_server::Response,
+) -> Vec<IsographEffect> {
+    state.outstanding.0.remove(&(client, id));
+    crate::effect::IsographEffect::SendLspResponse(
+        crate::effect::SendLspResponseEffect { reply, response }.boxed(),
+    )
+    .wrap_vec()
+}
+
+fn method_not_found<THostLanguage: HostLanguage>(
+    state: &mut State<THostLanguage>,
+    incoming: crate::event::LspRequest,
+) -> Vec<IsographEffect> {
+    let id = incoming.request.id.clone();
+    send_lsp_response(
+        state,
+        incoming.client,
+        id,
+        incoming.reply,
+        lsp_server::Response {
+            id: incoming.request.id,
+            result: None,
+            error: lsp_server::ResponseError {
+                code: lsp_server::ErrorCode::MethodNotFound as i32,
+                data: None,
+                message: format!(
+                    "No handler registered for method '{}'",
+                    incoming.request.method
+                ),
+            }
+            .wrap_some(),
+        },
+    )
+}
 ```
 
-`remove` is whether the id was still open. `SendLspResponseEffect` whose pair is absent is not forwarded. `ClientEffect` still forwards.
+Delta: `dispatch_lsp` takes `&mut State`. `dispatch_lsp_request` takes `&mut State` and `&state.db` into `LSPRequestDispatch`. A request whose client is not live returns no effects and does not insert. A live request inserts, then `send_lsp_response` removes and returns `SendLspResponseEffect`. `handle` of `Gone` also retains outstanding. `dispatch_lsp_notification` / `handle_internal` still take `&mut IsographState`.
+
+`SendLspResponseEffect` does not gain `client`. `perform` still sends on `reply`.
+
+```rust
+// from crates/isograph_cli/src/daemon.rs
+pub(crate) async fn run_event_loop<THostLanguage: HostLanguage>(
+    mut state: crate::state::State<THostLanguage>,
+    mut event_rx: UnboundedReceiver<IsographEvent>,
+    effect_tx: UnboundedSender<IsographEffect>,
+) {
+    while let Some(event) = event_rx.recv().await {
+        tracing::debug!(?event, "event");
+        let effects = handle(&mut state, event);
+        for effect in effects {
+            let _ = effect_tx.send(effect);
+        }
+    }
+}
+```
+
+Delta: none.
 
 ### Session
-
-`accept_loop` already assigns `ClientId` and `session` already posts `ClientConnectionEvent::Gone` (sessions.md). `run_session` takes `client` and puts it on `LspEvent::Request`.
 
 ```rust
 // from crates/isograph_cli/src/lsp_socket.rs
@@ -113,16 +206,31 @@ Lives in `run_event_loop`.
             }
 ```
 
+Delta: `client` on `LspRequest`.
+
 ## Tests
 
-`lsp_socket.rs`: drop a connection after initialize. `event_rx` receives `ClientConnectionEvent::Gone` (sessions.md). A second connection HelloWorld still works. Two connections that both drop produce two `ClientConnectionEvent::Gone` with different `ClientId`s.
+`handle` of `Lsp` request when that `client` is in `live_sessions` (a prior `ClientConnectionEvent::Started` with a dummy sender): one `SendLspResponseEffect`, MethodNotFound bytes unchanged for `textDocument/hover`, `state.outstanding.0` empty.
 
-`handle` still returns `SendLspResponseEffect` in the same turn as an `Lsp` request. A dropped in-flight reply is not observable until a later slice can defer the response. Do not assert it here.
+`handle` of `Lsp` request when that `client` was never `Started`: empty effects, outstanding empty.
 
-Do not add a production API only tests call.
+`handle` of `Started`, then `Gone`, then `Lsp` request for that `client`: empty effects, outstanding empty.
+
+`handle` of `Gone` when `outstanding` already has `(client, id)` and `(other, id)`: `client` is absent from `live_sessions` and from outstanding; `other`'s pair remains. Empty effects. Construct `State { outstanding: OutstandingLspRequests(...), .. }` with those two pairs; this is not a production API only tests call.
+
+`handle` of `Gone` of an id that was never registered: empty effects, outstanding empty. Same as sessions.md for `live_sessions`.
+
+Existing `lsp_request_returns_method_not_found` `Started`s first.
+
+`lsp_socket.rs` (`listen_for_events`): initialize, then a `textDocument/hover` request. First event `ClientConnectionEvent::Started`. Next event `LspEvent::Request` whose `client` equals that `Started` client. Two connections: two `Started` with different `ClientId`s; each connection's request carries that connection's id.
+
+`listen_and_reply`: hover after initialize is still MethodNotFound. Drop one of two connections; the remaining connection's hover is still MethodNotFound.
 
 ## Call sites
 
 - `run_session` -> `client` on `LspRequest`
-- `run_event_loop` -> outstanding insert / retain / remove
-- later cancel / async reply -> the same set
+- `handle` of `Lsp` request -> insert / `send_lsp_response` remove
+- `handle` of `Gone` -> `live_sessions` remove and outstanding retain
+- `serve` / `empty` / `empty_state` / `listen_and_reply` / watch `Harness` -> `State { .., outstanding }`
+- later cancel / async reply -> take a pair from `state.outstanding`; emit `SendLspResponseEffect` only if it was present
+- lsp-open-files.md -> `client` already on `LspRequest`; notifications still need `client`
