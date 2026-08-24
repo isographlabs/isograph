@@ -251,13 +251,12 @@ Workspace `members` gains `"crates/freddie_timer"`. The three files are Types.
 ```rust
 // external freddie/crates/freddie/src/lib.rs
 pub use freddie_timer::{
-    AlwaysEqual, DropGuard, TimerEffect, TimerFired, TimerGuard, TimerId, drop_guard,
+    AlwaysEqual, DropGuard, TimerEffect, TimerFired, TimerGuard, TimerId, TimerTrigger, drop_guard,
     timer_effect_and_guard,
 };
-
-#[cfg(feature = "bind")]
-pub use freddie_timer::TimerTrigger;
 ```
+
+`freddie` always enables `freddie_timer/bind`, so `TimerTrigger` is always re-exported.
 
 `crates/freddie` deletes `always_equal.rs`, `drop_guard.rs`, `timer.rs` and the `pub mod` lines. `sequence.rs` keeps `use crate::TimerGuard` via the re-export. `crates/freddie/Cargo.toml` drops direct `tokio`; `freddie_timer` is the tokio user. `bind` stays on `freddie` only to enable `freddie_timer/bind`.
 
@@ -281,7 +280,7 @@ Figaro keeps the `freddie` dep. Bind lines are unchanged. `schedule_timer` is un
     Timer(TimerFired),
 ```
 
-`TimerFired` is `TimerFired<()>`. Handlers stay `_ev: &TimerFired`.
+`TimerFired` is `TimerFired<()>`. Bind still passes `&TimerFired`. `TimerFired` is Copy, so those handlers take `#[expect(clippy::trivially_copy_pass_by_ref)]`.
 
 ```rust
 // external figaro/figaro_model/src/model/mod.rs (before)
