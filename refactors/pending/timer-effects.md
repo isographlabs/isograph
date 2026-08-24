@@ -1,20 +1,22 @@
 # Timer effects
 
-Requires event-loop.md (landed) and freddie-timer.md. Independent of lsp-tokens.md. lsp-diagnostics.md is a consumer of this.
+Requires event-loop.md (landed), freddie-timer.md, and lsp-outstanding.md. lsp-outstanding.md must be past before this ships. Independent of lsp-tokens.md. lsp-diagnostics.md is a consumer of this.
 
 Incorporation of `freddie_timer` into i2. HelloWorld arms a `Duration::ZERO` timer with payload `HelloWorldDebounced`. `handle` of the matching fire returns `LogHelloWorld`. lsp-diagnostics.md deletes that payload and the guard field.
 
-Origin: figaro `src/daemon.rs` `schedule_timer` / `perform_effect` taking `event_tx`. Origin of the halves: freddie-timer.md. Delta: `IsographEvent::Timer` / `IsographEffect::Timer`; `perform` gains `event_tx`; payload `HelloWorldDebounced`.
+`isograph send` of HelloWorld is `Lsp(Notification { method: isograph/event, params: HelloWorld })`, not `IsographEvent::Internal(HelloWorld)`. After lsp-outstanding, that path is `handle` -> `dispatch_lsp(&mut State)` -> `dispatch_lsp_notification(&mut IsographState)` -> `on_isograph_event` -> `handle_internal`. This slice points the notification path at `&mut State` and has `on_isograph_event` call `handle(state, internal.to())`, so send and in-process Internal share the HelloWorld arm.
+
+Origin: figaro `src/daemon.rs` `schedule_timer` / `perform_effect` taking `event_tx`. Origin of the halves: freddie-timer.md. Delta: `IsographEvent::Timer` / `IsographEffect::Timer`; `perform` gains `event_tx` and the Timer arm returns `ControlFlow::Continue`; payload `HelloWorldDebounced`; notification dispatch takes `State` and re-enters `handle`.
 
 One shippable change.
 
 ## What the user does
 
-Same verbs. `isograph send` of HelloWorld still logs `hello world`. The log arrives after the timer fires (`Duration::ZERO` in this slice). A second HelloWorld before fire logs once.
+Same verbs. `isograph send` of HelloWorld still logs `hello world`. The log arrives after the timer fires (`Duration::ZERO` in this slice). `Duration::ZERO` plus two send processes does not log once: each send is a full LSP handshake, and the ZERO timer fires as soon as the runtime polls the spawn, which is long before a second CLI send exists. Overwrite-of-guard is the handle-only test `a_second_hello_world_drops_the_first_guard`. `two_sends_then_stop_exits_without_force` still asserts the log contains `hello world`, not that it appears once.
 
 ## Types
 
-The crate is freddie-timer.md. i2 does not enable `bind`. No `freddie` dep.
+The crate is freddie-timer.md. i2 does not enable `bind`. No `freddie` dep. `TimerFired<TimerPayload>` and `TimerEffect<TimerPayload>` share `TimerPayload`. `perform` posts `IsographEvent::Timer(timer.event)`.
 
 ```rust
 // from crates/isograph_cli/src/event.rs
@@ -52,8 +54,6 @@ pub enum IsographEffect {
 }
 ```
 
-`TimerFired<TimerPayload>` and `TimerEffect<TimerPayload>` share `TimerPayload`. `perform` posts `IsographEvent::Timer(timer.event)`.
-
 ```rust
 // from crates/isograph_cli/src/state.rs
 pub struct State<THostLanguage: HostLanguage> {
@@ -63,7 +63,15 @@ pub struct State<THostLanguage: HostLanguage> {
 }
 ```
 
-Arming is figaro's pair:
+`State` has no `Default`. Every `State { ... }` writes `hello_world_debounce: None`:
+
+- `crates/isograph_cli/src/state.rs` `empty` (and `with_config`, which calls `empty`)
+- `crates/isograph_cli/src/daemon.rs` `serve`
+- `crates/isograph_cli/src/daemon.rs` tests `empty_state`
+- `crates/isograph_cli/src/lsp_socket.rs` `listen_and_reply`
+- `crates/isograph_cli/src/watch.rs` `Harness::new`
+
+Arming is figaro's pair. Overwrite assigns a new guard onto the field. That drops the old one, so `select!` cancels that sleep.
 
 ```rust
 // from crates/isograph_cli/src/state.rs
@@ -75,9 +83,9 @@ Arming is figaro's pair:
         IsographEffect::Timer(effect).wrap_vec()
 ```
 
-Overwrite assigns a new guard onto the field. That drops the old one, so `select!` cancels that sleep.
-
 ## Change 1: isograph uses `freddie_timer`
+
+`785c7950b009309eee8b3810e078876b77d2015e` is `freddie_cli` / `freddie_single_instance` only. The crate appears at `38df736` as the 3-arg API (`timer_effect_and_guard(delay, payload, Event::Timer)`, `TimerEffect<E> { event: E }`). The 2-arg API this slice uses (`timer_effect_and_guard(delay, payload)`, `TimerEffect<P> { event: TimerFired<P> }`) is `e2dde74d6560e65705fdc796663fe32f6f1b8ba0`, the commit that landed freddie-timer.md. This slice cannot start until that rev is on `origin` of `https://github.com/freddiehg/freddie`. All three git deps use that rev.
 
 ```toml
 # from crates/isograph_cli/Cargo.toml (before)
@@ -87,37 +95,136 @@ freddie_single_instance = { git = "https://github.com/freddiehg/freddie", rev = 
 
 ```toml
 # from crates/isograph_cli/Cargo.toml (after)
-freddie_cli = { git = "https://github.com/freddiehg/freddie", rev = "785c7950b009309eee8b3810e078876b77d2015e" }
-freddie_single_instance = { git = "https://github.com/freddiehg/freddie", rev = "785c7950b009309eee8b3810e078876b77d2015e" }
-freddie_timer = { git = "https://github.com/freddiehg/freddie", rev = "785c7950b009309eee8b3810e078876b77d2015e" }
+freddie_cli = { git = "https://github.com/freddiehg/freddie", rev = "e2dde74d6560e65705fdc796663fe32f6f1b8ba0" }
+freddie_single_instance = { git = "https://github.com/freddiehg/freddie", rev = "e2dde74d6560e65705fdc796663fe32f6f1b8ba0" }
+freddie_timer = { git = "https://github.com/freddiehg/freddie", rev = "e2dde74d6560e65705fdc796663fe32f6f1b8ba0" }
 ```
 
-The rev is the commit that landed freddie-timer.md, all three equal.
+`dropping_the_guard_after_perform_does_not_fire` uses `tokio::time::pause` / `advance`. Those need `test-util`, which `tokio` `full` does not include. Add it on the test build only:
 
-`empty()` fills `hello_world_debounce: None`.
+```toml
+# from crates/isograph_cli/Cargo.toml (dev-dependencies, after)
+tokio = { workspace = true, features = ["rt", "macros", "sync", "time", "test-util"] }
+```
+
+After lsp-outstanding, `handle` and `dispatch_lsp` already take `&mut State`. `dispatch_lsp_request` stays on `&IsographState`. `dispatch_lsp_notification` and `on_isograph_event` still take `&mut IsographState` and call `handle_internal`.
 
 ```rust
 // from crates/isograph_cli/src/state.rs (before)
     match event {
-        IsographEvent::Lsp(lsp) => dispatch_lsp(&mut state.db, lsp),
+        IsographEvent::Lsp(lsp) => dispatch_lsp(state, lsp),
         IsographEvent::Internal(internal) => handle_internal(&mut state.db, internal),
-        IsographEvent::ClientConnection(ClientConnectionEvent::Started(started)) => {
+        IsographEvent::ClientConnection(client) => handle_client_connection(state, client),
+    }
 ```
 
 ```rust
 // from crates/isograph_cli/src/state.rs (after)
     match event {
-        IsographEvent::Lsp(lsp) => dispatch_lsp(&mut state.db, lsp),
-        IsographEvent::Internal(InternalEvent::HelloWorld) => handle_hello_world(state),
-        IsographEvent::Internal(internal) => handle_internal(&mut state.db, internal),
+        IsographEvent::Lsp(lsp) => dispatch_lsp(state, lsp),
+        IsographEvent::Internal(internal) => handle_internal(state, internal),
         IsographEvent::Timer(fired) => handle_timer_fired(state, fired),
-        IsographEvent::ClientConnection(ClientConnectionEvent::Started(started)) => {
+        IsographEvent::ClientConnection(client) => handle_client_connection(state, client),
+    }
 ```
 
-`handle_internal` loses the `HelloWorld` arm. HelloWorld writes the guard on `State`.
+Matching `Internal(HelloWorld)` only on `handle` and deleting that variant from `handle_internal` does not compile: `handle_internal` takes `InternalEvent`, which rustc does not narrow. `handle_internal` takes `&mut State`. Its HelloWorld arm is `handle_hello_world`. `handle`'s Internal arm is `handle_internal(state, internal)`. That is one arm.
+
+Do not leave HelloWorld on `handle_internal` as `LogHelloWorld`. CLI tests send HelloWorld over LSP and wait for `hello world` in the log. If the LSP path still calls `handle_internal` on `&mut IsographState` and that arm is `LogHelloWorld`, send skips the timer, the in-process Internal tests pass, and the log still appears.
 
 ```rust
-// from crates/isograph_cli/src/state.rs
+// from crates/isograph_cli/src/state.rs (before)
+        crate::event::LspEvent::Notification(notification) => {
+            dispatch_lsp_notification(&mut state.db, notification)
+        }
+```
+
+```rust
+// from crates/isograph_cli/src/state.rs (after)
+        crate::event::LspEvent::Notification(notification) => {
+            dispatch_lsp_notification(state, notification)
+        }
+```
+
+```rust
+// from crates/isograph_cli/src/state.rs (before)
+fn dispatch_lsp_notification<THostLanguage: HostLanguage>(
+    state: &mut IsographState<THostLanguage>,
+    notification: lsp_server::Notification,
+) -> Vec<IsographEffect> {
+    let dispatch = || {
+        crate::lsp_notification_dispatch::LSPNotificationDispatch::new(notification, state)
+            .on_notification_sync::<crate::lsp_socket::IsographEventNotification>(
+                on_isograph_event::<THostLanguage>,
+            )?
+            .notification();
+        ControlFlow::Continue(())
+    };
+    match dispatch() {
+        ControlFlow::Break(effects) => effects,
+        ControlFlow::Continue(()) => Vec::new(),
+    }
+}
+
+fn on_isograph_event<THostLanguage: HostLanguage>(
+    state: &mut IsographState<THostLanguage>,
+    internal: InternalEvent,
+) -> Vec<IsographEffect> {
+    handle_internal(state, internal)
+}
+
+fn handle_internal<THostLanguage: HostLanguage>(
+    state: &mut IsographState<THostLanguage>,
+    internal: InternalEvent,
+) -> Vec<IsographEffect> {
+    match internal {
+        InternalEvent::HelloWorld => IsographEffect::LogHelloWorld.wrap_vec(),
+        InternalEvent::Quit => IsographEffect::Kill.wrap_vec(),
+        InternalEvent::DiskChanged(change) => handle_disk_changed(state, change),
+    }
+}
+```
+
+`LSPNotificationDispatch` is already generic over `TState`. The handler is `fn(&mut TState, Params) -> Vec<IsographEffect>`.
+
+```rust
+// from crates/isograph_cli/src/state.rs (after)
+fn dispatch_lsp_notification<THostLanguage: HostLanguage>(
+    state: &mut State<THostLanguage>,
+    notification: lsp_server::Notification,
+) -> Vec<IsographEffect> {
+    let dispatch = || {
+        crate::lsp_notification_dispatch::LSPNotificationDispatch::new(notification, state)
+            .on_notification_sync::<crate::lsp_socket::IsographEventNotification>(
+                on_isograph_event::<THostLanguage>,
+            )?
+            .notification();
+        ControlFlow::Continue(())
+    };
+    match dispatch() {
+        ControlFlow::Break(effects) => effects,
+        ControlFlow::Continue(()) => Vec::new(),
+    }
+}
+
+fn on_isograph_event<THostLanguage: HostLanguage>(
+    state: &mut State<THostLanguage>,
+    internal: InternalEvent,
+) -> Vec<IsographEffect> {
+    handle(state, internal.to())
+}
+
+fn handle_internal<THostLanguage: HostLanguage>(
+    state: &mut State<THostLanguage>,
+    internal: InternalEvent,
+) -> Vec<IsographEffect> {
+    match internal {
+        InternalEvent::HelloWorld => handle_hello_world(state),
+        InternalEvent::Quit => IsographEffect::Kill.wrap_vec(),
+        InternalEvent::DiskChanged(change) => handle_disk_changed(&mut state.db, change),
+    }
+}
+
 fn handle_hello_world<THostLanguage: HostLanguage>(
     state: &mut State<THostLanguage>,
 ) -> Vec<IsographEffect> {
@@ -143,9 +250,11 @@ fn handle_timer_fired<THostLanguage: HostLanguage>(
 }
 ```
 
-`state.rs` gains `use std::time::Duration` and `use crate::event::TimerPayload`.
+`state.rs` gains `use std::time::Duration` and `use crate::event::TimerPayload`. Payload is readable only through `trigger_if_matching`.
 
-Origin of `schedule_timer` and of `perform` taking `event_tx`: figaro `src/daemon.rs`. Delta: `IsographEvent` / `IsographEffect`; crate `freddie_timer`; i2's `perform` gains `event_tx`.
+`on_isograph_event` re-enters `handle` with `Internal`, not `Lsp`. `handle` of that Internal is `handle_internal`. There is no recursion through `Lsp`.
+
+Origin of `schedule_timer` and of `perform` taking `event_tx`: figaro `src/daemon.rs`. Figaro's `perform_effect` matches, then returns `Continue` after the match (`Kill` is `return Break`). i2's `perform` returns from each arm. `schedule_timer` is `-> ()`. `IsographEffect::Timer(timer) => schedule_timer(timer, event_tx)` is a type error. The Timer arm calls `schedule_timer` then returns `Continue`.
 
 ```rust
 // from crates/isograph_cli/src/daemon.rs (before)
@@ -190,17 +299,17 @@ pub fn perform(
                 .send(lsp_server::Message::Response(respond.response));
             ControlFlow::Continue(())
         }
-        IsographEffect::Timer(timer) => schedule_timer(timer, event_tx),
+        IsographEffect::Timer(timer) => {
+            schedule_timer(timer, event_tx);
+            ControlFlow::Continue(())
+        }
     }
 }
 
 /// Schedule `timer`: fire its event after its delay, unless the guard the model kept drops first.
 ///
 /// Fire-and-forget on the runtime, so a pending sleep runs off the effect loop.
-fn schedule_timer(
-    timer: TimerEffect<TimerPayload>,
-    event_tx: &UnboundedSender<IsographEvent>,
-) {
+fn schedule_timer(timer: TimerEffect<TimerPayload>, event_tx: &UnboundedSender<IsographEvent>) {
     let TimerEffect {
         delay,
         event,
@@ -221,14 +330,16 @@ fn schedule_timer(
 }
 ```
 
-`daemon.rs` gains `use freddie_timer::{AlwaysEqual, TimerEffect};` and `use tokio::sync::oneshot::error::TryRecvError;`.
+The effect carries `TimerFired<TimerPayload>`. The wrap to `IsographEvent::Timer` is in `schedule_timer`. `event_tx` is cloned into the spawn; the receiver stays on the worker.
+
+`daemon.rs` gains `use freddie_timer::{AlwaysEqual, TimerEffect};` and `use tokio::sync::oneshot::error::TryRecvError`.
 
 Callers of `run_effect_loop` and `perform` pass `event_tx`:
 
 - `serve`'s `select!`: `event_tx.clone()`
 - `lsp_socket.rs` `listen_and_reply`: clone `loop_tx` before the forwarder spawn, pass that clone
 - `kill_ends_the_effect_loop`: an `event_tx` the test does not read
-- `lsp_request_returns_method_not_found`: an `event_tx` the test does not read
+- every `perform` of `SendLspResponse` in `state.rs` tests: an `event_tx` the test does not read
 
 ```rust
 // from crates/isograph_cli/src/state.rs
@@ -253,9 +364,14 @@ Callers of `run_effect_loop` and `perform` pass `event_tx`:
     }
 ```
 
-`lsp_socket.rs` `listen_and_reply`, next to `let (loop_tx, loop_rx) = unbounded_channel();`: `let effect_event_tx = loop_tx.clone();`, and `run_effect_loop(effect_rx, effect_event_tx)`.
+```rust
+// from crates/isograph_cli/src/lsp_socket.rs (after), next to let (loop_tx, loop_rx) = unbounded_channel();
+        let effect_event_tx = loop_tx.clone();
+```
 
-`sending_hello_world_emits_log_hello_world` drives the event loop only, so it now receives `Timer` not `LogHelloWorld`. Assert `Timer`.
+and `run_effect_loop(effect_rx, effect_event_tx)`.
+
+`sending_hello_world_emits_log_hello_world` drives the event loop only, so it now receives `Timer` not `LogHelloWorld`. Assert `Timer`. Rename it `sending_hello_world_emits_a_timer`.
 
 ## Tests
 
@@ -310,31 +426,79 @@ Park on `event_rx.recv().await`. Absence of a firing has no edge: inject `Quit` 
     fn a_second_hello_world_drops_the_first_guard() {
         let mut state = empty();
         let first = handle(&mut state, InternalEvent::HelloWorld.to());
-        let _second = handle(&mut state, InternalEvent::HelloWorld.to());
-        let IsographEffect::Timer(timer) = first
+        let second = handle(&mut state, InternalEvent::HelloWorld.to());
+        let IsographEffect::Timer(first_timer) = first
             .into_iter()
             .next()
             .expect("HelloWorld returns one Timer")
         else {
             panic!("HelloWorld returns Timer");
         };
-        let effects = handle(&mut state, IsographEvent::Timer(timer.event));
+        let effects = handle(&mut state, IsographEvent::Timer(first_timer.event));
         assert!(effects.is_empty());
+        let IsographEffect::Timer(second_timer) = second
+            .into_iter()
+            .next()
+            .expect("HelloWorld returns one Timer")
+        else {
+            panic!("HelloWorld returns Timer");
+        };
+        let effects = handle(&mut state, IsographEvent::Timer(second_timer.event));
+        assert!(matches!(
+            effects.as_slice(),
+            [IsographEffect::LogHelloWorld]
+        ));
+        assert!(state.hello_world_debounce.is_none());
+    }
+
+    #[test]
+    fn lsp_isograph_event_hello_world_returns_a_timer() {
+        let mut state = empty();
+        let effects = handle(
+            &mut state,
+            event_notification(
+                serde_json::to_value(InternalEvent::HelloWorld).expect("serializes"),
+            ),
+        );
+        assert!(matches!(effects.as_slice(), [IsographEffect::Timer(_)]));
+        assert!(state.hello_world_debounce.is_some());
+    }
+
+    #[test]
+    fn lsp_isograph_event_hello_world_then_its_timer_returns_log_hello_world() {
+        let mut state = empty();
+        let effects = handle(
+            &mut state,
+            event_notification(
+                serde_json::to_value(InternalEvent::HelloWorld).expect("serializes"),
+            ),
+        );
+        let IsographEffect::Timer(timer) = effects
+            .into_iter()
+            .next()
+            .expect("LSP HelloWorld returns one Timer")
+        else {
+            panic!("LSP HelloWorld returns Timer");
+        };
+        let effects = handle(&mut state, IsographEvent::Timer(timer.event));
+        assert!(matches!(
+            effects.as_slice(),
+            [IsographEffect::LogHelloWorld]
+        ));
     }
 ```
 
-The matching test does not `perform` the timer: it feeds `timer.event` to `handle` as if the sleep had won. The stale test drops the field first. The second HelloWorld test is overwrite.
+The matching test does not `perform` the timer: it feeds `timer.event` to `handle` as if the sleep had won. The stale test drops the field first. The second HelloWorld test is overwrite plus the second fire. The LSP tests are the send-shaped path through `on_isograph_event` -> `handle`. `lsp_isograph_event_hello_world_returns_log_hello_world` is deleted; those two replace it.
 
 ```rust
 // from crates/isograph_cli/src/daemon.rs
     #[tokio::test]
     async fn a_timer_effect_fires_its_event_after_a_zero_delay() {
         let (event_tx, mut event_rx) = unbounded_channel();
-        let (guard, timer) =
-            freddie_timer::timer_effect_and_guard(
-                Duration::ZERO,
-                TimerPayload::HelloWorldDebounced,
-            );
+        let (guard, timer) = freddie_timer::timer_effect_and_guard(
+            Duration::ZERO,
+            TimerPayload::HelloWorldDebounced,
+        );
         assert!(perform(IsographEffect::Timer(timer), event_tx.reference()).is_continue());
         let event = event_rx.recv().await.expect("the timer fired");
         let IsographEvent::Timer(fired) = event else {
@@ -349,11 +513,10 @@ The matching test does not `perform` the timer: it feeds `timer.event` to `handl
     #[tokio::test]
     async fn dropping_the_guard_before_perform_does_not_fire() {
         let (event_tx, mut event_rx) = unbounded_channel();
-        let (guard, timer) =
-            freddie_timer::timer_effect_and_guard(
-                Duration::ZERO,
-                TimerPayload::HelloWorldDebounced,
-            );
+        let (guard, timer) = freddie_timer::timer_effect_and_guard(
+            Duration::ZERO,
+            TimerPayload::HelloWorldDebounced,
+        );
         drop(guard);
         let _ = perform(IsographEffect::Timer(timer), event_tx.reference());
         event_tx
@@ -368,6 +531,7 @@ The matching test does not `perform` the timer: it feeds `timer.event` to `handl
 
     #[tokio::test]
     async fn dropping_the_guard_after_perform_does_not_fire() {
+        tokio::time::pause();
         let (event_tx, mut event_rx) = unbounded_channel();
         let (guard, timer) = freddie_timer::timer_effect_and_guard(
             Duration::from_secs(60),
@@ -375,6 +539,8 @@ The matching test does not `perform` the timer: it feeds `timer.event` to `handl
         );
         let _ = perform(IsographEffect::Timer(timer), event_tx.reference());
         drop(guard);
+        tokio::task::yield_now().await;
+        tokio::time::advance(Duration::from_secs(60)).await;
         event_tx
             .send(InternalEvent::Quit.to())
             .expect("the test sends Quit");
@@ -386,18 +552,52 @@ The matching test does not `perform` the timer: it feeds `timer.event` to `handl
     }
 ```
 
-`Duration::ZERO` is the degenerate delay. The 60s delay is only to make a late fire lose to `Quit` if cancel failed. `daemon.rs` tests gain `use super::perform`, `use std::time::Duration`, `IsographEvent`, `TimerPayload`. `lsp_isograph_event_hello_world_returns_log_hello_world` becomes a timer, same as `hello_world_returns_a_timer`.
+`Duration::ZERO` is the degenerate delay for the fire test. `dropping_the_guard_before_perform` checks the `try_recv` Closed short-circuit, not the spawned `select!`.
+
+`dropping_the_guard_after_perform` is the spawned `select!`. Pause, perform a long delay, drop the guard, yield so the spawn polls the closed oneshot before time moves (otherwise both branches can be ready and fair `select!` can pick sleep even when cancel worked), advance past the delay, send Quit, `recv` is Quit. If cancel failed, the spawn is still on sleep; advance posts Timer; `recv` is Timer.
 
 Keep `guard` alive until after `trigger_if_matching` in the fire test.
 
+```rust
+// from crates/isograph_cli/src/daemon.rs
+    #[tokio::test]
+    async fn hello_world_through_event_and_effect_loops_returns_log_hello_world() {
+        let (event_tx, event_rx) = unbounded_channel();
+        let (effect_tx, mut effect_rx) = unbounded_channel();
+        event_tx
+            .send(InternalEvent::HelloWorld.to())
+            .expect("the test sends HelloWorld");
+        let event_loop = run_event_loop(empty_state(), event_rx, effect_tx);
+        let effect_loop = async {
+            loop {
+                let effect = effect_rx.recv().await.expect("effects until LogHelloWorld");
+                if matches!(effect, IsographEffect::LogHelloWorld) {
+                    break;
+                }
+                assert!(perform(effect, event_tx.reference()).is_continue());
+            }
+        };
+        tokio::select! {
+            () = event_loop => panic!("event loop ended before LogHelloWorld"),
+            () = effect_loop => {}
+        }
+    }
+```
+
+`event_tx` is not dropped: the spawn needs it, and `run_event_loop` must still be parked for the fire. The test loop `perform`s every effect except `LogHelloWorld`; receiving that effect is the assertion. Path: HelloWorld -> Timer effect -> `schedule_timer` -> fire -> Timer event -> `LogHelloWorld`.
+
+`daemon.rs` tests gain `use super::perform`, `use std::time::Duration`, `IsographEvent`, `TimerPayload`.
+
+CLI tests in `crates/ts_graphql_react_isograph_cli/tests/cli.rs` send HelloWorld and wait for `hello world` in the log. They fail if the LSP path does not arm, perform, fire, and log.
+
 ## Call sites
 
-- `handle` of HelloWorld -> `Timer` effect plus guard
+- `handle` of HelloWorld (`Internal` or LSP `isograph/event`) -> `Timer` effect plus guard
 - `handle` of `TimerFired` -> `trigger_if_matching` -> `LogHelloWorld` or empty
-- `perform` of `Timer` -> `schedule_timer` -> `event_tx.send` of the baked event, or cancel
+- `perform` of `Timer` -> `schedule_timer` -> wrap as `IsographEvent::Timer` on `event_tx.send`, or cancel
 - `serve` / `listen_and_reply` / `kill_ends_the_effect_loop` pass `event_tx` into `run_effect_loop`
-- `lsp_request_returns_method_not_found` passes `event_tx` into `perform`
+- `lsp_request_returns_method_not_found` and the other `SendLspResponse` `perform`s pass `event_tx` into `perform`
 
 ## Design doc
 
-`docs-website/docs/design-docs/event-model.md` gains `Timer(TimerFired<TimerPayload>)` on `IsographEvent` and `Timer(TimerEffect<IsographEvent>)` on `IsographEffect`. It is not on `InternalEvent`. `handle` of `Timer` uses `trigger_if_matching`. `handle` does not sleep. Performing `Timer` is `schedule_timer`.
+`docs-website/docs/design-docs/event-model.md` gains `Timer(TimerFired<TimerPayload>)` on `IsographEvent` and `Timer(TimerEffect<TimerPayload>)` on `IsographEffect`. It is not on `InternalEvent`. `handle` of `Timer` uses `trigger_if_matching`. `handle` does not sleep. Performing `Timer` is `schedule_timer`, which posts `IsographEvent::Timer(timer.event)`.
