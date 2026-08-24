@@ -159,7 +159,7 @@ fn lint_markdown_file(path: &Path, hits: &mut Vec<String>) {
             None => break,
         };
         let body = &rest[..end];
-        if matches!(lang, "rust" | "rs") && snippet_origin_is_in_workspace(body) {
+        if matches!(lang, "rust" | "rs") && !snippet_is_external(body) {
             lint_rust_snippet(display.reference(), line, body, hits);
         }
         line += body.bytes().filter(|&b| b == b'\n').count();
@@ -167,15 +167,10 @@ fn lint_markdown_file(path: &Path, hits: &mut Vec<String>) {
     }
 }
 
-fn snippet_origin_is_in_workspace(body: &str) -> bool {
-    let Some(line) = body.lines().find(|line| !line.trim().is_empty()) else {
-        return true;
-    };
-    let Some(from) = line.trim().strip_prefix("// from ") else {
-        return true;
-    };
-    let path = from.split([' ', '(']).next().unwrap_or(from);
-    workspace_root().join(path).is_file()
+fn snippet_is_external(body: &str) -> bool {
+    body.lines()
+        .find(|line| !line.trim().is_empty())
+        .is_some_and(|line| line.trim().starts_with("// external"))
 }
 
 fn lint_rust_snippet(path: &str, start_line: usize, body: &str, hits: &mut Vec<String>) {
