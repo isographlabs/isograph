@@ -73,7 +73,9 @@ Most important first.
 
 `ParsedIsoLiteral.tokens` is `Vec<WithOptionalSpan<IsographSemanticToken>>`. Consume has `Some(span)` because the highlighter needs file positions and the printer needs the source lexeme (`fullName`, `Query`, `{`). `Comma` has `location: None`: it is not in the source. `parse_each_chunk` after a successful item always records that `Comma` (after the last item too). Empty level: no comma. Failed item: no comma. Source commas are ignored: `leftover_token` on `Comma` is `None`, same as `LineBreak`.
 
-Depth is a counter over list-group open and close. `ResolvePosition` does not enter `None`. The highlighter skips `Comma`. The handler does not call `format_recorded` when there are errors.
+Depth is a counter over list-group open and close. `ResolvePosition` does not enter `None`. The highlighter skips `Comma`.
+
+Leftover remaining contents always `report_error` (`parse_stream`). A failed item does too. `parsed.errors.is_empty()` means a full valid parse: no leftover extra, no failed item. `format_iso_literals` calls `format_recorded` only then. The printer never sees leftover tokens.
 
 `require_token` / `require_group` signatures do not change. `commit` pushes `WithGenericLocation::new(token, span.wrap_some())`.
 
@@ -176,9 +178,8 @@ pub fn format_recorded(
             last = IsographSemanticToken::Comma.wrap_some();
             continue;
         }
-        let Some(lexeme) = lexeme(text, token) else {
-            continue;
-        };
+        let span = token.location.expect("only Comma is recorded with location None");
+        let lexeme = &text[span.as_usize_range()];
         let role = token.item;
         let delta = list_indent(role, lexeme);
         let empty_open = delta > 0
@@ -201,9 +202,7 @@ pub fn format_recorded(
 }
 
 fn lexeme<'a>(text: &'a str, token: &WithOptionalSpan<IsographSemanticToken>) -> Option<&'a str> {
-    token
-        .location
-        .map(|span| &text[span.as_usize_range()])
+    token.location.map(|span| &text[span.as_usize_range()])
 }
 
 enum Gap {
@@ -1274,7 +1273,7 @@ mod tests {
 }
 ```
 
-Failed parse is refused by the handler, not by `format_recorded`. The last test only pins that `errors` is non-empty so the handler skips.
+Leftover remaining contents report an error, so this covers leftover too. The handler skips `format_recorded` when `errors` is non-empty.
 
 #### `crates/isograph_cli/src/lsp_socket.rs`
 
