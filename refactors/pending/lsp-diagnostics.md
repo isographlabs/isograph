@@ -1,6 +1,6 @@
 # Debounced `publishDiagnostics`
 
-Requires lsp-port.md, lsp-sessions.md, and timer-effects.md. Independent of lsp-tokens.md.
+Requires lsp-port.md, lsp-sessions.md, freddie-timer.md, and timer-effects.md. Independent of lsp-tokens.md.
 
 A change that should refresh squiggles arms a 100ms timer (timer-effects.md) and stores the guard. Another change before it fires overwrites the guard, which cancels the earlier sleep. `handle` of `TimerFired` whose `trigger_if_matching` yields `TimerPayload::DiagnosticsDebounce` reads parse/host errors and returns `ReportDiagnostics`. The effect loop sends `textDocument/publishDiagnostics` to live sessions whose `PublishDiagnosticsCap` is `Yes`. This slice deletes `HelloWorldDebounced` and `hello_world_debounce`. HelloWorld returns `LogHelloWorld` again.
 
