@@ -77,6 +77,35 @@ Depth is a counter over list-group open and close. `ResolvePosition` does not en
 
 `require_token` / `require_group` signatures do not change. `commit` pushes `WithGenericLocation::new(token, span.wrap_some())`.
 
+```rust
+// from crates/isograph_parser/src/chunk.rs
+    pub(crate) fn parse_each_chunk<P>(
+        &self,
+        parent: &mut ItemCursor<'_>,
+        leftover: Expectation,
+        parse_item: impl Fn(&mut ItemCursor<'_>) -> Result<P, WithSpan<AstError>>,
+    ) -> Vec<WithSpan<Slot<P, UnparsedChunkItems>>> {
+        self.0
+            .iter()
+            .map(|chunk| {
+                let slot = parse_one_chunk(
+                    chunk,
+                    parent.stream_chunk(&chunk.item),
+                    leftover,
+                    &parse_item,
+                );
+                if slot.item.item.is_some() {
+                    parent.tokens().push(WithGenericLocation::new(
+                        IsographSemanticToken::Comma,
+                        None,
+                    ));
+                }
+                slot
+            })
+            .collect()
+    }
+```
+
 Roles that would format two ways are split on `IsographSemanticToken`:
 
 ```rust
@@ -376,6 +405,12 @@ Before:
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
+    pub(crate) fn parse_each_chunk<P>(
+        &self,
+        parent: &mut ItemCursor<'_>,
+        leftover: Expectation,
+        parse_item: impl Fn(&mut ItemCursor<'_>) -> Result<P, WithSpan<AstError>>,
+    ) -> Vec<WithSpan<Slot<P, UnparsedChunkItems>>> {
         self.0
             .iter()
             .map(|chunk| {
@@ -387,30 +422,10 @@ Before:
                 )
             })
             .collect()
+    }
 ```
 
-After:
-
-```rust
-        self.0
-            .iter()
-            .map(|chunk| {
-                let slot = parse_one_chunk(
-                    chunk,
-                    parent.stream_chunk(&chunk.item),
-                    leftover,
-                    &parse_item,
-                );
-                if slot.item.item.is_some() {
-                    parent.tokens().push(WithGenericLocation::new(
-                        IsographSemanticToken::Comma,
-                        None,
-                    ));
-                }
-                slot
-            })
-            .collect()
-```
+After: the function in Recording. Delta: bind `slot`, push `Comma` with `None` when `slot.item.item.is_some()`, return `slot`.
 
 #### `crates/isograph_parser/src/parse_iso_literal.rs`
 
