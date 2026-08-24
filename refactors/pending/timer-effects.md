@@ -30,7 +30,7 @@ pub enum IsographEvent {
     #[from]
     Internal(InternalEvent),
     #[from]
-    Client(ClientConnectionEvent),
+    ClientConnection(ClientConnectionEvent),
     Timer(freddie_timer::TimerFired<TimerPayload>),
 }
 ```
@@ -102,7 +102,7 @@ The rev is the commit that landed freddie-timer.md, all three equal.
     match event {
         IsographEvent::Lsp(lsp) => dispatch_lsp(&mut state.db, lsp),
         IsographEvent::Internal(internal) => handle_internal(&mut state.db, internal),
-        IsographEvent::Client(ClientConnectionEvent::Started(started)) => {
+        IsographEvent::ClientConnection(ClientConnectionEvent::Started(started)) => {
 ```
 
 ```rust
@@ -112,7 +112,7 @@ The rev is the commit that landed freddie-timer.md, all three equal.
         IsographEvent::Internal(InternalEvent::HelloWorld) => handle_hello_world(state),
         IsographEvent::Internal(internal) => handle_internal(&mut state.db, internal),
         IsographEvent::Timer(fired) => handle_timer_fired(state, fired),
-        IsographEvent::Client(ClientConnectionEvent::Started(started)) => {
+        IsographEvent::ClientConnection(ClientConnectionEvent::Started(started)) => {
 ```
 
 `handle_internal` loses the `HelloWorld` arm. HelloWorld writes the guard on `State`.

@@ -29,11 +29,11 @@ pub fn handle<THostLanguage: HostLanguage>(
     match event {
         IsographEvent::Lsp(lsp) => dispatch_lsp(&mut state.db, lsp),
         IsographEvent::Internal(internal) => handle_internal(&mut state.db, internal),
-        IsographEvent::Client(client) => handle_client(state, client),
+        IsographEvent::ClientConnection(client) => handle_client_connection(state, client),
     }
 }
 
-fn handle_client<THostLanguage: HostLanguage>(
+fn handle_client_connection<THostLanguage: HostLanguage>(
     state: &mut State<THostLanguage>,
     event: ClientConnectionEvent,
 ) -> Vec<IsographEffect> {

@@ -453,14 +453,14 @@ mod tests {
 
     fn client_started(event: IsographEvent) -> ClientStartedEvent {
         match event {
-            IsographEvent::Client(ClientConnectionEvent::Started(started)) => started,
+            IsographEvent::ClientConnection(ClientConnectionEvent::Started(started)) => started,
             other => panic!("expected ClientConnectionEvent::Started, got {other:?}"),
         }
     }
 
     fn client_gone(event: IsographEvent) -> ClientId {
         match event {
-            IsographEvent::Client(ClientConnectionEvent::Gone(client)) => client,
+            IsographEvent::ClientConnection(ClientConnectionEvent::Gone(client)) => client,
             other => panic!("expected ClientConnectionEvent::Gone, got {other:?}"),
         }
     }
@@ -658,7 +658,7 @@ mod tests {
             drain(&mut event_rx).iter().all(|event| {
                 !matches!(
                     event,
-                    IsographEvent::Client(ClientConnectionEvent::Started(_))
+                    IsographEvent::ClientConnection(ClientConnectionEvent::Started(_))
                 )
             }),
             "truncated handshake posts Gone and no Started"
@@ -696,7 +696,7 @@ mod tests {
             drain(&mut event_rx).iter().all(|event| {
                 !matches!(
                     event,
-                    IsographEvent::Client(ClientConnectionEvent::Started(_))
+                    IsographEvent::ClientConnection(ClientConnectionEvent::Started(_))
                 )
             }),
             "failed handshake posts Gone and no Started"
@@ -793,10 +793,10 @@ mod tests {
             drain(&mut event_rx)
                 .iter()
                 .fold((0, 0, 0), |acc, event| match event {
-                    IsographEvent::Client(ClientConnectionEvent::Started(_)) => {
+                    IsographEvent::ClientConnection(ClientConnectionEvent::Started(_)) => {
                         (acc.0 + 1, acc.1, acc.2)
                     }
-                    IsographEvent::Client(ClientConnectionEvent::Gone(_)) => {
+                    IsographEvent::ClientConnection(ClientConnectionEvent::Gone(_)) => {
                         (acc.0, acc.1, acc.2 + 1)
                     }
                     IsographEvent::Lsp(crate::event::LspEvent::Notification(_)) => {
@@ -822,10 +822,10 @@ mod tests {
             drain(&mut event_rx)
                 .iter()
                 .fold((0, 0, 0), |acc, event| match event {
-                    IsographEvent::Client(ClientConnectionEvent::Started(_)) => {
+                    IsographEvent::ClientConnection(ClientConnectionEvent::Started(_)) => {
                         (acc.0 + 1, acc.1, acc.2)
                     }
-                    IsographEvent::Client(ClientConnectionEvent::Gone(_)) => {
+                    IsographEvent::ClientConnection(ClientConnectionEvent::Gone(_)) => {
                         (acc.0, acc.1, acc.2 + 1)
                     }
                     IsographEvent::Lsp(crate::event::LspEvent::Notification(_)) => {
@@ -1132,7 +1132,7 @@ mod tests {
             drain(&mut event_rx).iter().all(|event| {
                 !matches!(
                     event,
-                    IsographEvent::Client(ClientConnectionEvent::Started(_))
+                    IsographEvent::ClientConnection(ClientConnectionEvent::Started(_))
                 )
             }),
             "bad InitializeParams posts Gone and no Started"
@@ -1149,7 +1149,7 @@ mod tests {
             drain(&mut event_rx).iter().all(|event| {
                 !matches!(
                     event,
-                    IsographEvent::Client(ClientConnectionEvent::Started(_))
+                    IsographEvent::ClientConnection(ClientConnectionEvent::Started(_))
                 )
             }),
             "drop before initialize posts Gone and no Started"

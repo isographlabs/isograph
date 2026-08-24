@@ -58,7 +58,7 @@ pub enum IsographEvent {
     #[from]
     Internal(InternalEvent),
     #[from]
-    Client(ClientConnectionEvent),
+    ClientConnection(ClientConnectionEvent),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
