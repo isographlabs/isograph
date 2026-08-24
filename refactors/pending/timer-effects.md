@@ -1,10 +1,12 @@
 # Timer effects
 
-Requires event-loop.md (landed). Independent of lsp-sessions.md. lsp-diagnostics.md's debounce is a consumer of this.
+Requires event-loop.md (landed). Independent of lsp-sessions.md.
 
-A timer is two linked halves built by one call: a guard the owning node holds, and an effect a handler returns. The effect loop schedules the effect. Dropping the guard cancels it. Every timer fires the same event, `Timer(TimerFired)`. What tells them apart is which node still holds that guard.
+This is the primitive debounce uses. Arm a timer, keep the guard, return the effect. A later event that should push the deadline drops the old guard (that sleep is cancelled) and arms a new one. When the firing arrives and the guard still matches, do the work. A firing whose guard is already gone matches nothing.
 
-Origin: figaro `figaro_model/src/effect.rs` `FigaroEffect::Timer`, `figaro_model/src/events.rs` `FigaroEvent::Timer`, `figaro/src/daemon.rs` `schedule_timer` / `perform_effect` taking `event_tx`, `freddie::timer_effect_and_guard`. Origin of matching by the guard: freddie `docs-website/docs/architecture/timers.md`. Delta: `IsographEvent` / `IsographEffect`; `handle` matches `TimerFired` rather than bind dispatch; `Timer` is not `Internal` (not on the `isograph/event` wire); this slice adds no guard field, so every firing is unmatched and `handle` of it is no effects.
+lsp-diagnostics.md is that: a change that should refresh squiggles arms a 100ms timer; another change before it fires replaces the guard; `handle` of the matching fire returns `ReportDiagnostics`. There is no `ResetDiagnosticsDebounce` effect and no timer owned by the effect loop.
+
+Origin: figaro `figaro_model/src/effect.rs` `FigaroEffect::Timer`, `figaro_model/src/events.rs` `FigaroEvent::Timer`, `figaro/src/daemon.rs` `schedule_timer` / `perform_effect` taking `event_tx`, `freddie::timer_effect_and_guard`. Origin of matching by the guard, and of reset by overwrite: freddie `docs-website/docs/architecture/timers.md`. Delta: `IsographEvent` / `IsographEffect`; `handle` matches `TimerFired` rather than bind dispatch; `Timer` is not `Internal` (not on the `isograph/event` wire); this slice adds no guard field, so every firing is unmatched and `handle` of it is no effects.
 
 One shippable change.
 
@@ -69,7 +71,26 @@ pub fn timer_fired(id: freddie::TimerId) -> IsographEvent {
 
 `timer_fired` is the closure `timer_effect_and_guard` takes. Figaro's tests name that function `fired`.
 
-The level that wants the timer holds the guard as a field. Dropping the field cancels it. `TimerGuard::trigger()` matches that firing and no other. This slice adds no field; `handle` of `TimerFired` is no effects. A consumer stores the guard, returns `IsographEffect::Timer`, and matches with `trigger()`.
+The level that wants the timer holds the guard as a field on the state `handle` mutates. Dropping the field cancels it. `TimerGuard::trigger()` matches that firing and no other. This slice adds no field; `handle` of `TimerFired` is no effects.
+
+Debounce is overwrite. Figaro resets a timeout the same way:
+
+```rust
+// external freddie/docs-website/docs/architecture/timers.md
+let (timeout, timer) = arm_return_home();
+self.home_timeout = timeout;   // drops the old guard
+```
+
+A consumer (lsp-diagnostics.md) does the same:
+
+```rust
+// from crates/isograph_cli/src/state.rs
+        let (guard, effect) = freddie::timer_effect_and_guard(delay, crate::event::timer_fired);
+        state.debounce = guard.wrap_some();
+        IsographEffect::Timer(effect).wrap_vec()
+```
+
+The assignment drops a previous guard, so two changes 10ms apart schedule two effects and only the later firing matches. `handle` of that firing takes the field and does the work. `handle` of the earlier firing finds no matching guard and returns nothing.
 
 ## Change 1: the `freddie` dep, the types, `handle` of `TimerFired`
 
