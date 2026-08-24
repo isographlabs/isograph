@@ -109,7 +109,9 @@ Delta: no `reply`, no `response` on the struct. Those are captured in `send`. Ma
             }
             dispatch_lsp_request(state, incoming, id)
         }
+```
 
+```rust
 fn dispatch_lsp_request<THostLanguage: HostLanguage>(
     state: &mut State<THostLanguage>,
     incoming: crate::event::LspRequest,
