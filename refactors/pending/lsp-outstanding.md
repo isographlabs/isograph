@@ -2,9 +2,9 @@
 
 Requires lsp-request-response.md and lsp-sessions.md (both landed). Independent of lsp-tokens.md.
 
-`LspRequest` carries `reply`, a clone of `connection.sender` minted on the session thread. That clone still sends after `Gone`. This slice puts `client` on `LspRequest`, drops `reply` from the event, and has `send_lsp_response` clone the sender from `LiveSessions::reply`. A request whose `client` is not live returns no effects before `get_response`.
+`LspRequest` carries `reply`, a clone of `connection.sender` minted on the session thread. That clone still sends after `Gone`. This slice puts `client` on `LspRequest`, drops `reply` from the event, and obtains the sender from `LiveSessions::reply` in `dispatch_lsp`. `dispatch_lsp_request` is only called with that sender. It always runs `get_response`.
 
-Origin: landed `LspRequest.reply`; sessions.md `LiveSession.sender` / `handle_client_connection`. Delta: `client` on `LspRequest`, no `reply` on `LspRequest`, `LiveSessions::reply`, `dispatch_lsp` takes `&mut State`, not-live returns before `get_response`.
+Origin: landed `LspRequest.reply`; sessions.md `LiveSession.sender` / `handle_client_connection`. Delta: `client` on `LspRequest`, no `reply` on `LspRequest`, `LiveSessions::reply`, `dispatch_lsp` takes `&mut State`, `dispatch_lsp_request` takes the sender.
 
 One shippable change. MethodNotFound bytes do not change.
 
@@ -59,7 +59,12 @@ fn dispatch_lsp<THostLanguage: HostLanguage>(
     lsp: crate::event::LspEvent,
 ) -> Vec<IsographEffect> {
     match lsp {
-        crate::event::LspEvent::Request(incoming) => dispatch_lsp_request(state, incoming),
+        crate::event::LspEvent::Request(incoming) => {
+            let Some(reply) = state.live_sessions.reply(incoming.client) else {
+                return Vec::new();
+            };
+            dispatch_lsp_request(&state.db, incoming, reply)
+        }
         crate::event::LspEvent::Notification(notification) => {
             dispatch_lsp_notification(&mut state.db, notification)
         }
@@ -68,16 +73,14 @@ fn dispatch_lsp<THostLanguage: HostLanguage>(
 }
 
 fn dispatch_lsp_request<THostLanguage: HostLanguage>(
-    state: &State<THostLanguage>,
+    state: &IsographState<THostLanguage>,
     incoming: crate::event::LspRequest,
+    reply: crossbeam::channel::Sender<lsp_server::Message>,
 ) -> Vec<IsographEffect> {
-    let crate::event::LspRequest { client, request } = incoming;
-    let Some(reply) = state.live_sessions.reply(client) else {
-        return Vec::new();
-    };
+    let request = incoming.request;
     let get_response = || {
         let request =
-            isograph_lsp::lsp_request_dispatch::LSPRequestDispatch::new(request, &state.db)
+            isograph_lsp::lsp_request_dispatch::LSPRequestDispatch::new(request, state)
                 .on_request_sync::<lsp_types::request::SemanticTokensFullRequest>(
                     crate::adapter::semantic_tokens_response::<THostLanguage>,
                 )?
@@ -129,7 +132,7 @@ fn method_not_found(
 }
 ```
 
-Delta: `handle` of `Lsp` is `dispatch_lsp(state, lsp)`. `LiveSessions::reply` runs before `get_response`. `None` returns. `Some(reply)` is passed to `send_lsp_response` / `method_not_found`. `handle_client_connection` is unchanged. `dispatch_lsp_notification` / `handle_internal` still take `&mut IsographState`. `SendLspResponseEffect` still has `reply`. `perform` is unchanged. `run_event_loop` is unchanged.
+Delta: `handle` of `Lsp` is `dispatch_lsp(state, lsp)`. `dispatch_lsp` of `Request` calls `LiveSessions::reply`. `None` does not call `dispatch_lsp_request`. `Some(reply)` is passed in. `dispatch_lsp_request` always runs `get_response`. `handle_client_connection` is unchanged. `dispatch_lsp_notification` / `handle_internal` still take `&mut IsographState`. `SendLspResponseEffect` still has `reply`. `perform` is unchanged. `run_event_loop` is unchanged.
 
 ```rust
 // from crates/isograph_cli/src/lsp_socket.rs
@@ -163,7 +166,8 @@ Existing `lsp_request_returns_method_not_found` `Started`s first. The dummy `(tx
 ## Call sites
 
 - `run_session` -> `client` on `LspRequest`; no `reply`
-- `dispatch_lsp_request` -> `LiveSessions::reply` before `get_response`; `None` returns; `Some(reply)` is passed through
+- `dispatch_lsp` of `Request` -> `LiveSessions::reply`; `None` does not call `dispatch_lsp_request`
+- `dispatch_lsp_request` -> `get_response`; `reply` is a parameter
 - `send_lsp_response` -> the `reply` already obtained
 - `handle` of `Lsp` -> `dispatch_lsp(state, lsp)`
 - existing `LspRequest { request, reply }` constructions (handle tests) -> `Started` plus `LspRequest { client, request }`

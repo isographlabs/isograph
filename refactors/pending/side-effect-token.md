@@ -98,16 +98,24 @@ Delta: no `reply`, no `response` on the struct. Those are captured in `send`. Ma
 
 ```rust
 // from crates/isograph_cli/src/state.rs
+        crate::event::LspEvent::Request(incoming) => {
+            let client = incoming.client;
+            let id = incoming.request.id.clone();
+            {
+                let Some(session) = state.live_sessions.0.get_mut(&client) else {
+                    return Vec::new();
+                };
+                session.outstanding.insert(id.clone());
+            }
+            dispatch_lsp_request(state, incoming, id)
+        }
+
 fn dispatch_lsp_request<THostLanguage: HostLanguage>(
     state: &mut State<THostLanguage>,
     incoming: crate::event::LspRequest,
+    id: lsp_server::RequestId,
 ) -> Vec<IsographEffect> {
     let crate::event::LspRequest { client, request } = incoming;
-    let id = request.id.clone();
-    let Some(session) = state.live_sessions.0.get_mut(&client) else {
-        return Vec::new();
-    };
-    session.outstanding.insert(id.clone());
     let get_response = || {
         let request =
             isograph_lsp::lsp_request_dispatch::LSPRequestDispatch::new(request, &state.db)
@@ -174,7 +182,7 @@ fn method_not_found<THostLanguage: HostLanguage>(
 }
 ```
 
-Delta: `dispatch_lsp_request` takes `&mut State`. `get_mut(&client)` is the not-live return before `get_response`, and the insert. After dispatch, `send_lsp_response` always `take_reply`s. `None` is no effects. No `UnexpectedError`. Later readers call `send_lsp_response` the same way.
+Delta: `dispatch_lsp` of `Request` `get_mut`s, inserts the id, and only then calls `dispatch_lsp_request`. `dispatch_lsp_request` always runs `get_response`. `send_lsp_response` always `take_reply`s. `None` is no effects. No `UnexpectedError`. Later readers call `send_lsp_response` the same way.
 
 `get_response` uses `&state.db`. The `get_mut` borrow of `live_sessions` ends before that.
 
@@ -231,7 +239,8 @@ Do not add a production API only tests call. `mint` is the same function `run_ef
 ## Call sites
 
 - `run_session` / dummy `LiveSession` -> `outstanding: HashSet::new()`
-- `dispatch_lsp_request` -> `get_mut` insert before `get_response`; `send_lsp_response` after
+- `dispatch_lsp` of `Request` -> `get_mut` insert; no `dispatch_lsp_request` if not live
+- `dispatch_lsp_request` -> `get_response`; then `send_lsp_response`
 - `send_lsp_response` -> `take_reply`; `None` is no effects
 - later cancel -> `session.outstanding.remove(&id)` only
 - later async reply -> `send_lsp_response` (always)
