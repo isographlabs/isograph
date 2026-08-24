@@ -1,12 +1,12 @@
 # `freddie_timer`
 
-The two halves leave `freddie` for their own crate. Figaro and mercury keep importing from `freddie`, which re-exports. Arming takes a payload and an event constructor. The payload is readable only through `trigger_if_matching`.
+Freddie + figaro refactor. The two halves leave `freddie` for their own crate. Figaro keeps importing from `freddie`, which re-exports. Arming takes a payload and an event constructor. The payload is readable only through `trigger_if_matching`.
 
-timer-effects.md is the isograph consumer. It requires this.
+timer-effects.md is the i2 incorporation. It requires this.
 
-Origin: `freddie/crates/freddie/src/timer.rs`, `drop_guard.rs`, `always_equal.rs`. Origin of the two halves: freddie `docs-website/docs/architecture/timers.md`. Origin of figaro arming: `figaro_model` overlay / windows / typing. Delta: crate `freddie_timer`; `TimerFired<P = ()>`; `timer_effect_and_guard(delay, payload, event)`; `TimerTrigger` behind `bind`; figaro and mercury `(), Event::Timer`.
+Origin: `freddie/crates/freddie/src/timer.rs`, `drop_guard.rs`, `always_equal.rs`. Origin of the two halves: freddie `docs-website/docs/architecture/timers.md`. Origin of figaro arming: `figaro_model` overlay / windows / typing. Delta: crate `freddie_timer`; `TimerFired<P = ()>`; `timer_effect_and_guard(delay, payload, event)`; `TimerTrigger` behind `bind`; figaro `(), FigaroEvent::Timer`.
 
-One shippable change. Lands in the freddie repo, then figaro (path dep) in lockstep.
+Two changes. Crate in the freddie repo (`mercury_model` is the in-tree consumer, same arming delta, same commit). Then figaro (path dep) in lockstep.
 
 ## What the user does
 
@@ -297,6 +297,4 @@ Same replacement at `windows.rs` `PLACEMENT_SETTLE` and `typing/mod.rs` `arm_win
 
 Tests: `fired` / `timer_id` cannot read a private id. A test that needs the firing uses the `event` on the `Timer` effect it just got (`m.handle(&timer.event)`), not a reconstructed `TimerFired(id)`. Delete `fired` and `timer_id`. Every `m.handle(&fired(timer_id(&fx)))` becomes that.
 
-## Change 3: mercury
-
-Mercury in the freddie repo: the same arming and test change as figaro, same commit as the crate.
+`mercury_model` in the freddie repo does the same arming and test change, in the crate commit.
