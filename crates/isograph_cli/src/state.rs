@@ -10,7 +10,7 @@ use isograph_compiler::HostLanguage;
 use pico::Database;
 use prelude::Postfix;
 
-use crate::effect::IsographEffect;
+use crate::effect::{IsographEffect, no_effects};
 use crate::event::{
     ClientConnectionEvent, DiskChanged, InternalEvent, IsographEvent, LiveSessions, Presence,
 };
@@ -43,11 +43,11 @@ fn handle_client_connection<THostLanguage: HostLanguage>(
                 .live_sessions
                 .0
                 .insert(started.client, started.session);
-            Vec::new()
+            no_effects()
         }
         ClientConnectionEvent::Gone(client) => {
             state.live_sessions.0.remove(&client);
-            Vec::new()
+            no_effects()
         }
     }
 }
@@ -62,7 +62,7 @@ fn dispatch_lsp<THostLanguage: HostLanguage>(
             let id = incoming.request.id.clone();
             {
                 let Some(session) = state.live_sessions.0.get_mut(&client) else {
-                    return Vec::new();
+                    return no_effects();
                 };
                 session.outstanding.insert(id.clone());
             }
@@ -71,7 +71,7 @@ fn dispatch_lsp<THostLanguage: HostLanguage>(
         crate::event::LspEvent::Notification(notification) => {
             dispatch_lsp_notification(&mut state.db, notification)
         }
-        crate::event::LspEvent::Response(_response) => Vec::new(),
+        crate::event::LspEvent::Response(_response) => no_effects(),
     }
 }
 
@@ -109,7 +109,7 @@ fn send_lsp_response<THostLanguage: HostLanguage>(
     response: lsp_server::Response,
 ) -> Vec<IsographEffect> {
     let Some(send) = state.live_sessions.take_reply(client, id) else {
-        return Vec::new();
+        return no_effects();
     };
     crate::effect::IsographEffect::SendLspResponse(
         crate::effect::SendLspResponseEffect {
@@ -171,7 +171,7 @@ fn dispatch_lsp_notification<THostLanguage: HostLanguage>(
     };
     match dispatch() {
         ControlFlow::Break(effects) => effects,
-        ControlFlow::Continue(()) => Vec::new(),
+        ControlFlow::Continue(()) => no_effects(),
     }
 }
 
@@ -228,7 +228,7 @@ fn handle_disk_changed<THostLanguage: HostLanguage>(
             state.remove_disk_files_from_path(path);
         }
     }
-    Vec::new()
+    no_effects()
 }
 
 #[cfg(test)]

@@ -3,7 +3,7 @@ use std::ops::ControlFlow;
 use lsp_types::notification::Notification;
 use tracing::warn;
 
-use crate::effect::IsographEffect;
+use crate::effect::{IsographEffect, no_effects};
 
 pub struct LSPNotificationDispatch<'state, TState> {
     notification: lsp_server::Notification,
@@ -38,7 +38,7 @@ impl<'state, TState> LSPNotificationDispatch<'state, TState> {
             }
             Err(lsp_server::ExtractError::JsonError { method, error }) => {
                 warn!(method = method.as_str(), error = %error, "notification params");
-                ControlFlow::Break(Vec::new())
+                ControlFlow::Break(no_effects())
             }
         }
     }

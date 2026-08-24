@@ -26,3 +26,7 @@ pub enum IsographEffect {
     Kill,
     SendLspResponse(Box<SendLspResponseEffect>),
 }
+
+pub fn no_effects() -> Vec<IsographEffect> {
+    Vec::new()
+}
