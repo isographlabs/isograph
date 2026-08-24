@@ -159,6 +159,7 @@ pub(crate) async fn run_event_loop<THostLanguage: HostLanguage>(
     effect_tx: UnboundedSender<IsographEffect>,
 ) {
     while let Some(event) = event_rx.recv().await {
+        tracing::debug!(?event, "event");
         let effects = handle(&mut state, event);
         for effect in effects {
             let _ = effect_tx.send(effect);
@@ -168,6 +169,7 @@ pub(crate) async fn run_event_loop<THostLanguage: HostLanguage>(
 
 pub(crate) async fn run_effect_loop(mut effect_rx: UnboundedReceiver<IsographEffect>) {
     while let Some(effect) = effect_rx.recv().await {
+        tracing::debug!(?effect, "effect");
         if perform(effect).is_break() {
             break;
         }
