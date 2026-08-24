@@ -71,22 +71,32 @@ The `iso(\`` and closing backtick stay. A parsed literal in the same file as a f
 
 Most important first.
 
-The tokens vec on `ParsedIsoLiteral` is `Vec<Recorded>`. `commit` still takes only the highlight role. `require_token` / `require_group` signatures do not change.
+The tokens vec is enough to print, plus chunk boundaries. Depth is not recorded; the printer counts list-group open and close. Source commas are chunk separators and are not consume tokens. `parse_each_chunk` after a successful item pushes a spanless `Comma` (after the last item too). Empty level: no comma. Failed item: no comma.
 
 ```rust
 // from crates/isograph_parser/src/semantic_token.rs
 pub enum Recorded {
-    Consume(WithSpan<IsographSemanticToken>),
-    Leftover(WithSpan<IsographSemanticToken>),
+    Token(WithSpan<IsographSemanticToken>),
     Comma,
 }
 ```
 
-`commit` pushes `Consume`. Leftover fill-in pushes `Leftover`. `parse_each_chunk` after a successfully parsed item pushes `Comma`, including after the last item of the level. A failed item has no comma. An empty level has no comma. A trailing source comma is leftover fill-in.
+`commit` and leftover fill-in push `Token`. The highlighter reads `.item` on `Token` and skips `Comma`. List-item commas live on `Chunk::trailing_separator` and are not leftover-filled (`parse_each_chunk`'s leftover is `Expectation::Separator`). The printer sees those as `Recorded::Comma` only. `Comma` has no span. `ResolvePosition` does not enter it. The handler does not call `format_recorded` when there are errors.
 
-The highlighter walks `Consume` and `Leftover`, reads `.item`, skips `Comma`. The printer walks `Consume` and `Comma`. `Comma` has no span. `ResolvePosition` does not enter it.
+`require_token` / `require_group` signatures do not change.
 
-`!` after a type is `peek.advance()` today and is not recorded. Consume it with `IsographSemanticToken::Content` so it prints, glued, in `[Foo!]`.
+Roles that would format two ways are split on `IsographSemanticToken`:
+
+```rust
+// from crates/isograph_parser/src/semantic_token.rs
+    Description,
+    At,
+    Exclamation,
+```
+
+- `Description`: the declaration description. Own line. `String` stays a string value (`name: "x"`).
+- `At`: `@`. Space before, glued to `DirectiveName`. `DirectiveName` is the identifier only. `FieldName` is already the selectable name.
+- `Exclamation`: `!` after a type. Glued. Today `peek.advance()` records nothing, so `[Foo!]` would drop `!`.
 
 ```rust
 cursor.require_token(
@@ -97,6 +107,10 @@ cursor.require_group(
     BracketKind::Brace,
     IsographSemanticToken::Brace,
     parse_inside,
+)
+cursor.require_token(
+    NonBracketTokenKind::Exclamation,
+    IsographSemanticToken::Exclamation,
 )
 ```
 
@@ -109,52 +123,24 @@ cursor.require_group(
 pub fn format_recorded(text: &str, tokens: &[Recorded]) -> String
 ```
 
-A list-group open is a `Consume` whose token is `Brace` / `Parenthesis` / `Bracket` and whose source char is `{` / `(` / `[`. A list-group close is the same roles with `}` / `)` / `]`. Type-list `[` `]` are `GraphQLTypeName` and are not list-group brackets.
+Each role prints its lexeme. List-group `{` `(` `[` (`Brace` / `Parenthesis` / `Bracket`) indent in and break; the matching close indents out and breaks. Type-list `[` `]` are `GraphQLTypeName` and do not indent. `Comma` prints `,` and a line break. Open immediately followed by its close is `{}` `()` `[]`. `Description` is its own line. Space after `Keyword` / `Colon` / `Equals`. Space before `Keyword` / `Equals` / `Brace` / `At`. Everything else glues: `Query.x`, `user(`, `$id`, `@loadable`, `[Foo!]`, `id:`.
 
-A description is a `Consume` `String` whose previous `Consume` is not `Colon` and not `Equals`.
-
-```
-indent = 0
-pending_line = false
-open_awaiting_close = false
-last: Option<WithSpan<IsographSemanticToken>>
-output empty
-
-for each Consume token or Comma:
-    if Comma:
-        push ','
-        pending_line = true
-        open_awaiting_close = false
-        continue
-    if list-group close: indent = indent - 1, not below 0
-    empty = list-group close and open_awaiting_close
-    if empty:
-        gap is none
-    else if pending_line or list-group close or this token is a description or last is a description:
-        push '\n' then "  " repeated indent times
-    else if last is Some(prev) and space_between(prev, this, text):
-        push ' '
-    push source slice
-    last = this token
-    if list-group open:
-        indent = indent + 1
-        pending_line = true
-        open_awaiting_close = true
-    else:
-        pending_line = false
-        open_awaiting_close = false
+```rust
+// from crates/isograph_parser/src/format.rs
+fn list_indent(role: IsographSemanticToken, lexeme: &str) -> i8 {
+    match (role, lexeme) {
+        (IsographSemanticToken::Brace, "{")
+        | (IsographSemanticToken::Parenthesis, "(")
+        | (IsographSemanticToken::Bracket, "[") => 1,
+        (IsographSemanticToken::Brace, "}")
+        | (IsographSemanticToken::Parenthesis, ")")
+        | (IsographSemanticToken::Bracket, "]") => -1,
+        _ => 0,
+    }
+}
 ```
 
-`space_between(prev, next, text)` is true when `space_after(prev)` or `space_before(next, text)`:
-
-- `space_after`: `Keyword`, `Colon`, `Equals`
-- `space_before`: `Keyword`, `Equals`, `Brace`, and `DirectiveName` whose source text is `@`
-
-Everything else glues: `Query.x`, `user(`, `$id`, `@loadable`, `[Foo!]`, `id:`.
-
-Width is 2 spaces.
-
-A parse failure of a literal is not passed to `format_recorded`.
+Width is 2 spaces. A parse failure of a literal is not passed to `format_recorded`.
 
 ## Target shape
 
@@ -233,13 +219,13 @@ Missing file is `Ok(None)` JSON `null`.
 
 Two independently shippable changes.
 
-### Change 1: `Recorded`, commas after list items, record `!`
+### Change 1: `Recorded`, commas after list items, `Description` / `At` / `Exclamation`
 
-`ParsedIsoLiteral.tokens` is `Vec<Recorded>`. `commit` pushes `Consume`. Leftover fill-in pushes `Leftover`. `parse_each_chunk` pushes `Comma` after every successful item, including the last. Consume `!` with `Content`.
+`ParsedIsoLiteral.tokens` is `Vec<Recorded>`. `commit` and leftover fill-in push `Token`. `parse_each_chunk` pushes `Comma` after every successful item, including the last. Description consume is `Description`. `@` is `At`, the identifier is `DirectiveName`. `!` is `Exclamation`.
 
-Tests: a `field Query.x { id, name }` parse records `Keyword`, `Type`, `Period`, `FieldName`, `Brace`, `FieldName`, `Comma`, `FieldName`, `Comma`, `Brace`. `field Query.x { id }` records `Comma` after `id`. `field Query.x {}` has no `Comma`. `user(a: 1, b: 2)` records `Comma` after each argument; both parens are `Parenthesis`. `[Foo!]` records `GraphQLTypeName`, `GraphQLTypeName`, `Content`, `GraphQLTypeName`. Failed `require_token` records nothing. A description is `String`. Compile `NoSemanticTokens` still compiles.
+Tests: a `field Query.x { id, name }` parse records `Keyword`, `Type`, `Period`, `FieldName`, `Brace`, `FieldName`, `Comma`, `FieldName`, `Comma`, `Brace`. `field Query.x { id }` records `Comma` after `id`. `field Query.x {}` has no `Comma`. `user(a: 1, b: 2)` records `Comma` after each argument; both parens are `Parenthesis`. `[Foo!]` records `GraphQLTypeName`, `GraphQLTypeName`, `Exclamation`, `GraphQLTypeName`. Failed `require_token` records nothing. `field Pet.x "desc" { id }` records `Description`. `id @loadable` records `At` then `DirectiveName`. Compile `NoSemanticTokens` still compiles.
 
-Highlighting tests read `.item` on `Consume` and `Leftover` and skip `Comma`. iso-format-lsp.md tests still get `[]`.
+Highlighting tests read `.item` on `Token` and skip `Comma`. iso-format-lsp.md tests still get `[]`.
 
 ### Change 2: `format_recorded` and the handler body
 
@@ -270,22 +256,24 @@ Printer tests (string equality):
 
 ## Call sites
 
-- grammar consume → `commit(token)` → `Recorded::Consume`
-- leftover fill-in → `Recorded::Leftover`
+- grammar consume → `commit(token)` → `Recorded::Token`
+- leftover fill-in → `Recorded::Token`
 - `parse_each_chunk` after each successful item → `Recorded::Comma`
-- `!` after a type → `commit(Content)`
+- description → `commit(Description)`
+- `@` → `commit(At)`; directive identifier → `commit(DirectiveName)`
+- `!` after a type → `commit(Exclamation)`
 - `formatting_response` / `will_save_wait_until_response` → `format_iso_literals` → `format_recorded` → `TextEdit`s
 - vscode-languageclient → `willSaveWaitUntil` on save
-- highlighter → `.item` on `Consume` and `Leftover`
+- highlighter → `Token.item`
 
 ## Docs this change amends
 
 iso-format-lsp.md: the two handlers return the edits from `format_iso_literals`.
 
-semantic-tokens.md "Formatter metadata": no `Layout` on consume. List groups are `Brace` / `Parenthesis` / `Bracket`. Type-list `[` is `GraphQLTypeName`. Commas are `Recorded::Comma`. This file.
+semantic-tokens.md: `Description`, `At`, `Exclamation`. `DirectiveName` is the identifier only. `String` is a value. `!` is recorded. Formatter metadata: list groups are `Brace` / `Parenthesis` / `Bracket`; type-list `[` is `GraphQLTypeName`; chunk commas are `Recorded::Comma`. This file.
 
 lsp-open-files.md: format reads `lsp_file_contents` once that exists.
 
 iso-format-later.md: packing a group onto one line when it fits the width.
 
-comments.md: leftover is `Recorded::Leftover`, not `layout: None`. Descriptions are own-line in the printer, not a consume `Layout`.
+comments.md: leftover fill-in is still `Recorded::Token`. Descriptions are `Description`.

@@ -44,12 +44,12 @@ Call sites, by variant:
 - `Type`: `Query` / `User` in `Type.fieldName`.
 - `FieldName`: `foo` in `Query.foo`, a selection name, and a selection alias. The first identifier of `alias: name` is consumed before the colon is visible; `SafePeekable` has one item of lookahead, so that identifier is `FieldName` on both arms.
 - `ObjectKey`: an object-literal key.
-- `GraphQLTypeName`: a type annotation's name and a type-list `[]` the grammar consumes (`Foo`, `[Foo]`). `!` is consumed without a semantic token. This variant goes away when type annotations leave the language.
-- `DirectiveName`: `@` and the directive identifier the grammar consumes.
+- `GraphQLTypeName`: a type annotation's name and a type-list `[]` the grammar consumes (`Foo`, `[Foo]`). `!` is consumed without a semantic token. iso-format.md records `!` as `Exclamation`. This variant goes away when type annotations leave the language.
+- `DirectiveName`: `@` and the directive identifier the grammar consumes. iso-format.md splits `@` to `At` and the identifier stays `DirectiveName`.
 - `Variable`: `$` and the variable identifier the grammar consumes.
 - `Argument`: an argument name.
 - `Integer`: an integer literal the grammar consumes. Leftover fill-in reuses this for an unparsed integer.
-- `String`: a string or block string the grammar consumes, including a description. Leftover fill-in reuses this for an unparsed string.
+- `String`: a string or block string the grammar consumes, including a description. Leftover fill-in reuses this for an unparsed string. iso-format.md splits the description to `Description`; `String` stays a value.
 - `BooleanOrNull`: `true` / `false` / `null`.
 - `Period`: `.` in `Type.fieldName`.
 - `Colon`: alias, argument, type-annotation, and object-entry colons the grammar consumes.
@@ -387,7 +387,7 @@ Facts:
 
 ### Formatter metadata
 
-No layout on consume. List-group brackets are `Brace` / `Parenthesis` / `Bracket`; type-list `[` is `GraphQLTypeName`. iso-format.md records `Recorded::Comma` after each successful chunk and prints from that stream.
+The token role is enough to print, except chunk commas (`Recorded::Comma`, no span) and indent (a counter over list-group `{` `(` `[`). Type-list `[` is `GraphQLTypeName`. iso-format.md.
 
 ### Cheap pass
 

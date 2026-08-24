@@ -2,7 +2,7 @@
 
 Requires the `SingleLineComment` token in `token_kind.rs` (Shared lexer). Independent of lsp-diagnostics.md. GraphQL schema parsing skips comments at the lexer (`logos::skip`) and is a different language (newlines are not separators); do not copy that skip into iso.
 
-iso-format.md is pending. Until it lands, comments are recorded into the current `Vec<WithSpan<IsographSemanticToken>>`. After it lands, they are `Recorded::Token` with a `Layout`. A literal is formatted only when `errors.is_empty()`. Leftover is an error (`parse_stream` reports `Expected` on remaining contents). A comment that is leftover therefore refuses format. Preservation means comments are recorded at consume or attachment, not leftover.
+iso-format.md is pending. Until it lands, comments are recorded into the current `Vec<WithSpan<IsographSemanticToken>>`. After it lands, they are `Recorded::Token`. A literal is formatted only when `errors.is_empty()`. Leftover is an error (`parse_stream` reports `Expected` on remaining contents). A comment that is leftover therefore refuses format. Preservation means comments are recorded at consume or attachment, not leftover.
 
 This is a strategy discussion. It does not pick one. A later pass, with permission, turns one strategy into the implementation plan.
 
