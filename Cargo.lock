@@ -485,7 +485,7 @@ dependencies = [
 [[package]]
 name = "freddie_cli"
 version = "0.0.1"
-source = "git+https://github.com/freddiehg/freddie?rev=2cf07439ce57fd55079b89128b2f22603ef8d1a8#2cf07439ce57fd55079b89128b2f22603ef8d1a8"
+source = "git+https://github.com/freddiehg/freddie?rev=785c7950b009309eee8b3810e078876b77d2015e#785c7950b009309eee8b3810e078876b77d2015e"
 dependencies = [
  "clap",
  "freddie_single_instance",
@@ -500,7 +500,7 @@ dependencies = [
 [[package]]
 name = "freddie_single_instance"
 version = "0.0.1"
-source = "git+https://github.com/freddiehg/freddie?rev=2cf07439ce57fd55079b89128b2f22603ef8d1a8#2cf07439ce57fd55079b89128b2f22603ef8d1a8"
+source = "git+https://github.com/freddiehg/freddie?rev=785c7950b009309eee8b3810e078876b77d2015e#785c7950b009309eee8b3810e078876b77d2015e"
 
 [[package]]
 name = "fsevent-sys"

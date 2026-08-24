@@ -157,7 +157,7 @@ The wire is `serde_json` of `InternalEvent`. A frame that is not a valid `Intern
 
 `AsyncWorkFinished` is the answer to work `handle` asked the effect loop to do off-thread: a compilation, a schema fetch. Tests and the CLI may inject it.
 
-`Quit` is `isograph stop`, SIGTERM, and a `Quit` frame on the socket. `handle` returns `Kill`.
+`Quit` is SIGTERM, and a `Quit` frame on the socket (`isograph send` and Windows `stop`). `handle` returns `Kill`.
 
 ## Effect
 

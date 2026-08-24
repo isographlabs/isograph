@@ -148,4 +148,19 @@ impl<THostLanguage: HostLanguage> App for Isograph<THostLanguage> {
         };
         crate::daemon::run::<THostLanguage>(path, port_path, args.filesystem, config);
     }
+
+    #[cfg(windows)]
+    fn ask_to_quit(instance: &Instance) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        post_quit(instance)
+    }
+}
+
+#[cfg(windows)]
+fn post_quit(instance: &Instance) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let stream =
+        crate::discover::connect_to_daemon(&crate::discover::port_file(instance.lock_file()))?;
+    stream.set_read_timeout(std::time::Duration::from_secs(5).wrap_some())?;
+    stream.set_write_timeout(std::time::Duration::from_secs(5).wrap_some())?;
+    crate::send::notify(stream, crate::event::InternalEvent::Quit)?;
+    ().wrap_ok()
 }

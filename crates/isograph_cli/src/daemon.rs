@@ -95,8 +95,9 @@ async fn serve<THostLanguage: HostLanguage>(
         }
     };
 
-    // `isograph stop` sends SIGTERM. Route it into the event channel as Quit, so the
-    // model turns it into Kill, the effect loop breaks, and serve returns.
+    // `isograph stop` without `--force` is SIGTERM on unix, App::ask_to_quit on Windows
+    // (InternalEvent::Quit on the socket). Route SIGTERM into the event channel as Quit,
+    // so the model turns it into Kill, the effect loop breaks, and serve returns.
     //
     // A spawned task rather than a third `select!` arm, because an arm that completed
     // would drop the other two futures and skip the graceful path this exists to run.

@@ -203,16 +203,7 @@ fn read_initialize_result(stdout: &mut impl std::io::BufRead) -> lsp_server::Res
     response
 }
 
-// freddie_cli's stop and restart without --force is SIGTERM, which it does not send on Windows.
-#[cfg(windows)]
-const STOP: &[&str] = &["stop", "--force"];
-#[cfg(not(windows))]
 const STOP: &[&str] = &["stop"];
-
-#[cfg(windows)]
-const RESTART: &[&str] = &["restart", "--force", "--filesystem", "injected"];
-#[cfg(not(windows))]
-const RESTART: &[&str] = &["restart", "--filesystem", "injected"];
 
 #[test]
 fn start_then_status_reports_running() {
@@ -246,7 +237,7 @@ fn send_after_start_needs_no_extra_wait() {
 #[test]
 fn send_after_restart_needs_no_extra_wait() {
     let daemon = Daemon::start();
-    let restarted = daemon.isograph(RESTART);
+    let restarted = daemon.isograph(["restart", "--filesystem", "injected"].reference());
     assert!(
         restarted.status.success(),
         "stdout: {} stderr: {}",
@@ -681,11 +672,11 @@ fn stop_after_send_exits_without_force() {
         stderr(stopped.reference())
     );
     poll(|| (!daemon.isograph(["status"].reference()).status.success()).then_some(()));
+    poll(|| daemon.log_text().contains("kill: exiting").then_some(()));
+    #[cfg(windows)]
+    assert!(!daemon.log_text().contains("SIGTERM: quitting"));
     #[cfg(not(windows))]
-    poll(|| {
-        let log = daemon.log_text();
-        (log.contains("SIGTERM: quitting") && log.contains("kill: exiting")).then_some(())
-    });
+    assert!(daemon.log_text().contains("SIGTERM: quitting"));
 }
 
 #[test]
@@ -716,11 +707,11 @@ fn two_sends_then_stop_exits_without_force() {
         stderr(stopped.reference())
     );
     poll(|| (!daemon.isograph(["status"].reference()).status.success()).then_some(()));
+    poll(|| daemon.log_text().contains("kill: exiting").then_some(()));
+    #[cfg(windows)]
+    assert!(!daemon.log_text().contains("SIGTERM: quitting"));
     #[cfg(not(windows))]
-    poll(|| {
-        let log = daemon.log_text();
-        (log.contains("SIGTERM: quitting") && log.contains("kill: exiting")).then_some(())
-    });
+    assert!(daemon.log_text().contains("SIGTERM: quitting"));
 }
 
 #[test]
@@ -765,11 +756,70 @@ fn stop_then_status_reports_not_running() {
         stderr(stopped.reference())
     );
     poll(|| (!daemon.isograph(["status"].reference()).status.success()).then_some(()));
+    poll(|| daemon.log_text().contains("kill: exiting").then_some(()));
+    #[cfg(windows)]
+    assert!(!daemon.log_text().contains("SIGTERM: quitting"));
     #[cfg(not(windows))]
-    poll(|| {
-        let log = daemon.log_text();
-        (log.contains("SIGTERM: quitting") && log.contains("kill: exiting")).then_some(())
-    });
+    assert!(daemon.log_text().contains("SIGTERM: quitting"));
+}
+
+#[test]
+fn send_of_quit_then_status_reports_not_running() {
+    let daemon = Daemon::start();
+    let frame = write_frame(daemon.dir.path(), "{\"kind\":\"Quit\"}\n");
+    let sent = daemon.isograph(["send", "--file", frame.to_str().expect("utf-8")].reference());
+    assert!(
+        sent.status.success(),
+        "stdout: {} stderr: {}",
+        stdout(sent.reference()),
+        stderr(sent.reference())
+    );
+    poll(|| (!daemon.isograph(["status"].reference()).status.success()).then_some(()));
+    poll(|| daemon.log_text().contains("kill: exiting").then_some(()));
+    assert!(!daemon.log_text().contains("SIGTERM: quitting"));
+}
+
+#[test]
+fn stop_when_not_running_exits_0() {
+    let daemon = Daemon::start();
+    assert!(daemon.isograph(STOP).status.success());
+    poll(|| (!daemon.isograph(["status"].reference()).status.success()).then_some(()));
+    let again = daemon.isograph(STOP);
+    assert!(
+        again.status.success(),
+        "stdout: {} stderr: {}",
+        stdout(again.reference()),
+        stderr(again.reference())
+    );
+}
+
+#[test]
+fn stop_with_no_port_exits_1_and_force_destroys() {
+    let daemon = Daemon::start();
+    std::fs::remove_file(port_file_path(daemon.reference())).expect("the port file exists");
+    let stopped = daemon.isograph(STOP);
+    #[cfg(windows)]
+    assert!(
+        !stopped.status.success(),
+        "stdout: {} stderr: {}",
+        stdout(stopped.reference()),
+        stderr(stopped.reference())
+    );
+    #[cfg(not(windows))]
+    assert!(
+        stopped.status.success(),
+        "stdout: {} stderr: {}",
+        stdout(stopped.reference()),
+        stderr(stopped.reference())
+    );
+    let forced = daemon.isograph(["stop", "--force"].reference());
+    assert!(
+        forced.status.success(),
+        "stdout: {} stderr: {}",
+        stdout(forced.reference()),
+        stderr(forced.reference())
+    );
+    poll(|| (!daemon.isograph(["status"].reference()).status.success()).then_some(()));
 }
 
 #[test]
