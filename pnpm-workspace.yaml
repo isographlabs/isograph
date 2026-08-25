@@ -1,6 +1,10 @@
 packages:
   - docs-website
 
+enablePrePostScripts: true
+saveWorkspaceProtocol: false
+verifyDepsBeforeRun: install
+
 ignoredBuiltDependencies:
   - '@swc/core'
   - core-js
