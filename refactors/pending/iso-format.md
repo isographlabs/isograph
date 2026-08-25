@@ -86,6 +86,7 @@ Leftover remaining contents always `report_error` (`parse_stream`). A failed ite
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
+// after
     pub(crate) fn parse_each_chunk<P>(
         &self,
         parent: &mut ItemCursor<'_>,
@@ -115,6 +116,7 @@ Leftover remaining contents always `report_error` (`parse_stream`). A failed ite
 
 ```rust
 // from crates/isograph_parser/src/semantic_token.rs
+// after
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum IsographSemanticToken {
     Keyword,
@@ -149,6 +151,7 @@ pub enum IsographSemanticToken {
 - `Comma`: recorded only by `parse_each_chunk`. Prints `,` and a line break.
 
 ```rust
+// after
 cursor.require_token(
     NonBracketTokenKind::Period,
     IsographSemanticToken::Period,
@@ -170,6 +173,7 @@ cursor.require_token(
 
 ```rust
 // from crates/isograph_parser/src/format.rs
+// after
 pub fn format_recorded(
     text: &str,
     tokens: &[WithOptionalSpan<IsographSemanticToken>],
@@ -335,6 +339,7 @@ If request dispatch already passes `LspClientId`, `format_iso_literals` takes it
 
 ```rust
 // from crates/isograph_cli/src/adapter.rs
+// after
 pub(crate) fn formatting_response<THostLanguage: HostLanguage>(
     state: &isograph_compiler::IsographDb<THostLanguage>,
     params: lsp_types::DocumentFormattingParams,
@@ -368,6 +373,7 @@ Before:
 
 ```rust
 // from crates/isograph_parser/src/semantic_token.rs
+// before
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum IsographSemanticToken {
     Keyword,
@@ -411,7 +417,40 @@ pub(crate) fn leftover_token(kind: SplitToken) -> Option<IsographSemanticToken> 
 }
 ```
 
-After: the enum in Recording. `leftover_token` is unchanged. Delta: four variants on the enum.
+After:
+
+```rust
+// from crates/isograph_parser/src/semantic_token.rs
+// after
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub enum IsographSemanticToken {
+    Keyword,
+    Type,
+    FieldName,
+    ObjectKey,
+    GraphQLTypeName,
+    DirectiveName,
+    Variable,
+    Argument,
+    Integer,
+    String,
+    BooleanOrNull,
+    Period,
+    Colon,
+    Equals,
+    Parenthesis,
+    Brace,
+    Content,
+    Bracket,
+    Error,
+    Description,
+    At,
+    Exclamation,
+    Comma,
+}
+```
+
+`leftover_token` is unchanged. Delta: four variants on the enum.
 
 #### `crates/isograph_parser/src/chunk_stream.rs`
 
@@ -419,17 +458,27 @@ Before:
 
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
+// before
     tokens: &'a mut Vec<WithSpan<IsographSemanticToken>>,
 ```
 
 on `ItemCursor`, `CursorPeek`, `ChunkStream::new`, `from_nonempty`, `from_iter`, `tokens()`, `take_item`.
 
-After: `Vec<WithOptionalSpan<IsographSemanticToken>>` on each of those.
+After:
+
+```rust
+// from crates/isograph_parser/src/chunk_stream.rs
+// after
+    tokens: &'a mut Vec<WithOptionalSpan<IsographSemanticToken>>,
+```
+
+on each of those.
 
 Before:
 
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
+// before
     fn record(&mut self, token: IsographSemanticToken, span: Span) {
         self.tokens.push(token.with_span(span));
     }
@@ -439,6 +488,7 @@ After:
 
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
+// after
     fn record(&mut self, token: IsographSemanticToken, span: Span) {
         self.tokens
             .push(WithGenericLocation::new(token, span.wrap_some()));
@@ -449,6 +499,7 @@ Before:
 
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
+// before
     pub(crate) fn commit(self, token: IsographSemanticToken) -> &'a WithSpan<ChunkContentItem> {
         let (tokens, item) = self.take_item();
         let span = match item.item.reference() {
@@ -464,6 +515,7 @@ After:
 
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
+// after
     pub(crate) fn commit(self, token: IsographSemanticToken) -> &'a WithSpan<ChunkContentItem> {
         let (tokens, item) = self.take_item();
         let span = match item.item.reference() {
@@ -483,6 +535,7 @@ Before:
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
+// before
 fn record_leftover_span(
     tokens: &mut Vec<WithSpan<IsographSemanticToken>>,
     role: Option<IsographSemanticToken>,
@@ -500,6 +553,7 @@ After:
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
+// after
 fn record_leftover_span(
     tokens: &mut Vec<WithOptionalSpan<IsographSemanticToken>>,
     role: Option<IsographSemanticToken>,
@@ -519,6 +573,7 @@ Before:
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
+// before
     pub(crate) fn parse_each_chunk<P>(
         &self,
         parent: &mut ItemCursor<'_>,
@@ -539,7 +594,39 @@ Before:
     }
 ```
 
-After: the function in Recording. Delta: bind `slot`, push `Comma` with `None` when `slot.item.item.is_some()`, return `slot`.
+After:
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+// after
+    pub(crate) fn parse_each_chunk<P>(
+        &self,
+        parent: &mut ItemCursor<'_>,
+        leftover: Expectation,
+        parse_item: impl Fn(&mut ItemCursor<'_>) -> Result<P, WithSpan<AstError>>,
+    ) -> Vec<WithSpan<Slot<P, UnparsedChunkItems>>> {
+        self.0
+            .iter()
+            .map(|chunk| {
+                let slot = parse_one_chunk(
+                    chunk,
+                    parent.stream_chunk(&chunk.item),
+                    leftover,
+                    &parse_item,
+                );
+                if slot.item.item.is_some() {
+                    parent.tokens().push(WithGenericLocation::new(
+                        IsographSemanticToken::Comma,
+                        None,
+                    ));
+                }
+                slot
+            })
+            .collect()
+    }
+```
+
+Delta: bind `slot`, push `Comma` with `None` when `slot.item.item.is_some()`, return `slot`.
 
 #### `crates/isograph_parser/src/parse_iso_literal.rs`
 
@@ -547,6 +634,7 @@ Before:
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
+// before
 pub struct ParsedIsoLiteral {
     pub item: Option<WithSpan<IsoLiteralParse>>,
     pub errors: Vec<WithSpan<ParseError>>,
@@ -558,6 +646,7 @@ After:
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
+// after
 pub struct ParsedIsoLiteral {
     pub item: Option<WithSpan<IsoLiteralParse>>,
     pub errors: Vec<WithSpan<ParseError>>,
@@ -571,6 +660,7 @@ Before:
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
+// before
 pub(crate) fn consume_description(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<Description>> {
     if let Some(span) = cursor.consume_token_if(
         NonBracketTokenKind::StringLiteral,
@@ -592,7 +682,33 @@ pub(crate) fn consume_description(cursor: &mut ItemCursor<'_>) -> Option<WithSpa
 }
 ```
 
-After: both `IsographSemanticToken::String` are `IsographSemanticToken::Description`. Body otherwise unchanged.
+After:
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+// after
+pub(crate) fn consume_description(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<Description>> {
+    if let Some(span) = cursor.consume_token_if(
+        NonBracketTokenKind::StringLiteral,
+        IsographSemanticToken::Description,
+    ) {
+        return Description(span.exclude_ends(1).interned().item)
+            .with_span(span.location)
+            .wrap_some();
+    }
+    cursor
+        .consume_token_if(
+            NonBracketTokenKind::BlockStringLiteral,
+            IsographSemanticToken::Description,
+        )
+        .map(|span| {
+            Description(intern_block_string_value(span.exclude_ends(3).text()))
+                .with_span(span.location)
+        })
+}
+```
+
+Delta: both `IsographSemanticToken::String` are `IsographSemanticToken::Description`. Body otherwise unchanged.
 
 #### `crates/isograph_parser/src/directives.rs`
 
@@ -600,6 +716,7 @@ Before:
 
 ```rust
 // from crates/isograph_parser/src/directives.rs
+// before
             while let Some(at) = cursor.consume_token_if(
                 NonBracketTokenKind::At,
                 IsographSemanticToken::DirectiveName,
@@ -612,6 +729,7 @@ After:
 
 ```rust
 // from crates/isograph_parser/src/directives.rs
+// after
             while let Some(at) = cursor.consume_token_if(
                 NonBracketTokenKind::At,
                 IsographSemanticToken::At,
@@ -628,6 +746,7 @@ Before:
 
 ```rust
 // from crates/isograph_parser/src/variables.rs
+// before
 pub(crate) fn parse_type_annotation(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<WithSpan<TypeAnnotation>, WithSpan<AstError>> {
@@ -658,6 +777,7 @@ After:
 
 ```rust
 // from crates/isograph_parser/src/variables.rs
+// after
 pub(crate) fn parse_type_annotation(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<WithSpan<TypeAnnotation>, WithSpan<AstError>> {
@@ -690,6 +810,7 @@ Before:
 
 ```rust
 // from crates/isograph_parser/src/assert_semantic_tokens.rs
+// before
 pub(crate) fn assert_semantic_tokens(
     text: &str,
     actual: &[WithSpan<IsographSemanticToken>],
@@ -736,6 +857,7 @@ After:
 
 ```rust
 // from crates/isograph_parser/src/assert_semantic_tokens.rs
+// after
 pub(crate) fn assert_semantic_tokens(
     text: &str,
     actual: &[WithOptionalSpan<IsographSemanticToken>],
@@ -804,6 +926,7 @@ Before:
 
 ```rust
 // from crates/isograph_extract_typescript/src/lib.rs
+// before
         assert_eq!(literals[0].1.tokens[0].location, Span::from_usize(0, 10));
 ```
 
@@ -811,6 +934,7 @@ After:
 
 ```rust
 // from crates/isograph_extract_typescript/src/lib.rs
+// after
         assert_eq!(
             literals[0].1.tokens[0].location,
             Span::from_usize(0, 10).wrap_some()
@@ -845,6 +969,7 @@ Before:
 
 ```rust
 // from crates/isograph_parser/src/lib.rs
+// before
 mod arguments;
 mod chunk;
 mod chunk_stream;
@@ -862,7 +987,30 @@ mod tokenize;
 mod variables;
 ```
 
-After: `mod format;` after `mod directives;`. `pub use format::format_recorded;` next to `pub use semantic_token::IsographSemanticToken`.
+After:
+
+```rust
+// from crates/isograph_parser/src/lib.rs
+// after
+mod arguments;
+mod chunk;
+mod chunk_stream;
+mod directives;
+mod format;
+mod isograph_resolution_node;
+mod matched_brackets;
+mod non_bracket_token;
+mod parse_error;
+mod parse_iso_literal;
+mod selections;
+mod semantic_token;
+mod string_value;
+mod token_kind;
+mod tokenize;
+mod variables;
+```
+
+`pub use format::format_recorded;` next to `pub use semantic_token::IsographSemanticToken`.
 
 #### `crates/isograph_lsp/src/semantic_tokens.rs`
 
@@ -870,18 +1018,31 @@ Before:
 
 ```rust
 // from crates/isograph_lsp/src/semantic_tokens.rs
+// before
 pub fn lsp_semantic_tokens<'a>(
     page_content: &str,
     literals: impl IntoIterator<Item = (IsoLiteralStartIndex, &'a [WithSpan<IsographSemanticToken>])>,
 ) -> Vec<lsp_types::SemanticToken> {
 ```
 
-After: the slice type is `&'a [WithOptionalSpan<IsographSemanticToken>]`. Same on `lsp_semantic_tokens_with` and `encode`.
+After:
+
+```rust
+// from crates/isograph_lsp/src/semantic_tokens.rs
+// after
+pub fn lsp_semantic_tokens<'a>(
+    page_content: &str,
+    literals: impl IntoIterator<Item = (IsoLiteralStartIndex, &'a [WithOptionalSpan<IsographSemanticToken>])>,
+) -> Vec<lsp_types::SemanticToken> {
+```
+
+Same on `lsp_semantic_tokens_with` and `encode`.
 
 Before:
 
 ```rust
 // from crates/isograph_lsp/src/semantic_tokens.rs
+// before
         for token in tokens {
             let token = token.item.with_span(token.location.with_offset(offset));
             cursor.check_span(token.location, previous_token_end);
@@ -896,6 +1057,7 @@ After:
 
 ```rust
 // from crates/isograph_lsp/src/semantic_tokens.rs
+// after
         for token in tokens {
             if token.item == IsographSemanticToken::Comma {
                 continue;
@@ -916,6 +1078,7 @@ Before:
 
 ```rust
 // from crates/isograph_lsp/src/semantic_tokens.rs
+// before
 fn lsp_type_index(token: IsographSemanticToken) -> u32 {
     match token {
         IsographSemanticToken::Keyword => KEYWORD,
@@ -944,6 +1107,7 @@ After:
 
 ```rust
 // from crates/isograph_lsp/src/semantic_tokens.rs
+// after
 fn lsp_type_index(token: IsographSemanticToken) -> u32 {
     match token {
         IsographSemanticToken::Keyword => KEYWORD,
@@ -1006,6 +1170,7 @@ Before:
 
 ```rust
 // from crates/isograph_cli/src/adapter.rs
+// before
 pub(crate) fn formatting_response<THostLanguage: isograph_compiler::HostLanguage>(
     _state: &isograph_compiler::IsographDb<THostLanguage>,
     _params: lsp_types::DocumentFormattingParams,
@@ -1029,6 +1194,7 @@ After:
 
 ```rust
 // from crates/isograph_cli/src/adapter.rs
+// after
 pub(crate) fn formatting_response<THostLanguage: HostLanguage>(
     state: &isograph_compiler::IsographDb<THostLanguage>,
     params: lsp_types::DocumentFormattingParams,
@@ -1084,6 +1250,7 @@ Missing file: `file_path` or cwd or the literals memo is `None` → `format_iso_
 
 ```rust
 // from crates/isograph_lsp/src/semantic_tokens.rs
+// after
 pub fn lsp_range_for_byte_range(page_content: &str, start: u32, end: u32) -> lsp_types::Range {
     let index = LineIndex::new(page_content);
     let utf16_len = |text: &str| {
@@ -1117,6 +1284,7 @@ Before:
 
 ```rust
 // from crates/isograph_lsp/src/lib.rs
+// before
 pub use semantic_tokens::{lsp_semantic_tokens, semantic_token_legend};
 ```
 
@@ -1124,6 +1292,7 @@ After:
 
 ```rust
 // from crates/isograph_lsp/src/lib.rs
+// after
 pub use semantic_tokens::{lsp_range_for_byte_range, lsp_semantic_tokens, semantic_token_legend};
 ```
 
@@ -1135,6 +1304,7 @@ After:
 
 ```toml
 # from crates/isograph_cli/Cargo.toml
+# after
 isograph_parser = { path = "../isograph_parser" }
 ```
 
@@ -1144,6 +1314,7 @@ next to `isograph_lsp`.
 
 ```rust
 // from crates/isograph_parser/src/format.rs
+// after
 #[cfg(test)]
 mod tests {
     use super::format_recorded;
@@ -1286,6 +1457,7 @@ Leftover remaining contents report an error, so this covers leftover too. The ha
 
 ```rust
 // from crates/isograph_cli/src/lsp_socket.rs
+// after
     #[tokio::test(flavor = "multi_thread")]
     async fn formatting_of_an_interned_iso_literal_edits_the_interior() {
         let (port, _event_rx) = listen_and_reply().await;
