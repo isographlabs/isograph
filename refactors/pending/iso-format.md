@@ -177,41 +177,31 @@ pub fn format_recorded(
     let mut out = String::new();
     let mut indent = 0_usize;
     let mut last: Option<IsographSemanticToken> = None;
-    for (i, token) in tokens.iter().enumerate() {
+    let mut last_delta = 0_i8;
+    for token in tokens {
         // Always recorded with location None, even when a source comma exists. No lexeme to slice.
         if token.item == IsographSemanticToken::Comma {
             out.push(',');
             last = IsographSemanticToken::Comma.wrap_some();
+            last_delta = 0;
             continue;
         }
         let span = token.location.expect("only Comma is recorded with location None");
         let lexeme = &text[span.as_usize_range()];
         let role = token.item;
         let delta = list_indent(role, lexeme);
-        // `{` `(` `[` with the closer next. Break at this indent so the closer is not
-        // an indented item (`foo: {\n}` not `foo: {\n  }`).
-        let empty_open = delta > 0
-            && tokens
-                .get(i + 1)
-                .and_then(|next| lexeme(text, next))
-                .is_some_and(|next_lexeme| list_indent(tokens[i + 1].item, next_lexeme) < 0);
         if delta < 0 {
             indent = indent.saturating_sub(1);
         }
-        apply_gap(&mut out, gap(last, role, lexeme), indent);
+        apply_gap(&mut out, gap(last, last_delta, role, lexeme), indent);
         out.push_str(lexeme);
         if delta > 0 {
-            let break_at = if empty_open { indent } else { indent + 1 };
             indent += 1;
-            apply_gap(&mut out, Gap::Line, break_at);
         }
         last = role.wrap_some();
+        last_delta = delta;
     }
     out
-}
-
-fn lexeme<'a>(text: &'a str, token: &WithOptionalSpan<IsographSemanticToken>) -> Option<&'a str> {
-    token.location.map(|span| &text[span.as_usize_range()])
 }
 
 enum Gap {
@@ -232,10 +222,16 @@ fn list_indent(role: IsographSemanticToken, lexeme: &str) -> i8 {
     }
 }
 
-fn gap(last: Option<IsographSemanticToken>, role: IsographSemanticToken, lexeme: &str) -> Gap {
+fn gap(
+    last: Option<IsographSemanticToken>,
+    last_delta: i8,
+    role: IsographSemanticToken,
+    lexeme: &str,
+) -> Gap {
     match last {
         None => Gap::None,
         Some(IsographSemanticToken::Comma) => Gap::Line,
+        Some(_) if last_delta > 0 => Gap::Line,
         Some(prev) => {
             if role == IsographSemanticToken::Description
                 || prev == IsographSemanticToken::Description
@@ -282,7 +278,7 @@ fn apply_gap(out: &mut String, gap: Gap, indent: usize) {
 }
 ```
 
-After a list open the printer already wrote a line break, so `last` is the open bracket and the next item glues onto that new line. An empty opener writes that break at the opener's indent; the closer glues onto it. Type-list `[` `]` are `GraphQLTypeName`; `list_indent` is 0. Width is 2 spaces. A parse failure of a literal is not passed to `format_recorded`.
+A list open prints and increments. It does not break. The next token's gap is `Line` at the current indent: a first item at inner indent, or, after the closer decrements, the closer at the opener's indent. Zero items is no items. `Brace` is both `{` and `}`, so "last was an opener" is `last_delta > 0`, not the role. Type-list `[` `]` are `GraphQLTypeName`; `list_indent` is 0. Width is 2 spaces. A parse failure of a literal is not passed to `format_recorded`.
 
 ## Target shape
 
