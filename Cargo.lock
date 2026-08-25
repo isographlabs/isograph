@@ -793,6 +793,7 @@ dependencies = [
  "isograph_config",
  "isograph_extract_typescript",
  "isograph_lsp",
+ "isograph_parser",
  "lsp-server",
  "lsp-types",
  "notify",

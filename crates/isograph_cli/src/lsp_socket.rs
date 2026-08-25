@@ -978,7 +978,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn formatting_of_an_interned_iso_literal_is_an_empty_array() {
+    async fn formatting_of_an_interned_iso_literal_edits_the_interior() {
         let (port, _event_rx) = listen_and_reply().await;
         intern_iso_field(port).await;
         let stream = connect(port);
@@ -991,28 +991,44 @@ mod tests {
             formatting_params("file:///tmp/proj/src/x.ts"),
         );
         assert!(response.error.is_none(), "{response:?}");
-        assert_eq!(response.result, serde_json::json!([]).wrap_some());
+        let edits: Vec<lsp_types::TextEdit> =
+            serde_json::from_value(response.result.expect("edits")).expect("Vec<TextEdit>");
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].new_text, "field Query.x {\n  id,\n}");
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn will_save_wait_until_of_an_interned_iso_literal_is_an_empty_array() {
+    async fn formatting_skips_a_failed_literal_and_edits_the_good_one() {
         let (port, _event_rx) = listen_and_reply().await;
-        intern_iso_field(port).await;
+        notify(
+            connect(port),
+            InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
+                path: PathBuf::from("/tmp/proj/src/x.ts"),
+                presence: Presence::Present(
+                    "iso(`field Query.x{id}`) iso(`not a declaration`)".to_owned(),
+                ),
+            })),
+        )
+        .expect("notify DiskChanged");
+        tokio::time::sleep(SETTLE).await;
         let stream = connect(port);
         let (mut writer, mut reader) = split(stream);
         initialize(&mut writer, &mut reader);
-        let response = will_save_wait_until(
+        let response = formatting(
             &mut writer,
             &mut reader,
             2,
-            will_save_wait_until_params("file:///tmp/proj/src/x.ts"),
+            formatting_params("file:///tmp/proj/src/x.ts"),
         );
         assert!(response.error.is_none(), "{response:?}");
-        assert_eq!(response.result, serde_json::json!([]).wrap_some());
+        let edits: Vec<lsp_types::TextEdit> =
+            serde_json::from_value(response.result.expect("edits")).expect("Vec<TextEdit>");
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].new_text, "field Query.x {\n  id,\n}");
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn formatting_of_a_never_interned_uri_is_an_empty_array() {
+    async fn formatting_of_a_never_interned_uri_is_null() {
         let (port, _event_rx) = listen_and_reply().await;
         let stream = connect(port);
         let (mut writer, mut reader) = split(stream);
@@ -1024,7 +1040,33 @@ mod tests {
             formatting_params("file:///tmp/proj/src/never.ts"),
         );
         assert!(response.error.is_none(), "{response:?}");
-        assert_eq!(response.result, serde_json::json!([]).wrap_some());
+        assert!(
+            response.result.is_none()
+                || response.result.as_ref() == serde_json::Value::Null.reference().wrap_some(),
+            "{response:?}"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn will_save_wait_until_matches_formatting() {
+        let (port, _event_rx) = listen_and_reply().await;
+        intern_iso_field(port).await;
+        let stream = connect(port);
+        let (mut writer, mut reader) = split(stream);
+        initialize(&mut writer, &mut reader);
+        let formatted = formatting(
+            &mut writer,
+            &mut reader,
+            2,
+            formatting_params("file:///tmp/proj/src/x.ts"),
+        );
+        let will_save = will_save_wait_until(
+            &mut writer,
+            &mut reader,
+            3,
+            will_save_wait_until_params("file:///tmp/proj/src/x.ts"),
+        );
+        assert_eq!(formatted.result, will_save.result);
     }
 
     #[tokio::test(flavor = "multi_thread")]

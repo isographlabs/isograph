@@ -56,6 +56,32 @@ fn lsp_semantic_tokens_with<'a>(
     encoded
 }
 
+pub fn lsp_range_for_byte_range(page_content: &str, start: u32, end: u32) -> lsp_types::Range {
+    let index = LineIndex::new(page_content);
+    let utf16_len = |text: &str| {
+        if page_content.is_ascii() {
+            text.len() as u32
+        } else {
+            text.encode_utf16().count() as u32
+        }
+    };
+    let mut cursor = index.cursor();
+    cursor.advance_to(start);
+    let start_pos = lsp_types::Position {
+        line: cursor.break_index as u32,
+        character: cursor.column(start, utf16_len),
+    };
+    cursor.advance_to(end);
+    let end_pos = lsp_types::Position {
+        line: cursor.break_index as u32,
+        character: cursor.column(end, utf16_len),
+    };
+    lsp_types::Range {
+        start: start_pos,
+        end: end_pos,
+    }
+}
+
 fn emit_pieces(
     token: WithSpan<IsographSemanticToken>,
     cursor: &mut LineCursor,

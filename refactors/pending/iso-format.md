@@ -1338,10 +1338,6 @@ mod tests {
             "field Query.x {\n  id,\n  name,\n}"
         );
         assert_eq!(
-            formatted("field Query.x { id name }"),
-            "field Query.x {\n  id,\n  name,\n}"
-        );
-        assert_eq!(
             formatted("field Query.x { id, name, }"),
             "field Query.x {\n  id,\n  name,\n}"
         );

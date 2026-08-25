@@ -35,20 +35,50 @@ fn semantic_tokens<THostLanguage: HostLanguage>(
     isograph_lsp::lsp_semantic_tokens_for_file::<THostLanguage>(state, path).clone()
 }
 
-pub(crate) fn formatting_response<THostLanguage: isograph_compiler::HostLanguage>(
-    _state: &isograph_compiler::IsographDb<THostLanguage>,
-    _params: lsp_types::DocumentFormattingParams,
+pub(crate) fn formatting_response<THostLanguage: HostLanguage>(
+    state: &isograph_compiler::IsographDb<THostLanguage>,
+    params: lsp_types::DocumentFormattingParams,
 ) -> isograph_lsp::lsp_runtime_error::LSPRuntimeResult<
     <lsp_types::request::Formatting as lsp_types::request::Request>::Result,
 > {
-    Vec::new().wrap_some().wrap_ok()
+    format_iso_literals(state, params.text_document.uri.reference()).wrap_ok()
 }
 
-pub(crate) fn will_save_wait_until_response<THostLanguage: isograph_compiler::HostLanguage>(
-    _state: &isograph_compiler::IsographDb<THostLanguage>,
-    _params: lsp_types::WillSaveTextDocumentParams,
+pub(crate) fn will_save_wait_until_response<THostLanguage: HostLanguage>(
+    state: &isograph_compiler::IsographDb<THostLanguage>,
+    params: lsp_types::WillSaveTextDocumentParams,
 ) -> isograph_lsp::lsp_runtime_error::LSPRuntimeResult<
     <lsp_types::request::WillSaveWaitUntil as lsp_types::request::Request>::Result,
 > {
-    Vec::new().wrap_some().wrap_ok()
+    format_iso_literals(state, params.text_document.uri.reference()).wrap_ok()
+}
+
+fn format_iso_literals<THostLanguage: HostLanguage>(
+    state: &isograph_compiler::IsographDb<THostLanguage>,
+    uri: &lsp_types::Uri,
+) -> Option<Vec<lsp_types::TextEdit>> {
+    let absolute = file_path(uri)?;
+    let cwd = *state.get_singleton::<common_lang_types::CurrentWorkingDirectory>()?;
+    let path = common_lang_types::relative_path_from_absolute_and_working_directory(cwd, &absolute);
+    let literals = isograph_compiler::parsed_iso_literals_in_file(state, path).as_ref()?;
+    let page_content = isograph_compiler::text_through_last_iso_literal(state, path).as_ref()?;
+    literals
+        .iter()
+        .filter_map(|(extraction, parsed)| {
+            if !parsed.errors.is_empty() {
+                return None;
+            }
+            let start = extraction.iso_literal_start_index.0 as u32;
+            let end = start + extraction.iso_literal_text.len() as u32;
+            lsp_types::TextEdit {
+                range: isograph_lsp::lsp_range_for_byte_range(page_content, start, end),
+                new_text: isograph_parser::format_recorded(
+                    extraction.iso_literal_text.as_str(),
+                    parsed.tokens.as_slice(),
+                ),
+            }
+            .wrap_some()
+        })
+        .collect::<Vec<_>>()
+        .wrap_some()
 }

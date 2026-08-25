@@ -2,6 +2,7 @@ mod arguments;
 mod chunk;
 mod chunk_stream;
 mod directives;
+mod format;
 mod isograph_resolution_node;
 mod matched_brackets;
 mod non_bracket_token;
@@ -41,6 +42,7 @@ pub use directives::{
     IsographFieldDirectiveList, IsographFieldDirectiveListParent, IsographFieldDirectiveListPath,
     IsographFieldDirectivePath,
 };
+pub use format::format_recorded;
 pub use isograph_resolution_node::IsographResolutionNode;
 pub use matched_brackets::{BracketError, CloseBracket, NonBracketToken, OpenBracket};
 pub use non_bracket_token::{BracketKind, NonBracketTokenKind};

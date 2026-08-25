@@ -565,7 +565,7 @@ mod tests {
     }
 
     #[test]
-    fn lsp_formatting_of_a_live_client_returns_an_empty_array() {
+    fn lsp_formatting_of_a_live_client_without_a_file_is_null() {
         let mut state = empty();
         let client = ClientId(1);
         let (tx, rx) = crossbeam::channel::unbounded();
@@ -600,7 +600,7 @@ mod tests {
             panic!("perform sends Message::Response");
         };
         assert_eq!(response.id, id);
-        assert_eq!(response.result, serde_json::json!([]).wrap_some());
+        assert_eq!(response.result, serde_json::Value::Null.wrap_some());
         assert!(
             state
                 .live_sessions
