@@ -1,22 +1,39 @@
 # Reply function at insert
 
-Requires side-effect-token.md (landed). Independent of timer-effects.md and lsp-open-files.md.
+Requires side-effect-token.md (landed). Independent of lsp-open-files.md.
 
-`LiveSessions::reply(client, id)` inserts the id and returns `Option<FnOnce(serde_json::Value) -> FnOnce(&SideEffectToken)>`. `dispatch_lsp` of `Request` checks that `Option` before `dispatch_lsp_request`. `None` is no effects; `get_response` does not run. `Some(reply)` closes over that id and that session's `sender`. `ControlFlow::Break` with `error: None` and `result: Some(value)` calls `reply(value)`. That callback builds `Message::Response(Response { id, result: Some(value), error: None })` and returns the send. `send_lsp_response` wraps it as `SendLspResponseEffect`. `take_reply` is gone.
+`LiveSessions::reply(client, id)` inserts the id and returns `Option<BeforeCompute>`. `dispatch_lsp` of `Request` checks that `Option` before `dispatch_lsp_request`. `LiveSessions::before_compute` looks up the session and `contains` the id. `None` skips `get_response`. After `get_response`, `LiveSessions::after_compute` takes `Result<serde_json::Value, lsp_server::ResponseError>`: session still live and `outstanding.remove`? `None` does not send. `Some` creates `Message::Response` with the token's id and returns `FnOnce(&SideEffectToken)`. `send_lsp_response` wraps that as `SendLspResponseEffect`. MethodNotFound and `Break` with `error: Some(_)` also go through `after_compute`. `take_reply` is gone.
 
-Origin: landed `take_reply` / insert-then-`dispatch_lsp_request(..., id)` / `send_lsp_response` `take_reply`. Delta: `reply` replaces `take_reply`; the `Option` is checked before `get_response`; the outer `FnOnce` takes the `Break` JSON value, not a `Message` or `Response`. Sending does not `remove` the id from `outstanding`. `take_reply` did. `Gone` drops the session and the set. Later cancel is still `outstanding.remove`.
+`outstanding` is the revoke table for a capability held outside the session. This slice's `handle` holds the tokens on the stack and calls both stages before returning. Later async holds `BeforeCompute` until it is ready to compute, then holds `AfterCompute` until it is ready to send. Later cancel is `outstanding.remove` of that id. `Gone` drops the row. Either stage then returns `None`. `before_compute` uses `contains`, not `remove`, so a cancel between the stages still prevents the send.
+
+Origin: landed `take_reply` / insert-then-`dispatch_lsp_request(..., id)` / `send_lsp_response` `take_reply`. Delta: `reply` / `before_compute` / `after_compute` replace `take_reply`; two token types; three `Option`s; the body has no id; the message is created in `after_compute`.
 
 One shippable change.
 
-The inner `FnOnce` takes `&SideEffectToken`. `perform` has one token for the loop. Nested `impl FnOnce` returning `impl FnOnce` is not a representable return type; the inner function is `Box<dyn FnOnce(&SideEffectToken) + Send>`, which is `SendLspResponseEffect.send`.
+The tokens carry `client` and `id`, not `sender`. Each stage takes `&mut LiveSessions`. Handle already holds that map. A token cannot see `Gone` without a lookup. The send `FnOnce` takes `&SideEffectToken` and is boxed: `Box<dyn FnOnce(&SideEffectToken) + Send>`, which is `SendLspResponseEffect.send`.
 
 ## What the user does
 
-Same verbs. Live `Formatting` is still `[]`. A not-live request is still no effects.
+Same verbs. Live `Formatting` is still `[]`. Hover is still MethodNotFound. Bad params and `UnexpectedError` still send an error response. A not-live request is still no effects. A stage invoked after that client is `Gone`, or after that id was removed from `outstanding`, is no effects and does not send.
 
 ## Types
 
 Most important first.
+
+```rust
+// from crates/isograph_cli/src/event.rs
+pub struct BeforeCompute {
+    client: ClientId,
+    id: lsp_server::RequestId,
+}
+
+pub struct AfterCompute {
+    client: ClientId,
+    id: lsp_server::RequestId,
+}
+```
+
+Private fields. Not `Clone`. Only `reply` constructs `BeforeCompute`. Only `before_compute` constructs `AfterCompute`.
 
 ```rust
 // from crates/isograph_cli/src/event.rs
@@ -50,31 +67,53 @@ impl LiveSessions {
         &mut self,
         client: ClientId,
         id: lsp_server::RequestId,
-    ) -> Option<
-        impl FnOnce(serde_json::Value) -> Box<dyn FnOnce(&crate::effect::SideEffectToken) + Send>
-            + Send
-            + use<>,
-    > {
+    ) -> Option<BeforeCompute> {
         let session = self.0.get_mut(&client)?;
         session.outstanding.insert(id.clone());
+        BeforeCompute { client, id }.wrap_some()
+    }
+
+    pub fn before_compute(&mut self, before: BeforeCompute) -> Option<AfterCompute> {
+        let session = self.0.get_mut(&before.client)?;
+        if !session.outstanding.contains(&before.id) {
+            return None;
+        }
+        AfterCompute {
+            client: before.client,
+            id: before.id,
+        }
+        .wrap_some()
+    }
+
+    pub fn after_compute(
+        &mut self,
+        after: AfterCompute,
+        body: Result<serde_json::Value, lsp_server::ResponseError>,
+    ) -> Option<Box<dyn FnOnce(&crate::effect::SideEffectToken) + Send>> {
+        let session = self.0.get_mut(&after.client)?;
+        if !session.outstanding.remove(&after.id) {
+            return None;
+        }
         let sender = session.sender.clone();
-        (move |value| {
-            let message = lsp_server::Message::Response(lsp_server::Response {
-                id,
-                result: value.wrap_some(),
-                error: None,
-            });
-            (move |_token: &crate::effect::SideEffectToken| {
-                let _ = sender.send(message);
-            })
-            .boxed()
+        let (result, error) = match body {
+            Ok(value) => (value.wrap_some(), None),
+            Err(error) => (None, error.wrap_some()),
+        };
+        let message = lsp_server::Message::Response(lsp_server::Response {
+            id: after.id,
+            result,
+            error,
+        });
+        (move |_token: &crate::effect::SideEffectToken| {
+            let _ = sender.send(message);
         })
+        .boxed()
         .wrap_some()
     }
 }
 ```
 
-Delta: `reply` replaces `take_reply`. `None` is only `get_mut` miss. Insert stays. Sending does not `remove` the id. After a successful send the id is still in `outstanding` until `Gone` or later cancel. The outer `FnOnce` closes over `sender` and `id`. It takes the `Break` JSON value, which has no id. It creates `Message::Response` with the closed-over id. That is when the id is put on the message this process sends. The inner `FnOnce` sends that message. Neither looks up `LiveSessions`. Calling either twice does not compile. `use<>` so the `impl Trait` does not capture `&mut self`.
+Delta: `reply` replaces `take_reply`. First `Option`: client is not live. Insert then return `BeforeCompute`. Second `Option`: `before_compute`; session gone or id not in `outstanding` is `None`. Third `Option`: `after_compute`; session gone or id already removed is `None`. A successful third step `remove`s the id, clones `sender`, creates the message with the token's id. That is when the id is put on the message. The send `FnOnce` does not take a `Message`. `Ok` is `result: Some(value)`, `error: None`. `Err` is `result: None`, `error: Some(error)`.
 
 ```rust
 // from crates/isograph_cli/src/state.rs
@@ -98,10 +137,10 @@ Delta: `reply` replaces `take_reply`. `None` is only `get_mut` miss. Insert stay
         crate::event::LspEvent::Request(incoming) => {
             let client = incoming.client;
             let id = incoming.request.id.clone();
-            let Some(reply) = state.live_sessions.reply(client, id) else {
+            let Some(before_compute) = state.live_sessions.reply(client, id) else {
                 return no_effects();
             };
-            dispatch_lsp_request(state, incoming, reply)
+            dispatch_lsp_request(state, incoming, before_compute)
         }
 ```
 
@@ -186,11 +225,14 @@ fn method_not_found<THostLanguage: HostLanguage>(
 // from crates/isograph_cli/src/state.rs
 // after
 fn dispatch_lsp_request<THostLanguage: HostLanguage>(
-    state: &IsographState<THostLanguage>,
+    state: &mut IsographState<THostLanguage>,
     incoming: crate::event::LspRequest,
-    reply: impl FnOnce(serde_json::Value) -> Box<dyn FnOnce(&crate::effect::SideEffectToken) + Send>,
+    before: crate::event::BeforeCompute,
 ) -> Vec<IsographEffect> {
     let request = incoming.request;
+    let Some(after) = state.live_sessions.before_compute(before) else {
+        return no_effects();
+    };
     let get_response = || {
         let request =
             isograph_lsp::lsp_request_dispatch::LSPRequestDispatch::new(request, &state.db)
@@ -207,61 +249,106 @@ fn dispatch_lsp_request<THostLanguage: HostLanguage>(
         ControlFlow::Continue(request)
     };
     match get_response() {
-        ControlFlow::Break(lsp_server::Response {
-            result: Some(value),
-            error: None,
-            id: _,
-        }) => send_lsp_response(reply, value),
-        ControlFlow::Continue(request) => method_not_found(request),
-        ControlFlow::Break(_) => no_effects(),
+        ControlFlow::Break(response) => {
+            send_lsp_response(&mut state.live_sessions, after, response_body(response))
+        }
+        ControlFlow::Continue(request) => {
+            method_not_found(&mut state.live_sessions, after, request)
+        }
     }
 }
 
 fn send_lsp_response(
-    reply: impl FnOnce(serde_json::Value) -> Box<dyn FnOnce(&crate::effect::SideEffectToken) + Send>,
-    value: serde_json::Value,
+    sessions: &mut crate::event::LiveSessions,
+    after: crate::event::AfterCompute,
+    body: Result<serde_json::Value, lsp_server::ResponseError>,
 ) -> Vec<IsographEffect> {
+    let Some(send) = sessions.after_compute(after, body) else {
+        return no_effects();
+    };
     crate::effect::IsographEffect::SendLspResponse(
-        crate::effect::SendLspResponseEffect {
-            send: reply(value),
-        }
-        .boxed(),
+        crate::effect::SendLspResponseEffect { send }.boxed(),
     )
     .wrap_vec()
 }
+
+fn method_not_found(
+    sessions: &mut crate::event::LiveSessions,
+    after: crate::event::AfterCompute,
+    request: lsp_server::Request,
+) -> Vec<IsographEffect> {
+    send_lsp_response(
+        sessions,
+        after,
+        lsp_server::ResponseError {
+            code: lsp_server::ErrorCode::MethodNotFound as i32,
+            data: None,
+            message: format!("No handler registered for method '{}'", request.method),
+        }
+        .wrap_err(),
+    )
+}
+
+fn response_body(
+    response: lsp_server::Response,
+) -> Result<serde_json::Value, lsp_server::ResponseError> {
+    match (response.result, response.error) {
+        (Some(value), None) => value.wrap_ok(),
+        (_, Some(error)) => error.wrap_err(),
+        (None, None) => lsp_server::ResponseError {
+            code: lsp_server::ErrorCode::UnknownErrorCode as i32,
+            data: None,
+            message: "LSP response has neither result nor error".to_owned(),
+        }
+        .wrap_err(),
+    }
+}
 ```
 
-Delta: `dispatch_lsp_request` takes `&IsographState` and the outer `FnOnce`. It does not take `id`. It always runs `get_response`. The `Break` arm that is `error: None` and `result: Some(value)` calls `send_lsp_response(reply, value)`. `send_lsp_response` is `reply(value)` then `SendLspResponseEffect { send }`. No `take_reply`. This callback does not write `Response.error`. `handle_client_connection` is unchanged. `SendLspResponseEffect` is unchanged. The `SendLspResponse` arm of `perform` stays `(respond.send)(token)`. timer-effects.md adds `event_tx` to `perform` and `run_effect_loop`; this slice passes that sender through. `run_event_loop` is unchanged.
+Delta: `dispatch_lsp_request` takes `&mut IsographState` and `BeforeCompute`. It does not take `id`. It calls `before_compute` before `get_response`. Every `get_response` outcome that replies calls `after_compute` (ok `Break`, error `Break`, MethodNotFound). `send_lsp_response` calls `after_compute` and wraps `Some(send)`. `None` is no send. No `take_reply`. `handle_client_connection` is unchanged. `SendLspResponseEffect` is unchanged. `perform` is unchanged (`(respond.send)(token)`). `run_event_loop` is unchanged. `run_effect_loop` is unchanged.
 
-The `get_mut` borrow of `live_sessions` in `reply` ends before `dispatch_lsp_request`. `get_response` uses `&state.db`.
+`ControlFlow::Continue` is leftover / MethodNotFound. `ControlFlow::Break` with `error: Some(_)` is `on_request_sync` of bad params or `UnexpectedError`. `ExpectedError` is `result: Some(Null)`, `error: None`, and is `Ok`. `(None, None)` is not produced by `convert_to_lsp_response`; `response_body` still replies so the reservation is consumed.
 
-`ControlFlow::Continue` is leftover / MethodNotFound. `ControlFlow::Break` with `error: Some(_)` is `on_request_sync` of bad params or `UnexpectedError`. This callback does not send those.
+This slice's `dispatch_lsp_request` calls both stages in one `handle`. Later async is a different caller: hold `BeforeCompute` across `handle` returns until compute, hold `AfterCompute` until send. `Gone` or `outstanding.remove` in between either call is `None`. Dropping a token without calling the next stage leaves the id in `outstanding` until `Gone` or later cancel of that id.
 
 ## Tests
 
-`handle` of `Formatting` for a live client: JSON `[]`. `Response.id` equals the request id. `error` is `None`. `perform(&SideEffectToken::mint(), effect)`: dummy receiver gets the response.
+`handle` of hover for a live client: MethodNotFound bytes unchanged. `Response.id` equals the request id. `perform` of that effect (`mint`, same `event_tx` as `run_effect_loop`): dummy receiver gets the response. That client's `outstanding` is empty.
 
-Never `Started`, `Started(A)` then request from `B`, `Started` then `Gone` then request, `Formatting` from a not-live client: empty effects. No `perform`. `get_response` does not run (no `SendLspResponseEffect`).
+`handle` of `Formatting` for a live client: JSON `[]`. `Response.id` equals the request id. `error` is `None`. `perform` of that effect: dummy receiver gets the response. That client's `outstanding` is empty.
+
+`handle` of `Formatting` for a live client with `{}` params: one `SendLspResponseEffect`. `result` is `None`. `error` is `Some`. `Response.id` equals the request id. That client's `outstanding` is empty.
+
+Never `Started`, `Started(A)` then request from `B`, `Started` then `Gone` then request, `Formatting` from a not-live client: empty effects. No `perform`. `get_response` does not run.
 
 `LiveSessions::reply` of a client that is not in the map: `None`.
 
-`LiveSessions::reply` of a live client: `Some`. After `reply`, that id is in `outstanding`. Invoking the outer `FnOnce` with `serde_json::json!([])`, wrapping as `SendLspResponseEffect`, `perform`: delivered `Response.id` is the id passed to `reply`, `result` is `[]`, `error` is `None`.
+`LiveSessions::reply` of a live client: `Some`. After `reply`, that id is in `outstanding`. `before_compute` then `after_compute` with `serde_json::json!([]).wrap_ok()`: `outstanding` empty, `perform` delivers `Response.id` equal to the id passed to `reply`.
+
+`LiveSessions::reply` of a live client, then remove that client, then `before_compute`: `None`. No send.
+
+`LiveSessions::reply` of a live client, `before_compute` succeeds, then remove that client, then `after_compute`: `None`. No send.
+
+`LiveSessions::reply` of a live client, then `outstanding.remove` of that id, then `before_compute`: `None`. No send.
+
+`LiveSessions::reply` of a live client, `before_compute` succeeds, then `outstanding.remove` of that id, then `after_compute`: `None`. No send.
 
 Drop `take_reply_of_an_id_that_is_not_outstanding_is_none` and `take_reply_of_an_outstanding_id_is_some_once`.
 
 `Started` twice for the same `ClientId`: one row, the second session, outstanding empty.
 
-`run_effect_loop` still ends on `Kill`. After timer-effects.md, `run_event_loop` HelloWorld emits `Timer`, not `LogHelloWorld`. This slice does not change that.
+`run_effect_loop` still ends on `Kill`. `run_event_loop` HelloWorld still emits `LogHelloWorld`.
 
-Do not add a production API only tests call. `reply` is the same function `dispatch_lsp` uses. `mint` is the same function `run_effect_loop` uses.
+Do not add a production API only tests call. `reply` / `before_compute` / `after_compute` are the same functions `dispatch_lsp` uses. `mint` is the same function `run_effect_loop` uses.
 
 ## Call sites
 
-- `dispatch_lsp` of `Request` -> `LiveSessions::reply`; `None` does not call `dispatch_lsp_request` (no `get_response`)
-- `dispatch_lsp_request` -> `get_response`; `Break` with `Some(value)` and `error: None` -> `send_lsp_response(reply, value)`
-- `send_lsp_response` -> `SendLspResponseEffect { send: reply(value) }`
-- outer `FnOnce` -> create `Message::Response(Response { id, result: Some(value), error: None })`; return inner `FnOnce(&SideEffectToken)`
-- `perform` of `SendLspResponse` -> `(respond.send)(token)`; `let _ = sender.send(message)` (dropped receiver is a no-op)
-- later cancel -> `outstanding.remove` and drop the outer `FnOnce` without calling it
-- later async reply -> hold the outer `FnOnce` from `reply`; `send_lsp_response(reply, value)`
-- existing `take_reply` tests -> `reply` of not-live is `None`; `reply` of live, invoke outer with a JSON value, delivered `id` is the one passed to `reply`
+- `dispatch_lsp` of `Request` -> `LiveSessions::reply`; `None` does not call `dispatch_lsp_request`
+- `dispatch_lsp_request` -> `before_compute`; `None` does not call `get_response`
+- `Break` -> `send_lsp_response(sessions, after, response_body(response))`
+- `Continue` -> `method_not_found(sessions, after, request)` -> `after_compute` with MethodNotFound
+- `send_lsp_response` -> `after_compute`; `None` does not send; `Some(send)` is `SendLspResponseEffect`
+- `after_compute` `Some` -> `outstanding.remove`; create `Message::Response` with the token's id
+- `perform` of `SendLspResponse` -> `(respond.send)(token)`
+- later cancel -> `outstanding.remove` of that id; the next stage is `None`
+- later async -> hold `BeforeCompute`, then hold `AfterCompute`, call each stage when that stage runs
