@@ -3,7 +3,7 @@ use nonempty::NonEmpty;
 use prelude::Postfix;
 use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
-use span::{WithSpan, WithSpanPostfix};
+use span::{WithOptionalSpan, WithSpan, WithSpanPostfix};
 
 use crate::chunk_stream::{ChunkStream, ItemCursor};
 use crate::{
@@ -114,7 +114,7 @@ pub type SelectableNameWrapperPath<'a> =
 pub struct ParsedIsoLiteral {
     pub item: Option<WithSpan<IsoLiteralParse>>,
     pub errors: Vec<WithSpan<ParseError>>,
-    pub tokens: Vec<WithSpan<IsographSemanticToken>>,
+    pub tokens: Vec<WithOptionalSpan<IsographSemanticToken>>,
 }
 
 pub fn parse_iso_literal(text: &str) -> ParsedIsoLiteral {
@@ -154,7 +154,7 @@ pub(crate) fn parse_chunked_iso_literal(
     text: &str,
     root: WithSpan<ChunkedRoot>,
     errors: &mut Vec<WithSpan<AstError>>,
-    tokens: &mut Vec<WithSpan<IsographSemanticToken>>,
+    tokens: &mut Vec<WithOptionalSpan<IsographSemanticToken>>,
 ) -> Option<WithSpan<IsoLiteralParse>> {
     let location = root.location;
     let Some((head, tail)) = root.item.0.split_first() else {
@@ -291,7 +291,7 @@ fn consume_to_target(
 pub(crate) fn consume_description(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<Description>> {
     if let Some(span) = cursor.consume_token_if(
         NonBracketTokenKind::StringLiteral,
-        IsographSemanticToken::String,
+        IsographSemanticToken::Description,
     ) {
         return Description(span.exclude_ends(1).interned().item)
             .with_span(span.location)
@@ -300,7 +300,7 @@ pub(crate) fn consume_description(cursor: &mut ItemCursor<'_>) -> Option<WithSpa
     cursor
         .consume_token_if(
             NonBracketTokenKind::BlockStringLiteral,
-            IsographSemanticToken::String,
+            IsographSemanticToken::Description,
         )
         .map(|span| {
             Description(intern_block_string_value(span.exclude_ends(3).text()))
@@ -383,7 +383,7 @@ mod tests {
     fn stream_of<'a>(
         tree: &'a WithSpan<ChunkedRoot>,
         text: &'a str,
-        tokens: &'a mut Vec<WithSpan<IsographSemanticToken>>,
+        tokens: &'a mut Vec<WithOptionalSpan<IsographSemanticToken>>,
         errors: &'a mut Vec<WithSpan<AstError>>,
     ) -> crate::chunk_stream::ChunkStream<'a> {
         crate::chunk_stream::ChunkStream::new(tree.item.0.as_slice(), text, tokens, errors)
@@ -1098,7 +1098,7 @@ mod tests {
                 (IsographSemanticToken::Type, "Query"),
                 (IsographSemanticToken::Period, "."),
                 (IsographSemanticToken::FieldName, "foo"),
-                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::At, "@"),
                 (IsographSemanticToken::DirectiveName, "lazyLoad"),
             ],
         );
@@ -1132,9 +1132,9 @@ mod tests {
                 (IsographSemanticToken::Colon, ":"),
                 (IsographSemanticToken::GraphQLTypeName, "ID"),
                 (IsographSemanticToken::Parenthesis, ")"),
-                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::At, "@"),
                 (IsographSemanticToken::DirectiveName, "component"),
-                (IsographSemanticToken::String, "\"the route\""),
+                (IsographSemanticToken::Description, "\"the route\""),
                 (IsographSemanticToken::Brace, "{"),
                 (IsographSemanticToken::FieldName, "bar"),
                 (IsographSemanticToken::Brace, "}"),
@@ -1166,9 +1166,9 @@ mod tests {
                 (IsographSemanticToken::FieldName, "BestFriend"),
                 (IsographSemanticToken::Keyword, "to"),
                 (IsographSemanticToken::GraphQLTypeName, "Owner"),
-                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::At, "@"),
                 (IsographSemanticToken::DirectiveName, "updatable"),
-                (IsographSemanticToken::String, "\"x\""),
+                (IsographSemanticToken::Description, "\"x\""),
                 (IsographSemanticToken::Brace, "{"),
                 (IsographSemanticToken::FieldName, "id"),
                 (IsographSemanticToken::Brace, "}"),
@@ -1200,7 +1200,7 @@ mod tests {
                 (IsographSemanticToken::FieldName, "Foo"),
                 (IsographSemanticToken::Brace, "{"),
                 (IsographSemanticToken::FieldName, "bar"),
-                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::At, "@"),
                 (IsographSemanticToken::DirectiveName, "loadable"),
                 (IsographSemanticToken::Parenthesis, "("),
                 (IsographSemanticToken::Argument, "lazyLoadArtifact"),
@@ -1244,9 +1244,9 @@ mod tests {
                 (IsographSemanticToken::FieldName, "Foo"),
                 (IsographSemanticToken::Brace, "{"),
                 (IsographSemanticToken::FieldName, "bar"),
-                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::At, "@"),
                 (IsographSemanticToken::DirectiveName, "loadable"),
-                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::At, "@"),
                 (IsographSemanticToken::DirectiveName, "updatable"),
                 (IsographSemanticToken::Brace, "}"),
             ],
@@ -1305,7 +1305,7 @@ mod tests {
                 (IsographSemanticToken::Type, "Query"),
                 (IsographSemanticToken::Period, "."),
                 (IsographSemanticToken::FieldName, "foo"),
-                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::At, "@"),
                 (IsographSemanticToken::DirectiveName, "notARealDirective"),
             ],
         );
@@ -1337,7 +1337,7 @@ mod tests {
                 (IsographSemanticToken::Type, "Query"),
                 (IsographSemanticToken::Period, "."),
                 (IsographSemanticToken::FieldName, "foo"),
-                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::At, "@"),
             ],
         );
     }
@@ -1354,7 +1354,7 @@ mod tests {
                 (IsographSemanticToken::FieldName, "Foo"),
                 (IsographSemanticToken::Brace, "{"),
                 (IsographSemanticToken::FieldName, "bar"),
-                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::At, "@"),
                 (IsographSemanticToken::DirectiveName, "loadable"),
                 (IsographSemanticToken::Brace, "}"),
             ],
@@ -1612,10 +1612,10 @@ mod tests {
                 (IsographSemanticToken::Type, "Query"),
                 (IsographSemanticToken::Period, "."),
                 (IsographSemanticToken::FieldName, "HomeRoute"),
-                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::At, "@"),
                 (IsographSemanticToken::DirectiveName, "component"),
                 (
-                    IsographSemanticToken::String,
+                    IsographSemanticToken::Description,
                     "\"\"\"\n  Show a list of pets\n  \"\"\"",
                 ),
                 (IsographSemanticToken::Brace, "{"),
@@ -1870,7 +1870,7 @@ mod tests {
                 (IsographSemanticToken::Type, "Query"),
                 (IsographSemanticToken::Period, "."),
                 (IsographSemanticToken::FieldName, "Foo"),
-                (IsographSemanticToken::String, "\"the home route\""),
+                (IsographSemanticToken::Description, "\"the home route\""),
                 (IsographSemanticToken::Brace, "{"),
                 (IsographSemanticToken::FieldName, "bar"),
                 (IsographSemanticToken::Brace, "}"),
@@ -1899,7 +1899,7 @@ mod tests {
                 (IsographSemanticToken::Period, "."),
                 (IsographSemanticToken::FieldName, "Foo"),
                 (
-                    IsographSemanticToken::String,
+                    IsographSemanticToken::Description,
                     "\"\"\"\n  the home\n  route\n\"\"\"",
                 ),
                 (IsographSemanticToken::Brace, "{"),
@@ -1984,7 +1984,7 @@ mod tests {
                 (IsographSemanticToken::Type, "Query"),
                 (IsographSemanticToken::Period, "."),
                 (IsographSemanticToken::FieldName, "Foo"),
-                (IsographSemanticToken::String, "\"the home route\""),
+                (IsographSemanticToken::Description, "\"the home route\""),
             ],
         );
         assert_eq!(errors, vec![]);
@@ -2152,7 +2152,8 @@ mod tests {
                 (IsographSemanticToken::Parenthesis, ")"),
                 (IsographSemanticToken::Keyword, "to"),
                 (IsographSemanticToken::GraphQLTypeName, "Person"),
-                (IsographSemanticToken::String, "\"the owner\""),
+                (IsographSemanticToken::Exclamation, "!"),
+                (IsographSemanticToken::Description, "\"the owner\""),
                 (IsographSemanticToken::Brace, "{"),
                 (IsographSemanticToken::FieldName, "name"),
                 (IsographSemanticToken::Brace, "}"),
@@ -2197,6 +2198,22 @@ mod tests {
                     (IsographSemanticToken::FieldName, "id"),
                     (IsographSemanticToken::Brace, "}"),
                 ]
+            } else if text.contains("[Pet!]!") {
+                &[
+                    (IsographSemanticToken::Keyword, "field"),
+                    (IsographSemanticToken::Type, "Query"),
+                    (IsographSemanticToken::Period, "."),
+                    (IsographSemanticToken::FieldName, "Foo"),
+                    (IsographSemanticToken::Keyword, "to"),
+                    (IsographSemanticToken::GraphQLTypeName, "["),
+                    (IsographSemanticToken::GraphQLTypeName, "Pet"),
+                    (IsographSemanticToken::Exclamation, "!"),
+                    (IsographSemanticToken::GraphQLTypeName, "]"),
+                    (IsographSemanticToken::Exclamation, "!"),
+                    (IsographSemanticToken::Brace, "{"),
+                    (IsographSemanticToken::FieldName, "id"),
+                    (IsographSemanticToken::Brace, "}"),
+                ]
             } else if text.contains('[') {
                 &[
                     (IsographSemanticToken::Keyword, "field"),
@@ -2207,6 +2224,19 @@ mod tests {
                     (IsographSemanticToken::GraphQLTypeName, "["),
                     (IsographSemanticToken::GraphQLTypeName, "Pet"),
                     (IsographSemanticToken::GraphQLTypeName, "]"),
+                    (IsographSemanticToken::Brace, "{"),
+                    (IsographSemanticToken::FieldName, "id"),
+                    (IsographSemanticToken::Brace, "}"),
+                ]
+            } else if text.contains('!') {
+                &[
+                    (IsographSemanticToken::Keyword, "field"),
+                    (IsographSemanticToken::Type, "Query"),
+                    (IsographSemanticToken::Period, "."),
+                    (IsographSemanticToken::FieldName, "Foo"),
+                    (IsographSemanticToken::Keyword, "to"),
+                    (IsographSemanticToken::GraphQLTypeName, "Pet"),
+                    (IsographSemanticToken::Exclamation, "!"),
                     (IsographSemanticToken::Brace, "{"),
                     (IsographSemanticToken::FieldName, "id"),
                     (IsographSemanticToken::Brace, "}"),
@@ -2251,7 +2281,9 @@ mod tests {
                 (IsographSemanticToken::Keyword, "to"),
                 (IsographSemanticToken::GraphQLTypeName, "["),
                 (IsographSemanticToken::GraphQLTypeName, "Pet"),
+                (IsographSemanticToken::Exclamation, "!"),
                 (IsographSemanticToken::GraphQLTypeName, "]"),
+                (IsographSemanticToken::Exclamation, "!"),
                 (IsographSemanticToken::Brace, "{"),
                 (IsographSemanticToken::FieldName, "id"),
                 (IsographSemanticToken::Brace, "}"),
@@ -2332,6 +2364,7 @@ mod tests {
                 (IsographSemanticToken::FieldName, "Foo"),
                 (IsographSemanticToken::Keyword, "to"),
                 (IsographSemanticToken::GraphQLTypeName, "Pet"),
+                (IsographSemanticToken::Exclamation, "!"),
                 (IsographSemanticToken::Brace, "{"),
                 (IsographSemanticToken::FieldName, "id"),
                 (IsographSemanticToken::Brace, "}"),
@@ -2419,7 +2452,9 @@ mod tests {
                 (IsographSemanticToken::Keyword, "to"),
                 (IsographSemanticToken::GraphQLTypeName, "["),
                 (IsographSemanticToken::GraphQLTypeName, "Pet"),
+                (IsographSemanticToken::Exclamation, "!"),
                 (IsographSemanticToken::GraphQLTypeName, "]"),
+                (IsographSemanticToken::Exclamation, "!"),
                 (IsographSemanticToken::Brace, "{"),
                 (IsographSemanticToken::FieldName, "id"),
                 (IsographSemanticToken::Brace, "}"),
@@ -2452,6 +2487,7 @@ mod tests {
                 (IsographSemanticToken::FieldName, "Foo"),
                 (IsographSemanticToken::Keyword, "to"),
                 (IsographSemanticToken::GraphQLTypeName, "Pet"),
+                (IsographSemanticToken::Exclamation, "!"),
                 (IsographSemanticToken::Content, "!"),
                 (IsographSemanticToken::Bracket, "{"),
                 (IsographSemanticToken::Content, "id"),
@@ -2526,6 +2562,7 @@ mod tests {
                 (IsographSemanticToken::Variable, "x"),
                 (IsographSemanticToken::Colon, ":"),
                 (IsographSemanticToken::GraphQLTypeName, "ID"),
+                (IsographSemanticToken::Exclamation, "!"),
                 (IsographSemanticToken::Parenthesis, ")"),
                 (IsographSemanticToken::Brace, "{"),
                 (IsographSemanticToken::FieldName, "bar"),
@@ -2640,6 +2677,7 @@ mod tests {
                 (IsographSemanticToken::Keyword, "to"),
                 (IsographSemanticToken::GraphQLTypeName, "["),
                 (IsographSemanticToken::GraphQLTypeName, "Pet"),
+                (IsographSemanticToken::Exclamation, "!"),
                 (IsographSemanticToken::GraphQLTypeName, "]"),
                 (IsographSemanticToken::Brace, "{"),
                 (IsographSemanticToken::FieldName, "id"),
@@ -2685,6 +2723,7 @@ mod tests {
                 (IsographSemanticToken::GraphQLTypeName, "["),
                 (IsographSemanticToken::GraphQLTypeName, "Pet"),
                 (IsographSemanticToken::GraphQLTypeName, "]"),
+                (IsographSemanticToken::Exclamation, "!"),
                 (IsographSemanticToken::Brace, "{"),
                 (IsographSemanticToken::FieldName, "id"),
                 (IsographSemanticToken::Brace, "}"),
@@ -2815,7 +2854,7 @@ mod tests {
                 (IsographSemanticToken::Type, "Query"),
                 (IsographSemanticToken::Period, "."),
                 (IsographSemanticToken::FieldName, "Foo"),
-                (IsographSemanticToken::String, "\"x\""),
+                (IsographSemanticToken::Description, "\"x\""),
                 (IsographSemanticToken::Content, "to"),
                 (IsographSemanticToken::Content, "Owner"),
                 (IsographSemanticToken::Bracket, "{"),
@@ -2940,7 +2979,7 @@ mod tests {
                 (IsographSemanticToken::Type, "Query"),
                 (IsographSemanticToken::Period, "."),
                 (IsographSemanticToken::FieldName, "Foo"),
-                (IsographSemanticToken::String, "\"the home route\""),
+                (IsographSemanticToken::Description, "\"the home route\""),
                 (IsographSemanticToken::Brace, "{"),
                 (IsographSemanticToken::FieldName, "bar"),
                 (IsographSemanticToken::Brace, "}"),
@@ -3204,7 +3243,7 @@ mod tests {
         assert_semantic_tokens(
             text,
             &tokens,
-            &[(IsographSemanticToken::String, "\"the home route\"")],
+            &[(IsographSemanticToken::Description, "\"the home route\"")],
         );
     }
 
@@ -3219,7 +3258,11 @@ mod tests {
             consume_description(stream.cursor()).expect("the fixture is a string description");
         assert_eq!(description.location, span_of(text, "\"\""));
         assert_eq!(description.item, Description("".intern().to()));
-        assert_semantic_tokens(text, &tokens, &[(IsographSemanticToken::String, "\"\"")]);
+        assert_semantic_tokens(
+            text,
+            &tokens,
+            &[(IsographSemanticToken::Description, "\"\"")],
+        );
     }
 
     #[test]
@@ -3245,7 +3288,7 @@ mod tests {
             text,
             &tokens,
             &[(
-                IsographSemanticToken::String,
+                IsographSemanticToken::Description,
                 "\"\"\"\n  the home\n  route\n\"\"\"",
             )],
         );
@@ -3290,7 +3333,7 @@ mod tests {
             &[
                 (IsographSemanticToken::FieldName, "Foo"),
                 (
-                    IsographSemanticToken::String,
+                    IsographSemanticToken::Description,
                     "\"\"\"\n  the home\n  route\n\"\"\"",
                 ),
                 (IsographSemanticToken::FieldName, "Bar"),
@@ -3322,7 +3365,7 @@ mod tests {
             text,
             &tokens,
             &[
-                (IsographSemanticToken::String, "\"hi\""),
+                (IsographSemanticToken::Description, "\"hi\""),
                 (IsographSemanticToken::FieldName, "Foo"),
             ],
         );
@@ -3429,7 +3472,7 @@ mod tests {
         assert_semantic_tokens(
             text,
             &tokens,
-            &[(IsographSemanticToken::String, "\"\"\"\"\"\"")],
+            &[(IsographSemanticToken::Description, "\"\"\"\"\"\"")],
         );
     }
 
@@ -3448,6 +3491,7 @@ mod tests {
                 (IsographSemanticToken::Variable, "id"),
                 (IsographSemanticToken::Colon, ":"),
                 (IsographSemanticToken::GraphQLTypeName, "ID"),
+                (IsographSemanticToken::Exclamation, "!"),
                 (IsographSemanticToken::Parenthesis, ")"),
                 (IsographSemanticToken::Brace, "{"),
                 (IsographSemanticToken::FieldName, "pets"),
@@ -3489,7 +3533,9 @@ mod tests {
                 (IsographSemanticToken::Colon, ":"),
                 (IsographSemanticToken::GraphQLTypeName, "["),
                 (IsographSemanticToken::GraphQLTypeName, "Pet"),
+                (IsographSemanticToken::Exclamation, "!"),
                 (IsographSemanticToken::GraphQLTypeName, "]"),
+                (IsographSemanticToken::Exclamation, "!"),
                 (IsographSemanticToken::Parenthesis, ")"),
                 (IsographSemanticToken::Brace, "{"),
                 (IsographSemanticToken::FieldName, "bar"),
@@ -3591,6 +3637,7 @@ mod tests {
                 (IsographSemanticToken::Colon, ":"),
                 (IsographSemanticToken::GraphQLTypeName, "["),
                 (IsographSemanticToken::GraphQLTypeName, "ID"),
+                (IsographSemanticToken::Exclamation, "!"),
                 (IsographSemanticToken::GraphQLTypeName, "]"),
                 (IsographSemanticToken::Equals, "="),
                 (IsographSemanticToken::Bracket, "["),
@@ -4009,6 +4056,7 @@ mod tests {
                 (IsographSemanticToken::Variable, "id"),
                 (IsographSemanticToken::Colon, ":"),
                 (IsographSemanticToken::GraphQLTypeName, "ID"),
+                (IsographSemanticToken::Exclamation, "!"),
                 (IsographSemanticToken::Parenthesis, ")"),
                 (IsographSemanticToken::Brace, "{"),
                 (IsographSemanticToken::FieldName, "bar"),
@@ -4086,7 +4134,7 @@ mod tests {
                 (IsographSemanticToken::Type, "Query"),
                 (IsographSemanticToken::Period, "."),
                 (IsographSemanticToken::FieldName, "Foo"),
-                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::At, "@"),
                 (IsographSemanticToken::DirectiveName, "component"),
                 (IsographSemanticToken::Brace, "{"),
                 (IsographSemanticToken::FieldName, "bar"),
@@ -4125,9 +4173,10 @@ mod tests {
                 (IsographSemanticToken::Parenthesis, ")"),
                 (IsographSemanticToken::Keyword, "to"),
                 (IsographSemanticToken::GraphQLTypeName, "Person"),
-                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::Exclamation, "!"),
+                (IsographSemanticToken::At, "@"),
                 (IsographSemanticToken::DirectiveName, "updatable"),
-                (IsographSemanticToken::String, "\"the owner\""),
+                (IsographSemanticToken::Description, "\"the owner\""),
                 (IsographSemanticToken::Brace, "{"),
                 (IsographSemanticToken::FieldName, "name"),
                 (IsographSemanticToken::Brace, "}"),
@@ -4152,9 +4201,9 @@ mod tests {
                 (IsographSemanticToken::Type, "Query"),
                 (IsographSemanticToken::Period, "."),
                 (IsographSemanticToken::FieldName, "Foo"),
-                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::At, "@"),
                 (IsographSemanticToken::DirectiveName, "a"),
-                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::At, "@"),
                 (IsographSemanticToken::DirectiveName, "b"),
                 (IsographSemanticToken::Brace, "{"),
                 (IsographSemanticToken::FieldName, "bar"),
@@ -4180,9 +4229,9 @@ mod tests {
                 (IsographSemanticToken::Type, "Query"),
                 (IsographSemanticToken::Period, "."),
                 (IsographSemanticToken::FieldName, "foo"),
-                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::At, "@"),
                 (IsographSemanticToken::DirectiveName, "a"),
-                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::At, "@"),
                 (IsographSemanticToken::DirectiveName, "b"),
             ],
         );
@@ -4204,7 +4253,7 @@ mod tests {
                 (IsographSemanticToken::Type, "Query"),
                 (IsographSemanticToken::Period, "."),
                 (IsographSemanticToken::FieldName, "Foo"),
-                (IsographSemanticToken::String, "\"x\""),
+                (IsographSemanticToken::Description, "\"x\""),
                 (IsographSemanticToken::Content, "@"),
                 (IsographSemanticToken::Content, "component"),
                 (IsographSemanticToken::Bracket, "{"),
@@ -4231,7 +4280,7 @@ mod tests {
                 (IsographSemanticToken::Type, "Query"),
                 (IsographSemanticToken::Period, "."),
                 (IsographSemanticToken::FieldName, "Foo"),
-                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::At, "@"),
                 (IsographSemanticToken::DirectiveName, "component"),
                 (IsographSemanticToken::Content, "to"),
                 (IsographSemanticToken::Content, "Pet"),
@@ -4474,7 +4523,7 @@ mod tests {
                 (IsographSemanticToken::FieldName, "Foo"),
                 (IsographSemanticToken::Brace, "{"),
                 (IsographSemanticToken::FieldName, "bar"),
-                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::At, "@"),
                 (IsographSemanticToken::DirectiveName, "loadable"),
                 (IsographSemanticToken::Parenthesis, "("),
                 (IsographSemanticToken::Parenthesis, ")"),
@@ -4519,7 +4568,7 @@ mod tests {
                 (IsographSemanticToken::Variable, "$"),
                 (IsographSemanticToken::Variable, "id"),
                 (IsographSemanticToken::Parenthesis, ")"),
-                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::At, "@"),
                 (IsographSemanticToken::DirectiveName, "loadable"),
                 (IsographSemanticToken::Brace, "{"),
                 (IsographSemanticToken::FieldName, "baz"),
@@ -4549,7 +4598,7 @@ mod tests {
                 (IsographSemanticToken::Type, "Query"),
                 (IsographSemanticToken::Period, "."),
                 (IsographSemanticToken::FieldName, "Foo"),
-                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::At, "@"),
                 (IsographSemanticToken::DirectiveName, "component"),
                 (IsographSemanticToken::Brace, "{"),
                 (IsographSemanticToken::FieldName, "bar"),
@@ -4649,7 +4698,7 @@ mod tests {
                 (IsographSemanticToken::FieldName, "Foo"),
                 (IsographSemanticToken::Brace, "{"),
                 (IsographSemanticToken::FieldName, "bar"),
-                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::At, "@"),
                 (IsographSemanticToken::Brace, "}"),
             ],
         );
@@ -4673,7 +4722,7 @@ mod tests {
                 (IsographSemanticToken::Type, "Query"),
                 (IsographSemanticToken::Period, "."),
                 (IsographSemanticToken::FieldName, "foo"),
-                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::At, "@"),
                 (IsographSemanticToken::DirectiveName, "lazyLoad"),
                 (IsographSemanticToken::Parenthesis, "("),
                 (IsographSemanticToken::Argument, "x"),
@@ -4707,7 +4756,7 @@ mod tests {
                 (IsographSemanticToken::Type, "Query"),
                 (IsographSemanticToken::Period, "."),
                 (IsographSemanticToken::FieldName, "Foo"),
-                (IsographSemanticToken::DirectiveName, "@"),
+                (IsographSemanticToken::At, "@"),
                 (IsographSemanticToken::DirectiveName, "component"),
                 (IsographSemanticToken::Parenthesis, "("),
                 (IsographSemanticToken::Argument, "x"),

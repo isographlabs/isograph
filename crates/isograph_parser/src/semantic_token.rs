@@ -23,6 +23,10 @@ pub enum IsographSemanticToken {
     Content,
     Bracket,
     Error,
+    Description,
+    At,
+    Exclamation,
+    Comma,
 }
 
 // Only leftover fill-in: extra, leftover chunks, the matcher's cut.

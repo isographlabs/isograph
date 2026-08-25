@@ -3,7 +3,7 @@ use prelude::Postfix;
 use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
 use safe_peekable::{IntoSafePeekable, SafePeekable};
-use span::{Span, WithSpan, WithSpanPostfix};
+use span::{Span, WithGenericLocation, WithOptionalSpan, WithSpan, WithSpanPostfix};
 use thiserror::Error;
 
 use crate::{
@@ -129,7 +129,7 @@ impl Chunk {
     pub(crate) fn stream<'a>(
         &'a self,
         text: &'a str,
-        tokens: &'a mut Vec<WithSpan<IsographSemanticToken>>,
+        tokens: &'a mut Vec<WithOptionalSpan<IsographSemanticToken>>,
         errors: &'a mut Vec<WithSpan<AstError>>,
     ) -> ChunkStream<'a> {
         ChunkStream::from_nonempty(self.contents.reference(), text, tokens, errors)
@@ -173,12 +173,18 @@ impl ChunkedLevel {
         self.0
             .iter()
             .map(|chunk| {
-                parse_one_chunk(
+                let slot = parse_one_chunk(
                     chunk,
                     parent.stream_chunk(&chunk.item),
                     leftover,
                     &parse_item,
-                )
+                );
+                if slot.item.item.is_some() {
+                    parent
+                        .tokens()
+                        .push(WithGenericLocation::new(IsographSemanticToken::Comma, None));
+                }
+                slot
             })
             .collect()
     }
@@ -279,7 +285,7 @@ fn extra_plus_trailing_separator(
 }
 
 fn record_leftover_item(
-    tokens: &mut Vec<WithSpan<IsographSemanticToken>>,
+    tokens: &mut Vec<WithOptionalSpan<IsographSemanticToken>>,
     item: &WithSpan<ChunkContentItem>,
 ) {
     match item.item.reference() {
@@ -313,7 +319,7 @@ fn record_leftover_item(
 }
 
 pub(crate) fn record_leftover_chunk(
-    tokens: &mut Vec<WithSpan<IsographSemanticToken>>,
+    tokens: &mut Vec<WithOptionalSpan<IsographSemanticToken>>,
     chunk: &Chunk,
 ) {
     for item in chunk.contents.iter() {
@@ -322,7 +328,7 @@ pub(crate) fn record_leftover_chunk(
 }
 
 fn record_leftover_extra(
-    tokens: &mut Vec<WithSpan<IsographSemanticToken>>,
+    tokens: &mut Vec<WithOptionalSpan<IsographSemanticToken>>,
     extra: &Option<WithSpan<UnparsedChunkItems>>,
 ) {
     if let Some(extra) = extra {
@@ -333,14 +339,16 @@ fn record_leftover_extra(
 }
 
 fn record_leftover_span(
-    tokens: &mut Vec<WithSpan<IsographSemanticToken>>,
+    tokens: &mut Vec<WithOptionalSpan<IsographSemanticToken>>,
     role: Option<IsographSemanticToken>,
     span: Span,
 ) {
     if let Some(role) = role
-        && tokens.iter().all(|recorded| recorded.location != span)
+        && tokens
+            .iter()
+            .all(|recorded| recorded.location != span.wrap_some())
     {
-        tokens.push(role.with_span(span));
+        tokens.push(WithGenericLocation::new(role, span.wrap_some()));
     }
 }
 

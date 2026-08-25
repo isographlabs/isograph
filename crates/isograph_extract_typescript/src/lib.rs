@@ -1344,7 +1344,10 @@ iso(`entrypoint Query.HomeRoute`)";
             Some(IsoLiteralItem::Entrypoint(_))
         ));
         assert_eq!(literals[0].1.tokens[0].item, IsographSemanticToken::Keyword);
-        assert_eq!(literals[0].1.tokens[0].location, Span::from_usize(0, 10));
+        assert_eq!(
+            literals[0].1.tokens[0].location,
+            Span::from_usize(0, 10).wrap_some()
+        );
         assert_eq!(literals[0].1.tokens[1].item, IsographSemanticToken::Type);
         assert_eq!(literals[0].1.tokens[2].item, IsographSemanticToken::Period);
         assert_eq!(
@@ -1462,10 +1465,23 @@ iso(`entrypoint Query.HomeRoute`)";
             .tokens
             .iter()
             .find(|token| {
-                token.item == IsographSemanticToken::FieldName && token.location.start == name_start
+                token.item == IsographSemanticToken::FieldName
+                    && token
+                        .location
+                        .expect("FieldName is recorded with a span")
+                        .start
+                        == name_start
             })
             .expect("name is a FieldName token");
-        assert!(name.location.start > field.location.start);
+        assert!(
+            name.location
+                .expect("FieldName is recorded with a span")
+                .start
+                > field
+                    .location
+                    .expect("Keyword is recorded with a span")
+                    .start
+        );
     }
 
     #[test]

@@ -1,13 +1,18 @@
 use isograph_compiler::IsoLiteralStartIndex;
 use isograph_parser::IsographSemanticToken;
 use lsp_types::{SemanticTokenModifier, SemanticTokenType, SemanticTokensLegend};
-use span::{Span, WithSpan, WithSpanPostfix};
+use span::{Span, WithOptionalSpan, WithSpan, WithSpanPostfix};
 
 /// Parser tokens whose spans are relative to each iso interior.
 /// `literals` is every interior in `page_content`, left to right, with its file start.
 pub fn lsp_semantic_tokens<'a>(
     page_content: &str,
-    literals: impl IntoIterator<Item = (IsoLiteralStartIndex, &'a [WithSpan<IsographSemanticToken>])>,
+    literals: impl IntoIterator<
+        Item = (
+            IsoLiteralStartIndex,
+            &'a [WithOptionalSpan<IsographSemanticToken>],
+        ),
+    >,
 ) -> Vec<lsp_types::SemanticToken> {
     let index = LineIndex::new(page_content);
     if page_content.is_ascii() {
@@ -19,7 +24,12 @@ pub fn lsp_semantic_tokens<'a>(
 
 fn lsp_semantic_tokens_with<'a>(
     index: &LineIndex,
-    literals: impl IntoIterator<Item = (IsoLiteralStartIndex, &'a [WithSpan<IsographSemanticToken>])>,
+    literals: impl IntoIterator<
+        Item = (
+            IsoLiteralStartIndex,
+            &'a [WithOptionalSpan<IsographSemanticToken>],
+        ),
+    >,
     utf16_len: impl Fn(&str) -> u32,
 ) -> Vec<lsp_types::SemanticToken> {
     let mut cursor = index.cursor();
@@ -29,7 +39,13 @@ fn lsp_semantic_tokens_with<'a>(
     for (offset, tokens) in literals {
         let offset = offset.0 as u32;
         for token in tokens {
-            let token = token.item.with_span(token.location.with_offset(offset));
+            if token.item == IsographSemanticToken::Comma {
+                continue;
+            }
+            let Some(location) = token.location else {
+                continue;
+            };
+            let token = token.item.with_span(location.with_offset(offset));
             cursor.check_span(token.location, previous_token_end);
             previous_token_end = token.location.end;
             emit_pieces(token, &mut cursor, &mut last_start, &utf16_len, |t| {
@@ -353,18 +369,20 @@ fn lsp_type_index(token: IsographSemanticToken) -> u32 {
         IsographSemanticToken::FieldName => METHOD,
         IsographSemanticToken::ObjectKey | IsographSemanticToken::Argument => TYPE_PARAMETER,
         IsographSemanticToken::GraphQLTypeName => TYPE,
-        IsographSemanticToken::DirectiveName => DECORATOR,
+        IsographSemanticToken::DirectiveName | IsographSemanticToken::At => DECORATOR,
         IsographSemanticToken::Variable => FUNCTION,
         IsographSemanticToken::BooleanOrNull => VARIABLE,
         IsographSemanticToken::Integer => NUMBER,
-        IsographSemanticToken::String => STRING,
+        IsographSemanticToken::String | IsographSemanticToken::Description => STRING,
         IsographSemanticToken::Period
         | IsographSemanticToken::Colon
         | IsographSemanticToken::Equals
         | IsographSemanticToken::Parenthesis
         | IsographSemanticToken::Brace
         | IsographSemanticToken::Content
-        | IsographSemanticToken::Bracket => OPERATOR,
+        | IsographSemanticToken::Bracket
+        | IsographSemanticToken::Exclamation
+        | IsographSemanticToken::Comma => OPERATOR,
         IsographSemanticToken::Error => COMMENT,
     }
 }
@@ -375,7 +393,7 @@ mod tests {
     use isograph_parser::{IsographSemanticToken, parse_iso_literal};
     use lsp_types::{SemanticToken, SemanticTokenType};
     use prelude::Postfix;
-    use span::{Span, WithSpan, WithSpanPostfix};
+    use span::{Span, WithGenericLocation, WithOptionalSpan};
 
     use super::{
         CLASS, COMMENT, DECORATOR, FUNCTION, KEYWORD, LineBreak, METHOD, NUMBER, OPERATOR,
@@ -396,7 +414,7 @@ mod tests {
     }
 
     fn encode(
-        tokens: &[WithSpan<IsographSemanticToken>],
+        tokens: &[WithOptionalSpan<IsographSemanticToken>],
         page_content: &str,
     ) -> Vec<SemanticToken> {
         lsp_semantic_tokens(page_content, [(IsoLiteralStartIndex(0), tokens)])
@@ -642,7 +660,7 @@ mod tests {
             parsed
                 .tokens
                 .iter()
-                .filter(|token| token.item == IsographSemanticToken::String)
+                .filter(|token| token.item == IsographSemanticToken::Description)
                 .count(),
             1,
         );
@@ -665,7 +683,7 @@ mod tests {
             parsed
                 .tokens
                 .iter()
-                .filter(|token| token.item == IsographSemanticToken::String)
+                .filter(|token| token.item == IsographSemanticToken::Description)
                 .count(),
             1,
         );
@@ -690,7 +708,7 @@ mod tests {
             parsed
                 .tokens
                 .iter()
-                .filter(|token| token.item == IsographSemanticToken::String)
+                .filter(|token| token.item == IsographSemanticToken::Description)
                 .count(),
             1,
         );
@@ -714,7 +732,7 @@ mod tests {
             parsed
                 .tokens
                 .iter()
-                .filter(|token| token.item == IsographSemanticToken::String)
+                .filter(|token| token.item == IsographSemanticToken::Description)
                 .count(),
             1,
         );
@@ -874,9 +892,11 @@ mod tests {
     #[test]
     fn a_multiline_leftover_token_splits_the_same_way() {
         let source = "\"\"\"\n  x";
-        let tokens = IsographSemanticToken::Content
-            .with_span(Span::from_usize(0, source.len()))
-            .wrap_vec();
+        let tokens = WithGenericLocation::new(
+            IsographSemanticToken::Content,
+            Span::from_usize(0, source.len()).wrap_some(),
+        )
+        .wrap_vec();
         let lsp = encode(&tokens, source);
         assert_eq!(lsp.len(), 2);
         assert_eq!(lsp[0].token_type, OPERATOR);
@@ -890,9 +910,11 @@ mod tests {
     #[test]
     fn a_multiline_leftover_with_a_blank_line() {
         let source = "\"\"\"\n\n  x";
-        let tokens = IsographSemanticToken::Content
-            .with_span(Span::from_usize(0, source.len()))
-            .wrap_vec();
+        let tokens = WithGenericLocation::new(
+            IsographSemanticToken::Content,
+            Span::from_usize(0, source.len()).wrap_some(),
+        )
+        .wrap_vec();
         let lsp = encode(&tokens, source);
         assert_eq!(lsp.len(), 2);
         assert_eq!(lsp[0].length, 3);
@@ -903,9 +925,11 @@ mod tests {
     #[test]
     fn a_span_starting_at_a_line_break_emits_the_text_after_it() {
         let source = "\n  x";
-        let tokens = IsographSemanticToken::Content
-            .with_span(Span::from_usize(0, source.len()))
-            .wrap_vec();
+        let tokens = WithGenericLocation::new(
+            IsographSemanticToken::Content,
+            Span::from_usize(0, source.len()).wrap_some(),
+        )
+        .wrap_vec();
         let lsp = encode(&tokens, source);
         assert_eq!(lsp.len(), 1);
         assert_eq!(lsp[0].delta_line, 1);
@@ -923,9 +947,11 @@ mod tests {
     #[should_panic(expected = "contains no text to highlight")]
     fn a_span_of_only_line_breaks_panics() {
         let source = "\n\n";
-        let tokens = IsographSemanticToken::Content
-            .with_span(Span::from_usize(0, source.len()))
-            .wrap_vec();
+        let tokens = WithGenericLocation::new(
+            IsographSemanticToken::Content,
+            Span::from_usize(0, source.len()).wrap_some(),
+        )
+        .wrap_vec();
         encode(&tokens, source);
     }
 
@@ -933,9 +959,11 @@ mod tests {
     #[should_panic(expected = "contains no text to highlight")]
     fn a_span_of_one_line_break_panics() {
         let source = "\n";
-        let tokens = IsographSemanticToken::Content
-            .with_span(Span::from_usize(0, source.len()))
-            .wrap_vec();
+        let tokens = WithGenericLocation::new(
+            IsographSemanticToken::Content,
+            Span::from_usize(0, source.len()).wrap_some(),
+        )
+        .wrap_vec();
         encode(&tokens, source);
     }
 
@@ -943,9 +971,11 @@ mod tests {
     #[should_panic(expected = "contains no text to highlight")]
     fn a_span_of_only_crlf_panics() {
         let source = "\r\n";
-        let tokens = IsographSemanticToken::Content
-            .with_span(Span::from_usize(0, source.len()))
-            .wrap_vec();
+        let tokens = WithGenericLocation::new(
+            IsographSemanticToken::Content,
+            Span::from_usize(0, source.len()).wrap_some(),
+        )
+        .wrap_vec();
         encode(&tokens, source);
     }
 
@@ -953,18 +983,22 @@ mod tests {
     #[should_panic(expected = "contains no text to highlight")]
     fn a_span_of_only_cr_panics() {
         let source = "\r";
-        let tokens = IsographSemanticToken::Content
-            .with_span(Span::from_usize(0, source.len()))
-            .wrap_vec();
+        let tokens = WithGenericLocation::new(
+            IsographSemanticToken::Content,
+            Span::from_usize(0, source.len()).wrap_some(),
+        )
+        .wrap_vec();
         encode(&tokens, source);
     }
 
     #[test]
     fn utf16_length_of_a_non_ascii_token() {
         let source = "aéb";
-        let tokens = IsographSemanticToken::String
-            .with_span(Span::from_usize(1, 3))
-            .wrap_vec();
+        let tokens = WithGenericLocation::new(
+            IsographSemanticToken::String,
+            Span::from_usize(1, 3).wrap_some(),
+        )
+        .wrap_vec();
         let lsp = encode(&tokens, source);
         assert_eq!(lsp.len(), 1);
         assert_eq!(lsp[0].delta_start, 1);
@@ -974,9 +1008,11 @@ mod tests {
     #[test]
     fn utf16_length_of_a_surrogate_pair() {
         let source = "a😀b";
-        let tokens = IsographSemanticToken::String
-            .with_span(Span::from_usize(1, 5))
-            .wrap_vec();
+        let tokens = WithGenericLocation::new(
+            IsographSemanticToken::String,
+            Span::from_usize(1, 5).wrap_some(),
+        )
+        .wrap_vec();
         let lsp = encode(&tokens, source);
         assert_eq!(lsp.len(), 1);
         assert_eq!(lsp[0].delta_start, 1);
@@ -987,8 +1023,14 @@ mod tests {
     fn adjacent_spans_encode() {
         let source = "ab";
         let tokens = vec![
-            IsographSemanticToken::Keyword.with_span(Span::from_usize(0, 1)),
-            IsographSemanticToken::Type.with_span(Span::from_usize(1, 2)),
+            WithGenericLocation::new(
+                IsographSemanticToken::Keyword,
+                Span::from_usize(0, 1).wrap_some(),
+            ),
+            WithGenericLocation::new(
+                IsographSemanticToken::Type,
+                Span::from_usize(1, 2).wrap_some(),
+            ),
         ];
         let lsp = encode(&tokens, source);
         assert_eq!(lsp.len(), 2);
@@ -1003,9 +1045,11 @@ mod tests {
     #[should_panic(expected = "contains no text to highlight")]
     fn an_empty_span_panics() {
         let source = "a";
-        let tokens = IsographSemanticToken::Keyword
-            .with_span(Span::from_usize(0, 0))
-            .wrap_vec();
+        let tokens = WithGenericLocation::new(
+            IsographSemanticToken::Keyword,
+            Span::from_usize(0, 0).wrap_some(),
+        )
+        .wrap_vec();
         encode(&tokens, source);
     }
 
@@ -1014,8 +1058,14 @@ mod tests {
     fn overlapping_spans_panic() {
         let source = "abcd";
         let tokens = vec![
-            IsographSemanticToken::Keyword.with_span(Span::from_usize(0, 2)),
-            IsographSemanticToken::Type.with_span(Span::from_usize(1, 3)),
+            WithGenericLocation::new(
+                IsographSemanticToken::Keyword,
+                Span::from_usize(0, 2).wrap_some(),
+            ),
+            WithGenericLocation::new(
+                IsographSemanticToken::Type,
+                Span::from_usize(1, 3).wrap_some(),
+            ),
         ];
         encode(&tokens, source);
     }
@@ -1025,8 +1075,14 @@ mod tests {
     fn out_of_order_spans_panic() {
         let source = "abcd";
         let tokens = vec![
-            IsographSemanticToken::Keyword.with_span(Span::from_usize(2, 4)),
-            IsographSemanticToken::Type.with_span(Span::from_usize(0, 1)),
+            WithGenericLocation::new(
+                IsographSemanticToken::Keyword,
+                Span::from_usize(2, 4).wrap_some(),
+            ),
+            WithGenericLocation::new(
+                IsographSemanticToken::Type,
+                Span::from_usize(0, 1).wrap_some(),
+            ),
         ];
         encode(&tokens, source);
     }
@@ -1035,9 +1091,11 @@ mod tests {
     #[should_panic(expected = "should be less than or equal")]
     fn inverted_span_panics() {
         let source = "abcd";
-        let tokens = IsographSemanticToken::Keyword
-            .with_span(Span { start: 3, end: 1 })
-            .wrap_vec();
+        let tokens = WithGenericLocation::new(
+            IsographSemanticToken::Keyword,
+            Span { start: 3, end: 1 }.wrap_some(),
+        )
+        .wrap_vec();
         encode(&tokens, source);
     }
 
@@ -1045,9 +1103,11 @@ mod tests {
     #[should_panic(expected = "out of range")]
     fn out_of_range_span_panics() {
         let source = "ab";
-        let tokens = IsographSemanticToken::Keyword
-            .with_span(Span::from_usize(0, 5))
-            .wrap_vec();
+        let tokens = WithGenericLocation::new(
+            IsographSemanticToken::Keyword,
+            Span::from_usize(0, 5).wrap_some(),
+        )
+        .wrap_vec();
         encode(&tokens, source);
     }
 
@@ -1055,9 +1115,11 @@ mod tests {
     #[should_panic(expected = "not a char boundary")]
     fn a_span_inside_a_multibyte_char_panics() {
         let source = "aéb";
-        let tokens = IsographSemanticToken::Keyword
-            .with_span(Span::from_usize(2, 3))
-            .wrap_vec();
+        let tokens = WithGenericLocation::new(
+            IsographSemanticToken::Keyword,
+            Span::from_usize(2, 3).wrap_some(),
+        )
+        .wrap_vec();
         encode(&tokens, source);
     }
 
@@ -1066,8 +1128,14 @@ mod tests {
     fn a_span_strictly_inside_crlf_panics() {
         let source = "a\r\nb";
         let tokens = vec![
-            IsographSemanticToken::Keyword.with_span(Span::from_usize(0, 1)),
-            IsographSemanticToken::Type.with_span(Span::from_usize(2, 3)),
+            WithGenericLocation::new(
+                IsographSemanticToken::Keyword,
+                Span::from_usize(0, 1).wrap_some(),
+            ),
+            WithGenericLocation::new(
+                IsographSemanticToken::Type,
+                Span::from_usize(2, 3).wrap_some(),
+            ),
         ];
         encode(&tokens, source);
     }

@@ -5,10 +5,10 @@ use span::{Span, WithGenericLocation, WithOptionalSpan, WithSpan, WithSpanPostfi
 
 use crate::chunk_stream::ItemCursor;
 use crate::{
-    AstError, BracketKind, ChunkContentItem, ChunkedLevel, EntityNameWrapper, Expectation, Found,
-    IsographResolutionNode, IsographSemanticToken, NonBracketToken, NonBracketTokenKind,
-    NonConstantValue, SelectableDeclarationPath, Slot, UnparsedChunkItems,
-    VariableDeclarationOrUsage, parse_name_colon, parse_non_constant_value, parse_variable_name,
+    AstError, BracketKind, ChunkedLevel, EntityNameWrapper, Expectation, Found,
+    IsographResolutionNode, IsographSemanticToken, NonBracketTokenKind, NonConstantValue,
+    SelectableDeclarationPath, Slot, UnparsedChunkItems, VariableDeclarationOrUsage,
+    parse_name_colon, parse_non_constant_value, parse_variable_name,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
@@ -177,13 +177,13 @@ pub(crate) fn parse_type_annotation(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<WithSpan<TypeAnnotation>, WithSpan<AstError>> {
     let core = parse_named_or_list(cursor)?;
-    if let Some(peek) = cursor.peek()
-        && matches!(
-            peek.view().item.reference(),
-            ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::Exclamation))
+    if cursor
+        .consume_token_if(
+            NonBracketTokenKind::Exclamation,
+            IsographSemanticToken::Exclamation,
         )
+        .is_some()
     {
-        peek.advance();
         return core
             .item
             .into_type_annotation()

@@ -2,7 +2,7 @@ use intern::string_key::Intern;
 use nonempty::NonEmpty;
 use prelude::Postfix;
 use safe_peekable::{IntoSafePeekable, Peek, SafePeekable};
-use span::{Span, WithSpan, WithSpanPostfix};
+use span::{Span, WithGenericLocation, WithOptionalSpan, WithSpan, WithSpanPostfix};
 
 use crate::{
     AstError, BracketKind, Chunk, ChunkContentItem, ChunkedLevel, Expectation, Found,
@@ -32,14 +32,14 @@ pub(crate) struct ItemCursor<'a> {
     /// any). An `Expected(_, EndOfChunk)` error uses this offset.
     previous_end: u32,
     text: &'a str,
-    tokens: &'a mut Vec<WithSpan<IsographSemanticToken>>,
+    tokens: &'a mut Vec<WithOptionalSpan<IsographSemanticToken>>,
     errors: &'a mut Vec<WithSpan<AstError>>,
 }
 
 pub(crate) struct CursorPeek<'c, 'a> {
     peek: Peek<'c, &'a WithSpan<ChunkContentItem>>,
     previous_end: &'c mut u32,
-    tokens: &'c mut Vec<WithSpan<IsographSemanticToken>>,
+    tokens: &'c mut Vec<WithOptionalSpan<IsographSemanticToken>>,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -92,7 +92,7 @@ impl<'a> ChunkStream<'a> {
     pub(crate) fn new(
         contents: &'a [WithSpan<ChunkContentItem>],
         text: &'a str,
-        tokens: &'a mut Vec<WithSpan<IsographSemanticToken>>,
+        tokens: &'a mut Vec<WithOptionalSpan<IsographSemanticToken>>,
         errors: &'a mut Vec<WithSpan<AstError>>,
     ) -> Self {
         Self::from_iter(
@@ -110,7 +110,7 @@ impl<'a> ChunkStream<'a> {
     pub(crate) fn from_nonempty(
         contents: &'a NonEmpty<WithSpan<ChunkContentItem>>,
         text: &'a str,
-        tokens: &'a mut Vec<WithSpan<IsographSemanticToken>>,
+        tokens: &'a mut Vec<WithOptionalSpan<IsographSemanticToken>>,
         errors: &'a mut Vec<WithSpan<AstError>>,
     ) -> Self {
         Self::from_iter(
@@ -126,7 +126,7 @@ impl<'a> ChunkStream<'a> {
         items: ContentIter<'a>,
         previous_end: u32,
         text: &'a str,
-        tokens: &'a mut Vec<WithSpan<IsographSemanticToken>>,
+        tokens: &'a mut Vec<WithOptionalSpan<IsographSemanticToken>>,
         errors: &'a mut Vec<WithSpan<AstError>>,
     ) -> Self {
         ChunkStream(ItemCursor {
@@ -142,7 +142,7 @@ impl<'a> ChunkStream<'a> {
         &mut self.0
     }
 
-    pub(crate) fn tokens(&mut self) -> &mut Vec<WithSpan<IsographSemanticToken>> {
+    pub(crate) fn tokens(&mut self) -> &mut Vec<WithOptionalSpan<IsographSemanticToken>> {
         self.0.tokens
     }
 
@@ -175,6 +175,10 @@ impl<'a> ItemCursor<'a> {
                 _ => break,
             }
         }
+    }
+
+    pub(crate) fn tokens(&mut self) -> &mut Vec<WithOptionalSpan<IsographSemanticToken>> {
+        self.tokens
     }
 
     pub(crate) fn peek(&mut self) -> Option<CursorPeek<'_, 'a>> {
@@ -240,7 +244,8 @@ impl<'a> ItemCursor<'a> {
     }
 
     fn record(&mut self, token: IsographSemanticToken, span: Span) {
-        self.tokens.push(token.with_span(span));
+        self.tokens
+            .push(WithGenericLocation::new(token, span.wrap_some()));
     }
 
     pub(crate) fn expected(&mut self, expected: Expectation) -> WithSpan<AstError> {
@@ -310,7 +315,7 @@ impl<'c, 'a> CursorPeek<'c, 'a> {
     fn take_item(
         self,
     ) -> (
-        &'c mut Vec<WithSpan<IsographSemanticToken>>,
+        &'c mut Vec<WithOptionalSpan<IsographSemanticToken>>,
         &'a WithSpan<ChunkContentItem>,
     ) {
         let item = self.peek.commit();
@@ -328,7 +333,7 @@ impl<'c, 'a> CursorPeek<'c, 'a> {
             ChunkContentItem::NonBracket(_) => item.location,
             ChunkContentItem::Group(group) => group.opening.location,
         };
-        tokens.push(token.with_span(span));
+        tokens.push(WithGenericLocation::new(token, span.wrap_some()));
         item
     }
 }
@@ -336,7 +341,7 @@ impl<'c, 'a> CursorPeek<'c, 'a> {
 #[cfg(test)]
 mod tests {
     use prelude::Postfix;
-    use span::{Span, WithSpan, WithSpanPostfix};
+    use span::{Span, WithGenericLocation, WithOptionalSpan, WithSpan, WithSpanPostfix};
 
     use super::{ChunkStream, TokenText};
     use crate::{
@@ -370,7 +375,7 @@ mod tests {
     fn stream_of<'a>(
         tree: &'a WithSpan<crate::ChunkedRoot>,
         text: &'a str,
-        tokens: &'a mut Vec<WithSpan<IsographSemanticToken>>,
+        tokens: &'a mut Vec<WithOptionalSpan<IsographSemanticToken>>,
         errors: &'a mut Vec<WithSpan<AstError>>,
     ) -> ChunkStream<'a> {
         ChunkStream::new(tree.item.0.as_slice(), text, tokens, errors)
@@ -756,7 +761,10 @@ mod tests {
                     "for literal {text:?}",
                 );
             }
-            assert_eq!(tokens, token.with_span(span_of(text, text)).wrap_vec());
+            assert_eq!(
+                tokens,
+                WithGenericLocation::new(token, span_of(text, text).wrap_some()).wrap_vec()
+            );
         }
     }
 
@@ -827,9 +835,18 @@ mod tests {
         assert_eq!(
             tokens,
             vec![
-                IsographSemanticToken::FieldName.with_span(span_of(text, "alias")),
-                IsographSemanticToken::Colon.with_span(span_of(text, ":")),
-                IsographSemanticToken::FieldName.with_span(span_of(text, "name")),
+                WithGenericLocation::new(
+                    IsographSemanticToken::FieldName,
+                    span_of(text, "alias").wrap_some()
+                ),
+                WithGenericLocation::new(
+                    IsographSemanticToken::Colon,
+                    span_of(text, ":").wrap_some()
+                ),
+                WithGenericLocation::new(
+                    IsographSemanticToken::FieldName,
+                    span_of(text, "name").wrap_some()
+                ),
             ],
         );
     }
@@ -850,8 +867,14 @@ mod tests {
             assert_eq!(
                 tokens,
                 vec![
-                    IsographSemanticToken::Brace.with_span(span_of(text, "{")),
-                    IsographSemanticToken::Brace.with_span(span_of(text, "}")),
+                    WithGenericLocation::new(
+                        IsographSemanticToken::Brace,
+                        span_of(text, "{").wrap_some()
+                    ),
+                    WithGenericLocation::new(
+                        IsographSemanticToken::Brace,
+                        span_of(text, "}").wrap_some()
+                    ),
                 ],
                 "for literal {text:?}",
             );
@@ -929,9 +952,11 @@ mod tests {
         }
         assert_eq!(
             tokens,
-            IsographSemanticToken::FieldName
-                .with_span(span_of(text, "foo"))
-                .wrap_vec(),
+            WithGenericLocation::new(
+                IsographSemanticToken::FieldName,
+                span_of(text, "foo").wrap_some()
+            )
+            .wrap_vec(),
         );
     }
 

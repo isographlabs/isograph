@@ -62,10 +62,9 @@ pub(crate) fn consume_directives(
     cursor
         .spanning(|cursor| {
             let mut directives = Vec::new();
-            while let Some(at) = cursor.consume_token_if(
-                NonBracketTokenKind::At,
-                IsographSemanticToken::DirectiveName,
-            ) {
+            while let Some(at) =
+                cursor.consume_token_if(NonBracketTokenKind::At, IsographSemanticToken::At)
+            {
                 directives.push(parse_directive_after_at(cursor, at.location)?);
             }
             IsographFieldDirectiveList(directives).wrap_ok()
