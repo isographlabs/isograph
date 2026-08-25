@@ -2,11 +2,11 @@
 
 Requires lsp-sessions.md and lsp-outstanding.md (treat both as landed). Independent of lsp-diagnostics.md.
 
-The session already has `LspClientId`, posts `LspClientGone` when the connection ends, and puts `client` on `LspRequest`. Notifications are still a bare `lsp_server::Notification`. `semanticTokens/full` reads `DiskFile` only. Unsaved buffer text is leftover.
+The session already has `ClientId`, posts `ClientConnectionEvent::Gone` when the connection ends, and puts `client` on `LspRequest`. Notifications are still a bare `lsp_server::Notification`. `semanticTokens/full` reads `DiskFile` only. Unsaved buffer text is leftover.
 
-This file is the open-file path. A `didOpen` / `didChange` / `didClose` writes an `OpenFile` source keyed by that client and path. `LspClientGone` removes every `OpenFile` for that client. Every LSP read of file text goes through one function: that client's `OpenFile` if present, otherwise `DiskFile`. Artifact generation still reads `DiskFile` only.
+This file is the open-file path. A `didOpen` / `didChange` / `didClose` writes an `OpenFile` source keyed by that client and path. `ClientConnectionEvent::Gone` removes every `OpenFile` for that client. Every LSP read of file text goes through one function: that client's `OpenFile` if present, otherwise `DiskFile`. Artifact generation still reads `DiskFile` only.
 
-Origin of the map and the handlers: isograph `OpenFileMap` / `OpenFileSource` / `insert_open_file` / `remove_open_file` and `crates/isograph_lsp/src/text_document.rs`. Origin of overlay-then-disk: isograph `file_text_at_location`. Origin of `LspClientId` / `LspClientGone`: lsp-outstanding.md.
+Origin of the map and the handlers: isograph `OpenFileMap` / `OpenFileSource` / `insert_open_file` / `remove_open_file` and `crates/isograph_lsp/src/text_document.rs`. Origin of overlay-then-disk: isograph `file_text_at_location`. Origin of `ClientId` / `ClientConnectionEvent::Gone`: lsp-sessions.md and lsp-outstanding.md. isograph is one client, path-only `OpenFile`. i2 keys the source by `(client, path)` so two connections do not collide.
 
 Delta from isograph: the source key includes the client, so two connections can have different unsaved text for the same path; disconnect garbage-collects that client's sources. No `expect` on the URI. Full document sync; a `didChange` that is not one full-text change is a no-op, not a panic. `Internal::EditorChanged` is not added. The notification arms write the map.
 
@@ -24,7 +24,7 @@ After change 3, `semanticTokens/full` for a URI uses the asking client's buffer 
 
 ## Change 1: per-client `OpenFile`, document sync, GC
 
-`Lsp::Notification` carries the client. Notification handlers receive it. `didOpen` / `didChange` / `didClose` insert or remove `OpenFile` for that client. `handle` of `LspClientGone` removes that client's entries. `initialize` advertises full document sync. `semanticTokens/full` still reads `DiskFile`.
+`Lsp::Notification` carries the client. Notification handlers receive it. `didOpen` / `didChange` / `didClose` insert or remove `OpenFile` for that client. `handle` of `ClientConnectionEvent::Gone` removes that client's entries. `initialize` advertises full document sync. `semanticTokens/full` still reads `DiskFile`.
 
 ### Types
 
@@ -32,7 +32,7 @@ Most important first.
 
 pico `#[key]` is one field. Two clients on one path cannot share a path-only source: `db.set` would collide, and removing one client would `remove` the source the other still points at. The key is `(client, path)`.
 
-`LspClientId` today lives in the CLI (`event.rs` from lsp-outstanding.md, `lsp_socket.rs` from lsp-sessions.md). `OpenFile` sits on `IsographDb` in `isograph_compiler`. Move the newtype to the compiler crate. The CLI uses that type. One definition.
+`ClientId` today lives in the CLI (`event.rs`, `lsp_socket.rs`). `OpenFile` sits on `IsographDb` in `isograph_compiler`. Move the newtype to the compiler crate as `LspClientId`. The CLI uses that type. One definition.
 
 ```rust
 // from crates/isograph_compiler/src/database.rs
@@ -40,7 +40,7 @@ pico `#[key]` is one field. Two clients on one path cannot share a path-only sou
 pub struct LspClientId(pub u64);
 ```
 
-`event.rs` and `lsp_socket.rs` drop their local `LspClientId`. They use `isograph_compiler::LspClientId`. `crates/isograph_compiler/src/lib.rs` re-exports it next to `DiskFile`.
+`event.rs` and `lsp_socket.rs` drop `ClientId`. They use `isograph_compiler::LspClientId`. `crates/isograph_compiler/src/lib.rs` re-exports it next to `DiskFile`.
 
 ```rust
 // from crates/isograph_compiler/src/database.rs
@@ -61,16 +61,14 @@ pub struct IsographDb<THostLanguage: HostLanguage> {
     phantom_data: PhantomData<THostLanguage>,
 }
 
-#[derive(Debug, Default)]
-pub struct OpenFileMap(
-    pub HashMap<LspClientId, HashMap<RelativePathToSourceFile, SourceId<OpenFile>>>,
-);
-
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub struct OpenFileKey {
     pub client: LspClientId,
     pub path: RelativePathToSourceFile,
 }
+
+#[derive(Debug, Default)]
+pub struct OpenFileMap(pub HashMap<OpenFileKey, SourceId<OpenFile>>);
 
 #[derive(Debug, Clone, PartialEq, Eq, Source)]
 pub struct OpenFile {
@@ -80,7 +78,9 @@ pub struct OpenFile {
 }
 ```
 
-The tracked field is nested: outer key is the client, inner map is that client's open paths. `handle` of `LspClientGone` drops one outer key. A memo keyed by `(client, path)` looks up that pair; it does not iterate the outer map.
+`OpenFileMap` is the same shape as `DiskFileMap`: one `HashMap` from source key to `SourceId`. The key is a pair because two clients can hold different unsaved text for one path. A memo keyed by `(client, path)` looks up that `OpenFileKey`; it does not iterate the map.
+
+Connected clients live in `LiveSessions` only. `OpenFileMap` is buffers. A connected client with no open files is in `LiveSessions` and not in `OpenFileMap`. `handle` of `ClientConnectionEvent::Gone` writes both: drops the session, then `remove_open_files_for_client`.
 
 `Default` for `IsographDb` also sets `open_file_map: OpenFileMap::default()`.
 
@@ -95,36 +95,26 @@ impl<THostLanguage: HostLanguage> IsographDb<THostLanguage> {
     ) {
         let key = OpenFileKey { client, path };
         let source_id = self.set(OpenFile { key, contents });
-        self.get_open_file_map_mut()
-            .tracked()
-            .0
-            .entry(client)
-            .or_default()
-            .insert(path, source_id);
+        self.get_open_file_map_mut().tracked().0.insert(key, source_id);
     }
 
     pub fn remove_open_file(&mut self, client: LspClientId, path: RelativePathToSourceFile) {
-        let source_id = {
-            let map = self.get_open_file_map_mut().tracked();
-            let Some(files) = map.0.get_mut(&client) else {
-                return;
-            };
-            let Some(source_id) = files.remove(&path) else {
-                return;
-            };
-            if files.is_empty() {
-                map.0.remove(&client);
-            }
-            source_id
+        let key = OpenFileKey { client, path };
+        let Some(source_id) = self.get_open_file_map_mut().tracked().0.remove(&key) else {
+            return;
         };
         self.remove(source_id);
     }
 
     pub fn remove_open_files_for_client(&mut self, client: LspClientId) {
-        let Some(files) = self.get_open_file_map_mut().tracked().0.remove(&client) else {
-            return;
-        };
-        for source_id in files.into_values() {
+        let ids: Vec<_> = self
+            .get_open_file_map_mut()
+            .tracked()
+            .0
+            .extract_if(|key, _| key.client == client)
+            .map(|(_, source_id)| source_id)
+            .collect();
+        for source_id in ids {
             self.remove(source_id);
         }
     }
@@ -134,22 +124,10 @@ impl<THostLanguage: HostLanguage> IsographDb<THostLanguage> {
         client: LspClientId,
         path: RelativePathToSourceFile,
     ) -> Option<&OpenFile> {
-        let source_id = match self
-            .get_open_file_map()
-            .untracked()
-            .0
-            .get(&client)
-            .and_then(|files| files.get(&path))
-            .copied()
-        {
+        let key = OpenFileKey { client, path };
+        let source_id = match self.get_open_file_map().untracked().0.get(&key).copied() {
             Some(source_id) => source_id,
-            None => self
-                .get_open_file_map()
-                .tracked()
-                .0
-                .get(&client)
-                .and_then(|files| files.get(&path))
-                .copied()?,
+            None => self.get_open_file_map().tracked().0.get(&key).copied()?,
         };
         self.get(source_id).wrap_some()
     }
@@ -158,7 +136,7 @@ impl<THostLanguage: HostLanguage> IsographDb<THostLanguage> {
 
 Same miss pattern as `TypeScriptHostLanguage::extract_iso_literals` on `disk_file_map`. Hit: `untracked` then `db.get`, so another client's insert does not re-invoke. Miss: `tracked` the map, so a later insert of this pair is seen. A miss also re-invokes on an unrelated client's `didOpen`. That is the disk-map miss pattern.
 
-`insert_open_file` of a pair that is already present replaces the `OpenFile` (`set` on the same `OpenFileKey`) and the inner map entry. `remove_open_file` of a pair that is not present is a no-op. Removing the last path for a client drops the outer key. `remove_open_files_for_client` of a client that has no entry is a no-op. An empty string is present, not absent.
+`insert_open_file` of a pair that is already present replaces the `OpenFile` (`set` on the same `OpenFileKey`) and the map entry. `remove_open_file` of a pair that is not present is a no-op. `remove_open_files_for_client` of a client that has no entries is a no-op (`extract_if` matches nothing). An empty string is present, not absent. `remove_open_files_for_client` walks the map the way `remove_disk_files_from_path` does.
 
 `open_file` is a lookup of that client's buffer. It does not fall back to disk. Change 3 is the fallback.
 
@@ -423,32 +401,33 @@ Before: `ServerCapabilities` with `semantic_tokens_provider`, `document_formatti
 
 `open_close` / `change` are `lsp_types` fields. `FULL` is why `on_did_change` requires one rangeless change.
 
-### `LspClientGone` garbage-collects
+### `ClientConnectionEvent::Gone` garbage-collects
 
-lsp-outstanding.md: `handle` of `LspClientGone` is `Vec::new()`. This slice is the first writer of sources on that event.
+Landed `handle` of `Gone` is `live_sessions.0.remove`. This slice also removes that client's `OpenFile` sources. One event, two writes: the session map is connectedness; the db map is buffers.
 
 ```rust
 // from crates/isograph_cli/src/state.rs
-        IsographEvent::LspClientGone(gone) => {
-            state.remove_open_files_for_client(gone.client);
-            Vec::new()
+        ClientConnectionEvent::Gone(client) => {
+            state.live_sessions.0.remove(&client);
+            state.db.remove_open_files_for_client(client);
+            no_effects()
         }
 ```
 
-`handle` is the only writer of `OpenFile`, same as `DiskFile`. `SessionGuard` already drops the live-session writer. It does not touch pico sources.
+`handle` is the only writer of `OpenFile`, same as `DiskFile`. Dropping the `LiveSession` drops the writer. It does not drop pico sources; `remove_open_files_for_client` does.
 
 ### Tests
 
 Compiler, `database.rs` (same shape as the `DiskFile` tests; intern paths, call insert/remove, no `PathBuf`):
 
 - `insert_open_file` then `open_file` is the contents
-- a second insert of the same client and path replaces contents; outer map length 1, inner length 1
+- a second insert of the same client and path replaces contents; map length 1
 - empty string is stored
-- two paths for one client are two inner entries
-- two clients, same path, different contents: each `open_file` returns that client's text; they are two `OpenFile` sources
+- two paths for one client are two map entries
+- two clients, same path, different contents: each `open_file` returns that client's text; they are two `OpenFile` sources; map length 2
 - `remove_open_file` then `open_file` is `None`
 - `remove_open_file` of a never-present pair is a no-op
-- removing the last path for a client drops the outer key (`get_open_file_map().untracked().0.get(&client)` is `None`)
+- removing the last path for a client leaves no `OpenFileKey` with that `client`
 - `remove_open_files_for_client` removes both paths; the other client's path remains
 - `remove_open_files_for_client` of a never-present client is a no-op
 - `insert_disk_file` of the same path does not change `open_file`; `insert_open_file` does not change `disk_file`
@@ -462,7 +441,8 @@ Compiler, `database.rs` (same shape as the `DiskFile` tests; intern paths, call 
 - `didChange` with `contentChanges: []`: open text unchanged
 - `didChange` with `range` set: open text unchanged
 - `didChange` with two full changes: open text unchanged
-- `LspClientGone` after two `didOpen`s: both gone; a `DiskFile` at one of those paths is still there
+- `ClientConnectionEvent::Gone` after two `didOpen`s: both gone; a `DiskFile` at one of those paths is still there; that `client` is absent from `live_sessions`
+- `ClientConnectionEvent::Gone` of a live client that never `didOpen`: `live_sessions` empty, `open_file_map` empty, no effects
 - `isograph/event` HelloWorld still returns `LogHelloWorld` with the new handler signature
 - unknown notification still no effects
 
@@ -470,7 +450,7 @@ Compiler, `database.rs` (same shape as the `DiskFile` tests; intern paths, call 
 
 - initialize result has `textDocumentSync.change == 1` (`FULL`) and `openClose == true`
 - two connections, each `didOpen` the same URI with different text: after settle, each client's `open_file` is that connection's text. Inspect via `handle` on a harness `IsographState` is not available from listen_and_reply's private state. Drive this fact through `handle` tests above; the socket test is: drop one connection, the remaining connection's later `didChange` still succeeds (no panic). After both drop, a third connection HelloWorld still works.
-- drop a connection after `didOpen`: `event_rx` receives `LspClientGone` (already an outstanding test). This slice adds: a subsequent `didOpen` from a new connection of the same URI is that new client's file only (no leftover from the dropped id). Observable after change 3 via tokens; this slice asserts via `handle` + `LspClientGone` as above.
+- drop a connection after `didOpen`: `event_rx` receives `ClientConnectionEvent::Gone` (already a sessions test). This slice adds: a subsequent `didOpen` from a new connection of the same URI is that new client's file only (no leftover from the dropped id). Observable after change 3 via tokens; this slice asserts via `handle` + `Gone` as above.
 
 Do not add a production function only tests call.
 
@@ -479,7 +459,7 @@ Do not add a production function only tests call.
 - `accept_loop` -> `LspClientId` -> `session` -> `LspNotification.client`
 - `didOpen` / `didChange` -> `insert_open_file`
 - `didClose` -> `remove_open_file`
-- `LspClientGone` -> `remove_open_files_for_client`
+- `ClientConnectionEvent::Gone` -> `live_sessions.0.remove` and `remove_open_files_for_client`
 - `isograph/event` -> `handle_internal` (client unused)
 - later change 3 -> `open_file` / `lsp_file_contents`
 
@@ -502,17 +482,17 @@ struct OpenFile {
 }
 ```
 
-A path may have a `DiskFile`, any number of `OpenFile`s (one per client), both, or neither. Artifact generation reads `DiskFile`. The LSP reads that client's `OpenFile` when it exists, otherwise `DiskFile`. `LspClientGone` removes every `OpenFile` whose key contains that client.
+A path may have a `DiskFile`, any number of `OpenFile`s (one per client), both, or neither. Artifact generation reads `DiskFile`. The LSP reads that client's `OpenFile` when it exists, otherwise `DiskFile`. `ClientConnectionEvent::Gone` removes every `OpenFile` whose key contains that client. Connected clients are `LiveSessions` keys, not `OpenFileMap` keys.
 
 `docs-website/docs/design-docs/event-model.md` State: drop the path-only `OpenFile { path, contents }`. Same `OpenFile` / `OpenFileKey` / `OpenFileMap` as above. `handle` of `didOpen` / `didChange` / `didClose` is the writer. There is no `Internal::EditorChanged`.
 
-`docs-website/docs/design-docs/event-model.md` Dispatch: `EditorChanged` sentences become: `DidOpenTextDocument` / `DidChangeTextDocument` (one rangeless change) call `insert_open_file`. `DidCloseTextDocument` calls `remove_open_file`. `LspClientGone` calls `remove_open_files_for_client`.
+`docs-website/docs/design-docs/event-model.md` Dispatch: `EditorChanged` sentences become: `DidOpenTextDocument` / `DidChangeTextDocument` (one rangeless change) call `insert_open_file`. `DidCloseTextDocument` calls `remove_open_file`. `ClientConnectionEvent::Gone` calls `live_sessions.0.remove` and `remove_open_files_for_client`.
 
 `docs-website/docs/design-docs/event-model.md` Event: `EditorChanged` / `Buffer` types are not added.
 
 `refactors/pending/event-model.md`: after lsp-sessions.md, this file's three changes, then lsp-diagnostics.md. lsp-diagnostics.md currently walks interned `DiskFile`s; when it lands after this, it uses change 3's `lsp_file_contents` per live session, not a global overlay.
 
-`refactors/pending/lsp-outstanding.md`: `handle` of `LspClientGone` is no longer empty; it is `remove_open_files_for_client`.
+Landed `handle` of `ClientConnectionEvent::Gone` is `live_sessions.0.remove`. This slice adds `remove_open_files_for_client` on that same arm.
 
 ## Change 2: `extract_iso_literals_from_text`
 
@@ -629,7 +609,7 @@ impl<THostLanguage: HostLanguage> IsographDb<THostLanguage> {
 
 `disk_file` today `untracked` then `?`, so a miss never `tracked`s the map and a later `Present` of that path is not seen. `extract_iso_literals` already uses the miss-tracked pattern. This slice makes `disk_file` use that pattern. `lsp_file_contents` uses `disk_file_source_id` on overlay miss, so a later disk `Present` of a path this client does not have open is seen.
 
-If `open_file` hits, this function does not read `DiskFile`. A later disk change does not re-invoke a memo that took the overlay. The buffer still wins until `didClose` or `LspClientGone`.
+If `open_file` hits, this function does not read `DiskFile`. A later disk change does not re-invoke a memo that took the overlay. The buffer still wins until `didClose` or `ClientConnectionEvent::Gone`.
 
 `TypeScriptHostLanguage::extract_iso_literals` can keep its own lookup or call `disk_file`. Either way it does not call `lsp_file_contents`.
 
