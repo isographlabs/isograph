@@ -64,13 +64,10 @@ fn dispatch_lsp<THostLanguage: HostLanguage>(
         crate::event::LspEvent::Request(incoming) => {
             let client = incoming.client;
             let id = incoming.request.id.clone();
-            {
-                let Some(session) = state.live_sessions.0.get_mut(&client) else {
-                    return no_effects();
-                };
-                session.outstanding.insert(id.clone());
-            }
-            dispatch_lsp_request(state, incoming, id)
+            let Some(before_compute) = state.live_sessions.reply(client, id) else {
+                return no_effects();
+            };
+            dispatch_lsp_request(state, incoming, before_compute)
         }
         crate::event::LspEvent::Notification(notification) => {
             dispatch_lsp_notification(state, notification)
@@ -82,9 +79,12 @@ fn dispatch_lsp<THostLanguage: HostLanguage>(
 fn dispatch_lsp_request<THostLanguage: HostLanguage>(
     state: &mut IsographState<THostLanguage>,
     incoming: crate::event::LspRequest,
-    id: lsp_server::RequestId,
+    before: crate::event::BeforeCompute,
 ) -> Vec<IsographEffect> {
-    let crate::event::LspRequest { client, request } = incoming;
+    let request = incoming.request;
+    let Some(after) = state.live_sessions.before_compute(before) else {
+        return no_effects();
+    };
     let get_response = || {
         let request =
             isograph_lsp::lsp_request_dispatch::LSPRequestDispatch::new(request, &state.db)
@@ -101,53 +101,59 @@ fn dispatch_lsp_request<THostLanguage: HostLanguage>(
         ControlFlow::Continue(request)
     };
     match get_response() {
-        ControlFlow::Break(response) => send_lsp_response(state, client, id, response),
-        ControlFlow::Continue(request) => method_not_found(state, client, id, request),
+        ControlFlow::Break(response) => {
+            send_lsp_response(&mut state.live_sessions, after, response_body(response))
+        }
+        ControlFlow::Continue(request) => {
+            method_not_found(&mut state.live_sessions, after, request)
+        }
     }
 }
 
-fn send_lsp_response<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
-    client: crate::event::ClientId,
-    id: lsp_server::RequestId,
-    response: lsp_server::Response,
+fn send_lsp_response(
+    sessions: &mut crate::event::LiveSessions,
+    after: crate::event::AfterCompute,
+    body: Result<serde_json::Value, lsp_server::ResponseError>,
 ) -> Vec<IsographEffect> {
-    let Some(send) = state.live_sessions.take_reply(client, id) else {
+    let Some(send) = sessions.after_compute(after, body) else {
         return no_effects();
     };
     crate::effect::IsographEffect::SendLspResponse(
-        crate::effect::SendLspResponseEffect {
-            send: (move |token: &crate::effect::SideEffectToken| {
-                send(token, lsp_server::Message::Response(response))
-            })
-            .boxed(),
-        }
-        .boxed(),
+        crate::effect::SendLspResponseEffect { send }.boxed(),
     )
     .wrap_vec()
 }
 
-fn method_not_found<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
-    client: crate::event::ClientId,
-    id: lsp_server::RequestId,
+fn method_not_found(
+    sessions: &mut crate::event::LiveSessions,
+    after: crate::event::AfterCompute,
     request: lsp_server::Request,
 ) -> Vec<IsographEffect> {
     send_lsp_response(
-        state,
-        client,
-        id,
-        lsp_server::Response {
-            id: request.id,
-            result: None,
-            error: lsp_server::ResponseError {
-                code: lsp_server::ErrorCode::MethodNotFound as i32,
-                data: None,
-                message: format!("No handler registered for method '{}'", request.method),
-            }
-            .wrap_some(),
-        },
+        sessions,
+        after,
+        lsp_server::ResponseError {
+            code: lsp_server::ErrorCode::MethodNotFound as i32,
+            data: None,
+            message: format!("No handler registered for method '{}'", request.method),
+        }
+        .wrap_err(),
     )
+}
+
+fn response_body(
+    response: lsp_server::Response,
+) -> Result<serde_json::Value, lsp_server::ResponseError> {
+    match (response.result, response.error) {
+        (Some(value), None) => value.wrap_ok(),
+        (_, Some(error)) => error.wrap_err(),
+        (None, None) => lsp_server::ResponseError {
+            code: lsp_server::ErrorCode::UnknownErrorCode as i32,
+            data: None,
+            message: "LSP response has neither result nor error".to_owned(),
+        }
+        .wrap_err(),
+    }
 }
 
 fn handle_internal_event<THostLanguage: HostLanguage>(
@@ -613,6 +619,55 @@ mod tests {
     }
 
     #[test]
+    fn lsp_formatting_of_a_live_client_with_empty_params_returns_an_error() {
+        let mut state = empty();
+        let client = ClientId(1);
+        let (tx, rx) = crossbeam::channel::unbounded();
+        start_client(&mut state, client, tx);
+        let id = lsp_server::RequestId::from(1);
+        let effects = handle(
+            &mut state,
+            lsp_request(
+                client,
+                id.clone(),
+                lsp_types::request::Formatting::METHOD,
+                serde_json::json!({}),
+            ),
+        );
+        assert_eq!(effects.len(), 1);
+        let effect = effects
+            .into_iter()
+            .next()
+            .expect("handle returned one effect");
+        assert!(
+            matches!(effect, crate::effect::IsographEffect::SendLspResponse(_)),
+            "handle of Formatting with empty params returns SendLspResponseEffect"
+        );
+        let (event_tx, _event_rx) = tokio::sync::mpsc::unbounded_channel();
+        let _ = crate::daemon::perform(
+            &crate::effect::SideEffectToken::mint(),
+            effect,
+            event_tx.reference(),
+        );
+        let lsp_server::Message::Response(response) = rx.recv().expect("perform sends on reply")
+        else {
+            panic!("perform sends Message::Response");
+        };
+        assert_eq!(response.id, id);
+        assert!(response.result.is_none());
+        assert!(response.error.is_some());
+        assert!(
+            state
+                .live_sessions
+                .0
+                .get(&client)
+                .expect("the client is live")
+                .outstanding
+                .is_empty()
+        );
+    }
+
+    #[test]
     fn lsp_request_without_a_live_session_returns_no_effects() {
         let mut state = empty();
         let effects = handle(
@@ -1060,39 +1115,155 @@ mod tests {
         assert!(session.outstanding.is_empty());
     }
 
-    #[test]
-    fn take_reply_of_an_id_that_is_not_outstanding_is_none() {
-        let mut sessions = LiveSessions::default();
-        let (tx, _rx) = crossbeam::channel::unbounded();
-        let client = ClientId(1);
+    fn insert_live_session(
+        sessions: &mut LiveSessions,
+        client: ClientId,
+    ) -> crossbeam::channel::Receiver<lsp_server::Message> {
+        let (tx, rx) = crossbeam::channel::unbounded();
         sessions.0.insert(
             client,
             dummy_session(tx, lsp_types::ClientCapabilities::default()),
         );
+        rx
+    }
+
+    fn perform_send(effect: crate::effect::IsographEffect) {
+        let (event_tx, _event_rx) = tokio::sync::mpsc::unbounded_channel();
+        let _ = crate::daemon::perform(
+            &crate::effect::SideEffectToken::mint(),
+            effect,
+            event_tx.reference(),
+        );
+    }
+
+    #[test]
+    fn reply_of_a_client_that_is_not_in_the_map_is_none() {
+        let mut sessions = LiveSessions::default();
         assert!(
             sessions
-                .take_reply(client, lsp_server::RequestId::from(1))
+                .reply(ClientId(1), lsp_server::RequestId::from(1))
                 .is_none()
         );
     }
 
     #[test]
-    fn take_reply_of_an_outstanding_id_is_some_once() {
+    fn reply_then_after_compute_of_a_live_client_sends_the_closed_over_id() {
         let mut sessions = LiveSessions::default();
-        let (tx, _rx) = crossbeam::channel::unbounded();
         let client = ClientId(1);
         let id = lsp_server::RequestId::from(1);
-        sessions.0.insert(
-            client,
-            dummy_session(tx, lsp_types::ClientCapabilities::default()),
+        let rx = insert_live_session(&mut sessions, client);
+        let before = sessions
+            .reply(client, id.clone())
+            .expect("reply of a live client is Some");
+        assert!(
+            sessions
+                .0
+                .get(&client)
+                .expect("the client is live")
+                .outstanding
+                .contains(&id)
         );
+        let after = sessions
+            .before_compute(before)
+            .expect("before_compute of an outstanding id is Some");
+        let send = sessions
+            .after_compute(after, serde_json::json!([]).wrap_ok())
+            .expect("after_compute of an outstanding id is Some");
+        assert!(
+            sessions
+                .0
+                .get(&client)
+                .expect("the client is live")
+                .outstanding
+                .is_empty()
+        );
+        perform_send(crate::effect::IsographEffect::SendLspResponse(
+            crate::effect::SendLspResponseEffect { send }.boxed(),
+        ));
+        let lsp_server::Message::Response(response) = rx.recv().expect("perform sends on reply")
+        else {
+            panic!("perform sends Message::Response");
+        };
+        assert_eq!(response.id, id);
+        assert_eq!(response.result, serde_json::json!([]).wrap_some());
+        assert!(response.error.is_none());
+    }
+
+    #[test]
+    fn before_compute_after_removing_the_client_is_none() {
+        let mut sessions = LiveSessions::default();
+        let client = ClientId(1);
+        let rx = insert_live_session(&mut sessions, client);
+        let before = sessions
+            .reply(client, lsp_server::RequestId::from(1))
+            .expect("reply of a live client is Some");
+        sessions.0.remove(&client);
+        assert!(sessions.before_compute(before).is_none());
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn after_compute_after_removing_the_client_is_none() {
+        let mut sessions = LiveSessions::default();
+        let client = ClientId(1);
+        let rx = insert_live_session(&mut sessions, client);
+        let before = sessions
+            .reply(client, lsp_server::RequestId::from(1))
+            .expect("reply of a live client is Some");
+        let after = sessions
+            .before_compute(before)
+            .expect("before_compute of an outstanding id is Some");
+        sessions.0.remove(&client);
+        assert!(
+            sessions
+                .after_compute(after, serde_json::json!([]).wrap_ok())
+                .is_none()
+        );
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn before_compute_after_removing_the_id_is_none() {
+        let mut sessions = LiveSessions::default();
+        let client = ClientId(1);
+        let id = lsp_server::RequestId::from(1);
+        let rx = insert_live_session(&mut sessions, client);
+        let before = sessions
+            .reply(client, id.clone())
+            .expect("reply of a live client is Some");
         sessions
             .0
             .get_mut(&client)
-            .expect("the test inserted the session")
+            .expect("the client is live")
             .outstanding
-            .insert(id.clone());
-        assert!(sessions.take_reply(client, id.clone()).is_some());
-        assert!(sessions.take_reply(client, id).is_none());
+            .remove(&id);
+        assert!(sessions.before_compute(before).is_none());
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn after_compute_after_removing_the_id_is_none() {
+        let mut sessions = LiveSessions::default();
+        let client = ClientId(1);
+        let id = lsp_server::RequestId::from(1);
+        let rx = insert_live_session(&mut sessions, client);
+        let before = sessions
+            .reply(client, id.clone())
+            .expect("reply of a live client is Some");
+        let after = sessions
+            .before_compute(before)
+            .expect("before_compute of an outstanding id is Some");
+        sessions
+            .0
+            .get_mut(&client)
+            .expect("the client is live")
+            .outstanding
+            .remove(&id);
+        assert!(
+            sessions
+                .after_compute(after, serde_json::json!([]).wrap_ok())
+                .is_none()
+        );
+        assert!(rx.try_recv().is_err());
     }
 }

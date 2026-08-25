@@ -39,23 +39,61 @@ pub struct LiveSession {
 #[derive(Debug, Default)]
 pub struct LiveSessions(pub std::collections::HashMap<ClientId, LiveSession>);
 
+pub struct BeforeCompute {
+    client: ClientId,
+    id: lsp_server::RequestId,
+}
+
+pub struct AfterCompute {
+    client: ClientId,
+    id: lsp_server::RequestId,
+}
+
 impl LiveSessions {
-    pub fn take_reply(
-        &mut self,
-        client: ClientId,
-        id: lsp_server::RequestId,
-    ) -> Option<
-        impl for<'a> FnOnce(&'a crate::effect::SideEffectToken, lsp_server::Message) + Send + use<>,
-    > {
+    pub fn reply(&mut self, client: ClientId, id: lsp_server::RequestId) -> Option<BeforeCompute> {
         let session = self.0.get_mut(&client)?;
-        if !session.outstanding.remove(&id) {
+        session.outstanding.insert(id.clone());
+        BeforeCompute { client, id }.wrap_some()
+    }
+
+    pub fn before_compute(&mut self, before: BeforeCompute) -> Option<AfterCompute> {
+        let session = self.0.get_mut(&before.client)?;
+        if !session.outstanding.contains(&before.id) {
+            return None;
+        }
+        AfterCompute {
+            client: before.client,
+            id: before.id,
+        }
+        .wrap_some()
+    }
+
+    #[expect(clippy::type_complexity)]
+    pub fn after_compute(
+        &mut self,
+        after: AfterCompute,
+        body: Result<serde_json::Value, lsp_server::ResponseError>,
+    ) -> Option<Box<dyn FnOnce(&crate::effect::SideEffectToken) + Send>> {
+        let session = self.0.get_mut(&after.client)?;
+        if !session.outstanding.remove(&after.id) {
             return None;
         }
         let sender = session.sender.clone();
-        (move |_token: &crate::effect::SideEffectToken, message| {
-            let _ = sender.send(message);
-        })
-        .wrap_some()
+        let (result, error) = match body {
+            Ok(value) => (value.wrap_some(), None),
+            Err(error) => (None, error.wrap_some()),
+        };
+        let message = lsp_server::Message::Response(lsp_server::Response {
+            id: after.id,
+            result,
+            error,
+        });
+        let send: Box<dyn FnOnce(&crate::effect::SideEffectToken) + Send> =
+            (move |_token: &crate::effect::SideEffectToken| {
+                let _ = sender.send(message);
+            })
+            .boxed();
+        send.wrap_some()
     }
 }
 
