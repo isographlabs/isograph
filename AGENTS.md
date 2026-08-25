@@ -153,9 +153,22 @@ If std or an existing crate provides it, use that. A hand-rolled version needs a
 
 Avoid custom traits. Prefer a concrete type, an enum, a plain function, or a std trait (`From`/`Into`, `Default`, the iterator traits). A trait with one implementor is the case to avoid. When a design introduces a trait, say what it buys over a concrete type, and default to the version without it.
 
-If a function does not return every variant of an enum, return something narrower. Propagating a final error type is allowed; it is still an anti-pattern.
-
 Always test degenerate cases.
+
+## Never throw information away
+
+A cardinal rule. Never discard a distinction the program has already established. The type of a value must be as narrow as what is still possible.
+
+Matching some variants and binding the rest at the original type throws information away:
+
+```
+Foo(Bar::A) => handle_a(),
+Foo(another_bar) => handle_remainder(another_bar),
+```
+
+`another_bar` is `Bar`. That type still includes `A`. The match already ruled `A` out. Never do this. The remainder's type must not include `A`. Introduce that narrower type, or match every remaining variant.
+
+If a function does not return every variant of an enum, return something narrower. Same rule. Propagating a final error type is allowed; it is still an anti-pattern.
 
 ## Result
 
@@ -216,6 +229,7 @@ An audit fixes the whole class, not the quoted instance. Sweep every file the st
 
 ## Invariants - do not work around these
 
+- Never throw information away. A remainder after matching some variants is a narrower type that does not include those variants, not the original type.
 - No tree-sitter. Parsers are tokenize and grammar consume in our crates (the iso parser also match-brackets and chunks). A highlighting or schema-parse need is that pipeline, not a grammar.js.
 - No manual `ResolvePosition` impls. If one seems needed, that is a missing feature in `resolve_position`; add it as a prefactor first.
 - `run_event_loop` is recv, `handle`, send those effects. It does not match on the event or the effect. New behavior is an event `handle` interprets, a field on state `handle` writes, or an effect `perform` runs.
