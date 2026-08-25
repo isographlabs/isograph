@@ -170,6 +170,8 @@ Foo(another_bar) => handle_remainder(another_bar),
 
 If a function does not return every variant of an enum, return something narrower. Same rule. Propagating a final error type is allowed; it is still an anti-pattern.
 
+Calling a function that takes `Option<T>` when you have a `T` (`foo(t.wrap_some())`) is the same defect on the input side. The callee still admits `None`. That is generally an anti-pattern, especially when `foo` contains business logic. If we own `foo`, rewrite it to take `T`, and add a `foo_opt` that takes `Option<T>` and calls `foo` internally.
+
 ## Result
 
 Do not `match` a `Result` to bind the success value and return or convert the error. Write `let value = expr.map_err(...)?;`. Same type on both arms: `expr.unwrap_or_else(|err| ...)`.
