@@ -178,7 +178,7 @@ pub fn format_recorded(
     let mut indent = 0_usize;
     let mut last: Option<IsographSemanticToken> = None;
     for (i, token) in tokens.iter().enumerate() {
-        // Not in the source: no span, no lexeme. The line break is `gap` on the next token.
+        // Always recorded with location None, even when a source comma exists. No lexeme to slice.
         if token.item == IsographSemanticToken::Comma {
             out.push(',');
             last = IsographSemanticToken::Comma.wrap_some();
