@@ -21,7 +21,7 @@ pico_source         #[derive(Source)], #[derive(Singleton)], #[derive(Db)]
 
 `pico` re-exports `pico_types`. A crate that depends on `pico` writes `use pico::SourceId` as today. A crate that only names the identifiers depends on `pico_types` and does not take the engine.
 
-`Database` stays one trait, `get` and `set` both on it. A `#[memo]` body already takes `&IsographState` and cannot call `set`. The crate split is what stops a memo crate from defining a source type or a database.
+`Database` stays one trait, `get` and `set` both on it. A `#[memo]` body already takes `&IsographDb` and cannot call `set`. The crate split is what stops a memo crate from defining a source type or a database.
 
 ## What the user does
 
@@ -42,7 +42,7 @@ isograph is the map. i2's graph after extract-iso-literals-from-file.md and the 
 `pico` and `pico_macros`, not `pico_source`:
 
 - `isograph_extract_typescript`: `#[memo] fn extract_iso_literals`. Reads a `DiskFile` with `db.get`. Does not define a source type.
-- `isograph_lsp`: `#[memo]` hover, tokens, goto. Calls `insert_open_file` on `IsographState` (a method the compiler crate owns). Does not `#[derive(Source)]`.
+- `isograph_lsp`: `#[memo]` hover, tokens, goto. Calls `insert_open_file` on `IsographDb` (a method the compiler crate owns). Does not `#[derive(Source)]`.
 - `isograph_protocol_graphql`: `#[memo]` parse of the schema. Takes `SourceId<SchemaSource>`. Does not intern that source.
 
 `pico` only (no macros):
@@ -51,7 +51,7 @@ isograph is the map. i2's graph after extract-iso-literals-from-file.md and the 
 
 `pico`, `pico_macros`, and `pico_source`:
 
-- `isograph_compiler`: owns `IsographState`, `DiskFile`, `#[derive(Db)]`, `#[derive(Source)]`, and compiler memos.
+- `isograph_compiler`: owns `IsographDb`, `DiskFile`, `#[derive(Db)]`, `#[derive(Source)]`, and compiler memos.
 - pico's own tests.
 
 Nothing:
@@ -375,7 +375,7 @@ pub struct SourceNode {
 }
 ```
 
-Who calls it: every `#[memo]` expansion (`execute_memoized_function`, `Database`, `MemoRef`, `macro_fns`). `#[derive(Db)]` expansions. Tests. `IsographState` methods. Generation `lookup`.
+Who calls it: every `#[memo]` expansion (`execute_memoized_function`, `Database`, `MemoRef`, `macro_fns`). `#[derive(Db)]` expansions. Tests. `IsographDb` methods. Generation `lookup`.
 
 `#[memo]` still emits `::pico::`. A memo crate depends on `pico` and `pico_macros`.
 
@@ -528,7 +528,7 @@ After:
 
 The `impl Database` / `impl DatabaseDyn` quote is unchanged and still `::pico::`. `#[derive(Db)]` requires a dependency on `pico`.
 
-Who calls it: `IsographState` (`Db`), `DiskFile` (`Source`), `CompilerConfig` (`Singleton`), pico tests (`Db`, `Source`, `Singleton`). `CurrentWorkingDirectory` does not: it impls the traits by hand.
+Who calls it: `IsographDb` (`Db`), `DiskFile` (`Source`), `CompilerConfig` (`Singleton`), pico tests (`Db`, `Source`, `Singleton`). `CurrentWorkingDirectory` does not: it impls the traits by hand.
 
 ## Change 1: `pico_types`
 

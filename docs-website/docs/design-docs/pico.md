@@ -21,7 +21,7 @@ The building blocks are `Database`, `Source`, `Memo`, and `Key`.
 
 ```rust
 #[derive(Debug, Db)]
-struct IsographState<THostLanguage: HostLanguage> {
+struct IsographDb<THostLanguage: HostLanguage> {
     storage: Storage<Self>,
     #[tracked]
     disk_file_map: DiskFileMap,
@@ -29,9 +29,9 @@ struct IsographState<THostLanguage: HostLanguage> {
 }
 ```
 
-`IsographState` is the database. `handle` writes sources into it. Memos read from it. Tests construct the same type, intern a `RelativePathToSourceFile`, `insert_disk_file`, and call memos. `handle` converts an event `PathBuf` first, then the same insert.
+`IsographDb` is the database. `handle` writes sources into it. Memos read from it. Tests construct the same type, intern a `RelativePathToSourceFile`, `insert_disk_file`, and call memos. `handle` converts an event `PathBuf` first, then the same insert.
 
-Memos take `&IsographState<THostLanguage>`. `set` and `remove` take `&mut` and panic if a memo is on the stack. Derived data is a return value. A `&mut Entity` that you write selectables into cannot sit behind a memo. isograph had to delete `server_object_entity_mut` before those reads could be memos.
+Memos take `&IsographDb<THostLanguage>`. `set` and `remove` take `&mut` and panic if a memo is on the stack. Derived data is a return value. A `&mut Entity` that you write selectables into cannot sit behind a memo. isograph had to delete `server_object_entity_mut` before those reads could be memos.
 
 ## Source
 
@@ -83,7 +83,7 @@ A singleton has no key field. There is at most one. `CompilerConfig` and `Curren
 impl HostLanguage for TypeScriptHostLanguage {
     #[memo]
     fn extract_iso_literals(
-        db: &IsographState<Self>,
+        db: &IsographDb<Self>,
         path: RelativePathToSourceFile,
     ) -> Option<Vec<IsoLiteralExtraction<Self>>>;
 }
@@ -91,7 +91,7 @@ impl HostLanguage for TypeScriptHostLanguage {
 
 The trait writes the lookup type `&Option<Vec<IsoLiteralExtraction<Self>>>`. `#[memo]` is on the impl. pico rewrites the impl return to `&T`. First argument is `&Database`. There is no `&self`. Origin of that shape: isograph `CompilationProfile` methods in `graphql_network_protocol.rs`.
 
-The first argument is `&Database`. The rest are the key, at most eight of them. pico hashes the function identity (the signature text at expansion) plus those arguments. That tuple is the cache slot. A type parameter is not an argument. `IsographState<THostLanguage>` is a different database type per host, same as isograph `IsographDatabase<TCompilationProfile>`.
+The first argument is `&Database`. The rest are the key, at most eight of them. pico hashes the function identity (the signature text at expansion) plus those arguments. That tuple is the cache slot. A type parameter is not an argument. `IsographDb<THostLanguage>` is a different database type per host, same as isograph `IsographDatabase<TCompilationProfile>`.
 
 The body must be a pure function of `db` reads and the arguments. No filesystem, no clock, no LSP. Reading the world is `handle` interning a source.
 
@@ -200,7 +200,7 @@ struct LiteralId {
 impl HostLanguage for TypeScriptHostLanguage {
     #[memo]
     fn extract_iso_literals(
-        db: &IsographState<Self>,
+        db: &IsographDb<Self>,
         path: RelativePathToSourceFile,
     ) -> Option<Vec<IsoLiteralExtraction<Self>>> {
         let source_id = match db.get_disk_file_map().untracked().0.get(&path).copied() {
@@ -229,7 +229,7 @@ impl HostLanguage for TypeScriptHostLanguage {
 
 #[memo]
 fn literal_id_at_location<THostLanguage: HostLanguage>(
-    db: &IsographState<THostLanguage>,
+    db: &IsographDb<THostLanguage>,
     path: RelativePathToSourceFile,
     line_char: LineChar,
 ) -> Option<LiteralId> {
@@ -241,7 +241,7 @@ fn literal_id_at_location<THostLanguage: HostLanguage>(
 
 #[memo]
 fn iso_literal_extraction<THostLanguage: HostLanguage>(
-    db: &IsographState<THostLanguage>,
+    db: &IsographDb<THostLanguage>,
     literal_id: LiteralId,
 ) -> Option<IsoLiteralExtraction<THostLanguage>> {
     let extractions =
@@ -250,7 +250,7 @@ fn iso_literal_extraction<THostLanguage: HostLanguage>(
 }
 
 #[memo]
-fn parsed_iso_literal(db: &IsographState, iso_literal_text: String) -> ParsedIsoLiteral {
+fn parsed_iso_literal(db: &IsographDb, iso_literal_text: String) -> ParsedIsoLiteral {
     parse_iso_literal(iso_literal_text.as_str())
 }
 ```
@@ -279,23 +279,23 @@ A public function takes a public key. Hover is `path` and `LineChar`. Semantic t
 
 ```rust
 #[memo]
-fn hover(db: &IsographState, path: RelativePathToSourceFile, line_char: LineChar) -> Option<Hover>;
+fn hover(db: &IsographDb, path: RelativePathToSourceFile, line_char: LineChar) -> Option<Hover>;
 
 #[memo]
 fn lsp_semantic_tokens_for_file(
-    db: &IsographState,
+    db: &IsographDb,
     path: RelativePathToSourceFile,
 ) -> Option<Vec<lsp_types::SemanticToken>>;
 
 #[memo]
 fn flattened_entity_named(
-    db: &IsographState,
+    db: &IsographDb,
     entity_name: EntityName,
 ) -> Option<MemoRef<Entity>>;
 
 #[memo]
 fn flattened_selectable_named(
-    db: &IsographState,
+    db: &IsographDb,
     entity_name: EntityName,
     selectable_name: SelectableName,
 ) -> Option<MemoRef<Selectable>>;
@@ -343,7 +343,7 @@ The map is which paths currently have a `DiskFile`. `db.set` of a `DiskFile` doe
 
 `tracked()` records a dependency on the whole map. Inserting or removing any path invalidates every memo that used `tracked()`. A memo that iterates every file (compile, "all client declarations") uses `tracked()`.
 
-`untracked()` does not record the map. It is correct when the memo is already keyed by `path`, looks up that one `SourceId`, and then `db.get(source_id)` (which tracks the source). Adding an unrelated file must not re-invoke a per-file extract. Iterating `untracked()` is wrong: a newly inserted path is not seen. `IsographState::disk_file` is that untracked lookup. Callers that already resolved the path (extract or `parsed_iso_literals_in_file` returned `Some`) write `db.disk_file(path)`. Extract is the first lookup of a path and does not use it.
+`untracked()` does not record the map. It is correct when the memo is already keyed by `path`, looks up that one `SourceId`, and then `db.get(source_id)` (which tracks the source). Adding an unrelated file must not re-invoke a per-file extract. Iterating `untracked()` is wrong: a newly inserted path is not seen. `IsographDb::disk_file` is that untracked lookup. Callers that already resolved the path (extract or `parsed_iso_literals_in_file` returned `Some`) write `db.disk_file(path)`. Extract is the first lookup of a path and does not use it.
 
 A lookup that misses did not `db.get`. If it also did not `tracked()` the map, a later `Present` of that path is not seen and the memo stays `None`. isograph hit this: an autofix created a file, `get_iso_literal` ran untracked, returned `None`, and the next request reused that `None` and panicked. On miss, `tracked()` the map so a later insert of that key is seen. The intended dependency of a per-file memo that hits is that file, not the set of all files.
 

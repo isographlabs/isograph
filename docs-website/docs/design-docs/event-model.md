@@ -49,7 +49,7 @@ enum Filesystem {
 fn handle(state: &mut IsographState, event: IsographEvent) -> Vec<IsographEffect>
 ```
 
-`IsographState` is the pico database. The test harness calls `handle`. It does not start a daemon, open a socket, or write a file. A test constructs a `DiskChanged` or `EditorChanged`, runs `handle`, and asserts the effects and the `DiskFile` sources. The binary's event loop calls the same `handle` with the same types.
+`IsographState` is the process wrapper (`db: IsographDb`, live sessions). `IsographDb` is the pico database. The test harness calls `handle`. It does not start a daemon, open a socket, or write a file. A test constructs a `DiskChanged` or `EditorChanged`, runs `handle`, and asserts the effects and the `DiskFile` sources. The binary's event loop calls the same `handle` with the same types.
 
 `IsographEvent` is `Lsp(LspEvent)` | `Internal(InternalEvent)`. `LspEvent` is `Request` (request plus reply) / `Notification` / `Response`. `handle` of `Lsp` matches those and runs isograph request/notification dispatch. A request leftover is `method_not_found`: one immediate `SendLspResponseEffect`. Later a handler can return a timer plus an event; `handle` of that event is an immediate `SendLspResponseEffect`. A notification leftover is no effects. A notification that matches returns `Vec<IsographEffect>` and not `SendLspResponseEffect`. Bad `isograph/event` params are leftover (empty effects). A response is no effects. `handle` of `Internal` is `HelloWorld` / `Quit` / `DiskChanged`. `handle` does not touch the socket. The effect loop writes the `Response`.
 
@@ -195,15 +195,15 @@ struct StartAsyncWork;
 
 `Kill` ends the effect loop. `run` returns. The process exits.
 
-event-loop.md ships `HelloWorld` / `LogHelloWorld`, `Quit` / `Kill`, tokio `run_event_loop` / `run_effect_loop`, and `handle` returning `Vec<IsographEffect>`. send-events.md ships the event socket, the port file, `Serialize` + `Deserialize` on `IsographEvent`, and `isograph send`. filesystem-events.md makes `IsographState` a pico database, adds `DiskChanged` with `Presence`, and interns `DiskFile`.
+event-loop.md ships `HelloWorld` / `LogHelloWorld`, `Quit` / `Kill`, tokio `run_event_loop` / `run_effect_loop`, and `handle` returning `Vec<IsographEffect>`. send-events.md ships the event socket, the port file, `Serialize` + `Deserialize` on `IsographEvent`, and `isograph send`. filesystem-events.md makes `IsographDb` a pico database, adds `DiskChanged` with `Presence`, and interns `DiskFile`.
 
 ## State
 
-The state is a pico database. Disk files and open editor buffers are source nodes. Compilation is derived.
+`IsographDb` is the pico database. Disk files and open editor buffers are source nodes. Compilation is derived.
 
 ```rust
 #[derive(Debug, Db)]
-struct IsographState<THostLanguage: HostLanguage> {
+struct IsographDb<THostLanguage: HostLanguage> {
     storage: Storage<Self>,
     #[tracked]
     disk_file_map: DiskFileMap,
@@ -231,7 +231,7 @@ Artifact generation and watch mode read `DiskFile`. They do not read `OpenFile`.
 
 The LSP adapter reads `OpenFile` when it exists for that path, otherwise `DiskFile`. The LSP adapter does not generate artifacts.
 
-event-loop.md ships `IsographState` with no fields. filesystem-events.md makes `IsographState` the pico database and interns `DiskFile`. `OpenFile` lands with the adapter.
+event-loop.md ships `IsographDb` with no fields. filesystem-events.md makes `IsographDb` the pico database and interns `DiskFile`. `OpenFile` lands with the adapter.
 
 ## Dispatch
 

@@ -4,11 +4,11 @@ Requires event-loop.md (landed), freddie-timer.md, and lsp-outstanding.md. lsp-o
 
 Incorporation of `freddie_timer` into i2. HelloWorld arms a `Duration::ZERO` timer with payload `HelloWorldDebounced`. `handle` of the matching fire returns `LogHelloWorld`. lsp-diagnostics.md deletes that payload and the guard field.
 
-`IsographState` is the pico database in `isograph_compiler`. `State` is the CLI process wrapper (`db`, `live_sessions`, and this slice's guard). The guard is not a pico source. It is RAII over a oneshot that cancels a tokio sleep. It lives on `State`. `handle_internal` stays on `&mut IsographState` (Quit, DiskChanged). HelloWorld and `TimerFired` are matched on `handle` because they write that field.
+`IsographDb` is the pico database in `isograph_compiler`. `IsographState` is the CLI process wrapper (`db`, `live_sessions`, and this slice's guard). The guard is not a pico source. It is RAII over a oneshot that cancels a tokio sleep. It lives on `IsographState`. `handle_internal` stays on `&mut IsographDb` (Quit, DiskChanged). HelloWorld and `TimerFired` are matched on `handle` because they write that field.
 
-`isograph send` of HelloWorld is `Lsp(Notification { method: isograph/event, params: HelloWorld })`, not `IsographEvent::Internal(HelloWorld)`. After lsp-outstanding, that path is `handle` -> `dispatch_lsp(&mut State)` -> `dispatch_lsp_notification(&mut IsographState)` -> `on_isograph_event` -> `handle_internal`. This slice points the notification path at `&mut State` and has `on_isograph_event` call `handle(state, internal.to())`, so send hits `handle`'s HelloWorld arm. `handle_internal` does not take `State`.
+`isograph send` of HelloWorld is `Lsp(Notification { method: isograph/event, params: HelloWorld })`, not `IsographEvent::Internal(HelloWorld)`. After lsp-outstanding, that path is `handle` -> `dispatch_lsp(&mut IsographState)` -> `dispatch_lsp_notification(&mut IsographDb)` -> `on_isograph_event` -> `handle_internal`. This slice points the notification path at `&mut IsographState` and has `on_isograph_event` call `handle(state, internal.to())`, so send hits `handle`'s HelloWorld arm. `handle_internal` does not take `IsographState`.
 
-Origin: figaro `src/daemon.rs` `schedule_timer` / `perform_effect` taking `event_tx`. Origin of the halves: freddie-timer.md. Delta: `IsographEvent::Timer` / `IsographEffect::Timer`; `perform` gains `event_tx` and the Timer arm returns `ControlFlow::Continue`; payload `HelloWorldDebounced`; notification dispatch takes `State` and re-enters `handle`.
+Origin: figaro `src/daemon.rs` `schedule_timer` / `perform_effect` taking `event_tx`. Origin of the halves: freddie-timer.md. Delta: `IsographEvent::Timer` / `IsographEffect::Timer`; `perform` gains `event_tx` and the Timer arm returns `ControlFlow::Continue`; payload `HelloWorldDebounced`; notification dispatch takes `IsographState` and re-enters `handle`.
 
 One shippable change.
 
@@ -58,14 +58,14 @@ pub enum IsographEffect {
 
 ```rust
 // from crates/isograph_cli/src/state.rs
-pub struct State<THostLanguage: HostLanguage> {
-    pub db: IsographState<THostLanguage>,
+pub struct IsographState<THostLanguage: HostLanguage> {
+    pub db: IsographDb<THostLanguage>,
     pub live_sessions: LiveSessions,
     hello_world_debounce: Option<freddie_timer::TimerGuard>,
 }
 ```
 
-`State` has no `Default`. Every `State { ... }` writes `hello_world_debounce: None`:
+`IsographState` has no `Default`. Every `IsographState { ... }` writes `hello_world_debounce: None`:
 
 - `crates/isograph_cli/src/state.rs` `empty` (and `with_config`, which calls `empty`)
 - `crates/isograph_cli/src/daemon.rs` `serve`
@@ -109,7 +109,7 @@ freddie_timer = { git = "https://github.com/freddiehg/freddie", rev = "e2dde74d6
 tokio = { workspace = true, features = ["rt", "macros", "sync", "time", "test-util"] }
 ```
 
-After lsp-outstanding, `handle` and `dispatch_lsp` already take `&mut State`. `dispatch_lsp_request` stays on `&IsographState`. `dispatch_lsp_notification` and `on_isograph_event` still take `&mut IsographState` and call `handle_internal`.
+After lsp-outstanding, `handle` and `dispatch_lsp` already take `&mut IsographState`. `dispatch_lsp_request` stays on `&IsographDb`. `dispatch_lsp_notification` and `on_isograph_event` still take `&mut IsographDb` and call `handle_internal`.
 
 ```rust
 // from crates/isograph_cli/src/state.rs (before)
@@ -131,7 +131,7 @@ After lsp-outstanding, `handle` and `dispatch_lsp` already take `&mut State`. `d
     }
 ```
 
-`handle_internal` still takes `&mut IsographState`. rustc does not narrow `InternalEvent`, so that match still names HelloWorld. That arm is `no_effects()`, not `LogHelloWorld`. The send path is `handle`'s HelloWorld arm. If `on_isograph_event` still called `handle_internal` and that arm were `LogHelloWorld`, send would skip the timer, the in-process Internal tests would pass, and the log would still appear.
+`handle_internal` still takes `&mut IsographDb`. rustc does not narrow `InternalEvent`, so that match still names HelloWorld. That arm is `no_effects()`, not `LogHelloWorld`. The send path is `handle`'s HelloWorld arm. If `on_isograph_event` still called `handle_internal` and that arm were `LogHelloWorld`, send would skip the timer, the in-process Internal tests would pass, and the log would still appear.
 
 ```rust
 // from crates/isograph_cli/src/state.rs (before)
@@ -150,7 +150,7 @@ After lsp-outstanding, `handle` and `dispatch_lsp` already take `&mut State`. `d
 ```rust
 // from crates/isograph_cli/src/state.rs (before)
 fn dispatch_lsp_notification<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
+    state: &mut IsographDb<THostLanguage>,
     notification: lsp_server::Notification,
 ) -> Vec<IsographEffect> {
     let dispatch = || {
@@ -168,14 +168,14 @@ fn dispatch_lsp_notification<THostLanguage: HostLanguage>(
 }
 
 fn on_isograph_event<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
+    state: &mut IsographDb<THostLanguage>,
     internal: InternalEvent,
 ) -> Vec<IsographEffect> {
     handle_internal(state, internal)
 }
 
 fn handle_internal<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
+    state: &mut IsographDb<THostLanguage>,
     internal: InternalEvent,
 ) -> Vec<IsographEffect> {
     match internal {
@@ -191,7 +191,7 @@ fn handle_internal<THostLanguage: HostLanguage>(
 ```rust
 // from crates/isograph_cli/src/state.rs (after)
 fn dispatch_lsp_notification<THostLanguage: HostLanguage>(
-    state: &mut State<THostLanguage>,
+    state: &mut IsographState<THostLanguage>,
     notification: lsp_server::Notification,
 ) -> Vec<IsographEffect> {
     let dispatch = || {
@@ -209,14 +209,14 @@ fn dispatch_lsp_notification<THostLanguage: HostLanguage>(
 }
 
 fn on_isograph_event<THostLanguage: HostLanguage>(
-    state: &mut State<THostLanguage>,
+    state: &mut IsographState<THostLanguage>,
     internal: InternalEvent,
 ) -> Vec<IsographEffect> {
     handle(state, internal.to())
 }
 
 fn handle_internal<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
+    state: &mut IsographDb<THostLanguage>,
     internal: InternalEvent,
 ) -> Vec<IsographEffect> {
     match internal {
@@ -227,7 +227,7 @@ fn handle_internal<THostLanguage: HostLanguage>(
 }
 
 fn handle_hello_world<THostLanguage: HostLanguage>(
-    state: &mut State<THostLanguage>,
+    state: &mut IsographState<THostLanguage>,
 ) -> Vec<IsographEffect> {
     let (guard, effect) = freddie_timer::timer_effect_and_guard(
         Duration::ZERO,
@@ -238,7 +238,7 @@ fn handle_hello_world<THostLanguage: HostLanguage>(
 }
 
 fn handle_timer_fired<THostLanguage: HostLanguage>(
-    state: &mut State<THostLanguage>,
+    state: &mut IsographState<THostLanguage>,
     fired: freddie_timer::TimerFired<TimerPayload>,
 ) -> Vec<IsographEffect> {
     match fired.trigger_if_matching(state.hello_world_debounce.as_ref()) {

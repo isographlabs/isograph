@@ -25,13 +25,13 @@ pub struct LiteralId {
 }
 
 pub fn literal_id_at_location<THostLanguage: HostLanguage>(
-    db: &IsographState<THostLanguage>,
+    db: &IsographDb<THostLanguage>,
     path: RelativePathToSourceFile,
     line_char: LineChar,
 ) -> Option<LiteralId>
 
 pub fn iso_literal_extraction<THostLanguage: HostLanguage>(
-    db: &IsographState<THostLanguage>,
+    db: &IsographDb<THostLanguage>,
     literal_id: LiteralId,
 ) -> Option<IsoLiteralExtraction<THostLanguage>>
 ```
@@ -52,7 +52,7 @@ pub struct FileLiteral<'a> {
 }
 
 pub fn file_literals<'a>(
-    db: &'a IsographState<TypeScriptHostLanguage>,
+    db: &'a IsographDb<TypeScriptHostLanguage>,
     path: RelativePathToSourceFile,
 ) -> Option<Vec<FileLiteral<'a>>>
 ```
@@ -64,7 +64,7 @@ Tokens, the `isograph_lsp` crate. No production crate depends on it. Production 
 ```rust
 // from crates/isograph_lsp/src/file_semantic_tokens.rs
 pub fn lsp_semantic_tokens_for_file<THostLanguage: HostLanguage>(
-    db: &IsographState<THostLanguage>,
+    db: &IsographDb<THostLanguage>,
     path: RelativePathToSourceFile,
 ) -> Option<Vec<lsp_types::SemanticToken>>
 
@@ -82,17 +82,17 @@ File memos that only those two call. They stay. `parsed_iso_literals_in_file` an
 ```rust
 // from crates/isograph_compiler/src/iso_literals.rs
 pub fn parsed_iso_literal<THostLanguage: HostLanguage>(
-    db: &IsographState<THostLanguage>,
+    db: &IsographDb<THostLanguage>,
     iso_literal_text: String,
 ) -> ParsedIsoLiteral
 
 pub fn parsed_iso_literals_in_file<THostLanguage: HostLanguage>(
-    db: &IsographState<THostLanguage>,
+    db: &IsographDb<THostLanguage>,
     path: RelativePathToSourceFile,
 ) -> Option<Vec<(IsoLiteralExtraction<THostLanguage>, ParsedIsoLiteral)>>
 
 pub fn text_through_last_iso_literal<THostLanguage: HostLanguage>(
-    db: &IsographState<THostLanguage>,
+    db: &IsographDb<THostLanguage>,
     path: RelativePathToSourceFile,
 ) -> Option<String>
 ```

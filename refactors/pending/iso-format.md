@@ -328,7 +328,7 @@ If request dispatch already passes `LspClientId`, `format_iso_literals` takes it
 ```rust
 // from crates/isograph_cli/src/adapter.rs
 pub(crate) fn formatting_response<THostLanguage: HostLanguage>(
-    state: &isograph_compiler::IsographState<THostLanguage>,
+    state: &isograph_compiler::IsographDb<THostLanguage>,
     params: lsp_types::DocumentFormattingParams,
 ) -> isograph_lsp::lsp_runtime_error::LSPRuntimeResult<
     <lsp_types::request::Formatting as lsp_types::request::Request>::Result,
@@ -337,7 +337,7 @@ pub(crate) fn formatting_response<THostLanguage: HostLanguage>(
 }
 
 pub(crate) fn will_save_wait_until_response<THostLanguage: HostLanguage>(
-    state: &isograph_compiler::IsographState<THostLanguage>,
+    state: &isograph_compiler::IsographDb<THostLanguage>,
     params: lsp_types::WillSaveTextDocumentParams,
 ) -> isograph_lsp::lsp_runtime_error::LSPRuntimeResult<
     <lsp_types::request::WillSaveWaitUntil as lsp_types::request::Request>::Result,
@@ -999,7 +999,7 @@ Before:
 ```rust
 // from crates/isograph_cli/src/adapter.rs
 pub(crate) fn formatting_response<THostLanguage: isograph_compiler::HostLanguage>(
-    _state: &isograph_compiler::IsographState<THostLanguage>,
+    _state: &isograph_compiler::IsographDb<THostLanguage>,
     _params: lsp_types::DocumentFormattingParams,
 ) -> isograph_lsp::lsp_runtime_error::LSPRuntimeResult<
     <lsp_types::request::Formatting as lsp_types::request::Request>::Result,
@@ -1008,7 +1008,7 @@ pub(crate) fn formatting_response<THostLanguage: isograph_compiler::HostLanguage
 }
 
 pub(crate) fn will_save_wait_until_response<THostLanguage: isograph_compiler::HostLanguage>(
-    _state: &isograph_compiler::IsographState<THostLanguage>,
+    _state: &isograph_compiler::IsographDb<THostLanguage>,
     _params: lsp_types::WillSaveTextDocumentParams,
 ) -> isograph_lsp::lsp_runtime_error::LSPRuntimeResult<
     <lsp_types::request::WillSaveWaitUntil as lsp_types::request::Request>::Result,
@@ -1022,7 +1022,7 @@ After:
 ```rust
 // from crates/isograph_cli/src/adapter.rs
 pub(crate) fn formatting_response<THostLanguage: HostLanguage>(
-    state: &isograph_compiler::IsographState<THostLanguage>,
+    state: &isograph_compiler::IsographDb<THostLanguage>,
     params: lsp_types::DocumentFormattingParams,
 ) -> isograph_lsp::lsp_runtime_error::LSPRuntimeResult<
     <lsp_types::request::Formatting as lsp_types::request::Request>::Result,
@@ -1031,7 +1031,7 @@ pub(crate) fn formatting_response<THostLanguage: HostLanguage>(
 }
 
 pub(crate) fn will_save_wait_until_response<THostLanguage: HostLanguage>(
-    state: &isograph_compiler::IsographState<THostLanguage>,
+    state: &isograph_compiler::IsographDb<THostLanguage>,
     params: lsp_types::WillSaveTextDocumentParams,
 ) -> isograph_lsp::lsp_runtime_error::LSPRuntimeResult<
     <lsp_types::request::WillSaveWaitUntil as lsp_types::request::Request>::Result,
@@ -1040,7 +1040,7 @@ pub(crate) fn will_save_wait_until_response<THostLanguage: HostLanguage>(
 }
 
 fn format_iso_literals<THostLanguage: HostLanguage>(
-    state: &isograph_compiler::IsographState<THostLanguage>,
+    state: &isograph_compiler::IsographDb<THostLanguage>,
     uri: &lsp_types::Uri,
 ) -> Option<Vec<lsp_types::TextEdit>> {
     let absolute = file_path(uri)?;

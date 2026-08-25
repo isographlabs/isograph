@@ -28,8 +28,8 @@ pub enum TimerPayload {
 
 ```rust
 // from crates/isograph_cli/src/state.rs
-pub struct State<THostLanguage: HostLanguage> {
-    pub db: IsographState<THostLanguage>,
+pub struct IsographState<THostLanguage: HostLanguage> {
+    pub db: IsographDb<THostLanguage>,
     pub live_sessions: LiveSessions,
     diagnostics_debounce: Option<freddie_timer::TimerGuard>,
 }
@@ -66,7 +66,7 @@ struct ReportDiagnostics {
         }
 ```
 
-`report_diagnostics` walks interned `DiskFile`s, maps `file_literals` errors to `lsp_types::Diagnostic` (origin lsp-parse-diagnostics.md, now this file). URI from config directory + relative path (`file://`). Empty diagnostic list for a URI that had errors last time and has none now is required so the client clears squiggles. Keep the previous URI set on `IsographState` or on `LiveSessions`. A `HashSet<Uri>` on a new tracked field is compiler state; put it on a session-less `DiagnosticsUris` singleton source, or compute the clear set in the effect loop from the last `ReportDiagnostics`. Last published URIs on `LiveSessions` is enough: effect loop remembers `last: HashSet<Uri>`, new report, send empty lists for `last - new`.
+`report_diagnostics` walks interned `DiskFile`s, maps `file_literals` errors to `lsp_types::Diagnostic` (origin lsp-parse-diagnostics.md, now this file). URI from config directory + relative path (`file://`). Empty diagnostic list for a URI that had errors last time and has none now is required so the client clears squiggles. Keep the previous URI set on `IsographDb` or on `LiveSessions`. A `HashSet<Uri>` on a new tracked field is compiler state; put it on a session-less `DiagnosticsUris` singleton source, or compute the clear set in the effect loop from the last `ReportDiagnostics`. Last published URIs on `LiveSessions` is enough: effect loop remembers `last: HashSet<Uri>`, new report, send empty lists for `last - new`.
 
 ```rust
 // from crates/isograph_cli/src/daemon.rs

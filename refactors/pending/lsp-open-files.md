@@ -32,7 +32,7 @@ Most important first.
 
 pico `#[key]` is one field. Two clients on one path cannot share a path-only source: `db.set` would collide, and removing one client would `remove` the source the other still points at. The key is `(client, path)`.
 
-`LspClientId` today lives in the CLI (`event.rs` from lsp-outstanding.md, `lsp_socket.rs` from lsp-sessions.md). `OpenFile` sits on `IsographState` in `isograph_compiler`. Move the newtype to the compiler crate. The CLI uses that type. One definition.
+`LspClientId` today lives in the CLI (`event.rs` from lsp-outstanding.md, `lsp_socket.rs` from lsp-sessions.md). `OpenFile` sits on `IsographDb` in `isograph_compiler`. Move the newtype to the compiler crate. The CLI uses that type. One definition.
 
 ```rust
 // from crates/isograph_compiler/src/database.rs
@@ -52,7 +52,7 @@ use pico::{Database, SourceId, Storage};
 use pico_macros::{Db, Source};
 
 #[derive(Debug, Db)]
-pub struct IsographState<THostLanguage: HostLanguage> {
+pub struct IsographDb<THostLanguage: HostLanguage> {
     storage: Storage<Self>,
     #[tracked]
     disk_file_map: DiskFileMap,
@@ -82,11 +82,11 @@ pub struct OpenFile {
 
 The tracked field is nested: outer key is the client, inner map is that client's open paths. `handle` of `LspClientGone` drops one outer key. A memo keyed by `(client, path)` looks up that pair; it does not iterate the outer map.
 
-`Default` for `IsographState` also sets `open_file_map: OpenFileMap::default()`.
+`Default` for `IsographDb` also sets `open_file_map: OpenFileMap::default()`.
 
 ```rust
 // from crates/isograph_compiler/src/database.rs
-impl<THostLanguage: HostLanguage> IsographState<THostLanguage> {
+impl<THostLanguage: HostLanguage> IsographDb<THostLanguage> {
     pub fn insert_open_file(
         &mut self,
         client: LspClientId,
@@ -288,7 +288,7 @@ impl<'state, TState> LSPNotificationDispatch<'state, TState> {
 ```rust
 // from crates/isograph_cli/src/state.rs
 fn dispatch_lsp_notification<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
+    state: &mut IsographDb<THostLanguage>,
     incoming: crate::event::LspNotification,
 ) -> Vec<IsographEffect> {
     let crate::event::LspNotification {
@@ -323,7 +323,7 @@ fn dispatch_lsp_notification<THostLanguage: HostLanguage>(
 }
 
 fn on_isograph_event<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
+    state: &mut IsographDb<THostLanguage>,
     _client: isograph_compiler::LspClientId,
     internal: Internal,
 ) -> Vec<IsographEffect> {
@@ -348,7 +348,7 @@ use lsp_types::notification::Notification;
 use prelude::Postfix;
 
 pub(crate) fn on_did_open<THostLanguage: HostLanguage>(
-    state: &mut isograph_compiler::IsographState<THostLanguage>,
+    state: &mut isograph_compiler::IsographDb<THostLanguage>,
     client: LspClientId,
     params: <lsp_types::notification::DidOpenTextDocument as Notification>::Params,
 ) -> Vec<crate::effect::IsographEffect> {
@@ -360,7 +360,7 @@ pub(crate) fn on_did_open<THostLanguage: HostLanguage>(
 }
 
 pub(crate) fn on_did_change<THostLanguage: HostLanguage>(
-    state: &mut isograph_compiler::IsographState<THostLanguage>,
+    state: &mut isograph_compiler::IsographDb<THostLanguage>,
     client: LspClientId,
     params: <lsp_types::notification::DidChangeTextDocument as Notification>::Params,
 ) -> Vec<crate::effect::IsographEffect> {
@@ -378,7 +378,7 @@ pub(crate) fn on_did_change<THostLanguage: HostLanguage>(
 }
 
 pub(crate) fn on_did_close<THostLanguage: HostLanguage>(
-    state: &mut isograph_compiler::IsographState<THostLanguage>,
+    state: &mut isograph_compiler::IsographDb<THostLanguage>,
     client: LspClientId,
     params: <lsp_types::notification::DidCloseTextDocument as Notification>::Params,
 ) -> Vec<crate::effect::IsographEffect> {
@@ -390,7 +390,7 @@ pub(crate) fn on_did_close<THostLanguage: HostLanguage>(
 }
 
 fn relative_from_uri<THostLanguage: HostLanguage>(
-    state: &isograph_compiler::IsographState<THostLanguage>,
+    state: &isograph_compiler::IsographDb<THostLanguage>,
     uri: &lsp_types::Uri,
 ) -> Option<common_lang_types::RelativePathToSourceFile> {
     let absolute = file_path(uri)?;
@@ -525,7 +525,7 @@ Origin: the regex body of `TypeScriptHostLanguage::extract_iso_literals`. Delta:
     fn extract_iso_literals_from_text(contents: &str) -> Vec<IsoLiteralExtraction<Self>>;
 
     fn extract_iso_literals(
-        db: &IsographState<Self>,
+        db: &IsographDb<Self>,
         path: RelativePathToSourceFile,
     ) -> &Option<Vec<IsoLiteralExtraction<Self>>>;
 ```
@@ -538,7 +538,7 @@ TypeScript impl: move the `captures_iter` body into `extract_iso_literals_from_t
 // from crates/isograph_extract_typescript/src/lib.rs
     #[memo]
     fn extract_iso_literals(
-        db: &IsographState<Self>,
+        db: &IsographDb<Self>,
         path: RelativePathToSourceFile,
     ) -> Option<Vec<IsoLiteralExtraction<Self>>> {
         let source_id = match db.get_disk_file_map().untracked().0.get(&path).copied() {
@@ -598,7 +598,7 @@ Request handlers receive `LspClientId`. `semanticTokens/full` uses the asking cl
 
 ```rust
 // from crates/isograph_compiler/src/database.rs
-impl<THostLanguage: HostLanguage> IsographState<THostLanguage> {
+impl<THostLanguage: HostLanguage> IsographDb<THostLanguage> {
     fn disk_file_source_id(
         &self,
         path: RelativePathToSourceFile,
@@ -641,7 +641,7 @@ Nothing in `isograph_lsp` or `adapter.rs` calls `disk_file`, `get_disk_file_map`
 // from crates/isograph_compiler/src/iso_literals.rs
 #[memo]
 pub fn lsp_extract_iso_literals<THostLanguage: HostLanguage>(
-    db: &IsographState<THostLanguage>,
+    db: &IsographDb<THostLanguage>,
     client: LspClientId,
     path: RelativePathToSourceFile,
 ) -> Option<Vec<IsoLiteralExtraction<THostLanguage>>> {
@@ -650,7 +650,7 @@ pub fn lsp_extract_iso_literals<THostLanguage: HostLanguage>(
 }
 
 fn with_parsed_literals<THostLanguage: HostLanguage>(
-    db: &IsographState<THostLanguage>,
+    db: &IsographDb<THostLanguage>,
     extractions: &[IsoLiteralExtraction<THostLanguage>],
 ) -> Vec<(IsoLiteralExtraction<THostLanguage>, ParsedIsoLiteral)> {
     extractions
@@ -666,7 +666,7 @@ fn with_parsed_literals<THostLanguage: HostLanguage>(
 
 #[memo]
 pub fn parsed_iso_literals_in_file<THostLanguage: HostLanguage>(
-    db: &IsographState<THostLanguage>,
+    db: &IsographDb<THostLanguage>,
     path: RelativePathToSourceFile,
 ) -> Option<Vec<(IsoLiteralExtraction<THostLanguage>, ParsedIsoLiteral)>> {
     let extractions = THostLanguage::extract_iso_literals(db, path).as_ref()?;
@@ -675,7 +675,7 @@ pub fn parsed_iso_literals_in_file<THostLanguage: HostLanguage>(
 
 #[memo]
 pub fn lsp_parsed_iso_literals_in_file<THostLanguage: HostLanguage>(
-    db: &IsographState<THostLanguage>,
+    db: &IsographDb<THostLanguage>,
     client: LspClientId,
     path: RelativePathToSourceFile,
 ) -> Option<Vec<(IsoLiteralExtraction<THostLanguage>, ParsedIsoLiteral)>> {
@@ -685,7 +685,7 @@ pub fn lsp_parsed_iso_literals_in_file<THostLanguage: HostLanguage>(
 
 #[memo]
 pub fn text_through_last_iso_literal<THostLanguage: HostLanguage>(
-    db: &IsographState<THostLanguage>,
+    db: &IsographDb<THostLanguage>,
     path: RelativePathToSourceFile,
 ) -> Option<String> {
     let extractions = THostLanguage::extract_iso_literals(db, path).as_ref()?;
@@ -695,7 +695,7 @@ pub fn text_through_last_iso_literal<THostLanguage: HostLanguage>(
 
 #[memo]
 pub fn lsp_text_through_last_iso_literal<THostLanguage: HostLanguage>(
-    db: &IsographState<THostLanguage>,
+    db: &IsographDb<THostLanguage>,
     client: LspClientId,
     path: RelativePathToSourceFile,
 ) -> Option<String> {
@@ -724,7 +724,7 @@ fn text_through_last<THostLanguage: HostLanguage>(
 // from crates/isograph_lsp/src/file_semantic_tokens.rs
 #[memo]
 pub fn lsp_semantic_tokens_for_file<THostLanguage: HostLanguage>(
-    db: &IsographState<THostLanguage>,
+    db: &IsographDb<THostLanguage>,
     client: LspClientId,
     path: RelativePathToSourceFile,
 ) -> Option<Vec<lsp_types::SemanticToken>> {
@@ -803,7 +803,7 @@ Dispatch tests (`AtomicI32` handlers) gain `LspClientId` on `new` and on the han
 ```rust
 // from crates/isograph_cli/src/state.rs
 fn dispatch_lsp_request<THostLanguage: HostLanguage>(
-    state: &IsographState<THostLanguage>,
+    state: &IsographDb<THostLanguage>,
     incoming: crate::event::LspRequest,
 ) -> Vec<IsographEffect> {
     let crate::event::LspRequest {
@@ -832,7 +832,7 @@ fn dispatch_lsp_request<THostLanguage: HostLanguage>(
 ```rust
 // from crates/isograph_cli/src/adapter.rs
 pub(crate) fn semantic_tokens_response<THostLanguage: HostLanguage>(
-    state: &isograph_compiler::IsographState<THostLanguage>,
+    state: &isograph_compiler::IsographDb<THostLanguage>,
     client: LspClientId,
     params: lsp_types::SemanticTokensParams,
 ) -> isograph_lsp::lsp_runtime_error::LSPRuntimeResult<
@@ -853,7 +853,7 @@ pub(crate) fn semantic_tokens_response<THostLanguage: HostLanguage>(
 }
 
 fn semantic_tokens<THostLanguage: HostLanguage>(
-    state: &isograph_compiler::IsographState<THostLanguage>,
+    state: &isograph_compiler::IsographDb<THostLanguage>,
     client: LspClientId,
     absolute: &std::path::Path,
 ) -> Option<Vec<lsp_types::SemanticToken>> {
