@@ -16,7 +16,7 @@ Figaro is unchanged at the keys. Overlay still hides on its dwell. A placement s
 
 The crate is `freddie_timer`. Two halves from one call. `timer_effect_and_guard` mints the id, builds the oneshot pair, puts the sender in the guard and the receiver in the effect, and stores `TimerFired { id, payload }` on the effect. `P` is shared: `TimerFired<P>` and `TimerEffect<P>`.
 
-Copy: `TimerId`, `TimerTrigger`, `TimerFired<P>` when `P: Copy`. Not Copy: `DropGuard` (owns `oneshot::Sender`), `TimerGuard` (owns `DropGuard`), `AlwaysEqual<T>` (a testing wrapper for incomparable fields such as `RidingGeneration`), `TimerEffect<P>` (owns delay, firing, cancel receiver). None of the non-Copy types are `Clone`. The guard and the effect are each used once. Overwrite of a guard field is drop of the old one.
+Copy: `TimerId`, `TimerTrigger`, `TimerFired<P>` when `P: Copy`. Not Copy: `DropGuard` (owns `oneshot::Sender`), `TimerGuard` (owns `DropGuard`), `TimerEffect<P>` (owns delay, firing, cancel receiver). None of the non-Copy types are `Clone`. The guard and the effect are each used once. Overwrite of a guard field is drop of the old one.
 
 `schedule_timer` is not in this crate. The consumer's effect loop performs `TimerEffect`.
 
@@ -85,7 +85,7 @@ pub struct TimerEffect<P = ()> {
 }
 ```
 
-Not Copy. Not Clone. Used once: the effect loop moves it into `schedule_timer`. Under `testing`, `PartialEq` is delay and firing; the receiver is a handle, not data. `P` is the payload, the same `P` as `TimerFired`. `AlwaysEqual` is not this field. It wraps `RidingGeneration` on read effects, which have no `PartialEq` by design.
+Not Copy. Not Clone. Used once: the effect loop moves it into `schedule_timer`. Under `testing`, `PartialEq` is delay and firing; the receiver is a handle, not data. `P` is the payload, the same `P` as `TimerFired`.
 
 ### `TimerFired`
 
@@ -161,31 +161,6 @@ pub fn drop_guard() -> (DropGuard, oneshot::Receiver<()>) {
 
 Not Copy. Not Clone. Timer's cancel mechanism; not timer-specific besides that.
 
-### `AlwaysEqual`
-
-```rust
-// external freddie/crates/freddie_timer/src/always_equal.rs
-pub struct AlwaysEqual<T>(pub T);
-
-impl<T> std::fmt::Debug for AlwaysEqual<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("AlwaysEqual")
-    }
-}
-
-#[cfg(feature = "testing")]
-impl<T> PartialEq for AlwaysEqual<T> {
-    fn eq(&self, _other: &Self) -> bool {
-        true
-    }
-}
-
-#[cfg(feature = "testing")]
-impl<T> Eq for AlwaysEqual<T> {}
-```
-
-Not Copy. Not Clone unless `T` is and we add those derives; we do not. Mercury wraps `RidingGeneration` in this: that token is not comparable, and `MercuryEffect` derives `PartialEq` under `testing`.
-
 ### `TimerTrigger`
 
 ```rust
@@ -209,11 +184,9 @@ Copy. `TimerFired` here is `TimerFired<()>` via the default. Figaro bind: `|path
 
 ```rust
 // external freddie/crates/freddie_timer/src/lib.rs
-pub mod always_equal;
 pub mod drop_guard;
 pub mod timer;
 
-pub use always_equal::AlwaysEqual;
 pub use drop_guard::{DropGuard, drop_guard};
 pub use timer::{TimerEffect, TimerFired, TimerGuard, TimerId, timer_effect_and_guard};
 
@@ -249,7 +222,7 @@ Workspace `members` gains `"crates/freddie_timer"`. The three files are Types.
 ```rust
 // external freddie/crates/freddie/src/lib.rs
 pub use freddie_timer::{
-    AlwaysEqual, DropGuard, TimerEffect, TimerFired, TimerGuard, TimerId, TimerTrigger, drop_guard,
+    DropGuard, TimerEffect, TimerFired, TimerGuard, TimerId, TimerTrigger, drop_guard,
     timer_effect_and_guard,
 };
 ```
