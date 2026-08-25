@@ -177,36 +177,36 @@ pub fn format_recorded(
     let mut out = String::new();
     let mut indent = 0_usize;
     let mut last: Option<IsographSemanticToken> = None;
-    // Brace is `{` and `}`. Role cannot mean "last was an opener"; this is that
-    // token's list_indent. After an opener, the next gap is Line at current indent.
-    let mut last_delta = 0_i8;
+    // Brace is `{` and `}`. Role cannot mean "last was an opener". After an
+    // opener, the next gap is Line at current indent.
+    let mut last_list = ListIndent::Neither;
     for token in tokens {
         // Always recorded with location None, even when a source comma exists. No lexeme to slice.
         if token.item == IsographSemanticToken::Comma {
             out.push(',');
             last = IsographSemanticToken::Comma.wrap_some();
-            last_delta = 0;
+            last_list = ListIndent::Neither;
             continue;
         }
         let span = token.location.expect("only Comma is recorded with location None");
         let lexeme = &text[span.as_usize_range()];
         let role = token.item;
-        // List-group `{` `(` `[` are +1 / -1. Type-list `[` is GraphQLTypeName, 0.
-        let delta = list_indent(role, lexeme);
+        // Type-list `[` is GraphQLTypeName, Neither.
+        let list = list_indent(role, lexeme);
         // Before the gap: a closer uses the opener's indent (`foo: {\n}` not `foo: {\n  }`).
-        if delta < 0 {
+        if let ListIndent::Close = list {
             indent = indent
                 .checked_sub(1)
                 .expect("a closer is preceded by an opener that incremented indent");
         }
-        apply_gap(&mut out, gap(last, last_delta, role, lexeme), indent);
+        apply_gap(&mut out, gap(last, last_list, role, lexeme), indent);
         out.push_str(lexeme);
         // After the lexeme: indent what follows. Do not break; the next token's gap does.
-        if delta > 0 {
+        if let ListIndent::Open = list {
             indent += 1;
         }
         last = role.wrap_some();
-        last_delta = delta;
+        last_list = list;
     }
     out
 }
@@ -217,28 +217,35 @@ enum Gap {
     Line,
 }
 
-fn list_indent(role: IsographSemanticToken, lexeme: &str) -> i8 {
+#[derive(Copy, Clone)]
+enum ListIndent {
+    Open,
+    Close,
+    Neither,
+}
+
+fn list_indent(role: IsographSemanticToken, lexeme: &str) -> ListIndent {
     match (role, lexeme) {
         (IsographSemanticToken::Brace, "{")
         | (IsographSemanticToken::Parenthesis, "(")
-        | (IsographSemanticToken::Bracket, "[") => 1,
+        | (IsographSemanticToken::Bracket, "[") => ListIndent::Open,
         (IsographSemanticToken::Brace, "}")
         | (IsographSemanticToken::Parenthesis, ")")
-        | (IsographSemanticToken::Bracket, "]") => -1,
-        _ => 0,
+        | (IsographSemanticToken::Bracket, "]") => ListIndent::Close,
+        _ => ListIndent::Neither,
     }
 }
 
 fn gap(
     last: Option<IsographSemanticToken>,
-    last_delta: i8,
+    last_list: ListIndent,
     role: IsographSemanticToken,
     lexeme: &str,
 ) -> Gap {
     match last {
         None => Gap::None,
         Some(IsographSemanticToken::Comma) => Gap::Line,
-        Some(_) if last_delta > 0 => Gap::Line,
+        Some(_) if matches!(last_list, ListIndent::Open) => Gap::Line,
         Some(prev) => {
             if role == IsographSemanticToken::Description
                 || prev == IsographSemanticToken::Description
@@ -285,7 +292,7 @@ fn apply_gap(out: &mut String, gap: Gap, indent: usize) {
 }
 ```
 
-A list open prints and increments. It does not break. The next token's gap is `Line` at the current indent: a first item at inner indent, or, after the closer decrements, the closer at the opener's indent. Zero items is no items. `Brace` is both `{` and `}`, so "last was an opener" is `last_delta > 0`, not the role. Type-list `[` `]` are `GraphQLTypeName`; `list_indent` is 0. Width is 2 spaces. A parse failure of a literal is not passed to `format_recorded`.
+A list open prints and increments. It does not break. The next token's gap is `Line` at the current indent: a first item at inner indent, or, after the closer decrements, the closer at the opener's indent. Zero items is no items. `Brace` is both `{` and `}`, so "last was an opener" is `last_list == ListIndent::Open`, not the role. Type-list `[` `]` are `GraphQLTypeName`; `list_indent` is `Neither`. Width is 2 spaces. A parse failure of a literal is not passed to `format_recorded`.
 
 ## Target shape
 
