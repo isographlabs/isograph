@@ -117,7 +117,17 @@ background = true
 # Shortcuts to internal functions (scrolling, toggling, etc.)
 # should go in your personal global prefs.toml file instead.
 [jobs.watch-extension]
-command = ["npm", "run", "esbuild-watch"]
+command = [
+    "./node_modules/.bin/esbuild",
+    "./src/extension.ts",
+    "--bundle",
+    "--outfile=out/extension.js",
+    "--external:vscode",
+    "--format=cjs",
+    "--platform=node",
+    "--sourcemap",
+    "--watch",
+]
 workdir = "vscode-extension"
 need_stdout = true
 background = false
