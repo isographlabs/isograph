@@ -6,9 +6,9 @@ Incorporation of `freddie_timer` into i2. HelloWorld arms a `Duration::ZERO` tim
 
 `IsographDb` is the pico database in `isograph_compiler`. `IsographState` is the CLI process wrapper (`db`, `live_sessions`, and this slice's guard). The guard is not a pico source. It is RAII over a oneshot that cancels a tokio sleep. It lives on `IsographState`. `handle` matches `IsographEvent` only. `Internal` is `handle_internal_event(state, internal)`. That function takes `IsographState` and matches `InternalEvent`. DiskChanged still calls `handle_disk_changed(&mut state.db, change)`.
 
-`isograph send` of HelloWorld is `Lsp(Notification { method: isograph/event, params: HelloWorld })`, not `IsographEvent::Internal(HelloWorld)`. Today that path is `handle` -> `dispatch_lsp` -> `dispatch_lsp_notification` -> `on_isograph_event` -> `handle_internal(&mut state.db)`. This slice has `on_isograph_event` call `handle(state, internal.to())`, so send hits `handle_internal_event`'s HelloWorld arm.
+`isograph send` of HelloWorld is `Lsp(Notification { method: isograph/event, params: HelloWorld })`. `on_isograph_event` calls `handle_internal_event(state, internal)`. In-process `Internal` is the same function.
 
-Origin: figaro `src/daemon.rs` `schedule_timer` / `perform_effect` taking `event_tx`. Origin of the halves: freddie-timer.md. Delta: `IsographEvent::Timer` / `IsographEffect::Timer`; `perform` gains `event_tx` and the Timer arm returns `ControlFlow::Continue`; payload `HelloWorldDebounced`; `on_isograph_event` re-enters `handle`.
+Origin: figaro `src/daemon.rs` `schedule_timer` / `perform_effect` taking `event_tx`. Origin of the halves: freddie-timer.md. Delta: `IsographEvent::Timer` / `IsographEffect::Timer`; `perform` gains `event_tx` and the Timer arm returns `ControlFlow::Continue`; payload `HelloWorldDebounced`; `on_isograph_event` calls `handle_internal_event`.
 
 One shippable change.
 
@@ -159,7 +159,7 @@ fn on_isograph_event<THostLanguage: HostLanguage>(
     state: &mut IsographState<THostLanguage>,
     internal: InternalEvent,
 ) -> Vec<IsographEffect> {
-    handle(state, internal.to())
+    handle_internal_event(state, internal)
 }
 
 fn handle_internal_event<THostLanguage: HostLanguage>(
@@ -199,8 +199,6 @@ fn handle_timer_fired<THostLanguage: HostLanguage>(
 ```
 
 `state.rs` gains `use std::time::Duration` and `use crate::event::TimerPayload`. Payload is readable only through `trigger_if_matching`.
-
-`on_isograph_event` re-enters `handle` with `Internal`, not `Lsp`. `handle` of `Internal` is `handle_internal_event`. There is no recursion through `Lsp`. `handle_internal` is renamed; it takes `IsographState`.
 
 Origin of `schedule_timer` and of `perform` taking `event_tx`: figaro `src/daemon.rs`. Figaro's `perform_effect` matches, then returns `Continue` after the match (`Kill` is `return Break`). i2's `perform` returns from each arm. `schedule_timer` is `-> ()`. `IsographEffect::Timer(timer) => schedule_timer(timer, event_tx)` is a type error. The Timer arm calls `schedule_timer` then returns `Continue`.
 
@@ -436,7 +434,7 @@ Park on `event_rx.recv().await`. Absence of a firing has no edge: inject `Quit` 
     }
 ```
 
-The matching test does not `perform` the timer: it feeds `timer.event` to `handle` as if the sleep had won. The stale test drops the field first. The second HelloWorld test is overwrite plus the second fire. The LSP tests are the send-shaped path through `on_isograph_event` -> `handle`. `lsp_isograph_event_hello_world_returns_log_hello_world` is deleted; those two replace it.
+The matching test does not `perform` the timer: it feeds `timer.event` to `handle` as if the sleep had won. The stale test drops the field first. The second HelloWorld test is overwrite plus the second fire. The LSP tests are the send-shaped path through `on_isograph_event` -> `handle_internal_event`. `lsp_isograph_event_hello_world_returns_log_hello_world` is deleted; those two replace it.
 
 ```rust
 // from crates/isograph_cli/src/daemon.rs
@@ -540,7 +538,7 @@ CLI tests in `crates/ts_graphql_react_isograph_cli/tests/cli.rs` send HelloWorld
 
 ## Call sites
 
-- `handle` of HelloWorld (`Internal` or LSP `isograph/event` re-entering `handle`) -> `Timer` effect plus guard
+- `handle_internal_event` of HelloWorld (`Internal` or LSP `isograph/event`) -> `Timer` effect plus guard
 - `handle` of `TimerFired` -> `trigger_if_matching` -> `LogHelloWorld` or empty
 - `perform` of `Timer` -> `schedule_timer` -> wrap as `IsographEvent::Timer` on `event_tx.send`, or cancel
 - `serve` / `listen_and_reply` / `kill_ends_the_effect_loop` pass `event_tx` into `run_effect_loop`
