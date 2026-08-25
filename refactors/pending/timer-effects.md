@@ -6,9 +6,9 @@ Incorporation of `freddie_timer` into i2. HelloWorld arms a `Duration::ZERO` tim
 
 `IsographDb` is the pico database in `isograph_compiler`. `IsographState` is the CLI process wrapper (`db`, `live_sessions`, and this slice's guard). The guard is not a pico source. It is RAII over a oneshot that cancels a tokio sleep. It lives on `IsographState`. `handle_internal` stays on `&mut IsographDb` (Quit, DiskChanged). HelloWorld and `TimerFired` are matched on `handle` because they write that field.
 
-`isograph send` of HelloWorld is `Lsp(Notification { method: isograph/event, params: HelloWorld })`, not `IsographEvent::Internal(HelloWorld)`. After lsp-outstanding, that path is `handle` -> `dispatch_lsp(&mut IsographState)` -> `dispatch_lsp_notification(&mut IsographDb)` -> `on_isograph_event` -> `handle_internal`. This slice points the notification path at `&mut IsographState` and has `on_isograph_event` call `handle(state, internal.to())`, so send hits `handle`'s HelloWorld arm. `handle_internal` does not take `IsographState`.
+`isograph send` of HelloWorld is `Lsp(Notification { method: isograph/event, params: HelloWorld })`, not `IsographEvent::Internal(HelloWorld)`. After lsp-outstanding, that path is `handle` -> `dispatch_lsp` -> `dispatch_lsp_notification` -> `on_isograph_event` -> `handle_internal(&mut state.db)`. `dispatch_lsp_notification` and `on_isograph_event` already take `&mut IsographState`. This slice has `on_isograph_event` call `handle(state, internal.to())`, so send hits `handle`'s HelloWorld arm. `handle_internal` does not take `IsographState`.
 
-Origin: figaro `src/daemon.rs` `schedule_timer` / `perform_effect` taking `event_tx`. Origin of the halves: freddie-timer.md. Delta: `IsographEvent::Timer` / `IsographEffect::Timer`; `perform` gains `event_tx` and the Timer arm returns `ControlFlow::Continue`; payload `HelloWorldDebounced`; notification dispatch takes `IsographState` and re-enters `handle`.
+Origin: figaro `src/daemon.rs` `schedule_timer` / `perform_effect` taking `event_tx`. Origin of the halves: freddie-timer.md. Delta: `IsographEvent::Timer` / `IsographEffect::Timer`; `perform` gains `event_tx` and the Timer arm returns `ControlFlow::Continue`; payload `HelloWorldDebounced`; `on_isograph_event` re-enters `handle`.
 
 One shippable change.
 
@@ -109,7 +109,7 @@ freddie_timer = { git = "https://github.com/freddiehg/freddie", rev = "e2dde74d6
 tokio = { workspace = true, features = ["rt", "macros", "sync", "time", "test-util"] }
 ```
 
-After lsp-outstanding, `handle` and `dispatch_lsp` already take `&mut IsographState`. `dispatch_lsp_request` stays on `&IsographDb`. `dispatch_lsp_notification` and `on_isograph_event` still take `&mut IsographDb` and call `handle_internal`.
+After lsp-outstanding, `handle` and `dispatch_lsp` already take `&mut IsographState`. `dispatch_lsp_notification` and `on_isograph_event` already take `&mut IsographState`. `on_isograph_event` still calls `handle_internal(&mut state.db, internal)`.
 
 ```rust
 // from crates/isograph_cli/src/state.rs (before)
@@ -135,43 +135,11 @@ After lsp-outstanding, `handle` and `dispatch_lsp` already take `&mut IsographSt
 
 ```rust
 // from crates/isograph_cli/src/state.rs (before)
-        crate::event::LspEvent::Notification(notification) => {
-            dispatch_lsp_notification(&mut state.db, notification)
-        }
-```
-
-```rust
-// from crates/isograph_cli/src/state.rs (after)
-        crate::event::LspEvent::Notification(notification) => {
-            dispatch_lsp_notification(state, notification)
-        }
-```
-
-```rust
-// from crates/isograph_cli/src/state.rs (before)
-fn dispatch_lsp_notification<THostLanguage: HostLanguage>(
-    state: &mut IsographDb<THostLanguage>,
-    notification: lsp_server::Notification,
-) -> Vec<IsographEffect> {
-    let dispatch = || {
-        crate::lsp_notification_dispatch::LSPNotificationDispatch::new(notification, state)
-            .on_notification_sync::<crate::lsp_socket::IsographEventNotification>(
-                on_isograph_event::<THostLanguage>,
-            )?
-            .notification();
-        ControlFlow::Continue(())
-    };
-    match dispatch() {
-        ControlFlow::Break(effects) => effects,
-        ControlFlow::Continue(()) => no_effects(),
-    }
-}
-
 fn on_isograph_event<THostLanguage: HostLanguage>(
-    state: &mut IsographDb<THostLanguage>,
+    state: &mut IsographState<THostLanguage>,
     internal: InternalEvent,
 ) -> Vec<IsographEffect> {
-    handle_internal(state, internal)
+    handle_internal(&mut state.db, internal)
 }
 
 fn handle_internal<THostLanguage: HostLanguage>(
@@ -190,24 +158,6 @@ fn handle_internal<THostLanguage: HostLanguage>(
 
 ```rust
 // from crates/isograph_cli/src/state.rs (after)
-fn dispatch_lsp_notification<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
-    notification: lsp_server::Notification,
-) -> Vec<IsographEffect> {
-    let dispatch = || {
-        crate::lsp_notification_dispatch::LSPNotificationDispatch::new(notification, state)
-            .on_notification_sync::<crate::lsp_socket::IsographEventNotification>(
-                on_isograph_event::<THostLanguage>,
-            )?
-            .notification();
-        ControlFlow::Continue(())
-    };
-    match dispatch() {
-        ControlFlow::Break(effects) => effects,
-        ControlFlow::Continue(()) => no_effects(),
-    }
-}
-
 fn on_isograph_event<THostLanguage: HostLanguage>(
     state: &mut IsographState<THostLanguage>,
     internal: InternalEvent,

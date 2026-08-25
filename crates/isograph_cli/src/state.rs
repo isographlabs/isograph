@@ -69,7 +69,7 @@ fn dispatch_lsp<THostLanguage: HostLanguage>(
             dispatch_lsp_request(state, incoming, id)
         }
         crate::event::LspEvent::Notification(notification) => {
-            dispatch_lsp_notification(&mut state.db, notification)
+            dispatch_lsp_notification(state, notification)
         }
         crate::event::LspEvent::Response(_response) => no_effects(),
     }
@@ -158,7 +158,7 @@ fn handle_internal<THostLanguage: HostLanguage>(
 }
 
 fn dispatch_lsp_notification<THostLanguage: HostLanguage>(
-    state: &mut IsographDb<THostLanguage>,
+    state: &mut IsographState<THostLanguage>,
     notification: lsp_server::Notification,
 ) -> Vec<IsographEffect> {
     let dispatch = || {
@@ -176,10 +176,10 @@ fn dispatch_lsp_notification<THostLanguage: HostLanguage>(
 }
 
 fn on_isograph_event<THostLanguage: HostLanguage>(
-    state: &mut IsographDb<THostLanguage>,
+    state: &mut IsographState<THostLanguage>,
     internal: InternalEvent,
 ) -> Vec<IsographEffect> {
-    handle_internal(state, internal)
+    handle_internal(&mut state.db, internal)
 }
 
 pub(crate) fn intern_config_directory(
