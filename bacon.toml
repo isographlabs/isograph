@@ -126,7 +126,7 @@ command = [
     "--format=cjs",
     "--platform=node",
     "--sourcemap",
-    "--watch",
+    "--watch=forever",
 ]
 workdir = "vscode-extension"
 need_stdout = true
