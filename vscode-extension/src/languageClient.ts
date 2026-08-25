@@ -1,6 +1,11 @@
 import * as path from 'path';
+import type { FormattingOptions, TextEdit } from 'vscode';
+import { WorkspaceEdit, workspace } from 'vscode';
 import type { LanguageClientOptions } from 'vscode-languageclient';
-import { RevealOutputChannelOn } from 'vscode-languageclient';
+import {
+  RevealOutputChannelOn,
+  TextDocumentIdentifier,
+} from 'vscode-languageclient';
 import type { ServerOptions } from 'vscode-languageclient/node';
 import { LanguageClient } from 'vscode-languageclient/node';
 import { getConfig } from './config';
@@ -56,6 +61,34 @@ export async function createAndStartLanguageClient(
       serverOptions,
     )}`,
   );
+
+  if (config.autoformatIsoLiterals) {
+    workspace.onWillSaveTextDocument((event) => {
+      event.waitUntil(
+        (async () => {
+          try {
+            const textEdits: TextEdit[] = await client.sendRequest(
+              'textDocument/formatting',
+              {
+                textDocument: TextDocumentIdentifier.create(
+                  event.document.uri.toString(),
+                ),
+                options: {
+                  tabSize: 2,
+                  insertSpaces: true,
+                } as FormattingOptions,
+              },
+            );
+            const edit = new WorkspaceEdit();
+            edit.set(event.document.uri, textEdits);
+            await workspace.applyEdit(edit);
+          } catch {
+            // The client may not be ready yet; save still proceeds.
+          }
+        })(),
+      );
+    });
+  }
 
   await client.start();
   context.client = client;

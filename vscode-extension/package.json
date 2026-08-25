@@ -51,6 +51,13 @@
             "null"
           ],
           "description": "Path relative to the VS Code workspace. Default is the workspace root. Changes where the extension looks for @isograph/compiler and the cwd of isograph lsp (and therefore config walk-up)."
+        },
+        "isograph.autoformatIsoLiterals": {
+          "scope": "workspace",
+          "default": true,
+          "type": [
+            "boolean"
+          ]
         }
       }
     }
