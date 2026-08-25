@@ -131,7 +131,7 @@ After lsp-outstanding, `handle` and `dispatch_lsp` already take `&mut State`. `d
     }
 ```
 
-`handle_internal` still takes `&mut IsographState`. rustc does not narrow `InternalEvent`, so that match still names HelloWorld. That arm is `Vec::new()`, not `LogHelloWorld`. The send path is `handle`'s HelloWorld arm. If `on_isograph_event` still called `handle_internal` and that arm were `LogHelloWorld`, send would skip the timer, the in-process Internal tests would pass, and the log would still appear.
+`handle_internal` still takes `&mut IsographState`. rustc does not narrow `InternalEvent`, so that match still names HelloWorld. That arm is `no_effects()`, not `LogHelloWorld`. The send path is `handle`'s HelloWorld arm. If `on_isograph_event` still called `handle_internal` and that arm were `LogHelloWorld`, send would skip the timer, the in-process Internal tests would pass, and the log would still appear.
 
 ```rust
 // from crates/isograph_cli/src/state.rs (before)
@@ -163,7 +163,7 @@ fn dispatch_lsp_notification<THostLanguage: HostLanguage>(
     };
     match dispatch() {
         ControlFlow::Break(effects) => effects,
-        ControlFlow::Continue(()) => Vec::new(),
+        ControlFlow::Continue(()) => no_effects(),
     }
 }
 
@@ -204,7 +204,7 @@ fn dispatch_lsp_notification<THostLanguage: HostLanguage>(
     };
     match dispatch() {
         ControlFlow::Break(effects) => effects,
-        ControlFlow::Continue(()) => Vec::new(),
+        ControlFlow::Continue(()) => no_effects(),
     }
 }
 
@@ -220,7 +220,7 @@ fn handle_internal<THostLanguage: HostLanguage>(
     internal: InternalEvent,
 ) -> Vec<IsographEffect> {
     match internal {
-        InternalEvent::HelloWorld => Vec::new(),
+        InternalEvent::HelloWorld => no_effects(),
         InternalEvent::Quit => IsographEffect::Kill.wrap_vec(),
         InternalEvent::DiskChanged(change) => handle_disk_changed(state, change),
     }
@@ -246,7 +246,7 @@ fn handle_timer_fired<THostLanguage: HostLanguage>(
             state.hello_world_debounce = None;
             IsographEffect::LogHelloWorld.wrap_vec()
         }
-        None => Vec::new(),
+        None => no_effects(),
     }
 }
 ```

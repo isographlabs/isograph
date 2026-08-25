@@ -61,7 +61,7 @@ struct ReportDiagnostics {
                     state.diagnostics_debounce = None;
                     report_diagnostics(state).wrap_vec()
                 }
-                None => Vec::new(),
+                None => no_effects(),
             }
         }
 ```
