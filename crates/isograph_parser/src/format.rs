@@ -247,6 +247,18 @@ mod tests {
     }
 
     #[test]
+    fn a_blank_line_after_a_comma_does_not_change_the_print() {
+        let pretty = formatted("field Pet.fullName @foo(bar: 123, baz: $qux) { id }");
+        (0usize..=4).for_each(|spaces| {
+            let src = format!(
+                "field Pet.fullName @foo(\n    bar: 123,\n    baz: $qux,\n  ) {{\n    id,\n{}\n  }}",
+                " ".repeat(spaces)
+            );
+            assert_eq!(formatted(&src), pretty, "spaces={spaces}");
+        });
+    }
+
+    #[test]
     fn at_has_a_space_before() {
         let out = formatted("field Query.x { id @loadable }");
         assert!(out.contains("id @loadable"), "{out}");
