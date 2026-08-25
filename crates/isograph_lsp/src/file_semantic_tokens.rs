@@ -1,6 +1,6 @@
 use common_lang_types::RelativePathToSourceFile;
 use isograph_compiler::{
-    HostLanguage, IsographState, parsed_iso_literals_in_file, text_through_last_iso_literal,
+    HostLanguage, IsographDb, parsed_iso_literals_in_file, text_through_last_iso_literal,
 };
 use pico_macros::memo;
 use prelude::Postfix;
@@ -9,7 +9,7 @@ use crate::lsp_semantic_tokens;
 
 #[memo]
 pub fn lsp_semantic_tokens_for_file<THostLanguage: HostLanguage>(
-    db: &IsographState<THostLanguage>,
+    db: &IsographDb<THostLanguage>,
     path: RelativePathToSourceFile,
 ) -> Option<Vec<lsp_types::SemanticToken>> {
     let literals = parsed_iso_literals_in_file(db, path).as_ref()?;
@@ -27,7 +27,7 @@ pub fn lsp_semantic_tokens_for_file<THostLanguage: HostLanguage>(
 mod tests {
     use common_lang_types::RelativePathToSourceFile;
     use intern::string_key::Intern;
-    use isograph_compiler::IsographState;
+    use isograph_compiler::IsographDb;
     use isograph_extract_typescript::TypeScriptHostLanguage;
     use prelude::Postfix;
 
@@ -38,7 +38,7 @@ mod tests {
     }
 
     fn intern_file(
-        db: &mut IsographState<TypeScriptHostLanguage>,
+        db: &mut IsographDb<TypeScriptHostLanguage>,
         path: RelativePathToSourceFile,
         contents: &str,
     ) {
@@ -49,7 +49,7 @@ mod tests {
 
     #[test]
     fn one_literal_encodes_entrypoint_as_keyword() {
-        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
         let path = intern_path("src/a.ts");
         intern_file(
             &mut db,
@@ -70,7 +70,7 @@ mod tests {
 
     #[test]
     fn two_iso_interiors_encode_both_entrypoints() {
-        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
         let path = intern_path("src/a.ts");
         intern_file(
             &mut db,
@@ -93,7 +93,7 @@ mod tests {
 
     #[test]
     fn empty_file_encodes_empty() {
-        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
         let path = intern_path("src/a.ts");
         intern_file(&mut db, path, "");
         let lsp = lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, path)
@@ -104,7 +104,7 @@ mod tests {
 
     #[test]
     fn space_only_literal_encodes_empty() {
-        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
         let path = intern_path("src/a.ts");
         intern_file(&mut db, path, "iso(` `)");
         let lsp = lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, path)
@@ -115,7 +115,7 @@ mod tests {
 
     #[test]
     fn remove_disk_file_is_none() {
-        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
         let path = intern_path("src/a.ts");
         intern_file(&mut db, path, "iso(`entrypoint Query.HomeRoute`)");
         assert!(lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, path).is_some());
@@ -125,14 +125,14 @@ mod tests {
 
     #[test]
     fn no_disk_file_is_none() {
-        let db = IsographState::<TypeScriptHostLanguage>::default();
+        let db = IsographDb::<TypeScriptHostLanguage>::default();
         let path = intern_path("src/a.ts");
         assert!(lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, path).is_none());
     }
 
     #[test]
     fn append_after_the_literal_keeps_encoded_tokens() {
-        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
         let path = intern_path("src/a.ts");
         let contents = "export const Home = iso(`entrypoint Query.HomeRoute`)";
         intern_file(&mut db, path, contents);
@@ -149,7 +149,7 @@ mod tests {
 
     #[test]
     fn prefix_increments_delta_line_and_keeps_delta_start() {
-        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
         let path = intern_path("src/a.ts");
         let contents = "export const Home = iso(`entrypoint Query.HomeRoute`)";
         intern_file(&mut db, path, contents);
@@ -169,7 +169,7 @@ mod tests {
 
     #[test]
     fn context_only_export_rename_keeps_encoded_tokens() {
-        let mut db = IsographState::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
         let path = intern_path("src/a.ts");
         intern_file(
             &mut db,

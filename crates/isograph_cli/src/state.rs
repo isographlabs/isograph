@@ -15,10 +15,10 @@ use crate::event::{
     ClientConnectionEvent, DiskChanged, InternalEvent, IsographEvent, LiveSessions, Presence,
 };
 
-pub use isograph_compiler::IsographState;
+pub use isograph_compiler::IsographDb;
 
 pub struct State<THostLanguage: HostLanguage> {
-    pub db: IsographState<THostLanguage>,
+    pub db: IsographDb<THostLanguage>,
     pub live_sessions: LiveSessions,
 }
 
@@ -147,7 +147,7 @@ fn method_not_found<THostLanguage: HostLanguage>(
 }
 
 fn handle_internal<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
+    state: &mut IsographDb<THostLanguage>,
     internal: InternalEvent,
 ) -> Vec<IsographEffect> {
     match internal {
@@ -158,7 +158,7 @@ fn handle_internal<THostLanguage: HostLanguage>(
 }
 
 fn dispatch_lsp_notification<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
+    state: &mut IsographDb<THostLanguage>,
     notification: lsp_server::Notification,
 ) -> Vec<IsographEffect> {
     let dispatch = || {
@@ -176,14 +176,14 @@ fn dispatch_lsp_notification<THostLanguage: HostLanguage>(
 }
 
 fn on_isograph_event<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
+    state: &mut IsographDb<THostLanguage>,
     internal: InternalEvent,
 ) -> Vec<IsographEffect> {
     handle_internal(state, internal)
 }
 
 pub(crate) fn intern_config_directory(
-    state: &mut IsographState<impl HostLanguage>,
+    state: &mut IsographDb<impl HostLanguage>,
     config_path: &Path,
 ) {
     let directory = config_path
@@ -198,7 +198,7 @@ pub(crate) fn intern_config_directory(
 }
 
 fn relative_path_to_source_file(
-    state: &IsographState<impl HostLanguage>,
+    state: &IsographDb<impl HostLanguage>,
     absolute: &Path,
 ) -> RelativePathToSourceFile {
     let cwd = *state
@@ -208,7 +208,7 @@ fn relative_path_to_source_file(
 }
 
 fn handle_disk_changed<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
+    state: &mut IsographDb<THostLanguage>,
     change: DiskChanged,
 ) -> Vec<IsographEffect> {
     match change {
@@ -243,7 +243,7 @@ mod tests {
 
     use isograph_extract_typescript::TypeScriptHostLanguage;
 
-    use super::{IsographState, State, handle, intern_config_directory};
+    use super::{IsographDb, State, handle, intern_config_directory};
     use crate::effect::IsographEffect;
     use crate::event::{
         ClientConnectionEvent, ClientId, ClientStartedEvent, DiskChanged, DiskFileChanged,
@@ -256,7 +256,7 @@ mod tests {
 
     fn empty() -> State<TypeScriptHostLanguage> {
         State {
-            db: IsographState::<TypeScriptHostLanguage>::default(),
+            db: IsographDb::<TypeScriptHostLanguage>::default(),
             live_sessions: LiveSessions::default(),
         }
     }

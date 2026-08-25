@@ -6,7 +6,7 @@ use thiserror::Error;
 use common_lang_types::RelativePathToSourceFile;
 use isograph_parser::ParseError;
 
-use crate::IsographState;
+use crate::IsographDb;
 
 /// Byte offset of the iso literal text in its file.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -68,7 +68,7 @@ pub trait HostLanguage: Send + Sync + Sized + 'static {
     type LiteralContext: Clone + PartialEq + Eq + Debug + 'static;
 
     fn extract_iso_literals(
-        db: &IsographState<Self>,
+        db: &IsographDb<Self>,
         path: RelativePathToSourceFile,
     ) -> &Option<Vec<IsoLiteralExtraction<Self>>>;
 

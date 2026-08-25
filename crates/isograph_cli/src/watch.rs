@@ -622,7 +622,7 @@ mod tests {
     use std::time::{Duration, Instant};
 
     use intern::string_key::Intern;
-    use isograph_compiler::{HostLanguage, IsoLiteralExtraction, IsographState, SkipSourceFile};
+    use isograph_compiler::{HostLanguage, IsoLiteralExtraction, IsographDb, SkipSourceFile};
     use isograph_config::ISOGRAPH_FOLDER;
     use prelude::Postfix;
     use thiserror::Error;
@@ -646,7 +646,7 @@ mod tests {
         type LiteralContext = ();
 
         fn extract_iso_literals(
-            _db: &IsographState<Self>,
+            _db: &IsographDb<Self>,
             _path: common_lang_types::RelativePathToSourceFile,
         ) -> &Option<Vec<IsoLiteralExtraction<Self>>> {
             const NONE: Option<Vec<IsoLiteralExtraction<InHost>>> = None;
@@ -688,7 +688,7 @@ mod tests {
             let config_path = dir.path().join("isograph.config.json");
             std::fs::write(config_path.reference(), "{}\n").expect("a test can write a config");
             let config_path = config_path.canonicalize().expect("the config exists");
-            let mut db = IsographState::<InHost>::default();
+            let mut db = IsographDb::<InHost>::default();
             intern_config_directory(&mut db, config_path.reference());
             let config_directory = config_path
                 .parent()

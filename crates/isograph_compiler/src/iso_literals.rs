@@ -3,7 +3,7 @@ use isograph_parser::{ParsedIsoLiteral, parse_iso_literal};
 use pico_macros::memo;
 use prelude::Postfix;
 
-use crate::IsographState;
+use crate::IsographDb;
 use crate::host_language::{HostLanguage, IsoLiteralExtraction};
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
@@ -20,7 +20,7 @@ pub struct LiteralId {
 
 #[memo]
 pub fn parsed_iso_literal<THostLanguage: HostLanguage>(
-    db: &IsographState<THostLanguage>,
+    db: &IsographDb<THostLanguage>,
     iso_literal_text: String,
 ) -> ParsedIsoLiteral {
     parse_iso_literal(iso_literal_text.as_str())
@@ -28,7 +28,7 @@ pub fn parsed_iso_literal<THostLanguage: HostLanguage>(
 
 #[memo]
 pub fn parsed_iso_literals_in_file<THostLanguage: HostLanguage>(
-    db: &IsographState<THostLanguage>,
+    db: &IsographDb<THostLanguage>,
     path: RelativePathToSourceFile,
 ) -> Option<Vec<(IsoLiteralExtraction<THostLanguage>, ParsedIsoLiteral)>> {
     let extractions = THostLanguage::extract_iso_literals(db, path).as_ref()?;
@@ -46,7 +46,7 @@ pub fn parsed_iso_literals_in_file<THostLanguage: HostLanguage>(
 
 #[memo]
 pub fn text_through_last_iso_literal<THostLanguage: HostLanguage>(
-    db: &IsographState<THostLanguage>,
+    db: &IsographDb<THostLanguage>,
     path: RelativePathToSourceFile,
 ) -> Option<String> {
     let extractions = THostLanguage::extract_iso_literals(db, path).as_ref()?;
@@ -60,7 +60,7 @@ pub fn text_through_last_iso_literal<THostLanguage: HostLanguage>(
 
 #[memo]
 pub fn literal_id_at_location<THostLanguage: HostLanguage>(
-    db: &IsographState<THostLanguage>,
+    db: &IsographDb<THostLanguage>,
     path: RelativePathToSourceFile,
     line_char: LineChar,
 ) -> Option<LiteralId> {
@@ -72,7 +72,7 @@ pub fn literal_id_at_location<THostLanguage: HostLanguage>(
 
 #[memo]
 pub fn iso_literal_extraction<THostLanguage: HostLanguage>(
-    db: &IsographState<THostLanguage>,
+    db: &IsographDb<THostLanguage>,
     literal_id: LiteralId,
 ) -> Option<IsoLiteralExtraction<THostLanguage>> {
     let extractions = THostLanguage::extract_iso_literals(db, literal_id.path).as_ref()?;

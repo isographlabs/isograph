@@ -3,7 +3,7 @@ use pico::Database;
 use prelude::Postfix;
 
 pub(crate) fn semantic_tokens_response<THostLanguage: HostLanguage>(
-    state: &isograph_compiler::IsographState<THostLanguage>,
+    state: &isograph_compiler::IsographDb<THostLanguage>,
     params: lsp_types::SemanticTokensParams,
 ) -> isograph_lsp::lsp_runtime_error::LSPRuntimeResult<
     <lsp_types::request::SemanticTokensFullRequest as lsp_types::request::Request>::Result,
@@ -27,7 +27,7 @@ fn file_path(uri: &lsp_types::Uri) -> Option<std::path::PathBuf> {
 }
 
 fn semantic_tokens<THostLanguage: HostLanguage>(
-    state: &isograph_compiler::IsographState<THostLanguage>,
+    state: &isograph_compiler::IsographDb<THostLanguage>,
     absolute: &std::path::Path,
 ) -> Option<Vec<lsp_types::SemanticToken>> {
     let cwd = state.get_singleton::<common_lang_types::CurrentWorkingDirectory>()?;
@@ -36,7 +36,7 @@ fn semantic_tokens<THostLanguage: HostLanguage>(
 }
 
 pub(crate) fn formatting_response<THostLanguage: isograph_compiler::HostLanguage>(
-    _state: &isograph_compiler::IsographState<THostLanguage>,
+    _state: &isograph_compiler::IsographDb<THostLanguage>,
     _params: lsp_types::DocumentFormattingParams,
 ) -> isograph_lsp::lsp_runtime_error::LSPRuntimeResult<
     <lsp_types::request::Formatting as lsp_types::request::Request>::Result,
@@ -45,7 +45,7 @@ pub(crate) fn formatting_response<THostLanguage: isograph_compiler::HostLanguage
 }
 
 pub(crate) fn will_save_wait_until_response<THostLanguage: isograph_compiler::HostLanguage>(
-    _state: &isograph_compiler::IsographState<THostLanguage>,
+    _state: &isograph_compiler::IsographDb<THostLanguage>,
     _params: lsp_types::WillSaveTextDocumentParams,
 ) -> isograph_lsp::lsp_runtime_error::LSPRuntimeResult<
     <lsp_types::request::WillSaveWaitUntil as lsp_types::request::Request>::Result,

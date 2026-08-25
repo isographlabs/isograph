@@ -9,14 +9,14 @@ use prelude::Postfix;
 use crate::HostLanguage;
 
 #[derive(Debug, Db)]
-pub struct IsographState<THostLanguage: HostLanguage> {
+pub struct IsographDb<THostLanguage: HostLanguage> {
     storage: Storage<Self>,
     #[tracked]
     disk_file_map: DiskFileMap,
     phantom_data: PhantomData<THostLanguage>,
 }
 
-impl<THostLanguage: HostLanguage> Default for IsographState<THostLanguage> {
+impl<THostLanguage: HostLanguage> Default for IsographDb<THostLanguage> {
     fn default() -> Self {
         Self {
             storage: Storage::default(),
@@ -36,7 +36,7 @@ pub struct DiskFile {
     pub contents: String,
 }
 
-impl<THostLanguage: HostLanguage> IsographState<THostLanguage> {
+impl<THostLanguage: HostLanguage> IsographDb<THostLanguage> {
     pub fn insert_disk_file(&mut self, path: RelativePathToSourceFile, contents: String) {
         let source_id = self.set(DiskFile { path, contents });
         self.get_disk_file_map_mut()
@@ -79,7 +79,7 @@ mod tests {
 
     use std::path::Path;
 
-    use super::IsographState;
+    use super::IsographDb;
     use crate::host_language::{HostLanguage, IsoLiteralExtraction, SkipSourceFile};
 
     #[derive(Clone, Debug, PartialEq, Eq, Error)]
@@ -93,7 +93,7 @@ mod tests {
         type LiteralContext = ();
 
         fn extract_iso_literals(
-            _db: &IsographState<Self>,
+            _db: &IsographDb<Self>,
             _path: RelativePathToSourceFile,
         ) -> &Option<Vec<IsoLiteralExtraction<Self>>> {
             const NONE: Option<Vec<IsoLiteralExtraction<TestHostLanguage>>> = None;
@@ -111,7 +111,7 @@ mod tests {
 
     #[test]
     fn present_inserts_a_disk_file() {
-        let mut state = IsographState::<TestHostLanguage>::default();
+        let mut state = IsographDb::<TestHostLanguage>::default();
         let path = intern_path("src/a.ts");
         state.insert_disk_file(path, "export const a = 1;\n".to_owned());
         assert_eq!(
@@ -125,7 +125,7 @@ mod tests {
 
     #[test]
     fn a_second_present_replaces_contents() {
-        let mut state = IsographState::<TestHostLanguage>::default();
+        let mut state = IsographDb::<TestHostLanguage>::default();
         let path = intern_path("src/a.ts");
         state.insert_disk_file(path, "first".to_owned());
         state.insert_disk_file(path, "second".to_owned());
@@ -141,7 +141,7 @@ mod tests {
 
     #[test]
     fn an_empty_string_is_stored() {
-        let mut state = IsographState::<TestHostLanguage>::default();
+        let mut state = IsographDb::<TestHostLanguage>::default();
         let path = intern_path("src/a.ts");
         state.insert_disk_file(path, String::new());
         assert_eq!(
@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn two_paths_are_two_entries() {
-        let mut state = IsographState::<TestHostLanguage>::default();
+        let mut state = IsographDb::<TestHostLanguage>::default();
         let a = intern_path("src/a.ts");
         let b = intern_path("src/b.ts");
         state.insert_disk_file(a, "a".to_owned());
@@ -179,7 +179,7 @@ mod tests {
 
     #[test]
     fn absent_removes_a_disk_file() {
-        let mut state = IsographState::<TestHostLanguage>::default();
+        let mut state = IsographDb::<TestHostLanguage>::default();
         let path = intern_path("src/a.ts");
         state.insert_disk_file(path, "export const a = 1;\n".to_owned());
         state.remove_disk_file(path);
@@ -188,7 +188,7 @@ mod tests {
 
     #[test]
     fn absent_of_a_never_present_path_is_a_noop() {
-        let mut state = IsographState::<TestHostLanguage>::default();
+        let mut state = IsographDb::<TestHostLanguage>::default();
         let path = intern_path("src/a.ts");
         state.remove_disk_file(path);
         assert!(state.disk_file(path).is_none());
@@ -197,7 +197,7 @@ mod tests {
 
     #[test]
     fn absent_then_present_on_different_paths_is_a_move() {
-        let mut state = IsographState::<TestHostLanguage>::default();
+        let mut state = IsographDb::<TestHostLanguage>::default();
         let from = intern_path("src/a.ts");
         let to = intern_path("src/b.ts");
         state.insert_disk_file(from, "export const a = 1;\n".to_owned());
@@ -215,7 +215,7 @@ mod tests {
 
     #[test]
     fn an_empty_relative_path_is_a_map_key() {
-        let mut state = IsographState::<TestHostLanguage>::default();
+        let mut state = IsographDb::<TestHostLanguage>::default();
         let path = intern_path("");
         state.insert_disk_file(path, "empty".to_owned());
         assert_eq!(
@@ -231,7 +231,7 @@ mod tests {
 
     #[test]
     fn unnormalized_relative_paths_are_two_entries() {
-        let mut state = IsographState::<TestHostLanguage>::default();
+        let mut state = IsographDb::<TestHostLanguage>::default();
         let a = intern_path("src/a.ts");
         let b = intern_path("src/./a.ts");
         state.insert_disk_file(a, "a".to_owned());
@@ -255,7 +255,7 @@ mod tests {
 
     #[test]
     fn remove_disk_files_from_path_removes_descendants_not_a_sibling_prefix() {
-        let mut state = IsographState::<TestHostLanguage>::default();
+        let mut state = IsographDb::<TestHostLanguage>::default();
         let a = intern_path("src/a.ts");
         let b = intern_path("src/b.ts");
         let c = intern_path("src2/c.ts");
@@ -276,7 +276,7 @@ mod tests {
 
     #[test]
     fn remove_disk_files_from_path_does_not_treat_a_filename_prefix_as_a_directory() {
-        let mut state = IsographState::<TestHostLanguage>::default();
+        let mut state = IsographDb::<TestHostLanguage>::default();
         let path = intern_path("src/a.ts");
         state.insert_disk_file(path, "a".to_owned());
         state.remove_disk_files_from_path(intern_path("src/a.ts.bak"));
@@ -291,7 +291,7 @@ mod tests {
 
     #[test]
     fn remove_disk_files_from_path_of_the_empty_relative_path_removes_every_file() {
-        let mut state = IsographState::<TestHostLanguage>::default();
+        let mut state = IsographDb::<TestHostLanguage>::default();
         let path = intern_path("src/a.ts");
         state.insert_disk_file(path, "a".to_owned());
         state.remove_disk_files_from_path(intern_path(""));

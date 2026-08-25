@@ -230,7 +230,7 @@ mod tests {
         InternalEvent, IsographEvent, LiveSessions, Presence,
     };
     use crate::send::notify;
-    use crate::state::{IsographState, State};
+    use crate::state::{IsographDb, State};
     use isograph_extract_typescript::TypeScriptHostLanguage;
 
     const SETTLE: Duration = Duration::from_millis(250);
@@ -280,7 +280,7 @@ mod tests {
                 .enable_all()
                 .build()
                 .expect("a test can start a tokio runtime");
-            let mut db = IsographState::<TypeScriptHostLanguage>::default();
+            let mut db = IsographDb::<TypeScriptHostLanguage>::default();
             crate::state::intern_config_directory(
                 &mut db,
                 std::path::Path::new("/tmp/proj/isograph.config.json"),
