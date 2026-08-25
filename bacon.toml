@@ -116,9 +116,18 @@ background = true
 # a project, for example a shortcut to launch a specific job.
 # Shortcuts to internal functions (scrolling, toggling, etc.)
 # should go in your personal global prefs.toml file instead.
+[jobs.watch-extension]
+command = ["npm", "run", "esbuild-watch"]
+workdir = "vscode-extension"
+need_stdout = true
+background = false
+default_watch = false
+allow_warnings = true
+
 [keybindings]
 # alt-m = "job:my-job"
 c = "job:clippy-all" # comment this to have 'c' run clippy on only the default target
 b = "job:build"
 x = "job:check"
 z = "job:check-cli"
+e = "job:watch-extension"

@@ -11,6 +11,7 @@
   },
   "scripts": {
     "watch-rs": "bacon -j build",
+    "watch-extension": "bacon -j watch-extension",
     "check-rs": "bacon -j check",
     "check-cli-rs": "bacon -j check-cli",
     "build-compiler": "cargo build --color=always",
