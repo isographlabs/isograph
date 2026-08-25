@@ -4,9 +4,9 @@ Requires event-loop.md (landed), freddie-timer.md, and lsp-outstanding.md. lsp-o
 
 Incorporation of `freddie_timer` into i2. HelloWorld arms a `Duration::ZERO` timer with payload `HelloWorldDebounced`. `handle` of the matching fire returns `LogHelloWorld`. lsp-diagnostics.md deletes that payload and the guard field.
 
-`IsographDb` is the pico database in `isograph_compiler`. `IsographState` is the CLI process wrapper (`db`, `live_sessions`, and this slice's guard). The guard is not a pico source. It is RAII over a oneshot that cancels a tokio sleep. It lives on `IsographState`. `handle_internal` stays on `&mut IsographDb` (Quit, DiskChanged). HelloWorld and `TimerFired` are matched on `handle` because they write that field.
+`IsographDb` is the pico database in `isograph_compiler`. `IsographState` is the CLI process wrapper (`db`, `live_sessions`, and this slice's guard). The guard is not a pico source. It is RAII over a oneshot that cancels a tokio sleep. It lives on `IsographState`. HelloWorld and `TimerFired` are matched on `handle` because they write that field. Quit and DiskChanged move onto `handle` too. DiskChanged still calls `handle_disk_changed(&mut state.db, change)`. `handle_internal` is deleted.
 
-`isograph send` of HelloWorld is `Lsp(Notification { method: isograph/event, params: HelloWorld })`, not `IsographEvent::Internal(HelloWorld)`. After lsp-outstanding, that path is `handle` -> `dispatch_lsp` -> `dispatch_lsp_notification` -> `on_isograph_event` -> `handle_internal(&mut state.db)`. `dispatch_lsp_notification` and `on_isograph_event` already take `&mut IsographState`. This slice has `on_isograph_event` call `handle(state, internal.to())`, so send hits `handle`'s HelloWorld arm. `handle_internal` does not take `IsographState`.
+`isograph send` of HelloWorld is `Lsp(Notification { method: isograph/event, params: HelloWorld })`, not `IsographEvent::Internal(HelloWorld)`. Today that path is `handle` -> `dispatch_lsp` -> `dispatch_lsp_notification` -> `on_isograph_event` -> `handle_internal(&mut state.db)`. This slice has `on_isograph_event` call `handle(state, internal.to())`, so send hits `handle`'s HelloWorld arm.
 
 Origin: figaro `src/daemon.rs` `schedule_timer` / `perform_effect` taking `event_tx`. Origin of the halves: freddie-timer.md. Delta: `IsographEvent::Timer` / `IsographEffect::Timer`; `perform` gains `event_tx` and the Timer arm returns `ControlFlow::Continue`; payload `HelloWorldDebounced`; `on_isograph_event` re-enters `handle`.
 
@@ -125,13 +125,16 @@ After lsp-outstanding, `handle` and `dispatch_lsp` already take `&mut IsographSt
     match event {
         IsographEvent::Lsp(lsp) => dispatch_lsp(state, lsp),
         IsographEvent::Internal(InternalEvent::HelloWorld) => handle_hello_world(state),
-        IsographEvent::Internal(internal) => handle_internal(&mut state.db, internal),
+        IsographEvent::Internal(InternalEvent::Quit) => IsographEffect::Kill.wrap_vec(),
+        IsographEvent::Internal(InternalEvent::DiskChanged(change)) => {
+            handle_disk_changed(&mut state.db, change)
+        }
         IsographEvent::Timer(fired) => handle_timer_fired(state, fired),
         IsographEvent::ClientConnection(client) => handle_client_connection(state, client),
     }
 ```
 
-`handle_internal` still takes `&mut IsographDb`. rustc does not narrow `InternalEvent`, so that match still names HelloWorld. That arm is `no_effects()`, not `LogHelloWorld`. The send path is `handle`'s HelloWorld arm. If `on_isograph_event` still called `handle_internal` and that arm were `LogHelloWorld`, send would skip the timer, the in-process Internal tests would pass, and the log would still appear.
+`handle` matches every `InternalEvent` variant. There is no catch-all into `handle_internal`, and no leftover HelloWorld arm.
 
 ```rust
 // from crates/isograph_cli/src/state.rs (before)
@@ -165,17 +168,6 @@ fn on_isograph_event<THostLanguage: HostLanguage>(
     handle(state, internal.to())
 }
 
-fn handle_internal<THostLanguage: HostLanguage>(
-    state: &mut IsographDb<THostLanguage>,
-    internal: InternalEvent,
-) -> Vec<IsographEffect> {
-    match internal {
-        InternalEvent::HelloWorld => no_effects(),
-        InternalEvent::Quit => IsographEffect::Kill.wrap_vec(),
-        InternalEvent::DiskChanged(change) => handle_disk_changed(state, change),
-    }
-}
-
 fn handle_hello_world<THostLanguage: HostLanguage>(
     state: &mut IsographState<THostLanguage>,
 ) -> Vec<IsographEffect> {
@@ -203,7 +195,7 @@ fn handle_timer_fired<THostLanguage: HostLanguage>(
 
 `state.rs` gains `use std::time::Duration` and `use crate::event::TimerPayload`. Payload is readable only through `trigger_if_matching`.
 
-`on_isograph_event` re-enters `handle` with `Internal`, not `Lsp`. HelloWorld is `handle_hello_world`. Quit and DiskChanged are `handle_internal`. There is no recursion through `Lsp`.
+`on_isograph_event` re-enters `handle` with `Internal`, not `Lsp`. HelloWorld is `handle_hello_world`. Quit is `Kill`. DiskChanged is `handle_disk_changed` on the db. There is no recursion through `Lsp`. `handle_internal` is deleted.
 
 Origin of `schedule_timer` and of `perform` taking `event_tx`: figaro `src/daemon.rs`. Figaro's `perform_effect` matches, then returns `Continue` after the match (`Kill` is `return Break`). i2's `perform` returns from each arm. `schedule_timer` is `-> ()`. `IsographEffect::Timer(timer) => schedule_timer(timer, event_tx)` is a type error. The Timer arm calls `schedule_timer` then returns `Continue`.
 
