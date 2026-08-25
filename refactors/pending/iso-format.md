@@ -4,7 +4,7 @@ Requires iso-format-lsp.md. Independent of lsp-diagnostics.md. Uses open-file co
 
 iso-format-lsp.md's `textDocument/formatting` and `textDocument/willSaveWaitUntil` handlers return `[]`. This slice records a printable stream at consume, prints from that stream, and those handlers return the edits.
 
-A list group (`{` of a selection set or object, `(` of arguments or variables, `[` of a value list) indents: line break after the opener, line break before the closer. Each successful chunk ends with a comma and a line break. Empty groups stay `{}` `()` `[]`. Type-list `[Foo!]` does not indent: those brackets are `GraphQLTypeName`, glued, including `!`. A description occupies its own line, so `{` after a description is on the next line.
+A list group (`{` of a selection set or object, `(` of arguments or variables, `[` of a value list) indents: line break after the opener, line break before the closer. Each successful chunk ends with a comma and a line break. An empty group still breaks; the closer is on the next line at the opener's indent, not glued and not indented as an item. Type-list `[Foo!]` does not indent: those brackets are `GraphQLTypeName`, glued, including `!`. A description occupies its own line, so `{` after a description is on the next line.
 
 ```
 user(
@@ -13,6 +13,11 @@ user(
   },
   c: false,
 )
+```
+
+```
+foo: {
+},
 ```
 
 ```
@@ -183,6 +188,8 @@ pub fn format_recorded(
         let lexeme = &text[span.as_usize_range()];
         let role = token.item;
         let delta = list_indent(role, lexeme);
+        // `{` `(` `[` with the closer next. Break at this indent so the closer is not
+        // an indented item (`foo: {\n}` not `foo: {\n  }`).
         let empty_open = delta > 0
             && tokens
                 .get(i + 1)
@@ -193,9 +200,10 @@ pub fn format_recorded(
         }
         apply_gap(&mut out, gap(last, role, lexeme), indent);
         out.push_str(lexeme);
-        if delta > 0 && !empty_open {
+        if delta > 0 {
+            let break_at = if empty_open { indent } else { indent + 1 };
             indent += 1;
-            apply_gap(&mut out, Gap::Line, indent);
+            apply_gap(&mut out, Gap::Line, break_at);
         }
         last = role.wrap_some();
     }
@@ -274,7 +282,7 @@ fn apply_gap(out: &mut String, gap: Gap, indent: usize) {
 }
 ```
 
-After a list open the printer already wrote a line break, so `last` is the open bracket and the next item glues onto that new line. Type-list `[` `]` are `GraphQLTypeName`; `list_indent` is 0. Width is 2 spaces. A parse failure of a literal is not passed to `format_recorded`.
+After a list open the printer already wrote a line break, so `last` is the open bracket and the next item glues onto that new line. An empty opener writes that break at the opener's indent; the closer glues onto it. Type-list `[` `]` are `GraphQLTypeName`; `list_indent` is 0. Width is 2 spaces. A parse failure of a literal is not passed to `format_recorded`.
 
 ## Target shape
 
@@ -1161,15 +1169,31 @@ mod tests {
     }
 
     #[test]
-    fn empty_braces_stay_empty() {
-        assert_eq!(formatted("field Query.x {}"), "field Query.x {}");
+    fn empty_braces_break() {
+        assert_eq!(formatted("field Query.x {}"), "field Query.x {\n}");
     }
 
     #[test]
-    fn empty_parens_stay_empty() {
+    fn empty_parens_break() {
         assert_eq!(
             formatted("field Query.x { user() }"),
-            "field Query.x {\n  user(),\n}"
+            "field Query.x {\n  user(\n  ),\n}"
+        );
+    }
+
+    #[test]
+    fn empty_object_breaks() {
+        assert_eq!(
+            formatted("field Query.x { user(arg: {}) }"),
+            "field Query.x {\n  user(\n    arg: {\n    },\n  ),\n}"
+        );
+    }
+
+    #[test]
+    fn empty_value_list_breaks() {
+        assert_eq!(
+            formatted("field Query.x { foo(x: []) }"),
+            "field Query.x {\n  foo(\n    x: [\n    ],\n  ),\n}"
         );
     }
 
