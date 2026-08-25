@@ -225,7 +225,7 @@ fn send_lsp_response(
 }
 ```
 
-Delta: `dispatch_lsp_request` takes `&IsographState` and the outer `FnOnce`. It does not take `id`. It always runs `get_response`. The `Break` arm that is `error: None` and `result: Some(value)` calls `send_lsp_response(reply, value)`. `send_lsp_response` is `reply(value)` then `SendLspResponseEffect { send }`. No `take_reply`. This callback does not write `Response.error`. `handle_client_connection` is unchanged. `SendLspResponseEffect` is unchanged. `perform` is unchanged (`(respond.send)(token)`). `run_event_loop` is unchanged. `run_effect_loop` is unchanged.
+Delta: `dispatch_lsp_request` takes `&IsographState` and the outer `FnOnce`. It does not take `id`. It always runs `get_response`. The `Break` arm that is `error: None` and `result: Some(value)` calls `send_lsp_response(reply, value)`. `send_lsp_response` is `reply(value)` then `SendLspResponseEffect { send }`. No `take_reply`. This callback does not write `Response.error`. `handle_client_connection` is unchanged. `SendLspResponseEffect` is unchanged. The `SendLspResponse` arm of `perform` stays `(respond.send)(token)`. timer-effects.md adds `event_tx` to `perform` and `run_effect_loop`; this slice passes that sender through. `run_event_loop` is unchanged.
 
 The `get_mut` borrow of `live_sessions` in `reply` ends before `dispatch_lsp_request`. `get_response` uses `&state.db`.
 
@@ -245,7 +245,7 @@ Drop `take_reply_of_an_id_that_is_not_outstanding_is_none` and `take_reply_of_an
 
 `Started` twice for the same `ClientId`: one row, the second session, outstanding empty.
 
-`run_effect_loop` still ends on `Kill`. `run_event_loop` HelloWorld still emits `LogHelloWorld`.
+`run_effect_loop` still ends on `Kill`. After timer-effects.md, `run_event_loop` HelloWorld emits `Timer`, not `LogHelloWorld`. This slice does not change that.
 
 Do not add a production API only tests call. `reply` is the same function `dispatch_lsp` uses. `mint` is the same function `run_effect_loop` uses.
 
