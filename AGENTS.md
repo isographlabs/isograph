@@ -85,6 +85,8 @@ If a task cannot be fulfilled without a workaround, ugly code, or a violation of
 
 The final architecture is always clean. There is never a reason to introduce unclean or janky things. If the architecture cannot achieve the goal, the architecture changes until it can, with elegance. Shipping janky code is never an acceptable step.
 
+Things to look out for include mixing levels of logic in a function. If a function passes a parameter onto another function and does not inspect it, inspecting that parameter and handling one specific case is a red flag.
+
 ## Tests
 
 No snapshot tests; they pin implementation, not behavior. Assert facts about the result. Test behavior, not implementation.
