@@ -6,9 +6,9 @@ Incorporation of `freddie_timer` into i2. HelloWorld arms a `Duration::ZERO` tim
 
 `IsographDb` is the pico database in `isograph_compiler`. `IsographState` is the CLI process wrapper (`db`, `live_sessions`, and this slice's guard). The guard is not a pico source. It is RAII over a oneshot that cancels a tokio sleep. It lives on `IsographState`. `handle` matches `IsographEvent` only. `Internal` is `handle_internal_event(state, internal)`. That function takes `IsographState` and matches `InternalEvent`. DiskChanged still calls `handle_disk_changed(&mut state.db, change)`.
 
-`isograph send` of HelloWorld is `Lsp(Notification { method: isograph/event, params: HelloWorld })`. `on_isograph_event` calls `handle_internal_event(state, internal)`. In-process `Internal` is the same function.
+`isograph send` of HelloWorld is `Lsp(Notification { method: isograph/event, params: HelloWorld })`. `dispatch_lsp_notification` registers `handle_internal_event` on that method. In-process `Internal` is the same function.
 
-Origin: figaro `src/daemon.rs` `schedule_timer` / `perform_effect` taking `event_tx`. Origin of the halves: freddie-timer.md. Delta: `IsographEvent::Timer` / `IsographEffect::Timer`; `perform` gains `event_tx` and the Timer arm returns `ControlFlow::Continue`; payload `HelloWorldDebounced`; `on_isograph_event` calls `handle_internal_event`.
+Origin: figaro `src/daemon.rs` `schedule_timer` / `perform_effect` taking `event_tx`. Origin of the halves: freddie-timer.md. Delta: `IsographEvent::Timer` / `IsographEffect::Timer`; `perform` gains `event_tx` and the Timer arm returns `ControlFlow::Continue`; payload `HelloWorldDebounced`; `isograph/event` registers `handle_internal_event`.
 
 One shippable change.
 
@@ -109,7 +109,7 @@ freddie_timer = { git = "https://github.com/freddiehg/freddie", rev = "e2dde74d6
 tokio = { workspace = true, features = ["rt", "macros", "sync", "time", "test-util"] }
 ```
 
-After lsp-outstanding, `handle` and `dispatch_lsp` already take `&mut IsographState`. `dispatch_lsp_notification` and `on_isograph_event` already take `&mut IsographState`. `on_isograph_event` still calls `handle_internal(&mut state.db, internal)`.
+After lsp-outstanding, `handle` and `dispatch_lsp` already take `&mut IsographState`. `dispatch_lsp_notification` already takes `&mut IsographState`. `on_isograph_event` peels `db` into `handle_internal`.
 
 ```rust
 // from crates/isograph_cli/src/state.rs (before)
@@ -151,15 +151,26 @@ fn handle_internal<THostLanguage: HostLanguage>(
 }
 ```
 
-`LSPNotificationDispatch` is already generic over `TState`. The handler is `fn(&mut TState, Params) -> Vec<IsographEffect>`.
+`LSPNotificationDispatch` is already generic over `TState`. The handler is `fn(&mut TState, Params) -> Vec<IsographEffect>`. `IsographEventNotification::Params` is `InternalEvent`, the same as `handle_internal_event`.
 
 ```rust
 // from crates/isograph_cli/src/state.rs (after)
-fn on_isograph_event<THostLanguage: HostLanguage>(
+fn dispatch_lsp_notification<THostLanguage: HostLanguage>(
     state: &mut IsographState<THostLanguage>,
-    internal: InternalEvent,
+    notification: lsp_server::Notification,
 ) -> Vec<IsographEffect> {
-    handle_internal_event(state, internal)
+    let dispatch = || {
+        crate::lsp_notification_dispatch::LSPNotificationDispatch::new(notification, state)
+            .on_notification_sync::<crate::lsp_socket::IsographEventNotification>(
+                handle_internal_event::<THostLanguage>,
+            )?
+            .notification();
+        ControlFlow::Continue(())
+    };
+    match dispatch() {
+        ControlFlow::Break(effects) => effects,
+        ControlFlow::Continue(()) => no_effects(),
+    }
 }
 
 fn handle_internal_event<THostLanguage: HostLanguage>(
@@ -434,7 +445,7 @@ Park on `event_rx.recv().await`. Absence of a firing has no edge: inject `Quit` 
     }
 ```
 
-The matching test does not `perform` the timer: it feeds `timer.event` to `handle` as if the sleep had won. The stale test drops the field first. The second HelloWorld test is overwrite plus the second fire. The LSP tests are the send-shaped path through `on_isograph_event` -> `handle_internal_event`. `lsp_isograph_event_hello_world_returns_log_hello_world` is deleted; those two replace it.
+The matching test does not `perform` the timer: it feeds `timer.event` to `handle` as if the sleep had won. The stale test drops the field first. The second HelloWorld test is overwrite plus the second fire. The LSP tests are the send-shaped path through `handle_internal_event`. `lsp_isograph_event_hello_world_returns_log_hello_world` is deleted; those two replace it.
 
 ```rust
 // from crates/isograph_cli/src/daemon.rs
@@ -538,7 +549,7 @@ CLI tests in `crates/ts_graphql_react_isograph_cli/tests/cli.rs` send HelloWorld
 
 ## Call sites
 
-- `handle_internal_event` of HelloWorld (`Internal` or LSP `isograph/event`) -> `Timer` effect plus guard
+- `handle_internal_event` of HelloWorld -> `Timer` effect plus guard
 - `handle` of `TimerFired` -> `trigger_if_matching` -> `LogHelloWorld` or empty
 - `perform` of `Timer` -> `schedule_timer` -> wrap as `IsographEvent::Timer` on `event_tx.send`, or cancel
 - `serve` / `listen_and_reply` / `kill_ends_the_effect_loop` pass `event_tx` into `run_effect_loop`
