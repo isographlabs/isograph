@@ -4,7 +4,7 @@ Requires parsing-standards.md and ast.md. This file is the work list. Each item 
 
 Origin of each parse function: isograph `crates/graphql_schema_parser/src/parse_schema.rs` and `description.rs`, control flow copied. Delta: primitives in parsing-standards.md; types in ast.md.
 
-Crate `crates/graphql_schema_parser`, workspace member via `./crates/*`. Tests in that crate (`#[cfg(test)]` next to the code).
+Crate `crates/graphql_schema_parser`, workspace member via `./crates/*`. No other crate's `Cargo.toml` lists it. Tests are `#[cfg(test)]` in this crate, calling `parse_schema` / `parse_schema_extensions` on string fixtures. That is the only use.
 
 ```toml
 # from crates/graphql_schema_parser/Cargo.toml

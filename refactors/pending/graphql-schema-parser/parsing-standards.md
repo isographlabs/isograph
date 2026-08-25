@@ -43,7 +43,7 @@ pub fn parse_schema_extensions_with_tokens(
 >
 ```
 
-`text` is the file. `parse_schema` / `parse_schema_extensions` construct an empty tokens vec and call the inner function. The inner function constructs `PeekableLexer::new(text, tokens)` and `spanning` around the definition loop. The wrapper span is that spanning span (empty file: zero-width at 0). The first error stops the parse. Tests call `parse_schema` / `parse_schema_extensions`. Semantic-token tests call the `#[cfg(test)]` helpers. A later compiler memo keys on the file text and calls `parse_schema`.
+`text` is the file. `parse_schema` / `parse_schema_extensions` construct an empty tokens vec and call the inner function. The inner function constructs `PeekableLexer::new(text, tokens)` and `spanning` around the definition loop. The wrapper span is that spanning span (empty file: zero-width at 0). The first error stops the parse. Callers are the unit tests in this crate: they call `parse_schema` / `parse_schema_extensions`. Semantic-token tests call the `#[cfg(test)]` helpers.
 
 Logos lives on `PeekableLexer`. There is no `tokenize() -> Vec` that the grammar then walks.
 
