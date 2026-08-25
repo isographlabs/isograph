@@ -16,7 +16,7 @@ Figaro is unchanged at the keys. Overlay still hides on its dwell. A placement s
 
 The crate is `freddie_timer`. Two halves from one call. `timer_effect_and_guard` mints the id, builds the oneshot pair, puts the sender in the guard and the receiver in the effect, and stores `TimerFired { id, payload }` on the effect. `P` is shared: `TimerFired<P>` and `TimerEffect<P>`.
 
-Copy: `TimerId`, `TimerTrigger`, `TimerFired<P>` when `P: Copy`. Not Copy: `DropGuard` (owns `oneshot::Sender`), `TimerGuard` (owns `DropGuard`), `AlwaysEqual<T>` (owns the cancel receiver), `TimerEffect<P>` (owns delay, firing, cancel receiver). None of the non-Copy types are `Clone`. The guard and the effect are each used once. Overwrite of a guard field is drop of the old one.
+Copy: `TimerId`, `TimerTrigger`, `TimerFired<P>` when `P: Copy`. Not Copy: `DropGuard` (owns `oneshot::Sender`), `TimerGuard` (owns `DropGuard`), `AlwaysEqual<T>` (a testing wrapper for incomparable fields such as `RidingGeneration`), `TimerEffect<P>` (owns delay, firing, cancel receiver). None of the non-Copy types are `Clone`. The guard and the effect are each used once. Overwrite of a guard field is drop of the old one.
 
 `schedule_timer` is not in this crate. The consumer's effect loop performs `TimerEffect`.
 
@@ -35,7 +35,7 @@ pub fn timer_effect_and_guard<P>(
         TimerEffect {
             delay,
             event: TimerFired { id, payload },
-            cancel: AlwaysEqual(receiver),
+            cancel: receiver,
         },
     )
 }
@@ -77,16 +77,15 @@ Figaro bind uses `trigger()`.
 
 ```rust
 // external freddie/crates/freddie_timer/src/timer.rs
-#[cfg_attr(feature = "testing", derive(PartialEq, Eq))]
 #[derive(Debug)]
 pub struct TimerEffect<P = ()> {
     pub delay: Duration,
     pub event: TimerFired<P>,
-    pub cancel: AlwaysEqual<oneshot::Receiver<()>>,
+    pub cancel: oneshot::Receiver<()>,
 }
 ```
 
-Not Copy. Not Clone. Used once: the effect loop moves it into `schedule_timer`. Under `testing`, equality is delay and firing; `AlwaysEqual` makes the receiver compare equal. `P` is the payload, the same `P` as `TimerFired`.
+Not Copy. Not Clone. Used once: the effect loop moves it into `schedule_timer`. Under `testing`, `PartialEq` is delay and firing; the receiver is a handle, not data. `P` is the payload, the same `P` as `TimerFired`. `AlwaysEqual` is not this field. It wraps `RidingGeneration` on read effects, which have no `PartialEq` by design.
 
 ### `TimerFired`
 
@@ -185,7 +184,7 @@ impl<T> PartialEq for AlwaysEqual<T> {
 impl<T> Eq for AlwaysEqual<T> {}
 ```
 
-Not Copy. Not Clone unless `T` is and we add those derives; we do not. The cancel receiver is not data.
+Not Copy. Not Clone unless `T` is and we add those derives; we do not. Mercury wraps `RidingGeneration` in this: that token is not comparable, and `MercuryEffect` derives `PartialEq` under `testing`.
 
 ### `TimerTrigger`
 

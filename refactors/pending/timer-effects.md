@@ -314,7 +314,7 @@ fn schedule_timer(timer: TimerEffect<TimerPayload>, event_tx: &UnboundedSender<I
     let TimerEffect {
         delay,
         event,
-        cancel: AlwaysEqual(mut cancel),
+        mut cancel,
     } = timer;
     // If the guard dropped before the loop reached this, the receiver is closed and the timer is
     // already cancelled, so there is nothing to spawn.
@@ -333,7 +333,7 @@ fn schedule_timer(timer: TimerEffect<TimerPayload>, event_tx: &UnboundedSender<I
 
 The effect carries `TimerFired<TimerPayload>`. The wrap to `IsographEvent::Timer` is in `schedule_timer`. `event_tx` is cloned into the spawn; the receiver stays on the worker.
 
-`daemon.rs` gains `use freddie_timer::{AlwaysEqual, TimerEffect};` and `use tokio::sync::oneshot::error::TryRecvError`.
+`daemon.rs` gains `use freddie_timer::TimerEffect;` and `use tokio::sync::oneshot::error::TryRecvError`.
 
 Callers of `run_effect_loop` and `perform` pass `event_tx`:
 
