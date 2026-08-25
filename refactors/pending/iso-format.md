@@ -177,6 +177,8 @@ pub fn format_recorded(
     let mut out = String::new();
     let mut indent = 0_usize;
     let mut last: Option<IsographSemanticToken> = None;
+    // Brace is `{` and `}`. Role cannot mean "last was an opener"; this is that
+    // token's list_indent. After an opener, the next gap is Line at current indent.
     let mut last_delta = 0_i8;
     for token in tokens {
         // Always recorded with location None, even when a source comma exists. No lexeme to slice.
@@ -189,12 +191,15 @@ pub fn format_recorded(
         let span = token.location.expect("only Comma is recorded with location None");
         let lexeme = &text[span.as_usize_range()];
         let role = token.item;
+        // List-group `{` `(` `[` are +1 / -1. Type-list `[` is GraphQLTypeName, 0.
         let delta = list_indent(role, lexeme);
+        // Before the gap: a closer uses the opener's indent (`foo: {\n}` not `foo: {\n  }`).
         if delta < 0 {
             indent = indent.saturating_sub(1);
         }
         apply_gap(&mut out, gap(last, last_delta, role, lexeme), indent);
         out.push_str(lexeme);
+        // After the lexeme: indent what follows. Do not break; the next token's gap does.
         if delta > 0 {
             indent += 1;
         }
