@@ -1,6 +1,6 @@
 # i2
 
-From upstream isograph we keep pico and pico_macros (unchanged), the swc plugin and its dependency chain (isograph_config, common_lang_types, string_key_newtype, prelude), resolve_position, the relay crates, the docs website, and the build process. The new work is `crates/isograph_parser`, `crates/tests`, `crates/isograph_cli` (freddie_cli's lifecycle verbs around the daemon), and `crates/ts_graphql_react_isograph_cli` (the `isograph` binary).
+From upstream isograph we keep pico and pico_macros (unchanged), the swc plugin and its dependency chain (isograph_config, common_lang_types, string_key_newtype, prelude), resolve_position, the relay crates, the docs website, and the build process. The new work is `crates/isograph_parser`, `crates/graphql_schema_parser` (SDL parse, unit tests in that crate, no other crate depends on it), `crates/tests`, `crates/isograph_cli` (freddie_cli's lifecycle verbs around the daemon), and `crates/ts_graphql_react_isograph_cli` (the `isograph` binary).
 
 The parser does not use pico. Parser functions are plain functions over `&str`. Memoization applies above the parser (which files changed, which literals were extracted). The iso parser is tokenize, match brackets, chunk, grammar consume. The GraphQL schema parser is tokenize, then grammar consume. We do not add tree-sitter, a tree-sitter grammar, or a tree-sitter crate.
 
