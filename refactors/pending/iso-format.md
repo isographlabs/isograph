@@ -195,9 +195,7 @@ pub fn format_recorded(
         let list = list_indent(role, lexeme);
         // Before the gap: a closer uses the opener's indent (`foo: {\n}` not `foo: {\n  }`).
         if let ListIndent::Close = list {
-            indent = indent
-                .checked_sub(1)
-                .expect("a closer is preceded by an opener that incremented indent");
+            indent -= 1;
         }
         apply_gap(&mut out, gap(last, last_list, role, lexeme), indent);
         out.push_str(lexeme);
