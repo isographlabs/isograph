@@ -4,7 +4,7 @@ Requires side-effect-token.md (landed). Independent of timer-effects.md and lsp-
 
 `LiveSessions::reply(client, id)` inserts the id and returns `Option<FnOnce(serde_json::Value) -> FnOnce(&SideEffectToken)>`. `dispatch_lsp` of `Request` checks that `Option` before `dispatch_lsp_request`. `None` is no effects; `get_response` does not run. `Some(reply)` closes over that id and that session's `sender`. `ControlFlow::Break` with `error: None` and `result: Some(value)` calls `reply(value)`. That callback builds `Message::Response(Response { id, result: Some(value), error: None })` and returns the send. `send_lsp_response` wraps it as `SendLspResponseEffect`. `take_reply` is gone.
 
-Origin: landed `take_reply` / insert-then-`dispatch_lsp_request(..., id)` / `send_lsp_response` `take_reply`. Delta: `reply` replaces `take_reply`; the `Option` is checked before `get_response`; the outer `FnOnce` takes the `Break` JSON value, not a `Message` or `Response`.
+Origin: landed `take_reply` / insert-then-`dispatch_lsp_request(..., id)` / `send_lsp_response` `take_reply`. Delta: `reply` replaces `take_reply`; the `Option` is checked before `get_response`; the outer `FnOnce` takes the `Break` JSON value, not a `Message` or `Response`. Sending does not `remove` the id from `outstanding`. `take_reply` did. `Gone` drops the session and the set. Later cancel is still `outstanding.remove`.
 
 One shippable change.
 
@@ -74,7 +74,7 @@ impl LiveSessions {
 }
 ```
 
-Delta: `reply` replaces `take_reply`. `None` is only `get_mut` miss. Insert stays. The outer `FnOnce` closes over `sender` and `id`. It takes the `Break` JSON value, which has no id. It creates `Message::Response` with the closed-over id. That is when the id is put on the message this process sends. The inner `FnOnce` sends that message. Neither looks up `LiveSessions`. Calling either twice does not compile. `use<>` so the `impl Trait` does not capture `&mut self`.
+Delta: `reply` replaces `take_reply`. `None` is only `get_mut` miss. Insert stays. Sending does not `remove` the id. After a successful send the id is still in `outstanding` until `Gone` or later cancel. The outer `FnOnce` closes over `sender` and `id`. It takes the `Break` JSON value, which has no id. It creates `Message::Response` with the closed-over id. That is when the id is put on the message this process sends. The inner `FnOnce` sends that message. Neither looks up `LiveSessions`. Calling either twice does not compile. `use<>` so the `impl Trait` does not capture `&mut self`.
 
 ```rust
 // from crates/isograph_cli/src/state.rs
