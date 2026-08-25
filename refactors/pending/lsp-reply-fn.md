@@ -20,6 +20,7 @@ Most important first.
 
 ```rust
 // from crates/isograph_cli/src/event.rs
+// before
 impl LiveSessions {
     pub fn take_reply(
         &mut self,
@@ -43,6 +44,7 @@ impl LiveSessions {
 
 ```rust
 // from crates/isograph_cli/src/event.rs
+// after
 impl LiveSessions {
     pub fn reply(
         &mut self,
@@ -76,6 +78,7 @@ Delta: `reply` replaces `take_reply`. `None` is only `get_mut` miss. Insert stay
 
 ```rust
 // from crates/isograph_cli/src/state.rs
+// before
         crate::event::LspEvent::Request(incoming) => {
             let client = incoming.client;
             let id = incoming.request.id.clone();
@@ -91,6 +94,7 @@ Delta: `reply` replaces `take_reply`. `None` is only `get_mut` miss. Insert stay
 
 ```rust
 // from crates/isograph_cli/src/state.rs
+// after
         crate::event::LspEvent::Request(incoming) => {
             let client = incoming.client;
             let id = incoming.request.id.clone();
@@ -105,6 +109,7 @@ Delta: insert and the live-session check are `reply`. `None` does not call `disp
 
 ```rust
 // from crates/isograph_cli/src/state.rs
+// before
 fn dispatch_lsp_request<THostLanguage: HostLanguage>(
     state: &mut IsographState<THostLanguage>,
     incoming: crate::event::LspRequest,
@@ -179,6 +184,7 @@ fn method_not_found<THostLanguage: HostLanguage>(
 
 ```rust
 // from crates/isograph_cli/src/state.rs
+// after
 fn dispatch_lsp_request<THostLanguage: HostLanguage>(
     state: &IsographState<THostLanguage>,
     incoming: crate::event::LspRequest,
