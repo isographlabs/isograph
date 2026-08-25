@@ -18,6 +18,7 @@ mod lsp_stdio;
 mod send;
 mod start;
 mod state;
+mod timer;
 mod watch;
 
 pub fn run<THostLanguage: HostLanguage>() -> ExitCode {

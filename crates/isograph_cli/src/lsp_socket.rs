@@ -262,6 +262,7 @@ mod tests {
         let (session_tx, mut session_rx) = unbounded_channel();
         let (test_tx, test_rx) = unbounded_channel();
         let (loop_tx, loop_rx) = unbounded_channel();
+        let effect_event_tx = loop_tx.clone();
         let (effect_tx, effect_rx) = unbounded_channel();
         tokio::spawn(accept_loop(listener, session_tx));
         tokio::spawn(async move {
@@ -288,11 +289,12 @@ mod tests {
             let state = IsographState {
                 db,
                 live_sessions: LiveSessions::default(),
+                hello_world_debounce: None,
             };
             runtime.block_on(async {
                 tokio::select! {
                     () = run_event_loop(state, loop_rx, effect_tx) => {}
-                    () = run_effect_loop(effect_rx) => {}
+                    () = run_effect_loop(effect_rx, effect_event_tx) => {}
                 }
             });
         });

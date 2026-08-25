@@ -702,6 +702,7 @@ mod tests {
                 state: IsographState {
                     db,
                     live_sessions: LiveSessions::default(),
+                    hello_world_debounce: None,
                 },
                 event_tx,
                 event_rx,

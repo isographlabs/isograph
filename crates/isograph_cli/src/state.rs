@@ -1,5 +1,6 @@
 use std::ops::ControlFlow;
 use std::path::Path;
+use std::time::Duration;
 
 use common_lang_types::{
     CurrentWorkingDirectory, RelativePathToSourceFile,
@@ -14,12 +15,14 @@ use crate::effect::{IsographEffect, no_effects};
 use crate::event::{
     ClientConnectionEvent, DiskChanged, InternalEvent, IsographEvent, LiveSessions, Presence,
 };
+use crate::timer::TimerPayload;
 
 pub use isograph_compiler::IsographDb;
 
 pub struct IsographState<THostLanguage: HostLanguage> {
     pub db: IsographDb<THostLanguage>,
     pub live_sessions: LiveSessions,
+    pub(crate) hello_world_debounce: Option<freddie_timer::TimerGuard>,
 }
 
 pub fn handle<THostLanguage: HostLanguage>(
@@ -28,7 +31,8 @@ pub fn handle<THostLanguage: HostLanguage>(
 ) -> Vec<IsographEffect> {
     match event {
         IsographEvent::Lsp(lsp) => dispatch_lsp(state, lsp),
-        IsographEvent::Internal(internal) => handle_internal(&mut state.db, internal),
+        IsographEvent::Internal(internal) => handle_internal_event(state, internal),
+        IsographEvent::Timer(fired) => handle_timer_fired(state, fired),
         IsographEvent::ClientConnection(client) => handle_client_connection(state, client),
     }
 }
@@ -146,14 +150,36 @@ fn method_not_found<THostLanguage: HostLanguage>(
     )
 }
 
-fn handle_internal<THostLanguage: HostLanguage>(
-    state: &mut IsographDb<THostLanguage>,
+fn handle_internal_event<THostLanguage: HostLanguage>(
+    state: &mut IsographState<THostLanguage>,
     internal: InternalEvent,
 ) -> Vec<IsographEffect> {
     match internal {
-        InternalEvent::HelloWorld => IsographEffect::LogHelloWorld.wrap_vec(),
+        InternalEvent::HelloWorld => handle_hello_world(state),
         InternalEvent::Quit => IsographEffect::Kill.wrap_vec(),
-        InternalEvent::DiskChanged(change) => handle_disk_changed(state, change),
+        InternalEvent::DiskChanged(change) => handle_disk_changed(&mut state.db, change),
+    }
+}
+
+fn handle_hello_world<THostLanguage: HostLanguage>(
+    state: &mut IsographState<THostLanguage>,
+) -> Vec<IsographEffect> {
+    let (guard, effect) =
+        freddie_timer::timer_effect_and_guard(Duration::ZERO, TimerPayload::HelloWorldDebounced);
+    state.hello_world_debounce = guard.wrap_some();
+    IsographEffect::Timer(effect).wrap_vec()
+}
+
+fn handle_timer_fired<THostLanguage: HostLanguage>(
+    state: &mut IsographState<THostLanguage>,
+    fired: freddie_timer::TimerFired<TimerPayload>,
+) -> Vec<IsographEffect> {
+    match fired.trigger_if_matching(state.hello_world_debounce.as_ref()) {
+        Some(&TimerPayload::HelloWorldDebounced) => {
+            state.hello_world_debounce = None;
+            IsographEffect::LogHelloWorld.wrap_vec()
+        }
+        None => no_effects(),
     }
 }
 
@@ -164,7 +190,7 @@ fn dispatch_lsp_notification<THostLanguage: HostLanguage>(
     let dispatch = || {
         crate::lsp_notification_dispatch::LSPNotificationDispatch::new(notification, state)
             .on_notification_sync::<crate::lsp_socket::IsographEventNotification>(
-                on_isograph_event::<THostLanguage>,
+                handle_internal_event::<THostLanguage>,
             )?
             .notification();
         ControlFlow::Continue(())
@@ -173,13 +199,6 @@ fn dispatch_lsp_notification<THostLanguage: HostLanguage>(
         ControlFlow::Break(effects) => effects,
         ControlFlow::Continue(()) => no_effects(),
     }
-}
-
-fn on_isograph_event<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
-    internal: InternalEvent,
-) -> Vec<IsographEffect> {
-    handle_internal(&mut state.db, internal)
 }
 
 pub(crate) fn intern_config_directory(
@@ -258,6 +277,7 @@ mod tests {
         IsographState {
             db: IsographDb::<TypeScriptHostLanguage>::default(),
             live_sessions: LiveSessions::default(),
+            hello_world_debounce: None,
         }
     }
 
@@ -281,13 +301,108 @@ mod tests {
     }
 
     #[test]
-    fn hello_world_returns_log_hello_world() {
+    fn hello_world_returns_a_timer() {
         let mut state = empty();
         let effects = handle(&mut state, InternalEvent::HelloWorld.to());
+        assert!(matches!(effects.as_slice(), [IsographEffect::Timer(_)]));
+        assert!(state.hello_world_debounce.is_some());
+    }
+
+    #[test]
+    fn matching_hello_world_debounced_returns_log_hello_world() {
+        let mut state = empty();
+        let effects = handle(&mut state, InternalEvent::HelloWorld.to());
+        let IsographEffect::Timer(timer) = effects
+            .into_iter()
+            .next()
+            .expect("HelloWorld returns one Timer")
+        else {
+            panic!("HelloWorld returns Timer");
+        };
+        let effects = handle(&mut state, IsographEvent::Timer(timer.event));
         assert!(matches!(
             effects.as_slice(),
             [IsographEffect::LogHelloWorld]
         ));
+        assert!(state.hello_world_debounce.is_none());
+    }
+
+    #[test]
+    fn stale_hello_world_debounced_returns_no_effects() {
+        let mut state = empty();
+        let effects = handle(&mut state, InternalEvent::HelloWorld.to());
+        let IsographEffect::Timer(timer) = effects
+            .into_iter()
+            .next()
+            .expect("HelloWorld returns one Timer")
+        else {
+            panic!("HelloWorld returns Timer");
+        };
+        state.hello_world_debounce = None;
+        let effects = handle(&mut state, IsographEvent::Timer(timer.event));
+        assert!(effects.is_empty());
+    }
+
+    #[test]
+    fn a_second_hello_world_drops_the_first_guard() {
+        let mut state = empty();
+        let first = handle(&mut state, InternalEvent::HelloWorld.to());
+        let second = handle(&mut state, InternalEvent::HelloWorld.to());
+        let IsographEffect::Timer(first_timer) = first
+            .into_iter()
+            .next()
+            .expect("HelloWorld returns one Timer")
+        else {
+            panic!("HelloWorld returns Timer");
+        };
+        let effects = handle(&mut state, IsographEvent::Timer(first_timer.event));
+        assert!(effects.is_empty());
+        let IsographEffect::Timer(second_timer) = second
+            .into_iter()
+            .next()
+            .expect("HelloWorld returns one Timer")
+        else {
+            panic!("HelloWorld returns Timer");
+        };
+        let effects = handle(&mut state, IsographEvent::Timer(second_timer.event));
+        assert!(matches!(
+            effects.as_slice(),
+            [IsographEffect::LogHelloWorld]
+        ));
+        assert!(state.hello_world_debounce.is_none());
+    }
+
+    #[test]
+    fn timer_fired_on_a_never_armed_state_returns_no_effects() {
+        let mut armed = empty();
+        let effects = handle(&mut armed, InternalEvent::HelloWorld.to());
+        let IsographEffect::Timer(timer) = effects
+            .into_iter()
+            .next()
+            .expect("HelloWorld returns one Timer")
+        else {
+            panic!("HelloWorld returns Timer");
+        };
+        let mut state = empty();
+        let effects = handle(&mut state, timer.event.to());
+        assert!(effects.is_empty());
+    }
+
+    #[test]
+    fn a_matching_hello_world_debounced_fed_twice_logs_once() {
+        let mut state = empty();
+        let effects = handle(&mut state, InternalEvent::HelloWorld.to());
+        let IsographEffect::Timer(timer) = effects
+            .into_iter()
+            .next()
+            .expect("HelloWorld returns one Timer")
+        else {
+            panic!("HelloWorld returns Timer");
+        };
+        let first = handle(&mut state, timer.event.to());
+        assert!(matches!(first.as_slice(), [IsographEffect::LogHelloWorld]));
+        let second = handle(&mut state, timer.event.to());
+        assert!(second.is_empty());
     }
 
     #[test]
@@ -420,7 +535,12 @@ mod tests {
             matches!(effect, crate::effect::IsographEffect::SendLspResponse(_)),
             "handle of LspRequest returns SendLspResponseEffect"
         );
-        let _ = crate::daemon::perform(&crate::effect::SideEffectToken::mint(), effect);
+        let (event_tx, _event_rx) = tokio::sync::mpsc::unbounded_channel();
+        let _ = crate::daemon::perform(
+            &crate::effect::SideEffectToken::mint(),
+            effect,
+            event_tx.reference(),
+        );
         let lsp_server::Message::Response(response) = rx.recv().expect("perform sends on reply")
         else {
             panic!("perform sends Message::Response");
@@ -469,7 +589,12 @@ mod tests {
             matches!(effect, crate::effect::IsographEffect::SendLspResponse(_)),
             "handle of Formatting returns SendLspResponseEffect"
         );
-        let _ = crate::daemon::perform(&crate::effect::SideEffectToken::mint(), effect);
+        let (event_tx, _event_rx) = tokio::sync::mpsc::unbounded_channel();
+        let _ = crate::daemon::perform(
+            &crate::effect::SideEffectToken::mint(),
+            effect,
+            event_tx.reference(),
+        );
         let lsp_server::Message::Response(response) = rx.recv().expect("perform sends on reply")
         else {
             panic!("perform sends Message::Response");
@@ -705,7 +830,7 @@ mod tests {
     }
 
     #[test]
-    fn lsp_isograph_event_hello_world_returns_log_hello_world() {
+    fn lsp_isograph_event_hello_world_returns_a_timer() {
         let mut state = empty();
         let effects = handle(
             &mut state,
@@ -713,6 +838,27 @@ mod tests {
                 serde_json::to_value(InternalEvent::HelloWorld).expect("serializes"),
             ),
         );
+        assert!(matches!(effects.as_slice(), [IsographEffect::Timer(_)]));
+        assert!(state.hello_world_debounce.is_some());
+    }
+
+    #[test]
+    fn lsp_isograph_event_hello_world_then_its_timer_returns_log_hello_world() {
+        let mut state = empty();
+        let effects = handle(
+            &mut state,
+            event_notification(
+                serde_json::to_value(InternalEvent::HelloWorld).expect("serializes"),
+            ),
+        );
+        let IsographEffect::Timer(timer) = effects
+            .into_iter()
+            .next()
+            .expect("LSP HelloWorld returns one Timer")
+        else {
+            panic!("LSP HelloWorld returns Timer");
+        };
+        let effects = handle(&mut state, IsographEvent::Timer(timer.event));
         assert!(matches!(
             effects.as_slice(),
             [IsographEffect::LogHelloWorld]

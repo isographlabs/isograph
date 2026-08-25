@@ -1,3 +1,7 @@
+use freddie_timer::TimerEffect;
+
+use crate::timer::TimerPayload;
+
 pub struct SideEffectToken {
     _not_send: std::marker::PhantomData<*const ()>,
 }
@@ -25,6 +29,7 @@ pub enum IsographEffect {
     LogHelloWorld,
     Kill,
     SendLspResponse(Box<SendLspResponseEffect>),
+    Timer(TimerEffect<TimerPayload>),
 }
 
 pub fn no_effects() -> Vec<IsographEffect> {

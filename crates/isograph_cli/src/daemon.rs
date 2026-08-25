@@ -1,15 +1,18 @@
 use std::ops::ControlFlow;
 use std::path::PathBuf;
 
+use freddie_timer::TimerEffect;
 use isograph_compiler::HostLanguage;
 use isograph_config::IsographProjectConfig;
 use prelude::Postfix;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
+use tokio::sync::oneshot::error::TryRecvError;
 
 use crate::Filesystem;
 use crate::effect::IsographEffect;
 use crate::event::{IsographEvent, LiveSessions};
 use crate::state::{IsographDb, IsographState, handle, intern_config_directory};
+use crate::timer::TimerPayload;
 use crate::watch::SourceFileEvent;
 
 pub fn run<THostLanguage: HostLanguage>(
@@ -77,6 +80,7 @@ async fn serve<THostLanguage: HostLanguage>(
     let mut state = IsographState {
         db: IsographDb::<THostLanguage>::default(),
         live_sessions: LiveSessions::default(),
+        hello_world_debounce: None,
     };
     intern_config_directory(&mut state.db, config_path.reference());
     let config_directory = config_path
@@ -128,7 +132,7 @@ async fn serve<THostLanguage: HostLanguage>(
     let _hold_events = event_tx.clone();
     tokio::select! {
         () = run_event_loop(state, event_rx, effect_tx) => {}
-        () = run_effect_loop(effect_rx) => {}
+        () = run_effect_loop(effect_rx, event_tx.clone()) => {}
         () = crate::lsp_socket::accept_loop(listener, event_tx.clone()) => {}
         () = run_filesystem_watcher::<THostLanguage>(
             watch_rx,
@@ -171,17 +175,24 @@ pub(crate) async fn run_event_loop<THostLanguage: HostLanguage>(
     }
 }
 
-pub(crate) async fn run_effect_loop(mut effect_rx: UnboundedReceiver<IsographEffect>) {
+pub(crate) async fn run_effect_loop(
+    mut effect_rx: UnboundedReceiver<IsographEffect>,
+    event_tx: UnboundedSender<IsographEvent>,
+) {
     let token = crate::effect::SideEffectToken::mint();
     while let Some(effect) = effect_rx.recv().await {
         tracing::debug!(?effect, "effect");
-        if perform(token.reference(), effect).is_break() {
+        if perform(token.reference(), effect, event_tx.reference()).is_break() {
             break;
         }
     }
 }
 
-pub fn perform(token: &crate::effect::SideEffectToken, effect: IsographEffect) -> ControlFlow<()> {
+pub fn perform(
+    token: &crate::effect::SideEffectToken,
+    effect: IsographEffect,
+    event_tx: &UnboundedSender<IsographEvent>,
+) -> ControlFlow<()> {
     match effect {
         IsographEffect::LogHelloWorld => {
             tracing::info!("hello world");
@@ -195,15 +206,41 @@ pub fn perform(token: &crate::effect::SideEffectToken, effect: IsographEffect) -
             (respond.send)(token);
             ControlFlow::Continue(())
         }
+        IsographEffect::Timer(timer) => {
+            schedule_timer(timer, event_tx);
+            ControlFlow::Continue(())
+        }
     }
+}
+
+/// Fire-and-forget on the runtime, so a pending sleep runs off the effect loop.
+fn schedule_timer(timer: TimerEffect<TimerPayload>, event_tx: &UnboundedSender<IsographEvent>) {
+    let TimerEffect {
+        delay,
+        event,
+        mut cancel,
+    } = timer;
+    if matches!(cancel.try_recv(), Err(TryRecvError::Closed)) {
+        return;
+    }
+    let event_tx = event_tx.clone();
+    tokio::spawn(async move {
+        tokio::select! {
+            () = tokio::time::sleep(delay) => { let _ = event_tx.send(event.to()); }
+            _ = cancel => {}
+        }
+    });
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{run_effect_loop, run_event_loop};
+    use std::time::Duration;
+
+    use super::{perform, run_effect_loop, run_event_loop};
     use crate::effect::IsographEffect;
-    use crate::event::{InternalEvent, LiveSessions};
+    use crate::event::{InternalEvent, IsographEvent, LiveSessions};
     use crate::state::{IsographDb, IsographState};
+    use crate::timer::TimerPayload;
     use isograph_extract_typescript::TypeScriptHostLanguage;
     use prelude::Postfix;
     use tokio::sync::mpsc::unbounded_channel;
@@ -212,11 +249,12 @@ mod tests {
         IsographState {
             db: IsographDb::<TypeScriptHostLanguage>::default(),
             live_sessions: LiveSessions::default(),
+            hello_world_debounce: None,
         }
     }
 
     #[tokio::test]
-    async fn sending_hello_world_emits_log_hello_world() {
+    async fn sending_hello_world_emits_a_timer() {
         let (event_tx, event_rx) = unbounded_channel();
         let (effect_tx, mut effect_rx) = unbounded_channel();
         event_tx
@@ -225,7 +263,105 @@ mod tests {
         drop(event_tx);
         run_event_loop(empty_state(), event_rx, effect_tx).await;
         let effect = effect_rx.recv().await.expect("handle sent one effect");
-        assert!(matches!(effect, IsographEffect::LogHelloWorld));
+        assert!(matches!(effect, IsographEffect::Timer(_)));
+    }
+
+    #[tokio::test]
+    async fn a_timer_effect_fires_its_event_after_a_zero_delay() {
+        let (event_tx, mut event_rx) = unbounded_channel();
+        let (guard, timer) = freddie_timer::timer_effect_and_guard(
+            Duration::ZERO,
+            TimerPayload::HelloWorldDebounced,
+        );
+        assert!(
+            perform(
+                &crate::effect::SideEffectToken::mint(),
+                IsographEffect::Timer(timer),
+                event_tx.reference(),
+            )
+            .is_continue()
+        );
+        let event = event_rx.recv().await.expect("the timer fired");
+        let IsographEvent::Timer(fired) = event else {
+            panic!("the timer posts TimerFired");
+        };
+        assert!(matches!(
+            fired.trigger_if_matching(guard.reference().wrap_some()),
+            Some(&TimerPayload::HelloWorldDebounced)
+        ));
+    }
+
+    #[tokio::test]
+    async fn dropping_the_guard_before_perform_does_not_fire() {
+        let (event_tx, mut event_rx) = unbounded_channel();
+        let (guard, timer) = freddie_timer::timer_effect_and_guard(
+            Duration::ZERO,
+            TimerPayload::HelloWorldDebounced,
+        );
+        drop(guard);
+        let _ = perform(
+            &crate::effect::SideEffectToken::mint(),
+            IsographEffect::Timer(timer),
+            event_tx.reference(),
+        );
+        event_tx
+            .send(InternalEvent::Quit.to())
+            .expect("the test sends Quit");
+        let event = event_rx.recv().await.expect("Quit arrives");
+        assert!(matches!(
+            event,
+            IsographEvent::Internal(InternalEvent::Quit)
+        ));
+    }
+
+    #[tokio::test]
+    async fn dropping_the_guard_after_perform_does_not_fire() {
+        tokio::time::pause();
+        let (event_tx, mut event_rx) = unbounded_channel();
+        let (guard, timer) = freddie_timer::timer_effect_and_guard(
+            Duration::from_secs(60),
+            TimerPayload::HelloWorldDebounced,
+        );
+        let _ = perform(
+            &crate::effect::SideEffectToken::mint(),
+            IsographEffect::Timer(timer),
+            event_tx.reference(),
+        );
+        drop(guard);
+        tokio::task::yield_now().await;
+        tokio::time::advance(Duration::from_secs(60)).await;
+        event_tx
+            .send(InternalEvent::Quit.to())
+            .expect("the test sends Quit");
+        let event = event_rx.recv().await.expect("Quit arrives");
+        assert!(matches!(
+            event,
+            IsographEvent::Internal(InternalEvent::Quit)
+        ));
+    }
+
+    #[tokio::test]
+    async fn hello_world_through_event_and_effect_loops_returns_log_hello_world() {
+        let (event_tx, event_rx) = unbounded_channel();
+        let (effect_tx, mut effect_rx) = unbounded_channel();
+        event_tx
+            .send(InternalEvent::HelloWorld.to())
+            .expect("the test sends HelloWorld");
+        let token = crate::effect::SideEffectToken::mint();
+        let event_loop = run_event_loop(empty_state(), event_rx, effect_tx);
+        let effect_loop = async {
+            loop {
+                let effect = effect_rx.recv().await.expect("effects until LogHelloWorld");
+                if matches!(effect, IsographEffect::LogHelloWorld) {
+                    break;
+                }
+                assert!(perform(token.reference(), effect, event_tx.reference(),).is_continue());
+            }
+        };
+        tokio::select! {
+            () = event_loop => panic!("event loop ended before LogHelloWorld"),
+            () = effect_loop => {}
+        }
     }
 
     #[tokio::test]
@@ -247,7 +383,8 @@ mod tests {
         effect_tx
             .send(IsographEffect::Kill)
             .expect("the test sends Kill");
-        run_effect_loop(effect_rx).await;
+        let (event_tx, _event_rx) = unbounded_channel();
+        run_effect_loop(effect_rx, event_tx).await;
         let _hold = effect_tx;
     }
 }

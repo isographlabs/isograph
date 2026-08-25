@@ -2,6 +2,8 @@ use std::path::PathBuf;
 
 use prelude::Postfix;
 
+use crate::timer::TimerPayload;
+
 #[derive(Clone, Debug)]
 pub struct LspRequest {
     pub client: ClientId,
@@ -79,6 +81,8 @@ pub enum IsographEvent {
     Internal(InternalEvent),
     #[from]
     ClientConnection(ClientConnectionEvent),
+    #[from]
+    Timer(freddie_timer::TimerFired<TimerPayload>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]

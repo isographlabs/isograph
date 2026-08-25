@@ -485,7 +485,7 @@ dependencies = [
 [[package]]
 name = "freddie_cli"
 version = "0.0.1"
-source = "git+https://github.com/freddiehg/freddie?rev=785c7950b009309eee8b3810e078876b77d2015e#785c7950b009309eee8b3810e078876b77d2015e"
+source = "git+https://github.com/freddiehg/freddie?rev=fb083a319970d468d87ccdd85ee08a47f24af3d1#fb083a319970d468d87ccdd85ee08a47f24af3d1"
 dependencies = [
  "clap",
  "freddie_single_instance",
@@ -500,7 +500,15 @@ dependencies = [
 [[package]]
 name = "freddie_single_instance"
 version = "0.0.1"
-source = "git+https://github.com/freddiehg/freddie?rev=785c7950b009309eee8b3810e078876b77d2015e#785c7950b009309eee8b3810e078876b77d2015e"
+source = "git+https://github.com/freddiehg/freddie?rev=fb083a319970d468d87ccdd85ee08a47f24af3d1#fb083a319970d468d87ccdd85ee08a47f24af3d1"
+
+[[package]]
+name = "freddie_timer"
+version = "0.0.1"
+source = "git+https://github.com/freddiehg/freddie?rev=fb083a319970d468d87ccdd85ee08a47f24af3d1#fb083a319970d468d87ccdd85ee08a47f24af3d1"
+dependencies = [
+ "tokio",
+]
 
 [[package]]
 name = "fsevent-sys"
@@ -778,6 +786,7 @@ dependencies = [
  "derive_more",
  "freddie_cli",
  "freddie_single_instance",
+ "freddie_timer",
  "globset",
  "intern",
  "isograph_compiler",
