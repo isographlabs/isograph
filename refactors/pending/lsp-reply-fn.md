@@ -2,11 +2,13 @@
 
 Requires side-effect-token.md (landed). Independent of timer-effects.md and lsp-open-files.md.
 
-Starting a request inserts its id into that client's `outstanding` and returns a `FnOnce` that closes over that id and that session's `sender`. Calling the `FnOnce` writes that id onto the `Response` and builds a `SendLspResponseEffect` for that sender. `perform` already does `let _ = sender.send(...)`: a dropped receiver is a no-op there. `dispatch_lsp_request` takes the `FnOnce`, not the id. `take_reply` is gone.
+Starting a request inserts its id into that client's `outstanding` and returns `Option<FnOnce(Response) -> FnOnce(&SideEffectToken)>`. `None` is a client that is not live. Check that `Option` before `get_response`. `Some` is a callback that closes over that id and that session's `sender`. Calling it with a `Response` stamps `response.id` and returns the send that `perform` runs with the token. `send_lsp_response` wraps that send as `SendLspResponseEffect`. `take_reply` is gone.
 
-Origin: side-effect-token.md `LiveSessions::take_reply` / insert-then-`dispatch_lsp_request(..., id)` / `send_lsp_response` `take_reply`. Landed `LiveSession.outstanding` / `SendLspResponseEffect.send` / `SideEffectToken`. Delta: `reply` replaces `take_reply` and the insert block; the `FnOnce` closes over `sender` and `id`.
+Origin: side-effect-token.md `LiveSessions::take_reply` / insert-then-`dispatch_lsp_request(..., id)` / `send_lsp_response` `take_reply`. Landed `LiveSession.outstanding` / `SendLspResponseEffect.send` / `SideEffectToken`. Delta: `reply` returns the nested `FnOnce`; `dispatch_lsp` checks `Option` before `dispatch_lsp_request`; `send_lsp_response` calls `reply(response)` then wraps.
 
 One shippable change. MethodNotFound bytes do not change.
+
+The inner `FnOnce` takes `&SideEffectToken`, not an owned token. `perform` has one token for the loop and passes a reference. Nested `impl FnOnce` returning `impl FnOnce` is not a representable return type; the inner function is `Box<dyn FnOnce(&SideEffectToken) + Send>`, which is `SendLspResponseEffect.send`.
 
 ## What the user does
 
@@ -24,34 +26,30 @@ impl LiveSessions {
         client: ClientId,
         id: lsp_server::RequestId,
     ) -> Option<
-        impl FnOnce(lsp_server::Response) -> Vec<crate::effect::IsographEffect> + Send + use<>,
+        impl FnOnce(
+                lsp_server::Response,
+            ) -> Box<dyn FnOnce(&crate::effect::SideEffectToken) + Send>
+            + Send
+            + use<>,
     > {
         let session = self.0.get_mut(&client)?;
         session.outstanding.insert(id.clone());
         let sender = session.sender.clone();
         (move |mut response: lsp_server::Response| {
             response.id = id;
-            crate::effect::IsographEffect::SendLspResponse(
-                crate::effect::SendLspResponseEffect {
-                    send: (move |_token: &crate::effect::SideEffectToken| {
-                        let _ = sender.send(lsp_server::Message::Response(response));
-                    })
-                    .boxed(),
-                }
-                .boxed(),
-            )
-            .wrap_vec()
+            (move |_token: &crate::effect::SideEffectToken| {
+                let _ = sender.send(lsp_server::Message::Response(response));
+            })
+            .boxed()
         })
         .wrap_some()
     }
 }
 ```
 
-Delta: replaces `take_reply`. `None` is only `get_mut` miss (that client is not live). The `FnOnce` closes over `sender` and `id`. After `reply` returns, `id` is in `outstanding`. Calling the `FnOnce` assigns `response.id` from the closed-over id and builds one `SendLspResponseEffect`. That assignment is when the id is put on the `Response` this process sends. Calling it twice does not compile. `use<>` so the `impl Trait` does not capture `&mut self`.
+Delta: replaces `take_reply`. `None` is only `get_mut` miss. The outer `FnOnce` closes over `sender` and `id`. After `reply` returns, `id` is in `outstanding`. Calling the outer `FnOnce` assigns `response.id` from the closed-over id and returns the inner send. That assignment is when the id is put on the `Response` this process sends. Neither `FnOnce` looks up `LiveSessions`. Neither removes from `outstanding`. Calling either twice does not compile. `use<>` so the `impl Trait` does not capture `&mut self`.
 
-The `FnOnce` does not look up `LiveSessions`. It does not remove from `outstanding`. `Gone` drops the session (and the set). `perform` of `SendLspResponse` is still `let _ = sender.send(...)`.
-
-`get_response` still returns a `lsp_server::Response` (`convert_to_lsp_response` fills `id` there because the struct requires it). The callback overwrites `response.id` with the id it closed over.
+`get_response` still returns a `lsp_server::Response` (`convert_to_lsp_response` fills `id` there because the struct requires it). The outer callback overwrites `response.id` with the id it closed over.
 
 ```rust
 // from crates/isograph_cli/src/state.rs
@@ -65,12 +63,16 @@ The `FnOnce` does not look up `LiveSessions`. It does not remove from `outstandi
         }
 ```
 
+`None` does not call `dispatch_lsp_request`. `get_response` does not run.
+
 ```rust
 // from crates/isograph_cli/src/state.rs
 fn dispatch_lsp_request<THostLanguage: HostLanguage>(
     state: &IsographState<THostLanguage>,
     incoming: crate::event::LspRequest,
-    reply: impl FnOnce(lsp_server::Response) -> Vec<IsographEffect>,
+    reply: impl FnOnce(
+        lsp_server::Response,
+    ) -> Box<dyn FnOnce(&crate::effect::SideEffectToken) + Send>,
 ) -> Vec<IsographEffect> {
     let request = incoming.request;
     let get_response = || {
@@ -95,14 +97,24 @@ fn dispatch_lsp_request<THostLanguage: HostLanguage>(
 }
 
 fn send_lsp_response(
-    reply: impl FnOnce(lsp_server::Response) -> Vec<IsographEffect>,
+    reply: impl FnOnce(
+        lsp_server::Response,
+    ) -> Box<dyn FnOnce(&crate::effect::SideEffectToken) + Send>,
     response: lsp_server::Response,
 ) -> Vec<IsographEffect> {
-    reply(response)
+    crate::effect::IsographEffect::SendLspResponse(
+        crate::effect::SendLspResponseEffect {
+            send: reply(response),
+        }
+        .boxed(),
+    )
+    .wrap_vec()
 }
 
 fn method_not_found(
-    reply: impl FnOnce(lsp_server::Response) -> Vec<IsographEffect>,
+    reply: impl FnOnce(
+        lsp_server::Response,
+    ) -> Box<dyn FnOnce(&crate::effect::SideEffectToken) + Send>,
     request: lsp_server::Request,
 ) -> Vec<IsographEffect> {
     send_lsp_response(
@@ -121,7 +133,7 @@ fn method_not_found(
 }
 ```
 
-Delta: `dispatch_lsp` of `Request` calls `LiveSessions::reply`. `None` does not call `dispatch_lsp_request`. `dispatch_lsp_request` takes `&IsographState` and the `FnOnce`. It does not take `id`. It always runs `get_response`. `send_lsp_response` calls the `FnOnce`. No `take_reply`. `method_not_found` still builds the MethodNotFound error body; `id: request.id` is only because `Response` requires the field. The callback overwrites it. `handle_client_connection` is unchanged. `SendLspResponseEffect` is unchanged. `perform` is unchanged. `run_event_loop` is unchanged. `run_effect_loop` is unchanged.
+Delta: `dispatch_lsp` of `Request` checks `LiveSessions::reply` before `dispatch_lsp_request`. `dispatch_lsp_request` takes `&IsographState` and the outer `FnOnce`. It does not take `id`. It always runs `get_response`. `send_lsp_response` is `reply(response)` then `SendLspResponseEffect { send }`. No `take_reply`. `method_not_found` still builds the MethodNotFound error body; `id: request.id` is only because `Response` requires the field. The outer callback overwrites it. `handle_client_connection` is unchanged. `SendLspResponseEffect` is unchanged. `perform` is unchanged (`(respond.send)(token)`). `run_event_loop` is unchanged. `run_effect_loop` is unchanged.
 
 The `get_mut` borrow of `live_sessions` in `reply` ends before `dispatch_lsp_request`. `get_response` uses `&state.db`.
 
@@ -131,11 +143,11 @@ The `get_mut` borrow of `live_sessions` in `reply` ends before `dispatch_lsp_req
 
 `handle` of `Formatting` for that live client: `result` is `[]`. `Response.id` equals the request id.
 
-Never `Started`, `Started(A)` then request from `B`, `Started` then `Gone` then request, `Formatting` from a not-live client: empty effects. No `perform`.
+Never `Started`, `Started(A)` then request from `B`, `Started` then `Gone` then request, `Formatting` from a not-live client: empty effects. No `perform`. `get_response` does not run (no `SendLspResponseEffect`).
 
 `LiveSessions::reply` of a client that is not in the map: `None`.
 
-`LiveSessions::reply` of a live client: `Some`. After `reply`, that id is in `outstanding`. Invoking the `FnOnce` with a `Response` whose `id` is a different value: one `SendLspResponseEffect`. `perform` delivers a `Response` whose `id` is the id passed to `reply`.
+`LiveSessions::reply` of a live client: `Some`. After `reply`, that id is in `outstanding`. Invoking the outer `FnOnce` with a `Response` whose `id` is a different value, wrapping as `SendLspResponseEffect`, `perform`: delivered `Response.id` is the id passed to `reply`.
 
 Drop `take_reply_of_an_id_that_is_not_outstanding_is_none` and `take_reply_of_an_outstanding_id_is_some_once`.
 
@@ -147,12 +159,12 @@ Do not add a production API only tests call. `reply` is the same function `dispa
 
 ## Call sites
 
-- `dispatch_lsp` of `Request` -> `LiveSessions::reply`; `None` does not call `dispatch_lsp_request`
+- `dispatch_lsp` of `Request` -> `LiveSessions::reply`; `None` does not call `dispatch_lsp_request` (no `get_response`)
 - `dispatch_lsp_request` -> `get_response`; then `send_lsp_response(reply, response)`
-- `send_lsp_response` -> `reply(response)`
-- the `FnOnce` -> `response.id = id`; build `SendLspResponseEffect` on the closed-over `sender`
-- `perform` of `SendLspResponse` -> `let _ = sender.send(...)` (dropped receiver is a no-op)
+- `send_lsp_response` -> `SendLspResponseEffect { send: reply(response) }`
+- outer `FnOnce` -> `response.id = id`; return inner `FnOnce(&SideEffectToken)`
+- `perform` of `SendLspResponse` -> `(respond.send)(token)`; `let _ = sender.send(...)` (dropped receiver is a no-op)
 - `method_not_found` -> `send_lsp_response(reply, Response { error: MethodNotFound, ... })`
-- later cancel -> `outstanding.remove` and drop the `FnOnce` without calling it
-- later async reply -> hold the `FnOnce` from `reply`; `send_lsp_response(reply, response)`
-- existing `take_reply` tests -> `reply` of not-live is `None`; `reply` of live, invoke with a `Response`, delivered `id` is the one passed to `reply`
+- later cancel -> `outstanding.remove` and drop the outer `FnOnce` without calling it
+- later async reply -> hold the outer `FnOnce` from `reply`; `send_lsp_response(reply, response)`
+- existing `take_reply` tests -> `reply` of not-live is `None`; `reply` of live, invoke outer with a `Response`, delivered `id` is the one passed to `reply`
