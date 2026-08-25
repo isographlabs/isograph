@@ -633,7 +633,7 @@ mod tests {
         categorize_folder, start,
     };
     use crate::event::{IsographEvent, LiveSessions};
-    use crate::state::{State, handle, intern_config_directory};
+    use crate::state::{IsographState, handle, intern_config_directory};
 
     #[derive(Clone, Debug, PartialEq, Eq, Error)]
     #[error("in host")]
@@ -665,7 +665,7 @@ mod tests {
         s.intern().to()
     }
 
-    fn contents(state: &State<InHost>, path: &str) -> Option<String> {
+    fn contents(state: &IsographState<InHost>, path: &str) -> Option<String> {
         state
             .db
             .disk_file(interned(path))
@@ -676,7 +676,7 @@ mod tests {
         _dir: tempfile::TempDir,
         config_path: PathBuf,
         config_directory: PathBuf,
-        state: State<InHost>,
+        state: IsographState<InHost>,
         event_tx: tokio::sync::mpsc::UnboundedSender<IsographEvent>,
         event_rx: tokio::sync::mpsc::UnboundedReceiver<IsographEvent>,
         source_files: Vec<String>,
@@ -699,7 +699,7 @@ mod tests {
                 _dir: dir,
                 config_path,
                 config_directory,
-                state: State {
+                state: IsographState {
                     db,
                     live_sessions: LiveSessions::default(),
                 },

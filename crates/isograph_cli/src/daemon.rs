@@ -9,7 +9,7 @@ use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 use crate::Filesystem;
 use crate::effect::IsographEffect;
 use crate::event::{IsographEvent, LiveSessions};
-use crate::state::{IsographDb, State, handle, intern_config_directory};
+use crate::state::{IsographDb, IsographState, handle, intern_config_directory};
 use crate::watch::SourceFileEvent;
 
 pub fn run<THostLanguage: HostLanguage>(
@@ -74,7 +74,7 @@ async fn serve<THostLanguage: HostLanguage>(
     }
     tracing::info!(config = %config_path.display(), port, "isograph daemon up");
 
-    let mut state = State {
+    let mut state = IsographState {
         db: IsographDb::<THostLanguage>::default(),
         live_sessions: LiveSessions::default(),
     };
@@ -158,7 +158,7 @@ async fn run_filesystem_watcher<THostLanguage: HostLanguage>(
 }
 
 pub(crate) async fn run_event_loop<THostLanguage: HostLanguage>(
-    mut state: crate::state::State<THostLanguage>,
+    mut state: crate::state::IsographState<THostLanguage>,
     mut event_rx: UnboundedReceiver<IsographEvent>,
     effect_tx: UnboundedSender<IsographEffect>,
 ) {
@@ -203,13 +203,13 @@ mod tests {
     use super::{run_effect_loop, run_event_loop};
     use crate::effect::IsographEffect;
     use crate::event::{InternalEvent, LiveSessions};
-    use crate::state::{IsographDb, State};
+    use crate::state::{IsographDb, IsographState};
     use isograph_extract_typescript::TypeScriptHostLanguage;
     use prelude::Postfix;
     use tokio::sync::mpsc::unbounded_channel;
 
-    fn empty_state() -> State<TypeScriptHostLanguage> {
-        State {
+    fn empty_state() -> IsographState<TypeScriptHostLanguage> {
+        IsographState {
             db: IsographDb::<TypeScriptHostLanguage>::default(),
             live_sessions: LiveSessions::default(),
         }

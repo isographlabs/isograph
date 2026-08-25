@@ -230,7 +230,7 @@ mod tests {
         InternalEvent, IsographEvent, LiveSessions, Presence,
     };
     use crate::send::notify;
-    use crate::state::{IsographDb, State};
+    use crate::state::{IsographDb, IsographState};
     use isograph_extract_typescript::TypeScriptHostLanguage;
 
     const SETTLE: Duration = Duration::from_millis(250);
@@ -285,7 +285,7 @@ mod tests {
                 &mut db,
                 std::path::Path::new("/tmp/proj/isograph.config.json"),
             );
-            let state = State {
+            let state = IsographState {
                 db,
                 live_sessions: LiveSessions::default(),
             };

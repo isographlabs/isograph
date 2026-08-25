@@ -17,13 +17,13 @@ use crate::event::{
 
 pub use isograph_compiler::IsographDb;
 
-pub struct State<THostLanguage: HostLanguage> {
+pub struct IsographState<THostLanguage: HostLanguage> {
     pub db: IsographDb<THostLanguage>,
     pub live_sessions: LiveSessions,
 }
 
 pub fn handle<THostLanguage: HostLanguage>(
-    state: &mut State<THostLanguage>,
+    state: &mut IsographState<THostLanguage>,
     event: IsographEvent,
 ) -> Vec<IsographEffect> {
     match event {
@@ -34,7 +34,7 @@ pub fn handle<THostLanguage: HostLanguage>(
 }
 
 fn handle_client_connection<THostLanguage: HostLanguage>(
-    state: &mut State<THostLanguage>,
+    state: &mut IsographState<THostLanguage>,
     event: ClientConnectionEvent,
 ) -> Vec<IsographEffect> {
     match event {
@@ -53,7 +53,7 @@ fn handle_client_connection<THostLanguage: HostLanguage>(
 }
 
 fn dispatch_lsp<THostLanguage: HostLanguage>(
-    state: &mut State<THostLanguage>,
+    state: &mut IsographState<THostLanguage>,
     lsp: crate::event::LspEvent,
 ) -> Vec<IsographEffect> {
     match lsp {
@@ -76,7 +76,7 @@ fn dispatch_lsp<THostLanguage: HostLanguage>(
 }
 
 fn dispatch_lsp_request<THostLanguage: HostLanguage>(
-    state: &mut State<THostLanguage>,
+    state: &mut IsographState<THostLanguage>,
     incoming: crate::event::LspRequest,
     id: lsp_server::RequestId,
 ) -> Vec<IsographEffect> {
@@ -103,7 +103,7 @@ fn dispatch_lsp_request<THostLanguage: HostLanguage>(
 }
 
 fn send_lsp_response<THostLanguage: HostLanguage>(
-    state: &mut State<THostLanguage>,
+    state: &mut IsographState<THostLanguage>,
     client: crate::event::ClientId,
     id: lsp_server::RequestId,
     response: lsp_server::Response,
@@ -124,7 +124,7 @@ fn send_lsp_response<THostLanguage: HostLanguage>(
 }
 
 fn method_not_found<THostLanguage: HostLanguage>(
-    state: &mut State<THostLanguage>,
+    state: &mut IsographState<THostLanguage>,
     client: crate::event::ClientId,
     id: lsp_server::RequestId,
     request: lsp_server::Request,
@@ -243,7 +243,7 @@ mod tests {
 
     use isograph_extract_typescript::TypeScriptHostLanguage;
 
-    use super::{IsographDb, State, handle, intern_config_directory};
+    use super::{IsographDb, IsographState, handle, intern_config_directory};
     use crate::effect::IsographEffect;
     use crate::event::{
         ClientConnectionEvent, ClientId, ClientStartedEvent, DiskChanged, DiskFileChanged,
@@ -254,21 +254,21 @@ mod tests {
         s.intern().to()
     }
 
-    fn empty() -> State<TypeScriptHostLanguage> {
-        State {
+    fn empty() -> IsographState<TypeScriptHostLanguage> {
+        IsographState {
             db: IsographDb::<TypeScriptHostLanguage>::default(),
             live_sessions: LiveSessions::default(),
         }
     }
 
-    fn with_config() -> State<TypeScriptHostLanguage> {
+    fn with_config() -> IsographState<TypeScriptHostLanguage> {
         let mut state = empty();
         intern_config_directory(&mut state.db, Path::new("/tmp/proj/isograph.config.json"));
         state
     }
 
     fn contents(
-        state: &State<TypeScriptHostLanguage>,
+        state: &IsographState<TypeScriptHostLanguage>,
         path: common_lang_types::RelativePathToSourceFile,
     ) -> Option<&str> {
         state
@@ -357,7 +357,7 @@ mod tests {
     }
 
     fn start_client(
-        state: &mut State<TypeScriptHostLanguage>,
+        state: &mut IsographState<TypeScriptHostLanguage>,
         client: ClientId,
         sender: crossbeam::channel::Sender<lsp_server::Message>,
     ) {
