@@ -76,6 +76,15 @@ Stop on unexpected complexity: a redesign, a new shared-state primitive, a new t
 
 Do not paper over a gap by choosing the easy version, leaving a TODO, or narrowing the step so it fits.
 
+## Workarounds
+
+If a task cannot be fulfilled without a workaround, ugly code, or a violation of an invariant or coding standard, and the user has not explicitly approved that:
+
+1. Attempt to avoid the workaround. Think carefully about how to make the solution align with the standards and architecture.
+2. If that does not work, raise it with the user.
+
+The final architecture is always clean. There is never a reason to introduce unclean or janky things. If the architecture cannot achieve the goal, the architecture changes until it can, with elegance. Shipping janky code is never an acceptable step.
+
 ## Tests
 
 No snapshot tests; they pin implementation, not behavior. Assert facts about the result. Test behavior, not implementation.
