@@ -38,7 +38,13 @@ pub fn format_recorded(text: &str, tokens: &[WithOptionalSpan<IsographSemanticTo
         last = role.wrap_some();
         last_list = list;
     }
-    out
+    wrap_iso_literal(&out)
+}
+
+fn wrap_iso_literal(body: &str) -> String {
+    std::iter::once("\n")
+        .chain(body.lines().flat_map(|line| ["  ", line, "\n"]))
+        .collect()
 }
 
 enum Gap {
@@ -132,31 +138,34 @@ mod tests {
 
     #[test]
     fn one_selection_breaks_and_trailing_comma() {
-        assert_eq!(formatted("field Query.x{id}"), "field Query.x {\n  id,\n}");
+        assert_eq!(
+            formatted("field Query.x{id}"),
+            "\n  field Query.x {\n    id,\n  }\n"
+        );
     }
 
     #[test]
     fn two_selections_one_per_line_with_commas() {
         assert_eq!(
             formatted("field Query.x { id, name }"),
-            "field Query.x {\n  id,\n  name,\n}"
+            "\n  field Query.x {\n    id,\n    name,\n  }\n"
         );
         assert_eq!(
             formatted("field Query.x { id, name, }"),
-            "field Query.x {\n  id,\n  name,\n}"
+            "\n  field Query.x {\n    id,\n    name,\n  }\n"
         );
     }
 
     #[test]
     fn empty_braces_break() {
-        assert_eq!(formatted("field Query.x {}"), "field Query.x {\n}");
+        assert_eq!(formatted("field Query.x {}"), "\n  field Query.x {\n  }\n");
     }
 
     #[test]
     fn empty_parens_break() {
         assert_eq!(
             formatted("field Query.x { user() }"),
-            "field Query.x {\n  user(\n  ),\n}"
+            "\n  field Query.x {\n    user(\n    ),\n  }\n"
         );
     }
 
@@ -164,7 +173,7 @@ mod tests {
     fn empty_object_breaks() {
         assert_eq!(
             formatted("field Query.x { user(arg: {}) }"),
-            "field Query.x {\n  user(\n    arg: {\n    },\n  ),\n}"
+            "\n  field Query.x {\n    user(\n      arg: {\n      },\n    ),\n  }\n"
         );
     }
 
@@ -172,7 +181,7 @@ mod tests {
     fn empty_value_list_breaks() {
         assert_eq!(
             formatted("field Query.x { foo(x: []) }"),
-            "field Query.x {\n  foo(\n    x: [\n    ],\n  ),\n}"
+            "\n  field Query.x {\n    foo(\n      x: [\n      ],\n    ),\n  }\n"
         );
     }
 
@@ -180,7 +189,7 @@ mod tests {
     fn value_list_breaks() {
         assert_eq!(
             formatted("field Query.x { foo(x: [1, 2]) }"),
-            "field Query.x {\n  foo(\n    x: [\n      1,\n      2,\n    ],\n  ),\n}"
+            "\n  field Query.x {\n    foo(\n      x: [\n        1,\n        2,\n      ],\n    ),\n  }\n"
         );
     }
 
@@ -188,15 +197,15 @@ mod tests {
     fn type_list_stays_glued() {
         assert_eq!(
             formatted("field Query.x($y: [Foo!]) { id }"),
-            "field Query.x(\n  $y: [Foo!],\n) {\n  id,\n}"
+            "\n  field Query.x(\n    $y: [Foo!],\n  ) {\n    id,\n  }\n"
         );
     }
 
     #[test]
-    fn entrypoint_is_unchanged() {
+    fn entrypoint_is_on_its_own_indented_line() {
         assert_eq!(
             formatted("entrypoint Query.HomeRoute"),
-            "entrypoint Query.HomeRoute"
+            "\n  entrypoint Query.HomeRoute\n"
         );
     }
 
@@ -204,7 +213,7 @@ mod tests {
     fn to_has_spaces() {
         assert_eq!(
             formatted("field Pet.x to Image { id }"),
-            "field Pet.x to Image {\n  id,\n}"
+            "\n  field Pet.x to Image {\n    id,\n  }\n"
         );
     }
 
@@ -212,7 +221,7 @@ mod tests {
     fn nested_object_and_args_break() {
         assert_eq!(
             formatted("field Query.x { user(arg: { b: true }, c: false) }"),
-            "field Query.x {\n  user(\n    arg: {\n      b: true,\n    },\n    c: false,\n  ),\n}"
+            "\n  field Query.x {\n    user(\n      arg: {\n        b: true,\n      },\n      c: false,\n    ),\n  }\n"
         );
     }
 
@@ -220,7 +229,7 @@ mod tests {
     fn variable_list_breaks() {
         assert_eq!(
             formatted("field Query.user($id:ID,$x:Int){id}"),
-            "field Query.user(\n  $id: ID,\n  $x: Int,\n) {\n  id,\n}"
+            "\n  field Query.user(\n    $id: ID,\n    $x: Int,\n  ) {\n    id,\n  }\n"
         );
     }
 
@@ -228,8 +237,13 @@ mod tests {
     fn description_is_on_its_own_line() {
         assert_eq!(
             formatted("field Pet.x\n\"desc\"\n{id}"),
-            "field Pet.x\n\"desc\"\n{\n  id,\n}"
+            "\n  field Pet.x\n  \"desc\"\n  {\n    id,\n  }\n"
         );
+    }
+
+    #[test]
+    fn no_tokens_is_a_newline() {
+        assert_eq!(format_recorded("", &[]), "\n");
     }
 
     #[test]

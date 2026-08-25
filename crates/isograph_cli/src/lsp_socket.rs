@@ -994,7 +994,7 @@ mod tests {
         let edits: Vec<lsp_types::TextEdit> =
             serde_json::from_value(response.result.expect("edits")).expect("Vec<TextEdit>");
         assert_eq!(edits.len(), 1);
-        assert_eq!(edits[0].new_text, "field Query.x {\n  id,\n}");
+        assert_eq!(edits[0].new_text, "\n  field Query.x {\n    id,\n  }\n");
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -1024,7 +1024,7 @@ mod tests {
         let edits: Vec<lsp_types::TextEdit> =
             serde_json::from_value(response.result.expect("edits")).expect("Vec<TextEdit>");
         assert_eq!(edits.len(), 1);
-        assert_eq!(edits[0].new_text, "field Query.x {\n  id,\n}");
+        assert_eq!(edits[0].new_text, "\n  field Query.x {\n    id,\n  }\n");
     }
 
     #[tokio::test(flavor = "multi_thread")]
