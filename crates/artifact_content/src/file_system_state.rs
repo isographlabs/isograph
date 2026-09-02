@@ -28,6 +28,9 @@ impl FileSystemState {
         operations.push(FileSystemOperation::DeleteDirectory(
             artifact_directory.to_path_buf(),
         ));
+        operations.push(FileSystemOperation::CreateDirectory(
+            artifact_directory.to_path_buf(),
+        ));
 
         for (new_server_object_entity_name, new_selectable_map) in &state.nested_files {
             let new_server_object_path = artifact_directory.join(new_server_object_entity_name);
@@ -322,8 +325,22 @@ mod tests {
             .filter(|op| matches!(op, FileSystemOperation::WriteFile(_, _)))
             .count();
 
-        assert_eq!(create_dirs, 1);
+        assert_eq!(create_dirs, 2); // the artifact directory itself, plus User/name
         assert_eq!(write_files, 1);
+    }
+
+    #[test]
+    fn test_recreate_all_creates_artifact_directory() {
+        let artifacts = [create_artifact(None, None, "tsconfig.json", "{}")];
+        let state = FileSystemState::from(&artifacts[..]);
+
+        let artifact_dir = PathBuf::from("/__isograph");
+        let ops = FileSystemState::recreate_all(&state, &artifact_dir);
+
+        assert_eq!(ops.len(), 3);
+        assert!(matches!(ops[0], FileSystemOperation::DeleteDirectory(_)));
+        assert!(matches!(&ops[1], FileSystemOperation::CreateDirectory(p) if p == &artifact_dir));
+        assert!(matches!(ops[2], FileSystemOperation::WriteFile(_, _)));
     }
 
     #[test]
