@@ -298,8 +298,8 @@ fn sorted_user_written_types<TCompilationProfile: CompilationProfile>(
     let mut client_types = deprecated_client_selectable_map(db)
         .as_ref()
         .expect("Expected client selectable map to be valid.")
-        .iter()
-        .flat_map(|(_, value)| {
+        .values()
+        .flat_map(|value| {
             let value = value
                 .as_ref()
                 .expect("Expected client selectable to be valid");

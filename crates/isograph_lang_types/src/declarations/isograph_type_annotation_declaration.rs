@@ -38,7 +38,7 @@ impl std::fmt::Display for TypeAnnotationDeclaration {
             TypeAnnotationDeclaration::Union(union_type_annotation) => {
                 write!(f, "{}", union_type_annotation)
             }
-            TypeAnnotationDeclaration::Plural(plural) => write!(f, "[{}]", &plural.item),
+            TypeAnnotationDeclaration::Plural(plural) => write!(f, "[{}]", plural.item),
         }
     }
 }
@@ -201,7 +201,7 @@ impl std::fmt::Display for UnionVariant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             UnionVariant::Scalar(entity_name_wrapper) => write!(f, "{}", entity_name_wrapper),
-            UnionVariant::Plural(plural) => write!(f, "{}", &plural.item),
+            UnionVariant::Plural(plural) => write!(f, "{}", plural.item),
         }
     }
 }

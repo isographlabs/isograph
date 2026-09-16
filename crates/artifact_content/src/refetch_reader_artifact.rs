@@ -191,7 +191,7 @@ fn get_read_out_data(field_map: &[FieldMapItem]) -> String {
         let split_to_arg = item.split_to_arg();
         let mut path_segments = Vec::with_capacity(1 + split_to_arg.to_field_names.len());
         path_segments.push(split_to_arg.to_argument_name);
-        path_segments.extend(split_to_arg.to_field_names.into_iter());
+        path_segments.extend(split_to_arg.to_field_names);
 
         let last_index = path_segments.len() - 1;
         let mut path_so_far = "".to_string();

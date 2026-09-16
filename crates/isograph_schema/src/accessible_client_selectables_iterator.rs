@@ -85,90 +85,85 @@ impl<'db, TCompilationProfile: CompilationProfile> Iterator
 
         'main_loop: loop {
             let item = self.selection_set.item.selections.get(self.index);
-
-            if let Some(selection) = item {
-                let selectable_name: SelectableName = selection.item.name();
-                let selectable =
-                    selectable_named(self.db, self.parent_entity_name, selectable_name)
-                        .as_ref()
-                        .expect(
-                            "Expected parsing to have succeeded. \
+            let selection = item?;
+            let selectable_name: SelectableName = selection.item.name();
+            let selectable = selectable_named(self.db, self.parent_entity_name, selectable_name)
+                .as_ref()
+                .expect(
+                    "Expected parsing to have succeeded. \
                             This is indicative of a bug in Isograph.",
-                        )
-                        .expect_selectable_to_exist(self.parent_entity_name, selectable_name);
-                match selection.item.reference() {
-                    SelectionType::Scalar(scalar_selection) => {
-                        match selectable {
-                            DefinitionLocation::Server(_) => {
-                                self.index += 1;
-                                continue 'main_loop;
-                            }
-                            DefinitionLocation::Client(_) => {
-                                self.index += 1;
-                                return (self.parent_entity_name, selection.item.name())
-                                    .scalar_selected()
-                                    .with_location(scalar_selection.name.location)
-                                    .wrap_some();
-                            }
-                        };
-                    }
-                    SelectionType::Object(object_selection) => {
-                        let object_selectable = selectable;
-
-                        // TODO don't match on object_selectable twice
-                        let target_entity_name = match object_selectable {
-                            DefinitionLocation::Server(s) => {
-                                match s.lookup(self.db).target_entity.item.as_ref() {
-                                    Ok(annotation) => annotation.inner(),
-                                    Err(_) => {
-                                        continue 'main_loop;
-                                    }
-                                }
-                            }
-                            DefinitionLocation::Client(c) => match c {
-                                SelectionType::Scalar(_) => {
-                                    panic!(
-                                        "Unexpected client scalar selectable. \
-                                        This is indicative of a bug in Isograph."
-                                    );
-                                }
-                                SelectionType::Object(o) => o.lookup(self.db).target_entity.inner(),
-                            },
-                        };
-
-                        let mut iterator = AccessibleClientSelectableIterator {
-                            selection_set: object_selection.selection_set.clone(),
-                            index: 0,
-                            sub_iterator: None,
-                            db: self.db,
-                            parent_entity_name: target_entity_name.0,
-                        };
-
-                        match object_selectable {
-                            DefinitionLocation::Server(_) => {}
-                            DefinitionLocation::Client(_) => {
-                                self.sub_iterator = Some(iterator.boxed());
-                                self.index += 1;
-                                return (self.parent_entity_name, object_selection.name.item)
-                                    .object_selected()
-                                    .with_location(object_selection.name.location)
-                                    .wrap_some();
-                            }
-                        }
-                        let next = iterator.next();
-                        if next.is_some() {
-                            self.sub_iterator = Some(iterator.boxed());
-                            // When we exhaust the iterator, we don't want to re-create and
-                            // re-iterate sub_iterator, so we also advance the index.
+                )
+                .expect_selectable_to_exist(self.parent_entity_name, selectable_name);
+            match selection.item.reference() {
+                SelectionType::Scalar(scalar_selection) => {
+                    match selectable {
+                        DefinitionLocation::Server(_) => {
                             self.index += 1;
-                            return next;
+                            continue 'main_loop;
                         }
-                        self.index += 1;
-                        continue 'main_loop;
-                    }
+                        DefinitionLocation::Client(_) => {
+                            self.index += 1;
+                            return (self.parent_entity_name, selection.item.name())
+                                .scalar_selected()
+                                .with_location(scalar_selection.name.location)
+                                .wrap_some();
+                        }
+                    };
                 }
-            } else {
-                return None;
+                SelectionType::Object(object_selection) => {
+                    let object_selectable = selectable;
+
+                    // TODO don't match on object_selectable twice
+                    let target_entity_name = match object_selectable {
+                        DefinitionLocation::Server(s) => {
+                            match s.lookup(self.db).target_entity.item.as_ref() {
+                                Ok(annotation) => annotation.inner(),
+                                Err(_) => {
+                                    continue 'main_loop;
+                                }
+                            }
+                        }
+                        DefinitionLocation::Client(c) => match c {
+                            SelectionType::Scalar(_) => {
+                                panic!(
+                                    "Unexpected client scalar selectable. \
+                                        This is indicative of a bug in Isograph."
+                                );
+                            }
+                            SelectionType::Object(o) => o.lookup(self.db).target_entity.inner(),
+                        },
+                    };
+
+                    let mut iterator = AccessibleClientSelectableIterator {
+                        selection_set: object_selection.selection_set.clone(),
+                        index: 0,
+                        sub_iterator: None,
+                        db: self.db,
+                        parent_entity_name: target_entity_name.0,
+                    };
+
+                    match object_selectable {
+                        DefinitionLocation::Server(_) => {}
+                        DefinitionLocation::Client(_) => {
+                            self.sub_iterator = Some(iterator.boxed());
+                            self.index += 1;
+                            return (self.parent_entity_name, object_selection.name.item)
+                                .object_selected()
+                                .with_location(object_selection.name.location)
+                                .wrap_some();
+                        }
+                    }
+                    let next = iterator.next();
+                    if next.is_some() {
+                        self.sub_iterator = Some(iterator.boxed());
+                        // When we exhaust the iterator, we don't want to re-create and
+                        // re-iterate sub_iterator, so we also advance the index.
+                        self.index += 1;
+                        return next;
+                    }
+                    self.index += 1;
+                    continue 'main_loop;
+                }
             }
         }
     }

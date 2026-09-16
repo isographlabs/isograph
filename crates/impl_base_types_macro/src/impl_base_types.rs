@@ -60,7 +60,7 @@ pub(crate) fn impl_base_types(
                 item,
                 format!(
                     "{}: associated types in traits are not supported for now ({})",
-                    invocation_name, &trait_item_type.ident
+                    invocation_name, trait_item_type.ident
                 ),
             )
             .to_compile_error(),

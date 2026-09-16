@@ -31,7 +31,7 @@ pub fn client_selectable_declaration_map_from_iso_literals<
     let mut out: BTreeMap<(_, SelectableName), _> = BTreeMap::new();
     let mut non_fatal_diagnostics = vec![];
 
-    for (_relative_path, iso_literals_source_id) in db.get_iso_literal_map().tracked().0.iter() {
+    for iso_literals_source_id in db.get_iso_literal_map().tracked().0.values() {
         for extraction in parse_iso_literal_in_source(db, *iso_literals_source_id).to_owned() {
             match extraction {
                 Ok((extraction_result, _)) => match extraction_result {

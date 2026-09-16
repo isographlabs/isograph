@@ -19,7 +19,7 @@ pub fn entrypoint_declarations<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
 ) -> Vec<EntrypointDeclaration> {
     let mut out = vec![];
-    for (_relative_path, iso_literals_source_id) in db.get_iso_literal_map().tracked().0.iter() {
+    for iso_literals_source_id in db.get_iso_literal_map().tracked().0.values() {
         for result in parse_iso_literal_in_source(db, *iso_literals_source_id) {
             if let Ok((IsoLiteralExtractionResult::EntrypointDeclaration(e), _)) = result {
                 out.push(e.item.clone().note_todo("Do not clone. Use a MemoRef."));
