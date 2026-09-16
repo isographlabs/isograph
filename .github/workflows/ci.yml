@@ -371,9 +371,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-turbo-
       - uses: pnpm/action-setup@v2
+      # Node 24 ships npm 11.5.1+, required for OIDC trusted publishing.
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           registry-url: https://registry.npmjs.org/
           cache: 'pnpm'
       - name: Install dependencies
@@ -438,10 +439,9 @@ jobs:
       - name: Build swc
         run: pnpm build-swc
 
+      # Do not set NODE_AUTH_TOKEN. npm would use it and skip OIDC.
       - name: Publish to NPM
         run: pnpm --filter='./libs/*' publish --no-git-checks --tag ${{ startsWith(github.ref, 'refs/heads/deploy/') && 'deploy' || 'main' }}
-        env:
-          NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
 
   versioned-release:
     name: Versioned NPM release
@@ -458,9 +458,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-turbo-
       - uses: pnpm/action-setup@v2
+      # Node 24 ships npm 11.5.1+, required for OIDC trusted publishing.
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           registry-url: https://registry.npmjs.org/
           cache: 'pnpm'
       - name: Install dependencies
@@ -519,10 +520,9 @@ jobs:
       - name: Build swc
         run: pnpm build-swc
 
+      # Do not set NODE_AUTH_TOKEN. npm would use it and skip OIDC.
       - name: Publish latest version to NPM
         run: pnpm --filter './libs/*' publish --no-git-checks --tag latest
-        env:
-          NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
 
   publish-isograph-extension:
     name: Publish Isograph Extension
