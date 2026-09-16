@@ -3,11 +3,10 @@ import type {
   Factory,
   ItemCleanupPair,
 } from '@isograph/disposable-types';
-import type { CacheItem } from './CacheItem';
+import type { CacheItem, CacheItemOptions } from './CacheItem';
 import { createTemporarilyRetainedCacheItem } from './CacheItem';
 
 // TODO convert cache impl to a getter and setter and free functions
-// TODO accept options that get passed to CacheItem
 
 /**
  * ParentCache
@@ -28,11 +27,13 @@ import { createTemporarilyRetainedCacheItem } from './CacheItem';
 export class ParentCache<T> {
   private __cacheItem: CacheItem<T> | null = null;
   private readonly __factory: Factory<T>;
+  private readonly __options: CacheItemOptions | void;
 
   // TODO pass an onEmpty function, which can e.g. remove this ParentCache
   // from some parent object.
-  constructor(factory: Factory<T>) {
+  constructor(factory: Factory<T>, options?: CacheItemOptions) {
     this.__factory = factory;
+    this.__options = options;
   }
 
   /**
@@ -59,24 +60,28 @@ export class ParentCache<T> {
 
   private __populateAndTemporaryRetain(): [CacheItem<T>, T, CleanupFn] {
     const pair: ItemCleanupPair<CacheItem<T>> =
-      createTemporarilyRetainedCacheItem(this.__factory, () => {
-        // We are doing this check because we don't want to remove the cache item
-        // if it is not the one that was created when the temporary retain was created.
-        //
-        // Consider the following scenario:
-        // - we populate the cache with CacheItem A,
-        // - then manually delete CacheItem A (e.g. to force a refetch)
-        // - then, we re-populate the parent cache with CacheItem B
-        // - then, the temporary retain of CacheItem A is disposed or expires.
-        //
-        // At this point, we don't want to delete CacheItem B from the cache.
-        //
-        // TODO consider what happens if items are === comparable to each other,
-        // e.g. the item is a number!
-        if (this.__cacheItem === pair[0]) {
-          this.empty();
-        }
-      });
+      createTemporarilyRetainedCacheItem(
+        this.__factory,
+        () => {
+          // We are doing this check because we don't want to remove the cache item
+          // if it is not the one that was created when the temporary retain was created.
+          //
+          // Consider the following scenario:
+          // - we populate the cache with CacheItem A,
+          // - then manually delete CacheItem A (e.g. to force a refetch)
+          // - then, we re-populate the parent cache with CacheItem B
+          // - then, the temporary retain of CacheItem A is disposed or expires.
+          //
+          // At this point, we don't want to delete CacheItem B from the cache.
+          //
+          // TODO consider what happens if items are === comparable to each other,
+          // e.g. the item is a number!
+          if (this.__cacheItem === pair[0]) {
+            this.empty();
+          }
+        },
+        this.__options,
+      );
 
     // We deconstruct this here instead of at the definition site because otherwise,
     // typescript thinks that cacheItem is any, because it's referenced in the closure.
