@@ -130,8 +130,9 @@ z = "job:check-cli"
 
 [jobs.build-swc]
 command = [
-	"cargo", "build", "-p", "swc_isograph_plugin", "--release", "--target", "wasm32-wasip1",
+	"cargo", "rustc", "-p", "swc_isograph_plugin", "--release", "--target", "wasm32-wasip1",
 	"--color", "always",
+	"--", "-C", "link-arg=--allow-undefined",
 ]
 watch = ["crates"]
 need_stdout = false

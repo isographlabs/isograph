@@ -1,0 +1,5 @@
+# SWC plugins import host functions (__set_transform_result, etc.).
+# rustc 1.96 stopped passing --allow-undefined to wasm-ld by default.
+# https://blog.rust-lang.org/2026/04/04/changes-to-webassembly-targets-and-handling-undefined-symbols/
+[target.wasm32-wasip1]
+rustflags = ["-C", "link-arg=--allow-undefined"]
