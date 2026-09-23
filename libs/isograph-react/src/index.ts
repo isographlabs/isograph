@@ -181,3 +181,4 @@ export {
   useImperativeLoadableField,
   type UseImperativeLoadableFieldReturn,
 } from './loadable-hooks/useImperativeLoadableField';
+export { hmr } from './react/hmr';

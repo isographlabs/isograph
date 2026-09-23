@@ -443,17 +443,19 @@ function readDataForOnComplete<
       }
       case 'EagerReaderArtifact': {
         return readerArtifact.resolver({
-          data: fragmentResult,
-          parameters: variables,
-          ...(readerArtifact.hasUpdatable
-            ? {
-                startUpdate: getOrCreateCachedStartUpdate(
-                  environment,
-                  fragment,
-                  fakeNetworkRequestOptions,
-                ),
-              }
-            : undefined),
+          firstParameter: {
+            data: fragmentResult,
+            parameters: variables,
+            ...(readerArtifact.hasUpdatable
+              ? {
+                  startUpdate: getOrCreateCachedStartUpdate(
+                    environment,
+                    fragment,
+                    fakeNetworkRequestOptions,
+                  ),
+                }
+              : undefined),
+          },
         });
       }
     }
