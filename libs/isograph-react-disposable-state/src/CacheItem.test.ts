@@ -153,7 +153,45 @@ describe('CacheItem', () => {
 
       expect(() => {
         disposeTemporaryRetain();
-      }).toThrow();
+      }).toThrow('A temporary retain should only be cleared once.');
+    });
+  });
+
+  describe('Item that is temporarily retained twice', () => {
+    // A second clear of one temporary retain while the other still holds the
+    // item: without the status transition the count is decremented twice, the
+    // item leaves the parent cache, and the other holder's clear finds it in an
+    // invalid state.
+    test('Clearing the same temporary retain twice throws and leaves the other retain intact', () => {
+      const removeFromParentCache = vi.fn();
+      const disposeItem = vi.fn();
+
+      const factory = vi.fn(() => {
+        const ret: ItemCleanupPair<number> = [1, disposeItem];
+        return ret;
+      });
+      const [cacheItem, disposeTemporaryRetain1] =
+        createTemporarilyRetainedCacheItem<number>(
+          factory,
+          removeFromParentCache,
+        );
+      const disposeTemporaryRetain2 = cacheItem.temporaryRetain();
+
+      disposeTemporaryRetain1();
+      expect(() => {
+        disposeTemporaryRetain1();
+      }).toThrow('A temporary retain should only be cleared once.');
+
+      const state = getState(cacheItem);
+      assert(state.kind === 'InParentCacheAndNotDisposed');
+      expect(state.temporaryRetainCount).toEqual(1);
+      expect(removeFromParentCache).not.toHaveBeenCalled();
+      expect(disposeItem).not.toHaveBeenCalled();
+
+      disposeTemporaryRetain2();
+      expect(getState(cacheItem).kind).toEqual('NotInParentCacheAndDisposed');
+      expect(removeFromParentCache).toHaveBeenCalledOnce();
+      expect(disposeItem).toHaveBeenCalledOnce();
     });
   });
 
@@ -213,7 +251,7 @@ describe('CacheItem', () => {
 
       expect(() => {
         disposeTemporaryRetain();
-      }).toThrow();
+      }).toThrow('A temporary retain should only be cleared once.');
     });
 
     test('Item is disposed when the permanently retain is disposed', () => {
