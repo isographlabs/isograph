@@ -3,6 +3,7 @@
 import type { ItemCleanupPair } from '@isograph/disposable-types';
 import { useEffect, useRef, useState } from 'react';
 import type { ParentCache } from './ParentCache';
+import { useEffectsRerunWithoutRenderRef } from './useEffectsRerunWithoutRender';
 
 /**
  * useCachedResponsivePrecommitValue<T>
@@ -49,6 +50,8 @@ export function useCachedResponsivePrecommitValue<T>(
   const [, rerender] = useState<{} | null>(null);
   const lastCommittedParentCache = useRef<ParentCache<T> | null>(null);
 
+  const effectsRerunWithoutRenderRef = useEffectsRerunWithoutRenderRef();
+
   useEffect(() => {
     lastCommittedParentCache.current = parentCache;
     // On commit, cacheItem may be disposed, because during the render phase,
@@ -67,28 +70,37 @@ export function useCachedResponsivePrecommitValue<T>(
     //
     // After the above, we have a non-disposed item and a cleanup function, which we
     // can pass to onCommit.
-    const undisposedPair = cacheItem.permanentRetainIfNotDisposed(
-      disposeOfTemporaryRetain,
-    );
-    if (undisposedPair != null) {
-      onCommit(undisposedPair);
-    } else {
-      // The cache item we created during render has been disposed. Check if the parent
-      // cache is populated.
-      const existingCacheItemCleanupPair =
-        parentCache.getAndPermanentRetainIfPresent();
-      if (existingCacheItemCleanupPair != null) {
-        onCommit(existingCacheItemCleanupPair);
-      } else {
-        // We did not find an item in the parent cache, create a new one.
-        onCommit(parentCache.factory());
+    //
+    // When this effect runs again without a render (StrictMode's simulated
+    // remount, Fast Refresh, Activity), the render's temporary retain was
+    // already converted by the first run and released by the cleanup, so the
+    // item is re-acquired from the parent cache below instead.
+    if (!effectsRerunWithoutRenderRef.current) {
+      const undisposedPair = cacheItem.permanentRetainIfNotDisposed(
+        disposeOfTemporaryRetain,
+      );
+      if (undisposedPair != null) {
+        onCommit(undisposedPair);
+        return;
       }
-      // TODO: Consider whether we always want to rerender if the committed item
-      // was not returned during the last render, or whether some callers will
-      // prefer opting out of this behavior (e.g. if every disposable item behaves
-      // identically, but must be loaded.)
-      rerender({});
     }
+    effectsRerunWithoutRenderRef.current = false;
+
+    // The cache item we created during render has been disposed. Check if the parent
+    // cache is populated.
+    const existingCacheItemCleanupPair =
+      parentCache.getAndPermanentRetainIfPresent();
+    if (existingCacheItemCleanupPair != null) {
+      onCommit(existingCacheItemCleanupPair);
+    } else {
+      // We did not find an item in the parent cache, create a new one.
+      onCommit(parentCache.factory());
+    }
+    // TODO: Consider whether we always want to rerender if the committed item
+    // was not returned during the last render, or whether some callers will
+    // prefer opting out of this behavior (e.g. if every disposable item behaves
+    // identically, but must be loaded.)
+    rerender({});
   }, [parentCache]);
 
   if (lastCommittedParentCache.current === parentCache) {
