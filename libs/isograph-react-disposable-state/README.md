@@ -110,6 +110,25 @@ const {
 } = useUpdatableDisposableState<T>(options);
 ```
 
+### `useUpdatableDisposableClearableState`
+
+`useUpdatableDisposableState` with a third member, `clearState`:
+
+- `clearState` returns the state to `UNASSIGNED_STATE`. The item that was in state is disposed on the next commit, exactly as if `setState` had superseded it.
+- `clearState` throws if called before the initial commit, as `setState` does.
+
+```typescript
+const {
+  state,
+  setState,
+  clearState,
+}: {
+  state: T | UnassignedState;
+  setState: (pair: ItemCleanupPair<T>) => void;
+  clearState: () => void;
+} = useUpdatableDisposableClearableState<T>();
+```
+
 ### `useDisposableState`
 
 > This could properly be called `useLazyUpdatableDisposableState`, but that's quite long!
