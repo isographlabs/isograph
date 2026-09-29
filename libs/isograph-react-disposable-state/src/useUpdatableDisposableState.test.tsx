@@ -1,4 +1,11 @@
-import React, { type MutableRefObject, StrictMode } from 'react';
+import type { ItemCleanupPair } from '@isograph/disposable-types';
+import { render, screen } from '@testing-library/react';
+import React, {
+  type MutableRefObject,
+  StrictMode,
+  useEffect,
+  useLayoutEffect,
+} from 'react';
 import { create } from 'react-test-renderer';
 import { describe, expect, test, vi } from 'vitest';
 import {
@@ -59,8 +66,54 @@ async function awaitableCreate(Component, isConcurrent: boolean) {
   return element;
 }
 
-describe('nothing', () => {
-  test('it should pass', () => {});
+describe('useUpdatableDisposableState during its first commit', () => {
+  // A child's effects run before its parent's effects of the same kind, and every layout effect runs before any
+  // passive effect, so a child effect runs after the parent's DOM is committed and before the parent's own effects.
+  // DOM event handlers of the parent can also run in that window.
+  test.each([
+    ['useLayoutEffect', useLayoutEffect],
+    ['useEffect', useEffect],
+  ])(
+    'setState called from a child %s throws, although the component has committed',
+    (_effectName, useChildEffect) => {
+      const dispose = vi.fn();
+      let setStateError: unknown = null;
+      function Child({
+        setState,
+      }: {
+        setState: (pair: ItemCleanupPair<number>) => void;
+      }) {
+        useChildEffect(() => {
+          try {
+            setState([1, dispose]);
+          } catch (error) {
+            setStateError = error;
+          }
+        }, []);
+        return null;
+      }
+      function Owner() {
+        const { state, setState } = useUpdatableDisposableState<number>();
+        return (
+          <>
+            {state === UNASSIGNED_STATE ? 'unassigned' : `item ${state}`}
+            <Child setState={setState} />
+          </>
+        );
+      }
+
+      const { unmount } = render(<Owner />);
+
+      expect(setStateError).toEqual(
+        new Error(
+          'Calling setState before the component has committed is unsafe and disallowed.',
+        ),
+      );
+      expect(screen.getByText('unassigned')).toBeTruthy();
+      unmount();
+      expect(dispose).not.toHaveBeenCalled();
+    },
+  );
 });
 
 // Temporarily disable unit tests until flakiness is investigated
