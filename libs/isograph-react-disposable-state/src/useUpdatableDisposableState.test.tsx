@@ -74,7 +74,7 @@ describe('useUpdatableDisposableState during its first commit', () => {
     ['useLayoutEffect', useLayoutEffect],
     ['useEffect', useEffect],
   ])(
-    'setState called from a child %s throws, although the component has committed',
+    'setState called from a child %s puts the item in state, and the item is disposed on unmount',
     (_effectName, useChildEffect) => {
       const dispose = vi.fn();
       let setStateError: unknown = null;
@@ -104,14 +104,11 @@ describe('useUpdatableDisposableState during its first commit', () => {
 
       const { unmount } = render(<Owner />);
 
-      expect(setStateError).toEqual(
-        new Error(
-          'Calling setState before the component has committed is unsafe and disallowed.',
-        ),
-      );
-      expect(screen.getByText('unassigned')).toBeTruthy();
-      unmount();
+      expect(setStateError).toBeNull();
+      expect(screen.getByText('item 1')).toBeTruthy();
       expect(dispose).not.toHaveBeenCalled();
+      unmount();
+      expect(dispose).toHaveBeenCalledTimes(1);
     },
   );
 });
