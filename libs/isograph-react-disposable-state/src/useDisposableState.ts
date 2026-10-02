@@ -1,8 +1,9 @@
 import type { ItemCleanupPair } from '@isograph/disposable-types';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useInsertionEffect, useRef } from 'react';
 import type { ParentCache } from './ParentCache';
 import { useCachedResponsivePrecommitValue } from './useCachedResponsivePrecommitValue';
 import {
+  type DisposableSetStateAction,
   UNASSIGNED_STATE,
   type UnassignedState,
   useUpdatableDisposableState,
@@ -10,18 +11,31 @@ import {
 
 type UseUpdatableDisposableStateReturnValue<T> = {
   state: T;
-  setState: (pair: ItemCleanupPair<Exclude<T, UnassignedState>>) => void;
+  setState: (
+    action: DisposableSetStateAction<Exclude<T, UnassignedState>>,
+  ) => void;
 };
 
+/**
+ * A setState updater receives the item this hook returns (the item from the
+ * parent cache) until setState is first called, and after that the item most
+ * recently passed to setState, as for useUpdatableDisposableState.
+ */
 export function useDisposableState<T = never>(
   parentCache: ParentCache<T>,
 ): UseUpdatableDisposableStateReturnValue<T> {
   const itemCleanupPairRef = useRef<ItemCleanupPair<T> | null>(null);
+  // The item from the parent cache that the hook returns, for setState updaters
+  // called before setState has put an item in the inner hook. It is the item
+  // returned by the last committed render, or the item committed by
+  // useCachedResponsivePrecommitValue, which the next render returns.
+  const parentCacheItemRef = useRef<T | UnassignedState>(UNASSIGNED_STATE);
 
   const preCommitItem = useCachedResponsivePrecommitValue(
     parentCache,
     (pair) => {
       itemCleanupPairRef.current = pair;
+      parentCacheItemRef.current = pair[0];
     },
   );
 
@@ -60,10 +74,49 @@ export function useDisposableState<T = never>(
     preCommitItem?.state ??
     itemCleanupPairRef.current?.[0];
 
+  // An insertion effect runs before any layout or passive effect of the commit,
+  // so a setState updater called from a child's effect during the first commit
+  // receives the precommit item.
+  useInsertionEffect(() => {
+    if (state != null && stateFromDisposableStateHook === UNASSIGNED_STATE) {
+      parentCacheItemRef.current = state;
+    }
+  });
+
+  const setStateWithParentCacheItem = useCallback(
+    (action: DisposableSetStateAction<Exclude<T, UnassignedState>>) => {
+      if (typeof action !== 'function') {
+        setState(action);
+        return;
+      }
+      setState((latestQueuedItem) => {
+        if (latestQueuedItem !== UNASSIGNED_STATE) {
+          return action(latestQueuedItem);
+        }
+        // Safety: the parent cache never holds UNASSIGNED_STATE, but
+        // ParentCache<T> does not exclude it from T.
+        const current = parentCacheItemRef.current as
+          | Exclude<T, UnassignedState>
+          | UnassignedState;
+        const next = action(current);
+        if (next === current) {
+          return latestQueuedItem;
+        }
+        if (!Array.isArray(next)) {
+          throw new Error(
+            'A setState updater must return an ItemCleanupPair or the value it received.',
+          );
+        }
+        return next;
+      });
+    },
+    [setState],
+  );
+
   if (state != null) {
     return {
       state: state,
-      setState,
+      setState: setStateWithParentCacheItem,
     };
   }
   // Safety: we can be in one of three states. Pre-commit, in which case
@@ -98,4 +151,7 @@ function tsTests() {
   // @ts-expect-error
   b.setState([UNASSIGNED_STATE, () => {}]);
   b.setState(['asdf', () => {}]);
+  b.setState((current) => (current === 'asdf' ? ['jkl', () => {}] : current));
+  // @ts-expect-error
+  b.setState((current) => (current === 'asdf' ? 1 : current));
 }

@@ -1,6 +1,6 @@
-import type { ItemCleanupPair } from '@isograph/disposable-types';
 import { useCallback } from 'react';
 import {
+  type DisposableSetStateAction,
   UNASSIGNED_STATE,
   type UnassignedState,
   useUpdatableDisposableState,
@@ -8,7 +8,9 @@ import {
 
 type UseUpdatableDisposableClearableStateReturnValue<T> = {
   state: T | UnassignedState;
-  setState: (pair: ItemCleanupPair<Exclude<T, UnassignedState>>) => void;
+  setState: (
+    action: DisposableSetStateAction<Exclude<T, UnassignedState>>,
+  ) => void;
   clearState: () => void;
 };
 
@@ -28,6 +30,8 @@ function noop() {}
  *   is disposed on the next commit, exactly as if it had been superseded by
  *   setState.
  * - Like setState, clearState throws if called before the initial commit.
+ * - A setState updater receives UNASSIGNED_STATE while the state is cleared, and
+ *   returning it is a no-op, as for useUpdatableDisposableState.
  *
  * This is a wrapper around useUpdatableDisposableState: clearing sets a sentinel
  * item with no cleanup, so the underlying hook's commit-time disposal of
@@ -43,9 +47,25 @@ export function useUpdatableDisposableClearableState<
     setState([CLEARED_STATE, noop]);
   }, [setState]);
 
+  const setStateHidingClearedState = useCallback(
+    (action: DisposableSetStateAction<Exclude<T, UnassignedState>>) => {
+      if (typeof action !== 'function') {
+        setState(action);
+        return;
+      }
+      setState((current) => {
+        const visibleCurrent =
+          current === CLEARED_STATE ? UNASSIGNED_STATE : current;
+        const next = action(visibleCurrent);
+        return next === visibleCurrent ? current : next;
+      });
+    },
+    [setState],
+  );
+
   return {
     clearState,
-    setState,
+    setState: setStateHidingClearedState,
     state: state === CLEARED_STATE ? UNASSIGNED_STATE : state,
   };
 }
@@ -64,4 +84,9 @@ function tsTests() {
   // The cleared sentinel is not part of T, so it cannot be set from outside.
   // @ts-expect-error
   b.setState([CLEARED_STATE, () => {}]);
+  b.setState((current) =>
+    current === UNASSIGNED_STATE ? ['asdf', () => {}] : current,
+  );
+  // @ts-expect-error
+  b.setState(() => [CLEARED_STATE, () => {}]);
 }
