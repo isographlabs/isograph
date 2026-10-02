@@ -1,5 +1,5 @@
 import type { ItemCleanupPair } from '@isograph/disposable-types';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import React, {
   type MutableRefObject,
   StrictMode,
@@ -7,8 +7,12 @@ import React, {
   useLayoutEffect,
 } from 'react';
 import { create } from 'react-test-renderer';
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { ParentCache } from './ParentCache';
+import { useDisposableState } from './useDisposableState';
+import { useUpdatableDisposableClearableState } from './useUpdatableDisposableClearableState';
 import {
+  type DisposableSetStateAction,
   UNASSIGNED_STATE,
   useUpdatableDisposableState,
 } from './useUpdatableDisposableState';
@@ -111,6 +115,314 @@ describe('useUpdatableDisposableState during its first commit', () => {
       expect(dispose).toHaveBeenCalledTimes(1);
     },
   );
+});
+
+function renderInStrictMode<
+  THook extends {
+    state: unknown;
+    setState: (action: DisposableSetStateAction<number>) => void;
+  },
+>(useHook: () => THook) {
+  const hookRef: { current: THook | null } = { current: null };
+  function Owner() {
+    const hook = useHook();
+    hookRef.current = hook;
+    return (
+      <>
+        {hook.state === UNASSIGNED_STATE
+          ? 'unassigned'
+          : `item ${String(hook.state)}`}
+      </>
+    );
+  }
+  const { unmount } = render(
+    <StrictMode>
+      <Owner />
+    </StrictMode>,
+  );
+  function setState(action: DisposableSetStateAction<number>) {
+    act(() => {
+      hookRef.current!.setState(action);
+    });
+  }
+  return { hookRef, setState, unmount };
+}
+
+describe('useUpdatableDisposableState setState with an updater', () => {
+  test('the updater receives the latest queued item, so a stale settle is ignored', () => {
+    const [pending1, settled1, pending2, settled2] = [1, 10, 2, 20];
+    const disposePending1 = vi.fn();
+    const disposeSettled1 = vi.fn();
+    const disposePending2 = vi.fn();
+    const disposeSettled2 = vi.fn();
+    const { hookRef, setState, unmount } = renderInStrictMode(() =>
+      useUpdatableDisposableState<number>(),
+    );
+
+    setState([pending1, disposePending1]);
+    expect(screen.getByText('item 1')).toBeTruthy();
+
+    act(() => {
+      const { setState } = hookRef.current!;
+      setState([pending2, disposePending2]);
+      setState((current) =>
+        current === pending2 ? [settled2, disposeSettled2] : current,
+      );
+      // Request 1 settles after request 2 replaced it. The rendered item is
+      // still pending1, but the updater receives settled2.
+      setState((current) =>
+        current === pending1 ? [settled1, disposeSettled1] : current,
+      );
+    });
+
+    expect(screen.getByText('item 20')).toBeTruthy();
+    expect(disposePending1).toHaveBeenCalledTimes(1);
+    expect(disposePending2).toHaveBeenCalledTimes(1);
+    expect(disposeSettled2).not.toHaveBeenCalled();
+
+    unmount();
+    expect(disposeSettled2).toHaveBeenCalledTimes(1);
+    // The hook never took ownership of request 1's settled pair.
+    expect(disposeSettled1).not.toHaveBeenCalled();
+  });
+
+  test('a pair returned from the updater replaces the current pair, which is disposed after commit', () => {
+    const dispose1 = vi.fn();
+    const dispose2 = vi.fn();
+    const { hookRef, setState, unmount } = renderInStrictMode(() =>
+      useUpdatableDisposableState<number>(),
+    );
+    setState([1, dispose1]);
+
+    act(() => {
+      hookRef.current!.setState((current) =>
+        current === UNASSIGNED_STATE ? current : [current + 1, dispose2],
+      );
+      expect(dispose1).not.toHaveBeenCalled();
+    });
+
+    expect(screen.getByText('item 2')).toBeTruthy();
+    expect(dispose1).toHaveBeenCalledTimes(1);
+    expect(dispose2).not.toHaveBeenCalled();
+
+    unmount();
+    expect(dispose1).toHaveBeenCalledTimes(1);
+    expect(dispose2).toHaveBeenCalledTimes(1);
+  });
+
+  test('returning current from the updater keeps the item and disposes nothing', () => {
+    const dispose1 = vi.fn();
+    const { setState, unmount } = renderInStrictMode(() =>
+      useUpdatableDisposableState<number>(),
+    );
+
+    // With nothing in state, the updater receives UNASSIGNED_STATE.
+    setState((current) => current);
+    expect(screen.getByText('unassigned')).toBeTruthy();
+
+    setState([1, dispose1]);
+    setState((current) => current);
+    setState((current) => current);
+
+    expect(screen.getByText('item 1')).toBeTruthy();
+    expect(dispose1).not.toHaveBeenCalled();
+
+    unmount();
+    expect(dispose1).toHaveBeenCalledTimes(1);
+  });
+
+  test('under StrictMode, every pair the hook took ownership of is disposed exactly once', () => {
+    const dispose0 = vi.fn();
+    const dispose1 = vi.fn();
+    const dispose2 = vi.fn();
+    const { hookRef, setState, unmount } = renderInStrictMode(() =>
+      useUpdatableDisposableState<number>(),
+    );
+
+    setState([0, dispose0]);
+    act(() => {
+      const { setState } = hookRef.current!;
+      setState((current) => (current === 0 ? [1, dispose1] : current));
+      setState((current) => (current === 1 ? [2, dispose2] : current));
+      setState((current) => (current === 1 ? [3, vi.fn()] : current));
+    });
+
+    expect(screen.getByText('item 2')).toBeTruthy();
+    expect(dispose0).toHaveBeenCalledTimes(1);
+    expect(dispose1).toHaveBeenCalledTimes(1);
+    expect(dispose2).not.toHaveBeenCalled();
+
+    unmount();
+    expect(dispose0).toHaveBeenCalledTimes(1);
+    expect(dispose1).toHaveBeenCalledTimes(1);
+    expect(dispose2).toHaveBeenCalledTimes(1);
+  });
+
+  test('useUpdatableDisposableClearableState passes UNASSIGNED_STATE to the updater after clearState', () => {
+    const dispose1 = vi.fn();
+    const dispose2 = vi.fn();
+    const { hookRef, setState, unmount } = renderInStrictMode(() =>
+      useUpdatableDisposableClearableState<number>(),
+    );
+    setState([1, dispose1]);
+    act(() => {
+      hookRef.current!.clearState();
+    });
+    expect(dispose1).toHaveBeenCalledTimes(1);
+
+    const receivedCurrent: unknown[] = [];
+    setState((current) => {
+      receivedCurrent.push(current);
+      return current;
+    });
+    expect(screen.getByText('unassigned')).toBeTruthy();
+
+    setState((current) =>
+      current === UNASSIGNED_STATE ? [2, dispose2] : current,
+    );
+    expect(screen.getByText('item 2')).toBeTruthy();
+    expect(new Set(receivedCurrent)).toEqual(new Set([UNASSIGNED_STATE]));
+
+    unmount();
+    expect(dispose1).toHaveBeenCalledTimes(1);
+    expect(dispose2).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('useDisposableState setState with an updater', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function createParentCache(item: number) {
+    const disposeItem = vi.fn();
+    const parentCache = new ParentCache(() => {
+      const pair: ItemCleanupPair<number> = [item, disposeItem];
+      return pair;
+    });
+    return { parentCache, disposeItem };
+  }
+
+  test.each([
+    ['useLayoutEffect', useLayoutEffect],
+    ['useEffect', useEffect],
+  ])(
+    'an updater called from a child %s during the first commit receives the precommit item, and returning it keeps the item',
+    (_effectName, useChildEffect) => {
+      const { parentCache, disposeItem } = createParentCache(1);
+      const receivedCurrent: unknown[] = [];
+      function Child({
+        setState,
+      }: {
+        setState: (action: DisposableSetStateAction<number>) => void;
+      }) {
+        useChildEffect(() => {
+          setState((current) => {
+            receivedCurrent.push(current);
+            return current;
+          });
+        }, []);
+        return null;
+      }
+      function Owner() {
+        const { state, setState } = useDisposableState(parentCache);
+        return (
+          <>
+            {`item ${state}`}
+            <Child setState={setState} />
+          </>
+        );
+      }
+
+      const { unmount } = render(
+        <StrictMode>
+          <Owner />
+        </StrictMode>,
+      );
+      vi.runAllTimers();
+
+      // StrictMode runs the child's effect twice.
+      expect(receivedCurrent).toEqual([1, 1]);
+      expect(screen.getByText('item 1')).toBeTruthy();
+      expect(disposeItem).not.toHaveBeenCalled();
+
+      unmount();
+      vi.runAllTimers();
+      expect(disposeItem).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test('a pair returned from the first updater replaces the precommit item, which is disposed after commit', () => {
+    const { parentCache, disposeItem } = createParentCache(1);
+    const dispose2 = vi.fn();
+    const receivedCurrent: unknown[] = [];
+    const { hookRef, unmount } = renderInStrictMode(() =>
+      useDisposableState(parentCache),
+    );
+    // Expire the temporary retain of StrictMode's second render, so that only
+    // the hook retains item 1.
+    vi.runAllTimers();
+
+    act(() => {
+      hookRef.current!.setState((current) => {
+        receivedCurrent.push(current);
+        return current === 1 ? [2, dispose2] : current;
+      });
+      expect(disposeItem).not.toHaveBeenCalled();
+    });
+
+    expect(receivedCurrent).toEqual([1]);
+    expect(screen.getByText('item 2')).toBeTruthy();
+    expect(disposeItem).toHaveBeenCalledTimes(1);
+    expect(dispose2).not.toHaveBeenCalled();
+
+    unmount();
+    vi.runAllTimers();
+    expect(disposeItem).toHaveBeenCalledTimes(1);
+    expect(dispose2).toHaveBeenCalledTimes(1);
+  });
+
+  test('a stale settle updater receives the latest queued item, not the precommit item', () => {
+    const [pending1, settled1, pending2, settled2] = [1, 10, 2, 20];
+    const { parentCache, disposeItem: disposePending1 } =
+      createParentCache(pending1);
+    const disposeSettled1 = vi.fn();
+    const disposePending2 = vi.fn();
+    const disposeSettled2 = vi.fn();
+    const receivedBySettle1: unknown[] = [];
+    const { hookRef, unmount } = renderInStrictMode(() =>
+      useDisposableState(parentCache),
+    );
+    vi.runAllTimers();
+    expect(screen.getByText('item 1')).toBeTruthy();
+
+    act(() => {
+      const { setState } = hookRef.current!;
+      setState([pending2, disposePending2]);
+      setState((current) =>
+        current === pending2 ? [settled2, disposeSettled2] : current,
+      );
+      setState((current) => {
+        receivedBySettle1.push(current);
+        return current === pending1 ? [settled1, disposeSettled1] : current;
+      });
+    });
+
+    expect(receivedBySettle1).toEqual([settled2]);
+    expect(screen.getByText('item 20')).toBeTruthy();
+    expect(disposePending1).toHaveBeenCalledTimes(1);
+    expect(disposePending2).toHaveBeenCalledTimes(1);
+    expect(disposeSettled2).not.toHaveBeenCalled();
+
+    unmount();
+    vi.runAllTimers();
+    expect(disposePending1).toHaveBeenCalledTimes(1);
+    expect(disposeSettled2).toHaveBeenCalledTimes(1);
+    expect(disposeSettled1).not.toHaveBeenCalled();
+  });
 });
 
 // Temporarily disable unit tests until flakiness is investigated

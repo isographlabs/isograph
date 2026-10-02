@@ -99,6 +99,7 @@ A hook that:
 - The `state` (a disposable item) is guaranteed to be undisposed during the tick in which it is returned from the hook. It will not be disposed until after it can no longer be returned from this hook, even in the presence of concurrent rendering.
 - Every time the hook commits, a given disposable item is currently exposed in the state. All items previously passed to `setState` are guaranteed to never be returned from the hook, so they are disposed at that time.
 - When the hook unmounts, all disposable items passed to `setState` are disposed.
+- `setState` also accepts an updater function, `setState((current) => next)`. `current` is the item most recently passed to `setState`, including calls that have not rendered yet, or `UNASSIGNED_STATE`. The updater returns either a new `ItemCleanupPair`, which replaces the current item exactly as `setState(pair)` would (even if the new item is `===` to the current one), or `current` itself, which does nothing: no re-render, nothing disposed. This lets a caller ignore a stale async result: `setState((current) => current === pendingItem ? [settledItem, cleanup] : current)`. The updater should be pure; the hook takes ownership only of a pair the updater returns.
 
 ```typescript
 const {
@@ -106,8 +107,14 @@ const {
   setState,
 }: {
   state: T | null;
-  setState: (pair: ItemCleanupPair<T>) => void;
+  setState: (action: DisposableSetStateAction<T>) => void;
 } = useUpdatableDisposableState<T>(options);
+
+type DisposableSetStateAction<T> =
+  | ItemCleanupPair<T>
+  | ((
+      current: T | UnassignedState,
+    ) => ItemCleanupPair<T> | T | UnassignedState);
 ```
 
 ### `useUpdatableDisposableClearableState`
@@ -116,6 +123,7 @@ const {
 
 - `clearState` returns the state to `UNASSIGNED_STATE`. The item that was in state is disposed on the next commit, exactly as if `setState` had superseded it.
 - `clearState` throws if called before the initial commit, as `setState` does.
+- A `setState` updater receives `UNASSIGNED_STATE` while the state is cleared.
 
 ```typescript
 const {
@@ -124,7 +132,7 @@ const {
   clearState,
 }: {
   state: T | UnassignedState;
-  setState: (pair: ItemCleanupPair<T>) => void;
+  setState: (action: DisposableSetStateAction<T>) => void;
   clearState: () => void;
 } = useUpdatableDisposableClearableState<T>();
 ```
@@ -135,13 +143,15 @@ const {
 
 A hook that combines the behavior of the previous two hooks:
 
+- `setState` accepts an updater function, as for `useUpdatableDisposableState`. Until `setState` is first called, the updater's `current` is the item from the parent cache that the hook returns. Returning it does nothing, and returning a new pair replaces it; the parent cache item is then released after the next commit.
+
 ```typescript
 const {
   state,
   setState,
 }: {
   state: T;
-  setState: (pair: ItemCleanupPair<T>) => void;
+  setState: (action: DisposableSetStateAction<T>) => void;
 } = useDisposableState<T>(parentCache, factory, options);
 ```
 
