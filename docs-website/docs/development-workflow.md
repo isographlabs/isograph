@@ -44,7 +44,7 @@ Isograph is built (in CI) using the latest stable version. Rust is fairly stable
 You should also install [`bacon`](https://dystroy.org/bacon/) via
 
 ```sh
-cargo install bacon@3.1.1
+cargo install --locked bacon@3.5.0
 ```
 
 Versions newer than 3.6 will not work. (This is fixable, but we haven't yet needed to.)
