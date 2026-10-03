@@ -1,5 +1,5 @@
 import type { ItemCleanupPair } from '@isograph/disposable-types';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import React, {
   type MutableRefObject,
   StrictMode,
@@ -109,6 +109,126 @@ describe('useUpdatableDisposableState during its first commit', () => {
       expect(dispose).not.toHaveBeenCalled();
       unmount();
       expect(dispose).toHaveBeenCalledTimes(1);
+    },
+  );
+});
+
+/**
+ * start stores a pending item; settle replaces it with a new pair. Disposal
+ * of the pending pair sets isDisposed, so a settle after a newer request
+ * commits is ignored. A settle in the same tick as the newer setState still
+ * runs, because that cleanup has not run yet, and setState accepts only a
+ * pair.
+ */
+function startRequest(
+  setState: (pair: ItemCleanupPair<number>) => void,
+  pending: number,
+  cleanup: () => void,
+): { settle: (value: number) => void } {
+  let isSettled = false;
+  let isDisposed = false;
+  function disposeRequest() {
+    if (!isDisposed) {
+      isDisposed = true;
+      cleanup();
+    }
+  }
+  setState([
+    pending,
+    function disposePending() {
+      if (!isSettled) {
+        disposeRequest();
+      }
+    },
+  ]);
+  return {
+    settle(value: number) {
+      if (isDisposed || isSettled) {
+        return;
+      }
+      isSettled = true;
+      setState([value, disposeRequest]);
+    },
+  };
+}
+
+function renderOwner() {
+  const hookRef: {
+    current: {
+      setState: (pair: ItemCleanupPair<number>) => void;
+    } | null;
+  } = { current: null };
+  function Owner() {
+    const hook = useUpdatableDisposableState<number>();
+    hookRef.current = hook;
+    return (
+      <>
+        {hook.state === UNASSIGNED_STATE ? 'unassigned' : `item ${hook.state}`}
+      </>
+    );
+  }
+  const { unmount } = render(<Owner />);
+  function setState(pair: ItemCleanupPair<number>) {
+    const current = hookRef.current;
+    if (current == null) {
+      throw new Error('Owner has not rendered');
+    }
+    current.setState(pair);
+  }
+  function startAndCommit(pending: number, cleanup: () => void) {
+    let resolvers: ReturnType<typeof startRequest> | null = null;
+    act(() => {
+      resolvers = startRequest(setState, pending, cleanup);
+    });
+    if (resolvers == null) {
+      throw new Error('startRequest returned no resolvers');
+    }
+    return resolvers;
+  }
+  return { setState, startAndCommit, unmount };
+}
+
+describe('useUpdatableDisposableState when a pending request is replaced', () => {
+  test('a replaced request that settles after the newer request commits is ignored', () => {
+    const { startAndCommit, unmount } = renderOwner();
+    const replacedCleanup = vi.fn();
+    const latestCleanup = vi.fn();
+
+    const replaced = startAndCommit(1, replacedCleanup);
+    const latest = startAndCommit(2, latestCleanup);
+    expect(replacedCleanup).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      replaced.settle(10);
+    });
+    expect(screen.getByText('item 2')).toBeTruthy();
+
+    act(() => {
+      latest.settle(20);
+    });
+    expect(screen.getByText('item 20')).toBeTruthy();
+    expect(replacedCleanup).toHaveBeenCalledTimes(1);
+    expect(latestCleanup).not.toHaveBeenCalled();
+
+    unmount();
+    expect(latestCleanup).toHaveBeenCalledTimes(1);
+  });
+
+  // setState accepts only a pair, so settle cannot skip when a newer
+  // setState has been queued but has not committed. The pending pair's
+  // cleanup has not run yet, so isDisposed is still false.
+  test.fails(
+    'keeps a newer request when a replaced request settles before the newer one commits',
+    () => {
+      const { setState, startAndCommit, unmount } = renderOwner();
+      const replaced = startAndCommit(1, vi.fn());
+      act(() => {
+        const latest = startRequest(setState, 2, vi.fn());
+        latest.settle(20);
+        replaced.settle(10);
+      });
+      expect(screen.getByText('item 20')).toBeTruthy();
+      unmount();
     },
   );
 });
