@@ -4,6 +4,9 @@ import commonjs from 'vite-plugin-commonjs';
 import { defineProject } from 'vitest/config';
 
 export default defineProject({
+  test: {
+    environment: 'happy-dom',
+  },
   plugins: [
     babel({
       filter: /\.[jt]sx?$/,
