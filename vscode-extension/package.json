@@ -1,7 +1,7 @@
 {
   "name": "isograph",
   "displayName": "Isograph",
-  "version": "0.5.5",
+  "version": "0.5.6",
   "description": "Isograph-powered IDE experience",
   "repository": {
     "type": "git",
