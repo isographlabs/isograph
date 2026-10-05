@@ -3,6 +3,7 @@ export * from '@isograph/disposable-types';
 export * from './CacheItem';
 export * from './ParentCache';
 export * from './useCachedResponsivePrecommitValue';
+export * from './useDisposableArray';
 export * from './useDisposableState';
 export * from './useEffectsRerunWithoutRender';
 export * from './useHasCommittedRef';

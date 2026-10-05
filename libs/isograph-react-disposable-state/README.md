@@ -129,6 +129,53 @@ const {
 } = useUpdatableDisposableClearableState<T>();
 ```
 
+### `useDisposableArray`
+
+A hook that holds an array of disposable items, built on `useUpdatableDisposableState`.
+
+- Returns an `{ entries, setEntries }` object. `entries` is the array of `ItemCleanupPair`s the current render shows. It is empty until the first `setEntries` call commits. The hook owns each pair's cleanup, so do not call it.
+- `setEntries(nextEntries)` stores `nextEntries`. Older arrays are released when a newer array commits, and the rest on unmount. Releasing an array calls the cleanup of each of its pairs once.
+- Every pair in `nextEntries` must be acquired by the caller for that call, and the hook owns it from then on. To keep an item of `entries`, take a new reference to it, for example with `cloneIfNotDisposed()` on a `ReferenceCountedPointer` from `@isograph/reference-counted-pointer`. Never pass a pair of `entries` itself.
+- Build `nextEntries` from the `entries` of the same render. If that render is stale, because its `entries` were released after a newer array committed, `cloneIfNotDisposed()` returns `null`. Release what you acquired and do not call `setEntries`.
+- Two `setEntries` calls before a commit both build on the same `entries`, and the second replaces the first.
+- `setEntries` throws if called before the initial commit, as `setState` does. It stores nothing in that case, so the caller still owns `nextEntries`.
+
+```typescript
+const {
+  entries,
+  setEntries,
+}: {
+  entries: ReadonlyArray<ItemCleanupPair<T>>;
+  setEntries: (nextEntries: ReadonlyArray<ItemCleanupPair<T>>) => void;
+} = useDisposableArray<T>();
+```
+
+For example, to keep at most three items, store reference-counted pointers, take a new reference to each item that stays, and add the new one:
+
+```typescript
+const { entries, setEntries } =
+  useDisposableArray<ReferenceCountedPointer<Item>>();
+
+function addItem(pair: ItemCleanupPair<Item>) {
+  const kept: Array<ItemCleanupPair<ReferenceCountedPointer<Item>>> = [];
+  for (const entry of entries.slice(-2)) {
+    const clone = entry[0].cloneIfNotDisposed();
+    if (clone == null) {
+      // This render is stale.
+      for (const keptEntry of kept) {
+        keptEntry[1]();
+      }
+      pair[1]();
+      return;
+    }
+    kept.push(clone);
+  }
+  setEntries([...kept, createReferenceCountedPointer(pair)]);
+}
+
+// Read an item with entries[index][0].getItemIfNotDisposed().
+```
+
 ### `useDisposableState`
 
 > This could properly be called `useLazyUpdatableDisposableState`, but that's quite long!
