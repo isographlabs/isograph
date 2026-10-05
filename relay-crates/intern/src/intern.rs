@@ -15,7 +15,6 @@ use std::hash::Hasher;
 use std::num::NonZeroU32;
 use std::sync::atomic::AtomicU32;
 use std::sync::atomic::Ordering;
-use std::u32;
 
 use once_cell::sync::OnceCell;
 use serde::Deserialize;
