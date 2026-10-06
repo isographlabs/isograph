@@ -206,6 +206,21 @@ export function useConnectionSpecPagination<
       count: number,
       fetchOptions?: FetchOptions<Connection<TItem>, never>,
     ): void => {
+      const clonedPointers: Array<
+        LoadedFragmentReference<TReadFromStore, Connection<TItem>>
+      > = [];
+      for (const [pointer] of loadedReferences) {
+        const clonedPointer = pointer.cloneIfNotDisposed();
+        // Every pointer of one stored array is released together, so a failed clone means this render's pages were
+        // released after a newer array committed. A fetchMore from such a render does nothing.
+        if (clonedPointer == null) {
+          for (const [, disposeClonedPointer] of clonedPointers) {
+            disposeClonedPointer();
+          }
+          return;
+        }
+        clonedPointers.push(clonedPointer);
+      }
       const loadedField = loadableField(
         {
           after: after,
@@ -213,20 +228,16 @@ export function useConnectionSpecPagination<
         },
         fetchOptions ?? {},
       )[1]();
-      const newPointer = createReferenceCountedPointer(loadedField);
-      const clonedPointers = loadedReferences.map(([refCountedPointer]) => {
-        const clonedRefCountedPointer = refCountedPointer.cloneIfNotDisposed();
-        if (clonedRefCountedPointer == null) {
-          throw new Error(
-            'This reference counted pointer has already been disposed. \
-            This is indicative of a bug in useSkipLimitPagination.',
-          );
+      clonedPointers.push(createReferenceCountedPointer(loadedField));
+      try {
+        setEntries(clonedPointers);
+      } catch (error) {
+        // setEntries stores nothing when it throws, so these pairs are still ours.
+        for (const [, disposeEntry] of clonedPointers) {
+          disposeEntry();
         }
-        return clonedRefCountedPointer;
-      });
-      clonedPointers.push(newPointer);
-
-      setEntries(clonedPointers);
+        throw error;
+      }
     };
 
   const [, rerender] = useState({});
