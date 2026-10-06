@@ -27,6 +27,15 @@ const NO_ENTRIES: ReadonlyArray<never> = Object.freeze([]);
 // - The caller builds nextEntries from the entries of its render. If that render is stale, because its entries were
 //   released after a newer array committed, taking a new reference fails (cloneIfNotDisposed() returns null). The
 //   caller then releases what it acquired and does not call setEntries.
+// - A caller that keeps none of its render's entries, for example one that replaces the only entry, takes no new
+//   reference, so no failed clone can tell it that its render is stale. It also checks whether any item of its
+//   render's entries is already released, for example with isDisposed() on a ReferenceCountedPointer. Releasing a
+//   stored array releases every pair of it at once, so one released item means the render is stale.
+// - Neither check detects a stale render whose entries are empty, or a stale render whose entries are not released
+//   yet. useUpdatableDisposableState releases older arrays in a passive effect, so between a newer array's commit and
+//   that commit's passive effects, the older render's entries are still undisposed. A setEntries call from such a
+//   render replaces the newer array, and the newer array's update is lost. Nothing leaks: the newer array is released
+//   when the replacing array commits, and the replacing array holds its own references.
 // - Two setEntries calls before a commit both build on the same entries, and the second replaces the first.
 // - Like useUpdatableDisposableState's setState, setEntries throws if called before the initial commit. It throws
 //   before storing anything, so the caller still owns nextEntries and must release them.
