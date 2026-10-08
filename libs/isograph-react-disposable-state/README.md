@@ -129,6 +129,27 @@ const {
 } = useUpdatableDisposableClearableState<T>();
 ```
 
+### `useDisposableStateOnce`
+
+A hook for a disposable item that an event creates at most once, such as a network request that starts when the user first hovers or clicks a button.
+
+- Returns a `{ state, setStateOnce }` object. `state` is `UNASSIGNED_STATE` until the first `setStateOnce` call puts an item in state.
+- `setStateOnce` takes a factory rather than an `ItemCleanupPair`. The first call calls the factory and puts the item in state. Every later call does nothing and does not call its factory. Several event handlers can therefore each call `setStateOnce`, and only one item is created.
+- `setStateOnce` throws if called before the initial commit, as `setState` does. A call after unmount creates nothing.
+- The item is disposed when the component unmounts, and only then. The hook disposes it in an insertion effect's cleanup, which React runs when it deletes the component, but not when an `Activity` hides it or on StrictMode's simulated unmount. A component hidden by an `Activity` keeps its item and shows the same item when it is shown again.
+- React 18 and React 19 before 19.2 skip insertion effect cleanups when they delete a subtree that a `Suspense` boundary or an `Activity` is hiding (fixed by https://github.com/facebook/react/pull/34372). On those versions, an item whose component is deleted while hidden is never disposed.
+- The item's cleanup runs inside an insertion effect, so it must not update React state synchronously.
+
+```typescript
+const {
+  state,
+  setStateOnce,
+}: {
+  state: T | UnassignedState;
+  setStateOnce: (factory: () => ItemCleanupPair<T>) => void;
+} = useDisposableStateOnce<T>();
+```
+
 ### `useDisposableArray`
 
 A hook that holds an array of disposable items, built on `useUpdatableDisposableState`.
