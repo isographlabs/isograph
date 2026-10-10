@@ -140,7 +140,9 @@ export function useSkipLimitPagination<
         );
       }
 
-      return readerWithRefetchQueries.readerArtifact.resolver(firstParameter);
+      return readerWithRefetchQueries.readerArtifact.resolver({
+        firstParameter,
+      });
     });
 
     const items = flatten(results);

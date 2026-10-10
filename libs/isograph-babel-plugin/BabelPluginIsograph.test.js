@@ -56,7 +56,10 @@ describe('Babel plugin Isograph', () => {
     const result = transform(code, transformerOpts) ?? { code: '' };
 
     expect(result.code).toMatchInlineSnapshot(
-      `"export const HomeRoute = x => x;"`,
+      `
+      "import { hmr as _hmr } from "@isograph/react";
+      export const HomeRoute = _hmr;"
+    `,
     );
   });
 
@@ -76,10 +79,11 @@ describe('Babel plugin Isograph', () => {
     const result = transform(code, transformerOpts) ?? { code: '' };
 
     expect(result.code).toMatchInlineSnapshot(`
-        "export const HomeRoute = function HomeRouteComponent() {
-          return 'Render';
-        };"
-      `);
+      "import { hmr as _hmr } from "@isograph/react";
+      export const HomeRoute = _hmr(function HomeRouteComponent() {
+        return 'Render';
+      });"
+    `);
   });
 
   test('should transform the iso function to a require call', () => {

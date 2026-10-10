@@ -61,7 +61,9 @@ export function useResult<
           : undefined),
       };
       // @ts-expect-error
-      return readerWithRefetchQueries.readerArtifact.resolver(param);
+      return readerWithRefetchQueries.readerArtifact.resolver({
+        firstParameter: param,
+      });
     }
   }
 }

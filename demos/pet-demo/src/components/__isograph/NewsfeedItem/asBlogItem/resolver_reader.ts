@@ -21,7 +21,7 @@ const artifact = (): EagerReaderArtifact<
 > => ({
   kind: "EagerReaderArtifact",
   fieldName: "asBlogItem",
-  resolver: ({ data }) => data.__typename === "BlogItem" ? data.__link : null,
+  resolver: ({ firstParameter }) => firstParameter.data.__typename === "BlogItem" ? firstParameter.data.__link : null,
   readerAst,
   hasUpdatable: false,
 });

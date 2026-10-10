@@ -1,3 +1,4 @@
+import React from 'react';
 import { useEffect, useState } from 'react';
 import {
   type ExtractData,
@@ -112,16 +113,18 @@ export const componentFunction: IsographComponentFunction = (
       rootLink: fragmentReference.root,
     }));
 
-    return readerWithRefetchQueries.readerArtifact.resolver(
-      // @ts-expect-error
-      {
-        data,
-        parameters: fragmentReference.variables,
-        startUpdate: readerWithRefetchQueries.readerArtifact.hasUpdatable
-          ? startUpdate
-          : undefined,
-      },
-      additionalRuntimeProps,
+    return (
+      <readerWithRefetchQueries.readerArtifact.resolver
+        // @ts-expect-error
+        firstParameter={{
+          data,
+          parameters: fragmentReference.variables,
+          startUpdate: readerWithRefetchQueries.readerArtifact.hasUpdatable
+            ? startUpdate
+            : undefined,
+        }}
+        additionalRuntimeProps={additionalRuntimeProps}
+      />
     );
   }
   const idString = `(type: ${fragmentReference.root.__typename}, id: ${fragmentReference.root.__link})`;

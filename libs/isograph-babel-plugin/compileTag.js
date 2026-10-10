@@ -1,6 +1,6 @@
 'use strict';
 
-const { addDefault } = require('@babel/helper-module-imports');
+const { addDefault, addNamed } = require('@babel/helper-module-imports');
 const pathModule = require('path');
 const os = require('os');
 
@@ -30,20 +30,7 @@ function compileTag(t, path, config) {
         config,
       );
     } else if (keyword === 'field' || keyword === 'pointer') {
-      if (t.isCallExpression(path.parentPath.node)) {
-        const firstArg = path.parentPath.node.arguments[0];
-        if (path.parentPath.node.arguments.length === 1 && firstArg != null) {
-          path.parentPath.replaceWith(firstArg);
-        } else {
-          throw new Error(
-            'Invalid iso tag usage. The iso function should be passed at most one argument.',
-          );
-        }
-      } else {
-        path.replaceWith(
-          t.arrowFunctionExpression([t.identifier('x')], t.identifier('x')),
-        );
-      }
+      importHmrAndWrapField(t, path, config);
     } else {
       throw new Error(
         "Invalid iso tag usage. Expected 'entrypoint', 'field' or 'pointer'.",
@@ -160,6 +147,41 @@ function compileImportStatement(t, path, type, field, artifactType, config) {
           t.stringLiteral(fileToArtifact),
         ]),
         t.identifier('default'),
+      ),
+    );
+  }
+}
+
+/**
+ * @param {typeof babel.types} t
+ * @param {babel.NodePath<babel.types.CallExpression>} path
+ * @param {NonNullable<import("cosmiconfig").CosmiconfigResult>} config
+ */
+function importHmrAndWrapField(t, path, config) {
+  const PACKAGE_NAME = '@isograph/react';
+  const EXPORT_NAME = 'hmr';
+  const module = config.config['options']?.['module'];
+
+  if (module === 'esmodule') {
+    const program = path.scope.getProgramParent();
+    const imports = /** @type {Map<string, string>} */ (
+      program.data['imports'] ??= new Map()
+    );
+
+    let id = imports.get(PACKAGE_NAME);
+    if (id == null) {
+      id = addNamed(path, EXPORT_NAME, PACKAGE_NAME).name;
+      imports.set(PACKAGE_NAME, id);
+    }
+
+    path.replaceWith(t.identifier(id));
+  } else {
+    path.replaceWith(
+      t.memberExpression(
+        t.callExpression(t.identifier('require'), [
+          t.stringLiteral(PACKAGE_NAME),
+        ]),
+        t.identifier(EXPORT_NAME),
       ),
     );
   }

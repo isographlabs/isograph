@@ -1,1 +1,2 @@
-export const HomeRoute = (x) => x;
+import { hmr as _hmr } from "@isograph/react";
+export const HomeRoute = _hmr;
