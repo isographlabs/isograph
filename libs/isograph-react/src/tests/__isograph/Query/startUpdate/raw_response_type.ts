@@ -1,8 +1,8 @@
 export type Query__startUpdate__raw_response_type = {
-  node____id___v_id?: ({
-    __typename: "Economist",
-    id: string,
-    name: string,
+  readonly node____id___v_id?: ({
+    readonly __typename: "Economist",
+    readonly id: string,
+    readonly name: string,
   } | null),
 }
 

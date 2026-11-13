@@ -1,8 +1,8 @@
 export type Query__subquery__raw_response_type = {
-  query: {
-    node____id___v_id?: ({
-      __typename: "Economist",
-      id: string,
+  readonly query: {
+    readonly node____id___v_id?: ({
+      readonly __typename: "Economist",
+      readonly id: string,
     } | null),
   },
 }

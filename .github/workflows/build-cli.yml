@@ -26,7 +26,7 @@ on:
 jobs:
   build-cli:
     name: Build compiler
-    timeout-minutes: 15
+    timeout-minutes: 45
     runs-on: ${{ inputs.os }}
     steps:
       - uses: actions/checkout@v2
@@ -51,6 +51,15 @@ jobs:
           toolchain: stable
           override: true
           target: ${{ inputs.target }}
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          # One cache entry per target triple so Linux/macOS/Windows don't collide
+          shared-key: build-cli-${{ inputs.target }}
+          # Cache even when the build fails so the next run benefits from
+          # partially-compiled deps (especially important for slow targets like
+          # Windows and macOS ARM64 where we hit the timeout).
+          cache-on-failure: true
       # more info here:- https://github.com/rust-lang/cargo/issues/13020
       - name: Enable longer pathnames for git
         if: inputs.longpaths
@@ -66,6 +75,15 @@ jobs:
         with:
           packages: musl-tools # provides musl-gcc
           version: 1.0
+      - name: Install protoc (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Install protoc (macOS)
+        if: runner.os == 'macOS'
+        run: brew install protobuf
+      - name: Install protoc (Windows)
+        if: runner.os == 'Windows'
+        run: choco install protoc
       - name: 'Build isograph_cli with cargo (${{inputs.target}})'
         run: pnpm exec turbo ${{ inputs.cross && 'cross' || 'build-compiler' }} -- --target ${{ inputs.target }} --release
       - uses: actions/upload-artifact@v4

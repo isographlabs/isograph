@@ -1,11 +1,11 @@
 export type Pet__PetCheckinsCard__raw_response_type = {
-  node____id___v_id?: ({
-    __typename: "Pet",
-    id: string,
-    checkins____skip___v_skip____limit___v_limit: ReadonlyArray<{
-      id: string,
-      location: string,
-      time: string,
+  readonly node____id___v_id?: ({
+    readonly __typename: "Pet",
+    readonly id: string,
+    readonly checkins____skip___v_skip____limit___v_limit: ReadonlyArray<{
+      readonly id: string,
+      readonly location: string,
+      readonly time: string,
     }>,
   } | null),
 }

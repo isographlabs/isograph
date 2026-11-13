@@ -1,8 +1,8 @@
 export type Query__SmartestPetRoute__raw_response_type = {
-  pets: ReadonlyArray<{
-    id: string,
-    stats?: ({
-      intelligence?: (number | null),
+  readonly pets: ReadonlyArray<{
+    readonly id: string,
+    readonly stats?: ({
+      readonly intelligence?: (number | null),
     } | null),
   }>,
 }

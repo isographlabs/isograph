@@ -1,19 +1,19 @@
 export type Viewer__NewsfeedPaginationComponent__raw_response_type = {
-  node____id___v_id?: ({
-    __typename: "Viewer",
-    id: string,
-    newsfeed____skip___v_skip____limit___v_limit: ReadonlyArray<{
-      __typename: "AdItem",
-      id: string,
+  readonly node____id___v_id?: ({
+    readonly __typename: "Viewer",
+    readonly id: string,
+    readonly newsfeed____skip___v_skip____limit___v_limit: ReadonlyArray<{
+      readonly __typename: "AdItem",
+      readonly id: string,
     } | {
-      __typename: "BlogItem",
-      id: string,
-      author: string,
-      content: string,
-      image?: ({
-        id: string,
+      readonly __typename: "BlogItem",
+      readonly id: string,
+      readonly author: string,
+      readonly content: string,
+      readonly image?: ({
+        readonly id: string,
       } | null),
-      title: string,
+      readonly title: string,
     }>,
   } | null),
 }

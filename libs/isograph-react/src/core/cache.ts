@@ -58,19 +58,14 @@ export type NetworkResponseValue =
   | NetworkResponsePlural<NetworkResponseObject>;
 
 export type NetworkResponseObject = {
-  // N.B. undefined is here to support optional id's, but
+  // N.B. undefined is here to support optional fields, but
   // undefined should not *actually* be present in the network response.
-  readonly [key: ScalarNetworkResponseKey]:
-    | undefined
-    | NetworkResponsePlural<NetworkResponseScalarValue>;
-  readonly [key: LinkedNetworkResponseKey]:
-    | undefined
-    | NetworkResponsePlural<NetworkResponseObject>;
-  readonly [key: NetworkResponseKey]:
-    | undefined
-    | NetworkResponsePlural<NetworkResponseScalarValue>
-    | NetworkResponsePlural<NetworkResponseObject>;
-  readonly id?: DataId;
+  // Uses a plain string index signature to support both GraphQL-style responses
+  // (dynamic field access with branded keys) and SQL-style responses (specific named fields).
+  readonly [key: string]: undefined | NetworkResponseValue;
+} & {
+  // SQL protocols use numeric IDs; GraphQL uses string DataIds.
+  readonly id?: DataId | number;
   readonly __typename?: TypeName;
 };
 
@@ -276,7 +271,9 @@ function normalizeLinkedField(
     // TODO check astNode.plural or the like
     const dataIds: (StoreLink | null)[] = [];
     for (let i = 0; i < networkResponseData.length; i++) {
-      const networkResponseObject = networkResponseData[i];
+      const networkResponseObject = networkResponseData[
+        i
+      ] as NetworkResponseObject | null;
       if (networkResponseObject == null) {
         dataIds.push(null);
         continue;
@@ -308,11 +305,12 @@ function normalizeLinkedField(
     targetParentRecord[parentRecordKey] = dataIds;
     return !dataIdsAreTheSame(existingValue, dataIds);
   } else {
+    const networkResponseObject = networkResponseData as NetworkResponseObject;
     const newStoreRecordId = normalizeNetworkResponseObject(
       environment,
       storeLayer,
       astNode,
-      networkResponseData,
+      networkResponseObject,
       targetParentRecordLink,
       variables,
       null,
@@ -320,7 +318,7 @@ function normalizeLinkedField(
     );
 
     let __typename =
-      astNode.concreteType ?? networkResponseData[TYPENAME_FIELD_NAME];
+      astNode.concreteType ?? networkResponseObject[TYPENAME_FIELD_NAME];
 
     if (__typename == null) {
       throw new Error(
@@ -622,7 +620,7 @@ function getDataIdOfNetworkResponse(
 
   const dataId = dataToNormalize.id;
   if (dataId != null) {
-    return dataId;
+    return String(dataId);
   }
 
   let storeKey = `${parentRecordLink.__typename}:${parentRecordLink.__link}.${astNode.fieldName}`;

@@ -40,6 +40,10 @@ impl WrappedMergedSelectionMap {
         self.0
     }
 
+    pub fn inner_ref(&self) -> &MergedSelectionMap {
+        &self.0
+    }
+
     pub fn new(inner: MergedSelectionMap) -> WrappedMergedSelectionMap {
         WrappedMergedSelectionMap(inner)
     }
