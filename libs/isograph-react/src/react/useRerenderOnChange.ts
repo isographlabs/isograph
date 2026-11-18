@@ -16,7 +16,7 @@ export function useRerenderOnChange<
     data: WithEncounteredRecords<TReadFromStore>,
   ) => void,
   readerAst: ReaderAst<TReadFromStore>,
-) {
+): void {
   const environment = useIsographEnvironment();
   useEffect(() => {
     return subscribe(
