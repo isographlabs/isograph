@@ -210,7 +210,11 @@ mod tests {
 
     struct TestNetworkProtocol;
 
-    impl NetworkProtocol for TestNetworkProtocol {}
+    impl NetworkProtocol for TestNetworkProtocol {
+        fn should_include_schema_file(_relative_path: &Path) -> IncludeFile {
+            IncludeFile::Skip
+        }
+    }
 
     struct TestProfile;
 

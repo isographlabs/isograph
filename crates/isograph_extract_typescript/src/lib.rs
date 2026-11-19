@@ -417,13 +417,15 @@ export const HomeRoute = iso(`
 
 #[cfg(test)]
 mod memo_tests {
+    use std::path::Path;
+
     use common_lang_types::RelativePathToSourceFile;
     use intern::string_key::Intern;
     use isograph_compiler::{
-        ClientId, CompilationProfile, HostLanguage, IsoLiteralError, IsoLiteralExtraction,
-        IsoLiteralStartIndex, IsographDb, LiteralId, NetworkProtocol, extract_iso_literals,
-        iso_literal_extraction, iso_literal_parse_errors_in_file, parsed_iso_literal,
-        parsed_iso_literals_in_file, text_through_last_iso_literal,
+        ClientId, CompilationProfile, HostLanguage, IncludeFile, IsoLiteralError,
+        IsoLiteralExtraction, IsoLiteralStartIndex, IsographDb, LiteralId, NetworkProtocol,
+        extract_iso_literals, iso_literal_extraction, iso_literal_parse_errors_in_file,
+        parsed_iso_literal, parsed_iso_literals_in_file, text_through_last_iso_literal,
     };
     use isograph_parser::{
         AstError, IsoLiteralItem, IsographSemanticToken, ParseError, ParsedIsoLiteral,
@@ -439,7 +441,11 @@ mod memo_tests {
 
     struct TestNetworkProtocol;
 
-    impl NetworkProtocol for TestNetworkProtocol {}
+    impl NetworkProtocol for TestNetworkProtocol {
+        fn should_include_schema_file(_relative_path: &Path) -> IncludeFile {
+            IncludeFile::Skip
+        }
+    }
 
     struct TestProfile;
 

@@ -76,7 +76,9 @@ pub trait CompilationProfile: 'static {
 }
 
 /// The way the compiler communicates with the upstream.
-pub trait NetworkProtocol: 'static {}
+pub trait NetworkProtocol: 'static {
+    fn should_include_schema_file(relative_path: &Path) -> IncludeFile;
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WithErrors<T, E> {
