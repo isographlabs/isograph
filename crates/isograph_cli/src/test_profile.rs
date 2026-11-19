@@ -22,6 +22,7 @@ impl NetworkProtocol for TestNetworkProtocol {
     type NotFetchable = TestProtocolError;
     type LookupError = Infallible;
     type SchemaFileError = Infallible;
+    type ArgumentError = Infallible;
 
     fn should_include_schema_file(relative_path: &Path) -> IncludeFile {
         match relative_path.extension().and_then(|e| e.to_str()) {
@@ -38,6 +39,27 @@ impl NetworkProtocol for TestNetworkProtocol {
         isograph_compiler::file_contents(db, client, path)
             .as_ref()
             .map(|_| Vec::new())
+    }
+
+    fn selection_argument_errors<TProfile: CompilationProfile<NetworkProtocol = Self>>(
+        _db: &IsographDb<TProfile>,
+        _client: ClientId,
+        _selectable: isograph_compiler::SelectableKey,
+        _selection_name: span::Span,
+        _arguments: Option<&span::WithSpan<isograph_parser::ArgumentList>>,
+        _variables: Option<&span::WithSpan<isograph_parser::VariableDeclarationList>>,
+    ) -> Vec<span::WithSpan<Infallible>> {
+        Vec::new()
+    }
+
+    fn field_argument_errors<TProfile: CompilationProfile<NetworkProtocol = Self>>(
+        _db: &IsographDb<TProfile>,
+        _client: ClientId,
+        _field_variables: Option<&span::WithSpan<isograph_parser::VariableDeclarationList>>,
+        _arguments: Option<&span::WithSpan<isograph_parser::ArgumentList>>,
+        _variables: Option<&span::WithSpan<isograph_parser::VariableDeclarationList>>,
+    ) -> Vec<span::WithSpan<Infallible>> {
+        Vec::new()
     }
 
     fn entity_kind(_data: &()) -> EntityKind {

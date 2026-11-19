@@ -676,6 +676,7 @@ dependencies = [
  "pico_macros",
  "prelude",
  "span",
+ "strum",
  "thiserror 1.0.69",
  "tracing",
 ]

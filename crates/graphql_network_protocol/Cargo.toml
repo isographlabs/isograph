@@ -15,6 +15,7 @@ pico = { path = "../pico" }
 pico_macros = { path = "../pico_macros" }
 prelude = { path = "../prelude" }
 span = { path = "../span" }
+strum = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 

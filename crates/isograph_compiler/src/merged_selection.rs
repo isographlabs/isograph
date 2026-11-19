@@ -221,7 +221,7 @@ pub enum SelectionMapErrorKind {
     DuplicateObjectKey(ValueKeyName),
     #[error("List arguments are not supported in queries yet.")]
     ListArgument,
-    #[error("`{}` declares no variable `${}`.", .0.field, .0.argument)]
+    #[error("{0}")]
     UnknownFieldArgument(UnknownFieldArgument),
     #[error("`{0}` has no entity to select into.")]
     NoTargetEntity(SelectableKey),
@@ -243,7 +243,9 @@ pub enum SelectionMapErrorKind {
     Merge(MergeError),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// An argument a selection passes to a `field` declaration that does not declare it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[error("`{field}` declares no variable `${argument}`.")]
 pub struct UnknownFieldArgument {
     pub field: SelectableKey,
     pub argument: ArgumentName,
@@ -845,7 +847,7 @@ fn declared_variables(
 }
 
 /// `annotation` as a variable type: `T` is non-null, `T | null` is nullable.
-fn variable_type(
+pub fn variable_type(
     annotation: &WithSpan<TypeAnnotation>,
 ) -> Result<VariableType, WithSpan<SelectionMapErrorKind>> {
     let unparsed = || SelectionMapErrorKind::UnparsedVariableType.with_span(annotation.location);

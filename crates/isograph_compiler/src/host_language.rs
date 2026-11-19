@@ -4,13 +4,13 @@ use std::path::Path;
 
 use common_lang_types::{EntityName, RelativePathToSourceFile, SelectableName};
 
-use isograph_parser::ParsedIsoLiteral;
-use span::WithSpan;
+use isograph_parser::{ArgumentList, ParsedIsoLiteral, VariableDeclarationList};
+use span::{Span, WithSpan};
 
 use crate::{
     ArtifactPath, ClientId, EntityKind, EntityShape, EntrypointOperation, GenerationOptions,
     IsographDb, ProjectArtifacts, ProtocolEntity, ProtocolQueryText, ProtocolSelectable,
-    RootEntities, SelectableShape,
+    RootEntities, SelectableKey, SelectableShape,
 };
 
 /// Byte offset of the iso literal text in its file.
@@ -116,6 +116,8 @@ pub trait NetworkProtocol: Sized + 'static {
     type NotFetchable: Clone + Debug + PartialEq + Eq + std::fmt::Display + 'static;
     /// Why the protocol's lookup of an entity or selectable failed.
     type LookupError: Clone + Debug + PartialEq + Eq + std::fmt::Display + 'static;
+    /// An error of a selection's argument values.
+    type ArgumentError: Clone + Debug + PartialEq + Eq + std::fmt::Display + 'static;
     /// An error the protocol reports for a schema file.
     type SchemaFileError: Clone + Debug + PartialEq + Eq + std::fmt::Display + 'static;
 
@@ -128,6 +130,29 @@ pub trait NetworkProtocol: Sized + 'static {
         client: ClientId,
         path: RelativePathToSourceFile,
     ) -> Option<Vec<WithSpan<Self::SchemaFileError>>>;
+
+    /// The errors of `arguments`, passed by a selection of the protocol selectable `selectable`
+    /// whose name is at `selection_name`, inside a `field` declaration whose variables are
+    /// `variables`. Spans are relative to the selection's literal.
+    fn selection_argument_errors<TProfile: CompilationProfile<NetworkProtocol = Self>>(
+        db: &IsographDb<TProfile>,
+        client: ClientId,
+        selectable: SelectableKey,
+        selection_name: Span,
+        arguments: Option<&WithSpan<ArgumentList>>,
+        variables: Option<&WithSpan<VariableDeclarationList>>,
+    ) -> Vec<WithSpan<Self::ArgumentError>>;
+
+    /// The errors of the values of `arguments`, passed by a selection of a `field` declaration
+    /// whose variables are `field_variables`, inside a `field` declaration whose variables are
+    /// `variables`. Spans are relative to the selection's literal.
+    fn field_argument_errors<TProfile: CompilationProfile<NetworkProtocol = Self>>(
+        db: &IsographDb<TProfile>,
+        client: ClientId,
+        field_variables: Option<&WithSpan<VariableDeclarationList>>,
+        arguments: Option<&WithSpan<ArgumentList>>,
+        variables: Option<&WithSpan<VariableDeclarationList>>,
+    ) -> Vec<WithSpan<Self::ArgumentError>>;
 
     /// The compiler's kind of an entity the protocol defines.
     fn entity_kind(data: &Self::EntityData) -> EntityKind;

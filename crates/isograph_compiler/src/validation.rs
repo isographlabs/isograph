@@ -8,11 +8,13 @@ use intern::Lookup;
 use isograph_parser::{
     EntityNameWrapper, EntrypointDeclaration, IsoLiteralItem, ListTypeAnnotation,
     SelectableDeclaration, Selection, SelectionSet, TypeAnnotation, UnionVariant,
+    VariableDeclarationList,
 };
 use pico_macros::memo;
 use prelude::Postfix;
 use span::{WithSpan, WithSpanPostfix};
 
+use crate::merged_selection::UnknownFieldArgument;
 use crate::schema::{Definitions, entity_definitions, selectable_definitions};
 use crate::{
     ClientId, CompilationProfile, EntityOrigin, EntityShape, IsographDb, NetworkProtocol,
@@ -22,7 +24,7 @@ use crate::{
 
 /// A reference in an iso literal that the source declarations do not satisfy.
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
-pub enum ValidationError<TNotFetchable: std::fmt::Display> {
+pub enum ValidationError<TNotFetchable: std::fmt::Display, TArgumentError: std::fmt::Display> {
     #[error("{0}")]
     UnknownEntity(UnknownEntityError),
     #[error("{0}")]
@@ -45,6 +47,11 @@ pub enum ValidationError<TNotFetchable: std::fmt::Display> {
     DuplicateResponseName(DuplicateResponseName),
     #[error("{0}")]
     InvalidEntity(InvalidEntityError),
+    #[error("{0}")]
+    UnknownFieldArgument(UnknownFieldArgument),
+    /// The protocol's verdict on a selection's argument values.
+    #[error("{0}")]
+    Argument(TArgumentError),
 }
 
 /// An entity that cannot parent a `field` declaration or be the target of its `to` clause.
@@ -104,6 +111,7 @@ pub enum EntrypointNotFetchableError<TNotFetchable: std::fmt::Display> {
 
 pub type ProfileValidationError<TProfile> = ValidationError<
     <<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::NotFetchable,
+    <<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::ArgumentError,
 >;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
@@ -267,7 +275,13 @@ fn selectable_declaration_errors<'a, TProfile: CompilationProfile>(
                 .selection_set
                 .iter()
                 .flat_map(move |selection_set| {
-                    validate_selection_set(db, client, entity, selection_set.item.reference())
+                    validate_selection_set(
+                        db,
+                        client,
+                        declaration.variable_definitions.as_ref(),
+                        entity,
+                        selection_set.item.reference(),
+                    )
                 }),
         )
         .boxed()
@@ -384,6 +398,7 @@ fn entrypoint_declaration_error<TProfile: CompilationProfile>(
 fn validate_selection_set<'a, TProfile: CompilationProfile>(
     db: &'a IsographDb<TProfile>,
     client: ClientId,
+    variables: Option<&'a WithSpan<VariableDeclarationList>>,
     parent: EntityName,
     selection_set: &'a SelectionSet,
 ) -> impl Iterator<Item = WithSpan<ProfileValidationError<TProfile>>> + 'a {
@@ -409,13 +424,14 @@ fn validate_selection_set<'a, TProfile: CompilationProfile>(
         })
         .flatten();
     duplicates.chain(selections().flat_map(move |selection| {
-        validate_selection(db, client, parent, selection.item.reference())
+        validate_selection(db, client, variables, parent, selection.item.reference())
     }))
 }
 
 fn validate_selection<'a, TProfile: CompilationProfile>(
     db: &'a IsographDb<TProfile>,
     client: ClientId,
+    variables: Option<&'a WithSpan<VariableDeclarationList>>,
     parent: EntityName,
     selection: &'a Selection,
 ) -> ValidationErrors<'a, TProfile> {
@@ -430,11 +446,21 @@ fn validate_selection<'a, TProfile: CompilationProfile>(
         )
         .boxed(),
         Definitions::Unique(selectable) => {
-            let missing = match selectable.kind {
+            let arguments = match selectable.kind {
                 SelectableKind::ClientField | SelectableKind::ClientPointer(_) => {
-                    missing_field_arguments(db, client, key, selection)
+                    field_argument_errors(db, client, variables, key, selection)
                 }
-                SelectableKind::Server(_) => Vec::new(),
+                SelectableKind::Server(_) => TProfile::NetworkProtocol::selection_argument_errors(
+                    db,
+                    client,
+                    key,
+                    selection.name.location,
+                    selection.arguments.as_ref(),
+                    variables,
+                )
+                .into_iter()
+                .map(|error| error.map(ValidationError::Argument))
+                .collect(),
             };
             let nested: ValidationErrors<'a, TProfile> =
                 match (selection.selection_set.as_ref(), selectable.target_entity()) {
@@ -447,17 +473,10 @@ fn validate_selection<'a, TProfile: CompilationProfile>(
                     )
                     .boxed(),
                     (selection_set, Some(target)) => {
-                        target_errors(db, client, key, selection, selection_set, target)
+                        target_errors(db, client, variables, key, selection, selection_set, target)
                     }
                 };
-            missing
-                .into_iter()
-                .map(|missing| {
-                    ValidationError::MissingFieldArgument(missing)
-                        .with_span(selection.name.location)
-                })
-                .chain(nested)
-                .boxed()
+            arguments.into_iter().chain(nested).boxed()
         }
         Definitions::Duplicated | Definitions::ProtocolLookupFailed(_) => {
             std::iter::empty().boxed()
@@ -493,6 +512,7 @@ fn target_shape<TProfile: CompilationProfile>(entity: &ProfileEntity<TProfile>) 
 fn target_errors<'a, TProfile: CompilationProfile>(
     db: &'a IsographDb<TProfile>,
     client: ClientId,
+    variables: Option<&'a WithSpan<VariableDeclarationList>>,
     key: SelectableKey,
     selection: &'a Selection,
     selection_set: Option<&'a WithSpan<SelectionSet>>,
@@ -501,7 +521,8 @@ fn target_errors<'a, TProfile: CompilationProfile>(
     let Ok(entity) = entity_named(db, client, target) else {
         return match (selection_set, entity_definedness(db, client, target)) {
             (Some(nested), EntityDefinedness::Defined) => {
-                validate_selection_set(db, client, target, nested.item.reference()).boxed()
+                validate_selection_set(db, client, variables, target, nested.item.reference())
+                    .boxed()
             }
             (None, _) | (Some(_), EntityDefinedness::Undefined) => std::iter::empty().boxed(),
         };
@@ -521,9 +542,68 @@ fn target_errors<'a, TProfile: CompilationProfile>(
         )
         .boxed(),
         (TargetShape::Composite, Some(nested)) => {
-            validate_selection_set(db, client, target, nested.item.reference()).boxed()
+            validate_selection_set(db, client, variables, target, nested.item.reference()).boxed()
         }
     }
+}
+
+/// The errors of the arguments `selection` passes to the `field` declaration `field`, inside a
+/// declaration whose variables are `variables`: each variable with no default it does not pass,
+/// each argument the field does not declare, and the protocol's verdict on the values.
+fn field_argument_errors<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    variables: Option<&WithSpan<VariableDeclarationList>>,
+    field: SelectableKey,
+    selection: &Selection,
+) -> Vec<WithSpan<ProfileValidationError<TProfile>>> {
+    let Ok(declaration) = field_declaration(
+        db,
+        client,
+        EntityNameAndSelectableName {
+            parent_entity_name: field.entity,
+            selectable_name: field.selectable,
+        },
+    ) else {
+        return Vec::new();
+    };
+    let field_variables = declaration.declaration.variable_definitions.as_ref();
+    let declared: Vec<&str> = field_variables
+        .iter()
+        .flat_map(|list| list.item.0.iter())
+        .filter_map(|slot| slot.item.item.as_ref())
+        .map(|variable| variable.item.name.item.0.item.0.lookup())
+        .collect();
+    let unknown = selection
+        .arguments
+        .iter()
+        .flat_map(|arguments| arguments.item.0.iter())
+        .filter_map(|slot| slot.item.item.as_ref())
+        .filter(|argument| !declared.contains(&argument.item.name.item.0.lookup()))
+        .map(|argument| {
+            ValidationError::UnknownFieldArgument(UnknownFieldArgument {
+                field,
+                argument: argument.item.name.item.0,
+            })
+            .with_span(argument.item.name.location)
+        });
+    let values = TProfile::NetworkProtocol::field_argument_errors(
+        db,
+        client,
+        field_variables,
+        selection.arguments.as_ref(),
+        variables,
+    )
+    .into_iter()
+    .map(|error| error.map(ValidationError::Argument));
+    missing_field_arguments(db, client, field, selection)
+        .into_iter()
+        .map(|missing| {
+            ValidationError::MissingFieldArgument(missing).with_span(selection.name.location)
+        })
+        .chain(unknown)
+        .chain(values)
+        .collect()
 }
 
 /// The variables of the `field` declaration `field` that have no default and that `selection`

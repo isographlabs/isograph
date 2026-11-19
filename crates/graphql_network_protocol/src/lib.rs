@@ -1,3 +1,4 @@
+mod argument_errors;
 mod fetch_plan;
 mod print_operation;
 mod protocol_data;
@@ -16,11 +17,16 @@ use intern::string_key::Intern;
 use isograph_compiler::{
     ClientId, CompilationProfile, EntityKind, EntityShape, EntrypointOperation, IncludeFile,
     IsographDb, NetworkProtocol, ProtocolEntity, ProtocolQueryText, ProtocolSelectable,
-    RootEntities, ScalarKind, ScalarValueKind, SelectableShape,
+    RootEntities, ScalarKind, ScalarValueKind, SelectableKey, SelectableShape,
 };
+use isograph_parser::{ArgumentList, VariableDeclarationList};
 use prelude::Postfix;
 use span::WithSpan;
 
+pub use argument_errors::{
+    ArgumentOf, GraphQLArgumentError, InputFieldOf, LiteralKind, LiteralTypeMismatch,
+    VariableTypeMismatch,
+};
 pub use fetch_plan::{GraphQLFetchPlan, GraphQLNotFetchable, graphql_fetch_plan};
 pub use protocol_data::{
     DuplicateInputField, GraphQLCompositeData, GraphQLEntityData, GraphQLSelectableData,
@@ -67,6 +73,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
     type NotFetchable = GraphQLNotFetchable;
     type LookupError = GraphQLLookupError;
     type SchemaFileError = GraphQLSchemaFileError;
+    type ArgumentError = GraphQLArgumentError;
 
     fn should_include_schema_file(relative_path: &Path) -> IncludeFile {
         match relative_path.extension().and_then(|e| e.to_str()) {
@@ -81,6 +88,34 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         path: RelativePathToSourceFile,
     ) -> Option<Vec<WithSpan<GraphQLSchemaFileError>>> {
         graphql_schema_file_errors(db, client, path).clone()
+    }
+
+    fn selection_argument_errors<TProfile: CompilationProfile<NetworkProtocol = Self>>(
+        db: &IsographDb<TProfile>,
+        client: ClientId,
+        selectable: SelectableKey,
+        selection_name: span::Span,
+        arguments: Option<&WithSpan<ArgumentList>>,
+        variables: Option<&WithSpan<VariableDeclarationList>>,
+    ) -> Vec<WithSpan<GraphQLArgumentError>> {
+        argument_errors::selection_argument_errors(
+            db,
+            client,
+            selectable,
+            selection_name,
+            arguments,
+            variables,
+        )
+    }
+
+    fn field_argument_errors<TProfile: CompilationProfile<NetworkProtocol = Self>>(
+        db: &IsographDb<TProfile>,
+        client: ClientId,
+        field_variables: Option<&WithSpan<VariableDeclarationList>>,
+        arguments: Option<&WithSpan<ArgumentList>>,
+        variables: Option<&WithSpan<VariableDeclarationList>>,
+    ) -> Vec<WithSpan<GraphQLArgumentError>> {
+        argument_errors::field_argument_errors(db, client, field_variables, arguments, variables)
     }
 
     fn entity_kind(data: &GraphQLEntityData) -> EntityKind {

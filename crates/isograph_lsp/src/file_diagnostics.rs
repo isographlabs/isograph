@@ -331,13 +331,22 @@ mod validation_tests {
     }
 
     #[test]
-    fn arguments_are_not_checked() {
+    fn an_argument_a_field_does_not_declare_is_an_error_on_its_name() {
+        let unknown = |argument: &str| {
+            (
+                ValidationError::UnknownFieldArgument(isograph_compiler::UnknownFieldArgument {
+                    field: key("Owner", "displayName"),
+                    argument: argument.intern().to(),
+                }),
+                argument.to_owned(),
+            )
+        };
         assert_eq!(
             errors_in(
                 "iso(`field Owner.x { displayName(id: 1, other: $v) }`)",
                 &[]
             ),
-            vec![]
+            vec![unknown("id"), unknown("other")]
         );
     }
 

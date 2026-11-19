@@ -1188,6 +1188,204 @@ fn a_field_parent_and_pointer_target_must_be_composite() {
     }
 }
 
+/// The compiler errors of a `field` declaration whose literal is `literal`, beside the pet demo
+/// and a schema extension with a list argument.
+fn argument_errors_of(literal: &str) -> Vec<(String, String)> {
+    let contents = format!("export const a = iso(`{literal}`)(() => 1)");
+    let schema = (
+        "schema/tagged.graphql",
+        "extend type Query { tagged(tags: [String!]!): [Pet!]! }",
+    );
+    let schema_files: Vec<(&str, &str)> = PET_DEMO_SCHEMA.iter().copied().chain([schema]).collect();
+    let db = project_db(
+        &schema_files,
+        &pet_demo_sources(&[], &[("src/a.ts", contents.as_str())]),
+    );
+    compiler_errors(&db, "src/a.ts", contents.as_str())
+}
+
+#[test]
+fn schema_field_arguments_are_checked_against_the_schema() {
+    let query =
+        |body: &str| format!("field Query.a($id: ID!, $name: String!, $n: Int) {{ {body} }}");
+    let cases = [
+        (
+            "pet { id }",
+            vec![(
+                "`Query.pet` requires the argument `id`, and this selection does not pass it.",
+                "pet",
+            )],
+        ),
+        (
+            "pet(id: $id, petId: 1) { id }",
+            vec![("`Query.pet` takes no argument `petId`.", "petId")],
+        ),
+        ("pets { checkins { id } }", vec![]),
+        (
+            "viewer { newsfeed(limit: 1) { asAdItem { id } } }",
+            vec![(
+                "`Viewer.newsfeed` requires the argument `skip`, and this selection does not pass it.",
+                "newsfeed",
+            )],
+        ),
+        (
+            "viewer { newsfeed(limit: 1, skip: 0) { asAdItem(x: 1) { id } } }",
+            vec![("`NewsfeedItem.asAdItem` takes no argument `x`.", "x")],
+        ),
+    ];
+    for (body, expected) in cases {
+        let literal = query(body);
+        let errors = argument_errors_of(literal.as_str());
+        assert_eq!(errors, messages(&expected), "{body}");
+    }
+}
+
+#[test]
+fn argument_values_are_type_checked() {
+    let query = |body: &str| {
+        format!("field Query.a($id: ID!, $name: String!, $n: Int, $ns: [Int!]) {{ {body} }}")
+    };
+    let cases = [
+        (
+            "pet(id: $name) { id }",
+            vec![(
+                "Mismatched type. Received $name, with type String!, expected ID!.",
+                "$name",
+            )],
+        ),
+        (
+            "pet(id: $nope) { id }",
+            vec![("This variable is not defined: $nope", "$nope")],
+        ),
+        (
+            "petByName(name: 1) { id }",
+            vec![(
+                "Expected input of type String!, found an integer literal.",
+                "1",
+            )],
+        ),
+        (
+            "pet(id: null) { id }",
+            vec![("Expected non null input of type ID!, found null", "null")],
+        ),
+        ("pet(id: 1) { id }", vec![]),
+        ("pet(id: \"1\") { id }", vec![]),
+        ("pets { checkins(limit: $n) { id } }", vec![]),
+        ("pets { checkins(limit: null) { id } }", vec![]),
+        (
+            "pets { checkins(limit: 3000000000) { id } }",
+            vec![(
+                "`3000000000` is outside GraphQL's 32-bit `Int` range.",
+                "3000000000",
+            )],
+        ),
+        (
+            "pet(id: $n) { id }",
+            vec![(
+                "Mismatched type. Received $n, with type Int, expected ID!.",
+                "$n",
+            )],
+        ),
+        (
+            "petsBySpecies(species: \"CAT\") { id }",
+            vec![(
+                "Expected input of type PetSpecies!, found a string literal.",
+                "\"CAT\"",
+            )],
+        ),
+        ("tagged(tags: \"a\") { id }", vec![]),
+        (
+            "tagged(tags: $ns) { id }",
+            vec![(
+                "Mismatched type. Received $ns, with type [Int!], expected [String!]!.",
+                "$ns",
+            )],
+        ),
+    ];
+    for (body, expected) in cases {
+        let literal = query(body);
+        assert_eq!(
+            argument_errors_of(literal.as_str()),
+            messages(&expected),
+            "{body}"
+        );
+    }
+}
+
+#[test]
+fn input_object_values_have_the_input_objects_fields() {
+    let mutation = |input: &str| {
+        format!(
+            "field Mutation.b($id: ID!) {{ set_pet_tagline(input: {input}) {{ pet {{ id }} }} }}"
+        )
+    };
+    let cases = [
+        ("{ id: $id, tagline: \"x\" }", vec![]),
+        (
+            "{ id: $id }",
+            vec![(
+                "`SetPetTaglineParams` requires the field `tagline`, and this object does not have it.",
+                "{ id: $id }",
+            )],
+        ),
+        (
+            "{ id: $id, tagline: \"x\", taglin: \"y\" }",
+            vec![("`SetPetTaglineParams` has no field `taglin`.", "taglin")],
+        ),
+        (
+            "{ id: $id, tagline: 1 }",
+            vec![(
+                "Expected input of type String!, found an integer literal.",
+                "1",
+            )],
+        ),
+        (
+            "\"x\"",
+            vec![(
+                "Expected input of type SetPetTaglineParams!, found a string literal.",
+                "\"x\"",
+            )],
+        ),
+    ];
+    for (input, expected) in cases {
+        let literal = mutation(input);
+        assert_eq!(
+            argument_errors_of(literal.as_str()),
+            messages(&expected),
+            "{input}"
+        );
+    }
+}
+
+#[test]
+fn a_client_field_selections_values_are_checked_against_its_variables() {
+    let cases = [
+        ("pets { PetCheckinsCard(limit: 5) }", vec![]),
+        (
+            "pets { PetCheckinsCard(limit: \"x\") }",
+            vec![(
+                "Expected input of type Int, found a string literal.",
+                "\"x\"",
+            )],
+        ),
+        (
+            "pets { PetCheckinsCard(limt: 5) }",
+            vec![(
+                "`Pet.PetCheckinsCard` declares no variable `$limt`.",
+                "limt",
+            )],
+        ),
+    ];
+    for (body, expected) in cases {
+        let literal = format!("field Query.a {{ {body} }}");
+        assert_eq!(
+            argument_errors_of(literal.as_str()),
+            messages(&expected),
+            "{body}"
+        );
+    }
+}
+
 #[test]
 fn the_pet_demo_has_no_validation_errors() {
     let db = project_db(&PET_DEMO_SCHEMA, &PET_DEMO_SOURCES);

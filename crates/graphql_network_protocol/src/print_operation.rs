@@ -174,7 +174,7 @@ fn print_variable_definition(variable: &FieldVariable) -> String {
     )
 }
 
-fn print_variable_type(variable_type: &VariableType) -> String {
+pub(crate) fn print_variable_type(variable_type: &VariableType) -> String {
     match variable_type {
         VariableType::NonNull(inner) => format!("{}!", print_non_null_variable_type(inner)),
         VariableType::Nullable(inner) => print_non_null_variable_type(inner),

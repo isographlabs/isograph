@@ -285,7 +285,7 @@ fn input_field_named<TProfile: CompilationProfile>(
 
 /// Every field of an input object's definition and its input object extensions, with its
 /// file. Empty for every other kind of type.
-fn input_fields(
+pub(crate) fn input_fields(
     schema_entity: &SchemaEntity,
 ) -> impl Iterator<Item = InSchemaFile<InputValueDefinition>> + '_ {
     let definition_fields = match schema_entity.definition.item.item.reference() {

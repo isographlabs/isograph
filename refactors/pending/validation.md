@@ -294,6 +294,8 @@ An undefined target is the existing `UnknownEntity`. A source entity is a valid 
 
 ### 9. Schema field arguments (gap 2)
 
+Changes 9 and 10 land as one commit: both protocol methods share one value walk, and change 9's unknown-argument check is the first arm of it.
+
 ```rust
 // from crates/isograph_compiler/src/host_language.rs
 pub trait NetworkProtocol: Sized + 'static {
@@ -372,7 +374,7 @@ pub enum GraphQLArgumentError {
     #[error("Expected input of type {expected}, found {literal}.")]
     LiteralTypeMismatch(LiteralTypeMismatch),
     #[error("Expected non null input of type {0}, found null")]
-    NullForNonNull(InputType),
+    NullForNonNull(Box<VariableType>),
     #[error("`{0}` is outside GraphQL's 32-bit `Int` range.")]
     IntegerOutOfRange(i64),
     #[error("`{entity}` requires the field `{field}`, and this object does not have it.")]
@@ -382,7 +384,7 @@ pub enum GraphQLArgumentError {
 }
 ```
 
-`InputType` is the protocol's input type (`Named`, `List`, `NonNull`), converted from the schema's `TypeAnnotation` and from the iso `TypeAnnotation`, displayed in GraphQL syntax. `LiteralKind` (`String`, `Integer`, `Boolean`, `Object`, `List`) displays as "a string literal" and so on. A type whose name the schema does not define is not checked here. Tests: one per rule and its degenerate case (empty object, empty list, a nullable variable into a nullable argument, `$x: Int` into `Int!`, a list of lists).
+The expected and supplied types are the core's `VariableType` (the type grammar variable definitions already use), converted from the schema's `TypeAnnotation` in the protocol and from the iso `TypeAnnotation` by the core's now-public `variable_type`, and displayed by the protocol's `print_variable_type`. A variable whose type does not convert is not type checked. `LiteralKind` (`String`, `Integer`, `Boolean`, `Object`, `List`) displays as "a string literal" and so on. A type whose name the schema does not define is not checked here. Tests: one per rule and its degenerate case (empty object, empty list, a nullable variable into a nullable argument, `$x: Int` into `Int!`, a list of lists).
 
 ### 11. `__typename` (gap 6)
 

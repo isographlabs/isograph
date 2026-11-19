@@ -12,13 +12,17 @@ use crate::{
 
 /// An error the compiler reports for a source file.
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
-pub enum CompilerError<THostError: std::fmt::Display, TNotFetchable: std::fmt::Display> {
+pub enum CompilerError<
+    THostError: std::fmt::Display,
+    TNotFetchable: std::fmt::Display,
+    TArgumentError: std::fmt::Display,
+> {
     #[error("{0}")]
     Parse(ParseError),
     #[error("{0}")]
     Host(THostError),
     #[error("{0}")]
-    Validation(ValidationError<TNotFetchable>),
+    Validation(ValidationError<TNotFetchable, TArgumentError>),
     #[error("{0}")]
     Generation(QueryGenerationError),
 }
@@ -26,6 +30,7 @@ pub enum CompilerError<THostError: std::fmt::Display, TNotFetchable: std::fmt::D
 pub type ProfileCompilerError<TProfile> = CompilerError<
     <<TProfile as CompilationProfile>::HostLanguage as HostLanguage>::Error,
     <<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::NotFetchable,
+    <<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::ArgumentError,
 >;
 
 pub type ProfileSchemaFileError<TProfile> =
