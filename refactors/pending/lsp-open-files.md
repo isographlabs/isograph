@@ -10,9 +10,9 @@ Origin of the open-file map and handlers: isograph `OpenFileMap` / `OpenFileSour
 
 These are not approved.
 
-1. A tracked map whose counter was never written (change 2). The problem and both options are in change 2. Change 4 depends on the outcome.
-2. Order relative to format-file-from-segments.md. (a) This doc first: change 6's `format_iso_literals` uses `parsed_iso_literals_in_file` and `text_through_last_iso_literal` with the client, and format-file-from-segments.md then reads `file_contents(db, client, path)` instead of `state.disk_file(path)`. (b) format-file-from-segments.md first: change 6's `format_iso_literals` is that doc's version with `file_contents` replacing `disk_file` (second snippet in change 6). Either order ships; (b) makes change 6's format diff smaller, (a) makes format-file-from-segments.md read the buffer from the start.
-3. `SendLspResponseEffect` as data (optional change). The feature does not need it. Tests read a response by calling `perform` and `recv`ing on the crossbeam receiver behind the `LiveSession` (`lsp_formatting_of_a_live_client_without_a_file_is_null`, `crates/isograph_cli/src/state.rs`), and change 5's tests use that pattern. (a) Ship the optional change. (b) Do not ship it; `Box<dyn FnOnce(&SideEffectToken) + Send>` stays.
+1. A tracked map whose counter was never written (change 3). The problem and both options are in change 3. Change 5 depends on the outcome.
+2. Order relative to format-file-from-segments.md. (a) This doc first: change 7's `format_iso_literals` uses `parsed_iso_literals_in_file` and `text_through_last_iso_literal` with the client, and format-file-from-segments.md then reads `file_contents(db, client, path)` instead of `state.disk_file(path)`. (b) format-file-from-segments.md first: change 7's `format_iso_literals` is that doc's version with `file_contents` replacing `disk_file` (second snippet in change 7). Either order ships; (b) makes change 7's format diff smaller, (a) makes format-file-from-segments.md read the buffer from the start.
+3. `SendLspResponseEffect` as data (optional change). The feature does not need it. Tests read a response by calling `perform` and `recv`ing on the crossbeam receiver behind the `LiveSession` (`lsp_formatting_of_a_live_client_without_a_file_is_null`, `crates/isograph_cli/src/state.rs`), and change 6's tests use that pattern. (a) Ship the optional change. (b) Do not ship it; `Box<dyn FnOnce(&SideEffectToken) + Send>` stays.
 
 ## What the user does
 
@@ -36,18 +36,19 @@ This doc adds no panic and no `UnexpectedError`. The `db.get` calls on ids found
 
 Prefactors first.
 
-1. Notifications carry the client; handlers receive it as a parameter. Dispatch drops a notification from a client not in `LiveSessions`.
-2. A tracked counter that was never written. Open decision; not decided.
-3. `ClientId` moves to `isograph_compiler`.
-4. `open_file_map`, the `file_contents` memo, the writers, and unit tests.
-5. `didOpen` / `didChange` / `didClose`, advertised capabilities, `Gone` cleanup, and `handle` tests.
-6. Semantic tokens and formatting read through `file_contents`. Pending.
+1. Notifications carry the client; handlers receive it as a parameter. Dispatch drops a notification from a client not in `LiveSessions`. Landed in `9e0dcde0`.
+2. Requests and responses carry the client; request handlers receive it as a parameter. `LSPRequestDispatch` moves from `isograph_lsp` to `isograph_cli`, next to `LSPNotificationDispatch`. Dispatch drops a response from a client not in `LiveSessions`.
+3. A tracked counter that was never written. Open decision; not decided.
+4. `ClientId` moves to `isograph_compiler`.
+5. `open_file_map`, the `file_contents` memo, the writers, and unit tests.
+6. `didOpen` / `didChange` / `didClose`, advertised capabilities, `Gone` cleanup, and `handle` tests.
+7. Semantic tokens and formatting read through `file_contents`. Pending.
 
 The optional change (`SendLspResponseEffect` is data) ships only if open decision 3 picks (a); no other change depends on it.
 
 ## Change 1: notifications carry the client
 
-After this change every LSP notification reaches its handler with the `ClientId` of the connection that sent it. Nothing reads the client yet except `dispatch_lsp`, which drops a notification from a client not in `LiveSessions`, the same as it drops a request (`LiveSessions::reply` returns `None`). Within one connection `run_session` forwards messages only after it posts `Started`, and `session` posts `Gone` after `run_session` returns, so no notification arrives from such a client today; the check makes `handle` total over that input instead of relying on the socket's ordering, and change 5 relies on it so that a `didOpen` cannot write buffers for a client whose `Gone` was already handled.
+After this change every LSP notification reaches its handler with the `ClientId` of the connection that sent it. Nothing reads the client yet except `dispatch_lsp`, which drops a notification from a client not in `LiveSessions`, the same as it drops a request (`LiveSessions::reply` returns `None`). Within one connection `run_session` forwards messages only after it posts `Started`, and `session` posts `Gone` after `run_session` returns, so no notification arrives from such a client today; the check makes `handle` total over that input instead of relying on the socket's ordering, and change 6 relies on it so that a `didOpen` cannot write buffers for a client whose `Gone` was already handled.
 
 ### Types
 
@@ -299,7 +300,413 @@ fn on_isograph_event_notification<THostLanguage: HostLanguage>(
 
 `docs-website/docs/design-docs/event-model.md` Dispatch: add "An LSP notification carries the `ClientId` of its connection. `handle` drops a notification from a client not in `LiveSessions`."
 
-## Change 2: a tracked counter that was never written
+## Change 2: requests and responses carry the client
+
+After this change every LSP request reaches its handler with the `ClientId` of the connection that sent it, and every LSP response from a client reaches `dispatch_lsp` with that `ClientId`. No handler reads the client yet; each takes `_client: ClientId`. Change 7 reads it in the request handlers.
+
+The request dispatcher moves to `isograph_cli`, next to the notification dispatcher, because its struct carries `ClientId`. `ClientId` is `pub(crate)` in `crates/isograph_cli/src/event.rs`, and `isograph_lsp` cannot name it: `isograph_cli` depends on `isograph_lsp` (`crates/isograph_cli/Cargo.toml`), not the reverse. With both dispatchers in `isograph_cli`, `ClientId` stays where it is until change 4.
+
+Today `dispatch_lsp` drops every response (`crates/isograph_cli/src/state.rs:79`, `crate::event::LspEvent::Response(_response) => no_effects()`), and `lsp_response_returns_no_effects` (`state.rs:1007`) pins that. Nothing else matches `LspEvent::Response`. After this change the only reader of `LspResponse.client` is a liveness check, the same as for notifications: a response from a client not in `LiveSessions` is dropped before `on_lsp_response`. Both paths return no effects, so the check changes nothing a test can observe until `on_lsp_response` does something. The client becomes necessary once the daemon sends server-to-client requests (for example `workspace/configuration` or `workspace/semanticTokens/refresh`): the response to such a request names a `RequestId` the daemon minted for one connection, and matching it requires knowing which connection answered.
+
+The change ships as two commits: the move, then the client.
+
+### Move `LSPRequestDispatch` to `isograph_cli`
+
+`crates/isograph_lsp/src/lsp_request_dispatch.rs` moves to `crates/isograph_cli/src/lsp_request_dispatch.rs` with its two test modules. Delta: the `LSPRuntimeError` / `LSPRuntimeResult` import names `isograph_lsp`, which keeps `lsp_runtime_error`.
+
+Before:
+
+```rust
+// from crates/isograph_lsp/src/lsp_request_dispatch.rs
+use crate::lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult};
+```
+
+```rust
+// from crates/isograph_lsp/src/lsp_request_dispatch.rs
+    use super::LSPRequestDispatch;
+    use crate::lsp_runtime_error::LSPRuntimeResult;
+```
+
+After:
+
+```rust
+// from crates/isograph_cli/src/lsp_request_dispatch.rs
+use isograph_lsp::lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult};
+```
+
+```rust
+// from crates/isograph_cli/src/lsp_request_dispatch.rs
+    use super::LSPRequestDispatch;
+    use isograph_lsp::lsp_runtime_error::LSPRuntimeResult;
+```
+
+Before:
+
+```rust
+// from crates/isograph_lsp/src/lib.rs
+mod file_semantic_tokens;
+pub mod lsp_request_dispatch;
+pub mod lsp_runtime_error;
+mod semantic_tokens;
+```
+
+After:
+
+```rust
+// from crates/isograph_lsp/src/lib.rs
+mod file_semantic_tokens;
+pub mod lsp_runtime_error;
+mod semantic_tokens;
+```
+
+`crates/isograph_cli/src/lib.rs` adds `mod lsp_request_dispatch;` after `mod lsp_notification_dispatch;`.
+
+`crates/isograph_lsp/Cargo.toml` drops `serde_json`; `lsp_request_dispatch.rs` was its only user. `isograph_cli` already depends on `lsp-server`, `lsp-types`, `serde_json`, and `isograph_lsp`.
+
+`crates/prelude/src/postfix_constructors.rs` `walk_rust` skips the file at its new path. The file keeps its upstream `Ok` / `Err` / `Some` constructors; converting them is not part of a move.
+
+Before:
+
+```rust
+// from crates/prelude/src/postfix_constructors.rs
+                let skip = path.ends_with("crates/isograph_lsp/src/lsp_request_dispatch.rs")
+                    || path.ends_with("crates/isograph_lsp/src/lsp_runtime_error.rs");
+```
+
+After:
+
+```rust
+// from crates/prelude/src/postfix_constructors.rs
+                let skip = path.ends_with("crates/isograph_cli/src/lsp_request_dispatch.rs")
+                    || path.ends_with("crates/isograph_lsp/src/lsp_runtime_error.rs");
+```
+
+Before:
+
+```rust
+// from crates/isograph_cli/src/state.rs
+        let request =
+            isograph_lsp::lsp_request_dispatch::LSPRequestDispatch::new(request, &state.db)
+```
+
+After:
+
+```rust
+// from crates/isograph_cli/src/state.rs
+        let request = crate::lsp_request_dispatch::LSPRequestDispatch::new(request, &state.db)
+```
+
+`dispatch_lsp_request` is the only caller of `LSPRequestDispatch` outside its own tests. No other crate names `lsp_request_dispatch`, `convert_to_lsp_response`, or `extract_request_params`.
+
+### Types
+
+Before:
+
+```rust
+// from crates/isograph_cli/src/event.rs
+#[derive(Clone, Debug)]
+pub enum LspEvent {
+    Request(LspRequest),
+    Notification(LspNotification),
+    Response(lsp_server::Response),
+}
+```
+
+After:
+
+```rust
+// from crates/isograph_cli/src/event.rs
+#[derive(Clone, Debug)]
+pub struct LspResponse {
+    pub client: ClientId,
+    pub response: lsp_server::Response,
+}
+
+#[derive(Clone, Debug)]
+pub enum LspEvent {
+    Request(LspRequest),
+    Notification(LspNotification),
+    Response(LspResponse),
+}
+```
+
+`LspResponse` mirrors `LspRequest { client, request }` and `LspNotification { client, notification }`.
+
+### `run_session`
+
+Before:
+
+```rust
+// from crates/isograph_cli/src/lsp_socket.rs
+            lsp_server::Message::Response(response) => crate::event::LspEvent::Response(response),
+```
+
+After:
+
+```rust
+// from crates/isograph_cli/src/lsp_socket.rs
+            lsp_server::Message::Response(response) => {
+                crate::event::LspEvent::Response(crate::event::LspResponse { client, response })
+            }
+```
+
+### `LSPRequestDispatch`
+
+The dispatch struct carries the client and passes it to the handler, the same as `LSPNotificationDispatch` in change 1. `new` takes the `LspRequest`. The handler type stays a `fn` pointer; the `ControlFlow` chain, `request`, `convert_to_lsp_response`, and `extract_request_params` are unchanged.
+
+Before (after the move):
+
+```rust
+// from crates/isograph_cli/src/lsp_request_dispatch.rs
+pub struct LSPRequestDispatch<'state, TState> {
+    request: lsp_server::Request,
+    state: &'state TState,
+}
+
+impl<'state, TState> LSPRequestDispatch<'state, TState> {
+    pub fn new(request: lsp_server::Request, state: &'state TState) -> Self {
+        LSPRequestDispatch { request, state }
+    }
+
+    pub fn on_request_sync<TRequest: Request>(
+        self,
+        handler: fn(&TState, TRequest::Params) -> LSPRuntimeResult<TRequest::Result>,
+    ) -> ControlFlow<Response, Self> {
+        if self.request.method == TRequest::METHOD {
+            let id = self.request.id.clone();
+            match extract_request_params::<TRequest>(self.request) {
+                Ok((request_id, params)) => {
+                    let response = handler(self.state, params).and_then(|handler_result| {
+                        // ... unchanged
+                    });
+                    // ... unchanged
+                }
+                // ... the error arm is unchanged
+            }
+        }
+
+        ControlFlow::Continue(self)
+    }
+}
+```
+
+After:
+
+```rust
+// from crates/isograph_cli/src/lsp_request_dispatch.rs
+use crate::event::{ClientId, LspRequest};
+
+pub struct LSPRequestDispatch<'state, TState> {
+    client: ClientId,
+    request: lsp_server::Request,
+    state: &'state TState,
+}
+
+impl<'state, TState> LSPRequestDispatch<'state, TState> {
+    pub fn new(incoming: LspRequest, state: &'state TState) -> Self {
+        LSPRequestDispatch {
+            client: incoming.client,
+            request: incoming.request,
+            state,
+        }
+    }
+
+    pub fn on_request_sync<TRequest: Request>(
+        self,
+        handler: fn(&TState, ClientId, TRequest::Params) -> LSPRuntimeResult<TRequest::Result>,
+    ) -> ControlFlow<Response, Self> {
+        if self.request.method == TRequest::METHOD {
+            let id = self.request.id.clone();
+            match extract_request_params::<TRequest>(self.request) {
+                Ok((request_id, params)) => {
+                    let response =
+                        handler(self.state, self.client, params).and_then(|handler_result| {
+                            // ... unchanged
+                        });
+                    // ... unchanged
+                }
+                // ... the error arm is unchanged
+            }
+        }
+
+        ControlFlow::Continue(self)
+    }
+}
+```
+
+The doc comment on `on_request_sync` is unchanged.
+
+### Request handlers
+
+Each handler gains `_client: ClientId` as its second parameter. The bodies are unchanged. `adapter.rs` imports `crate::event::ClientId`.
+
+Before:
+
+```rust
+// from crates/isograph_cli/src/adapter.rs
+pub(crate) fn semantic_tokens_response<THostLanguage: HostLanguage>(
+    state: &isograph_compiler::IsographDb<THostLanguage>,
+    params: lsp_types::SemanticTokensParams,
+) -> isograph_lsp::lsp_runtime_error::LSPRuntimeResult<
+    <lsp_types::request::SemanticTokensFullRequest as lsp_types::request::Request>::Result,
+> {
+```
+
+```rust
+// from crates/isograph_cli/src/adapter.rs
+pub(crate) fn formatting_response<THostLanguage: HostLanguage>(
+    state: &isograph_compiler::IsographDb<THostLanguage>,
+    params: lsp_types::DocumentFormattingParams,
+) -> isograph_lsp::lsp_runtime_error::LSPRuntimeResult<
+    <lsp_types::request::Formatting as lsp_types::request::Request>::Result,
+> {
+```
+
+```rust
+// from crates/isograph_cli/src/adapter.rs
+pub(crate) fn will_save_wait_until_response<THostLanguage: HostLanguage>(
+    state: &isograph_compiler::IsographDb<THostLanguage>,
+    params: lsp_types::WillSaveTextDocumentParams,
+) -> isograph_lsp::lsp_runtime_error::LSPRuntimeResult<
+    <lsp_types::request::WillSaveWaitUntil as lsp_types::request::Request>::Result,
+> {
+```
+
+After:
+
+```rust
+// from crates/isograph_cli/src/adapter.rs
+pub(crate) fn semantic_tokens_response<THostLanguage: HostLanguage>(
+    state: &isograph_compiler::IsographDb<THostLanguage>,
+    _client: ClientId,
+    params: lsp_types::SemanticTokensParams,
+) -> isograph_lsp::lsp_runtime_error::LSPRuntimeResult<
+    <lsp_types::request::SemanticTokensFullRequest as lsp_types::request::Request>::Result,
+> {
+```
+
+```rust
+// from crates/isograph_cli/src/adapter.rs
+pub(crate) fn formatting_response<THostLanguage: HostLanguage>(
+    state: &isograph_compiler::IsographDb<THostLanguage>,
+    _client: ClientId,
+    params: lsp_types::DocumentFormattingParams,
+) -> isograph_lsp::lsp_runtime_error::LSPRuntimeResult<
+    <lsp_types::request::Formatting as lsp_types::request::Request>::Result,
+> {
+```
+
+```rust
+// from crates/isograph_cli/src/adapter.rs
+pub(crate) fn will_save_wait_until_response<THostLanguage: HostLanguage>(
+    state: &isograph_compiler::IsographDb<THostLanguage>,
+    _client: ClientId,
+    params: lsp_types::WillSaveTextDocumentParams,
+) -> isograph_lsp::lsp_runtime_error::LSPRuntimeResult<
+    <lsp_types::request::WillSaveWaitUntil as lsp_types::request::Request>::Result,
+> {
+```
+
+`method_not_found` is not a handler. It runs on the `ControlFlow::Continue` leftover and already reaches the client through `AfterCompute`; it is unchanged.
+
+### `dispatch_lsp` and `dispatch_lsp_request`
+
+Before (`dispatch_lsp_request` after the move):
+
+```rust
+// from crates/isograph_cli/src/state.rs
+        crate::event::LspEvent::Response(_response) => no_effects(),
+```
+
+```rust
+// from crates/isograph_cli/src/state.rs
+fn dispatch_lsp_request<THostLanguage: HostLanguage>(
+    state: &mut IsographState<THostLanguage>,
+    incoming: crate::event::LspRequest,
+    before: crate::event::BeforeCompute,
+) -> Vec<IsographEffect> {
+    let request = incoming.request;
+    let Some(after) = state.live_sessions.before_compute(before) else {
+        return no_effects();
+    };
+    let get_response = || {
+        let request = crate::lsp_request_dispatch::LSPRequestDispatch::new(request, &state.db)
+            .on_request_sync::<lsp_types::request::SemanticTokensFullRequest>(
+                crate::adapter::semantic_tokens_response::<THostLanguage>,
+            )?
+            // ... Formatting, WillSaveWaitUntil unchanged
+            .request();
+        ControlFlow::Continue(request)
+    };
+    // ... unchanged
+}
+```
+
+After:
+
+```rust
+// from crates/isograph_cli/src/state.rs
+        crate::event::LspEvent::Response(incoming) => {
+            if !state.live_sessions.0.contains_key(&incoming.client) {
+                return no_effects();
+            }
+            on_lsp_response(incoming.client, incoming.response)
+        }
+```
+
+```rust
+// from crates/isograph_cli/src/state.rs
+fn on_lsp_response(_client: ClientId, _response: lsp_server::Response) -> Vec<IsographEffect> {
+    no_effects()
+}
+```
+
+```rust
+// from crates/isograph_cli/src/state.rs
+fn dispatch_lsp_request<THostLanguage: HostLanguage>(
+    state: &mut IsographState<THostLanguage>,
+    incoming: crate::event::LspRequest,
+    before: crate::event::BeforeCompute,
+) -> Vec<IsographEffect> {
+    let Some(after) = state.live_sessions.before_compute(before) else {
+        return no_effects();
+    };
+    let get_response = || {
+        let request = crate::lsp_request_dispatch::LSPRequestDispatch::new(incoming, &state.db)
+            .on_request_sync::<lsp_types::request::SemanticTokensFullRequest>(
+                crate::adapter::semantic_tokens_response::<THostLanguage>,
+            )?
+            // ... Formatting, WillSaveWaitUntil unchanged
+            .request();
+        ControlFlow::Continue(request)
+    };
+    // ... unchanged
+}
+```
+
+`on_lsp_response` takes no state; nothing in it reads state. The request liveness check is unchanged: `LiveSessions::reply` returns `None` for a client not in the map.
+
+### Tests
+
+`crates/isograph_cli/src/state.rs` (`handle` seam, no sleep):
+
+- `lsp_response_returns_no_effects` is renamed `lsp_response_from_a_live_client_returns_no_effects`; it starts a client with `start_a_client` and sends `LspEvent::Response(LspResponse { client, response })`: no effects
+- added `lsp_response_from_a_client_that_never_started_returns_no_effects`: `LspResponse` from `ClientId(1)` with no `Started`: no effects
+- the request case is already covered: `lsp_request_without_a_live_session_returns_no_effects` sends a request from `ClientId(1)` with no `Started` and asserts no effects; `lsp_formatting_from_a_client_that_is_not_live_returns_no_effects`, `lsp_request_from_a_sibling_client_returns_no_effects`, and `lsp_request_after_gone_returns_no_effects` cover the other cases. Facts unchanged.
+
+`crates/isograph_cli/src/lsp_request_dispatch.rs`: `calls_first_matching_request_handler` builds `LspRequest { client: ClientId(1), request }` for `LSPRequestDispatch::new`; `hover_handler` and `goto_definition_handler` take `_client: ClientId`. Facts unchanged. `test_extract_request_params_error` is unchanged.
+
+### Call sites
+
+- `run_session` -> `LspEvent::Response(LspResponse { client, response })`
+- `dispatch_lsp` -> `live_sessions.0.contains_key`, then `on_lsp_response`
+- `dispatch_lsp` -> `live_sessions.reply`, then `dispatch_lsp_request` -> `LSPRequestDispatch::new(incoming, &state.db)` -> `on_request_sync` -> `semantic_tokens_response` / `formatting_response` / `will_save_wait_until_response`
+
+### Docs this change amends
+
+`docs-website/docs/design-docs/event-model.md` Dispatch: "A response is no effects." becomes "An LSP request and an LSP response carry the `ClientId` of their connection. `handle` drops a response from a client not in `LiveSessions`; a response from a live client is no effects."
+
+## Change 3: a tracked counter that was never written
 
 Open decision. Not decided.
 
@@ -314,7 +721,7 @@ Together: a memo that misses a key and reads the map tracked on a fresh database
 Where it is reached:
 
 - `disk_file_map`. `TypeScriptHostLanguage::extract_iso_literals` reads the map tracked on a miss. Before the first `insert_disk_file`, a later `DiskChanged` that creates the file is not seen. `missing_then_present_extracts` in `isograph_extract_typescript` inserts an unrelated file first to work around this.
-- `open_file_map` (change 4). `file_contents` reads the map tracked on an open-file miss. Every client reads through `file_contents`, and until some client's first `didOpen` no counter exists; the first `didOpen` of a path whose `file_contents` already ran for that client would not be seen. Change 4 cannot ship correctly without one of the options below.
+- `open_file_map` (change 5). `file_contents` reads the map tracked on an open-file miss. Every client reads through `file_contents`, and until some client's first `didOpen` no counter exists; the first `didOpen` of a path whose `file_contents` already ran for that client would not be seen. Change 5 cannot ship correctly without one of the options below.
 
 Options:
 
@@ -337,13 +744,13 @@ impl<THostLanguage: HostLanguage> Default for IsographDb<THostLanguage> {
 }
 ```
 
-(b) pico prefactor. The `#[derive(Db)]` macro (`crates/pico_macros/src/db_macro.rs`) generates the constructor, which builds every field with `Default::default()` and sets every tracked field's counter singleton; `IsographDb` derives its `Default` through it instead of writing one. `MutView::tracked` increments an existing counter with no default branch, because every counter now exists from construction. A new tracked field cannot be forgotten. pico and pico_macros are kept unchanged from upstream isograph per AGENTS.md, so this is an upstream divergence and needs user approval; it ships with pico tests before change 4.
+(b) pico prefactor. The `#[derive(Db)]` macro (`crates/pico_macros/src/db_macro.rs`) generates the constructor, which builds every field with `Default::default()` and sets every tracked field's counter singleton; `IsographDb` derives its `Default` through it instead of writing one. `MutView::tracked` increments an existing counter with no default branch, because every counter now exists from construction. A new tracked field cannot be forgotten. pico and pico_macros are kept unchanged from upstream isograph per AGENTS.md, so this is an upstream divergence and needs user approval; it ships with pico tests before change 5.
 
 With either option, `missing_then_present_extracts` drops the `other` insert: it is a fresh-database miss then insert and asserts the same extraction.
 
-## Change 3: `ClientId` moves to `isograph_compiler`
+## Change 4: `ClientId` moves to `isograph_compiler`
 
-The database keys open buffers by `ClientId` (change 4), so the type moves to the crate that owns `IsographDb` and becomes `pub`. One `ClientId` names every client.
+The database keys open buffers by `ClientId` (change 5), so the type moves to the crate that owns `IsographDb` and becomes `pub`. One `ClientId` names every client.
 
 Before:
 
@@ -369,13 +776,13 @@ Delta: `pub` instead of `pub(crate)`, and the doc comment.
 pub use database::{ClientId, DiskFile, DiskFileMap, IsographDb};
 ```
 
-`event.rs` has no `ClientId` definition and imports `isograph_compiler::ClientId`. `LspRequest.client`, `LspNotification.client`, the `LiveSessions` key, `BeforeCompute.client`, `AfterCompute.client`, `LiveSessions::reply`, `ClientStartedEvent.client`, `ClientConnectionEvent::Gone`, `LSPNotificationDispatch.client`, and `session` / `run_session` keep the type name `ClientId` and now name `isograph_compiler::ClientId`. `accept_loop` builds `isograph_compiler::ClientId(next)`.
+`event.rs` has no `ClientId` definition and imports `isograph_compiler::ClientId`. `LspRequest.client`, `LspNotification.client`, the `LiveSessions` key, `BeforeCompute.client`, `AfterCompute.client`, `LiveSessions::reply`, `ClientStartedEvent.client`, `ClientConnectionEvent::Gone`, `LspResponse.client`, `LSPNotificationDispatch.client`, `LSPRequestDispatch.client`, the `ClientId` parameter of every notification and request handler, and `session` / `run_session` keep the type name `ClientId` and now name `isograph_compiler::ClientId`. `accept_loop` builds `isograph_compiler::ClientId(next)`. `lsp_notification_dispatch.rs`, `lsp_request_dispatch.rs`, and `state.rs` import `isograph_compiler::ClientId` instead of `crate::event::ClientId`.
 
 Tests: the test modules of `lsp_socket.rs` and `state.rs` drop `ClientId` from their `crate::event::{...}` imports and import `isograph_compiler::ClientId`. Facts unchanged.
 
-## Change 4: `open_file_map`, `file_contents`, writers
+## Change 5: `open_file_map`, `file_contents`, writers
 
-Requires change 2 (whichever option) and change 3.
+Requires change 3 (whichever option) and change 4.
 
 ### Types
 
@@ -459,7 +866,7 @@ impl<THostLanguage: HostLanguage> IsographDb<THostLanguage> {
 }
 ```
 
-`file_contents` is a memo and returns an owned `Option<String>`, which pico hands out as `&Option<String>`. A memo cannot return a `&str` into a source (`pico.md` Memo). Its callers are memos (change 6) and tests; `handle` does not call it.
+`file_contents` is a memo and returns an owned `Option<String>`, which pico hands out as `&Option<String>`. A memo cannot return a `&str` into a source (`pico.md` Memo). Its callers are memos (change 7) and tests; `handle` does not call it.
 
 The lookups follow `pico.md` Tracked maps: a hit is untracked, then `db.get` records that one source; a miss reads the map tracked, so a later insert of that key re-invokes. `disk_file_source_id` is the lookup `TypeScriptHostLanguage::extract_iso_literals` writes inline today. `IsographDb::disk_file` (untracked only) is unchanged.
 
@@ -475,7 +882,7 @@ Every open-miss slot depends on the one `open_file_map` counter. Any client's `d
 
 ### Writers
 
-Called only by `handle` (change 5), never inside a memo.
+Called only by `handle` (change 6), never inside a memo.
 
 ```rust
 // from crates/isograph_compiler/src/database.rs
@@ -525,7 +932,7 @@ impl<THostLanguage: HostLanguage> IsographDb<THostLanguage> {
 }
 ```
 
-`set_open_file` writes the map only when the key is absent. `MutView::tracked()` increments the counter on every call (change 2), so writing a present key would re-invoke every open-miss slot on each keystroke. The `SourceId` of a key is a function of the key, so re-inserting a present key would write the same id. Reading the key untracked before writing it is the shape AGENTS.md steers away from in favor of `entry`; it is required here because `MutView` has only `tracked()`, and calling it is the bump.
+`set_open_file` writes the map only when the key is absent. `MutView::tracked()` increments the counter on every call (change 3), so writing a present key would re-invoke every open-miss slot on each keystroke. The `SourceId` of a key is a function of the key, so re-inserting a present key would write the same id. Reading the key untracked before writing it is the shape AGENTS.md steers away from in favor of `entry`; it is required here because `MutView` has only `tracked()`, and calling it is the bump.
 
 `remove_open_file` of an absent key returns before any write. `remove_open_files_of_client` of a client with no buffers returns before any write; that occurs on every `isograph send` connection and on the readiness probe in `start.rs`, which connect and never `didOpen`. Its scan is over every client's keys; a per-client index is backlog (`future-improvements.md`). `open_file_ids` is collected because `self.remove` needs `&mut self` after the map borrow ends. pico does not collect sources (`crates/pico/src/garbage_collection.rs:21`), so `Gone` must remove each `OpenFile` explicitly.
 
@@ -545,14 +952,14 @@ impl<THostLanguage: HostLanguage> IsographDb<THostLanguage> {
 - `remove_open_files_of_client` of a client with no buffers leaves every read unchanged and `get_open_file_map().untracked().0.len()` unchanged
 - `remove_disk_file` of a path client 1 has open: client 1 still reads the buffer; client 2 reads `None`
 - miss then hit: client 1 reads disk; `set_open_file`; reads the buffer; `set_open_file` again; reads the new text; `remove_open_file`; reads disk; `remove_disk_file`; `None`, no panic
-- fresh-database miss then insert: client 1 reads `None` before any write; `set_open_file(ClientId(1), path, "open")`; reads `"open"`. A second: client 1 reads `None`; `insert_disk_file`; reads disk's text. These fail without change 2.
+- fresh-database miss then insert: client 1 reads `None` before any write; `set_open_file(ClientId(1), path, "open")`; reads `"open"`. A second: client 1 reads `None`; `insert_disk_file`; reads disk's text. These fail without change 3.
 - client 1 reads `path`; client 2 `set_open_file` of `path`: client 1 still reads disk's text
 
-## Change 5: document sync handlers
+## Change 6: document sync handlers
 
 Requires changes 1 and 4.
 
-After this change `didOpen` / `didChange` / `didClose` write the sending client's buffers, `initialize` advertises full document sync, and `Gone` removes that client's buffers. Nothing reads the buffers until change 6.
+After this change `didOpen` / `didChange` / `didClose` write the sending client's buffers, `initialize` advertises full document sync, and `Gone` removes that client's buffers. Nothing reads the buffers until change 7.
 
 ### Typed path conversion
 
@@ -1033,7 +1440,7 @@ After:
         }
 ```
 
-`Started` is unchanged: a client needs no database state before its first `didOpen`. `Gone` of a client that never started, or that has no buffers, is a no-op on the database (change 4).
+`Started` is unchanged: a client needs no database state before its first `didOpen`. `Gone` of a client that never started, or that has no buffers, is a no-op on the database (change 5).
 
 ### Tests
 
@@ -1083,11 +1490,11 @@ All at the `handle` seam in `crates/isograph_cli/src/state.rs`: one process, no 
 - Dispatch: "`EditorChanged` with `Open` sets `OpenFile`. `EditorChanged` with `Closed` removes it." becomes "`DidOpenTextDocument` and `DidChangeTextDocument` (one change, no range) call `set_open_file` for the notification's client. `DidCloseTextDocument` calls `remove_open_file`. `ClientConnectionEvent::Gone` calls `remove_open_files_of_client`."
 - The test-harness sentence "A test constructs a `DiskChanged` or `EditorChanged`" becomes "A test constructs a `DiskChanged` or an `LspNotification`".
 
-`docs-website/docs/design-docs/pico.md` Source: the path-keyed `OpenFile` snippet becomes `OpenFileKey` and `OpenFile` as in change 4, and the Database snippet gains `#[tracked] open_file_map: OpenFileMap`. "A path may have a `DiskFile`, an `OpenFile`, both, or neither. Artifact generation reads `DiskFile`. The LSP reads `OpenFile` when that path has one, otherwise `DiskFile`. Those are different memos. One overlay used by both, as isograph's `read_iso_literals_source` does, makes artifact generation depend on editor buffers." becomes "A path may have a `DiskFile`, one `OpenFile` per client that has it open, both, or neither. Every read of file text is `file_contents(db, client, path)`: client `c` reads `c`'s `OpenFile` if present, otherwise `DiskFile`. The file-based compiler will be another client with its own `ClientId`."
+`docs-website/docs/design-docs/pico.md` Source: the path-keyed `OpenFile` snippet becomes `OpenFileKey` and `OpenFile` as in change 5, and the Database snippet gains `#[tracked] open_file_map: OpenFileMap`. "A path may have a `DiskFile`, an `OpenFile`, both, or neither. Artifact generation reads `DiskFile`. The LSP reads `OpenFile` when that path has one, otherwise `DiskFile`. Those are different memos. One overlay used by both, as isograph's `read_iso_literals_source` does, makes artifact generation depend on editor buffers." becomes "A path may have a `DiskFile`, one `OpenFile` per client that has it open, both, or neither. Every read of file text is `file_contents(db, client, path)`: client `c` reads `c`'s `OpenFile` if present, otherwise `DiskFile`. The file-based compiler will be another client with its own `ClientId`."
 
 `pico.md` Tracked maps: add "`open_file_map` is keyed by `OpenFileKey { client, path }`. `file_contents` looks up untracked and `db.get`s the hit; on a miss it reads the map tracked. A write of a key already present does not write the map, so a keystroke re-invokes only the slot that read that `OpenFile`. Any open or close re-invokes every open-miss slot of every client; each backdates when its text is `==`."
 
-## Change 6: semantic tokens and formatting read `file_contents`
+## Change 7: semantic tokens and formatting read `file_contents`
 
 Pending. Not approved.
 
@@ -1283,31 +1690,9 @@ pub fn lsp_semantic_tokens_for_file<THostLanguage: HostLanguage>(
 }
 ```
 
-### Request dispatch carries the client
+### Request handlers read the client
 
-Same shape as change 1. `LSPRequestDispatch` (`crates/isograph_lsp/src/lsp_request_dispatch.rs`) gains `client: ClientId`, `new` takes it, and the handler type becomes `fn(&TState, ClientId, TRequest::Params) -> LSPRuntimeResult<TRequest::Result>`.
-
-Before:
-
-```rust
-// from crates/isograph_lsp/src/lsp_request_dispatch.rs
-    pub fn on_request_sync<TRequest: Request>(
-        self,
-        handler: fn(&TState, TRequest::Params) -> LSPRuntimeResult<TRequest::Result>,
-    ) -> ControlFlow<Response, Self> {
-```
-
-After:
-
-```rust
-// from crates/isograph_lsp/src/lsp_request_dispatch.rs
-    pub fn on_request_sync<TRequest: Request>(
-        self,
-        handler: fn(&TState, ClientId, TRequest::Params) -> LSPRuntimeResult<TRequest::Result>,
-    ) -> ControlFlow<Response, Self> {
-```
-
-`dispatch_lsp_request` destructures `LspRequest { client, request }` and calls `LSPRequestDispatch::new(client, request, &state.db)`. `semantic_tokens_response`, `formatting_response`, and `will_save_wait_until_response` gain `client: ClientId` as their second parameter and pass it to `lsp_semantic_tokens_for_file` / `format_iso_literals`.
+Change 2 already passes the client to every request handler. This change reads it: `semantic_tokens_response`, `formatting_response`, and `will_save_wait_until_response` rename `_client: ClientId` to `client: ClientId` and pass it to `lsp_semantic_tokens_for_file` / `format_iso_literals`. `LSPRequestDispatch` and `dispatch_lsp_request` are unchanged by this change.
 
 ### Formatting and `willSaveWaitUntil`
 
@@ -1377,7 +1762,7 @@ fn format_iso_literals<THostLanguage: HostLanguage>(
 
 ### Call sites
 
-- `dispatch_lsp_request` -> `semantic_tokens_response(db, client, params)` -> `lsp_semantic_tokens_for_file(db, client, path)` -> `parsed_iso_literals_in_file` / `text_through_last_iso_literal` -> `extract_iso_literals` -> `file_contents`
+- `dispatch_lsp_request` -> `LSPRequestDispatch::on_request_sync` -> `semantic_tokens_response(db, client, params)` -> `lsp_semantic_tokens_for_file(db, client, path)` -> `parsed_iso_literals_in_file` / `text_through_last_iso_literal` -> `extract_iso_literals` -> `file_contents`
 - `dispatch_lsp_request` -> `formatting_response` / `will_save_wait_until_response` -> `format_iso_literals(db, client, path)` -> the same family
 - `file_literals`, `literal_id_at_location`, `iso_literal_extraction` -> `extract_iso_literals` / `file_contents` with the caller's `ClientId`
 
