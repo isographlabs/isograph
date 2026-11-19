@@ -1,6 +1,8 @@
 mod database;
 mod host_language;
 mod iso_literals;
+#[cfg(test)]
+mod test_profile;
 
 pub use database::{ClientId, DiskFile, DiskFileMap, IsographDb, SchemaFileSet, file_contents};
 pub use host_language::*;
