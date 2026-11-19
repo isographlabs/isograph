@@ -179,6 +179,35 @@ describe('Babel plugin Isograph', () => {
     );
   });
 
+  test('should replace an entity literal with undefined', () => {
+    const code = 'iso(`entity Owner`); const a = iso(`\n  entity Owner\n`);';
+
+    expect(transformIn(code, project)).toBe(
+      ['void 0;', 'const a = void 0;'].join('\n'),
+    );
+  });
+
+  test('should replace an entity literal in a script with undefined', () => {
+    const code = 'iso(`entity Owner`);';
+
+    expect(
+      transformIn(
+        code,
+        project,
+        'src/components/Home/Header/File.ts',
+        'script',
+      ),
+    ).toBe('void 0;');
+  });
+
+  test('should reject a called entity literal', () => {
+    const code = 'const a = iso(`entity Owner`)(f);';
+
+    expect(() => transformIn(code, project)).toThrow(
+      'Invalid iso tag usage. An entity literal cannot be called.',
+    );
+  });
+
   test('should reject an unknown keyword', () => {
     const code = 'const a = iso(`unknown Query.HomeRoute`);';
 

@@ -22,6 +22,8 @@ module.exports = {
 
 This package changes calls to `iso` entrypoint to imports of the generated artifact. For example, `` iso`entrypoint Query.HomePage` `` might get replaced with an import of `"../__isograph/Query/HomePage/entrypoint.ts"`. In a file Babel parses as a script, it becomes `require("../__isograph/Query/HomePage/entrypoint.ts").default` instead.
 
+A `field` or `pointer` literal called with a resolver becomes that resolver. An `entity` literal, such as ``iso(`entity Owner`)``, becomes `void 0`, since it declares an entity and has no runtime value.
+
 The artifact is under `output_directory` from the config, relative to the config file. Without `output_directory`, it is under the config file's directory.
 
 ## Requirements

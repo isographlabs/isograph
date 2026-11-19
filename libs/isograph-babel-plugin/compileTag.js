@@ -17,8 +17,17 @@ function compileTag(t, path, config) {
     callee.name === 'iso' &&
     path.node.arguments != null
   ) {
-    const { keyword, parentObjectEntityName, selectableName } =
-      getParentObjectEntityNameAndSelectableName(path);
+    const literal = parseIsoLiteral(path);
+    if (literal.kind === 'entity') {
+      if (path.parentPath.isCallExpression({ callee: path.node })) {
+        throw new Error(
+          'Invalid iso tag usage. An entity literal cannot be called.',
+        );
+      }
+      path.replaceWith(path.scope.buildUndefinedNode());
+      return false;
+    }
+    const { keyword, parentObjectEntityName, selectableName } = literal;
     if (keyword === 'entrypoint') {
       // This throws if the tag is invalid
       compileImportStatement(
@@ -46,12 +55,14 @@ function compileTag(t, path, config) {
       }
     } else {
       throw new Error(
-        "Invalid iso tag usage. Expected 'entrypoint', 'field' or 'pointer'.",
+        "Invalid iso tag usage. Expected 'entity', 'entrypoint', 'field' or 'pointer'.",
       );
     }
   }
   return false;
 }
+
+const entityRegex = /^\s*entity\s+\S/;
 
 const parentObjectEntityNameAndSelectableNameRegex = new RegExp(
   '\\s*(entrypoint|field|pointer)\\s*([^\\.\\s]+)\\.([^\\s\\(]+)',
@@ -60,8 +71,9 @@ const parentObjectEntityNameAndSelectableNameRegex = new RegExp(
 
 /**
  * @param {babel.NodePath<babel.types.CallExpression>} path
+ * @returns {{ kind: 'entity' } | { kind: 'selectable', keyword: string, parentObjectEntityName: string, selectableName: string }}
  **/
-function getParentObjectEntityNameAndSelectableName(path) {
+function parseIsoLiteral(path) {
   const firstArg = path.node.arguments[0];
   if (path.node.arguments.length !== 1 || firstArg == null) {
     throw new Error(
@@ -84,6 +96,9 @@ function getParentObjectEntityNameAndSelectableName(path) {
   }
 
   const content = firstQuasi.value.raw;
+  if (entityRegex.test(content)) {
+    return { kind: 'entity' };
+  }
   const typeAndField =
     parentObjectEntityNameAndSelectableNameRegex.exec(content);
 
@@ -100,7 +115,12 @@ function getParentObjectEntityNameAndSelectableName(path) {
       'Malformed iso literal. I hope the iso compiler failed to accept this literal!',
     );
   }
-  return { keyword, parentObjectEntityName, selectableName };
+  return {
+    kind: 'selectable',
+    keyword,
+    parentObjectEntityName,
+    selectableName,
+  };
 }
 
 /**
