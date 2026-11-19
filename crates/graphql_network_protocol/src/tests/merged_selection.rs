@@ -689,10 +689,6 @@ fn argument_errors_are_located_at_their_node() {
         )
     );
     assert_eq!(
-        query_error("pet(id: [1]) { id }", &[]).0,
-        SelectionMapErrorKind::ListArgument
-    );
-    assert_eq!(
         query_error("pet(id: { a: 1, a: 2 }) { id }", &[]).0,
         SelectionMapErrorKind::DuplicateObjectKey("a".intern().to())
     );

@@ -110,6 +110,7 @@ pub enum MergedValue {
     Boolean(Boolean),
     Null,
     Object(MergedObject),
+    List(Vec<MergedValue>),
 }
 
 /// Object entries sorted by name, no name twice.
@@ -219,8 +220,6 @@ pub enum SelectionMapErrorKind {
     DuplicateArgument(ArgumentName),
     #[error("Key `{0}` appears more than once in this object.")]
     DuplicateObjectKey(ValueKeyName),
-    #[error("List arguments are not supported in queries yet.")]
-    ListArgument,
     #[error("{0}")]
     UnknownFieldArgument(UnknownFieldArgument),
     #[error("`{0}` has no entity to select into.")]
@@ -379,6 +378,14 @@ impl MergedValue {
                     .collect::<Vec<_>>()
                     .join("_")
             ),
+            MergedValue::List(items) => format!(
+                "a_{}_c",
+                items
+                    .iter()
+                    .map(MergedValue::alias_chunk)
+                    .collect::<Vec<_>>()
+                    .join("_")
+            ),
         }
     }
 
@@ -390,6 +397,7 @@ impl MergedValue {
                 .iter()
                 .flat_map(|entry| entry.value.variables())
                 .collect(),
+            MergedValue::List(items) => items.iter().flat_map(MergedValue::variables).collect(),
             MergedValue::String(_)
             | MergedValue::Integer(_)
             | MergedValue::Boolean(_)
@@ -639,6 +647,11 @@ fn substitute_value(
             })
             .collect::<Result<Vec<_>, _>>()
             .map(|entries| MergedValue::Object(MergedObject(entries))),
+        MergedValue::List(items) => items
+            .iter()
+            .map(|item| substitute_value(item, context))
+            .collect::<Result<Vec<_>, _>>()
+            .map(MergedValue::List),
         MergedValue::String(_)
         | MergedValue::Integer(_)
         | MergedValue::Boolean(_)
@@ -938,9 +951,19 @@ fn merged_value(
                 })
             })
             .map(MergedValue::Object),
-        NonConstantValue::List(_) => SelectionMapErrorKind::ListArgument
-            .with_span(value.location)
-            .wrap_err(),
+        NonConstantValue::List(list) => {
+            list.0
+                .iter()
+                .map(|slot| {
+                    let item =
+                        slot.item.item.as_ref().ok_or(
+                            SelectionMapErrorKind::UnparsedArgument.with_span(slot.location),
+                        )?;
+                    merged_value(item.item.value.reference(), scope)
+                })
+                .collect::<Result<Vec<_>, _>>()
+                .map(MergedValue::List)
+        }
     }
 }
 

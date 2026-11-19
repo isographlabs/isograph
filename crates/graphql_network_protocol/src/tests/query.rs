@@ -1,4 +1,5 @@
 use intern::Lookup;
+use intern::string_key::Intern;
 use std::collections::BTreeSet;
 
 use isograph_compiler::{
@@ -6,8 +7,8 @@ use isograph_compiler::{
     EntrypointNotFetchableError, EntrypointQueryError, FieldSelectionMapError, FixedRecordId,
     IntegerOutOfRange, NormalizationAlias, NormalizationAst, NormalizationCompositeTarget,
     NormalizationNode, NormalizationRootRecord, NormalizationSelection, NormalizationTarget,
-    QueryArtifact, RecordEntity, ResponseKey, RootEntities, SelectionMapErrorKind, TopLevelError,
-    field_selection_map, query_for_entrypoint,
+    NormalizationValue, QueryArtifact, RecordEntity, ResponseKey, RootEntities,
+    SelectionMapErrorKind, TopLevelError, field_selection_map, query_for_entrypoint,
 };
 use prelude::Postfix;
 
@@ -705,4 +706,37 @@ fn typename_is_a_leaf_without_arguments() {
             ),
         ]
     );
+}
+
+#[test]
+fn a_list_argument_is_printed_aliased_and_substituted() {
+    let schema = (
+        "schema/tagged.graphql",
+        "extend type Query { tagged(tags: [String!]!): [Pet!]! }",
+    );
+    let contents = "export const Tags = iso(`field Query.Tags($t: String!) { tagged(tags: [\"a\", $t]) { id }, empty: tagged(tags: []) { id } }`)(() => 1)\nexport const T = iso(`field Query.T { Tags(t: \"b\") }`)(() => 1)\niso(`entrypoint Query.T`)";
+    let db = demo(&[], &[("src/T.ts", contents)], &[schema]);
+    assert_eq!(validation_errors(&db, "src/T.ts", contents), vec![]);
+    let text = text(&db, "Query", "T");
+    let lines = lines(text.as_str());
+    assert!(
+        lines.contains(&"  tagged____tags___a_s_a_s_b_c: tagged(tags: [\"a\", \"b\"]) {"),
+        "{text}"
+    );
+    assert!(
+        lines.contains(&"  tagged____tags___a__c: tagged(tags: []) {"),
+        "{text}"
+    );
+    let ast = query(&db, "Query", "T")
+        .expect("the fixture's entrypoint has a query")
+        .normalization_ast;
+    assert!(ast.selections.0.iter().any(|node| matches!(
+        node,
+        NormalizationNode::Selection(selection)
+            if selection.arguments.0.iter().any(|argument| argument.value
+                == NormalizationValue::List(vec![
+                    NormalizationValue::String("a".intern().to()),
+                    NormalizationValue::String("b".intern().to()),
+                ]))
+    )));
 }

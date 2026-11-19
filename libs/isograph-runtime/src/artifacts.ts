@@ -86,7 +86,8 @@ export type ArgumentValue =
   | { readonly kind: 'Variable'; readonly name: string }
   | { readonly kind: 'Literal'; readonly value: number | boolean | null }
   | { readonly kind: 'String'; readonly value: string }
-  | { readonly kind: 'Object'; readonly value: Arguments };
+  | { readonly kind: 'Object'; readonly value: Arguments }
+  | { readonly kind: 'List'; readonly value: ReadonlyArray<ArgumentValue> };
 
 /** The default export of an `entrypoint.ts` artifact: an entrypoint whose field's param type
  * is `TParam` and output type is `TOutput`, on the root entity `TEntityName`. */

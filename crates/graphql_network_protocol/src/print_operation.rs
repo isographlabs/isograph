@@ -139,6 +139,10 @@ fn print_value(value: &MergedValue) -> String {
                 format!("{{ {} }}", entries.join(", "))
             }
         }
+        MergedValue::List(items) => format!(
+            "[{}]",
+            items.iter().map(print_value).collect::<Vec<_>>().join(", ")
+        ),
     }
 }
 

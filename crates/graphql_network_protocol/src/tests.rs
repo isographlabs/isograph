@@ -1330,6 +1330,21 @@ fn argument_values_are_type_checked() {
         ),
         ("tagged(tags: \"a\") { id }", vec![]),
         (
+            "tagged(tags: [\"a\", 1]) { id }",
+            vec![(
+                "Expected input of type String!, found an integer literal.",
+                "1",
+            )],
+        ),
+        ("tagged(tags: []) { id }", vec![]),
+        (
+            "tagged(tags: [[\"a\"]]) { id }",
+            vec![(
+                "Expected input of type String!, found a list literal.",
+                "[\"a\"]",
+            )],
+        ),
+        (
             "tagged(tags: $ns) { id }",
             vec![(
                 "Mismatched type. Received $ns, with type [Int!], expected [String!]!.",

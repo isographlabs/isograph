@@ -215,6 +215,7 @@ The value of an argument, before `stableCopy`:
 - `String`: the string.
 - `Variable`: `variables[name]`.
 - `Object`: an object with one key per entry, each value by these rules.
+- `List`: an array of its items, each value by these rules (refactors/pending/validation.md change 13).
 
 So `limit: 5` is `____limit___5`, `name: "Ada Lovelace"` is `____name___"Ada Lovelace"`, `name: null` is `____name___null`, `name: "null"` is `____name___"null"`, `id: 1` is `____id___1` and `id: "1"` is `____id___"1"`, and `filter: { nameContains: $q, minAge: 2 }` with `q: "Rex"` is `____filter___{"minAge":2,"nameContains":"Rex"}`.
 

@@ -90,6 +90,7 @@ pub enum NormalizationValue {
     Boolean(Boolean),
     Null,
     Object(Vec<NormalizationObjectEntry>),
+    List(Vec<NormalizationValue>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -240,6 +241,11 @@ fn normalization_value(value: &MergedValue) -> Result<NormalizationValue, Intege
             })
             .collect::<Result<Vec<_>, _>>()
             .map(NormalizationValue::Object),
+        MergedValue::List(items) => items
+            .iter()
+            .map(normalization_value)
+            .collect::<Result<Vec<_>, _>>()
+            .map(NormalizationValue::List),
     }
 }
 

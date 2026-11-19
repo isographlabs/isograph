@@ -188,6 +188,13 @@ fn argument_value(value: &NormalizationValue) -> ArtifactValue {
                 ),
             ),
         ]),
+        NormalizationValue::List(items) => ArtifactValue::Object(vec![
+            kind("List"),
+            entry(
+                "value",
+                ArtifactValue::Array(items.iter().map(argument_value).collect()),
+            ),
+        ]),
     }
 }
 
@@ -205,8 +212,9 @@ mod tests {
     use isograph_parser::Boolean;
     use prelude::Postfix;
 
-    use super::normalization_ast_artifact;
+    use super::{argument_value, entry, kind, normalization_ast_artifact};
     use crate::entrypoint::entrypoint_artifact;
+    use crate::module::ArtifactValue;
     use crate::module::module_of_artifact;
     use crate::swc::print;
 
@@ -487,6 +495,30 @@ mod tests {
         assert!(
             text.contains("normalizationAst: Query__HomeRoute__normalization_ast"),
             "{text}"
+        );
+    }
+
+    #[test]
+    fn a_list_argument_value_is_a_list_of_argument_values() {
+        let literal = |value| ArtifactValue::Object(vec![kind("Literal"), entry("value", value)]);
+        assert_eq!(
+            argument_value(&NormalizationValue::List(vec![
+                NormalizationValue::Integer(1),
+                NormalizationValue::List(Vec::new()),
+            ])),
+            ArtifactValue::Object(vec![
+                kind("List"),
+                entry(
+                    "value",
+                    ArtifactValue::Array(vec![
+                        literal(ArtifactValue::Number(1.0)),
+                        ArtifactValue::Object(vec![
+                            kind("List"),
+                            entry("value", ArtifactValue::Array(Vec::new())),
+                        ]),
+                    ]),
+                ),
+            ])
         );
     }
 }
