@@ -1,3 +1,4 @@
+import type { Query____link__output_type } from "./../__link/output_type";
 export type Query__PetLists__param = {
   readonly data: {
     readonly pets: ReadonlyArray<{
@@ -17,4 +18,5 @@ export type Query__PetLists__param = {
     } | null)> | null)> | null);
   };
   readonly parameters: Record<PropertyKey, never>;
+  readonly link: Query____link__output_type;
 };

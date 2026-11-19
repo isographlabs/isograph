@@ -1,3 +1,4 @@
+import type { Query____link__output_type } from "./../__link/output_type";
 export type Query__NestedQuery__param = {
   readonly data: {
     readonly greeting: (string | null);
@@ -6,4 +7,5 @@ export type Query__NestedQuery__param = {
     };
   };
   readonly parameters: Record<PropertyKey, never>;
+  readonly link: Query____link__output_type;
 };

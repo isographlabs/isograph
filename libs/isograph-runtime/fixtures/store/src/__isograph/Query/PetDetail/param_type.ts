@@ -1,3 +1,4 @@
+import type { Query____link__output_type } from "./../__link/output_type";
 import type { Query__PetDetail__parameters } from "./parameters_type";
 export type Query__PetDetail__param = {
   readonly data: {
@@ -29,4 +30,5 @@ export type Query__PetDetail__param = {
     } | null);
   };
   readonly parameters: Query__PetDetail__parameters;
+  readonly link: Query____link__output_type;
 };
