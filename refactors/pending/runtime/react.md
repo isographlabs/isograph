@@ -217,8 +217,7 @@ From `index.ts:1-183`. Keep means the name, signature, and behavior are upstream
 - `useLazyReference` (`react/useLazyReference.ts:19-60`): adapted (Fetching with `useLazyReference`).
 - `useImperativeReference`, `UseImperativeReferenceResult` (`react/useImperativeReference.ts:25-100`): adapted.
 - `useResult` (`react/useResult.ts:16-67`): adapted. Only the eager case remains.
-- `useReadAndSubscribe` (`react/useReadAndSubscribe.ts:25-43`): adapted; it re-reads when the fragment reference changes.
-- `useRerenderOnChange` (`react/useRerenderOnChange.ts:10-38`): adapted, with the same fix.
+- `useReadAndSubscribe` (`react/useReadAndSubscribe.ts:25-43`): adapted; it reads through `useSyncExternalStore` over the runtime's subscription instead of React state, and reads again when the fragment reference changes.
 - `FragmentReader` (`react/FragmentReader.tsx:10-29`): adapted type parameters.
 - `FragmentReference`, `stableIdForFragmentReference`, `StableIdForFragmentReference` (`core/FragmentReference.ts:35-79`): adapted.
 - `FragmentReferenceOfEntrypoint`, `ExtractReadFromStore`, `ExtractClientFieldValue` (`core/entrypoint.ts:95-100`, `:200-203`): adapted to two type parameters.
@@ -245,6 +244,7 @@ From `index.ts:1-183`. Keep means the name, signature, and behavior are upstream
 
 ### Dropped
 
+- `useRerenderOnChange` (`react/useRerenderOnChange.ts:10-38`): `useSyncExternalStore`'s `subscribe` does its job, and the data it set in React state lives only in the runtime (Reading, `useReadAndSubscribe`).
 - `ComponentReaderArtifact`, `FragmentRenderer`, `IsExactlyIntrinsicAttributes`, `ExtractProps`, `ExtractSecondParam`, `CombineWithIntrinsicAttributes`, `ComponentOrFieldName`, `FieldCache`: v1 has no `@component` (reader-ast.md). `FragmentRenderer` renders a resolver result as a component; upstream gives each fragment reference one stable component through `getOrCreateCachedComponent` (`core/componentCache.ts`), and without it a resolver that returns a new function on each read would remount on each render.
 - `LoadableFieldReader`, `LoadableFieldRenderer`, `LoadableField`, `ReaderLoadableField`, `useClientSideDefer`, `useImperativeLoadableField`, `UseImperativeLoadableFieldReturn`, `useSkipLimitPagination`, `useConnectionSpecPagination` and their types, `NormalizationAstLoader`, `IsographEntrypointLoader`, `RequiredFetchOptions`, `RequiredShouldFetch`: v1 has no `@loadable` and no lazily loaded artifacts.
 - `useImperativeExposedMutationField`, `UseImperativeExposedMutationFieldReturn`: v1 has no directives (`@exposeField`).
@@ -299,8 +299,9 @@ libs/isograph-react/                  @isograph/react
   src/react/useImperativeReference.ts
   src/react/useLazyReference.ts
   src/react/useReadAndSubscribe.ts
-  src/react/useRerenderOnChange.ts
   src/react/useResult.ts
+  src/react/useSubscription.ts
+  src/react/useSubscriptionSnapshot.ts
   test/setup.ts
   test/fixtures.tsx
   test/useLazyReference.test.tsx
@@ -422,7 +423,6 @@ export {
 } from './react/useImperativeReference';
 export { useLazyReference } from './react/useLazyReference';
 export { useReadAndSubscribe } from './react/useReadAndSubscribe';
-export { useRerenderOnChange } from './react/useRerenderOnChange';
 export { useResult } from './react/useResult';
 ```
 
@@ -454,7 +454,7 @@ Every generated parameters type is assignable to `Variables`, because every para
 
 ## The environment and the network path
 
-The environment, the network function, `PromiseWrapper`, the fetch options, retention, the request cache (`networkRequestCache`, `getOrCreateCacheForArtifact`), `fetchEntrypoint`, and the two-phase subscriptions are `@isograph/runtime`'s (network-and-subscriptions.md); `CacheItem` and `ParentCache` are `@isograph/disposable-types`'s. The React package imports them, re-exports none of them, and adds no field to the environment. The app creates one environment with the runtime's `createIsographEnvironment`, once, at module level or in a component's `useState` initializer (upstream's demos use `useMemo`, `isograph/demos/pet-demo/pages/_app.tsx:68-70`; the initializer runs once by contract), and `IsographEnvironmentProvider` only passes it through context.
+The environment, the network function, `PromiseWrapper`, the fetch options, retention, the request cache (`networkRequestCache`, `getOrCreateCacheForArtifact`), `fetchEntrypoint`, and the two-phase subscriptions are `@isograph/runtime`'s (network-and-subscriptions.md); `CacheItem` and `ParentCache` are `@isograph/disposable-types`'s. The React package imports them, re-exports none of them, and adds no field to the environment. The app creates one environment with the runtime's `createIsographEnvironment`, once, at module level or in a component's `useState` initializer (upstream's demos use `useMemo`, `isograph/demos/pet-demo/pages/_app.tsx:68-70`; the initializer runs once by contract), and `IsographEnvironmentProvider` only passes it through context. The provider's state holds the environment, created once; it is never a cache of read results, which live only in the runtime (Reading, `useReadAndSubscribe`).
 
 The React package calls the runtime's pieces only at render and commit: at render, `getOrCreateCacheForArtifact(..).getOrPopulateAndTemporaryRetain()` and a temporarily retained `readAndSubscribe`; at commit, `permanentRetainIfNotDisposed`, as `useCachedResponsivePrecommitValue` and `useLazyDisposableState` do (network-and-subscriptions.md, The request cache, The two-phase lifetime). The hook snippets below are upstream's shape, which subscribes in an effect and reads the request cache through a React-side `getOrCreateCacheForArtifact`; they are stale against the runtime's two-phase subscriptions and its `getOrCreateCacheForArtifact` until this doc is next worked, when the subscribe moves to render under a temporary retain and the cache lookup is the runtime's.
 
@@ -768,10 +768,10 @@ import {
   type IsographEnvironment,
   NOT_SET,
   readAndSubscribe,
-  readButDoNotEvaluate,
-  type ReadMissingData,
   type ResolverParam,
   type SelectionSetData,
+  type SubscriptionResult,
+  subscriptionSnapshot,
 } from '@isograph/runtime';
 import type { FragmentReference } from './FragmentReference';
 
@@ -795,24 +795,23 @@ export function getNetworkRequestOptionsWithDefaults(
   };
 }
 
-/** The data `fragmentReference`'s reader AST reads. On `MissingData`, throws the promise
- * that resolves when that read changes, or the network error. */
-export function readOrSuspend<
+/** The data in `result`, a snapshot of `fragmentReference`'s read. On `MissingData`, throws
+ * the promise that resolves when that read changes, or the network error; on `Err`, throws
+ * the read's error. */
+export function unwrapOrSuspend<
   TReadFromStore extends ResolverParam<TEntityName>,
   TEntityName extends EntityName,
 >(
   environment: IsographEnvironment,
   fragmentReference: FragmentReference<TReadFromStore, unknown, TEntityName>,
   networkRequestOptions: NetworkRequestReaderOptions,
+  result: SubscriptionResult,
 ): SelectionSetData {
-  const result = readButDoNotEvaluate(
-    environment.store,
-    fragmentReference.readerArtifact,
-    fragmentReference.root,
-    fragmentReference.variables,
-  );
   if (result.kind === 'Ok') {
     return result.value;
+  }
+  if (result.kind === 'Err') {
+    throw result.error;
   }
   if (
     networkRequestOptions.whileInFlight === 'ReadStore' &&
@@ -823,44 +822,46 @@ export function readOrSuspend<
       throw new Error('NetworkError', { cause: networkResult.error });
     }
     throw new Promise<void>((resolve, reject) => {
-      onNextChangeToFragmentData(environment, fragmentReference, result).then(
-        resolve,
-      );
+      onNextChangeToFragmentData(environment, fragmentReference).then(resolve);
       fragmentReference.networkRequest.promise.catch(reject);
     });
   }
-  throw onNextChangeToFragmentData(environment, fragmentReference, result);
+  throw onNextChangeToFragmentData(environment, fragmentReference);
 }
 
 /** Resolves at the first write after which `fragmentReference`'s read is no longer
- * `MissingData`. */
+ * `MissingData`, or at once when the read is already not `MissingData`. */
 export function onNextChangeToFragmentData<
   TReadFromStore extends ResolverParam<TEntityName>,
   TEntityName extends EntityName,
 >(
   environment: IsographEnvironment,
   fragmentReference: FragmentReference<TReadFromStore, unknown, TEntityName>,
-  missing: ReadMissingData,
 ): Promise<void> {
   return new Promise((resolve) => {
-    const unsubscribe = readAndSubscribe(
+    const [subscription, unsubscribe] = readAndSubscribe(
       environment,
       fragmentReference.readerArtifact,
       fragmentReference.root,
       fragmentReference.variables,
-      missing,
-      () => {
-        unsubscribe();
-        resolve();
+      (result) => {
+        if (result.kind !== 'MissingData') {
+          unsubscribe();
+          resolve();
+        }
       },
     );
+    if (subscriptionSnapshot(subscription).kind !== 'MissingData') {
+      unsubscribe();
+      resolve();
+    }
   });
 }
 ```
 
-`NetworkRequestReaderOptions` and `getNetworkRequestOptionsWithDefaults` are `core/read.ts:972-984` with `readonly` properties and each boolean replaced by an enum whose variants name the two behaviors (AGENTS.md, Booleans): `suspendIfInFlight: boolean` is `whileInFlight: WhileInFlight`, default `'ReadStore'` (upstream's `false`), and `throwOnNetworkError: boolean` is `onNetworkError: OnNetworkError`, default `'Throw'` (upstream's `true`). This is a deviation from upstream's public API, made for AGENTS.md's rule; the pagination hooks, which upstream calls with `suspendIfInFlight: true`, pass `whileInFlight: 'Suspend'` when they return (Later). Both options are React-only: the runtime's `read` returns a typed result and never suspends or throws. `readOrSuspend` is upstream's `readButDoNotEvaluate` (`read.ts:60-129`) on the React side: the runtime's `readButDoNotEvaluate` returns the `ReadResult`, and this function throws what upstream throws. The deltas: no `readPromise` of the reader (`:70-72`), no log (`:85-90`), no `encounteredRecords` in the result, and the promise is `onNextChangeToFragmentData` instead of `onNextChangeToRecord(environment, response.recordLink)` (`cache.ts:135-149`).
+`NetworkRequestReaderOptions` and `getNetworkRequestOptionsWithDefaults` are `core/read.ts:972-984` with `readonly` properties and each boolean replaced by an enum whose variants name the two behaviors (AGENTS.md, Booleans): `suspendIfInFlight: boolean` is `whileInFlight: WhileInFlight`, default `'ReadStore'` (upstream's `false`), and `throwOnNetworkError: boolean` is `onNetworkError: OnNetworkError`, default `'Throw'` (upstream's `true`). This is a deviation from upstream's public API, made for AGENTS.md's rule; the pagination hooks, which upstream calls with `suspendIfInFlight: true`, pass `whileInFlight: 'Suspend'` when they return (Later). Both options are React-only: the runtime's `read` returns a typed result and never suspends or throws. `unwrapOrSuspend` is the throwing half of upstream's `readButDoNotEvaluate` (`read.ts:60-129`) on the React side: it receives the subscription's snapshot instead of reading, because the hook reads only through `useSyncExternalStore` (`useReadAndSubscribe`), and throws what upstream throws. The deltas: no `readPromise` of the reader (`:70-72`), no log (`:85-90`), no `encounteredRecords` in the result, an `Err` snapshot is thrown, and the promise is `onNextChangeToFragmentData` instead of `onNextChangeToRecord(environment, response.recordLink)` (`cache.ts:135-149`).
 
-Upstream suspends until any write touches the record the read stopped at; i2's `normalize` records no touched records, so the suspended read subscribes with `readAndSubscribe`, `delivered` set to its `MissingData`, and resumes at the first write after which the read is no longer `MissingData` (`Ok`, or `Err` when a nested resolver throws, which the retried render then throws). A write that fills the record but leaves the read missing elsewhere resumes upstream's render, which suspends again; it does not resume i2's. The promise is created in the same synchronous call as the read that returned `MissingData`, so `readAndSubscribe`'s immediate comparison sees `MissingData` again and does not call the callback before `unsubscribe` is bound. A suspended read whose component never retries keeps its subscription until the data arrives, as upstream's `onNextChangeToRecord` keeps its record subscription.
+Upstream suspends until any write touches the record the read stopped at; i2's `normalize` records no touched records, so the suspended read subscribes with `readAndSubscribe` and resumes at the first write after which the read is no longer `MissingData` (`Ok`, or `Err` when a nested resolver throws, which the retried render then throws). A write that fills the record but leaves the read missing elsewhere resumes upstream's render, which suspends again; it does not resume i2's. `readAndSubscribe` reads when it subscribes, so a read that is no longer `MissingData` by then resolves the promise at once instead of waiting for a write that may never come; the callback refers to `unsubscribe` only when `callSubscriptions` calls it, after the binding. A suspended read whose component never retries keeps its subscription until the data arrives, as upstream's `onNextChangeToRecord` keeps its record subscription.
 
 ```ts
 // from libs/isograph-react/src/react/maybeUnwrapNetworkRequest.ts
@@ -887,7 +888,9 @@ Delta from `react/maybeUnwrapNetworkRequest.ts`: `PromiseWrapper<void, unknown>`
 
 What the two options do, upstream's semantics: `whileInFlight: 'Suspend'` suspends while the request is pending even when the store has the data; `onNetworkError: 'Throw'` (the default) throws the request's error at render, and makes a `MissingData` read reject when the request rejects. With `whileInFlight: 'ReadStore'` (the default), a read whose data the store already has renders it while the request is in flight.
 
-### `useReadAndSubscribe` and `useRerenderOnChange`
+### `useReadAndSubscribe`
+
+This is a deviation from upstream. Upstream's `useReadAndSubscribe` keeps the read result in React state: it reads in a `useState` initializer, and `useRerenderOnChange` subscribes in an effect and calls `setState` from the callback (`react/useReadAndSubscribe.ts:33-35`, `react/useRerenderOnChange.ts:21-37`). i2 keeps the read result only in the runtime, in the subscription's `delivered`, and the hook reads it through `useSyncExternalStore(subscribe, getSnapshot)`. React state would hold a second copy of what the runtime already holds. That copy goes stale when a write lands between the render that read it and the commit that subscribes, which is why upstream re-reads on subscribe (`subscribe.ts:32-36`), and under concurrent rendering two components can render from copies taken after different writes. `useSyncExternalStore` exists to read an external store without that copy: React calls `getSnapshot` at render, calls it again after `subscribe` at commit, and re-renders when the two differ.
 
 ```ts
 // from libs/isograph-react/src/react/useReadAndSubscribe.ts
@@ -896,24 +899,15 @@ import type {
   ResolverParam,
   SelectionSetData,
 } from '@isograph/runtime';
-import { useState } from 'react';
-import {
-  type FragmentReference,
-  stableIdForFragmentReference,
-  type StableIdForFragmentReference,
-} from '../core/FragmentReference';
-import { type NetworkRequestReaderOptions, readOrSuspend } from '../core/read';
+import type { FragmentReference } from '../core/FragmentReference';
+import { type NetworkRequestReaderOptions, unwrapOrSuspend } from '../core/read';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
-import { useRerenderOnChange } from './useRerenderOnChange';
-
-/** The data last read, and the fragment reference it was read for. */
-type ReadOutData = {
-  readonly stableId: StableIdForFragmentReference;
-  readonly data: SelectionSetData;
-};
+import { useSubscription } from './useSubscription';
+import { useSubscriptionSnapshot } from './useSubscriptionSnapshot';
 
 /**
- * Read the data from a fragment reference and subscribe to updates.
+ * The data `fragmentReference`'s reader AST reads, re-rendering when it changes. Suspends on
+ * `MissingData`; throws a read's error.
  */
 export function useReadAndSubscribe<
   TReadFromStore extends ResolverParam<TEntityName>,
@@ -923,76 +917,102 @@ export function useReadAndSubscribe<
   networkRequestOptions: NetworkRequestReaderOptions,
 ): SelectionSetData {
   const environment = useIsographEnvironment();
-  const stableId = stableIdForFragmentReference(fragmentReference);
-  const [readOutData, setReadOutData] = useState<ReadOutData>(() => ({
-    stableId,
-    data: readOrSuspend(environment, fragmentReference, networkRequestOptions),
-  }));
-  let current = readOutData;
-  if (readOutData.stableId !== stableId) {
-    current = {
-      stableId,
-      data: readOrSuspend(environment, fragmentReference, networkRequestOptions),
-    };
-    setReadOutData(current);
-  }
-  useRerenderOnChange(current.data, fragmentReference, (data) => {
-    setReadOutData({ stableId, data });
-  });
-  return current.data;
+  const subscription = useSubscription(
+    environment,
+    fragmentReference.readerArtifact,
+    fragmentReference.root,
+    fragmentReference.variables,
+  );
+  const result = useSubscriptionSnapshot(subscription);
+  return unwrapOrSuspend(environment, fragmentReference, networkRequestOptions, result);
 }
 ```
 
 ```ts
-// from libs/isograph-react/src/react/useRerenderOnChange.ts
+// from libs/isograph-react/src/react/useSubscriptionSnapshot.ts
 import {
-  type EntityName,
-  readAndSubscribe,
-  type ResolverParam,
-  type SelectionSetData,
+  listenToSubscription,
+  type Subscription,
+  type SubscriptionResult,
+  subscriptionSnapshot,
 } from '@isograph/runtime';
-import { useEffect } from 'react';
-import {
-  type FragmentReference,
-  stableIdForFragmentReference,
-} from '../core/FragmentReference';
-import { useIsographEnvironment } from './IsographEnvironmentProvider';
+import { useCallback, useSyncExternalStore } from 'react';
 
-export function useRerenderOnChange<
-  TReadFromStore extends ResolverParam<TEntityName>,
-  TEntityName extends EntityName,
->(
-  data: SelectionSetData,
-  fragmentReference: FragmentReference<TReadFromStore, unknown, TEntityName>,
-  setData: (data: SelectionSetData) => void,
-): void {
-  const environment = useIsographEnvironment();
-  const stableId = stableIdForFragmentReference(fragmentReference);
-  useEffect(
-    () =>
-      readAndSubscribe(
-        environment,
-        fragmentReference.readerArtifact,
-        fragmentReference.root,
-        fragmentReference.variables,
-        { kind: 'Ok', value: data },
-        (result) => {
-          if (result.kind === 'Ok') {
-            setData(result.value);
-          }
-        },
-      ),
-    [environment, stableId],
+/** `subscription`'s last result, re-rendering when it changes. */
+export function useSubscriptionSnapshot(subscription: Subscription): SubscriptionResult {
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => listenToSubscription(subscription, onStoreChange),
+    [subscription],
   );
+  return useSyncExternalStore(subscribe, () => subscriptionSnapshot(subscription));
 }
 ```
+
+```ts
+// from libs/isograph-react/src/react/useSubscription.ts
+import type {
+  EntityName,
+  IsographEnvironment,
+  Link,
+  ReaderArtifact,
+  ResolverParam,
+  Subscription,
+  Variables,
+} from '@isograph/runtime';
+
+/**
+ * The subscription to `readerArtifact`'s read at `link` with `variables`, created at render by
+ * `readAndSubscribe` under a temporary retain and permanently retained at commit
+ * (network-and-subscriptions.md, The two-phase lifetime). Another artifact, link, or
+ * `stableStringify(variables)` gets another subscription, and the old one is released.
+ */
+export function useSubscription<TEntityName extends EntityName>(
+  environment: IsographEnvironment,
+  readerArtifact: ReaderArtifact<ResolverParam<TEntityName>, unknown, TEntityName>,
+  link: NoInfer<Link<TEntityName>>,
+  variables: Variables,
+): Subscription;
+```
+
+`useSubscription` holds the `Subscription`, a disposable item, across renders, as `useLazyDisposableState` holds its item (`disposable-state/useLazyDisposableState.ts`). It holds the handle and never the data: every render reads the data from the handle through `subscriptionSnapshot`. Its body is the two-phase lifetime in `useLazyDisposableState`'s shape, written with the request-cache hooks when this doc is next worked (The environment and the network path). The `callback` it passes to `readAndSubscribe` does nothing: React receives the notification through `listenToSubscription`, because React hands its listener to `subscribe` at commit, after `readAndSubscribe` fixed the callback at render. `useCallback` keeps `subscribe` the same function while the subscription is the same, so React does not unsubscribe and subscribe again on every render; it memoizes a function of the handle, not a read result.
+
+What `useSyncExternalStore` needs from the runtime, by name:
+
+- `getSnapshot` is `() => subscriptionSnapshot(subscription)` (network-and-subscriptions.md, The snapshot). It must return the same object (`===`) until a write changes the read. React compares consecutive `getSnapshot` results with `Object.is`; a fresh object on every call is a change on every call, and React re-renders in a loop (React's warning: "The result of getSnapshot should be cached to avoid an infinite loop"). `callSubscriptions` replaces `delivered` only when a re-read is unequal to it by the reader AST's rule, which gives this. The read itself is never done in `getSnapshot`.
+- `subscribe` is `(onStoreChange) => listenToSubscription(subscription, onStoreChange)`. `listenToSubscription` is not yet in network-and-subscriptions.md (Docs this doc amends).
+
+```ts
+// from libs/isograph-runtime/src/subscribe.ts
+export type Subscription = {
+  readonly artifact: ReaderArtifact<ResolverParam, unknown, EntityName>;
+  readonly root: StoreLink;
+  readonly variables: Variables;
+  /** The result last read: at subscribe, or the last one the callback received. */
+  delivered: SubscriptionResult;
+  readonly callback: (result: SubscriptionResult) => void;
+  /** Called after each change to `delivered`, after `callback`. */
+  readonly listeners: Set<() => void>;
+};
+
+/** Calls `listener` after each change to `subscriptionSnapshot(subscription)`, until the
+ * returned function is called. */
+export function listenToSubscription(
+  subscription: Subscription,
+  listener: () => void,
+): () => void;
+```
+
+`callSubscriptions` calls each listener through `reportCallbackError` after it replaces `delivered` and calls `callback`. Under pico-runtime.md's change 4, `listen` and `snapshot` take the places of `listenToSubscription` and `subscriptionSnapshot`, and the hook keeps this shape.
+
+React constraint (pico-runtime.md, Follow-ups 9): `useSyncExternalStore` performs a store update as blocking even inside a transition. A write inside `startTransition` re-renders the components that read it synchronously, with no pending state. Deferring that re-render is `useDeferredValue` over the hook's result, or a deferred snapshot the React package updates inside `startTransition`; v1 does neither.
 
 Deltas from `react/useReadAndSubscribe.ts:25-43` and `react/useRerenderOnChange.ts:10-38`:
 
 - No `readerAst` parameter: the fragment reference holds the reader artifact.
 - The data is `SelectionSetData`, not `ExtractData<TReadFromStore>`. The hook passes it only to the resolver; typing it would need a cast from the runtime's untyped read.
-- The state records the stable id it was read for. When the fragment reference's stable id changes, the render reads again (React's "adjust state during render" pattern) and the subscription effect re-runs (`[environment, stableId]`). Upstream reads only in the `useState` initializer (`useReadAndSubscribe.ts:33-35`) and subscribes once (`useRerenderOnChange.ts:31-37`, deps `[]`, "the fragment reference is stable for the life of the component"). That held because each upstream fragment reference rendered through its own cached component (`getOrCreateCachedComponent`), which remounts for a new reference. Without `@component`, `useResult` is called with a changing reference by the same component (a route whose `id` changes), and upstream's version would keep the old data and the old subscription.
-- The callback sets state on `Ok` only. On `MissingData` and `Err` the component keeps the data it rendered, as upstream's, whose re-read throws and is caught by `logAnyError` (`core/subscribe.ts:47-61`). What the hook does with those two results is open decision 2.
+- No React state holds the data, and `useRerenderOnChange` is gone: the reasons above.
+- When the fragment reference changes, `useSubscription` returns another subscription, `subscribe` changes with it, and React unsubscribes the old listener and subscribes the new one; `getSnapshot` reads the new subscription in the same render. Upstream reads only in the `useState` initializer (`useReadAndSubscribe.ts:33-35`) and subscribes once (`useRerenderOnChange.ts:31-37`, deps `[]`, "the fragment reference is stable for the life of the component"). That held because each upstream fragment reference rendered through its own cached component (`getOrCreateCachedComponent`), which remounts for a new reference. Without `@component`, `useResult` is called with a changing reference by the same component (a route whose `id` changes), and upstream's version would keep the old data and the old subscription.
+- A `MissingData` or `Err` snapshot after mount suspends or throws, because the snapshot is what the subscription delivered last. Upstream keeps the rendered data, whose re-read throws and is caught by `logAnyError` (`core/subscribe.ts:47-61`). Open decision 2.
 - `useSubscribeToMultiple` (`:45-86`) and `componentFunction` (`:88-130`) are dropped.
 
 ### `FragmentReader`
@@ -1027,7 +1047,7 @@ Delta from `react/FragmentReader.tsx:10-29`: the reference's type is given by `T
 
 ## Re-rendering on writes
 
-`readButDoNotEvaluate`, `readAndSubscribe`, and `callSubscriptions` are network-and-subscriptions.md's (Reading without the root resolver, Subscriptions): pico-runtime.md's Step A with this doc's former amendments. A hook passes the data it rendered as `delivered`, so a write between the render and the effect is delivered at subscribe time; the callback receives the reader's data, and the hook calls the resolver in render; a `MissingData` or `Err` re-read is delivered as such.
+`readButDoNotEvaluate`, `readAndSubscribe`, `subscriptionSnapshot`, and `callSubscriptions` are network-and-subscriptions.md's (Reading without the root resolver, Subscriptions): pico-runtime.md's Step A with this doc's former amendments. A hook subscribes at render, so a write between the render and the commit replaces the subscription's `delivered`, and `useSyncExternalStore`'s check after `subscribe` re-renders with it. The callback receives the reader's data, and the hook calls the resolver in render; a `MissingData` or `Err` re-read is delivered as such, and becomes the snapshot.
 
 ## Disposal, StrictMode, and upstream's disposable-state behavior
 
@@ -1041,7 +1061,7 @@ The following hold at `9d72f6fc`, traced from source, not reproduced:
 - When the commit finds its item disposed and the parent cache empty, it creates one with `parentCache.factory()` outside the parent cache (`useCachedResponsivePrecommitValue.ts:89-98`), so another component with the same cache key creates another item. That item's `fetchEntrypoint` sends a second request while the first is in flight (`IfNecessary` sees `MissingData`); after the first settled, `IfNecessary` finds the data with `check` and sends nothing.
 - The first caller's `fetchOptions` win for a cache key: the factory closes over them (`getOrCreateCacheForArtifact.ts:55-84`), so a second component's `onComplete` with the same query and variables is not called. The runtime's cache keeps this outcome (network-and-subscriptions.md, The request cache).
 - Cache entries are never removed: one empty `ParentCache` per distinct query text and variables stays in the map for the environment's life (`ParentCache.ts:32`, "TODO pass an onEmpty function").
-- `useReadAndSubscribe` keeps stale data when its fragment reference changes: fixed here, because v1 forces it (Reading).
+- `useReadAndSubscribe` keeps stale data when its fragment reference changes: fixed here, because v1 forces it, by a new subscription per reference (Reading).
 
 Held for the rest: upstream's behavior. Each is listed so that a fix is a decision, not a surprise.
 
@@ -1055,17 +1075,17 @@ The port keeps upstream's code as it is, including TypeScript's `private __x` fi
 
 1. `useLazyReference` renders: the runtime's `getOrCreateCacheForArtifact` returns the cache for `queryText + stableStringify(variables)`; `useLazyDisposableState` calls its factory on the first render.
 2. The factory: the runtime's `fetchEntrypoint`, which checks, sends the request or retains without sending, and retains `{ ast, variables }` in `environment.retainedQueries`.
-3. `FragmentReader` renders `useResult`: `maybeUnwrapNetworkRequest`, then `useReadAndSubscribe` reads with `readButDoNotEvaluate`; `MissingData` throws `onNextChangeToFragmentData`'s promise.
-4. The response arrives: `normalize`, then `callSubscriptions`: the suspended read's subscription sees `Ok`, removes itself, and resolves; React retries and the read is `Ok`. The component commits; `useRerenderOnChange` subscribes with the rendered data.
-5. A later write that changes the data calls the subscription's callback, which sets state; the component re-renders and calls the resolver on the new data.
-6. Unmount: `useRerenderOnChange` unsubscribes; `useLazyReference`'s permanent retain is cleared, and the cache item calls `fetchEntrypoint`'s cleanup, which unretains the query. Collection follows open decision 1.
+3. `FragmentReader` renders `useResult`: `maybeUnwrapNetworkRequest`, then `useReadAndSubscribe`: `useSubscription` reads and subscribes with `readAndSubscribe`, and `useSyncExternalStore` returns `subscriptionSnapshot`; `MissingData` throws `onNextChangeToFragmentData`'s promise.
+4. The response arrives: `normalize`, then `callSubscriptions`: the suspended read's promise subscription sees `Ok`, removes itself, and resolves; React retries and the snapshot is `Ok`. The component commits; `useSubscription` retains the subscription permanently, and `useSyncExternalStore` calls `listenToSubscription`.
+5. A later write that changes the data replaces the subscription's `delivered` and calls React's listener; React re-renders the component, which reads the new snapshot and calls the resolver on it.
+6. Unmount: React's listener is removed and `useSubscription` releases the subscription; `useLazyReference`'s permanent retain is cleared, and the cache item calls `fetchEntrypoint`'s cleanup, which unretains the query. Collection follows open decision 1.
 
 ## Errors
 
 Every throw this package adds or keeps, and its invariant:
 
 - `useIsographEnvironment` outside a provider: upstream's message (`IsographEnvironmentProvider.tsx:25-34`). The invariant is the user's: hooks render under a provider.
-- `readOrSuspend` and `maybeUnwrapNetworkRequest` throw promises and the network error. These are React's Suspense and error boundary protocol, upstream's behavior, not broken invariants.
+- `unwrapOrSuspend` and `maybeUnwrapNetworkRequest` throw promises, the network error, and an `Err` snapshot's error. These are React's Suspense and error boundary protocol, upstream's behavior, not broken invariants.
 - The ported disposable-state throws ("This indicates a bug in react-disposable-state.", "Calling setState before the component has committed is unsafe and disallowed."): upstream's, unchanged.
 - The runtime's network path rejects a request's wrapper on a network error or a malformed response (network-and-subscriptions.md, Errors); a reader sees it through `onNetworkError`.
 
@@ -1443,6 +1463,7 @@ The package files; `src/core/*`; `src/index.ts` exporting the core names; the fi
 ## Docs this doc amends
 
 - `refactors/pending/runtime/store.md`: `stableStringify` is exported from the package index, and `exports` gains the `import` condition, with this doc's first import of runtime values.
+- `refactors/pending/runtime/network-and-subscriptions.md`, Subscriptions: `Subscription` gains `listeners`, `listenToSubscription` is added and exported, and `callSubscriptions` calls the listeners after the callback (Reading, `useReadAndSubscribe`).
 
 ## Later
 
@@ -1450,7 +1471,7 @@ The package files; `src/core/*`; `src/index.ts` exporting the core names; the fi
 - `FragmentRenderer` and components: with `@component`, or with resolvers that return components in userland, and a per-reference component cache (`core/componentCache.ts`).
 - The loadable hooks and pagination, with `@loadable` and refetch queries.
 - A release buffer before collection (pico-runtime.md, Follow-ups 7).
-- Replacing `readAndSubscribe` with pico-runtime.md's level 2 (`listen`, `snapshot`) and `useSyncExternalStore`.
+- Replacing `readAndSubscribe`, `subscriptionSnapshot`, and `listenToSubscription` with pico-runtime.md's level 2 (`listen`, `snapshot`); the hooks keep their `useSyncExternalStore` shape.
 - The pagination hooks, which pass `whileInFlight: 'Suspend'` where upstream passes `suspendIfInFlight: true`.
 
 ## Open decisions
@@ -1467,13 +1488,13 @@ Not held.
 
 ### 2. What a mounted hook does with a `MissingData` or `Err` delivery
 
-`readAndSubscribe` delivers `MissingData` and `Err` (network-and-subscriptions.md, Semantics). Upstream's hook never sees either: its re-read throws and `logAnyError` swallows it (`core/subscribe.ts:47-61`).
+`readAndSubscribe` delivers `MissingData` and `Err` (network-and-subscriptions.md, Semantics), and `subscriptionSnapshot` returns them. Upstream's hook never sees either: its re-read throws and `logAnyError` swallows it (`core/subscribe.ts:47-61`). The hook keeps no copy of the data in React state (Reading, `useReadAndSubscribe`), so keeping the rendered data is the runtime's to do.
 
-- (a) Ignore both and keep the rendered data, upstream's outcome (the snippets above). Cost: a component shows data the store no longer holds, and a resolver error after mount is invisible.
-- (b) Re-render, so the render reads again: `MissingData` suspends until data arrives, and `Err` throws into the error boundary. Cost: a mounted component falls back to its `Suspense` fallback after a collection.
-- (c) (b) for `Err` and (a) for `MissingData`.
+- (a) Keep the rendered data, upstream's outcome: the runtime adds a second snapshot function that returns the last `Ok` result, stable by the same rule, and `useSubscriptionSnapshot` passes it as `getSnapshot`. Cost: a component shows data the store no longer holds, a resolver error after mount is invisible, and a runtime function exists for one caller's policy.
+- (b) Render the snapshot as it is (the snippets above): `MissingData` suspends until data arrives, and `Err` throws into the error boundary. Cost: a mounted component falls back to its `Suspense` fallback after a collection.
+- (c) (b) for `Err` and (a) for `MissingData`. Cost: (a)'s runtime function, for `MissingData` only.
 
-Not held.
+Not held. The snippets are written as (b), which is what `subscriptionSnapshot` gives; (a) and (c) change only the function `useSubscriptionSnapshot` passes as `getSnapshot`.
 
 ### 3. The demo's browser entry
 

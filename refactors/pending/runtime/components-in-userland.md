@@ -6,7 +6,7 @@ The question: what happens when a client field's resolver returns a React compon
 
 The answer turns on one distinction (Two kinds of resolver result): whether the field's result is a closure that reads the field's data when the closure is executed, or a value computed from data read when the resolver runs. Every option below produces one of the two, or is storage for one.
 
-Upstream references are the checkout at `/Users/rbalicki/code/isograph` (commit `79e2a3c0`). Paths without a directory are under `isograph/libs/isograph-react/src/core`; `react/` paths are under `isograph/libs/isograph-react/src/react`. "Change 1" to "change 4" and "Step A" are those of `refactors/pending/runtime/pico-runtime.md`. `readButDoNotEvaluate`, `readAndSubscribe`, `SubscriptionResult`, and `IsographEnvironment` are `refactors/pending/runtime/network-and-subscriptions.md`'s (Step A, amended). `useIsographEnvironment`, `onNextChangeToFragmentData`, and `useResult` are `refactors/pending/runtime/react.md`'s.
+Upstream references are the checkout at `/Users/rbalicki/code/isograph` (commit `79e2a3c0`). Paths without a directory are under `isograph/libs/isograph-react/src/core`; `react/` paths are under `isograph/libs/isograph-react/src/react`. "Change 1" to "change 4" and "Step A" are those of `refactors/pending/runtime/pico-runtime.md`. `readButDoNotEvaluate`, `readAndSubscribe`, `SubscriptionResult`, and `IsographEnvironment` are `refactors/pending/runtime/network-and-subscriptions.md`'s (Step A, amended). `subscriptionSnapshot` is network-and-subscriptions.md's too, and `listenToSubscription` is the addition to it that react.md names. `useIsographEnvironment`, `onNextChangeToFragmentData`, `useSubscription`, `useSubscriptionSnapshot`, and `useResult` are `refactors/pending/runtime/react.md`'s.
 
 ## What upstream does
 
@@ -398,53 +398,38 @@ export function component<TParam extends ResolverParam, TProps extends object>(
 
 ```ts
 // from libs/isograph-react/src/react/useClosureData.ts
-import {
-  readAndSubscribe,
-  readButDoNotEvaluate,
-  type ClosureReference,
-  type ResolverParam,
-  type SelectionSetData,
-  type SubscriptionResult,
-} from '@isograph/runtime';
-import { useEffect, useState } from 'react';
+import type { ClosureReference, ResolverParam, SelectionSetData } from '@isograph/runtime';
 import { onNextChangeToFragmentData } from '../core/read';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
+import { useSubscription } from './useSubscription';
+import { useSubscriptionSnapshot } from './useSubscriptionSnapshot';
 
 /**
  * The data `reference`'s reader AST reads now, re-rendering when it changes. Suspends on
- * `MissingData` until a write fills it; throws a re-read's error.
+ * `MissingData` until a write fills it; throws a read's error.
  */
 export function useClosureData<TParam extends ResolverParam>(
   reference: ClosureReference<TParam>,
 ): SelectionSetData {
   const environment = useIsographEnvironment();
-  const [result, setResult] = useState<SubscriptionResult>(() =>
-    readButDoNotEvaluate(environment.store, reference.artifact, reference.link, reference.parameters),
-  );
-  useEffect(
-    () =>
-      readAndSubscribe(
-        environment,
-        reference.artifact,
-        reference.link,
-        reference.parameters,
-        result,
-        setResult,
-      ),
-    [environment],
-  );
+  const subscription = useSubscription(environment, reference.artifact, reference.link, reference.parameters);
+  const result = useSubscriptionSnapshot(subscription);
   switch (result.kind) {
     case 'Ok':
       return result.value;
     case 'MissingData':
-      throw onNextChangeToFragmentData(environment, reference.artifact, reference.link, reference.parameters, result);
+      throw onNextChangeToFragmentData(environment, reference.artifact, reference.link, reference.parameters);
     case 'Err':
       throw result.error;
   }
 }
 ```
 
-- The read is react.md's `useReadAndSubscribe` (a read in the `useState` initializer, `readAndSubscribe` in an effect with the rendered result as `delivered`, so a write between render and effect is delivered), without the stable-id check. react.md adds that check because a component calling `useResult` can receive another fragment reference. A wrapper has exactly one `ClosureReference` for its life, so the effect's dependencies are `[environment]`, which is upstream's assumption (`react/useRerenderOnChange.ts:31-37`) made true by construction.
+- The data lives only in the runtime, in the subscription's `delivered`; no `useState` or `useRef` holds a read result. The hook reads through `useSyncExternalStore(subscribe, getSnapshot)` (react.md, `useReadAndSubscribe`), with `subscribe` `listenToSubscription` and `getSnapshot` `subscriptionSnapshot`. A copy in React state would duplicate the store, would go stale when a write lands between the render that read it and the commit that subscribes, and is the copy `useSyncExternalStore` exists to avoid. This deviates from upstream's `componentFunction`, which reads through `useReadAndSubscribe`'s `useState` (`react/useReadAndSubscribe.ts:25-43`).
+- `subscriptionSnapshot` must return the same object until a write changes the read, or React re-renders in a loop; `callSubscriptions` replaces `delivered` only on an unequal re-read, which gives this (network-and-subscriptions.md, The snapshot).
+- `useSubscription` holds the `Subscription` handle across renders, never its data. A wrapper has exactly one `ClosureReference` for its life, so `useSubscription` keeps one subscription for the mount, which is upstream's assumption (`react/useRerenderOnChange.ts:31-37`) made true by construction.
+- A `MissingData` or `Err` snapshot after mount suspends or throws, as react.md's `useReadAndSubscribe` does (react.md, open decision 2).
+- `useSyncExternalStore` performs a store update as blocking even inside a transition (pico-runtime.md, Follow-ups 9), so a write inside `startTransition` re-renders a closure component synchronously.
 - `onNextChangeToFragmentData` takes the artifact, the link, and the variables instead of a `FragmentReference`, because a closure has no network request. The component waits for the data and does not see a request's error; the error reaches the entrypoint's reader through `useResult`'s `maybeUnwrapNetworkRequest`. Upstream's component waits on the first request that created it (What upstream does, the first caller wins), which this removes.
 - The component reads through the environment in context, not through the `store` `createWrapper` receives. A component rendered under another provider than the one whose store created it reads the other store. Open question 5.
 - `displayName` is upstream's (`react/useReadAndSubscribe.ts:127-128`) without the `@component` suffix.
@@ -500,7 +485,7 @@ type IdentityWithParam<TParam extends ResolverParam, TReturnConstraint = unknown
 };
 ```
 
-- `TEntityName`: `ClosureReference<TParam>.link` is `TParam['link']`, the generated `E____link__output_type`, so a `PetCard` wrapper's link is `Link<"Pet">`, and on an abstract entity the union of its concrete entities' names (reader-ast.md, The parent entity's name). `reference.artifact` is held at `EntityName`; `readButDoNotEvaluate` and `readAndSubscribe` are called with the pair at `EntityName`, which network-and-subscriptions.md's `Subscription` already does.
+- `TEntityName`: `ClosureReference<TParam>.link` is `TParam['link']`, the generated `E____link__output_type`, so a `PetCard` wrapper's link is `Link<"Pet">`, and on an abstract entity the union of its concrete entities' names (reader-ast.md, The parent entity's name). `reference.artifact` is held at `EntityName`; `useSubscription` and `onNextChangeToFragmentData` are called with the pair at `EntityName`, which network-and-subscriptions.md's `Subscription` already does.
 - Props: `component`'s `TProps` is inferred from the annotation on `body`'s second parameter, and the field's output type is `React.FC<TProps>`. `key` is admitted by TypeScript's JSX check through `JSX.IntrinsicAttributes`, so upstream's `CombineWithIntrinsicAttributes` (`generate_artifacts.rs:623-626`) is not needed.
 - `TParam` for `body`'s first parameter comes from the contextual type: `component(..)` is the argument of the second `IdentityWithParam` signature, whose parameter type is `ClosureResolver<Pet__PetCard__param, TWrapper>`, and TypeScript infers `component`'s `TParam` from that return type. This is not checked with `tsc`. If inference through the overload fails, `data` is `SelectionSetData`'s values typed `unknown`, and the implementer stops and raises it.
 - `TArgs` of `closure` is inferred from `body`'s parameters after the first, `TResult` from its return.
@@ -515,7 +500,7 @@ This is the split option 2 builds out of `PetCardFetched` and `PetCardData` (Opt
 
 - Change 2: a parent that selects a closure field records one dependency on the closure entry. Its observed `timeUpdated` changes only when the entry is deleted and created again, so the parent's entry never recomputes for the closure's data.
 - Change 3: settlement does not compute the closure's data, because no parent depends on it. A component's render then reads its data, which pico-runtime.md's goal ("Renders do no work") excludes. The alternative is a second entry per closure entry, holding the data read as a `ResolverEntry`, which settlement computes when a retained root reaches the closure entry and which the component observes. Open question 3.
-- Change 4: Step A's `readAndSubscribe` is replaced by `listen` and `snapshot`, which take an `EntryLocation`. `useClosureData` then needs that second entry's location, so change 4 decides open question 3.
+- Change 4: Step A's `readAndSubscribe`, `subscriptionSnapshot`, and `listenToSubscription` are replaced by `listen` and `snapshot`, which take an `EntryLocation`, and `useClosureData` keeps its `useSyncExternalStore` shape with them as `subscribe` and `getSnapshot`. `useClosureData` then needs that second entry's location, so change 4 decides open question 3.
 
 ### Without runtime support
 
