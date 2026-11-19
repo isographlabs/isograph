@@ -13,6 +13,7 @@ mod discover;
 mod effect;
 mod event;
 mod lsp_notification_dispatch;
+mod lsp_request_dispatch;
 mod lsp_socket;
 mod lsp_stdio;
 mod send;

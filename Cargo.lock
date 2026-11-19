@@ -863,7 +863,6 @@ dependencies = [
  "pico",
  "pico_macros",
  "prelude",
- "serde_json",
  "span",
  "tracing",
 ]

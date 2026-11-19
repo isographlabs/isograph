@@ -82,7 +82,7 @@ fn walk_rust(dir: &Path, hits: &mut Vec<String>) {
                 }
                 stack.push(path);
             } else if path.extension().is_some_and(|e| e == "rs") {
-                let skip = path.ends_with("crates/isograph_lsp/src/lsp_request_dispatch.rs")
+                let skip = path.ends_with("crates/isograph_cli/src/lsp_request_dispatch.rs")
                     || path.ends_with("crates/isograph_lsp/src/lsp_runtime_error.rs");
                 if skip {
                     continue;

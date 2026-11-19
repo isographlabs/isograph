@@ -90,18 +90,17 @@ fn dispatch_lsp_request<THostLanguage: HostLanguage>(
         return no_effects();
     };
     let get_response = || {
-        let request =
-            isograph_lsp::lsp_request_dispatch::LSPRequestDispatch::new(request, &state.db)
-                .on_request_sync::<lsp_types::request::SemanticTokensFullRequest>(
-                    crate::adapter::semantic_tokens_response::<THostLanguage>,
-                )?
-                .on_request_sync::<lsp_types::request::Formatting>(
-                    crate::adapter::formatting_response::<THostLanguage>,
-                )?
-                .on_request_sync::<lsp_types::request::WillSaveWaitUntil>(
-                    crate::adapter::will_save_wait_until_response::<THostLanguage>,
-                )?
-                .request();
+        let request = crate::lsp_request_dispatch::LSPRequestDispatch::new(request, &state.db)
+            .on_request_sync::<lsp_types::request::SemanticTokensFullRequest>(
+                crate::adapter::semantic_tokens_response::<THostLanguage>,
+            )?
+            .on_request_sync::<lsp_types::request::Formatting>(
+                crate::adapter::formatting_response::<THostLanguage>,
+            )?
+            .on_request_sync::<lsp_types::request::WillSaveWaitUntil>(
+                crate::adapter::will_save_wait_until_response::<THostLanguage>,
+            )?
+            .request();
         ControlFlow::Continue(request)
     };
     match get_response() {

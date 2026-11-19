@@ -6,7 +6,7 @@ use lsp_server::{
 use lsp_types::request::Request;
 use serde_json::Value;
 
-use crate::lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult};
+use isograph_lsp::lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult};
 
 pub struct LSPRequestDispatch<'state, TState> {
     request: lsp_server::Request,
@@ -114,7 +114,7 @@ mod test {
     };
 
     use super::LSPRequestDispatch;
-    use crate::lsp_runtime_error::LSPRuntimeResult;
+    use isograph_lsp::lsp_runtime_error::LSPRuntimeResult;
 
     #[test]
     fn calls_first_matching_request_handler() {
