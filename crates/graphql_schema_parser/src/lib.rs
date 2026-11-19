@@ -15,10 +15,11 @@ mod span_of;
 mod test_cursor;
 
 pub use ast::{
-    Argument, ArgumentNameWrapper, Directive, DirectiveNameWrapper, EntityNameWrapper,
-    ValueKeyNameWrapper,
+    Argument, ArgumentNameWrapper, Description, Directive, DirectiveNameWrapper, EntityNameWrapper,
+    ScalarTypeDefinition, ValueKeyNameWrapper,
 };
 pub use parse_error::{Expectation, ExpectedFound, Found, ParseError};
+pub use parse_schema::{DefinitionError, DefinitionName};
 pub use token_kind::GraphQLTokenKind;
 pub use type_annotation::{
     ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation, NullableTypeAnnotation,

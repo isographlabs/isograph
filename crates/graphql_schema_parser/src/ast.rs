@@ -1,7 +1,15 @@
-use common_lang_types::{ArgumentName, DirectiveName, EntityName, ValueKeyName};
+use common_lang_types::{ArgumentName, DescriptionValue, DirectiveName, EntityName, ValueKeyName};
 use span::WithSpan;
 
 use crate::ConstantValue;
+
+/// Spec 3.5 `ScalarTypeDefinition`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ScalarTypeDefinition {
+    pub description: Option<WithSpan<Description>>,
+    pub name: WithSpan<EntityNameWrapper>,
+    pub directives: Vec<WithSpan<Directive>>,
+}
 
 /// Spec 2.13 `Directive[Const] : @ Name Arguments[Const]?`. The span runs from `@` through
 /// the arguments.
@@ -33,3 +41,7 @@ pub struct ValueKeyNameWrapper(pub ValueKeyName);
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct DirectiveNameWrapper(pub DirectiveName);
+
+/// The decoded value of a description, quotes excluded.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct Description(pub DescriptionValue);

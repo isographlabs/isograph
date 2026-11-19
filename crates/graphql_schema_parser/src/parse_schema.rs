@@ -1,14 +1,84 @@
+use common_lang_types::{DescriptionValue, DirectiveName, EntityName};
 use prelude::Postfix;
 use span::WithSpan;
 
+use crate::string_value::consume_string_value_if;
 use crate::token_cursor::TokenCursor;
 use crate::value::parse_constant_value;
 use crate::{
-    Argument, ArgumentNameWrapper, Directive, DirectiveNameWrapper, Expectation, GraphQLTokenKind,
-    ParseError,
+    Argument, ArgumentNameWrapper, Description, Directive, DirectiveNameWrapper, EntityNameWrapper,
+    Expectation, GraphQLTokenKind, ParseError, ScalarTypeDefinition,
 };
 
+/// A top-level definition or extension whose parse failed. The wrapping span is the text the
+/// definition occupied, from its first token to the last token recovery skipped.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct DefinitionError {
+    /// The name the failed definition declared; `None` when the parse failed before the
+    /// name, and for a schema definition or extension, which has no name.
+    pub name: Option<DefinitionName>,
+    pub error: WithSpan<ParseError>,
+}
+
+/// The name a top-level definition or extension declares.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum DefinitionName {
+    Entity(EntityName),
+    Directive(DirectiveName),
+}
+
+impl DefinitionError {
+    fn unnamed(error: WithSpan<ParseError>) -> Self {
+        DefinitionError { name: None, error }
+    }
+}
+
+fn parse_after_entity_name<T>(
+    cursor: &mut TokenCursor<'_>,
+    parse_rest: impl FnOnce(
+        &mut TokenCursor<'_>,
+        WithSpan<EntityNameWrapper>,
+    ) -> Result<T, WithSpan<ParseError>>,
+) -> Result<T, DefinitionError> {
+    let name = parse_entity_name(cursor).map_err(DefinitionError::unnamed)?;
+    parse_rest(cursor, name).map_err(|error| DefinitionError {
+        name: DefinitionName::Entity(name.item.0).wrap_some(),
+        error,
+    })
+}
+
 #[cfg_attr(not(test), expect(dead_code))]
+fn consume_description(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<Option<WithSpan<Description>>, WithSpan<ParseError>> {
+    consume_string_value_if::<DescriptionValue>(cursor)
+        .map(|description| description.map(|description| description.map(Description)))
+}
+
+fn parse_entity_name(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<WithSpan<EntityNameWrapper>, WithSpan<ParseError>> {
+    cursor
+        .require_token(GraphQLTokenKind::Identifier)
+        .map(|name| name.interned().map(EntityNameWrapper))
+        .map_err(|()| cursor.expected(Expectation::Token(GraphQLTokenKind::Identifier)))
+}
+
+#[cfg_attr(not(test), expect(dead_code))]
+fn parse_scalar_type_definition(
+    cursor: &mut TokenCursor<'_>,
+    description: Option<WithSpan<Description>>,
+) -> Result<ScalarTypeDefinition, DefinitionError> {
+    parse_after_entity_name(cursor, |cursor, name| {
+        ScalarTypeDefinition {
+            description,
+            name,
+            directives: parse_directives(cursor)?,
+        }
+        .wrap_ok()
+    })
+}
+
 fn parse_directives(
     cursor: &mut TokenCursor<'_>,
 ) -> Result<Vec<WithSpan<Directive>>, WithSpan<ParseError>> {
@@ -105,15 +175,123 @@ pub(crate) fn parse_group_after_open<T>(
 
 #[cfg(test)]
 mod tests {
+    use common_lang_types::EntityName;
+    use intern::string_key::Intern;
     use prelude::Postfix;
-    use span::{Span, WithSpan};
+    use span::{Span, WithSpan, WithSpanPostfix};
 
-    use super::parse_directives;
+    use super::{
+        DefinitionError, DefinitionName, consume_description, parse_directives,
+        parse_scalar_type_definition,
+    };
     use crate::span_of::span_of;
     use crate::test_cursor::with_cursor;
+    use crate::token_cursor::TokenCursor;
     use crate::{
-        ConstantValue, Directive, Expectation, Found, GraphQLTokenKind, IntegerValue, ParseError,
+        ConstantValue, Description, Directive, Expectation, Found, GraphQLTokenKind, IntegerValue,
+        ParseError,
     };
+
+    /// Runs `parse` on `text` after its description, when it has one, and its keyword.
+    fn after_keyword<T>(
+        text: &str,
+        parse: impl FnOnce(
+            &mut TokenCursor<'_>,
+            Option<WithSpan<Description>>,
+        ) -> Result<T, DefinitionError>,
+    ) -> Result<WithSpan<T>, DefinitionError> {
+        with_cursor(text, |cursor| {
+            let description =
+                consume_description(cursor).expect("the fixture's description decodes");
+            cursor.advance();
+            cursor.spanning(|cursor| parse(cursor, description))
+        })
+    }
+
+    fn entity(name: &str) -> Option<DefinitionName> {
+        DefinitionName::Entity(EntityName::from(name.intern())).wrap_some()
+    }
+
+    #[test]
+    fn a_scalar_is_its_name_and_directives() {
+        let scalar = after_keyword("scalar Date", parse_scalar_type_definition)
+            .expect("the fixture is a scalar");
+        assert_eq!(scalar.location, Span::new(7, 11));
+        assert_eq!(scalar.item.name.item.0, "Date");
+        assert!(scalar.item.directives.is_empty());
+        assert_eq!(scalar.item.description, None);
+
+        let scalar = after_keyword(
+            "scalar Date @specifiedBy(url: \"https://example.com\")",
+            parse_scalar_type_definition,
+        )
+        .expect("the fixture is a scalar");
+        assert_eq!(scalar.item.directives.len(), 1);
+        let directive = scalar.item.directives[0].item.reference();
+        assert_eq!(directive.name.item.0, "specifiedBy");
+        assert_eq!(directive.arguments.len(), 1);
+        assert_eq!(directive.arguments[0].item.name.item.0, "url");
+    }
+
+    #[test]
+    fn a_scalar_that_fails_before_its_name_is_unnamed() {
+        assert_eq!(
+            after_keyword("scalar", parse_scalar_type_definition),
+            DefinitionError {
+                name: None,
+                error: ParseError::expected(
+                    Expectation::Token(GraphQLTokenKind::Identifier),
+                    Found::EndOfFile
+                )
+                .with_span(Span::new(6, 6)),
+            }
+            .wrap_err()
+        );
+        let error = after_keyword("scalar 1", parse_scalar_type_definition)
+            .expect_err("the fixture has no name");
+        assert_eq!(error.name, None);
+        assert_eq!(
+            error.error.item,
+            ParseError::expected(
+                Expectation::Token(GraphQLTokenKind::Identifier),
+                Found::Token(GraphQLTokenKind::IntegerLiteral)
+            )
+        );
+    }
+
+    #[test]
+    fn a_scalar_that_fails_after_its_name_keeps_the_name() {
+        let error = after_keyword("scalar Date @a(", parse_scalar_type_definition)
+            .expect_err("the fixture has an unclosed directive");
+        assert_eq!(error.name, entity("Date"));
+    }
+
+    #[test]
+    fn descriptions_decode() {
+        with_cursor("\"a date\"", |cursor| {
+            let description = consume_description(cursor)
+                .expect("the fixture decodes")
+                .expect("the fixture is a description");
+            assert_eq!(description.item.0, "a date");
+            assert_eq!(description.location, Span::new(0, 8));
+        });
+        with_cursor("\"\"\"\n  a\n  date\n\"\"\"", |cursor| {
+            let description = consume_description(cursor)
+                .expect("the fixture decodes")
+                .expect("the fixture is a description");
+            assert_eq!(description.item.0, "a\ndate");
+        });
+        with_cursor("scalar", |cursor| {
+            assert_eq!(consume_description(cursor), None.wrap_ok());
+            assert!(!cursor.at_end());
+        });
+        with_cursor(r#""\uDEAD""#, |cursor| {
+            assert_eq!(
+                consume_description(cursor).map_err(|error| error.item),
+                ParseError::InvalidUnicodeEscape.wrap_err()
+            );
+        });
+    }
 
     fn directives(text: &str) -> Result<Vec<WithSpan<Directive>>, WithSpan<ParseError>> {
         with_cursor(text, parse_directives)
