@@ -29,23 +29,16 @@ impl<'state, TState> LSPNotificationDispatch<'state, TState> {
         if self.notification.method != TNotification::METHOD {
             return ControlFlow::Continue(self);
         }
-        match self
-            .notification
-            .extract::<TNotification::Params>(TNotification::METHOD)
-        {
-            Ok(params) => ControlFlow::Break(handler(self.state, self.client, params)),
-            Err(lsp_server::ExtractError::MethodMismatch(notification)) => {
-                ControlFlow::Continue(Self {
-                    client: self.client,
-                    notification,
-                    state: self.state,
-                })
-            }
-            Err(lsp_server::ExtractError::JsonError { method, error }) => {
-                warn!(method = method.as_str(), error = %error, "notification params");
-                ControlFlow::Break(no_effects())
-            }
-        }
+        let lsp_server::Notification { method, params } = self.notification;
+        ControlFlow::Break(
+            serde_json::from_value::<TNotification::Params>(params).map_or_else(
+                |error| {
+                    warn!(method = method.as_str(), error = %error, "notification params");
+                    no_effects()
+                },
+                |params| handler(self.state, self.client, params),
+            ),
+        )
     }
 
     pub fn notification(self) -> lsp_server::Notification {
