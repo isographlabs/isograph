@@ -128,11 +128,24 @@ fn apply_gap(out: &mut String, gap: Gap, indent: usize) {
 #[cfg(test)]
 mod tests {
     use super::format_recorded;
-    use crate::parse_iso_literal;
+    use crate::{AstError, ParseError, parse_iso_literal};
 
     fn formatted(text: &str) -> String {
         let parsed = parse_iso_literal(text);
         assert!(parsed.errors.is_empty(), "{:?}", parsed.errors);
+        format_recorded(text, parsed.tokens.as_slice())
+    }
+
+    fn formatted_with_unexpected_directives(text: &str) -> String {
+        let parsed = parse_iso_literal(text);
+        assert!(
+            parsed
+                .errors
+                .iter()
+                .all(|error| error.item == ParseError::Ast(AstError::UnexpectedDirective)),
+            "{:?}",
+            parsed.errors
+        );
         format_recorded(text, parsed.tokens.as_slice())
     }
 
@@ -254,19 +267,25 @@ mod tests {
 
     #[test]
     fn a_blank_line_after_a_comma_does_not_change_the_print() {
-        let pretty = formatted("field Pet.fullName @foo(bar: 123, baz: $qux) { id }");
+        let pretty = formatted_with_unexpected_directives(
+            "field Pet.fullName @foo(bar: 123, baz: $qux) { id }",
+        );
         (0usize..=4).for_each(|spaces| {
             let src = format!(
                 "field Pet.fullName @foo(\n    bar: 123,\n    baz: $qux,\n  ) {{\n    id,\n{}\n  }}",
                 " ".repeat(spaces)
             );
-            assert_eq!(formatted(&src), pretty, "spaces={spaces}");
+            assert_eq!(
+                formatted_with_unexpected_directives(&src),
+                pretty,
+                "spaces={spaces}"
+            );
         });
     }
 
     #[test]
     fn at_has_a_space_before() {
-        let out = formatted("field Query.x { id @loadable }");
+        let out = formatted_with_unexpected_directives("field Query.x { id @loadable }");
         assert!(out.contains("id @loadable"), "{out}");
     }
 

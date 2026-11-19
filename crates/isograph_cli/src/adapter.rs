@@ -438,7 +438,7 @@ pub(crate) mod tests {
         schema_file: IncludeFile::Include,
     };
 
-    const PRETTY: &str = "export const fullName = iso(`\n  field Pet.fullName @foo(\n    bar: 123,\n    baz: $qux,\n  ) {\n    id,\n  }\n`);\n";
+    const PRETTY: &str = "export const fullName = iso(`\n  field Pet.fullName(\n    $bar: Int,\n    $baz: String,\n  ) {\n    id,\n  }\n`);\n";
 
     fn db_with(contents: String) -> IsographDb<TestProfile> {
         let mut db = IsographDb::<TestProfile>::default();
@@ -460,7 +460,7 @@ pub(crate) mod tests {
 
     fn source_with_blank_spaces(spaces: usize) -> String {
         format!(
-            "export const fullName = iso(`\n  field Pet.fullName @foo(\n    bar: 123,\n    baz: $qux,\n  ) {{\n    id,\n{}\n  }}\n`);\n",
+            "export const fullName = iso(`\n  field Pet.fullName(\n    $bar: Int,\n    $baz: String,\n  ) {{\n    id,\n{}\n  }}\n`);\n",
             " ".repeat(spaces)
         )
     }
@@ -601,7 +601,7 @@ pub(crate) mod tests {
 
     #[test]
     fn edits_for_a_client_without_a_buffer_applied_to_a_longer_buffer_leave_an_extra_brace() {
-        const EXTRA_BRACE: &str = "export const fullName = iso(`\n  field Pet.fullName @foo(\n    bar: 123,\n    baz: $qux,\n  ) {\n    id,\n  }\n  }\n`);\n";
+        const EXTRA_BRACE: &str = "export const fullName = iso(`\n  field Pet.fullName(\n    $bar: Int,\n    $baz: String,\n  ) {\n    id,\n  }\n  }\n`);\n";
         let db = db_with(PRETTY.to_owned());
         let edits = format_iso_literals(&db, client(), path()).expect("edits");
         (0usize..=4).for_each(|spaces| {

@@ -28,6 +28,10 @@ pub struct IsographFieldDirective {
 #[resolve_position(parent_type = IsographFieldDirectivePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct IsographDirectiveNameWrapper(pub common_lang_types::IsographDirectiveName);
 
+/// A directive name the iso parser accepts. v1 accepts none.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, strum::EnumString)]
+enum SupportedDirectiveName {}
+
 #[derive(Debug)]
 pub enum IsographFieldDirectiveListParent<'a> {
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
@@ -87,10 +91,17 @@ fn parse_directive_after_at(
         .as_ref()
         .map(|list| list.location.end)
         .unwrap_or(name.location.end);
+    let location = Span::new(at.start, end);
+    match name.text().parse::<SupportedDirectiveName>() {
+        Ok(supported) => match supported {},
+        Err(strum::ParseError::VariantNotFound) => {
+            cursor.report_error(AstError::UnexpectedDirective.with_span(location));
+        }
+    }
     IsographFieldDirective {
         name: name.interned().map(IsographDirectiveNameWrapper),
         arguments,
     }
-    .with_span(Span::new(at.start, end))
+    .with_span(location)
     .wrap_ok()
 }

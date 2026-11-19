@@ -137,6 +137,29 @@ mod tests {
     }
 
     #[test]
+    fn a_directive_is_reported_as_unexpected_on_its_range() {
+        let contents = "iso(`entity Pet`) iso(`field Pet.id`) iso(`field Pet.f @component { id }`)";
+        let diagnostics = diagnostics_of(contents);
+        assert_eq!(
+            diagnostics
+                .iter()
+                .map(|diagnostic| diagnostic.message.as_str())
+                .collect::<Vec<_>>(),
+            "unexpected directive".wrap_vec()
+        );
+        let start = contents
+            .find("@component")
+            .expect("the fixture writes @component") as u32;
+        assert_eq!(
+            diagnostics[0].range,
+            lsp_types::Range::new(
+                lsp_types::Position::new(0, start),
+                lsp_types::Position::new(0, start + "@component".len() as u32)
+            )
+        );
+    }
+
+    #[test]
     fn crlf_and_lone_cr_before_the_literal_put_the_range_on_line_one() {
         for contents in [
             "const a = 1;\r\niso(`entrypoint`)",
@@ -427,7 +450,7 @@ mod validation_tests {
         let files = [
             (
                 "src/Owner.ts",
-                "iso(`entity Owner`)\niso(`field Owner.displayName \"How the owner signs.\"`)\niso(`field Owner.OwnerBadge @component { displayName }`)",
+                "iso(`entity Owner`)\niso(`field Owner.displayName \"How the owner signs.\"`)\niso(`field Owner.OwnerBadge { displayName }`)",
             ),
             (
                 "src/Pet.ts",
@@ -435,7 +458,7 @@ mod validation_tests {
             ),
             (
                 "src/Card.ts",
-                "iso(`field Pet.card($id: ID!) @component { owner { displayName, OwnerBadge }, id }`)",
+                "iso(`field Pet.card($id: ID!) { owner { displayName, OwnerBadge }, id }`)",
             ),
         ];
         let db = db_with(&files);

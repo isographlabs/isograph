@@ -238,7 +238,7 @@ mod tests {
 
     const PET_SCHEMA: &str = "type Query {\n  pets: [Pet!]!\n  pet(id: ID!): Pet\n}\n\ntype Pet {\n  id: ID!\n  firstName: String!\n  lastName: String!\n  best_friend: Pet\n}\n";
     const PET: &str = "export const fullName = iso(`\n  field Pet.fullName {\n    firstName\n    lastName\n  }\n`);\n\nexport const bestFriend = iso(`\n  field Pet.bestFriend to Pet {\n    best_friend {\n      id\n    }\n  }\n`);\n";
-    const HOME_ROUTE: &str = "export const HomeRoute = iso(`\n  field Query.HomeRoute @component {\n    pets {\n      id\n      fullName\n      bestFriend {\n        firstName\n      }\n    }\n  }\n`);\n\nconsole.log(iso(`entrypoint Query.HomeRoute`));\n";
+    const HOME_ROUTE: &str = "export const HomeRoute = iso(`\n  field Query.HomeRoute {\n    pets {\n      id\n      fullName\n      bestFriend {\n        firstName\n      }\n    }\n  }\n`);\n\nconsole.log(iso(`entrypoint Query.HomeRoute`));\n";
 
     const SOURCE_FILE: isograph_compiler::FileMembership = isograph_compiler::FileMembership {
         source_file: isograph_compiler::IncludeFile::Include,

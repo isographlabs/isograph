@@ -14,6 +14,8 @@ pub enum AstError {
     EmptyLiteral,
     #[error("This integer does not fit in a 64-bit signed integer.")]
     IntegerDoesNotFitI64,
+    #[error("unexpected directive")]
+    UnexpectedDirective,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
@@ -219,6 +221,10 @@ mod tests {
         assert_eq!(
             AstError::IntegerDoesNotFitI64.to_string(),
             "This integer does not fit in a 64-bit signed integer.",
+        );
+        assert_eq!(
+            AstError::UnexpectedDirective.to_string(),
+            "unexpected directive"
         );
     }
 

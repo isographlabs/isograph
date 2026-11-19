@@ -488,6 +488,13 @@ mod tests {
             .expect("expected a selection")
     }
 
+    fn unexpected_directives(text: &str, directives: &[&str]) -> Vec<WithSpan<AstError>> {
+        directives
+            .iter()
+            .map(|directive| AstError::UnexpectedDirective.with_span(span_of(text, directive)))
+            .collect()
+    }
+
     fn assert_no_declaration(
         text: &str,
         reason: AstError,
@@ -1127,72 +1134,6 @@ mod tests {
     }
 
     #[test]
-    fn an_entrypoint_directive_parses() {
-        let text = "entrypoint Query.foo @lazyLoad";
-        let (parse, errors) = parsed(
-            text,
-            &[
-                (IsographSemanticToken::Keyword, "entrypoint"),
-                (IsographSemanticToken::Type, "Query"),
-                (IsographSemanticToken::Period, "."),
-                (IsographSemanticToken::FieldName, "foo"),
-                (IsographSemanticToken::At, "@"),
-                (IsographSemanticToken::DirectiveName, "lazyLoad"),
-            ],
-        );
-        assert_eq!(errors, vec![]);
-        let directives = as_entrypoint(parse.reference())
-            .directive_set
-            .as_ref()
-            .expect("the fixture carries a directive");
-        assert_eq!(directives.location, span_of(text, "@lazyLoad"));
-        assert_eq!(directives.item.0.len(), 1);
-        assert_eq!(
-            directives.item.0[0].item.name.item,
-            IsographDirectiveNameWrapper("lazyLoad".intern().to())
-        );
-        assert!(directives.item.0[0].item.arguments.is_none());
-    }
-
-    #[test]
-    fn a_field_directive_sits_between_variables_and_the_description() {
-        let text = "field Query.Foo($id: ID) @component \"the route\" { bar }";
-        let (parse, errors) = parsed(
-            text,
-            &[
-                (IsographSemanticToken::Keyword, "field"),
-                (IsographSemanticToken::Type, "Query"),
-                (IsographSemanticToken::Period, "."),
-                (IsographSemanticToken::FieldName, "Foo"),
-                (IsographSemanticToken::Parenthesis, "("),
-                (IsographSemanticToken::Variable, "$"),
-                (IsographSemanticToken::Variable, "id"),
-                (IsographSemanticToken::Colon, ":"),
-                (IsographSemanticToken::GraphQLTypeName, "ID"),
-                (IsographSemanticToken::Parenthesis, ")"),
-                (IsographSemanticToken::At, "@"),
-                (IsographSemanticToken::DirectiveName, "component"),
-                (IsographSemanticToken::Description, "\"the route\""),
-                (IsographSemanticToken::Brace, "{"),
-                (IsographSemanticToken::FieldName, "bar"),
-                (IsographSemanticToken::Brace, "}"),
-            ],
-        );
-        assert_eq!(errors, vec![]);
-        let field = as_selectable(parse.reference());
-        assert!(field.variable_definitions.is_some());
-        assert_eq!(
-            field
-                .directive_set
-                .as_ref()
-                .expect("the fixture carries a directive")
-                .location,
-            span_of(text, "@component")
-        );
-        assert!(field.description.is_some());
-    }
-
-    #[test]
     fn a_field_directive_sits_between_the_target_and_the_description() {
         let text = "field Pet.BestFriend to Owner @updatable \"x\" { id }";
         let (parse, errors) = parsed(
@@ -1212,7 +1153,7 @@ mod tests {
                 (IsographSemanticToken::Brace, "}"),
             ],
         );
-        assert_eq!(errors, vec![]);
+        assert_eq!(errors, unexpected_directives(text, &["@updatable"]));
         let field = as_selectable(parse.reference());
         assert!(field.target_type.is_some());
         assert_eq!(
@@ -1224,50 +1165,6 @@ mod tests {
             span_of(text, "@updatable")
         );
         assert!(field.description.is_some());
-    }
-
-    #[test]
-    fn a_selection_directive_with_arguments_parses() {
-        let text = "field Query.Foo { bar @loadable(lazyLoadArtifact: true) }";
-        let (parse, errors) = parsed(
-            text,
-            &[
-                (IsographSemanticToken::Keyword, "field"),
-                (IsographSemanticToken::Type, "Query"),
-                (IsographSemanticToken::Period, "."),
-                (IsographSemanticToken::FieldName, "Foo"),
-                (IsographSemanticToken::Brace, "{"),
-                (IsographSemanticToken::FieldName, "bar"),
-                (IsographSemanticToken::At, "@"),
-                (IsographSemanticToken::DirectiveName, "loadable"),
-                (IsographSemanticToken::Parenthesis, "("),
-                (IsographSemanticToken::Argument, "lazyLoadArtifact"),
-                (IsographSemanticToken::Colon, ":"),
-                (IsographSemanticToken::BooleanOrNull, "true"),
-                (IsographSemanticToken::Parenthesis, ")"),
-                (IsographSemanticToken::Brace, "}"),
-            ],
-        );
-        assert_eq!(errors, vec![]);
-        let selection = as_selection(
-            selections(selection_set_of(as_selectable(parse.reference())))[0]
-                .item
-                .reference(),
-        );
-        let directives = selection
-            .directive_set
-            .as_ref()
-            .expect("the fixture selects with a directive");
-        assert_eq!(
-            directives.location,
-            span_of(text, "@loadable(lazyLoadArtifact: true)")
-        );
-        let arguments = directives.item.0[0]
-            .item
-            .arguments
-            .as_ref()
-            .expect("the fixture passes arguments");
-        assert_eq!(arguments.item.0.len(), 1);
     }
 
     #[test]
@@ -1289,7 +1186,10 @@ mod tests {
                 (IsographSemanticToken::Brace, "}"),
             ],
         );
-        assert_eq!(errors, vec![]);
+        assert_eq!(
+            errors,
+            unexpected_directives(text, &["@loadable", "@updatable"])
+        );
         let directives = as_selection(
             selections(selection_set_of(as_selectable(parse.reference())))[0]
                 .item
@@ -1347,7 +1247,7 @@ mod tests {
                 (IsographSemanticToken::DirectiveName, "notARealDirective"),
             ],
         );
-        assert_eq!(errors, vec![]);
+        assert_eq!(errors, unexpected_directives(text, &["@notARealDirective"]));
         assert_eq!(
             as_entrypoint(parse.reference())
                 .directive_set
@@ -1359,6 +1259,170 @@ mod tests {
                 .name
                 .item,
             IsographDirectiveNameWrapper("notARealDirective".intern().to())
+        );
+    }
+
+    #[test]
+    fn a_field_directive_before_the_description_is_unexpected_and_the_rest_parses() {
+        let text = "field Query.Foo($id: ID) @component \"the route\" { bar }";
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Variable, "$"),
+                (IsographSemanticToken::Variable, "id"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::GraphQLTypeName, "ID"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::At, "@"),
+                (IsographSemanticToken::DirectiveName, "component"),
+                (IsographSemanticToken::Description, "\"the route\""),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::Brace, "}"),
+            ],
+        );
+        assert_eq!(errors, unexpected_directives(text, &["@component"]));
+        let field = as_selectable(parse.reference());
+        assert!(field.variable_definitions.is_some());
+        assert!(field.description.is_some());
+        assert_eq!(selections(selection_set_of(field)).len(), 1);
+    }
+
+    #[test]
+    fn a_selection_directive_with_arguments_is_unexpected_on_the_whole_directive() {
+        let text = "field Query.Foo { bar @loadable(lazyLoadArtifact: true), baz }";
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::At, "@"),
+                (IsographSemanticToken::DirectiveName, "loadable"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Argument, "lazyLoadArtifact"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::BooleanOrNull, "true"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::FieldName, "baz"),
+                (IsographSemanticToken::Brace, "}"),
+            ],
+        );
+        assert_eq!(
+            errors,
+            unexpected_directives(text, &["@loadable(lazyLoadArtifact: true)"])
+        );
+        let items = selections(selection_set_of(as_selectable(parse.reference())));
+        assert_eq!(items.len(), 2);
+        assert_eq!(
+            as_selection(items[1].item.reference()).name.location,
+            span_of(text, "baz")
+        );
+    }
+
+    #[test]
+    fn each_of_several_directives_is_unexpected() {
+        let text = "field Query.Foo @a @b(x: 1) { bar @c @d }";
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::At, "@"),
+                (IsographSemanticToken::DirectiveName, "a"),
+                (IsographSemanticToken::At, "@"),
+                (IsographSemanticToken::DirectiveName, "b"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Argument, "x"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Integer, "1"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::At, "@"),
+                (IsographSemanticToken::DirectiveName, "c"),
+                (IsographSemanticToken::At, "@"),
+                (IsographSemanticToken::DirectiveName, "d"),
+                (IsographSemanticToken::Brace, "}"),
+            ],
+        );
+        assert_eq!(
+            errors,
+            unexpected_directives(text, &["@a", "@b(x: 1)", "@c", "@d"])
+        );
+        let field = as_selectable(parse.reference());
+        assert_eq!(
+            field
+                .directive_set
+                .as_ref()
+                .expect("the fixture carries directives")
+                .item
+                .0
+                .len(),
+            2
+        );
+    }
+
+    #[test]
+    fn an_entrypoint_directive_is_unexpected() {
+        let text = "entrypoint Query.foo @lazyLoad";
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (IsographSemanticToken::Keyword, "entrypoint"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "foo"),
+                (IsographSemanticToken::At, "@"),
+                (IsographSemanticToken::DirectiveName, "lazyLoad"),
+            ],
+        );
+        assert_eq!(errors, unexpected_directives(text, &["@lazyLoad"]));
+        assert_eq!(
+            as_entrypoint(parse.reference()).name.location,
+            span_of(text, "foo")
+        );
+    }
+
+    #[test]
+    fn a_directive_with_an_argument_error_reports_both() {
+        let text = "field Query.Foo { bar @loadable(x: 99999999999999999999) }";
+        let (_, errors) = parsed(
+            text,
+            &[
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "Foo"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "bar"),
+                (IsographSemanticToken::At, "@"),
+                (IsographSemanticToken::DirectiveName, "loadable"),
+                (IsographSemanticToken::Parenthesis, "("),
+                (IsographSemanticToken::Argument, "x"),
+                (IsographSemanticToken::Colon, ":"),
+                (IsographSemanticToken::Integer, "99999999999999999999"),
+                (IsographSemanticToken::Parenthesis, ")"),
+                (IsographSemanticToken::Brace, "}"),
+            ],
+        );
+        assert_eq!(
+            errors,
+            vec![
+                AstError::IntegerDoesNotFitI64.with_span(span_of(text, "99999999999999999999")),
+                AstError::UnexpectedDirective
+                    .with_span(span_of(text, "@loadable(x: 99999999999999999999)")),
+            ]
         );
     }
 
@@ -1664,7 +1728,7 @@ mod tests {
                 (IsographSemanticToken::Brace, "}"),
             ],
         );
-        assert_eq!(errors, vec![]);
+        assert_eq!(errors, unexpected_directives(text, &["@component"]));
         let field = as_selectable(parse.reference());
         assert!(field.description.is_some());
         assert!(field.selection_set.is_some());
@@ -4182,7 +4246,7 @@ mod tests {
                 (IsographSemanticToken::Brace, "}"),
             ],
         );
-        assert_eq!(errors, vec![]);
+        assert_eq!(errors, unexpected_directives(text, &["@component"]));
         let field = as_selectable(parse.reference());
         assert!(field.variable_definitions.is_none());
         assert_eq!(field.target_type, None);
@@ -4223,7 +4287,7 @@ mod tests {
                 (IsographSemanticToken::Brace, "}"),
             ],
         );
-        assert_eq!(errors, vec![]);
+        assert_eq!(errors, unexpected_directives(text, &["@updatable"]));
         let declaration = as_selectable(parse.reference());
         assert!(declaration.variable_definitions.is_some());
         assert!(declaration.target_type.is_some());
@@ -4251,7 +4315,7 @@ mod tests {
                 (IsographSemanticToken::Brace, "}"),
             ],
         );
-        assert_eq!(errors, vec![]);
+        assert_eq!(errors, unexpected_directives(text, &["@a", "@b"]));
         let directives = as_selectable(parse.reference())
             .directive_set
             .as_ref()
@@ -4276,7 +4340,7 @@ mod tests {
                 (IsographSemanticToken::DirectiveName, "b"),
             ],
         );
-        assert_eq!(errors, vec![]);
+        assert_eq!(errors, unexpected_directives(text, &["@a", "@b"]));
         let directives = as_entrypoint(parse.reference())
             .directive_set
             .as_ref()
@@ -4309,6 +4373,11 @@ mod tests {
             errors[0],
             expected(EndOfDeclaration, Found::Token(At)).with_span(span_of(text, "@")),
         );
+        assert!(
+            errors
+                .iter()
+                .all(|error| error.item != AstError::UnexpectedDirective)
+        );
     }
 
     #[test]
@@ -4333,8 +4402,9 @@ mod tests {
         let declaration = as_selectable(parse.reference());
         assert!(declaration.directive_set.is_some());
         assert_eq!(declaration.target_type, None);
+        assert_eq!(errors[0], unexpected_directives(text, &["@component"])[0]);
         assert_eq!(
-            errors[0],
+            errors[1],
             expected(EndOfDeclaration, Found::Token(Identifier)).with_span(span_of(text, "to")),
         );
     }
@@ -4571,7 +4641,7 @@ mod tests {
                 (IsographSemanticToken::Brace, "}"),
             ],
         );
-        assert_eq!(errors, vec![]);
+        assert_eq!(errors, unexpected_directives(text, &["@loadable()"]));
         let arguments = as_selection(
             selections(selection_set_of(as_selectable(parse.reference())))[0]
                 .item
@@ -4617,7 +4687,7 @@ mod tests {
                 (IsographSemanticToken::Brace, "}"),
             ],
         );
-        assert_eq!(errors, vec![]);
+        assert_eq!(errors, unexpected_directives(text, &["@loadable"]));
         let selection = as_selection(
             selections(selection_set_of(as_selectable(parse.reference())))[0]
                 .item
@@ -4772,7 +4842,7 @@ mod tests {
                 (IsographSemanticToken::Parenthesis, ")"),
             ],
         );
-        assert_eq!(errors, vec![]);
+        assert_eq!(errors, unexpected_directives(text, &["@lazyLoad(x: 1)"]));
         let arguments = as_entrypoint(parse.reference())
             .directive_set
             .as_ref()
@@ -4809,7 +4879,7 @@ mod tests {
                 (IsographSemanticToken::Brace, "}"),
             ],
         );
-        assert_eq!(errors, vec![]);
+        assert_eq!(errors, unexpected_directives(text, &["@component(x: 1)"]));
         let arguments = as_selectable(parse.reference())
             .directive_set
             .as_ref()

@@ -222,7 +222,7 @@ An argument is a `name: value` pair. The names are argument definitions of the s
 
 `user(id: $id)` passes `id` set to the variable `$id`. `user(id: 4)` passes a different value to the same definition.
 
-A directive takes the same `Argument` type. `@loadable(lazyLoadArtifact: true)` passes `lazyLoadArtifact` set to `true`. `@component` has no arguments.
+A directive takes the same `Argument` type. `@loadable(lazyLoadArtifact: true)` passes `lazyLoadArtifact` set to `true`. v1 supports no directive: the iso parser parses each directive and reports `unexpected directive` on its span.
 
 ## Selection
 
