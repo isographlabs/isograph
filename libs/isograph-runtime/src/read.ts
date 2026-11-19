@@ -248,6 +248,8 @@ function argumentValue(
           argumentValue(variables, entry) ?? null,
         ]),
       );
+    case 'List':
+      return value.value.map((item) => argumentValue(variables, item) ?? null);
   }
 }
 
