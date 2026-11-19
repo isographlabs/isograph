@@ -42,7 +42,8 @@ From the goal and the decisions this doc, store.md, and reader-ast.md settle:
 - R6. One entry per client field, record, and argument values, shared by every parent and query that reads it (The same resolver selected twice).
 - R7. Dependencies follow the data. A recomputation can read different inputs than the previous one (a link moved from `Pet:2` to `Pet:3`, a `MissingData` that became present). The next write is judged against the inputs of the last computation only.
 - R8. `normalize` is the only writer of server values. It knows exactly which (record, store key) pairs it changed and which records it created. `garbageCollect` is the only deleter, and knows which records it deleted.
-- R9. Minimal machinery: the fewest stored fields and functions that meet R1 to R8.
+- R9. Minimal machinery: the fewest stored fields and functions that meet R1 to R8 and allow R10.
+- R10. Scheduled recalculation can be added later without redesign (Follow-ups 9). Changes 1 to 4 do not build it: they bring every retained result up to date in one pass after each write. The architecture must allow two additions that undo nothing in changes 1 to 4: an entry no observer reaches is only marked on a write and is recomputed when next read; and a caller-supplied scheduler decides when, and at which priority, observed roots are brought up to date, with observers notified once per pass that settled their roots. This requires that marking a write is separate from bringing entries up to date, that bringing up to date takes the set of roots it settles, and that the number of observers reaching an entry is derivable from stored edges.
 
 Cost terms used below, per write:
 
@@ -307,6 +308,7 @@ The simplest eager baseline. No dependencies stored at all. After every write, s
 - R3: 1 fails "nothing twice"; 2, 3a, 3b, 3c, 4, 5 meet it.
 - R4: 1 and 5 fail; 2, 3a, 3b, 3c, 4 meet it.
 - R5 and R7: every candidate meets them.
+- R10: 3b allows it: marking already runs in `normalize` apart from settlement, an entry that settlement skips keeps its mark, so it stays recorded as stale, `settle` takes its roots, and the observed count is the observers at a location plus the observed `dependents`. 2 allows it: nothing is verified until demanded, and a deferred pass is a later verification of fewer roots; each pass still walks every live edge under its roots. 4 allows it: Preact keeps unsubscribed computeds lazy and queues effects to the end of a batch, so priority goes on that queue. 3a and 3c fail without redesign: their propagation recomputes every affected entry as it goes, so skipping an unobserved entry leaves it stale with no record of it; the lazy variant needs a stale mark per entry and a pull on read, which is 3b's state and bring-up-to-date, and priorities need one bucket queue or count pass per priority. 5 allows it per root at full cost per pass. 1 has nothing stored to defer; scheduling exists only in React's re-render.
 - R6: 1 fails; the rest meet it.
 - R8, what each does with `C`: 1 needs it at record granularity; 2 turns it into stamps and rediscovers it by walking `E`; 3a, 3b, 3c, 4 start from it; 5 ignores it.
 - Per write with a small change on a large screen: 1 `O(overlapping subscription trees)`; 2 `O(R + E)`; 3a `O(A')`; 3b and 3c `O(R + A)`; 5 `O(L)` resolver calls.
@@ -318,7 +320,7 @@ For a sense of scale, from no measurement: a screen with 2,000 live entries aver
 
 ### Held: 3b, mark then bring up to date
 
-The eager requirement removes the one thing pico's epochs are for: pull verification exists so that undemanded memos are never visited, and R2 demands every live entry after every write, so 2 visits every live edge on every write while `normalize` already holds the exact set of changed locations and discards it into stamps. Push from that set bounds each write by what it affects, and among the push orderings 3b is the only one that needs no ordering state beyond a three-valued state per entry: its order is the same recursion as pico's verification (dependencies brought up to date in recorded order before the entry), restricted to the marked entries, so R3 holds by the argument pico's design already makes. 3a with static heights visits fewer entries (it never walks the `Check` part of `A`), but it recomputes entries no root reaches until `garbageCollect`, has no lazy mode for open decision 3 (b) or for a plain `read`, and needs a height per artifact; 3c and 4 add counters or versions to 3b without a new property; 5 fails R4; 1 fails R1 to R4. The cost 3b takes on is the inverse edge set: memory per edge and an invariant (the dependents sets equal the inverse of the dependency lists) whose violation is a silently stale result. That is contained by making one function, `setDependencies`, the only writer of either side. The inverse also pays for itself elsewhere: it is the reference count constructors and destructors need (Follow-ups 1, open decision 11), and the index open decision 6 (b) needs. Removing epochs also removes the tag and stamp from every server value, so records stay store.md's untagged maps and `check`, `garbageCollect`'s mark, and the reader's server reads do not change.
+The eager requirement removes the one thing pico's epochs are for: pull verification exists so that undemanded memos are never visited, and R2 demands every live entry after every write, so 2 visits every live edge on every write while `normalize` already holds the exact set of changed locations and discards it into stamps. Push from that set bounds each write by what it affects, and among the push orderings 3b is the only one that needs no ordering state beyond a three-valued state per entry: its order is the same recursion as pico's verification (dependencies brought up to date in recorded order before the entry), restricted to the marked entries, so R3 holds by the argument pico's design already makes. 3a with static heights visits fewer entries (it never walks the `Check` part of `A`), but it recomputes entries no root reaches until `garbageCollect`, has no lazy mode for open decision 3 (b) or for a plain `read`, and needs a height per artifact; 3c and 4 add counters or versions to 3b without a new property; 5 fails R4; 1 fails R1 to R4. R10 separates 3b from 3a further: 3a and 3c need 3b's marks to be lazy at all, while 3b gets both laziness and deferral from what it already has (marking in `normalize`, `settle` over a set of roots, and `dependents` from which an observed count is derived), and changes 1 to 4 need no field that a later scheduler would remove. The cost 3b takes on is the inverse edge set: memory per edge and an invariant (the dependents sets equal the inverse of the dependency lists) whose violation is a silently stale result. That is contained by making one function, `setDependencies`, the only writer of either side. The inverse also pays for itself elsewhere: it is the reference count constructors and destructors need (Follow-ups 1, open decision 11), and the index open decision 6 (b) needs. Removing epochs also removes the tag and stamp from every server value, so records stay store.md's untagged maps and `check`, `garbageCollect`'s mark, and the reader's server reads do not change.
 
 ### What depends on this choice
 
@@ -1214,6 +1216,31 @@ Costs:
 
 Relation to changes 2 and 3: the stored selection-set result is an extra level between server values and resolver entries. A resolver entry depends on a selection-set entry, the selection-set entry depends on server values and on the resolver entries of the `Resolver` nodes it contains, and marking and bringing up to date walk that level as they walk a resolver entry.
 
+### 9. Scheduled recalculation
+
+Future work, not part of changes 1 to 4; R10 requires that the architecture allows it. The user wants control over when recalculation runs:
+
+- Unobserved entries are lazy. An entry no mounted observer reaches (an unmounted component's result, a retained query nobody renders) is only marked on a write and is recomputed when next read. This is open decision 3 (b) extended from roots to every entry.
+- Deferred work. Some recalculation and re-rendering runs later at lower priority, for example the work caused by a write that came from user input. In the React layer this corresponds to `startTransition` and `useDeferredValue`. `@isograph/runtime` stays React-free and takes the caller-supplied scheduler of note 7; the scheduler decides when each pending pass runs.
+
+What it changes in the requirements: R2 becomes "every observed result is current when the pass for its priority finishes; an unobserved result is current when read". R5 becomes "observers are called once per settlement pass", not once per write.
+
+What it needs:
+
+- An observed count per entry: the observers at its location plus the number of its `dependents` that are observed. The reverse edges of change 2 give it; `listen`, its stop function, and `setDependencies` keep it current. It is the same count shape as open decision 11 (b), with observers in place of retentions.
+- A priority on a write (`normalize` called inside a transition) or on an observer (a component rendered with a deferred value). A write's marks record the highest priority that reached each entry, or settlement takes the set of roots per priority.
+- Notification per pass. A write settles in more than one pass when it reaches roots of different priorities; each pass notifies the observers whose roots it brought up to date. An entry shared by an urgent root and a deferred root is brought up to date in the urgent pass, and the deferred pass finds it `Clean`. A second write before a deferred pass runs marks on top of the existing marks, so the deferred pass recomputes each entry once for both writes. A `snapshot` inside a callback returns a settled result for that observer's location; entries only deferred roots reach can still be marked.
+
+Fit with each candidate:
+
+- 3b (held): marking is already separate from bringing up to date. Laziness is "mark only, and skip `bringUpToDate`, for entries whose observed count is zero". Deferral is "the scheduler decides when `bringUpToDate` runs for which roots". Neither adds a state beyond the count and the priority.
+- 2: laziness is native, because nothing is verified until demanded, and deferral is the scheduler choosing when to verify which roots. Each deferred pass still walks every live edge under its roots.
+- 3a and 3c: neither has a lazy mode. Skipping an unobserved entry leaves it stale with no record that it is stale, so it needs a mark, which is 3b's state. Height order across priorities needs one bucket queue per priority.
+- 4: Preact already keeps unsubscribed computeds lazy and defers effects to the end of a batch; priority would be added to its effect queue.
+- 5: both work per root, at full cost per pass and with no cutoff below the root.
+
+React constraint: `useSyncExternalStore` performs a store update as blocking even inside a transition, per React's documentation. Deferred re-rendering therefore needs the React package to hold a deferred snapshot per observer and update it inside `startTransition`, or to read through `useDeferredValue`; this is the React package's design, not the runtime's.
+
 ## Open decisions
 
 ### 1. Resolver markers in the normalization AST
@@ -1225,8 +1252,8 @@ Relation to changes 2 and 3: the stored selection-set result is an extra level b
 
 The candidates and their comparison are Recomputation architecture.
 
-- (a) 3b, mark along reverse edges, then bring up to date (held). Cost: the inverse of every dependency list, kept by `setDependencies`, and a state per entry.
-- (b) 3a, static heights and buckets. Cost: a height per artifact, the inverse edges, and recomputation of entries no root reaches until `garbageCollect`; benefit: the `Check` part of the affected set is never visited.
+- (a) 3b, mark along reverse edges, then bring up to date (held). Cost: the inverse of every dependency list, kept by `setDependencies`, and a state per entry. Allows R10 as is.
+- (b) 3a, static heights and buckets. Cost: a height per artifact, the inverse edges, recomputation of entries no root reaches until `garbageCollect`, and a redesign toward 3b's marks for R10; benefit: the `Check` part of the affected set is never visited.
 - (c) 2, pico's pull with epochs. Cost: every live edge compared on every write, and a tag and epoch on every server value; benefit: no inverse to keep.
 - (d) 5, full re-run per write. Cost: every live resolver on every write, and no equality cutoff below the roots.
 
