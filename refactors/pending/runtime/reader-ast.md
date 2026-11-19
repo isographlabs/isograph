@@ -661,14 +661,25 @@ pub fn field_variables<TProfile: CompilationProfile>(
     selectable: SelectableName,
 ) -> Result<Vec<FieldVariable>, SelectionMapError>;
 
-/// `arguments` as `MergedArguments`, every variable checked against `context.variables`.
+/// `arguments` as merged arguments, every variable checked against `context.variables`.
 pub(crate) fn merged_arguments(
     context: DeclarationContext<'_>,
-    arguments: &SelectionArgumentList,
-) -> Result<MergedArguments, SelectionMapError>;
+    arguments: Option<&WithSpan<ArgumentList>>,
+) -> Result<SelectionArguments, SelectionMapError>;
+
+/// The first of `arguments` that the client field `field`, which declares `variables`, does
+/// not declare, as an `UnknownFieldArgument` located at that argument.
+pub(crate) fn undeclared_argument(
+    context: DeclarationContext<'_>,
+    field: SelectableKey,
+    arguments: &SelectionArguments,
+    variables: &[FieldVariable],
+) -> Option<SelectionMapError>;
 ```
 
-`field_selection_map`'s step 3 becomes a call to `field_variables`, and `selection_contribution`'s conversion a call to `merged_arguments`; their results and errors are unchanged. `SelectionArgumentList` stands for whatever `isograph_parser` type `Selection.arguments` holds when change 6 lands. If change 6 lands with these functions under other names, this prefactor is those functions.
+`field_selection_map`'s step 3 becomes a call to `field_variables`, `selection_contribution`'s conversion a call to `merged_arguments`, and `client_field_contribution`'s unknown-argument check a call to `undeclared_argument`; their results and errors are unchanged. The landed private `field_variables(declaration)` is renamed `declared_variables`; the memo calls it.
+
+Delta from the plan as first written (landed): `merged_arguments` returns the landed `SelectionArguments { located, merged }` (each argument with its span, and the `MergedArguments`), not `MergedArguments` alone, because `resolver_arguments` locates `UnknownFieldArgument` at the argument and needs the spans. `undeclared_argument` is the landed check, extracted so that both walks call it.
 
 ### Arguments and variable defaults
 

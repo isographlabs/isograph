@@ -49,8 +49,8 @@ pub use merged_selection::{
     MergedSelectableSelection, MergedSelection, MergedSelectionMap, MergedSelectionTarget,
     MergedValue, NonNullVariableType, NormalizationAlias, RecordEntity, ResponseKey, SelectionKey,
     SelectionMapError, SelectionMapErrorKind, SourceFieldDeclaration, TopLevelError,
-    UnknownFieldArgument, VariableType, complete, field_selection_map, inlined_fields,
-    source_field_declaration,
+    UnknownFieldArgument, VariableType, complete, field_selection_map, field_variables,
+    inlined_fields, source_field_declaration,
 };
 pub use normalization_ast::{
     IntegerOutOfRange, NormalizationArgument, NormalizationArguments, NormalizationAst,

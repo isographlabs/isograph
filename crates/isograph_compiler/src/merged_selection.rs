@@ -696,10 +696,10 @@ pub fn source_field_declaration<TProfile: CompilationProfile>(
 
 /// What a selection set's errors are located against: the declaration it is in.
 #[derive(Clone, Copy)]
-struct DeclarationContext<'a> {
-    path: RelativePathToSourceFile,
-    literal_start: u32,
-    variables: &'a [FieldVariable],
+pub(crate) struct DeclarationContext<'a> {
+    pub(crate) path: RelativePathToSourceFile,
+    pub(crate) literal_start: u32,
+    pub(crate) variables: &'a [FieldVariable],
 }
 
 impl DeclarationContext<'_> {
@@ -740,7 +740,7 @@ pub fn field_selection_map<TProfile: CompilationProfile>(
         )
         .wrap_err();
     }
-    let variables = field_variables(field.declaration).map_err(located)?;
+    let variables = field_variables(db, client, entity, selectable).clone()?;
     let context = DeclarationContext {
         path: field.path,
         literal_start: field.literal_start,
@@ -759,8 +759,27 @@ pub fn field_selection_map<TProfile: CompilationProfile>(
     .wrap_ok()
 }
 
+/// The variables `field entity.selectable` declares, in source order.
+#[memo]
+pub fn field_variables<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    entity: EntityName,
+    selectable: SelectableName,
+) -> Result<Vec<FieldVariable>, SelectionMapError> {
+    let field = source_field_declaration(db, client, entity, selectable)?;
+    declared_variables(field.declaration).map_err(|error| {
+        DeclarationContext {
+            path: field.path,
+            literal_start: field.literal_start,
+            variables: &[],
+        }
+        .located(error)
+    })
+}
+
 /// The variables `declaration` declares, in source order.
-fn field_variables(
+fn declared_variables(
     declaration: &SelectableDeclaration,
 ) -> Result<Vec<FieldVariable>, WithSpan<SelectionMapErrorKind>> {
     declaration
@@ -887,9 +906,45 @@ fn merged_value(
 }
 
 /// A selection's arguments, each with its span, and as merged arguments.
-struct SelectionArguments {
-    located: Vec<WithSpan<MergedArgument>>,
-    merged: MergedArguments,
+pub(crate) struct SelectionArguments {
+    pub(crate) located: Vec<WithSpan<MergedArgument>>,
+    pub(crate) merged: MergedArguments,
+}
+
+/// `arguments` as merged arguments, every variable checked against `context.variables`.
+pub(crate) fn merged_arguments(
+    context: DeclarationContext<'_>,
+    arguments: Option<&WithSpan<ArgumentList>>,
+) -> Result<SelectionArguments, SelectionMapError> {
+    selection_arguments(arguments, VariableScope::Declaration(context.variables))
+        .map_err(|error| context.located(error))
+}
+
+/// The first of `arguments` that the client field `field`, which declares `variables`, does
+/// not declare, as an `UnknownFieldArgument` located at that argument.
+pub(crate) fn undeclared_argument(
+    context: DeclarationContext<'_>,
+    field: SelectableKey,
+    arguments: &SelectionArguments,
+    variables: &[FieldVariable],
+) -> Option<SelectionMapError> {
+    arguments
+        .located
+        .iter()
+        .find(|argument| {
+            !variables
+                .iter()
+                .any(|variable| variable.name.lookup() == argument.item.name.lookup())
+        })
+        .map(|unknown| {
+            context.located(
+                SelectionMapErrorKind::UnknownFieldArgument(UnknownFieldArgument {
+                    field,
+                    argument: unknown.item.name,
+                })
+                .with_span(unknown.location),
+            )
+        })
 }
 
 fn selection_arguments(
@@ -973,11 +1028,7 @@ fn selection_contribution<TProfile: CompilationProfile>(
                     .with_span(selection.name.location),
             )
         })?;
-    let arguments = selection_arguments(
-        selection.arguments.as_ref(),
-        VariableScope::Declaration(context.variables),
-    )
-    .map_err(|error| context.located(error))?;
+    let arguments = merged_arguments(context, selection.arguments.as_ref())?;
     let key = SelectableKey {
         entity: parent,
         selectable: name,
@@ -1096,21 +1147,13 @@ fn client_field_contribution<TProfile: CompilationProfile>(
     let field = field_selection_map(db, client, key.entity, key.selectable)
         .as_ref()
         .map_err(Clone::clone)?;
-    if let Some(unknown) = arguments.located.iter().find(|argument| {
-        !field
-            .variables
-            .iter()
-            .any(|variable| variable.name.lookup() == argument.item.name.lookup())
-    }) {
-        return context
-            .located(
-                SelectionMapErrorKind::UnknownFieldArgument(UnknownFieldArgument {
-                    field: key,
-                    argument: unknown.item.name,
-                })
-                .with_span(unknown.location),
-            )
-            .wrap_err();
+    if let Some(unknown) = undeclared_argument(
+        context,
+        key,
+        arguments.reference(),
+        field.variables.as_slice(),
+    ) {
+        return unknown.wrap_err();
     }
     let values = field
         .variables
