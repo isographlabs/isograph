@@ -46,7 +46,7 @@ Prefactors first.
 
 ## Known gap
 
-Closed. Change 3 did not ship. Upstream isograph #994 (change 1 of `refactors/pending/pico-missing-key-dependency.md`) makes a memo that reads a tracked map whose counter was never written depend on the absent counter, so a `file_contents(client, path)` miss before the first `set_open_file` or `insert_disk_file` sees that later write. `read_before_first_open_file_write_sees_the_later_open` (`crates/isograph_compiler/src/database.rs`) asserts the buffer text after the open. The `file_contents`, `sources`, `compiler_errors_in_file`, and `extract_iso_literals` tests no longer write an unrelated map entry before the first read.
+Closed. Change 3 did not ship. Upstream isograph #994 (change 1 of `refactors/pending/pico-missing-key-dependency.md`), as reworked by upstream isograph #1000, makes a memo that reads a tracked map whose counter was never written depend on the counter's key at the initial epoch, and the first counter write advances the epoch, so a `file_contents(client, path)` miss before the first `set_open_file` or `insert_disk_file` sees that later write. `read_before_first_open_file_write_sees_the_later_open` (`crates/isograph_compiler/src/database.rs`) asserts the buffer text after the open. The `file_contents`, `sources`, `compiler_errors_in_file`, and `extract_iso_literals` tests no longer write an unrelated map entry before the first read.
 
 Deltas from the snippets below, as landed:
 

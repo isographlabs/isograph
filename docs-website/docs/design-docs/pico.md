@@ -77,9 +77,9 @@ The `#[key]` field is the identity of the source. Under the hood that identity i
 
 If the new value `==` the old value, the epoch does not advance and dependents do not re-invoke.
 
-`db.set` stores the value in a `SourceNode` (`time_updated` plus `Box<dyn DynEq>`), records `Key -> index` in a map, and returns `SourceId<T>`. That id is `Copy`: a `Key` plus `PhantomData<T>`. It is a type-level proof that a `T` exists in the database. `db.get(id)` takes that proof, looks up the `Key`, downcasts the node to `T`, records a read, and returns `&T`. There is no `Option`. A `SourceId<T>` whose source is missing is a false proof. pico panics. That panic is allowed.
+`db.set` stores the value in a `SourceNode` (`time_updated` plus `Option<Box<dyn DynEq>>`) in a `HashMap<Key, SourceNode>` and returns `SourceId<T>`. Inserting a new key and replacing a value with an unequal one each advance the epoch. That id is `Copy`: a `Key` plus `PhantomData<T>`. It is a type-level proof that a `T` exists in the database. `db.get(id)` takes that proof, looks up the `Key`, downcasts the node to `T`, records a read, and returns `&T`. There is no `Option`. A `SourceId<T>` whose source is missing is a false proof. pico panics. That panic is allowed.
 
-The type system does not stop you from holding a `SourceId` after `remove`. `remove` drops the map entry, `take`s the `SourceNode`, and increments the epoch. Dependents that read that source see it as changed (`source_node_changed_since` is true when the node is gone). The next `get` of the stale id panics. A memo that returns a `SourceId` after the source was removed is handing out a false proof.
+The type system does not stop you from holding a `SourceId` after `remove`. `remove` keeps the key's `SourceNode`, `take`s its value, and stamps it with an incremented epoch. Dependents that read that source see it as changed (`source_node_changed_since` compares the node's newer `time_updated`). The next `get` of the stale id panics. A memo that returns a `SourceId` after the source was removed is handing out a false proof.
 
 A path is not a proof. Looking up by path can miss and return `None`. The tracked map is `HashMap<RelativePathToSourceFile, SourceId<DiskFile>>`: `Option<SourceId<_>>` from the map, then `get` of the id. Call sites that have a path and not a `SourceId` intern a `RelativePathToSourceFile` and go through the map.
 
@@ -479,7 +479,7 @@ fn disk_file_source_id(&self, path: RelativePathToSourceFile) -> Option<SourceId
 }
 ```
 
-The miss branch depends on the map's counter singleton. pico records a dependency on a missing key through an absent node (upstream isograph #994), so the miss depends on the counter even before the map's first write. On a fresh database, a `file_contents` miss before the first `set_open_file` sees that open. The miss re-invokes on any insert into the map, not only an insert of that path.
+The miss branch depends on the map's counter singleton. A read of a missing key inside a memo records a dependency on that key at the initial epoch and does not write storage, and inserting a new key advances the epoch (upstream isograph #1000). The miss therefore depends on the counter even before the map's first write. On a fresh database, a `file_contents` miss before the first `set_open_file` sees that open. The miss re-invokes on any insert into the map, not only an insert of that path.
 
 A keyed lookup that depends on its key alone, present or absent, needs `T::source_id` and `get_if_present` (change 3 of `refactors/pending/pico-missing-key-dependency.md`). After that change, `tracked()` is used only to iterate the map.
 
@@ -508,7 +508,7 @@ Every conversion between an LSP position and a byte offset goes through one `lin
 
 ## Equality and backdating
 
-Each source has a `time_updated` epoch. Each derived node's `DerivedNodeRevision` has `time_verified` (last epoch we checked it) and `time_updated` (last epoch its value actually changed). The database epoch increments when a source is set to a different value.
+Each source has a `time_updated` epoch. Each derived node's `DerivedNodeRevision` has `time_verified` (last epoch we checked it) and `time_updated` (last epoch its value actually changed). The database epoch increments when a source is set at a new key, set to a different value, or removed.
 
 pico re-invokes a memo when a dependency's `time_updated` is newer than this memo's last `time_verified`. After re-invoke, it compares the new value to the stored value with `==`.
 
@@ -546,7 +546,7 @@ A lookup that misses did not `db.get`. If it also did not `tracked()` the map, a
 
 `open_file_map` is keyed by `OpenFileKey { client, path }`. `file_contents` looks up untracked and `db.get`s the hit; on a miss it reads the map tracked. A write of a key already present does not write the map, so a keystroke re-invokes only the derived node that read that `OpenFile`. Any open or close re-invokes every `file_contents` derived node of every client that missed in `open_file_map`; each backdates when its text is `==`.
 
-A tracked read of a map whose counter was never written records a dependency on the absent counter. On a fresh database, a `file_contents` miss before the first `set_open_file` sees that later open.
+A tracked read of a map whose counter was never written records a dependency on the counter's key at the initial epoch. The first counter write inserts that key and advances the epoch. On a fresh database, a `file_contents` miss before the first `set_open_file` sees that later open.
 
 ## Intern
 

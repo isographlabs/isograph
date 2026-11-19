@@ -27,7 +27,6 @@ fn config(name: &str) -> Config {
 }
 
 /// Advances the epoch by setting an unrelated source twice with different values.
-/// The first set is a vacant insert and does not advance the epoch; the second does.
 fn advance_epoch(db: &mut TestDatabase) {
     db.set(Unrelated {
         key: "unrelated",

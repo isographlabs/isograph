@@ -1,6 +1,6 @@
-# pico depends on missing keys through absent nodes
+# pico depends on missing keys
 
-Every keyed read of a source or singleton inside a memo records a dependency on that key, whether a source is set there or not. A read of a missing key creates an absent node at that key. Setting the key later is a change to that node, and the reader re-runs. Removing a source turns its node into an absent node, which is also a change. `tracked()` on a `#[tracked]` map is for iteration only.
+Every keyed read of a source or singleton inside a memo records a dependency on that key, whether a source is set there or not. A read of a missing key records the dependency at the initial epoch and does not write storage. Inserting a new key advances the epoch and stamps the key's node with the new epoch, so the reader re-runs. Removing a source clears its node's value and stamps the node with a new epoch, which is also a change. `tracked()` on a `#[tracked]` map is for iteration only.
 
 ## How pico works, and where this fits
 
@@ -430,7 +430,7 @@ After change 3, a per-key source lookup has the same shape with no map:
 
 Each change ships on its own and leaves the tree green.
 
-1. pico: absent source nodes. Landed upstream as isograph #994 (the tests it flips landed first as #995, pinning the old behavior) and in i2 with the commit that brings #994 into `crates/pico`. The landed version differs from the Change 1 section below: `get_impl` inserts an absent node on every read of a missing key, inside or outside a memo; `source_node_changed_since` keeps `None => true`; pico takes no `prelude` dependency and uses `Some(` / `Box::new` (open decision 2 (b)); there are no unit tests in `src/database.rs`, only integration tests in `crates/pico/tests`. The i2 tests that wrote an unrelated map entry first only because of the old behavior no longer do, and `read_before_first_open_file_write_sees_the_later_open` asserts the buffer text.
+1. pico: absent source nodes. Landed upstream as isograph #994 (the tests it flips landed first as #995, pinning the old behavior) and in i2 with the commit that brings #994 into `crates/pico`. The landed version differs from the Change 1 section below: `get_impl` inserts an absent node on every read of a missing key, inside or outside a memo; `source_node_changed_since` keeps `None => true`; pico takes no `prelude` dependency and uses `Some(` / `Box::new` (open decision 2 (b)); there are no unit tests in `src/database.rs`, only integration tests in `crates/pico/tests`. Upstream isograph #1000, brought into i2 the same way, replaces the absent-node insertion: a read of a missing key records a dependency at the initial epoch (`Epoch::new()`) without writing storage, `source_node_changed_since` reads the same `(value, epoch)` pair, inserting a new key advances the epoch, and source nodes live in a `HashMap<Key, SourceNode>` instead of a `DashMap` index plus a `BoxcarVec`. The i2 tests that wrote an unrelated map entry first only because of the old behavior no longer do, and `read_before_first_open_file_write_sees_the_later_open` asserts the buffer text.
 2. pico / pico_macros: the `#[tracked]` counter has no `Default`. `Counter::next(previous: Option<&Self>)` replaces `Counter::increment` and the `C::default()` branch.
 3. pico / pico_macros: keyed source reads without a value. `#[derive(Source)]` generates `T::source_id(&key) -> SourceId<T>`; `Database::get_if_present(id) -> Option<&T>`.
 4. i2: keyed lookups read the source key directly; tracked-on-miss call sites go away; AGENTS.md and pico.md rule text changes. Later; not implemented with this doc.
@@ -451,7 +451,7 @@ extern crate self as pico;
 
 ### Change 1 tests
 
-Re-invocation counts are pico's own behavior and are asserted in pico's tests. Each test owns its memo and its `static AtomicUsize` counter (the existing pico pattern, `crates/pico/tests/basic.rs:6`; open decision 1), so tests run in parallel without the `RUN_SERIALLY` lock (`crates/pico/tests/basic_multi_function_chain.rs:13`). An unrelated epoch advance is two `set`s of an `Unrelated` source with different values: the first is a vacant insert and does not advance.
+Re-invocation counts are pico's own behavior and are asserted in pico's tests. Each test owns its memo and its `static AtomicUsize` counter (the existing pico pattern, `crates/pico/tests/basic.rs:6`; open decision 1), so tests run in parallel without the `RUN_SERIALLY` lock (`crates/pico/tests/basic_multi_function_chain.rs:13`). An unrelated epoch advance is two `set`s of an `Unrelated` source with different values; since upstream isograph #1000 each of the two advances the epoch.
 
 `crates/pico/tests/tests.rs` gains:
 
@@ -1027,7 +1027,7 @@ pico `absent_source` tests pin the keyed rules.
 pico.md, "## Source": replace the paragraph at line 70 with:
 
 ```text
-The type system does not stop you from holding a `SourceId` after `remove`. `remove` keeps the key and replaces its node with an absent node stamped with a new epoch. Dependents that read that source see it as changed. `get_if_present` of that id returns `None`; `get` panics. A memo that returns a `SourceId` after the source was removed is handing out a false proof.
+The type system does not stop you from holding a `SourceId` after `remove`. `remove` keeps the key's node, clears its value, and stamps it with a new epoch. Dependents that read that source see it as changed. `get_if_present` of that id returns `None`; `get` panics. A memo that returns a `SourceId` after the source was removed is handing out a false proof.
 ```
 
 and the paragraph at line 72 with:
@@ -1062,10 +1062,10 @@ Change 1 adds one panic for approval and removes one.
 
 ## Upstream divergence
 
-AGENTS.md says pico and pico_macros are kept unchanged from upstream isograph. `diff -r` of `crates/pico` and `crates/pico_macros` against `/Users/rbalicki/code/isograph` differs today only in `crates/pico/tests/tracking_field/correctness.rs` (`.values()` for `.iter()`) and in the single-line string literals of `a0752020`. Change 1 (absent source nodes) landed upstream as isograph #994 and does not diverge. Changes 2-3 diverge: `Counter::next` (change 2), `T::source_id` and `Database::get_if_present` (change 3), and under open decision 2 (a), a `prelude` dependency. This needs the user's approval. Proposed AGENTS.md first paragraph, first sentence, landing with change 1:
+AGENTS.md says pico and pico_macros are kept unchanged from upstream isograph. `diff -r` of `crates/pico` and `crates/pico_macros` against `/Users/rbalicki/code/isograph` differs today only in `crates/pico/tests/tracking_field/correctness.rs` (`.values()` for `.iter()`) and in the single-line string literals of `a0752020`. Change 1 landed upstream as isograph #994, was reworked upstream by isograph #1000, and does not diverge. Changes 2-3 diverge: `Counter::next` (change 2), `T::source_id` and `Database::get_if_present` (change 3), and under open decision 2 (a), a `prelude` dependency. This needs the user's approval. Proposed AGENTS.md first paragraph, first sentence, landing with change 1:
 
 ```text
-From upstream isograph we keep pico and pico_macros (unchanged except that a read of a missing source key inside a memo records a dependency through an absent node, the `#[tracked]` counter has no `Default`, and sources can be read by key with `T::source_id` and `get_if_present`; see refactors/pending/pico-missing-key-dependency.md), the swc plugin and its dependency chain (isograph_config, common_lang_types, string_key_newtype, prelude), resolve_position, the relay crates, the docs website, and the build process.
+From upstream isograph we keep pico and pico_macros (unchanged except that the `#[tracked]` counter has no `Default`, and sources can be read by key with `T::source_id` and `get_if_present`; see refactors/pending/pico-missing-key-dependency.md), the swc plugin and its dependency chain (isograph_config, common_lang_types, string_key_newtype, prelude), resolve_position, the relay crates, the docs website, and the build process.
 ```
 
 An upstream isograph PR with changes 1-3 would remove the divergence.
