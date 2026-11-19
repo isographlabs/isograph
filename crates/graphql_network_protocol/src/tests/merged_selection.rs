@@ -4,8 +4,9 @@ use common_lang_types::VariableName;
 use intern::string_key::Intern;
 use isograph_compiler::{
     Condition, FieldSelectionMap, IdentitySelection, InlineCycle, MergeError, MergedSelection,
-    MergedSelectionMap, MergedSelectionTarget, MergedValue, SelectableKey, SelectionMapError,
-    SelectionMapErrorKind, UnknownFieldArgument, field_selection_map, inlined_fields,
+    MergedSelectionMap, MergedSelectionTarget, MergedValue, MissingFieldArgument, SelectableKey,
+    SelectionMapError, SelectionMapErrorKind, UnknownFieldArgument, field_selection_map,
+    inlined_fields,
 };
 use prelude::Postfix;
 
@@ -294,20 +295,86 @@ fn an_eager_field_selected_with_two_argument_sets_is_two_entries_and_a_default_f
     );
 }
 
+const CHAIN: &str = "iso(`field Pet.Leaf($z: Int) { checkins(limit: $z) { id } }`)
+iso(`field Pet.Middle($y: Int) { Leaf(z: $y) }`)
+iso(`field Pet.Defaulted($y: Int = 7) { Leaf(z: $y) }`)
+iso(`field Query.Top($x: Int) { pets { Middle(y: $x) } }`)
+iso(`field Query.Literal { pets { Middle(y: 4) } }`)
+iso(`field Query.Null { pets { Middle(y: null) } }`)
+iso(`field Query.Missing { pets { Middle } }`)
+iso(`field Query.MissingInside { pets { Broken } }`)
+iso(`field Pet.Broken { Leaf }`)
+iso(`field Query.Default { pets { Defaulted } }`)";
+
 #[test]
-fn an_unset_variable_without_a_default_removes_the_argument() {
-    let db = demo(
-        &[],
-        &[(
-            "src/Opt.ts",
-            "iso(`field Pet.Opt($x: Int) { checkins(limit: $x) { id } }`)\n\
-             iso(`field Query.UsesOpt { pets { Opt } }`)",
-        )],
-        &[],
+fn a_variable_without_a_default_that_a_selection_does_not_pass_is_an_error_at_the_selection() {
+    let db = demo(&[], &[("src/Chain.ts", CHAIN)], &[]);
+    let missing = error(&db, "Query", "Missing");
+    assert_eq!(
+        missing.kind,
+        SelectionMapErrorKind::MissingFieldArgument(MissingFieldArgument {
+            field: key("Pet", "Middle"),
+            variable: "y".intern().to(),
+        })
     );
     assert_eq!(
-        outline(selections(&db, "Query", "UsesOpt").reference()),
-        lines(&["pets {", "  checkins {", "    id"])
+        missing.location,
+        located("src/Chain.ts", CHAIN, "Middle }")
+            .wrap_some()
+            .map(|mut location| {
+                location.span.end = location.span.start + "Middle".len() as u32;
+                location
+            })
+    );
+    assert_eq!(
+        error(&db, "Pet", "Broken").kind,
+        SelectionMapErrorKind::MissingFieldArgument(MissingFieldArgument {
+            field: key("Pet", "Leaf"),
+            variable: "z".intern().to(),
+        })
+    );
+    assert_eq!(
+        error(&db, "Query", "MissingInside"),
+        error(&db, "Pet", "Broken")
+    );
+}
+
+#[test]
+fn a_value_passes_through_a_chain_of_inlined_fields() {
+    let db = demo(&[], &[("src/Chain.ts", CHAIN)], &[]);
+    let top = selections(&db, "Query", "Top");
+    assert_eq!(
+        outline(top.reference()),
+        lines(&["pets {", "  checkins____limit___v_x {", "    id"])
+    );
+    assert_eq!(
+        top.used_variables(),
+        ["x"]
+            .into_iter()
+            .map(|name| name.intern().to::<VariableName>())
+            .collect::<BTreeSet<_>>()
+    );
+    assert_eq!(
+        outline(selections(&db, "Query", "Literal").reference()),
+        lines(&["pets {", "  checkins____limit___l_4 {", "    id"])
+    );
+}
+
+#[test]
+fn a_passed_null_is_a_value() {
+    let db = demo(&[], &[("src/Chain.ts", CHAIN)], &[]);
+    assert_eq!(
+        outline(selections(&db, "Query", "Null").reference()),
+        lines(&["pets {", "  checkins____limit___l_null {", "    id"])
+    );
+}
+
+#[test]
+fn a_variable_with_a_default_that_a_selection_does_not_pass_takes_its_default() {
+    let db = demo(&[], &[("src/Chain.ts", CHAIN)], &[]);
+    assert_eq!(
+        outline(selections(&db, "Query", "Default").reference()),
+        lines(&["pets {", "  checkins____limit___l_7 {", "    id"])
     );
 }
 

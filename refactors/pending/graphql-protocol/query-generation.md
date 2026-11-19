@@ -666,24 +666,16 @@ The iso `TypeAnnotation` converts: `Named(n)` is `NonNull(Named(n))`, `List(l)` 
 
 ```rust
 // from crates/isograph_compiler/src/merged_selection.rs
-/// What each variable of an inlined field is replaced by.
-#[derive(Clone, Debug, PartialEq, Eq)]
-enum VariableValue {
-    Value(MergedValue),
-    /// The selection passed no argument and the variable has no default.
-    Unset,
-}
-
 /// `field_map` with each variable replaced by its value in `context`.
 fn substitute(
     field_map: &MergedSelectionMap,
-    context: &BTreeMap<VariableName, VariableValue>,
+    context: &BTreeMap<VariableName, MergedValue>,
 ) -> Result<MergedSelectionMap, SelectionMapErrorKind>;
 ```
 
-The context of a selection `G(a: v)` of a field `G` with variables `$a`, `$b: Int = 3`, `$c: Int` is `{ a: Value(v), b: Value(3), c: Unset }`. `v` is already a `MergedValue` of the parent's map: a parent variable stays a `Variable` naming the parent's variable, and is substituted when the parent is inlined in turn. Upstream's origin is `VariableContext::child_variable_context` (`isograph/crates/isograph_schema/src/variable_context.rs`).
+The context of a selection `G(a: v)` of a field `G` with variables `$a` and `$b: Int = 3` is `{ a: v, b: 3 }`. A variable that has no default and that the selection does not pass is `MissingFieldArgument` (below): there are no unset variables, so every variable of a client field has a value wherever the field is read (store.md, open decision 11, settled). A passed `null` is a value. `v` is already a `MergedValue` of the parent's map: a parent variable stays a `Variable` naming the parent's variable, and is substituted when the parent is inlined in turn. Upstream's origin is `VariableContext::child_variable_context` (`isograph/crates/isograph_schema/src/variable_context.rs`).
 
-An argument whose value is a top-level `Unset` variable is removed from the key. Inside an object, `Unset` is `Null`. Delta: upstream writes `null` for both, which overrides a server-side default (`checkins(skip: null)` where the schema says `skip: Int = 0`); omitting the argument keeps the default (open decision 2). Substitution re-keys `Selectable` entries at every depth, inside composite targets and conditionals; two keys that become equal merge, and the result is checked for alias collisions. `Err` is `UndefinedVariable` or `Merge`, as in the stash.
+Delta from upstream: upstream writes `null` for an unpassed variable without a default (`VariableContext::child_variable_context`); i2 rejects the selection. Substitution re-keys `Selectable` entries at every depth, inside composite targets and conditionals; two keys that become equal merge, and the result is checked for alias collisions. `Err` is `UndefinedVariable` or `Merge`, as in the stash.
 
 A variable that is not declared by the field whose selection set uses it is `UndefinedVariable`, reported when that field's map is built, so every `Variable` in a field's map names one of its `variables`.
 
@@ -769,7 +761,7 @@ fn selection_contribution<TProfile: CompilationProfile>(
   - `Refinement` on a `Composite(shape)` target: arguments on the selection are `ArgumentsOnRefinement`, no selection set is `MissingSelectionSet`; otherwise one entry `Conditional(MergedConditional { condition: Condition::SelectionEquals(target), identity: shape.identity, selections })`. `shape.concreteness` is not kept: the conditional's records are of `target`, the entity the condition names.
   - `Refinement` on a `Leaf` target is `RefinementToNonComposite(target)`; GraphQL's refinements target only object types (`refinement_to`), so GraphQL does not reach it.
   - Either shape on an `Input` target is `InputTarget(target)`.
-- `SelectableKind::ClientField`: `field_selection_map(db, client, parent, selection.name)`, then `substitute` with the context built from the converted arguments and that map's `variables`. An argument the field does not declare is `UnknownFieldArgument`. The selection's own nested selection set is not read.
+- `SelectableKind::ClientField`: `field_selection_map(db, client, parent, selection.name)`, then `substitute` with the context built from the converted arguments and that map's `variables`. An argument the field does not declare is `UnknownFieldArgument`. A variable with no default that the selection does not pass is `MissingFieldArgument`, located at the selection's name; the first such variable, in declaration order, is reported. The selection's own nested selection set is not read.
 - `SelectableKind::ClientPointer(_)`: the empty map. Its own selection set and the selection's nested selection set are not read (Client pointers, below).
 
 `key` is `SelectionKey { name: selection.name, arguments }` with the converted arguments. Each shape error is located at the selection's name. The `Server` arm is the private `server_contribution` and the `ClientField` arm the private `client_field_contribution`, each taking the context, the `SelectableKey`, the selection, and the converted arguments; a substitution error is located at the selection's name.
@@ -835,6 +827,8 @@ pub struct SelectionMapError {
 pub enum SelectionMapErrorKind {
     #[error("{}", .0.0.message)]
     Lookup(Diagnostic),
+    #[error("{0}")]
+    MissingFieldArgument(MissingFieldArgument),
     #[error("`{0}` comes from the schema and has no selection set to inline.")]
     NotASourceField(SelectableKey),
     #[error("The declaration of `{0}` is not where its definition says.")]
@@ -889,6 +883,19 @@ pub struct UnknownFieldArgument {
 ```
 
 The enum is the stash's (`git stash show -p stash@{0}`), whose deltas from the earlier text of this doc stay: `location` is optional, and `UnparsedVariable`, `UnsupportedVariableType`, and `NoTargetEntity` exist. Deltas from the stash: `SelectionSetOnLeaf`, `MissingSelectionSet`, `InputTarget`, `ArgumentsOnRefinement`, and `RefinementToNonComposite` are new; `AliasCollision(AliasCollision)` becomes `Merge(MergeError)`, which also carries `SelectionMismatch`.
+
+```rust
+// from crates/isograph_compiler/src/validation.rs
+/// A selection of `field` that passes no value for `variable`, which has no default.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[error("`{field}` declares `${variable}` with no default, and this selection does not pass it.")]
+pub struct MissingFieldArgument {
+    pub field: SelectableKey,
+    pub variable: VariableName,
+}
+```
+
+`MissingFieldArgument` is also `ValidationError::MissingFieldArgument`, so the editor shows it: `validate_selection` reports one per variable of a selected `field` declaration (client field or client pointer) that has no default and that the selection does not pass, located at the selection's name, reading the declaration through `field_declaration` (`missing_field_arguments`, private).
 
 `SelectableKey` implements `Display` as `Entity.selectable` (`derive_more::Display`), and `InlineCycle::display` joins the keys with ` -> `. `location` is the offending node's span in its file: the selection name, the argument, the variable, or for `InlineCycle` the name of the field that starts the walk. A field that inlines a broken field returns the inlined field's error unchanged, so the location is where the mistake is.
 
@@ -1510,7 +1517,7 @@ Facts about generated text, not snapshots. A helper in the test module returns t
 - `entrypoint Pet.PetSummaryCard`, `entrypoint PetStats.Card`, and `entrypoint Node.Card` are `NotFetchable(Protocol(NotRootOperationType))`.
 - `field Query.NestedQuery { greeting query { tags } }` on a schema whose `Query` has `query: Query!`: the `query {` block is `__typename` then `tags`, with no `id` line even when `Query` has `id: ID!`. With `schema { query: RootQuery }` and `type RootQuery { me: RootQuery! name: String }`, `field RootQuery.Me { me { name } }` gives the `me` target `Known(RootQuery)` with `Fixed(FixedRecordId::root())`; `graphql_fetch_plan(RootQuery).roots` is `{ operation: RootQuery, others: {} }`.
 - Selecting `PetCheckinsCard(limit: 5)` in `PetDetailRoute` adds the line `    checkins____limit___l_5____skip___l_0: checkins(limit: 5, skip: 0) {`. A second selection `PetCheckinsCard` with no arguments adds `checkins____limit___l_3____skip___l_0` (the default); both blocks are present.
-- `field Pet.Opt($x: Int) { checkins(limit: $x) { id } }` selected as `Opt` with no argument prints `checkins {` with no arguments.
+- `field Pet.Opt($x: Int) { checkins(limit: $x) { id } }` selected as `Opt` with no argument is `MissingFieldArgument` naming `Pet.Opt` and `$x`, located at `Opt`, and a validation diagnostic on `Opt`; selected as `Opt(x: null)` it prints `checkins____limit___l_null: checkins(limit: null) {`. A variable with a default that the selection does not pass takes the default, through a chain of inlined fields.
 - An entrypoint field declaring `$unused: Int` that nothing reads has no `$unused` in its header.
 - A union refinement: `field Query.Feed { viewer { newsfeed(limit: 2, skip: 0) { asBlogItem { title } } } }` prints a `newsfeed____limit___l_2____skip___l_0: newsfeed(limit: 2, skip: 0) {` block whose first line is `__typename` and which contains `... on BlogItem {` with `title`.
 - Isolation: adding `nope` to `field Pet.PetStatsCard` makes `query_for_entrypoint(Query, PetDetailRoute)` an `Err` whose `SelectionMap` location is the `nope` span in `src/PetStatsCard.ts`; `query_for_entrypoint(Query, HomeRoute)` is `==` to its value before the edit.
@@ -1603,7 +1610,7 @@ Depends on 7.
 ## Open decisions
 
 1. Merge key. Options: selectable name and arguments, with every field printed under its normalization alias (upstream keys the same way and aliases only fields with arguments); the response name (reader alias or field name), where one response name with two argument sets is a conflict error, GraphQL's own field-merging rule. Consequences: the first lets two components select `checkins(limit: 3)` and `checkins(limit: 5)` on the same pet, and its only conflicts are alias collisions and duplicate arguments; the second makes composition of independently written fields fail. Held: the first.
-2. A variable with no argument and no default. Options: omit the argument; print `null` (upstream). Consequences: `null` overrides a schema default and is an error for a non-null argument; omitting keeps the server's default and changes the normalization alias, which the runtime computes from the same key. Held: omit at the top level, `null` inside an object.
+2. A variable with no argument and no default. Settled: a compile error at the selection, `MissingFieldArgument` (store.md, open decision 11, option (a)). The earlier options were omitting the argument and printing `null` (upstream).
 3. Operation name. Options: the selectable name (upstream: `query HomeRoute`); `Entity__name` (`query Query__HomeRoute`). Consequences: two entrypoints `Query.Foo` and `Pet.Foo` send the same operation name, which servers that key persisted operations or metrics by name conflate. Held: the selectable name, upstream's.
 4. Writing when a query fails. Options: no artifacts written (artifact-generation.md's rule for a parse error); everything written except the failing entrypoint's files, which keep their previous contents. Consequences: the first keeps the generated folder consistent and blocks all output for one broken field; the second mixes a stale query with new readers. Held: the first.
 5. List arguments. Options: an error in query generation; extend the normalization alias with a list chunk. Consequences: the alias format is shared with the runtime, which upstream never defined for lists (it panics); defining one is a runtime decision. Held: an error until the runtime design fixes the chunk.

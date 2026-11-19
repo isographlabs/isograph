@@ -71,8 +71,9 @@ pub use selectable_for_path::{
     selectable_for_selection_parent, selectable_for_selection_path, selectable_target,
 };
 pub use validation::{
-    DuplicateDefinitionError, EntrypointNotFetchableError, ProfileValidationError, SelectableKey,
-    SelectionSetOnFieldWithoutTargetError, UnknownEntityError, UnknownSelectableError,
-    ValidationError, iso_literal_validation_errors_in_file,
+    DuplicateDefinitionError, EntrypointNotFetchableError, MissingFieldArgument,
+    ProfileValidationError, SelectableKey, SelectionSetOnFieldWithoutTargetError,
+    UnknownEntityError, UnknownSelectableError, ValidationError,
+    iso_literal_validation_errors_in_file,
 };
 pub use wrapper::{Nullability, UnionWrapper, Wrapper, WrapperVariant};

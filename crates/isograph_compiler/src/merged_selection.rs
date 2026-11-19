@@ -14,7 +14,7 @@ use pico_macros::memo;
 use prelude::Postfix;
 use span::{WithSpan, WithSpanPostfix};
 
-use crate::validation::SelectableKey;
+use crate::validation::{MissingFieldArgument, SelectableKey};
 use crate::{
     ClientId, CompilationProfile, CompositeShape, Concreteness, DefinitionLocation, EntityOrigin,
     EntityShape, IdentitySelection, IsographDb, NetworkProtocol, RootEntities, SelectableKind,
@@ -183,6 +183,8 @@ pub struct SelectionMapError {
 pub enum SelectionMapErrorKind {
     #[error("{}", .0.0.message)]
     Lookup(Diagnostic),
+    #[error("{0}")]
+    MissingFieldArgument(MissingFieldArgument),
     #[error("`{0}` comes from the schema and has no selection set to inline.")]
     NotASourceField(SelectableKey),
     #[error("The declaration of `{0}` is not where its definition says.")]
@@ -526,18 +528,10 @@ impl MergedSelectionMap {
     }
 }
 
-/// What each variable of an inlined field is replaced by.
-#[derive(Clone, Debug, PartialEq, Eq)]
-enum VariableValue {
-    Value(MergedValue),
-    /// The selection passed no argument and the variable has no default.
-    Unset,
-}
-
 /// `field_map` with each variable replaced by its value in `context`.
 fn substitute(
     field_map: &MergedSelectionMap,
-    context: &BTreeMap<VariableName, VariableValue>,
+    context: &BTreeMap<VariableName, MergedValue>,
 ) -> Result<MergedSelectionMap, SelectionMapErrorKind> {
     field_map
         .iter()
@@ -552,7 +546,7 @@ fn substitute(
 /// `selection` with each variable replaced by its value in `context`, at any depth.
 fn substitute_selection(
     selection: &MergedSelection,
-    context: &BTreeMap<VariableName, VariableValue>,
+    context: &BTreeMap<VariableName, MergedValue>,
 ) -> Result<MergedSelection, SelectionMapErrorKind> {
     match selection {
         MergedSelection::Selectable(selection) => {
@@ -584,44 +578,31 @@ fn substitute_selection(
     .wrap_ok()
 }
 
-/// `arguments` with each variable replaced by its value in `context`; an argument whose value
-/// is an unset variable is removed.
+/// `arguments` with each variable replaced by its value in `context`.
 fn substitute_arguments(
     arguments: &MergedArguments,
-    context: &BTreeMap<VariableName, VariableValue>,
+    context: &BTreeMap<VariableName, MergedValue>,
 ) -> Result<MergedArguments, SelectionMapErrorKind> {
     arguments
         .iter()
         .map(|argument| {
-            let value = match argument.value.reference() {
-                MergedValue::Variable(name) => match variable_value(name.dereference(), context)? {
-                    VariableValue::Value(value) => value.wrap_some(),
-                    VariableValue::Unset => None,
-                },
-                value => substitute_value(value, context)?.wrap_some(),
-            };
-            value
-                .map(|value| MergedArgument {
-                    name: argument.name,
-                    value,
-                })
-                .wrap_ok()
+            MergedArgument {
+                name: argument.name,
+                value: substitute_value(argument.value.reference(), context)?,
+            }
+            .wrap_ok()
         })
-        .filter_map(Result::transpose)
         .collect::<Result<Vec<_>, _>>()
         .map(MergedArguments)
 }
 
-/// `value` with each variable replaced by its value in `context`; an unset variable is `null`.
+/// `value` with each variable replaced by its value in `context`.
 fn substitute_value(
     value: &MergedValue,
-    context: &BTreeMap<VariableName, VariableValue>,
+    context: &BTreeMap<VariableName, MergedValue>,
 ) -> Result<MergedValue, SelectionMapErrorKind> {
     match value {
-        MergedValue::Variable(name) => match variable_value(name.dereference(), context)? {
-            VariableValue::Value(value) => value.wrap_ok(),
-            VariableValue::Unset => MergedValue::Null.wrap_ok(),
-        },
+        MergedValue::Variable(name) => variable_value(name.dereference(), context),
         MergedValue::Object(object) => object
             .iter()
             .map(|entry| {
@@ -644,8 +625,8 @@ fn substitute_value(
 /// field, and `context` holds every declared variable.
 fn variable_value(
     name: VariableName,
-    context: &BTreeMap<VariableName, VariableValue>,
-) -> Result<VariableValue, SelectionMapErrorKind> {
+    context: &BTreeMap<VariableName, MergedValue>,
+) -> Result<MergedValue, SelectionMapErrorKind> {
     context
         .get(name.reference())
         .cloned()
@@ -1140,13 +1121,20 @@ fn client_field_contribution<TProfile: CompilationProfile>(
                 .iter()
                 .find(|argument| argument.name.lookup() == variable.name.lookup())
                 .map(|argument| argument.value.clone());
-            let value = match passed.or_else(|| variable.default_value.clone()) {
-                Some(value) => VariableValue::Value(value),
-                None => VariableValue::Unset,
-            };
-            (variable.name, value)
+            let value = passed
+                .or_else(|| variable.default_value.clone())
+                .ok_or_else(|| {
+                    context.located(
+                        SelectionMapErrorKind::MissingFieldArgument(MissingFieldArgument {
+                            field: key,
+                            variable: variable.name,
+                        })
+                        .with_span(selection.name.location),
+                    )
+                })?;
+            (variable.name, value).wrap_ok()
         })
-        .collect::<BTreeMap<_, _>>();
+        .collect::<Result<BTreeMap<_, _>, _>>()?;
     substitute(field.selections.reference(), values.reference())
         .map_err(|kind| context.located(kind.with_span(selection.name.location)))
 }
@@ -1537,7 +1525,7 @@ mod tests {
         MergedCompositeTarget, MergedConditional, MergedObject, MergedObjectEntry,
         MergedSelectableSelection, MergedSelection, MergedSelectionMap, MergedSelectionTarget,
         MergedValue, NormalizationAlias, ResponseKey, SelectionKey, SelectionMapErrorKind,
-        VariableValue, substitute,
+        substitute,
     };
     use crate::{CompositeShape, Concreteness, IdentitySelection};
 
@@ -2114,7 +2102,7 @@ mod tests {
         );
     }
 
-    fn context(values: Vec<(&str, VariableValue)>) -> BTreeMap<VariableName, VariableValue> {
+    fn context(values: Vec<(&str, MergedValue)>) -> BTreeMap<VariableName, MergedValue> {
         values
             .into_iter()
             .map(|(name, value)| (variable(name), value))
@@ -2130,11 +2118,7 @@ mod tests {
         assert_eq!(
             substitute(
                 field.reference(),
-                context(vec![(
-                    "limit",
-                    VariableValue::Value(MergedValue::Integer(5))
-                )])
-                .reference()
+                context(vec![("limit", MergedValue::Integer(5))]).reference()
             ),
             map(vec![leaf(
                 "checkins",
@@ -2145,7 +2129,7 @@ mod tests {
         assert_eq!(
             substitute(
                 field.reference(),
-                context(vec![("limit", VariableValue::Value(var("parent")))]).reference()
+                context(vec![("limit", var("parent"))]).reference()
             ),
             map(vec![leaf(
                 "checkins",
@@ -2156,39 +2140,21 @@ mod tests {
     }
 
     #[test]
-    fn an_unset_variable_removes_its_argument_and_is_null_inside_an_object() {
+    fn a_null_value_substitutes_as_null_at_the_top_and_inside_an_object() {
         let field = map(vec![
-            leaf(
-                "checkins",
-                vec![
-                    argument("limit", var("x")),
-                    argument("skip", MergedValue::Integer(0)),
-                ],
-            ),
-            leaf(
-                "f",
-                vec![argument(
-                    "input",
-                    object(vec![("a", var("x")), ("b", MergedValue::Integer(1))]),
-                )],
-            ),
+            leaf("checkins", vec![argument("limit", var("x"))]),
+            leaf("f", vec![argument("input", object(vec![("a", var("x"))]))]),
         ]);
         assert_eq!(
             substitute(
                 field.reference(),
-                context(vec![("x", VariableValue::Unset)]).reference()
+                context(vec![("x", MergedValue::Null)]).reference()
             ),
             map(vec![
-                leaf("checkins", vec![argument("skip", MergedValue::Integer(0))]),
+                leaf("checkins", vec![argument("limit", MergedValue::Null)]),
                 leaf(
                     "f",
-                    vec![argument(
-                        "input",
-                        object(vec![
-                            ("a", MergedValue::Null),
-                            ("b", MergedValue::Integer(1))
-                        ])
-                    )]
+                    vec![argument("input", object(vec![("a", MergedValue::Null)]))]
                 ),
             ])
             .wrap_ok()
@@ -2210,7 +2176,7 @@ mod tests {
         assert_eq!(
             substitute(
                 field.reference(),
-                context(vec![("id", VariableValue::Value(string("1")))]).reference()
+                context(vec![("id", string("1"))]).reference()
             ),
             map(vec![composite(
                 "pet",
@@ -2242,7 +2208,7 @@ mod tests {
                 vec![leaf("y", vec![])],
             ),
         ]);
-        let one = || VariableValue::Value(MergedValue::Integer(1));
+        let one = || MergedValue::Integer(1);
         let substituted = substitute(
             field.reference(),
             context(vec![("a", one()), ("b", one())]).reference(),
@@ -2253,16 +2219,6 @@ mod tests {
             aliases(nested(substituted.reference(), "pet")),
             vec!["x", "y"]
         );
-        let both_unset = substitute(
-            field.reference(),
-            context(vec![
-                ("a", VariableValue::Unset),
-                ("b", VariableValue::Unset),
-            ])
-            .reference(),
-        )
-        .expect("equal keys merge");
-        assert_eq!(aliases(both_unset.reference()), vec!["pet"]);
     }
 
     #[test]
@@ -2274,11 +2230,7 @@ mod tests {
         assert!(matches!(
             substitute(
                 field.reference(),
-                context(vec![
-                    ("a", VariableValue::Value(string("a b"))),
-                    ("b", VariableValue::Value(string("a_b"))),
-                ])
-                .reference()
+                context(vec![("a", string("a b")), ("b", string("a_b")),]).reference()
             ),
             Err(SelectionMapErrorKind::Merge(MergeError::AliasCollision(_)))
         ));

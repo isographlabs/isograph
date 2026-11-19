@@ -195,20 +195,53 @@ fn an_eager_field_with_two_argument_sets_prints_two_blocks() {
 }
 
 #[test]
-fn an_unset_variable_omits_the_argument_and_an_unused_one_is_not_declared() {
+fn an_unpassed_variable_fails_the_query_and_an_unused_one_is_not_declared() {
     let db = demo(
         &[],
         &[(
             "src/Opt.ts",
             "iso(`field Pet.Opt($x: Int) { checkins(limit: $x) { id } }`)\n\
-             iso(`field Query.UsesOpt($unused: Int) { pets { Opt } }`)",
+             iso(`field Query.UsesOpt { pets { Opt } }`)\n\
+             iso(`field Query.PassesNull($unused: Int) { pets { Opt(x: null) } }`)",
         )],
         &[],
     );
-    let text = text(&db, "Query", "UsesOpt");
-    assert_eq!(lines(text.as_str())[0], "query UsesOpt {");
-    assert!(lines(text.as_str()).contains(&"    checkins {"));
+    assert!(matches!(
+        error(&db, "Query", "UsesOpt"),
+        EntrypointQueryError::SelectionMap(error)
+            if matches!(error.kind, SelectionMapErrorKind::MissingFieldArgument(_))
+    ));
+    let text = text(&db, "Query", "PassesNull");
+    assert_eq!(lines(text.as_str())[0], "query PassesNull {");
+    assert!(
+        lines(text.as_str()).contains(&"    checkins____limit___l_null: checkins(limit: null) {")
+    );
     assert!(!text.contains("$unused"));
+}
+
+#[test]
+fn an_unpassed_variable_is_a_validation_error_on_the_selection() {
+    let contents = "iso(`field Pet.Opt($x: Int, $d: Int = 1) { checkins(limit: $x, skip: $d) { id } }`)\n\
+         iso(`field Query.Missing { pets { Opt } }`)\n\
+         iso(`field Query.Passed { pets { Opt(x: null) } }`)\n\
+         iso(`field Pet.p($n: Int) to Pet { id }`)\n\
+         iso(`field Query.PointerMissing { pets { p { id } } }`)";
+    let db = demo(&[], &[("src/Opt.ts", contents)], &[]);
+    assert_eq!(
+        validation_errors(&db, "src/Opt.ts", contents),
+        vec![
+            (
+                "`Pet.Opt` declares `$x` with no default, and this selection does not pass it."
+                    .to_owned(),
+                "Opt".to_owned()
+            ),
+            (
+                "`Pet.p` declares `$n` with no default, and this selection does not pass it."
+                    .to_owned(),
+                "p".to_owned()
+            ),
+        ]
+    );
 }
 
 #[test]

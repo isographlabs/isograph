@@ -157,14 +157,14 @@ The value of an argument, before `stableStringify`:
 
 - `Literal`: its value (`5`, `true`, `null`).
 - `String`: the string.
-- `Variable`: `variables[name]`. A top-level argument whose variable is absent from `variables` is omitted from the key, chunk and all.
-- `Object`: an object with one key per entry, each value by these rules; an entry whose variable is absent is `null`.
+- `Variable`: `variables[name]`.
+- `Object`: an object with one key per entry, each value by these rules.
 
 So `limit: 5` is `____limit___5`, `name: "Ada Lovelace"` is `____name___"Ada Lovelace"`, `name: null` is `____name___null`, `name: "null"` is `____name___"null"`, `id: 1` is `____id___1` and `id: "1"` is `____id___"1"`, and `filter: { nameContains: $q, minAge: 2 }` with `q: "Rex"` is `____filter___{"minAge":2,"nameContains":"Rex"}`.
 
 `stableStringify` is `JSON.stringify(value, (_key, v) => isJsonObject(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) : v)`: the replacer returns each object with its keys sorted, and `JSON.stringify` recurses into what the replacer returns, so nested objects are sorted at every depth; arrays keep their order; a key whose value is `undefined` is omitted, as `JSON.stringify` omits it; `isJsonObject` is `typeof v === "object" && v !== null && !Array.isArray(v)`. The sort is code unit order, not `localeCompare`, so the key does not depend on the locale. The sort runs at runtime because a variable whose value is an object comes from the caller in any key order; literal object arguments are already sorted by the compiler (`MergedObject`), and one function covers both.
 
-Every operation variable is present in `variables`: the generated parameters type of an entrypoint requires each one (Variables, below), and a missing one is undefined behavior, as any input outside its type is. The absent-variable rules above apply only to `read` of a client field whose parent did not pass a variable that has no default: query generation omits that top-level argument from the query and the normalization AST and writes `null` inside an object (query-generation.md, Source fields and variables), and the reader's key must match (`checkins`, not `checkins____limit___null`; reader-ast.md, Arguments and variable defaults).
+Every variable is present in `variables`. An operation's variables are required by its generated parameters type (Variables, below), and a missing one is undefined behavior, as any input outside its type is. A client field's variables are computed by its parent's `Resolver` node, and every one has a value: a selection that leaves a variable with no default unpassed is a compile error (`MissingFieldArgument`, query-generation.md, Source fields and variables; open decision 11, settled), and a default fills an unpassed variable that has one. `storeKey` has no rule for an absent variable.
 
 `noPropertyAccessFromIndexSignature` and the `Object.hasOwn` read apply to `variables`.
 
@@ -172,7 +172,7 @@ Deltas from upstream (`getStoreKeyChunkForArgument` and `getStoreKeyChunkForArgu
 
 - Each value is JSON, so `null` and `"null"`, and `1` and `"1"`, are distinct keys; upstream writes `${value}` for strings, numbers, and booleans, which makes each pair one chunk. A cost: `node(id: 1)` and `node(id: "1")`, one value after `ID` coercion, are two keys, which is a cache miss, not wrong data.
 - The value is written by the standard serializer (`JSON.stringify`), with no hand-written escaping; upstream hand-rolls the chunk per kind and stringifies only objects and arrays.
-- A top-level argument whose variable is unset is omitted; upstream writes `null` for it (`cache.ts:481-520`). An unset variable applies the schema default for the argument (GraphQL spec, CoerceArgumentValues), and `null` overrides it, so the two are different requests; query generation already omits the argument (query-generation.md, open decision 2, held), and the reader's key must match the normalizer's.
+- No variable is unset, so `storeKey` has no unset case; upstream writes `null` for an unset variable (`cache.ts:481-520`).
 - Upstream's overloads for `LinkedParentRecordKey` and `ScalarParentRecordKey` (`cache.ts:449-469`) are one `StoreKey`, because a link and a leaf are told apart by the AST. `Enum` has no case (normalization-ast.md: `ArgumentValue` has no `Enum`).
 
 ### Variables
@@ -213,7 +213,7 @@ fn input_field_property(key: &str, wrapper: &Wrapper<ArtifactInputType>, options
 
 `input_field_property` is today's `parameter_property` body, renamed, and the `:170` caller (input object fields) calls it. The new `parameter_property` has the same match with the nullable arm `(Optionality::Required, TypeScriptType::Union(<other variants>.chain([Keyword(Null)])))`; the `:153` caller (parameters) calls it. Delta from upstream: upstream's parameters types make a nullable variable optional (`readonly skip?: number | null | void`, `isograph/demos/pet-demo/src/components/__isograph/Pet/PetCheckinsCard/parameters_type.ts`). The type artifacts change lands with the store (change 7). artifact-set-and-types.md's `readonly w?: T | null | void` for parameters is amended (Docs this doc amends).
 
-`parameters_type.ts` is one file per field, and a field's parameters type is also the type of its resolver's `parameters` when another field selects it (reader-ast.md, `childVariables`). There, a variable with no default that the parent does not pass is absent at runtime, so `readonly n: number | null` does not describe it. Open decision 11.
+`parameters_type.ts` is one file per field, and a field's parameters type is also the type of its resolver's `parameters` when another field selects it (reader-ast.md, `childVariables`). Every variable has a value there too, because a selection that leaves a variable with no default unpassed is a compile error (open decision 11, settled as option (a)), so `readonly n: number | null` describes it.
 
 ## Record ids
 
@@ -682,7 +682,7 @@ Selections are taken from the fixture ASTs by response key.
 - `pet` with `{ id: "1" }` is `pet____id___"1"`; with `{ id: 1 }` (a test input of the wrong GraphQL type) it is `pet____id___1`, a different key; the response key is `pet____id___v_id`.
 - `stableStringify` of `{ b: 1, a: { d: [3, { f: 1, e: 2 }], c: 2 } }` and of `{ a: { c: 2, d: [3, { e: 2, f: 1 }] }, b: 1 }` are both `{"a":{"c":2,"d":[3,{"e":2,"f":1}]},"b":1}`: key order is independent at every depth, and array order is kept (`[2, 1]` stays `[2,1]`).
 - `stableStringify` of `{ a: undefined, b: 1 }`, a value outside `JsonValue` built by a cast, is `{"b":1}`, as `JSON.stringify` writes it.
-- A top-level `Variable` argument whose variable is absent is omitted: `checkins(limit: $n)` with `{}` is `checkins`; inside an object it is `null`: `search(filter: { nameContains: $q, minAge: 2 })` with `{}` is `search____filter___{"minAge":2,"nameContains":null}`.
+- A `Variable` argument whose variable is `null` is `null`: `checkins(limit: $n)` with `{ n: null }` is `checkins____limit___null`; inside an object, `search(filter: { nameContains: $q, minAge: 2 })` with `{ q: null }` is `search____filter___{"minAge":2,"nameContains":null}`.
 
 ### `normalize` (`test/normalize.test.ts`)
 
@@ -797,4 +797,4 @@ Held: (b). A malformed response happens only when the server broke the contract 
 - (b) Two generated types: the entrypoint's variables type, every variable required, and the field's parameters type, a nullable variable without a default optional. Cost: a second type artifact per entrypoint and an `entrypoint.ts` type change.
 - (c) Required for every field, and `childVariables` writes `null` for an unpassed variable with no default. Cost: the resolver's `parameters` then says `null` where the store key was computed for an omitted argument.
 
-Not held: raised with this change.
+Settled: (a). The error is `MissingFieldArgument`, named for the variable and the field and located at the selection, from the merge walk and from validation (query-generation.md, Source fields and variables). A passed variable may be `null`; a variable with a default that the parent does not pass takes the default. No variable is unset anywhere, `storeKey` has no unset rule, and `parameters_type.ts` stays one file with every variable required.

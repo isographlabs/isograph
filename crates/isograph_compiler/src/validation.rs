@@ -1,4 +1,7 @@
-use common_lang_types::{EntityName, RelativePathToSourceFile, SelectableName};
+use common_lang_types::{
+    EntityName, EntityNameAndSelectableName, RelativePathToSourceFile, SelectableName, VariableName,
+};
+use intern::Lookup;
 use isograph_parser::{
     EntityNameWrapper, EntrypointDeclaration, IsoLiteralItem, SelectableDeclaration, Selection,
     SelectionSet,
@@ -9,8 +12,8 @@ use span::{WithSpan, WithSpanPostfix};
 
 use crate::schema::{Definitions, entity_definitions, selectable_definitions};
 use crate::{
-    ClientId, CompilationProfile, IsographDb, NetworkProtocol, entity_named, entrypoint_fetch_plan,
-    parsed_iso_literals_in_file, selectable_named,
+    ClientId, CompilationProfile, IsographDb, NetworkProtocol, SelectableKind, entity_named,
+    entrypoint_fetch_plan, field_declaration, parsed_iso_literals_in_file, selectable_named,
 };
 
 /// A reference in an iso literal that the source declarations do not satisfy.
@@ -26,6 +29,16 @@ pub enum ValidationError<TNotFetchable: std::fmt::Display> {
     SelectionSetOnFieldWithoutTarget(SelectionSetOnFieldWithoutTargetError),
     #[error("{0}")]
     EntrypointNotFetchable(EntrypointNotFetchableError<TNotFetchable>),
+    #[error("{0}")]
+    MissingFieldArgument(MissingFieldArgument),
+}
+
+/// A selection of `field` that passes no value for `variable`, which has no default.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[error("`{field}` declares `${variable}` with no default, and this selection does not pass it.")]
+pub struct MissingFieldArgument {
+    pub field: SelectableKey,
+    pub variable: VariableName,
 }
 
 /// Why `entrypoint E.f` cannot be fetched.
@@ -283,25 +296,79 @@ fn validate_selection<'a, TProfile: CompilationProfile>(
         )
         .boxed(),
         Definitions::Unique(selectable) => {
-            match (selection.selection_set.as_ref(), selectable.target_entity()) {
-                (None, _) => std::iter::empty().boxed(),
-                (Some(nested), None) => std::iter::once(
-                    ValidationError::SelectionSetOnFieldWithoutTarget(
-                        SelectionSetOnFieldWithoutTargetError(key),
+            let missing = match selectable.kind {
+                SelectableKind::ClientField | SelectableKind::ClientPointer(_) => {
+                    missing_field_arguments(db, client, key, selection)
+                }
+                SelectableKind::Server(_) => Vec::new(),
+            };
+            let nested: ValidationErrors<'a, TProfile> =
+                match (selection.selection_set.as_ref(), selectable.target_entity()) {
+                    (None, _) => std::iter::empty().boxed(),
+                    (Some(nested), None) => std::iter::once(
+                        ValidationError::SelectionSetOnFieldWithoutTarget(
+                            SelectionSetOnFieldWithoutTargetError(key),
+                        )
+                        .with_span(nested.location),
                     )
-                    .with_span(nested.location),
-                )
-                .boxed(),
-                (Some(nested), Some(target)) => match entity_definedness(db, client, target) {
-                    EntityDefinedness::Undefined => std::iter::empty().boxed(),
-                    EntityDefinedness::Defined => {
-                        validate_selection_set(db, client, target, nested.item.reference()).boxed()
-                    }
-                },
-            }
+                    .boxed(),
+                    (Some(nested), Some(target)) => match entity_definedness(db, client, target) {
+                        EntityDefinedness::Undefined => std::iter::empty().boxed(),
+                        EntityDefinedness::Defined => {
+                            validate_selection_set(db, client, target, nested.item.reference())
+                                .boxed()
+                        }
+                    },
+                };
+            missing
+                .into_iter()
+                .map(|missing| {
+                    ValidationError::MissingFieldArgument(missing)
+                        .with_span(selection.name.location)
+                })
+                .chain(nested)
+                .boxed()
         }
         Definitions::Duplicated | Definitions::ProtocolLookupFailed(_) => {
             std::iter::empty().boxed()
         }
     }
+}
+
+/// The variables of the `field` declaration `field` that have no default and that `selection`
+/// does not pass, in declaration order. Empty when the declaration cannot be read.
+fn missing_field_arguments<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    field: SelectableKey,
+    selection: &Selection,
+) -> Vec<MissingFieldArgument> {
+    let Ok(declaration) = field_declaration(
+        db,
+        client,
+        EntityNameAndSelectableName {
+            parent_entity_name: field.entity,
+            selectable_name: field.selectable,
+        },
+    ) else {
+        return Vec::new();
+    };
+    let passed: Vec<&str> = selection
+        .arguments
+        .iter()
+        .flat_map(|arguments| arguments.item.0.iter())
+        .filter_map(|slot| slot.item.item.as_ref())
+        .map(|argument| argument.item.name.item.0.lookup())
+        .collect();
+    declaration
+        .declaration
+        .variable_definitions
+        .iter()
+        .flat_map(|list| list.item.0.iter())
+        .filter_map(|slot| slot.item.item.as_ref())
+        .filter(|variable| variable.item.default_value.is_none())
+        .map(|variable| variable.item.name.item.0.item.0)
+        .filter(|name| !passed.contains(&name.lookup()))
+        .map(|variable| MissingFieldArgument { field, variable })
+        .collect()
 }

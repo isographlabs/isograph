@@ -539,7 +539,7 @@ pub(crate) fn merged_arguments(
 
 `resolver_arguments` starts from `reader_arguments`. It reads `field_variables(db, client, selected.parent_entity_name, selected.selectable_name)`; an argument `selected` does not declare is `SelectionMap` with `UnknownFieldArgument` (located at the argument, as query generation locates it). For each variable of `selected` that the selection does not pass and that has a `default_value`, it adds the default (a `MergedValue` with no variables, so it narrows like a literal). The result is sorted by name.
 
-Why defaults go into the parent's node: query generation inlines `field Pet.X($n: Int = 3) { checkins(limit: $n) }` selected as `X` with `n` replaced by `3`, so the normalizer writes the store key of `checkins(limit: 3)`. `X`'s own reader reads `checkins(limit: $n)` with the variables its `Resolver` node computes. With the default in the node, those variables hold `n: 3` and the reader computes the same key. The alternative, defaults in the child's reader artifact applied by `read`, would apply them at an entrypoint's top-level read too, where `normalize` receives the caller's variables and applies none, so the two keys would differ. A variable with no default that is not passed is absent from the child's variables; query generation removes such an argument from the merge key, and the reader's key omits it too, because `storeKey` omits a top-level argument whose variable is absent (store.md, Store keys). Both keys are `checkins`.
+Why defaults go into the parent's node: query generation inlines `field Pet.X($n: Int = 3) { checkins(limit: $n) }` selected as `X` with `n` replaced by `3`, so the normalizer writes the store key of `checkins(limit: 3)`. `X`'s own reader reads `checkins(limit: $n)` with the variables its `Resolver` node computes. With the default in the node, those variables hold `n: 3` and the reader computes the same key. The alternative, defaults in the child's reader artifact applied by `read`, would apply them at an entrypoint's top-level read too, where `normalize` receives the caller's variables and applies none, so the two keys would differ. A variable with no default that is not passed does not compile: it is `MissingFieldArgument` (query-generation.md, Source fields and variables; store.md, open decision 11, settled), so the child's variables hold a value for every variable of the child. A passed `null` is a value: `X(n: null)` gives `n: null`, and both keys are `checkins____limit___null`.
 
 At the top of a read (an entrypoint's reader, read with the caller's variables) no default is applied by either side: the normalizer and the reader receive the same `variables`, so their keys agree.
 
@@ -910,7 +910,7 @@ Semantics, stated as facts the tests assert:
 - A missing value under a `Linked`, `Refinement`, or `Resolver` node is wrapped once per node, as upstream wraps it (`read.ts:579-584`, `:737-747`): `nestedReason` is the inner `MissingData`, and `recordLink` is the innermost record, the one that lacks the value.
 - A refinement compares `root.entityName` with `condition.entityName` and reads no store value.
 - A `Resolver` node reads the selected field's reader AST on the same root, with `childVariables`, and calls its resolver with `{ data, parameters: childVariables }`. The resolver's return is the node's value. The resolver is not called when its data is `MissingData`.
-- `childVariables` drops an argument whose top-level value is an absent variable, and writes `null` for an absent variable inside an object, which matches query-generation.md's held open decision 2. Upstream drops the absent variable in both places (`read.ts:465-490`).
+- `childVariables` holds a value for every variable of the selected field: the node passes it or carries its default, and a selection that passes neither does not compile (`MissingFieldArgument`). Upstream drops an absent variable (`read.ts:465-490`); i2 has none.
 - The first `MissingData` ends the read (upstream's behavior); there is no partial result.
 - A resolver that throws propagates out of `read`. There is no catching and no log event.
 - A value under a `Linked` node's store key that is not `null`, a link, or a list of these throws store.md's non-link message (store.md, Errors: a store state only a disagreeing AST produces). A switch on a reader node's `kind` or a condition's `kind` is exhaustive, with no `default` (store.md, Errors: artifacts).
@@ -953,7 +953,7 @@ export function isStoreLink(value: StoreValue): value is StoreLink;
 
 store.md states this test in its Errors section ("A link is an object whose own keys are exactly `entityName` and `id`, both strings") for `check` and `garbageCollect`; this doc names it as a module export of `src/store.ts` so that `check.ts`, `garbageCollection.ts`, and `read.ts` import one function. The package index does not export it.
 
-The reader's store keys come from `storeKey`, so they follow store.md's encoding (Store keys), including its rule for an absent variable.
+The reader's store keys come from `storeKey`, so they follow store.md's encoding (Store keys).
 
 ## Memos and invalidation
 
@@ -1024,20 +1024,20 @@ field Query.ConstantPet($id: ID!) {
   pet(id: $id) { Constant }
 }
 
-field Pet.UnpassedCheckins($n: Int) {
+field Pet.NullableCheckins($n: Int) {
   checkins(limit: $n) { id }
 }
 
-field Query.UnpassedPet($id: ID!) {
-  pet(id: $id) { UnpassedCheckins }
+field Query.NullPassedPet($id: ID!) {
+  pet(id: $id) { NullableCheckins(n: null) }
 }
 ```
 
-with `entrypoint Query.PetSummary`, `entrypoint Query.PetSummaries`, `entrypoint Query.ConstantPet`, and `entrypoint Query.UnpassedPet`. `Pet.Constant` has no selection set, so its reader AST is empty. `RecentCheckins` selected with no argument reads `checkins(limit: $n)` with `n: 2` from its `Resolver` node, and query generation inlines it as `checkins(limit: 2)`, so both keys are `checkins____limit___2`.
+with `entrypoint Query.PetSummary`, `entrypoint Query.PetSummaries`, `entrypoint Query.ConstantPet`, and `entrypoint Query.NullPassedPet`. `Pet.Constant` has no selection set, so its reader AST is empty. `RecentCheckins` selected with no argument reads `checkins(limit: $n)` with `n: 2` from its `Resolver` node, and query generation inlines it as `checkins(limit: 2)`, so both keys are `checkins____limit___2`.
 
 - Leaves: `Leaves` reads `greeting`, `literalGreeting`, `nullGreeting`, `variableGreeting`, `tags`, and `settings` equal to the response's values: a `null` leaf is `null`, `tags: ["a", null]` and `tags: []` are returned as stored, and `settings: { entityName: "Pet", id: "1" }` (a `JSON` scalar) is returned whole as a leaf.
 - Variables: `variableGreeting` read with `{ name: "Bo" }` after normalizing with `{ name: "Bo" }` is the response's value; read with `{ name: null }` after normalizing with `{ name: null }` it is the response's value; read with `{ name: "Bo" }` after normalizing only with `{ name: null }` is `MissingData` whose `reason` names `greeting____name___"Bo"`.
-- Unpassed variable: `UnpassedPet` with `{ id: "1" }` normalizes `Pet:1.checkins` and reads it back through `UnpassedCheckins`, whose `$n` its `Resolver` node does not pass: both store keys are `checkins` (store.md, Store keys: the argument is omitted).
+- A passed `null`: `NullPassedPet` with `{ id: "1" }` normalizes `Pet:1.checkins____limit___null` and reads it back through `NullableCheckins`, whose `$n` its `Resolver` node passes as `null`: both store keys are `checkins____limit___null`. Selecting `NullableCheckins` without `n` is `MissingFieldArgument` at compile time, so no fixture can leave `$n` unset.
 - Linked: `PetDetail` with `{ id: "1", skip: null }` reads `pet` with `stats` (an identity-less `PetStats` at `Pet:1.stats`), `bestFriend` two levels deep, `checkins` and `pagedCheckins` as their own lists; `stats: null` reads `null`.
 - Cyclic data: `Pet:1.bestFriend` is `Pet:2`, whose `bestFriend` is `Pet:1`; the read terminates, because it recurses on the reader AST.
 - Lists: `PetLists` reads `pets` in response order, `pets: []` as `[]`, `maybePets: [null, ..]` with `null` at index 0, `petGrid: [[a], [], [null, b]]` as the same nesting, `petGrid: null` as `null`, and `statGrid` as nested arrays of objects.
@@ -1134,6 +1134,6 @@ The regenerated `demos/pet-demo/src/__isograph/`: every `resolver_reader.ts` is 
 ## Docs this doc amends
 
 - `refactors/pending/artifact-set-and-types.md`, Per field: `P/f/resolver_reader.ts` is this doc's artifact, not a stub. Per entrypoint: `readerArtifact` imports an object, not a thunk. Its open decision 2 (b): a pointer selection has no key in the selecting field's param type.
-- `refactors/pending/runtime/store.md`: `storeKey` takes `Pick<NormalizationSelection, "selectableName" | "arguments">`; `src/store.ts` exports `isStoreLink`, which `check` and `garbageCollect` use; the fixture project gains `Pet.PetName`, `Pet.RecentCheckins`, `Query.PetSummary`, `Query.PetSummaries`, `Pet.Constant`, `Query.ConstantPet`, `Pet.UnpassedCheckins`, and `Query.UnpassedPet`, and its `resolver_reader.ts` artifacts are reader artifacts; "v1 has no reader" no longer holds once this doc lands; the package gains `vitest.config.ts` and the `@isograph/babel-plugin` and `@babel/core` dev dependencies (Loading reader artifacts).
+- `refactors/pending/runtime/store.md`: `storeKey` takes `Pick<NormalizationSelection, "selectableName" | "arguments">`; `src/store.ts` exports `isStoreLink`, which `check` and `garbageCollect` use; the fixture project gains `Pet.PetName`, `Pet.RecentCheckins`, `Query.PetSummary`, `Query.PetSummaries`, `Pet.Constant`, `Query.ConstantPet`, `Pet.NullableCheckins`, and `Query.NullPassedPet`, and its `resolver_reader.ts` artifacts are reader artifacts; "v1 has no reader" no longer holds once this doc lands; the package gains `vitest.config.ts` and the `@isograph/babel-plugin` and `@babel/core` dev dependencies (Loading reader artifacts).
 - `refactors/pending/runtime/pico-runtime.md`, 11. Artifacts: `ReaderScalarField`, `ReaderLinkedField`, `ReaderResolverField`, and `EagerReaderArtifact` are this doc's `ReaderScalarSelection`, `ReaderLinkedSelection`, `ReaderResolverSelection`, and `ReaderArtifact`; `ReaderLinkField` does not exist; `ReaderRefinementSelection` is new; `ResolverParameters` is `ResolverParam`; `alias` is always a string and `fieldName` is `selectableName`. Its `computeResolver` and `readSelection` replace this doc's `read` and `readSelection` when memoization lands.
 - `refactors/pending/graphql-protocol/normalization-ast.md`, change 4: the `NamedTypeImport` struct it specifies is the landed one, renamed `NamedImport` (The TypeScript artifact).
