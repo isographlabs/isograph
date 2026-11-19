@@ -6,6 +6,7 @@ mod generate_types;
 mod imports;
 mod iso_overloads;
 mod module;
+mod normalization_ast;
 mod swc;
 
 use common_lang_types::{ConstExportName, EntityNameAndSelectableName};
@@ -15,9 +16,12 @@ use isograph_compiler::{
 use prelude::Postfix;
 
 pub use custom_scalar::{ModuleSpecifier, TypeScriptCustomScalarType};
-pub use module::{ArtifactImport, ArtifactModule, ArtifactObjectEntry, ArtifactValue};
+pub use module::{
+    ArtifactImport, ArtifactModule, ArtifactObjectEntry, ArtifactValue, DeclaredExportType,
+    DeclaredTypeArgument, DefaultExportType, NamedTypeImport,
+};
 
-use crate::entrypoint::{NORMALIZATION_AST, RESOLVER_READER, stub_artifact};
+use crate::entrypoint::{RESOLVER_READER, stub_artifact};
 use crate::module::{TypeScriptModule, module_of_artifact};
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
@@ -81,12 +85,18 @@ pub fn generate_artifacts<TLiteralContext>(
     let per_entrypoint = project.entrypoints.iter().flat_map(|artifacts| {
         let EntrypointArtifacts { entrypoint, query } = artifacts;
         [
-            printed_artifact(entrypoint::entrypoint_artifact(entrypoint.dereference())),
+            printed_artifact(entrypoint::entrypoint_artifact(
+                entrypoint.dereference(),
+                query.normalization_ast.root.entity_name,
+            )),
             printed_artifact(entrypoint::query_text_artifact(
                 entrypoint.dereference(),
                 query.text.reference(),
             )),
-            printed_artifact(stub_artifact(entrypoint.dereference(), NORMALIZATION_AST)),
+            printed_artifact(normalization_ast::normalization_ast_artifact(
+                entrypoint.dereference(),
+                query.normalization_ast.reference(),
+            )),
         ]
         .into_iter()
         .chain(query.file_name.map(|file_name| {
@@ -139,9 +149,10 @@ mod tests {
         ArtifactInnerType, ArtifactInputField, ArtifactInputType, ArtifactObjectField,
         ArtifactObjectType, ArtifactParameter, ArtifactPath, EntrypointArtifacts,
         FieldArtifactKind, FieldArtifacts, FieldDeclarationSource, FixedRecordId, Generation,
-        GenerationOptions, LinkType, NormalizationAst, NormalizationRootRecord,
-        NormalizationSelectionSet, ParametersType, ProjectArtifacts, QueryArtifact, ScalarKind,
-        ScalarValueKind, UnionWrapper, Wrapper, WrapperVariant,
+        GenerationOptions, LinkType, NormalizationAst, NormalizationNode, NormalizationRootRecord,
+        NormalizationSelection, NormalizationSelectionSet, NormalizationTarget, ParametersType,
+        ProjectArtifacts, QueryArtifact, ResponseKey, ScalarKind, ScalarValueKind, UnionWrapper,
+        Wrapper, WrapperVariant,
     };
     use nonempty::NonEmpty;
     use prelude::Postfix;
@@ -532,7 +543,15 @@ mod tests {
                         entity_name: entity("Query"),
                         id: FixedRecordId::root(),
                     },
-                    selections: NormalizationSelectionSet(Vec::new()),
+                    selections: NormalizationSelectionSet(
+                        NormalizationNode::Selection(NormalizationSelection {
+                            response_key: ResponseKey::SelectableName,
+                            selectable_name: "pets".intern().to(),
+                            arguments: Default::default(),
+                            target: NormalizationTarget::Leaf,
+                        })
+                        .wrap_vec(),
+                    ),
                 },
             },
         }
@@ -584,7 +603,7 @@ mod tests {
     }
 
     #[test]
-    fn readers_and_normalization_asts_are_empty_objects() {
+    fn a_reader_is_an_empty_object_and_the_normalization_ast_is_the_query_s_ast() {
         let mut checkins = field("Pet", "Checkins", Vec::new());
         checkins.resolver_reader = Generation::Generated;
         let artifacts = generated(
@@ -594,16 +613,13 @@ mod tests {
             }
             .reference(),
         );
-        let texts: Vec<&str> = ["resolver_reader.ts", "normalization_ast.ts"]
-            .into_iter()
-            .map(|file| {
-                text_at(
-                    artifacts.as_slice(),
-                    format!("Pet/Checkins/{file}").as_str(),
-                )
-            })
-            .collect();
-        assert_eq!(texts, ["export default {};\n"; 2]);
+        assert_eq!(
+            text_at(artifacts.as_slice(), "Pet/Checkins/resolver_reader.ts"),
+            "export default {};\n"
+        );
+        let ast = text_at(artifacts.as_slice(), "Pet/Checkins/normalization_ast.ts");
+        assert!(ast.contains("selectableName: \"pets\""), "{ast}");
+        assert!(ast.contains("responseKey: null"), "{ast}");
         assert!(has_path(artifacts.as_slice(), "Pet/Checkins/entrypoint.ts"));
         assert!(!has_path(
             artifacts.as_slice(),

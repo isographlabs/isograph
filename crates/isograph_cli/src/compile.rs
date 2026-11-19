@@ -843,7 +843,8 @@ mod generation_tests {
     const INLINED: &str = "export const Inner = iso(`field Query.Inner { id }`)(() => null);\nexport const Outer = iso(`field Query.Outer { Inner }`)(() => null);\niso(`entrypoint Query.Outer`)\n";
 
     #[test]
-    fn editing_an_inlined_field_rewrites_its_param_type_and_the_query_files() {
+    fn editing_an_inlined_field_rewrites_its_param_type_the_query_files_and_the_normalization_ast()
+    {
         let mut state = state();
         present(&mut state, "/tmp/proj/src/Query.ts", INLINED);
         changes(&mut state);
@@ -859,6 +860,7 @@ mod generation_tests {
             written_paths(changes.reference()),
             [
                 "Query/Inner/param_type.ts",
+                "Query/Outer/normalization_ast.ts",
                 "Query/Outer/query_text.graphql",
                 "Query/Outer/query_text.ts",
             ]

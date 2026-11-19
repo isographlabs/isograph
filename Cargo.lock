@@ -2427,6 +2427,7 @@ dependencies = [
  "common_lang_types",
  "intern",
  "isograph_compiler",
+ "isograph_parser",
  "nonempty",
  "pathdiff",
  "prelude",

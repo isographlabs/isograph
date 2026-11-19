@@ -1,17 +1,57 @@
-use common_lang_types::{ArtifactFileName, EntityNameAndSelectableName, QueryText};
+use common_lang_types::{ArtifactFileName, EntityName, EntityNameAndSelectableName, QueryText};
 use intern::Lookup;
 use isograph_compiler::ArtifactPath;
+use prelude::Postfix;
 
-use crate::module::{ArtifactImport, ArtifactModule, ArtifactObjectEntry, ArtifactValue};
+use crate::generate_types::{OUTPUT_TYPE, PARAM_TYPE, output_type_name, param_type_name};
+use crate::imports::relative_artifact_specifier;
+use crate::module::{
+    ArtifactImport, ArtifactModule, ArtifactObjectEntry, ArtifactValue, DeclaredExportType,
+    DeclaredTypeArgument, DefaultExportType, NamedTypeImport,
+};
+
+/// The package the artifact types and the runtime live in.
+pub(crate) const RUNTIME_PACKAGE: &str = "@isograph/runtime";
+const ISOGRAPH_ENTRYPOINT: &str = "IsographEntrypoint";
 
 pub(crate) const NORMALIZATION_AST: &str = "normalization_ast.ts";
 pub(crate) const QUERY_TEXT: &str = "query_text.ts";
 pub(crate) const RESOLVER_READER: &str = "resolver_reader.ts";
 
-/// The entrypoint artifact of `entrypoint`, at the path the iso transforms import.
-pub(crate) fn entrypoint_artifact(entrypoint: EntityNameAndSelectableName) -> ArtifactModule {
+/// The entrypoint artifact of `entrypoint`, whose operation's root entity is `root_entity`,
+/// at the path the iso transforms import, declared as an `IsographEntrypoint` of its param
+/// type, output type, and root entity.
+pub(crate) fn entrypoint_artifact(
+    entrypoint: EntityNameAndSelectableName,
+    root_entity: EntityName,
+) -> ArtifactModule {
+    let path = entrypoint_path(entrypoint);
+    let type_import = |file: &str, name: String| NamedTypeImport {
+        specifier: relative_artifact_specifier(
+            path.reference(),
+            field_artifact_path(entrypoint, file).reference(),
+        ),
+        imported: name.clone(),
+        local: name,
+    };
     ArtifactModule {
-        path: entrypoint_path(entrypoint),
+        default_export_type: DefaultExportType::Declared(DeclaredExportType {
+            binding: "artifact".to_owned(),
+            type_import: NamedTypeImport {
+                specifier: RUNTIME_PACKAGE.to_owned(),
+                imported: ISOGRAPH_ENTRYPOINT.to_owned(),
+                local: ISOGRAPH_ENTRYPOINT.to_owned(),
+            },
+            type_arguments: vec![
+                DeclaredTypeArgument::Import(type_import(PARAM_TYPE, param_type_name(entrypoint))),
+                DeclaredTypeArgument::Import(type_import(
+                    OUTPUT_TYPE,
+                    output_type_name(entrypoint),
+                )),
+                DeclaredTypeArgument::StringLiteral(root_entity.to_string()),
+            ],
+        }),
+        path: path.clone(),
         default_export: ArtifactValue::Object(vec![
             ArtifactObjectEntry {
                 key: "kind".to_owned(),
@@ -32,10 +72,7 @@ pub(crate) fn entrypoint_artifact(entrypoint: EntityNameAndSelectableName) -> Ar
             },
             ArtifactObjectEntry {
                 key: "normalizationAst".to_owned(),
-                value: ArtifactValue::Import(ArtifactImport(field_artifact_path(
-                    entrypoint,
-                    NORMALIZATION_AST,
-                ))),
+                value: ArtifactValue::Import(ArtifactImport(normalization_ast_path(entrypoint))),
             },
             ArtifactObjectEntry {
                 key: "readerArtifact".to_owned(),
@@ -56,6 +93,7 @@ pub(crate) fn query_text_artifact(
     ArtifactModule {
         path: field_artifact_path(entrypoint, QUERY_TEXT),
         default_export: ArtifactValue::String(text.0.clone()),
+        default_export_type: DefaultExportType::Inferred,
     }
 }
 
@@ -71,11 +109,17 @@ pub(crate) fn raw_query_text_file(
     )
 }
 
+/// `<Entity>/<selectable>/normalization_ast.ts`.
+pub(crate) fn normalization_ast_path(entrypoint: EntityNameAndSelectableName) -> ArtifactPath {
+    field_artifact_path(entrypoint, NORMALIZATION_AST)
+}
+
 /// A module whose default export is an empty object, at `P/f/<file>`.
 pub(crate) fn stub_artifact(field: EntityNameAndSelectableName, file: &str) -> ArtifactModule {
     ArtifactModule {
         path: field_artifact_path(field, file),
         default_export: ArtifactValue::Object(Vec::new()),
+        default_export_type: DefaultExportType::Inferred,
     }
 }
 

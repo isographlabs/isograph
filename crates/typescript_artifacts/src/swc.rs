@@ -15,15 +15,16 @@ use swc_ecma_ast::{
     TsKeywordType, TsKeywordTypeKind, TsLit, TsLitType, TsParenthesizedType, TsPropertySignature,
     TsTplLitType, TsType, TsTypeAliasDecl, TsTypeAnn, TsTypeElement, TsTypeLit, TsTypeParam,
     TsTypeParamDecl, TsTypeParamInstantiation, TsTypeQuery, TsTypeQueryExpr, TsTypeRef,
-    TsUnionOrIntersectionType, TsUnionType,
+    TsUnionOrIntersectionType, TsUnionType, VarDecl, VarDeclKind, VarDeclarator,
 };
 use swc_ecma_codegen::text_writer::{BindingStorage, JsWriter, ScopeKind, WriteJs};
 use swc_ecma_codegen::{Config, Emitter};
 
 use crate::imports::{artifact_import_identifier, artifact_import_specifier};
 use crate::module::{
-    ArtifactImport, ArtifactValue, FunctionParam, FunctionSignature, NamedTypeImport, Optionality,
-    TypeAlias, TypeParam, TypeScriptItem, TypeScriptKeyword, TypeScriptModule, TypeScriptType,
+    ArtifactImport, ArtifactValue, DeclaredConst, FunctionParam, FunctionSignature,
+    NamedTypeImport, Optionality, TypeAlias, TypeParam, TypeScriptItem, TypeScriptKeyword,
+    TypeScriptModule, TypeScriptType,
 };
 
 /// Gives a property's description a leading comment and returns the span to attach it to.
@@ -235,7 +236,37 @@ fn module_item(from: &ArtifactPath, item: &TypeScriptItem, comment_at: CommentAt
                 expr: expression(value).boxed(),
             }))
         }
+        TypeScriptItem::DeclaredConst(declared) => {
+            ModuleItem::Stmt(Stmt::Decl(Decl::Var(declared_const(declared, comment_at))))
+        }
+        TypeScriptItem::ExportDefaultBinding(binding) => {
+            ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultExpr(ExportDefaultExpr {
+                span: DUMMY_SP,
+                expr: Expr::Ident(ident(binding.as_str())).boxed(),
+            }))
+        }
     }
+}
+
+/// `const <binding>: <type> = <value>;`
+fn declared_const(declared: &DeclaredConst, comment_at: CommentAt) -> Box<VarDecl> {
+    VarDecl {
+        span: DUMMY_SP,
+        ctxt: SyntaxContext::empty(),
+        kind: VarDeclKind::Const,
+        declare: false,
+        decls: VarDeclarator {
+            span: DUMMY_SP,
+            name: Pat::Ident(BindingIdent {
+                id: ident(declared.binding.as_str()),
+                type_ann: type_annotation(declared.type_.reference(), comment_at).wrap_some(),
+            }),
+            init: expression(declared.value.reference()).boxed().wrap_some(),
+            definite: false,
+        }
+        .wrap_vec(),
+    }
+    .boxed()
 }
 
 fn type_alias(alias: &TypeAlias, comment_at: CommentAt) -> Box<TsTypeAliasDecl> {
@@ -637,9 +668,9 @@ mod tests {
 
     use super::print;
     use crate::module::{
-        ArtifactImport, ArtifactModule, ArtifactObjectEntry, ArtifactValue, Optionality,
-        PropertySignature, TemplateLiteralSpan, TemplateLiteralType, TypeAlias, TypeScriptItem,
-        TypeScriptKeyword, TypeScriptModule, TypeScriptType, module_of_artifact,
+        ArtifactImport, ArtifactModule, ArtifactObjectEntry, ArtifactValue, DefaultExportType,
+        Optionality, PropertySignature, TemplateLiteralSpan, TemplateLiteralType, TypeAlias,
+        TypeScriptItem, TypeScriptKeyword, TypeScriptModule, TypeScriptType, module_of_artifact,
     };
 
     fn path(text: &str) -> ArtifactPath {
@@ -659,6 +690,7 @@ mod tests {
                 ArtifactModule {
                     path: path("Query/A/entrypoint.ts"),
                     default_export: value,
+                    default_export_type: DefaultExportType::Inferred,
                 }
                 .reference(),
             )

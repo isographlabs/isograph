@@ -1,5 +1,7 @@
 use isograph_compiler::ArtifactPath;
 
+use prelude::Postfix;
+
 use crate::imports::imports_of;
 
 /// A module whose only export is its default export.
@@ -7,6 +9,34 @@ use crate::imports::imports_of;
 pub struct ArtifactModule {
     pub path: ArtifactPath,
     pub default_export: ArtifactValue,
+    pub default_export_type: DefaultExportType,
+}
+
+/// Whether the default export is declared with a type.
+#[derive(Clone, Debug, PartialEq)]
+pub enum DefaultExportType {
+    /// `export default <value>;`: TypeScript infers the type.
+    Inferred,
+    /// `const <binding>: <type> = <value>; export default <binding>;`
+    Declared(DeclaredExportType),
+}
+
+/// `<type_import>`, or `<type_import><type_arguments>` when it has arguments.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DeclaredExportType {
+    /// The name of the `const` that holds the value.
+    pub binding: String,
+    pub type_import: NamedTypeImport,
+    pub type_arguments: Vec<DeclaredTypeArgument>,
+}
+
+/// A type argument of a declared export type.
+#[derive(Clone, Debug, PartialEq)]
+pub enum DeclaredTypeArgument {
+    /// A type imported by name; the module imports it.
+    Import(NamedTypeImport),
+    /// A string literal type.
+    StringLiteral(String),
 }
 
 /// A value a module exports, in no particular host language.
@@ -57,10 +87,23 @@ pub(crate) enum TypeScriptItem {
     ExportedThrowingFunction(ThrowingFunction),
     /// `export default <value>;`
     ExportDefault(ArtifactValue),
+    /// `const <binding>: <type> = <value>;`
+    DeclaredConst(DeclaredConst),
+    /// `export default <binding>;`
+    ExportDefaultBinding(String),
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct DeclaredConst {
+    pub binding: String,
+    pub type_: TypeScriptType,
+    pub value: ArtifactValue,
+}
+
+/// `import type { <imported> as <local> } from "<specifier>";`, or `{ <imported> }` when the
+/// two names are equal.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct NamedTypeImport {
+pub struct NamedTypeImport {
     /// Printed as written.
     pub specifier: String,
     pub imported: String,
@@ -191,19 +234,62 @@ pub(crate) struct FunctionType {
     pub return_type: TypeScriptType,
 }
 
-/// `artifact` as a TypeScript module: a default import for each distinct import in its value,
-/// in path order, then the default export.
+/// `artifact` as a TypeScript module. Inferred: a default import for each distinct import in
+/// its value, in path order, then the default export. Declared: the type's imports, the value's
+/// default imports, the `const` declared with the type, then its default export.
 pub(crate) fn module_of_artifact(artifact: &ArtifactModule) -> TypeScriptModule {
-    TypeScriptModule {
-        path: artifact.path.clone(),
-        items: imports_of(&artifact.default_export)
-            .into_iter()
-            .cloned()
-            .map(TypeScriptItem::DefaultImport)
+    let default_imports = imports_of(&artifact.default_export)
+        .into_iter()
+        .cloned()
+        .map(TypeScriptItem::DefaultImport);
+    let items = match artifact.default_export_type.reference() {
+        DefaultExportType::Inferred => default_imports
             .chain(std::iter::once(TypeScriptItem::ExportDefault(
                 artifact.default_export.clone(),
             )))
             .collect(),
+        DefaultExportType::Declared(declared) => std::iter::once(TypeScriptItem::NamedTypeImport(
+            declared.type_import.clone(),
+        ))
+        .chain(
+            declared
+                .type_arguments
+                .iter()
+                .filter_map(|argument| match argument {
+                    DeclaredTypeArgument::Import(import) => {
+                        TypeScriptItem::NamedTypeImport(import.clone()).wrap_some()
+                    }
+                    DeclaredTypeArgument::StringLiteral(_) => None,
+                }),
+        )
+        .chain(default_imports)
+        .chain([
+            TypeScriptItem::DeclaredConst(DeclaredConst {
+                binding: declared.binding.clone(),
+                type_: TypeScriptType::generic(
+                    declared.type_import.local.as_str(),
+                    declared
+                        .type_arguments
+                        .iter()
+                        .map(|argument| match argument {
+                            DeclaredTypeArgument::Import(import) => {
+                                TypeScriptType::reference(import.local.as_str())
+                            }
+                            DeclaredTypeArgument::StringLiteral(literal) => {
+                                TypeScriptType::StringLiteral(literal.clone())
+                            }
+                        })
+                        .collect(),
+                ),
+                value: artifact.default_export.clone(),
+            }),
+            TypeScriptItem::ExportDefaultBinding(declared.binding.clone()),
+        ])
+        .collect(),
+    };
+    TypeScriptModule {
+        path: artifact.path.clone(),
+        items,
     }
 }
 

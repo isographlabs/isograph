@@ -8,6 +8,7 @@ license = { workspace = true }
 common_lang_types = { path = "../common_lang_types" }
 intern = { path = "../../relay-crates/intern" }
 isograph_compiler = { path = "../isograph_compiler" }
+isograph_parser = { path = "../isograph_parser" }
 pathdiff = { workspace = true }
 prelude = { path = "../prelude" }
 swc_common = { version = "=27.0.0", default-features = false }

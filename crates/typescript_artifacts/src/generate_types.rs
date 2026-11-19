@@ -25,7 +25,7 @@ pub(crate) type Options = GenerationOptions<TypeScriptCustomScalarType>;
 
 pub(crate) const PARAM_TYPE: &str = "param_type.ts";
 const PARAMETERS_TYPE: &str = "parameters_type.ts";
-const OUTPUT_TYPE: &str = "output_type.ts";
+pub(crate) const OUTPUT_TYPE: &str = "output_type.ts";
 
 /// `P__f__param`.
 pub(crate) fn param_type_name(field: EntityNameAndSelectableName) -> String {
@@ -36,7 +36,7 @@ fn parameters_type_name(field: EntityNameAndSelectableName) -> String {
     format!("{}__parameters", field.underscore_separated())
 }
 
-fn output_type_name(field: EntityNameAndSelectableName) -> String {
+pub(crate) fn output_type_name(field: EntityNameAndSelectableName) -> String {
     format!("{}__output_type", field.underscore_separated())
 }
 
