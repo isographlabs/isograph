@@ -1,7 +1,51 @@
-use common_lang_types::{ArgumentName, DescriptionValue, DirectiveName, EntityName, ValueKeyName};
+use common_lang_types::{
+    ArgumentName, DescriptionValue, DirectiveName, EntityName, InputValueName, SelectableName,
+    ValueKeyName,
+};
 use span::WithSpan;
 
-use crate::ConstantValue;
+use crate::{ConstantValue, TypeAnnotation};
+
+/// Spec 3.6 `ObjectTypeDefinition`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ObjectTypeDefinition {
+    pub description: Option<WithSpan<Description>>,
+    pub name: WithSpan<EntityNameWrapper>,
+    pub interfaces: Vec<WithSpan<EntityNameWrapper>>,
+    pub directives: Vec<WithSpan<Directive>>,
+    pub fields: Vec<WithSpan<FieldDefinition>>,
+}
+
+/// Spec 3.7 `InterfaceTypeDefinition`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct InterfaceTypeDefinition {
+    pub description: Option<WithSpan<Description>>,
+    pub name: WithSpan<EntityNameWrapper>,
+    pub interfaces: Vec<WithSpan<EntityNameWrapper>>,
+    pub directives: Vec<WithSpan<Directive>>,
+    pub fields: Vec<WithSpan<FieldDefinition>>,
+}
+
+/// Spec 3.6 `FieldDefinition`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FieldDefinition {
+    pub description: Option<WithSpan<Description>>,
+    pub name: WithSpan<SelectableNameWrapper>,
+    pub arguments: Vec<WithSpan<InputValueDefinition>>,
+    pub type_: WithSpan<TypeAnnotation>,
+    pub directives: Vec<WithSpan<Directive>>,
+}
+
+/// Spec 3.6.1 `InputValueDefinition`: a field argument, a directive argument, or an input
+/// object field (spec 3.10 `InputFieldsDefinition`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct InputValueDefinition {
+    pub description: Option<WithSpan<Description>>,
+    pub name: WithSpan<InputValueNameWrapper>,
+    pub type_: WithSpan<TypeAnnotation>,
+    pub default_value: Option<WithSpan<ConstantValue>>,
+    pub directives: Vec<WithSpan<Directive>>,
+}
 
 /// Spec 3.5 `ScalarTypeDefinition`.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -30,6 +74,14 @@ pub struct Argument {
 /// root operation type, or a named type in a type annotation.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct EntityNameWrapper(pub EntityName);
+
+/// A field definition's name.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct SelectableNameWrapper(pub SelectableName);
+
+/// An input value definition's name.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct InputValueNameWrapper(pub InputValueName);
 
 /// A directive argument's name.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

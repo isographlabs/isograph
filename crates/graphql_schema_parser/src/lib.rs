@@ -16,7 +16,8 @@ mod test_cursor;
 
 pub use ast::{
     Argument, ArgumentNameWrapper, Description, Directive, DirectiveNameWrapper, EntityNameWrapper,
-    ScalarTypeDefinition, ValueKeyNameWrapper,
+    FieldDefinition, InputValueDefinition, InputValueNameWrapper, InterfaceTypeDefinition,
+    ObjectTypeDefinition, ScalarTypeDefinition, SelectableNameWrapper, ValueKeyNameWrapper,
 };
 pub use parse_error::{Expectation, ExpectedFound, Found, ParseError};
 pub use parse_schema::{DefinitionError, DefinitionName};
