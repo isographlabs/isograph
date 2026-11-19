@@ -76,7 +76,7 @@ pub(crate) fn reader_artifact_file<TLiteralContext>(
     ))
     .chain(value_imports)
     .chain([
-        TypeScriptItem::DeclaredConst(DeclaredConst {
+        TypeScriptItem::DeclaredThunk(DeclaredConst {
             binding: BINDING.to_owned(),
             type_: TypeScriptType::generic(
                 READER_ARTIFACT_TYPE,
@@ -258,7 +258,7 @@ mod tests {
         );
         assert!(
             lines.iter().any(|line| line.starts_with(
-                "const readerArtifact: ReaderArtifact<Pet__fullName__param, Pet__fullName__output_type, \"Pet\"> = {"
+                "const readerArtifact = (): ReaderArtifact<Pet__fullName__param, Pet__fullName__output_type, \"Pet\"> =>"
             )),
             "{text}"
         );

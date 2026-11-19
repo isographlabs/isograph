@@ -76,7 +76,7 @@ pub(crate) fn entrypoint_artifact(
             },
             ArtifactObjectEntry {
                 key: "readerArtifact".to_owned(),
-                value: ArtifactValue::Import(ArtifactImport(field_artifact_path(
+                value: ArtifactValue::ImportCallThunk(ArtifactImport(field_artifact_path(
                     entrypoint,
                     RESOLVER_READER,
                 ))),

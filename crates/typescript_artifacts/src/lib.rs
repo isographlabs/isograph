@@ -662,7 +662,7 @@ mod tests {
             "{text}"
         );
         assert!(
-            text.contains("readerArtifact: Query__HomeRoute__resolver_reader"),
+            text.contains("readerArtifact: ()=>Query__HomeRoute__resolver_reader()"),
             "{text}"
         );
         assert!(

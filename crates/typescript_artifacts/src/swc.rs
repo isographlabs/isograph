@@ -6,16 +6,17 @@ use swc_common::comments::{Comment, CommentKind, Comments, SingleThreadedComment
 use swc_common::sync::Lrc;
 use swc_common::{BytePos, DUMMY_SP, FileName, SourceMap, Span, SyntaxContext};
 use swc_ecma_ast::{
-    ArrayLit, BindingIdent, Bool, Decl, EsVersion, ExportDecl, ExportDefaultExpr, Expr,
-    ExprOrSpread, FnDecl, Function, FunctionBody, Ident, IdentName, ImportDecl,
-    ImportDefaultSpecifier, ImportNamedSpecifier, ImportPhase, ImportSpecifier, KeyValueProp, Lit,
-    Module, ModuleDecl, ModuleExportName, ModuleItem, NewExpr, Null, Number, ObjectLit, Param, Pat,
-    Prop, PropName, PropOrSpread, Stmt, Str, ThrowStmt, TplElement, TsConditionalType,
-    TsEntityName, TsFnOrConstructorType, TsFnParam, TsFnType, TsInferType, TsIntersectionType,
-    TsKeywordType, TsKeywordTypeKind, TsLit, TsLitType, TsParenthesizedType, TsPropertySignature,
-    TsTplLitType, TsType, TsTypeAliasDecl, TsTypeAnn, TsTypeElement, TsTypeLit, TsTypeParam,
-    TsTypeParamDecl, TsTypeParamInstantiation, TsTypeQuery, TsTypeQueryExpr, TsTypeRef,
-    TsUnionOrIntersectionType, TsUnionType, VarDecl, VarDeclKind, VarDeclarator,
+    ArrayLit, ArrowExpr, ArrowFunctionBody, BindingIdent, Bool, CallExpr, Callee, Decl, EsVersion,
+    ExportDecl, ExportDefaultExpr, Expr, ExprOrSpread, FnDecl, Function, FunctionBody, Ident,
+    IdentName, ImportDecl, ImportDefaultSpecifier, ImportNamedSpecifier, ImportPhase,
+    ImportSpecifier, KeyValueProp, Lit, Module, ModuleDecl, ModuleExportName, ModuleItem, NewExpr,
+    Null, Number, ObjectLit, Param, ParenExpr, Pat, Prop, PropName, PropOrSpread, Stmt, Str,
+    ThrowStmt, TplElement, TsConditionalType, TsEntityName, TsFnOrConstructorType, TsFnParam,
+    TsFnType, TsInferType, TsIntersectionType, TsKeywordType, TsKeywordTypeKind, TsLit, TsLitType,
+    TsParenthesizedType, TsPropertySignature, TsTplLitType, TsType, TsTypeAliasDecl, TsTypeAnn,
+    TsTypeElement, TsTypeLit, TsTypeParam, TsTypeParamDecl, TsTypeParamInstantiation, TsTypeQuery,
+    TsTypeQueryExpr, TsTypeRef, TsUnionOrIntersectionType, TsUnionType, VarDecl, VarDeclKind,
+    VarDeclarator,
 };
 use swc_ecma_codegen::text_writer::{BindingStorage, JsWriter, ScopeKind, WriteJs};
 use swc_ecma_codegen::{Config, Emitter};
@@ -240,6 +241,9 @@ fn module_item(from: &ArtifactPath, item: &TypeScriptItem, comment_at: CommentAt
         TypeScriptItem::DeclaredConst(declared) => {
             ModuleItem::Stmt(Stmt::Decl(Decl::Var(declared_const(declared, comment_at))))
         }
+        TypeScriptItem::DeclaredThunk(declared) => {
+            ModuleItem::Stmt(Stmt::Decl(Decl::Var(declared_thunk(declared, comment_at))))
+        }
         TypeScriptItem::ExportDefaultBinding(binding) => {
             ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultExpr(ExportDefaultExpr {
                 span: DUMMY_SP,
@@ -263,6 +267,45 @@ fn declared_const(declared: &DeclaredConst, comment_at: CommentAt) -> Box<VarDec
                 type_ann: type_annotation(declared.type_.reference(), comment_at).wrap_some(),
             }),
             init: expression(declared.value.reference()).boxed().wrap_some(),
+            definite: false,
+        }
+        .wrap_vec(),
+    }
+    .boxed()
+}
+
+/// `const <binding> = (): <type> => (<value>);`
+fn declared_thunk(declared: &DeclaredConst, comment_at: CommentAt) -> Box<VarDecl> {
+    VarDecl {
+        span: DUMMY_SP,
+        ctxt: SyntaxContext::empty(),
+        kind: VarDeclKind::Const,
+        declare: false,
+        decls: VarDeclarator {
+            span: DUMMY_SP,
+            name: Pat::Ident(BindingIdent {
+                id: ident(declared.binding.as_str()),
+                type_ann: None,
+            }),
+            init: Expr::Arrow(ArrowExpr {
+                span: DUMMY_SP,
+                ctxt: SyntaxContext::empty(),
+                params: Vec::new(),
+                body: ArrowFunctionBody::Expr(
+                    Expr::Paren(ParenExpr {
+                        span: DUMMY_SP,
+                        expr: expression(declared.value.reference()).boxed(),
+                    })
+                    .boxed(),
+                )
+                .boxed(),
+                is_async: false,
+                is_generator: false,
+                type_params: None,
+                return_type: type_annotation(declared.type_.reference(), comment_at).wrap_some(),
+            })
+            .boxed()
+            .wrap_some(),
             definite: false,
         }
         .wrap_vec(),
@@ -407,6 +450,28 @@ fn expression(value: &ArtifactValue) -> Expr {
             Expr::Ident(ident(artifact_import_identifier(import).as_str()))
         }
         ArtifactValue::NamedImport(import) => Expr::Ident(ident(import.local.as_str())),
+        ArtifactValue::ImportCallThunk(import) => Expr::Arrow(ArrowExpr {
+            span: DUMMY_SP,
+            ctxt: SyntaxContext::empty(),
+            params: Vec::new(),
+            body: ArrowFunctionBody::Expr(
+                Expr::Call(CallExpr {
+                    span: DUMMY_SP,
+                    ctxt: SyntaxContext::empty(),
+                    callee: Callee::Expr(
+                        Expr::Ident(ident(artifact_import_identifier(import).as_str())).boxed(),
+                    ),
+                    args: Vec::new(),
+                    type_args: None,
+                })
+                .boxed(),
+            )
+            .boxed(),
+            is_async: false,
+            is_generator: false,
+            type_params: None,
+            return_type: None,
+        }),
     }
 }
 
@@ -779,6 +844,25 @@ mod tests {
             .reference(),
         );
         assert!(same.contains("import { a } from \"x\";"), "{same}");
+    }
+
+    #[test]
+    fn an_import_call_thunk_calls_the_import_only_when_called() {
+        let text = printed(ArtifactValue::Object(
+            entry(
+                "x",
+                ArtifactValue::ImportCallThunk(ArtifactImport(path("Query/A/resolver_reader.ts"))),
+            )
+            .wrap_vec(),
+        ));
+        assert!(
+            text.contains("x: ()=>Query__A__resolver_reader()"),
+            "{text}"
+        );
+        assert!(
+            text.contains("import Query__A__resolver_reader from \"./resolver_reader\";"),
+            "{text}"
+        );
     }
 
     #[test]

@@ -9,6 +9,6 @@ const artifact: IsographEntrypoint<Query__Feed__param, Query__Feed__output_type,
   name: "Query.Feed",
   queryText: Query__Feed__query_text,
   normalizationAst: Query__Feed__normalization_ast,
-  readerArtifact: Query__Feed__resolver_reader
+  readerArtifact: ()=>Query__Feed__resolver_reader()
 };
 export default artifact;

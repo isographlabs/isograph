@@ -9,6 +9,6 @@ const artifact: IsographEntrypoint<Query__NestedQuery__param, Query__NestedQuery
   name: "Query.NestedQuery",
   queryText: Query__NestedQuery__query_text,
   normalizationAst: Query__NestedQuery__normalization_ast,
-  readerArtifact: Query__NestedQuery__resolver_reader
+  readerArtifact: ()=>Query__NestedQuery__resolver_reader()
 };
 export default artifact;

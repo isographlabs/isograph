@@ -92,7 +92,7 @@ export type ArgumentValue =
 /** The default export of an `entrypoint.ts` artifact: an entrypoint whose field's param type
  * is `TParam` and output type is `TOutput`, on the root entity `TEntityName`. */
 export type IsographEntrypoint<
-  TParam,
+  TParam extends ResolverParam<TEntityName>,
   TOutput,
   TEntityName extends EntityName,
 > = {
@@ -101,17 +101,16 @@ export type IsographEntrypoint<
   readonly name: string;
   readonly queryText: string;
   readonly normalizationAst: NormalizationAst<TEntityName>;
-  /** Typed by `TParam` and `TOutput` once reader artifacts exist. */
-  readonly readerArtifact: unknown;
-  /** Type-only, absent at runtime, as upstream's `~TRawResponseType`. */
-  readonly '~param'?: TParam;
-  /** Type-only, absent at runtime. */
-  readonly '~output'?: TOutput;
+  /** Returns the field's reader artifact. A function, so that loading this module does not
+   * read the reader artifact's module, which imports the field's source file. */
+  readonly readerArtifact: () => ReaderArtifact<TParam, TOutput, TEntityName>;
 };
 
 /**
- * The default export of a `resolver_reader.ts` artifact. `TEntityName` is the name of the
- * field's parent entity, or the union of its concrete entities' names when it is abstract.
+ * What the default export of a `resolver_reader.ts` artifact returns; the default export is a
+ * function, as upstream's (`() => ReaderArtifact<..>`), so that no import is read while the
+ * module is evaluated. `TEntityName` is the name of the field's parent entity, or the union of
+ * its concrete entities' names when it is abstract.
  */
 export type ReaderArtifact<
   TParam extends ResolverParam<TEntityName>,
@@ -178,5 +177,10 @@ export type ReaderResolverSelection = {
   readonly alias: string;
   /** The values the selection passes to the field's variables, in terms of the reader's own. */
   readonly arguments: Arguments | null;
-  readonly readerArtifact: ReaderArtifact<ResolverParam, unknown, EntityName>;
+  /** The selected field's reader artifact's default export, called when the read reaches it. */
+  readonly readerArtifact: () => ReaderArtifact<
+    ResolverParam,
+    unknown,
+    EntityName
+  >;
 };

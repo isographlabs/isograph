@@ -9,6 +9,6 @@ const artifact: IsographEntrypoint<Query__Leaves__param, Query__Leaves__output_t
   name: "Query.Leaves",
   queryText: Query__Leaves__query_text,
   normalizationAst: Query__Leaves__normalization_ast,
-  readerArtifact: Query__Leaves__resolver_reader
+  readerArtifact: ()=>Query__Leaves__resolver_reader()
 };
 export default artifact;

@@ -9,6 +9,6 @@ const artifact: IsographEntrypoint<Query__Search__param, Query__Search__output_t
   name: "Query.Search",
   queryText: Query__Search__query_text,
   normalizationAst: Query__Search__normalization_ast,
-  readerArtifact: Query__Search__resolver_reader
+  readerArtifact: ()=>Query__Search__resolver_reader()
 };
 export default artifact;

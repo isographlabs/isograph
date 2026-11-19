@@ -18,7 +18,9 @@ pub(crate) fn imports_of(value: &ArtifactValue) -> BTreeSet<&ArtifactImport> {
             .iter()
             .flat_map(|entry| imports_of(&entry.value))
             .collect(),
-        ArtifactValue::Import(import) => std::iter::once(import).collect(),
+        ArtifactValue::Import(import) | ArtifactValue::ImportCallThunk(import) => {
+            std::iter::once(import).collect()
+        }
     }
 }
 
@@ -29,7 +31,8 @@ pub(crate) fn named_imports_of(value: &ArtifactValue) -> BTreeSet<&NamedImport> 
         | ArtifactValue::Boolean(_)
         | ArtifactValue::Number(_)
         | ArtifactValue::String(_)
-        | ArtifactValue::Import(_) => BTreeSet::new(),
+        | ArtifactValue::Import(_)
+        | ArtifactValue::ImportCallThunk(_) => BTreeSet::new(),
         ArtifactValue::Array(items) => items.iter().flat_map(named_imports_of).collect(),
         ArtifactValue::Object(entries) => entries
             .iter()

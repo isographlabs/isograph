@@ -49,6 +49,9 @@ pub enum ArtifactValue {
     Array(Vec<ArtifactValue>),
     Object(Vec<ArtifactObjectEntry>),
     Import(ArtifactImport),
+    /// `() => <import>()`: a function that calls the default export of the module at this
+    /// path, reading the import only when it is called.
+    ImportCallThunk(ArtifactImport),
     /// The binding `local` of a named import, which the module declares.
     NamedImport(NamedImport),
 }
@@ -94,6 +97,9 @@ pub(crate) enum TypeScriptItem {
     ExportDefault(ArtifactValue),
     /// `const <binding>: <type> = <value>;`
     DeclaredConst(DeclaredConst),
+    /// `const <binding> = (): <type> => (<value>);`: a function that builds the value each time
+    /// it is called, so the module reads none of its imports while it is evaluated.
+    DeclaredThunk(DeclaredConst),
     /// `export default <binding>;`
     ExportDefaultBinding(String),
 }

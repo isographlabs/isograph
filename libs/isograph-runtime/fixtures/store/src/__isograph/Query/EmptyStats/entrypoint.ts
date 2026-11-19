@@ -9,6 +9,6 @@ const artifact: IsographEntrypoint<Query__EmptyStats__param, Query__EmptyStats__
   name: "Query.EmptyStats",
   queryText: Query__EmptyStats__query_text,
   normalizationAst: Query__EmptyStats__normalization_ast,
-  readerArtifact: Query__EmptyStats__resolver_reader
+  readerArtifact: ()=>Query__EmptyStats__resolver_reader()
 };
 export default artifact;
