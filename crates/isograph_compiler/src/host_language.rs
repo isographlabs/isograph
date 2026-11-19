@@ -72,6 +72,8 @@ pub trait HostLanguage: Send + Sync + Sized + 'static {
         path: RelativePathToSourceFile,
     ) -> &Option<Vec<IsoLiteralExtraction<Self>>>;
 
+    fn extract_iso_literals_from_text(contents: &str) -> Vec<IsoLiteralExtraction<Self>>;
+
     fn should_skip_source_file(relative_path: &Path) -> SkipSourceFile;
 }
 

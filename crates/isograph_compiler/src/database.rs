@@ -199,6 +199,10 @@ mod tests {
             &NONE
         }
 
+        fn extract_iso_literals_from_text(_contents: &str) -> Vec<IsoLiteralExtraction<Self>> {
+            Vec::new()
+        }
+
         fn should_skip_source_file(_relative_path: &Path) -> SkipSourceFile {
             SkipSourceFile::Keep
         }

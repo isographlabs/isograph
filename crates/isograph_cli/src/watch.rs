@@ -653,6 +653,10 @@ mod tests {
             &NONE
         }
 
+        fn extract_iso_literals_from_text(_contents: &str) -> Vec<IsoLiteralExtraction<Self>> {
+            Vec::new()
+        }
+
         fn should_skip_source_file(relative_path: &Path) -> SkipSourceFile {
             match relative_path.extension().and_then(|e| e.to_str()) {
                 Some("in") => SkipSourceFile::Keep,

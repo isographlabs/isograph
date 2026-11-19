@@ -69,7 +69,10 @@ impl HostLanguage for TypeScriptHostLanguage {
             Some(source_id) => source_id,
             None => db.get_disk_file_map().tracked().0.get(&path).copied()?,
         };
-        let contents = db.get(source_id).contents.reference();
+        Self::extract_iso_literals_from_text(db.get(source_id).contents.as_str()).wrap_some()
+    }
+
+    fn extract_iso_literals_from_text(contents: &str) -> Vec<IsoLiteralExtraction<Self>> {
         EXTRACT_ISO_LITERAL
             .captures_iter(contents)
             .filter_map(|captures| {
@@ -96,8 +99,7 @@ impl HostLanguage for TypeScriptHostLanguage {
                 }
                 .wrap_some()
             })
-            .collect::<Vec<_>>()
-            .wrap_some()
+            .collect()
     }
 
     fn should_skip_source_file(relative_path: &Path) -> SkipSourceFile {
@@ -173,9 +175,8 @@ pub fn file_literals<'a>(
 
 #[cfg(test)]
 mod tests {
-    use common_lang_types::RelativePathToSourceFile;
     use intern::string_key::Intern;
-    use isograph_compiler::{HostLanguage, IsoLiteralExtraction, IsoLiteralStartIndex, IsographDb};
+    use isograph_compiler::{HostLanguage, IsoLiteralExtraction, IsoLiteralStartIndex};
     use prelude::Postfix;
 
     use super::{
@@ -183,26 +184,8 @@ mod tests {
         TypeScriptLiteralContext,
     };
 
-    fn intern_path(s: &str) -> RelativePathToSourceFile {
-        s.intern().to()
-    }
-
-    fn intern_file(
-        db: &mut IsographDb<TypeScriptHostLanguage>,
-        path: RelativePathToSourceFile,
-        contents: &str,
-    ) {
-        db.insert_disk_file(path, contents.to_owned());
-    }
-
     fn extract(source: &str) -> Vec<IsoLiteralExtraction<TypeScriptHostLanguage>> {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
-        let path = intern_path("src/a.ts");
-        intern_file(&mut db, path, source);
-        TypeScriptHostLanguage::extract_iso_literals(&db, path)
-            .as_ref()
-            .expect("the test interned this path")
-            .clone()
+        TypeScriptHostLanguage::extract_iso_literals_from_text(source)
     }
 
     fn interned_export(name: &str) -> common_lang_types::ConstExportName {
