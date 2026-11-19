@@ -99,9 +99,20 @@ On later runs, when `$wt` is this repo's worktree:
 # from scripts/precommit-in-worktree.sh
 git -C "$wt" reset --hard "$snapshot"
 git -C "$wt" clean -fd
+for dir in "$wt"/crates/*/ "$wt"/libs/*/; do
+  [[ -d "$dir" ]] || continue
+  rel=${dir#"$wt"/}
+  rel=${rel%/}
+  if [[ -z "$(git -C "$wt" ls-files -- "$rel/Cargo.toml" "$rel/package.json")" ]]; then
+    git -C "$wt" clean -ffdXq -- "$rel"
+    if [[ -d "$dir" && -z "$(ls -A "$dir")" ]]; then
+      rmdir "$dir"
+    fi
+  fi
+done
 ```
 
-`git clean -fd` without `-x` leaves gitignored `target/` and `node_modules/`.
+`git clean -fd` without `-x` leaves gitignored `target/` and `node_modules/`. A directory under `crates/` or `libs/` with no tracked `Cargo.toml` or `package.json` in the snapshot loses its ignored files, and the directory itself when that leaves it empty. A crate that exists on another branch but not in this snapshot otherwise leaves `crates/<name>/target/` behind, and the workspace's `members = ["./crates/*"]` glob then fails `cargo metadata` on a member with no manifest. Crates that exist in the snapshot keep their warm `target/`.
 
 If `$wt` exists and is not this repo's worktree, exit 1 and name the path. Do not reuse it.
 
@@ -398,6 +409,7 @@ Degenerate cases the test establishes:
 - unborn `HEAD`: script exits 0; mock args contain `--all-files` and do not contain `--from-ref`
 - `$wt` already a directory that is not a gitdir: script exits 1, directory left as it was (marker file unchanged)
 - `$wt` already a different git repo: script exits 1, that repo's file is unchanged
+- a second run after `$wt` gained ignored `crates/gone/target/`, `libs/gone/node_modules/`, `crates/kept/target/` (tracked `Cargo.toml`), `libs/kept/node_modules/` (tracked `package.json`), and `crates/notes/target/` (tracked `README`, no manifest): script exits 0; `crates/gone` and `libs/gone` are gone; the `kept` artifacts and `crates/notes/README` are unchanged; `crates/notes/target` is gone
 - after a successful run, invoke the script with cwd `$wt`: exit 1, stderr contains `refusing to commit from the dedicated precommit worktree`
 
 ```bash

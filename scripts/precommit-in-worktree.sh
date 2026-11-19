@@ -81,6 +81,17 @@ if [[ -e "$wt/.git" ]]; then
   fi
   git -C "$wt" reset --hard "$snapshot"
   git -C "$wt" clean -fd
+  for dir in "$wt"/crates/*/ "$wt"/libs/*/; do
+    [[ -d "$dir" ]] || continue
+    rel=${dir#"$wt"/}
+    rel=${rel%/}
+    if [[ -z "$(git -C "$wt" ls-files -- "$rel/Cargo.toml" "$rel/package.json")" ]]; then
+      git -C "$wt" clean -ffdXq -- "$rel"
+      if [[ -d "$dir" && -z "$(ls -A "$dir")" ]]; then
+        rmdir "$dir"
+      fi
+    fi
+  done
 elif git --git-dir="$common" worktree list --porcelain | grep -F -x "worktree $wt" >/dev/null; then
   git --git-dir="$common" worktree remove --force "$wt"
   git --git-dir="$common" worktree add --detach --lock --reason "pre-commit checks" "$wt" "$snapshot"

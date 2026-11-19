@@ -312,3 +312,48 @@ status=$?
 set -e
 assert_eq "$status" "1" "refuse from wt exit"
 assert_contains "$(cat "$root/refuse/out")" "refusing to commit from the dedicated precommit worktree" "refuse message"
+
+# ignored residue of a crate absent from the snapshot is removed; warm target/ of a crate that exists is kept
+repo="$root/stale/repo"
+bindir="$root/stale/bin"
+init_with_head "$repo"
+printf '%s\n' '**/target/**' '**/node_modules/**' > "$repo/.gitignore"
+mkdir -p "$repo/crates/kept" "$repo/crates/notes" "$repo/libs/kept"
+echo '[package]' > "$repo/crates/kept/Cargo.toml"
+echo notes > "$repo/crates/notes/README"
+echo '{}' > "$repo/libs/kept/package.json"
+git -C "$repo" add .gitignore crates libs
+git -C "$repo" commit -q -m crates
+make_mocks "$bindir"
+write_precommit_mock "$bindir" "exit 0"
+stage_and_dirty "$repo"
+set +e
+(cd "$repo" && PATH="$bindir:$PATH" "$under_test")
+status=$?
+set -e
+assert_eq "$status" "0" "stale setup exit"
+wt=$(expected_wt "$repo")
+mkdir -p "$wt/crates/kept/target" "$wt/crates/gone/target" "$wt/crates/notes/target" \
+  "$wt/libs/kept/node_modules" "$wt/libs/gone/node_modules"
+echo warm > "$wt/crates/kept/target/artifact"
+echo stale > "$wt/crates/gone/target/artifact"
+echo stale > "$wt/crates/notes/target/artifact"
+echo warm > "$wt/libs/kept/node_modules/artifact"
+echo stale > "$wt/libs/gone/node_modules/artifact"
+set +e
+(cd "$repo" && PATH="$bindir:$PATH" "$under_test")
+status=$?
+set -e
+assert_eq "$status" "0" "stale exit"
+assert_eq "$(cat "$wt/crates/kept/target/artifact")" "warm" "kept crate target"
+assert_eq "$(cat "$wt/libs/kept/node_modules/artifact")" "warm" "kept lib node_modules"
+assert_eq "$(cat "$wt/crates/notes/README")" "notes" "tracked file without a manifest"
+if [[ -e "$wt/crates/gone" ]]; then
+  fail "stale crate directory $wt/crates/gone remains"
+fi
+if [[ -e "$wt/libs/gone" ]]; then
+  fail "stale lib directory $wt/libs/gone remains"
+fi
+if [[ -e "$wt/crates/notes/target" ]]; then
+  fail "ignored target of a directory without a manifest remains"
+fi
