@@ -94,7 +94,7 @@ pub enum GraphQLTokenKind {
     #[strum(to_string = "at symbol ('@')")]
     At,
     #[token("}")]
-    #[strum(to_string = "closing brace ('}}')")]
+    #[strum(to_string = "closing brace ('}')")]
     CloseBrace,
     #[token("]")]
     #[strum(to_string = "closing bracket (']')")]
@@ -134,7 +134,7 @@ pub enum GraphQLTokenKind {
     ErrorFloatLiteralMissingZero,
 
     #[token("{")]
-    #[strum(to_string = "open brace ('{{')")]
+    #[strum(to_string = "open brace ('{')")]
     OpenBrace,
     #[token("[")]
     #[strum(to_string = "open bracket ('[')")]
@@ -162,6 +162,7 @@ Copied from iso `crates/isograph_parser/src/token_kind.rs` `IsographLangTokenKin
 - `Ampersand` (`implements A & B`, spec 3.6) and `Pipe` (union members, spec 3.8; directive locations, spec 3.13) are added.
 - The number regexes are iso's. They implement spec 2.10.1 `IntValue` and 2.10.2 `FloatValue`, including the `[lookahead != {Digit, ., NameStart}]` rule (`1.`, `1a`, `0x` are `ErrorNumberLiteralTrailingInvalid`; `01` is `ErrorNumberLiteralLeadingZero`; `.5` is `ErrorFloatLiteralMissingZero`).
 - `Identifier` is spec 2.1.8 `Name`.
+- `OpenBrace` and `CloseBrace` display a single brace. `strum::Display` writes a unit variant's `to_string` verbatim and does not format it, so iso's `'{{'` and `'}}'` display both braces.
 
 ```rust
 // from crates/graphql_schema_parser/src/token_kind.rs
@@ -772,11 +773,11 @@ pub enum Expectation {
     DirectiveLocation,
     #[strum(to_string = "a directive, like '@deprecated'")]
     Directive,
-    #[strum(to_string = "`implements`, a directive, or '{{'")]
+    #[strum(to_string = "`implements`, a directive, or '{'")]
     ImplementsDirectiveOrOpenBrace,
     #[strum(to_string = "a directive or '='")]
     DirectiveOrEquals,
-    #[strum(to_string = "a directive or '{{'")]
+    #[strum(to_string = "a directive or '{'")]
     DirectiveOrOpenBrace,
 }
 

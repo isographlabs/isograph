@@ -55,7 +55,7 @@ Tests (`tokenize` kinds and spans):
 - `0`, `-0`, `42`, `9223372036854775807`: IntegerLiteral each. `1.5`, `-1.5`, `1e2`, `1.5E-2`: FloatLiteral each.
 - `01`: ErrorNumberLiteralLeadingZero. `.5`: ErrorFloatLiteralMissingZero. `1.`, `1a`, `0x`: ErrorNumberLiteralTrailingInvalid.
 - `"hi"`, `""`: StringLiteral. `"""hi"""`: BlockStringLiteral. `""""""`: one BlockStringLiteral spanning all six quotes.
-- `"\u{1F4A9}"`, `"💩"`, `"💩"`, `"a\u{0001}b"` (a raw control character): StringLiteral each.
+- `"\u{1F4A9}"`, `"\uD83D\uDCA9"`, `"💩"`, `"a\u{0001}b"` (a raw control character): StringLiteral each.
 - `"\x"`: ErrorUnsupportedStringCharacter spanning `"\x"`. `"unterminated`: ErrorUnterminatedString spanning the rest. `"hi\n`: ErrorUnterminatedString spanning `"hi`. `"""unterminated`: ErrorUnterminatedBlockString.
 - `"""\u{0000}💩"""`: BlockStringLiteral.
 
@@ -69,9 +69,9 @@ Tests call `decode_string_value` on the interior of a tokenized `StringLiteral` 
 
 - `"hi"` is `hi`; `""` is the empty string.
 - `"a\"b\\c\/d\be\ff\ng\rh\ti"` decodes each of the eight escapes.
-- `"A"` is `A`; `"\u{41}"` is `A`; `"\u{1F4A9}"` and `"💩"` are both U+1F4A9.
+- `"\u0041"` is `A`; `"\u{41}"` is `A`; `"\u{1F4A9}"` and `"\uD83D\uDCA9"` are both U+1F4A9.
 - `"\uDEAD"` (lone trailing surrogate), `"\uD83D"` (lone leading surrogate), `"\uD83Dx"`, `"\u{D800}"`, `"\u{110000}"`, `"\u{FFFFFFFFF}"` are `InvalidUnicodeEscape`. For `"x\uDEADy"` the error span is the span of `\uDEAD` in the text.
-- `"A💩"` is `A` then U+1F4A9 (one fixed-width run with a scalar and a pair).
+- `"\u0041\uD83D\uDCA9"` is `A` then U+1F4A9 (one fixed-width run with a scalar and a pair).
 - `"💩"` is U+1F4A9 (unescaped supplementary character).
 - `clean_block_string("hi")` is `hi`; `"\n  hello\n  world\n"` is `hello\nworld`; `"   hi"` is `   hi` (first line keeps its indent); `"\r  a\r  b"` is `a\nb` (lone CR splits); `"\r\n  a\r\n  b\r\n"` is `a\nb`; `""` is empty; `"  \n  \n"` is empty.
 - `intern_block_string_value::<StringLiteralValue>` of `a\"""b` (backslash then three quotes) looks up `a"""b`.
@@ -269,7 +269,7 @@ fn parse_scalar_type_definition(
 
 Origin: upstream isograph `parse_scalar_type_definition` and `parse_optional_description` (`../isograph/crates/graphql_schema_parser/src/parse_schema.rs`, `description.rs`). Delta: `DefinitionError` carries the name; a description is any `StringValue` and decodes.
 
-Changes 6 to 10 add the definition and extension parse functions; change 11 adds `parse_schema`, which dispatches on the keyword. Their tests run `with_cursor` on the text after the keyword (after `extend` for change 10, which calls `parse_type_system_extension`) and call the function directly, passing `None` as the description unless the test is about descriptions. The fixtures below are written with the keyword for readability. "`Err` named `X`" means `DefinitionError { name: Some(DefinitionName::Entity(X)), .. }` (or `Directive` for directive definitions).
+Changes 6 to 10 add the definition and extension parse functions; change 11 adds `parse_schema`, which dispatches on the keyword. Their tests run `with_cursor` on the whole fixture, consume the description when the fixture has one, advance past the keyword (past `extend` only for change 10, which calls `parse_type_system_extension`), and call the function directly with that description (`None` when the fixture has none). Spans are offsets in the whole fixture. "`Err` named `X`" means `DefinitionError { name: Some(DefinitionName::Entity(X)), .. }` (or `Directive` for directive definitions).
 
 Tests:
 
@@ -474,7 +474,7 @@ fn parse_directive_location(
 - `parse_root_operation_type_definition`: `consume_identifier_of::<OperationType>()` mapped to `OperationTypeWrapper`, `Expectation::OperationType` when absent; `require_token(Colon)`; `parse_entity_name`.
 - `parse_after_directive_name` lands here (parsing-standards.md, Recovery).
 - `parse_directive_definition`: `parse_after_directive_name`, then `parse_arguments_definition`, `repeatable`: `consume_keyword_if("repeatable")` is `Repeatable` when `Some`, `NotRepeatable` when `None`; `require_keyword("on")` mapped to `Expectation::Keyword("on")`; `locations`: `parse_separated_nonempty(cursor, Pipe, parse_directive_location)`.
-- `parse_directive_definition_name`: spanning over `require_token(At)` then `require_token(Identifier)`; the result's span is the identifier's (the `@` is not part of the name).
+- `parse_directive_definition_name`: `require_token(At)`, then `require_token(Identifier)` interned as `DirectiveNameWrapper`; the result's span is the identifier's (the `@` is not part of the name), so there is no `spanning`.
 - `parse_directive_location`: `consume_identifier_of::<DirectiveLocation>()` mapped to `DirectiveLocationWrapper`, `Expectation::DirectiveLocation` when absent.
 
 Spec 3.13 requires the `@` in a directive definition. Upstream isograph accepts a definition without it; this parser does not.
