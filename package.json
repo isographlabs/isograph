@@ -8,6 +8,7 @@
     "oxlint-tsgolint": "0.9.0",
     "prettier": "^3.6.2",
     "tsdown": "0.20.1",
+    "turbo": "^2.5.6",
     "typescript": "5.6.3"
   },
   "scripts": {
@@ -16,6 +17,8 @@
     "check-rs": "bacon -j check",
     "check-cli-rs": "bacon -j check-cli",
     "build-compiler": "cargo build --color=always",
+    "compile-libs": "turbo compile-libs --log-order=grouped",
+    "watch-libs": "turbo watch compile-libs",
     "lint": "oxlint --type-aware",
     "format": "pnpm run format-prettier && pnpm run format-rust",
     "format-prettier": "prettier --experimental-cli --cache --config-path ./.prettierrc.json --write .",

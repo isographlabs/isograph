@@ -1,0 +1,18 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "tsc": {
+      "dependsOn": ["^compile-libs"]
+    },
+    "compile-libs": {
+      "dependsOn": ["tsc"],
+      "outputs": ["dist/**", "package.json"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/tsdown.config.ts",
+        "$TURBO_ROOT$/tsconfig.json",
+        "$TURBO_ROOT$/tsconfig.build.json"
+      ]
+    }
+  }
+}

@@ -15,6 +15,7 @@
 
 **/out/**
 
+**/.turbo/**
 **/swc_isograph_plugin.wasm
 
 **/.claude/settings.local.json

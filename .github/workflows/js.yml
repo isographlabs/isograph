@@ -32,10 +32,8 @@ jobs:
       - uses: ./.github/actions/setup-js
       - name: Typecheck
         run: pnpm --filter @isograph/babel-plugin typecheck
-      - name: Typecheck the runtime
-        run: pnpm --filter @isograph/runtime tsc
-      - name: Build the runtime
-        run: pnpm --filter @isograph/runtime compile-libs
+      - name: Build JS files
+        run: pnpm compile-libs
       - name: Test the runtime
         run: pnpm --filter @isograph/runtime test
       - name: Typecheck the pet demo

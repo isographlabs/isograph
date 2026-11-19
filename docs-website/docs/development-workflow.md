@@ -79,6 +79,20 @@ You can install everything by running the following from the root:
 pnpm i
 ```
 
+### Build the Isograph JavaScript libraries for use in demos
+
+```sh
+pnpm watch-libs
+```
+
+`watch-libs` will watch the source files for changes, and rebuild everything. Run it alongside `pnpm watch-rs`. If you only want to do it once, you can:
+
+```sh
+pnpm compile-libs
+```
+
+Each lib's `exports` point at its `dist`, so the demos resolve `@isograph/runtime` only after one of these has run.
+
 ### Format the code
 
 ```sh
@@ -113,6 +127,7 @@ This command runs `scripts/open-pet-demo.sh`. The script builds `target/debug/is
 
 - Run `pnpm watch-rs` to rebuild the `isograph` binary. After each successful build, the job (`scripts/watch-rs-build.sh`) restarts the daemon for `demos/pet-demo/isograph.config.json` if `isograph status` reports it running. A failed build does not restart it, and the job never starts a daemon. Daemons for other configs are not restarted; run `isograph restart --config <that config>` for those.
 - Run `pnpm watch-extension` to rebuild `vscode-extension/out/extension.js`.
+- Run `pnpm watch-libs` to rebuild the `dist` of each lib in `libs/` that the demos import.
 - Run "Developer: Reload Window" in the Extension Development Host. The reloaded window loads the new `out/extension.js` and starts a new `isograph lsp`, which connects to the restarted daemon running the new binary.
 
 ### Logs etc.
