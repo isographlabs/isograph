@@ -1856,19 +1856,51 @@ mod tests {
     }
 
     #[test]
-    fn highlight_on_whitespace_outside_a_literal_or_past_the_line_end_is_null() {
+    fn highlight_between_tokens_inside_a_literal_is_empty() {
         let mut state = with_disk_home();
         let one = live_client(&mut state, ClientId(1));
-        let space = column(HOME_DISK, " Query");
+        assert_eq!(
+            highlights(&mut state, &one, HOME_URI, 0, column(HOME_DISK, " Query")),
+            Vec::new().wrap_some()
+        );
+        let trailing = "iso(`entrypoint Query.A  `)";
+        assert_eq!(
+            highlights_on_disk(trailing, 0, column(trailing, "  `") + 1),
+            Vec::new().wrap_some()
+        );
+        let comma = "iso(`field Query.x { a, b }`)";
+        assert_eq!(
+            highlights_on_disk(comma, 0, column(comma, ",")),
+            Vec::new().wrap_some()
+        );
+    }
+
+    #[test]
+    fn highlight_outside_every_literal_is_null() {
+        let mut state = with_disk_home();
+        let one = live_client(&mut state, ClientId(1));
+        let opening = column(HOME_DISK, "`");
+        let closing = HOME_DISK
+            .rfind('`')
+            .expect("the fixture has a closing backtick") as u32;
         let end = HOME_DISK.len() as u32;
-        assert_eq!(highlights(&mut state, &one, HOME_URI, 0, space), None);
         assert_eq!(highlights(&mut state, &one, HOME_URI, 0, 1), None);
         assert_eq!(
-            highlights(&mut state, &one, HOME_URI, 0, column(HOME_DISK, "`")),
+            highlights(&mut state, &one, HOME_URI, 0, column(HOME_DISK, "iso(")),
             None
         );
+        assert_eq!(highlights(&mut state, &one, HOME_URI, 0, opening), None);
+        assert_eq!(highlights(&mut state, &one, HOME_URI, 0, closing), None);
         assert_eq!(highlights(&mut state, &one, HOME_URI, 0, end), None);
+        assert_eq!(highlights(&mut state, &one, HOME_URI, 0, end + 1), None);
         assert_eq!(highlights(&mut state, &one, HOME_URI, 1, 0), None);
+    }
+
+    #[test]
+    fn highlight_of_a_path_without_text_is_null() {
+        let mut state = with_config();
+        let one = live_client(&mut state, ClientId(1));
+        assert_eq!(highlights(&mut state, &one, HOME_URI, 0, 0), None);
     }
 
     #[test]

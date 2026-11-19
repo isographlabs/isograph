@@ -9,18 +9,28 @@ use span::{Span, WithOptionalSpan};
 use crate::hover::iso_literal_at_lsp_position;
 use crate::line_index::line_index;
 
+/// What lies under a position inside an iso literal.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TokenUnderCursor<TLocation> {
+    Token(TLocation),
+    BetweenTokens,
+}
+
 /// The file range of the semantic token under `position` in `path` as `client` reads it.
+/// `None` when `position` is not inside an iso literal.
 pub fn token_range_at_lsp_position<THostLanguage: HostLanguage>(
     db: &IsographDb<THostLanguage>,
     client: ClientId,
     path: RelativePathToSourceFile,
     position: lsp_types::Position,
-) -> Option<lsp_types::Range> {
-    let span = token_span_at_lsp_position(db, client, path, position)?;
-    line_index(db, client, path)
-        .as_ref()?
-        .range(span)
-        .wrap_some()
+) -> Option<TokenUnderCursor<lsp_types::Range>> {
+    match token_span_at_lsp_position(db, client, path, position)? {
+        TokenUnderCursor::Token(span) => {
+            TokenUnderCursor::Token(line_index(db, client, path).as_ref()?.range(span))
+        }
+        TokenUnderCursor::BetweenTokens => TokenUnderCursor::BetweenTokens,
+    }
+    .wrap_some()
 }
 
 /// The file span of the semantic token under `position`.
@@ -29,24 +39,30 @@ fn token_span_at_lsp_position<THostLanguage: HostLanguage>(
     client: ClientId,
     path: RelativePathToSourceFile,
     position: lsp_types::Position,
-) -> Option<Span> {
+) -> Option<TokenUnderCursor<Span>> {
     let (literal_id, token) = literal_token_at_lsp_position(db, client, path, position)?;
-    let extraction = iso_literal_extraction(db, literal_id).as_ref()?;
-    token
-        .with_offset(extraction.iso_literal_start_index.0 as u32)
-        .wrap_some()
+    match token {
+        TokenUnderCursor::Token(span) => {
+            let extraction = iso_literal_extraction(db, literal_id).as_ref()?;
+            TokenUnderCursor::Token(span.with_offset(extraction.iso_literal_start_index.0 as u32))
+        }
+        TokenUnderCursor::BetweenTokens => TokenUnderCursor::BetweenTokens,
+    }
+    .wrap_some()
 }
 
-/// The literal under `position`, and the span within it of the semantic token there.
+/// The literal under `position`, and what lies under it within that literal.
 fn literal_token_at_lsp_position<THostLanguage: HostLanguage>(
     db: &IsographDb<THostLanguage>,
     client: ClientId,
     path: RelativePathToSourceFile,
     position: lsp_types::Position,
-) -> Option<(LiteralId, Span)> {
+) -> Option<(LiteralId, TokenUnderCursor<Span>)> {
     let (literal_id, cursor) = iso_literal_at_lsp_position(db, client, path, position)?;
     let parsed = parsed_iso_literal_by_id(db, literal_id)?;
-    (literal_id, semantic_token_span_at(&parsed.tokens, cursor)?).wrap_some()
+    let token = semantic_token_span_at(&parsed.tokens, cursor)
+        .map_or(TokenUnderCursor::BetweenTokens, TokenUnderCursor::Token);
+    (literal_id, token).wrap_some()
 }
 
 /// The span of the token that contains `cursor`. Tokens without a span and commas are

@@ -60,12 +60,13 @@ pub(crate) fn document_highlight_response<THostLanguage: HostLanguage>(
     let position = params.text_document_position_params;
     let path = relative_from_uri(db, position.text_document.uri.reference()).map_err(lsp_error)?;
     isograph_lsp::token_range_at_lsp_position(db, client, path, position.position)
-        .map(|range| {
-            lsp_types::DocumentHighlight {
+        .map(|token| match token {
+            isograph_lsp::TokenUnderCursor::Token(range) => lsp_types::DocumentHighlight {
                 range,
                 kind: lsp_types::DocumentHighlightKind::TEXT.wrap_some(),
             }
-            .wrap_vec()
+            .wrap_vec(),
+            isograph_lsp::TokenUnderCursor::BetweenTokens => Vec::new(),
         })
         .wrap_ok()
 }
