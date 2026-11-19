@@ -32,17 +32,22 @@ pub enum NonBracketTokenKind {
 
 /// The bracket kinds, named as isograph names its tokens: paren `()`, brace `{}`,
 /// bracket `[]`.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, strum::Display)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum BracketKind {
-    #[strum(to_string = "'('")]
     Parenthesis,
-    #[strum(to_string = "'{'")]
     Brace,
-    #[strum(to_string = "'['")]
     Bracket,
 }
 
 impl BracketKind {
+    pub fn opening(self) -> &'static str {
+        match self {
+            BracketKind::Parenthesis => "'('",
+            BracketKind::Brace => "'{'",
+            BracketKind::Bracket => "'['",
+        }
+    }
+
     pub fn closing(self) -> &'static str {
         match self {
             BracketKind::Parenthesis => "')'",

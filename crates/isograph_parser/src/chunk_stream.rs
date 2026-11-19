@@ -346,7 +346,7 @@ mod tests {
     use super::{ChunkStream, TokenText};
     use crate::{
         AstError, BracketKind, ChunkedRoot, Expectation, Found, IsographSemanticToken,
-        NonBracketTokenKind, chunk, match_brackets, parsed_items::span_of, tokenize,
+        NonBracketTokenKind, OpenBracket, chunk, match_brackets, parsed_items::span_of, tokenize,
     };
 
     fn chunked(text: &str) -> WithSpan<ChunkedRoot> {
@@ -518,7 +518,7 @@ mod tests {
             cursor.expected(token(NonBracketTokenKind::Identifier)),
             expected(
                 token(NonBracketTokenKind::Identifier),
-                Found::Group(BracketKind::Brace),
+                Found::Group(OpenBracket(BracketKind::Brace)),
             )
             .with_span(span_of(text, "{ bar }")),
         );

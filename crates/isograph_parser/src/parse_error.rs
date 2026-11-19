@@ -2,7 +2,9 @@ use std::fmt;
 
 use thiserror::Error;
 
-use crate::{BracketError, BracketKind, ChunkContentItem, CommaWithoutItem, NonBracketTokenKind};
+use crate::{
+    BracketError, BracketKind, ChunkContentItem, CommaWithoutItem, NonBracketTokenKind, OpenBracket,
+};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
 pub enum AstError {
@@ -108,7 +110,7 @@ pub enum Found {
     #[strum(to_string = "{0}")]
     Token(NonBracketTokenKind),
     #[strum(to_string = "a group opened by {0}")]
-    Group(BracketKind),
+    Group(OpenBracket),
     #[strum(to_string = "nothing more")]
     EndOfChunk,
 }
@@ -123,7 +125,7 @@ impl From<&ChunkContentItem> for Found {
     fn from(item: &ChunkContentItem) -> Self {
         match item {
             ChunkContentItem::NonBracket(token) => Found::Token(token.0),
-            ChunkContentItem::Group(group) => Found::Group(group.opening.item.0),
+            ChunkContentItem::Group(group) => Found::Group(group.opening.item),
         }
     }
 }
@@ -131,7 +133,7 @@ impl From<&ChunkContentItem> for Found {
 #[cfg(test)]
 mod tests {
     use super::{AstError, DECLARATION_KEYWORD, Expectation, ExpectedFound, Found};
-    use crate::{BracketKind, NonBracketTokenKind};
+    use crate::{BracketKind, NonBracketTokenKind, OpenBracket};
 
     #[test]
     fn expectation_token_forwards_the_token_kind() {
@@ -230,7 +232,7 @@ mod tests {
     #[test]
     fn found_group_includes_the_bracket() {
         assert_eq!(
-            Found::Group(BracketKind::Brace).to_string(),
+            Found::Group(OpenBracket(BracketKind::Brace)).to_string(),
             "a group opened by '{'",
         );
     }

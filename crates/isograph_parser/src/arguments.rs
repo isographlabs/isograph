@@ -414,7 +414,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        AstError, Found, IsographSemanticToken, NonBracketTokenKind,
+        AstError, Found, IsographSemanticToken, NonBracketTokenKind, OpenBracket,
         assert_semantic_tokens::assert_semantic_tokens,
         chunk,
         chunk_stream::ChunkStream,
@@ -1403,7 +1403,10 @@ mod tests {
         assert!(items[0].item.item.is_none());
         assert!(errors.iter().any(|error| {
             error.item
-                == AstError::expected(Expectation::Value, Found::Group(BracketKind::Parenthesis))
+                == AstError::expected(
+                    Expectation::Value,
+                    Found::Group(OpenBracket(BracketKind::Parenthesis)),
+                )
                 && error.location == span_of(text, "(x)")
         }));
     }

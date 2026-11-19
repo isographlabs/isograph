@@ -112,7 +112,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        AstError, Found, IsographSemanticToken, NonBracketTokenKind,
+        AstError, Found, IsographSemanticToken, NonBracketTokenKind, OpenBracket,
         parsed_items::{parsed_items, span_of},
     };
 
@@ -351,7 +351,10 @@ mod tests {
         assert!(items[1].item.extra.is_some());
         assert!(errors.iter().any(|error| {
             error.item
-                == AstError::expected(Expectation::Selection, Found::Group(BracketKind::Brace))
+                == AstError::expected(
+                    Expectation::Selection,
+                    Found::Group(OpenBracket(BracketKind::Brace)),
+                )
                 && error.location == span_of(text, "{ baz }")
         }));
     }

@@ -101,6 +101,25 @@ mod tests {
     }
 
     #[test]
+    fn a_stray_close_parenthesis_is_reported_as_unexpected_close_parenthesis() {
+        let diagnostics = diagnostics_of("iso(`field Pet.x { id ) }`)");
+        assert_eq!(
+            diagnostics
+                .iter()
+                .map(|diagnostic| diagnostic.message.as_str())
+                .collect::<Vec<_>>(),
+            "Unexpected ')'".wrap_vec()
+        );
+        assert_eq!(
+            diagnostics[0].range,
+            lsp_types::Range::new(
+                lsp_types::Position::new(0, 22),
+                lsp_types::Position::new(0, 23)
+            )
+        );
+    }
+
+    #[test]
     fn crlf_and_lone_cr_before_the_literal_put_the_range_on_line_one() {
         for contents in [
             "const a = 1;\r\niso(`entrypoint`)",

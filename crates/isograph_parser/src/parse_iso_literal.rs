@@ -327,10 +327,10 @@ mod tests {
         DECLARATION_KEYWORD, Expectation, Found, IntegerValue, IsographDirectiveNameWrapper,
         IsographFieldDirectiveListParent, IsographResolutionNode, NamedTypeAnnotation,
         NonBracketTokenKind, NonConstantValue, NonConstantValueParent, NullTypeAnnotation,
-        ObjectEntry, ParseError, Selection, SelectionNameWrapper, SelectionSet, SelectionSetParent,
-        Slot, TypeAnnotation, TypeAnnotationParent, UnionTypeAnnotation, UnionVariant,
-        UnparsedChunkItems, UnparsedChunkItemsParent, VariableDeclaration, VariableDeclarationList,
-        VariableDeclarationOrUsageParent, VariableNameWrapper,
+        ObjectEntry, OpenBracket, ParseError, Selection, SelectionNameWrapper, SelectionSet,
+        SelectionSetParent, Slot, TypeAnnotation, TypeAnnotationParent, UnionTypeAnnotation,
+        UnionVariant, UnparsedChunkItems, UnparsedChunkItemsParent, VariableDeclaration,
+        VariableDeclarationList, VariableDeclarationOrUsageParent, VariableNameWrapper,
         assert_semantic_tokens::assert_semantic_tokens, chunk, match_brackets,
         parsed_items::span_of, tokenize,
     };
@@ -823,7 +823,10 @@ mod tests {
         let text = "{ bar }";
         assert_no_declaration(
             text,
-            expected(DECLARATION_KEYWORD, Found::Group(BracketKind::Brace)),
+            expected(
+                DECLARATION_KEYWORD,
+                Found::Group(OpenBracket(BracketKind::Brace)),
+            ),
             span_of(text, "{ bar }"),
             &[
                 (IsographSemanticToken::Bracket, "{"),
@@ -1088,9 +1091,12 @@ mod tests {
         as_entrypoint(parse.reference());
         assert_eq!(
             errors,
-            expected(EndOfDeclaration, Found::Group(BracketKind::Brace))
-                .with_span(span_of(text, "{ bar }"))
-                .wrap_vec(),
+            expected(
+                EndOfDeclaration,
+                Found::Group(OpenBracket(BracketKind::Brace))
+            )
+            .with_span(span_of(text, "{ bar }"))
+            .wrap_vec(),
         );
     }
 
@@ -1715,9 +1721,12 @@ mod tests {
         assert!(first_slot(parse.reference()).extra.is_some());
         assert_eq!(
             errors,
-            expected(EndOfDeclaration, Found::Group(BracketKind::Parenthesis))
-                .with_span(span_of(text, "($id: ID)"))
-                .wrap_vec(),
+            expected(
+                EndOfDeclaration,
+                Found::Group(OpenBracket(BracketKind::Parenthesis))
+            )
+            .with_span(span_of(text, "($id: ID)"))
+            .wrap_vec(),
         );
     }
 
@@ -2816,7 +2825,7 @@ mod tests {
             text,
             expected(
                 Expectation::TypeAnnotation,
-                Found::Group(BracketKind::Brace),
+                Found::Group(OpenBracket(BracketKind::Brace)),
             ),
             span_of(text, "{ id }"),
             &[

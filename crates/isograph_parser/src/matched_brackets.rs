@@ -33,13 +33,15 @@ pub struct Bracketed {
 pub struct NonBracketToken(pub NonBracketTokenKind);
 
 /// An opening bracket: a group's own opening.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition, derive_more::Display)]
 #[resolve_position(parent_type = ChunkedGroupPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[display("{}", _0.opening())]
 pub struct OpenBracket(pub BracketKind);
 
 /// A closing bracket: a group's own closing.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition, derive_more::Display)]
 #[resolve_position(parent_type = ChunkedGroupPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[display("{}", _0.closing())]
 pub struct CloseBracket(pub BracketKind);
 
 /// The matcher's errors, returned beside the tree, in source order. The tree cannot
@@ -47,10 +49,10 @@ pub struct CloseBracket(pub BracketKind);
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
 pub enum BracketError {
     /// An open bracket whose close never came.
-    #[error("Unclosed {}", .0.item.0)]
+    #[error("Unclosed {}", .0.item)]
     UnmatchedOpen(WithSpan<OpenBracket>),
     /// A close bracket no enclosing group owns.
-    #[error("Unexpected {}", .0.item.0)]
+    #[error("Unexpected {}", .0.item)]
     UnmatchedClose(WithSpan<CloseBracket>),
 }
 
@@ -199,7 +201,7 @@ mod tests {
     use prelude::Postfix;
 
     use super::*;
-    use crate::{parsed_items::span_of, tokenize};
+    use crate::{ParseError, parse_iso_literal, parsed_items::span_of, tokenize};
     use BracketKind::{Brace, Parenthesis};
 
     fn tree(literal: &str) -> (WithSpan<MatchedBrackets>, Vec<BracketError>) {
@@ -229,18 +231,216 @@ mod tests {
     }
 
     #[test]
-    fn unmatched_open_displays_the_kind() {
-        let err =
-            BracketError::UnmatchedOpen(OpenBracket(BracketKind::Brace).with_span(Span::new(0, 1)));
-        assert_eq!(err.to_string(), "Unclosed '{'");
+    fn unmatched_open_displays_the_opening_character() {
+        for (kind, expected) in [
+            (Parenthesis, "Unclosed '('"),
+            (Brace, "Unclosed '{'"),
+            (BracketKind::Bracket, "Unclosed '['"),
+        ] {
+            let err = BracketError::UnmatchedOpen(OpenBracket(kind).with_span(Span::new(0, 1)));
+            assert_eq!(err.to_string(), expected);
+        }
     }
 
     #[test]
-    fn unmatched_close_displays_the_kind() {
-        let err = BracketError::UnmatchedClose(
-            CloseBracket(BracketKind::Parenthesis).with_span(Span::new(0, 1)),
+    fn unmatched_close_displays_the_closing_character() {
+        for (kind, expected) in [
+            (Parenthesis, "Unexpected ')'"),
+            (Brace, "Unexpected '}'"),
+            (BracketKind::Bracket, "Unexpected ']'"),
+        ] {
+            let err = BracketError::UnmatchedClose(CloseBracket(kind).with_span(Span::new(0, 1)));
+            assert_eq!(err.to_string(), expected);
+        }
+    }
+
+    /// The `ParseError::Bracket` errors `parse_iso_literal` reports for `text`, in order, as
+    /// each one's message and span. Each error's own bracket span must equal the span the
+    /// `ParseError` carries.
+    fn bracket_diagnostics(text: &str) -> Vec<(String, Span)> {
+        parse_iso_literal(text)
+            .errors
+            .into_iter()
+            .filter_map(|error| match error.item.reference() {
+                ParseError::Bracket(bracket) => {
+                    let own = match bracket {
+                        BracketError::UnmatchedOpen(open) => open.location,
+                        BracketError::UnmatchedClose(close) => close.location,
+                    };
+                    assert_eq!(own, error.location, "for literal {text:?}");
+                    (error.item.to_string(), error.location).wrap_some()
+                }
+                ParseError::Ast(_) | ParseError::Comma(_) => None,
+            })
+            .collect()
+    }
+
+    /// The one-character span at byte `offset`.
+    fn at(offset: u32) -> Span {
+        Span::new(offset, offset + 1)
+    }
+
+    fn unexpected(close: char) -> String {
+        format!("Unexpected '{close}'")
+    }
+
+    fn unclosed(open: char) -> String {
+        format!("Unclosed '{open}'")
+    }
+
+    const CLOSERS: [char; 3] = [')', '}', ']'];
+
+    #[test]
+    fn a_stray_closer_inside_a_selection_set_names_the_closer() {
+        for close in [')', ']'] {
+            let text = format!("field Pet.x {{ id {close} }}");
+            assert_eq!(
+                bracket_diagnostics(&text),
+                (unexpected(close), at(17)).wrap_vec(),
+                "for literal {text:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_stray_closer_at_the_top_level_names_the_closer() {
+        for close in CLOSERS {
+            let text = format!("field Pet.x {{ id }} {close}");
+            assert_eq!(
+                bracket_diagnostics(&text),
+                (unexpected(close), at(19)).wrap_vec(),
+                "for literal {text:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_stray_closer_inside_a_group_of_another_kind_names_the_closer() {
+        for (text, close) in [
+            ("{ ) }", ')'),
+            ("{ ] }", ']'),
+            ("( ] )", ']'),
+            ("( } )", '}'),
+            ("[ } ]", '}'),
+            ("[ ) ]", ')'),
+        ] {
+            assert_eq!(
+                bracket_diagnostics(text),
+                (unexpected(close), at(2)).wrap_vec(),
+                "for literal {text:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_closer_after_its_own_kind_already_closed_names_the_closer() {
+        for (text, close) in [("( ) )", ')'), ("{ } }", '}'), ("[ ] ]", ']')] {
+            assert_eq!(
+                bracket_diagnostics(text),
+                (unexpected(close), at(4)).wrap_vec(),
+                "for literal {text:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn several_stray_closers_each_name_their_own_closer_in_order() {
+        assert_eq!(
+            bracket_diagnostics("field Pet.x { id } ) ] }"),
+            vec![
+                (unexpected(')'), at(19)),
+                (unexpected(']'), at(21)),
+                (unexpected('}'), at(23)),
+            ]
         );
-        assert_eq!(err.to_string(), "Unexpected '('");
+        assert_eq!(
+            bracket_diagnostics("{ ] ) }"),
+            vec![(unexpected(']'), at(2)), (unexpected(')'), at(4))]
+        );
+    }
+
+    #[test]
+    fn a_stray_closer_at_the_very_start_names_the_closer() {
+        for close in CLOSERS {
+            let text = format!("{close}field Pet.x {{ id }}");
+            assert_eq!(
+                bracket_diagnostics(&text),
+                (unexpected(close), at(0)).wrap_vec(),
+                "for literal {text:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_stray_closer_at_the_very_end_names_the_closer() {
+        for close in CLOSERS {
+            let text = format!("field Pet.x {{ id }}{close}");
+            assert_eq!(
+                bracket_diagnostics(&text),
+                (unexpected(close), at(18)).wrap_vec(),
+                "for literal {text:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_stray_closer_inside_nested_groups_names_the_closer() {
+        assert_eq!(
+            bracket_diagnostics("{ a( b ] ) }"),
+            (unexpected(']'), at(7)).wrap_vec()
+        );
+        assert_eq!(
+            bracket_diagnostics("[ { ( ) } } ]"),
+            (unexpected('}'), at(10)).wrap_vec()
+        );
+    }
+
+    #[test]
+    fn an_opener_unclosed_at_the_end_names_the_opener() {
+        for open in ['(', '{', '['] {
+            let text = open.to_string();
+            assert_eq!(
+                bracket_diagnostics(&text),
+                (unclosed(open), at(0)).wrap_vec(),
+                "for literal {text:?}"
+            );
+            let text = format!("field Pet.x {open} id");
+            assert_eq!(
+                bracket_diagnostics(&text),
+                (unclosed(open), at(12)).wrap_vec(),
+                "for literal {text:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn an_unclosed_opener_with_a_stray_closer_of_another_kind_inside_names_both() {
+        for (text, open, close) in [
+            ("( }", '(', '}'),
+            ("( ]", '(', ']'),
+            ("{ )", '{', ')'),
+            ("{ ]", '{', ']'),
+            ("[ )", '[', ')'),
+            ("[ }", '[', '}'),
+        ] {
+            assert_eq!(
+                bracket_diagnostics(text),
+                vec![(unclosed(open), at(0)), (unexpected(close), at(2))],
+                "for literal {text:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn an_unclosed_opener_and_a_stray_closer_in_one_literal_name_their_own_characters() {
+        assert_eq!(
+            bracket_diagnostics("foo { ( } )"),
+            vec![(unclosed('('), at(6)), (unexpected(')'), at(10))]
+        );
+        assert_eq!(
+            bracket_diagnostics("field Pet.x { a[ } ]"),
+            vec![(unclosed('['), at(15)), (unexpected(']'), at(19))]
+        );
     }
 
     #[test]
