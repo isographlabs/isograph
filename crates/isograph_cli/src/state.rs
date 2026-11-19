@@ -13,7 +13,8 @@ use prelude::Postfix;
 
 use crate::effect::{IsographEffect, no_effects};
 use crate::event::{
-    ClientConnectionEvent, DiskChanged, InternalEvent, IsographEvent, LiveSessions, Presence,
+    ClientConnectionEvent, ClientId, DiskChanged, InternalEvent, IsographEvent, LiveSessions,
+    Presence,
 };
 use crate::timer::TimerPayload;
 
@@ -70,6 +71,9 @@ fn dispatch_lsp<THostLanguage: HostLanguage>(
             dispatch_lsp_request(state, incoming, before_compute)
         }
         crate::event::LspEvent::Notification(notification) => {
+            if !state.live_sessions.0.contains_key(&notification.client) {
+                return no_effects();
+            }
             dispatch_lsp_notification(state, notification)
         }
         crate::event::LspEvent::Response(_response) => no_effects(),
@@ -191,12 +195,12 @@ fn handle_timer_fired<THostLanguage: HostLanguage>(
 
 fn dispatch_lsp_notification<THostLanguage: HostLanguage>(
     state: &mut IsographState<THostLanguage>,
-    notification: lsp_server::Notification,
+    notification: crate::event::LspNotification,
 ) -> Vec<IsographEffect> {
     let dispatch = || {
         crate::lsp_notification_dispatch::LSPNotificationDispatch::new(notification, state)
             .on_notification_sync::<crate::lsp_socket::IsographEventNotification>(
-                handle_internal_event::<THostLanguage>,
+                on_isograph_event_notification::<THostLanguage>,
             )?
             .notification();
         ControlFlow::Continue(())
@@ -205,6 +209,14 @@ fn dispatch_lsp_notification<THostLanguage: HostLanguage>(
         ControlFlow::Break(effects) => effects,
         ControlFlow::Continue(()) => no_effects(),
     }
+}
+
+fn on_isograph_event_notification<THostLanguage: HostLanguage>(
+    state: &mut IsographState<THostLanguage>,
+    _client: ClientId,
+    internal: InternalEvent,
+) -> Vec<IsographEffect> {
+    handle_internal_event(state, internal)
 }
 
 pub(crate) fn intern_config_directory(
@@ -272,7 +284,8 @@ mod tests {
     use crate::effect::IsographEffect;
     use crate::event::{
         ClientConnectionEvent, ClientId, ClientStartedEvent, DiskChanged, DiskFileChanged,
-        FolderRemoved, InternalEvent, IsographEvent, LiveSession, LiveSessions, LspEvent, Presence,
+        FolderRemoved, InternalEvent, IsographEvent, LiveSession, LiveSessions, LspEvent,
+        LspNotification, Presence,
     };
 
     fn interned(s: &str) -> common_lang_types::RelativePathToSourceFile {
@@ -876,20 +889,32 @@ mod tests {
         );
     }
 
-    fn event_notification(params: serde_json::Value) -> IsographEvent {
-        LspEvent::Notification(lsp_server::Notification {
-            method: crate::lsp_socket::IsographEventNotification::METHOD.to_owned(),
-            params,
+    fn event_notification(client: ClientId, params: serde_json::Value) -> IsographEvent {
+        LspEvent::Notification(LspNotification {
+            client,
+            notification: lsp_server::Notification {
+                method: crate::lsp_socket::IsographEventNotification::METHOD.to_owned(),
+                params,
+            },
         })
         .to()
+    }
+
+    fn start_a_client(state: &mut IsographState<TypeScriptHostLanguage>) -> ClientId {
+        let client = ClientId(1);
+        let (tx, _rx) = crossbeam::channel::unbounded();
+        start_client(state, client, tx);
+        client
     }
 
     #[test]
     fn lsp_isograph_event_hello_world_returns_a_timer() {
         let mut state = empty();
+        let client = start_a_client(&mut state);
         let effects = handle(
             &mut state,
             event_notification(
+                client,
                 serde_json::to_value(InternalEvent::HelloWorld).expect("serializes"),
             ),
         );
@@ -900,9 +925,11 @@ mod tests {
     #[test]
     fn lsp_isograph_event_hello_world_then_its_timer_returns_log_hello_world() {
         let mut state = empty();
+        let client = start_a_client(&mut state);
         let effects = handle(
             &mut state,
             event_notification(
+                client,
                 serde_json::to_value(InternalEvent::HelloWorld).expect("serializes"),
             ),
         );
@@ -923,9 +950,13 @@ mod tests {
     #[test]
     fn lsp_isograph_event_quit_returns_kill() {
         let mut state = empty();
+        let client = start_a_client(&mut state);
         let effects = handle(
             &mut state,
-            event_notification(serde_json::to_value(InternalEvent::Quit).expect("serializes")),
+            event_notification(
+                client,
+                serde_json::to_value(InternalEvent::Quit).expect("serializes"),
+            ),
         );
         assert!(matches!(effects.as_slice(), [IsographEffect::Kill]));
     }
@@ -933,9 +964,11 @@ mod tests {
     #[test]
     fn lsp_isograph_event_disk_changed_interns() {
         let mut state = with_config();
+        let client = start_a_client(&mut state);
         let effects = handle(
             &mut state,
             event_notification(
+                client,
                 serde_json::to_value(InternalEvent::DiskChanged(DiskChanged::File(
                     DiskFileChanged {
                         path: PathBuf::from("/tmp/proj/src/a.ts"),
@@ -955,11 +988,15 @@ mod tests {
     #[test]
     fn lsp_unknown_notification_returns_no_effects() {
         let mut state = empty();
+        let client = start_a_client(&mut state);
         let effects = handle(
             &mut state,
-            LspEvent::Notification(lsp_server::Notification {
-                method: "window/logMessage".to_owned(),
-                params: serde_json::json!({}),
+            LspEvent::Notification(LspNotification {
+                client,
+                notification: lsp_server::Notification {
+                    method: "window/logMessage".to_owned(),
+                    params: serde_json::json!({}),
+                },
             })
             .to(),
         );
@@ -984,11 +1021,62 @@ mod tests {
     #[test]
     fn lsp_isograph_event_bad_params_returns_no_effects() {
         let mut state = empty();
+        let client = start_a_client(&mut state);
         let effects = handle(
             &mut state,
-            event_notification(serde_json::json!({"kind":"Nope"})),
+            event_notification(client, serde_json::json!({"kind":"Nope"})),
         );
         assert!(effects.is_empty());
+    }
+
+    #[test]
+    fn lsp_notification_from_a_client_that_never_started_returns_no_effects() {
+        let mut state = empty();
+        let effects = handle(
+            &mut state,
+            event_notification(
+                ClientId(1),
+                serde_json::to_value(InternalEvent::HelloWorld).expect("serializes"),
+            ),
+        );
+        assert!(effects.is_empty());
+        assert!(state.hello_world_debounce.is_none());
+    }
+
+    #[test]
+    fn lsp_notification_disk_changed_from_a_client_that_never_started_does_not_intern() {
+        let mut state = with_config();
+        let effects = handle(
+            &mut state,
+            event_notification(
+                ClientId(1),
+                serde_json::to_value(InternalEvent::DiskChanged(DiskChanged::File(
+                    DiskFileChanged {
+                        path: PathBuf::from("/tmp/proj/src/a.ts"),
+                        presence: Presence::Present("export const a = 1;\n".to_owned()),
+                    },
+                )))
+                .expect("serializes"),
+            ),
+        );
+        assert!(effects.is_empty());
+        assert!(contents(state.reference(), interned("src/a.ts")).is_none());
+    }
+
+    #[test]
+    fn lsp_notification_after_gone_returns_no_effects() {
+        let mut state = empty();
+        let client = start_a_client(&mut state);
+        handle(&mut state, ClientConnectionEvent::Gone(client).to());
+        let effects = handle(
+            &mut state,
+            event_notification(
+                client,
+                serde_json::to_value(InternalEvent::HelloWorld).expect("serializes"),
+            ),
+        );
+        assert!(effects.is_empty());
+        assert!(state.hello_world_debounce.is_none());
     }
 
     fn dummy_session(

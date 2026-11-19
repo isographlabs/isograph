@@ -11,9 +11,15 @@ pub struct LspRequest {
 }
 
 #[derive(Clone, Debug)]
+pub struct LspNotification {
+    pub client: ClientId,
+    pub notification: lsp_server::Notification,
+}
+
+#[derive(Clone, Debug)]
 pub enum LspEvent {
     Request(LspRequest),
-    Notification(lsp_server::Notification),
+    Notification(LspNotification),
     Response(lsp_server::Response),
 }
 

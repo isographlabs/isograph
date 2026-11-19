@@ -4,23 +4,26 @@ use lsp_types::notification::Notification;
 use tracing::warn;
 
 use crate::effect::{IsographEffect, no_effects};
+use crate::event::{ClientId, LspNotification};
 
 pub struct LSPNotificationDispatch<'state, TState> {
+    client: ClientId,
     notification: lsp_server::Notification,
     state: &'state mut TState,
 }
 
 impl<'state, TState> LSPNotificationDispatch<'state, TState> {
-    pub fn new(notification: lsp_server::Notification, state: &'state mut TState) -> Self {
+    pub fn new(incoming: LspNotification, state: &'state mut TState) -> Self {
         Self {
-            notification,
+            client: incoming.client,
+            notification: incoming.notification,
             state,
         }
     }
 
     pub fn on_notification_sync<TNotification: Notification>(
         self,
-        handler: fn(&mut TState, TNotification::Params) -> Vec<IsographEffect>,
+        handler: fn(&mut TState, ClientId, TNotification::Params) -> Vec<IsographEffect>,
     ) -> ControlFlow<Vec<IsographEffect>, Self> {
         if self.notification.method != TNotification::METHOD {
             return ControlFlow::Continue(self);
@@ -29,9 +32,10 @@ impl<'state, TState> LSPNotificationDispatch<'state, TState> {
             .notification
             .extract::<TNotification::Params>(TNotification::METHOD)
         {
-            Ok(params) => ControlFlow::Break(handler(self.state, params)),
+            Ok(params) => ControlFlow::Break(handler(self.state, self.client, params)),
             Err(lsp_server::ExtractError::MethodMismatch(notification)) => {
                 ControlFlow::Continue(Self {
+                    client: self.client,
                     notification,
                     state: self.state,
                 })

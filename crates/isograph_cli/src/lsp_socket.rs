@@ -199,7 +199,10 @@ fn run_session(
                 crate::event::LspEvent::Request(crate::event::LspRequest { client, request })
             }
             lsp_server::Message::Notification(notification) => {
-                crate::event::LspEvent::Notification(notification)
+                crate::event::LspEvent::Notification(crate::event::LspNotification {
+                    client,
+                    notification,
+                })
             }
             lsp_server::Message::Response(response) => crate::event::LspEvent::Response(response),
         };
@@ -444,7 +447,10 @@ mod tests {
     }
 
     fn posted_internal(event: IsographEvent) -> InternalEvent {
-        let IsographEvent::Lsp(crate::event::LspEvent::Notification(notification)) = event else {
+        let IsographEvent::Lsp(crate::event::LspEvent::Notification(
+            crate::event::LspNotification { notification, .. },
+        )) = event
+        else {
             panic!("session posts Lsp::Notification");
         };
         assert_eq!(notification.method, IsographEventNotification::METHOD);
@@ -725,8 +731,12 @@ mod tests {
         );
         tokio::time::sleep(SETTLE).await;
         let _started = take_started(&mut event_rx);
-        let IsographEvent::Lsp(crate::event::LspEvent::Notification(unknown)) =
-            event_rx.try_recv().expect("logMessage arrived")
+        let IsographEvent::Lsp(crate::event::LspEvent::Notification(
+            crate::event::LspNotification {
+                notification: unknown,
+                ..
+            },
+        )) = event_rx.try_recv().expect("logMessage arrived")
         else {
             panic!("session posts Lsp::Notification");
         };
@@ -754,8 +764,11 @@ mod tests {
         );
         tokio::time::sleep(SETTLE).await;
         let _started = take_started(&mut event_rx);
-        let IsographEvent::Lsp(crate::event::LspEvent::Notification(bad)) =
-            event_rx.try_recv().expect("Nope arrived")
+        let IsographEvent::Lsp(crate::event::LspEvent::Notification(
+            crate::event::LspNotification {
+                notification: bad, ..
+            },
+        )) = event_rx.try_recv().expect("Nope arrived")
         else {
             panic!("session posts Lsp::Notification");
         };
