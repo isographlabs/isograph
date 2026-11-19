@@ -36,7 +36,7 @@ pub enum TypeScriptGenerationError {
     SourceNotRelative(EntityNameAndSelectableName),
 }
 
-const TSCONFIG_JSON: &str = "{\n    \"compilerOptions\": {\n        \"noUnusedLocals\": false,\n        \"noUnusedParameters\": false,\n        \"jsx\": \"preserve\",\n        \"esModuleInterop\": true\n    }\n}";
+const TSCONFIG_JSON: &str = "{\n    \"compilerOptions\": {\n        \"noUnusedLocals\": false,\n        \"noUnusedParameters\": false,\n        \"jsx\": \"preserve\",\n        \"esModuleInterop\": true\n    }\n}\n";
 
 /// The path and text of every artifact of `project`, in this order: per field its param type,
 /// parameters type, output type, resolver reader, and refetch reader; per entrypoint and
@@ -707,11 +707,11 @@ mod tests {
     }
 
     #[test]
-    fn tsconfig_json_is_upstreams_text() {
+    fn tsconfig_json_is_upstreams_text_with_a_trailing_newline() {
         let artifacts = generated(project(Vec::new()).reference());
         assert_eq!(
             text_at(artifacts.as_slice(), "tsconfig.json"),
-            "{\n    \"compilerOptions\": {\n        \"noUnusedLocals\": false,\n        \"noUnusedParameters\": false,\n        \"jsx\": \"preserve\",\n        \"esModuleInterop\": true\n    }\n}"
+            "{\n    \"compilerOptions\": {\n        \"noUnusedLocals\": false,\n        \"noUnusedParameters\": false,\n        \"jsx\": \"preserve\",\n        \"esModuleInterop\": true\n    }\n}\n"
         );
     }
 
