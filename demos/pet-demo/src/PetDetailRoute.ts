@@ -23,4 +23,4 @@ export const PetDetailRoute = iso(`
   return data.pet?.fullName ?? 'No pet with that id';
 });
 
-console.log(iso(`entrypoint Query.PetDetailRoute`).name);
+console.log(iso(`entrypoint Query.PetDetailRoute`));
