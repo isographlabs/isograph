@@ -14,7 +14,7 @@ use prelude::Postfix;
 
 use crate::TypeScriptGenerationError;
 use crate::custom_scalar::TypeScriptCustomScalarType;
-use crate::entrypoint::field_artifact_path;
+use crate::entrypoint::{RUNTIME_PACKAGE, field_artifact_path};
 use crate::imports::relative_artifact_specifier;
 use crate::module::{
     NamedTypeImport, Optionality, PropertySignature, TypeAlias, TypeScriptItem, TypeScriptKeyword,
@@ -218,34 +218,46 @@ pub(crate) fn output_type_file(
     .wrap_ok()
 }
 
-/// `E/__link/output_type.ts`.
+/// `E/__link/output_type.ts`: `Link<..>` of `entity_name_type` of the concrete types, or
+/// `never` with no import when there are none.
 pub(crate) fn link_type_file(link: &LinkType) -> TypeScriptModule {
-    let mut objects: Vec<TypeScriptType> = link
-        .concrete_types
-        .iter()
-        .map(|concrete| {
-            TypeScriptType::Object(vec![
-                required("__link", TypeScriptType::Keyword(TypeScriptKeyword::String)),
-                required(
-                    "__typename",
-                    TypeScriptType::StringLiteral(concrete.to_string()),
-                ),
-            ])
-        })
-        .collect();
-    let aliased = match objects.len() {
-        0 => TypeScriptType::Keyword(TypeScriptKeyword::Never),
-        1 => objects.remove(0),
-        _ => TypeScriptType::Union(objects),
-    };
-    TypeScriptModule {
-        path: link_type_path(link.entity),
-        items: TypeScriptItem::ExportedTypeAlias(TypeAlias {
+    let alias = |aliased: TypeScriptType| {
+        TypeScriptItem::ExportedTypeAlias(TypeAlias {
             name: link_type_name(link.entity),
             type_params: Vec::new(),
             aliased,
         })
-        .wrap_vec(),
+    };
+    TypeScriptModule {
+        path: link_type_path(link.entity),
+        items: match link.concrete_types.as_slice() {
+            [] => alias(TypeScriptType::Keyword(TypeScriptKeyword::Never)).wrap_vec(),
+            concrete => vec![
+                TypeScriptItem::NamedTypeImport(NamedTypeImport {
+                    specifier: RUNTIME_PACKAGE.to_owned(),
+                    imported: "Link".to_owned(),
+                    local: "Link".to_owned(),
+                }),
+                alias(TypeScriptType::generic(
+                    "Link",
+                    entity_name_type(concrete).wrap_vec(),
+                )),
+            ],
+        },
+    }
+}
+
+/// The names of `concrete` as one type: `never` when empty, a string literal when one, else
+/// their union in order.
+pub(crate) fn entity_name_type(concrete: &[EntityName]) -> TypeScriptType {
+    let mut names: Vec<TypeScriptType> = concrete
+        .iter()
+        .map(|name| TypeScriptType::StringLiteral(name.to_string()))
+        .collect();
+    match names.len() {
+        0 => TypeScriptType::Keyword(TypeScriptKeyword::Never),
+        1 => names.remove(0),
+        _ => TypeScriptType::Union(names),
     }
 }
 

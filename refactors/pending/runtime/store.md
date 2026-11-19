@@ -912,7 +912,7 @@ The package's upstream build (The package): `package.json`, the three `tsconfig`
 
 ### 6. Link output types (typescript_artifacts)
 
-`entity_name_type`; `link_type_file` writes `Link<..>` (The store); the type artifact tests that assert `__link` and `__typename` assert `import type { Link } from "@isograph/runtime";` and `export type Pet____link__output_type = Link<"Pet">;`, `Link<"Owner" | "Pet">` for an abstract entity with those two concrete entities, and `never` with no import for one with none; the regenerated `demos/pet-demo/src/__isograph/*/__link/output_type.ts` and the fixture's. Depends on 2, which exports `Link`.
+`entity_name_type`; `link_type_file` writes `Link<..>` (The store); the type artifact tests that assert `__link` and `__typename` assert `import type { Link } from "@isograph/runtime";` and `export type Pet____link__output_type = Link<"Pet">;`, `Link<"Owner" | "Pet">` for an abstract entity with those two concrete entities, and `never` with no import for one with none; the regenerated `demos/pet-demo/src/__isograph/*/__link/output_type.ts`; the pet demo's two pointer resolvers (`Pet.bestFriend` in `demos/pet-demo/src/Pet.ts`, `Pet.owner` in `demos/pet-demo/src/Owner.ts`) return `{ entityName, id }`, and `demos/pet-demo/README.md` names that shape, because `tsc` rejects the old `{ __link, __typename }` objects against `Link<..>`. The fixture project has no pointer, so it has no link type file. Depends on 2, which exports `Link`.
 
 ### 7. Required parameters (typescript_artifacts)
 

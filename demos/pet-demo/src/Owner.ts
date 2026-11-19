@@ -21,5 +21,5 @@ export const owner = iso(`
     id
   }
 `)(function owner({ data }) {
-  return { __link: `owner-of-${data.id}`, __typename: 'Owner' as const };
+  return { entityName: 'Owner' as const, id: `owner-of-${data.id}` };
 });

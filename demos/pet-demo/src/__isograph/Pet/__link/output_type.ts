@@ -1,4 +1,2 @@
-export type Pet____link__output_type = {
-  readonly __link: string;
-  readonly __typename: "Pet";
-};
+import type { Link } from "@isograph/runtime";
+export type Pet____link__output_type = Link<"Pet">;

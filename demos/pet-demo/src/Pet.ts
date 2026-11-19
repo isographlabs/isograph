@@ -19,7 +19,5 @@ export const bestFriend = iso(`
   }
 `)(function bestFriend({ data }) {
   const friend = data.best_friend_relationship?.best_friend;
-  return friend == null
-    ? null
-    : { __link: friend.id, __typename: 'Pet' as const };
+  return friend == null ? null : { entityName: 'Pet' as const, id: friend.id };
 });

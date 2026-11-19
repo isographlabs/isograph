@@ -665,7 +665,7 @@ mod tests {
     }
 
     #[test]
-    fn a_link_type_is_one_object_per_concrete_type() {
+    fn a_link_type_is_a_link_to_its_concrete_entities() {
         let link = |name: &str, concrete: &[&str]| LinkType {
             entity: entity(name),
             concrete_types: concrete.iter().map(|concrete| entity(concrete)).collect(),
@@ -674,24 +674,21 @@ mod tests {
             ProjectArtifacts {
                 link_types: vec![
                     link("Pet", &["Pet"]),
-                    link("Node", &["A", "B"]),
+                    link("Node", &["Owner", "Pet"]),
                     link("Empty", &[]),
                 ],
                 ..project(Vec::new())
             }
             .reference(),
         );
-        let pet = text_at(artifacts.as_slice(), "Pet/__link/output_type.ts");
-        assert!(
-            pet.contains("export type Pet____link__output_type = {"),
-            "{pet}"
+        assert_eq!(
+            text_at(artifacts.as_slice(), "Pet/__link/output_type.ts"),
+            "import type { Link } from \"@isograph/runtime\";\nexport type Pet____link__output_type = Link<\"Pet\">;\n"
         );
-        assert!(pet.contains("readonly __link: string;"), "{pet}");
-        assert!(pet.contains("readonly __typename: \"Pet\";"), "{pet}");
-        let node = text_at(artifacts.as_slice(), "Node/__link/output_type.ts");
-        assert!(node.contains("readonly __typename: \"A\";"), "{node}");
-        assert!(node.contains("} | {"), "{node}");
-        assert!(node.contains("readonly __typename: \"B\";"), "{node}");
+        assert_eq!(
+            text_at(artifacts.as_slice(), "Node/__link/output_type.ts"),
+            "import type { Link } from \"@isograph/runtime\";\nexport type Node____link__output_type = Link<\"Owner\" | \"Pet\">;\n"
+        );
         assert_eq!(
             text_at(artifacts.as_slice(), "Empty/__link/output_type.ts"),
             "export type Empty____link__output_type = never;\n"
