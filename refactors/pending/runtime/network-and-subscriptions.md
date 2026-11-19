@@ -743,6 +743,7 @@ Equality, `selectionSetDataAreEqual` (upstream's `mergeObjectsUsingReaderAst`, `
 ```ts
 // from libs/isograph-runtime/src/areEqualWithDeepComparison.ts
 import type { ReaderSelection, ReaderSelectionSet, SelectionSetData } from "./artifacts";
+import { isArray } from "./util";
 
 /** Whether two reads of `selections` hold equal values, upstream's rule. */
 export function selectionSetDataAreEqual(
@@ -777,13 +778,13 @@ function valuesAreEqual(
   read: unknown,
   itemsAreEqual: (delivered: unknown, read: unknown) => boolean,
 ): boolean {
-  if (delivered === null || read === null) {
+  if (delivered == null || read == null) {
     return delivered === read;
   }
-  if (isList(delivered) || isList(read)) {
+  if (isArray(delivered) || isArray(read)) {
     return (
-      isList(delivered) &&
-      isList(read) &&
+      isArray(delivered) &&
+      isArray(read) &&
       delivered.length === read.length &&
       delivered.every((item, index) => valuesAreEqual(item, read[index], itemsAreEqual))
     );
@@ -791,14 +792,12 @@ function valuesAreEqual(
   return itemsAreEqual(delivered, read);
 }
 
-function isList(value: unknown): value is ReadonlyArray<unknown> {
-  return Array.isArray(value);
-}
-
 function isSelectionSetData(value: unknown): value is SelectionSetData {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  return typeof value === "object" && value != null && !isArray(value);
 }
 ```
+
+The `null` checks are `== null` and `!= null`: the repo's oxlint `eqeqeq` rule is `always` with `null: "never"`, which rejects `=== null`. A read never produces `undefined` for a selection's alias, so the two agree on every read result. `isList` is the landed `util.ts` `isArray`.
 
 A `Linked` item that is not an object is a read result that reader-ast.md's `readLinkedValue` never produces; the comparison reports it unequal rather than throwing, because the callback then receives the read as it is.
 

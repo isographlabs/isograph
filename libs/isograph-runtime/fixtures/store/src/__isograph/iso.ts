@@ -5,6 +5,7 @@ import type { Pet__NullableCheckins__param } from './Pet/NullableCheckins/param_
 import type { Pet__PetLink__param } from './Pet/PetLink/param_type';
 import type { Pet__PetName__param } from './Pet/PetName/param_type';
 import type { Pet__RecentCheckins__param } from './Pet/RecentCheckins/param_type';
+import type { Pet__ThrowingName__param } from './Pet/ThrowingName/param_type';
 import type { PetStats__StatsCard__param } from './PetStats/StatsCard/param_type';
 import type { PetStats__StatsLink__param } from './PetStats/StatsLink/param_type';
 import type { Query__ConstantPet__param } from './Query/ConstantPet/param_type';
@@ -19,6 +20,7 @@ import type { Query__PetLists__param } from './Query/PetLists/param_type';
 import type { Query__PetSummaries__param } from './Query/PetSummaries/param_type';
 import type { Query__PetSummary__param } from './Query/PetSummary/param_type';
 import type { Query__Search__param } from './Query/Search/param_type';
+import type { Query__ThrowingPet__param } from './Query/ThrowingPet/param_type';
 import type { Mutation____link__output_type } from './Mutation/__link/output_type';
 import type { Node____link__output_type } from './Node/__link/output_type';
 import type { Pet____link__output_type } from './Pet/__link/output_type';
@@ -37,6 +39,7 @@ import type Query__PetLists__entrypoint from './Query/PetLists/entrypoint';
 import type Query__PetSummaries__entrypoint from './Query/PetSummaries/entrypoint';
 import type Query__PetSummary__entrypoint from './Query/PetSummary/entrypoint';
 import type Query__Search__entrypoint from './Query/Search/entrypoint';
+import type Query__ThrowingPet__entrypoint from './Query/ThrowingPet/entrypoint';
 
 type IdentityWithParam<TParam extends object, TReturnConstraint = unknown> = <
   TClientFieldReturn extends TReturnConstraint,
@@ -70,6 +73,9 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Pet.RecentCheckins', T>,
 ): IdentityWithParam<Pet__RecentCheckins__param>;
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Pet.ThrowingName', T>,
+): IdentityWithParam<Pet__ThrowingName__param>;
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field PetStats.StatsCard', T>,
 ): IdentityWithParam<PetStats__StatsCard__param>;
@@ -113,6 +119,9 @@ export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.Search', T>,
 ): IdentityWithParam<Query__Search__param>;
 export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Query.ThrowingPet', T>,
+): IdentityWithParam<Query__ThrowingPet__param>;
+export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Mutation.SetTagline', T>,
 ): typeof Mutation__SetTagline__entrypoint;
 export function iso<T>(
@@ -151,6 +160,9 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.Search', T>,
 ): typeof Query__Search__entrypoint;
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Query.ThrowingPet', T>,
+): typeof Query__ThrowingPet__entrypoint;
 export function iso(
   _isographLiteralText: string,
 ): IdentityWithParam<any> | object | void {

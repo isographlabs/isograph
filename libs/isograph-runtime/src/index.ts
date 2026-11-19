@@ -71,4 +71,12 @@ export {
   unretainQuery,
 } from './environment';
 export type { NetworkRequestKey } from './network';
-export type { ReadErr, Subscription, SubscriptionResult } from './subscribe';
+export {
+  callSubscriptions,
+  listenToSubscription,
+  readAndSubscribe,
+  type ReadErr,
+  type Subscription,
+  type SubscriptionResult,
+  subscriptionSnapshot,
+} from './subscribe';

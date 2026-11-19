@@ -1,0 +1,7 @@
+query ThrowingPet($id: ID!) {
+  pet____id___v_id: pet(id: $id) {
+    __typename
+    id
+    name
+  }
+}
