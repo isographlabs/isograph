@@ -8,7 +8,7 @@ Three prefactors make this correct. The watcher's boot scan is posted onto the e
 
 Builds on: `file_contents` and the client-keyed iso literal memos, `iso_literal_parse_errors_in_file`, `iso_literal_validation_errors_in_file`, `line_index`, the diagnostics debounce (refactors/past/lsp-diagnostics.md), `freddie_timer`, `LiveSessions`, and the path maps `source_path_map` and `schema_path_map` with their listing memos `source_file_paths` (`crates/isograph_compiler/src/database.rs`) and `schema_file_paths` (`crates/graphql_network_protocol/src/schema_files.rs`).
 
-Depends on, for change 9 only: `parsed_schema_file` from refactors/pending/graphql-schema-parser/integration.md.
+Depends on, for change 9 only: `parsed_schema_file` from refactors/past/graphql-schema-parser/integration.md.
 
 ## What the user does
 
@@ -1849,7 +1849,7 @@ Change 6 adds the e2e `errors_of_a_bad_selection_prints_the_validation_message`.
 
 ## Change 9: schema parse errors are compiler errors
 
-Ships after refactors/pending/graphql-schema-parser/integration.md change 2 (`parsed_schema_file`). `CompilerError` gains `SchemaParse(<the schema parser's error type>)`. `project_errors` also iterates `schema_file_paths(db, input.client)` (`schema_path_map`, the client's view) and skips a path that `source_file_paths(db, input.client)` also lists (a path in both is reported once, through `compiler_errors_in_file`), reading `parsed_schema_file(db, input.client, path)` errors through a new memo `schema_file_errors(db, client, path) -> Option<Vec<WithSpan<CompilerError>>>`. Classification stays in `handle`: neither listing re-reads the globs. The exact types are written when integration change 2 lands; this section is updated then. Same command, same output format.
+Ships after refactors/past/graphql-schema-parser/integration.md change 2 (`parsed_schema_file`). `CompilerError` gains `SchemaParse(<the schema parser's error type>)`. `project_errors` also iterates `schema_file_paths(db, input.client)` (`schema_path_map`, the client's view) and skips a path that `source_file_paths(db, input.client)` also lists (a path in both is reported once, through `compiler_errors_in_file`), reading `parsed_schema_file(db, input.client, path)` errors through a new memo `schema_file_errors(db, client, path) -> Option<Vec<WithSpan<CompilerError>>>`. Classification stays in `handle`: neither listing re-reads the globs. The exact types are written when integration change 2 lands; this section is updated then. Same command, same output format.
 
 ## Panics
 
