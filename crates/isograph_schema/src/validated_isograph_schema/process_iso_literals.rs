@@ -16,7 +16,7 @@ use crate::parse_iso_literal_in_source;
 pub fn parse_iso_literals<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
 ) -> DiagnosticVecResult<ParsedIsoLiteralsMap> {
-    // TODO we are not checking the open file map here. This will probably be fixed when we
+    // TODO we are not checking the editor buffers here. This will probably be fixed when we
     // fully rewrite everything to be incremental.
     let mut contains_iso = ParsedIsoLiteralsMap::default();
     let mut iso_literal_parse_errors = vec![];

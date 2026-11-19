@@ -46,7 +46,7 @@ pub struct IsoLiteralsSource {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Source)]
-pub struct OpenFileSource {
+pub struct EditorBufferSource {
     #[key]
     pub relative_path: RelativePathToSourceFile,
     pub content: String,
@@ -81,8 +81,8 @@ impl<TCompilationProfile: CompilationProfile> IsographDatabase<TCompilationProfi
         self.get(self.standard_sources.schema_source_id)
     }
 
-    pub fn get_open_file(&self, file: RelativePathToSourceFile) -> Option<&OpenFileSource> {
-        self.try_get(OpenFileSource::id_for_key(&file))
+    pub fn get_editor_buffer(&self, file: RelativePathToSourceFile) -> Option<&EditorBufferSource> {
+        self.try_get(EditorBufferSource::id_for_key(&file))
     }
 
     pub fn remove_schema_extension(
@@ -143,15 +143,15 @@ impl<TCompilationProfile: CompilationProfile> IsographDatabase<TCompilationProfi
         }
     }
 
-    pub fn insert_open_file(&mut self, relative_path: RelativePathToSourceFile, content: String) {
-        self.set(OpenFileSource {
+    pub fn set_editor_buffer(&mut self, relative_path: RelativePathToSourceFile, content: String) {
+        self.set(EditorBufferSource {
             relative_path,
             content,
         });
     }
 
-    pub fn remove_open_file(&mut self, relative_path: RelativePathToSourceFile) {
-        self.remove(OpenFileSource::id_for_key(&relative_path));
+    pub fn remove_editor_buffer(&mut self, relative_path: RelativePathToSourceFile) {
+        self.remove(EditorBufferSource::id_for_key(&relative_path));
     }
 
     pub fn print_location_fn<'a>(&'a self, color: bool) -> PrintLocationFn<'a> {
@@ -238,9 +238,9 @@ fn file_text_at_location<TCompilationProfile: CompilationProfile>(
 ) -> Option<String> {
     // TODO do something smarter
 
-    // First, check if its open
-    if let Some(open_file) = db.get_open_file(relative_path) {
-        return open_file.content.clone().wrap_some();
+    // First, check if it has an editor buffer
+    if let Some(editor_buffer) = db.get_editor_buffer(relative_path) {
+        return editor_buffer.content.clone().wrap_some();
     }
 
     // Check if it's an iso literal
