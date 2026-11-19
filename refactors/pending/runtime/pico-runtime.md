@@ -253,12 +253,13 @@ Reactively's algorithm (`packages/core/src/core.ts` of `milomg/reactively`): eac
 Here the entry gains `state: 'Clean' | 'Check' | 'Dirty'`. A write, step by step:
 
 1. While writing, `normalize` marks: for each changed location in `C`, every entry in its dependents set becomes `Dirty`; an entry that was `Clean` marks its dependents `Check`, recursively, stopping at an entry not `Clean`. Marking runs no resolver.
-2. Settlement brings every retained and observed location up to date. A `Clean` entry returns at once. A `Check` entry brings its `Resolver` dependencies up to date in recorded order and stops at the first after which it is `Dirty`. A `Dirty` entry recomputes; each stored result it reads is brought up to date first, by the read. A recomputed entry whose result is unequal sets its dependents `Dirty`. The entry ends `Clean`.
+2. Settlement brings the marked roots up to date: the entries that are both marked by this write or an earlier one and the stored result at a retained or observed location. It does not visit an unmarked root. A `Clean` entry returns at once. A `Check` entry brings its `Resolver` dependencies up to date in recorded order and stops at the first after which it is `Dirty`. A `Dirty` entry recomputes; each stored result it reads is brought up to date first, by the read. A recomputed entry whose result is unequal sets its dependents `Dirty`. The entry ends `Clean`.
 
 Diamond, `Rex` to `Max`:
 
 ```text
 mark   name changed: Initial Dirty; Monogram, Signature, Badge, BadgePage Check
+       marked roots: BadgePage (the only retained location; Initial, Monogram, Signature, Badge are marked and are not roots)
 settle BadgePage         Check: dependencies in order
   Badge                  Check: dependencies in order
     Monogram             Check: dependencies in order
@@ -274,7 +275,11 @@ settle BadgePage         Check: dependencies in order
 BadgePage                Dirty: recompute                        (BadgePage call 1)
 ```
 
-`Rex` to `Ray`: `Initial` recomputes `"R"`, `===` the old string, so `Monogram` and `Signature` stay `Check`; `Monogram` finds no dependency made it `Dirty` and becomes `Clean`; so do `Signature`, `Badge`, and `BadgePage`. One call, five entries visited. A write to `Pet:1.tagline` marks nothing in the diamond, and settlement returns at `BadgePage`, which is `Clean`.
+`Rex` to `Ray`: `Initial` recomputes `"R"`, `===` the old string, so `Monogram` and `Signature` stay `Check`; `Monogram` finds no dependency made it `Dirty` and becomes `Clean`; so do `Signature`, `Badge`, and `BadgePage`. One call, five entries visited. A write to `Pet:1.tagline` marks nothing in the diamond, so `BadgePage` is not a marked root and settlement does not visit it.
+
+With observers on `Badge` and `Initial` as well as the retained `BadgePage`, the marked roots are `Initial`, `Badge`, and `BadgePage`. Settlement brings each up to date in any order; the first brings up to date every marked entry it reaches by the recursion, and the later ones find those entries `Clean`. The calls are the same as in the trace above.
+
+Why `Check` marks exist. A pure push from the `Dirty` entries (recompute each `Dirty` entry, and only when its result changed, mark its direct dependents `Dirty`) visits fewer entries: it never touches the dependents of an unchanged result, so `Rex` to `Ray` visits `Initial` alone. It needs an order, though. In the diamond, `Badge` reads both `Monogram` and `Signature`; pushed from `Monogram` first, it recomputes with the stale `Signature` and again after `Signature` recomputes, which R3 forbids. Holding `Badge` until every changed input is done is 3a's heights or 3c's pending-input counts. 3b instead marks every transitive dependent `Check` eagerly, while marking, and resolves the order by pulling: an entry brings its dependencies up to date before it decides. The price is that settlement clears the `Check` marks above an unchanged result (`Monogram`, `Signature`, `Badge`, `BadgePage` when `Initial` recomputes to `"R"`), so settlement costs `O(marked)` where the pure push costs `O(recomputed)`. Marking already visits those entries, so the order of growth of a write is the same.
 
 New object, `Rex` to `Ray`:
 
@@ -295,7 +300,8 @@ Chain, `Pet:2.name`: marking makes `PetName` on `Pet:2` `Dirty` and `FriendLabel
 
 - Ordering: an entry recomputes only after every stored result it reads was brought up to date, because the only ways it reaches one are the `Check` walk and the read during recomputation, and both bring it up to date first. It recomputes at most once per write: after recomputing it is `Clean`, and only a dependency's recomputation can make it `Dirty` again, and every dependency was brought up to date before it.
 - Laziness: an entry no settled location reaches keeps its mark and is not recomputed; a later `read` brings it up to date. Marking stops at marked entries, so repeated writes cost `O(1)` per already marked entry.
-- Cost per write: marking `O(|A| + edges within A)`; settlement `O(R)` for the locations plus `O(|A| + edges within A)` for the walk; `A'` recomputations.
+- Marked roots suffice. Every dependent of an entry that is not `Clean` is not `Clean` (change 2, Marking, the invariant), so a root that reaches a marked entry is itself marked. Settling the marked roots therefore settles every root that reaches anything this write changed, and an unmarked root costs nothing.
+- Cost per write: marking `O(|A| + edges within A)`; settlement `O(marked roots)` to start, plus `O(|A| + edges within A)` for the walk; `A'` recomputations. No term grows with the number of retained or observed locations `R`.
 - Failure mode it shares with 3a and 3c: the inverse must equal the forward lists exactly. A missed removal keeps a dead entry in a set (memory, and a mark that does nothing); a missed addition loses a mark and leaves a stale result with no error. One function writing both sides is the guard.
 
 #### 3c. Pending-input counts
@@ -328,10 +334,10 @@ The simplest eager baseline. No dependencies stored at all. After every write, s
 - R4, an optimization: 2, 3a, 3b, 3c, 4 stop propagation at an entry whose result is `===` its previous one (a primitive, or a stored or reused object), and propagate every new object. 1 compares only at the subscription; 5 only at the root. No candidate compares resolver outputs structurally, because that comparison is not well-defined on arbitrary JavaScript values.
 - Structural equality on inputs: the one place it is well-defined is a resolver's inputs, which are store data shaped by the reader AST. 1 does it at the subscription with upstream's `mergeObjectsUsingReaderAst`, which also keeps the old object when equal and so gives stable identity. 2, 3a, 3b, 3c, 4 get the server half from `normalize`'s comparison by AST shape (change 1: an unchanged write changes no input, so nothing is marked or stamped; a leaf whose value is a JSON object or list always counts as changed) and compare resolver inputs by `===`. A snapshot whose identity must stay stable across a recomputation with equal data needs upstream's merge applied to the data read along the reader AST; it does not need structural equality on outputs.
 - R5 and R7: every candidate meets them.
-- R10: 3b allows it: marking already runs in `normalize` apart from settlement, an entry that settlement skips keeps its mark, so it stays recorded as stale, `settle` takes its roots, and the observed count is the observers at a location plus the observed `dependents`. 2 allows it: nothing is verified until demanded, and a deferred pass is a later verification of fewer roots; each pass still walks every live edge under its roots. 4 allows it: Preact keeps unsubscribed computeds lazy and queues effects to the end of a batch, so priority goes on that queue. 3a and 3c fail without redesign: their propagation recomputes every affected entry as it goes, so skipping an unobserved entry leaves it stale with no record of it; the lazy variant needs a stale mark per entry and a pull on read, which is 3b's state and bring-up-to-date, and priorities need one bucket queue or count pass per priority. 5 allows it per root at full cost per pass. 1 has nothing stored to defer; scheduling exists only in React's re-render.
+- R10: 3b allows it: marking already runs in `normalize` apart from settlement, an entry that settlement skips keeps its mark, so it stays recorded as stale, `settle` iterates the marked roots and a scheduler chooses which of them each pass settles, and the observed count is the observers at a location plus the observed `dependents`. 2 allows it: nothing is verified until demanded, and a deferred pass is a later verification of fewer roots; each pass still walks every live edge under its roots. 4 allows it: Preact keeps unsubscribed computeds lazy and queues effects to the end of a batch, so priority goes on that queue. 3a and 3c fail without redesign: their propagation recomputes every affected entry as it goes, so skipping an unobserved entry leaves it stale with no record of it; the lazy variant needs a stale mark per entry and a pull on read, which is 3b's state and bring-up-to-date, and priorities need one bucket queue or count pass per priority. 5 allows it per root at full cost per pass. 1 has nothing stored to defer; scheduling exists only in React's re-render.
 - R6: 1 fails; the rest meet it.
 - R8, what each does with `C`: 1 needs it at record granularity; 2 turns it into stamps and rediscovers it by walking `E`; 3a, 3b, 3c, 4 start from it; 5 ignores it.
-- Per write with a small change on a large screen: 1 `O(overlapping subscription trees)`; 2 `O(R + E)`; 3a `O(A')`; 3b and 3c `O(R + A)`; 5 `O(L)` resolver calls.
+- Per write with a small change on a large screen: 1 `O(overlapping subscription trees)`; 2 `O(R + E)`; 3a `O(A')`; 3b and 3c `O(A)` (3b starts settlement from the marked roots, change 3, Settlement); 5 `O(L)` resolver calls.
 - Memory beyond the results: 2 a tag and epoch on all `S` server values, two epochs and forward edges per entry; 3a, 3b, 3c, 4 forward and reverse edges, plus a dependents index for the server locations live entries read (only those, not all of `S`); 3b a state per entry; 3a a height per artifact; 4 a version per edge.
 - Machinery (R9): 2 has the fewest invariants (no inverse to keep). 3b adds the inverse, one state, mark, and bring-up-to-date. 3a adds the inverse, a height, and a bucket queue. 3c and 4 add 3b's pieces plus counters or versions.
 - Unreached entries (a disposed retention before `garbageCollect`, a plain `read` outside any retention): 2, 3b, 4 leave them unvisited; 3a and 3c recompute them.
@@ -340,7 +346,7 @@ For a sense of scale, from no measurement: a screen with 2,000 live entries aver
 
 ### Held: 3b, mark then bring up to date
 
-The eager requirement removes the one thing pico's epochs are for: pull verification exists so that undemanded memos are never visited, and R2 demands every live entry after every write, so 2 visits every live edge on every write while `normalize` already holds the exact set of changed locations and discards it into stamps. Push from that set bounds each write by what it affects, and among the push orderings 3b is the only one that needs no ordering state beyond a three-valued state per entry: its order is the same recursion as pico's verification (dependencies brought up to date in recorded order before the entry), restricted to the marked entries, so R3 holds by the argument pico's design already makes. 3a with static heights visits fewer entries (it never walks the `Check` part of `A`), but it recomputes entries no root reaches until `garbageCollect`, has no lazy mode for open decision 3 (b) or for a plain `read`, and needs a height per artifact; 3c and 4 add counters or versions to 3b without a new property; 5 meets the requirements and runs every live resolver on every write; 1 fails R1, R2, R3, and R6. R10 separates 3b from 3a further: 3a and 3c need 3b's marks to be lazy at all, while 3b gets both laziness and deferral from what it already has (marking in `normalize`, `settle` over a set of roots, and `dependents` from which an observed count is derived), and changes 1 to 4 need no field that a later scheduler would remove. The cost 3b takes on is the inverse edge set: memory per edge and an invariant (the dependents sets equal the inverse of the dependency lists) whose violation is a silently stale result. That is contained by making one function, `setDependencies`, the only writer of either side. The inverse also pays for itself elsewhere: it is the reference count constructors and destructors need (Follow-ups 1, open decision 11), and the index open decision 6 (b) needs. Removing epochs also removes the tag and stamp from every server value, so records stay store.md's untagged maps and `check`, `garbageCollect`'s mark, and the reader's server reads do not change.
+The eager requirement removes the one thing pico's epochs are for: pull verification exists so that undemanded memos are never visited, and R2 demands every live entry after every write, so 2 visits every live edge on every write while `normalize` already holds the exact set of changed locations and discards it into stamps. Push from that set bounds each write by what it affects, and among the push orderings 3b is the only one that needs no ordering state beyond a three-valued state per entry: its order is the same recursion as pico's verification (dependencies brought up to date in recorded order before the entry), restricted to the marked entries, so R3 holds by the argument pico's design already makes. Settlement starts from the marked roots, not from every retained root, so a write costs `O(A)` and nothing per untouched root. The `Check` state is how 3b gets order without ordering state: marking every transitive dependent `Check` and pulling dependencies before deciding replaces 3a's heights and 3c's counts, and costs clearing `Check` marks above an unchanged result (`O(marked)` against a pure push's `O(recomputed)`; Candidate 3b, Why `Check` marks exist). 3a with static heights visits fewer entries (it never walks the `Check` part of `A`), but it recomputes entries no root reaches until `garbageCollect`, has no lazy mode for open decision 3 (b) or for a plain `read`, and needs a height per artifact; 3c and 4 add counters or versions to 3b without a new property; 5 meets the requirements and runs every live resolver on every write; 1 fails R1, R2, R3, and R6. R10 separates 3b from 3a further: 3a and 3c need 3b's marks to be lazy at all, while 3b gets both laziness and deferral from what it already has (marking in `normalize`, `settle` over the marked roots, of which a scheduler picks a subset per pass, and `dependents` from which an observed count is derived), and changes 1 to 4 need no field that a later scheduler would remove. The cost 3b takes on is the inverse edge set: memory per edge and an invariant (the dependents sets equal the inverse of the dependency lists) whose violation is a silently stale result. That is contained by making one function, `setDependencies`, the only writer of either side. The inverse also pays for itself elsewhere: it is the reference count constructors and destructors need (Follow-ups 1, open decision 11), and the index open decision 6 (b) needs. Removing epochs also removes the tag and stamp from every server value, so records stay store.md's untagged maps and `check`, `garbageCollect`'s mark, and the reader's server reads do not change.
 
 3b still wins with equality cutoff reduced to a `===` optimization. Its bound on a write comes from the reverse edges, not from equality: only entries that read a changed location, directly or through other entries, are marked, and `normalize`'s comparison by AST shape (change 1) keeps an unchanged server value out of `C`. When every resolver returns a new object, `A'` is `A`, and 3b recomputes exactly the entries that read what changed; 5 recomputes all of `L`, and 2 still compares all of `E`. Against 3a the case does not change: 3a visits `A'` and 3b visits `A`, and with no cutoff the two sets are equal, so 3a's one advantage disappears while its lack of a lazy mode and its height per artifact remain. What weaker cutoff costs 3b is the value of the `Check` state: `Check` exists only so that a dependent of a `===` result becomes `Clean` without computing. Marking every transitive dependent `Dirty` would keep R3 and give up cutoff entirely. `Check` is kept because the cutoff it gives is real for primitive results (`Initial`, `Monogram`, `Signature`, `ShapeLabel`) and for resolvers that return a stored or reused object, and it costs one more state value and the `Check` walk over `A`.
 
@@ -349,6 +355,284 @@ The eager requirement removes the one thing pico's epochs are for: pull verifica
 Written for 3b, and changed if another candidate is chosen: Steps; change 1; change 2 except The resolver store key and Results, equality, and a resolver that throws; Ordering; change 3's Settlement, Eager computation, and Garbage collection; change 4's notification paragraph; the mentions of `dependents` and marking in Follow-ups 1 and 8; and open decisions 2, 3, 4, 6, 8, and 11. Each of those sections opens with a line saying so, except the Follow-ups and open decisions.
 
 Independent of it: Goal, Two levels, Step A, End-user experience, The resolver store key with `ReaderArtifact.selectableName`, Results, equality, and a resolver that throws, change 3's `normalize`, `Retention`, and Resolver markers, change 4's `listen`, `snapshot`, and `Observed`, Later, the rest of Follow-ups, and open decisions 1, 5, 7, 9, and 10.
+
+## Coupling to the store
+
+Status: design analysis. The option it ends on is held, not decided: the user has not chosen. Changes 1 to 4 are written for today's coupling; Steps says what the held option changes.
+
+### What couples 3b to the store today
+
+Change 2 writes the recomputation graph into the store's shape:
+
+- `Store.resolvers` keys entries by `EntityName`, record id, and resolver store key, and `ResolverEntry.location` is an `EntryLocation` (a `StoreLink` and a `StoreKey`).
+- `Store.serverDependents` keys the inverse of server dependencies by record, with `RecordDependents.absent` for a record read while absent and `RecordDependents.values` per store key.
+- `Dependency` names store locations: `RecordDependency` and `ValueDependency` carry a `StoreLink`, and `ResolverDependency` an entry.
+- `StoreChange` is `RecordCreated | RecordDeleted | ValueChanged`, and `dependentsOf` reads the record grouping: `RecordDeleted` marks every set of the record and the dependents of every entry stored on it.
+- `writeValue` and `garbageCollect` call `markChanged` with a change to the one base layer `store.records`, and R8 assumes `normalize` is the only writer.
+
+A layered store breaks the last two. With an optimistic layer over the base layer (upstream's `StoreLayer` chain, `optimisticProxy.ts:24-98`), a value's effective value is the topmost layer's: a base write under a shadowing layer changes no effective value and marks entries for nothing, and removing a layer changes effective values with no `normalize` call, so nothing marks. Upstream handles removal by comparing the old and new merged data and calling `callSubscriptions` with the records that differ (`revertOptimisticStoreLayerAndMaybeReplace`, `optimisticProxy.ts:393-493`; `compareData`, `:506-544`). That obligation exists whatever the engine looks like; the coupling question is whether the engine's types and functions name records, store keys, and layers.
+
+### Held: a store-agnostic engine
+
+The engine, `graph.ts`, imports nothing from the store or the reader. It knows two kinds of id, both opaque, both minted by its caller:
+
+```ts
+// from libs/isograph-runtime/src/graph.ts
+declare const inputIdBrand: unique symbol;
+declare const nodeIdBrand: unique symbol;
+
+/** A value the store owns that a computation can read. The engine compares ids by `===` and never parses one. */
+export type InputId = string & { readonly [inputIdBrand]: true };
+
+/** A node. One `NodeId` names one computation for the node's whole life. */
+export type NodeId = string & { readonly [nodeIdBrand]: true };
+
+/** The recomputation graph: nodes, the inverse of their dependencies, roots, and observers. */
+export type RecomputationGraph<TValue> = {
+  readonly nodes: Map<NodeId, GraphNode<TValue>>;
+  /** The nodes whose last computation read each input. Written only by `setDependencies`. */
+  readonly inputDependents: Map<InputId, Set<GraphNode<TValue>>>;
+  /** The nodes created with each owner. Written by node creation and disposal. */
+  readonly owned: Map<InputId, Set<GraphNode<TValue>>>;
+  /** Every node with `rootCount > 0` whose `state` is not `Clean`. */
+  readonly markedRoots: Set<GraphNode<TValue>>;
+  readonly observers: Map<NodeId, Observed<TValue>>;
+  /** Whether two values of a node are equal, for cutoff: `resultsEqual` in the runtime. */
+  readonly valuesEqual: (a: TValue, b: TValue) => boolean;
+};
+
+export type GraphNode<TValue> = {
+  readonly id: NodeId;
+  /** The input whose deletion disposes this node: the presence of the record it was computed on. */
+  readonly owner: InputId;
+  readonly computation: Computation<TValue>;
+  value: TValue;
+  state: EntryState;
+  /** What the last computation read, in read order. Written only by `setDependencies`. */
+  dependencies: ReadonlyArray<GraphDependency<TValue>>;
+  /** Every node whose `dependencies` hold a `Node` dependency on this one. Written only by `setDependencies`. */
+  readonly dependents: Set<GraphNode<TValue>>;
+  /** The roots `retainRoot` holds at this node plus the callbacks `observe` holds at it. */
+  rootCount: number;
+};
+
+export type GraphDependency<TValue> = InputDependency | NodeDependency<TValue>;
+export type InputDependency = { readonly kind: 'Input'; readonly input: InputId };
+export type NodeDependency<TValue> = { readonly kind: 'Node'; readonly node: GraphNode<TValue> };
+
+/** A node's computation. It reports every input it reads, and reads other nodes, through `context`. */
+export type Computation<TValue> = (context: ComputeContext<TValue>) => TValue;
+
+export type ComputeContext<TValue> = {
+  /** Records that the computation read `input`. The store's read path calls it on every read. */
+  readInput(input: InputId): void;
+  /** Brings the node `id` up to date, creating it from `create()` when absent, records the dependency, and returns its value. */
+  readNode(id: NodeId, create: () => NodeDefinition<TValue>): TValue;
+};
+
+/** What creating an absent node needs. */
+export type NodeDefinition<TValue> = {
+  readonly owner: InputId;
+  readonly computation: Computation<TValue>;
+};
+
+/** The observers of one node. */
+export type Observed<TValue> = {
+  readonly callbacks: Set<() => void>;
+  /** The value the callbacks were last called for, or were registered at. */
+  notified: TValue | undefined;
+};
+```
+
+`EntryState` is change 2's. The read hook is a parameter, as change 2's `track` is, not an ambient "current computation" (MobX's `globalState.trackingDerivation`, Reactively's `CurrentReaction`): the context is built per computation by the engine and passed in.
+
+```ts
+// from libs/isograph-runtime/src/graph.ts
+export function createGraph<TValue>(valuesEqual: (a: TValue, b: TValue) => boolean): RecomputationGraph<TValue>;
+
+/** The node `id`, created from `create()` when absent, brought up to date. Records no dependency: the caller is not a node. */
+export function track<TValue>(graph: RecomputationGraph<TValue>, id: NodeId, create: () => NodeDefinition<TValue>): TValue;
+
+/** Marks `Dirty` every node that read one of `inputs`, and `Check` every node that reads those, transitively. Runs no computation. */
+export function markChanged<TValue>(graph: RecomputationGraph<TValue>, inputs: Iterable<InputId>): void;
+
+/** `markChanged([input])`, then marks `Dirty` the dependents of every node `input` owns and disposes those nodes. */
+export function deleteInput<TValue>(graph: RecomputationGraph<TValue>, input: InputId): void;
+
+/** Brings the node `id` up to date when it exists. */
+export function bringUpToDate<TValue>(graph: RecomputationGraph<TValue>, id: NodeId): void;
+
+/** Brings every node in `graph.markedRoots` up to date. */
+export function settle<TValue>(graph: RecomputationGraph<TValue>): void;
+
+/** Adds one to the node's `rootCount`. Returns the function that removes it. */
+export function retainRoot<TValue>(graph: RecomputationGraph<TValue>, id: NodeId): CleanupFn;
+
+/** Adds `onChange` at `id` and one to its `rootCount`. Returns the function that removes both. */
+export function observe<TValue>(graph: RecomputationGraph<TValue>, id: NodeId, onChange: () => void): CleanupFn;
+
+/** The node's value as of its last computation, or `undefined` when no node is stored. Computes nothing. */
+export function valueOf<TValue>(graph: RecomputationGraph<TValue>, id: NodeId): TValue | undefined;
+
+/** Calls each observer whose node's value is not `===` its `notified`; open decision 9's error rule. */
+export function notify<TValue>(graph: RecomputationGraph<TValue>): void;
+
+/** Disposes every node no node with `rootCount > 0` reaches through `Node` dependencies. */
+export function collect<TValue>(graph: RecomputationGraph<TValue>): void;
+```
+
+`markDirty`, `markCheck`, `recompute`, and `setDependencies` are change 2's functions over `GraphNode`, with `inputDependents` in place of `serverDependents`. A disposed node is `setDependencies(graph, node, [])`, removed from `nodes`, from `owned`, and from `markedRoots`.
+
+The store's side is three id functions, its read path, and its change reports:
+
+```ts
+// from libs/isograph-runtime/src/inputs.ts
+/** The input every read on `record` reports, whether the record is present or absent. It changes when the record is created or deleted. */
+export function recordInput(record: StoreLink): InputId {
+  return stableStringify(['Record', record.entityName, record.id]) as InputId;
+}
+
+/** The input a read of `storeKey` on a present `record` reports. */
+export function valueInput(record: StoreLink, storeKey: StoreKey): InputId {
+  return stableStringify(['Value', record.entityName, record.id, storeKey]) as InputId;
+}
+
+/** The node of the resolver store key `storeKey` on `record`. */
+export function resolverNode(record: StoreLink, storeKey: StoreKey): NodeId {
+  return stableStringify([record.entityName, record.id, storeKey]) as NodeId;
+}
+```
+
+The casts are the only places an `InputId` or `NodeId` is minted. `Store` keeps `records` and `retained`, and gains `readonly graph: RecomputationGraph<ReadResult<unknown>>` in place of `resolvers`, `serverDependents`, `markedRoots`, and change 4's `observed`. `store.ts` imports `graph.ts`; `graph.ts` imports nothing back.
+
+- Reads. `readStoreValue` calls `context.readInput(recordInput(root))` on every read, and `context.readInput(valueInput(root, key))` when the record is present. Every reader of any key on a record also read the record's presence, so a deletion reports one input instead of the record's keys, including keys read while absent, which the store cannot enumerate. `readResolver` checks presence the same way, returns `MissingData` with no node for an absent record, and otherwise calls `context.readNode(resolverNode(root, storeKey), () => ({ owner: recordInput(root), computation }))`, where `computation` closes over the artifact, `root`, and the variables and calls change 2's `compute`.
+- Writes. `writeValue` calls `markChanged(store.graph, [valueInput(owner, key)])` after `record.set`; creating a record calls `markChanged(store.graph, [recordInput(record)])`; `garbageCollect` calls `deleteInput(store.graph, recordInput(record))` per deleted record, then `collect(store.graph)`.
+- Roots. `normalize` calls `track` for the new retention's node, then `settle`, then `retainRoot`; `dispose` calls the cleanup `retainRoot` returned. `listen` is `observe` and `snapshot` is `valueOf`, at `resolverNode(location.record, location.storeKey)`.
+
+What moves out of the store into the engine: `Store.resolvers` (now `graph.nodes`), `Store.serverDependents` and `RecordDependents` (now `graph.inputDependents`, one flat map), `Store.markedRoots`, `Store.observed`, `ResolverEntry` (now `GraphNode`, whose `location`, `artifact`, and `variables` live in the closure `computation`), `Dependency` (now `GraphDependency`), and `StoreChange` with `dependentsOf` (the store translates each change into input ids at the write). The store keeps only server data and retentions.
+
+### What the store must do
+
+Two obligations, and nothing else couples the engine to the store:
+
+- Report every read. Each read a computation makes goes through the read path that calls `readInput` with `recordInput` and `valueInput` of the location read. For a layered store this is the effective location: one input per (record, store key), whichever layer answered.
+- Report every effective change. After an operation that changes what a read would return, the store calls `markChanged` with every input whose effective value changed, and `deleteInput` for each record whose effective presence went from present to absent (from absent to present is `markChanged` of its `recordInput`). It may report more: an input reported but unchanged costs a recomputation that cuts off by `===` or recomputes to an equal result. It must not report fewer: an unreported change is a stale result with no error. Settlement runs after the operation and before notification.
+
+For the layered store of Later's optimistic writes:
+
+- A write to the topmost layer that holds a key reports it when `isUnchanged` (change 1) rejects it against the previous effective value. A write to a layer that a higher layer shadows at that key reports nothing.
+- Adding a layer reports each key it holds whose value differs from the previous effective value, and each record it creates.
+- Removing a layer reports each key the removed layer, or a layer re-executed above it, wrote whose effective value differs after the removal, and `deleteInput` for each record that existed only in the removed layer. This is upstream's `compareData` (`optimisticProxy.ts:506-544`) at store key granularity instead of record granularity, comparing by change 1's AST shape: each layer keeps the `WrittenValue` of every key it wrote, so a list of scalars compares element by element. Without that, `===` reports every list of scalars, which is correct and costs recomputation.
+
+### Lifetime still follows records
+
+A node's `owner` is the `recordInput` of the record it was computed on. `deleteInput(graph, recordInput(record))` marks every reader of the record `Dirty` (every reader of any key on it read its presence), marks the dependents of every node the record owns `Dirty`, and disposes those nodes. This is what change 2's `RecordDeleted` does with `dependentsOf` followed by deleting the record's resolver entries, without the engine knowing what a record is. A dependent marked `Dirty` re-reads, finds the record absent, and records `recordInput` with no node, as `readResolver` does today; the `Check` walk never reaches a disposed node, because its only dependents were marked `Dirty`, not `Check`.
+
+components-in-userland.md says a closure field's wrapper is "stored on the record, and freed with it". "Stored on the record" already does not hold literally under held open decision 4 (a): entries live in `store.resolvers` beside the records, keyed by record. Under this option it holds as "keyed by the record": the wrapper is the value of the node `resolverNode(record, storeKey)` in `graph.nodes`. "Freed with the record" holds through `owner`: deleting the record calls `deleteInput` with its `recordInput`, which disposes the wrapper's node. The wrapper's computation reads only the record's presence (its `createWrapper` receives no data), so no write recomputes it while the record lives.
+
+### Costs
+
+- An id per read. Each server read in a computation builds two strings (`recordInput`, `valueInput`) and each resolver read one (`resolverNode`; `resolverStoreKey` is built today too), and `setDependencies` does one `Map` lookup per id. Today the same reads are three nested `Map` lookups with no string built. The order of growth is the same; the string building is the extra, and it is not measured. An interned object per (entity, id, store key) avoids the string but needs an intern table, whose entries need the same lifetime rule as `inputDependents` (deleted when no node reads them), so it is `inputDependents` again under a second name; the string is held.
+- A presence edge per (node, record read): one more `inputDependents` set member than today for a node that read a present record.
+- A map lookup instead of a field: a node no longer sits in a per-record map, so deleting a record finds its nodes through `owned`, one more map kept by node creation and disposal.
+- The casts in the three id functions.
+
+What it buys: the engine has no import from the store, so a layered store, another record layout, or an input that is not server data (a client-only value, a clock) is an `InputId` and two calls. R8 becomes the store's obligation above, stated once, instead of a property of `normalize`. The engine is testable with literal ids.
+
+## Values with lifecycles
+
+Status: design analysis, held options, not decided. Nothing in changes 1 to 4 produces a value with a lifecycle; this lands with the first feature that does (Follow-ups 1, 2, 4), and changes 1 to 4 must not preclude it.
+
+A stored result can be a handle: a value with a constructor and a destructor, reference-counted, the `ItemCleanupPair<T>` shape of `@isograph/disposable-types` (`isograph-disposable-types/index.ts:2`). Examples: a client pointer's follow-up query (Follow-ups 2), a handle a retain returns (Follow-ups 4), a closure component whose wrapper holds a subscription. 3b handles them if the engine owns each node's value lifecycle: a node acquires its value when it computes, and releases it when the value is replaced or the node is disposed.
+
+### The hook
+
+A node's computation is created with a kind; the engine cannot tell an `ItemCleanupPair` from a plain array value at run time, so the kind comes from compiler-written data (the artifact's kind), not from the returned value.
+
+```ts
+// from libs/isograph-runtime/src/graph.ts
+export type Computation<TValue> = PlainComputation<TValue> | DisposableComputation<TValue>;
+
+/** A computation whose value holds nothing to release. */
+export type PlainComputation<TValue> = {
+  readonly kind: 'Plain';
+  compute(context: ComputeContext<TValue>): TValue;
+};
+
+/** A computation whose value can hold a resource. */
+export type DisposableComputation<TValue> = {
+  readonly kind: 'Disposable';
+  compute(context: ComputeContext<TValue>): Constructed<TValue>;
+};
+
+/** `Constructed`: the constructor ran; the engine calls the cleanup exactly once.
+ * `NotConstructed`: nothing was acquired (the data read was `MissingData`, or the constructor threw). */
+export type Constructed<TValue> =
+  | { readonly kind: 'Constructed'; readonly pair: ItemCleanupPair<TValue> }
+  | { readonly kind: 'NotConstructed'; readonly value: TValue };
+
+/** What a node holds. */
+export type Holding<TValue> =
+  | { readonly kind: 'Value'; readonly value: TValue }
+  | { readonly kind: 'Resource'; readonly pair: ItemCleanupPair<TValue> };
+```
+
+These types replace Coupling to the store's `Computation<TValue>`. `GraphNode.value` becomes `holding: Holding<TValue>`; the node's value is `holding.value` or `holding.pair[0]`. `RecomputationGraph` gains `readonly pendingReleases: CleanupFn[]`, the cleanups of replaced and disposed values not yet run, and:
+
+```ts
+// from libs/isograph-runtime/src/graph.ts
+/** Runs and empties `pendingReleases` in order; then rethrows one error, or an `AggregateError` of several. */
+export function flushReleases<TValue>(graph: RecomputationGraph<TValue>): void;
+```
+
+For the runtime, a resolver whose artifact is disposable reads its data as any resolver does; on `Ok` it calls the constructor with the data and returns `Constructed` with `[ok(handle), cleanup]`; on `MissingData` it returns `NotConstructed`.
+
+Contract on a constructor: a constructor that can return a `===` value on two calls (a handle deduplicated by key) reference-counts it, so each pair's cleanup releases only its own retain. Follow-ups 5's registry is that count; each holding node holds one retain.
+
+### Replacement and release
+
+`recompute` of a `Disposable` node, after `setDependencies`:
+
+1. The computation runs, so the new value is constructed before anything is released. A shared resource reached again (the same follow-up for the same target) gets a second retain, not a teardown and a rebuild.
+2. When the new value is `valuesEqual` to the old (`===` for `Ok`), the node keeps its old holding, and the new pair's cleanup runs at once: it drops the second retain while the first still holds the resource, and no observer sees a change. Dependents are not marked: R4's cutoff works for handles deduplicated by key.
+3. Otherwise the node holds the new holding, the old pair's cleanup is pushed to `pendingReleases`, and dependents are marked `Dirty`, as change 2's `recompute` does.
+
+Disposing a node (`collect`, `deleteInput`) pushes its pair's cleanup to `pendingReleases`. `normalize` runs `settle`, then `notify`, then `flushReleases`; `garbageCollect` runs `flushReleases` at its end.
+
+Ordering guarantees:
+
+- A constructor runs inside its node's computation, so after every input it reads is current (R3), and at most once per node per write.
+- A new value is constructed before the old one is released.
+- No value is released while a node holds it.
+- A replaced or disposed value is released after every observer of that settlement was notified, so a `snapshot` in a callback never returns a released value, and each cleanup runs exactly once, in the order the values were replaced or disposed.
+- Under React, release after notification is not late enough: a concurrent render can still be on screen showing the old value until the commit of the re-render. The engine's retain is one retain among others. The React package takes its own retain on the handle it renders: a temporary retain at render, converted to a permanent retain at commit, and released when the component unmounts or commits a newer value (network-and-subscriptions.md, the two-phase lifetime; `CacheItem.temporaryRetain`, `CacheItem.ts:195-256`, and `permanentRetainIfNotDisposed`, `:114-193`). The handle is destroyed when the engine's release and React's both happened, so a committed tree never holds a destroyed handle. The handle the constructor returns is therefore retainable by others: a `CacheItem`, or an entry of a registry that counts retains as network-and-subscriptions.md change 7's `RequestEntry` does.
+
+Garbage collection: `collect` and `deleteInput` dispose nodes, which releases their values. Under held open decision 11 (a), a node no root reaches keeps its value until the next `garbageCollect`, and under 3b it is not recomputed until then: a pointer node whose target moved keeps its old follow-up alive until collection. That is Follow-ups 7's batched destruction; 11 (b) would release at the release of the last root instead.
+
+### Failures
+
+A constructor that throws. Options:
+
+- (a) The node's value becomes `ResolverThrew` (open decision 5 (a)), held as `NotConstructed`; the old value is released through `pendingReleases`, as any replacement; dependents are marked `Dirty`. Held. Reason: `setDependencies` has already recorded the new computation's reads, so a node that kept its old value would hold a value that no recorded input explains, and it would stay stale until one of the new inputs changes.
+- (b) Keep the old holding and value, and record the error elsewhere. Cost: the stale value above, and a second place an error lives.
+- (c) Propagate out of `normalize`. Cost: open decision 5 (b)'s, every retained query left unsettled.
+
+A destructor that throws. Options:
+
+- (a) `flushReleases` runs every remaining cleanup, then rethrows one error as is or several as an `AggregateError`, open decision 9's rule; `normalize` combines them with `notify`'s errors into one `AggregateError` when both threw. The node is unaffected: it dropped the value before the cleanup ran. Held.
+- (b) Stop at the first throw. Cost: later resources leak.
+
+A cleanup is never called twice by the engine; a handle's own second-call throw (`CacheItem.ts:125-130`) is not reachable from it.
+
+### Relation to Follow-ups 1 to 7
+
+- 1, constructors and destructors: the `Disposable` computation is the constructor, at the node's first computation in settlement; the cleanup is the destructor, run when the node's value is replaced or the node is disposed. "The last handle referencing that entry" is the handle's own count: the engine holds one retain per holding node, React holds its own.
+- 2, client pointer and follow-up query: the pointer's node returns `[ok(handle), cleanup]` for the follow-up of its target. A recomputation that returns another id constructs the new follow-up and then releases the old one after notification; the parent retention's `dispose` releases it through `collect`.
+- 3, a pointer whose target it read: no lifecycle; it removes the follow-up instead.
+- 4, handles: the node's value is the handle; `snapshot` returns it, a lookup, readable during render.
+- 5, deduplication: under R6, two retained queries that reach the same pointer on the same record already share one node, so the key Follow-ups 5 names (the record, the selectable, the variables) is the node's id and needs no registry. Sharing across different nodes (two pointers that return the same target) needs a key of the follow-up itself: the target link, the target fragment's selectable, and its variables. A recomputation to a new target constructs under the new key.
+- 6, a destructor and an in-flight follow-up: the deferred release calls the follow-up's cleanup, which aborts its request through the `AbortSignal` the network function accepts.
+- 7, deferral: `flushReleases` is the batch. It can be handed to the caller-supplied scheduler instead of run at the end of `normalize`, and a handle released and retained again before the batch runs is not destroyed, because the second retain reached it first. A constructor that defers its own setup returns the handle at once and schedules the rest; the engine sees only the pair.
 
 ## Steps
 
@@ -359,8 +643,10 @@ Each change is one commit, in order. Step A is optional and independent of 1 to 
 - Step A. Re-read every subscription after each write, upstream's mechanism, with v1's `read`. No memoization.
 - 1. `Store` becomes an object, leaf selections in the normalization AST record their list depth, and `normalize` skips an unchanged value (prefactor).
 - 2. Stored resolver results: `read` stores each resolver's result with its dependencies and their inverse; `normalize` and `garbageCollect` mark the entries that read what they changed; a read brings a marked entry up to date (3b).
-- 3. Level 1: `normalize` retains its query, computes the entries its entrypoint reaches, and settles every retained query after each write. `garbageCollect` reads the retained queries from the store and deletes unreached entries.
+- 3. Level 1: `normalize` retains its query, computes the entries its entrypoint reaches, and after each write settles the marked roots (the retained and observed entries the write marked), not every retained query. `garbageCollect` reads the retained queries from the store and deletes unreached entries.
 - 4. Level 2: `listen` and `snapshot`, called after settlement.
+
+Under Coupling to the store's held option (open decision 12), change 2 becomes two commits: 2a, `graph.ts`, the engine over opaque `InputId`s and `NodeId`s, importing nothing from the store or the reader; 2b, the store's side (`recordInput`, `valueInput`, `resolverNode`, the read path calling `readInput` and `readNode`, `writeValue` and record creation calling `markChanged`, `garbageCollect` calling `deleteInput` and `collect`), with `Store.resolvers` and `Store.serverDependents` replaced by `Store.graph`. Change 3's `rootCount` and `markedRoots` and change 4's observers are the engine's (`retainRoot`, `settle`, `observe`, `valueOf`, `notify`). Values with lifecycles (open decision 13) adds no change here: it is a later change, with the first feature that produces a disposable value, and adds `Disposable` computations, `holding`, `pendingReleases`, and `flushReleases` to the engine.
 
 ## Step A: re-read every subscription after each write
 
@@ -1348,19 +1634,53 @@ A resolver entry is live while a retention's `location` or an observed location 
 
 Depends on the held architecture (3b).
 
+Settlement does not visit every retained root. Marking already produces the set of entries a write made stale, and a root that reaches a stale entry is itself marked (change 2, Marking, the invariant), so settlement iterates the marked entries that are roots.
+
 ```ts
-// from libs/isograph-runtime/src/settle.ts
-/** Brings the resolver result at every retained location, then at every observed location, up to date. */
-function settle(store: Store, retentions: Iterable<Retention<unknown>>): void;
+// from libs/isograph-runtime/src/store.ts
+export type ResolverEntry = {
+  // .. change 2's fields, and:
+  /** The retentions whose `location` is this entry's, plus the callbacks `listen` holds at it. */
+  rootCount: number;
+};
+
+export type Store = {
+  // .. change 2's fields, and:
+  /** Every entry with `rootCount > 0` whose `state` is not `Clean`. */
+  readonly markedRoots: Set<ResolverEntry>;
+};
 ```
 
-`normalize` passes `store.retained` and the new retention. Each retained location is read with `readResolver(store, retention.artifact, retention.location.record, retention.variables)`; each observed location with `bringUpToDate` of its stored entry when one is stored. Change 2's `bringUpToDate` gives the order (Ordering), and an entry reached from several roots is brought up to date once. After `settle` returns, every entry a retained or observed location reaches is `Clean`, which is what change 4 reads.
+```ts
+// from libs/isograph-runtime/src/settle.ts
+/** Computes `added`'s root entry, then brings every entry in `store.markedRoots` up to date. */
+function settle(store: Store, added: Retention<unknown>): void {
+  readResolver(store, added.artifact, added.location.record, added.variables);
+  [...store.markedRoots].forEach((entry) => bringUpToDate(store, entry));
+}
+```
 
-The entries a new retention reaches are computed here, children before parents: the root's computation reads each `Resolver` node through `readResolver`, which computes the child first. This is the bottom-up order the user's design creates them in on the way back up the response (Resolver markers, below).
+Change 2's marking adds a root to the set when it leaves `Clean`, and `bringUpToDate` removes it when it ends `Clean`:
 
-A `normalize` that changed nothing marked nothing, and settlement returns at the first check of each root.
+```ts
+// from libs/isograph-runtime/src/mark.ts
+// markDirty and markCheck, after `entry.state = ..`:
+  if (entry.rootCount > 0) {
+    store.markedRoots.add(entry);
+  }
+// bringUpToDate, after `entry.state = 'Clean'`:
+  store.markedRoots.delete(entry);
+```
 
-Cost: `O(R)` to visit the roots, plus the marked entries they reach and their edges, plus the recomputations. Upstream walks every subscription too (`subscribe.ts:67`) and re-reads the overlapping ones in full (`:117`).
+`markDirty` and `markCheck` take `store` for this. `rootCount` is written by `normalize` (increment, after settlement created the entry), `dispose` (decrement), `listen` and its stop function (change 4; increment and decrement when the entry is stored), and `createEntry`, which starts it at the retentions and callbacks already at its location; a change of `rootCount` from 0 adds a marked entry to `markedRoots`, and one to 0 removes it. The spread copies the set before the walk, because `bringUpToDate` deletes from it.
+
+The entries a new retention reaches are computed here, children before parents: the root's computation reads each `Resolver` node through `readResolver`, which computes the child first. This is the bottom-up order the user's design creates them in on the way back up the response (Resolver markers, below). Change 2's `bringUpToDate` gives the order of the rest (Ordering), and an entry reached from several marked roots is brought up to date once; the later roots find it `Clean`. After `settle` returns, every entry a retained or observed location reaches is `Clean`, which is what change 4 reads.
+
+A `normalize` that changed nothing marked nothing, so `markedRoots` is empty and settlement visits only the new retention's root.
+
+Cost: `O(marked roots)` to start, plus the marked entries they reach and their edges, plus the recomputations; nothing per unmarked root. `Check` marks above an unchanged result are cleared by this walk (Candidate 3b, Why `Check` marks exist). Upstream walks every subscription (`subscribe.ts:67`) and re-reads the overlapping ones in full (`:117`).
+
+A scheduler (Follow-ups 9) chooses which of `store.markedRoots` each pass settles; an entry it leaves stays in the set, marked.
 
 ### Eager computation
 
@@ -1472,7 +1792,7 @@ An observer keeps its entry current (settlement brings observed locations up to 
 
 - `@component`: a component is a resolver result, stored and settled like any other; a mounted component observes its own entry.
 - Client pointers, `@loadable`, refetch queries (reader-ast.md, Later): each adds entries or retentions, and the markers of normalization-ast-mount-markers.md.
-- Optimistic writes: a layer of server entries that settlement reads through.
+- Optimistic writes: a layer of server entries that settlement reads through. What the layered store must report to the recomputation engine is Coupling to the store, What the store must do.
 
 ## Follow-ups
 
@@ -1558,7 +1878,7 @@ What it needs:
 
 Fit with each candidate:
 
-- 3b (held): marking is already separate from bringing up to date. Laziness is "mark only, and skip `bringUpToDate`, for entries whose observed count is zero". Deferral is "the scheduler decides when `bringUpToDate` runs for which roots". Neither adds a state beyond the count and the priority.
+- 3b (held): marking is already separate from bringing up to date. Laziness is "mark only, and skip `bringUpToDate`, for entries whose observed count is zero". Deferral is "the scheduler chooses which entries of `markedRoots` (change 3, Settlement) each pass brings up to date"; the set already holds exactly the roots a write made stale, with their priority added. Neither adds a state beyond the count and the priority.
 - 2: laziness is native, because nothing is verified until demanded, and deferral is the scheduler choosing when to verify which roots. Each deferred pass still walks every live edge under its roots.
 - 3a and 3c: neither has a lazy mode. Skipping an unobserved entry leaves it stale with no record that it is stale, so it needs a mark, which is 3b's state. Height order across priorities needs one bucket queue per priority.
 - 4: Preact already keeps unsubscribed computeds lazy and defers effects to the end of a batch; priority would be added to its effect queue.
@@ -1587,7 +1907,7 @@ Not decided: the user's choice.
 ### 3. Eager computation for retained queries nobody renders
 
 - (a) Every retained query is settled after every write (held; the user's goal: renders do no work).
-- (b) Only roots that have an observer are settled; a retained root without one keeps its marks and is brought up to date when `listen` attaches, in the subscribe call, not in render. Cost: the first render of a newly observed location can get a stale `snapshot` before `listen` runs. Under 3b this is settlement iterating `store.observed` only; under 3a it is not expressible.
+- (b) Only roots that have an observer are settled; a retained root without one keeps its marks and is brought up to date when `listen` attaches, in the subscribe call, not in render. Cost: the first render of a newly observed location can get a stale `snapshot` before `listen` runs. Under 3b this is `rootCount` counting observers only, so `markedRoots` holds only observed entries; under 3a it is not expressible.
 - (c) Per retention, a choice between (a) and (b). Cost: an option on `normalize`.
 
 ### 4. Where resolver entries live
@@ -1640,3 +1960,21 @@ Not held: the user's choice.
 
 - (a) By `garbageCollect`'s sweep (held, change 3). Under 3b such an entry costs a mark per relevant write and no recomputation until then. Matches v1's caller-driven collection and Follow-ups 7's deferral.
 - (b) By reference count: an entry's count is the retentions and observers at its location plus `dependents.size`; `dispose`, the stop function of `listen`, and `setDependencies` decrement it, and at zero the entry is deleted and `setDependencies(store, entry, [])` decrements its dependencies in turn. Cost: a count kept on three paths, and deletion in the middle of a write. It is what constructors and destructors need (Follow-ups 1).
+
+### 12. Coupling of the recomputation engine to the store
+
+The analysis is Coupling to the store.
+
+- (a) A store-agnostic engine over opaque `InputId`s and `NodeId`s (held). The store reports every read through `readInput` and every effective change through `markChanged` and `deleteInput`; nodes are owned by their record's presence input, so they are freed with the record. Cost: two id strings per server read and one per resolver read, a presence edge per (node, record read), and the `owned` map.
+- (b) Change 2 as written: entries and dependents keyed by record and store key in `Store.resolvers` and `Store.serverDependents`. Cost: the engine names records and store keys, and a layered store must translate its changes into `StoreChange`s over the base layer's shape, which has no case for removing a layer.
+
+Not decided: the user's choice.
+
+### 13. Values with lifecycles
+
+The analysis is Values with lifecycles.
+
+- (a) The engine owns each node's value lifecycle (held): `Disposable` computations return an `ItemCleanupPair`; a new value is constructed before the old is released; releases are deferred until after notification and flushed in order; a `===` value keeps the old holding and releases the new retain at once. A constructor that throws stores `ResolverThrew` and releases the old value (held); a destructor that throws does not stop the flush, and the errors are rethrown together (held).
+- (b) Lifecycles outside the engine: a disposable value lives in a registry the resolver's code calls, and the engine stores only the handle. Cost: nothing releases a handle when the node's value is replaced or the node is disposed, so the registry needs its own reachability, which is the engine's again.
+
+Not decided: the user's choice.
