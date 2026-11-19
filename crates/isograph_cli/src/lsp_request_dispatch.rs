@@ -1,15 +1,17 @@
 use std::ops::ControlFlow;
 
-use lsp_server::{
-    ErrorCode, Request as ServerRequest, RequestId as ServerRequestId, Response, ResponseError,
-};
+use lsp_server::{ErrorCode, ResponseError};
 use lsp_types::request::Request;
+use prelude::Postfix;
 use serde_json::Value;
 
 use crate::event::LspRequest;
 use isograph_compiler::ClientId;
 
 use isograph_lsp::lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult};
+
+/// The `result` or the `error` of a response.
+pub type ResponseBody = Result<Value, ResponseError>;
 
 pub struct LSPRequestDispatch<'state, TState> {
     client: ClientId,
@@ -34,30 +36,22 @@ impl<'state, TState> LSPRequestDispatch<'state, TState> {
     pub fn on_request_sync<TRequest: Request>(
         self,
         handler: fn(&TState, ClientId, TRequest::Params) -> LSPRuntimeResult<TRequest::Result>,
-    ) -> ControlFlow<Response, Self> {
-        if self.request.method == TRequest::METHOD {
-            let id = self.request.id.clone();
-            match extract_request_params::<TRequest>(self.request) {
-                Ok((request_id, params)) => {
-                    let response =
-                        handler(self.state, self.client, params).and_then(|handler_result| {
-                            serde_json::to_value(handler_result).map_err(|_err| {
-                                LSPRuntimeError::UnexpectedError(
-                                    "Unable to serialize request response".to_string(),
-                                )
-                            })
-                        });
-                    let server_response = convert_to_lsp_response(request_id, response);
-
-                    return ControlFlow::Break(server_response);
-                }
-                Err(error) => {
-                    return ControlFlow::Break(convert_to_lsp_response(id, Err(error)));
-                }
-            }
+    ) -> ControlFlow<ResponseBody, Self> {
+        if self.request.method != TRequest::METHOD {
+            return ControlFlow::Continue(self);
         }
-
-        ControlFlow::Continue(self)
+        ControlFlow::Break(
+            extract_request_params::<TRequest>(self.request)
+                .and_then(|params| handler(self.state, self.client, params))
+                .and_then(|handler_result| {
+                    serde_json::to_value(handler_result).map_err(|_err| {
+                        LSPRuntimeError::UnexpectedError(
+                            "Unable to serialize request response".to_string(),
+                        )
+                    })
+                })
+                .map_or_else(runtime_error_body, Value::wrap_ok),
+        )
     }
 
     pub fn request(self) -> lsp_server::Request {
@@ -65,38 +59,19 @@ impl<'state, TState> LSPRequestDispatch<'state, TState> {
     }
 }
 
-pub(crate) fn convert_to_lsp_response(
-    id: ServerRequestId,
-    result: LSPRuntimeResult<serde_json::Value>,
-) -> Response {
-    match result {
-        Ok(result) => Response {
-            id,
-            result: Some(result),
-            error: None,
-        },
-        Err(LSPRuntimeError::ExpectedError) => Response {
-            id,
-            result: Some(Value::Null),
-            error: None,
-        },
-        Err(runtime_error) => {
-            let response_error: Option<ResponseError> = runtime_error.into();
-            let response_error = response_error.unwrap_or_else(|| ResponseError {
-                code: ErrorCode::UnknownErrorCode as i32,
-                message: "Request Canceled".to_string(),
-                data: None,
-            });
-            Response {
-                id,
-                result: None,
-                error: Some(response_error),
-            }
+fn runtime_error_body(error: LSPRuntimeError) -> ResponseBody {
+    match error {
+        LSPRuntimeError::ExpectedError => Value::Null.wrap_ok(),
+        LSPRuntimeError::UnexpectedError(message) => ResponseError {
+            code: ErrorCode::UnknownErrorCode as i32,
+            message,
+            data: None,
         }
+        .wrap_err(),
     }
 }
 
-fn extract_request_params<R>(req: ServerRequest) -> LSPRuntimeResult<(ServerRequestId, R::Params)>
+fn extract_request_params<R>(req: lsp_server::Request) -> LSPRuntimeResult<R::Params>
 where
     R: Request,
 {
@@ -104,6 +79,7 @@ where
         req.extract(R::METHOD)
             .expect("extract_request_params: could not extract request params")
     })
+    .map(|(_id, params)| params)
     .map_err(|err| {
         LSPRuntimeError::UnexpectedError(format!("panic in the `extract_request_params`: {err:?}"))
     })
@@ -191,8 +167,8 @@ mod tests {
 
     #[test]
     fn test_extract_request_params_error() {
-        let request_id = ServerRequestId::from("test-id".to_string());
-        let request = ServerRequest {
+        let request_id = lsp_server::RequestId::from("test-id".to_string());
+        let request = lsp_server::Request {
             id: request_id,
             method: "textDocument/codeAction".to_string(),
             params: json!({

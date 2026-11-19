@@ -183,9 +183,7 @@ fn dispatch_lsp_request<TProfile: CompilationProfile>(
         ControlFlow::Continue(request)
     };
     match get_response() {
-        ControlFlow::Break(response) => {
-            send_lsp_response(&mut state.live_sessions, after, response_body(response))
-        }
+        ControlFlow::Break(body) => send_lsp_response(&mut state.live_sessions, after, body),
         ControlFlow::Continue(request) => {
             method_not_found(&mut state.live_sessions, after, request)
         }
@@ -195,7 +193,7 @@ fn dispatch_lsp_request<TProfile: CompilationProfile>(
 fn send_lsp_response(
     sessions: &mut crate::event::LiveSessions,
     after: crate::event::AfterCompute,
-    body: Result<serde_json::Value, lsp_server::ResponseError>,
+    body: crate::lsp_request_dispatch::ResponseBody,
 ) -> Vec<IsographEffect> {
     let Some(send) = sessions.after_compute(after, body) else {
         return no_effects();
@@ -221,21 +219,6 @@ fn method_not_found(
         }
         .wrap_err(),
     )
-}
-
-fn response_body(
-    response: lsp_server::Response,
-) -> Result<serde_json::Value, lsp_server::ResponseError> {
-    match (response.result, response.error) {
-        (Some(value), None) => value.wrap_ok(),
-        (_, Some(error)) => error.wrap_err(),
-        (None, None) => lsp_server::ResponseError {
-            code: lsp_server::ErrorCode::UnknownErrorCode as i32,
-            data: None,
-            message: "LSP response has neither result nor error".to_owned(),
-        }
-        .wrap_err(),
-    }
 }
 
 fn handle_internal_event<TProfile: CompilationProfile>(

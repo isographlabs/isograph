@@ -1040,7 +1040,6 @@ dependencies = [
  "isograph_compiler",
  "isograph_extract_typescript",
  "isograph_parser",
- "lsp-server",
  "lsp-types",
  "pico",
  "pico_macros",
