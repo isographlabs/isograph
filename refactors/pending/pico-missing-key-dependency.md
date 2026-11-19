@@ -1,751 +1,15 @@
-# pico records dependencies on missing keys
+# pico depends on missing keys through absent nodes
 
-A memo that reads a key from a tracked map depends on the value held by that key, an `Option<V>`. A hit and a miss are the same kind of dependency. Inserting the key (`None` to `Some`), removing it (`Some` to `None`), or replacing its value with an unequal one re-invokes the readers of that key and no other memo. A key that stays absent stays equal, and its readers do not re-invoke. Iterating the map is a separate dependency on the map's entries.
+Every keyed read of a source or singleton inside a memo records a dependency on that key, whether a source is set there or not. A read of a missing key creates an absent node at that key. Setting the key later is a change to that node, and the reader re-runs. Removing a source turns its node into an absent node, which is also a change. `tracked()` on a `#[tracked]` map is for iteration only.
 
-pico provides this as a map type, `TrackedMap<K, V>`, on a `#[tracked_map]` database field. It replaces `#[tracked]` and its `View` / `MutView` / `Counter`. Source `get` / `set` / `remove` keep their upstream semantics, including a vacant `set` not advancing the epoch (upstream 21d671d7).
+## How pico works, and where this fits
 
-## Problem in the current code
+pico.md has the depth: sections "Source", "Memo", "Equality and backdating", "Tracked maps", and "Garbage collection". This section is the minimum needed to read the design.
 
-- `View::tracked()` reads the field's counter with `get_singleton` (`crates/pico/src/view.rs:29-32`). `Storage::get_impl` returns `None` before registering a dependency when the key has no node (`crates/pico/src/database.rs:134-140`; the `?` is on line 135). A singleton is a source whose key is the hash of its `TypeId` (`crates/pico_macros/src/singleton_macro.rs:10-23`), so the same path applies.
-- The counter does not exist until the first `MutView::tracked()` (`crates/pico/src/view.rs:67-74`), which writes `C::default()` when `get_singleton` returns `None`. That first write is a vacant `set_source`, which inserts with `time_updated: current_epoch` and does not advance the epoch (`crates/pico/src/database.rs:352-358`). A memo that read the map `tracked()` before that write recorded nothing, and `node_verified_in_current_epoch` (`database.rs:258-263`) or an empty dependency list makes the next call reuse the stale result.
-- `MutView::tracked()` writes `counter + 1` on every call (`view.rs:67-74`), whether or not the caller then changes the map. An insert of an already-present path or a remove of an absent path re-invokes every memo that read the map `tracked()`.
-- A keyed `untracked()` lookup that misses records nothing. pico.md and AGENTS.md make every memo author pair it with a `tracked()` read on the miss, which depends on every key of the map. `TypeScriptHostLanguage::extract_iso_literals` does this (`crates/isograph_extract_typescript/src/lib.rs:68-71`). `IsographDb::disk_file` does not (`crates/isograph_compiler/src/database.rs:67-70`), so a memo that calls it on a missing path is stale after the file appears.
-- `missing_then_present_extracts` (`crates/isograph_extract_typescript/src/lib.rs:556-567`) inserts an unrelated `src/b.ts` first so the counter exists before the miss.
-
-## Design
-
-Each `TrackedMap` field owns pico source nodes in the database's existing source storage (`source_node_key_to_index: DashMap<Key, Index<SourceNode>>` and `source_nodes: BoxcarVec<Option<SourceNode>>`, `crates/pico/src/database.rs:72,76`):
-
-- One slot per key, a `TrackedMapSlot<M, K, V>` whose value is `Option<V>`. Its `Key` is the hash of `TypeId::<TrackedMapSlot<M, K, V>>` and `K`, the same scheme `#[derive(Source)]` uses (`crates/pico_macros/src/source_macro.rs:49-58`). `M` is a marker type that `#[derive(Db)]` generates per field, so two maps with the same `K` and `V` have different slot keys.
-- One entries node, a `TrackedMapEntries<M>` singleton holding a generation number.
-
-Reads go through `&Db` and create a missing node. Writes go through `&mut Db` and the public `Database::set`.
-
-- `get(&key)` reads K's slot. If the slot does not exist, `get` inserts it holding `None` and stamped with the current epoch, then registers the dependency. The slot is a present node with value `None` from then on.
-- `iter()` reads the entries node the same way, inserting it if it does not exist, then iterates the field's `HashMap`.
-- `insert(key, value)` writes the `HashMap`. If the entry changed (it was absent or held an unequal value), it `set`s K's slot to `value.wrap_some()` and `set`s the entries node to the next generation.
-- `remove(&key)` removes from the `HashMap`. If the key was present, it `set`s K's slot to `None` and the entries node to the next generation.
-
-### Why creation during a read is invisible
-
-The reader registers `Dependency { node_to: NodeKind::Source(slot_key), time_verified_or_updated: current_epoch }` (`database.rs:109-121`). Verification asks `source_node_changed_since(slot_key, since)`, which is `time_updated > since` for a present node (`crates/pico/src/execute_memoized_function.rs:202-207`). The new slot's `time_updated` is the current epoch, which equals the reader's `since`, so the slot reads as unchanged. Creation does not advance the epoch, so `node_verified_in_current_epoch` of every other memo is unaffected. No other memo can depend on a node that did not exist. The same stamping is what `intern_value` does for a node it creates during a read (`database.rs:402-419`).
-
-A missing slot means the key was never in the map: every change to an entry `set`s that key's slot (below), and the `HashMap` is a private field that only `TrackedMapMutView` writes. So a slot that a read creates always holds `None`, and that is the key's true value.
-
-### Why a write re-invokes exactly the readers of K
-
-- A slot that a reader created exists. `insert` of K `set`s it from `None` to `Some(value)`. That is the Occupied-unequal arm of `set_source` (`database.rs:340-347`): the epoch advances and the slot's `time_updated` is the new epoch, which is greater than every reader's `since`. Readers of K re-invoke. Readers of other keys hold dependencies on other slots, whose `time_updated` did not change.
-- A slot nobody read and nobody wrote does not exist. `insert` of that key is a vacant `set` (`database.rs:352-358`): no epoch bump, which is correct because no memo depends on it.
-- `remove` `set`s the slot to `None`: Occupied-unequal, the epoch advances. The slot is kept, so there are no tombstones and `source_node_changed_since`'s `None => true` arm is never reached for a slot.
-- An `insert` of a value equal to the present one, or a `remove` of an absent key, does not `set` anything. The epoch does not advance and nothing re-invokes. The map never `set`s a slot to an equal value, so the Occupied-equal arm's `source_node.time_updated = self.current_epoch` (`database.rs:348-350`) is not reached for slots.
-- A `SourceId` value whose source is re-`set` with new contents is the same `SourceId`. The map entry is unchanged, no slot is written, and readers that `db.get` the id re-invoke through the source's own node.
-
-### Entries node
-
-`iter()` depends on the entries node. Every changed entry advances its generation: a new key, a removed key, or an unequal value at a present key (the iterator yields values, so a changed value is a changed result). An equal re-insert does not. The node is created by the first `iter()` or the first changed write, whichever is first, so a memo that iterates before any write records a dependency on an existing node, and the first insert after that is an Occupied-unequal `set` that re-invokes it. The never-written-counter hole cannot occur.
-
-### Interior mutability
-
-Creating a node during a read uses `DashMap::entry` on `source_node_key_to_index` and `boxcar::Vec::push` on `source_nodes`. Both are already written through `&self` during memo execution: `insert_source_node` takes `&self` (`database.rs:319-321`), and `intern_value` inserts into `derived_node_id_to_revision` through `&self` (`database.rs:396-419`). No new primitive. `Storage` is `!Sync` because `DependencyStack` is a `RefCell` (`crates/pico/src/dependency.rs:55`), so these are single-thread writes.
-
-### Memory and garbage collection
-
-Source nodes are not garbage collected (`crates/pico/src/garbage_collection.rs:21`; `add_dependencies_to_queue` skips `NodeKind::Source`, `garbage_collection.rs:136-137`). A slot exists for every key ever read through `get` or ever inserted, and lives as long as the database. A slot is one `DashMap` entry and one boxed `TrackedMapSlot { key: K, value: Option<V> }`. For `disk_file_map` that is an interned path plus a `SourceId` per path ever seen, including paths an LSP request asked about that never existed. A memo collected by GC loses its dependency list, not the slot. The next call re-creates the memo and reads the existing slot.
-
-`V` is stored twice for a key that has a slot: in the field's `HashMap` (for `iter`) and in the slot (for `get` and the equality check). For a `SourceId` value that is a `Copy` key.
-
-## End-user experience
-
-A memo author calls `get` for a key and `iter` for the whole map. There is no tracked/untracked choice. A miss is safe.
-
-```rust
-// from crates/isograph_extract_typescript/src/lib.rs
-    #[memo]
-    fn extract_iso_literals(
-        db: &IsographDb<Self>,
-        path: RelativePathToSourceFile,
-    ) -> Option<Vec<IsoLiteralExtraction<Self>>> {
-        let contents = db.disk_file(path)?.contents.reference();
-        // ... unchanged
-    }
-```
-
-- `extract_iso_literals(db, path)` on a missing path returns `None`. Inserting a `DiskFile` at another path does not re-invoke it. Inserting a `DiskFile` at `path` re-invokes it, and it returns `Some`.
-- Re-saving an unchanged file re-invokes nothing (`set` of an equal `DiskFile`, `database.rs:348-350`; the map entry is the same `SourceId`).
-- A compile memo that iterates `get_disk_file_map().iter()` re-invokes when a file is added or removed, and not when one file's contents change (that is a dependency on that `DiskFile`, read through `db.get`).
-
-## Changes
-
-Three changes. Change 1 is pico only and changes nothing for existing users. Change 2 migrates i2. Change 3 deletes `#[tracked]`.
-
-1. pico: `TrackedMap`, `TrackedMapView`, `TrackedMapMutView`, `Storage::get_or_insert`, and `#[tracked_map]`.
-2. i2: `disk_file_map` becomes `#[tracked_map]`; every call site migrates.
-3. pico: delete `#[tracked]`, `View`, `MutView`, `Counter`, and the `tracking_field` tests.
-
-## Change 1: `TrackedMap` in pico
-
-### `crates/pico/src/tracked_map.rs` (new)
-
-```rust
-// from crates/pico/src/tracked_map.rs
-use std::{
-    any::TypeId,
-    collections::{HashMap, hash_map},
-    hash::{DefaultHasher, Hash, Hasher},
-    marker::PhantomData,
-};
-
-use prelude::Postfix;
-
-use crate::{Database, Key, Projector, ProjectorMut, Singleton, Source};
-
-/// A map on a `#[tracked_map]` database field.
-#[derive(Debug)]
-pub struct TrackedMap<K, V>(HashMap<K, V>);
-
-impl<K, V> Default for TrackedMap<K, V> {
-    fn default() -> Self {
-        Self(HashMap::new())
-    }
-}
-
-/// Read access to a `TrackedMap` field whose marker is `M`.
-pub struct TrackedMapView<'a, Db: Database, M, T> {
-    db: &'a Db,
-    projector: Projector<Db, T>,
-    phantom: PhantomData<M>,
-}
-
-impl<'a, Db: Database, M, T> TrackedMapView<'a, Db, M, T> {
-    pub fn new(db: &'a Db, projector: Projector<Db, T>) -> Self {
-        Self {
-            db,
-            projector,
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<'a, Db: Database, M: 'static, K: Hash + Eq + Clone + 'static, V: PartialEq + 'static>
-    TrackedMapView<'a, Db, M, TrackedMap<K, V>>
-{
-    /// The value held by `key`. The caller depends on that value, present or absent, and on no other key.
-    pub fn get(&self, key: &K) -> Option<&'a V> {
-        self.db
-            .get_storage()
-            .get_or_insert(TrackedMapSlot::<M, K, V>::source_key(key), || TrackedMapSlot {
-                key: key.clone(),
-                value: None,
-                phantom: PhantomData,
-            })
-            .value
-            .as_ref()
-    }
-
-    /// Every entry. The caller depends on the entries: a new key, a removed key, or an unequal value at a present key.
-    pub fn iter(&self) -> hash_map::Iter<'a, K, V> {
-        self.db.get_storage().get_or_insert(
-            TrackedMapEntries::<M>::get_singleton_key(),
-            TrackedMapEntries::<M>::initial,
-        );
-        (self.projector)(self.db).0.iter()
-    }
-}
-
-/// Write access to a `TrackedMap` field whose marker is `M`.
-pub struct TrackedMapMutView<'a, Db: Database, M, T> {
-    db: &'a mut Db,
-    projector: ProjectorMut<Db, T>,
-    phantom: PhantomData<M>,
-}
-
-impl<'a, Db: Database, M, T> TrackedMapMutView<'a, Db, M, T> {
-    pub fn new(db: &'a mut Db, projector: ProjectorMut<Db, T>) -> Self {
-        Self {
-            db,
-            projector,
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<Db: Database, M: 'static, K: Hash + Eq + Clone + 'static, V: Clone + PartialEq + 'static>
-    TrackedMapMutView<'_, Db, M, TrackedMap<K, V>>
-{
-    /// Inserts `value` at `key` and returns the previous value.
-    pub fn insert(self, key: K, value: V) -> Option<V> {
-        let previous = (self.projector)(self.db)
-            .0
-            .insert(key.clone(), value.clone());
-        if previous.as_ref() != value.reference().wrap_some() {
-            set_slot::<Db, M, K, V>(self.db, key, value.wrap_some());
-        }
-        previous
-    }
-
-    /// Removes `key` and returns its value.
-    pub fn remove(self, key: &K) -> Option<V> {
-        let previous = (self.projector)(self.db).0.remove(key)?;
-        set_slot::<Db, M, K, V>(self.db, key.clone(), None);
-        previous.wrap_some()
-    }
-}
-
-fn set_slot<Db: Database, M: 'static, K: Hash + PartialEq + 'static, V: PartialEq + 'static>(
-    db: &mut Db,
-    key: K,
-    value: Option<V>,
-) {
-    db.set(TrackedMapSlot::<M, K, V> {
-        key,
-        value,
-        phantom: PhantomData,
-    });
-    let entries = db
-        .get_singleton::<TrackedMapEntries<M>>()
-        .map_or(TrackedMapEntries::initial(), TrackedMapEntries::next);
-    db.set(entries);
-}
-
-/// The value held by one key of the `TrackedMap` whose marker is `M`.
-pub(crate) struct TrackedMapSlot<M, K, V> {
-    key: K,
-    value: Option<V>,
-    phantom: PhantomData<M>,
-}
-
-impl<M: 'static, K: Hash + 'static, V: 'static> TrackedMapSlot<M, K, V> {
-    fn source_key(key: &K) -> Key {
-        let mut hasher = DefaultHasher::new();
-        TypeId::of::<Self>().hash(&mut hasher);
-        key.hash(&mut hasher);
-        Key::from(hasher.finish())
-    }
-}
-
-impl<M: 'static, K: Hash + 'static, V: 'static> Source for TrackedMapSlot<M, K, V> {
-    fn get_key(&self) -> Key {
-        Self::source_key(self.key.reference())
-    }
-}
-
-impl<M, K: PartialEq, V: PartialEq> PartialEq for TrackedMapSlot<M, K, V> {
-    fn eq(&self, other: &Self) -> bool {
-        self.key == other.key && self.value == other.value
-    }
-}
-
-/// The generation of the entries of the `TrackedMap` whose marker is `M`.
-pub(crate) struct TrackedMapEntries<M> {
-    generation: u64,
-    phantom: PhantomData<M>,
-}
-
-impl<M> TrackedMapEntries<M> {
-    fn initial() -> Self {
-        Self {
-            generation: 0,
-            phantom: PhantomData,
-        }
-    }
-
-    fn next(&self) -> Self {
-        Self {
-            generation: self.generation.wrapping_add(1),
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<M: 'static> Singleton for TrackedMapEntries<M> {
-    fn get_singleton_key() -> Key {
-        let mut hasher = DefaultHasher::new();
-        TypeId::of::<Self>().hash(&mut hasher);
-        Key::from(hasher.finish())
-    }
-}
-
-impl<M: 'static> Source for TrackedMapEntries<M> {
-    fn get_key(&self) -> Key {
-        Self::get_singleton_key()
-    }
-}
-
-impl<M> PartialEq for TrackedMapEntries<M> {
-    fn eq(&self, other: &Self) -> bool {
-        self.generation == other.generation
-    }
-}
-```
-
-`PartialEq` is written by hand on `TrackedMapSlot` and `TrackedMapEntries` because `#[derive(PartialEq)]` would bound `M: PartialEq`, and the marker carries no data.
-
-`TrackedMapSlot` and `TrackedMapEntries` are `pub(crate)`. `Database::set` and `get_singleton` are generic, so pico instantiates them with crate-private types.
-
-### `Storage::get_or_insert` (new, `crates/pico/src/database.rs`)
-
-```rust
-// from crates/pico/src/database.rs
-impl<Db: Database> Storage<Db> {
-    /// The source at `key`, after inserting `make_source()` there if `key` has no node. Registers a dependency either way. An inserted node's `time_updated` is the current epoch. `make_source` runs while `source_node_key_to_index` holds the entry's shard lock, so it must not read the database.
-    pub(crate) fn get_or_insert<T: DynEq>(&self, key: Key, make_source: impl FnOnce() -> T) -> &T {
-        if let Entry::Vacant(vacant_entry) = self.internal.source_node_key_to_index.entry(key) {
-            vacant_entry.insert(self.internal.insert_source_node(SourceNode {
-                time_updated: self.internal.current_epoch,
-                value: make_source().boxed(),
-            }));
-        }
-        self.get_impl(key).expect(
-            "get_or_insert inserted a node at this key if it had none. \
-            This is indicative of a bug in Pico.",
-        )
-    }
-}
-```
-
-`get_impl` (`database.rs:134-152`) is unchanged; it registers `NodeKind::Source(key)` with the node's `time_updated` and downcasts.
-
-### `crates/pico/src/lib.rs`
-
-Before:
-
-```rust
-// from crates/pico/src/lib.rs
-mod source;
-mod view;
-mod with_serialize;
-
-pub use source::*;
-pub use view::*;
-pub use with_serialize::*;
-```
-
-After:
-
-```rust
-// from crates/pico/src/lib.rs
-mod source;
-mod tracked_map;
-mod view;
-mod with_serialize;
-
-pub use source::*;
-pub use tracked_map::*;
-pub use view::*;
-pub use with_serialize::*;
-```
-
-### `crates/pico/Cargo.toml`
-
-Add `prelude = { path = "../prelude" }` under `[dependencies]`. `prelude` has no dependencies (`crates/prelude/Cargo.toml`). Open decision 3 covers this.
-
-### `#[derive(Db)]`
-
-`crates/pico_macros/src/lib.rs` before:
-
-```rust
-// from crates/pico_macros/src/lib.rs
-#[proc_macro_derive(Db, attributes(tracked))]
-pub fn db(input: TokenStream) -> TokenStream {
-    db_macro::db_macro(input)
-}
-```
-
-After:
-
-```rust
-// from crates/pico_macros/src/lib.rs
-#[proc_macro_derive(Db, attributes(tracked, tracked_map))]
-pub fn db(input: TokenStream) -> TokenStream {
-    db_macro::db_macro(input)
-}
-```
-
-`crates/pico_macros/src/db_macro.rs` before (lines 6-96):
-
-```rust
-// from crates/pico_macros/src/db_macro.rs
-pub(crate) fn db_macro(item: TokenStream) -> TokenStream {
-    struct TrackedField {
-        field_ident: syn::Ident,
-        field_ty: Type,
-    }
-
-    let input = parse_macro_input!(item as ItemStruct);
-
-    let fields = match &input.fields {
-        syn::Fields::Named(named) => named,
-        _ => {
-            return syn::Error::new_spanned(&input.fields, "#[db] requires named fields")
-                .to_compile_error()
-                .into();
-        }
-    };
-
-    let struct_ident = input.ident.clone();
-    let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
-
-    let mut tracked = Vec::new();
-    let mut errors = Vec::new();
-
-    for f in fields.named.iter() {
-        let field_ident = f.ident.as_ref().unwrap();
-        if has_attr(&f.attrs, "tracked") {
-            if !matches!(f.vis, Visibility::Inherited) {
-                errors.push(
-                    syn::Error::new(
-                        f.vis.span(),
-                        "fields marked `#[tracked]` must be private (remove any `pub` visibility)",
-                    )
-                    .to_compile_error(),
-                );
-            }
-            tracked.push(TrackedField {
-                field_ident: field_ident.clone(),
-                field_ty: f.ty.clone(),
-            });
-        }
-    }
-
-    if !errors.is_empty() {
-        return quote! { #(#errors)* }.into();
-    }
-
-    let mut struct_impl = Vec::new();
-    let mut aux_struct_defs = Vec::new();
-
-    for TrackedField {
-        field_ident,
-        field_ty,
-    } in tracked
-    {
-        let counter_ident =
-            format_ident!("{}Counter", field_ident.to_string().to_case(Case::Pascal));
-        let proj_ident = format_ident!(
-            "{}_PROJECTOR",
-            field_ident.to_string().to_case(Case::UpperSnake)
-        );
-        let proj_ident_mut = format_ident!(
-            "{}_PROJECTOR_MUT",
-            field_ident.to_string().to_case(Case::UpperSnake)
-        );
-        let get_ident = format_ident!("get_{field_ident}");
-        let get_ident_mut = format_ident!("get_{field_ident}_mut");
-
-        aux_struct_defs.push(quote! {
-            #[derive(Clone, Copy, Default, PartialEq, Eq, Hash, ::pico_macros::Singleton)]
-            pub struct #counter_ident(u64);
-            impl ::pico::Counter for #counter_ident {
-                #[inline]
-                fn increment(self) -> Self { Self(self.0.wrapping_add(1)) }
-            }
-        });
-
-        struct_impl.push(quote! {
-            const #proj_ident: ::pico::Projector<#struct_ident #type_generics, #field_ty> = |db: &#struct_ident #type_generics| &db.#field_ident;
-            const #proj_ident_mut: ::pico::ProjectorMut<#struct_ident #type_generics, #field_ty> = |db: &mut #struct_ident #type_generics| &mut db.#field_ident;
-
-            #[inline]
-            pub fn #get_ident(&self) -> ::pico::View<'_, #struct_ident #type_generics, #field_ty, #counter_ident> {
-                ::pico::View::new(self, Self::#proj_ident)
-            }
-
-            #[inline]
-            pub fn #get_ident_mut(&mut self) -> ::pico::MutView<'_, #struct_ident #type_generics, #field_ty, #counter_ident> {
-                ::pico::MutView::new(self, Self::#proj_ident_mut)
-            }
-        });
-    }
-```
-
-After (the rest of the function, from `let output = quote! {` on, is unchanged):
-
-```rust
-// from crates/pico_macros/src/db_macro.rs
-pub(crate) fn db_macro(item: TokenStream) -> TokenStream {
-    enum TrackedFieldKind {
-        Tracked,
-        TrackedMap,
-    }
-
-    struct TrackedField {
-        field_ident: syn::Ident,
-        field_ty: Type,
-        kind: TrackedFieldKind,
-    }
-
-    let input = parse_macro_input!(item as ItemStruct);
-
-    let fields = match &input.fields {
-        syn::Fields::Named(named) => named,
-        _ => {
-            return syn::Error::new_spanned(&input.fields, "#[db] requires named fields")
-                .to_compile_error()
-                .into();
-        }
-    };
-
-    let struct_ident = input.ident.clone();
-    let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
-
-    let mut tracked = Vec::new();
-    let mut errors = Vec::new();
-
-    for f in fields.named.iter() {
-        let field_ident = f.ident.as_ref().unwrap();
-        let kind = match (has_attr(&f.attrs, "tracked"), has_attr(&f.attrs, "tracked_map")) {
-            (false, false) => continue,
-            (true, false) => TrackedFieldKind::Tracked,
-            (false, true) => TrackedFieldKind::TrackedMap,
-            (true, true) => {
-                errors.push(
-                    syn::Error::new(
-                        f.span(),
-                        "a field is marked `#[tracked]` or `#[tracked_map]`, not both",
-                    )
-                    .to_compile_error(),
-                );
-                continue;
-            }
-        };
-        if !matches!(f.vis, Visibility::Inherited) {
-            errors.push(
-                syn::Error::new(
-                    f.vis.span(),
-                    "fields marked `#[tracked]` or `#[tracked_map]` must be private (remove any `pub` visibility)",
-                )
-                .to_compile_error(),
-            );
-        }
-        tracked.push(TrackedField {
-            field_ident: field_ident.clone(),
-            field_ty: f.ty.clone(),
-            kind,
-        });
-    }
-
-    if !errors.is_empty() {
-        return quote! { #(#errors)* }.into();
-    }
-
-    let mut struct_impl = Vec::new();
-    let mut aux_struct_defs = Vec::new();
-
-    for TrackedField {
-        field_ident,
-        field_ty,
-        kind,
-    } in tracked
-    {
-        let proj_ident = format_ident!(
-            "{}_PROJECTOR",
-            field_ident.to_string().to_case(Case::UpperSnake)
-        );
-        let proj_ident_mut = format_ident!(
-            "{}_PROJECTOR_MUT",
-            field_ident.to_string().to_case(Case::UpperSnake)
-        );
-        let get_ident = format_ident!("get_{field_ident}");
-        let get_ident_mut = format_ident!("get_{field_ident}_mut");
-
-        let projectors = quote! {
-            const #proj_ident: ::pico::Projector<#struct_ident #type_generics, #field_ty> = |db: &#struct_ident #type_generics| &db.#field_ident;
-            const #proj_ident_mut: ::pico::ProjectorMut<#struct_ident #type_generics, #field_ty> = |db: &mut #struct_ident #type_generics| &mut db.#field_ident;
-        };
-
-        match kind {
-            TrackedFieldKind::Tracked => {
-                let counter_ident =
-                    format_ident!("{}Counter", field_ident.to_string().to_case(Case::Pascal));
-
-                aux_struct_defs.push(quote! {
-                    #[derive(Clone, Copy, Default, PartialEq, Eq, Hash, ::pico_macros::Singleton)]
-                    pub struct #counter_ident(u64);
-                    impl ::pico::Counter for #counter_ident {
-                        #[inline]
-                        fn increment(self) -> Self { Self(self.0.wrapping_add(1)) }
-                    }
-                });
-
-                struct_impl.push(quote! {
-                    #projectors
-
-                    #[inline]
-                    pub fn #get_ident(&self) -> ::pico::View<'_, #struct_ident #type_generics, #field_ty, #counter_ident> {
-                        ::pico::View::new(self, Self::#proj_ident)
-                    }
-
-                    #[inline]
-                    pub fn #get_ident_mut(&mut self) -> ::pico::MutView<'_, #struct_ident #type_generics, #field_ty, #counter_ident> {
-                        ::pico::MutView::new(self, Self::#proj_ident_mut)
-                    }
-                });
-            }
-            TrackedFieldKind::TrackedMap => {
-                let marker_ident =
-                    format_ident!("{}Marker", field_ident.to_string().to_case(Case::Pascal));
-
-                aux_struct_defs.push(quote! {
-                    pub struct #marker_ident;
-                });
-
-                struct_impl.push(quote! {
-                    #projectors
-
-                    #[inline]
-                    pub fn #get_ident(&self) -> ::pico::TrackedMapView<'_, #struct_ident #type_generics, #marker_ident, #field_ty> {
-                        ::pico::TrackedMapView::new(self, Self::#proj_ident)
-                    }
-
-                    #[inline]
-                    pub fn #get_ident_mut(&mut self) -> ::pico::TrackedMapMutView<'_, #struct_ident #type_generics, #marker_ident, #field_ty> {
-                        ::pico::TrackedMapMutView::new(self, Self::#proj_ident_mut)
-                    }
-                });
-            }
-        }
-    }
-```
-
-`get` / `iter` / `insert` / `remove` exist only when the field type is `TrackedMap<K, V>`, because they are on `impl ... TrackedMapView<'a, Db, M, TrackedMap<K, V>>`. A `#[tracked_map]` field of another type compiles, and its view has no methods; the first call site fails with "no method named `get`". The macro does not parse the field type.
-
-`f.span()` needs `syn::spanned::Spanned`, already imported (`db_macro.rs:4`).
-
-### Change 1 tests
-
-`crates/pico/tests/tests.rs` gains:
-
-```rust
-// from crates/pico/tests/tests.rs
-mod tracked_map {
-    mod entries;
-    mod garbage_collection;
-    mod keyed;
-    mod source_id_values;
-}
-```
-
-Every test owns its memos and its `static` `AtomicUsize` counters, so tests run in parallel without the `RUN_SERIALLY` mutex some existing pico tests use. Counting executions of a memo body with a `static AtomicUsize` is the existing pico test pattern (`crates/pico/tests/basic.rs:6`); open decision 2 covers it. `pico`'s `[dev-dependencies]` needs nothing new: `prelude` is a dependency after change 1.
-
-Shared fixture shape (each file declares its own copy, as existing pico test files do):
-
-```rust
-// from crates/pico/tests/tracked_map/keyed.rs
-use std::sync::atomic::{AtomicUsize, Ordering};
-
-use pico::{Database, Storage, TrackedMap};
-use pico_macros::{Db, Source, memo};
-use prelude::Postfix;
-
-#[derive(Db, Default)]
-struct TestDatabase {
-    storage: Storage<Self>,
-    #[tracked_map]
-    map: TrackedMap<&'static str, String>,
-    #[tracked_map]
-    other_map: TrackedMap<&'static str, String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Source)]
-struct Input {
-    #[key]
-    key: &'static str,
-    value: String,
-}
-
-static MISSING_THEN_INSERTED: AtomicUsize = AtomicUsize::new(0);
-
-#[memo]
-fn missing_then_inserted_reader(db: &TestDatabase, key: &'static str) -> Option<String> {
-    MISSING_THEN_INSERTED.fetch_add(1, Ordering::SeqCst);
-    db.get_map().get(key.reference()).cloned()
-}
-
-#[test]
-fn missing_then_inserted_reruns() {
-    let mut db = TestDatabase::default();
-    assert_eq!(*missing_then_inserted_reader(&db, "a"), None);
-    db.get_map_mut().insert("a", "x".to_string());
-    assert_eq!(
-        *missing_then_inserted_reader(&db, "a"),
-        "x".to_string().wrap_some()
-    );
-    assert_eq!(MISSING_THEN_INSERTED.load(Ordering::SeqCst), 2);
-}
-```
-
-An unrelated epoch advance in these tests is `db.set(Input { key: "unrelated", value })` with a value unequal to the previous one; the first `set` of that key is vacant and does not advance the epoch, so a test that needs an advance `set`s it twice with different values.
-
-`tracked_map/keyed.rs` (one `reader` memo per test, shaped like `missing_then_inserted_reader`, with its own counter):
-
-- `missing_then_inserted_reruns`: above.
-- `first_read_creates_slot_without_rerun`: read `"a"` (1 run, `None`). Read again in the same epoch: 1 run. Advance the epoch with an unrelated `Input`; read: 1 run, `None`.
-- `missing_and_still_missing_across_epochs_does_not_rerun`: read `"a"` (`None`). Advance the epoch three times with unrelated `Input` sets, reading after each: 1 run total.
-- `unrelated_insert_does_not_rerun`: read `"a"` (`None`). Insert `"b"`; read `"a"`: 1 run, `None`.
-- `insert_reruns_only_readers_of_that_key`: read `"a"`, `"b"`, `"c"` (3 runs, each `None`). Insert `"b"`. Read all three: 4 runs; `"b"` is `Some("x")`, `"a"` and `"c"` are `None`.
-- `present_then_removed_reruns`: insert `"a"`; read (1 run, `Some`); remove `"a"`; read: 2 runs, `None`.
-- `removed_then_reinserted_equal_reruns`: insert `"a"` = `"x"`; read; remove; read (`None`); insert `"a"` = `"x"`; read: 3 runs, `Some("x")`.
-- `equal_reinsert_does_not_rerun`: insert `"a"` = `"x"`; read (1 run); insert `"a"` = `"x"`; read: 1 run. `insert` returns `"x".to_string().wrap_some()`.
-- `unequal_reinsert_reruns`: insert `"a"` = `"x"`; read; insert `"a"` = `"y"`; read: 2 runs, `Some("y")`.
-- `remove_of_absent_key_does_not_rerun`: read `"a"` (`None`); remove `"a"` (returns `None`); read: 1 run.
-- `same_key_in_two_maps_does_not_interfere`: a reader of `map` at `"a"` and a reader of `other_map` at `"a"`, both `None`. Insert `"a"` into `other_map`. The `map` reader: 1 run, `None`. The `other_map` reader: 2 runs, `Some`.
-- `read_outside_a_memo_then_insert`: call `db.get_map().get(&"a")` from the test (no memo on the stack; returns `None`). Then a memo reads `"a"` (1 run); insert `"a"`; read: 2 runs, `Some`.
-- `same_missing_key_twice_in_one_memo`: the memo reads `"a"` twice and returns both. Insert `"a"`: 2 runs, both `Some`.
-- `parent_of_a_missing_reader_reruns`: a parent memo returns `reader(db, "a").clone()`. Call the parent (1 parent run, `None`). Insert `"a"`. Call the parent: 2 parent runs, `Some`. Call a second parent of the same `reader` that was first called before the insert: it returns `Some` (the child's `time_updated` advanced with its changed value).
-
-`tracked_map/entries.rs` (an `iterating` memo returns `db.get_map().iter().map(|(key, value)| (*key, value.clone())).collect::<Vec<_>>()` sorted by key, with its own counter per test):
-
-- `iteration_before_any_write_then_insert_reruns`: iterate an empty map (1 run, empty). Insert `"a"`. Iterate: 2 runs, one entry. This is the never-written-counter case.
-- `iteration_reruns_on_new_key`: insert `"a"`; iterate; insert `"b"`; iterate: 2 runs, two entries.
-- `iteration_reruns_on_remove`: insert `"a"`, `"b"`; iterate; remove `"a"`; iterate: 2 runs, one entry.
-- `iteration_reruns_on_unequal_value`: insert `"a"` = `"x"`; iterate; insert `"a"` = `"y"`; iterate: 2 runs.
-- `iteration_does_not_rerun_on_equal_reinsert`: insert `"a"` = `"x"`; iterate; insert `"a"` = `"x"`; iterate: 1 run.
-- `iteration_does_not_rerun_on_remove_of_absent_key`: insert `"a"`; iterate; remove `"b"`; iterate: 1 run.
-- `keyed_read_does_not_rerun_on_iteration_change`: insert `"a"`; a keyed reader of `"a"` (1 run); insert `"b"`; read `"a"`: 1 run.
-
-`tracked_map/source_id_values.rs` (the map is `TrackedMap<&'static str, SourceId<Input>>`):
-
-- `source_reset_reruns_through_the_source`: `set` an `Input` `"a"` = `"x"` and insert its id at `"a"`. A `contents` memo does `db.get_map().get(&key).map(|id| db.get(*id).value.clone())`; a `has_id` memo returns `db.get_map().get(&key).is_some()`. Both run once. `set` `Input` `"a"` = `"y"` (same id). `contents`: 2 runs, `Some("y")`. `has_id`: 1 run.
-- `source_reset_equal_does_not_rerun`: as above, then `set` `Input` `"a"` = `"x"` again. `contents`: 1 run.
-- `insert_of_same_id_does_not_rerun`: `set` `Input` `"a"` and insert its id; read; `set` `Input` `"a"` = `"y"` and insert the same id again (the `insert_disk_file` shape). The `has_id` reader: 1 run. An iterating memo: 1 run.
-
-`tracked_map/garbage_collection.rs` (the database uses `Storage::new_with_capacity(1.try_into().unwrap())`, as `crates/pico/tests/garbage_collection/basic_gc.rs:333` does):
-
-- `collected_reader_of_missing_key_sees_insert`: reader of `"a"` (1 run, `None`); call an unrelated memo so the LRU holds only that; `run_garbage_collection`; insert `"a"`; reader of `"a"`: 2 runs, `Some`.
-- `retained_reader_of_missing_key_sees_insert`: reader of `"a"` (1 run, `None`) is the last top-level call; `run_garbage_collection`; reader of `"a"` again: 1 run (retained, slot unchanged); insert `"a"`; reader: 2 runs, `Some`. The slot and the dependency survived collection.
-- `remove_after_collection`: insert `"a"`; reader (1 run, `Some`); `run_garbage_collection` with the reader retained; remove `"a"`; reader: 2 runs, `None`.
-
-## Change 2: migrate `disk_file_map`
-
-`disk_file_map` is the only tracked field in i2 (`grep -rn '#\[tracked\]' crates` outside pico finds `crates/isograph_compiler/src/database.rs:14` only). Its values are `SourceId<DiskFile>`, and `DiskFile`'s `#[key]` is `path`, the map key (`database.rs:31-36`). Re-grep `get_disk_file_map` before implementing: `crates/isograph_cli` is being edited concurrently, so its line numbers below may have moved.
-
-### `crates/isograph_compiler/src/database.rs`
-
-Before (lines 11-70):
+A source is input data. `handle` writes it with `db.set`. Its identity is its `#[key]` field. `#[derive(Source)]` hashes the type's `TypeId` plus the key field into a `Key` (`crates/pico_macros/src/source_macro.rs:49-58`). `db.set` returns a `SourceId<T>`, which is that `Key` plus `PhantomData<T>` (`crates/pico/src/source.rs:16-20`, `crates/pico/src/database.rs:157-162`). Pass the `SourceId` to `db.get(id)` and you get `&T` back. A singleton is a source whose key is the hash of its `TypeId` alone, read with `db.get_singleton::<T>()`, which returns `Option<&T>` (`crates/pico_macros/src/singleton_macro.rs:10-23`, `database.rs:130-132`).
 
 ```rust
 // from crates/isograph_compiler/src/database.rs
-#[derive(Debug, Db)]
-pub struct IsographDb<THostLanguage: HostLanguage> {
-    storage: Storage<Self>,
-    #[tracked]
-    disk_file_map: DiskFileMap,
-    phantom_data: PhantomData<THostLanguage>,
-}
-
-impl<THostLanguage: HostLanguage> Default for IsographDb<THostLanguage> {
-    fn default() -> Self {
-        Self {
-            storage: Storage::default(),
-            disk_file_map: DiskFileMap::default(),
-            phantom_data: PhantomData,
-        }
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct DiskFileMap(pub HashMap<RelativePathToSourceFile, SourceId<DiskFile>>);
-
 #[derive(Debug, Clone, PartialEq, Eq, Source)]
 pub struct DiskFile {
     #[key]
@@ -761,23 +25,921 @@ impl<THostLanguage: HostLanguage> IsographDb<THostLanguage> {
             .0
             .insert(path, source_id);
     }
+}
+```
 
-    pub fn remove_disk_file(&mut self, path: RelativePathToSourceFile) {
-        if let Some(source_id) = self.get_disk_file_map_mut().tracked().0.remove(&path) {
-            self.remove(source_id);
+A memo is a `#[memo]` function of `&db` and parameters. pico caches its result per (function, parameters) as a derived node (`crates/pico/src/execute_memoized_function.rs:58-104`).
+
+A memo records dependencies while it runs. Each `db.get` / `get_singleton` inside it calls `get_impl`, which registers `NodeKind::Source(key)` together with that node's `time_updated` (`database.rs:134-140`). Each nested memo call registers `NodeKind::Derived(id)` (`execute_memoized_function.rs:99-102`). The recorded `Dependency` stores the epoch the read happened in, `time_verified_or_updated: current_epoch` (`database.rs:109-121`).
+
+An epoch is a counter in the database (`crates/pico/src/epoch.rs:5-20`, `database.rs:78`). It advances when `set` replaces a source with an unequal value (`database.rs:340-347`) and when `remove` removes one (`database.rs:362-373`). Every source node carries `time_updated`, the epoch it last changed in (`source.rs:80-84`).
+
+A later call of a memo verifies before it reuses (`execute_memoized_function.rs:71-98`):
+
+```text
+already verified in the current epoch          -> reuse                     (database.rs:258-263)
+else, for each dependency recorded in an older epoch:
+  source:  node.time_updated > since ?           (execute_memoized_function.rs:202-207)
+  derived: verify that memo first, then compare  (execute_memoized_function.rs:209-248)
+any changed -> re-run the body; if the new value == the old value, keep the old time_updated (backdating, execute_memoized_function.rs:162-174)
+none changed -> reuse
+```
+
+A `#[tracked]` field (`disk_file_map`, `open_file_map`) is a plain `HashMap<key, SourceId<_>>` on the database plus a generated counter singleton (`DiskFileMapCounter`, `crates/pico_macros/src/db_macro.rs:73-80`). `View::tracked()` reads the counter, which depends on every key of the map (`crates/pico/src/view.rs:29-32`). `MutView::tracked()` writes counter + 1 (`view.rs:67-74`). `untracked()` reads the field with no dependency (`view.rs:42-44`). The i2 rule today: on a hit, `untracked()` lookup then `db.get(source_id)`, which depends on that one source. On a miss, `tracked()`, which depends on the counter. Iteration uses `tracked()`. `extract_iso_literals` is the shape (`crates/isograph_extract_typescript/src/lib.rs:68-71`).
+
+The gap: `get_impl` returns at `get_source_node(key)?` (`database.rs:135`) before it registers anything, so a read of a missing key records nothing. A tracked-on-miss read of a counter that has never been written records nothing either, because the counter is itself a missing key. Concretely in i2: on a database where no `DiskFile` was ever inserted, `lsp_semantic_tokens_for_file(path)` reaches `extract_iso_literals(path)`, which misses in the map and reads `DiskFileMapCounter`, which does not exist. The memo stores `None` with no dependencies. The first `insert_disk_file` is two vacant `set`s (the `DiskFile` and the counter), and neither advances the epoch (`database.rs:352-358`). The next semantic tokens request finds the memo verified in the current epoch and returns the stale `None`. The same happens to `file_contents` (`crates/isograph_compiler/src/database.rs:65-80`) before any client has opened any buffer: the first `set_open_file` is seen by nothing, and the memo keeps returning disk text. After an absent node exists for the missing key (or for the counter), the first `set` of that key is a change from absent to present, the epoch advances, and the reader re-runs.
+
+## Design
+
+### `SourceNode` can be absent
+
+The node storage is `source_node_key_to_index: DashMap<Key, Index<SourceNode>>` plus `source_nodes: BoxcarVec<Option<SourceNode>>` (`database.rs:72,76`). Today `remove_source` drops the key from the map and `take`s the boxcar slot, leaving `None` there (`database.rs:362-373`). After this change nothing removes a key or empties a slot. Absence moves into the node, and the boxcar `Option` goes away.
+
+Before:
+
+```rust
+// external isograph/crates/pico/src/source.rs
+#[derive(Debug)]
+pub struct SourceNode {
+    pub time_updated: Epoch,
+    pub value: Box<dyn DynEq>,
+}
+```
+
+After:
+
+```rust
+// from crates/pico/src/source.rs
+#[derive(Debug)]
+pub struct SourceNode {
+    pub time_updated: Epoch,
+    /// The source set at this key, or `None` when no source is set at it.
+    pub value: Option<Box<dyn DynEq>>,
+}
+
+impl SourceNode {
+    pub(crate) fn present(time_updated: Epoch, value: Box<dyn DynEq>) -> Self {
+        Self {
+            time_updated,
+            value: value.wrap_some(),
         }
     }
 
-    pub fn remove_disk_files_from_path(&mut self, path: RelativePathToSourceFile) {
-        let ids: Vec<_> = self
-            .get_disk_file_map_mut()
-            .tracked()
-            .0
-            .extract_if(|key, _| key.as_ref().starts_with(path.as_ref()))
-            .map(|(_, source_id)| source_id)
-            .collect();
-        for source_id in ids {
-            self.remove(source_id);
+    pub(crate) fn absent(time_updated: Epoch) -> Self {
+        Self {
+            time_updated,
+            value: None,
+        }
+    }
+}
+```
+
+`source.rs` gains `use prelude::Postfix;` (open decision 2).
+
+`InternalStorage` field, before (`database.rs:76`):
+
+```rust
+// external isograph/crates/pico/src/database.rs
+    pub(crate) source_nodes: BoxcarVec<Option<SourceNode>>,
+```
+
+After:
+
+```rust
+// from crates/pico/src/database.rs
+    pub(crate) source_nodes: BoxcarVec<SourceNode>,
+```
+
+`Storage::new_with_capacity` (`database.rs:96`) is unchanged: `BoxcarVec::new()` infers the new element type.
+
+Before/after pico snippets are labeled `// external isograph/...` because `crates/pico` and `crates/pico_macros` are byte-identical to upstream isograph today (`diff -r` against `../isograph` differs only in `crates/pico/tests/tracking_field/correctness.rs`), and pico's sources use `Some(` and `Box::new`, which the pending-doc postfix lint rejects in `// from` snippets (`crates/prelude/src/postfix_constructors.rs:48-58,134-167`).
+
+### Reads register a dependency on missing keys
+
+Before (`database.rs:134-152`):
+
+```rust
+// external isograph/crates/pico/src/database.rs
+    fn get_impl<T: 'static>(&self, key: Key) -> Option<&T> {
+        let source_node = self.internal.get_source_node(key)?;
+
+        self.register_dependency_in_parent_memoized_fn(
+            NodeKind::Source(key),
+            source_node.time_updated,
+        );
+        Some(
+            source_node
+                .value
+                .as_ref()
+                .as_any()
+                .downcast_ref::<T>()
+                .expect(
+                    "unexpected struct type. \
+            This is indicative of a bug in Pico.",
+                ),
+        )
+    }
+```
+
+After:
+
+```rust
+// from crates/pico/src/database.rs
+    fn get_impl<T: 'static>(&self, key: Key) -> Option<&T> {
+        let source_node = if self.dependency_stack.is_empty() {
+            self.internal.get_source_node(key)?
+        } else {
+            self.internal.get_or_insert_absent_source_node(key)
+        };
+
+        self.register_dependency_in_parent_memoized_fn(
+            NodeKind::Source(key),
+            source_node.time_updated,
+        );
+        source_node.value.as_ref().map(|value| {
+            value.as_ref().as_any().downcast_ref::<T>().expect(
+                "unexpected struct type. \
+                This is indicative of a bug in Pico.",
+            )
+        })
+    }
+```
+
+Callers are unchanged: `Storage::get` (`database.rs:123-128`) and `Storage::get_singleton` (`database.rs:130-132`). `Storage::get` on a `SourceId` whose node is absent still panics with its existing message, because `get_impl` returns `None` and `get` calls `expect` on it. A `SourceId` of a removed source is still a false proof (pico.md "Source"). `removing_params.rs` keeps passing: after the remove, `first_letter`'s dependency on the key is an absent node with a newer `time_updated`, the memo re-runs, and `db.get` panics.
+
+`InternalStorage` lookup functions, before (`database.rs:308-321`):
+
+```rust
+// external isograph/crates/pico/src/database.rs
+    pub fn get_source_node(&self, key: Key) -> Option<&SourceNode> {
+        let index = self.source_node_key_to_index.get(&key)?;
+        self.source_nodes
+            .get(index.idx)
+            .expect(
+                "indexes should always be valid. \
+                This is indicative of a bug in Pico.",
+            )
+            .as_ref()
+    }
+
+    pub(crate) fn insert_source_node(&self, source_node: SourceNode) -> Index<SourceNode> {
+        Index::new(self.source_nodes.push(Some(source_node)))
+    }
+```
+
+After:
+
+```rust
+// from crates/pico/src/database.rs
+    pub fn get_source_node(&self, key: Key) -> Option<&SourceNode> {
+        let index = self.source_node_key_to_index.get(&key)?;
+        self.source_node_at(index.idx).wrap_some()
+    }
+
+    /// The node at `key`, after inserting an absent node stamped with the current epoch if `key` has none.
+    pub(crate) fn get_or_insert_absent_source_node(&self, key: Key) -> &SourceNode {
+        let idx = self
+            .source_node_key_to_index
+            .entry(key)
+            .or_insert_with(|| self.insert_source_node(SourceNode::absent(self.current_epoch)))
+            .idx;
+        self.source_node_at(idx)
+    }
+
+    fn source_node_at(&self, idx: usize) -> &SourceNode {
+        self.source_nodes.get(idx).expect(
+            "indexes should always be valid. \
+            This is indicative of a bug in Pico.",
+        )
+    }
+
+    pub(crate) fn insert_source_node(&self, source_node: SourceNode) -> Index<SourceNode> {
+        Index::new(self.source_nodes.push(source_node))
+    }
+```
+
+`.idx` is read out of the `RefMut` because `Index<SourceNode>` is not `Copy`: `#[derive(Clone, Copy)]` on `Index<T>` (`crates/pico/src/index.rs:3`) bounds `T: Copy`. The `RefMut` drops at the end of the `let`, before `source_node_at`. The closure touches only `source_nodes` and `current_epoch`, not `source_node_key_to_index`, so it cannot deadlock on the shard lock that `entry` holds.
+
+Why creating the node is not a change for its reader: the reader registers `Dependency { node_to: NodeKind::Source(key), time_verified_or_updated: current_epoch }` (`database.rs:114-120`). The new node's `time_updated` is that same `current_epoch`. Verification asks `time_updated > since` (`execute_memoized_function.rs:204`), which is false. Creation does not advance the epoch, so `node_verified_in_current_epoch` (`database.rs:258-263`) of every other memo is unaffected. No other memo depends on a node that did not exist. `intern_value` stamps a node it creates during a read the same way (`database.rs:402-419`).
+
+Interior mutability: creation goes through `&self` with `DashMap::entry` on `source_node_key_to_index` and `boxcar::Vec::push` on `source_nodes`. Both are already written through `&self` during memo execution: `insert_source_node` takes `&self` (`database.rs:319-321`), `intern_value` inserts into `derived_node_id_to_revision` through `&self` (`database.rs:396-419`), and `intern_borrowed_param` pushes to `params` through `&self` (`crates/pico/src/macro_fns.rs:20-27`). No new primitive. `Storage` is `!Sync` because `DependencyStack` is a `RefCell` (`crates/pico/src/dependency.rs:55`), so these are single-thread writes. A `&SourceNode` handed out earlier stays valid across the push, because `boxcar::Vec` does not move elements.
+
+A read outside any memo does not create a node. With an empty dependency stack, `register_dependency_in_parent_memoized_fn` registers nothing (`dependency.rs:81-89`), so nothing could ever compare against the node. A node created there would only turn a later first `set` of that key from a vacant insert into an epoch advance that no memo observes. `relative_from_uri` reads `CurrentWorkingDirectory` this way, from a request handler with no memo on the stack (`crates/isograph_cli/src/adapter.rs:42-53`).
+
+### `set` over an absent node is a change
+
+Before (`database.rs:323-360`):
+
+```rust
+// external isograph/crates/pico/src/database.rs
+    /// Sets a source in the database. If there is an existing item and it does not equal
+    /// the new source, increment the current epoch.
+    fn set_source<T: DynEq>(&mut self, source: T, source_id: SourceId<T>) {
+        match self.source_node_key_to_index.entry(source_id.key) {
+            Entry::Occupied(occupied_entry) => {
+                let source_node = self
+                    .source_nodes
+                    .get_mut(occupied_entry.get().idx)
+                    .expect(
+                        "indexes should always be valid. \
+                        This is indicative of a bug in Pico.",
+                    )
+                    .as_mut()
+                    .expect(
+                        "indexes should always point to a non-empty source node. \
+                        This is indicative of a bug in Pico.",
+                    );
+                if !source_node.value.as_ref().dyn_eq(&source) {
+                    // We cannot call self.increment_epoch() because that borrows
+                    // the entire struct, but self.source_nodes is already borrowed
+                    let next_epoch = self.current_epoch.increment();
+                    *source_node = SourceNode {
+                        time_updated: next_epoch,
+                        value: Box::new(source),
+                    };
+                } else {
+                    source_node.time_updated = self.current_epoch;
+                }
+            }
+            Entry::Vacant(vacant_entry) => {
+                let index = self.insert_source_node(SourceNode {
+                    time_updated: self.current_epoch,
+                    value: Box::new(source),
+                });
+                vacant_entry.insert(index);
+            }
+        }
+    }
+```
+
+After:
+
+```rust
+// from crates/pico/src/database.rs
+    /// Sets a source in the database. If the key has a node that is absent or holds an unequal
+    /// source, increment the current epoch.
+    fn set_source<T: DynEq>(&mut self, source: T, source_id: SourceId<T>) {
+        match self.source_node_key_to_index.entry(source_id.key) {
+            Entry::Occupied(occupied_entry) => {
+                let source_node = self
+                    .source_nodes
+                    .get_mut(occupied_entry.get().idx)
+                    .expect(
+                        "indexes should always be valid. \
+                        This is indicative of a bug in Pico.",
+                    );
+                match source_node.value.as_ref() {
+                    Some(value) if value.as_ref().dyn_eq(&source) => {
+                        source_node.time_updated = self.current_epoch;
+                    }
+                    Some(_) | None => {
+                        // We cannot call self.increment_epoch() because that borrows
+                        // the entire struct, but self.source_nodes is already borrowed
+                        let next_epoch = self.current_epoch.increment();
+                        *source_node = SourceNode::present(next_epoch, source.boxed());
+                    }
+                }
+            }
+            Entry::Vacant(vacant_entry) => {
+                let index =
+                    self.insert_source_node(SourceNode::present(self.current_epoch, source.boxed()));
+                vacant_entry.insert(index);
+            }
+        }
+    }
+```
+
+- Absent to present: the `None` arm. The epoch advances, the node's `time_updated` is the new epoch, and every reader's `since` is older, so readers re-run.
+- Present and unequal: unchanged behavior.
+- Present and equal: unchanged behavior (`source_node.time_updated = self.current_epoch`, no advance). See Follow-ups for what this arm does after an unrelated epoch advance.
+- A key that has no node (no memo ever read it while missing, nobody ever set it): the `Vacant` arm, unchanged. Upstream 21d671d7 ("When setting a source in a Database, avoid incrementing the epoch if the source is identical to the previously set source") introduced this `Occupied` / `Vacant` split with a vacant insert at `current_epoch`. Its message states the intent as not advancing the epoch on an identical re-set. The vacant arm not advancing is kept because no memo can depend on a key that has no node, now that every in-memo read of a missing key creates one.
+- `set_source` loses the "indexes should always point to a non-empty source node" `expect`: a slot is never empty.
+
+### `remove` turns a present node into an absent node
+
+Before (`database.rs:362-373`):
+
+```rust
+// external isograph/crates/pico/src/database.rs
+    pub fn remove_source<T>(&mut self, id: SourceId<T>) {
+        if let Some((_, index)) = self.source_node_key_to_index.remove(&id.key) {
+            self.current_epoch.increment();
+            self.source_nodes
+                .get_mut(index.idx)
+                .expect(
+                    "indexes should always be valid. \
+                    This is indicative of a bug in Pico.",
+                )
+                .take();
+        }
+    }
+```
+
+After:
+
+```rust
+// from crates/pico/src/database.rs
+    pub fn remove_source<T>(&mut self, id: SourceId<T>) {
+        let Some(index) = self.source_node_key_to_index.get(&id.key) else {
+            return;
+        };
+        let source_node = self.source_nodes.get_mut(index.idx).expect(
+            "indexes should always be valid. \
+            This is indicative of a bug in Pico.",
+        );
+        if source_node.value.is_some() {
+            *source_node = SourceNode::absent(self.current_epoch.increment());
+        }
+    }
+```
+
+- Present: the node becomes absent, stamped with a new epoch. Readers re-run and see `None` (or, through `db.get`, panic as today).
+- Absent already: no change, no epoch advance.
+- No node: no change, no epoch advance (today the same).
+- The key stays in `source_node_key_to_index`. There is no tombstone side structure; the absent node is the record.
+
+`Storage::remove` and `Storage::remove_singleton` (`database.rs:164-173`) are unchanged.
+
+### Verification compares absent nodes like any node
+
+Before (`execute_memoized_function.rs:202-207`):
+
+```rust
+// external isograph/crates/pico/src/execute_memoized_function.rs
+fn source_node_changed_since<Db: Database>(db: &Db, key: Key, since: Epoch) -> bool {
+    match db.get_storage().internal.get_source_node(key) {
+        Some(source) => source.time_updated > since,
+        None => true,
+    }
+}
+```
+
+After:
+
+```rust
+// from crates/pico/src/execute_memoized_function.rs
+fn source_node_changed_since<Db: Database>(db: &Db, key: Key, since: Epoch) -> bool {
+    db.get_storage()
+        .internal
+        .get_source_node(key)
+        .expect(
+            "a source dependency is recorded only for a key that has a node, and source nodes \
+            are never removed. This is indicative of a bug in Pico.",
+        )
+        .time_updated
+        > since
+}
+```
+
+An absent node that is still absent compares `time_updated > since` like a present one, so a missing key that stays missing across any number of unrelated epochs does not re-run its reader. A key with no node cannot be a recorded dependency: `NodeKind::Source` is registered only by `get_impl` (`grep -rn "NodeKind::Source" crates/pico/src` finds `database.rs:138`, the match at `execute_memoized_function.rs:193`, and `garbage_collection.rs:137`), `get_impl` with a memo on the stack always finds or creates the node, and after this change no code removes a key from `source_node_key_to_index`. The `None` case is that broken invariant; open decision 3 is whether it is an `expect` or stays `true`.
+
+### Garbage collection
+
+Unchanged code. Source nodes are not collected (`crates/pico/src/garbage_collection.rs:21`; `add_dependencies_to_queue` skips `NodeKind::Source`, `garbage_collection.rs:136-137`). An absent node is a source node, so it lives as long as the database. Memory cost: one node per key that a memo ever read while missing, plus one per removed source. A node is one `DashMap` entry (`Key` and `Index`, 16 bytes plus map overhead) and one `SourceNode` (`Epoch` plus `Option<Box<dyn DynEq>>`, 24 bytes) with no heap value. Removed sources already kept their boxcar slot today (`take` leaves `None` in the `BoxcarVec`), so the new cost for them is only the retained map entry. For `disk_file_map` this is one node per path an LSP request or a memo asked about, including paths that never existed. The earlier `TrackedMap` slot design had the same cost (a slot per key ever read or inserted, see Follow-ups). A memo collected by GC loses its dependency list, not the node; the next call re-creates the memo and reads the existing node.
+
+## Memo author experience
+
+A memo reads a singleton or source key and gets `None` when nothing is set. That read is a dependency. Nothing else is required.
+
+```rust
+// from crates/pico/tests/absent_source/missing_key.rs
+#[memo]
+fn config_name(db: &TestDatabase) -> Option<String> {
+    db.get_singleton::<Config>()
+        .map(|config| config.name.clone())
+}
+```
+
+- `config_name(&db)` before any `Config` is set returns `None`.
+- `db.set(Config { name: "a".to_string() })`, then `config_name(&db)` re-runs and returns `Some("a")`. Today it returns the stale `None`.
+- `db.remove_singleton::<Config>()`, then `config_name(&db)` re-runs and returns `None`.
+- Setting or removing any other source does not re-run it.
+
+After change 3, a per-key source lookup has the same shape with no map:
+
+```rust
+// from crates/isograph_compiler/src/database.rs
+    pub fn disk_file(&self, path: RelativePathToSourceFile) -> Option<&DiskFile> {
+        self.get_if_present(DiskFile::source_id(path.reference()))
+    }
+```
+
+`tracked()` on a `#[tracked]` map stays the way to depend on the set of keys (iteration). It is no longer needed for a keyed miss.
+
+## Changes
+
+Each change ships on its own and leaves the tree green.
+
+1. pico: absent source nodes. `SourceNode.value` is `Option`, `source_nodes` loses its `Option`, `get_impl` creates absent nodes in memos, `set_source` treats absent as a change, `remove_source` makes nodes absent, `source_node_changed_since` compares every node. Tests. This alone fixes the never-written-counter case in i2 with no i2 code change.
+2. pico / pico_macros: the `#[tracked]` counter has no `Default`. `Counter::next(previous: Option<&Self>)` replaces `Counter::increment` and the `C::default()` branch.
+3. pico / pico_macros: keyed source reads without a value. `#[derive(Source)]` generates `T::source_id(&key) -> SourceId<T>`; `Database::get_if_present(id) -> Option<&T>`.
+4. i2: keyed lookups read the source key directly; tracked-on-miss call sites go away; AGENTS.md and pico.md rule text changes. Later; not implemented with this doc.
+
+## Change 1: absent source nodes
+
+Code: the Design section above, in full. Files: `crates/pico/src/source.rs`, `crates/pico/src/database.rs`, `crates/pico/src/execute_memoized_function.rs`, `crates/pico/Cargo.toml`, `crates/pico/src/lib.rs`, `crates/pico/tests`.
+
+`crates/pico/Cargo.toml` gains `prelude = { path = "../prelude" }` under `[dependencies]` (open decision 2). `prelude` has no dependencies of its own.
+
+`crates/pico/src/lib.rs` gains, for the unit tests below (`#[derive(Db)]` and `#[memo]` expand to `::pico::` paths, `crates/pico_macros/src/db_macro.rs:105`, `crates/pico_macros/src/memo_macro.rs:65`):
+
+```rust
+// from crates/pico/src/lib.rs
+#[cfg(test)]
+extern crate self as pico;
+```
+
+### Change 1 tests
+
+Re-invocation counts are pico's own behavior and are asserted in pico's tests. Each test owns its memo and its `static AtomicUsize` counter (the existing pico pattern, `crates/pico/tests/basic.rs:6`; open decision 1), so tests run in parallel without the `RUN_SERIALLY` lock (`crates/pico/tests/basic_multi_function_chain.rs:13`). An unrelated epoch advance is two `set`s of an `Unrelated` source with different values: the first is a vacant insert and does not advance.
+
+`crates/pico/tests/tests.rs` gains:
+
+```rust
+// from crates/pico/tests/tests.rs
+mod absent_source {
+    mod garbage_collection;
+    mod missing_key;
+    mod remove;
+}
+```
+
+and `mod never_written;` inside the existing `mod tracking_field`.
+
+Fixture shape (each file declares its own copy, as existing pico test files do):
+
+```rust
+// from crates/pico/tests/absent_source/missing_key.rs
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+use pico::{Database, Storage};
+use pico_macros::{Db, Singleton, Source, memo};
+use prelude::Postfix;
+
+#[derive(Db, Default)]
+struct TestDatabase {
+    storage: Storage<Self>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Singleton)]
+struct Config {
+    name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Singleton)]
+struct OtherConfig {
+    name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Source)]
+struct Unrelated {
+    #[key]
+    key: &'static str,
+    value: String,
+}
+
+fn advance_epoch(db: &mut TestDatabase) {
+    db.set(Unrelated {
+        key: "unrelated",
+        value: "first".to_string(),
+    });
+    db.set(Unrelated {
+        key: "unrelated",
+        value: "second".to_string(),
+    });
+}
+
+static MISSING_THEN_SET: AtomicUsize = AtomicUsize::new(0);
+
+#[memo]
+fn missing_then_set_reader(db: &TestDatabase) -> Option<String> {
+    MISSING_THEN_SET.fetch_add(1, Ordering::SeqCst);
+    db.get_singleton::<Config>()
+        .map(|config| config.name.clone())
+}
+
+#[test]
+fn missing_then_set_reruns() {
+    let mut db = TestDatabase::default();
+    assert_eq!(*missing_then_set_reader(&db), None);
+    db.set(Config {
+        name: "a".to_string(),
+    });
+    assert_eq!(
+        *missing_then_set_reader(&db),
+        "a".to_string().wrap_some()
+    );
+    assert_eq!(MISSING_THEN_SET.load(Ordering::SeqCst), 2);
+}
+```
+
+`advance_epoch` is called only from tests in the same file, so no `expect(dead_code)` is needed. Each test below has its own reader memo shaped like `missing_then_set_reader` and its own counter.
+
+`absent_source/missing_key.rs`:
+
+- `missing_then_set_reruns`: above.
+- `missing_and_still_missing_across_epochs_does_not_rerun`: read `Config` (1 run, `None`). `advance_epoch` three times, reading after each: 1 run total, `None`.
+- `unrelated_set_does_not_rerun_reader_of_missing_key`: read `Config` (`None`). Set `OtherConfig` twice with different values (the second is an advance); read `Config`: 1 run, `None`.
+- `set_reruns_only_readers_of_that_key`: one reader of `Config`, one of `OtherConfig`, both `None`. Set `Config`. `Config` reader: 2 runs, `Some`. `OtherConfig` reader: 1 run, `None`.
+- `same_missing_key_twice_in_one_memo`: the memo reads `Config` twice and returns both as a tuple. Set `Config`: 2 runs, both `Some`.
+- `parent_of_missing_reader_reruns`: a parent memo returns `missing_reader(db).clone()`. Parent: 1 run, `None`. Set `Config`. Parent: 2 runs, `Some`.
+- `read_outside_a_memo_then_set`: `db.get_singleton::<Config>()` from the test returns `None`. Set `Config`. A memo reads it: 1 run, `Some`. `db.get_singleton::<Config>()` from the test returns `Some`.
+- `read_outside_a_memo_after_absent_node_exists`: a memo reads `Config` (`None`, which creates the absent node). `db.get_singleton::<Config>()` from the test returns `None`.
+
+`absent_source/remove.rs` (`remove_singleton` is the keyed remove that change 1 can observe; a removed `SourceId` read with `db.get` still panics, covered by `crates/pico/tests/removing_params.rs`):
+
+- `present_then_removed_reruns_and_returns_none`: set `Config`; read (1 run, `Some`); `remove_singleton::<Config>()`; read: 2 runs, `None`.
+- `removed_then_set_reruns`: set `Config` = `"a"`; read; remove; read (`None`); set `Config` = `"a"` (equal to the value before the remove); read: 3 runs, `Some("a")`.
+- `removed_and_still_removed_does_not_rerun`: set; read; remove; read (2 runs, `None`); remove again; `advance_epoch`; read: 2 runs, `None`.
+- `remove_of_missing_key_does_not_rerun`: read `Config` (1 run, `None`); `remove_singleton::<Config>()`; read: 1 run.
+- `remove_of_never_read_key_then_read`: `remove_singleton::<Config>()` on a fresh database (no panic); a memo reads `Config`: `None`.
+- Equal re-set of a present node in the same epoch does not re-run: the existing `crates/pico/tests/overriding_same_source.rs`, unchanged.
+
+`absent_source/garbage_collection.rs` (the database uses `Storage::new_with_capacity(1.try_into().unwrap())`, as `crates/pico/tests/garbage_collection/outer_retained.rs:17` does):
+
+- `collected_reader_of_missing_key_sees_set`: reader of `Config` (1 run, `None`); call an unrelated memo so the LRU holds only that; `run_garbage_collection`; set `Config`; reader: 2 runs, `Some`.
+- `retained_reader_of_missing_key_sees_set`: reader of `Config` (1 run, `None`) is the last top-level call; `run_garbage_collection`; reader: 1 run; set `Config`; reader: 2 runs, `Some`. The absent node and the dependency survived collection.
+- `remove_after_collection`: set `Config`; reader (1 run, `Some`) is the last top-level call; `run_garbage_collection`; `remove_singleton`; reader: 2 runs, `None`.
+
+`tracking_field/never_written.rs` (the i2 shape: `#[tracked] map: TestMap(HashMap<String, SourceId<Input>>)` as in `crates/pico/tests/tracking_field/correctness.rs:6-14`):
+
+- `iteration_before_first_write_then_insert_reruns`: a memo collects `db.get_map().tracked().0.values()` on a fresh database (1 run, empty). `set` an `Input` and insert its id with `get_map_mut().tracked()`. The memo: 2 runs, one value.
+- `untracked_miss_then_tracked_then_insert_reruns`: a memo does the `extract_iso_literals` lookup (`untracked()` get, on miss `tracked()` get) for `"a"` on a fresh database (1 run, `None`). Insert `"a"`. The memo: 2 runs, `Some`.
+
+Unit tests in `crates/pico/src/database.rs` (`#[cfg(test)] mod tests`). The epoch is not observable through pico's public API; these tests assert the epoch directly because "a vacant insert does not advance the epoch" is the behavior 21d671d7 established and this change keeps.
+
+```rust
+// from crates/pico/src/database.rs
+#[cfg(test)]
+mod tests {
+    use pico_macros::{Db, Singleton, memo};
+
+    use crate::{Database, Storage};
+
+    #[derive(Db, Default)]
+    struct TestDatabase {
+        storage: Storage<Self>,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, Singleton)]
+    struct Config(u64);
+
+    #[memo]
+    fn read_config(db: &TestDatabase) -> Option<u64> {
+        db.get_singleton::<Config>().map(|config| config.0)
+    }
+
+    fn epoch(db: &TestDatabase) -> usize {
+        usize::from(db.storage.internal.current_epoch)
+    }
+
+    #[test]
+    fn set_of_never_read_key_does_not_advance_epoch() {
+        let mut db = TestDatabase::default();
+        let before = epoch(&db);
+        db.set(Config(1));
+        assert_eq!(epoch(&db), before);
+    }
+
+    #[test]
+    fn set_over_absent_node_advances_epoch() {
+        let mut db = TestDatabase::default();
+        read_config(&db);
+        let before = epoch(&db);
+        db.set(Config(1));
+        assert_eq!(epoch(&db), before + 1);
+    }
+}
+```
+
+The same module also has:
+
+- `read_in_a_memo_does_not_advance_epoch`: `read_config(&db)` on a fresh database; the epoch is unchanged.
+- `read_outside_a_memo_does_not_create_a_node`: `db.get_singleton::<Config>()` from the test, then `db.set(Config(1))`: the epoch is unchanged (a vacant insert).
+- `remove_of_present_advances_epoch`: set, then `remove_singleton`: one advance.
+- `remove_of_absent_node_does_not_advance_epoch`: `read_config` (absent node), `remove_singleton`: unchanged.
+- `remove_of_key_with_no_node_does_not_advance_epoch`: `remove_singleton` on a fresh database: unchanged.
+- `equal_set_does_not_advance_epoch`: set `Config(1)` twice: unchanged after the second.
+
+## Change 2: the `#[tracked]` counter has no `Default`
+
+No values are inserted on reads, and no `Default` stands in for "not written yet". The counter's first value comes from `next(None)`.
+
+`crates/pico/src/view.rs`, before (lines 5-7 and 67-74):
+
+```rust
+// external isograph/crates/pico/src/view.rs
+pub trait Counter: Singleton + Default + Copy + Eq + 'static {
+    fn increment(self) -> Self;
+}
+
+    pub fn tracked(&'a mut self) -> &'a mut T {
+        let next = self
+            .db
+            .get_singleton::<C>()
+            .map_or(C::default(), |c| c.increment());
+        self.db.set(next);
+        (self.projector)(self.db)
+    }
+```
+
+After:
+
+```rust
+// from crates/pico/src/view.rs
+pub trait Counter: Singleton + Eq + 'static {
+    /// The value written after `previous`, or the first value when `previous` is `None`.
+    fn next(previous: Option<&Self>) -> Self;
+}
+
+    pub fn tracked(&'a mut self) -> &'a mut T {
+        let next = C::next(self.db.get_singleton::<C>());
+        self.db.set(next);
+        (self.projector)(self.db)
+    }
+```
+
+The `Copy` bound goes too: `increment(self)` from `&C` was its only use. `View::tracked` (`view.rs:29-32`) is unchanged; under change 1 its `get_singleton` inside a memo creates the counter's absent node.
+
+`crates/pico_macros/src/db_macro.rs`, before (lines 73-80):
+
+```rust
+// external isograph/crates/pico_macros/src/db_macro.rs
+        aux_struct_defs.push(quote! {
+            #[derive(Clone, Copy, Default, PartialEq, Eq, Hash, ::pico_macros::Singleton)]
+            pub struct #counter_ident(u64);
+            impl ::pico::Counter for #counter_ident {
+                #[inline]
+                fn increment(self) -> Self { Self(self.0.wrapping_add(1)) }
+            }
+        });
+```
+
+After:
+
+```rust
+// from crates/pico_macros/src/db_macro.rs
+        aux_struct_defs.push(quote! {
+            #[derive(Clone, Copy, PartialEq, Eq, Hash, ::pico_macros::Singleton)]
+            pub struct #counter_ident(u64);
+            impl ::pico::Counter for #counter_ident {
+                #[inline]
+                fn next(previous: ::core::option::Option<&Self>) -> Self {
+                    previous.map_or(Self(0), |previous| Self(previous.0.wrapping_add(1)))
+                }
+            }
+        });
+```
+
+Generated for `disk_file_map`, before:
+
+```rust
+// external isograph/crates/pico_macros/src/db_macro.rs
+// generated by crates/pico_macros/src/db_macro.rs
+#[derive(Clone, Copy, Default, PartialEq, Eq, Hash, ::pico_macros::Singleton)]
+pub struct DiskFileMapCounter(u64);
+impl ::pico::Counter for DiskFileMapCounter {
+    #[inline]
+    fn increment(self) -> Self { Self(self.0.wrapping_add(1)) }
+}
+```
+
+After:
+
+```rust
+// generated by crates/pico_macros/src/db_macro.rs
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::pico_macros::Singleton)]
+pub struct DiskFileMapCounter(u64);
+impl ::pico::Counter for DiskFileMapCounter {
+    #[inline]
+    fn next(previous: ::core::option::Option<&Self>) -> Self {
+        previous.map_or(Self(0), |previous| Self(previous.0.wrapping_add(1)))
+    }
+}
+```
+
+The value sequence is unchanged (0, then +1). `grep -rn "Counter\b\|increment()" crates` outside pico finds no other implementor or caller. No new tests: `tracking_field/correctness.rs`, `efficiency.rs`, and change 1's `never_written.rs` cover `MutView::tracked`.
+
+## Change 3: keyed source reads without a value
+
+A keyed lookup needs the `SourceId` of a key without holding a source value, and a read that returns `Option`.
+
+`crates/pico_macros/src/source_macro.rs`, before (lines 25-61):
+
+```rust
+// external isograph/crates/pico_macros/src/source_macro.rs
+    let key_field_name = fields
+        .iter()
+        .find(|field| {
+            field.attrs.iter().any(|attr| {
+                attr.path()
+                    .segments
+                    .last()
+                    .is_some_and(|segment| segment.ident == "key")
+            })
+        })
+        .and_then(|field| field.ident.clone());
+
+    let field_name = match key_field_name {
+        Some(field_name) => field_name,
+        None => {
+            return Error::new_spanned(
+                &struct_name,
+                "#[key] attribute must be set on a struct field",
+            )
+            .to_compile_error()
+            .into();
+        }
+    };
+
+    let output = quote! {
+        impl ::pico::Source for #struct_name {
+            fn get_key(&self) -> ::pico::Key {
+                use ::std::hash::{Hash, Hasher, DefaultHasher};
+                let mut s = DefaultHasher::new();
+                ::core::any::TypeId::of::<#struct_name>().hash(&mut s);
+                self.#field_name.hash(&mut s);
+                s.finish().into()
+            }
+        }
+    };
+
+    output.into()
+}
+```
+
+After:
+
+```rust
+// from crates/pico_macros/src/source_macro.rs
+    let key_field = fields.iter().find(|field| {
+        field.attrs.iter().any(|attr| {
+            attr.path()
+                .segments
+                .last()
+                .is_some_and(|segment| segment.ident == "key")
+        })
+    });
+
+    let (field_name, field_ty) = match key_field.and_then(|field| {
+        field
+            .ident
+            .clone()
+            .map(|field_name| (field_name, field.ty.clone()))
+    }) {
+        Some(name_and_ty) => name_and_ty,
+        None => {
+            return Error::new_spanned(
+                &struct_name,
+                "#[key] attribute must be set on a struct field",
+            )
+            .to_compile_error()
+            .to();
+        }
+    };
+
+    let output = quote! {
+        impl #struct_name {
+            /// The `SourceId` of the source whose key field is `key`.
+            pub fn source_id(key: &#field_ty) -> ::pico::SourceId<Self> {
+                use ::std::hash::{Hash, Hasher, DefaultHasher};
+                let mut s = DefaultHasher::new();
+                ::core::any::TypeId::of::<#struct_name>().hash(&mut s);
+                key.hash(&mut s);
+                ::pico::SourceId::from(::pico::Key::from(s.finish()))
+            }
+        }
+
+        impl ::pico::Source for #struct_name {
+            fn get_key(&self) -> ::pico::Key {
+                Self::source_id(&self.#field_name).key
+            }
+        }
+    };
+
+    output.to()
+}
+```
+
+`&T: Hash` hashes as `T` does, so `source_id(&value.path).key == value.get_key()`: the same `Key` as today for every existing source. `Some(name_and_ty) =>` is a pattern. `.to()` requires `pico_macros` to depend on `prelude` (open decision 2); under option (b) it stays `.into()`.
+
+Generated for `DiskFile`:
+
+```rust
+// generated by crates/pico_macros/src/source_macro.rs
+impl DiskFile {
+    /// The `SourceId` of the source whose key field is `key`.
+    pub fn source_id(key: &RelativePathToSourceFile) -> ::pico::SourceId<Self> {
+        use ::std::hash::{Hash, Hasher, DefaultHasher};
+        let mut s = DefaultHasher::new();
+        ::core::any::TypeId::of::<DiskFile>().hash(&mut s);
+        key.hash(&mut s);
+        ::pico::SourceId::from(::pico::Key::from(s.finish()))
+    }
+}
+
+impl ::pico::Source for DiskFile {
+    fn get_key(&self) -> ::pico::Key {
+        Self::source_id(&self.path).key
+    }
+}
+```
+
+`Database` trait (`database.rs:22-33`), after (one method added; the rest unchanged):
+
+```rust
+// from crates/pico/src/database.rs
+pub trait Database: DatabaseDyn + Sized {
+    fn get_storage(&self) -> &Storage<Self>;
+    fn get<T: 'static>(&self, id: SourceId<T>) -> &T;
+    /// The source at `id`, or `None` when no source is set there. The caller depends on that key either way.
+    fn get_if_present<T: 'static>(&self, id: SourceId<T>) -> Option<&T>;
+    /// Because `T` is a `Singleton`, unlike `get` this does not require `id: SourceId<T>`
+    fn get_singleton<T: 'static + Singleton>(&self) -> Option<&T>;
+    fn intern_value<T: Clone + Hash + DynEq + 'static>(&self, value: T) -> MemoRef<T>;
+    fn intern_ref<T: Clone + Hash + DynEq + 'static>(&self, value: &T) -> MemoRef<T>;
+    fn set<T: Source + DynEq>(&mut self, source: T) -> SourceId<T>;
+    fn remove<T>(&mut self, id: SourceId<T>);
+    fn remove_singleton<T: Singleton + 'static>(&mut self);
+    fn run_garbage_collection(&mut self);
+}
+```
+
+`Storage`, added next to `get` (`database.rs:123`):
+
+```rust
+// from crates/pico/src/database.rs
+    pub fn get_if_present<T: 'static>(&self, id: SourceId<T>) -> Option<&T> {
+        self.get_impl(id.key)
+    }
+```
+
+`crates/pico_macros/src/db_macro.rs`, added after the generated `get` (line 114):
+
+```rust
+// from crates/pico_macros/src/db_macro.rs
+            #[inline]
+            fn get_if_present<T: 'static>(&self, id: ::pico::SourceId<T>) -> Option<&T> {
+                self.storage.get_if_present(id)
+            }
+```
+
+### Change 3 tests
+
+`crates/pico/tests/get_if_present.rs` (own fixture with `Input { #[key] key: &'static str, value: String }`):
+
+- `source_id_matches_set`: `Input::source_id(&"a") == db.set(Input { key: "a", .. })`.
+- `missing_then_set_reruns`: a memo returns `db.get_if_present(Input::source_id(&"a")).map(|input| input.value.clone())`. 1 run, `None`. Set `"a"`. 2 runs, `Some`.
+- `unrelated_set_does_not_rerun`: same reader; set `"b"` twice with different values; 1 run, `None`.
+- `present_then_removed_reruns_and_returns_none`: set `"a"`; read; `db.remove(id)`; read: 2 runs, `None`.
+- `get_if_present_outside_a_memo`: `None` before the set, `Some` after.
+
+## Change 4 (later): i2 keyed lookups read the source key
+
+Not implemented with this doc. `crates/isograph_*` is being edited concurrently; re-grep `untracked()` / `tracked()` before implementing. The call sites below are as of `0ecc7e2f`.
+
+Tracked-on-miss call sites today (`grep -rn "tracked()" crates` outside pico):
+
+- `TypeScriptHostLanguage::extract_iso_literals`, `crates/isograph_extract_typescript/src/lib.rs:68-71`.
+- `IsographDb::open_file_source_id`, `crates/isograph_compiler/src/database.rs:82-87`.
+- `IsographDb::disk_file_source_id`, `crates/isograph_compiler/src/database.rs:89-94`.
+- `IsographDb::disk_file`, `crates/isograph_compiler/src/database.rs:166-169`, does an `untracked()` lookup with no tracked miss. Its memo callers (`text_through_last_iso_literal`, `crates/isograph_compiler/src/iso_literals.rs:53`) call `extract_iso_literals` first, which records the miss.
+
+Not keyed reads in a memo, unchanged: the `untracked()` checks in `set_open_file`, `remove_open_file`, `remove_open_files_of_client` (`database.rs:104,115,124`, called from `handle`), and test assertions (`database.rs:238,276,294,352,608`, `crates/isograph_cli/src/state.rs:338,915,933`, `crates/isograph_cli/src/watch.rs:808`).
+
+`crates/isograph_compiler/src/database.rs`, before (lines 64-94 and 166-169):
+
+```rust
+// from crates/isograph_compiler/src/database.rs
+/// The text of `path` as `client` reads it: that client's open buffer, otherwise disk.
+#[memo]
+pub fn file_contents<THostLanguage: HostLanguage>(
+    db: &IsographDb<THostLanguage>,
+    client: ClientId,
+    path: RelativePathToSourceFile,
+) -> Option<String> {
+    match db.open_file_source_id(OpenFileKey { client, path }) {
+        Some(open_file_id) => db.get(open_file_id).contents.clone().wrap_some(),
+        None => db
+            .get(db.disk_file_source_id(path)?)
+            .contents
+            .clone()
+            .wrap_some(),
+    }
+}
+
+impl<THostLanguage: HostLanguage> IsographDb<THostLanguage> {
+    fn open_file_source_id(&self, key: OpenFileKey) -> Option<SourceId<OpenFile>> {
+        match self.get_open_file_map().untracked().0.get(&key).copied() {
+            Some(open_file_id) => open_file_id.wrap_some(),
+            None => self.get_open_file_map().tracked().0.get(&key).copied(),
+        }
+    }
+
+    fn disk_file_source_id(&self, path: RelativePathToSourceFile) -> Option<SourceId<DiskFile>> {
+        match self.get_disk_file_map().untracked().0.get(&path).copied() {
+            Some(disk_file_id) => disk_file_id.wrap_some(),
+            None => self.get_disk_file_map().tracked().0.get(&path).copied(),
         }
     }
 
@@ -788,92 +950,33 @@ impl<THostLanguage: HostLanguage> IsographDb<THostLanguage> {
 }
 ```
 
-After:
+After (`open_file_source_id` and `disk_file_source_id` are deleted):
 
 ```rust
 // from crates/isograph_compiler/src/database.rs
-#[derive(Debug, Db)]
-pub struct IsographDb<THostLanguage: HostLanguage> {
-    storage: Storage<Self>,
-    #[tracked_map]
-    disk_file_map: TrackedMap<RelativePathToSourceFile, SourceId<DiskFile>>,
-    phantom_data: PhantomData<THostLanguage>,
-}
-
-impl<THostLanguage: HostLanguage> Default for IsographDb<THostLanguage> {
-    fn default() -> Self {
-        Self {
-            storage: Storage::default(),
-            disk_file_map: TrackedMap::default(),
-            phantom_data: PhantomData,
-        }
+/// The text of `path` as `client` reads it: that client's open buffer, otherwise disk.
+#[memo]
+pub fn file_contents<THostLanguage: HostLanguage>(
+    db: &IsographDb<THostLanguage>,
+    client: ClientId,
+    path: RelativePathToSourceFile,
+) -> Option<String> {
+    match db.get_if_present(OpenFile::source_id(OpenFileKey { client, path }.reference())) {
+        Some(open_file) => open_file.contents.clone().wrap_some(),
+        None => db
+            .disk_file(path)
+            .map(|disk_file| disk_file.contents.clone()),
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Source)]
-pub struct DiskFile {
-    #[key]
-    pub path: RelativePathToSourceFile,
-    pub contents: String,
 }
 
 impl<THostLanguage: HostLanguage> IsographDb<THostLanguage> {
-    pub fn insert_disk_file(&mut self, path: RelativePathToSourceFile, contents: String) {
-        let source_id = self.set(DiskFile { path, contents });
-        self.get_disk_file_map_mut().insert(path, source_id);
-    }
-
-    pub fn remove_disk_file(&mut self, path: RelativePathToSourceFile) {
-        if let Some(source_id) = self.get_disk_file_map_mut().remove(path.reference()) {
-            self.remove(source_id);
-        }
-    }
-
-    pub fn remove_disk_files_from_path(&mut self, path: RelativePathToSourceFile) {
-        let descendants: Vec<_> = self
-            .get_disk_file_map()
-            .iter()
-            .filter_map(|(key, _)| key.as_ref().starts_with(path.as_ref()).then_some(key.dereference()))
-            .collect();
-        descendants
-            .into_iter()
-            .for_each(|descendant| self.remove_disk_file(descendant));
-    }
-
     pub fn disk_file(&self, path: RelativePathToSourceFile) -> Option<&DiskFile> {
-        let source_id = self.get_disk_file_map().get(path.reference()).copied()?;
-        self.get(source_id).wrap_some()
+        self.get_if_present(DiskFile::source_id(path.reference()))
     }
 }
 ```
 
-The `collect` in `remove_disk_files_from_path` ends the shared borrow of `self` before `remove_disk_file` takes `&mut self`. `insert_disk_file` discards `insert`'s previous value; the source `set` already replaced the contents and the id is the same. `use std::collections::HashMap;` is removed and `use pico::{Database, SourceId, Storage, TrackedMap};` replaces the `pico` import.
-
-Behavior deltas: `insert_disk_file` of an already-present path no longer re-invokes iterating memos (the entry is the same id). `remove_disk_file` of an absent path no longer re-invokes anything. `disk_file` on a miss now records a dependency on that path's slot.
-
-Test call sites in the same file: `state.get_disk_file_map().untracked().0.len()` (lines 139, 177, 253) becomes `state.get_disk_file_map().iter().len()` (`hash_map::Iter` is `ExactSizeIterator`). `assert!(state.get_disk_file_map().untracked().0.is_empty())` (line 195) becomes `assert_eq!(state.get_disk_file_map().iter().len(), 0)`.
-
-### `crates/isograph_compiler/src/lib.rs`
-
-Before:
-
-```rust
-// from crates/isograph_compiler/src/lib.rs
-pub use database::{DiskFile, DiskFileMap, IsographDb};
-```
-
-After:
-
-```rust
-// from crates/isograph_compiler/src/lib.rs
-pub use database::{DiskFile, IsographDb};
-```
-
-`DiskFileMap` has no other users (`grep -rn DiskFileMap crates` finds only `isograph_compiler`).
-
-### `crates/isograph_extract_typescript/src/lib.rs`
-
-Before (lines 63-72):
+`crates/isograph_extract_typescript/src/lib.rs`, before (lines 63-72):
 
 ```rust
 // from crates/isograph_extract_typescript/src/lib.rs
@@ -901,184 +1004,81 @@ After:
         let contents = db.disk_file(path)?.contents.reference();
 ```
 
-`missing_then_present_extracts` (lines 556-567) before:
+`missing_then_present_extracts` (`lib.rs:556-568`) drops its first two lines (`let other = intern_path("src/b.ts");` and `intern_file(&mut db, other, ...)`), which existed only so the counter existed before the miss. Change 1 already makes the test pass without them.
 
-```rust
-// from crates/isograph_extract_typescript/src/lib.rs
-    #[test]
-    fn missing_then_present_extracts() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
-        let other = intern_path("src/b.ts");
-        intern_file(&mut db, other, "export const x = 1;");
-        let path = intern_path("src/a.ts");
-        assert!(TypeScriptHostLanguage::extract_iso_literals(&db, path).is_none());
-        intern_file(&mut db, path, "iso(`entrypoint Query.HomeRoute`)");
-        let extracted = TypeScriptHostLanguage::extract_iso_literals(&db, path)
-            .as_ref()
-            .expect("the test interned this path");
-        assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].iso_literal_text, "entrypoint Query.HomeRoute");
-    }
+Behavior delta: inserting, opening, or removing one path no longer re-runs memos that missed a different path. A miss depends on its own key. The maps stay for iteration (`remove_disk_files_from_path`, `remove_open_files_of_client`, and a future compile memo that walks every file with `tracked()`).
+
+### Docs amended by change 4
+
+Proposed text only; these files are not edited by this doc.
+
+AGENTS.md, replace the body of "## pico tracked maps" with:
+
+```text
+A keyed read depends on its key, present or absent. `db.get_if_present(DiskFile::source_id(path.reference()))` (what `IsographDb::disk_file` does), `db.get(source_id)`, and `db.get_singleton::<T>()` inside a memo record a dependency on that key. Setting a missing key, removing a present one, or replacing it with an unequal value re-invokes the reader. A change to another key does not. A miss needs nothing extra.
+
+`#[tracked]` on a database field (`disk_file_map`, `open_file_map`) gives `get_disk_file_map()` / `get_disk_file_map_mut()`. `handle` writes the map with `tracked()`; `MutView` has no `untracked()`.
+
+`tracked()` is for iteration. A memo that iterates the map (compile, every file) uses `tracked()`. That records a dependency on the whole map. Inserting or removing any key re-invokes it. Do not look up one key through the map in a memo; read the source key. Do not iterate `untracked()`: a newly inserted key is not seen. pico `tracking_field::correctness` pins this.
+
+pico `absent_source` tests pin the keyed rules.
 ```
 
-After (the unrelated `src/b.ts` was there only so the counter existed before the miss):
+pico.md, "## Source": replace the paragraph at line 70 with:
 
-```rust
-// from crates/isograph_extract_typescript/src/lib.rs
-    #[test]
-    fn missing_then_present_extracts() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
-        let path = intern_path("src/a.ts");
-        assert!(TypeScriptHostLanguage::extract_iso_literals(&db, path).is_none());
-        intern_file(&mut db, path, "iso(`entrypoint Query.HomeRoute`)");
-        let extracted = TypeScriptHostLanguage::extract_iso_literals(&db, path)
-            .as_ref()
-            .expect("the test interned this path");
-        assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].iso_literal_text, "entrypoint Query.HomeRoute");
-    }
+```text
+The type system does not stop you from holding a `SourceId` after `remove`. `remove` keeps the key and replaces its node with an absent node stamped with a new epoch. Dependents that read that source see it as changed. `get_if_present` of that id returns `None`; `get` panics. A memo that returns a `SourceId` after the source was removed is handing out a false proof.
 ```
 
-Unchanged and still passing: `missing_disk_file_is_none` (line 549), `missing_disk_file_has_no_text_or_tree` (716), `missing_disk_file_has_no_literal_id` (922), `missing_disk_file_has_no_file_literals` (1235), `missing_disk_file_has_no_parsed_iso_literals_in_file` (1311), `missing_disk_file_has_no_text_through_last_iso_literal` (1620). Each reads a missing path once and asserts `None`; the read now creates a `None` slot, which none of them observes.
+and the paragraph at line 72 with:
 
-### `crates/isograph_cli`
-
-`crates/isograph_cli/src/state.rs` test helper `contents` (around line 308) before:
-
-```rust
-// from crates/isograph_cli/src/state.rs
-    fn contents(
-        state: &IsographState<TypeScriptHostLanguage>,
-        path: common_lang_types::RelativePathToSourceFile,
-    ) -> Option<&str> {
-        state
-            .db
-            .get_disk_file_map()
-            .untracked()
-            .0
-            .get(&path)
-            .map(|id| state.db.get(*id).contents.as_str())
-    }
+```text
+A path is not a proof. `DiskFile::source_id(&path)` is the id that path would have; `db.get_if_present(id)` returns `None` when no `DiskFile` is set there. That miss is a dependency on the key: a memo that read it inside its body re-invokes when the path is later set. `IsographDb::disk_file(path)` is that read.
 ```
 
-After:
+pico.md, replace the body of "## Tracked maps" (lines 336-348) with:
 
-```rust
-// from crates/isograph_cli/src/state.rs
-    fn contents(
-        state: &IsographState<TypeScriptHostLanguage>,
-        path: common_lang_types::RelativePathToSourceFile,
-    ) -> Option<&str> {
-        state
-            .db
-            .disk_file(path)
-            .map(|disk_file| disk_file.contents.as_str())
-    }
+```text
+    struct DiskFileMap(pub HashMap<RelativePathToSourceFile, SourceId<DiskFile>>);
+
+The map is which paths currently have a `DiskFile`. `db.set` of a `DiskFile` does not update the map. `handle` does both: intern the source, then insert into the map. Remove is the reverse.
+
+`#[tracked]` on the field gives `get_disk_file_map()` / `get_disk_file_map_mut()`.
+
+`tracked()` records a dependency on the whole map. Inserting or removing any path invalidates every memo that used `tracked()`. A memo that iterates every file (compile, "all client declarations") uses `tracked()`. Iterating `untracked()` is wrong: a newly inserted path is not seen.
+
+A memo keyed by `path` does not go through the map. It reads the source key with `db.disk_file(path)`, which depends on that path whether or not a `DiskFile` is set there. Adding an unrelated file does not re-invoke a per-file extract, and a later insert of this path does. Before this rule, a miss through the map recorded nothing unless the memo also read the map `tracked()`; isograph hit this when an autofix created a file and `get_iso_literal` reused a stale `None`.
 ```
 
-`crates/isograph_cli/src/watch.rs` (around line 808): `assert!(h.state.db.get_disk_file_map().untracked().0.is_empty());` becomes `assert_eq!(h.state.db.get_disk_file_map().iter().len(), 0);`.
-
-## Change 3: delete `#[tracked]`
-
-- `crates/pico/src/view.rs`: delete `Counter`, `View`, `MutView`. Move `Projector` and `ProjectorMut` into `crates/pico/src/tracked_map.rs` and delete `view.rs`; `lib.rs` drops `mod view;` and `pub use view::*;`.
-- `crates/pico_macros/src/lib.rs`: `#[proc_macro_derive(Db, attributes(tracked_map))]`.
-- `crates/pico_macros/src/db_macro.rs`: delete `TrackedFieldKind` and the `Tracked` arm. The attribute check is `if !has_attr(&f.attrs, "tracked_map") { continue; }`, the visibility error names `#[tracked_map]` only, and the loop body is change 1's `TrackedMap` arm with `#projectors` inlined.
-- `crates/pico/tests/tracking_field/correctness.rs` and `efficiency.rs` are deleted, and `mod tracking_field` leaves `tests.rs`. Their facts are covered by `tracked_map/entries.rs` (`iteration_reruns_on_new_key`) and `tracked_map/keyed.rs` (`unrelated_insert_does_not_rerun`). `correctness.rs` pins that iterating `untracked()` misses an insert; that API no longer exists.
-
-After change 3:
-
-```rust
-// from crates/pico/src/tracked_map.rs
-pub type Projector<Db, T> = for<'a> fn(&'a Db) -> &'a T;
-
-pub type ProjectorMut<Db, T> = for<'a> fn(&'a mut Db) -> &'a mut T;
-```
+and in "## Iso literals", the `source_id` match and `db.get` in the `extract_iso_literals` snippet (pico.md:206-210) become `let contents = db.disk_file(path)?.contents.reference();`.
 
 ## Panics
 
-Change 1 adds one `expect`, in `Storage::get_or_insert`: after a vacant key gets a node, `get_impl` of that key finds it. The invariant is that the code two lines above inserted a node at that key and nothing between them removes it. The type system cannot express that a `DashMap` lookup after an insert hits. It is the same family as the existing pico invariant panics (`database.rs:124-127`, `147-150`, `312-315`, `336-339`), all "indicative of a bug in Pico". `UnexpectedError` is an LSP type that pico does not depend on. `TrackedMapView::get` on a key whose slot is a removed source cannot occur: slot keys are crate-private, and if a user forged a `SourceId` from the key and `remove`d it, `remove_source` drops the key from `source_node_key_to_index` (`database.rs:363`), so the next `get` takes the vacant arm and re-creates the slot.
+Change 1 adds one panic for approval and removes one.
 
-## Alternatives
-
-### Absent reads at the source layer
-
-`get_impl` registers `NodeKind::Source(key)` before its `?`. A vacant `set_source` advances the epoch. `remove_source` keeps the key and replaces the slot with a tombstone holding the removal epoch, so `source_nodes` becomes `BoxcarVec<SourceSlot>`:
-
-```rust
-// from crates/pico/src/source.rs
-pub(crate) enum SourceSlot {
-    Present(SourceNode),
-    Removed(RemovedSourceNode),
-}
-
-pub(crate) struct RemovedSourceNode(pub Epoch);
-```
-
-`source_node_changed_since` is `Present` `time_updated > since`, `Removed` epoch `> since`, never-set `false`. A keyed lookup would go by the source key directly, which needs a new `#[derive(Source)]` output that computes the `Key` from the `#[key]` field without a value, plus an `Option`-returning `get`. The tracked map would be needed only for iteration.
-
-Not chosen. It changes semantics for every source, not only map lookups: every vacant `set` advances the global epoch, so a boot scan of N files is N bumps, and every bump defeats `node_verified_in_current_epoch` for every memo, which then walks its dependencies on the next call. Every `remove` leaves a tombstone. It reverses 21d671d7's vacant arm. It needs a second public API on `Source` for key derivation, and the iteration dependency still needs the counter fix.
-
-### Entries node created at database construction
-
-`#[derive(Db)]` does not generate `Default` (`IsographDb` writes its own, `database.rs:19-27`), and `TrackedMap::default()` has no `Storage` to write into. Creating the entries node at construction needs each database's constructor to call a pico function per field, which is the discipline that lsp-open-files.md open decision 2 option (a) relies on. Creating it on the first `iter()` has the same effect with no call site. Open decision 1.
-
-## Docs this change amends
-
-Proposed text only. These files are not edited by this doc.
-
-AGENTS.md, replace the whole "## pico tracked maps" section body with:
-
-```text
-`#[tracked_map]` on a database field of type `TrackedMap<K, V>` (`disk_file_map`) gives `get_disk_file_map()` / `get_disk_file_map_mut()`. `handle` writes through `get_disk_file_map_mut()` with `insert` and `remove`.
-
-`get(&key)` records a dependency on the value held by that key, present or absent. Inserting that key, replacing its value with an unequal one, or removing it re-invokes the reader. A change to another key does not. A miss is an ordinary dependency: a later insert of that key is seen. There is no tracked or untracked read.
-
-`iter()` records a dependency on the entries. A memo that iterates (compile, every file) uses `iter()`. Inserting a new key, replacing a value with an unequal one, or removing a key re-invokes it. Inserting an equal value at a present key, or removing an absent key, re-invokes nothing.
-
-A `SourceId` value is the same id after its source is re-`set`. Readers that `db.get` the id re-invoke through the source; the map entry is unchanged.
-
-pico `tracked_map` tests pin this.
-```
-
-pico.md, replace "## Tracked maps" (lines 334-348) with:
-
-```text
-## Tracked maps
-
-    struct IsographDb<THostLanguage: HostLanguage> {
-        storage: Storage<Self>,
-        #[tracked_map]
-        disk_file_map: TrackedMap<RelativePathToSourceFile, SourceId<DiskFile>>,
-        phantom_data: PhantomData<THostLanguage>,
-    }
-
-The map is which paths currently have a `DiskFile`. `db.set` of a `DiskFile` does not update the map. `handle` does both: intern the source, then `insert` into the map. Remove is the reverse.
-
-`#[tracked_map]` on the field gives `get_disk_file_map()` / `get_disk_file_map_mut()`.
-
-`get(&path)` records a dependency on the value held by `path`, an `Option<SourceId<DiskFile>>`. A hit and a miss are the same dependency. Inserting or removing that path re-invokes the reader; inserting or removing another path does not. `IsographDb::disk_file` is that lookup followed by `db.get`, and extract calls it.
-
-`iter()` records a dependency on the entries. Inserting a new path or removing a path re-invokes every memo that iterated. A memo that walks every file (compile, "all client declarations") uses `iter()`.
-
-`insert` of the same `SourceId` at a present path, and `remove` of an absent path, re-invoke nothing. Re-setting a `DiskFile` with new contents keeps its `SourceId`; memos that `db.get` it re-invoke, and the map entry does not change.
-
-pico keeps one node per path ever read or inserted. Those nodes are sources and are not garbage collected.
-```
+- Added (open decision 3): the `expect` in `source_node_changed_since`. Invariant: a `NodeKind::Source(key)` dependency is recorded only by `get_impl` with a memo on the stack, which always finds or creates the node at `key`, and no code removes a key from `source_node_key_to_index`. The type system cannot express that a `DashMap` lookup of a key recorded earlier hits. `UnexpectedError` is an LSP type that pico does not depend on; pico's existing invariant panics are all `expect("... This is indicative of a bug in Pico.")` (`database.rs:124-127,147-150,312-315,336-339`).
+- Removed: "indexes should always point to a non-empty source node" in `set_source` (`database.rs:336-339`). A boxcar slot is never empty after change 1.
+- Moved, not new: the "indexes should always be valid" `expect` of `get_source_node` moves into `source_node_at`, shared with `get_or_insert_absent_source_node`.
 
 ## Upstream divergence
 
-AGENTS.md says pico and pico_macros are kept unchanged from upstream isograph. `diff -r` of `crates/pico` and `crates/pico_macros` against `../isograph` today differs only in `crates/pico/tests/tracking_field/correctness.rs` (`.values()` for `.iter()`). This doc adds `crates/pico/src/tracked_map.rs`, `Storage::get_or_insert`, a `prelude` dependency, and `#[tracked_map]` (change 1), and deletes `View`, `MutView`, `Counter`, `#[tracked]`, and the `tracking_field` tests (change 3). The doc needs the user's approval for that divergence, and AGENTS.md's first paragraph changes to say pico and pico_macros are kept from upstream with `TrackedMap` added and `#[tracked]` removed.
+AGENTS.md says pico and pico_macros are kept unchanged from upstream isograph. `diff -r` of `crates/pico` and `crates/pico_macros` against `/Users/rbalicki/code/isograph` differs today only in `crates/pico/tests/tracking_field/correctness.rs` (`.values()` for `.iter()`). Changes 1-3 diverge: absent source nodes (change 1), `Counter::next` (change 2), `T::source_id` and `Database::get_if_present` (change 3), and under open decision 2 (a), a `prelude` dependency. This needs the user's approval. Proposed AGENTS.md first paragraph, first sentence, landing with change 1:
 
-## Follow-ups this unlocks
+```text
+From upstream isograph we keep pico and pico_macros (unchanged except that a read of a missing source key inside a memo records a dependency through an absent node, the `#[tracked]` counter has no `Default`, and sources can be read by key with `T::source_id` and `get_if_present`; see refactors/pending/pico-missing-key-dependency.md), the swc plugin and its dependency chain (isograph_config, common_lang_types, string_key_newtype, prelude), resolve_position, the relay crates, the docs website, and the build process.
+```
 
-- lsp-open-files.md open decision 2 resolves to neither (a) nor (b): the never-written counter does not exist.
-- lsp-open-files.md change 2 shrinks: `IsographDb::default` writes no counter, map writes bump only on a changed entry without call-site checks, and `disk_file` tracks its miss with no change to `disk_file`.
-- `IsographDb.clients` in lsp-open-files.md can be a `#[tracked_map]` `TrackedMap<ClientId, V>`. A non-`SourceId` `V` is stored twice (field and slot) and compared with `==` on every write.
-- split-pico.md: `TrackedMap` is engine (`pico`); `#[tracked_map]` is in whichever crate holds `#[derive(Db)]`.
-- An upstream isograph PR with the same three changes.
+An upstream isograph PR with changes 1-3 would remove the divergence.
+
+## Follow-ups and alternatives
+
+- `TrackedMap` (the previous design of this doc). A `#[tracked_map]` field type that owns one pico node per map key plus an entries node, with `get` / `iter` / `insert` / `remove` on its views. Over this design it would add per-key dependencies for a map whose keys are not the source keys of its values (for example a `HashMap<ClientId, V>` with non-source values), and it would encapsulate writes so an `insert` of an equal entry or a `remove` of an absent key advances nothing. It is not part of this change. For `disk_file_map` and `open_file_map` the map key is the source key (`DiskFile.path`, `OpenFile.key`), so change 3 covers keyed reads without it.
+- `MutView::tracked()` writes counter + 1 on every call (`view.rs:67-74`), whether or not the caller then changes the map. `set_open_file` reads the map `untracked()` first to avoid that (`database.rs:104`). Unchanged here.
+- The equal arm of `set_source` (`database.rs:348-350`, kept by this change, present upstream since 21d671d7) sets `time_updated = current_epoch`. A dependency's `since` is the epoch its reader last ran (`database.rs:117`), and verification without a re-run does not rewrite it (`execute_memoized_function.rs:182-200`). So after any unrelated epoch advance, an equal re-set of a source makes its readers re-run (and then backdate). pico.md "Equality and backdating" line 332 ("Re-saving an unchanged file does not re-invoke anything") holds only when no epoch advance happened since the reader last ran. Keeping the node's previous `time_updated` in that arm would make the statement hold. Separate change.
+- lsp-open-files.md change 3 ("a tracked counter that was never written") and its open decision are resolved by change 1 of this doc without either of its options (a) or (b): `IsographDb::default` writes no counter, and `#[derive(Db)]` generates no constructor.
 
 ## Open decisions
 
-1. Entries node creation. (a) On the first `iter()` or first changed write, as this doc specifies. (b) At database construction, with each database constructor calling a pico function per `#[tracked_map]` field (see Alternatives).
-2. Test counters. The new pico tests count memo-body executions with a `static AtomicUsize` per test, the existing pico test pattern (`crates/pico/tests/basic.rs:6`). A memo body is a `fn` with no state of its own, so the count has to live outside it; a per-test static avoids the `LazyLock<Mutex<()>>` serialization lock that `basic_multi_function_chain.rs:67` uses. (a) Approve the statics. (b) Name another counting mechanism.
-3. Postfix in pico. The pending-doc postfix lint (`crates/prelude/src/postfix_constructors.rs:49-58`) rejects `Some(`, `Box::new`, and `.into()` in this doc's snippets, and pico's own sources are outside `RUST_ROOTS` (`postfix_constructors.rs:17-32`). (a) pico depends on `prelude` and the new code uses `Postfix`, as written above. (b) pico takes no `prelude` dependency; the new code uses `Some(` / `Box::new` like the rest of pico, and the snippets are rewritten as `// external` or the lint gains a pico exemption.
+1. Test counters. The new pico tests count memo-body executions with a `static AtomicUsize` per test, the existing pico test pattern (`crates/pico/tests/basic.rs:6`). AGENTS.md bans statics and atomics for ambient program state; these are test-only. A memo body is a `fn` with no state of its own, so the count has to live outside it; a per-test static avoids the `LazyLock<Mutex<()>>` serialization lock that `basic_multi_function_chain.rs:13` uses. (a) Approve the statics. (b) Name another counting mechanism.
+2. Postfix in pico. The pending-doc postfix lint (`crates/prelude/src/postfix_constructors.rs:48-58`) rejects `Some(`, `Box::new`, and `.into()` in this doc's `// from` snippets, and pico's own sources are outside `RUST_ROOTS` (`postfix_constructors.rs:17-32`). (a) pico and pico_macros depend on `prelude` and the new code uses `Postfix` (`wrap_some`, `boxed`, `.to()`), as written above. (b) pico takes no `prelude` dependency; the new code uses `Some(` / `Box::new` / `.into()` like the rest of pico, and the after snippets are rewritten as `// external` or the lint gains a pico exemption.
+3. `source_node_changed_since` on a key with no node. (a) `expect`, as written above (see Panics). (b) Keep `None => true`, so a broken invariant re-runs the reader instead of panicking.
