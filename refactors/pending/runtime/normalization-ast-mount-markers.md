@@ -81,6 +81,7 @@ A follow-up request is a network request that normalizing a response starts, as 
 
 ## Open questions
 
+- `refactors/pending/runtime/pico-runtime.md`, Follow-ups, records the user's design notes for candidates 4 and 5: constructors and destructors whose lifetime follows retain and release, a client pointer as a function plus a follow-up query, a pointer whose target is one of the records it read, handles, deduplication, cancellation, and deferral of subscription setup and garbage collection. Those notes are recorded for later and settle none of the questions below.
 - Which candidates mount on normalization at all, and which only need to be visible to garbage collection while the mount stays on read or on a user call.
 - Whether a marker names a nested artifact by import, by index into a list on the entrypoint (upstream's `nestedRefetchQueries`), or carries the nested AST inline.
 - Who owns a mounted thing's lifetime: the parent's retained query, the record it is attached to, or a subscriber. What unmounts it when the parent record is overwritten by a later response that no longer links to it, and when garbage collection deletes the parent record.
