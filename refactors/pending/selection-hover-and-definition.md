@@ -271,13 +271,13 @@ use prelude::Postfix;
 
 /// The schema item a resolved position names.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum EntityOrSelectable {
+pub(crate) enum EntityOrSelectable {
     Entity(Entity),
     Selectable(Selectable),
 }
 
 impl EntityOrSelectable {
-    pub fn definition(&self) -> DefinitionLocation {
+    pub(crate) fn definition(&self) -> DefinitionLocation {
         match self {
             EntityOrSelectable::Entity(entity) => entity.definition,
             EntityOrSelectable::Selectable(selectable) => selectable.definition,
@@ -314,7 +314,7 @@ pub(crate) fn entity_or_selectable_of_node<TProfile: CompilationProfile>(
 }
 ```
 
-`Option<DiagnosticResult<_>>` keeps three outcomes apart: `None` (the node names no schema item; hover shows the variant name), `Some(Err)` (the lookup failed; no hover, no definition), `Some(Ok)` (the item). The `_` arm is required while `IsographResolutionNode` is `#[non_exhaustive]` and this match is outside `isograph_parser`. A separate parser change removes `#[non_exhaustive]`; this match becomes exhaustive after it lands. `EntityOrSelectable` lives in `isograph_lsp` because only hover and go-to-definition read it.
+`Option<DiagnosticResult<_>>` keeps three outcomes apart: `None` (the node names no schema item; hover shows the variant name), `Some(Err)` (the lookup failed; no hover, no definition), `Some(Ok)` (the item). The `_` arm is required while `IsographResolutionNode` is `#[non_exhaustive]` and this match is outside `isograph_parser`. A separate parser change removes `#[non_exhaustive]`; this match becomes exhaustive after it lands. `EntityOrSelectable` is `pub(crate)` in `isograph_lsp`: only hover and `definition_at_lsp_position` read it, and `definition_at_lsp_position` returns the `DefinitionLocation`.
 
 ```rust
 // from crates/isograph_lsp/src/lib.rs
@@ -323,7 +323,6 @@ mod document_highlight;
 mod entity_or_selectable;
 // ...
 pub use definition::definition_at_lsp_position;
-pub use entity_or_selectable::EntityOrSelectable;
 ```
 
 `resolved_position_at_lsp_position` in `hover.rs` becomes `pub(crate)`; its body is unchanged.
@@ -512,7 +511,8 @@ Go-to-definition on `Pet` or `owner` opens `schema.graphql` at that name, using 
 - `crates/isograph_lsp/src/entity_or_selectable.rs`: `EntityOrSelectable::definition` of an `Entity` and of a `Selectable` built in the test with different `DefinitionLocation`s is each one's own.
 - `crates/isograph_cli/src/adapter.rs`, `definition_lsp_location` of a `DefinitionLocation` built in the test:
   - Disk file `src/schema.graphql` is `"type Pet {\n  owner: User\n}\n"`; the span of `owner` maps to URI `file:///tmp/proj/src/schema.graphql` and range line 1, characters 2 to 7.
-  - With client 1's open buffer `"\ntype Pet {\n  owner: User\n}\n"` over that disk file, client 1 gets line 2 and client 2 gets line 1.
+  - With client 1's open buffer `"\ntype Pet {\n  owner: User\n}\n"` over that disk file, the same span maps through client 1's buffer to line 2, characters 1 to 6, and through disk for client 2 to line 1, characters 2 to 7.
+  - `isograph_cli` gets `span = { path = "../span" }` as a dev-dependency to build the `Span`.
   - A path with no file is `UnexpectedError`.
 - `crates/isograph_cli/src/state.rs`, through `handle`:
   - `hover_on_a_schema_name_is_null_until_the_schema_exists`: hover `None` at `Pet`, `x`, `ID`, `id` of `iso(\`field Pet.x($id: ID!) { id }\`)`, at `Query` and `X` of `iso(\`entrypoint Query.X\`)`, at `owner` and `name` of `iso(\`field Pet.fullName { owner { name } }\`)`, and at `b` and `bar` of `iso(\`field Pet.fullName { b: bar }\`)`. In those literals `field` hovers `SelectableDeclaration` and `entrypoint` hovers `EntrypointDeclaration`.
