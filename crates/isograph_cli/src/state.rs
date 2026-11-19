@@ -715,6 +715,93 @@ mod tests {
         );
     }
 
+    const REQUEST_METHODS: [&str; 8] = [
+        lsp_types::request::SemanticTokensFullRequest::METHOD,
+        lsp_types::request::Formatting::METHOD,
+        lsp_types::request::WillSaveWaitUntil::METHOD,
+        lsp_types::request::HoverRequest::METHOD,
+        lsp_types::request::GotoDefinition::METHOD,
+        lsp_types::request::DocumentHighlightRequest::METHOD,
+        lsp_types::request::Completion::METHOD,
+        lsp_types::request::References::METHOD,
+    ];
+
+    #[test]
+    fn a_request_whose_params_do_not_deserialize_returns_invalid_params() {
+        let mut state = with_config();
+        let client = live_client(&mut state);
+        let malformed = [
+            serde_json::json!({}),
+            serde_json::json!({ "textDocument": 5, "position": "start" }),
+            serde_json::Value::Null,
+            serde_json::json!([]),
+        ];
+        for method in REQUEST_METHODS {
+            for (index, params) in malformed.iter().enumerate() {
+                let id = lsp_server::RequestId::from(format!("{method}#{index}"));
+                let effects = handle(
+                    &mut state,
+                    lsp_request(client.client, id.clone(), method, params.clone()),
+                );
+                let response = only_response(effects, client.rx.reference());
+                assert_eq!(response.id, id);
+                assert!(response.result.is_none(), "{method} {params}");
+                let error = response.error.expect("malformed params are an error");
+                assert_eq!(
+                    error.code,
+                    lsp_server::ErrorCode::InvalidParams as i32,
+                    "{method} {params}"
+                );
+                assert!(
+                    error
+                        .message
+                        .starts_with(format!("invalid params for `{method}`: ").as_str()),
+                    "{method} {params}: {}",
+                    error.message
+                );
+            }
+        }
+        assert!(
+            state
+                .live_sessions
+                .0
+                .get(&client.client)
+                .expect("the client is live")
+                .outstanding
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn a_notification_whose_params_do_not_deserialize_is_dropped() {
+        let mut state = with_disk_x();
+        let client = started(&mut state);
+        let malformed = [
+            serde_json::json!({}),
+            serde_json::json!({ "textDocument": 5, "kind": "Nope" }),
+            serde_json::Value::Null,
+            serde_json::json!([]),
+        ];
+        for method in [
+            crate::lsp_socket::IsographEventNotification::METHOD,
+            lsp_types::notification::DidOpenTextDocument::METHOD,
+            lsp_types::notification::DidChangeTextDocument::METHOD,
+            lsp_types::notification::DidCloseTextDocument::METHOD,
+        ] {
+            for params in malformed.iter() {
+                let effects = handle(
+                    &mut state,
+                    document_notification(client, method, params.clone()),
+                );
+                assert!(effects.is_empty(), "{method} {params}");
+            }
+        }
+        assert_eq!(
+            read(state.reference(), client, "src/x.ts"),
+            "disk".to_owned().wrap_some()
+        );
+    }
+
     #[test]
     fn lsp_request_without_a_live_session_returns_no_effects() {
         let mut state = empty();

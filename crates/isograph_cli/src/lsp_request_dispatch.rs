@@ -40,17 +40,11 @@ impl<'state, TState> LSPRequestDispatch<'state, TState> {
         if self.request.method != TRequest::METHOD {
             return ControlFlow::Continue(self);
         }
+        let lsp_server::Request { method, params, .. } = self.request;
         ControlFlow::Break(
-            extract_request_params::<TRequest>(self.request)
-                .and_then(|params| handler(self.state, self.client, params))
-                .and_then(|handler_result| {
-                    serde_json::to_value(handler_result).map_err(|_err| {
-                        LSPRuntimeError::UnexpectedError(
-                            "Unable to serialize request response".to_string(),
-                        )
-                    })
-                })
-                .map_or_else(runtime_error_body, Value::wrap_ok),
+            serde_json::from_value::<TRequest::Params>(params)
+                .map_err(|error| InvalidParams { method, error }.response_error())
+                .and_then(|params| handler_body(handler(self.state, self.client, params))),
         )
     }
 
@@ -71,18 +65,32 @@ fn runtime_error_body(error: LSPRuntimeError) -> ResponseBody {
     }
 }
 
-fn extract_request_params<R>(req: lsp_server::Request) -> LSPRuntimeResult<R::Params>
-where
-    R: Request,
-{
-    std::panic::catch_unwind(|| {
-        req.extract(R::METHOD)
-            .expect("extract_request_params: could not extract request params")
-    })
-    .map(|(_id, params)| params)
-    .map_err(|err| {
-        LSPRuntimeError::UnexpectedError(format!("panic in the `extract_request_params`: {err:?}"))
-    })
+/// Request params that do not deserialize into the params of the request's method.
+#[derive(Debug, thiserror::Error)]
+#[error("invalid params for `{method}`: {error}")]
+struct InvalidParams {
+    method: String,
+    error: serde_json::Error,
+}
+
+impl InvalidParams {
+    fn response_error(self) -> ResponseError {
+        ResponseError {
+            code: ErrorCode::InvalidParams as i32,
+            message: self.to_string(),
+            data: None,
+        }
+    }
+}
+
+fn handler_body(result: LSPRuntimeResult<impl serde::Serialize>) -> ResponseBody {
+    result
+        .and_then(|handler_result| {
+            serde_json::to_value(handler_result).map_err(|_err| {
+                LSPRuntimeError::UnexpectedError("Unable to serialize request response".to_string())
+            })
+        })
+        .map_or_else(runtime_error_body, Value::wrap_ok)
 }
 
 #[cfg(test)]
@@ -155,28 +163,5 @@ mod test {
         state.store(2, Ordering::Relaxed);
 
         Ok(None)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use lsp_types::request::CodeActionRequest;
-    use serde_json::json;
-
-    use super::*;
-
-    #[test]
-    fn test_extract_request_params_error() {
-        let request_id = lsp_server::RequestId::from("test-id".to_string());
-        let request = lsp_server::Request {
-            id: request_id,
-            method: "textDocument/codeAction".to_string(),
-            params: json!({
-                "invalid_key": "invalid_value",
-            }),
-        };
-        let result = extract_request_params::<CodeActionRequest>(request);
-        // it returns an error, but not panic
-        assert!(result.is_err());
     }
 }
