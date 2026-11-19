@@ -33,3 +33,7 @@ Spread, `Pipe`, and `PeriodPeriod` sit as comments in the token enum, plus `TODO
 ```
 
 Delete those commented-out variants and the TODO on the skip regex. The commented-out `SingleLineComment` regex is comments.md, not this deletion. `token_kind.rs` uses `strum::Display`; there are no handwritten Display arms.
+
+## Per-client index of open paths
+
+`IsographDb::remove_open_files_of_client` (lsp-open-files.md change 4) runs on every `ClientConnectionEvent::Gone`. It scans every key of `open_file_map`, across every client, to find that client's keys. A per-client index of open paths, maintained by `set_open_file` and `remove_open_file`, would let disconnect cleanup visit only that client's paths. The index is state `handle` owns outside any memo; no memo reads it.
