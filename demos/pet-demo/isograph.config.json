@@ -1,3 +1,4 @@
 {
-  "source_files": ["src/**/*.ts"]
+  "source_files": ["src/**/*.ts"],
+  "schema": ["schema/**/*.graphql"]
 }
