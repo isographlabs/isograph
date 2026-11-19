@@ -40,5 +40,7 @@ jobs:
         run: pnpm --filter @isograph/runtime test
       - name: Typecheck the pet demo
         run: pnpm --filter pet-demo typecheck
+      - name: Fetch and read in the pet demo
+        run: pnpm --filter pet-demo fetch-and-read
       - name: Test
         run: pnpm --filter @isograph/babel-plugin test

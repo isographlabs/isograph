@@ -1,0 +1,26 @@
+{
+  "pets": [
+    {
+      "__typename": "Pet",
+      "id": "0",
+      "age": 4,
+      "firstName": "Makayla",
+      "lastName": "Balicki",
+      "nickname": "Mak",
+      "picture": "https://example.com/pets/0.png",
+      "species": "DOG",
+      "tagline": "I AM HUNGRY"
+    },
+    {
+      "__typename": "Pet",
+      "id": "1",
+      "age": 7,
+      "firstName": "Mr",
+      "lastName": "Biggles",
+      "nickname": null,
+      "picture": "https://example.com/pets/1.png",
+      "species": "CAT",
+      "tagline": "Pet me now, human"
+    }
+  ]
+}

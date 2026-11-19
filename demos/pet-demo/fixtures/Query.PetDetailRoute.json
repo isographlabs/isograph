@@ -1,0 +1,64 @@
+{
+  "0": {
+    "pet____id___v_id": {
+      "__typename": "Pet",
+      "id": "0",
+      "best_friend_relationship": {
+        "__typename": "BestFriendRelationship",
+        "best_friend": {
+          "__typename": "Pet",
+          "id": "1",
+          "firstName": "Mr",
+          "lastName": "Biggles"
+        },
+        "picture_together": null
+      },
+      "checkins____limit___l_5____skip___l_0": [
+        {
+          "__typename": "Checkin",
+          "id": "0-0",
+          "location": "The park",
+          "time": "2026-11-19T12:00:00Z"
+        },
+        {
+          "__typename": "Checkin",
+          "id": "0-1",
+          "location": "The vet",
+          "time": "2026-11-19T15:00:00Z"
+        }
+      ],
+      "firstName": "Makayla",
+      "lastName": "Balicki",
+      "nickname": "Mak",
+      "stats": {
+        "__typename": "PetStats",
+        "cuteness": 90,
+        "energy": 70,
+        "hunger": 100,
+        "intelligence": 80,
+        "sociability": 60,
+        "weight": 20
+      }
+    }
+  },
+  "1": {
+    "pet____id___v_id": {
+      "__typename": "Pet",
+      "id": "1",
+      "best_friend_relationship": null,
+      "checkins____limit___l_5____skip___l_0": [],
+      "firstName": "Mr",
+      "lastName": "Biggles",
+      "nickname": null,
+      "stats": {
+        "__typename": "PetStats",
+        "cuteness": 95,
+        "energy": 40,
+        "hunger": 30,
+        "intelligence": 95,
+        "sociability": 20,
+        "weight": 6
+      }
+    }
+  }
+}

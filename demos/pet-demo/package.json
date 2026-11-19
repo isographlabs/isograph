@@ -2,6 +2,7 @@
   "name": "pet-demo",
   "private": true,
   "scripts": {
+    "fetch-and-read": "node scripts/fetch-and-read.cjs",
     "log-entrypoints": "node scripts/log-entrypoints.cjs",
     "typecheck": "tsc --noEmit"
   },

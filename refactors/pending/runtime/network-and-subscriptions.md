@@ -1,6 +1,6 @@
 # Runtime: the network path and `readAndSubscribe`
 
-Status: changes 1 to 6 are approved for implementation; implementation starts after store.md's store and reader-ast.md's `read` land on i2. Request entries in the store (its own section, change 7) is a follow-up design under discussion, not approved. Change 8, the pet demo script (The pet demo script), is the final change; it depends on change 6 and not on change 7, and is not yet approved.
+Status: changes 1 to 6 are approved for implementation; implementation starts after store.md's store and reader-ast.md's `read` land on i2. Request entries in the store (its own section, change 7) is a follow-up design under discussion, not approved. Change 8, the pet demo script (The pet demo script), is the final change; it depends on change 6 and not on change 7, and is approved.
 
 `@isograph/runtime` (`libs/isograph-runtime`) gains the network path and subscriptions, as plain functions with no React. After this doc the package exposes `normalize`, `check`, `garbageCollect` (store.md), `read` (reader-ast.md), `readButDoNotEvaluate`, `readAndSubscribe`, `subscriptionSnapshot`, `listenToSubscription`, `callSubscriptions`, `fetchEntrypoint`, `getOrCreateCacheForArtifact`, `transpose`, and the environment functions `createIsographEnvironment`, `retainQuery`, `unretainQuery`, and `garbageCollectEnvironment`. The package has no React dependency and no React knowledge. A React package (`refactors/pending/runtime/react.md`) is a later plan built on these functions; it is not part of this work.
 
@@ -977,32 +977,27 @@ Mutation.SetTagline I AM FULL
 
 ### How it runs
 
-The script is Node with `@babel/register`, as `log-entrypoints` is. `tsx` does not work: it compiles with esbuild, which runs no Babel plugins, so each `iso(..)` call would reach the generated `iso`, which throws when called (`demos/pet-demo/src/__isograph/iso.ts`). Babel's CommonJS transform turns each `import` into a `require`, which Node resolves through the packages' `exports` with the `require` and `default` conditions, and `@babel/register` compiles each required `.ts` file in the directories its `only` lists.
+The script is Node with `@babel/register`, as `log-entrypoints` is. `tsx` does not work: it compiles with esbuild, which runs no Babel plugins, so each `iso(..)` call would reach the generated `iso`, which throws when called (`demos/pet-demo/src/__isograph/iso.ts`). Babel's CommonJS transform turns each `import` into a `require`. Node resolves `@isograph/runtime` and `@isograph/disposable-types` through their `exports`' `require` condition to `dist/index.cjs`, which the root `pnpm compile-libs` builds (both packages are built as upstream's libs packages are), so `@babel/register` compiles only the demo's `src`, and neither package gains an export condition.
 
-The Babel registration both scripts use moves into one file:
+The Babel registration both scripts use moves into one file, unchanged from `scripts/log-entrypoints.cjs`'s:
 
 ```js
 // from demos/pet-demo/scripts/registerBabel.cjs
 'use strict';
 
-// Compiles the demo's sources, and the TypeScript sources of the workspace packages they
-// import, with the Isograph Babel plugin as Node requires them.
+// Compiles the demo's sources with the Isograph Babel plugin as Node requires
+// them.
 
 const path = require('node:path');
 
 const demoDirectory = path.join(__dirname, '..');
-const librariesDirectory = path.join(demoDirectory, '..', '..', 'libs');
 
 require('@babel/register')({
   babelrc: false,
   configFile: false,
   cache: false,
   extensions: ['.ts'],
-  only: [
-    path.join(demoDirectory, 'src'),
-    path.join(librariesDirectory, 'isograph-runtime', 'src'),
-    path.join(librariesDirectory, 'isograph-disposable-types', 'src'),
-  ],
+  only: [path.join(demoDirectory, 'src')],
   presets: [require.resolve('@babel/preset-typescript')],
   plugins: [
     [require.resolve('@isograph/babel-plugin'), { searchFrom: demoDirectory }],
@@ -1011,14 +1006,12 @@ require('@babel/register')({
 });
 ```
 
-Delta from `scripts/log-entrypoints.cjs`'s registration: `only` adds the runtime's and `@isograph/disposable-types`' `src` directories, because the script imports their runtime values and both packages export TypeScript source. Node resolves the workspace symlinks to `libs/..` before `@babel/register` matches `only`.
-
 ```js
 // from demos/pet-demo/scripts/fetch-and-read.cjs
 'use strict';
 
-// Fetches and reads the demo's entrypoints from the mock network, and prints each root
-// resolver's result.
+// Fetches and reads the demo's entrypoints from the mock network, and prints
+// each root resolver's result.
 
 const path = require('node:path');
 
@@ -1036,29 +1029,30 @@ require(path.join(__dirname, '..', 'src', 'fetchAndRead'))
 // from demos/pet-demo/scripts/log-entrypoints.cjs
 'use strict';
 
-// Requires `src/logEntrypoints.ts`, which logs the artifact each entrypoint literal is
-// replaced with.
+// Requires every module that has an entrypoint literal and logs the artifact
+// its exported entrypoint literal is replaced with, with the reader artifact
+// its `readerArtifact` function returns.
 
 const path = require('node:path');
 
 require('./registerBabel.cjs');
 
-require(path.join(__dirname, '..', 'src', 'logEntrypoints'));
+const sourceDirectory = path.join(__dirname, '..', 'src');
+
+for (const moduleName of [
+  'HomeRoute',
+  'PetDetailRoute',
+  'SpeciesRoute',
+  'SetTagline',
+]) {
+  const entrypoint = require(path.join(sourceDirectory, moduleName))[
+    `${moduleName}Entrypoint`
+  ];
+  console.log({ ...entrypoint, readerArtifact: entrypoint.readerArtifact() });
+}
 ```
 
-The entrypoint logs move out of the resolver sources. A generated `resolver_reader.ts` imports its resolver from the source file (reader-ast.md), so with the logs in `HomeRoute.ts`, `PetDetailRoute.ts`, and `SetTagline.ts`, importing their entrypoints in `fetchAndRead.ts` would print three artifacts before the script's output. `HomeRoute.ts`, `PetDetailRoute.ts`, `SpeciesRoute.ts`, and `SetTagline.ts` each lose their last line, `console.log(iso(\`entrypoint ..\`));`, and one file holds the four:
-
-```ts
-// from demos/pet-demo/src/logEntrypoints.ts
-import { iso } from './__isograph/iso';
-
-console.log(iso(`entrypoint Query.HomeRoute`));
-console.log(iso(`entrypoint Query.PetDetailRoute`));
-console.log(iso(`entrypoint Query.SpeciesRoute`));
-console.log(iso(`entrypoint Mutation.SetTagline`));
-```
-
-`log-entrypoints`' output is unchanged: the same four artifacts, in the same order.
+Each route module already exports its entrypoint literal as `<Module>Entrypoint` and logs nothing, so `fetchAndRead.ts` and `mockNetwork.ts` import those exports, no entrypoint literal moves, and `log-entrypoints`' output is unchanged: the same four artifacts, in the same order.
 
 ```json
 // from demos/pet-demo/package.json
@@ -1084,7 +1078,7 @@ console.log(iso(`entrypoint Mutation.SetTagline`));
 }
 ```
 
-`demos/pet-demo/tsconfig.json` gains `"resolveJsonModule": true`, for the fixture imports. `libs/isograph-runtime/package.json`'s `exports["."]` and `libs/isograph-disposable-types/package.json`'s `exports["."]` each gain `"default": "./src/index.ts"` after their existing conditions, because the demo is the first module outside the packages that imports their runtime values, and it does so with `require`. `.github/workflows/js.yml` gains a step after "Typecheck the pet demo":
+`demos/pet-demo/tsconfig.json` gains `"resolveJsonModule": true`, for the fixture imports. `.github/workflows/js.yml` gains a step after "Typecheck the pet demo", which runs after "Build JS files":
 
 ```yaml
 # from .github/workflows/js.yml
@@ -1103,12 +1097,10 @@ import {
   readAndSubscribe,
   type ReadResult,
 } from '@isograph/runtime';
-import { iso } from './__isograph/iso';
+import { HomeRouteEntrypoint as homeRoute } from './HomeRoute';
 import { mockNetworkFunction } from './mockNetwork';
-
-const homeRoute = iso(`entrypoint Query.HomeRoute`);
-const petDetailRoute = iso(`entrypoint Query.PetDetailRoute`);
-const setTagline = iso(`entrypoint Mutation.SetTagline`);
+import { PetDetailRouteEntrypoint as petDetailRoute } from './PetDetailRoute';
+import { SetTaglineEntrypoint as setTagline } from './SetTagline';
 
 /**
  * Fetches and reads `Query.HomeRoute` and `Query.PetDetailRoute`, then changes a pet's
@@ -1120,10 +1112,20 @@ export async function fetchAndRead(): Promise<void> {
   const readHomeRoute = () =>
     valueOrThrow(
       homeRoute.name,
-      read(environment.store, homeRoute.readerArtifact, homeRoute.normalizationAst.root, {}),
+      read(
+        environment.store,
+        homeRoute.readerArtifact(),
+        homeRoute.normalizationAst.root,
+        {},
+      ),
     );
 
-  const [homeRouteRequest, releaseHomeRoute] = fetchEntrypoint(environment, homeRoute, {}, null);
+  const [homeRouteRequest, releaseHomeRoute] = fetchEntrypoint(
+    environment,
+    homeRoute,
+    {},
+    null,
+  );
   await homeRouteRequest.promise;
   console.log(homeRoute.name, readHomeRoute());
 
@@ -1142,7 +1144,7 @@ export async function fetchAndRead(): Promise<void> {
       petDetailRoute.name,
       read(
         environment.store,
-        petDetailRoute.readerArtifact,
+        petDetailRoute.readerArtifact(),
         petDetailRoute.normalizationAst.root,
         petDetailVariables,
       ),
@@ -1151,10 +1153,14 @@ export async function fetchAndRead(): Promise<void> {
 
   const [, unsubscribe] = readAndSubscribe(
     environment,
-    homeRoute.readerArtifact,
+    homeRoute.readerArtifact(),
     homeRoute.normalizationAst.root,
     {},
-    () => console.log(`${homeRoute.name} after ${setTagline.name}`, readHomeRoute()),
+    () =>
+      console.log(
+        `${homeRoute.name} after ${setTagline.name}`,
+        readHomeRoute(),
+      ),
   );
 
   const [setTaglineRequest, releaseSetTagline] = fetchEntrypoint(
@@ -1178,7 +1184,9 @@ export async function fetchAndRead(): Promise<void> {
  * means the fixture and the query disagree. */
 function valueOrThrow<T>(name: string, result: ReadResult<T>): T {
   if (result.kind === 'MissingData') {
-    throw new Error(`${name} is missing data after its response was normalized: ${result.reason}`);
+    throw new Error(
+      `${name} is missing data after its response was normalized: ${result.reason}`,
+    );
   }
   return result.value;
 }
@@ -1203,22 +1211,26 @@ export const HomeRoute = iso(`
 `)(function HomeRoute({ data }) {
   return data.pets.map((pet) => ({ id: pet.id, summary: pet.PetSummaryCard }));
 });
+
+export const HomeRouteEntrypoint = iso(`entrypoint Query.HomeRoute`);
 ```
 
-Before, it returned `data.pets.map((pet) => pet.PetSummaryCard)` and ended with the `console.log` line. The literal is unchanged, so no artifact changes: `output_type.ts` is `ReturnType<typeof resolver>`.
+Before, it returned `data.pets.map((pet) => pet.PetSummaryCard)`. The literal is unchanged, so no artifact changes: `output_type.ts` is `ReturnType<typeof resolver>`.
 
 ### The mock network function
 
 ```ts
 // from demos/pet-demo/src/mockNetwork.ts
-import type { IsographNetworkFunction, JsonObject, Variables } from '@isograph/runtime';
+import type {
+  IsographNetworkFunction,
+  JsonObject,
+  Variables,
+} from '@isograph/runtime';
 import homeRouteResponse from '../fixtures/Query.HomeRoute.json';
 import petDetailRouteResponses from '../fixtures/Query.PetDetailRoute.json';
-import { iso } from './__isograph/iso';
-
-const homeRoute = iso(`entrypoint Query.HomeRoute`);
-const petDetailRoute = iso(`entrypoint Query.PetDetailRoute`);
-const setTagline = iso(`entrypoint Mutation.SetTagline`);
+import { HomeRouteEntrypoint as homeRoute } from './HomeRoute';
+import { PetDetailRouteEntrypoint as petDetailRoute } from './PetDetailRoute';
+import { SetTaglineEntrypoint as setTagline } from './SetTagline';
 
 /** `Query.PetDetailRoute`'s response for each pet id the fixture has. */
 const petDetailRouteResponseById: ReadonlyMap<string, JsonObject> = new Map(
@@ -1229,7 +1241,10 @@ const petDetailRouteResponseById: ReadonlyMap<string, JsonObject> = new Map(
  * Answers `Query.HomeRoute` and `Query.PetDetailRoute` from the fixture responses, and
  * `Mutation.SetTagline` with the pet and tagline it was sent. Rejects anything else.
  */
-export const mockNetworkFunction: IsographNetworkFunction = (operation, variables) => {
+export const mockNetworkFunction: IsographNetworkFunction = (
+  operation,
+  variables,
+) => {
   const id = variables['id'];
   const tagline = variables['tagline'];
   if (operation.text === homeRoute.queryText) {
@@ -1237,9 +1252,15 @@ export const mockNetworkFunction: IsographNetworkFunction = (operation, variable
   }
   if (operation.text === petDetailRoute.queryText && typeof id === 'string') {
     const response = petDetailRouteResponseById.get(id);
-    return response === undefined ? noResponse(operation.text, variables) : Promise.resolve(response);
+    return response === undefined
+      ? noResponse(operation.text, variables)
+      : Promise.resolve(response);
   }
-  if (operation.text === setTagline.queryText && typeof id === 'string' && typeof tagline === 'string') {
+  if (
+    operation.text === setTagline.queryText &&
+    typeof id === 'string' &&
+    typeof tagline === 'string'
+  ) {
     return Promise.resolve({
       set_pet_tagline____input___o_id__v_id_tagline__v_tagline_c: {
         __typename: 'SetPetTaglineResponse',
@@ -1250,9 +1271,14 @@ export const mockNetworkFunction: IsographNetworkFunction = (operation, variable
   return noResponse(operation.text, variables);
 };
 
-function noResponse(queryText: string, variables: Variables): Promise<JsonObject> {
+function noResponse(
+  queryText: string,
+  variables: Variables,
+): Promise<JsonObject> {
   return Promise.reject(
-    new Error(`The mock network has no response for ${queryText} with ${JSON.stringify(variables)}`),
+    new Error(
+      `The mock network has no response for ${queryText} with ${JSON.stringify(variables)}`,
+    ),
   );
 }
 ```
@@ -1351,17 +1377,17 @@ Typing: `resolveJsonModule` types each fixture import as the object type of its 
 
 ### README
 
-`demos/pet-demo/README.md`: "Logging the entrypoint artifacts" says the script requires `src/logEntrypoints.ts`, which holds the four entrypoint literals, in place of requiring the four route modules; the Sources list says `src/HomeRoute.ts`, `src/PetDetailRoute.ts`, `src/SpeciesRoute.ts`, and `src/SetTagline.ts` hold the fields and `src/logEntrypoints.ts` the entrypoints, and lists `src/fetchAndRead.ts` and `src/mockNetwork.ts`. A new section after it:
+`demos/pet-demo/README.md`: "Logging the entrypoint artifacts" says the script requires `scripts/registerBabel.cjs`; the Sources paragraph says every file in `src/` except `fetchAndRead.ts` and `mockNetwork.ts` calls `iso(...)`; the Sources list says `HomeRoute` returns each pet's id with its summary, and lists `src/fetchAndRead.ts` and `src/mockNetwork.ts`. A new section after it:
 
 ```md
 <!-- from demos/pet-demo/README.md -->
 ## Fetching and reading
 
-From the i2 repo root, after `pnpm install`:
+From the i2 repo root, after `pnpm install` and `pnpm compile-libs`:
 
     pnpm --filter pet-demo fetch-and-read
 
-`scripts/fetch-and-read.cjs` registers Babel as `log-entrypoints` does, also over the TypeScript sources of `@isograph/runtime` and `@isograph/disposable-types`, and calls `fetchAndRead` in `src/fetchAndRead.ts`. That function creates an environment over `src/mockNetwork.ts`, which answers `Query.HomeRoute` and `Query.PetDetailRoute` from the JSON in `fixtures/` and `Mutation.SetTagline` from its variables. It fetches and reads `Query.HomeRoute` and `Query.PetDetailRoute` for pet `0`, subscribes to `Query.HomeRoute`, sets pet `0`'s tagline to `I AM FULL`, and prints each root resolver's result, the `Query.HomeRoute` result a second time from the subscription. Nothing renders; the resolvers return plain data.
+`scripts/fetch-and-read.cjs` requires `scripts/registerBabel.cjs` and calls `fetchAndRead` in `src/fetchAndRead.ts`. Node requires `@isograph/runtime` and `@isograph/disposable-types` from their built `dist`, which `pnpm compile-libs` writes. `fetchAndRead` creates an environment over `src/mockNetwork.ts`, which answers `Query.HomeRoute` and `Query.PetDetailRoute` from the JSON in `fixtures/` and `Mutation.SetTagline` from its variables. It fetches and reads `Query.HomeRoute` and `Query.PetDetailRoute` for pet `0`, subscribes to `Query.HomeRoute`, sets pet `0`'s tagline to `I AM FULL`, and prints each root resolver's result, the `Query.HomeRoute` result a second time from the subscription, followed by the expected output. Nothing renders; the resolvers return plain data.
 ```
 
 ## Request entries in the store
@@ -1501,11 +1527,11 @@ export {
 } from "./subscribe";
 ```
 
-The index re-exports nothing of `@isograph/disposable-types`; callers import `ParentCache`, `CacheItem`, and `ItemCleanupPair` from it. `package.json`'s `exports` keeps only its `types` condition through change 6: no module outside the package imports its runtime values until change 8, and tests import `../src/index`. Change 8 adds the `default` condition for the pet demo script, which requires the package through Babel's CommonJS transform.
+The index re-exports nothing of `@isograph/disposable-types`; callers import `ParentCache`, `CacheItem`, and `ItemCleanupPair` from it. `package.json`'s `exports` stay the landed `require` and `import` conditions into `dist`; tests import `../src/index`.
 
-### 8. The pet demo script (demos/pet-demo, libs/isograph-runtime, libs/isograph-disposable-types)
+### 8. The pet demo script (demos/pet-demo)
 
-`scripts/registerBabel.cjs`, `scripts/fetch-and-read.cjs`, and `scripts/log-entrypoints.cjs` requiring `src/logEntrypoints.ts`; `src/logEntrypoints.ts`, `src/fetchAndRead.ts`, `src/mockNetwork.ts`; `fixtures/Query.HomeRoute.json`, `fixtures/Query.PetDetailRoute.json`; the `console.log` lines removed from `src/HomeRoute.ts`, `src/PetDetailRoute.ts`, `src/SpeciesRoute.ts`, and `src/SetTagline.ts`, and `HomeRoute`'s resolver returning `{ id, summary }`; the `fetch-and-read` script in `package.json`; `resolveJsonModule` in `tsconfig.json`; the README section; the `default` export condition of `@isograph/runtime` and `@isograph/disposable-types`; the CI step. The daemon run in `demos/pet-demo` leaves `src/__isograph/` unchanged, because no literal changes and the moved entrypoint literals produce the same artifacts. Depends on 6 and on reader-ast.md's real `resolver_reader.ts` artifacts in the pet demo.
+`scripts/registerBabel.cjs`, `scripts/fetch-and-read.cjs`, and `scripts/log-entrypoints.cjs` requiring `scripts/registerBabel.cjs`; `src/fetchAndRead.ts` and `src/mockNetwork.ts`, importing the route modules' exported entrypoints; `fixtures/Query.HomeRoute.json`, `fixtures/Query.PetDetailRoute.json`; `HomeRoute`'s resolver returning `{ id, summary }`; the `fetch-and-read` script in `package.json`; `resolveJsonModule` in `tsconfig.json`; the README section; the CI step. The daemon run in `demos/pet-demo` leaves `src/__isograph/` unchanged, because no literal changes. Depends on 6.
 
 ## Docs this doc amends
 

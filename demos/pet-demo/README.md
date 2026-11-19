@@ -20,7 +20,7 @@ From the i2 repo root, after `pnpm install`:
 pnpm --filter pet-demo log-entrypoints
 ```
 
-`scripts/log-entrypoints.cjs` registers `@babel/register` with `@babel/preset-typescript`, the local `@isograph/babel-plugin`, and `@babel/plugin-transform-modules-commonjs`, so Node compiles each file under `src/` as it is required. The script then requires `HomeRoute`, `PetDetailRoute`, `SpeciesRoute`, and `SetTagline`. Each exports its entrypoint literal as `<Module>Entrypoint`, and the Babel plugin replaces each ``iso(`entrypoint ...`)`` call with an import of the generated `entrypoint.ts` in `src/__isograph/`. The script logs each entrypoint artifact with its `readerArtifact` called:
+`scripts/log-entrypoints.cjs` requires `scripts/registerBabel.cjs`, which registers `@babel/register` with `@babel/preset-typescript`, the local `@isograph/babel-plugin`, and `@babel/plugin-transform-modules-commonjs`, so Node compiles each file under `src/` as it is required. The script then requires `HomeRoute`, `PetDetailRoute`, `SpeciesRoute`, and `SetTagline`. Each exports its entrypoint literal as `<Module>Entrypoint`, and the Babel plugin replaces each ``iso(`entrypoint ...`)`` call with an import of the generated `entrypoint.ts` in `src/__isograph/`. The script logs each entrypoint artifact with its `readerArtifact` called:
 
 ```text
 {
@@ -36,6 +36,31 @@ and the same shape for `Query.PetDetailRoute`, `Query.SpeciesRoute`, and `Mutati
 
 The script reads the committed artifacts. It does not run the daemon, so after changing a literal, run the daemon in this directory first.
 
+## Fetching and reading
+
+From the i2 repo root, after `pnpm install` and `pnpm compile-libs`:
+
+```sh
+pnpm --filter pet-demo fetch-and-read
+```
+
+`scripts/fetch-and-read.cjs` requires `scripts/registerBabel.cjs` and calls `fetchAndRead` in `src/fetchAndRead.ts`. Node requires `@isograph/runtime` and `@isograph/disposable-types` from their built `dist`, which `pnpm compile-libs` writes. `fetchAndRead` creates an environment over `src/mockNetwork.ts`, which answers `Query.HomeRoute` and `Query.PetDetailRoute` from the JSON in `fixtures/` and `Mutation.SetTagline` from its variables. It fetches and reads `Query.HomeRoute` and `Query.PetDetailRoute` for pet `0`, subscribes to `Query.HomeRoute`, sets pet `0`'s tagline to `I AM FULL`, and prints each root resolver's result, the `Query.HomeRoute` result a second time from the subscription:
+
+```text
+Query.HomeRoute [
+  { id: '0', summary: 'Makayla Balicki: I AM HUNGRY' },
+  { id: '1', summary: 'Mr Biggles: Pet me now, human' }
+]
+Query.PetDetailRoute { id: '0' } Makayla Balicki
+Query.HomeRoute after Mutation.SetTagline [
+  { id: '0', summary: 'Makayla Balicki: I AM FULL' },
+  { id: '1', summary: 'Mr Biggles: Pet me now, human' }
+]
+Mutation.SetTagline I AM FULL
+```
+
+Nothing renders; the resolvers return plain data. The fixture responses use the response keys of the committed `query_text.graphql` files; a compiler change that renames a response key makes `normalize` throw, naming the key.
+
 ## Config
 
 `isograph.config.json` sets `source_files` to `src/**/*.ts`, `schema` to `schema/**/*.graphql`, and `output_directory` to `src`, so the daemon writes artifacts into `src/__isograph/`. That folder is generated and committed: running the daemon in this directory rewrites it. It holds `iso.ts`, `tsconfig.json`, a param type per field, a parameters type per field with variables, output types and reader artifacts per upstream's reachability rules, an entrypoint, normalization AST, `query_text.ts`, and `query_text.graphql` per entrypoint, and a link type per entity a field is declared on or a pointer points to.
@@ -48,7 +73,7 @@ The script reads the committed artifacts. It does not run the daemon, so after c
 
 ## Sources
 
-`iso` is generated into `src/__isograph/iso.ts`; resolvers are typed by their field's generated param type. A field literal's overload returns upstream's `IdentityWithParam<P__f__param>`, so a resolver's `{ data }` parameter needs no annotation: `data` has the type of the field's selection set, a client field selected by another field has the type its resolver returns, and a pointer's resolver must return a link (`{ entityName, id }`, `Link<"E">` from `@isograph/runtime`) of its target. An entrypoint literal has the type of its generated entrypoint artifact. Every file in `src/` calls `iso(...)`. `tsc --noEmit --strict` over `src` passes. `picture` and `picture_together` select the custom scalar `Url`, which is `unknown` because the `isograph` binary's profile maps no custom scalars. Each `field` literal is exported under its field name and immediately called with a resolver function. Each entrypoint literal's artifact is logged.
+`iso` is generated into `src/__isograph/iso.ts`; resolvers are typed by their field's generated param type. A field literal's overload returns upstream's `IdentityWithParam<P__f__param>`, so a resolver's `{ data }` parameter needs no annotation: `data` has the type of the field's selection set, a client field selected by another field has the type its resolver returns, and a pointer's resolver must return a link (`{ entityName, id }`, `Link<"E">` from `@isograph/runtime`) of its target. An entrypoint literal has the type of its generated entrypoint artifact. Every file in `src/` except `fetchAndRead.ts` and `mockNetwork.ts` calls `iso(...)`; those two import the exported entrypoints. `tsc --noEmit --strict` over `src` passes. `picture` and `picture_together` select the custom scalar `Url`, which is `unknown` because the `isograph` binary's profile maps no custom scalars. Each `field` literal is exported under its field name and immediately called with a resolver function. Each entrypoint literal's artifact is logged.
 
 - `src/Pet.ts`: `field Pet.fullName` with a string description, and `field Pet.bestFriend to Pet` with a nested selection set, whose resolver returns a link to a `Pet` or `null`.
 - `src/Owner.ts`: `entity Owner`, which exists only in the sources; `field Owner.displayName` with no selection set; `field Owner.OwnerBadge`, which selects `displayName`; and `field Pet.owner to Owner!`, whose resolver returns a link to an `Owner`.
@@ -56,10 +81,12 @@ The script reads the committed artifacts. It does not run the daemon, so after c
 - `src/PetStatsCard.ts`: `field Pet.PetStatsCard` with a nested selection on `stats`.
 - `src/PetCheckinsCard.ts`: `field Pet.PetCheckinsCard($limit: Int = 3)`, passing `$limit` and the literal `0` to `checkins`.
 - `src/PetBestFriendCard.ts`: `field Pet.PetBestFriendCard` with two levels of nesting and the aliased selection `friendName: firstName`.
-- `src/HomeRoute.ts`: `field Query.HomeRoute`, selecting `PetSummaryCard`, and `entrypoint Query.HomeRoute`.
+- `src/HomeRoute.ts`: `field Query.HomeRoute`, selecting `id` and `PetSummaryCard` on each pet and returning each pet's id with its summary, and `entrypoint Query.HomeRoute`.
 - `src/PetDetailRoute.ts`: `field Query.PetDetailRoute($id: ID!)`, selecting `pet(id: $id)` and under it the source fields `fullName`, `PetStatsCard`, `PetCheckinsCard(limit: 5)`, `PetBestFriendCard`, `bestFriend { fullName }`, and `owner { OwnerBadge }`; and `entrypoint Query.PetDetailRoute`.
 - `src/SpeciesRoute.ts`: `field Query.SpeciesRoute($species: PetSpecies!)`, selecting the extension field `petsBySpecies(species: $species)`, `viewer`, and `node(id: "1")` on the interface `Node`; and `entrypoint Query.SpeciesRoute`.
 - `src/SetTagline.ts`: `field Mutation.SetTagline($id: ID!, $tagline: String!)`, passing the object literal `{ id: $id, tagline: $tagline }` to `set_pet_tagline`; and `entrypoint Mutation.SetTagline`.
+- `src/fetchAndRead.ts`: `fetchAndRead`, which `scripts/fetch-and-read.cjs` calls (Fetching and reading).
+- `src/mockNetwork.ts`: the network function `fetchAndRead` uses, over the responses in `fixtures/`.
 
 ## Not yet validated
 
