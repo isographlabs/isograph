@@ -36,4 +36,4 @@ Delete those commented-out variants and the TODO on the skip regex. The commente
 
 ## Per-client index of open paths
 
-`IsographDb::remove_open_files_of_client` (lsp-open-files.md change 4) runs on every `ClientConnectionEvent::Gone`. It scans every key of `open_file_map`, across every client, to find that client's keys. A per-client index of open paths, maintained by `set_open_file` and `remove_open_file`, would let disconnect cleanup visit only that client's paths. The index is state `handle` owns outside any memo; no memo reads it.
+`IsographDb::remove_open_files_of_client` (lsp-open-files.md change 5) runs on every `ClientConnectionEvent::Gone`. It scans every key of `open_file_map`, across every client, to find that client's keys. A per-client index of open paths, maintained by `set_open_file` and `remove_open_file`, would let disconnect cleanup visit only that client's paths. The index is state `handle` owns outside any memo; no memo reads it.
