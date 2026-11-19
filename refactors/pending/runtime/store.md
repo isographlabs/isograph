@@ -40,8 +40,8 @@ test("a pet with an identity-less stats object", () => {
   );
   expect(store).toEqual(
     storeOf({
-      Query: { __ROOT: { pet____id___1: { entity: "Pet", id: "1" } } },
-      Pet: { "1": { id: "1", name: "Rex", nickname: null, stats: { entity: "PetStats", id: "Pet:1.stats" } /* ... */ } },
+      Query: { __ROOT: { pet____id___1: { entityName: "Pet", id: "1" } } },
+      Pet: { "1": { id: "1", name: "Rex", nickname: null, stats: { entityName: "PetStats", id: "Pet:1.stats" } /* ... */ } },
       PetStats: { "Pet:1.stats": { weight: 7, energy: null } },
     }),
   );
@@ -55,7 +55,7 @@ test("a pet with an identity-less stats object", () => {
 What this shows:
 
 - The response is read by each node's response key, `responseKey ?? selectableName` (`pet____id___v_id` for `pet(id: $id)`, `name` for `name`, which the query prints with no alias); the store is written by the store key, with variable values substituted (`pet____id___1`).
-- The top level is written onto `petDetail.root`, `{ entity: "Query", id: "__ROOT" }`; the caller passes no root.
+- The top level is written onto `petDetail.root`, `{ entityName: "Query", id: "__ROOT" }`; the caller passes no root.
 - `Pet:1`'s entity is its target's `entity` (`Known`, `Pet`), and its id the value under its target's `identity` (`Select`, `id`); `PetStats`'s target has `identity: { kind: "Omit" }` and gets upstream's derived id `Pet:1.stats`.
 - `null` is stored as `null` and is known data. `__typename` is not stored: the record's entity is its first-layer key.
 - `check` with other variables reports the root record, which lacks `pet____id___2`.
@@ -65,13 +65,14 @@ What this shows:
 
 ```ts
 // from libs/isograph-runtime/src/store.ts
-/** Every record: entity name, then record id, then the record. */
+import type { EntityName } from "./artifacts";
+
+/** Every record: `EntityName`, then record id, then the record. */
 export type Store = Map<EntityName, Map<RecordId, StoreRecord>>;
 
 /** One record's values by store key. An absent key is missing data; `null` is known data. */
 export type StoreRecord = Map<StoreKey, StoreValue>;
 
-export type EntityName = string;
 export type RecordId = string;
 /** A selectable name followed by one chunk per argument, variables substituted. */
 export type StoreKey = string;
@@ -87,7 +88,7 @@ export type CompositeValue = null | StoreLink | ReadonlyArray<CompositeValue>;
 
 /** Points at record `id` of entity `entity`. */
 export type StoreLink = {
-  readonly entity: EntityName;
+  readonly entityName: EntityName;
   readonly id: RecordId;
 };
 
@@ -102,9 +103,9 @@ The type is the two-layer map and nothing else. The empty store is `new Map()`. 
 
 `Map` at all three layers, mutable because `normalize` and `garbageCollect` write in place; `check` takes the same `Store` and does not write. Maps, not plain objects, because ids and store keys are arbitrary strings: a record id `"constructor"` or a selectable named `constructor` (a valid GraphQL name) would read `Object.prototype.constructor` from a plain object. For the same reason every read of a response object or of `variables` goes through `Object.hasOwn(object, key) ? object[key] : undefined` (ES2022).
 
-A link carries no tag. A `LeafValue` can have the same shape as a `StoreLink` (a `JSON` scalar `{ entity: "Pet", id: "1" }`); no function confuses them, because each reads a store key only under an AST selection whose `target` is `null` (leaf) or an object (composite). Upstream's links are `{ __link, __typename }` (`IsographEnvironment.ts:122-125`), and its walks also go through the AST.
+A link carries no tag. A `LeafValue` can have the same shape as a `StoreLink` (a `JSON` scalar `{ entityName: "Pet", id: "1" }`); no function confuses them, because each reads a store key only under an AST selection whose `target` is `null` (leaf) or an object (composite). Upstream's links are `{ __link, __typename }` (`IsographEnvironment.ts:122-125`), and its walks also go through the AST.
 
-Root records: an operation's root record is `ast.root`, `{ entity: <root operation type>, id: "__ROOT" }`, which the compiler writes (normalization-ast.md, The record). A nested selection of any root operation type has `identity: { kind: "Fixed", id: "__ROOT" }` and is written onto the same record. The runtime defines no root id and no root entity name: both come from the AST (upstream hard-codes `ROOT_ID`, `IsographEnvironment.ts:163`).
+Root records: an operation's root record is `ast.root`, `{ entityName: <root operation type>, id: "__ROOT" }`, which the compiler writes (normalization-ast.md, The record). A nested selection of any root operation type has `identity: { kind: "Fixed", id: "__ROOT" }` and is written onto the same record. The runtime defines no root id and no root entity name: both come from the AST (upstream hard-codes `ROOT_ID`, `IsographEnvironment.ts:163`).
 
 Deltas from upstream (`IsographEnvironment.ts:122-169`, `:211-217`):
 
@@ -165,14 +166,14 @@ export function recordLink(
 
 The entity, from `target.entity`:
 
-- `Known`: `target.entity.name`. The discriminator is not read and not compared.
+- `Known`: `target.entity.entityName`. The discriminator is not read and not compared.
 - `Discriminator`: the value under `discriminatorResponseKey`, which must be a string (else it throws, Errors).
 
 The identity: the `identity` of the `Conditional` among `target.selections` whose `condition.entityName` equals that entity, when one does and its identity is not `Omit`; otherwise `target.identity`. The conditional's comes first because it is the identity of the response object's concrete entity; a union target's is `Omit` and its `asBlogItem` conditional's is `Select("id")`. At most one conditional of a selection set matches: the conditions name distinct entities (the map keys conditionals by `Condition`). Only direct children are considered, because no condition nests under the current grammar (normalization-ast.md, Merging). The id, by the identity's `kind`:
 
 - `Fixed`: `identity.id`. The record is a root entity's one record (Nested objects of a root entity).
 - `Select`: the value under `identity.selectableName` (the identity selection has no arguments, so the query prints it with no alias), which must be a string (GraphQL serializes `ID` as a string, spec 3.5.5); any other value throws (Errors). An absent key throws as every absent selected key does.
-- `Omit`: the derived id, upstream's (`getDataIdOfNetworkResponse`, `cache.ts:599-642`): `${parent.entity}:${parent.id}.${selection.selectableName}`, then `.${index}` for each list level from the outermost, then `argumentChunks(selection.arguments, variables)`. Examples: `Pet:1.stats`, `Query:__ROOT.feed.1____limit___2`, `Query:__ROOT.statGrid.0.1`.
+- `Omit`: the derived id, upstream's (`getDataIdOfNetworkResponse`, `cache.ts:599-642`): `${parent.entityName}:${parent.id}.${selection.selectableName}`, then `.${index}` for each list level from the outermost, then `argumentChunks(selection.arguments, variables)`. Examples: `Pet:1.stats`, `Query:__ROOT.feed.1____limit___2`, `Query:__ROOT.statGrid.0.1`.
 
 Each switch on a `kind` is exhaustive, with no `default` (Errors: artifacts).
 
@@ -191,7 +192,7 @@ The rule covers every root operation type, not only the operation's own: a mutat
 
 ## Conditions
 
-A `Conditional`'s `condition` is `{ kind: "SelectionEquals", entityName }` (normalization-ast.md, The condition). Every walk compares `condition.entityName` with the entity of the record it is on, inline, with `===`: `normalize` with the entity of the record it is writing (the target's `Known` entity, or the response's discriminator value under `Discriminator`; at the top level, `ast.root.entity`), and `check` and `garbageCollect` with the `entity` of the link they are at. The two agree for every record `normalize` wrote, because the link's entity is the entity `normalize` wrote it under. There is no `conditionHolds` function and no `src/condition.ts`. Upstream inlines the same comparison at each site (`__typename === type`, `cache.ts:356`, `check.ts:193`, `garbageCollection.ts:159`).
+A `Conditional`'s `condition` is `{ kind: "SelectionEquals", entityName }` (normalization-ast.md, The condition). Every walk compares `condition.entityName` with the entity of the record it is on, inline, with `===`: `normalize` with the entity of the record it is writing (the target's `Known` entity, or the response's discriminator value under `Discriminator`; at the top level, `ast.root.entityName`), and `check` and `garbageCollect` with the `entity` of the link they are at. The two agree for every record `normalize` wrote, because the link's entity is the entity `normalize` wrote it under. There is no `conditionHolds` function and no `src/condition.ts`. Upstream inlines the same comparison at each site (`__typename === type`, `cache.ts:356`, `check.ts:193`, `garbageCollection.ts:159`).
 
 A switch on `condition.kind` would have one case; the comparison reads `condition.entityName` directly, because `kind` has one value in v1 and TypeScript narrows nothing by it. `VariableEquals` (normalization-ast.md, Later) adds the switch.
 
@@ -215,16 +216,16 @@ It returns nothing: no v1 caller reads what it wrote (no subscriptions, no `Enco
 
 A selection's response key is `selection.responseKey ?? selection.selectableName`: the alias the query prints for a selection with arguments, and the selectable name for one without (normalization-ast.md, End-user experience). Below, `response[responseKey]` means the value under that key.
 
-Behavior, walking `ast.selections` against `response` onto the record `ast.root` (`{ entity, id }`; the top level selects no discriminator, query-generation.md):
+Behavior, walking `ast.selections` against `response` onto the record `ast.root` (`{ entityName, id }`; the top level selects no discriminator, query-generation.md):
 
 - The record at a link is the store's record if present, else a new empty record inserted into `store`. Fields the AST does not select are kept. A store key written twice in one call (two paths to `Pet:1`) holds the later write, in AST and list order.
 - `Selection` with `target: null` (leaf): writes `response[responseKey]` under `storeKey(selection, variables)`, as received: a string, number, boolean, `null`, a list of leaves at any depth, or a `JSON` object.
 - `Selection` with a `target` (composite), by the response value:
   - `null`: writes `null`.
-  - An object: its record is `recordLink(value, selection.target, ast.discriminatorResponseKey, position, variables)` (Record ids). The record is written by walking `selection.target.selections` against `value`, and the parent gets the link `{ entity, id }`. `selections` may be `[]` (normalization-ast.md: `stats { X @loadable }`); the record is still created, empty.
+  - An object: its record is `recordLink(value, selection.target, ast.discriminatorResponseKey, position, variables)` (Record ids). The record is written by walking `selection.target.selections` against `value`, and the parent gets the link `{ entityName, id }`. `selections` may be `[]` (normalization-ast.md: `stats { X @loadable }`); the record is still created, empty.
   - A list: the value is the list with each item replaced, recursively: `null` stays `null`, an object becomes a link as above with its index path, a nested list recurses. `[]` writes `[]`.
   - A string, number, or boolean, here or as a list item: throws.
-- `Conditional`: when `condition.entityName === record.entity`, where `record` is the link of the record the walk is writing, walks `selections` against the same response object onto the same record; otherwise nothing.
+- `Conditional`: when `condition.entityName === record.entityName`, where `record` is the link of the record the walk is writing, walks `selections` against the same response object onto the same record; otherwise nothing.
 - A selected response key absent from the response object, outside a conditional that does not hold: throws. A well-formed response holds every such key, and conditionals already skip the keys of a fragment that does not apply.
 - The discriminator is never written to a record.
 
@@ -257,7 +258,7 @@ Upstream's semantics (`check.ts:43-215`): `null` is known data, only an absent k
 - `ast.root` absent from the store: `MissingData { record: ast.root }`.
 - Leaf selection: absent key is `MissingData { record: current }`; any value, `null` included, is enough.
 - Composite selection: absent key is `MissingData { record: current }`; `null` is enough; a link whose record is absent is `MissingData { record: link }`; a present record recurses with `selection.target.selections`, even when they are `[]`; a list recurses into every item and nested list, `null` items being enough. A value that is not `null`, a link, or a list of these throws (Errors).
-- `Conditional`: when `condition.entityName === current.entity`, recurses on the same record; otherwise enough.
+- `Conditional`: when `condition.entityName === current.entityName`, recurses on the same record; otherwise enough.
 
 v1 has no `shouldFetch` decision function. The later network layer decides upstream's `'Yes' | 'No' | 'IfNecessary'` (default `IfNecessary`, `check.ts:13-16`; `makeNetworkRequest.ts:67-118`) by calling `check`.
 
@@ -285,7 +286,7 @@ Mark, then sweep (upstream `garbageCollectBaseStoreLayer`, `garbageCollection.ts
 
 - Each retained query marks `ast.root` when that record exists, and walks its AST from it.
 - A leaf selection marks nothing. A composite selection follows each link in its value (every list level), and marks and walks each linked record that exists. An absent key, `null`, or an absent record stops that path. A value that is not `null`, a link, or a list of these throws (Errors).
-- `Conditional`: when `condition.entityName === current.entity`, walks the same record.
+- `Conditional`: when `condition.entityName === current.entityName`, walks the same record.
 - The sweep deletes every unmarked record, then every entity map left empty. Marked records stay whole, including fields no retained AST selects. `retained = []` empties the store.
 - Cyclic data terminates: the walk recurses on the AST, which is finite. A record reached by several paths is walked once per path.
 
@@ -319,7 +320,7 @@ Every throw site:
 - `normalize`, a composite selection's value, or a list item at any depth, that is a string, number, or boolean: `Malformed response at ${path}: expected an object, a list, or null for "${responseKey}", got ${JSON.stringify(value)}.` Invariant: a composite field's value is an object, a list, or `null`.
 - `recordLink`, a composite response object whose target's `entity` is `Discriminator`, with no string under `ast.discriminatorResponseKey`: `Malformed response at ${path}: expected a string under "${discriminatorResponseKey}".` Invariant: the compiler selects the discriminator in every selection set under a composite selection (query-generation.md, Completion, step 4). Under a `Known` entity the discriminator is not read, so its absence does not throw.
 - `recordLink`, a `Select` identity value that is not a string: `Malformed response at ${path}: expected a string record id under "${selectableName}", got ${JSON.stringify(value)}.` Invariant: GraphQL serializes `ID` as a string (spec 3.5.5), and the protocol names only an `ID!` selectable as the identity (`IdField::Present`, query-generation.md).
-- `check` and `garbageCollect`, a value under a composite store key that is not `null`, a link, or a list of these at any depth: `Store record ${entity}:${id} holds a non-link under the composite store key "${storeKey}"; the store was written with an AST that disagrees with this one.` Invariant: Store states only our normalizer produces, above. A link is an object whose own keys are exactly `entity` and `id`, both strings.
+- `check` and `garbageCollect`, a value under a composite store key that is not `null`, a link, or a list of these at any depth: `Store record ${entityName}:${id} holds a non-link under the composite store key "${storeKey}"; the store was written with an AST that disagrees with this one.` Invariant: Store states only our normalizer produces, above. A link is an object whose own keys are exactly `entityName` and `id`, both strings.
 - `storeKey` and `recordLink` (through `argumentChunks`), a required variable absent from `variables`: open decision 10.
 
 `${path}` is `JSON.stringify(path)`, the response keys and list indexes from the top of the response (`["pet____id___v_id","checkins____limit___2",1]`).
@@ -362,6 +363,7 @@ export type {
   Arguments,
   ArgumentValue,
   Condition,
+  EntityName,
   NormalizationAst,
   NormalizationCompositeTarget,
   NormalizationConditional,
@@ -374,7 +376,6 @@ export type {
 } from "./artifacts";
 export type {
   CompositeValue,
-  EntityName,
   JsonObject,
   JsonValue,
   LeafValue,
@@ -432,12 +433,12 @@ Tests build responses, variables, and stores by hand; those are inputs. Each tes
 ```ts
 // from libs/isograph-runtime/test/fixtures.ts
 /** The root records the fixture's ASTs name, for asserting on results. */
-export const queryRoot: StoreLink = { entity: "Query", id: "__ROOT" };
-export const mutationRoot: StoreLink = { entity: "Mutation", id: "__ROOT" };
+export const queryRoot: StoreLink = { entityName: "Query", id: "__ROOT" };
+export const mutationRoot: StoreLink = { entityName: "Mutation", id: "__ROOT" };
 
 /** A new store whose entities, ids, store keys, and values are `records`' keys and values, in order. */
 export function storeOf(records: {
-  readonly [entity: string]: { readonly [id: string]: { readonly [storeKey: string]: StoreValue } };
+  readonly [entityName: string]: { readonly [id: string]: { readonly [storeKey: string]: StoreValue } };
 }): Store;
 ```
 
@@ -609,7 +610,7 @@ Selections are taken from the fixture ASTs by response key.
 
 Each case asserts the whole resulting store with `storeOf`.
 
-- Leaves into the empty store: one record `Query.__ROOT` with the four `greeting` keys, `tags` and `settings`; `tags: []` is stored `[]`; `tags: ["a", null]` is stored as received; `settings: { entity: "Pet", id: "1" }` is stored as a leaf, and no `Pet` entity appears.
+- Leaves into the empty store: one record `Query.__ROOT` with the four `greeting` keys, `tags` and `settings`; `tags: []` is stored `[]`; `tags: ["a", null]` is stored as received; `settings: { entityName: "Pet", id: "1" }` is stored as a leaf, and no `Pet` entity appears.
 - A `null` leaf is stored `null`, and the key is present.
 - `PetDetail`: `Query.__ROOT` holds `pet____id___1` linking `Pet:1`; `Pet:1` holds `id`, `name`, `nickname: null`, `tagline`, `stats`, `bestFriend`, `checkins____limit___2`, and `checkins____limit___2____skip___null` (variables `{ id: "1" }`); no record holds `__typename`.
 - The same with `{ id: "1", skip: 4 }` writes `checkins____limit___2____skip___4`, a second key beside `checkins____limit___2`.
@@ -621,7 +622,7 @@ Each case asserts the whole resulting store with `storeOf`.
 - `EmptyStats`: `PetStats` `Pet:1.stats` exists with no fields, and `Pet:1.stats` links it.
 - `SetTagline`: `Mutation.__ROOT` links `SetTaglinePayload` `Mutation:__ROOT.setTagline____input___{"id":"4","tagline":"Hi"}`, which links `Pet:4` with the new `tagline`.
 - Into a non-empty store: `PetLists` then `PetDetail` for `Pet:1`: `Pet:1` holds the union of both; a field `PetDetail` does not select is kept; a field both write holds `PetDetail`'s value.
-- Nested root entity: `NestedQuery` with `query: { __typename: "Query", tags: ["a"] }` writes `greeting` and `tags` onto `Query.__ROOT`, which links itself under `query` (`{ entity: "Query", id: "__ROOT" }`), and creates no other `Query` record. The same with `query: { tags: ["a"] }` (no `__typename`) writes the same store: the `Known` entity reads no discriminator. `SetTagline` writes its nested `Query` object onto `Query.__ROOT` (`greeting`), and the `SetTaglinePayload` record links it under `query`.
+- Nested root entity: `NestedQuery` with `query: { __typename: "Query", tags: ["a"] }` writes `greeting` and `tags` onto `Query.__ROOT`, which links itself under `query` (`{ entityName: "Query", id: "__ROOT" }`), and creates no other `Query` record. The same with `query: { tags: ["a"] }` (no `__typename`) writes the same store: the `Known` entity reads no discriminator. `SetTagline` writes its nested `Query` object onto `Query.__ROOT` (`greeting`), and the `SetTaglinePayload` record links it under `query`.
 - Malformed responses throw, with the message of Errors: an empty response object `{}` for `Leaves` names `greeting`; `pet____id___v_id: "x"` at `["pet____id___v_id"]`; `petGrid: [[3]]` at `["petGrid",0,0]`; a pet without `__typename`; `id: 4`.
 - A throw part-way leaves the earlier writes: `pets: [{ ..valid Pet:1 }, "x"]` throws at `["pets",1]`, and `store` holds `Pet:1` (open decision 9).
 

@@ -248,11 +248,11 @@ Reasons:
 
 The runtime compares `condition.entityName` with the record's entity inline, as `normalize`, `check`, and `garbageCollect` do (store.md, Conditions).
 
-The read: the refinement's value is `null` when `root.entity` is not `condition.entityName`, and the selections read on the same record otherwise. That matches the param type the type walk already gives `asT` (`({ .. } | null)`, from the refinement's target `Union([Inner(T), Null])`). The link's `entity` is the entity `normalize` read from the response's discriminator (store.md, `normalize`), and store.md's `check` and `garbageCollect` test a conditional against the same value (store.md, Conditions). A refinement reads no store value, so it never reads `MissingData` itself.
+The read: the refinement's value is `null` when `root.entityName` is not `condition.entityName`, and the selections read on the same record otherwise. That matches the param type the type walk already gives `asT` (`({ .. } | null)`, from the refinement's target `Union([Inner(T), Null])`). The link's `entity` is the entity `normalize` read from the response's discriminator (store.md, `normalize`), and store.md's `check` and `garbageCollect` test a conditional against the same value (store.md, Conditions). A refinement reads no store value, so it never reads `MissingData` itself.
 
-A link to a root record is an ordinary link. `normalize` writes a nested selection of a root entity (`identity: { kind: "Fixed" }`, normalization-ast.md, The record) as the link `{ entity: "Query", id: "__ROOT" }`, and the reader follows the stored link like any other, so the reader AST carries no record identity: it has no `entity`, no `identity`, and no root record. A `read` call names its root record (`queryRoot` in the tests); the reader AST of an entrypoint's field does not.
+A link to a root record is an ordinary link. `normalize` writes a nested selection of a root entity (`identity: { kind: "Fixed" }`, normalization-ast.md, The record) as the link `{ entityName: "Query", id: "__ROOT" }`, and the reader follows the stored link like any other, so the reader AST carries no record identity: it has no `entity`, no `identity`, and no root record. A `read` call names its root record (`queryRoot` in the tests); the reader AST of an entrypoint's field does not.
 
-The comparison is store.md's: `condition.entityName === root.entity`, inline in `readSelection`, with no function.
+The comparison is store.md's: `condition.entityName === root.entityName`, inline in `readSelection`, with no function.
 
 Because refinements target concrete entities only (settled), the one condition kind is equality with one entity name. An abstract target would need the normalizer and the reader to agree on a second kind (normalization-ast.md, Abstract refinement targets, Later).
 
@@ -269,7 +269,7 @@ Delta in the generated pet demo, after the parser change: `Query__PetDetailRoute
 Eager pointers, read through the link the pointer's resolver returns, need:
 
 - Query generation: `selection_contribution`'s `ClientPointer` arm inlines the pointer's own selection set as the `ClientField` arm does (upstream `merge_client_object_field`, `isograph/crates/isograph_schema/src/create_merged_selection_set.rs:852-929`). `inlined_fields` then lists pointers, so `field Pet.loop to Pet { loop }` becomes `InlineCycle`. The target-side selections are fetched only if another selection fetches them; otherwise the read is `MissingData`.
-- Reader AST: a `Pointer` node (`alias`, `arguments`, the pointer's reader artifact, `selections`). The runtime reads the pointer's resolver, then `readLinkedValue` of the returned link or links with `selections`. The generated link output types (`E/__link/output_type.ts`) are upstream's `{ __link, __typename }`, and `readLinkedValue` reads store.md's `StoreLink` (`{ entity, id }`), so either those output types change to store.md's shape or the read converts.
+- Reader AST: a `Pointer` node (`alias`, `arguments`, the pointer's reader artifact, `selections`). The runtime reads the pointer's resolver, then `readLinkedValue` of the returned link or links with `selections`. The generated link output types (`E/__link/output_type.ts`) are upstream's `{ __link, __typename }`, and `readLinkedValue` reads store.md's `StoreLink` (`{ entityName, id }`), so either those output types change to store.md's shape or the read converts.
 - Reader artifact imports: `field Pet.Card { bestFriend { Card } }` is not an `InlineCycle`, so `Card`'s reader imports itself. That needs thunks (`readerArtifact: () => X`, upstream's shape) or a compile-time error for a cycle of reader imports.
 - Param types: the pointer's key returns, with the nested object under the `to` wrapper.
 
@@ -761,7 +761,7 @@ function ok<T>(value: T): ReadOk<T> {
 }
 
 function recordName(record: StoreLink): string {
-  return `${record.entity}:${record.id}`;
+  return `${record.entityName}:${record.id}`;
 }
 
 /** `missing` as the cause of a missing value for `name` on `root`. */
@@ -807,7 +807,7 @@ function readSelection(
       return linked.kind === "MissingData" ? missingDataFor(key, root, linked) : linked;
     }
     case "Refinement": {
-      if (selection.condition.entityName !== root.entity) {
+      if (selection.condition.entityName !== root.entityName) {
         return ok(null);
       }
       const refined = readSelectionSet(store, selection.selections, root, variables);
@@ -822,7 +822,7 @@ function readSelection(
 
 /** The value stored on `root`'s record under `key`. */
 function readStoreValue(store: Store, root: StoreLink, key: StoreKey): ReadResult<StoreValue> {
-  const record = store.get(root.entity)?.get(root.id);
+  const record = store.get(root.entityName)?.get(root.id);
   if (record === undefined) {
     return { kind: "MissingData", reason: `No record for ${recordName(root)}`, recordLink: root };
   }
@@ -905,7 +905,7 @@ Semantics, stated as facts the tests assert:
 - A `Linked` node's stored value is `null`, a link, or a list whose elements are those, at any depth; the read keeps the list structure. Upstream maps one level of list only (`read.ts:707-776`), so a `[[Pet]]` field fails there.
 - A record is looked up only by a node that reads a value from it: a `Resolver` node whose reader AST is empty reads nothing, so it reads `Ok` on a link to a record that does not exist. A `Scalar` or `Linked` node on an absent record is `MissingData` with `reason` `No record for ..`. Upstream returns `MissingData` for an absent root record before reading any node (`read.ts:161-167`); the result differs only for a selection set that reads no store value.
 - A missing value under a `Linked`, `Refinement`, or `Resolver` node is wrapped once per node, as upstream wraps it (`read.ts:579-584`, `:737-747`): `nestedReason` is the inner `MissingData`, and `recordLink` is the innermost record, the one that lacks the value.
-- A refinement compares `root.entity` with `condition.entityName` and reads no store value.
+- A refinement compares `root.entityName` with `condition.entityName` and reads no store value.
 - A `Resolver` node reads the selected field's reader AST on the same root, with `childVariables`, and calls its resolver with `{ data, parameters: childVariables }`. The resolver's return is the node's value. The resolver is not called when its data is `MissingData`.
 - `childVariables` drops an argument whose top-level value is an absent variable, and writes `null` for an absent variable inside an object, which matches query-generation.md's held open decision 2. Upstream drops the absent variable in both places (`read.ts:465-490`).
 - The first `MissingData` ends the read (upstream's behavior); there is no partial result.
@@ -921,13 +921,13 @@ What this doc uses from store.md, by name:
 export type Store = Map<EntityName, Map<RecordId, StoreRecord>>;
 export type StoreRecord = Map<StoreKey, StoreValue>;
 export type StoreLink = {
-  readonly entity: EntityName;
+  readonly entityName: EntityName;
   readonly id: RecordId;
 };
 export type Variables = { readonly [name: string]: JsonValue };
 ```
 
-A record is `store.get(link.entity)?.get(link.id)`; a value is `record.get(key)`, `undefined` when absent. store.md defines no lookup function, and `check` reads the maps the same way.
+A record is `store.get(link.entityName)?.get(link.id)`; a value is `record.get(key)`, `undefined` when absent. store.md defines no lookup function, and `check` reads the maps the same way.
 
 The two amendments this doc makes to store.md:
 
@@ -944,11 +944,11 @@ Delta from store.md: the parameter type is `Pick<NormalizationSelection, "select
 
 ```ts
 // from libs/isograph-runtime/src/store.ts
-/** An object whose own keys are exactly `entity` and `id`, both strings. */
+/** An object whose own keys are exactly `entityName` and `id`, both strings. */
 export function isStoreLink(value: StoreValue): value is StoreLink;
 ```
 
-store.md states this test in its Errors section ("A link is an object whose own keys are exactly `entity` and `id`, both strings") for `check` and `garbageCollect`; this doc names it as a module export of `src/store.ts` so that `check.ts`, `garbageCollection.ts`, and `read.ts` import one function. The package index does not export it.
+store.md states this test in its Errors section ("A link is an object whose own keys are exactly `entityName` and `id`, both strings") for `check` and `garbageCollect`; this doc names it as a module export of `src/store.ts` so that `check.ts`, `garbageCollection.ts`, and `read.ts` import one function. The package index does not export it.
 
 The reader's store keys come from `storeKey`, so they follow store.md's encoding, including its open decision 6.
 
@@ -1024,7 +1024,7 @@ field Query.ConstantPet($id: ID!) {
 
 with `entrypoint Query.PetSummary`, `entrypoint Query.PetSummaries`, and `entrypoint Query.ConstantPet`. `Pet.Constant` has no selection set, so its reader AST is empty. `RecentCheckins` selected with no argument reads `checkins(limit: $n)` with `n: 2` from its `Resolver` node, and query generation inlines it as `checkins(limit: 2)`, so both keys are `checkins____limit___2`.
 
-- Leaves: `Leaves` reads `greeting`, `literalGreeting`, `nullGreeting`, `variableGreeting`, `tags`, and `settings` equal to the response's values: a `null` leaf is `null`, `tags: ["a", null]` and `tags: []` are returned as stored, and `settings: { entity: "Pet", id: "1" }` (a `JSON` scalar) is returned whole as a leaf.
+- Leaves: `Leaves` reads `greeting`, `literalGreeting`, `nullGreeting`, `variableGreeting`, `tags`, and `settings` equal to the response's values: a `null` leaf is `null`, `tags: ["a", null]` and `tags: []` are returned as stored, and `settings: { entityName: "Pet", id: "1" }` (a `JSON` scalar) is returned whole as a leaf.
 - Variables: `variableGreeting` read with `{ name: "Bo" }` after normalizing with `{ name: "Bo" }` is the response's value; read with `{}` after normalizing with `{}` it is the response's value; read with `{ name: "Bo" }` after normalizing only with `{}` is `MissingData` whose `reason` names `greeting____name___Bo`.
 - Linked: `PetDetail` with `{ id: "1" }` reads `pet` with `stats` (an identity-less `PetStats` at `Pet:1.stats`), `bestFriend` two levels deep, `checkins` and `pagedCheckins` as their own lists; `stats: null` reads `null`.
 - Cyclic data: `Pet:1.bestFriend` is `Pet:2`, whose `bestFriend` is `Pet:1`; the read terminates, because it recurses on the reader AST.
@@ -1032,7 +1032,7 @@ with `entrypoint Query.PetSummary`, `entrypoint Query.PetSummaries`, and `entryp
 - Refinements: `Feed` with a `BlogItem` and an `AdItem` reads, for the `BlogItem`, `asBlogItem` as an object (with `author`) and `asAdItem` as `null`, and for the `AdItem` the reverse; an item whose `__typename` was `Other` reads both as `null`.
 - Object arguments: `Search` with `{ q: "Rex" }` reads the pets normalized under the stable-JSON key.
 - Client field chains: `PetSummary` with `{ id: "1" }` reads `{ pet: { id, PetName: { name, nickname }, RecentCheckins: { checkins } } }`; `PetSummaries` reads one `PetName` object per pet; a test resolver receives `parameters` equal to its node's substituted arguments (`{ n: 2 }`, the compiler-written default).
-- Roots: `PetName`'s reader artifact, after `PetDetail` normalized `Pet:4` with `{ id: "4" }`, read rooted at `{ entity: "Pet", id: "4" }` with `{}`, reads `name` and `nickname` without going through the query root. `SetTagline`'s reader rooted at `mutationRoot` reads the payload's `pet` and `query { greeting }`, the `greeting` on `Query.__ROOT`. `NestedQuery` from `queryRoot` reads `query { tags }` on `Query.__ROOT` itself.
+- Roots: `PetName`'s reader artifact, after `PetDetail` normalized `Pet:4` with `{ id: "4" }`, read rooted at `{ entityName: "Pet", id: "4" }` with `{}`, reads `name` and `nickname` without going through the query root. `SetTagline`'s reader rooted at `mutationRoot` reads the payload's `pet` and `query { greeting }`, the `greeting` on `Query.__ROOT`. `NestedQuery` from `queryRoot` reads `query { tags }` on `Query.__ROOT` itself.
 - Missing data: a read before any `normalize` is `MissingData` with `recordLink` `queryRoot` and `reason` `No record for Query:__ROOT`. A deleted `nickname` key on `Pet:1` under `PetSummary` is `MissingData` with `recordLink` `Pet:1` and nested reasons for `pet____id___1` and then `PetName` around the innermost `No value for nickname on Pet:1`. A deleted `Pet:2` record linked from `pets` is `MissingData` with `recordLink` `Pet:2`. A child resolver whose data is `MissingData` is not called (its call count is 0).
 - Absent records: `ConstantPet` with `{ id: "9" }`, on a store whose `Query.__ROOT` links `pet____id___9` to a `Pet:9` deleted by hand, reads `Ok` with `{ pet: { Constant: {} } }`: `Constant`'s empty reader AST reads no value from the absent record.
 - Shape: `Pet:1.stats` set by hand to `"x"` makes `PetDetail`'s read throw the non-link message naming `Pet:1` and `stats`.
