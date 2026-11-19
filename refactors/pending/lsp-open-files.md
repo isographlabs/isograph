@@ -10,7 +10,7 @@ Origin of the editor buffer map and handlers: isograph `EditorBufferSource` / `s
 
 These are not approved.
 
-1. A tracked map whose counter was never written (change 3). Resolved without change 3 by change 1 of `refactors/pending/pico-missing-key-dependency.md` (upstream isograph #994). See Known gap.
+1. A tracked map whose counter was never written (change 3). Resolved without change 3 by change 1 of `refactors/past/pico-missing-key-dependency.md` (upstream isograph #994). See Known gap.
 2. Order relative to format-file-from-segments.md. Decided: (a); change 7 landed first and format-file-from-segments.md reads `file_contents`. (a) This doc first: change 7's `format_iso_literals` uses `parsed_iso_literals_in_file` and `text_through_last_iso_literal` with the client, and format-file-from-segments.md then reads `file_contents(db, client, path)` instead of `state.disk_file(path)`. (b) format-file-from-segments.md first: change 7's `format_iso_literals` is that doc's version with `file_contents` replacing `disk_file` (second snippet in change 7). Either order ships; (b) makes change 7's format diff smaller, (a) makes format-file-from-segments.md read the buffer from the start.
 3. `SendLspResponseEffect` as data (optional change). The feature does not need it. Tests read a response by calling `perform` and `recv`ing on the crossbeam receiver behind the `LiveSession` (`lsp_formatting_of_a_live_client_without_a_file_is_null`, `crates/isograph_cli/src/state.rs`), and change 6's tests use that pattern. (a) Ship the optional change. (b) Do not ship it; `Box<dyn FnOnce(&SideEffectToken) + Send>` stays.
 
@@ -38,7 +38,7 @@ Prefactors first.
 
 1. Notifications carry the client; handlers receive it as a parameter. Dispatch drops a notification from a client not in `LiveSessions`. Landed in `9e0dcde0`.
 2. Requests and responses carry the client; request handlers receive it as a parameter. `LSPRequestDispatch` moves from `isograph_lsp` to `isograph_cli`, next to `LSPNotificationDispatch`. Dispatch drops a response from a client not in `LiveSessions`. Landed in `c74128a3` (move) and `862b68fc`.
-3. A tracked counter that was never written. Not needed; change 1 of `refactors/pending/pico-missing-key-dependency.md` fixes it in pico. See Known gap.
+3. A tracked counter that was never written. Not needed; change 1 of `refactors/past/pico-missing-key-dependency.md` fixes it in pico. See Known gap.
 4. `ClientId` moves to `isograph_compiler`. Landed in `65d4cce4`.
 5. `editor_buffer_map`, the `file_contents` memo, the writers, and unit tests. Landed in `a42d7cad`; `file_contents` reads both keys with `try_get(id_for_key)` since `27b023a1`.
 6. `didOpen` / `didChange` / `didClose`, advertised capabilities, `Gone` cleanup, and `handle` tests. Landed in `0ecc7e2f` (typed path conversion) and `a7846d69` (handlers, capabilities, `Gone`); design docs in `220e64ac`.
@@ -46,7 +46,7 @@ Prefactors first.
 
 ## Known gap
 
-Closed. Change 3 did not ship. Upstream isograph #994 (change 1 of `refactors/pending/pico-missing-key-dependency.md`), as reworked by upstream isograph #1000, makes a memo that reads a tracked map whose counter was never written depend on the counter's key at the initial epoch, and the first counter write advances the epoch, so a `file_contents(client, path)` miss before the first `set_editor_buffer` or `insert_disk_file` sees that later write. `read_before_first_editor_buffer_write_sees_the_later_open` (`crates/isograph_compiler/src/database.rs`) asserts the buffer text after the open. The `file_contents`, `sources`, `compiler_errors_in_file`, and `extract_iso_literals` tests no longer write an unrelated map entry before the first read.
+Closed. Change 3 did not ship. Upstream isograph #994 (change 1 of `refactors/past/pico-missing-key-dependency.md`), as reworked by upstream isograph #1000, makes a memo that reads a tracked map whose counter was never written depend on the counter's key at the initial epoch, and the first counter write advances the epoch, so a `file_contents(client, path)` miss before the first `set_editor_buffer` or `insert_disk_file` sees that later write. `read_before_first_editor_buffer_write_sees_the_later_open` (`crates/isograph_compiler/src/database.rs`) asserts the buffer text after the open. The `file_contents`, `sources`, `compiler_errors_in_file`, and `extract_iso_literals` tests no longer write an unrelated map entry before the first read.
 
 Deltas from the snippets below, as landed:
 
