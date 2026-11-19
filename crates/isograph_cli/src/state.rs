@@ -1385,19 +1385,65 @@ mod tests {
         );
     }
 
-    #[test]
-    fn formatting_two_literals_in_a_buffer_leaves_the_javascript_between_them() {
-        const TWO_LITERALS: &str = "const a = iso(`field Query.x{id}`);\nconst b = 1;\nconst c = iso(`field Query.y{id}`);\n";
-        const TWO_LITERALS_PRETTY: &str = "const a = iso(`\n  field Query.x {\n    id,\n  }\n`);\nconst b = 1;\nconst c = iso(`\n  field Query.y {\n    id,\n  }\n`);\n";
+    /// Client 1 opens `buffer` over a disk file without literals; `request` edits are applied to `buffer`.
+    fn buffer_after_edits(
+        buffer: &str,
+        request: fn(
+            &mut IsographState<TypeScriptHostLanguage>,
+            &TestClient,
+            &str,
+        ) -> Option<Vec<lsp_types::TextEdit>>,
+    ) -> String {
         let mut state = with_config();
         disk_changed(&mut state, "/tmp/proj/src/x.ts", "const x = 1;\n");
         let one = live_client(&mut state, ClientId(1));
-        handle(&mut state, did_open(one.client, X_URI, TWO_LITERALS));
-        let edits = formatting_edits(&mut state, &one, X_URI).expect("the buffer has text");
-        assert_eq!(edits.len(), 2);
+        handle(&mut state, did_open(one.client, X_URI, buffer));
+        let edits = request(&mut state, &one, X_URI).expect("the buffer has text");
+        crate::adapter::tests::assert_edits_replace_disjoint_interiors(buffer, &edits);
+        crate::adapter::tests::apply_text_edits(buffer, &edits)
+    }
+
+    #[test]
+    fn formatting_two_literals_in_a_buffer_leaves_the_javascript_around_them() {
+        use crate::adapter::tests::{TWO_LITERALS, TWO_LITERALS_PRETTY};
         assert_eq!(
-            crate::adapter::tests::apply_text_edits(TWO_LITERALS, &edits),
+            buffer_after_edits(TWO_LITERALS, formatting_edits),
             TWO_LITERALS_PRETTY
+        );
+        assert_eq!(
+            buffer_after_edits(TWO_LITERALS_PRETTY, formatting_edits),
+            TWO_LITERALS_PRETTY
+        );
+    }
+
+    #[test]
+    fn formatting_three_literals_in_a_buffer_leaves_the_javascript_around_them() {
+        use crate::adapter::tests::{THREE_LITERALS, THREE_LITERALS_PRETTY};
+        assert_eq!(
+            buffer_after_edits(THREE_LITERALS, formatting_edits),
+            THREE_LITERALS_PRETTY
+        );
+        assert_eq!(
+            buffer_after_edits(THREE_LITERALS_PRETTY, formatting_edits),
+            THREE_LITERALS_PRETTY
+        );
+    }
+
+    #[test]
+    fn will_save_wait_until_of_two_literals_in_a_buffer_formats_both() {
+        use crate::adapter::tests::{TWO_LITERALS, TWO_LITERALS_PRETTY};
+        assert_eq!(
+            buffer_after_edits(TWO_LITERALS, will_save_edits),
+            TWO_LITERALS_PRETTY
+        );
+    }
+
+    #[test]
+    fn will_save_wait_until_of_three_literals_in_a_buffer_formats_all_three() {
+        use crate::adapter::tests::{THREE_LITERALS, THREE_LITERALS_PRETTY};
+        assert_eq!(
+            buffer_after_edits(THREE_LITERALS, will_save_edits),
+            THREE_LITERALS_PRETTY
         );
     }
 

@@ -225,45 +225,103 @@ pub(crate) mod tests {
         )
     }
 
-    fn byte_offset(source: &str, position: lsp_types::Position) -> usize {
-        let mut rest = source;
-        let mut offset = 0;
-        for _ in 0..position.line {
-            let Some((line, after)) = rest.split_once('\n') else {
-                return source.len();
-            };
-            offset += line.len() + 1;
-            rest = after;
-        }
-        let line = rest.split('\n').next().unwrap_or(rest);
-        let mut utf16 = 0u32;
-        for (index, ch) in line.char_indices() {
-            if utf16 == position.character {
-                return offset + index;
+    /// Byte ranges of each line's content, excluding its `\n`, `\r\n`, or `\r` terminator.
+    fn line_contents(source: &str) -> Vec<std::ops::Range<usize>> {
+        let bytes = source.as_bytes();
+        let mut lines = Vec::new();
+        let mut line_start = 0;
+        let mut index = 0;
+        while index < bytes.len() {
+            match bytes[index] {
+                b'\r' if matches!(bytes.get(index + 1), Some(b'\n')) => {
+                    lines.push(line_start..index);
+                    index += 2;
+                    line_start = index;
+                }
+                b'\r' | b'\n' => {
+                    lines.push(line_start..index);
+                    index += 1;
+                    line_start = index;
+                }
+                _ => index += 1,
             }
-            utf16 += ch.len_utf16() as u32;
         }
-        offset + line.len()
+        lines.push(line_start..bytes.len());
+        lines
     }
 
+    /// The byte offset of a UTF-16 `position` in `source`, clamped to the end of its line.
+    fn byte_offset(source: &str, position: lsp_types::Position) -> usize {
+        let lines = line_contents(source);
+        let Some(line) = lines.get(position.line as usize) else {
+            return source.len();
+        };
+        let mut utf16 = 0u32;
+        source[line.clone()]
+            .char_indices()
+            .find_map(|(index, ch)| {
+                let here = utf16;
+                utf16 += ch.len_utf16() as u32;
+                (here >= position.character).then_some(line.start + index)
+            })
+            .unwrap_or(line.end)
+    }
+
+    /// Applies `edits` as LSP specifies: every range is resolved against `source`, and the
+    /// edits are applied from the last start to the first.
     pub(crate) fn apply_text_edits(source: &str, edits: &[lsp_types::TextEdit]) -> String {
-        let mut ordered: Vec<&lsp_types::TextEdit> = edits.iter().collect();
-        ordered.sort_by(|left, right| {
-            right
-                .range
-                .start
-                .line
-                .cmp(&left.range.start.line)
-                .then(right.range.start.character.cmp(&left.range.start.character))
-        });
-        ordered
+        let mut resolved: Vec<(usize, usize, &str)> = edits
+            .iter()
+            .map(|edit| {
+                (
+                    byte_offset(source, edit.range.start),
+                    byte_offset(source, edit.range.end),
+                    edit.new_text.as_str(),
+                )
+            })
+            .collect();
+        resolved.sort_by_key(|(start, _, _)| std::cmp::Reverse(*start));
+        resolved
             .into_iter()
-            .fold(source.to_owned(), |mut out, edit| {
-                let start = byte_offset(&out, edit.range.start);
-                let end = byte_offset(&out, edit.range.end);
-                out.replace_range(start..end, &edit.new_text);
+            .fold(source.to_owned(), |mut out, (start, end, new_text)| {
+                out.replace_range(start..end, new_text);
                 out
             })
+    }
+
+    /// Asserts the edits are pairwise disjoint and each replaces exactly one iso literal interior.
+    pub(crate) fn assert_edits_replace_disjoint_interiors(
+        source: &str,
+        edits: &[lsp_types::TextEdit],
+    ) {
+        let mut ranges: Vec<(usize, usize)> = edits
+            .iter()
+            .map(|edit| {
+                (
+                    byte_offset(source, edit.range.start),
+                    byte_offset(source, edit.range.end),
+                )
+            })
+            .collect();
+        ranges.sort();
+        for pair in ranges.windows(2) {
+            assert!(pair[0].1 <= pair[1].0, "{pair:?} overlap in {source:?}");
+        }
+        for &(start, end) in &ranges {
+            assert!(start <= end, "{start}..{end} is inverted");
+            assert!(
+                source[..start].ends_with("iso(`"),
+                "{start}..{end} in {source:?}"
+            );
+            assert!(
+                source[end..].starts_with('`'),
+                "{start}..{end} in {source:?}"
+            );
+            assert!(
+                !source[start..end].contains('`'),
+                "{start}..{end} in {source:?}"
+            );
+        }
     }
 
     fn formatted_source(contents: String) -> String {
@@ -326,52 +384,77 @@ pub(crate) mod tests {
         });
     }
 
-    const TWO_LITERALS: &str =
-        "const a = iso(`field Query.x{id}`);\nconst b = 1;\nconst c = iso(`field Query.y{id}`);\n";
-    const TWO_LITERALS_SECOND_PRETTY: &str = "const a = iso(`field Query.x{id}`);\nconst b = 1;\nconst c = iso(`\n  field Query.y {\n    id,\n  }\n`);\n";
-    const TWO_LITERALS_PRETTY: &str = "const a = iso(`\n  field Query.x {\n    id,\n  }\n`);\nconst b = 1;\nconst c = iso(`\n  field Query.y {\n    id,\n  }\n`);\n";
+    pub(crate) const TWO_LITERALS: &str = "const a = iso(`field Query.x{id,name}`)(() => 1);\nconst b = 1;\nconst c = iso(`field Query.y{id}`);\nexport default c;\n";
+    pub(crate) const TWO_LITERALS_PRETTY: &str = "const a = iso(`\n  field Query.x {\n    id,\n    name,\n  }\n`)(() => 1);\nconst b = 1;\nconst c = iso(`\n  field Query.y {\n    id,\n  }\n`);\nexport default c;\n";
+    pub(crate) const THREE_LITERALS: &str = "const a = iso(`field Query.x{id,name}`);\nconst b = 1;\nconst c = iso(`field Query.y{id}`);\nfoo(c);\nconst d = iso(`field Query.z{a,b,c}`);\nexport default d;\n";
+    pub(crate) const THREE_LITERALS_PRETTY: &str = "const a = iso(`\n  field Query.x {\n    id,\n    name,\n  }\n`);\nconst b = 1;\nconst c = iso(`\n  field Query.y {\n    id,\n  }\n`);\nfoo(c);\nconst d = iso(`\n  field Query.z {\n    a,\n    b,\n    c,\n  }\n`);\nexport default d;\n";
 
+    /// Formats `buffer` as client 1's open buffer, checks the edits, and returns the edited text.
     fn formatted_buffer(db: &mut IsographDb<TypeScriptHostLanguage>, buffer: &str) -> String {
         db.set_open_file(client(), path(), buffer.to_owned());
         let edits = format_iso_literals(db, client(), path()).expect("edits");
+        assert_edits_replace_disjoint_interiors(buffer, &edits);
         apply_text_edits(buffer, &edits)
     }
 
+    /// `buffer` formats to `expected`, and `expected` formats to itself.
+    fn assert_formats_to(buffer: &str, expected: &str) {
+        let mut db = db_with(String::new());
+        assert_eq!(formatted_buffer(&mut db, buffer), expected);
+        assert_eq!(formatted_buffer(&mut db, expected), expected);
+    }
+
     #[test]
-    fn two_literals_are_two_disjoint_edits_that_leave_the_javascript_unchanged() {
+    fn two_literals_where_the_first_grows_are_two_edits_that_format_both() {
         let mut db = db_with(String::new());
         db.set_open_file(client(), path(), TWO_LITERALS.to_owned());
         let edits = format_iso_literals(&db, client(), path()).expect("edits");
-        let [first, second] = edits.as_slice() else {
-            panic!("expected two edits, got {edits:?}");
-        };
-        let start =
-            |edit: &lsp_types::TextEdit| (edit.range.start.line, edit.range.start.character);
-        let end = |edit: &lsp_types::TextEdit| (edit.range.end.line, edit.range.end.character);
-        assert!(
-            end(first) <= start(second) || end(second) <= start(first),
-            "{first:?} overlaps {second:?}"
-        );
-        assert_eq!(apply_text_edits(TWO_LITERALS, &edits), TWO_LITERALS_PRETTY);
+        assert_eq!(edits.len(), 2);
+        assert_formats_to(TWO_LITERALS, TWO_LITERALS_PRETTY);
+    }
+
+    #[test]
+    fn three_literals_format_all_three() {
+        assert_formats_to(THREE_LITERALS, THREE_LITERALS_PRETTY);
     }
 
     #[test]
     fn two_literals_with_the_second_already_pretty_format_to_both_pretty() {
-        let mut db = db_with(String::new());
-        assert_eq!(
-            formatted_buffer(&mut db, TWO_LITERALS_SECOND_PRETTY),
-            TWO_LITERALS_PRETTY
+        assert_formats_to(
+            "const a = iso(`field Query.x{id,name}`)(() => 1);\nconst b = 1;\nconst c = iso(`\n  field Query.y {\n    id,\n  }\n`);\nexport default c;\n",
+            TWO_LITERALS_PRETTY,
         );
     }
 
     #[test]
-    fn formatting_two_formatted_literals_again_changes_no_text() {
-        let mut db = db_with(String::new());
-        let once = formatted_buffer(&mut db, TWO_LITERALS);
-        assert_eq!(once, TWO_LITERALS_PRETTY);
-        assert_eq!(
-            formatted_buffer(&mut db, once.as_str()),
-            TWO_LITERALS_PRETTY
+    fn a_first_literal_that_shrinks_formats_the_second() {
+        assert_formats_to(
+            "const a = iso(`\n\n  field Query.x {\n\n    id,\n\n\n    name,\n\n  }\n\n`)(() => 1);\nconst b = 1;\nconst c = iso(`field Query.y{id}`);\nexport default c;\n",
+            TWO_LITERALS_PRETTY,
+        );
+    }
+
+    #[test]
+    fn a_literal_with_parse_errors_between_two_good_ones_is_left_unchanged() {
+        assert_formats_to(
+            "const a = iso(`field Query.x{id,name}`);\nconst b = iso(`not a declaration`);\nconst c = iso(`field Query.y{id}`);\n",
+            "const a = iso(`\n  field Query.x {\n    id,\n    name,\n  }\n`);\nconst b = iso(`not a declaration`);\nconst c = iso(`\n  field Query.y {\n    id,\n  }\n`);\n",
+        );
+    }
+
+    #[test]
+    fn multi_byte_text_before_a_literal_on_its_line_offsets_it_in_utf16() {
+        assert_formats_to(
+            "const a = iso(`field Pet.x \"Café ü 日本\" {id,name}`); const s = \"日本😀\"; const c = iso(`field Query.y{id}`);\n",
+            "const a = iso(`\n  field Pet.x\n  \"Café ü 日本\"\n  {\n    id,\n    name,\n  }\n`); const s = \"日本😀\"; const c = iso(`\n  field Query.y {\n    id,\n  }\n`);\n",
+        );
+    }
+
+    #[test]
+    fn crlf_line_endings_outside_the_literals_are_unchanged() {
+        assert_formats_to(
+            "const a = iso(`field Query.x{id,name}`);\r\nconst b = 1;\r\nconst c = iso(`\r\n  field Query.y {\r\n\r\n    id,\r\n  }\r\n`);\r\nexport default c;\r\n",
+            "const a = iso(`\n  field Query.x {\n    id,\n    name,\n  }\n`);\r\nconst b = 1;\r\nconst c = iso(`\n  field Query.y {\n    id,\n  }\n`);\r\nexport default c;\r\n",
         );
     }
 
