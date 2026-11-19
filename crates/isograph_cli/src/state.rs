@@ -51,6 +51,7 @@ fn handle_client_connection<THostLanguage: HostLanguage>(
         }
         ClientConnectionEvent::Gone(client) => {
             state.live_sessions.0.remove(&client);
+            state.db.remove_open_files_of_client(client);
             no_effects()
         }
     }
@@ -206,6 +207,15 @@ fn dispatch_lsp_notification<THostLanguage: HostLanguage>(
         crate::lsp_notification_dispatch::LSPNotificationDispatch::new(notification, state)
             .on_notification_sync::<crate::lsp_socket::IsographEventNotification>(
                 on_isograph_event_notification::<THostLanguage>,
+            )?
+            .on_notification_sync::<lsp_types::notification::DidOpenTextDocument>(
+                crate::adapter::on_did_open::<THostLanguage>,
+            )?
+            .on_notification_sync::<lsp_types::notification::DidChangeTextDocument>(
+                crate::adapter::on_did_change::<THostLanguage>,
+            )?
+            .on_notification_sync::<lsp_types::notification::DidCloseTextDocument>(
+                crate::adapter::on_did_close::<THostLanguage>,
             )?
             .notification();
         ControlFlow::Continue(())
@@ -975,6 +985,251 @@ mod tests {
             .error
             .expect("a missing working directory is an error");
         assert_eq!(error.message, "CurrentWorkingDirectory is not interned");
+    }
+
+    const X_URI: &str = "file:///tmp/proj/src/x.ts";
+
+    fn document_notification(
+        client: ClientId,
+        method: &str,
+        params: serde_json::Value,
+    ) -> IsographEvent {
+        LspEvent::Notification(LspNotification {
+            client,
+            notification: lsp_server::Notification {
+                method: method.to_owned(),
+                params,
+            },
+        })
+        .to()
+    }
+
+    fn did_open(client: ClientId, uri: &str, text: &str) -> IsographEvent {
+        document_notification(
+            client,
+            lsp_types::notification::DidOpenTextDocument::METHOD,
+            serde_json::json!({
+                "textDocument": { "uri": uri, "languageId": "typescript", "version": 1, "text": text }
+            }),
+        )
+    }
+
+    fn did_change(client: ClientId, uri: &str, changes: serde_json::Value) -> IsographEvent {
+        document_notification(
+            client,
+            lsp_types::notification::DidChangeTextDocument::METHOD,
+            serde_json::json!({
+                "textDocument": { "uri": uri, "version": 2 },
+                "contentChanges": changes
+            }),
+        )
+    }
+
+    fn did_close(client: ClientId, uri: &str) -> IsographEvent {
+        document_notification(
+            client,
+            lsp_types::notification::DidCloseTextDocument::METHOD,
+            serde_json::json!({ "textDocument": { "uri": uri } }),
+        )
+    }
+
+    fn with_disk_x() -> IsographState<TypeScriptHostLanguage> {
+        let mut state = with_config();
+        state
+            .db
+            .insert_disk_file(interned("src/x.ts"), "disk".to_owned());
+        state
+    }
+
+    fn started(state: &mut IsographState<TypeScriptHostLanguage>, client: ClientId) {
+        let (tx, _rx) = crossbeam::channel::unbounded();
+        start_client(state, client, tx);
+    }
+
+    fn read(
+        state: &IsographState<TypeScriptHostLanguage>,
+        client: ClientId,
+        path: &str,
+    ) -> Option<String> {
+        isograph_compiler::file_contents(state.db.reference(), client, interned(path)).clone()
+    }
+
+    #[test]
+    fn did_open_stores_the_buffer_for_that_client_only() {
+        let mut state = with_disk_x();
+        started(&mut state, ClientId(1));
+        let effects = handle(&mut state, did_open(ClientId(1), X_URI, "open"));
+        assert!(effects.is_empty());
+        assert_eq!(
+            read(state.reference(), ClientId(1), "src/x.ts"),
+            "open".to_owned().wrap_some()
+        );
+        assert_eq!(
+            read(state.reference(), ClientId(2), "src/x.ts"),
+            "disk".to_owned().wrap_some()
+        );
+    }
+
+    #[test]
+    fn did_change_with_one_full_change_replaces_the_buffer() {
+        let mut state = with_disk_x();
+        started(&mut state, ClientId(1));
+        handle(&mut state, did_open(ClientId(1), X_URI, "open"));
+        let effects = handle(
+            &mut state,
+            did_change(
+                ClientId(1),
+                X_URI,
+                serde_json::json!([{ "text": "changed" }]),
+            ),
+        );
+        assert!(effects.is_empty());
+        assert_eq!(
+            read(state.reference(), ClientId(1), "src/x.ts"),
+            "changed".to_owned().wrap_some()
+        );
+    }
+
+    #[test]
+    fn did_change_that_is_not_one_full_change_leaves_the_buffer() {
+        let mut state = with_disk_x();
+        started(&mut state, ClientId(1));
+        handle(&mut state, did_open(ClientId(1), X_URI, "open"));
+        let ranged = serde_json::json!([{
+            "range": {
+                "start": { "line": 0, "character": 0 },
+                "end": { "line": 0, "character": 1 }
+            },
+            "text": "ranged"
+        }]);
+        for changes in [
+            serde_json::json!([]),
+            serde_json::json!([{ "text": "first" }, { "text": "second" }]),
+            ranged,
+        ] {
+            let effects = handle(&mut state, did_change(ClientId(1), X_URI, changes.clone()));
+            assert!(effects.is_empty(), "{changes}");
+            assert_eq!(
+                read(state.reference(), ClientId(1), "src/x.ts"),
+                "open".to_owned().wrap_some(),
+                "{changes}"
+            );
+        }
+    }
+
+    #[test]
+    fn did_close_falls_back_to_disk() {
+        let mut state = with_disk_x();
+        started(&mut state, ClientId(1));
+        handle(&mut state, did_open(ClientId(1), X_URI, "open"));
+        assert_eq!(
+            read(state.reference(), ClientId(1), "src/x.ts"),
+            "open".to_owned().wrap_some()
+        );
+        let effects = handle(&mut state, did_close(ClientId(1), X_URI));
+        assert!(effects.is_empty());
+        assert_eq!(
+            read(state.reference(), ClientId(1), "src/x.ts"),
+            "disk".to_owned().wrap_some()
+        );
+    }
+
+    #[test]
+    fn two_clients_that_open_one_uri_each_read_their_own() {
+        let mut state = with_disk_x();
+        started(&mut state, ClientId(1));
+        started(&mut state, ClientId(2));
+        handle(&mut state, did_open(ClientId(1), X_URI, "one"));
+        handle(&mut state, did_open(ClientId(2), X_URI, "two"));
+        assert_eq!(
+            read(state.reference(), ClientId(1), "src/x.ts"),
+            "one".to_owned().wrap_some()
+        );
+        assert_eq!(
+            read(state.reference(), ClientId(2), "src/x.ts"),
+            "two".to_owned().wrap_some()
+        );
+    }
+
+    #[test]
+    fn gone_removes_only_that_clients_buffers() {
+        let mut state = with_disk_x();
+        started(&mut state, ClientId(1));
+        started(&mut state, ClientId(2));
+        handle(&mut state, did_open(ClientId(1), X_URI, "one"));
+        handle(&mut state, did_open(ClientId(2), X_URI, "two"));
+        assert_eq!(
+            read(state.reference(), ClientId(1), "src/x.ts"),
+            "one".to_owned().wrap_some()
+        );
+        let effects = handle(&mut state, ClientConnectionEvent::Gone(ClientId(1)).to());
+        assert!(effects.is_empty());
+        assert_eq!(
+            read(state.reference(), ClientId(1), "src/x.ts"),
+            "disk".to_owned().wrap_some()
+        );
+        assert_eq!(
+            read(state.reference(), ClientId(2), "src/x.ts"),
+            "two".to_owned().wrap_some()
+        );
+    }
+
+    #[test]
+    fn gone_of_a_client_that_never_started_leaves_other_buffers() {
+        let mut state = with_disk_x();
+        started(&mut state, ClientId(2));
+        handle(&mut state, did_open(ClientId(2), X_URI, "two"));
+        let effects = handle(&mut state, ClientConnectionEvent::Gone(ClientId(7)).to());
+        assert!(effects.is_empty());
+        assert_eq!(
+            read(state.reference(), ClientId(2), "src/x.ts"),
+            "two".to_owned().wrap_some()
+        );
+    }
+
+    #[test]
+    fn did_open_from_a_client_that_never_started_stores_nothing() {
+        let mut state = with_disk_x();
+        let effects = handle(&mut state, did_open(ClientId(1), X_URI, "open"));
+        assert!(effects.is_empty());
+        assert_eq!(
+            read(state.reference(), ClientId(1), "src/x.ts"),
+            "disk".to_owned().wrap_some()
+        );
+    }
+
+    #[test]
+    fn did_open_of_a_non_file_uri_stores_nothing() {
+        let mut state = with_config();
+        started(&mut state, ClientId(1));
+        let effects = handle(
+            &mut state,
+            did_open(ClientId(1), "https://example.net/a.ts", "open"),
+        );
+        assert!(effects.is_empty());
+        assert!(state.db.get_open_file_map().untracked().0.is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn did_open_of_a_non_utf8_file_uri_stores_nothing() {
+        let mut state = with_config();
+        started(&mut state, ClientId(1));
+        let effects = handle(
+            &mut state,
+            did_open(ClientId(1), "file:///tmp/proj/%FF.ts", "open"),
+        );
+        assert!(effects.is_empty());
+        assert!(state.db.get_open_file_map().untracked().0.is_empty());
+    }
+
+    #[test]
+    fn did_open_without_a_working_directory_stores_nothing() {
+        let mut state = empty();
+        started(&mut state, ClientId(1));
+        let effects = handle(&mut state, did_open(ClientId(1), X_URI, "open"));
+        assert!(effects.is_empty());
+        assert!(state.db.get_open_file_map().untracked().0.is_empty());
     }
 
     #[test]

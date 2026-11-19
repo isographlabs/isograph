@@ -155,6 +155,8 @@ fn run_session(
         document_formatting_provider: lsp_types::OneOf::Left(true).wrap_some(),
         text_document_sync: lsp_types::TextDocumentSyncCapability::Options(
             lsp_types::TextDocumentSyncOptions {
+                open_close: true.wrap_some(),
+                change: lsp_types::TextDocumentSyncKind::FULL.wrap_some(),
                 will_save_wait_until: true.wrap_some(),
                 ..Default::default()
             },
@@ -990,6 +992,14 @@ mod tests {
         assert_eq!(
             result["capabilities"]["textDocumentSync"]["willSaveWaitUntil"],
             serde_json::json!(true)
+        );
+        assert_eq!(
+            result["capabilities"]["textDocumentSync"]["openClose"],
+            serde_json::json!(true)
+        );
+        assert_eq!(
+            result["capabilities"]["textDocumentSync"]["change"],
+            serde_json::json!(1)
         );
     }
 

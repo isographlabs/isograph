@@ -6,6 +6,10 @@ use isograph_compiler::{ClientId, HostLanguage, IsographDb};
 use isograph_lsp::lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult};
 use pico::Database;
 use prelude::Postfix;
+use tracing::warn;
+
+use crate::effect::{IsographEffect, no_effects};
+use crate::state::IsographState;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
 pub(crate) enum UriPathError {
@@ -34,6 +38,79 @@ pub(crate) fn semantic_tokens_response<THostLanguage: HostLanguage>(
             })
         })
         .wrap_ok()
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
+pub(crate) enum DidChangeError {
+    #[error("didChange carried {0} content changes; full document sync sends exactly one")]
+    NotOneChange(usize),
+    #[error("didChange carried a ranged change; full document sync sends the whole text")]
+    RangedChange,
+    #[error("{0}")]
+    Uri(#[from] UriPathError),
+}
+
+pub(crate) fn on_did_open<THostLanguage: HostLanguage>(
+    state: &mut IsographState<THostLanguage>,
+    client: ClientId,
+    params: lsp_types::DidOpenTextDocumentParams,
+) -> Vec<IsographEffect> {
+    did_open(&mut state.db, client, params).unwrap_or_else(|error| warn!(%error, "didOpen"));
+    no_effects()
+}
+
+pub(crate) fn on_did_change<THostLanguage: HostLanguage>(
+    state: &mut IsographState<THostLanguage>,
+    client: ClientId,
+    params: lsp_types::DidChangeTextDocumentParams,
+) -> Vec<IsographEffect> {
+    did_change(&mut state.db, client, params).unwrap_or_else(|error| warn!(%error, "didChange"));
+    no_effects()
+}
+
+pub(crate) fn on_did_close<THostLanguage: HostLanguage>(
+    state: &mut IsographState<THostLanguage>,
+    client: ClientId,
+    params: lsp_types::DidCloseTextDocumentParams,
+) -> Vec<IsographEffect> {
+    did_close(&mut state.db, client, params).unwrap_or_else(|error| warn!(%error, "didClose"));
+    no_effects()
+}
+
+fn did_open<THostLanguage: HostLanguage>(
+    db: &mut IsographDb<THostLanguage>,
+    client: ClientId,
+    params: lsp_types::DidOpenTextDocumentParams,
+) -> Result<(), UriPathError> {
+    let path = relative_from_uri(db, params.text_document.uri.reference())?;
+    db.set_open_file(client, path, params.text_document.text);
+    ().wrap_ok()
+}
+
+fn did_change<THostLanguage: HostLanguage>(
+    db: &mut IsographDb<THostLanguage>,
+    client: ClientId,
+    params: lsp_types::DidChangeTextDocumentParams,
+) -> Result<(), DidChangeError> {
+    let [change] =
+        <[lsp_types::TextDocumentContentChangeEvent; 1]>::try_from(params.content_changes)
+            .map_err(|changes| DidChangeError::NotOneChange(changes.len()))?;
+    if change.range.is_some() {
+        return DidChangeError::RangedChange.wrap_err();
+    }
+    let path = relative_from_uri(db, params.text_document.uri.reference())?;
+    db.set_open_file(client, path, change.text);
+    ().wrap_ok()
+}
+
+fn did_close<THostLanguage: HostLanguage>(
+    db: &mut IsographDb<THostLanguage>,
+    client: ClientId,
+    params: lsp_types::DidCloseTextDocumentParams,
+) -> Result<(), UriPathError> {
+    let path = relative_from_uri(db, params.text_document.uri.reference())?;
+    db.remove_open_file(client, path);
+    ().wrap_ok()
 }
 
 fn file_path(uri: &lsp_types::Uri) -> Option<std::path::PathBuf> {
