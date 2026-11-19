@@ -80,7 +80,7 @@ pub fn read_iso_literals_source_from_relative_path<TCompilationProfile: Compilat
 }
 
 /// We should (probably) never directly read SourceId<IsoLiteralsSource>, since if we do so,
-/// we will ignore open files.
+/// we will ignore editor buffers.
 #[memo]
 pub fn read_iso_literals_source<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
@@ -91,10 +91,10 @@ pub fn read_iso_literals_source<TCompilationProfile: CompilationProfile>(
         content,
     } = db.get(iso_literals_source_id);
 
-    let open_file = db.get_open_file(*relative_path);
+    let editor_buffer = db.get_editor_buffer(*relative_path);
 
-    // Use the open file's content, if it exists, otherwise use the content of the file from the file system
-    let content = open_file.map_or(content, |file| &file.content);
+    // Use the editor buffer's content, if it exists, otherwise use the content of the file from the file system
+    let content = editor_buffer.map_or(content, |file| &file.content);
 
     IsoLiteralsSource {
         relative_path: *relative_path,

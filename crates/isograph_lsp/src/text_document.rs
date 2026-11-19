@@ -25,7 +25,7 @@ pub fn on_did_open_text_document<TCompilationProfile: CompilationProfile>(
         current_working_directory,
         &uri.to_file_path().expect("Expected file path to be valid."),
     );
-    db.insert_open_file(relative_path_to_source_file, text);
+    db.set_editor_buffer(relative_path_to_source_file, text);
 
     Ok(())
 }
@@ -44,7 +44,7 @@ pub fn on_did_close_text_document<TCompilationProfile: CompilationProfile>(
         &uri.to_file_path().expect("Expected file path to be valid."),
     );
 
-    db.remove_open_file(relative_path_to_source_file);
+    db.remove_editor_buffer(relative_path_to_source_file);
 
     Ok(())
 }
@@ -72,7 +72,7 @@ pub fn on_did_change_text_document<TCompilationProfile: CompilationProfile>(
         &uri.to_file_path().expect("Expected file path to be valid."),
     );
 
-    db.insert_open_file(
+    db.set_editor_buffer(
         relative_path_to_source_file,
         content_changed.text.to_owned(),
     );

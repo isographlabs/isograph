@@ -182,7 +182,7 @@ pub async fn run<TCompilationProfile: CompilationProfile>(
                         lsp_state = LspState::new(compiler_state, &connection.sender);
 
                         // TODO this is a temporary expedient. We need a good way to copy the old DB state to the
-                        // new DB. Namely, there's an open files hash map that needs to be transferred over.
+                        // new DB. Namely, there are editor buffers that need to be transferred over.
                         //
                         // That will probably be a bit more easily solved when we have a db macro.
                         eprintln!("Shutting down language server. This is not currently supported");
