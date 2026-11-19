@@ -270,6 +270,8 @@ pub enum GraphQLEntityData {
     Union,
 }
 
+// id_field lands with query-generation.md change 7, fetchable_directives with change 4:
+// the changes whose code reads them.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GraphQLCompositeData {
     /// The interfaces this type declares it implements, in definition then extension order.
@@ -334,7 +336,7 @@ pub fn graphql_selectable<TProfile: CompilationProfile>(
 ) -> Result<Option<ProtocolSelectable<GraphQLSelectableData>>, GraphQLSelectableLookupError>
 ```
 
-A field is `graphql_network_protocol::selectable_named`'s result: `target_entity` is the type annotation's named type, `definition` is the field's path and name span, `description` the field's. A refinement is the decision of the integration step: `asX` on union `U` when `U`'s member types include `X`, on interface `I` when `X` is an object whose `interfaces` include `I`; no interface-on-interface refinements. Its `definition` is the member name's span in the union, or the `implements` entry's span in `X`. `GraphQLSelectableLookupError` is `SelectableLookupError` plus a variant for a field named `asX` that collides with a refinement, as the integration step specifies.
+A field is `graphql_network_protocol::selectable_named`'s result: `target_entity` is the type annotation's named type, `definition` is the field's path and name span, `description` the field's. A refinement is the decision of the integration step: `asX` on union `U` when `U`'s member types include `X`, on interface `I` when `X` is an object whose `interfaces` include `I`; no interface-on-interface refinements. Its `definition` is the target type's definition: `X`'s definition name, so go-to-definition on `asUser` jumps to `type User`. `GraphQLSelectableLookupError` is `SelectableLookupError` plus `RefinementTarget` (the target's own lookup failed) and `RefinementCollision` (a field named `asX` collides with a refinement), as integration.md specifies.
 
 `GraphQLNetworkProtocol::entity` and `::selectable` clone these memos' results; `LookupError` is an enum of `EntityLookupError` and `GraphQLSelectableLookupError` with `derive_more::From`.
 

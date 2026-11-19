@@ -776,9 +776,13 @@ entrypoints.md, Prefactor. Independent of every other change.
 
 ### 2. Protocol data types and origins (isograph_compiler)
 
+Lands as integration.md change 2. `NetworkProtocol` gained `EntityData` and `SelectableData` here and `LookupError` in change 3; `FetchPlan`, `NotFetchable`, and `QueryError` land with changes 4, 5, and 7, which read them.
+
 `NetworkProtocol`'s six associated types; `Entity<TEntityData>`, `EntityOrigin`, `Selectable<TSelectableData>`, `SelectableOrigin`, `SourceSelectableOrigin`, `ProtocolSelectableOrigin`, `Selectable::target_entity()`, the `Profile*` aliases; `SourceSelectableDefinition`; readers of `target_entity` switched to the method; the test protocol's types. Lookups still read source files only; every entity is `EntityOrigin::Source`. Depends on source-backed-lookups.md. Tests: the existing lookup, hover, and validation tests pass unchanged in their facts.
 
 ### 3. Protocol lookups in the core (isograph_compiler, graphql_network_protocol)
+
+Lands as integration.md change 3, which owns it (open decision 10). Deltas from the text below: `NetworkProtocol::selectables` (completion) is a fifth method; `GraphQLCompositeData` has only `interfaces`, with `id_field` arriving in change 7 and `fetchable_directives` in change 4; a refinement's definition is the target type's definition name.
 
 `NetworkProtocol::entity` and `::selectable`; `ProtocolEntity`, `ProtocolSelectable`; `GraphQLEntityData`, `GraphQLCompositeData`, `IdField`, `GraphQLSelectableData`; `graphql_entity`, `graphql_selectable` (refinements per the integration step); `entity_named` and `selectable_named` merging source and protocol definitions; validation's "defined" checks counting both. Depends on 2 and integration.md 1 to 3. This is the schema integration step that source-backed-lookups.md's Later section names; if a schema-integration doc specifies it first, that doc's version replaces this change and the data types above move into it (open decision 10).
 

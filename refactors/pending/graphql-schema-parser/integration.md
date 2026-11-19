@@ -1,14 +1,64 @@
 # GraphQL schema parser: integration
 
-Requires parsing-standards.md, ast.md, and every change in order.md. This file is how `graphql_network_protocol` reads schema files. That crate is created by the CompilationProfile prefactor; the changes here land after it. When this doc and that prefactor's code disagree (a type name, where `IsographState` keeps config), stop and fix this doc first.
+Requires parsing-standards.md, ast.md, and every change in order.md. This file is how `graphql_network_protocol` reads schema files and how the core lookups (`entity_named`, `selectable_named`, `selectables_for_entity` in `crates/isograph_compiler/src/schema.rs`) merge what the schema defines with what source files declare. The protocol data the core carries (`EntityOrigin`, `SelectableOrigin`, `GraphQLEntityData`, `GraphQLSelectableData`) is `refactors/pending/graphql-protocol/entrypoints.md`; its changes 2 and 3 (query-generation.md, Changes) land with this doc's changes 2 and 3.
 
 The goal is isolation: many schema files, any of them broken in places, and a lookup succeeds whenever the definitions on its own path parse and agree. A lookup uses `?` only on the parse results of the name it asks for.
 
 ## End-user experience
 
-The config's `schema` globs name the schema files. A user can split one type across files: `type User` in one file and `extend type User` in others, in any order. A lookup of `User` sees the definition and every extension. A syntax error inside `type User` fails every lookup that reaches `User`, and no other lookup. Two definitions of `User` (in one file or across files) and an `extend type User` with no `type User` are errors of `User` only. An unreadable or deleted schema file contributes nothing. A field whose type names an entity that does not exist fails only when something resolves that field's type. Adding or removing a schema file changes lookups without a restart. An open, edited schema buffer is what that client's lookups read. Errors are not surfaced to the user yet (parsing-standards.md, Later).
+The config's `schema` globs name the schema files. A user can split one type across files: `type User` in one file and `extend type User` in others, in any order. A lookup of `User` sees the definition and every extension.
 
-## Config
+```graphql
+# schema/schema.graphql
+type Query {
+  pet(id: ID!): Pet
+  feed: [FeedItem!]!
+}
+interface Node {
+  id: ID!
+}
+type Pet implements Node {
+  "The pet's given name."
+  name: String!
+}
+union FeedItem = Pet | Owner
+scalar ID
+```
+
+```graphql
+# schema/extensions.graphql
+extend type Pet {
+  nickname: String
+}
+type Owner implements Node {
+  id: ID!
+}
+```
+
+```ts
+iso(`field Query.HomeRoute { pet(id: $id) { name nickname } feed { asPet { name } } }`);
+```
+
+- Hover on `pet` shows `field **Query.pet**: **Pet**`; go-to-definition jumps to `pet` in `schema/schema.graphql`. Hover on `nickname` shows `field **Pet.nickname**: **String**`; go-to-definition jumps to `extensions.graphql`. Hover on `name` shows the description under the heading.
+- Hover on `asPet` shows `field **FeedItem.asPet**: **Pet**`; go-to-definition jumps to `Pet` in `type Pet`, the target type's definition.
+- Completion inside `pet(id: $id) { }` lists `name` and `nickname` with detail `String`; inside `feed { }` it lists `asPet` and `asOwner`. On `Node` it lists `id`, `asPet`, and `asOwner`.
+- Validation: `field Pet.x { name }` has no diagnostic (`Pet` comes from the schema). Selecting `nope` under `pet` is `` Field `Pet.nope` is not defined. `` on `nope`. `entity Pet` beside `type Pet` is `` Entity `Pet` is defined more than once. `` on the `entity Pet` name, and every lookup of `Pet` fails.
+
+Error rules, each an error of that name only:
+
+- A syntax error inside `type User` or `extend type User` fails every lookup that reaches `User` (`User` itself, `User.x`, and `asUser` on a union containing `User`), and no other lookup.
+- Two definitions of `User` (in one file or across files), an `extend type User` with no `type User`, and an `extend input User` on `type User` are errors of `User` and of its selectables.
+- Two fields `id` on `User` across the definition and extensions are an error of `User.id` only.
+- A field named `asPet` on a union or interface that also has the refinement `asPet` is an error of that selectable only.
+- An unreadable or deleted schema file contributes nothing. A field whose type names an entity that does not exist fails only when something resolves that field's target.
+
+Adding or removing a schema file changes lookups without a restart. An open, edited schema buffer is what that client's lookups read. Schema errors are not shown as diagnostics yet (parsing-standards.md, Later); they reach the user as a failed hover, go-to-definition, or completion, and validation does not report a selection whose lookup fails with a schema error.
+
+Entities are object, interface, union, enum, scalar, and input object types. `ID`, `String`, `Int`, `Float`, and `Boolean` are entities only when a schema file defines them; nothing reads a built-in scalar yet. Selectables are fields of objects and interfaces, and refinements. Input object fields are not selectables: input objects are never selection targets, and argument validation, their only reader, will add them (likely as a `GraphQLSelectableData::InputField` variant).
+
+A refinement `asT`: on a union `U`, for each member type `T` of the definition and its extensions that is an object type; on an interface `I`, for each object type `T` whose definition or any `extend type T implements I` lists `I`. No refinement targets an interface, so an interface implementing `I` gives none. Its target is `T` and its definition is `T`'s definition name. A union member or implementor whose own lookup fails makes `asT` fail with that error.
+
+## Config and schema paths
 
 ```rust
 // from crates/isograph_config/src/compilation_options.rs
@@ -16,10 +66,6 @@ The config's `schema` globs name the schema files. A user can split one type acr
     #[serde(default)]
     pub schema: Vec<String>,
 ```
-
-A field of the config struct that holds `source_files`, with the same glob semantics. `#[serde(default)]` keeps configs without it valid (no schema files). The daemon parses it with `SourceGlobs::parse` (`crates/isograph_cli/src/watch.rs`) as it parses `source_files`, and the watcher watches both lists.
-
-## Schema paths
 
 ```rust
 // from crates/isograph_compiler/src/database.rs
@@ -33,57 +79,79 @@ pub struct SchemaPathMap {
 // on IsographDb
     #[tracked]
     schema_path_map: SchemaPathMap,
-
 ```
 
-`SchemaPathMap`, its twin `SourcePathMap`, and their writers are in i2 (`refactors/past/source-and-schema-path-maps.md`). `insert_disk_file` and `set_open_file` take the path's `FileMembership`, which `handle` computes with `ProjectGlobs::membership`; they list a schema path in `schema_path_map` only when it is not already listed. `remove_disk_file`, `remove_disk_files_from_path`, `remove_open_file`, and `remove_open_files_of_client` drop the listed paths. A TypeScript file change does not write `schema_path_map`.
+The config field, the watcher on both glob lists, `SchemaPathMap`, and its writers (`insert_disk_file`, `set_open_file`, `remove_disk_file`, `remove_disk_files_from_path`, `remove_open_file`, `remove_open_files_of_client`) are in i2 (`refactors/past/source-and-schema-path-maps.md`). An applied `DiskChanged` arms the diagnostics debounce, so a schema edit on disk republishes the open source files' validation diagnostics.
+
+## Schema files
 
 ```rust
 // from crates/graphql_network_protocol/src/schema_files.rs
 /// Every schema file `client` reads: disk paths and this client's open paths, sorted.
 #[memo]
-pub fn schema_file_paths<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub fn schema_file_paths<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     client: ClientId,
 ) -> Vec<RelativePathToSourceFile> {
-    let map = db.get_schema_path_map().tracked();
+    let view = db.get_schema_path_map();
+    let map = view.tracked();
     map.disk
         .iter()
         .copied()
-        .chain(map.open.iter().filter(|key| key.client == client).map(|key| key.path))
+        .chain(
+            map.open
+                .iter()
+                .filter(|key| key.client == client)
+                .map(|key| key.path),
+        )
         .collect::<BTreeSet<_>>()
         .into_iter()
         .collect()
 }
-```
 
-The memo iterates the map, so it uses `tracked()` (AGENTS.md, pico tracked maps) and re-runs when any schema path is added or removed; it backdates when the list is `==`.
-
-Known gap: pico records no dependency when a memo reads a tracked map whose counter was never written (refactors/pending/lsp-open-files.md, Known gap; the fix is refactors/pending/pico-missing-key-dependency.md). On a database where `schema_path_map` was never written, `schema_file_paths` reads the empty map and does not see the first `insert_disk_file` of a schema path. Until that pico fix is in i2, tests write `schema_path_map` before the first read, with a comment naming this gap, as the `file_contents` tests do.
-
-## Parsed files
-
-```rust
-// from crates/graphql_network_protocol/src/schema_files.rs
 /// The parse of one schema file as `client` reads it; `None` when the file has no text.
 #[memo]
-pub fn parsed_schema_file<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub fn parsed_schema_file<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     client: ClientId,
     path: RelativePathToSourceFile,
 ) -> Option<ParsedSchema> {
     file_contents(db, client, path)
-        .as_ref()
-        .map(|text| graphql_schema_parser::parse_schema(text))
+        .as_deref()
+        .map(graphql_schema_parser::parse_schema)
+}
+
+/// Every parsed entry of every schema file `client` reads, with its file.
+pub(crate) fn schema_entries<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+) -> impl Iterator<Item = SchemaEntry<'_>> {
+    schema_file_paths(db, client).iter().flat_map(move |path| {
+        parsed_schema_file(db, client, path.dereference())
+            .iter()
+            .flat_map(|parsed| parsed.definitions.iter())
+            .map(move |entry| SchemaEntry {
+                path: path.dereference(),
+                entry,
+            })
+    })
+}
+
+/// One top-level entry of a schema file.
+pub(crate) struct SchemaEntry<'db> {
+    pub path: RelativePathToSourceFile,
+    pub entry: &'db Result<WithSpan<TypeSystemDefinitionOrExtension>, WithSpan<DefinitionError>>,
 }
 ```
 
-`file_contents` (`crates/isograph_compiler/src/database.rs`) is the client's open buffer, otherwise disk. Each keystroke in an open schema file re-invokes `parsed_schema_file` for that client and path and reparses the whole file (cheap, as iso reparses a whole literal). Lookups that read it re-run and backdate when their result is `==`. The parse runs once per client per file text version: two clients reading the same disk file parse it twice, once per memo key.
+`schema_file_paths` is `source_file_paths` (`crates/isograph_compiler/src/database.rs`) over `schema_path_map`. It iterates the map, so it reads `tracked()` (AGENTS.md, pico tracked maps). `file_contents` is the client's open buffer, otherwise disk. Each keystroke in an open schema file re-invokes `parsed_schema_file` for that client and path and reparses the whole file. The parse runs once per client per file text version.
 
-## Entities
+Known gap: pico records no dependency when a memo reads a tracked map whose counter was never written (refactors/pending/pico-missing-key-dependency.md). In the daemon the boot scan writes the map before the first request; tests insert their schema files before the first lookup.
+
+## Entities in the schema
 
 ```rust
-// from crates/graphql_network_protocol/src/entity_named.rs
+// from crates/graphql_network_protocol/src/schema_lookup.rs
 /// A definition or extension and the schema file it is in.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InSchemaFile<T> {
@@ -101,103 +169,380 @@ pub struct SchemaEntity {
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum EntityLookupError {
-    #[error("A definition or extension of this type has a syntax error.")]
-    Syntax(InSchemaFile<DefinitionError>),
-    #[error("This type is defined more than once.")]
+    #[error("{0}")]
+    Syntax(EntitySyntaxError),
+    #[error("{0}")]
     DuplicateDefinition(DuplicateDefinition),
-    #[error("This type is extended but never defined.")]
-    ExtensionWithoutDefinition(InSchemaFile<TypeExtension>),
-    #[error("This extension's kind does not match the type's definition.")]
-    ExtensionKindMismatch(InSchemaFile<TypeExtension>),
+    #[error("{0}")]
+    ExtensionWithoutDefinition(ExtensionWithoutDefinition),
+    #[error("{0}")]
+    ExtensionKindMismatch(ExtensionKindMismatch),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[error("A definition or extension of `{name}` has a syntax error: {}", .failed.item.item.error.item)]
+pub struct EntitySyntaxError {
+    pub name: EntityName,
+    pub failed: InSchemaFile<DefinitionError>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[error("Type `{name}` is defined more than once in the schema.")]
 pub struct DuplicateDefinition {
+    pub name: EntityName,
     pub first: InSchemaFile<TypeDefinition>,
     pub second: InSchemaFile<TypeDefinition>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[error("Type `{name}` is extended but never defined.")]
+pub struct ExtensionWithoutDefinition {
+    pub name: EntityName,
+    pub extension: InSchemaFile<TypeExtension>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[error("An extension of `{name}` is not the kind of type `{name}` is defined as.")]
+pub struct ExtensionKindMismatch {
+    pub name: EntityName,
+    pub extension: InSchemaFile<TypeExtension>,
 }
 
 /// The named entity `name` as `client` reads the schema; `Ok(None)` when no schema file
 /// defines or extends it.
 #[memo]
-pub fn entity_named<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub fn entity_named<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     client: ClientId,
     name: EntityName,
 ) -> Result<Option<SchemaEntity>, EntityLookupError>
 ```
 
-`InSchemaFile` uses `WithSpan<T>`'s span as written by the parser: the definition's span in that file. For a `DefinitionError` it is the failed definition's span (ast.md).
+`InSchemaFile` uses `WithSpan<T>`'s span as the parser wrote it: the entry's span in that file. For a `DefinitionError` it is the failed definition's span (ast.md).
 
-`entity_named` walks `schema_file_paths(db, client)` and, per path, `parsed_schema_file(db, client, path)`; a `None` file is skipped. From each file's entries it keeps only the ones of `name`:
+`entity_named` walks `schema_entries(db, client)` and keeps only the entries of `name`:
 
 - `Ok` with `Definition(Type(definition))` whose name is `name`: a definition.
 - `Ok` with `Extension(Type(extension))` whose name is `name`: an extension.
-- `Err` whose `DefinitionError.name` is `Some(DefinitionName::Entity(name))`: `Err(EntityLookupError::Syntax(..))`, returned for the first such entry.
+- `Err` whose `DefinitionError.name` is `Some(DefinitionName::Entity(name))`: `Syntax`, returned for the first such entry.
 - Every other entry (other names, schema definitions and extensions, directive definitions, unnamed failures) is not read.
 
-Then, in this order: no definition and no extension is `Ok(None)`; extensions and no definition is `ExtensionWithoutDefinition` of the first extension; two or more definitions is `DuplicateDefinition` of the first two; an extension of a different kind than the definition (spec 3.4.3: an object extension extends an object, and so on) is `ExtensionKindMismatch` of the first such extension; otherwise `Ok(Some(SchemaEntity))`. Extensions apply in any order: `SchemaEntity.extensions` keeps them all, and nothing reads their order for meaning.
-
-Each `entity_named` reads every schema file's parse, so a keystroke in any schema file re-runs every `entity_named` the client has asked for; each re-run is a scan of already-parsed entries and backdates when its result is `==`. A broken definition of another name, an unreadable file, a schema definition with an error, or a duplicate of another name does not change the result.
-
-## Selectables
+Then, in this order: no definition and no extension is `Ok(None)`; extensions and no definition is `ExtensionWithoutDefinition` of the first extension; two or more definitions is `DuplicateDefinition` of the first two; an extension of a different kind than the definition (spec 3.4.3) is `ExtensionKindMismatch` of the first such extension; otherwise `Ok(Some(SchemaEntity))`. Extensions apply in any order.
 
 ```rust
-// from crates/graphql_network_protocol/src/entity_named.rs
-#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+// from crates/graphql_network_protocol/src/schema_lookup.rs
+/// The kind of a type definition or extension (spec 3.4).
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum TypeKind {
+    Scalar,
+    Object,
+    Interface,
+    Union,
+    Enum,
+    InputObject,
+}
+
+pub(crate) fn type_definition_name(definition: &TypeDefinition) -> WithSpan<EntityNameWrapper>;
+pub(crate) fn type_definition_kind(definition: &TypeDefinition) -> TypeKind;
+pub(crate) fn type_extension_name(extension: &TypeExtension) -> WithSpan<EntityNameWrapper>;
+pub(crate) fn type_extension_kind(extension: &TypeExtension) -> TypeKind;
+```
+
+Each is a match over the six variants. They are plain functions because `TypeDefinition` and `TypeExtension` live in `graphql_schema_parser`, which no other crate depends on for behavior.
+
+## Fields in the schema
+
+```rust
+// from crates/graphql_network_protocol/src/schema_lookup.rs
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error, derive_more::From)]
 pub enum SelectableLookupError {
     #[error("{0}")]
-    Entity(#[from] EntityLookupError),
-    #[error("This field is defined more than once on its type.")]
+    Entity(EntityLookupError),
+    #[error("{0}")]
     DuplicateField(DuplicateField),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[error("Field `{entity}.{selectable}` is defined more than once in the schema.")]
 pub struct DuplicateField {
+    pub entity: EntityName,
+    pub selectable: SelectableName,
     pub first: InSchemaFile<FieldDefinition>,
     pub second: InSchemaFile<FieldDefinition>,
 }
 
-/// The field `selectable` of the entity `entity`; `Ok(None)` when the entity does not exist
-/// or has no such field.
+/// The field `selectable` of the entity `entity` in the schema; `Ok(None)` when the entity
+/// does not exist in the schema or has no such field.
 #[memo]
-pub fn selectable_named<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub fn selectable_named<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     client: ClientId,
     entity: EntityName,
     selectable: SelectableName,
 ) -> Result<Option<InSchemaFile<FieldDefinition>>, SelectableLookupError>
+
+/// Every field of `schema_entity`: the definition's then each extension's, with its file.
+pub(crate) fn schema_entity_fields(
+    schema_entity: &SchemaEntity,
+) -> impl Iterator<Item = InSchemaFile<FieldDefinition>> + '_
 ```
 
-`selectable_named` is `entity_named(db, client, entity).clone()?`, then the fields named `selectable` in the definition and in every object or interface extension (`ObjectTypeDefinition.fields`, `InterfaceTypeDefinition.fields`, and the extensions' `fields`; scalars, unions, enums, and input objects have no output fields). One field is `Ok(Some(..))`; two or more are `DuplicateField` of the first two; none is `Ok(None)`. The field's type is not resolved here: a caller that needs the target calls `entity_named` with the type annotation's name, so an unknown target type fails only the lookups that resolve that field.
+`selectable_named` is `entity_named(db, client, entity).clone()?`, then the fields named `selectable` among `schema_entity_fields`: `ObjectTypeDefinition.fields`, `InterfaceTypeDefinition.fields`, and the object and interface extensions' `fields`. Scalars, unions, enums, and input objects contribute none. One field is `Ok(Some(..))`; two or more are `DuplicateField` of the first two; none is `Ok(None)`. The field's type is not resolved here.
 
-Whole-schema checks (every root operation type exists, every interface a type implements is an interface, every union member is an object, no two definitions of any name) are not lookups. They belong to a later compile or diagnostics pass over every name, and do not gate `entity_named`.
+Whole-schema checks (every root operation type exists, every interface a type implements is an interface, every union member is an object) are not lookups. They belong to a later pass over every name and do not gate `entity_named`.
+
+## Protocol entities and selectables
+
+These memos turn the schema lookups into the core's `ProtocolEntity` and `ProtocolSelectable` (entrypoints.md, Protocol data on entities and selectables).
+
+```rust
+// from crates/graphql_network_protocol/src/protocol_data.rs
+/// What the GraphQL protocol records about a type.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum GraphQLEntityData {
+    /// A scalar or enum: selected with no selection set.
+    Leaf,
+    /// An input object: an argument type, never a selection target.
+    InputObject,
+    Object(GraphQLCompositeData),
+    Interface(GraphQLCompositeData),
+    Union,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GraphQLCompositeData {
+    /// The interfaces this type declares it implements, in definition then extension order.
+    pub interfaces: Vec<EntityName>,
+}
+
+/// What the GraphQL protocol records about a selectable.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum GraphQLSelectableData {
+    /// A field of the schema, printed as `name(arguments)`.
+    Field,
+    /// `asUser` on a union or interface: printed as `... on User`, where `User` is the
+    /// selectable's target.
+    Refinement,
+}
+
+/// The GraphQL type `name` as `client` reads the schema, with the data the protocol records.
+#[memo]
+pub fn graphql_entity<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    name: EntityName,
+) -> Result<Option<ProtocolEntity<GraphQLEntityData>>, EntityLookupError>
+```
+
+`graphql_entity` maps `entity_named`'s `Ok(Some(schema_entity))`: `definition` is the definition's path and name span; the variant follows `type_definition_kind` (`Scalar` and `Enum` are `Leaf`); `interfaces` is the definition's `interfaces` then each object or interface extension's `interfaces`. `GraphQLCompositeData` gains `id_field` with query-generation.md change 7 (the printer reads it) and `fetchable_directives` with change 4 (the fetch plan reads it).
+
+```rust
+// from crates/graphql_network_protocol/src/protocol_data.rs
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error, derive_more::From)]
+pub enum GraphQLSelectableLookupError {
+    #[error("{0}")]
+    Selectable(SelectableLookupError),
+    #[error("{0}")]
+    #[from(skip)]
+    RefinementTarget(RefinementTargetError),
+    #[error("{0}")]
+    #[from(skip)]
+    RefinementCollision(RefinementCollision),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[error("`{entity}.{selectable}` refines to `{target}`, whose lookup failed: {error}")]
+pub struct RefinementTargetError {
+    pub entity: EntityName,
+    pub selectable: SelectableName,
+    pub target: EntityName,
+    pub error: EntityLookupError,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[error("Field `{entity}.{selectable}` is defined in the schema and is also a refinement.")]
+pub struct RefinementCollision {
+    pub entity: EntityName,
+    pub selectable: SelectableName,
+    pub field: InSchemaFile<FieldDefinition>,
+}
+
+/// The selectable `selectable` of the GraphQL type `entity`: a field of the type, or a
+/// refinement `as<Type>` of a union or interface.
+#[memo]
+pub fn graphql_selectable<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    entity: EntityName,
+    selectable: SelectableName,
+) -> Result<Option<ProtocolSelectable<GraphQLSelectableData>>, GraphQLSelectableLookupError>
+
+/// Every selectable of the GraphQL type `entity`: its fields, then its refinements whose
+/// target resolves. A name may repeat. Empty when the type's lookup fails.
+#[memo]
+pub fn graphql_selectables<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    entity: EntityName,
+) -> Vec<(SelectableName, ProtocolSelectable<GraphQLSelectableData>)>
+
+/// Every object type whose definition or an object extension lists `interface` in
+/// `implements`, sorted, each once.
+#[memo]
+pub fn object_types_implementing<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    interface: EntityName,
+) -> Vec<EntityName>
+```
+
+A field becomes `ProtocolSelectable { description, target_entity, definition, data: Field }`: `target_entity` is the named type under the type annotation's list and non-null wrappers, `definition` is the path and the field name's span.
+
+`graphql_selectable` computes the field (`selectable_named`) and the refinement, then: both is `RefinementCollision`; one is that one; neither is `Ok(None)`. The refinement of `selectable` on `entity`: `selectable` must be `as` followed by a name `T`. On a union (`entity_named(entity)` is a `Union` definition), `T` must be a member of the definition or a union extension. On an interface, `graphql_entity(T)` must be `Object` whose `interfaces` contain `entity`. Then `graphql_entity(T)`: `Err` is `RefinementTarget`; `Ok(Some)` of an `Object` is the refinement `ProtocolSelectable { description: None, target_entity: T, definition: T's definition, data: Refinement }`; anything else is no refinement.
+
+`graphql_selectables` lists `schema_entity_fields` of the entity, then the refinements of each union member (deduplicated) or each of `object_types_implementing(entity)`, keeping the ones whose `graphql_entity` is `Ok(Some)` of an `Object`. A collision or a duplicate field shows as a repeated name; the core keeps names defined exactly once.
+
+`object_types_implementing` walks `schema_entries` and keeps the names of `Ok` object definitions and object extensions whose `interfaces` contain `interface`. It reads every schema file, so a keystroke in any schema file re-runs it; it backdates when the list is `==`.
+
+```rust
+// from crates/graphql_network_protocol/src/lib.rs
+pub struct GraphQLNetworkProtocol;
+
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error, derive_more::From)]
+pub enum GraphQLLookupError {
+    #[error("{0}")]
+    Entity(EntityLookupError),
+    #[error("{0}")]
+    Selectable(GraphQLSelectableLookupError),
+}
+
+impl NetworkProtocol for GraphQLNetworkProtocol {
+    type EntityData = GraphQLEntityData;
+    type SelectableData = GraphQLSelectableData;
+    type LookupError = GraphQLLookupError;
+
+    fn should_include_schema_file(relative_path: &Path) -> IncludeFile {
+        match relative_path.extension().and_then(|e| e.to_str()) {
+            Some("graphql" | "graphqls") => IncludeFile::Include,
+            _ => IncludeFile::Skip,
+        }
+    }
+
+    fn entity<TProfile: CompilationProfile<NetworkProtocol = Self>>(
+        db: &IsographDb<TProfile>,
+        client: ClientId,
+        name: EntityName,
+    ) -> Result<Option<ProtocolEntity<GraphQLEntityData>>, GraphQLLookupError> {
+        graphql_entity(db, client, name).clone().map_err(GraphQLLookupError::from)
+    }
+
+    fn selectable<TProfile: CompilationProfile<NetworkProtocol = Self>>(
+        db: &IsographDb<TProfile>,
+        client: ClientId,
+        entity: EntityName,
+        selectable: SelectableName,
+    ) -> Result<Option<ProtocolSelectable<GraphQLSelectableData>>, GraphQLLookupError> {
+        graphql_selectable(db, client, entity, selectable)
+            .clone()
+            .map_err(GraphQLLookupError::from)
+    }
+
+    fn selectables<TProfile: CompilationProfile<NetworkProtocol = Self>>(
+        db: &IsographDb<TProfile>,
+        client: ClientId,
+        entity: EntityName,
+    ) -> Vec<(SelectableName, ProtocolSelectable<GraphQLSelectableData>)> {
+        graphql_selectables(db, client, entity).clone()
+    }
+}
+```
+
+## The core lookups
+
+`NetworkProtocol` gains `EntityData`, `SelectableData`, `LookupError`, `entity`, `selectable` (entrypoints.md), and `selectables`, the completion list:
+
+```rust
+// from crates/isograph_compiler/src/host_language.rs
+    /// Every selectable the protocol defines on `entity`, by name. A name may repeat;
+    /// `selectables_for_entity` keeps names defined exactly once.
+    fn selectables<TProfile: CompilationProfile<NetworkProtocol = Self>>(
+        db: &IsographDb<TProfile>,
+        client: ClientId,
+        entity: EntityName,
+    ) -> Vec<(SelectableName, ProtocolSelectable<Self::SelectableData>)>;
+```
+
+`FetchPlan`, `NotFetchable`, `QueryError`, `fetch_plan`, and `query_artifact` land with the query-generation changes that read them (4, 5, 7).
+
+The core counts definitions in one place:
+
+```rust
+// from crates/isograph_compiler/src/schema.rs
+/// What the source files and the protocol define under one name.
+pub(crate) enum Definitions<T, TLookupError> {
+    Undefined,
+    Unique(T),
+    /// More than one definition among the source declarations and the protocol.
+    Duplicated,
+    /// The protocol's lookup failed and no source declaration has the name.
+    ProtocolLookupFailed(TLookupError),
+}
+
+pub(crate) fn entity_definitions<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    entity_name: EntityName,
+) -> Definitions<ProfileEntity<TProfile>, ProfileLookupError<TProfile>>
+
+pub(crate) fn selectable_definitions<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    entity_name: EntityName,
+    selectable_name: SelectableName,
+) -> Definitions<ProfileSelectable<TProfile>, ProfileLookupError<TProfile>>
+
+pub type ProfileLookupError<TProfile> =
+    <<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::LookupError;
+```
+
+The source definitions (`source_entity_definitions`, `source_selectable_definitions`) chained with the protocol's `Ok(Some)` are counted: zero is `Undefined`, one is `Unique`, more is `Duplicated`. A protocol `Err` counts as one definition: with no source definition it is `ProtocolLookupFailed`, with one or more it is `Duplicated`.
+
+`entity_named` and `selectable_named` match on it: `Unique` is `Ok`; `Undefined` is `` Entity `X` is not defined. `` / `` Field `X.y` is not defined. ``; `Duplicated` is `` Entity `X` is defined more than once. `` / `` Field `X.y` is defined more than once. ``; `ProtocolLookupFailed(error)` is `Diagnostic::new(error.to_string(), None)`.
+
+`selectables_for_entity` is `entity_named(..)?`, then the source selectables of the entity chained with `NetworkProtocol::selectables`, grouped by name, keeping names with exactly one.
+
+Validation reads `entity_definitions` and `selectable_definitions`:
+
+- `UnknownEntity` and `UnknownSelectable` are `Undefined`.
+- `DuplicateDefinition` is `Duplicated`, at the source declaration's name. `entity Pet` beside `type Pet` is a duplicate at `entity Pet`.
+- A selection whose lookup is `ProtocolLookupFailed` or `Duplicated` reports nothing at the selection and does not descend. A selection of a `Unique` selectable descends into its target when the target's `entity_definitions` is not `Undefined`, as today.
 
 ## Changes
 
-### 1. `schema` config field and `SchemaPathMap`
+### 1. Config, watcher, and `SchemaPathMap`
 
-`CompilationOptions.schema` and the watcher watching `schema` globs (`SchemaPathMap` and its writers are in i2). Tests (`crates/isograph_compiler/src/database.rs`, and the daemon's handle tests where `handle` is tested today): inserting a schema disk path twice writes once (a memo reading the map re-runs once); removing an absent path does not write; a TypeScript file event does not change `schema_path_map`; `remove_open_files_of_client` removes that client's open schema keys and no other client's.
+Status: landed.
 
-### 2. `schema_file_paths` and `parsed_schema_file`
+### 2. Protocol data types and origins
 
-Tests (`crates/graphql_network_protocol`, writing `schema_path_map` first per Known gap): disk paths `b.graphql`, `a.graphql` list as `[a, b]`; client 1 opening `c.graphql` lists `[a, b, c]` for client 1 and `[a, b]` for client 2; a path open and on disk lists once; adding a schema file adds it to the list and removing it drops it; `parsed_schema_file` of a path with no text is `None`; of an open buffer it parses the buffer text, not disk.
+query-generation.md change 2: `Entity<TEntityData>`, `EntityOrigin`, `Selectable<TSelectableData>`, `SelectableOrigin`, `SourceSelectableOrigin`, `ProtocolSelectableOrigin`, `Selectable::target_entity()`, `ProfileEntity`, `ProfileSelectable`, `SourceSelectableDefinition`; `NetworkProtocol::EntityData`, `SelectableData`. Lookups still read source files only. Tests: the existing lookup, hover, completion, and validation tests pass unchanged in their facts.
 
-### 3. `entity_named` and `selectable_named`
+### 3. Schema lookups and protocol lookups in the core
 
-Tests:
+`schema_file_paths`, `parsed_schema_file`, `schema_entries`, `entity_named`, `selectable_named` (protocol crate), `graphql_entity`, `graphql_selectable`, `graphql_selectables`, `object_types_implementing`, the error types, `GraphQLLookupError`; `NetworkProtocol::LookupError`, `entity`, `selectable`, `selectables`; `ProtocolEntity`, `ProtocolSelectable`; `Definitions`, `entity_definitions`, `selectable_definitions`; the core lookups and validation counting both. Merges query-generation.md change 3.
 
-- `type User { id: ID! }` in `a.graphql`, `extend type User { name: String }` in `b.graphql`: `entity_named(User)` has the definition from `a` and one extension from `b`; `selectable_named(User, name)` is the field from `b`.
-- The extension in `a.graphql` and the definition in `b.graphql`: the same result (extensions in any order, any file).
-- `type User` in `a.graphql` and `type User` in `b.graphql`: `DuplicateDefinition` with first from `a`, second from `b`; `entity_named(Query)` for `type Query { a: A }` in `a.graphql` is `Ok`.
-- `type User { a: A } type User { b: B }` in one file: `DuplicateDefinition`.
-- `extend type User { a: A }` with no definition anywhere: `ExtensionWithoutDefinition`; `entity_named(Other)` is unaffected.
-- `type User { a: A }` and `extend input User { b: B }`: `ExtensionKindMismatch`.
-- `type User { a: ! }` in `a.graphql` and `type Query { user: User }` in `b.graphql`: `entity_named(User)` is `Syntax` with path `a`; `entity_named(Query)` is `Ok`; `selectable_named(Query, user)` is `Ok(Some(..))` (the target is not resolved).
-- A broken definition of another name in the same file as `type User` (`type Broken { a: ! } type User { id: ID! }`): `entity_named(User)` is `Ok`.
-- `type Query { a: Missing }`: `selectable_named(Query, a)` is `Ok(Some(..))`; `entity_named(Missing)` is `Ok(None)`.
-- `entity_named(Nobody)` is `Ok(None)`; `selectable_named(User, nope)` is `Ok(None)`.
-- `type User { id: ID! }` and `extend type User { id: ID }`: `selectable_named(User, id)` is `DuplicateField`; `selectable_named(User, other)` for a third field is `Ok(Some(..))`.
-- Adding `b.graphql` with `extend type User { name: String }` after a first `entity_named(User)` call: the next call has the extension; removing the file drops it.
-- A schema path whose file was deleted from disk (path still listed, no text): `entity_named` of names in other files is `Ok`.
+Tests in `crates/graphql_network_protocol` (GraphQL profile with `TypeScriptHostLanguage`, schema files inserted before the first lookup):
+
+- `schema_file_paths`: disk `b.graphql`, `a.graphql` lists `[a, b]`; client 1 opening `c.graphql` lists `[a, b, c]` for client 1 and `[a, b]` for client 2; removing `b.graphql` drops it.
+- `parsed_schema_file` of an open buffer parses the buffer text, not disk; of a path with no text is `None`.
+- `type User { id: ID! }` in `a.graphql`, `extend type User { name: String }` in `b.graphql`: `entity_named(User)` has the definition from `a` and one extension from `b`; `selectable_named(User, name)` is the field from `b`. With the extension in `a.graphql` and the definition in `b.graphql`: the same.
+- `type User` in `a.graphql` and in `b.graphql`: `DuplicateDefinition`, first from `a`; `entity_named(Query)` is `Ok`. Two definitions in one file: `DuplicateDefinition`.
+- `extend type User { a: A }` alone: `ExtensionWithoutDefinition`; `type User { a: A }` with `extend input User { b: B }`: `ExtensionKindMismatch`.
+- `type User { a: ! }` in `a.graphql` and `type Query { user: User }` in `b.graphql`: `entity_named(User)` is `Syntax` with path `a`; `entity_named(Query)` is `Ok`; `selectable_named(Query, user)` is `Ok(Some)`. `type Broken { a: ! } type User { id: ID! }` in one file: `entity_named(User)` is `Ok`.
+- `type User { id: ID! }` and `extend type User { id: ID }`: `selectable_named(User, id)` is `DuplicateField`; `selectable_named(User, other)` for a third field is `Ok(Some)`.
 - An open buffer of `a.graphql` in client 1 that breaks `type User`: client 1's `entity_named(User)` is `Syntax`; client 2's is `Ok`.
+- `graphql_entity`: `scalar ID` and `enum E { A }` are `Leaf`; `input I { a: Int }` is `InputObject`; `union U = A` is `Union`; `type T implements I1` with `extend type T implements I2` is `Object` with `interfaces == [I1, I2]`; `interface I` is `Interface`.
+- `graphql_selectable`: `Query.pet` with `pet: [Pet!]!` has target `Pet`, data `Field`, and the definition span of `pet`; `union U = A | B` with `extend union U = C`, objects `A`, `B`, `C`: `asA`, `asC` are `Refinement` with targets `A`, `C` and definitions at their type names; `asD` is `Ok(None)`. `interface Node`, `type Pet implements Node`, `extend type Owner implements Node` in another file, `interface Named implements Node`: `Node.asPet` and `Node.asOwner` are refinements, `Node.asNamed` is `Ok(None)`. A union member `A` whose definition has a syntax error: `U.asA` is `RefinementTarget`, `U.asB` is `Ok(Some)`. `interface I { asPet: Pet }` with `type Pet implements I`: `I.asPet` is `RefinementCollision`, `I.other` unaffected.
+- `graphql_selectables(Node)` lists the fields then `asOwner`, `asPet`; of a broken type is empty.
+
+Tests in `crates/isograph_cli/src/state.rs` (handle seam, GraphQL profile, a schema file `schema/schema.graphql` and a source file `src/x.ts`): hover on a schema field and on a refinement; go-to-definition to the field's and the refinement target's definitions in the schema file; completion inside a selection set on a schema type lists the fields and refinements; validation publishes `` Field `Pet.nope` is not defined. `` for an unknown selection and nothing for known ones; editing the schema file on disk (a `DiskChanged`) to add `nope` clears that diagnostic on the next debounce fire.
