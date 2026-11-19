@@ -48,7 +48,7 @@ fn ast_at_lsp_position<THostLanguage: HostLanguage>(
 
 /// The literal whose interior contains `position`, and the span of the char under
 /// `position` relative to that interior.
-fn iso_literal_at_lsp_position<THostLanguage: HostLanguage>(
+pub(crate) fn iso_literal_at_lsp_position<THostLanguage: HostLanguage>(
     db: &IsographDb<THostLanguage>,
     client: ClientId,
     path: RelativePathToSourceFile,

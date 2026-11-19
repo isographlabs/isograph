@@ -110,6 +110,9 @@ fn dispatch_lsp_request<THostLanguage: HostLanguage>(
             .on_request_sync::<lsp_types::request::HoverRequest>(
                 crate::adapter::hover_response::<THostLanguage>,
             )?
+            .on_request_sync::<lsp_types::request::DocumentHighlightRequest>(
+                crate::adapter::document_highlight_response::<THostLanguage>,
+            )?
             .request();
         ControlFlow::Continue(request)
     };
@@ -1761,6 +1764,169 @@ mod tests {
         let one = live_client(&mut state, ClientId(1));
         assert_eq!(
             hover_text(&mut state, &one, "untitled:Untitled-1", 0, 0),
+            None
+        );
+    }
+
+    fn highlights(
+        state: &mut IsographState<TypeScriptHostLanguage>,
+        client: &TestClient,
+        uri: &str,
+        line: u32,
+        character: u32,
+    ) -> Option<Vec<lsp_types::DocumentHighlight>> {
+        let result = request_result(
+            state,
+            client,
+            lsp_types::request::DocumentHighlightRequest::METHOD,
+            hover_params(uri, line, character),
+        );
+        serde_json::from_value(result)
+            .expect("documentHighlight returns DocumentHighlight[] | null")
+    }
+
+    /// The one text highlight over `line:start..line:end`.
+    fn text_highlight(
+        line: u32,
+        start: u32,
+        end: u32,
+    ) -> Option<Vec<lsp_types::DocumentHighlight>> {
+        lsp_types::DocumentHighlight {
+            range: lsp_types::Range {
+                start: lsp_types::Position {
+                    line,
+                    character: start,
+                },
+                end: lsp_types::Position {
+                    line,
+                    character: end,
+                },
+            },
+            kind: lsp_types::DocumentHighlightKind::TEXT.wrap_some(),
+        }
+        .wrap_vec()
+        .wrap_some()
+    }
+
+    /// The highlight of the token `needle` on the one-line `line_text`.
+    fn highlight_of(
+        line: u32,
+        line_text: &str,
+        needle: &str,
+    ) -> Option<Vec<lsp_types::DocumentHighlight>> {
+        let start = column(line_text, needle);
+        text_highlight(line, start, start + needle.encode_utf16().count() as u32)
+    }
+
+    /// Client 1's highlights at `line:character` of `src/x.ts` on disk as `text`.
+    fn highlights_on_disk(
+        text: &str,
+        line: u32,
+        character: u32,
+    ) -> Option<Vec<lsp_types::DocumentHighlight>> {
+        let mut state = with_config();
+        disk_changed(&mut state, "/tmp/proj/src/x.ts", text);
+        let one = live_client(&mut state, ClientId(1));
+        highlights(&mut state, &one, X_URI, line, character)
+    }
+
+    #[test]
+    fn highlight_on_a_name_is_exactly_that_token() {
+        let mut state = with_disk_home();
+        let one = live_client(&mut state, ClientId(1));
+        let expected = highlight_of(0, HOME_DISK, "HomeRoute");
+        let first = column(HOME_DISK, "HomeRoute");
+        let last = first + "HomeRoute".len() as u32 - 1;
+        assert_eq!(highlights(&mut state, &one, HOME_URI, 0, first), expected);
+        assert_eq!(highlights(&mut state, &one, HOME_URI, 0, last), expected);
+        assert_eq!(
+            highlights(&mut state, &one, HOME_URI, 0, column(HOME_DISK, "Query")),
+            highlight_of(0, HOME_DISK, "Query")
+        );
+    }
+
+    #[test]
+    fn highlight_on_a_period_is_the_period() {
+        let mut state = with_disk_home();
+        let one = live_client(&mut state, ClientId(1));
+        assert_eq!(
+            highlights(&mut state, &one, HOME_URI, 0, column(HOME_DISK, ".")),
+            highlight_of(0, HOME_DISK, ".")
+        );
+    }
+
+    #[test]
+    fn highlight_on_whitespace_outside_a_literal_or_past_the_line_end_is_null() {
+        let mut state = with_disk_home();
+        let one = live_client(&mut state, ClientId(1));
+        let space = column(HOME_DISK, " Query");
+        let end = HOME_DISK.len() as u32;
+        assert_eq!(highlights(&mut state, &one, HOME_URI, 0, space), None);
+        assert_eq!(highlights(&mut state, &one, HOME_URI, 0, 1), None);
+        assert_eq!(
+            highlights(&mut state, &one, HOME_URI, 0, column(HOME_DISK, "`")),
+            None
+        );
+        assert_eq!(highlights(&mut state, &one, HOME_URI, 0, end), None);
+        assert_eq!(highlights(&mut state, &one, HOME_URI, 1, 0), None);
+    }
+
+    #[test]
+    fn highlight_in_two_literals_is_each_literals_token() {
+        let text = format!("{ENTRYPOINT_A}\n{FIELD_X}");
+        assert_eq!(
+            highlights_on_disk(&text, 0, column(ENTRYPOINT_A, "Query")),
+            highlight_of(0, ENTRYPOINT_A, "Query")
+        );
+        assert_eq!(
+            highlights_on_disk(&text, 1, column(FIELD_X, "id")),
+            highlight_of(1, FIELD_X, "id")
+        );
+        let one_line = format!("{ENTRYPOINT_A} {FIELD_X}");
+        assert_eq!(
+            highlights_on_disk(&one_line, 0, column(&one_line, "id")),
+            highlight_of(0, &one_line, "id")
+        );
+    }
+
+    #[test]
+    fn highlight_after_a_wide_char_is_in_utf16_columns() {
+        let text = format!("const s = \"😀\"; {ENTRYPOINT_A}");
+        let start = column(&text, "Query");
+        assert_eq!(
+            start,
+            text.find("Query").expect("the fixture has Query") as u32 - 2
+        );
+        assert_eq!(
+            highlights_on_disk(&text, 0, start),
+            text_highlight(0, start, start + 5)
+        );
+    }
+
+    #[test]
+    fn highlight_reads_the_clients_buffer_and_another_client_reads_disk() {
+        let mut state = with_disk_home();
+        let one = live_client(&mut state, ClientId(1));
+        let two = live_client(&mut state, ClientId(2));
+        handle(&mut state, did_open(one.client, HOME_URI, FIELD_X));
+        let id = column(FIELD_X, "id");
+        assert_eq!(
+            highlights(&mut state, &one, HOME_URI, 0, id),
+            highlight_of(0, FIELD_X, "id")
+        );
+        assert_eq!(highlights(&mut state, &two, HOME_URI, 0, id), None);
+        assert_eq!(
+            highlights(&mut state, &two, HOME_URI, 0, column(HOME_DISK, "Query")),
+            highlight_of(0, HOME_DISK, "Query")
+        );
+    }
+
+    #[test]
+    fn highlight_of_a_non_file_uri_is_null() {
+        let mut state = with_disk_home();
+        let one = live_client(&mut state, ClientId(1));
+        assert_eq!(
+            highlights(&mut state, &one, "untitled:Untitled-1", 0, 0),
             None
         );
     }

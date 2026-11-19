@@ -126,7 +126,7 @@ Capability in `run_session` (`lsp_socket.rs`); the lsp-types 0.97 field is `Opti
 
 ## Tests
 
-`document_highlight.rs`: `semantic_token_span_at` over `parse_iso_literal("entrypoint Query.HomeRoute").tokens` on each char of `HomeRoute` is the `HomeRoute` span; on the space is `None`; on `.` is the `.` span; past the end is `None`; on a comma in `field Query.x { a, b }` is `None`.
+`document_highlight.rs`: `semantic_token_span_at` over `parse_iso_literal("entrypoint Query.HomeRoute").tokens` on each char of `HomeRoute` is the `HomeRoute` span; on the space is `None`; on `.` is the `.` span; on trailing whitespace past the last token is `None`; on a comma in `field Query.x { a, b }` is `None`.
 
 `state.rs` (the `handle` seam):
 
@@ -138,7 +138,7 @@ Capability in `run_session` (`lsp_socket.rs`); the lsp-types 0.97 field is `Opti
 - Buffer over disk: client 1 with a buffer highlights the buffer's token; client 2 highlights disk's.
 - A non-file URI is `null`.
 
-`lsp_socket.rs`'s initialize capabilities test asserts `documentHighlightProvider` is `true`.
+`lsp_socket.rs`'s initialize capabilities test asserts `documentHighlightProvider` is `true` and is renamed `initialize_advertises_formatting_will_save_wait_until_hover_and_highlight`.
 
 ## Changes
 

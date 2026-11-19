@@ -50,6 +50,26 @@ pub(crate) fn hover_response<THostLanguage: HostLanguage>(
     isograph_lsp::hover_for_position(db, client, path, position.position).wrap_ok()
 }
 
+pub(crate) fn document_highlight_response<THostLanguage: HostLanguage>(
+    db: &IsographDb<THostLanguage>,
+    client: ClientId,
+    params: lsp_types::DocumentHighlightParams,
+) -> LSPRuntimeResult<
+    <lsp_types::request::DocumentHighlightRequest as lsp_types::request::Request>::Result,
+> {
+    let position = params.text_document_position_params;
+    let path = relative_from_uri(db, position.text_document.uri.reference()).map_err(lsp_error)?;
+    isograph_lsp::token_range_at_lsp_position(db, client, path, position.position)
+        .map(|range| {
+            lsp_types::DocumentHighlight {
+                range,
+                kind: lsp_types::DocumentHighlightKind::TEXT.wrap_some(),
+            }
+            .wrap_vec()
+        })
+        .wrap_ok()
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
 pub(crate) enum DidChangeError {
     #[error("didChange carried {0} content changes; full document sync sends exactly one")]
