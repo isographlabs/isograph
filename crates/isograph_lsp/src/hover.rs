@@ -1,7 +1,7 @@
 use common_lang_types::RelativePathToSourceFile;
 use isograph_compiler::{
     ClientId, CompilationProfile, IsographDb, LiteralId, extract_iso_literals,
-    get_parent_and_selectable_for_selection_path, iso_literal_extraction, parsed_iso_literal_by_id,
+    iso_literal_extraction, parsed_iso_literal_by_id, selectable_for_selection_path,
 };
 use isograph_parser::{IsographResolutionNode, ParsedIsoLiteral, SelectionPath, resolve_offset};
 use prelude::Postfix;
@@ -54,8 +54,7 @@ fn selection_hover_markdown<TProfile: CompilationProfile>(
     client: ClientId,
     selection_path: &SelectionPath<'_>,
 ) -> Option<String> {
-    let (_, selectable) =
-        get_parent_and_selectable_for_selection_path(db, client, selection_path).ok()?;
+    let selectable = selectable_for_selection_path(db, client, selection_path).ok()?;
     format!("{}: {}", selectable.name, selectable.target_entity).wrap_some()
 }
 

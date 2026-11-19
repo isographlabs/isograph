@@ -2,18 +2,15 @@ use common_lang_types::{DiagnosticResult, EntityName, SelectableName};
 use isograph_parser::{SelectionPath, SelectionSetParent, SelectionSetPath};
 use prelude::Postfix;
 
-use crate::{
-    ClientId, CompilationProfile, Entity, IsographDb, Selectable, entity_named, selectable_named,
-};
+use crate::{ClientId, CompilationProfile, IsographDb, Selectable, entity_named, selectable_named};
 
-/// The entity `selection_path` selects on and the selectable it selects, as `client` reads
-/// the schema.
-pub fn get_parent_and_selectable_for_selection_path<TProfile: CompilationProfile>(
+/// The selectable `selection_path` selects, as `client` reads the schema.
+pub fn selectable_for_selection_path<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
     selection_path: &SelectionPath<'_>,
-) -> DiagnosticResult<(Entity, Selectable)> {
-    get_parent_and_selectable_for_selection_parent(
+) -> DiagnosticResult<Selectable> {
+    selectable_for_selection_parent(
         db,
         client,
         selection_path.parent.parent.reference(),
@@ -21,17 +18,17 @@ pub fn get_parent_and_selectable_for_selection_path<TProfile: CompilationProfile
     )
 }
 
-/// The entity the selection set at `selection_set_path` selects on and its selectable named
-/// `selectable_name`.
-pub fn get_parent_and_selectable_for_selection_parent<TProfile: CompilationProfile>(
+/// The selectable named `selectable_name` on the entity the selection set at
+/// `selection_set_path` selects on.
+pub fn selectable_for_selection_parent<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
     selection_set_path: &SelectionSetPath<'_>,
     selectable_name: SelectableName,
-) -> DiagnosticResult<(Entity, Selectable)> {
+) -> DiagnosticResult<Selectable> {
     match selection_set_path.parent.reference() {
         SelectionSetParent::SelectableDeclaration(selectable_declaration_path) => {
-            parent_object_entity_and_selectable(
+            selectable_for_entity(
                 db,
                 client,
                 selectable_declaration_path.inner.parent_type.item.0,
@@ -39,28 +36,21 @@ pub fn get_parent_and_selectable_for_selection_parent<TProfile: CompilationProfi
             )
         }
         SelectionSetParent::Selection(selection_path) => {
-            let (_, selectable) =
-                get_parent_and_selectable_for_selection_path(db, client, selection_path)?;
-            parent_object_entity_and_selectable(
-                db,
-                client,
-                selectable.target_entity,
-                selectable_name,
-            )
+            let parent_selectable = selectable_for_selection_path(db, client, selection_path)?;
+            selectable_for_entity(db, client, parent_selectable.target_entity, selectable_name)
         }
     }
 }
 
-/// The entity named `parent_entity_name` and its selectable named `selectable_name`.
-pub fn parent_object_entity_and_selectable<TProfile: CompilationProfile>(
+/// The selectable named `selectable_name` on the entity named `entity_name`.
+pub fn selectable_for_entity<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
-    parent_entity_name: EntityName,
+    entity_name: EntityName,
     selectable_name: SelectableName,
-) -> DiagnosticResult<(Entity, Selectable)> {
-    let entity = entity_named(db, client, parent_entity_name).clone()?;
-    let selectable = selectable_named(db, client, parent_entity_name, selectable_name).clone()?;
-    (entity, selectable).wrap_ok()
+) -> DiagnosticResult<Selectable> {
+    entity_named(db, client, entity_name).clone()?;
+    selectable_named(db, client, entity_name, selectable_name).clone()
 }
 
 #[cfg(test)]
@@ -71,9 +61,9 @@ mod tests {
     use prelude::Postfix;
     use span::Span;
 
-    use super::get_parent_and_selectable_for_selection_path;
+    use super::selectable_for_selection_path;
     use crate::test_profile::TestProfile;
-    use crate::{ClientId, Entity, IsographDb, Selectable, entity_named};
+    use crate::{ClientId, IsographDb, Selectable, entity_named};
 
     const CLIENT: ClientId = ClientId(1);
 
@@ -84,7 +74,7 @@ mod tests {
         text: &str,
         needle: &str,
         nth: usize,
-    ) -> DiagnosticResult<(Entity, Selectable)> {
+    ) -> DiagnosticResult<Selectable> {
         let (start, _) = text
             .match_indices(needle)
             .nth(nth)
@@ -97,11 +87,7 @@ mod tests {
         let IsographResolutionNode::SelectionNameWrapper(selection_name_path) = node else {
             panic!("expected {needle:?} to resolve to a selection name, got {node}");
         };
-        get_parent_and_selectable_for_selection_path(
-            db,
-            CLIENT,
-            selection_name_path.parent.reference(),
-        )
+        selectable_for_selection_path(db, CLIENT, selection_name_path.parent.reference())
     }
 
     fn entity_named_error(db: &IsographDb<TestProfile>, name: &str) -> Option<Diagnostic> {
