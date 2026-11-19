@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use common_lang_types::RelativePathToSourceFile;
 use intern::Lookup;
-use isograph_compiler::{ClientId, CompilationProfile, HostLanguage, IsographDb, SkipSourceFile};
+use isograph_compiler::{ClientId, CompilationProfile, HostLanguage, IncludeFile, IsographDb};
 use prelude::Postfix;
 
 use crate::effect::{IsographEffect, PublishDiagnosticsEffect};
@@ -111,8 +111,8 @@ fn client_diagnostics<TProfile: CompilationProfile>(
             let relative = Path::new(path.lookup());
             source_globs.contains(relative)
                 && matches!(
-                    TProfile::HostLanguage::should_skip_source_file(relative),
-                    SkipSourceFile::Keep
+                    TProfile::HostLanguage::should_include_source_file(relative),
+                    IncludeFile::Include
                 )
         })
         .filter_map(|path| {

@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use globset::Glob;
-use isograph_compiler::{CompilationProfile, HostLanguage, SkipSourceFile};
+use isograph_compiler::{CompilationProfile, HostLanguage, IncludeFile};
 use isograph_config::ISOGRAPH_FOLDER;
 use notify::event::{CreateKind, ModifyKind, RemoveKind, RenameMode};
 use notify::{EventKind, RecommendedWatcher, RecursiveMode};
@@ -549,9 +549,9 @@ fn post_file<TProfile: CompilationProfile>(
     if !globs.contains(relative.reference()) {
         return;
     }
-    match TProfile::HostLanguage::should_skip_source_file(relative.reference()) {
-        SkipSourceFile::Skip => return,
-        SkipSourceFile::Keep => {}
+    match TProfile::HostLanguage::should_include_source_file(relative.reference()) {
+        IncludeFile::Skip => return,
+        IncludeFile::Include => {}
     }
     let contents = match std::fs::read_to_string(path.reference()) {
         Ok(contents) => contents,
@@ -623,7 +623,7 @@ mod tests {
 
     use intern::string_key::Intern;
     use isograph_compiler::{
-        CompilationProfile, HostLanguage, IsoLiteralExtraction, IsographDb, SkipSourceFile,
+        CompilationProfile, HostLanguage, IncludeFile, IsoLiteralExtraction, IsographDb,
     };
     use isograph_config::ISOGRAPH_FOLDER;
     use prelude::Postfix;
@@ -652,10 +652,10 @@ mod tests {
             Vec::new()
         }
 
-        fn should_skip_source_file(relative_path: &Path) -> SkipSourceFile {
+        fn should_include_source_file(relative_path: &Path) -> IncludeFile {
             match relative_path.extension().and_then(|e| e.to_str()) {
-                Some("in") => SkipSourceFile::Keep,
-                _ => SkipSourceFile::Skip,
+                Some("in") => IncludeFile::Include,
+                _ => IncludeFile::Skip,
             }
         }
     }

@@ -55,9 +55,9 @@ impl<THostLanguage: HostLanguage> IsoLiteralExtraction<THostLanguage> {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SkipSourceFile {
+pub enum IncludeFile {
+    Include,
     Skip,
-    Keep,
 }
 
 pub trait HostLanguage: Send + Sync + Sized + 'static {
@@ -66,7 +66,7 @@ pub trait HostLanguage: Send + Sync + Sized + 'static {
 
     fn extract_iso_literals_from_text(contents: &str) -> Vec<IsoLiteralExtraction<Self>>;
 
-    fn should_skip_source_file(relative_path: &Path) -> SkipSourceFile;
+    fn should_include_source_file(relative_path: &Path) -> IncludeFile;
 }
 
 /// One choice of host language and network protocol. A binary names one.

@@ -186,7 +186,7 @@ mod tests {
 
     use super::{ClientId, IsographDb, file_contents};
     use crate::host_language::{
-        CompilationProfile, HostLanguage, IsoLiteralExtraction, NetworkProtocol, SkipSourceFile,
+        CompilationProfile, HostLanguage, IncludeFile, IsoLiteralExtraction, NetworkProtocol,
     };
 
     #[derive(Clone, Debug, PartialEq, Eq, Error)]
@@ -203,8 +203,8 @@ mod tests {
             Vec::new()
         }
 
-        fn should_skip_source_file(_relative_path: &Path) -> SkipSourceFile {
-            SkipSourceFile::Keep
+        fn should_include_source_file(_relative_path: &Path) -> IncludeFile {
+            IncludeFile::Include
         }
     }
 

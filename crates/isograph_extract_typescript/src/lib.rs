@@ -4,8 +4,8 @@ use std::sync::LazyLock;
 use common_lang_types::{ConstExportName, RelativePathToSourceFile};
 use intern::string_key::Intern;
 use isograph_compiler::{
-    ClientId, CompilationProfile, HostLanguage, IsoLiteralError, IsoLiteralExtraction,
-    IsoLiteralStartIndex, IsographDb, SkipSourceFile, extract_iso_literals, parsed_iso_literal,
+    ClientId, CompilationProfile, HostLanguage, IncludeFile, IsoLiteralError, IsoLiteralExtraction,
+    IsoLiteralStartIndex, IsographDb, extract_iso_literals, parsed_iso_literal,
 };
 use isograph_parser::{IsoLiteralItem, IsoLiteralParse, ParsedIsoLiteral, SelectableNameWrapper};
 use prelude::Postfix;
@@ -89,10 +89,10 @@ impl HostLanguage for TypeScriptHostLanguage {
             .collect()
     }
 
-    fn should_skip_source_file(relative_path: &Path) -> SkipSourceFile {
+    fn should_include_source_file(relative_path: &Path) -> IncludeFile {
         match relative_path.extension().and_then(|e| e.to_str()) {
-            Some("ts" | "tsx" | "js" | "jsx") => SkipSourceFile::Keep,
-            _ => SkipSourceFile::Skip,
+            Some("ts" | "tsx" | "js" | "jsx") => IncludeFile::Include,
+            _ => IncludeFile::Skip,
         }
     }
 }
@@ -1355,10 +1355,10 @@ iso(`entrypoint Query.HomeRoute`)";
     }
 
     #[test]
-    fn should_skip_source_file_keeps_ts_tsx_js_jsx() {
+    fn should_include_source_file_includes_ts_tsx_js_jsx() {
         use std::path::Path;
 
-        use isograph_compiler::SkipSourceFile;
+        use isograph_compiler::IncludeFile;
 
         for path in [
             "src/a.ts",
@@ -1371,8 +1371,8 @@ iso(`entrypoint Query.HomeRoute`)";
             "src/__isograph/foo.ts",
         ] {
             assert_eq!(
-                TypeScriptHostLanguage::should_skip_source_file(Path::new(path)),
-                SkipSourceFile::Keep,
+                TypeScriptHostLanguage::should_include_source_file(Path::new(path)),
+                IncludeFile::Include,
                 "{path}"
             );
         }
@@ -1385,8 +1385,8 @@ iso(`entrypoint Query.HomeRoute`)";
             "",
         ] {
             assert_eq!(
-                TypeScriptHostLanguage::should_skip_source_file(Path::new(path)),
-                SkipSourceFile::Skip,
+                TypeScriptHostLanguage::should_include_source_file(Path::new(path)),
+                IncludeFile::Skip,
                 "{path}"
             );
         }
