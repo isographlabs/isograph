@@ -526,6 +526,18 @@ mod memo_tests {
         ) -> Result<(), TestProtocolError> {
             TestProtocolError.wrap_err()
         }
+
+        fn entity_shape(_data: &()) -> isograph_compiler::EntityShape {
+            isograph_compiler::EntityShape::Leaf
+        }
+
+        fn selectable_shape(_data: &()) -> isograph_compiler::SelectableShape {
+            isograph_compiler::SelectableShape::Direct
+        }
+
+        fn discriminator() -> SelectableName {
+            intern::string_key::Intern::intern("__typename").to()
+        }
     }
 
     struct TestProfile;

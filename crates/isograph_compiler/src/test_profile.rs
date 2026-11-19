@@ -119,6 +119,18 @@ impl NetworkProtocol for TestNetworkProtocol {
     ) -> Result<(), TestProtocolError> {
         TestProtocolError.wrap_err()
     }
+
+    fn entity_shape(_data: &()) -> crate::EntityShape {
+        crate::EntityShape::Leaf
+    }
+
+    fn selectable_shape(_data: &()) -> crate::SelectableShape {
+        crate::SelectableShape::Direct
+    }
+
+    fn discriminator() -> SelectableName {
+        intern::string_key::Intern::intern("__typename").to()
+    }
 }
 
 pub(crate) struct TestProfile;

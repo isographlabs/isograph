@@ -993,6 +993,7 @@ name = "isograph_compiler"
 version = "0.5.3"
 dependencies = [
  "common_lang_types",
+ "derive_more",
  "intern",
  "isograph_parser",
  "nonempty",

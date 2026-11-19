@@ -100,7 +100,7 @@ pub struct IntegerValue(pub i64);
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct BooleanValue(pub Boolean);
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Boolean {
     True,
     False,

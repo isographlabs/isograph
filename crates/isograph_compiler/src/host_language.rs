@@ -8,8 +8,8 @@ use thiserror::Error;
 use isograph_parser::ParseError;
 
 use crate::{
-    ArtifactPath, ClientId, EntityKind, GenerationOptions, IsographDb, ProjectArtifacts,
-    ProtocolEntity, ProtocolSelectable,
+    ArtifactPath, ClientId, EntityKind, EntityShape, GenerationOptions, IsographDb,
+    ProjectArtifacts, ProtocolEntity, ProtocolSelectable, SelectableShape,
 };
 
 /// Byte offset of the iso literal text in its file.
@@ -154,6 +154,18 @@ pub trait NetworkProtocol: Sized + 'static {
         client: ClientId,
         entity: EntityName,
     ) -> Result<Self::FetchPlan, Self::NotFetchable>;
+
+    /// What the core reads about an entity with `data`: whether a selection of it has
+    /// selections, and for one that does, the identity selection the protocol adds to every
+    /// selection set on it.
+    fn entity_shape(data: &Self::EntityData) -> EntityShape;
+
+    /// What a selection of a selectable with `data` is in a merged selection map.
+    fn selectable_shape(data: &Self::SelectableData) -> SelectableShape;
+
+    /// The selectable the protocol selects in every selection set on a composite entity,
+    /// whose value names the response object's concrete entity.
+    fn discriminator() -> SelectableName;
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -54,7 +54,6 @@ What the text shows:
 - `PetDetailRoute`'s own selections are the `pet(id: $id)` field. `fullName`, `PetStatsCard`, and `PetBestFriendCard` are `field` declarations without `to`; their selection sets are inlined (`firstName`, `lastName`, `nickname`, `stats { .. }`, `best_friend_relationship { .. }`, `id`).
 - `friendName: firstName` in `PetBestFriendCard` prints as `firstName: firstName`. A reader alias is the reader's name for a value; it does not reach the query.
 - Every field prints with its normalization alias: `pet(id: $id)` as `pet____id___v_id: pet(id: $id)`, and a field with no arguments under its own name (`firstName: firstName`).
-- `PetCheckinsCard(limit: 5) @loadable(lazyLoadArtifact: true)` contributes nothing. Its query is the loadable field's own, a later doc.
 - `bestFriend { fullName }` and `owner { OwnerBadge }` contribute nothing. `bestFriend` and `owner` are client pointers (`field Pet.bestFriend to Pet`, `field Pet.owner to Owner!`), which v0 query generation omits with their nested selection sets (Client pointers, below). The `best_friend_relationship` block comes from `PetBestFriendCard`.
 - `__typename: __typename` comes first in every selection set under a selection, and `id: id` next under every type with `id: ID!`, whether or not anything selected them. The top level has neither.
 - Entries are in alphabetical order after those two.
@@ -160,14 +159,15 @@ The core decides nothing about which identity an entity has; it inserts the sele
 
 ```rust
 // from crates/graphql_network_protocol/src/protocol_data.rs
-const TYPENAME: &str = "__typename";
+/// The selectable GraphQL selects in every selection set on a composite type.
+pub(crate) const TYPENAME: &str = "__typename";
 const ID: &str = "id";
 
 /// An object, interface, or union is composite; `id` is its identity where `IdField` is
 /// `Present`.
 pub(crate) fn graphql_entity_shape(data: &GraphQLEntityData) -> EntityShape {
     match data {
-        GraphQLEntityData::Leaf => EntityShape::Leaf,
+        GraphQLEntityData::Scalar(_) | GraphQLEntityData::Enum => EntityShape::Leaf,
         GraphQLEntityData::InputObject => EntityShape::Input,
         GraphQLEntityData::Object(composite) | GraphQLEntityData::Interface(composite) => {
             EntityShape::Composite(identity_selection(composite.id_field))
@@ -183,13 +183,18 @@ fn identity_selection(id_field: IdField) -> IdentitySelection {
     }
 }
 
+/// A field or input field is a direct selection; a refinement is a conditional.
 pub(crate) fn graphql_selectable_shape(data: &GraphQLSelectableData) -> SelectableShape {
     match data {
-        GraphQLSelectableData::Field => SelectableShape::Direct,
+        GraphQLSelectableData::Field | GraphQLSelectableData::InputField => {
+            SelectableShape::Direct
+        }
         GraphQLSelectableData::Refinement => SelectableShape::Refinement,
     }
 }
 ```
+
+Delta from entrypoints.md's `GraphQLEntityData`: the landed enum has `Scalar(EntityName)` and `Enum` where entrypoints.md has `Leaf`, and `GraphQLSelectableData` has `InputField`, both from the artifact-types work. `Scalar` and `Enum` are `Leaf`. `InputField` is `Direct`: an input field is a selectable of an input object, and a selection on an input object is never reached, because a selection whose target is an input object is `InputTarget` and an input object cannot parent an entrypoint (`NotComposite`). `id_field` is computed by `id_field(db, client, name)` in `protocol_data.rs`, which `graphql_entity` calls once per composite type.
 
 `GraphQLNetworkProtocol::entity_shape` and `::selectable_shape` call these; `::discriminator` is `TYPENAME.intern().to()`. `IdField` is decided by `IdentityFieldSelection::Auto` (Config, below). `GraphQLCompositeData` gains `id_field: IdField` (entrypoints.md) in this change, its first reader.
 
@@ -577,8 +582,8 @@ pub fn field_selection_map<TProfile: CompilationProfile>(
 
 The body:
 
-1. `inline_cycle(db, client, key)`: a cycle reachable from this field is `InlineCycle`, returned before any recursive call.
-2. `source_field_declaration(db, client, entity, selectable)`: the declaration's parse.
+1. `source_field_declaration(db, client, entity, selectable)`: the declaration's parse.
+2. `inline_cycle(db, client, key)`: a cycle reachable from this field is `InlineCycle`, located at the declaration's name, returned before any recursive call. The declaration is read first because the location is its name; a field whose declaration fails has no inlined fields, so the order changes no result.
 3. Its `variable_definitions` become `FieldVariable`s, in source order.
 4. Its selection set, when present, is `merge_selection_set(db, client, declaration_context, entity, selection_set)`; absent, the map is empty.
 
@@ -642,11 +647,10 @@ fn selection_contribution<TProfile: CompilationProfile>(
   - `Refinement` on a `Composite(identity)` target: arguments on the selection are `ArgumentsOnRefinement`, no selection set is `MissingSelectionSet`; otherwise one entry `Conditional(MergedConditional { condition: Condition::SelectionEquals(target), identity, selections })`.
   - `Refinement` on a `Leaf` target is `RefinementToNonComposite(target)`; GraphQL's refinements target only object types (`refinement_to`), so GraphQL does not reach it.
   - Either shape on an `Input` target is `InputTarget(target)`.
-- `SelectableKind::ClientField` with a directive named `loadable` on the selection: the empty map.
-- `SelectableKind::ClientField` otherwise: `field_selection_map(db, client, parent, selection.name)`, then `substitute` with the context built from the converted arguments and that map's `variables`. An argument the field does not declare is `UnknownFieldArgument`. The selection's own nested selection set is not read.
-- `SelectableKind::ClientPointer`: the empty map, with or without `@loadable`. Its own selection set and the selection's nested selection set are not read (Client pointers, below).
+- `SelectableKind::ClientField`: `field_selection_map(db, client, parent, selection.name)`, then `substitute` with the context built from the converted arguments and that map's `variables`. An argument the field does not declare is `UnknownFieldArgument`. The selection's own nested selection set is not read.
+- `SelectableKind::ClientPointer(_)`: the empty map. Its own selection set and the selection's nested selection set are not read (Client pointers, below).
 
-`key` is `SelectionKey { name: selection.name, arguments }` with the converted arguments. Each shape error is located at the selection's name.
+`key` is `SelectionKey { name: selection.name, arguments }` with the converted arguments. Each shape error is located at the selection's name. The `Server` arm is the private `server_contribution` and the `ClientField` arm the private `client_field_contribution`, each taking the context, the `SelectableKey`, the selection, and the converted arguments; a substitution error is located at the selection's name.
 
 ### Client pointers
 
@@ -665,8 +669,8 @@ The recursion through `field_selection_map` is a memo call, so pico records the 
 ```rust
 // from crates/isograph_compiler/src/merged_selection.rs
 /// The `field` declarations whose selection sets `entity.selectable`'s selection set
-/// inlines directly: client field selections, not `@loadable`, at any depth under protocol
-/// selections. A selection whose lookup fails is not listed, and neither is a client pointer.
+/// inlines directly: client field selections at any depth under protocol selections. A
+/// selection whose lookup fails is not listed, and neither is a client pointer.
 #[memo]
 pub fn inlined_fields<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
@@ -993,7 +997,7 @@ pub enum TopLevelError {
 }
 ```
 
-The operation's top level is not under a selection, so it gets no discriminator and no identity. GraphQL forbids an introspection field as a subscription's root field (spec 5.2.3.1), so `__typename` at the top level of `subscription` would be invalid, and the root record's entity is the root type, known without a discriminator. `top_level` completes each `Selectable` entry as `complete`'s step 1 does. A `Conditional` entry is `Conditional`, because its condition would read a discriminator the top level does not select; a GraphQL root type is an object type (spec 3.3.1) and has no refinements, so GraphQL does not reach it. An empty map is `Empty`: GraphQL rejects an empty selection set, and the top level has no discriminator to fill it. `entrypoint Query.X` whose only selection is `@loadable` is `Empty`.
+The operation's top level is not under a selection, so it gets no discriminator and no identity. GraphQL forbids an introspection field as a subscription's root field (spec 5.2.3.1), so `__typename` at the top level of `subscription` would be invalid, and the root record's entity is the root type, known without a discriminator. `top_level` completes each `Selectable` entry as `complete`'s step 1 does. A `Conditional` entry is `Conditional`, because its condition would read a discriminator the top level does not select; a GraphQL root type is an object type (spec 3.3.1) and has no refinements, so GraphQL does not reach it. An empty map is `Empty`: GraphQL rejects an empty selection set, and the top level has no discriminator to fill it. `entrypoint Query.X` on a `field Query.X` with no selection set, or whose selections are only client pointers, is `Empty`.
 
 ### The operation's selections and variables
 
@@ -1525,7 +1529,7 @@ Facts about generated text, not snapshots. A helper in the test module returns t
 - `SpeciesRoute`: the header is `query SpeciesRoute($species: PetSpecies!) {`; lines include `  petsBySpecies____species___v_species: petsBySpecies(species: $species) {`, `    favorite_phrase: favorite_phrase`, `  viewer: viewer {`, and `  node____id___s_1: node(id: "1") {`, whose block's first two lines are `__typename: __typename` and `id: id`.
 - `SetTagline`: the header is `mutation SetTagline($id: ID!, $tagline: String!) {`; the second line is the `set_pet_tagline____input___o_id__v_id_tagline__v_tagline_c: set_pet_tagline(input: { id: $id, tagline: $tagline }) {` line.
 - `entrypoint Pet.PetSummaryCard` with a `field`: the second line is `  node____id___v_id: node(id: $id) {`, the third is `    ... on Pet {`; no line at depth 2 is `__typename` or `id`.
-- Removing `@loadable` from `PetCheckinsCard(limit: 5)` in `PetDetailRoute` adds the line `    checkins____limit___l_5____skip___l_0: checkins(limit: 5, skip: 0) {`. A second selection `PetCheckinsCard` with no arguments adds `checkins____limit___l_3____skip___l_0` (the default); both blocks are present.
+- Selecting `PetCheckinsCard(limit: 5)` in `PetDetailRoute` adds the line `    checkins____limit___l_5____skip___l_0: checkins(limit: 5, skip: 0) {`. A second selection `PetCheckinsCard` with no arguments adds `checkins____limit___l_3____skip___l_0` (the default); both blocks are present.
 - `field Pet.Opt($x: Int) { checkins(limit: $x) { id } }` selected as `Opt` with no argument prints `checkins: checkins {` with no arguments.
 - An entrypoint field declaring `$unused: Int` that nothing reads has no `$unused` in its header.
 - A union refinement: `field Query.Feed { viewer { newsfeed(limit: 2, skip: 0) { asBlogItem { title } } } }` prints a `newsfeed____limit___l_2____skip___l_0: newsfeed(limit: 2, skip: 0) {` block whose first line is `__typename` and which contains `... on BlogItem {` with `title`.
@@ -1582,7 +1586,7 @@ The stash `stash@{0}` ("WIP change 6") is the starting point; its deltas are sta
 - `MergedSelectionMap`, `MergeKey`, `SelectionKey`, `MergedSelection`, `MergedSelectableSelection`, `MergedSelectionTarget`, `MergedCompositeTarget`, `MergedConditional`, `Condition`, `MergedSelection::key`, `MergedSelectionMap::{empty, single, merge, iter, used_variables}`, `MergeError`, `AliasCollision`; `MergedArguments` (with `Default`), `MergedArgument`, `MergedValue`, `MergedObject`, `MergedObjectEntry`, `NormalizationAlias`, `SelectionKey::normalization_alias`.
 - `FieldSelectionMap`, `FieldVariable`, `VariableValue`, `substitute`; `SourceFieldDeclaration`, `source_field_declaration`; `inlined_fields` (client fields only), `InlineCycle`, `inline_cycle`; `field_selection_map`, `merge_selection_set`, `selection_contribution` with the shape errors and the client pointer omission; `SelectionMapError`, `SelectionMapErrorKind`, `UnknownFieldArgument`.
 - `isograph_parser::Boolean` and `SelectableKey` gain the `Ord` and `Hash` derives.
-- The `crates/isograph_compiler/src/merged_selection.rs` tests and the walk tests of the GraphQL group above that do not read query text.
+- The `crates/isograph_compiler/src/merged_selection.rs` tests and the walk tests of the GraphQL group above that do not read query text, asserted on `field_selection_map`'s value, in `crates/graphql_network_protocol/src/tests/merged_selection.rs`.
 
 The landed `MergedTarget` stays until change 7. Depends on 3 and 5.
 

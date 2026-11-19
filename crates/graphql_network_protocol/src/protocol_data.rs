@@ -8,8 +8,8 @@ use graphql_schema_parser::{
 use intern::Lookup;
 use intern::string_key::Intern;
 use isograph_compiler::{
-    ClientId, CompilationProfile, DefinitionLocation, IsographDb, ProtocolEntity,
-    ProtocolSelectable, UnionWrapper, Wrapper, WrapperVariant,
+    ClientId, CompilationProfile, DefinitionLocation, EntityShape, IdentitySelection, IsographDb,
+    ProtocolEntity, ProtocolSelectable, SelectableShape, UnionWrapper, Wrapper, WrapperVariant,
 };
 use pico_macros::memo;
 use prelude::Postfix;
@@ -37,6 +37,67 @@ pub enum GraphQLEntityData {
 pub struct GraphQLCompositeData {
     /// The interfaces this type declares it implements, in definition then extension order.
     pub interfaces: Vec<EntityName>,
+    pub id_field: IdField,
+}
+
+/// Whether a type has a field `id: ID!`, which `graphql_entity_shape` makes its identity.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum IdField {
+    Present,
+    Absent,
+}
+
+/// The selectable GraphQL selects in every selection set on a composite type.
+pub(crate) const TYPENAME: &str = "__typename";
+const ID: &str = "id";
+
+/// An object, interface, or union is composite; `id` is its identity where `IdField` is
+/// `Present`.
+pub(crate) fn graphql_entity_shape(data: &GraphQLEntityData) -> EntityShape {
+    match data {
+        GraphQLEntityData::Scalar(_) | GraphQLEntityData::Enum => EntityShape::Leaf,
+        GraphQLEntityData::InputObject => EntityShape::Input,
+        GraphQLEntityData::Object(composite) | GraphQLEntityData::Interface(composite) => {
+            EntityShape::Composite(identity_selection(composite.id_field))
+        }
+        GraphQLEntityData::Union => EntityShape::Composite(IdentitySelection::Omit),
+    }
+}
+
+fn identity_selection(id_field: IdField) -> IdentitySelection {
+    match id_field {
+        IdField::Present => IdentitySelection::Select(ID.intern().to()),
+        IdField::Absent => IdentitySelection::Omit,
+    }
+}
+
+/// A field or input field is a direct selection; a refinement is a conditional.
+pub(crate) fn graphql_selectable_shape(data: &GraphQLSelectableData) -> SelectableShape {
+    match data {
+        GraphQLSelectableData::Field | GraphQLSelectableData::InputField => SelectableShape::Direct,
+        GraphQLSelectableData::Refinement => SelectableShape::Refinement,
+    }
+}
+
+/// `Present` when `name` has a field `id: ID!`. A failed lookup of `id` is `Absent`: the
+/// error belongs to lookups of `id`, not to the type.
+fn id_field<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    name: EntityName,
+) -> IdField {
+    let Ok(Some(field)) = selectable_named(db, client, name, ID.intern().to()) else {
+        return IdField::Absent;
+    };
+    match field.item.item.type_.item.reference() {
+        TypeAnnotation::NonNull(non_null) => match non_null.0.item.reference() {
+            NullableTypeAnnotation::Named(named) if named.0.item.0.lookup() == "ID" => {
+                IdField::Present
+            }
+            NullableTypeAnnotation::Named(_) | NullableTypeAnnotation::List(_) => IdField::Absent,
+        },
+        TypeAnnotation::Named(_) | TypeAnnotation::List(_) => IdField::Absent,
+    }
 }
 
 /// What the GraphQL protocol records about a selectable.
@@ -78,6 +139,7 @@ pub fn graphql_entity<TProfile: CompilationProfile>(
                     }))
                     .map(|interface| interface.item.0)
                     .collect(),
+                id_field: id_field(db, client, name),
             }
         };
     let data = match schema_entity.definition.item.item.reference() {

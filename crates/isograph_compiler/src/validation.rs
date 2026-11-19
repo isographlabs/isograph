@@ -67,7 +67,8 @@ pub enum DuplicateDefinitionError {
 pub struct SelectionSetOnFieldWithoutTargetError(pub SelectableKey);
 
 /// The identity of a selectable: its parent entity and its name.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, derive_more::Display)]
+#[display("{entity}.{selectable}")]
 pub struct SelectableKey {
     pub entity: EntityName,
     pub selectable: SelectableName,

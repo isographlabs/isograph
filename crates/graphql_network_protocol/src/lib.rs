@@ -10,19 +10,21 @@ use std::path::Path;
 
 use common_lang_types::{EntityName, SelectableName};
 use intern::Lookup;
+use intern::string_key::Intern;
 use isograph_compiler::{
-    ClientId, CompilationProfile, EntityKind, IncludeFile, IsographDb, NetworkProtocol,
-    ProtocolEntity, ProtocolSelectable, ScalarKind, ScalarValueKind,
+    ClientId, CompilationProfile, EntityKind, EntityShape, IncludeFile, IsographDb,
+    NetworkProtocol, ProtocolEntity, ProtocolSelectable, ScalarKind, ScalarValueKind,
+    SelectableShape,
 };
 use prelude::Postfix;
 
 pub use fetch_plan::{GraphQLFetchPlan, GraphQLNotFetchable, graphql_fetch_plan};
-use protocol_data::union_members;
 pub use protocol_data::{
     DuplicateInputField, GraphQLCompositeData, GraphQLEntityData, GraphQLSelectableData,
-    GraphQLSelectableLookupError, RefinementCollision, RefinementTargetError, graphql_entity,
-    graphql_selectable, graphql_selectables, object_types_implementing,
+    GraphQLSelectableLookupError, IdField, RefinementCollision, RefinementTargetError,
+    graphql_entity, graphql_selectable, graphql_selectables, object_types_implementing,
 };
+use protocol_data::{TYPENAME, graphql_entity_shape, graphql_selectable_shape, union_members};
 pub use root_operation_types::{
     DuplicateOperation, DuplicateSchemaDefinition, RootOperationTypes, RootOperationTypesError,
     root_operation_types,
@@ -135,5 +137,17 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         entity: EntityName,
     ) -> Result<GraphQLFetchPlan, GraphQLNotFetchable> {
         graphql_fetch_plan(db, client, entity).clone()
+    }
+
+    fn entity_shape(data: &GraphQLEntityData) -> EntityShape {
+        graphql_entity_shape(data)
+    }
+
+    fn selectable_shape(data: &GraphQLSelectableData) -> SelectableShape {
+        graphql_selectable_shape(data)
+    }
+
+    fn discriminator() -> SelectableName {
+        TYPENAME.intern().to()
     }
 }

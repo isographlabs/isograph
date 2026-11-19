@@ -6,6 +6,7 @@ mod entrypoint;
 mod host_language;
 mod iso_literals;
 mod merged_selection;
+mod protocol_shape;
 mod references;
 mod schema;
 mod selectable_for_path;
@@ -34,7 +35,16 @@ pub use iso_literals::{
     parsed_iso_literal, parsed_iso_literal_by_id, parsed_iso_literals_in_file,
     text_through_last_iso_literal,
 };
-pub use merged_selection::{MergedTarget, NonNullVariableType, VariableType};
+pub use merged_selection::{
+    AliasCollision, Condition, FieldSelectionMap, FieldVariable, InlineCycle, MergeError, MergeKey,
+    MergedArgument, MergedArguments, MergedCompositeTarget, MergedConditional, MergedObject,
+    MergedObjectEntry, MergedSelectableSelection, MergedSelection, MergedSelectionMap,
+    MergedSelectionTarget, MergedTarget, MergedValue, NonNullVariableType, NormalizationAlias,
+    SelectionKey, SelectionMapError, SelectionMapErrorKind, SourceFieldDeclaration,
+    UnknownFieldArgument, VariableType, field_selection_map, inlined_fields,
+    source_field_declaration,
+};
+pub use protocol_shape::{EntityShape, IdentitySelection, SelectableShape};
 pub use references::{ReferenceTarget, references_in_file};
 pub use schema::{
     ClientPointerTarget, DefinitionLocation, Entity, EntityKind, EntityOrigin, LiteralContextOf,

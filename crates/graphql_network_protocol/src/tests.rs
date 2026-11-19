@@ -4,9 +4,10 @@ use common_lang_types::{EntityName, RelativePathToSourceFile, SelectableName};
 use graphql_schema_parser::OperationType;
 use intern::string_key::Intern;
 use isograph_compiler::{
-    ClientId, CompilationProfile, DefinitionLocation, EntityKind, FileMembership, IncludeFile,
-    IsographDb, NetworkProtocol, ProtocolSelectable, ScalarKind, ScalarValueKind, UnionWrapper,
-    Wrapper, WrapperVariant, iso_literal_validation_errors_in_file,
+    ClientId, CompilationProfile, DefinitionLocation, EntityKind, EntityShape, FileMembership,
+    IdentitySelection, IncludeFile, IsographDb, NetworkProtocol, ProtocolSelectable, ScalarKind,
+    ScalarValueKind, SelectableShape, UnionWrapper, Wrapper, WrapperVariant,
+    iso_literal_validation_errors_in_file,
 };
 use isograph_extract_typescript::TypeScriptHostLanguage;
 use prelude::Postfix;
@@ -15,7 +16,7 @@ use span::Span;
 use crate::{
     DuplicateOperation, EntityLookupError, GraphQLCompositeData, GraphQLEntityData,
     GraphQLFetchPlan, GraphQLNetworkProtocol, GraphQLNotFetchable, GraphQLSelectableData,
-    GraphQLSelectableLookupError, RootOperationTypes, RootOperationTypesError,
+    GraphQLSelectableLookupError, IdField, RootOperationTypes, RootOperationTypesError,
     SelectableLookupError, entity_named, graphql_entity, graphql_fetch_plan, graphql_selectable,
     graphql_selectables, parsed_schema_file, root_operation_types, scalar_kind, schema_file_paths,
     selectable_named,
@@ -372,12 +373,16 @@ fn graphql_entity_data_follows_the_kind_of_type() {
     assert_eq!(data("U"), GraphQLEntityData::Union);
     assert_eq!(
         data("Node"),
-        GraphQLEntityData::Interface(GraphQLCompositeData { interfaces: vec![] })
+        GraphQLEntityData::Interface(GraphQLCompositeData {
+            interfaces: vec![],
+            id_field: IdField::Present,
+        })
     );
     assert_eq!(
         data("T"),
         GraphQLEntityData::Object(GraphQLCompositeData {
-            interfaces: vec![entity("Node"), entity("Other")]
+            interfaces: vec![entity("Node"), entity("Other")],
+            id_field: IdField::Present,
         })
     );
     assert_eq!(
@@ -386,6 +391,91 @@ fn graphql_entity_data_follows_the_kind_of_type() {
             .expect("T parses")
             .map(|t| t.definition),
         located_in("a.graphql", schema, "T implements", "T").wrap_some()
+    );
+}
+
+#[test]
+fn id_field_is_present_only_for_a_field_id_of_type_non_null_id() {
+    let schema = "scalar ID scalar String \
+        type Present { id: ID! } type Nullable { id: ID } type Text { id: String! } \
+        type List { id: [ID!]! } type Missing { name: String } type Duplicated { id: ID! id: ID! } \
+        interface Interface { id: ID! } type Extended { name: String } \
+        extend type Extended { id: ID! }";
+    let db = db_with(&[("a.graphql", schema)]);
+    let id_field = |name: &str| match graphql_entity(&db, CLIENT, entity(name))
+        .clone()
+        .expect("the fixture parses")
+        .expect("the fixture defines the type")
+        .data
+    {
+        GraphQLEntityData::Object(composite) | GraphQLEntityData::Interface(composite) => {
+            composite.id_field.wrap_some()
+        }
+        GraphQLEntityData::Scalar(_)
+        | GraphQLEntityData::Enum
+        | GraphQLEntityData::InputObject
+        | GraphQLEntityData::Union => None,
+    };
+    assert_eq!(id_field("Present"), IdField::Present.wrap_some());
+    assert_eq!(id_field("Interface"), IdField::Present.wrap_some());
+    assert_eq!(id_field("Extended"), IdField::Present.wrap_some());
+    for absent in ["Nullable", "Text", "List", "Missing", "Duplicated"] {
+        assert_eq!(id_field(absent), IdField::Absent.wrap_some(), "{absent}");
+    }
+}
+
+#[test]
+fn the_graphql_shapes_name_typename_and_id() {
+    let id: SelectableName = selectable("id");
+    let composite = |id_field| GraphQLCompositeData {
+        interfaces: vec![],
+        id_field,
+    };
+    assert_eq!(
+        GraphQLNetworkProtocol::entity_shape(&GraphQLEntityData::Object(composite(
+            IdField::Present
+        ))),
+        EntityShape::Composite(IdentitySelection::Select(id))
+    );
+    assert_eq!(
+        GraphQLNetworkProtocol::entity_shape(&GraphQLEntityData::Interface(composite(
+            IdField::Present
+        ))),
+        EntityShape::Composite(IdentitySelection::Select(id))
+    );
+    assert_eq!(
+        GraphQLNetworkProtocol::entity_shape(&GraphQLEntityData::Object(composite(
+            IdField::Absent
+        ))),
+        EntityShape::Composite(IdentitySelection::Omit)
+    );
+    assert_eq!(
+        GraphQLNetworkProtocol::entity_shape(&GraphQLEntityData::Union),
+        EntityShape::Composite(IdentitySelection::Omit)
+    );
+    assert_eq!(
+        GraphQLNetworkProtocol::entity_shape(&GraphQLEntityData::Scalar(entity("ID"))),
+        EntityShape::Leaf
+    );
+    assert_eq!(
+        GraphQLNetworkProtocol::entity_shape(&GraphQLEntityData::Enum),
+        EntityShape::Leaf
+    );
+    assert_eq!(
+        GraphQLNetworkProtocol::entity_shape(&GraphQLEntityData::InputObject),
+        EntityShape::Input
+    );
+    assert_eq!(
+        GraphQLNetworkProtocol::selectable_shape(&GraphQLSelectableData::Field),
+        SelectableShape::Direct
+    );
+    assert_eq!(
+        GraphQLNetworkProtocol::selectable_shape(&GraphQLSelectableData::Refinement),
+        SelectableShape::Refinement
+    );
+    assert_eq!(
+        GraphQLNetworkProtocol::discriminator(),
+        selectable("__typename")
     );
 }
 
@@ -1219,3 +1309,5 @@ mod field_types {
         assert_eq!(types(&db, "Pet", "f"), before);
     }
 }
+
+mod merged_selection;
