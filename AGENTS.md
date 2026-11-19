@@ -99,6 +99,10 @@ An API only tests call should not exist. A helper tests need lives in the tests 
 
 Do not test another crate. pico, intern, serde, std. Re-invoke counts, intern identity, and `ptr::eq` of interned values are pico or intern. Assert `Eq` of the values those memos return.
 
+A test of our own dependency tracking (which writes invalidate which memos) counts re-invocations; that is our behavior, not pico's. pico's own tests count re-invocations too.
+
+Tests may mutate shared state: atomics, `static`s, `Cell`/`RefCell`. "Shared state and interior mutability" governs production code.
+
 ## Wake on events
 
 No polling. No sleeping. An idle process is parked, not waking every N milliseconds to look. Work arrives by waking whatever the consumer is blocked on: the channel it `recv`s, the socket it `read`s, the flock wait, the OS watcher. A loop that retries a predicate until a deadline fires is polling, including `sleep` then `try_recv`. Capture the position first (subscribe, open the follow) then produce the event, so a wake cannot be lost if it races the wait. `select!` or a woken channel is the shape.
