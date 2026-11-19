@@ -89,20 +89,30 @@ pub type WithEmbeddedLocation<TItem> = WithGenericLocation<TItem, EmbeddedLocati
 
 impl<T> WithLocationPostfix for T {}
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
+pub enum RelativePathError {
+    #[error("the path has no form relative to the working directory")]
+    NotDiffable,
+    #[error("the relative path is not UTF-8")]
+    NotUtf8,
+}
+
 pub fn relative_path_from_absolute_and_working_directory(
     current_working_directory: CurrentWorkingDirectory,
     absolute_path: &Path,
-) -> RelativePathToSourceFile {
+) -> Result<RelativePathToSourceFile, RelativePathError> {
     let cwd = PathBuf::from(current_working_directory.lookup());
-    pathdiff::diff_paths(
+    let relative = pathdiff::diff_paths(
         without_windows_verbatim_prefix(absolute_path),
         without_windows_verbatim_prefix(cwd.as_path()),
     )
-    .expect("Expected path to be diffable")
-    .to_str()
-    .expect("Expected path to be able to be stringified")
-    .intern()
-    .to()
+    .ok_or(RelativePathError::NotDiffable)?;
+    relative
+        .to_str()
+        .ok_or(RelativePathError::NotUtf8)?
+        .intern()
+        .to::<RelativePathToSourceFile>()
+        .wrap_ok()
 }
 
 fn without_windows_verbatim_prefix(path: &Path) -> Cow<'_, Path> {
@@ -130,7 +140,7 @@ mod tests {
     use prelude::Postfix;
     use std::path::PathBuf;
 
-    use super::relative_path_from_absolute_and_working_directory;
+    use super::{RelativePathError, relative_path_from_absolute_and_working_directory};
     use crate::CurrentWorkingDirectory;
 
     fn cwd(s: &str) -> CurrentWorkingDirectory {
@@ -143,7 +153,8 @@ mod tests {
         let relative = relative_path_from_absolute_and_working_directory(
             cwd("/tmp/proj"),
             &PathBuf::from("/tmp/proj/src/a.ts"),
-        );
+        )
+        .expect("the test path is under the working directory");
         assert_eq!(relative.lookup(), "src/a.ts");
     }
 
@@ -153,7 +164,8 @@ mod tests {
         let relative = relative_path_from_absolute_and_working_directory(
             cwd(r"\\?\C:\proj"),
             &PathBuf::from(r"C:\proj\src\Home.ts"),
-        );
+        )
+        .expect("the test path is under the working directory");
         assert_eq!(relative.lookup(), r"src\Home.ts");
     }
 
@@ -163,7 +175,8 @@ mod tests {
         let relative = relative_path_from_absolute_and_working_directory(
             cwd(r"C:\proj"),
             &PathBuf::from(r"\\?\C:\proj\src\Home.ts"),
-        );
+        )
+        .expect("the test path is under the working directory");
         assert_eq!(relative.lookup(), r"src\Home.ts");
     }
 
@@ -173,7 +186,34 @@ mod tests {
         let relative = relative_path_from_absolute_and_working_directory(
             cwd(r"\\?\UNC\server\share"),
             &PathBuf::from(r"\\server\share\src\Home.ts"),
-        );
+        )
+        .expect("the test path is under the working directory");
         assert_eq!(relative.lookup(), r"src\Home.ts");
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn a_relative_path_against_an_absolute_working_directory_is_not_diffable() {
+        assert_eq!(
+            relative_path_from_absolute_and_working_directory(
+                cwd("/tmp/proj"),
+                &PathBuf::from("src/a.ts"),
+            ),
+            RelativePathError::NotDiffable.wrap_err()
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_path_with_a_non_utf8_component_is_not_utf8() {
+        use std::ffi::OsStr;
+        use std::os::unix::ffi::OsStrExt;
+        assert_eq!(
+            relative_path_from_absolute_and_working_directory(
+                cwd("/tmp/proj"),
+                &PathBuf::from(OsStr::from_bytes(b"/tmp/proj/\xFF.ts")),
+            ),
+            RelativePathError::NotUtf8.wrap_err()
+        );
     }
 }

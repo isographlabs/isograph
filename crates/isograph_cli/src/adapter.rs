@@ -1,19 +1,32 @@
-use isograph_compiler::{ClientId, HostLanguage};
+use common_lang_types::{
+    CurrentWorkingDirectory, RelativePathError, RelativePathToSourceFile,
+    relative_path_from_absolute_and_working_directory,
+};
+use isograph_compiler::{ClientId, HostLanguage, IsographDb};
+use isograph_lsp::lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult};
 use pico::Database;
 use prelude::Postfix;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
+pub(crate) enum UriPathError {
+    #[error("the URI is not a file URI")]
+    NotAFileUri,
+    #[error("CurrentWorkingDirectory is not interned")]
+    MissingWorkingDirectory,
+    #[error("{0}")]
+    Relative(RelativePathError),
+}
+
 pub(crate) fn semantic_tokens_response<THostLanguage: HostLanguage>(
-    state: &isograph_compiler::IsographDb<THostLanguage>,
+    db: &IsographDb<THostLanguage>,
     _client: ClientId,
     params: lsp_types::SemanticTokensParams,
-) -> isograph_lsp::lsp_runtime_error::LSPRuntimeResult<
+) -> LSPRuntimeResult<
     <lsp_types::request::SemanticTokensFullRequest as lsp_types::request::Request>::Result,
 > {
-    let Some(absolute) = file_path(params.text_document.uri.reference()) else {
-        return isograph_lsp::lsp_runtime_error::LSPRuntimeError::ExpectedError.wrap_err();
-    };
-    let tokens = semantic_tokens(state, absolute.reference());
-    tokens
+    let path = relative_from_uri(db, params.text_document.uri.reference()).map_err(lsp_error)?;
+    isograph_lsp::lsp_semantic_tokens_for_file::<THostLanguage>(db, path)
+        .clone()
         .map(|data| {
             lsp_types::SemanticTokensResult::Tokens(lsp_types::SemanticTokens {
                 result_id: None,
@@ -27,44 +40,53 @@ fn file_path(uri: &lsp_types::Uri) -> Option<std::path::PathBuf> {
     url::Url::parse(uri.as_str()).ok()?.to_file_path().ok()
 }
 
-fn semantic_tokens<THostLanguage: HostLanguage>(
-    state: &isograph_compiler::IsographDb<THostLanguage>,
-    absolute: &std::path::Path,
-) -> Option<Vec<lsp_types::SemanticToken>> {
-    let cwd = state.get_singleton::<common_lang_types::CurrentWorkingDirectory>()?;
-    let path = common_lang_types::relative_path_from_absolute_and_working_directory(*cwd, absolute);
-    isograph_lsp::lsp_semantic_tokens_for_file::<THostLanguage>(state, path).clone()
+pub(crate) fn relative_from_uri<THostLanguage: HostLanguage>(
+    db: &IsographDb<THostLanguage>,
+    uri: &lsp_types::Uri,
+) -> Result<RelativePathToSourceFile, UriPathError> {
+    let absolute = file_path(uri).ok_or(UriPathError::NotAFileUri)?;
+    let cwd = db
+        .get_singleton::<CurrentWorkingDirectory>()
+        .ok_or(UriPathError::MissingWorkingDirectory)?
+        .dereference();
+    relative_path_from_absolute_and_working_directory(cwd, absolute.as_path())
+        .map_err(UriPathError::Relative)
+}
+
+fn lsp_error(error: UriPathError) -> LSPRuntimeError {
+    match error {
+        UriPathError::NotAFileUri => LSPRuntimeError::ExpectedError,
+        UriPathError::MissingWorkingDirectory | UriPathError::Relative(_) => {
+            LSPRuntimeError::UnexpectedError(error.to_string())
+        }
+    }
 }
 
 pub(crate) fn formatting_response<THostLanguage: HostLanguage>(
-    state: &isograph_compiler::IsographDb<THostLanguage>,
+    db: &IsographDb<THostLanguage>,
     _client: ClientId,
     params: lsp_types::DocumentFormattingParams,
-) -> isograph_lsp::lsp_runtime_error::LSPRuntimeResult<
-    <lsp_types::request::Formatting as lsp_types::request::Request>::Result,
-> {
-    format_iso_literals(state, params.text_document.uri.reference()).wrap_ok()
+) -> LSPRuntimeResult<<lsp_types::request::Formatting as lsp_types::request::Request>::Result> {
+    let path = relative_from_uri(db, params.text_document.uri.reference()).map_err(lsp_error)?;
+    format_iso_literals(db, path).wrap_ok()
 }
 
 pub(crate) fn will_save_wait_until_response<THostLanguage: HostLanguage>(
-    state: &isograph_compiler::IsographDb<THostLanguage>,
+    db: &IsographDb<THostLanguage>,
     _client: ClientId,
     params: lsp_types::WillSaveTextDocumentParams,
-) -> isograph_lsp::lsp_runtime_error::LSPRuntimeResult<
-    <lsp_types::request::WillSaveWaitUntil as lsp_types::request::Request>::Result,
-> {
-    format_iso_literals(state, params.text_document.uri.reference()).wrap_ok()
+) -> LSPRuntimeResult<<lsp_types::request::WillSaveWaitUntil as lsp_types::request::Request>::Result>
+{
+    let path = relative_from_uri(db, params.text_document.uri.reference()).map_err(lsp_error)?;
+    format_iso_literals(db, path).wrap_ok()
 }
 
 fn format_iso_literals<THostLanguage: HostLanguage>(
-    state: &isograph_compiler::IsographDb<THostLanguage>,
-    uri: &lsp_types::Uri,
+    db: &IsographDb<THostLanguage>,
+    path: RelativePathToSourceFile,
 ) -> Option<Vec<lsp_types::TextEdit>> {
-    let absolute = file_path(uri)?;
-    let cwd = *state.get_singleton::<common_lang_types::CurrentWorkingDirectory>()?;
-    let path = common_lang_types::relative_path_from_absolute_and_working_directory(cwd, &absolute);
-    let literals = isograph_compiler::parsed_iso_literals_in_file(state, path).as_ref()?;
-    let page_content = isograph_compiler::text_through_last_iso_literal(state, path).as_ref()?;
+    let literals = isograph_compiler::parsed_iso_literals_in_file(db, path).as_ref()?;
+    let page_content = isograph_compiler::text_through_last_iso_literal(db, path).as_ref()?;
     literals
         .iter()
         .filter_map(|(extraction, parsed)| {
@@ -88,8 +110,7 @@ fn format_iso_literals<THostLanguage: HostLanguage>(
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-
+    use common_lang_types::RelativePathToSourceFile;
     use intern::string_key::Intern;
     use isograph_compiler::IsographDb;
     use isograph_extract_typescript::TypeScriptHostLanguage;
@@ -110,8 +131,8 @@ mod tests {
         db
     }
 
-    fn uri() -> lsp_types::Uri {
-        lsp_types::Uri::from_str("file:///tmp/proj/src/Pet.ts").expect("a file URI")
+    fn path() -> RelativePathToSourceFile {
+        "src/Pet.ts".intern().to()
     }
 
     fn source_with_blank_spaces(spaces: usize) -> String {
@@ -164,8 +185,7 @@ mod tests {
 
     fn formatted_source(contents: String) -> String {
         let db = db_with(contents.clone());
-        let uri = uri();
-        let edits = format_iso_literals(&db, uri.reference()).expect("edits");
+        let edits = format_iso_literals(&db, path()).expect("edits");
         apply_text_edits(&contents, &edits)
     }
 
@@ -190,8 +210,7 @@ mod tests {
         (0usize..=4).for_each(|spaces| {
             let source = source_with_blank_spaces(spaces);
             let db = db_with(source.clone());
-            let uri = uri();
-            let edits = format_iso_literals(&db, uri.reference()).expect("edits");
+            let edits = format_iso_literals(&db, path()).expect("edits");
             let once = apply_text_edits(&source, &edits);
             assert_eq!(once, PRETTY, "spaces={spaces}");
             let twice = apply_text_edits(&once, &edits);
@@ -203,8 +222,7 @@ mod tests {
     fn pretty_disk_edits_applied_to_a_buffer_with_an_extra_blank_line_leave_an_extra_brace() {
         const EXTRA_BRACE: &str = "export const fullName = iso(`\n  field Pet.fullName @foo(\n    bar: 123,\n    baz: $qux,\n  ) {\n    id,\n  }\n  }\n`);\n";
         let db = db_with(PRETTY.to_owned());
-        let uri = uri();
-        let edits = format_iso_literals(&db, uri.reference()).expect("edits");
+        let edits = format_iso_literals(&db, path()).expect("edits");
         (0usize..=4).for_each(|spaces| {
             assert_eq!(
                 apply_text_edits(&source_with_blank_spaces(spaces), &edits),
@@ -219,8 +237,7 @@ mod tests {
         (0usize..=4).for_each(|disk_spaces| {
             let disk = source_with_blank_spaces(disk_spaces);
             let db = db_with(disk);
-            let uri = uri();
-            let edits = format_iso_literals(&db, uri.reference()).expect("edits");
+            let edits = format_iso_literals(&db, path()).expect("edits");
             (0usize..=4).for_each(|buffer_spaces| {
                 let applied = apply_text_edits(&source_with_blank_spaces(buffer_spaces), &edits);
                 assert_eq!(

@@ -3,7 +3,7 @@ use std::path::Path;
 use std::time::Duration;
 
 use common_lang_types::{
-    CurrentWorkingDirectory, RelativePathToSourceFile,
+    CurrentWorkingDirectory, RelativePathError, RelativePathToSourceFile,
     relative_path_from_absolute_and_working_directory,
 };
 use intern::string_key::Intern;
@@ -239,38 +239,55 @@ pub(crate) fn intern_config_directory(
     state.set(interned);
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+#[error("{}: {error}", .path.display())]
+struct DiskChangedPathError {
+    path: std::path::PathBuf,
+    error: RelativePathError,
+}
+
 fn relative_path_to_source_file(
     state: &IsographDb<impl HostLanguage>,
     absolute: &Path,
-) -> RelativePathToSourceFile {
+) -> Result<RelativePathToSourceFile, DiskChangedPathError> {
     let cwd = *state
         .get_singleton::<CurrentWorkingDirectory>()
         .expect("CurrentWorkingDirectory is interned from the config path before DiskChanged");
-    relative_path_from_absolute_and_working_directory(cwd, absolute)
+    relative_path_from_absolute_and_working_directory(cwd, absolute).map_err(|error| {
+        DiskChangedPathError {
+            path: absolute.to_owned(),
+            error,
+        }
+    })
 }
 
 fn handle_disk_changed<THostLanguage: HostLanguage>(
     state: &mut IsographDb<THostLanguage>,
     change: DiskChanged,
 ) -> Vec<IsographEffect> {
+    apply_disk_changed(state, change)
+        .unwrap_or_else(|error| tracing::warn!(%error, "DiskChanged path"));
+    no_effects()
+}
+
+fn apply_disk_changed<THostLanguage: HostLanguage>(
+    state: &mut IsographDb<THostLanguage>,
+    change: DiskChanged,
+) -> Result<(), DiskChangedPathError> {
     match change {
         DiskChanged::File(change) => {
-            let path = relative_path_to_source_file(state, &change.path);
+            let path = relative_path_to_source_file(state, &change.path)?;
             match change.presence {
-                Presence::Present(contents) => {
-                    state.insert_disk_file(path, contents);
-                }
-                Presence::Absent => {
-                    state.remove_disk_file(path);
-                }
+                Presence::Present(contents) => state.insert_disk_file(path, contents),
+                Presence::Absent => state.remove_disk_file(path),
             }
         }
         DiskChanged::FolderRemoved(folder) => {
-            let path = relative_path_to_source_file(state, &folder.path);
+            let path = relative_path_to_source_file(state, &folder.path)?;
             state.remove_disk_files_from_path(path);
         }
     }
-    no_effects()
+    ().wrap_ok()
 }
 
 #[cfg(test)]
@@ -591,7 +608,7 @@ mod tests {
 
     #[test]
     fn lsp_formatting_of_a_live_client_without_a_file_is_null() {
-        let mut state = empty();
+        let mut state = with_config();
         let client = ClientId(1);
         let (tx, rx) = crossbeam::channel::unbounded();
         start_client(&mut state, client, tx);
@@ -867,6 +884,97 @@ mod tests {
             contents(state.reference(), interned("src/a.ts")),
             "a".wrap_some()
         );
+    }
+
+    fn only_response(
+        effects: Vec<IsographEffect>,
+        rx: &crossbeam::channel::Receiver<lsp_server::Message>,
+    ) -> lsp_server::Response {
+        let [effect] = <[IsographEffect; 1]>::try_from(effects)
+            .unwrap_or_else(|effects| panic!("expected one effect, got {}", effects.len()));
+        perform_send(effect);
+        let lsp_server::Message::Response(response) = rx.recv().expect("perform sends on reply")
+        else {
+            panic!("perform sends Message::Response");
+        };
+        response
+    }
+
+    #[test]
+    fn disk_changed_of_a_relative_path_returns_no_effects_and_interns_nothing() {
+        let mut state = with_config();
+        let effects = handle(
+            &mut state,
+            InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
+                path: PathBuf::from("src/a.ts"),
+                presence: Presence::Present("a".to_owned()),
+            }))
+            .to(),
+        );
+        assert!(effects.is_empty());
+        assert!(state.db.get_disk_file_map().untracked().0.is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn disk_changed_of_a_non_utf8_path_returns_no_effects_and_interns_nothing() {
+        use std::ffi::OsStr;
+        use std::os::unix::ffi::OsStrExt;
+        let mut state = with_config();
+        let effects = handle(
+            &mut state,
+            InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
+                path: PathBuf::from(OsStr::from_bytes(b"/tmp/proj/\xFF.ts")),
+                presence: Presence::Present("a".to_owned()),
+            }))
+            .to(),
+        );
+        assert!(effects.is_empty());
+        assert!(state.db.get_disk_file_map().untracked().0.is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn semantic_tokens_of_a_non_utf8_file_uri_is_an_error_response() {
+        let mut state = with_config();
+        let client = ClientId(1);
+        let (tx, rx) = crossbeam::channel::unbounded();
+        start_client(&mut state, client, tx);
+        let effects = handle(
+            &mut state,
+            lsp_request(
+                client,
+                lsp_server::RequestId::from(1),
+                lsp_types::request::SemanticTokensFullRequest::METHOD,
+                serde_json::json!({ "textDocument": { "uri": "file:///tmp/proj/%FF.ts" } }),
+            ),
+        );
+        let response = only_response(effects, rx.reference());
+        let error = response.error.expect("a non-UTF-8 path is an error");
+        assert_eq!(error.code, lsp_server::ErrorCode::UnknownErrorCode as i32);
+        assert_eq!(error.message, "the relative path is not UTF-8");
+    }
+
+    #[test]
+    fn formatting_without_a_working_directory_is_an_error_response() {
+        let mut state = empty();
+        let client = ClientId(1);
+        let (tx, rx) = crossbeam::channel::unbounded();
+        start_client(&mut state, client, tx);
+        let effects = handle(
+            &mut state,
+            lsp_request(
+                client,
+                lsp_server::RequestId::from(1),
+                lsp_types::request::Formatting::METHOD,
+                formatting_params(),
+            ),
+        );
+        let response = only_response(effects, rx.reference());
+        let error = response
+            .error
+            .expect("a missing working directory is an error");
+        assert_eq!(error.message, "CurrentWorkingDirectory is not interned");
     }
 
     #[test]
