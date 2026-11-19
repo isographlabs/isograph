@@ -3257,7 +3257,7 @@ mod tests {
     fn an_editor_buffer_selecting_an_undefined_field_publishes_that_validation_error() {
         let mut state = with_config();
         let (client_1, rx) = diagnostics_client(&mut state);
-        let text = "iso(`entity Query`) iso(`field Query.x { nope }`)";
+        let text = "iso(`entity Query`) export const x = iso(`field Query.x { nope }`)(() => null)";
         let armed = handle(&mut state, did_open(client_1, X_URI, text));
         let effects = fire(&mut state, armed);
         let start = text.find("nope").expect("the fixture selects nope") as u32;
@@ -3281,11 +3281,19 @@ mod tests {
     }
 
     #[test]
-    fn a_literal_with_only_a_host_language_problem_publishes_nothing() {
+    fn a_literal_with_only_a_host_language_problem_publishes_that_problem() {
         let mut state = with_config();
-        let (client_1, _rx) = diagnostics_client(&mut state);
+        let (client_1, rx) = diagnostics_client(&mut state);
         let armed = handle(&mut state, did_open(client_1, X_URI, "iso`entity Query`"));
-        assert!(fire(&mut state, armed).is_empty());
+        let effects = fire(&mut state, armed);
+        assert_eq!(
+            published(effects, rx.reference())[X_URI]
+                .iter()
+                .map(|diagnostic| diagnostic.message.as_str())
+                .collect::<Vec<_>>(),
+            "You must call the iso function with parentheses. \"iso`...`\" is not supported"
+                .wrap_vec()
+        );
     }
 
     #[test]
@@ -4111,7 +4119,7 @@ type Owner {
 
     #[test]
     fn validation_reads_the_schema_and_follows_a_schema_edit_on_disk() {
-        let text = "iso(`field Query.V { pet { nope, name } }`)";
+        let text = "export const V = iso(`field Query.V { pet { nope, name } }`)(() => null)";
         let mut state = with_schema(text);
         let (client_1, rx) = diagnostics_client(&mut state);
         let armed = handle(&mut state, did_open(client_1, X_URI, text));

@@ -79,6 +79,22 @@ pub fn iso_literal_parse_errors_in_file<TProfile: CompilationProfile>(
         .wrap_some()
 }
 
+/// Host language errors of every iso literal in `path` as `client` reads it, as file-absolute
+/// spans.
+#[memo]
+pub fn iso_literal_host_errors_in_file<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    path: RelativePathToSourceFile,
+) -> Option<Vec<WithSpan<<TProfile::HostLanguage as HostLanguage>::Error>>> {
+    let literals = parsed_iso_literals_in_file(db, client, path).as_ref()?;
+    literals
+        .iter()
+        .flat_map(|(extraction, parsed)| TProfile::HostLanguage::literal_errors(extraction, parsed))
+        .collect::<Vec<_>>()
+        .wrap_some()
+}
+
 #[memo]
 pub fn text_through_last_iso_literal<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,

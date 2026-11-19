@@ -113,8 +113,9 @@ mod tests {
 
     #[test]
     fn a_stray_close_parenthesis_is_reported_as_unexpected_close_parenthesis() {
-        let diagnostics =
-            diagnostics_of("iso(`field Pet.x { id ) }`) iso(`entity Pet`) iso(`field Pet.id`)");
+        let diagnostics = diagnostics_of(
+            "export const x = iso(`field Pet.x { id ) }`)(() => 1) iso(`entity Pet`) export const id = iso(`field Pet.id`)(() => 1)",
+        );
         assert_eq!(
             diagnostics
                 .iter()
@@ -125,15 +126,15 @@ mod tests {
         assert_eq!(
             diagnostics[0].range,
             lsp_types::Range::new(
-                lsp_types::Position::new(0, 22),
-                lsp_types::Position::new(0, 23)
+                lsp_types::Position::new(0, 39),
+                lsp_types::Position::new(0, 40)
             )
         );
     }
 
     #[test]
     fn a_directive_is_reported_as_unexpected_on_its_range() {
-        let contents = "iso(`entity Pet`) iso(`field Pet.id`) iso(`field Pet.f @component { id }`)";
+        let contents = "iso(`entity Pet`) export const id = iso(`field Pet.id`)(() => 1) export const f = iso(`field Pet.f @component { id }`)(() => 1)";
         let diagnostics = diagnostics_of(contents);
         assert_eq!(
             diagnostics
@@ -445,15 +446,15 @@ mod validation_tests {
         let files = [
             (
                 "src/Owner.ts",
-                "iso(`entity Owner`)\niso(`field Owner.displayName \"How the owner signs.\"`)\niso(`field Owner.OwnerBadge { displayName }`)",
+                "iso(`entity Owner`)\nexport const displayName = iso(`field Owner.displayName \"How the owner signs.\"`)(() => 1)\nexport const OwnerBadge = iso(`field Owner.OwnerBadge { displayName }`)(() => 1)",
             ),
             (
                 "src/Pet.ts",
-                "iso(`entity Pet`)\niso(`field Pet.id`)\niso(`field Pet.owner to Owner! { id }`)",
+                "iso(`entity Pet`)\nexport const id = iso(`field Pet.id`)(() => 1)\nexport const owner = iso(`field Pet.owner to Owner! { id }`)(() => 1)",
             ),
             (
                 "src/Card.ts",
-                "iso(`field Pet.card($id: ID!) { owner { displayName, OwnerBadge }, id }`)",
+                "export const card = iso(`field Pet.card($id: ID!) { owner { displayName, OwnerBadge }, id }`)(() => 1)",
             ),
         ];
         let db = db_with(&files);
@@ -468,7 +469,10 @@ mod validation_tests {
 
     #[test]
     fn parse_errors_come_before_validation_errors() {
-        let db = db_with(&[("src/a.ts", "iso(`field Ownr.x { ) }`)")]);
+        let db = db_with(&[(
+            "src/a.ts",
+            "export const x = iso(`field Ownr.x { ) }`)(() => 1)",
+        )]);
         let messages: Vec<String> = lsp_diagnostics_for_file(&db, client(), path("src/a.ts"))
             .clone()
             .expect("the test inserted src/a.ts")

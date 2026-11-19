@@ -3,9 +3,9 @@ use std::fmt::{self, Debug};
 use std::path::Path;
 
 use common_lang_types::{EntityName, SelectableName};
-use thiserror::Error;
 
-use isograph_parser::ParseError;
+use isograph_parser::ParsedIsoLiteral;
+use span::WithSpan;
 
 use crate::{
     ArtifactPath, ClientId, EntityKind, EntityShape, EntrypointOperation, GenerationOptions,
@@ -79,6 +79,12 @@ pub trait HostLanguage: Send + Sync + Sized + 'static {
     fn extract_iso_literals_from_text(contents: &str) -> Vec<IsoLiteralExtraction<Self>>;
 
     fn should_include_source_file(relative_path: &Path) -> IncludeFile;
+
+    /// The errors the host language reports for one literal, in file-absolute spans.
+    fn literal_errors(
+        extraction: &IsoLiteralExtraction<Self>,
+        parsed: &ParsedIsoLiteral,
+    ) -> Vec<WithSpan<Self::Error>>;
 
     /// The path and text of every artifact of `project`.
     fn generate_artifacts(
@@ -180,42 +186,4 @@ pub trait NetworkProtocol: Sized + 'static {
 pub struct WithErrors<T, E> {
     pub item: T,
     pub errors: E,
-}
-
-#[derive(Error)]
-pub enum IsoLiteralError<THostLanguage: HostLanguage> {
-    #[error("{0}")]
-    Host(THostLanguage::Error),
-    #[error("{0}")]
-    Parse(ParseError),
-}
-
-impl<THostLanguage: HostLanguage> Clone for IsoLiteralError<THostLanguage> {
-    fn clone(&self) -> Self {
-        match self {
-            Self::Host(error) => Self::Host(error.clone()),
-            Self::Parse(error) => Self::Parse(error.clone()),
-        }
-    }
-}
-
-impl<THostLanguage: HostLanguage> PartialEq for IsoLiteralError<THostLanguage> {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Host(left), Self::Host(right)) => left == right,
-            (Self::Parse(left), Self::Parse(right)) => left == right,
-            _ => false,
-        }
-    }
-}
-
-impl<THostLanguage: HostLanguage> Eq for IsoLiteralError<THostLanguage> {}
-
-impl<THostLanguage: HostLanguage> Debug for IsoLiteralError<THostLanguage> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Host(error) => f.debug_tuple("Host").field(error).finish(),
-            Self::Parse(error) => f.debug_tuple("Parse").field(error).finish(),
-        }
-    }
 }

@@ -1,12 +1,11 @@
 use std::path::Path;
 use std::sync::LazyLock;
 
-use common_lang_types::{ConstExportName, RelativePathToSourceFile};
+use common_lang_types::ConstExportName;
 use intern::string_key::Intern;
 use isograph_compiler::{
-    ArtifactPath, ClientId, CompilationProfile, GenerationOptions, HostLanguage, IncludeFile,
-    IsoLiteralError, IsoLiteralExtraction, IsoLiteralStartIndex, IsographDb, ProjectArtifacts,
-    extract_iso_literals, parsed_iso_literal,
+    ArtifactPath, GenerationOptions, HostLanguage, IncludeFile, IsoLiteralExtraction,
+    IsoLiteralStartIndex, ProjectArtifacts,
 };
 use isograph_parser::{IsoLiteralItem, IsoLiteralParse, ParsedIsoLiteral, SelectableNameWrapper};
 use prelude::Postfix;
@@ -110,70 +109,38 @@ impl HostLanguage for TypeScriptHostLanguage {
             _ => IncludeFile::Skip,
         }
     }
-}
 
-pub fn host_errors_for_extraction(
-    extraction: &IsoLiteralExtraction<TypeScriptHostLanguage>,
-    parsed: &ParsedIsoLiteral,
-) -> Vec<span::WithSpan<TypeScriptHostError>> {
-    let span = extraction.span();
-    let mut errors = Vec::new();
-    if let IsoCall::TaggedTemplate = extraction.context.call {
-        errors.push(TypeScriptHostError::MissingParentheses.with_span(span));
-    }
-    let parsed_item = parsed.item.as_ref().and_then(item_of);
-    if let Some(IsoLiteralItem::Selectable(selectable)) = parsed_item {
-        if extraction.context.const_export_name.is_none() {
-            errors.push(
-                TypeScriptHostError::MissingExport {
-                    suggested_name: selectable.name.item,
-                }
-                .with_span(span),
-            );
+    /// A tagged template call and a missing associated function are located on the literal; a
+    /// missing export is located on the field's name.
+    fn literal_errors(
+        extraction: &IsoLiteralExtraction<Self>,
+        parsed: &ParsedIsoLiteral,
+    ) -> Vec<span::WithSpan<TypeScriptHostError>> {
+        let span = extraction.span();
+        let mut errors = Vec::new();
+        if let IsoCall::TaggedTemplate = extraction.context.call {
+            errors.push(TypeScriptHostError::MissingParentheses.with_span(span));
         }
-        if let AssociatedJsFunction::Absent = extraction.context.associated_js_function {
-            errors.push(TypeScriptHostError::MissingAssociatedFunction.with_span(span));
+        let parsed_item = parsed.item.as_ref().and_then(item_of);
+        if let Some(IsoLiteralItem::Selectable(selectable)) = parsed_item {
+            if extraction.context.const_export_name.is_none() {
+                errors.push(
+                    TypeScriptHostError::MissingExport {
+                        suggested_name: selectable.name.item,
+                    }
+                    .with_span(selectable.name.location.with_offset(span.start)),
+                );
+            }
+            if let AssociatedJsFunction::Absent = extraction.context.associated_js_function {
+                errors.push(TypeScriptHostError::MissingAssociatedFunction.with_span(span));
+            }
         }
+        errors
     }
-    errors
 }
 
 fn item_of(parse: &span::WithSpan<IsoLiteralParse>) -> Option<&IsoLiteralItem> {
     parse.item.item.as_ref().map(|item| item.item.reference())
-}
-
-pub struct FileLiteral<'a> {
-    pub extraction: &'a IsoLiteralExtraction<TypeScriptHostLanguage>,
-    pub parsed: &'a ParsedIsoLiteral,
-    pub errors: Vec<span::WithSpan<IsoLiteralError<TypeScriptHostLanguage>>>,
-}
-
-pub fn file_literals<'a, TProfile: CompilationProfile<HostLanguage = TypeScriptHostLanguage>>(
-    db: &'a IsographDb<TProfile>,
-    client: ClientId,
-    path: RelativePathToSourceFile,
-) -> Option<Vec<FileLiteral<'a>>> {
-    let extractions = extract_iso_literals(db, client, path).as_ref()?;
-    extractions
-        .iter()
-        .map(|extraction| {
-            let parsed = parsed_iso_literal(db, extraction.iso_literal_text.clone());
-            let errors = host_errors_for_extraction(extraction, parsed)
-                .into_iter()
-                .map(|error| error.map(IsoLiteralError::Host))
-                .chain(parsed.errors.iter().map(|error| {
-                    IsoLiteralError::Parse(error.item.clone())
-                        .with_span(error.location.with_offset(extraction.span().start))
-                }))
-                .collect();
-            FileLiteral {
-                extraction,
-                parsed,
-                errors,
-            }
-        })
-        .collect::<Vec<_>>()
-        .wrap_some()
 }
 
 #[cfg(test)]
@@ -437,9 +404,9 @@ mod memo_tests {
     use common_lang_types::RelativePathToSourceFile;
     use intern::string_key::Intern;
     use isograph_compiler::{
-        ClientId, CompilationProfile, HostLanguage, IncludeFile, IsoLiteralError,
-        IsoLiteralExtraction, IsoLiteralStartIndex, IsographDb, LiteralId, NetworkProtocol,
-        extract_iso_literals, iso_literal_extraction, iso_literal_parse_errors_in_file,
+        ClientId, CompilationProfile, HostLanguage, IncludeFile, IsoLiteralExtraction,
+        IsoLiteralStartIndex, IsographDb, LiteralId, NetworkProtocol, extract_iso_literals,
+        iso_literal_extraction, iso_literal_host_errors_in_file, iso_literal_parse_errors_in_file,
         parsed_iso_literal, parsed_iso_literals_in_file, text_through_last_iso_literal,
     };
     use isograph_parser::{
@@ -451,7 +418,7 @@ mod memo_tests {
 
     use super::{
         AssociatedJsFunction, IsoCall, TypeScriptHostError, TypeScriptHostLanguage,
-        TypeScriptLiteralContext, file_literals, host_errors_for_extraction,
+        TypeScriptLiteralContext,
     };
 
     const SOURCE_FILE: isograph_compiler::FileMembership = isograph_compiler::FileMembership {
@@ -598,6 +565,16 @@ mod memo_tests {
 
     fn interned_export(name: &str) -> common_lang_types::ConstExportName {
         name.intern().to()
+    }
+
+    /// The file-absolute span of the first `name` inside `extraction`'s literal text.
+    fn name_span(extraction: &IsoLiteralExtraction<TypeScriptHostLanguage>, name: &str) -> Span {
+        let start = extraction.span().start as usize
+            + extraction
+                .iso_literal_text
+                .find(name)
+                .expect("the fixture names it");
+        Span::from_usize(start, start + name.len())
     }
 
     fn one_literal(
@@ -828,7 +805,7 @@ iso(`entrypoint Query.HomeRoute`)";
     fn tagged_template_is_missing_parentheses() {
         let (_db, _path, extraction, parsed) = one_literal("iso`entrypoint Query.HomeRoute`");
         assert_eq!(
-            host_errors_for_extraction(&extraction, &parsed),
+            TypeScriptHostLanguage::literal_errors(&extraction, &parsed),
             TypeScriptHostError::MissingParentheses
                 .with_span(extraction.span())
                 .wrap_vec()
@@ -839,31 +816,30 @@ iso(`entrypoint Query.HomeRoute`)";
     fn incomplete_entrypoint_is_a_parse_error() {
         let (db, path, extraction, parsed) = one_literal("iso(`entrypoint`)");
         assert!(!parsed.errors.is_empty());
-        assert!(host_errors_for_extraction(&extraction, &parsed).is_empty());
-        let literals = file_literals(&db, client(), path).expect("the test interned this path");
-        assert!(
-            literals
-                .iter()
-                .flat_map(|literal| literal.errors.iter())
-                .any(|error| matches!(error.item, IsoLiteralError::Parse(_)))
+        assert!(TypeScriptHostLanguage::literal_errors(&extraction, &parsed).is_empty());
+        assert_eq!(
+            iso_literal_host_errors_in_file(&db, client(), path).clone(),
+            Vec::new().wrap_some()
         );
     }
 
     #[test]
     fn entrypoint_without_export_is_valid() {
         let (_db, _path, extraction, parsed) = one_literal("iso(`entrypoint Query.HomeRoute`)");
-        assert!(host_errors_for_extraction(&extraction, &parsed).is_empty());
+        assert!(TypeScriptHostLanguage::literal_errors(&extraction, &parsed).is_empty());
     }
 
     #[test]
     fn field_without_export_is_missing_export() {
         let (_db, _path, extraction, parsed) = one_literal("iso(`field Pet.fullName { id }`)(");
-        let errors = host_errors_for_extraction(&extraction, &parsed);
-        assert_eq!(errors.len(), 1);
-        assert!(matches!(
-            errors[0].item,
-            TypeScriptHostError::MissingExport { .. }
-        ));
+        assert_eq!(
+            TypeScriptHostLanguage::literal_errors(&extraction, &parsed),
+            TypeScriptHostError::MissingExport {
+                suggested_name: SelectableNameWrapper("fullName".intern().to()),
+            }
+            .with_span(name_span(&extraction, "fullName"))
+            .wrap_vec()
+        );
     }
 
     #[test]
@@ -871,7 +847,7 @@ iso(`entrypoint Query.HomeRoute`)";
         let (_db, _path, extraction, parsed) =
             one_literal("export const fullName = iso(`field Pet.fullName { id }`)");
         assert_eq!(
-            host_errors_for_extraction(&extraction, &parsed),
+            TypeScriptHostLanguage::literal_errors(&extraction, &parsed),
             TypeScriptHostError::MissingAssociatedFunction
                 .with_span(extraction.span())
                 .wrap_vec()
@@ -882,7 +858,7 @@ iso(`entrypoint Query.HomeRoute`)";
     fn exported_field_with_associated_function_is_valid() {
         let (_db, _path, extraction, parsed) =
             one_literal("export const fullName = iso(`field Pet.fullName { id }`)(");
-        assert!(host_errors_for_extraction(&extraction, &parsed).is_empty());
+        assert!(TypeScriptHostLanguage::literal_errors(&extraction, &parsed).is_empty());
     }
 
     #[test]
@@ -890,13 +866,13 @@ iso(`entrypoint Query.HomeRoute`)";
         let (_db, _path, extraction, parsed) = one_literal("iso`field Pet.fullName { id }`");
         let span = extraction.span();
         assert_eq!(
-            host_errors_for_extraction(&extraction, &parsed),
+            TypeScriptHostLanguage::literal_errors(&extraction, &parsed),
             vec![
                 TypeScriptHostError::MissingParentheses.with_span(span),
                 TypeScriptHostError::MissingExport {
                     suggested_name: SelectableNameWrapper("fullName".intern().to()),
                 }
-                .with_span(span),
+                .with_span(name_span(&extraction, "fullName")),
                 TypeScriptHostError::MissingAssociatedFunction.with_span(span),
             ]
         );
@@ -905,7 +881,7 @@ iso(`entrypoint Query.HomeRoute`)";
     #[test]
     fn host_error_span_is_the_extraction_span() {
         let (_db, _path, extraction, parsed) = one_literal("iso`entrypoint Query.HomeRoute`");
-        let errors = host_errors_for_extraction(&extraction, &parsed);
+        let errors = TypeScriptHostLanguage::literal_errors(&extraction, &parsed);
         assert_eq!(errors.len(), 1);
         assert_eq!(errors[0].location, extraction.span());
     }
@@ -914,40 +890,37 @@ iso(`entrypoint Query.HomeRoute`)";
     fn valid_extraction_has_no_errors() {
         let (_db, _path, extraction, parsed) = one_literal("iso(`entrypoint Query.HomeRoute`)");
         assert!(parsed.errors.is_empty());
-        assert!(host_errors_for_extraction(&extraction, &parsed).is_empty());
+        assert!(TypeScriptHostLanguage::literal_errors(&extraction, &parsed).is_empty());
     }
 
     #[test]
-    fn missing_disk_file_has_no_file_literals() {
+    fn missing_disk_file_has_no_host_errors() {
         let db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
-        assert!(file_literals(&db, client(), path).is_none());
+        assert!(iso_literal_host_errors_in_file(&db, client(), path).is_none());
     }
 
     #[test]
-    fn present_file_with_no_iso_has_empty_file_literals() {
+    fn present_file_with_no_iso_has_no_host_errors() {
         let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         intern_file(&mut db, path, "export const Foo = 1;");
-        let literals = file_literals(&db, client(), path).expect("the test interned this path");
-        assert!(literals.is_empty());
+        assert_eq!(
+            iso_literal_host_errors_in_file(&db, client(), path).clone(),
+            Vec::new().wrap_some()
+        );
     }
 
     #[test]
-    fn file_literals_parse_error_is_file_absolute() {
-        let (db, path, extraction, _parsed) = one_literal("iso(`entrypoint`)");
-        let literals = file_literals(&db, client(), path).expect("the test interned this path");
-        assert_eq!(literals.len(), 1);
-        assert!(literals[0].errors.iter().any(|error| matches!(
-            error.item,
-            IsoLiteralError::Parse(_)
-        ) && error.location.start
-            >= extraction.span().start));
-        assert!(
-            literals[0]
-                .errors
-                .iter()
-                .all(|error| !matches!(error.item, IsoLiteralError::Host(_)))
+    fn host_errors_in_file_are_file_absolute() {
+        let source = "const a = 1;\niso`entrypoint Query.HomeRoute`";
+        let (db, path, extraction, _parsed) = one_literal(source);
+        assert_eq!(
+            iso_literal_host_errors_in_file(&db, client(), path).clone(),
+            TypeScriptHostError::MissingParentheses
+                .with_span(extraction.span())
+                .wrap_vec()
+                .wrap_some()
         );
     }
 
@@ -955,30 +928,23 @@ iso(`entrypoint Query.HomeRoute`)";
     fn failed_field_parse_is_not_missing_export() {
         let (_db, _path, extraction, parsed) = one_literal("iso(`field`)(");
         assert!(!parsed.errors.is_empty());
-        assert!(host_errors_for_extraction(&extraction, &parsed).is_empty());
+        assert!(TypeScriptHostLanguage::literal_errors(&extraction, &parsed).is_empty());
     }
 
     #[test]
     fn tagged_template_incomplete_entrypoint_is_parentheses_only() {
         let (db, path, extraction, parsed) = one_literal("iso`entrypoint`");
         assert_eq!(
-            host_errors_for_extraction(&extraction, &parsed),
+            TypeScriptHostLanguage::literal_errors(&extraction, &parsed),
             TypeScriptHostError::MissingParentheses
                 .with_span(extraction.span())
                 .wrap_vec()
         );
-        let literals = file_literals(&db, client(), path).expect("the test interned this path");
         assert!(
-            literals
-                .iter()
-                .flat_map(|literal| literal.errors.iter())
-                .any(|error| matches!(error.item, IsoLiteralError::Host(_)))
-        );
-        assert!(
-            literals
-                .iter()
-                .flat_map(|literal| literal.errors.iter())
-                .any(|error| matches!(error.item, IsoLiteralError::Parse(_)))
+            !iso_literal_parse_errors_in_file(&db, client(), path)
+                .as_ref()
+                .expect("the test interned this path")
+                .is_empty()
         );
     }
 

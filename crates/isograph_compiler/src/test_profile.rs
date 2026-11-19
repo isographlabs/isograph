@@ -49,6 +49,13 @@ impl HostLanguage for TestHostLanguage {
         IncludeFile::Include
     }
 
+    fn literal_errors(
+        _extraction: &IsoLiteralExtraction<Self>,
+        _parsed: &isograph_parser::ParsedIsoLiteral,
+    ) -> Vec<span::WithSpan<Self::Error>> {
+        Vec::new()
+    }
+
     fn generate_artifacts(
         _project: &ProjectArtifacts<()>,
         _options: &GenerationOptions<()>,

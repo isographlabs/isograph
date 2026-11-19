@@ -713,6 +713,13 @@ mod tests {
             Vec::new()
         }
 
+        fn literal_errors(
+            _extraction: &IsoLiteralExtraction<Self>,
+            _parsed: &isograph_parser::ParsedIsoLiteral,
+        ) -> Vec<span::WithSpan<Self::Error>> {
+            Vec::new()
+        }
+
         fn generate_artifacts(
             _project: &isograph_compiler::ProjectArtifacts<()>,
             _options: &isograph_compiler::GenerationOptions<()>,

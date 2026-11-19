@@ -5,20 +5,24 @@ use prelude::Postfix;
 use span::WithSpan;
 
 use crate::{
-    ClientId, CompilationProfile, IsographDb, NetworkProtocol, ValidationError,
-    iso_literal_parse_errors_in_file, iso_literal_validation_errors_in_file,
+    ClientId, CompilationProfile, HostLanguage, IsographDb, NetworkProtocol, ValidationError,
+    iso_literal_host_errors_in_file, iso_literal_parse_errors_in_file,
+    iso_literal_validation_errors_in_file,
 };
 
 /// An error the compiler reports for a source file.
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
-pub enum CompilerError<TNotFetchable: std::fmt::Display> {
+pub enum CompilerError<THostError: std::fmt::Display, TNotFetchable: std::fmt::Display> {
     #[error("{0}")]
     Parse(ParseError),
+    #[error("{0}")]
+    Host(THostError),
     #[error("{0}")]
     Validation(ValidationError<TNotFetchable>),
 }
 
 pub type ProfileCompilerError<TProfile> = CompilerError<
+    <<TProfile as CompilationProfile>::HostLanguage as HostLanguage>::Error,
     <<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::NotFetchable,
 >;
 
@@ -30,10 +34,16 @@ pub fn compiler_errors_in_file<TProfile: CompilationProfile>(
     path: RelativePathToSourceFile,
 ) -> Option<Vec<WithSpan<ProfileCompilerError<TProfile>>>> {
     let parse_errors = iso_literal_parse_errors_in_file(db, client, path).as_ref()?;
+    let host_errors = iso_literal_host_errors_in_file(db, client, path).as_ref()?;
     let validation_errors = iso_literal_validation_errors_in_file(db, client, path).as_ref()?;
     parse_errors
         .iter()
         .map(|error| error.clone().map(CompilerError::Parse))
+        .chain(
+            host_errors
+                .iter()
+                .map(|error| error.clone().map(CompilerError::Host)),
+        )
         .chain(
             validation_errors
                 .iter()

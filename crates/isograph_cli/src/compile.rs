@@ -233,12 +233,14 @@ mod tests {
     use crate::watch::ProjectGlobs;
 
     const BROKEN: &str = "iso(`entrypoint`)";
-    const CLEAN: &str = "iso(`entity Query`) iso(`field Query.HomeRoute`)";
-    const UNDEFINED_FIELD: &str = "iso(`entity Query`) iso(`field Query.x { nope }`)";
+    const CLEAN: &str =
+        "iso(`entity Query`) export const HomeRoute = iso(`field Query.HomeRoute`)(() => null)";
+    const UNDEFINED_FIELD: &str =
+        "iso(`entity Query`) export const x = iso(`field Query.x { nope }`)(() => null)";
 
     const PET_SCHEMA: &str = "type Query {\n  pets: [Pet!]!\n  pet(id: ID!): Pet\n}\n\ntype Pet {\n  id: ID!\n  firstName: String!\n  lastName: String!\n  best_friend: Pet\n}\n";
-    const PET: &str = "export const fullName = iso(`\n  field Pet.fullName {\n    firstName\n    lastName\n  }\n`);\n\nexport const bestFriend = iso(`\n  field Pet.bestFriend to Pet {\n    best_friend {\n      id\n    }\n  }\n`);\n";
-    const HOME_ROUTE: &str = "export const HomeRoute = iso(`\n  field Query.HomeRoute {\n    pets {\n      id\n      fullName\n      bestFriend {\n        firstName\n      }\n    }\n  }\n`);\n\nconsole.log(iso(`entrypoint Query.HomeRoute`));\n";
+    const PET: &str = "export const fullName = iso(`\n  field Pet.fullName {\n    firstName\n    lastName\n  }\n`)(() => null);\n\nexport const bestFriend = iso(`\n  field Pet.bestFriend to Pet {\n    best_friend {\n      id\n    }\n  }\n`)(() => null);\n";
+    const HOME_ROUTE: &str = "export const HomeRoute = iso(`\n  field Query.HomeRoute {\n    pets {\n      id\n      fullName\n      bestFriend {\n        firstName\n      }\n    }\n  }\n`)(() => null);\n\nconsole.log(iso(`entrypoint Query.HomeRoute`));\n";
 
     const SOURCE_FILE: isograph_compiler::FileMembership = isograph_compiler::FileMembership {
         source_file: isograph_compiler::IncludeFile::Include,
@@ -423,7 +425,7 @@ mod tests {
         present(
             &mut state,
             "/tmp/proj/src/a.ts",
-            "iso(`field Query.x { nope }`)",
+            "export const x = iso(`field Query.x { nope }`)(() => null)",
         );
         assert_eq!(
             errors(state.reference())
@@ -438,6 +440,26 @@ mod tests {
             "type Query {\n  a: String\n  nope: String\n}\n",
         );
         assert_eq!(errors(state.reference()), vec![]);
+    }
+
+    #[test]
+    fn project_errors_include_a_missing_export_on_the_field_name() {
+        let mut state = state();
+        let text = "iso(`entity Query`) iso(`field Query.HomeRoute`)(() => null)";
+        present(&mut state, "/tmp/proj/src/a.ts", text);
+        let start = text.find("HomeRoute").expect("the fixture names HomeRoute") as u32;
+        assert_eq!(
+            errors(state.reference()),
+            CompilerErrorReport {
+                path: PathBuf::from("/tmp/proj/src/a.ts"),
+                range: lsp_types::Range::new(
+                    lsp_types::Position::new(0, start),
+                    lsp_types::Position::new(0, start + 9)
+                ),
+                message: "This isograph field literal must be exported as a named export, for example as `export const HomeRoute`".to_owned(),
+            }
+            .wrap_vec()
+        );
     }
 
     #[test]
