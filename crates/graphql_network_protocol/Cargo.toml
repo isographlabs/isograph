@@ -10,6 +10,7 @@ derive_more = { workspace = true }
 graphql_schema_parser = { path = "../graphql_schema_parser" }
 intern = { path = "../../relay-crates/intern" }
 isograph_compiler = { path = "../isograph_compiler" }
+isograph_parser = { path = "../isograph_parser" }
 pico = { path = "../pico" }
 pico_macros = { path = "../pico_macros" }
 prelude = { path = "../prelude" }

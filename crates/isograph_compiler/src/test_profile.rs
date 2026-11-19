@@ -131,6 +131,13 @@ impl NetworkProtocol for TestNetworkProtocol {
     fn discriminator() -> SelectableName {
         intern::string_key::Intern::intern("__typename").to()
     }
+
+    fn query_text(_operation: &crate::EntrypointOperation<'_, Self>) -> crate::ProtocolQueryText {
+        crate::ProtocolQueryText {
+            text: common_lang_types::QueryText(String::new()),
+            file_name: None,
+        }
+    }
 }
 
 pub(crate) struct TestProfile;

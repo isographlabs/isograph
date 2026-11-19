@@ -7,6 +7,7 @@ mod host_language;
 mod iso_literals;
 mod merged_selection;
 mod protocol_shape;
+mod query;
 mod references;
 mod schema;
 mod selectable_for_path;
@@ -36,15 +37,21 @@ pub use iso_literals::{
     text_through_last_iso_literal,
 };
 pub use merged_selection::{
-    AliasCollision, Condition, FieldSelectionMap, FieldVariable, InlineCycle, MergeError, MergeKey,
-    MergedArgument, MergedArguments, MergedCompositeTarget, MergedConditional, MergedObject,
-    MergedObjectEntry, MergedSelectableSelection, MergedSelection, MergedSelectionMap,
-    MergedSelectionTarget, MergedTarget, MergedValue, NonNullVariableType, NormalizationAlias,
-    SelectionKey, SelectionMapError, SelectionMapErrorKind, SourceFieldDeclaration,
-    UnknownFieldArgument, VariableType, field_selection_map, inlined_fields,
-    source_field_declaration,
+    AddedSelectionCollision, AliasCollision, CompletedConditional, CompletedKey,
+    CompletedSelectableSelection, CompletedSelection, CompletedSelectionMap,
+    CompletedSelectionTarget, Condition, FieldSelectionMap, FieldVariable, InlineCycle, MergeError,
+    MergeKey, MergedArgument, MergedArguments, MergedCompositeTarget, MergedConditional,
+    MergedObject, MergedObjectEntry, MergedSelectableSelection, MergedSelection,
+    MergedSelectionMap, MergedSelectionTarget, MergedValue, NonNullVariableType,
+    NormalizationAlias, SelectionKey, SelectionMapError, SelectionMapErrorKind,
+    SourceFieldDeclaration, TopLevelError, UnknownFieldArgument, VariableType, complete,
+    field_selection_map, inlined_fields, source_field_declaration,
 };
 pub use protocol_shape::{EntityShape, IdentitySelection, SelectableShape};
+pub use query::{
+    EntrypointOperation, EntrypointQueryError, ProfileEntrypointQueryError, ProtocolQueryText,
+    QueryArtifact, query_for_entrypoint,
+};
 pub use references::{ReferenceTarget, references_in_file};
 pub use schema::{
     ClientPointerTarget, DefinitionLocation, Entity, EntityKind, EntityOrigin, LiteralContextOf,

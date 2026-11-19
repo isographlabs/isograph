@@ -38,6 +38,8 @@ pub enum EntrypointNotFetchableError<TNotFetchable: std::fmt::Display> {
     SourceEntity(EntityName),
     #[error("`{}.{}` comes from the schema; an entrypoint names a `field` declaration.", .0.entity, .0.selectable)]
     ProtocolSelectable(SelectableKey),
+    #[error("`{0}` has no selectables, so it cannot parent an entrypoint.")]
+    NotComposite(EntityName),
     #[error("{0}")]
     Protocol(TNotFetchable),
 }
@@ -235,9 +237,9 @@ fn entrypoint_declaration_error<TProfile: CompilationProfile>(
         .ok()?;
     let location = |error: &EntrypointNotFetchableError<_>| match error {
         EntrypointNotFetchableError::ProtocolSelectable(_) => declaration.name.location,
-        EntrypointNotFetchableError::SourceEntity(_) | EntrypointNotFetchableError::Protocol(_) => {
-            declaration.parent_type.location
-        }
+        EntrypointNotFetchableError::SourceEntity(_)
+        | EntrypointNotFetchableError::NotComposite(_)
+        | EntrypointNotFetchableError::Protocol(_) => declaration.parent_type.location,
     };
     entrypoint_fetch_plan(db, client, entity, selectable)
         .err()

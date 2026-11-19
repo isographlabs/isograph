@@ -1,5 +1,7 @@
 mod fetch_plan;
+mod print_operation;
 mod protocol_data;
+mod query_text;
 mod root_operation_types;
 mod schema_files;
 mod schema_lookup;
@@ -12,9 +14,9 @@ use common_lang_types::{EntityName, SelectableName};
 use intern::Lookup;
 use intern::string_key::Intern;
 use isograph_compiler::{
-    ClientId, CompilationProfile, EntityKind, EntityShape, IncludeFile, IsographDb,
-    NetworkProtocol, ProtocolEntity, ProtocolSelectable, ScalarKind, ScalarValueKind,
-    SelectableShape,
+    ClientId, CompilationProfile, EntityKind, EntityShape, EntrypointOperation, IncludeFile,
+    IsographDb, NetworkProtocol, ProtocolEntity, ProtocolQueryText, ProtocolSelectable, ScalarKind,
+    ScalarValueKind, SelectableShape,
 };
 use prelude::Postfix;
 
@@ -25,6 +27,7 @@ pub use protocol_data::{
     graphql_entity, graphql_selectable, graphql_selectables, object_types_implementing,
 };
 use protocol_data::{TYPENAME, graphql_entity_shape, graphql_selectable_shape, union_members};
+pub use query_text::QUERY_TEXT_FILE_NAME;
 pub use root_operation_types::{
     DuplicateOperation, DuplicateSchemaDefinition, RootOperationTypes, RootOperationTypesError,
     root_operation_types,
@@ -149,5 +152,9 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
 
     fn discriminator() -> SelectableName {
         TYPENAME.intern().to()
+    }
+
+    fn query_text(operation: &EntrypointOperation<'_, Self>) -> ProtocolQueryText {
+        query_text::query_text(operation)
     }
 }

@@ -8,8 +8,9 @@ use thiserror::Error;
 use isograph_parser::ParseError;
 
 use crate::{
-    ArtifactPath, ClientId, EntityKind, EntityShape, GenerationOptions, IsographDb,
-    ProjectArtifacts, ProtocolEntity, ProtocolSelectable, SelectableShape,
+    ArtifactPath, ClientId, EntityKind, EntityShape, EntrypointOperation, GenerationOptions,
+    IsographDb, ProjectArtifacts, ProtocolEntity, ProtocolQueryText, ProtocolSelectable,
+    SelectableShape,
 };
 
 /// Byte offset of the iso literal text in its file.
@@ -166,6 +167,10 @@ pub trait NetworkProtocol: Sized + 'static {
     /// The selectable the protocol selects in every selection set on a composite entity,
     /// whose value names the response object's concrete entity.
     fn discriminator() -> SelectableName;
+
+    /// The text of `operation`'s query, and the protocol's name for a file holding exactly
+    /// that text.
+    fn query_text(operation: &EntrypointOperation<'_, Self>) -> ProtocolQueryText;
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

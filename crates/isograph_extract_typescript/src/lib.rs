@@ -538,6 +538,15 @@ mod memo_tests {
         fn discriminator() -> SelectableName {
             intern::string_key::Intern::intern("__typename").to()
         }
+
+        fn query_text(
+            _operation: &isograph_compiler::EntrypointOperation<'_, Self>,
+        ) -> isograph_compiler::ProtocolQueryText {
+            isograph_compiler::ProtocolQueryText {
+                text: common_lang_types::QueryText(String::new()),
+                file_name: None,
+            }
+        }
     }
 
     struct TestProfile;

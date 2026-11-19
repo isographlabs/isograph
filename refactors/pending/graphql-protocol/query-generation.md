@@ -19,29 +19,35 @@ query_text.graphql
 ```graphql
 query PetDetailRoute($id: ID!) {
   pet____id___v_id: pet(id: $id) {
-    __typename: __typename
-    id: id
-    best_friend_relationship: best_friend_relationship {
-      __typename: __typename
-      best_friend: best_friend {
-        __typename: __typename
-        id: id
-        firstName: firstName
-        lastName: lastName
+    __typename
+    id
+    best_friend_relationship {
+      __typename
+      best_friend {
+        __typename
+        id
+        firstName
+        lastName
       }
-      picture_together: picture_together
+      picture_together
     }
-    firstName: firstName
-    lastName: lastName
-    nickname: nickname
-    stats: stats {
-      __typename: __typename
-      cuteness: cuteness
-      energy: energy
-      hunger: hunger
-      intelligence: intelligence
-      sociability: sociability
-      weight: weight
+    checkins____limit___l_5____skip___l_0: checkins(limit: 5, skip: 0) {
+      __typename
+      id
+      location
+      time
+    }
+    firstName
+    lastName
+    nickname
+    stats {
+      __typename
+      cuteness
+      energy
+      hunger
+      intelligence
+      sociability
+      weight
     }
   }
 }
@@ -51,43 +57,26 @@ followed by one newline. `query_text.ts` default-exports the same text as a stri
 
 What the text shows:
 
-- `PetDetailRoute`'s own selections are the `pet(id: $id)` field. `fullName`, `PetStatsCard`, and `PetBestFriendCard` are `field` declarations without `to`; their selection sets are inlined (`firstName`, `lastName`, `nickname`, `stats { .. }`, `best_friend_relationship { .. }`, `id`).
-- `friendName: firstName` in `PetBestFriendCard` prints as `firstName: firstName`. A reader alias is the reader's name for a value; it does not reach the query.
-- Every field prints with its normalization alias: `pet(id: $id)` as `pet____id___v_id: pet(id: $id)`, and a field with no arguments under its own name (`firstName: firstName`).
+- `PetDetailRoute`'s own selections are the `pet(id: $id)` field. `fullName`, `PetStatsCard`, `PetCheckinsCard`, and `PetBestFriendCard` are `field` declarations without `to`; their selection sets are inlined (`firstName`, `lastName`, `nickname`, `stats { .. }`, `checkins(..) { .. }`, `best_friend_relationship { .. }`, `id`).
+- `friendName: firstName` in `PetBestFriendCard` prints as `firstName`. A reader alias is the reader's name for a value; it does not reach the query.
+- A field with arguments prints with its normalization alias: `pet(id: $id)` as `pet____id___v_id: pet(id: $id)`. A field with no arguments prints its name (`firstName`), as upstream does.
+- `PetCheckinsCard(limit: 5)` inlines `checkins(limit: $limit, skip: 0)` with `$limit` replaced by `5`.
 - `bestFriend { fullName }` and `owner { OwnerBadge }` contribute nothing. `bestFriend` and `owner` are client pointers (`field Pet.bestFriend to Pet`, `field Pet.owner to Owner!`), which v0 query generation omits with their nested selection sets (Client pointers, below). The `best_friend_relationship` block comes from `PetBestFriendCard`.
-- `__typename: __typename` comes first in every selection set under a selection, and `id: id` next under every type with `id: ID!`, whether or not anything selected them. The top level has neither.
+- `__typename` comes first in every selection set under a selection, and `id` next under every type with `id: ID!`, whether or not anything selected them. The top level has neither.
 - Entries are in alphabetical order after those two.
 
-`entrypoint Pet.PetSummaryCard`, through `Node`:
-
-```graphql
-query PetSummaryCard($id: ID!) {
-  node____id___v_id: node(id: $id) {
-    ... on Pet {
-      __typename: __typename
-      id: id
-      age: age
-      firstName: firstName
-      lastName: lastName
-      nickname: nickname
-      picture: picture
-      species: species
-      tagline: tagline
-    }
-  }
-}
-```
+`entrypoint Pet.PetSummaryCard` has no query: v1 entrypoints are on root operation types only (entrypoints.md), and it is a validation error on `Pet`.
 
 `entrypoint Mutation.SetTagline`:
 
 ```graphql
 mutation SetTagline($id: ID!, $tagline: String!) {
   set_pet_tagline____input___o_id__v_id_tagline__v_tagline_c: set_pet_tagline(input: { id: $id, tagline: $tagline }) {
-    __typename: __typename
-    pet: pet {
-      __typename: __typename
-      id: id
-      tagline: tagline
+    __typename
+    pet {
+      __typename
+      id
+      tagline
     }
   }
 }
@@ -364,7 +353,7 @@ impl CompletedSelectionMap {
 }
 ```
 
-The field is private; `complete`, `top_level`, and `fetch_selection` (The operation) are the only constructors, which keeps a key and its selection in agreement and the map non-empty.
+The field is private; `complete` and `top_level` (The operation) are the only constructors, which keeps a key and its selection in agreement and the map non-empty.
 
 `MergedArguments`, `MergedArgument`, `MergedValue`, `MergedObject`, and `MergedObjectEntry` are unchanged:
 
@@ -497,9 +486,9 @@ impl SelectionKey {
 }
 ```
 
-Every selection in a generated query prints with its normalization alias, including a selection with no arguments and the discriminator and identity selections, whose key is their name with `MergedArguments::default()`; a selection with no arguments aliases to its own name (`firstName: firstName`).
+A selection with arguments prints with its normalization alias (`pet____id___v_id: pet(id: $id)`); a selection without arguments prints its bare name (`firstName`), and so do the discriminator and identity selections. `normalization_alias` is defined for every key, and for a key with no arguments it is the selectable name, the response key under which GraphQL returns the value. Collision detection compares these response keys for every selectable key, with or without arguments, so a field literally named `f____s___s_a` still collides with `f(s: "a")`.
 
-Upstream aliases only fields with arguments. `MergedScalarFieldSelection::normalization_alias` and `MergedLinkedFieldSelection::normalization_alias` return `None` when `arguments` is empty (`isograph/crates/isograph_schema/src/create_merged_selection_set.rs:124-131` and `:159-166`), and `write_selections_for_query_text` writes `alias: ` only for `Some` (`isograph/crates/graphql_network_protocol/src/query_text.rs:90-92` and `:100-102`). The user's direction is to alias every field automatically, and this doc writes that: every field gets the deterministic alias above. Upstream shows no concrete problem with it. The runtime reads a field's value from the response under the field name followed by the same per-argument chunks (`getNetworkResponseKey`, `isograph/libs/isograph-react/src/core/cache.ts:538-552`, with `____`, `___`, `__` at `:594-596`), which for a field with no arguments is the field name, so `firstName: firstName` puts the value where the runtime reads it. GraphQL accepts an alias equal to the field name, `__typename` included (spec 2.7). The cost is query text length.
+This is upstream's rule: `MergedScalarFieldSelection::normalization_alias` and `MergedLinkedFieldSelection::normalization_alias` return `None` when `arguments` is empty (`isograph/crates/isograph_schema/src/create_merged_selection_set.rs:124-131` and `:159-166`), and `write_selections_for_query_text` writes `alias: ` only for `Some` (`isograph/crates/graphql_network_protocol/src/query_text.rs:90-92` and `:100-102`). The runtime reads a field's value from the response under the field name followed by the same per-argument chunks (`getNetworkResponseKey`, `isograph/libs/isograph-react/src/core/cache.ts:538-552`, with `____`, `___`, `__` at `:594-596`), which for a field with no arguments is the field name.
 
 The format is upstream's `get_aliased_mutation_field_name` and `to_alias_str_chunk` (`isograph/crates/isograph_schema/src/create_merged_selection_set.rs`, `isograph/crates/isograph_lang_types/src/declarations/selection_argument.rs`): the name, then per argument `____`, the argument name, `___`, and the value chunk. Chunks: `v_<name>` for a variable, `l_<n>` for an integer, `l_true` and `l_false`, `l_null`, `s_<text>` with every character outside `[A-Za-z0-9_]` replaced by `_`, and `o_<entries>_c` with each entry `<name>__<chunk>` joined by `_`. The alias lives in the core because the runtime's normalization keys and the query must agree, whatever the protocol.
 
@@ -774,86 +763,20 @@ The enum is the stash's (`git stash show -p stash@{0}`), whose deltas from the e
 
 `query_for_entrypoint` builds one operation's completed selection map in the core, builds the normalization AST from it (normalization-ast.md), and hands the same map to the protocol, which prints the text. The text and the AST are produced from one value.
 
-### Where the entrypoint's selections sit
-
-```rust
-// from crates/isograph_compiler/src/entrypoint.rs
-/// Where a fetch plan puts an entrypoint's selections in its operation.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum FetchPosition<'a> {
-    /// At the operation's top level: the entrypoint's parent is the operation's root.
-    TopLevel,
-    /// Under one top-level selection, whose arguments are operation variables of the same
-    /// names.
-    Selection(&'a FetchSelection),
-}
-
-/// The top-level selection a fetch goes through: GraphQL's `node(id: $id)`.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct FetchSelection {
-    pub selectable: SelectableName,
-    /// In definition order.
-    pub arguments: Vec<FetchArgument>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct FetchArgument {
-    pub name: InputValueName,
-    /// The argument's type, made nullable when the argument has a default, so the caller
-    /// may omit it (spec 5.8.5, All Variable Usages Are Allowed).
-    pub variable_type: VariableType,
-}
-```
-
-```rust
-// from crates/isograph_compiler/src/host_language.rs
-pub trait NetworkProtocol: Sized + 'static {
-    // as above
-    /// Where `plan` puts an entrypoint's selections.
-    fn fetch_position(plan: &Self::FetchPlan) -> FetchPosition<'_>;
-}
-```
-
-`FetchArgument` is the landed `GraphQLFetchArgument` (`crates/graphql_network_protocol/src/fetch_plan.rs`) moved to the core and renamed; its fields are unchanged. `InputValueName` converts to `ArgumentName` and `VariableName` with `.to()` (`string_key_one_way_conversion!` in `crates/common_lang_types/src/string_key_types.rs`). The test protocol's `fetch_position` returns `TopLevel`; its `fetch_plan` never returns `Ok`.
-
-`fetch_position` maps the protocol's plan to the one fact the core reads. The alternative, a core `FetchPlan<TFetchData> { position, data }`, would let a GraphQL `Root` plan carry a `Selection` position; the method derives the position from the plan, so that state does not exist.
+An entrypoint's parent is a root operation type (entrypoints.md), so the entrypoint field's selections are the operation's top-level selections. There is no fetch selection between the operation and the entrypoint's selections.
 
 ### The fetch plan
 
-Completion in the core changes the landed `GraphQLFetchPlan` (change 4). Its `MergedTarget<GraphQLEntityData>` payloads existed so the GraphQL operation builder could add `id` and `__typename` under the root type, under `node`, and inside `... on T`. The core now adds them from `discriminator()` and `entity_shape`, and the `node` selection's selections are the entity's own (below), so no payload carries entity data. The `node` selection and its arguments become the core `FetchSelection`, which `fetch_position` returns. The refinement stays GraphQL data: it prints `... on T` and has no normalization AST node.
+Completion in the core changes the `GraphQLFetchPlan` that the Node removal left (entrypoints.md, Delta from the landed fetch plan). Its `MergedTarget<GraphQLEntityData>` payload existed so the GraphQL operation builder could add `id` and `__typename` under the root type. The core now adds the discriminator and the identity from `discriminator()` and `entity_shape`, and adds neither at the top level (Completion), so no payload carries entity data.
 
-Before (landed):
+Before:
 
 ```rust
 // from crates/graphql_network_protocol/src/fetch_plan.rs
-pub enum GraphQLFetchPlan {
-    Root(GraphQLRootFetch),
-    Node(GraphQLNodeFetch),
-}
-
-pub struct GraphQLRootFetch {
+pub struct GraphQLFetchPlan {
     pub operation_type: OperationType,
     /// The root type, whose data decides the top-level `id` and `__typename`.
     pub entity: MergedTarget<GraphQLEntityData>,
-}
-
-pub struct GraphQLNodeFetch {
-    /// `node`'s arguments, each passed as the operation variable of the same name.
-    pub arguments: Vec<GraphQLFetchArgument>,
-    /// The type `node` returns, which the operation builder completes like any selection
-    /// target.
-    pub field_target: MergedTarget<GraphQLEntityData>,
-    pub refinement: FetchRefinement,
-}
-
-pub struct GraphQLFetchArgument {
-    pub name: InputValueName,
-    pub variable_type: VariableType,
-}
-
-pub enum FetchRefinement {
-    Exact,
-    InlineFragment(MergedTarget<GraphQLEntityData>),
 }
 ```
 
@@ -861,88 +784,13 @@ After:
 
 ```rust
 // from crates/graphql_network_protocol/src/fetch_plan.rs
-/// How the GraphQL protocol fetches an entity that parents an entrypoint.
+/// How the GraphQL protocol fetches an entity that parents an entrypoint: the entity is the
+/// root type of this operation type, and its selections are the operation's.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum GraphQLFetchPlan {
-    /// The entity is the root type of this operation type: its selections are the
-    /// operation's.
-    Root(OperationType),
-    /// A `query` that selects the query root's `node` field, which returns the entity or an
-    /// interface or union containing it.
-    Node(GraphQLNodeFetch),
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct GraphQLNodeFetch {
-    /// `node` and its arguments.
-    pub selection: FetchSelection,
-    pub refinement: FetchRefinement,
-}
-
-/// How the query text puts the entity's selections under `node`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum FetchRefinement {
-    /// `node` returns the entity itself.
-    Exact,
-    /// `node` returns an interface or union containing the entity, an object type: the text
-    /// prints `... on Entity { }` around the entity's selections.
-    InlineFragment(EntityName),
-}
+pub struct GraphQLFetchPlan(pub OperationType);
 ```
 
-`GraphQLRootFetch` has one field once `entity` is gone, so it is replaced by its `OperationType` (AGENTS.md, a one-field struct is a newtype, and the variant then holds the payload). `GraphQLFetchArgument` is replaced by the core `FetchArgument`. `graphql_fetch_plan` and `node_fetch` change only in what they store:
-
-```rust
-// from crates/graphql_network_protocol/src/fetch_plan.rs
-/// The fetch of the object type `entity`, which declares `object`, through the `node` field
-/// of the query root `query_root`.
-fn node_fetch<TProfile: CompilationProfile>(
-    db: &IsographDb<TProfile>,
-    client: ClientId,
-    query_root: EntityName,
-    entity: EntityName,
-    object: &GraphQLCompositeData,
-) -> Result<GraphQLNodeFetch, NodeFieldError>;
-
-/// Whether the interface or union `returns`, whose data is `returns_data`, contains the
-/// object type `entity`, which declares `object`.
-fn contains<TProfile: CompilationProfile>(
-    db: &IsographDb<TProfile>,
-    client: ClientId,
-    returns: EntityName,
-    returns_data: &GraphQLEntityData,
-    entity: EntityName,
-    object: &GraphQLCompositeData,
-) -> bool;
-```
-
-`graphql_fetch_plan` step 1 binds the `Object`'s `GraphQLCompositeData` (entrypoints.md, objects only) and passes it to `node_fetch`. `node_fetch` still reads `graphql_entity(T)` of `node`'s return type, for `contains` and for `Target` and `UnknownTarget`, and no longer stores it. `contains`'s `Interface` arm is `object.interfaces.contains(&returns)`, with no match on the entity's data, because the entity is an object. `GraphQLNetworkProtocol::fetch_position` is `TopLevel` for `Root(_)` and `Selection(fetch.selection.reference())` for `Node(fetch)`.
-
-### The `node` selection's selections
-
-`node(id:)` returns the entity whose id is `$id`, so the entity is known by construction. The `node` selection's selections are the entity's own completed selections, and nothing is selected beside them: no `__typename` and no `id` under `node` outside the fragment, and no condition in the normalization AST. The GraphQL text still prints `... on T` around them, because GraphQL requires it to select `Pet`'s fields on a `Node`-typed field (spec 5.3.1). The text has this line and the AST does not: normalization-ast.md, The asymmetries, states it, and its Tests account for it. `FetchRefinement::InlineFragment` is text only; conditionals come only from refinements `asT`.
-
-For `entrypoint Pet.PetSummaryCard`:
-
-```graphql
-query PetSummaryCard($id: ID!) {
-  node____id___v_id: node(id: $id) {
-    ... on Pet {
-      __typename: __typename
-      id: id
-      age: age
-      firstName: firstName
-      lastName: lastName
-      nickname: nickname
-      picture: picture
-      species: species
-      tagline: tagline
-    }
-  }
-}
-```
-
-Inside the fragment, `__typename` is the discriminator every selection set under a selection gets, and `id` is `Pet`'s identity.
+The struct has one field once `entity` is gone, so it is a newtype (AGENTS.md). `graphql_fetch_plan` checks the root first and then that the root is an object type (`NotObject`, replacing `NotObjectOrInterface`); entrypoints.md has the body.
 
 ### Completion
 
@@ -969,21 +817,18 @@ pub struct AddedSelectionCollision(pub SelectionKey);
 4. `Discriminator` is added. `IdentitySelection::Select(i)` adds `Identity(i)`.
 5. A remaining `Selectable` key whose normalization alias equals the discriminator's or the identity's name is `AddedSelectionCollision(key)`. Step 3 has absorbed the leaf selection with no arguments; what remains is a composite selectable named like one of them, which GraphQL excludes (`__typename` is not a schema field, and `IdField::Present` requires `id: ID!`).
 
-Step 4 makes the map non-empty and puts the discriminator before every conditional in the same selection set, which the condition reads. Under `IdentitySelection::Omit` (a type whose `id` is not `ID!`), a selection of `id` stays a `Selectable` entry, in name order.
+Step 4 makes the map non-empty and puts the discriminator before every conditional in the same selection set, which the condition reads. The steps run per selection in the private `complete_selection` (steps 1 to 3 and 5 for one entry) and `complete_target` (a selectable's target, which `top_level` also calls); `CompletedSelectionMap::from_selections`, private, keys a list of completed selections by `CompletedSelection::key`, and is how `complete` and `top_level` build the map. Under `IdentitySelection::Omit` (a type whose `id` is not `ID!`), a selection of `id` stays a `Selectable` entry, in name order.
 
 Completion runs once, on the entrypoint's whole map, after all inlining and substitution, so a selection set merged from several selections receives the protocol's additions once. A `field` declaration's map is not completed: it is merged into its selection's parent and completed with it.
 
 ```rust
 // from crates/isograph_compiler/src/merged_selection.rs
 impl CompletedSelectionMap {
-    /// The operation's top-level map under a `TopLevel` fetch: every selection completed, and
-    /// nothing added at the top level itself.
+    /// The operation's top-level map: every selection completed, and nothing added at the top
+    /// level itself.
     pub fn top_level<TProtocol: NetworkProtocol>(
         map: &MergedSelectionMap,
     ) -> Result<Self, TopLevelError>;
-
-    /// The operation's top-level map under a fetch selection: that one selection.
-    pub fn fetch_selection(key: SelectionKey, selections: CompletedSelectionMap) -> Self;
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
@@ -1008,8 +853,7 @@ pub struct EntrypointOperation<'a, TProtocol: NetworkProtocol> {
     /// The operation name: the entrypoint's selectable name.
     pub name: SelectableName,
     pub fetch_plan: &'a TProtocol::FetchPlan,
-    /// The fetch selection's arguments, then the entrypoint field's variables that the
-    /// selections use, in declaration order.
+    /// The entrypoint field's variables that the selections use, in declaration order.
     pub variables: &'a [FieldVariable],
     pub selections: &'a CompletedSelectionMap,
 }
@@ -1030,18 +874,6 @@ pub struct QueryArtifact {
     pub file_name: Option<ArtifactFileName>,
     pub normalization_ast: NormalizationAst,
 }
-
-#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
-pub enum OperationError {
-    #[error("Variable `${0}` is declared by the entrypoint and is an argument of the fetch.")]
-    VariableCollision(VariableName),
-    #[error("The fetch passes argument `{0}` more than once.")]
-    DuplicateFetchArgument(ArgumentName),
-    #[error("{0}")]
-    TopLevel(TopLevelError),
-    #[error("{0}")]
-    Completion(AddedSelectionCollision),
-}
 ```
 
 ```rust
@@ -1054,42 +886,28 @@ pub trait NetworkProtocol: Sized + 'static {
 }
 ```
 
-`query_text` is infallible: the core finds every error of an operation (`OperationError`, and `SelectionSetOnLeaf`, `MissingSelectionSet`, `InputTarget` in the walk, located at the selection). `NetworkProtocol` has no `QueryError` associated type, because it would be `Infallible`. The test protocol's `query_text` returns an empty `QueryText` and `file_name: None`; its `fetch_plan` never returns `Ok`, so it is not reached.
+`common_lang_types::QueryText` gains `Clone` and `Hash` derives, because `QueryArtifact` is a memo value and derives `Clone`.
+
+`query_text` is infallible: the core finds every error of an operation (`TopLevelError`, and `SelectionSetOnLeaf`, `MissingSelectionSet`, `InputTarget` in the walk, located at the selection). `NetworkProtocol` has no `QueryError` associated type, because it would be `Infallible`. The test protocol's `query_text` returns an empty `QueryText` and `file_name: None`; its `fetch_plan` never returns `Ok`, so it is not reached.
 
 ```rust
 // from crates/isograph_compiler/src/query.rs
-/// The fetch selection's arguments as variables with no default, then the entrypoint
-/// field's variables that its selections use. A name in both is `VariableCollision`.
-fn operation_variables(
-    position: FetchPosition<'_>,
-    field: &FieldSelectionMap,
-) -> Result<Vec<FieldVariable>, OperationError>;
-
-/// The operation's top-level selections: the entrypoint field's map at the top level, or
-/// completed under the fetch selection when there is one.
-fn operation_selections<TProtocol: NetworkProtocol>(
-    identity: IdentitySelection,
-    position: FetchPosition<'_>,
-    selections: &MergedSelectionMap,
-) -> Result<CompletedSelectionMap, OperationError>;
+/// The entrypoint field's variables that its selections use, in declaration order.
+fn operation_variables(field: &FieldSelectionMap) -> Vec<FieldVariable>;
 ```
-
-`TopLevel` is `CompletedSelectionMap::top_level::<TProtocol>(selections)` (`Err` is `OperationError::TopLevel`). `Selection(fetch)` is `CompletedSelectionMap::fetch_selection(key, complete::<TProtocol>(selections, identity)?)` (`Err` is `Completion`), with `key` `SelectionKey { name: fetch.selectable, arguments }` and `arguments` `MergedArguments::new` of `<argument>: $<argument>` for each fetch argument (`Err` is `DuplicateFetchArgument`). The entity's selections are under a selection, so they get the discriminator and the entity's identity.
-
-The operation's top level under a fetch selection holds only the fetch selection.
 
 ```rust
 // from crates/isograph_compiler/src/query.rs
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum EntrypointQueryError<TNotFetchable: std::fmt::Display> {
-    #[error("{0}")]
+    #[error("{}", .0.0.message)]
     Lookup(Diagnostic),
     #[error("{0}")]
     NotFetchable(EntrypointNotFetchableError<TNotFetchable>),
     #[error("{0}")]
     SelectionMap(SelectionMapError),
     #[error("{0}")]
-    Operation(OperationError),
+    TopLevel(TopLevelError),
     #[error("{0}")]
     IntegerOutOfRange(IntegerOutOfRange),
 }
@@ -1112,20 +930,20 @@ pub fn query_for_entrypoint<TProfile: CompilationProfile>(
     let selectable_value = selectable_named(db, client, entity, selectable)
         .clone()
         .map_err(EntrypointQueryError::Lookup)?;
-    let fetch = entrypoint_fetch_plan(db, client, &entity_value, &selectable_value)
-        .map_err(EntrypointQueryError::NotFetchable)?;
+    let fetch_plan = entrypoint_fetch_plan(
+        db,
+        client,
+        entity_value.reference(),
+        selectable_value.reference(),
+    )
+    .map_err(EntrypointQueryError::NotFetchable)?;
     let field = field_selection_map(db, client, entity, selectable)
         .as_ref()
         .map_err(|error| EntrypointQueryError::SelectionMap(error.clone()))?;
-    let position = TProfile::NetworkProtocol::fetch_position(fetch.plan.reference());
-    let variables =
-        operation_variables(position, field).map_err(EntrypointQueryError::Operation)?;
-    let selections = operation_selections::<TProfile::NetworkProtocol>(
-        fetch.identity,
-        position,
-        field.selections.reference(),
-    )
-    .map_err(EntrypointQueryError::Operation)?;
+    let variables = operation_variables(field);
+    let selections =
+        CompletedSelectionMap::top_level::<TProfile::NetworkProtocol>(field.selections.reference())
+            .map_err(EntrypointQueryError::TopLevel)?;
     let normalization_ast = normalization_ast(
         selections.reference(),
         SelectionKey {
@@ -1138,7 +956,7 @@ pub fn query_for_entrypoint<TProfile: CompilationProfile>(
     let ProtocolQueryText { text, file_name } =
         TProfile::NetworkProtocol::query_text(&EntrypointOperation {
             name: selectable,
-            fetch_plan: fetch.plan.reference(),
+            fetch_plan: fetch_plan.reference(),
             variables: variables.as_slice(),
             selections: selections.reference(),
         });
@@ -1155,7 +973,7 @@ pub fn query_for_entrypoint<TProfile: CompilationProfile>(
 
 ### The entrypoint's parent shape
 
-Under a fetch selection, `query_for_entrypoint` completes the entity's map with the entity's `IdentitySelection`, which `entrypoint_fetch_plan` returns with the plan. A parent whose shape is not `Composite` has nothing to select and is reported where validation reports the other reasons.
+A parent whose shape is not `Composite` has nothing to select and is reported where validation reports the other reasons.
 
 Before (landed change 5):
 
@@ -1186,23 +1004,13 @@ After:
 
 ```rust
 // from crates/isograph_compiler/src/entrypoint.rs
-/// The protocol's plan for fetching an entrypoint's parent, and the parent's identity
-/// selection.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct EntrypointFetch<TFetchPlan> {
-    pub plan: TFetchPlan,
-    pub identity: IdentitySelection,
-}
-
-pub type ProfileEntrypointFetch<TProfile> = EntrypointFetch<ProfileFetchPlan<TProfile>>;
-
 /// The protocol's plan for fetching `entity` as the parent of the entrypoint `selectable`.
 pub fn entrypoint_fetch_plan<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
     entity: &ProfileEntity<TProfile>,
     selectable: &ProfileSelectable<TProfile>,
-) -> Result<ProfileEntrypointFetch<TProfile>, ProfileEntrypointNotFetchableError<TProfile>> {
+) -> Result<ProfileFetchPlan<TProfile>, ProfileEntrypointNotFetchableError<TProfile>> {
     let data = match entity.origin.reference() {
         EntityOrigin::Source => {
             return EntrypointNotFetchableError::SourceEntity(entity.name).wrap_err();
@@ -1216,19 +1024,18 @@ pub fn entrypoint_fetch_plan<TProfile: CompilationProfile>(
         })
         .wrap_err();
     }
-    let identity = match TProfile::NetworkProtocol::entity_shape(data) {
-        EntityShape::Composite(identity) => identity,
+    match TProfile::NetworkProtocol::entity_shape(data) {
+        EntityShape::Composite(_) => {}
         EntityShape::Leaf | EntityShape::Input => {
             return EntrypointNotFetchableError::NotComposite(entity.name).wrap_err();
         }
-    };
-    let plan = TProfile::NetworkProtocol::fetch_plan(db, client, entity.name)
-        .map_err(EntrypointNotFetchableError::Protocol)?;
-    EntrypointFetch { plan, identity }.wrap_ok()
+    }
+    TProfile::NetworkProtocol::fetch_plan(db, client, entity.name)
+        .map_err(EntrypointNotFetchableError::Protocol)
 }
 ```
 
-`EntrypointNotFetchableError` gains:
+The root's identity is not read: the top level has no identity selection. `EntrypointNotFetchableError` gains:
 
 ```rust
 // from crates/isograph_compiler/src/validation.rs
@@ -1236,7 +1043,7 @@ pub fn entrypoint_fetch_plan<TProfile: CompilationProfile>(
     NotComposite(EntityName),
 ```
 
-`entrypoint_declaration_error` locates `NotComposite` at `parent_type`, with `SourceEntity` and `Protocol`. The origin `match` binds the data the `if let` used to discard, so the shape is read from the same value the origin check ruled on. For GraphQL, `entrypoint String.X` is now `NotComposite` where it was `Protocol(NotObjectOrInterface)`; `graphql_fetch_plan(String)` itself is still `NotObject` (entrypoints.md).
+`entrypoint_declaration_error` locates `NotComposite` at `parent_type`, with `SourceEntity` and `Protocol`. The origin `match` binds the data the `if let` used to discard, so the shape is read from the same value the origin check ruled on. For GraphQL, `entrypoint String.X` is now `NotComposite` where it was `Protocol(NotRootOperationType)`.
 
 ### GraphQL printing
 
@@ -1266,21 +1073,13 @@ pub(crate) fn print_operation(
     operation: &EntrypointOperation<'_, GraphQLNetworkProtocol>,
 ) -> QueryText;
 
-/// `query`, `mutation`, or `subscription`: the root's operation type, or `query` for `node`.
-fn operation_type(plan: &GraphQLFetchPlan) -> OperationType;
-
-/// The lines of the operation's top-level selections. Under `Node` with
-/// `InlineFragment(T)`, each composite selection's selections are printed inside
-/// `... on T { }`.
-fn print_top_level(plan: &GraphQLFetchPlan, selections: &CompletedSelectionMap) -> Vec<String>;
-
 /// The lines of `selections` at `depth`, without braces.
 fn print_selection_set(selections: &CompletedSelectionMap, depth: usize) -> Vec<String>;
 
 /// The lines of one selection at `depth`.
 fn print_selection(selection: &CompletedSelection, depth: usize) -> Vec<String>;
 
-/// `<alias>: <name><arguments>`.
+/// `<alias>: <name>(<arguments>)`, or `<name>` when the key has no arguments.
 fn print_selection_head(key: &SelectionKey) -> String;
 
 /// `(name: value, ...)`, or the empty string when there are none.
@@ -1293,21 +1092,23 @@ fn print_variable_definition(variable: &FieldVariable) -> String;
 fn print_variable_type(variable_type: &VariableType) -> String;
 ```
 
+`print_operation.rs` reads `isograph_parser::Boolean` to print a boolean value, so `graphql_network_protocol` gains the `isograph_parser` dependency. `print_selection` prints the discriminator through `protocol_data.rs`'s `TYPENAME`.
+
 `print_selection_set` and `print_selection` return a `Vec` because each nested selection set's lines are spliced between its opening and closing lines, and a recursive `impl Iterator` is not a nameable type.
 
-The header is `<operation_type> <name>(<variable definitions>) {`, with the parentheses omitted when there are none, then `print_top_level` at depth 1, then `}`. `print_top_level` is `print_selection_set(selections, 1)` for `Root(_)` and `Node` with `Exact`. For `Node` with `InlineFragment(T)` it prints each top-level selection as `print_selection` does, except that a `Selectable` with a `Composite` target prints its head and ` {`, then `... on T {` at depth 2, its selections at depth 3, `}` at depth 2, and `}` at depth 1. The core gives that map one selection, the `node` selection. A variable definition prints `$name: Type`, then ` = <default>` when it has one. `VariableType` prints `Nullable(t)` as `t`'s text without `!`, `NonNull(t)` with `!`, `List` in brackets.
+The header is `<operation_type> <name>(<variable definitions>) {`, with the operation type the plan's `OperationType` and the parentheses omitted when there are none, then `print_selection_set(selections, 1)`, then `}`. A variable definition prints `$name: Type`, then ` = <default>` when it has one. `VariableType` prints `Nullable(t)` as `t`'s text without `!`, `NonNull(t)` with `!`, `List` in brackets.
 
 `print_selection`:
 
-- `Discriminator` prints `__typename: __typename`; `Identity(name)` prints `<name>: <name>`.
-- `Selectable(selection)` prints `print_selection_head(selection.key)`; with a `Composite` target, then ` {`, its selections at `depth + 1`, and `}` on its own line. The alias is `selection.key.normalization_alias()`.
+- `Discriminator` prints `__typename`; `Identity(name)` prints `<name>`.
+- `Selectable(selection)` prints `print_selection_head(selection.key)`; with a `Composite` target, then ` {`, its selections at `depth + 1`, and `}` on its own line. `print_selection_head` is `<alias>: <name>(<arguments>)` with the alias `selection.key.normalization_alias()` when the key has arguments, and `<name>` otherwise.
 - `Conditional(conditional)` with `SelectionEquals(entity)` prints `... on <entity> {`, its selections at `depth + 1`, and `}`.
 
-Values print as GraphQL: `$name`, integers in decimal, `true`, `false`, `null`, `{ key: value, key: value }`, and strings in double quotes with `"`, `\`, and the control characters U+0000 to U+001F escaped (`\"`, `\\`, `\n`, `\r`, `\t`, `\b`, `\f`, and `\u00XX` for the rest; spec 2.9.4). Upstream writes the string's text between quotes without escaping (`query_text.rs:164`, whose comment notes the bug).
+Values print as GraphQL: `$name`, integers in decimal, `true`, `false`, `null`, `{ key: value, key: value }` (an object with no entries prints `{}`), and strings in double quotes with `"`, `\`, and the control characters U+0000 to U+001F escaped (`\"`, `\\`, `\n`, `\r`, `\t`, `\b`, `\f`, and `\u00XX` for the rest; spec 2.9.4). Upstream writes the string's text between quotes without escaping (`query_text.rs:164`, whose comment notes the bug).
 
 `query_text` returns `file_name: Some(QUERY_TEXT_FILE_NAME)`. Upstream writes no raw query file; its query text lives only in `query_text.ts` (`export default 'query HomeRoute {\...'`), so the name is new. Upstream separates selections with `,` and builds a TypeScript string with `\` line continuations; here the protocol returns plain text, and the host language encodes it as a string literal.
 
-Upstream's origin for the completion rules is `select_typename_and_id_fields_in_merged_selection` and `selection_map_wrapped` (`isograph/crates/isograph_schema/src/create_merged_selection_set.rs:1414`, `:1477`) and `GraphQLNetworkProtocol::wrap_merged_selection_map` (`isograph/crates/graphql_network_protocol/src/graphql_network_protocol.rs:305`) for the `node` wrapping. Deltas: the names are the protocol's `discriminator()` and `entity_shape`, applied by the core's `complete`, rather than names hardcoded in the core; the discriminator is selected in every selection set under a selection, and none at the operation's top level; the `node` selection holds the entity's selections with no `__typename`, `id`, or conditional beside them; every selection is aliased (Normalization aliases); the text comes from one printer over the completed map.
+Upstream's origin for the completion rules is `select_typename_and_id_fields_in_merged_selection` (`isograph/crates/isograph_schema/src/create_merged_selection_set.rs:1414`). Deltas: the names are the protocol's `discriminator()` and `entity_shape`, applied by the core's `complete`, rather than names hardcoded in the core; the discriminator is selected in every selection set under a selection, and none at the operation's top level; upstream's `node` wrapping (`selection_map_wrapped`, `:1477`, and `GraphQLNetworkProtocol::wrap_merged_selection_map`, `isograph/crates/graphql_network_protocol/src/graphql_network_protocol.rs:305`) has no counterpart, because v1 has no Node-fetched entrypoints; the text comes from one printer over the completed map.
 
 ### Config: which types get an identity field
 
@@ -1469,7 +1270,7 @@ The TypeScript host never inspects the text or the file name beyond writing them
 query_for_entrypoint(client, E, f)
   -> entity_named(client, E), selectable_named(client, E, f)
   -> entrypoint_fetch_plan -> NetworkProtocol::fetch_plan -> graphql_fetch_plan(client, E)
-       -> graphql_entity(client, E), root_operation_types(client), graphql_selectable(client, Query, node)
+       -> graphql_entity(client, E), root_operation_types(client)
   -> field_selection_map(client, E, f)
        -> inlined_fields(client, ..) (via inline_cycle)
        -> parsed_iso_literals_in_file(client, path of E.f)
@@ -1488,7 +1289,7 @@ Each memo is keyed by the narrowest identity that determines it: `field_selectio
 
 ### Error isolation
 
-A query fails only on errors inside what it reads. A broken field fails every `field_selection_map` that inlines it, transitively, and every query that reaches one of those; no other memo reads it. A broken `Query.node` fails the fetch plan of every type fetched through `node`, and so only entrypoints whose parent is one of those types. A broken schema definition fails `root_operation_types`, which every fetch plan reads, so every entrypoint fails: the root types decide every operation's kind. A syntax error in `type Query` fails every `node` fetch plan and every `Query.*` field lookup, so entrypoints that read `Query` fail and `Mutation.SetTagline` does not.
+A query fails only on errors inside what it reads. A broken field fails every `field_selection_map` that inlines it, transitively, and every query that reaches one of those; no other memo reads it. A broken schema definition fails `root_operation_types`, which every fetch plan reads, so every entrypoint fails: the root types decide every operation's kind. A syntax error in `type Query` fails `Query`'s fetch plan and every `Query.*` field lookup, so entrypoints on `Query` fail and `Mutation.SetTagline` does not.
 
 ## Tests
 
@@ -1496,13 +1297,12 @@ Facts about generated text, not snapshots. A helper in the test module returns t
 
 `crates/graphql_network_protocol/src/print_operation.rs`, building `EntrypointOperation` values by hand from `complete` of hand-built `MergedSelectionMap`s (no database):
 
-- `Root(Query)` with no variables and one `Selectable` entry `pets` targeting an entity with identity `Select(id)` whose map has `tagline` (leaf): text is `query HomeRoute {`, `  pets: pets {`, `    __typename: __typename`, `    id: id`, `    tagline: tagline`, `  }`, `}`.
-- `Root(Mutation)` header starts `mutation`; `Root(Subscription)` starts `subscription`; no top-level line is `__typename: __typename`.
+- `Root(Query)` with no variables and one `Selectable` entry `pets` targeting an entity with identity `Select(id)` whose map has `tagline` (leaf): text is `query HomeRoute {`, `  pets {`, `    __typename`, `    id`, `    tagline`, `  }`, `}`.
+- `Root(Mutation)` header starts `mutation`; `Root(Subscription)` starts `subscription`; no top-level line is `__typename`.
 - A variable `$limit: Int = 3` used in the map prints `query X($limit: Int = 3) {`; `[ID!]!` prints `[ID!]!`; a nullable list of nullable prints `[ID]`.
-- An entry whose identity is `Omit` prints `__typename: __typename` first in its block and no `id: id`; one with `Select(id)` prints `__typename: __typename` then `id: id`; a `Conditional` entry `SelectionEquals(BlogItem)` prints `... on BlogItem {` after every `Selectable` entry of its block, with `__typename: __typename` first inside it.
-- A composite entry whose map is empty and whose identity is `Omit` prints one `__typename: __typename` line in its block.
-- Every line that is not the header, `}`, or an `... on` line has the form `<alias>: <name>`, where the alias is the key's `normalization_alias`.
-- `Node` with `InlineFragment(Pet)`: the header is `query X($id: ID!) {`, the second line is `  node____id___v_id: node(id: $id) {`, the third is `    ... on Pet {`, and the fourth is `      __typename: __typename`. With `Exact`, the third line is `    __typename: __typename`.
+- An entry whose identity is `Omit` prints `__typename` first in its block and no `id`; one with `Select(id)` prints `__typename` then `id`; a `Conditional` entry `SelectionEquals(BlogItem)` prints `... on BlogItem {` after every `Selectable` entry of its block, with `__typename` first inside it.
+- A composite entry whose map is empty and whose identity is `Omit` prints one `__typename` line in its block.
+- Every selection line with arguments has the form `<alias>: <name>(<arguments>)`, where the alias is the key's `normalization_alias`, and every selection line without arguments is the bare name.
 - A string argument `a"b\c` followed by a newline prints `"a\"b\\c\n"`.
 - An object argument `{ id: $id, tagline: $tagline }` prints in key order with `{ ` and ` }`.
 - No line ends in whitespace; the text does not end in a newline.
@@ -1512,8 +1312,7 @@ Facts about generated text, not snapshots. A helper in the test module returns t
 - `complete` of a map holding a leaf `id` with no arguments under `Select(id)` has one `Identity(id)` entry and no `Selectable` entry `id`; under `Omit`, the `Selectable` entry `id` remains, in name order.
 - `complete` of a map holding a composite selection named `id` with no arguments under `Select(id)` is `AddedSelectionCollision`.
 - `top_level` of an empty map is `Empty`; of a map with a `Conditional` entry is `Conditional`; of a map with `pets` has no `Discriminator` entry at its own level and one under `pets`.
-- `operation_variables` of `Selection` with fetch argument `id` and a used entrypoint variable `$id` is `VariableCollision(id)`.
-- `fetch_selection` under `Selection` with fetch arguments `id`, `id` is `DuplicateFetchArgument(id)`.
+- `operation_variables` declares only the used variables, in declaration order, each once.
 
 `crates/isograph_compiler/src/merged_selection.rs` (test protocol with `()` data where a case needs no protocol fields; otherwise the GraphQL profile in the next group):
 
@@ -1524,13 +1323,13 @@ Facts about generated text, not snapshots. A helper in the test module returns t
 
 `crates/graphql_network_protocol/tests` or the crate's test module (GraphQL profile, TypeScript host, the pet demo's schema and source files inserted before the first lookup):
 
-- `HomeRoute`: the first line is `query HomeRoute {`; the `pets: pets {` block contains `id: id`, `age: age`, `firstName: firstName`, `lastName: lastName`, `nickname: nickname`, `picture: picture`, `species: species`, `tagline: tagline`, each once; the block's first line is `__typename: __typename`; no line contains `PetSummaryCard` or `fullName`; the top level has no `__typename` line.
-- `PetDetailRoute`: the first line is `query PetDetailRoute($id: ID!) {`; a line is `  pet____id___v_id: pet(id: $id) {`; exactly one line is `    best_friend_relationship: best_friend_relationship {`, and its block contains `picture_together: picture_together` and a `best_friend: best_friend {` block with `id: id`, `firstName: firstName`, `lastName: lastName`; no line contains `checkins`, `friendName`, `owner`, `OwnerBadge`, or `displayName` (`owner` and `bestFriend` are client pointers, omitted).
-- `SpeciesRoute`: the header is `query SpeciesRoute($species: PetSpecies!) {`; lines include `  petsBySpecies____species___v_species: petsBySpecies(species: $species) {`, `    favorite_phrase: favorite_phrase`, `  viewer: viewer {`, and `  node____id___s_1: node(id: "1") {`, whose block's first two lines are `__typename: __typename` and `id: id`.
+- `HomeRoute`: the first line is `query HomeRoute {`; the `pets {` block contains `id`, `age`, `firstName`, `lastName`, `nickname`, `picture`, `species`, `tagline`, each once; the block's first line is `__typename`; no line contains `PetSummaryCard` or `fullName`; the top level has no `__typename` line.
+- `PetDetailRoute`: the first line is `query PetDetailRoute($id: ID!) {`; a line is `  pet____id___v_id: pet(id: $id) {`; exactly one line is `    best_friend_relationship {`, and its block contains `picture_together` and a `best_friend {` block with `id`, `firstName`, `lastName`; a line is `    checkins____limit___l_5____skip___l_0: checkins(limit: 5, skip: 0) {`; no line contains `friendName`, `owner`, `OwnerBadge`, or `displayName` (`owner` and `bestFriend` are client pointers, omitted).
+- `SpeciesRoute`: the header is `query SpeciesRoute($species: PetSpecies!) {`; lines include `  petsBySpecies____species___v_species: petsBySpecies(species: $species) {`, `    favorite_phrase`, `  viewer {`, and `  node____id___s_1: node(id: "1") {`, whose block's first two lines are `__typename` and `id`.
 - `SetTagline`: the header is `mutation SetTagline($id: ID!, $tagline: String!) {`; the second line is the `set_pet_tagline____input___o_id__v_id_tagline__v_tagline_c: set_pet_tagline(input: { id: $id, tagline: $tagline }) {` line.
-- `entrypoint Pet.PetSummaryCard` with a `field`: the second line is `  node____id___v_id: node(id: $id) {`, the third is `    ... on Pet {`; no line at depth 2 is `__typename` or `id`.
+- `entrypoint Pet.PetSummaryCard`, `entrypoint PetStats.Card`, and `entrypoint Node.Card` are `NotFetchable(Protocol(NotRootOperationType))`.
 - Selecting `PetCheckinsCard(limit: 5)` in `PetDetailRoute` adds the line `    checkins____limit___l_5____skip___l_0: checkins(limit: 5, skip: 0) {`. A second selection `PetCheckinsCard` with no arguments adds `checkins____limit___l_3____skip___l_0` (the default); both blocks are present.
-- `field Pet.Opt($x: Int) { checkins(limit: $x) { id } }` selected as `Opt` with no argument prints `checkins: checkins {` with no arguments.
+- `field Pet.Opt($x: Int) { checkins(limit: $x) { id } }` selected as `Opt` with no argument prints `checkins {` with no arguments.
 - An entrypoint field declaring `$unused: Int` that nothing reads has no `$unused` in its header.
 - A union refinement: `field Query.Feed { viewer { newsfeed(limit: 2, skip: 0) { asBlogItem { title } } } }` prints a `newsfeed____limit___l_2____skip___l_0: newsfeed(limit: 2, skip: 0) {` block whose first line is `__typename` and which contains `... on BlogItem {` with `title`.
 - Isolation: adding `nope` to `field Pet.PetStatsCard` makes `query_for_entrypoint(Query, PetDetailRoute)` an `Err` whose `SelectionMap` location is the `nope` span in `src/PetStatsCard.ts`; `query_for_entrypoint(Query, HomeRoute)` is `==` to its value before the edit.
@@ -1571,11 +1370,11 @@ Status: landed as integration.md change 3, which owns it (open decision 7). Delt
 
 ### 4. Root operation types and fetch plans (graphql_network_protocol)
 
-Status: landed (`103a23b9`). `RootOperationTypes`, `root_operation_types`; `GraphQLFetchPlan`, `GraphQLRootFetch`, `GraphQLNodeFetch`, `GraphQLFetchArgument`, `FetchRefinement`, `GraphQLNotFetchable`, `NodeFieldError`, `NodeFieldTypeMismatch`, `graphql_fetch_plan`, `node_fetch`; `NetworkProtocol::fetch_plan`; `VariableType` and `NonNullVariableType`; `MergedTarget`. Change 7 revises the fetch plan types and accepts only object types.
+Status: landed (`103a23b9`). `RootOperationTypes`, `root_operation_types`; `GraphQLFetchPlan`, `GraphQLRootFetch`, `GraphQLNodeFetch`, `GraphQLFetchArgument`, `FetchRefinement`, `GraphQLNotFetchable`, `NodeFieldError`, `NodeFieldTypeMismatch`, `graphql_fetch_plan`, `node_fetch`; `NetworkProtocol::fetch_plan`; `VariableType` and `NonNullVariableType`; `MergedTarget`. The Node removal (entrypoints.md, Delta from the landed fetch plan) deletes the `node` fetch; change 7 makes `GraphQLFetchPlan` a newtype of `OperationType` and accepts only object types.
 
 ### 5. Entrypoint validation (isograph_compiler)
 
-Status: landed (`7e38d5c4`). `EntrypointNotFetchableError`, `ValidationError<TNotFetchable>`, `entrypoint_fetch_plan`, `entrypoint_declaration_error`'s new check. Change 7 adds `NotComposite` and `EntrypointFetch`.
+Status: landed (`7e38d5c4`). `EntrypointNotFetchableError`, `ValidationError<TNotFetchable>`, `entrypoint_fetch_plan`, `entrypoint_declaration_error`'s new check. Change 7 adds `NotComposite`.
 
 ### 6. Protocol shapes and merged selection maps (isograph_compiler, graphql_network_protocol)
 
@@ -1592,12 +1391,12 @@ The landed `MergedTarget` stays until change 7. Depends on 3 and 5.
 
 ### 7. Completion, operations, and GraphQL printing (isograph_compiler, graphql_network_protocol)
 
-- Core: `CompletedSelectionMap`, `CompletedKey`, `CompletedSelection`, `CompletedSelectableSelection`, `CompletedSelectionTarget`, `CompletedConditional`, `CompletedSelection::key`, `CompletedSelectionMap::{iter, top_level, fetch_selection}`, `complete`, `AddedSelectionCollision`, `TopLevelError`.
-- Core: `FetchPosition`, `FetchSelection`, `FetchArgument`, `NetworkProtocol::fetch_position`; `EntrypointFetch`, `ProfileEntrypointFetch`, `entrypoint_fetch_plan` returning it, `EntrypointNotFetchableError::NotComposite` and its location in `entrypoint_declaration_error`.
-- Core: `EntrypointOperation`, `ProtocolQueryText`, `QueryArtifact { text, file_name }`, `OperationError`, `EntrypointQueryError` without `IntegerOutOfRange`, `operation_variables`, `operation_selections`, `query_for_entrypoint` without the `normalization_ast` step; `NetworkProtocol::query_text`; the test protocols' `fetch_position` and `query_text`. `MergedTarget` is deleted.
-- GraphQL: `GraphQLFetchPlan::Root(OperationType)`, `GraphQLNodeFetch { selection, refinement }`, `FetchRefinement::InlineFragment(EntityName)`; `GraphQLRootFetch` and `GraphQLFetchArgument` deleted; `node_fetch` and `contains` taking the object's `GraphQLCompositeData`; objects only (`NotObject`), entrypoints.md, Delta from the landed fetch plan; `GraphQLNetworkProtocol::fetch_position`.
-- GraphQL: `QUERY_TEXT_FILE_NAME`, `query_text`, `print_operation`, `operation_type`, `print_top_level`, `print_selection_set`, `print_selection`, `print_selection_head`, `print_arguments`, `print_value`, `print_variable_definition`, `print_variable_type`; `GraphQLNetworkProtocol::query_text`.
-- Tests: the printer tests, the core operation-rule tests, the profile tests that read query text, and the fetch plan and validation test updates.
+- Core: `CompletedSelectionMap`, `CompletedKey`, `CompletedSelection`, `CompletedSelectableSelection`, `CompletedSelectionTarget`, `CompletedConditional`, `CompletedSelection::key`, `CompletedSelectionMap::{iter, top_level}`, `complete`, `AddedSelectionCollision`, `TopLevelError`.
+- Core: `EntrypointNotFetchableError::NotComposite`, its check in `entrypoint_fetch_plan`, and its location in `entrypoint_declaration_error`.
+- Core: `EntrypointOperation`, `ProtocolQueryText`, `QueryArtifact { text, file_name }`, `EntrypointQueryError` without `IntegerOutOfRange`, `operation_variables`, `query_for_entrypoint` without the `normalization_ast` step; `NetworkProtocol::query_text`; the test protocols' `query_text`. `MergedTarget` is deleted.
+- GraphQL: `GraphQLFetchPlan(OperationType)`; objects only (`NotObject`, after the root check).
+- GraphQL: `QUERY_TEXT_FILE_NAME`, `query_text`, `print_operation`, `print_selection_set`, `print_selection`, `print_selection_head`, `print_arguments`, `print_value`, `print_variable_definition`, `print_variable_type`; `GraphQLNetworkProtocol::query_text`.
+- Tests: the printer tests (`print_operation.rs`), the core operation-rule tests (`merged_selection.rs` and `query.rs`, test protocol), the profile tests that read query text (`crates/graphql_network_protocol/src/tests/query.rs`), and the fetch plan and validation test updates.
 
 Depends on 4, 5, and 6.
 
@@ -1619,4 +1418,3 @@ The committed `demos/pet-demo/src/__isograph/` gains the query files for `HomeRo
 6. `entrypoint Mutation.set_pet_tagline` on a schema field. Options: not allowed (held); allowed with the field's whole response selected; allowed with a selection set written in the entrypoint literal. Consequences: the grammar has no selection set on `entrypoint`, so the third is a grammar change. Held: not allowed; every root field is reachable through a `field Mutation.X { set_pet_tagline(..) { .. } }` declaration.
 7. Ownership of change 3. The protocol lookups in `entity_named` and `selectable_named` are the schema integration step. Options: this doc owns it as written; a schema-integration doc owns it and this doc's change 3 is deleted. Held: this doc owns it unless that doc exists when implementation starts.
 8. `ValidationError` carrying the protocol's reason. Options: generic over `TNotFetchable` (held); a `String` message from the protocol. Consequences: generic keeps the reason's structure for a later code action at the cost of a type parameter through the diagnostics path; a string discards it.
-9. Fetch argument and entrypoint variable with the same name. Options: `VariableCollision` error (held); one operation variable when the types are equal. Consequences: unifying lets `field Pet.X($id: ID!)` read the id passed to `node`, a coupling between the fetch path and the field that the field cannot see.

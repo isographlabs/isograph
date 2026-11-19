@@ -763,15 +763,16 @@ fn fetch_plan(db: &Db, name: &str) -> Result<GraphQLFetchPlan, GraphQLNotFetchab
 fn root_plan(db: &Db, name: &str) -> OperationType {
     fetch_plan(db, name)
         .expect("the fixture makes this entity a root operation type")
-        .operation_type
+        .0
 }
 
 #[test]
 fn only_the_root_operation_types_of_the_pet_demo_are_fetchable() {
     let db = db_with(&PET_DEMO_SCHEMA);
-    let query = fetch_plan(&db, "Query").expect("Query is the query root");
-    assert_eq!(query.operation_type, OperationType::Query);
-    assert_eq!(query.entity.name, entity("Query"));
+    assert_eq!(
+        fetch_plan(&db, "Query"),
+        GraphQLFetchPlan(OperationType::Query).wrap_ok()
+    );
     assert_eq!(root_plan(&db, "Mutation"), OperationType::Mutation);
     for not_root in [
         "Pet",
@@ -814,14 +815,14 @@ fn the_default_root_types_are_fetchable_and_an_unnamed_mutation_is_not() {
 }
 
 #[test]
-fn a_root_that_is_not_an_object_or_interface_is_not_fetchable() {
+fn a_root_that_is_not_an_object_is_not_fetchable() {
     let db = db_with(&[(
         "a.graphql",
         "schema { query: Q } union Q = A type A { a: Int }",
     )]);
     assert_eq!(
         fetch_plan(&db, "Q"),
-        GraphQLNotFetchable::NotObjectOrInterface(entity("Q")).wrap_err()
+        GraphQLNotFetchable::NotObject(entity("Q")).wrap_err()
     );
 }
 
@@ -1311,3 +1312,4 @@ mod field_types {
 }
 
 mod merged_selection;
+mod query;

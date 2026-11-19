@@ -21,13 +21,6 @@ use crate::{
     parsed_iso_literals_in_file, selectable_named,
 };
 
-/// The entity a selection's selectable points at.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct MergedTarget<TEntityData> {
-    pub name: EntityName,
-    pub data: TEntityData,
-}
-
 /// The server selections of one selection set after inlining `field` declarations, keyed by
 /// what identifies them.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1237,6 +1230,205 @@ fn inline_cycle<TProfile: CompilationProfile>(
     }
 }
 
+/// A merged selection map with the discriminator and identity selections its protocol adds
+/// at every depth below the operation's top level. Never empty.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CompletedSelectionMap(BTreeMap<CompletedKey, CompletedSelection>);
+
+/// The derived order is query order: the discriminator, the identity, selectable selections
+/// by name and arguments, then conditionals.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum CompletedKey {
+    Discriminator,
+    Identity,
+    Selectable(SelectionKey),
+    Conditional(Condition),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CompletedSelection {
+    /// The selection of the protocol's `discriminator()`, with no arguments.
+    Discriminator,
+    /// The selection of the identity selectable this name names, with no arguments.
+    Identity(SelectableName),
+    Selectable(CompletedSelectableSelection),
+    Conditional(CompletedConditional),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CompletedSelectableSelection {
+    pub key: SelectionKey,
+    pub target: CompletedSelectionTarget,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CompletedSelectionTarget {
+    Leaf,
+    Composite(CompletedSelectionMap),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CompletedConditional {
+    pub condition: Condition,
+    pub selections: CompletedSelectionMap,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[error("`{}` has the normalization alias of a selection the protocol adds.", .0.name)]
+pub struct AddedSelectionCollision(pub SelectionKey);
+
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum TopLevelError {
+    #[error("The entrypoint selects nothing the server returns.")]
+    Empty,
+    #[error("A refinement cannot be selected at the top level of an operation.")]
+    Conditional,
+    #[error("{0}")]
+    AddedSelectionCollision(AddedSelectionCollision),
+}
+
+impl CompletedSelection {
+    pub fn key(&self) -> CompletedKey {
+        match self {
+            CompletedSelection::Discriminator => CompletedKey::Discriminator,
+            CompletedSelection::Identity(_) => CompletedKey::Identity,
+            CompletedSelection::Selectable(selection) => {
+                CompletedKey::Selectable(selection.key.clone())
+            }
+            CompletedSelection::Conditional(conditional) => {
+                CompletedKey::Conditional(conditional.condition.clone())
+            }
+        }
+    }
+}
+
+impl CompletedSelectionMap {
+    /// The selections in key order.
+    pub fn iter(&self) -> impl Iterator<Item = &CompletedSelection> {
+        self.0.values()
+    }
+
+    /// The operation's top-level map: every selection completed, and nothing added at the top
+    /// level itself.
+    pub fn top_level<TProtocol: NetworkProtocol>(
+        map: &MergedSelectionMap,
+    ) -> Result<Self, TopLevelError> {
+        let selections = map
+            .iter()
+            .map(|selection| match selection {
+                MergedSelection::Selectable(selection) => {
+                    CompletedSelection::Selectable(CompletedSelectableSelection {
+                        key: selection.key.clone(),
+                        target: complete_target::<TProtocol>(selection.target.reference())
+                            .map_err(TopLevelError::AddedSelectionCollision)?,
+                    })
+                    .wrap_ok()
+                }
+                MergedSelection::Conditional(_) => TopLevelError::Conditional.wrap_err(),
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        if selections.is_empty() {
+            return TopLevelError::Empty.wrap_err();
+        }
+        CompletedSelectionMap::from_selections(selections).wrap_ok()
+    }
+
+    /// `selections` keyed by `CompletedSelection::key`; of two with one key, the later.
+    fn from_selections(selections: Vec<CompletedSelection>) -> Self {
+        CompletedSelectionMap(
+            selections
+                .into_iter()
+                .map(|selection| (selection.key(), selection))
+                .collect(),
+        )
+    }
+}
+
+/// `map`, a selection set under a selection of an entity whose identity is `identity`, with
+/// the discriminator, the identity, and every composite target and conditional below it
+/// completed.
+pub fn complete<TProtocol: NetworkProtocol>(
+    map: &MergedSelectionMap,
+    identity: IdentitySelection,
+) -> Result<CompletedSelectionMap, AddedSelectionCollision> {
+    let discriminator = TProtocol::discriminator();
+    let added = std::iter::once(CompletedSelection::Discriminator).chain(match identity {
+        IdentitySelection::Select(name) => CompletedSelection::Identity(name).wrap_some(),
+        IdentitySelection::Omit => None,
+    });
+    map.iter()
+        .map(|selection| complete_selection::<TProtocol>(selection, discriminator, identity))
+        .collect::<Result<Vec<_>, _>>()
+        .map(|selections| CompletedSelectionMap::from_selections(added.chain(selections).collect()))
+}
+
+/// One selection of a selection set whose discriminator is `discriminator` and whose
+/// identity is `identity`, completed.
+fn complete_selection<TProtocol: NetworkProtocol>(
+    selection: &MergedSelection,
+    discriminator: SelectableName,
+    identity: IdentitySelection,
+) -> Result<CompletedSelection, AddedSelectionCollision> {
+    match selection {
+        MergedSelection::Selectable(selection) => {
+            let key = selection.key.reference();
+            let added = match (selection.target.reference(), key.arguments.is_empty()) {
+                (MergedSelectionTarget::Leaf, true) if key.name == discriminator => {
+                    CompletedSelection::Discriminator.wrap_some()
+                }
+                (MergedSelectionTarget::Leaf, true)
+                    if identity == IdentitySelection::Select(key.name) =>
+                {
+                    CompletedSelection::Identity(key.name).wrap_some()
+                }
+                (MergedSelectionTarget::Leaf | MergedSelectionTarget::Composite(_), _) => None,
+            };
+            if let Some(added) = added {
+                return added.wrap_ok();
+            }
+            let alias = key.normalization_alias();
+            let added_names = std::iter::once(discriminator).chain(match identity {
+                IdentitySelection::Select(name) => name.wrap_some(),
+                IdentitySelection::Omit => None,
+            });
+            if added_names
+                .map(|name| name.to_string())
+                .any(|name| name == alias.0)
+            {
+                return AddedSelectionCollision(key.clone()).wrap_err();
+            }
+            CompletedSelection::Selectable(CompletedSelectableSelection {
+                key: key.clone(),
+                target: complete_target::<TProtocol>(selection.target.reference())?,
+            })
+            .wrap_ok()
+        }
+        MergedSelection::Conditional(conditional) => {
+            CompletedSelection::Conditional(CompletedConditional {
+                condition: conditional.condition.clone(),
+                selections: complete::<TProtocol>(
+                    conditional.selections.reference(),
+                    conditional.identity,
+                )?,
+            })
+            .wrap_ok()
+        }
+    }
+}
+
+/// `target` with its selections completed under its own identity.
+fn complete_target<TProtocol: NetworkProtocol>(
+    target: &MergedSelectionTarget,
+) -> Result<CompletedSelectionTarget, AddedSelectionCollision> {
+    match target {
+        MergedSelectionTarget::Leaf => CompletedSelectionTarget::Leaf.wrap_ok(),
+        MergedSelectionTarget::Composite(target) => CompletedSelectionTarget::Composite(
+            complete::<TProtocol>(target.selections.reference(), target.identity)?,
+        )
+        .wrap_ok(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::{BTreeMap, BTreeSet};
@@ -2008,5 +2200,316 @@ mod tests {
             ),
             MergedSelectionMap::empty().wrap_ok()
         );
+    }
+
+    mod completion {
+        use super::{argument, composite, conditional, entity, id, leaf, map, name};
+        use crate::IdentitySelection;
+        use crate::merged_selection::{
+            AddedSelectionCollision, CompletedKey, CompletedSelection, CompletedSelectionMap,
+            CompletedSelectionTarget, Condition, MergedSelectionMap, MergedValue, SelectionKey,
+            TopLevelError, complete,
+        };
+        use crate::test_profile::TestNetworkProtocol;
+        use prelude::Postfix;
+
+        fn completed(
+            map: &MergedSelectionMap,
+            identity: IdentitySelection,
+        ) -> CompletedSelectionMap {
+            complete::<TestNetworkProtocol>(map, identity).expect("the test's map completes")
+        }
+
+        /// One line per completed selection, two spaces per depth.
+        fn outline(map: &CompletedSelectionMap) -> Vec<String> {
+            outline_at(map, 0)
+        }
+
+        fn outline_at(map: &CompletedSelectionMap, depth: usize) -> Vec<String> {
+            let indent = "  ".repeat(depth);
+            map.iter()
+                .flat_map(|selection| match selection {
+                    CompletedSelection::Discriminator => {
+                        format!("{indent}<discriminator>").wrap_vec()
+                    }
+                    CompletedSelection::Identity(name) => {
+                        format!("{indent}<identity {name}>").wrap_vec()
+                    }
+                    CompletedSelection::Selectable(selection) => {
+                        let alias = selection.key.normalization_alias();
+                        match selection.target.reference() {
+                            CompletedSelectionTarget::Leaf => format!("{indent}{alias}").wrap_vec(),
+                            CompletedSelectionTarget::Composite(inner) => {
+                                std::iter::once(format!("{indent}{alias} {{"))
+                                    .chain(outline_at(inner, depth + 1))
+                                    .collect()
+                            }
+                        }
+                    }
+                    CompletedSelection::Conditional(conditional) => {
+                        let Condition::SelectionEquals(on) = conditional.condition;
+                        std::iter::once(format!("{indent}... on {on} {{"))
+                            .chain(outline_at(conditional.selections.reference(), depth + 1))
+                            .collect()
+                    }
+                })
+                .collect()
+        }
+
+        fn lines(lines: &[&str]) -> Vec<String> {
+            lines
+                .iter()
+                .map(|line| line.dereference().to_owned())
+                .collect()
+        }
+
+        #[test]
+        fn completion_adds_the_discriminator_then_the_identity_before_every_selection() {
+            let merged = map(vec![leaf("age", vec![]), leaf("Zeta", vec![])]);
+            assert_eq!(
+                outline(completed(merged.reference(), id()).reference()),
+                lines(&["<discriminator>", "<identity id>", "Zeta", "age"])
+            );
+            assert_eq!(
+                outline(completed(merged.reference(), IdentitySelection::Omit).reference()),
+                lines(&["<discriminator>", "Zeta", "age"])
+            );
+        }
+
+        #[test]
+        fn an_empty_map_completes_to_the_discriminator_and_the_identity() {
+            assert_eq!(
+                outline(completed(MergedSelectionMap::empty().reference(), id()).reference()),
+                lines(&["<discriminator>", "<identity id>"])
+            );
+            assert_eq!(
+                outline(
+                    completed(
+                        MergedSelectionMap::empty().reference(),
+                        IdentitySelection::Omit
+                    )
+                    .reference()
+                ),
+                lines(&["<discriminator>"])
+            );
+        }
+
+        #[test]
+        fn a_user_selection_of_the_identity_merges_into_it_and_without_an_identity_stays() {
+            let merged = map(vec![leaf("id", vec![]), leaf("age", vec![])]);
+            assert_eq!(
+                outline(completed(merged.reference(), id()).reference()),
+                lines(&["<discriminator>", "<identity id>", "age"])
+            );
+            assert_eq!(
+                outline(completed(merged.reference(), IdentitySelection::Omit).reference()),
+                lines(&["<discriminator>", "age", "id"])
+            );
+        }
+
+        #[test]
+        fn a_user_selection_of_the_discriminator_merges_into_it() {
+            let merged = map(vec![leaf("__typename", vec![]), leaf("age", vec![])]);
+            assert_eq!(
+                outline(completed(merged.reference(), IdentitySelection::Omit).reference()),
+                lines(&["<discriminator>", "age"])
+            );
+        }
+
+        #[test]
+        fn an_identity_selection_with_arguments_is_an_ordinary_selection() {
+            let merged = map(vec![leaf(
+                "id",
+                vec![argument("x", MergedValue::Integer(1))],
+            )]);
+            assert_eq!(
+                outline(completed(merged.reference(), id()).reference()),
+                lines(&["<discriminator>", "<identity id>", "id____x___l_1"])
+            );
+        }
+
+        #[test]
+        fn a_composite_selection_named_like_an_added_selection_collides() {
+            let named_id = map(vec![composite(
+                "id",
+                vec![],
+                IdentitySelection::Omit,
+                vec![],
+            )]);
+            assert_eq!(
+                complete::<TestNetworkProtocol>(named_id.reference(), id()),
+                AddedSelectionCollision(SelectionKey {
+                    name: name("id"),
+                    arguments: Default::default(),
+                })
+                .wrap_err()
+            );
+            assert!(
+                complete::<TestNetworkProtocol>(named_id.reference(), IdentitySelection::Omit)
+                    .is_ok()
+            );
+            let named_typename = map(vec![composite(
+                "__typename",
+                vec![],
+                IdentitySelection::Omit,
+                vec![],
+            )]);
+            assert!(matches!(
+                complete::<TestNetworkProtocol>(
+                    named_typename.reference(),
+                    IdentitySelection::Omit
+                ),
+                Err(AddedSelectionCollision(_))
+            ));
+        }
+
+        #[test]
+        fn a_collision_at_depth_fails_the_whole_completion() {
+            let merged = map(vec![composite(
+                "pet",
+                vec![],
+                id(),
+                vec![conditional(
+                    "T",
+                    id(),
+                    vec![composite("id", vec![], IdentitySelection::Omit, vec![])],
+                )],
+            )]);
+            assert!(matches!(
+                complete::<TestNetworkProtocol>(merged.reference(), IdentitySelection::Omit),
+                Err(AddedSelectionCollision(_))
+            ));
+        }
+
+        #[test]
+        fn every_composite_target_and_conditional_is_completed_with_its_own_identity() {
+            let merged = map(vec![
+                composite(
+                    "pet",
+                    vec![],
+                    id(),
+                    vec![
+                        leaf("id", vec![]),
+                        composite(
+                            "stats",
+                            vec![],
+                            IdentitySelection::Omit,
+                            vec![leaf("weight", vec![])],
+                        ),
+                    ],
+                ),
+                conditional(
+                    "BlogItem",
+                    id(),
+                    vec![conditional(
+                        "Inner",
+                        IdentitySelection::Omit,
+                        vec![leaf("x", vec![])],
+                    )],
+                ),
+            ]);
+            assert_eq!(
+                outline(completed(merged.reference(), IdentitySelection::Omit).reference()),
+                lines(&[
+                    "<discriminator>",
+                    "pet {",
+                    "  <discriminator>",
+                    "  <identity id>",
+                    "  stats {",
+                    "    <discriminator>",
+                    "    weight",
+                    "... on BlogItem {",
+                    "  <discriminator>",
+                    "  <identity id>",
+                    "  ... on Inner {",
+                    "    <discriminator>",
+                    "    x",
+                ])
+            );
+        }
+
+        #[test]
+        fn the_key_of_a_completed_selection_matches_its_variant_and_orders_query_order() {
+            let merged = map(vec![conditional("A", id(), vec![]), leaf("b", vec![])]);
+            let completed = completed(merged.reference(), id());
+            assert_eq!(
+                completed
+                    .iter()
+                    .map(CompletedSelection::key)
+                    .collect::<Vec<_>>(),
+                vec![
+                    CompletedKey::Discriminator,
+                    CompletedKey::Identity,
+                    CompletedKey::Selectable(SelectionKey {
+                        name: name("b"),
+                        arguments: Default::default(),
+                    }),
+                    CompletedKey::Conditional(Condition::SelectionEquals(entity("A"))),
+                ]
+            );
+        }
+
+        #[test]
+        fn the_top_level_adds_nothing_at_its_own_level_and_completes_below() {
+            let merged = map(vec![
+                composite("pets", vec![], id(), vec![leaf("tagline", vec![])]),
+                leaf("count", vec![]),
+            ]);
+            assert_eq!(
+                outline(
+                    CompletedSelectionMap::top_level::<TestNetworkProtocol>(merged.reference())
+                        .expect("the map has selections")
+                        .reference()
+                ),
+                lines(&[
+                    "count",
+                    "pets {",
+                    "  <discriminator>",
+                    "  <identity id>",
+                    "  tagline",
+                ])
+            );
+        }
+
+        #[test]
+        fn the_top_level_rejects_an_empty_map_a_conditional_and_a_collision_below() {
+            assert_eq!(
+                CompletedSelectionMap::top_level::<TestNetworkProtocol>(
+                    MergedSelectionMap::empty().reference()
+                ),
+                TopLevelError::Empty.wrap_err()
+            );
+            assert_eq!(
+                CompletedSelectionMap::top_level::<TestNetworkProtocol>(
+                    map(vec![leaf("a", vec![]), conditional("T", id(), vec![])]).reference()
+                ),
+                TopLevelError::Conditional.wrap_err()
+            );
+            assert!(matches!(
+                CompletedSelectionMap::top_level::<TestNetworkProtocol>(
+                    map(vec![composite(
+                        "pets",
+                        vec![],
+                        id(),
+                        vec![composite("id", vec![], IdentitySelection::Omit, vec![])]
+                    )])
+                    .reference()
+                ),
+                Err(TopLevelError::AddedSelectionCollision(_))
+            ));
+        }
+
+        #[test]
+        fn a_top_level_selection_named_like_an_added_selection_is_ordinary() {
+            let merged = map(vec![leaf("__typename", vec![]), leaf("id", vec![])]);
+            assert_eq!(
+                outline(
+                    CompletedSelectionMap::top_level::<TestNetworkProtocol>(merged.reference())
+                        .expect("the map has selections")
+                        .reference()
+                ),
+                lines(&["__typename", "id"])
+            );
+        }
     }
 }

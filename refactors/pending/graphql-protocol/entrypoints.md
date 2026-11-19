@@ -98,12 +98,11 @@ pub trait NetworkProtocol: Sized + 'static {
     fn entity_shape(data: &Self::EntityData) -> EntityShape;
     fn selectable_shape(data: &Self::SelectableData) -> SelectableShape;
     fn discriminator() -> SelectableName;
-    fn fetch_position(plan: &Self::FetchPlan) -> FetchPosition<'_>;
     fn query_text(operation: &EntrypointOperation<'_, Self>) -> ProtocolQueryText;
 }
 ```
 
-Before, the trait had only `should_include_schema_file`. The core reads every method above: `entity` and `selectable` from `entity_named` and `selectable_named`, `fetch_plan` from validation and from `query_for_entrypoint`, `entity_shape` and `selectable_shape` from the merge walk and `entrypoint_fetch_plan`, `discriminator`, `fetch_position`, and `query_text` from `query_for_entrypoint`. `entity`, `selectable`, and `fetch_plan` return owned values: the GraphQL implementation clones them out of its own memos (below), whose results are small. pico cannot yet memoize a trait method (`refactors/pending/memo-on-trait-methods.md`), so each method is a plain function that calls a `#[memo]` free function in the implementing crate.
+Before, the trait had only `should_include_schema_file`. The core reads every method above: `entity` and `selectable` from `entity_named` and `selectable_named`, `fetch_plan` from validation and from `query_for_entrypoint`, `entity_shape` and `selectable_shape` from the merge walk and `entrypoint_fetch_plan`, `discriminator` and `query_text` from `query_for_entrypoint`. `entity`, `selectable`, and `fetch_plan` return owned values: the GraphQL implementation clones them out of its own memos (below), whose results are small. pico cannot yet memoize a trait method (`refactors/pending/memo-on-trait-methods.md`), so each method is a plain function that calls a `#[memo]` free function in the implementing crate.
 
 ```rust
 // from crates/isograph_compiler/src/schema.rs
@@ -441,7 +440,7 @@ Every field of the mutation and subscription root can thus parent an entrypoint,
 pub struct GraphQLFetchPlan(pub OperationType);
 ```
 
-This is the type after query-generation.md change 7; before it, the struct also holds the root type's `MergedTarget`, which change 7 deletes (query-generation.md, The fetch plan).
+This is the type after query-generation.md change 7; before it, the struct has fields `operation_type` and `entity: MergedTarget<GraphQLEntityData>`, and change 7 deletes `entity` (query-generation.md, The fetch plan).
 
 `OperationType` is the parser's (`crates/graphql_schema_parser/src/ast.rs`); it has `strum::Display` with `serialize_all = "lowercase"`, so the printer writes `query`, `mutation`, `subscription`.
 

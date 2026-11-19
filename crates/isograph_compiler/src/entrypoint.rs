@@ -2,8 +2,8 @@ use prelude::Postfix;
 
 use crate::validation::{EntrypointNotFetchableError, SelectableKey};
 use crate::{
-    ClientId, CompilationProfile, EntityOrigin, IsographDb, NetworkProtocol, ProfileEntity,
-    ProfileSelectable, SelectableKind,
+    ClientId, CompilationProfile, EntityOrigin, EntityShape, IsographDb, NetworkProtocol,
+    ProfileEntity, ProfileSelectable, SelectableKind,
 };
 
 /// The protocol's plan for fetching `entity` as the parent of the entrypoint `selectable`.
@@ -13,15 +13,24 @@ pub fn entrypoint_fetch_plan<TProfile: CompilationProfile>(
     entity: &ProfileEntity<TProfile>,
     selectable: &ProfileSelectable<TProfile>,
 ) -> Result<ProfileFetchPlan<TProfile>, ProfileEntrypointNotFetchableError<TProfile>> {
-    if let EntityOrigin::Source = entity.origin {
-        return EntrypointNotFetchableError::SourceEntity(entity.name).wrap_err();
-    }
+    let data = match entity.origin.reference() {
+        EntityOrigin::Source => {
+            return EntrypointNotFetchableError::SourceEntity(entity.name).wrap_err();
+        }
+        EntityOrigin::Protocol(data) => data,
+    };
     if let SelectableKind::Server(_) = selectable.kind {
         return EntrypointNotFetchableError::ProtocolSelectable(SelectableKey {
             entity: selectable.parent_entity,
             selectable: selectable.name,
         })
         .wrap_err();
+    }
+    match TProfile::NetworkProtocol::entity_shape(data) {
+        EntityShape::Composite(_) => {}
+        EntityShape::Leaf | EntityShape::Input => {
+            return EntrypointNotFetchableError::NotComposite(entity.name).wrap_err();
+        }
     }
     TProfile::NetworkProtocol::fetch_plan(db, client, entity.name)
         .map_err(EntrypointNotFetchableError::Protocol)
