@@ -21,6 +21,7 @@ const RUST_ROOTS: &[&str] = &[
     "crates/isograph_config",
     "crates/isograph_lsp",
     "crates/isograph_parser",
+    "crates/pico",
     "crates/prelude",
     "crates/resolve_position",
     "crates/resolve_position_macros",
