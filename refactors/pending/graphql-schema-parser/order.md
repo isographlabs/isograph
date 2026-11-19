@@ -1,10 +1,12 @@
 # GraphQL schema parser: order
 
-Requires parsing-standards.md and ast.md. This file is the work list. Each item is independently shippable. An agent implements the next pending item, with the tests named here, then sets that item's Status to done. When every item is done, `parse_schema` / `parse_schema_extensions` cover ast.md and parsing-standards.md.
+Requires parsing-standards.md and ast.md. This file is the work list for `crates/graphql_schema_parser`. Each change is independently shippable, lands with the tests named here, and is one commit. When every change is done, `parse_schema` covers spec 3 (Type System) and 3.1 (Type System Extensions) with the lexical grammar of spec 2.1 and 2.10. integration.md is the work in `graphql_network_protocol` that reads the result; it lands after change 11.
 
-Origin of each parse function: isograph `crates/graphql_schema_parser/src/parse_schema.rs` and `description.rs`, control flow copied. Delta: primitives in parsing-standards.md; types in ast.md.
+## End-user experience
 
-Crate `crates/graphql_schema_parser`, workspace member via `./crates/*`. No other crate's `Cargo.toml` lists it. Tests are `#[cfg(test)]` in this crate, calling `parse_schema` / `parse_schema_extensions` on string fixtures. That is the only use.
+A schema file is any file the config's `schema` globs match (integration.md). The user writes definitions and `extend` blocks in any of those files, in any order. A file with a syntax error in one definition still contributes every other definition: a lookup that reaches the broken definition's name fails with that definition's error, and every other lookup is unaffected. Errors are not shown to the user yet: there are no diagnostics, semantic tokens, or other LSP features on `.graphql` files (parsing-standards.md, Later). Every keystroke in an open schema file reparses that whole file.
+
+## Crate
 
 ```toml
 # from crates/graphql_schema_parser/Cargo.toml
@@ -19,9 +21,8 @@ common_lang_types = { path = "../common_lang_types" }
 derive_more = { workspace = true }
 intern = { path = "../../relay-crates/intern" }
 logos = { workspace = true }
+nonempty = { workspace = true }
 prelude = { path = "../prelude" }
-resolve_position = { path = "../resolve_position" }
-resolve_position_macros = { path = "../resolve_position_macros" }
 span = { path = "../span" }
 strum = { workspace = true }
 thiserror = { workspace = true }
@@ -30,449 +31,657 @@ thiserror = { workspace = true }
 workspace = true
 ```
 
-`lib.rs` modules: `token_kind`, `peekable_lexer`, `parse_error`, `semantic_token`, `ast`, `type_annotation`, `value`, `description`, `parse_schema`, `resolution_node`. Public: `parse_schema`, `parse_schema_extensions`, the AST types, `ParseError` / `Expectation` / `ExpectedFound` / `Found`, `GraphQLSemanticToken`, `GraphQLResolutionNode`. `#[cfg(test)]`: `parse_schema_with_tokens`, `parse_schema_extensions_with_tokens`.
+Workspace member through `./crates/*`. `lib.rs` modules: `token_kind`, `tokenize`, `string_value`, `token_cursor`, `keyword`, `parse_error`, `ast`, `type_annotation`, `value`, `parse_schema`, `recovery`; `#[cfg(test)]` modules `test_cursor` and `span_of`. Public: `parse_schema`, `ParsedSchema`, `DefinitionError`, `DefinitionName`, every type in ast.md, `ParseError`, `ExpectedFound`, `Expectation`, `Found`, `GraphQLTokenKind` (it is the payload of `Expectation::Token` and `Found::Token`).
 
-## 1. TokenKind
+Each change lists the functions it adds. A function's span comes from `spanning` when it returns `WithSpan`. Every `require_*` maps `Err(())` with `expected`; the expectation is `Expectation::Token(kind)` unless the change names another.
+
+## 1. Tokenizer
 
 Status: pending
 
-`token_kind.rs` as parsing-standards.md: `TokenKind`, `TokenKindExtras`, `StringToken`, `BlockStringToken`, `lex_string`, `lex_block_string`. No `tokenize() -> Vec` used by the grammar.
+The crate, `GraphQLTokenKind`, `TokenKindExtras`, `StringToken`, `VariableWidthEscape`, `BlockStringToken`, `lex_string`, `lex_block_string`, `fail_with`, `fixed_width_code_unit`, `variable_width_escape`, and `tokenize`, as parsing-standards.md (Tokenizer).
+
+Tests (`tokenize` kinds and spans):
+
+- `type Pet { id: ID! }`: Identifier, Identifier, OpenBrace, Identifier, Colon, Identifier, Exclamation, CloseBrace.
+- `a, b`: Identifier, Identifier (comma ignored, spec 2.1.4).
+- `# comment\ntype`: one Identifier at the span of `type` (spec 2.1.3).
+- `\u{feff}type`: one Identifier (BOM ignored, spec 2.1.6).
+- `a\rb` and `a\r\nb`: two Identifiers each.
+- `\u{000C}`: one Error (form feed is not whitespace, spec 2.1.1).
+- empty text and `  \t\n`: no tokens.
+- `& | = @ : ! ( ) [ ] { }`: their twelve kinds in order.
+- `$`, `.`, `...`: Error tokens.
+- `0`, `-0`, `42`, `9223372036854775807`: IntegerLiteral each. `1.5`, `-1.5`, `1e2`, `1.5E-2`: FloatLiteral each.
+- `01`: ErrorNumberLiteralLeadingZero. `.5`: ErrorFloatLiteralMissingZero. `1.`, `1a`, `0x`: ErrorNumberLiteralTrailingInvalid.
+- `"hi"`, `""`: StringLiteral. `"""hi"""`: BlockStringLiteral. `""""""`: one BlockStringLiteral spanning all six quotes.
+- `"\u{1F4A9}"`, `"💩"`, `"💩"`, `"a\u{0001}b"` (a raw control character): StringLiteral each.
+- `"\x"`: ErrorUnsupportedStringCharacter spanning `"\x"`. `"unterminated`: ErrorUnterminatedString spanning the rest. `"hi\n`: ErrorUnterminatedString spanning `"hi`. `"""unterminated`: ErrorUnterminatedBlockString.
+- `"""\u{0000}💩"""`: BlockStringLiteral.
+
+## 2. String values
+
+Status: pending
+
+`decode_string_value`, `decode_code_units`, `TokenText` (copied, with `sub_span`), `intern_block_string_value`, `clean_block_string`, `get_common_indent`, `block_string_lines`, `line_is_whitespace`, `is_not_whitespace`, as parsing-standards.md (String values). `consume_string_value_if` lands in change 3 with the cursor.
+
+Tests call `decode_string_value` on the interior of a tokenized `StringLiteral` (`TokenText` built from the token's span, `exclude_ends(1)`) and `clean_block_string` on literal interiors:
+
+- `"hi"` is `hi`; `""` is the empty string.
+- `"a\"b\\c\/d\be\ff\ng\rh\ti"` decodes each of the eight escapes.
+- `"A"` is `A`; `"\u{41}"` is `A`; `"\u{1F4A9}"` and `"💩"` are both U+1F4A9.
+- `"\uDEAD"` (lone trailing surrogate), `"\uD83D"` (lone leading surrogate), `"\uD83Dx"`, `"\u{D800}"`, `"\u{110000}"`, `"\u{FFFFFFFFF}"` are `InvalidUnicodeEscape`. For `"x\uDEADy"` the error span is the span of `\uDEAD` in the text.
+- `"A💩"` is `A` then U+1F4A9 (one fixed-width run with a scalar and a pair).
+- `"💩"` is U+1F4A9 (unescaped supplementary character).
+- `clean_block_string("hi")` is `hi`; `"\n  hello\n  world\n"` is `hello\nworld`; `"   hi"` is `   hi` (first line keeps its indent); `"\r  a\r  b"` is `a\nb` (lone CR splits); `"\r\n  a\r\n  b\r\n"` is `a\nb`; `""` is empty; `"  \n  \n"` is empty.
+- `intern_block_string_value::<StringLiteralValue>` of `a\"""b` (backslash then three quotes) looks up `a"""b`.
+
+## 3. Cursor and errors
+
+Status: pending
+
+`TokenIndex`, `TokenCursor`, `ParseError`, `ExpectedFound`, `Expectation`, `Found`, `ParseError::expected`, `consume_string_value_if`, `DefinitionKeyword`, `ExtensionKeyword`, `BooleanOrNullKeyword` (in `keyword.rs`), the `with_cursor` test helper, and `span_of` (copied), as parsing-standards.md (`TokenCursor`, Keyword dispatch, Errors, String values, Tests).
+
+Tests (through `with_cursor`):
+
+- `require_token(Identifier)` on `Pet` returns text `Pet` at `0..3`; `at_end` afterwards.
+- `require_token(Colon)` on `Pet` is `Err(())`; the cursor is still on `Pet`; `expected(Expectation::Token(Colon))` displays `Expected colon (':'), found non-variable identifier (e.g. 'x' or 'Foo').` with span `0..3`.
+- `expected` on an empty text is `Found::EndOfFile` at `0..0`; after consuming `Pet ` (trailing space), at `3..3`.
+- `consume_identifier_of::<DefinitionKeyword>()` on `type` is `Type` at `0..4`; on `typo` is `None` and the cursor is still on `typo`.
+- `consume_keyword_if("extend")` on `extended` is `None`.
+- `spanning` around two `require_token(Identifier)` on `a b` is `0..3`; `spanning` around a closure that consumes nothing, on `a`, is `0..0`; after consuming `a` in `a b`, a no-consume `spanning` is `1..1` (the zero-width rule).
+- `consumed_since(start)` after two advances on `a b c` is the first two tokens; `span_since(start)` is `0..3`.
+- `consume_string_value_if::<StringLiteralValue>` on `"a\nb"` looks up `a`, U+000A, `b` and spans the quotes; on `"""  x"""` looks up `  x`; on `x` is `Ok(None)`; on `"\uDEAD"` is `Err(InvalidUnicodeEscape)`.
+- `Expectation` displays: `DefinitionOrExtensionKeyword`, `ImplementsDirectiveOrOpenBrace` (`` `implements`, a directive, or '{' ``), `DirectiveOrOpenBrace` (`a directive or '{'`), `Keyword("on")` (`` the keyword `on` ``). `Found::EndOfFile` displays `end of file`. `ParseError::InvalidUnicodeEscape` displays its message.
+
+## 4. Constant values and directives
+
+Status: pending
 
 ```rust
-// from crates/graphql_schema_parser/src/token_kind.rs
-#[cfg(test)]
-fn lexed_kinds(text: &str) -> Vec<TokenKind>
-```
+// from crates/graphql_schema_parser/src/value.rs
+pub(crate) fn parse_constant_value(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<WithSpan<ConstantValue>, WithSpan<ParseError>> {
+    cursor.spanning(|cursor| {
+        if let Some(value) = consume_string_value_if::<StringLiteralValue>(cursor)? {
+            return ConstantValue::String(StringLiteralValueWrapper(value.item)).wrap_ok();
+        }
+        match cursor.peek().map(|token| token.item) {
+            Some(GraphQLTokenKind::IntegerLiteral) => {
+                ConstantValue::Int(parse_integer_value(cursor)?).wrap_ok()
+            }
+            Some(GraphQLTokenKind::FloatLiteral) => {
+                ConstantValue::Float(parse_float_value(cursor)?).wrap_ok()
+            }
+            Some(GraphQLTokenKind::Identifier) => parse_name_value(cursor),
+            Some(GraphQLTokenKind::OpenBracket) => {
+                ConstantValue::List(parse_list_value(cursor)?).wrap_ok()
+            }
+            Some(GraphQLTokenKind::OpenBrace) => {
+                ConstantValue::Object(parse_object_value(cursor)?).wrap_ok()
+            }
+            _ => cursor.expected(Expectation::ConstantValue).wrap_err(),
+        }
+    })
+}
 
-`lexed_kinds` iterates `TokenKind::lexer(text)`, taking `extras.error_token` the same way `parse_token` does. It does not emit `EndOfFile`.
-
-Tests:
-
-- `type Pet { id: ID! }` kinds: Identifier, Identifier, OpenBrace, Identifier, Colon, Identifier, Exclamation, CloseBrace.
-- `# hi\ntype` is Identifier `type` (comment skipped). Confirm by lexing and taking the first kind, and by `source` of that token being `type`.
-- `a, b` is Identifier, Identifier.
-- `"hi"` is StringLiteral. `"""hi"""` is BlockStringLiteral.
-- empty string is empty vec.
-- `"unterminated` is ErrorUnterminatedString.
-- `"""unterminated` is ErrorUnterminatedBlockString.
-- `"\x"` (unsupported string character) is ErrorUnsupportedStringCharacter.
-- `01` is ErrorNumberLiteralLeadingZero.
-- `.5` is ErrorFloatLiteralMissingZero.
-- `1.` and `1a` are ErrorNumberLiteralTrailingInvalid.
-
-## 2. PeekableLexer
-
-Status: pending
-
-`TokenText`, `PeekableLexer`, `ParseError` / `Expectation` / `ExpectedFound` / `Found`, `GraphQLSemanticToken` as parsing-standards.md. `parse_token` / `peek` / `reached_eof` / `source` / `spanning` / `expected` / `consume_token_if` / `require_token` / `consume_matching_identifier` / `require_matching_identifier`.
-
-Tests (construct `PeekableLexer::new` with a local tokens vec):
-
-- `require_token(Identifier, Type)` on `Pet` returns text `Pet`, location `0..3`. The tokens vec is one `Type` at that span.
-- `require_token(Colon, Colon)` on `Pet` is `Err(())`; `expected(Expectation::Token(Colon))` displays `Expected colon (':'), found non-variable identifier (e.g. 'x' or 'Foo').`; cursor still on `Pet`.
-- `consume_token_if(Colon, Colon)` on `Pet` is `None`, cursor still on `Pet`, tokens vec empty.
-- `require_matching_identifier("type", Keyword)` on `type` succeeds; on `scalar` is `Err(())`.
-- `reached_eof` after consuming the only token of `Pet`.
-- empty string: `reached_eof` is true immediately.
-- `spanning` of `require_token(Identifier, Type)` on `Pet` is `0..3`.
-- `"hi` : peek is `ErrorUnterminatedString`.
-
-## 3. Scalar, empty document, description, unknown keyword
-
-Status: pending
-
-```rust
-// from crates/graphql_schema_parser/src/lib.rs
-pub fn parse_schema(text: &str) -> Result<WithSpan<TypeSystemDocument>, WithSpan<ParseError>>
-fn parse_schema_inner(
-    text: &str,
-    tokens: &mut Vec<WithSpan<GraphQLSemanticToken>>,
-) -> Result<WithSpan<TypeSystemDocument>, WithSpan<ParseError>>
-#[cfg(test)]
-pub fn parse_schema_with_tokens(
-    text: &str,
-) -> Result<(WithSpan<TypeSystemDocument>, Vec<WithSpan<GraphQLSemanticToken>>), WithSpan<ParseError>>
+fn parse_integer_value(cursor: &mut TokenCursor<'_>) -> Result<IntegerValue, WithSpan<ParseError>>
+fn parse_float_value(cursor: &mut TokenCursor<'_>) -> Result<FloatValue, WithSpan<ParseError>>
+fn parse_name_value(cursor: &mut TokenCursor<'_>) -> Result<ConstantValue, WithSpan<ParseError>>
+fn parse_list_value(cursor: &mut TokenCursor<'_>) -> Result<ListValue, WithSpan<ParseError>>
+fn parse_object_value(cursor: &mut TokenCursor<'_>) -> Result<ObjectValue, WithSpan<ParseError>>
+fn parse_object_field(cursor: &mut TokenCursor<'_>) -> Result<WithSpan<ObjectField>, WithSpan<ParseError>>
 
 // from crates/graphql_schema_parser/src/parse_schema.rs
-fn parse_type_system_document(
-    lexer: &mut PeekableLexer<'_>,
-) -> Result<TypeSystemDocument, WithSpan<ParseError>>
-fn parse_type_system_definition(
-    lexer: &mut PeekableLexer<'_>,
-) -> Result<WithSpan<TypeSystemDefinition>, WithSpan<ParseError>>
-fn parse_scalar_type_definition(
-    lexer: &mut PeekableLexer<'_>,
-    description: Option<WithSpan<Description>>,
-) -> Result<ScalarTypeDefinition, WithSpan<ParseError>>
-fn parse_constant_directives(
-    lexer: &mut PeekableLexer<'_>,
-) -> Result<Vec<WithSpan<Directive>>, WithSpan<ParseError>>
+fn parse_directives(cursor: &mut TokenCursor<'_>) -> Result<Vec<WithSpan<Directive>>, WithSpan<ParseError>> {
+    std::iter::from_fn(|| {
+        cursor
+            .peek()
+            .is_some_and(|token| token.item == GraphQLTokenKind::At)
+            .then(|| cursor.spanning(parse_directive))
+    })
+    .collect()
+}
 
-// from crates/graphql_schema_parser/src/description.rs
-pub(crate) fn parse_optional_description(
-    lexer: &mut PeekableLexer<'_>,
-) -> Option<WithSpan<Description>>
-fn clean_block_string_literal(source: &str) -> String
+fn parse_directive(cursor: &mut TokenCursor<'_>) -> Result<Directive, WithSpan<ParseError>>
+fn parse_argument(cursor: &mut TokenCursor<'_>) -> Result<WithSpan<Argument>, WithSpan<ParseError>>
+fn parse_optional_nonempty_group<T>(...)    // parsing-standards.md, Groups
+fn parse_nonempty_group_after_open<T>(...)
+fn parse_group_after_open<T>(...)
 ```
 
-`parse_type_system_document`: while not eof, push `parse_type_system_definition`. `parse_type_system_definition` is `spanning`: optional description, `require_token(Identifier, Keyword)`, match `scalar` (other keywords land in later items; for this item they are `expected(Definition)`), else `expected(Definition)`. `parse_scalar_type_definition`: name `require_token(Identifier, Type)` interned as `EntityNameWrapper`, directives (this item: `consume_token_if(At, DirectiveName)` is none, empty vec).
+Strings go first through `consume_string_value_if`, the two `consume_token_if` calls of iso `parse_string_literal`; the other forms dispatch on the peeked kind and then call a function that requires its first token (iso `parse_non_constant_value`, `crates/isograph_parser/src/arguments.rs`).
 
-`clean_block_string_literal` copied from origin `description.rs`.
+- `parse_integer_value`: `require_token(IntegerLiteral)`, `text().parse::<i64>()`, `IntegerDoesNotFitI64` at the token on `Err` (iso `parse_integer_value`, `crates/isograph_parser/src/arguments.rs`).
+- `parse_float_value`: `require_token(FloatLiteral)`, `text().parse::<f64>()` then `FloatValue::new`, `InvalidFloat` at the token on `Err`.
+- `parse_name_value`: `consume_identifier_of::<BooleanOrNullKeyword>()` maps `True` / `False` to `Boolean(BooleanValue(..))` and `Null` to `Null(NullValue)`; otherwise `require_token(Identifier)` interned as `EnumLiteralValueWrapper` is `Enum`.
+- `parse_list_value`: `require_token(OpenBracket)`, then `parse_group_after_open(cursor, CloseBracket, parse_constant_value)` (empty allowed, spec 2.10.7).
+- `parse_object_value`: `require_token(OpenBrace)`, then `parse_group_after_open(cursor, CloseBrace, parse_object_field)` (empty allowed, spec 2.10.8).
+- `parse_object_field`: spanning; `require_token(Identifier)` interned as `ValueKeyNameWrapper`, `require_token(Colon)`, `parse_constant_value`.
+- `parse_directive`: `require_token(At)`, `require_token(Identifier)` interned as `DirectiveNameWrapper`, `parse_optional_nonempty_group(cursor, OpenParenthesis, CloseParenthesis, parse_argument)`.
+- `parse_argument`: spanning; `require_token(Identifier)` interned as `ArgumentNameWrapper`, `require_token(Colon)`, `parse_constant_value`.
+
+Tests (through `with_cursor`):
+
+- `1` is `Int(1)`; `-7` is `Int(-7)`; `9223372036854775808` is `IntegerDoesNotFitI64` at its span.
+- `1.5` is `Float` with `as_float() == 1.5`; `1e400` is `Float` with `as_float()` infinite.
+- `"hi"` is `String` looking up `hi`; `"""hi"""` is `String` looking up `hi` (block strings are spec `StringValue`); `"\n"`-escaped strings decode.
+- `true`, `false`, `null` are `Boolean(True)`, `Boolean(False)`, `Null`; `AVAILABLE` is `Enum` looking up `AVAILABLE`; `nullable` is `Enum`.
+- `[]` is an empty `List`; `[1, "a", [true]]` is a three-item list whose third item is a one-item list; `[1` is `Expected(Token(CloseBracket), EndOfFile)`.
+- `{}` is an empty `Object`; `{ a: 1, b: { c: null } }` has fields `a` and `b`, `b` holding an object with `c`; `{ a 1 }` is `Expected(Token(Colon), Token(IntegerLiteral))`.
+- `}` is `Expected(ConstantValue, Token(CloseBrace))`; empty text is `Expected(ConstantValue, EndOfFile)`; `$x` is `Expected(ConstantValue, Token(Error))`.
+- Value spans: `[1, 2]` spans the brackets; its items span `1` and `2`; `"hi"` spans the quotes.
+- `parse_directives` on `@a @b(x: 1) rest` is two directives (`a` with no arguments, `b` with argument `x` = `Int(1)`), and the cursor is on `rest`; the second directive's span runs from `@` to `)`.
+- `parse_directives` on `rest` is empty and consumes nothing; on `@a()` is `Expected(Token(Identifier), Token(CloseParenthesis))`; on `@` is `Expected(Token(Identifier), EndOfFile)`; on `@a(x: 1` is `Expected(Token(CloseParenthesis), EndOfFile)`.
+
+## 5. Type annotations
+
+Status: pending
+
+```rust
+// from crates/graphql_schema_parser/src/type_annotation.rs
+pub(crate) fn parse_type_annotation(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<WithSpan<TypeAnnotation>, WithSpan<ParseError>> {
+    cursor.spanning(|cursor| {
+        let nullable = parse_nullable_type_annotation(cursor)?;
+        match cursor.consume_token_if(GraphQLTokenKind::Exclamation) {
+            Some(_) => TypeAnnotation::NonNull(NonNullTypeAnnotation(nullable)).wrap_ok(),
+            None => nullable.item.into_type_annotation().wrap_ok(),
+        }
+    })
+}
+
+fn parse_nullable_type_annotation(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<WithSpan<NullableTypeAnnotation>, WithSpan<ParseError>> {
+    cursor.spanning(|cursor| {
+        if let Some(name) = cursor.consume_token_if(GraphQLTokenKind::Identifier) {
+            return NullableTypeAnnotation::Named(NamedTypeAnnotation(
+                name.interned().map(EntityNameWrapper),
+            ))
+            .wrap_ok();
+        }
+        if cursor.consume_token_if(GraphQLTokenKind::OpenBracket).is_some() {
+            let inner = parse_type_annotation(cursor)?;
+            cursor
+                .require_token(GraphQLTokenKind::CloseBracket)
+                .map_err(|()| cursor.expected(Expectation::Token(GraphQLTokenKind::CloseBracket)))?;
+            return NullableTypeAnnotation::List(ListTypeAnnotation(inner).boxed()).wrap_ok();
+        }
+        cursor.expected(Expectation::TypeAnnotation).wrap_err()
+    })
+}
+```
+
+Origin: iso `parse_type_annotation` and `parse_named_or_list` (`crates/isograph_parser/src/variables.rs`). Delta: `!` builds `NonNull` instead of iso's union-with-null; the list interior is `[` type `]` tokens, not a bracket group and its chunk; no semantic tokens.
+
+Tests (through `with_cursor`):
+
+- `String` is `Named` looking up `String`, span `0..6`.
+- `String!` is `NonNull` whose inner is `Named` at `0..6`; the outer span is `0..7`.
+- `[String]` is `List` spanning `0..8` whose inner is `Named`.
+- `[String!]!` is `NonNull` of `List` of `NonNull` of `Named`.
+- `[[Int]]` nests two lists.
+- `String!!` parses `String!` and leaves the cursor on the second `!`.
+- `!`, `]`, empty text are `Expected(TypeAnnotation, ..)` with found `Token(Exclamation)`, `Token(CloseBracket)`, `EndOfFile`.
+- `[String` is `Expected(Token(CloseBracket), EndOfFile)`; `[]` is `Expected(TypeAnnotation, Token(CloseBracket))`.
+
+## 6. Definition errors, descriptions, scalars
+
+Status: pending
+
+`DefinitionError`, `DefinitionName`, `DefinitionError::unnamed`, `parse_after_entity_name` (parsing-standards.md, Recovery), and:
+
+```rust
+// from crates/graphql_schema_parser/src/parse_schema.rs
+fn consume_description(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<Option<WithSpan<Description>>, WithSpan<ParseError>> {
+    consume_string_value_if::<DescriptionValue>(cursor)
+        .map(|description| description.map(|description| description.map(Description)))
+}
+
+fn parse_entity_name(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<WithSpan<EntityNameWrapper>, WithSpan<ParseError>> {
+    cursor
+        .require_token(GraphQLTokenKind::Identifier)
+        .map(|name| name.interned().map(EntityNameWrapper))
+        .map_err(|()| cursor.expected(Expectation::Token(GraphQLTokenKind::Identifier)))
+}
+
+fn parse_scalar_type_definition(
+    cursor: &mut TokenCursor<'_>,
+    description: Option<WithSpan<Description>>,
+) -> Result<ScalarTypeDefinition, DefinitionError> {
+    parse_after_entity_name(cursor, |cursor, name| {
+        ScalarTypeDefinition {
+            description,
+            name,
+            directives: parse_directives(cursor)?,
+        }
+        .wrap_ok()
+    })
+}
+```
+
+Origin: upstream isograph `parse_scalar_type_definition` and `parse_optional_description` (`../isograph/crates/graphql_schema_parser/src/parse_schema.rs`, `description.rs`). Delta: `DefinitionError` carries the name; a description is any `StringValue` and decodes.
+
+Changes 6 to 10 add the definition and extension parse functions; change 11 adds `parse_schema`, which dispatches on the keyword. Their tests run `with_cursor` on the text after the keyword (after `extend` for change 10, which calls `parse_type_system_extension`) and call the function directly, passing `None` as the description unless the test is about descriptions. The fixtures below are written with the keyword for readability. "`Err` named `X`" means `DefinitionError { name: Some(DefinitionName::Entity(X)), .. }` (or `Directive` for directive definitions).
 
 Tests:
 
-- `scalar Date` is one `Scalar` named `Date`, no description, empty directives.
-- `""` is empty `TypeSystemDocument`, spanning span zero-width at 0.
-- `foo` is `Expected(Definition, Token(Identifier))`.
-- `"a date" scalar Date` description lookup `a date`; description span includes the quotes (0..8).
-- `"""a date""" scalar Date` description lookup `a date`.
-- `"""\n  hello\n  world\n""" scalar Date` description lookup `hello\nworld` (origin indent rule).
-- `{` is `Expected(Definition, Token(OpenBrace))`.
-- `scalar` with no name is `Expected Token(Identifier), found end of file`.
+- `scalar Date` is named `Date` with no directives; the `spanning` span around the call is `7..11`.
+- `scalar Date @specifiedBy(url: "https://example.com")` has one directive `specifiedBy` with argument `url`.
+- `scalar` (nothing after the keyword) is `Err` with `name: None` and `Expected(Token(Identifier), EndOfFile)`.
+- `scalar 1` is `Err` with `name: None` and found `Token(IntegerLiteral)`.
+- `scalar Date @a(` is `Err` named `Date` (the name is kept when the failure comes after it).
+- `consume_description` on `"a date"` looks up `a date` at `0..8`; on `"""\n  a\n  date\n"""` looks up `a\ndate`; on `scalar` is `Ok(None)` and consumes nothing; on `"\uDEAD"` is `Err(InvalidUnicodeEscape)`.
 
-## 4. Type annotation and object fields
+## 7. Objects, interfaces, fields, input values
 
 Status: pending
 
 ```rust
 // from crates/graphql_schema_parser/src/parse_schema.rs
 fn parse_object_type_definition(
-    lexer: &mut PeekableLexer<'_>,
+    cursor: &mut TokenCursor<'_>,
     description: Option<WithSpan<Description>>,
-) -> Result<ObjectTypeDefinition, WithSpan<ParseError>>
-fn parse_implements_interfaces_if_present(
-    lexer: &mut PeekableLexer<'_>,
-) -> Result<Vec<WithSpan<EntityNameWrapper>>, WithSpan<ParseError>>
-fn parse_optional_fields(
-    lexer: &mut PeekableLexer<'_>,
-) -> Result<Vec<WithSpan<FieldDefinition>>, WithSpan<ParseError>>
-fn parse_field(
-    lexer: &mut PeekableLexer<'_>,
-) -> Result<WithSpan<FieldDefinition>, WithSpan<ParseError>>
-fn parse_type_annotation(
-    lexer: &mut PeekableLexer<'_>,
-) -> Result<WithSpan<TypeAnnotation>, WithSpan<ParseError>>
-fn parse_optional_enclosed_items<T>(
-    lexer: &mut PeekableLexer<'_>,
-    open: TokenKind,
-    close: TokenKind,
-    open_token: GraphQLSemanticToken,
-    close_token: GraphQLSemanticToken,
-    parse: impl FnMut(&mut PeekableLexer<'_>) -> Result<WithSpan<T>, WithSpan<ParseError>>,
-) -> Result<Vec<WithSpan<T>>, WithSpan<ParseError>>
-fn parse_argument_definition(
-    lexer: &mut PeekableLexer<'_>,
-) -> Result<WithSpan<InputValueDefinition>, WithSpan<ParseError>>
-```
+) -> Result<ObjectTypeDefinition, DefinitionError> {
+    parse_after_entity_name(cursor, |cursor, name| {
+        ObjectTypeDefinition {
+            description,
+            name,
+            interfaces: parse_implements_interfaces(cursor)?,
+            directives: parse_directives(cursor)?,
+            fields: parse_fields_definition(cursor)?,
+        }
+        .wrap_ok()
+    })
+}
 
-`parse_type_system_definition` match arm `"type"` → `parse_object_type_definition`. After the `type` keyword: name, `parse_implements_interfaces_if_present` (this item: no `implements`, empty vec), directives empty, `parse_optional_fields`.
-
-`parse_type_annotation` is `spanning` (this outer span includes `!` when present). Peek `Identifier`: intern as `EntityNameWrapper` (`Type` token) with that identifier's span; optional `!` (`Bang`). If bang, `TypeAnnotation::NonNull(NonNullTypeAnnotation { inner: NonNullInner::Named(...).with_span(identifier_span) })`. Else `TypeAnnotation::Named`. Peek `OpenBracket`: parse the inner annotation, `require_token(CloseBracket, Bracket)`; the list span is the spanning span of `[` through `]`; optional `!`. If bang, `NonNull` whose `inner` is `NonNullInner::List` at the list span. Else `TypeAnnotation::List`. Else `expected(TypeAnnotation)`. After a present `[`, the close bracket is required (origin: do not fall through if `[` was consumed).
-
-`parse_optional_fields` is `parse_optional_enclosed_items` with braces and `parse_field`. `parse_field` is `spanning`: optional description, name (`FieldName`), `parse_optional_enclosed_items` with parens and `parse_argument_definition` (arguments), `require_token(Colon, Colon)`, type annotation, directives empty for now.
-
-`parse_argument_definition` is `spanning`: optional description, name (`Argument`), colon, type annotation, `default_value: None` (item 5 consumes `=` and parses the constant), directives empty.
-
-Tests:
-
-- `type Pet { id: ID! }` object `Pet`, one field `id`, type `NonNull(Named(ID))`. Field arguments empty.
-- `type Pet { name: String }` named `String`.
-- `type Pet { tags: [String!]! }` non-null list of non-null named `String`.
-- `type Pet` fields empty vec.
-- `type Pet { }` errors (`Expected Token(Identifier), found closing brace ('}')`).
-- `type Pet { id: ID!, name: String }` two fields.
-- `type Pet { name(lang: String): String }` one argument `lang`, type named `String`, no default.
-- `type Pet { name(): String }` errors (present `(` requires a first argument).
-- `type Pet { "a field" id: ID! }` field description lookup `a field`.
-- `type Pet {` errors (first field parse at EOF).
-- `type Pet { id: ID!` errors (next field parse at EOF).
-- `type` with no name errors.
-- `[` as a field type with no close: `type Pet { x: [String }` errors on `require_token(CloseBracket)`.
-
-## 5. Directives on types and fields, constant values
-
-Status: pending
-
-```rust
-// from crates/graphql_schema_parser/src/parse_schema.rs
-fn parse_constant_directives(
-    lexer: &mut PeekableLexer<'_>,
-) -> Result<Vec<WithSpan<Directive>>, WithSpan<ParseError>>
-fn parse_optional_constant_arguments(
-    lexer: &mut PeekableLexer<'_>,
-) -> Result<Vec<WithSpan<Argument>>, WithSpan<ParseError>>
-fn parse_constant_name_value_pair(
-    lexer: &mut PeekableLexer<'_>,
-) -> Result<WithSpan<Argument>, WithSpan<ParseError>>
-fn parse_constant_value(
-    lexer: &mut PeekableLexer<'_>,
-) -> Result<WithSpan<ConstantValue>, WithSpan<ParseError>>
-fn parse_optional_constant_default_value(
-    lexer: &mut PeekableLexer<'_>,
-) -> Result<Option<WithSpan<ConstantValue>>, WithSpan<ParseError>>
-```
-
-`parse_constant_directives`: while peek is `At`, `spanning` around: `consume_token_if(At, DirectiveName)`, name `require_token(Identifier, DirectiveName)` interned as `DirectiveNameWrapper`, `arguments: parse_optional_constant_arguments`. The `Directive` span includes `@`. `parse_optional_constant_arguments` is `parse_optional_enclosed_items` with parens (required first argument if `(` present).
-
-`parse_constant_name_value_pair` is `spanning`: name (`Argument`) interned as `ArgumentNameWrapper`, colon, `parse_constant_value`.
-
-`parse_constant_value` is `spanning` and the peek dispatch in parsing-standards.md. Integer: `require_token(IntegerLiteral, Integer)`, `text().parse::<i64>()`, `IntegerDoesNotFitI64` at the token span on failure. Float: `require_token(FloatLiteral, Float)`, `text().parse::<f64>()` then `FloatValue::new`, `InvalidFloat` at the token span on `Err`. String: `StringLiteral`, interior interned, `String` token; span includes quotes. `true` / `false` / `null`: `require_matching_identifier` with `BooleanOrNull`. Other identifier: `Enum` / `EnumValue`. List: `OpenBracket` then while not close, push `parse_constant_value` (empty allowed). Object: `OpenBrace` then while not close, push `parse_constant_name_value_pair` (empty allowed).
-
-`parse_optional_constant_default_value`: if no `=`, `None`; if `=`, `parse_constant_value` wrapped `Some`. `parse_argument_definition` calls it after the type annotation.
-
-Tests:
-
-- `type Pet @foo { id: ID! }` one directive `foo`, no args.
-- `type Pet @foo(x: 1) { id: ID! }` argument `x` int 1.
-- `type Pet { id: ID! @bar }` field directive `bar`.
-- `type Pet @foo(x: 1) @bar { id: ID! }` two directives.
-- `type Pet @foo(xs: [1, 2]) { id: ID! }` list of two ints.
-- `type Pet @foo(xs: []) { id: ID! }` empty list.
-- `type Pet @foo(o: { a: true }) { id: ID! }` object field `a` boolean true.
-- `type Pet @foo(o: {}) { id: ID! }` empty object.
-- `type Pet @foo(x: false, y: null, z: AVAILABLE) { id: ID! }` boolean false, null, enum `AVAILABLE`.
-- `type Pet @foo(x: "hi") { id: ID! }` string lookup `hi`.
-- `type Pet @foo(x: 1.5) { id: ID! }` float `as_float() == 1.5`.
-- `type Pet { name(lang: String = "en"): String }` default string `en`.
-- `type Pet @foo(x: """no""") { id: ID! }` is `Expected(ConstantValue, Token(BlockStringLiteral))`.
-- `type Pet @foo() { id: ID! }` errors (required first argument).
-- integer `9223372036854775808` is `IntegerDoesNotFitI64`.
-- `type Pet @foo` (at EOF after the directive, no fields) is a valid object with empty fields.
-
-## 6. Interface, input, enum, union
-
-Status: pending
-
-```rust
-// from crates/graphql_schema_parser/src/parse_schema.rs
 fn parse_interface_type_definition(
-    lexer: &mut PeekableLexer<'_>,
+    cursor: &mut TokenCursor<'_>,
     description: Option<WithSpan<Description>>,
-) -> Result<InterfaceTypeDefinition, WithSpan<ParseError>>
-fn parse_input_object_type_definition(
-    lexer: &mut PeekableLexer<'_>,
+) -> Result<InterfaceTypeDefinition, DefinitionError>
+
+fn parse_implements_interfaces(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<Vec<WithSpan<EntityNameWrapper>>, WithSpan<ParseError>> {
+    match cursor.consume_keyword_if("implements") {
+        None => Vec::new().wrap_ok(),
+        Some(_) => parse_separated_nonempty(cursor, GraphQLTokenKind::Ampersand, parse_entity_name),
+    }
+}
+
+fn parse_fields_definition(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<Vec<WithSpan<FieldDefinition>>, WithSpan<ParseError>> {
+    parse_optional_nonempty_group(
+        cursor,
+        GraphQLTokenKind::OpenBrace,
+        GraphQLTokenKind::CloseBrace,
+        |cursor| cursor.spanning(parse_field_definition),
+    )
+}
+
+fn parse_field_definition(cursor: &mut TokenCursor<'_>) -> Result<FieldDefinition, WithSpan<ParseError>>
+
+fn parse_arguments_definition(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<Vec<WithSpan<InputValueDefinition>>, WithSpan<ParseError>>
+
+fn parse_input_value_definition(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<InputValueDefinition, WithSpan<ParseError>>
+
+fn parse_separated_nonempty<T>(...)    // parsing-standards.md, Groups
+```
+
+- `parse_interface_type_definition`: the same body as objects building `InterfaceTypeDefinition` (spec 3.7 allows `implements` on interfaces).
+- `parse_field_definition`: `consume_description`, `require_token(Identifier)` interned as `SelectableNameWrapper`, `parse_arguments_definition`, `require_token(Colon)`, `parse_type_annotation`, `parse_directives`.
+- `parse_arguments_definition`: `parse_optional_nonempty_group(cursor, OpenParenthesis, CloseParenthesis, |cursor| cursor.spanning(parse_input_value_definition))`.
+- `parse_input_value_definition`: `consume_description`, `require_token(Identifier)` interned as `InputValueNameWrapper`, `require_token(Colon)`, `parse_type_annotation`, `default_value`: `consume_token_if(Equals)` then `parse_constant_value` wrapped `Some`, else `None`; `parse_directives`.
+
+In change 11 the `DefinitionKeyword::Type` and `Interface` arms call these.
+
+Tests (`with_cursor`, the change 6 convention):
+
+- `type Pet { id: ID! name: String }` is `Object` `Pet` with fields `id` (`NonNull(Named(ID))`) and `name` (`Named(String)`); commas absent (spec 2.1.4).
+- `type Pet { id: ID!, name: String, }` has the same two fields.
+- `type Pet` has no fields; `type Pet {}` is `Err` named `Pet` with `Expected(Token(Identifier), Token(CloseBrace))`.
+- `type Pet {` is `Err` named `Pet` with `Expected(Token(Identifier), EndOfFile)` (the first field is required); `type Pet { id: ID!` is `Err` named `Pet` with `Expected(Token(CloseBrace), EndOfFile)`.
+- `type Pet implements Node { id: ID! }`, `type Pet implements Node & Named { id: ID! }`, `type Pet implements & Node { id: ID! }` have interfaces `[Node]`, `[Node, Named]`, `[Node]`.
+- `type Pet implements { id: ID! }` is `Err` named `Pet` with `Expected(Token(Identifier), Token(OpenBrace))`.
+- `type Pet @key(fields: "id") { id: ID! }` has one directive on the type.
+- `type Pet { "the id" id: ID! @deprecated(reason: "no") }`: field description `the id`, one field directive.
+- `type Pet { name(lang: String = "en", upper: Boolean): String }`: two arguments; `lang` default `String("en")`, `upper` no default.
+- `type Pet { name(): String }` is `Err` named `Pet` with `Expected(Token(Identifier), Token(CloseParenthesis))`.
+- `type Pet { name(lang: String = ): String }` is `Err` with `Expected(ConstantValue, Token(CloseParenthesis))`.
+- `type Pet { type: String input: Int }` has fields named `type` and `input` (keywords are names in field position).
+- `interface Node { id: ID! }` is `Interface` `Node`; `interface Named implements Node { id: ID! }` has interfaces `[Node]`.
+- `type type { id: ID! }` is `Object` named `type`.
+
+## 8. Unions, enums, input objects
+
+Status: pending
+
+```rust
+// from crates/graphql_schema_parser/src/parse_schema.rs
+fn parse_union_type_definition(
+    cursor: &mut TokenCursor<'_>,
     description: Option<WithSpan<Description>>,
-) -> Result<InputObjectTypeDefinition, WithSpan<ParseError>>
-fn parse_enum_definition(
-    lexer: &mut PeekableLexer<'_>,
-    description: Option<WithSpan<Description>>,
-) -> Result<EnumTypeDefinition, WithSpan<ParseError>>
-fn parse_enum_value_definitions(
-    lexer: &mut PeekableLexer<'_>,
-) -> Result<Vec<WithSpan<EnumValueDefinition>>, WithSpan<ParseError>>
-fn parse_enum_value_definition(
-    lexer: &mut PeekableLexer<'_>,
-) -> Result<WithSpan<EnumValueDefinition>, WithSpan<ParseError>>
-fn parse_union_definition(
-    lexer: &mut PeekableLexer<'_>,
-    description: Option<WithSpan<Description>>,
-) -> Result<UnionTypeDefinition, WithSpan<ParseError>>
+) -> Result<UnionTypeDefinition, DefinitionError>
+
 fn parse_union_member_types(
-    lexer: &mut PeekableLexer<'_>,
-) -> Result<Vec<WithSpan<EntityNameWrapper>>, WithSpan<ParseError>>
-fn parse_implements_interfaces_if_present(
-    lexer: &mut PeekableLexer<'_>,
-) -> Result<Vec<WithSpan<EntityNameWrapper>>, WithSpan<ParseError>>
-fn parse_interfaces(
-    lexer: &mut PeekableLexer<'_>,
-) -> Result<Vec<WithSpan<EntityNameWrapper>>, WithSpan<ParseError>>
+    cursor: &mut TokenCursor<'_>,
+) -> Result<Vec<WithSpan<EntityNameWrapper>>, WithSpan<ParseError>> {
+    match cursor.consume_token_if(GraphQLTokenKind::Equals) {
+        None => Vec::new().wrap_ok(),
+        Some(_) => parse_separated_nonempty(cursor, GraphQLTokenKind::Pipe, parse_entity_name),
+    }
+}
+
+fn parse_enum_type_definition(
+    cursor: &mut TokenCursor<'_>,
+    description: Option<WithSpan<Description>>,
+) -> Result<EnumTypeDefinition, DefinitionError>
+
+fn parse_enum_values_definition(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<Vec<WithSpan<EnumValueDefinition>>, WithSpan<ParseError>>
+
+fn parse_enum_value_definition(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<EnumValueDefinition, WithSpan<ParseError>> {
+    let description = consume_description(cursor)?;
+    if let Some(word) = cursor.peek_identifier_of::<BooleanOrNullKeyword>() {
+        return ParseError::EnumValueCannotBeTrueFalseOrNull
+            .with_span(word.location)
+            .wrap_err();
+    }
+    let value = cursor
+        .require_token(GraphQLTokenKind::Identifier)
+        .map_err(|()| cursor.expected(Expectation::Token(GraphQLTokenKind::Identifier)))?;
+    EnumValueDefinition {
+        description,
+        value: value.interned().map(EnumLiteralValueWrapper),
+        directives: parse_directives(cursor)?,
+    }
+    .wrap_ok()
+}
+
+fn parse_input_object_type_definition(
+    cursor: &mut TokenCursor<'_>,
+    description: Option<WithSpan<Description>>,
+) -> Result<InputObjectTypeDefinition, DefinitionError>
+
+fn parse_input_fields_definition(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<Vec<WithSpan<InputValueDefinition>>, WithSpan<ParseError>>
 ```
 
-Keyword arms: `interface`, `input`, `enum`, `union`. `parse_implements_interfaces_if_present`: `consume_matching_identifier("implements", Keyword)` then `parse_interfaces`, else empty. `parse_interfaces`: optional leading `&` (`Ampersand`), required first identifier (`Type`), while `consume_token_if(Ampersand, Ampersand)` push another identifier.
+- `parse_union_type_definition`: after the name, `parse_directives`, `parse_union_member_types`.
+- `parse_enum_type_definition`: after the name, `parse_directives`, `parse_enum_values_definition` (`parse_optional_nonempty_group` with braces and `|cursor| cursor.spanning(parse_enum_value_definition)`).
+- `parse_input_object_type_definition`: after the name, `parse_directives`, `parse_input_fields_definition` (`parse_optional_nonempty_group` with braces and `|cursor| cursor.spanning(parse_input_value_definition)`).
 
-`parse_enum_value_definitions` is `parse_optional_enclosed_items` with braces. `parse_enum_value_definition` is `spanning`: optional description, identifier (`EnumValue`); if text is `true` / `false` / `null`, `EnumValueCannotBeTrueFalseOrNull` at that span; else intern `EnumLiteralValueWrapper`; directives.
+Tests (`with_cursor`, the change 6 convention):
 
-`parse_union_definition`: name, directives, `require_token(Equals, Equals)`, `parse_union_member_types`. `parse_union_member_types`: optional leading `|` (`Pipe`), required first identifier (`Type`), while `consume_token_if(Pipe, Pipe)` push another.
+- `union Search = Pet | User`, `union Search = | Pet | User` have members `[Pet, User]`; `union Search = Pet` has `[Pet]`; `union Search` has none; `union Search @a` has one directive and no members.
+- `union Search =` and `union Search = |` are `Err` named `Search` with found `EndOfFile`; `union Search = Pet |` likewise.
+- `enum Status { AVAILABLE SOLD }` has values `AVAILABLE`, `SOLD`; `enum Status { "on sale" AVAILABLE @deprecated }` has a described value with a directive; `enum Status` has no values; `enum Status {}` is `Err`.
+- `enum Status { true }`, `{ false }`, `{ null }` are `Err` named `Status` with `EnumValueCannotBeTrueFalseOrNull` at the word; `enum Status { nullable }` is `Ok`.
+- `input PetInput { name: String = "x" tags: [String!] @a }` has two fields: `name` with default `String("x")`, `tags` with one directive; `input PetInput` has none; `input PetInput {}` is `Err`.
+- `input I { a: I = { b: [1, 2], c: ENUM } }` has a default `Object` with fields `b` (`List`) and `c` (`Enum`).
 
-`parse_input_object_type_definition`: name, directives, `parse_optional_enclosed_items` with braces and `parse_argument_definition`.
-
-Tests:
-
-- `interface Node { id: ID! }` interface `Node` one field `id`.
-- `type Pet implements Node { id: ID! }` implements `[Node]`.
-- `type Pet implements Foo & Bar { id: ID! }` two implements.
-- `type Pet implements & Node { id: ID! }` one implement `Node`.
-- `type Pet implements { id: ID! }` errors (required first interface name).
-- `input PetInput { name: String }` one input value `name`.
-- `input PetInput { name: String = "x" }` default string `x`.
-- `input PetInput` fields empty.
-- `input PetInput { }` errors.
-- `enum Status { AVAILABLE SOLD }` two values.
-- `enum Status` values empty.
-- `enum Status { true }` is `EnumValueCannotBeTrueFalseOrNull`.
-- `enum Status { false }` and `enum Status { null }` same error.
-- `union Search = Pet | User` members `Pet`, `User`.
-- `union Search = | Pet | User` same (leading pipe).
-- `union Search = Pet` one member.
-- `union Search =` errors (required first member).
-- `interface Node implements Foo { id: ID! }` interface implements `[Foo]`.
-
-## 7. Directive definition and schema definition
+## 9. Schema and directive definitions
 
 Status: pending
 
 ```rust
 // from crates/graphql_schema_parser/src/parse_schema.rs
-fn parse_directive_definition(
-    lexer: &mut PeekableLexer<'_>,
-    description: Option<WithSpan<Description>>,
-) -> Result<DirectiveDefinition, WithSpan<ParseError>>
-fn parse_directive_locations(
-    lexer: &mut PeekableLexer<'_>,
-) -> Result<Vec<WithSpan<DirectiveLocationWrapper>>, WithSpan<ParseError>>
-fn parse_directive_location(
-    lexer: &mut PeekableLexer<'_>,
-) -> Result<WithSpan<DirectiveLocationWrapper>, WithSpan<ParseError>>
 fn parse_schema_definition(
-    lexer: &mut PeekableLexer<'_>,
+    cursor: &mut TokenCursor<'_>,
     description: Option<WithSpan<Description>>,
-) -> Result<SchemaDefinition, WithSpan<ParseError>>
-fn parse_root_operation_type(
-    lexer: &mut PeekableLexer<'_>,
-) -> Result<(WithSpan<RootOperationKind>, WithSpan<EntityNameWrapper>), WithSpan<ParseError>>
-fn reassign_or_error(
-    root_type: &mut Option<WithSpan<EntityNameWrapper>>,
-    kind: WithSpan<RootOperationKind>,
-    object_name: WithSpan<EntityNameWrapper>,
-) -> Result<(), WithSpan<ParseError>>
+) -> Result<SchemaDefinition, DefinitionError>
+
+fn parse_root_operation_types_after_open(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<Vec<WithSpan<RootOperationTypeDefinition>>, WithSpan<ParseError>>
+
+fn parse_root_operation_type_definition(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<RootOperationTypeDefinition, WithSpan<ParseError>>
+
+fn parse_directive_definition(
+    cursor: &mut TokenCursor<'_>,
+    description: Option<WithSpan<Description>>,
+) -> Result<DirectiveDefinition, DefinitionError>
+
+fn parse_directive_definition_name(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<WithSpan<DirectiveNameWrapper>, WithSpan<ParseError>>
+
+fn parse_directive_location(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<WithSpan<DirectiveLocationWrapper>, WithSpan<ParseError>>
 ```
 
-Keyword arms: `directive`, `schema`.
+- `parse_schema_definition`: `parse_directives`, `require_token(OpenBrace)`, `parse_root_operation_types_after_open`; every error mapped with `DefinitionError::unnamed`.
+- `parse_root_operation_types_after_open`: `parse_nonempty_group_after_open(cursor, CloseBrace, |cursor| cursor.spanning(parse_root_operation_type_definition))`.
+- `parse_root_operation_type_definition`: `consume_identifier_of::<OperationType>()` mapped to `OperationTypeWrapper`, `Expectation::OperationType` when absent; `require_token(Colon)`; `parse_entity_name`.
+- `parse_after_directive_name` lands here (parsing-standards.md, Recovery).
+- `parse_directive_definition`: `parse_after_directive_name`, then `parse_arguments_definition`, `repeatable`: `consume_keyword_if("repeatable")` is `Repeatable` when `Some`, `NotRepeatable` when `None`; `require_keyword("on")` mapped to `Expectation::Keyword("on")`; `locations`: `parse_separated_nonempty(cursor, Pipe, parse_directive_location)`.
+- `parse_directive_definition_name`: spanning over `require_token(At)` then `require_token(Identifier)`; the result's span is the identifier's (the `@` is not part of the name).
+- `parse_directive_location`: `consume_identifier_of::<DirectiveLocation>()` mapped to `DirectiveLocationWrapper`, `Expectation::DirectiveLocation` when absent.
 
-`parse_directive_definition`: `consume_token_if(At, DirectiveName)` (optional; origin ignores a missing `@`), name (`DirectiveName`), `parse_optional_enclosed_items` with parens for arguments, `consume_matching_identifier("repeatable", Keyword)` mapped to `Some(span)` / `None`, `require_matching_identifier("on", Keyword)`, `parse_directive_locations`.
+Spec 3.13 requires the `@` in a directive definition. Upstream isograph accepts a definition without it; this parser does not.
 
-`parse_directive_locations`: optional leading `|`, required first `parse_directive_location`, while `consume_token_if(Pipe, Pipe)` push another. `parse_directive_location`: `require_token(Identifier, Keyword)` then `DirectiveLocation::from_str(text)` wrapped `DirectiveLocationWrapper`; mismatch `expected(DirectiveLocation)`.
+Tests (`with_cursor`, the change 6 convention):
 
-`parse_schema_definition`: directives, `require_token(OpenBrace, Brace)`, required first `parse_root_operation_type` assigned into the matching option, while `consume_token_if(CloseBrace, Brace).is_none()` parse another and `reassign_or_error`. `parse_root_operation_type`: identifier (`Keyword`) match `query` / `mutation` / `subscription` else `expected(RootOperation)`, colon, type name (`Type`). `reassign_or_error`: if the option is `Some`, `DuplicateRootOperation` at the second keyword span; else assign.
+- `schema { query: Query mutation: Mutation subscription: Subscription }`: three root operation types in order with their operation types and names.
+- `"the schema" schema @a { query: Query }`: description and one directive.
+- `schema { query: Query query: Other }`: two entries, both `Query` operation type (no duplicate error in the parser).
+- `schema {}` is `Err` with `name: None` and `Expected(OperationType, Token(CloseBrace))`; `schema` is `Err` with `Expected(Token(OpenBrace), EndOfFile)`; `schema { foo: Query }` is `Expected(OperationType, Token(Identifier))` at `foo`.
+- `directive @oneOf on INPUT_OBJECT`: name `oneOf`, no arguments, `NotRepeatable`, locations `[InputObject]`.
+- `directive @a(x: Int = 1) repeatable on FIELD | OBJECT`, `directive @a on | FIELD | OBJECT`: arguments, `Repeatable`, locations `[Field, Object]` (the second with a leading `|`).
+- Every one of the 19 locations parses: `directive @a on QUERY | MUTATION | SUBSCRIPTION | FIELD | FRAGMENT_DEFINITION | FRAGMENT_SPREAD | INLINE_FRAGMENT | VARIABLE_DEFINITION | SCHEMA | SCALAR | OBJECT | FIELD_DEFINITION | ARGUMENT_DEFINITION | INTERFACE | UNION | ENUM | ENUM_VALUE | INPUT_OBJECT | INPUT_FIELD_DEFINITION`.
+- `directive @a on FOO` is `Err` with `name: Some(Directive(a))` and `Expected(DirectiveLocation, Token(Identifier))` at `FOO`; `directive @a on field` likewise (locations are case-sensitive).
+- `directive @a FIELD` is `Expected(Keyword("on"), Token(Identifier))`; `directive @a on` is found `EndOfFile`; `directive @a() on FIELD` is `Expected(Token(Identifier), Token(CloseParenthesis))`.
+- `directive a on FIELD` is `Err` with `name: None` and `Expected(Token(At), Token(Identifier))`.
+- `directive @type on FIELD` is `Ok` named `type`.
 
-Tests:
-
-- `directive @oneOf on INPUT_OBJECT` name `oneOf`, one location `InputObject`, `repeatable` is `None`, arguments empty.
-- `directive oneOf on INPUT_OBJECT` same (optional `@`).
-- `directive @foo on FIELD | OBJECT` two locations.
-- `directive @foo on | FIELD | OBJECT` same (leading pipe).
-- `directive @foo repeatable on FIELD` `repeatable` is `Some` covering the keyword `repeatable`.
-- `directive @foo(x: Int) on FIELD` one argument `x`.
-- `directive @foo(x: Int = 1) on FIELD` argument default int 1.
-- `directive @foo() on FIELD` errors (present `(` requires a first argument).
-- `directive @foo on FOO` is `Expected(DirectiveLocation, Token(Identifier))`.
-- `directive @foo on {` is `Expected Token(Identifier), found open brace ('{')` (require Identifier first). Origin's non-identifier message is `Expected directive location, found …`; delta: Identifier is required, then `from_str`.
-- `directive @foo on` and `directive @foo on |` error (required first location).
-- `schema { query: Query }` `query` is `Query`, mutation and subscription `None`.
-- `schema { query: Query mutation: Mutation }` both set.
-- `schema { query: Query query: Other }` `DuplicateRootOperation` at the second `query`.
-- `schema { }` errors (required first root operation).
-- `schema` with no braces errors (`Expected Token(OpenBrace)`).
-- `schema { foo: Query }` is `Expected(RootOperation, Token(Identifier))`.
-- `schema @foo { query: Query }` one directive on the schema.
-
-## 8. Extend and `parse_schema_extensions`
+## 10. Extensions
 
 Status: pending
 
 ```rust
-// from crates/graphql_schema_parser/src/lib.rs
-pub fn parse_schema_extensions(
-    text: &str,
-) -> Result<WithSpan<TypeSystemExtensionDocument>, WithSpan<ParseError>>
-fn parse_schema_extensions_inner(
-    text: &str,
-    tokens: &mut Vec<WithSpan<GraphQLSemanticToken>>,
-) -> Result<WithSpan<TypeSystemExtensionDocument>, WithSpan<ParseError>>
-#[cfg(test)]
-pub fn parse_schema_extensions_with_tokens(
-    text: &str,
-) -> Result<
-    (
-        WithSpan<TypeSystemExtensionDocument>,
-        Vec<WithSpan<GraphQLSemanticToken>>,
-    ),
-    WithSpan<ParseError>,
->
-
 // from crates/graphql_schema_parser/src/parse_schema.rs
-fn parse_type_system_extension_document(
-    lexer: &mut PeekableLexer<'_>,
-) -> Result<TypeSystemExtensionDocument, WithSpan<ParseError>>
 fn parse_type_system_extension(
-    lexer: &mut PeekableLexer<'_>,
-) -> Result<WithSpan<TypeSystemExtension>, WithSpan<ParseError>>
-fn parse_object_type_extension(
-    lexer: &mut PeekableLexer<'_>,
-) -> Result<ObjectTypeExtension, WithSpan<ParseError>>
-fn peek_type_system_doc_type(
-    lexer: &PeekableLexer<'_>,
-) -> Result<TypeSystemDocType, WithSpan<ParseError>>
+    cursor: &mut TokenCursor<'_>,
+) -> Result<TypeSystemExtension, DefinitionError> {
+    let keyword = cursor
+        .consume_identifier_of::<ExtensionKeyword>()
+        .ok_or_else(|| DefinitionError::unnamed(cursor.expected(Expectation::ExtensionKeyword)))?;
+    match keyword.item {
+        ExtensionKeyword::Schema => TypeSystemExtension::Schema(parse_schema_extension(cursor)?),
+        ExtensionKeyword::Scalar => {
+            TypeSystemExtension::Type(TypeExtension::Scalar(parse_scalar_type_extension(cursor)?))
+        },
+        ExtensionKeyword::Type => {
+            TypeSystemExtension::Type(TypeExtension::Object(parse_object_type_extension(cursor)?))
+        },
+        ExtensionKeyword::Interface => {
+            TypeSystemExtension::Type(TypeExtension::Interface(
+                parse_interface_type_extension(cursor)?,
+            ))
+        }
+        ExtensionKeyword::Union => {
+            TypeSystemExtension::Type(TypeExtension::Union(parse_union_type_extension(cursor)?))
+        },
+        ExtensionKeyword::Enum => {
+            TypeSystemExtension::Type(TypeExtension::Enum(parse_enum_type_extension(cursor)?))
+        },
+        ExtensionKeyword::Input => {
+            TypeSystemExtension::Type(TypeExtension::InputObject(
+                parse_input_object_type_extension(cursor)?,
+            ))
+        }
+    }
+    .wrap_ok()
+}
 
-enum TypeSystemDocType {
-    Definition,
-    Extension,
+fn parse_object_type_extension(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<ObjectTypeExtension, DefinitionError> {
+    parse_after_entity_name(cursor, |cursor, name| {
+        let interfaces = parse_implements_interfaces(cursor)?;
+        let directives = parse_directives(cursor)?;
+        let fields = parse_fields_definition(cursor)?;
+        if interfaces.is_empty() && directives.is_empty() && fields.is_empty() {
+            return cursor
+                .expected(Expectation::ImplementsDirectiveOrOpenBrace)
+                .wrap_err();
+        }
+        ObjectTypeExtension {
+            name,
+            interfaces,
+            directives,
+            fields,
+        }
+        .wrap_ok()
+    })
+}
+
+fn parse_schema_extension(cursor: &mut TokenCursor<'_>) -> Result<SchemaExtension, DefinitionError>
+fn parse_scalar_type_extension(cursor: &mut TokenCursor<'_>) -> Result<ScalarTypeExtension, DefinitionError>
+fn parse_interface_type_extension(cursor: &mut TokenCursor<'_>) -> Result<InterfaceTypeExtension, DefinitionError>
+fn parse_union_type_extension(cursor: &mut TokenCursor<'_>) -> Result<UnionTypeExtension, DefinitionError>
+fn parse_enum_type_extension(cursor: &mut TokenCursor<'_>) -> Result<EnumTypeExtension, DefinitionError>
+fn parse_input_object_type_extension(cursor: &mut TokenCursor<'_>) -> Result<InputObjectTypeExtension, DefinitionError>
+```
+
+Each extension has no description (spec 3.1) and checks its spec alternatives after its parts:
+
+- `parse_schema_extension` (spec 3.3.2): `parse_directives`, then `root_operation_types`: `consume_token_if(OpenBrace)` then `parse_root_operation_types_after_open`, else empty; both empty is `Expectation::DirectiveOrOpenBrace`; errors mapped with `DefinitionError::unnamed`.
+- `parse_scalar_type_extension` (spec 3.5.6): after the name, `NonEmpty::from_vec(parse_directives(cursor)?)`, `None` is `Expectation::Directive`.
+- `parse_interface_type_extension` (spec 3.7.1): the object extension body building `InterfaceTypeExtension`.
+- `parse_union_type_extension` (spec 3.8.1): after the name, `parse_directives`, `parse_union_member_types`; both empty is `Expectation::DirectiveOrEquals`.
+- `parse_enum_type_extension` (spec 3.9.1): after the name, `parse_directives`, `parse_enum_values_definition`; both empty is `Expectation::DirectiveOrOpenBrace`.
+- `parse_input_object_type_extension` (spec 3.10.2): after the name, `parse_directives`, `parse_input_fields_definition`; both empty is `Expectation::DirectiveOrOpenBrace`.
+
+Origin: upstream isograph `parse_type_system_extension` and `parse_object_type_extension`. Delta: all seven kinds; `require` of the extension keyword through keyword dispatch instead of upstream's `expect` / `assert` on `extend`; the emptiness checks.
+
+Tests (`with_cursor`, the change 6 convention):
+
+- `extend type Pet { nickname: String }` is `Extension(Type(Object))` `Pet` with one field; `extend type Pet implements Node`, `extend type Pet @a` are `Ok`.
+- `extend type Pet` is `Err` named `Pet` with `Expected(ImplementsDirectiveOrOpenBrace, EndOfFile)`.
+- `extend interface Node { id: ID! }` is `Ok`; `extend interface Node` is `Err` with `ImplementsDirectiveOrOpenBrace`.
+- `extend scalar Date @a` is `Ok` with one directive; `extend scalar Date` is `Err` named `Date` with `Expected(Directive, EndOfFile)`.
+- `extend union Search = Photo`, `extend union Search @a` are `Ok`; `extend union Search` is `Err` with `DirectiveOrEquals`.
+- `extend enum Status { LOST }`, `extend enum Status @a` are `Ok`; `extend enum Status` is `Err` with `DirectiveOrOpenBrace`.
+- `extend input PetInput { age: Int }`, `extend input PetInput @a` are `Ok`; `extend input PetInput` is `Err` with `DirectiveOrOpenBrace`.
+- `extend schema { mutation: Mutation }`, `extend schema @a` are `Ok`; `extend schema` is `Err` with `name: None` and `DirectiveOrOpenBrace`.
+- `extend directive @a on FIELD` is `Err` with `name: None` and `Expected(ExtensionKeyword, Token(Identifier))` at `directive`; `extend` alone is found `EndOfFile`.
+
+## 11. `parse_schema` and recovery
+
+Status: pending
+
+`parse_schema`, `ParsedSchema`, `parse_definition_or_extension_or_skip`, `BracketDepth`, `skip_failed_definition`, `starts_definition`, `is_top_level_keyword` (parsing-standards.md, Pipeline and Recovery), and:
+
+```rust
+// from crates/graphql_schema_parser/src/parse_schema.rs
+fn parse_type_system_definition_or_extension(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<TypeSystemDefinitionOrExtension, DefinitionError> {
+    if cursor.consume_keyword_if("extend").is_some() {
+        return TypeSystemDefinitionOrExtension::Extension(parse_type_system_extension(cursor)?)
+            .wrap_ok();
+    }
+    TypeSystemDefinitionOrExtension::Definition(parse_type_system_definition(cursor)?).wrap_ok()
+}
+
+fn parse_type_system_definition(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<TypeSystemDefinition, DefinitionError> {
+    let description = consume_description(cursor).map_err(DefinitionError::unnamed)?;
+    let expectation = match description {
+        Some(_) => Expectation::DefinitionKeyword,
+        None => Expectation::DefinitionOrExtensionKeyword,
+    };
+    let keyword = cursor
+        .consume_identifier_of::<DefinitionKeyword>()
+        .ok_or_else(|| DefinitionError::unnamed(cursor.expected(expectation)))?;
+    match keyword.item {
+        DefinitionKeyword::Schema => {
+            TypeSystemDefinition::Schema(parse_schema_definition(cursor, description)?)
+        }
+        DefinitionKeyword::Scalar => {
+            TypeSystemDefinition::Type(TypeDefinition::Scalar(
+                parse_scalar_type_definition(cursor, description)?,
+            ))
+        }
+        DefinitionKeyword::Type => {
+            TypeSystemDefinition::Type(TypeDefinition::Object(
+                parse_object_type_definition(cursor, description)?,
+            ))
+        }
+        DefinitionKeyword::Interface => {
+            TypeSystemDefinition::Type(TypeDefinition::Interface(
+                parse_interface_type_definition(cursor, description)?,
+            ))
+        }
+        DefinitionKeyword::Union => {
+            TypeSystemDefinition::Type(TypeDefinition::Union(
+                parse_union_type_definition(cursor, description)?,
+            ))
+        }
+        DefinitionKeyword::Enum => {
+            TypeSystemDefinition::Type(TypeDefinition::Enum(
+                parse_enum_type_definition(cursor, description)?,
+            ))
+        }
+        DefinitionKeyword::Input => TypeSystemDefinition::Type(TypeDefinition::InputObject(
+                parse_input_object_type_definition(cursor, description)?,
+            )),
+        DefinitionKeyword::Directive => {
+            TypeSystemDefinition::Directive(parse_directive_definition(cursor, description)?)
+        }
+    }
+    .wrap_ok()
 }
 ```
 
-`peek_type_system_doc_type` does not consume. Peek `StringLiteral` or `BlockStringLiteral` → `Definition`. Peek `Identifier`: source `extend` → `Extension`, anything else → `Definition`. Else `expected(Definition)`. Origin's peek-error message lists `extend` among the definition keywords. `Definition` does not; `extend` is classified before that arm.
+Origin: upstream isograph `parse_schema`, `parse_schema_extensions`, `parse_type_system_document`, `parse_type_system_extension_document`, `peek_type_system_doc_type`, and `parse_type_system_definition`. Delta: one entry point for definitions and extensions; per-definition results with recovery; keyword dispatch (the unknown word is the error's span and is not consumed); a description before `extend` is an error at `extend`.
 
-`parse_type_system_extension_document`: while not eof, peek, then `Definition` → `parse_type_system_definition` wrapped `TypeSystemExtensionOrDefinition::Definition`, or `Extension` → `parse_type_system_extension` wrapped `Extension`.
+Tests (`parse_schema`):
 
-`parse_type_system_extension` is `spanning`: `require_matching_identifier("extend", Keyword)`, then `require_token(Identifier, Keyword)`, match `"type"` → `parse_object_type_extension` else `expected(ExtensionBody)`. Origin uses `expect` / `assert` that the first identifier is `extend`; we `require_matching_identifier`.
+- Empty text, `   `, and `# only a comment\n` have no entries.
+- `scalar Date` is one `Ok(Definition(Type(Scalar)))` with span `0..11`.
+- `"a date" scalar Date` is one `Ok` whose span starts at 0 and whose description looks up `a date`.
+- `scalar Date scalar Time` is two `Ok`s (no separator needed).
+- `type Pet { id: ID! } extend type Pet { name: String } scalar Date` is `Ok(Definition)`, `Ok(Extension)`, `Ok(Definition)` in order.
+- One fixture per definition kind and one per extension kind (the first passing fixture of changes 6 to 10 for that kind) is one `Ok` entry of that variant.
+- `foo` is one `Err` with `name: None`, error `Expected(DefinitionOrExtensionKeyword, Token(Identifier))` at `0..3`, entry span `0..3`.
+- `"desc" foo` is one `Err` with `Expected(DefinitionKeyword, Token(Identifier))` at the span of `foo`.
+- `"desc" extend type Pet { a: A }` is `Err` with `Expected(DefinitionKeyword, Token(Identifier))` at `extend` and entry span covering `"desc"`, then `Ok(Extension(Type(Object)))`.
 
-`parse_object_type_extension`: name, implements, directives, fields. No description (origin).
+Recovery tests (`parse_schema`):
 
-`parse_schema("extend type Pet { id: ID! }")` goes through `parse_type_system_definition`, identifier `extend`, `expected(Definition)`.
-
-Tests:
-
-- `extend type Pet { nickname: String }` object extension `Pet` one field `nickname`.
-- `type Pet { id: ID! } extend type Pet { nickname: String }` via `parse_schema_extensions`: one `Definition` (object `Pet`) and one `Extension`.
-- `parse_schema` of `extend type Pet { id: ID! }` is `Expected(Definition, Token(Identifier))`.
-- `extend foo` is `Expected(ExtensionBody, Token(Identifier))`.
-- `extend` at EOF is `Expected Token(Identifier), found end of file` (the body keyword).
-- `"desc" extend type Pet { id: ID! }` via `parse_schema_extensions` is `Expected(Definition, Token(Identifier))` (peek string → definition, then identifier `extend`).
-- `extend type Pet` fields empty.
-- `extend type` errors (required name).
-- `parse_schema_extensions("")` is empty `TypeSystemExtensionDocument`.
-- `scalar Date extend type Pet { id: ID! }` via `parse_schema_extensions`: definition then extension.
-
-## 9. Semantic tokens
-
-Status: pending
-
-Recording is already at every consume from item 2. This item adds tests that the recorded vec matches the call-site list in parsing-standards.md. Copy iso `assert_semantic_tokens` into this crate (`#[cfg(test)]`), same sequential-search behavior.
-
-Tests via `parse_schema_with_tokens`:
-
-- `type Pet { id: ID! }` tokens: `Keyword` `type`, `Type` `Pet`, `Brace` `{`, `FieldName` `id`, `Colon` `:`, `Type` `ID`, `Bang` `!`, `Brace` `}`.
-- `@foo` on `type Pet @foo { id: ID! }`: `DirectiveName` `@`, `DirectiveName` `foo`.
-- `"desc"` before `type` is `Description` covering `"desc"` including quotes.
-- `"""desc"""` before `type` is `Description` covering the block string.
-- `implements` / `&` / implement name: `Keyword`, `Ampersand`, `Type`.
-- `directive @foo repeatable on FIELD`: `Keyword` `directive`, `DirectiveName` `@`, `DirectiveName` `foo`, `Keyword` `repeatable`, `Keyword` `on`, `Keyword` `FIELD`.
-- `schema { query: Query }`: `Keyword` `schema`, `Brace` `{`, `Keyword` `query`, `Colon` `:`, `Type` `Query`, `Brace` `}`.
-- enum value `AVAILABLE` is `EnumValue`.
-- constant `1` / `1.5` / `"hi"` / `true` are `Integer` / `Float` / `String` / `BooleanOrNull`.
-- argument name `x` in `@foo(x: 1)` is `Argument`.
-- failed parse records tokens consumed before the error and nothing for the failed require (`type` then EOF: one `Keyword`).
-
-## 10. ResolvePosition
-
-Status: pending
-
-`#[derive(ResolvePosition)]` on every AST type as ast.md. `GraphQLResolutionNode` as ast.md. Tests call `parse_schema` then `document.resolve((), span)` on the `WithSpan<TypeSystemDocument>` (`WithSpan` delegates to the item; iso tests call `parse.resolve((), span_of(text, "id"))`). Copy `span_of` from `crates/isograph_parser/src/parsed_items.rs` (the pattern occurs exactly once; `expect` is the fixture invariant that test established). Assert the node's variant and `.0.lookup()` where it is a wrapper:
-
-- `type Pet { id: ID! }`, position on `id`: `SelectableNameWrapper`, lookup `id`.
-- on `Pet`: `EntityNameWrapper`, lookup `Pet`.
-- on `ID`: `EntityNameWrapper`, lookup `ID`.
-- on `!`: `NonNullTypeAnnotation`.
-- on `[` in `type Pet { tags: [String]! }`: `ListTypeAnnotation`.
-- on `type`: `ObjectTypeDefinition` (keyword is not a leaf).
-- on `{`: `ObjectTypeDefinition`.
-- `"a date" scalar Date`, position on `a date` (interior of the description): `Description`.
-- `type Pet @foo(x: 1) { id: ID! }`, on `foo`: `DirectiveNameWrapper`; on `x`: `ArgumentNameWrapper`; on `1`: `IntegerValue`.
-- `enum Status { AVAILABLE }`, on `AVAILABLE`: `EnumLiteralValueWrapper`.
-- `directive @foo on FIELD`, on `FIELD`: `DirectiveLocationWrapper` holding `DirectiveLocation::Field`.
-- `schema { query: Query }`, on `Query`: `EntityNameWrapper` with parent variant `SchemaQuery`.
-- `type Pet implements Node { id: ID! }`, on `Node`: `EntityNameWrapper` with parent variant `ObjectImplements`.
-- `union Search = Pet | User`, on `User`: `EntityNameWrapper` with parent variant `UnionMember`.
-- empty document, position 0: `TypeSystemDocument`.
-
-When 1–10 are done, the spec in ast.md and parsing-standards.md is implemented.
+- `type A { a: ! } type B { b: B }`: `Err` named `A`, then `Ok(B)` (two definitions, error in the first).
+- `type A { a: B } type B { b: ! }`: `Ok(A)`, then `Err` named `B` (error in the last).
+- `type A { a(x: { y: ! }): B type: C } type D { d: D }`: `Err` named `A` (the nested braces and the field named `type` inside are skipped), then `Ok(D)`.
+- `type A { a: B` then end of file: one `Err` named `A` with found `EndOfFile`; the entry span runs to the end of the file (unterminated `{`).
+- `scalar A @x( scalar B`: one `Err` named `A`; the open `(` keeps `scalar B` inside the skipped region.
+- `} scalar A`: `Err` with `name: None` for the stray `}` (depth never below zero), then `Ok(A)`.
+- `) ) ] scalar A`: one `Err` for the run of closers, then `Ok(A)`.
+- `"described" type A { a: ! } type B { b: B }`: `Err` named `A` whose entry span starts at the description, then `Ok(B)`.
+- `foo "desc" scalar A`: `Err` covering `foo`, then `Ok(A)` with description `desc` (a description followed by a keyword starts a definition).
+- `directive @a on scalar Date`: `Err` named `a` (`scalar` is not a directive location), then `Ok(Scalar)` named `Date` (the failing token is a top-level keyword, so nothing is skipped).
+- `type A { a: ! } type B { b: ! } type C { c: C }`: `Err` named `A`, `Err` named `B`, then `Ok(C)` (consecutive broken definitions).
+- `foo bar scalar A`: one `Err` covering `foo bar`, then `Ok(A)`.
+- `1 2 3`: one `Err` (a file of only errors).
+- `extend type A { a: ! } extend type B { b: B }`: `Err` named `A`, then `Ok(Extension)`.
