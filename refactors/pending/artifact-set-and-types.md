@@ -98,7 +98,7 @@ Every file upstream's `get_artifact_path_and_content_impl` (`crates/artifact_con
 For every `field` literal `field P.f`:
 
 - `P/f/param_type.ts` (generated): `export type P__f__param = { readonly data: <data>; readonly parameters: <parameters>; }`, where `<data>` is the object type of the field's selection set and `<parameters>` is `P__f__parameters` imported from `./parameters_type` or `Record<PropertyKey, never>`. Imports: one `import type { X__y__output_type } from ".../X/y/output_type"` per client field the data type names, then the parameters import.
-- `P/f/parameters_type.ts` (generated, when the field has variables): `export type P__f__parameters = { readonly v: T; readonly w: T | null; }`, every parameter required (`refactors/pending/runtime/store.md`, Variables), plus one local `type <InputObject> = { ... }` per input object its parameters name at any depth.
+- `P/f/parameters_type.ts` (generated, when the field has variables): `export type P__f__parameters = { readonly v: T; readonly w: T | null; }`, every parameter required (`refactors/pending/runtime/store.md`, Variables), plus one local `type <InputObject> = { readonly f: T; readonly g: T | null; }` per input object its parameters name at any depth, every field required (store.md, Variables).
 - `P/f/output_type.ts` (generated, when `f` is in the output-type set): `import type { <export> as resolver } from "<source>"; export type P__f__output_type = ReturnType<typeof resolver>;`.
 - `P/f/resolver_reader.ts` (stub, when `f` is reachable from an entrypoint): `export default {};`.
 - `P/f/refetch_reader.ts` (stub, when `f` is reachable and loadably selected): `export default {};`.
@@ -1076,20 +1076,13 @@ pub(crate) enum TypeScriptType {
     Parenthesized(Box<TypeScriptType>),
 }
 
-/// `readonly <key>: <type>` or `readonly <key>?: <type>`, after the description as a JSDoc
-/// comment.
+/// `readonly <key>: <type>`, after the description as a JSDoc comment. Every property is
+/// required (store.md, Variables).
 pub(crate) struct PropertySignature {
     /// An identifier.
     pub key: String,
-    pub optionality: Optionality,
     pub type_: TypeScriptType,
     pub description: Option<String>,
-}
-
-/// Whether a property may be absent.
-pub(crate) enum Optionality {
-    Required,
-    Optional,
 }
 
 pub(crate) enum TypeScriptKeyword {
@@ -1132,14 +1125,9 @@ pub(crate) fn link_type_file(link: &LinkType) -> TypeScriptModule;
 /// of two or more variants is `(A | B)`, `Null` is `null`, a one-variant union is its variant.
 pub(crate) fn wrapped_type<T>(wrapper: &Wrapper<T>, inner: &mut impl FnMut(&T) -> TypeScriptType) -> TypeScriptType;
 
-/// A parameter's property: required; a top-level nullable union prints its other variants
-/// then `null`, with no parentheses.
+/// A parameter's or input object field's property: required; a top-level nullable union
+/// prints its other variants then `null`, with no parentheses.
 fn parameter_property(key: &str, wrapper: &Wrapper<ArtifactInputType>, options: &Options) -> PropertySignature;
-
-/// An input object field's property: a top-level nullable union prints its other variants
-/// then `null | void`, with no parentheses, and the property is optional (upstream's
-/// `format_parameter_type`); otherwise as `parameter_property`.
-fn input_field_property(key: &str, wrapper: &Wrapper<ArtifactInputType>, options: &Options) -> PropertySignature;
 
 /// The specifier that imports the source file `source` from the artifact at `from`: `source`
 /// relative to `from`'s folder inside the artifact folder (`pathdiff::diff_paths`),
@@ -1388,7 +1376,7 @@ Tests for the TypeScript generator (`crates/isograph_extract_typescript`, hand-b
 - `ClientFieldOutput(Pet.fullName)` prints `Pet__fullName__output_type` and the file imports it with `import type { Pet__fullName__output_type } from "./../../Pet/fullName/output_type"`. The same output type named twice is imported once.
 - A description `The pet's ID` prints `/**` then `The pet's ID` then `*/` immediately before that property's `readonly`; a description containing `*/` prints `*\/`; a property with no description has no comment before it.
 - No parameters: `readonly parameters: Record<PropertyKey, never>` and no `parameters_type.ts`. With `$id: ID!` and `$limit: Int`: `parameters_type.ts` has `readonly id: string` and `readonly limit: number | null`, and `param_type.ts` imports `Pet__f__parameters` from `"./parameters_type"`.
-- An input object `Filter` prints a local `type Filter = {` in `parameters_type.ts` and the parameter's type names `Filter`.
+- An input object `Filter` prints a local `type Filter = {` in `parameters_type.ts` and the parameter's type names `Filter`. Its nullable field `nameContains: String` prints `readonly nameContains: string | null`, with no `?` and no `void`.
 - `output_type.ts` of a field exported as `fullName` from `src/Pet.ts` with artifact folder `src/__isograph` has `import type { fullName as resolver } from "./../../../Pet"` and `ReturnType<typeof resolver>`. A context with no export name is `Err(MissingExport(Pet.fullName))`.
 - `resolver_reader.ts`, `refetch_reader.ts`, and `normalization_ast.ts` are exactly `export default {};` and a newline.
 - `entrypoint.ts` has `kind: "Entrypoint"`, `name: "Query.HomeRoute"`, `normalizationAst: Query__HomeRoute__normalization_ast`, `readerArtifact: Query__HomeRoute__resolver_reader`, and imports both from `"./normalization_ast"` and `"./resolver_reader"`.

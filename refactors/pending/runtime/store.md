@@ -207,21 +207,18 @@ export type Pet__PetCheckinsCard__parameters = {
 };
 ```
 
-Only the parameters change; input object fields keep upstream's `readonly w?: T | null | void`, because an omitted input object field and a `null` one are a separate GraphQL case this decision does not cover. `parameters_type_file` calls `parameter_property` for both today (`crates/typescript_artifacts/src/generate_types.rs:153`, `:170`), so the function splits in two:
+Input object fields follow the same rule: an input object field is `readonly f: T`, or `readonly f: T | null` when nullable, with no `?` and no `void`, and the caller passes every field, `null` included. Reason: no value is unset anywhere, and GraphQL treats an omitted input object field as it treats an omitted argument, distinct from `null` (GraphQL spec, Input Objects, Input Coercion: an omitted field takes its default or is absent, and an explicit `null` is `null`), so the same choice between `{}` and `{ f: null }` is removed from the API. It also makes every parameters type assignable to `Variables`: `void` is not a `JsonValue`. Delta from upstream: upstream makes a nullable input object field optional (`readonly f?: T | null | void`, its `format_parameter_type`).
+
+`parameters_type_file` calls `parameter_property` for parameters and for input object fields (`crates/typescript_artifacts/src/generate_types.rs:153`, `:170`); both callers are unchanged. `parameter_property`'s nullable arm becomes `(Optionality::Required, TypeScriptType::Union(<other variants>.chain([Keyword(Null)])))`: the same filtered variants, then `null`, with no `void` and no parentheses.
 
 ```rust
 // from crates/typescript_artifacts/src/generate_types.rs
-/// A parameter's property: required; a top-level nullable union prints its other variants
-/// then `null`, with no parentheses.
+/// A parameter's or input object field's property: required; a top-level nullable union
+/// prints its other variants then `null`, with no parentheses.
 fn parameter_property(key: &str, wrapper: &Wrapper<ArtifactInputType>, options: &Options) -> PropertySignature;
-
-/// An input object field's property: a top-level nullable union prints its other variants
-/// then `null | void`, with no parentheses, and the property is optional (upstream's
-/// `format_parameter_type`); otherwise as `parameter_property`.
-fn input_field_property(key: &str, wrapper: &Wrapper<ArtifactInputType>, options: &Options) -> PropertySignature;
 ```
 
-`input_field_property` is today's `parameter_property` body, renamed, and the `:170` caller (input object fields) calls it. The new `parameter_property` has the same match with the nullable arm `(Optionality::Required, TypeScriptType::Union(<other variants>.chain([Keyword(Null)])))`; the `:153` caller (parameters) calls it. Delta from upstream: upstream's parameters types make a nullable variable optional (`readonly skip?: number | null | void`, `isograph/demos/pet-demo/src/components/__isograph/Pet/PetCheckinsCard/parameters_type.ts`). The type artifacts change lands with the store (change 7). artifact-set-and-types.md's `readonly w?: T | null | void` for parameters is amended (Docs this doc amends).
+`Optionality::Optional` then has no producer: `parameter_property` was its only one (`generate_types.rs:301`), and every other `PropertySignature` is `Required` (`:342`, `:449`). So `Optionality` (`crates/typescript_artifacts/src/module.rs:139`) and `PropertySignature.optionality` (`:132`) are removed, and `swc.rs` prints every property signature with `optional: false` (`:507-510`). `TypeScriptKeyword::Void` keeps its readers in `iso_overloads.rs` (`:89`, `:205`). Delta from upstream: upstream's parameters types make a nullable variable optional (`readonly skip?: number | null | void`, `isograph/demos/pet-demo/src/components/__isograph/Pet/PetCheckinsCard/parameters_type.ts`). The type artifacts change lands with the store (change 7). artifact-set-and-types.md's `readonly w?: T | null | void` for parameters and input object fields is amended (Docs this doc amends).
 
 `parameters_type.ts` is one file per field, and a field's parameters type is also the type of its resolver's `parameters` when another field selects it (reader-ast.md, `childVariables`). Every variable has a value there too, because a selection that leaves a variable with no default unpassed is a compile error (open decision 11, settled as option (a)), so `readonly n: number | null` describes it.
 
@@ -779,12 +776,12 @@ Each change is one commit. Prerequisite: normalization-ast.md changes 1 to 3.
 
 ### 7. Required parameters (typescript_artifacts)
 
-`parameter_property` writes every parameter as required, a nullable one as `T | null`, and `input_field_property` keeps the input object fields' form (Variables); the type artifact tests that assert `readonly limit?: number | null | void` assert `readonly limit: number | null`; the regenerated `parameters_type.ts` artifacts of the pet demo and the fixture. Independent of 2 to 6; lands with them.
+`parameter_property` writes every parameter and every input object field as required, a nullable one as `T | null` (Variables); `Optionality` and `PropertySignature.optionality` are removed; the type artifact tests that assert `readonly limit?: number | null | void` assert `readonly limit: number | null`, and an input object `Filter` with a nullable `nameContains: String` prints `readonly nameContains: string | null`; the regenerated `parameters_type.ts` artifacts of the pet demo and the fixture. Independent of 2 to 6; lands with them.
 
 ## Docs this doc amends
 
 - `refactors/pending/graphql-protocol/normalization-ast.md`: `conditionHolds` is removed and the condition loses `responseKey` (Conditions; normalization-ast.md's own text says so); `tsconfig.json` `target` is `ES2022`.
-- `refactors/pending/artifact-set-and-types.md`, Per field: `P/f/parameters_type.ts` is `{ readonly v: T; readonly w: T | null; }`, every parameter required, with input object fields unchanged (Variables); its test "`readonly limit?: number | null | void`" is `readonly limit: number | null`.
+- `refactors/pending/artifact-set-and-types.md`, Per field: `P/f/parameters_type.ts` is `{ readonly v: T; readonly w: T | null; }`, every parameter required, and each local input object type `{ readonly f: T; readonly g: T | null; }`, every field required (Variables); its test "`readonly limit?: number | null | void`" is `readonly limit: number | null`.
 - `refactors/pending/runtime/pico-runtime.md`: the store is `Store` above, not upstream's layered store; `normalize`, `check`, and `garbageCollect` land here; its retained queries with a release buffer (intro, section 10, change 7) and its `log` option are dropped.
 
 ## Later
