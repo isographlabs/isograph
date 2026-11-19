@@ -1,6 +1,6 @@
 # Runtime: the network path and `readAndSubscribe`
 
-Status: approved for implementation. Implementation starts after store.md's store and reader-ast.md's `read` land on i2.
+Status: changes 1 to 6 are approved for implementation; implementation starts after store.md's store and reader-ast.md's `read` land on i2. Request entries in the store (its own section, change 7) is a follow-up design under discussion, not approved.
 
 `@isograph/runtime` (`libs/isograph-runtime`) gains the network path and subscriptions, as plain functions with no React. After this doc the package exposes `normalize`, `check`, `garbageCollect` (store.md), `read` (reader-ast.md), `readButDoNotEvaluate`, `readAndSubscribe`, `subscriptionSnapshot`, `callSubscriptions`, `fetchEntrypoint`, `getOrCreateCacheForArtifact`, `transpose`, and the environment functions `createIsographEnvironment`, `retainQuery`, `unretainQuery`, and `garbageCollectEnvironment`. The package has no React dependency and no React knowledge. A React package (`refactors/pending/runtime/react.md`) is a later plan built on these functions; it is not part of this work.
 
@@ -908,6 +908,70 @@ field Query.ThrowingPet($id: ID!) {
 
 with `entrypoint Query.ThrowingPet`.
 
+## Request entries in the store
+
+The user's direction: the request cache lives in the store, so that garbage collection handles it with the records. This section is the held design for that, its feasibility, and what does not fit. It is change 7, after changes 1 to 6, and is not approved; until it is, the environment's `networkRequestCache` and `retainedQueries` above stand.
+
+### Upstream's two structures
+
+Upstream keeps a request's lifetime in two places that different code maintains. The suspense cache, `fragmentCache: CacheMap<FragmentReference<any, any>>` (`IsographEnvironment.ts:81-83`), holds one `ParentCache` per query text and variables (`getOrCreateCacheForArtifact.ts:42-54`, created by `getOrCreateItemInSuspenseCache`, `cache.ts:34-47`), and its entries are never removed (`ParentCache.ts:32`). The retained set, `retainedQueries: Set<RetainedQuery>` (`IsographEnvironment.ts:89`) with the release buffer `gcBuffer` (`:90-91`), is what collection keeps (`garbageCollection.ts:65-86`). The two disagree by construction: a query in the buffer keeps its records while its `ParentCache` is empty, so a render refetches or re-checks data the store still holds; a `ParentCache` stays in the map after its query was collected.
+
+### The held design
+
+```ts
+// from libs/isograph-runtime/src/store.ts
+export type Store = {
+  /** Every record: `EntityName`, then record id, then the record. */
+  readonly records: Map<EntityName, Map<RecordId, StoreRecord>>;
+  /** Every request not yet collected, by `RequestKey`. */
+  readonly requests: Map<RequestKey, RequestEntry>;
+};
+
+/** The entrypoint's query text, then `stableStringify(variables)`: upstream's cache key. */
+export type RequestKey = string;
+
+/** A fetched or retained query: what collection keeps, and who holds it. */
+export type RequestEntry = {
+  readonly ast: NormalizationAst;
+  readonly variables: Variables;
+  readonly networkRequest: PromiseWrapper<void, unknown>;
+  /** Renders not yet committed; each expires after 5000 ms. */
+  temporaryRetainCount: number;
+  /** Commits not yet released. */
+  permanentRetainCount: number;
+};
+```
+
+The root link is `ast.root` (normalization-ast.md), so the entry has no separate root field.
+
+- The retained set is derived: an entry with `temporaryRetainCount + permanentRetainCount > 0` is retained. `retainedQueries`, `retainQuery`, and `unretainQuery` are removed, and so is `networkRequestCache`: one structure holds both what is cached and what is retained, so the two cannot disagree.
+- `garbageCollect(store)` takes no retained list. Its mark walks the AST of every retained entry from `ast.root`, as store.md's walk does from each `RetainedQuery`; its sweep deletes every entry with no retain and every record no retained entry reaches, in the same call.
+- A render calls `getOrCreateRequest(environment, entrypoint, variables, fetchOptions)`, which returns the entry under the key or creates one by `fetchEntrypoint`'s `shouldFetch` logic, then `temporaryRetainRequest(environment, entry): CleanupFn`, which increments `temporaryRetainCount` and schedules its expiry. A commit calls `permanentRetainRequest(entry, releaseTemporaryRetain): ItemCleanupPair<PromiseWrapper<void, unknown>>`, which increments `permanentRetainCount` and releases the temporary retain; its cleanup decrements. Each cleanup throws on a second call, as `CacheItem`'s do (`CacheItem.ts:125-130`, `:206-210`).
+- A response is normalized when its entry is still in `requests`, and dropped when collection deleted it first. An entry whose retains reached 0 stays in `requests`, and a render with its key reuses it, until `garbageCollect` deletes it.
+- Concurrent identical requests share one entry: an entry stays under its key while in flight and while retained, so a second render, before or after the first commits, finds it and sends nothing. Decision 4's second request does not happen.
+
+### How `ParentCache` and `CacheItem` map onto it
+
+The entry replaces `ParentCache` and `CacheItem` for requests; their retain counting is written again as data on the entry. Moving their storage into the store and keeping their role does not work, for two reasons:
+
+- `CacheItem` keeps its counts and state in private fields (`CacheItem.ts:69-71`, `private __state`), so `garbageCollect` cannot read whether an item is retained without reaching into them.
+- `ParentCache` forgets an item when its temporary retain count reaches 0, even while it is permanently retained (`CacheItem.ts:344-351`), so a store holding `ParentCache`s cannot find a committed request; collection would delete records a committed request still needs.
+
+The entry's states map onto `CacheItem`'s three (`CacheItem.ts:46-67`): `InParentCacheAndNotDisposed` is an entry with `temporaryRetainCount > 0`; `NotInParentCacheAndNotDisposed` is an entry with only permanent retains, which here stays in `requests` and stays shareable (the deviation that gives the sharing above); `NotInParentCacheAndDisposed` is an entry with no retain, which here stays until collected instead of disposing at once. `CacheItem` and `ParentCache` stay for subscriptions (The two-phase lifetime) and for the React package.
+
+Keeping `ParentCache` and holding the `ParentCache`s in the store, with `garbageCollect` deleting the empty ones, fixes only upstream's never-removed entries; the retained set stays a second structure (decision 6, option (b)).
+
+### What does not fit
+
+- Expiry needs a timer. A temporary retain expires after 5000 ms, a side effect that no store function may own: `normalize`, `check`, `garbageCollect`, and `read` stay pure functions of their arguments. `temporaryRetainRequest` takes the environment and schedules with `setTimeout`, as `CacheItem` does (`CacheItem.ts:248-251`); tests drive it with fake timers (decision 7).
+- Promises are not data. An entry holds a `PromiseWrapper`, whose `promise` is a `Promise` and whose `result` `wrapPromise` writes later. The store stops being plain data: `structuredClone(store)` throws (`DataCloneError` on a `Promise`), so the store cannot be copied, persisted, or sent across a worker or server boundary; and vitest's `toEqual` treats any two `Promise`s as equal (they have no own enumerable properties), so a test that compares whole stores passes for different requests. store.md's tests compare `store.records` instead of `store`, and request entries are compared field by field with `toBe` on `networkRequest` (decision 8).
+- `Store` stops being the two-layer `Map`. store.md's "The type is the two-layer map and nothing else", its empty store `new Map()`, and every `store.get(entityName)` in `normalize`, `check`, `garbageCollect`, `read`, and their tests become `store.records`; pico-runtime.md's store entries and epochs (its change 1) land in the same struct. This is an amendment of store.md, which is under discussion.
+- Refetching. An entry shared after commit answers every later render with its key, `Yes` included, until it is collected; upstream's `Yes` after commit creates a new item and sends (decision 9).
+
+### Change 7. Request entries in the store (not approved)
+
+`Store` becomes `{ records, requests }` with `RequestKey` and `RequestEntry`; store.md's functions and tests read `store.records`; `garbageCollect(store)` marks from retained entries and sweeps entries and records; `getOrCreateRequest`, `temporaryRetainRequest`, `permanentRetainRequest` replace `getOrCreateCacheForArtifact`; `retainedQueries`, `retainQuery`, `unretainQuery`, `networkRequestCache`, and `garbageCollectEnvironment` are removed; the tests of The request cache are rewritten against entries. Depends on 6 and on the store.md amendment.
+
 ## Changes
 
 Each change is one commit, in order. Prerequisites: store.md changes 1 to 7 and reader-ast.md changes 1 to 6. Each package change adds its CI steps to `.github/workflows/js.yml` and its pre-commit hooks (the runtime's two, with the package name and `files: '^libs/<directory>/'`), and runs `pnpm install` to update `pnpm-lock.yaml`.
@@ -999,7 +1063,7 @@ The index re-exports nothing of `@isograph/disposable-types`; callers import `Pa
 
 ## Decisions
 
-Each was open during planning and is settled as its held option.
+Decisions 1 to 5 were open during planning and are settled as their held options. Decisions 6 to 9 concern change 7 and are open.
 
 ### 1. What the subscription callback receives
 
@@ -1029,3 +1093,32 @@ Once every holder of a request's item committed, the item has left its `ParentCa
 - (a) In `@isograph/disposable-types`, moved unchanged. Settled. The package already holds the types they import and a runtime function (`joinCleanups`), it has no dependencies, and `@isograph/react-disposable-state` already re-exports all of it (`disposable-state/index.ts:1`, `export * from '@isograph/disposable-types'`), so that package's public exports are unchanged when its `CacheItem` and `ParentCache` modules move. Cost: four import lines change in the moved files (`'@isograph/disposable-types'` is `'./index'`), and the React package's port changes its imports of `./CacheItem` and `./ParentCache` (`useCachedResponsivePrecommitValue.ts`, `useLazyDisposableState.ts`, `useDisposableState.ts`, `index.ts`, and their tests) to `@isograph/disposable-types`.
 - (b) A new React-free package holding the two files. Cost: a third package beside upstream's two, and the same import changes.
 - (c) Leave them in `@isograph/react-disposable-state` and have the runtime depend on it. Cost: the runtime depends on a package whose peer dependency is `react`.
+
+### 6. Where the request cache and the retained set live
+
+Open; the user's direction holds (a) unless it fails.
+
+- (a) Request entries in the store (Request entries in the store), one structure for cache and retention, collected with the records. Cost: retain counting written again outside `CacheItem`; the store holds promises; `Store` becomes a struct; sharing after commit (decision 9).
+- (b) `networkRequestCache` holds its `ParentCache`s in the store, and `garbageCollect` deletes the empty ones; `retainedQueries` stays. Cost: two structures that can still disagree; it only fixes upstream's never-removed cache entries.
+- (c) Changes 1 to 6 as approved: the environment holds both. Cost: upstream's two structures and its never-removed entries.
+
+### 7. Who owns the temporary retain's timer
+
+Open.
+
+- (a) `temporaryRetainRequest` calls `setTimeout`, as `CacheItem` does. Cost: a runtime function with a time side effect; tests need fake timers.
+- (b) `createIsographEnvironment` takes a scheduler, `(expire: () => void) => CleanupFn`, defaulting to `setTimeout` with 5000 ms. Cost: a parameter only tests and unusual hosts pass.
+
+### 8. Promises in the store
+
+Open.
+
+- (a) The entry holds the `PromiseWrapper` (the held design). Cost: the store is not plain data (no `structuredClone`, no persistence), and whole-store `toEqual` is unsound for requests.
+- (b) The entry holds the request's state as data (`Pending`, `Ok`, `Err` with the error), and the environment holds the promises in a `Map<RequestKey, Promise<void>>`. Cost: a second map again, keyed like the entries, which `garbageCollect` must also sweep.
+
+### 9. What a render with an existing entry's key gets
+
+Open.
+
+- (a) The existing entry, whatever `shouldFetch` says, as upstream's cache does during a temporary retain (`getOrCreateCacheForArtifact.ts:55-84`), extended to the entry's whole life. Cost: `Yes` does not refetch while an entry with that key exists.
+- (b) The existing entry while its request is in flight; after it settled, `Yes` (and `IfNecessary` with `MissingData`) sends a new request into the same entry, replacing `networkRequest`. Cost: holders of the old wrapper do not see the new request, and an entry's `networkRequest` changes under its holders.
