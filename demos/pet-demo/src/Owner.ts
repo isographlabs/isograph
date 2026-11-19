@@ -9,7 +9,7 @@ export const displayName = iso(`
 });
 
 export const OwnerBadge = iso(`
-  field Owner.OwnerBadge @component {
+  field Owner.OwnerBadge {
     displayName
   }
 `)(function OwnerBadge({ data }) {

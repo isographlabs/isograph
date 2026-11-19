@@ -1,7 +1,7 @@
 import { iso } from './__isograph/iso';
 
 export const PetBestFriendCard = iso(`
-  field Pet.PetBestFriendCard @component {
+  field Pet.PetBestFriendCard {
     id
     best_friend_relationship {
       picture_together

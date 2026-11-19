@@ -1,7 +1,7 @@
 import { iso } from './__isograph/iso';
 
 export const HomeRoute = iso(`
-  field Query.HomeRoute @component {
+  field Query.HomeRoute {
     pets {
       id
       PetSummaryCard

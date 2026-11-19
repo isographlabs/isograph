@@ -1,7 +1,7 @@
 import { iso } from './__isograph/iso';
 
 export const PetSummaryCard = iso(`
-  field Pet.PetSummaryCard @component
+  field Pet.PetSummaryCard
   """
   A card with the pet's name, picture, and tagline.
   """

@@ -1,7 +1,7 @@
 import { iso } from './__isograph/iso';
 
 export const SpeciesRoute = iso(`
-  field Query.SpeciesRoute($species: PetSpecies!) @component {
+  field Query.SpeciesRoute($species: PetSpecies!) {
     petsBySpecies(species: $species) {
       id
       fullName
