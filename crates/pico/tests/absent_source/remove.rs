@@ -2,6 +2,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use pico::{Database, Storage};
 use pico_macros::{Db, Singleton, Source, memo};
+use prelude::Postfix;
 
 #[derive(Db, Default)]
 struct TestDatabase {
@@ -51,7 +52,10 @@ fn present_then_removed_reader(db: &TestDatabase) -> Option<String> {
 fn present_then_removed_reruns_and_returns_none() {
     let mut db = TestDatabase::default();
     db.set(config("a"));
-    assert_eq!(*present_then_removed_reader(&db), Some("a".to_string()));
+    assert_eq!(
+        *present_then_removed_reader(&db),
+        "a".to_string().wrap_some()
+    );
     assert_eq!(PRESENT_THEN_REMOVED.load(Ordering::SeqCst), 1);
 
     db.remove_singleton::<Config>();
@@ -73,7 +77,7 @@ fn removed_then_set_reader(db: &TestDatabase) -> Option<String> {
 fn removed_then_set_reruns() {
     let mut db = TestDatabase::default();
     db.set(config("a"));
-    assert_eq!(*removed_then_set_reader(&db), Some("a".to_string()));
+    assert_eq!(*removed_then_set_reader(&db), "a".to_string().wrap_some());
 
     db.remove_singleton::<Config>();
     assert_eq!(*removed_then_set_reader(&db), None);
@@ -81,7 +85,7 @@ fn removed_then_set_reruns() {
     // Equal to the value before the remove.
     db.set(config("a"));
 
-    assert_eq!(*removed_then_set_reader(&db), Some("a".to_string()));
+    assert_eq!(*removed_then_set_reader(&db), "a".to_string().wrap_some());
     assert_eq!(REMOVED_THEN_SET.load(Ordering::SeqCst), 3);
 }
 
@@ -98,7 +102,7 @@ fn still_removed_reader(db: &TestDatabase) -> Option<String> {
 fn removed_and_still_removed_does_not_rerun() {
     let mut db = TestDatabase::default();
     db.set(config("a"));
-    assert_eq!(*still_removed_reader(&db), Some("a".to_string()));
+    assert_eq!(*still_removed_reader(&db), "a".to_string().wrap_some());
 
     db.remove_singleton::<Config>();
     assert_eq!(*still_removed_reader(&db), None);

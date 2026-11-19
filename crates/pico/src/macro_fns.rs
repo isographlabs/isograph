@@ -4,6 +4,7 @@ use std::{
 };
 
 use dashmap::Entry;
+use prelude::Postfix;
 use tinyvec::ArrayVec;
 
 use crate::{Database, ParamId, index::Index};
@@ -16,22 +17,18 @@ pub fn intern_borrowed_param<Db: Database, T: Hash + Clone + 'static>(
     db: &Db,
     param: &T,
 ) -> ParamId {
-    let param_id = hash(param).into();
+    let param_id = hash(param).to();
     if let Entry::Vacant(v) = db.get_storage().internal.param_id_to_index.entry(param_id) {
-        let idx = db
-            .get_storage()
-            .internal
-            .params
-            .push(Box::new(param.clone()));
+        let idx = db.get_storage().internal.params.push(param.clone().boxed());
         v.insert(Index::new(idx));
     }
     param_id
 }
 
 pub fn intern_owned_param<Db: Database, T: Hash + Clone + 'static>(db: &Db, param: T) -> ParamId {
-    let param_id = hash(&param).into();
+    let param_id = hash(&param).to();
     if let Entry::Vacant(v) = db.get_storage().internal.param_id_to_index.entry(param_id) {
-        let idx = db.get_storage().internal.params.push(Box::new(param));
+        let idx = db.get_storage().internal.params.push(param.boxed());
         v.insert(Index::new(idx));
     }
     param_id

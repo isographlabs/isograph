@@ -1,4 +1,5 @@
 use dashmap::Entry;
+use prelude::Postfix;
 use tracing::{Level, debug_span, event, trace_span};
 
 use crate::{
@@ -253,5 +254,5 @@ fn invoke_with_dependency_tracking<Db: Database>(
     let guard = db.get_storage().dependency_stack.enter(derived_node_id);
     let result = inner_fn.0(db, derived_node_id);
     let dependencies = guard.release();
-    Some((result?, dependencies))
+    (result?, dependencies).wrap_some()
 }
