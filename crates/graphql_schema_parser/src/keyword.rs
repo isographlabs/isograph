@@ -1,4 +1,3 @@
-#[cfg_attr(not(test), expect(dead_code))]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, strum::EnumString)]
 #[strum(serialize_all = "lowercase")]
 pub(crate) enum DefinitionKeyword {
@@ -12,7 +11,6 @@ pub(crate) enum DefinitionKeyword {
     Directive,
 }
 
-#[cfg_attr(not(test), expect(dead_code))]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, strum::EnumString)]
 #[strum(serialize_all = "lowercase")]
 pub(crate) enum ExtensionKeyword {
@@ -25,7 +23,6 @@ pub(crate) enum ExtensionKeyword {
     Input,
 }
 
-#[cfg_attr(not(test), expect(dead_code))]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, strum::EnumString)]
 #[strum(serialize_all = "lowercase")]
 pub(crate) enum BooleanOrNullKeyword {

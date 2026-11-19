@@ -2,6 +2,7 @@ mod ast;
 mod keyword;
 mod parse_error;
 mod parse_schema;
+mod recovery;
 mod string_value;
 mod token_cursor;
 mod token_kind;
@@ -16,7 +17,7 @@ mod test_cursor;
 
 pub use ast::*;
 pub use parse_error::{Expectation, ExpectedFound, Found, ParseError};
-pub use parse_schema::{DefinitionError, DefinitionName};
+pub use parse_schema::{DefinitionError, DefinitionName, ParsedSchema, parse_schema};
 pub use token_kind::GraphQLTokenKind;
 pub use type_annotation::{
     ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation, NullableTypeAnnotation,

@@ -10,7 +10,6 @@ use crate::token_cursor::{TokenCursor, TokenText};
 use crate::token_kind::{StringToken, VariableWidthEscape};
 use crate::{GraphQLTokenKind, ParseError};
 
-#[cfg_attr(not(test), expect(dead_code))]
 pub(crate) fn consume_string_value_if<T: From<intern::string_key::StringKey>>(
     cursor: &mut TokenCursor<'_>,
 ) -> Result<Option<WithSpan<T>>, WithSpan<ParseError>> {

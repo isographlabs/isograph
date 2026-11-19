@@ -3,9 +3,11 @@ use nonempty::NonEmpty;
 use prelude::Postfix;
 use span::{WithSpan, WithSpanPostfix};
 
-use crate::keyword::{BooleanOrNullKeyword, ExtensionKeyword};
+use crate::keyword::{BooleanOrNullKeyword, DefinitionKeyword, ExtensionKeyword};
+use crate::recovery::skip_failed_definition;
 use crate::string_value::consume_string_value_if;
 use crate::token_cursor::TokenCursor;
+use crate::tokenize::tokenize;
 use crate::type_annotation::parse_type_annotation;
 use crate::value::parse_constant_value;
 use crate::{
@@ -16,9 +18,29 @@ use crate::{
     InputObjectTypeExtension, InputValueDefinition, InputValueNameWrapper, InterfaceTypeDefinition,
     InterfaceTypeExtension, ObjectTypeDefinition, ObjectTypeExtension, OperationType,
     OperationTypeWrapper, ParseError, RootOperationTypeDefinition, ScalarTypeDefinition,
-    ScalarTypeExtension, SchemaDefinition, SchemaExtension, SelectableNameWrapper, TypeExtension,
-    TypeSystemExtension, UnionTypeDefinition, UnionTypeExtension,
+    ScalarTypeExtension, SchemaDefinition, SchemaExtension, SelectableNameWrapper, TypeDefinition,
+    TypeExtension, TypeSystemDefinition, TypeSystemDefinitionOrExtension, TypeSystemExtension,
+    UnionTypeDefinition, UnionTypeExtension,
 };
+
+/// One schema file: every top-level definition and extension, in source order, each parsed
+/// or failed on its own.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ParsedSchema {
+    pub definitions:
+        Vec<Result<WithSpan<TypeSystemDefinitionOrExtension>, WithSpan<DefinitionError>>>,
+}
+
+pub fn parse_schema(text: &str) -> ParsedSchema {
+    let items = tokenize(text);
+    let mut cursor = TokenCursor::new(items.as_slice(), text);
+    ParsedSchema {
+        definitions: std::iter::from_fn(|| {
+            (!cursor.at_end()).then(|| parse_definition_or_extension_or_skip(&mut cursor))
+        })
+        .collect(),
+    }
+}
 
 /// A top-level definition or extension whose parse failed. The wrapping span is the text the
 /// definition occupied, from its first token to the last token recovery skipped.
@@ -43,6 +65,68 @@ impl DefinitionError {
     }
 }
 
+fn parse_definition_or_extension_or_skip(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<WithSpan<TypeSystemDefinitionOrExtension>, WithSpan<DefinitionError>> {
+    let start = cursor.position();
+    cursor
+        .spanning(parse_type_system_definition_or_extension)
+        .map_err(|error| {
+            skip_failed_definition(cursor, start);
+            error.with_span(cursor.span_since(start))
+        })
+}
+
+fn parse_type_system_definition_or_extension(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<TypeSystemDefinitionOrExtension, DefinitionError> {
+    if cursor.consume_keyword_if("extend").is_some() {
+        return TypeSystemDefinitionOrExtension::Extension(parse_type_system_extension(cursor)?)
+            .wrap_ok();
+    }
+    TypeSystemDefinitionOrExtension::Definition(parse_type_system_definition(cursor)?).wrap_ok()
+}
+
+fn parse_type_system_definition(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<TypeSystemDefinition, DefinitionError> {
+    let description = consume_description(cursor).map_err(DefinitionError::unnamed)?;
+    let expectation = match description {
+        Some(_) => Expectation::DefinitionKeyword,
+        None => Expectation::DefinitionOrExtensionKeyword,
+    };
+    let keyword = cursor
+        .consume_identifier_of::<DefinitionKeyword>()
+        .ok_or_else(|| DefinitionError::unnamed(cursor.expected(expectation)))?;
+    match keyword.item {
+        DefinitionKeyword::Schema => {
+            TypeSystemDefinition::Schema(parse_schema_definition(cursor, description)?)
+        }
+        DefinitionKeyword::Scalar => TypeSystemDefinition::Type(TypeDefinition::Scalar(
+            parse_scalar_type_definition(cursor, description)?,
+        )),
+        DefinitionKeyword::Type => TypeSystemDefinition::Type(TypeDefinition::Object(
+            parse_object_type_definition(cursor, description)?,
+        )),
+        DefinitionKeyword::Interface => TypeSystemDefinition::Type(TypeDefinition::Interface(
+            parse_interface_type_definition(cursor, description)?,
+        )),
+        DefinitionKeyword::Union => TypeSystemDefinition::Type(TypeDefinition::Union(
+            parse_union_type_definition(cursor, description)?,
+        )),
+        DefinitionKeyword::Enum => TypeSystemDefinition::Type(TypeDefinition::Enum(
+            parse_enum_type_definition(cursor, description)?,
+        )),
+        DefinitionKeyword::Input => TypeSystemDefinition::Type(TypeDefinition::InputObject(
+            parse_input_object_type_definition(cursor, description)?,
+        )),
+        DefinitionKeyword::Directive => {
+            TypeSystemDefinition::Directive(parse_directive_definition(cursor, description)?)
+        }
+    }
+    .wrap_ok()
+}
+
 fn parse_after_entity_name<T>(
     cursor: &mut TokenCursor<'_>,
     parse_rest: impl FnOnce(
@@ -57,7 +141,6 @@ fn parse_after_entity_name<T>(
     })
 }
 
-#[cfg_attr(not(test), expect(dead_code))]
 fn consume_description(
     cursor: &mut TokenCursor<'_>,
 ) -> Result<Option<WithSpan<Description>>, WithSpan<ParseError>> {
@@ -74,7 +157,6 @@ fn parse_entity_name(
         .map_err(|()| cursor.expected(Expectation::Token(GraphQLTokenKind::Identifier)))
 }
 
-#[cfg_attr(not(test), expect(dead_code))]
 fn parse_scalar_type_definition(
     cursor: &mut TokenCursor<'_>,
     description: Option<WithSpan<Description>>,
@@ -89,7 +171,6 @@ fn parse_scalar_type_definition(
     })
 }
 
-#[cfg_attr(not(test), expect(dead_code))]
 fn parse_object_type_definition(
     cursor: &mut TokenCursor<'_>,
     description: Option<WithSpan<Description>>,
@@ -106,7 +187,6 @@ fn parse_object_type_definition(
     })
 }
 
-#[cfg_attr(not(test), expect(dead_code))]
 fn parse_interface_type_definition(
     cursor: &mut TokenCursor<'_>,
     description: Option<WithSpan<Description>>,
@@ -222,7 +302,6 @@ fn parse_separated_nonempty<T>(
     items.wrap_ok()
 }
 
-#[cfg_attr(not(test), expect(dead_code))]
 fn parse_union_type_definition(
     cursor: &mut TokenCursor<'_>,
     description: Option<WithSpan<Description>>,
@@ -247,7 +326,6 @@ fn parse_union_member_types(
     }
 }
 
-#[cfg_attr(not(test), expect(dead_code))]
 fn parse_enum_type_definition(
     cursor: &mut TokenCursor<'_>,
     description: Option<WithSpan<Description>>,
@@ -294,7 +372,6 @@ fn parse_enum_value_definition(
     .wrap_ok()
 }
 
-#[cfg_attr(not(test), expect(dead_code))]
 fn parse_input_object_type_definition(
     cursor: &mut TokenCursor<'_>,
     description: Option<WithSpan<Description>>,
@@ -321,7 +398,6 @@ fn parse_input_fields_definition(
     )
 }
 
-#[cfg_attr(not(test), expect(dead_code))]
 fn parse_schema_definition(
     cursor: &mut TokenCursor<'_>,
     description: Option<WithSpan<Description>>,
@@ -382,7 +458,6 @@ fn parse_after_directive_name<T>(
     })
 }
 
-#[cfg_attr(not(test), expect(dead_code))]
 fn parse_directive_definition(
     cursor: &mut TokenCursor<'_>,
     description: Option<WithSpan<Description>>,
@@ -432,7 +507,6 @@ fn parse_directive_location(
         .ok_or_else(|| cursor.expected(Expectation::DirectiveLocation))
 }
 
-#[cfg_attr(not(test), expect(dead_code))]
 fn parse_type_system_extension(
     cursor: &mut TokenCursor<'_>,
 ) -> Result<TypeSystemExtension, DefinitionError> {
@@ -701,8 +775,8 @@ mod tests {
         DefinitionError, DefinitionName, consume_description, parse_directive_definition,
         parse_directives, parse_enum_type_definition, parse_input_object_type_definition,
         parse_interface_type_definition, parse_object_type_definition,
-        parse_scalar_type_definition, parse_schema_definition, parse_type_system_extension,
-        parse_union_type_definition,
+        parse_scalar_type_definition, parse_schema, parse_schema_definition,
+        parse_type_system_extension, parse_union_type_definition,
     };
     use crate::span_of::span_of;
     use crate::test_cursor::with_cursor;
@@ -712,7 +786,8 @@ mod tests {
         DirectiveRepeatability, EntityNameWrapper, EnumValueDefinition, Expectation,
         FieldDefinition, Found, GraphQLTokenKind, InputObjectTypeDefinition, IntegerValue,
         NullableTypeAnnotation, ObjectTypeDefinition, OperationType, ParseError, SchemaDefinition,
-        TypeAnnotation, TypeExtension, TypeSystemExtension, UnionTypeDefinition,
+        TypeAnnotation, TypeDefinition, TypeExtension, TypeSystemDefinition,
+        TypeSystemDefinitionOrExtension, TypeSystemExtension, UnionTypeDefinition,
     };
 
     /// Runs `parse` on `text` after its description, when it has one, and its keyword.
@@ -1660,5 +1735,375 @@ mod tests {
             extension_error("extend").error.item,
             ParseError::expected(Expectation::ExtensionKeyword, Found::EndOfFile)
         );
+    }
+
+    type Entry = Result<WithSpan<TypeSystemDefinitionOrExtension>, WithSpan<DefinitionError>>;
+
+    fn entries(text: &str) -> Vec<Entry> {
+        parse_schema(text).definitions
+    }
+
+    fn only_entry(text: &str) -> Entry {
+        let mut entries = entries(text);
+        assert_eq!(entries.len(), 1, "for text {text:?}");
+        entries.remove(0)
+    }
+
+    /// The name the definition or extension declares, or the name a failed one declared.
+    fn entry_name(entry: &Entry) -> Option<DefinitionName> {
+        match entry {
+            Ok(definition) => match definition.item.reference() {
+                TypeSystemDefinitionOrExtension::Definition(TypeSystemDefinition::Type(
+                    definition,
+                )) => DefinitionName::Entity(match definition {
+                    TypeDefinition::Scalar(scalar) => scalar.name.item.0,
+                    TypeDefinition::Object(object) => object.name.item.0,
+                    TypeDefinition::Interface(interface) => interface.name.item.0,
+                    TypeDefinition::Union(union) => union.name.item.0,
+                    TypeDefinition::Enum(enum_) => enum_.name.item.0,
+                    TypeDefinition::InputObject(input) => input.name.item.0,
+                })
+                .wrap_some(),
+                TypeSystemDefinitionOrExtension::Definition(TypeSystemDefinition::Directive(
+                    directive,
+                )) => DefinitionName::Directive(directive.name.item.0).wrap_some(),
+                TypeSystemDefinitionOrExtension::Definition(TypeSystemDefinition::Schema(_))
+                | TypeSystemDefinitionOrExtension::Extension(TypeSystemExtension::Schema(_)) => {
+                    None
+                }
+                TypeSystemDefinitionOrExtension::Extension(TypeSystemExtension::Type(
+                    extension,
+                )) => DefinitionName::Entity(match extension {
+                    TypeExtension::Scalar(scalar) => scalar.name.item.0,
+                    TypeExtension::Object(object) => object.name.item.0,
+                    TypeExtension::Interface(interface) => interface.name.item.0,
+                    TypeExtension::Union(union) => union.name.item.0,
+                    TypeExtension::Enum(enum_) => enum_.name.item.0,
+                    TypeExtension::InputObject(input) => input.name.item.0,
+                })
+                .wrap_some(),
+            },
+            Err(error) => error.item.name,
+        }
+    }
+
+    /// `Ok` or `Err` with the declared name, for each entry.
+    fn outline(text: &str) -> Vec<Result<Option<DefinitionName>, Option<DefinitionName>>> {
+        entries(text)
+            .iter()
+            .map(|entry| match entry {
+                Ok(_) => entry_name(entry).wrap_ok(),
+                Err(_) => entry_name(entry).wrap_err(),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_file_without_definitions_has_no_entries() {
+        for text in ["", "   ", "# only a comment\n"] {
+            assert_eq!(entries(text), vec![], "for text {text:?}");
+        }
+    }
+
+    #[test]
+    fn a_scalar_is_one_definition_spanning_its_text() {
+        let text = "scalar Date";
+        let scalar = only_entry(text).expect("the fixture is a scalar");
+        assert_eq!(scalar.location, span_of(text, text));
+        assert!(matches!(
+            scalar.item,
+            TypeSystemDefinitionOrExtension::Definition(TypeSystemDefinition::Type(
+                TypeDefinition::Scalar(_)
+            ))
+        ));
+    }
+
+    #[test]
+    fn a_described_definition_spans_its_description() {
+        let text = "\"a date\" scalar Date";
+        let scalar = only_entry(text).expect("the fixture is a scalar");
+        assert_eq!(scalar.location, span_of(text, text));
+        let TypeSystemDefinitionOrExtension::Definition(TypeSystemDefinition::Type(
+            TypeDefinition::Scalar(scalar),
+        )) = scalar.item
+        else {
+            panic!("the fixture is a scalar");
+        };
+        assert_eq!(
+            scalar.description.map(|description| description.item.0),
+            DescriptionValue::from("a date".intern()).wrap_some()
+        );
+    }
+
+    #[test]
+    fn definitions_follow_each_other_without_separators() {
+        assert_eq!(
+            outline("scalar Date scalar Time"),
+            vec![entity("Date").wrap_ok(), entity("Time").wrap_ok()]
+        );
+        let entries = entries("type Pet { id: ID! } extend type Pet { name: String } scalar Date");
+        assert_eq!(entries.len(), 3);
+        assert!(matches!(
+            entries[0].as_ref().map(|entry| entry.item.reference()),
+            Ok(TypeSystemDefinitionOrExtension::Definition(_))
+        ));
+        assert!(matches!(
+            entries[1].as_ref().map(|entry| entry.item.reference()),
+            Ok(TypeSystemDefinitionOrExtension::Extension(_))
+        ));
+        assert!(matches!(
+            entries[2].as_ref().map(|entry| entry.item.reference()),
+            Ok(TypeSystemDefinitionOrExtension::Definition(_))
+        ));
+    }
+
+    #[test]
+    fn every_definition_and_extension_kind_is_its_variant() {
+        let definition =
+            |text: &str| match only_entry(text).expect("the fixture is a definition").item {
+                TypeSystemDefinitionOrExtension::Definition(definition) => definition,
+                TypeSystemDefinitionOrExtension::Extension(_) => {
+                    panic!("the fixture is a definition, not an extension")
+                }
+            };
+        assert!(matches!(
+            definition("schema { query: Query }"),
+            TypeSystemDefinition::Schema(_)
+        ));
+        assert!(matches!(
+            definition("scalar Date"),
+            TypeSystemDefinition::Type(TypeDefinition::Scalar(_))
+        ));
+        assert!(matches!(
+            definition("type Pet { id: ID! }"),
+            TypeSystemDefinition::Type(TypeDefinition::Object(_))
+        ));
+        assert!(matches!(
+            definition("interface Node { id: ID! }"),
+            TypeSystemDefinition::Type(TypeDefinition::Interface(_))
+        ));
+        assert!(matches!(
+            definition("union Search = Pet | User"),
+            TypeSystemDefinition::Type(TypeDefinition::Union(_))
+        ));
+        assert!(matches!(
+            definition("enum Status { AVAILABLE SOLD }"),
+            TypeSystemDefinition::Type(TypeDefinition::Enum(_))
+        ));
+        assert!(matches!(
+            definition("input PetInput { name: String }"),
+            TypeSystemDefinition::Type(TypeDefinition::InputObject(_))
+        ));
+        assert!(matches!(
+            definition("directive @oneOf on INPUT_OBJECT"),
+            TypeSystemDefinition::Directive(_)
+        ));
+
+        let extension =
+            |text: &str| match only_entry(text).expect("the fixture is an extension").item {
+                TypeSystemDefinitionOrExtension::Extension(extension) => extension,
+                TypeSystemDefinitionOrExtension::Definition(_) => {
+                    panic!("the fixture is an extension, not a definition")
+                }
+            };
+        assert!(matches!(
+            extension("extend schema { mutation: Mutation }"),
+            TypeSystemExtension::Schema(_)
+        ));
+        assert!(matches!(
+            extension("extend scalar Date @a"),
+            TypeSystemExtension::Type(TypeExtension::Scalar(_))
+        ));
+        assert!(matches!(
+            extension("extend type Pet { nickname: String }"),
+            TypeSystemExtension::Type(TypeExtension::Object(_))
+        ));
+        assert!(matches!(
+            extension("extend interface Node { id: ID! }"),
+            TypeSystemExtension::Type(TypeExtension::Interface(_))
+        ));
+        assert!(matches!(
+            extension("extend union Search = Photo"),
+            TypeSystemExtension::Type(TypeExtension::Union(_))
+        ));
+        assert!(matches!(
+            extension("extend enum Status { LOST }"),
+            TypeSystemExtension::Type(TypeExtension::Enum(_))
+        ));
+        assert!(matches!(
+            extension("extend input PetInput { age: Int }"),
+            TypeSystemExtension::Type(TypeExtension::InputObject(_))
+        ));
+    }
+
+    #[test]
+    fn an_unknown_word_is_an_unnamed_error() {
+        assert_eq!(
+            only_entry("foo"),
+            DefinitionError {
+                name: None,
+                error: ParseError::expected(
+                    Expectation::DefinitionOrExtensionKeyword,
+                    Found::Token(GraphQLTokenKind::Identifier)
+                )
+                .with_span(Span::new(0, 3)),
+            }
+            .with_span(Span::new(0, 3))
+            .wrap_err()
+        );
+        let text = "\"desc\" foo";
+        let error = only_entry(text).expect_err("the fixture has no keyword");
+        assert_eq!(
+            error.item.error,
+            ParseError::expected(
+                Expectation::DefinitionKeyword,
+                Found::Token(GraphQLTokenKind::Identifier)
+            )
+            .with_span(span_of(text, "foo"))
+        );
+    }
+
+    #[test]
+    fn a_description_before_extend_is_an_error_and_the_extension_parses() {
+        let text = "\"desc\" extend type Pet { a: A }";
+        let entries = entries(text);
+        assert_eq!(entries.len(), 2);
+        let error = entries[0]
+            .as_ref()
+            .expect_err("a description cannot precede extend");
+        assert_eq!(
+            error.item.error,
+            ParseError::expected(
+                Expectation::DefinitionKeyword,
+                Found::Token(GraphQLTokenKind::Identifier)
+            )
+            .with_span(span_of(text, "extend"))
+        );
+        assert_eq!(error.location, span_of(text, "\"desc\""));
+        assert!(matches!(
+            entries[1].as_ref().map(|entry| entry.item.reference()),
+            Ok(TypeSystemDefinitionOrExtension::Extension(
+                TypeSystemExtension::Type(TypeExtension::Object(_))
+            ))
+        ));
+    }
+
+    #[test]
+    fn recovery_continues_after_a_broken_definition() {
+        assert_eq!(
+            outline("type A { a: ! } type B { b: B }"),
+            vec![entity("A").wrap_err(), entity("B").wrap_ok()]
+        );
+        assert_eq!(
+            outline("type A { a: B } type B { b: ! }"),
+            vec![entity("A").wrap_ok(), entity("B").wrap_err()]
+        );
+        assert_eq!(
+            outline("type A { a(x: { y: ! }): B type: C } type D { d: D }"),
+            vec![entity("A").wrap_err(), entity("D").wrap_ok()]
+        );
+        assert_eq!(
+            outline("type A { a: ! } type B { b: ! } type C { c: C }"),
+            vec![
+                entity("A").wrap_err(),
+                entity("B").wrap_err(),
+                entity("C").wrap_ok()
+            ]
+        );
+        assert_eq!(
+            outline("extend type A { a: ! } extend type B { b: B }"),
+            vec![entity("A").wrap_err(), entity("B").wrap_ok()]
+        );
+    }
+
+    #[test]
+    fn an_unclosed_group_skips_to_the_end_of_the_file() {
+        let text = "type A { a: B";
+        let error = only_entry(text).expect_err("the fixture is unclosed");
+        assert_eq!(error.item.name, entity("A"));
+        assert_eq!(
+            error.item.error.item,
+            ParseError::expected(
+                Expectation::Token(GraphQLTokenKind::CloseBrace),
+                Found::EndOfFile
+            )
+        );
+        assert_eq!(error.location, span_of(text, text));
+        assert_eq!(
+            outline("scalar A @x( scalar B"),
+            entity("A").wrap_err().wrap_vec()
+        );
+    }
+
+    #[test]
+    fn stray_closers_are_one_error() {
+        assert_eq!(
+            outline("} scalar A"),
+            vec![None.wrap_err(), entity("A").wrap_ok()]
+        );
+        assert_eq!(
+            outline(") ) ] scalar A"),
+            vec![None.wrap_err(), entity("A").wrap_ok()]
+        );
+    }
+
+    #[test]
+    fn a_failed_entry_spans_its_description() {
+        let text = "\"described\" type A { a: ! } type B { b: B }";
+        let entries = entries(text);
+        assert_eq!(entries.len(), 2);
+        let error = entries[0].as_ref().expect_err("A is broken");
+        assert_eq!(error.item.name, entity("A"));
+        assert_eq!(
+            error.location,
+            span_of(text, "\"described\" type A { a: ! }")
+        );
+        assert_eq!(entry_name(entries[1].reference()), entity("B"));
+        assert!(entries[1].is_ok());
+    }
+
+    #[test]
+    fn a_description_followed_by_a_keyword_restarts_parsing() {
+        let text = "foo \"desc\" scalar A";
+        let entries = entries(text);
+        assert_eq!(entries.len(), 2);
+        assert_eq!(
+            entries[0].as_ref().map_err(|error| error.location),
+            span_of(text, "foo").wrap_err()
+        );
+        let Ok(scalar) = entries[1].reference() else {
+            panic!("A parses");
+        };
+        let TypeSystemDefinitionOrExtension::Definition(TypeSystemDefinition::Type(
+            TypeDefinition::Scalar(scalar),
+        )) = scalar.item.reference()
+        else {
+            panic!("A is a scalar");
+        };
+        assert_eq!(
+            scalar.description.map(|description| description.item.0),
+            DescriptionValue::from("desc".intern()).wrap_some()
+        );
+    }
+
+    #[test]
+    fn a_failing_keyword_starts_the_next_definition() {
+        assert_eq!(
+            outline("directive @a on scalar Date"),
+            vec![directive_named("a").wrap_err(), entity("Date").wrap_ok()]
+        );
+    }
+
+    #[test]
+    fn unknown_words_and_numbers_are_one_error_each_run() {
+        let text = "foo bar scalar A";
+        let entries = entries(text);
+        assert_eq!(entries.len(), 2);
+        assert_eq!(
+            entries[0].as_ref().map_err(|error| error.location),
+            span_of(text, "foo bar").wrap_err()
+        );
+        assert_eq!(entry_name(entries[1].reference()), entity("A"));
+        assert_eq!(outline("1 2 3"), None.wrap_err().wrap_vec());
     }
 }

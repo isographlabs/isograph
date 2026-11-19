@@ -41,7 +41,6 @@ impl NullableTypeAnnotation {
     }
 }
 
-#[cfg_attr(not(test), expect(dead_code))]
 pub(crate) fn parse_type_annotation(
     cursor: &mut TokenCursor<'_>,
 ) -> Result<WithSpan<TypeAnnotation>, WithSpan<ParseError>> {

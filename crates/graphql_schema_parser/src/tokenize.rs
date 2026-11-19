@@ -4,7 +4,6 @@ use span::{WithSpan, WithSpanPostfix};
 
 use crate::GraphQLTokenKind;
 
-#[cfg_attr(not(test), expect(dead_code))]
 pub(crate) fn tokenize(text: &str) -> Vec<WithSpan<GraphQLTokenKind>> {
     let mut lexer = GraphQLTokenKind::lexer(text);
     let mut tokens = Vec::new();

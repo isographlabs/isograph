@@ -26,7 +26,6 @@ impl<'a> TokenText<'a> {
         }
     }
 
-    #[cfg_attr(not(test), expect(dead_code))]
     pub(crate) fn interned<T: From<intern::string_key::StringKey>>(self) -> WithSpan<T> {
         self.text().intern().to::<T>().with_span(self.location)
     }
@@ -54,7 +53,6 @@ pub(crate) struct TokenCursor<'a> {
     text: &'a str,
 }
 
-#[cfg_attr(not(test), expect(dead_code))]
 impl<'a> TokenCursor<'a> {
     pub(crate) fn new(items: &'a [WithSpan<GraphQLTokenKind>], text: &'a str) -> Self {
         TokenCursor {
@@ -97,8 +95,6 @@ impl<'a> TokenCursor<'a> {
             None => Span::new(self.previous_end, self.previous_end),
         }
     }
-
-    #[expect(dead_code)]
     pub(crate) fn text(&self) -> &'a str {
         self.text
     }
@@ -150,7 +146,6 @@ impl<'a> TokenCursor<'a> {
         item.location.wrap_some()
     }
 
-    #[cfg_attr(not(test), expect(dead_code))]
     pub(crate) fn require_keyword(&mut self, word: &'static str) -> Result<Span, ()> {
         self.consume_keyword_if(word).ok_or(())
     }

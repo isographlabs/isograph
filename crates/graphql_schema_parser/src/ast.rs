@@ -164,6 +164,32 @@ pub enum DirectiveLocation {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct DirectiveLocationWrapper(pub DirectiveLocation);
 
+/// Spec 3.1 `TypeSystemDefinitionOrExtension`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TypeSystemDefinitionOrExtension {
+    Definition(TypeSystemDefinition),
+    Extension(TypeSystemExtension),
+}
+
+/// Spec 3 `TypeSystemDefinition`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TypeSystemDefinition {
+    Schema(SchemaDefinition),
+    Type(TypeDefinition),
+    Directive(DirectiveDefinition),
+}
+
+/// Spec 3.4 `TypeDefinition`: the definition of a named entity.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TypeDefinition {
+    Scalar(ScalarTypeDefinition),
+    Object(ObjectTypeDefinition),
+    Interface(InterfaceTypeDefinition),
+    Union(UnionTypeDefinition),
+    Enum(EnumTypeDefinition),
+    InputObject(InputObjectTypeDefinition),
+}
+
 /// Spec 3.1 `TypeSystemExtension`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TypeSystemExtension {
