@@ -29,3 +29,4 @@ export type {
   StoreValue,
   Variables,
 } from './store';
+export { normalize } from './normalize';

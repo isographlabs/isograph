@@ -346,6 +346,18 @@ It returns nothing: no v1 caller reads what it wrote (no subscriptions, no `Enco
 
 A selection's response key is `selection.responseKey ?? selection.selectableName`: the alias the query prints for a selection with arguments, and the selectable name for one without (normalization-ast.md, End-user experience). Below, `response[responseKey]` means the value under that key.
 
+The walk passes one context object down, beside its position:
+
+```ts
+// from libs/isograph-runtime/src/normalize.ts
+/** What every step of one `normalize` call reads besides its position. */
+type Normalization = {
+  readonly store: Store;
+  readonly discriminatorResponseKey: string;
+  readonly variables: Variables;
+};
+```
+
 Behavior, walking `ast.selections` against `response` onto the record `ast.root` (`{ entityName, id }`; the top level selects no discriminator, query-generation.md):
 
 - The record at a link is the store's record if present, else a new empty record inserted into `store`. Fields the AST does not select are kept. A store key written twice in one call (two paths to `Pet:1`) holds the later write, in AST and list order.
@@ -643,6 +655,15 @@ export function selectionAt(
   responseKey: string,
   ...rest: ReadonlyArray<string>
 ): NormalizationSelection;
+
+/** Fixture responses the three test files share: `PetDetail`'s for `Pet:1` (best friend
+ * `Pet:2`, whose best friend is `Pet:1`), `PetLists`', `Feed`'s with `limit: 2`, and
+ * `SetTagline`'s for `Pet:4`. */
+export function petDetailPet(): JsonObject;
+export function petDetailResponse(): JsonObject;
+export function petListsResponse(): JsonObject;
+export function feedResponse(): JsonObject;
+export function setTaglineResponse(): JsonObject;
 ```
 
 ```json
@@ -830,7 +851,8 @@ Each case asserts the whole resulting store with `storeOf`.
 - `SetTagline`: `Mutation.__ROOT` links `SetTaglinePayload` `Mutation:__ROOT.setTagline____input___{"id":"4","tagline":"Hi"}`, which links `Pet:4` with the new `tagline`.
 - Into a non-empty store: `PetLists` then `PetDetail` for `Pet:1`: `Pet:1` holds the union of both; a field `PetDetail` does not select is kept; a field both write holds `PetDetail`'s value.
 - Nested root entity: `NestedQuery` with `query: { __typename: "Query", tags: ["a"] }` writes `greeting` and `tags` onto `Query.__ROOT`, which links itself under `query` (`{ entityName: "Query", id: "__ROOT" }`), and creates no other `Query` record. The same with `query: { tags: ["a"] }` (no `__typename`) writes the same store: the `Known` entity reads no discriminator. `SetTagline` writes its nested `Query` object onto `Query.__ROOT` (`greeting`), and the `SetTaglinePayload` record links it under `query`.
-- Malformed responses throw, with the message of Errors: an empty response object `{}` for `Leaves` names `greeting`; `pet____id___v_id: "x"` at `["pet____id___v_id"]`; `petGrid: [[3]]` at `["petGrid",0,0]`; a pet without `__typename`; `id: 4`.
+- Malformed responses throw, with the message of Errors: an empty response object `{}` for `Leaves` names `greeting`; `pet____id___v_id: "x"` at `["pet____id___v_id"]`; `petGrid: [[3]]` at `["petGrid",0,0]`; a `feed` item without `__typename` (a `Discriminator` target); `id: 4`; a `search` item without `id` names `id`. A `search` item without `__typename` is written, because its target is `Known` and the discriminator is not read (Record ids).
+- A record id `constructor` is an ordinary key.
 - A throw part-way leaves the earlier writes: `pets: [{ ..valid Pet:1 }, "x"]` throws at `["pets",1]`, and `store` holds `Pet:1`.
 
 ### `check` (`test/check.test.ts`)
