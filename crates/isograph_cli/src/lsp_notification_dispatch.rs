@@ -1,10 +1,11 @@
 use std::ops::ControlFlow;
 
+use isograph_compiler::ClientId;
 use lsp_types::notification::Notification;
 use tracing::warn;
 
 use crate::effect::{IsographEffect, no_effects};
-use crate::event::{ClientId, LspNotification};
+use crate::event::LspNotification;
 
 pub struct LSPNotificationDispatch<'state, TState> {
     client: ClientId,

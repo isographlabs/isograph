@@ -7,14 +7,13 @@ use common_lang_types::{
     relative_path_from_absolute_and_working_directory,
 };
 use intern::string_key::Intern;
-use isograph_compiler::HostLanguage;
+use isograph_compiler::{ClientId, HostLanguage};
 use pico::Database;
 use prelude::Postfix;
 
 use crate::effect::{IsographEffect, no_effects};
 use crate::event::{
-    ClientConnectionEvent, ClientId, DiskChanged, InternalEvent, IsographEvent, LiveSessions,
-    Presence,
+    ClientConnectionEvent, DiskChanged, InternalEvent, IsographEvent, LiveSessions, Presence,
 };
 use crate::timer::TimerPayload;
 
@@ -289,10 +288,11 @@ mod tests {
     use super::{IsographDb, IsographState, handle, intern_config_directory};
     use crate::effect::IsographEffect;
     use crate::event::{
-        ClientConnectionEvent, ClientId, ClientStartedEvent, DiskChanged, DiskFileChanged,
-        FolderRemoved, InternalEvent, IsographEvent, LiveSession, LiveSessions, LspEvent,
-        LspNotification, LspResponse, Presence,
+        ClientConnectionEvent, ClientStartedEvent, DiskChanged, DiskFileChanged, FolderRemoved,
+        InternalEvent, IsographEvent, LiveSession, LiveSessions, LspEvent, LspNotification,
+        LspResponse, Presence,
     };
+    use isograph_compiler::ClientId;
 
     fn interned(s: &str) -> common_lang_types::RelativePathToSourceFile {
         s.intern().to()

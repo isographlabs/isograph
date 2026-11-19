@@ -1,8 +1,6 @@
-use isograph_compiler::HostLanguage;
+use isograph_compiler::{ClientId, HostLanguage};
 use pico::Database;
 use prelude::Postfix;
-
-use crate::event::ClientId;
 
 pub(crate) fn semantic_tokens_response<THostLanguage: HostLanguage>(
     state: &isograph_compiler::IsographDb<THostLanguage>,

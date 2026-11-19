@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use isograph_compiler::ClientId;
 use prelude::Postfix;
 
 use crate::timer::TimerPayload;
@@ -36,9 +37,6 @@ pub enum InternalEvent {
     Quit,
     DiskChanged(DiskChanged),
 }
-
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub(crate) struct ClientId(pub u64);
 
 #[derive(Clone, Debug)]
 pub struct LiveSession {

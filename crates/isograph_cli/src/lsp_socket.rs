@@ -97,7 +97,7 @@ pub(crate) async fn accept_loop(
     loop {
         match listener.accept().await {
             Ok((stream, peer)) => {
-                let client = crate::event::ClientId(next);
+                let client = isograph_compiler::ClientId(next);
                 next += 1;
                 let event_tx = event_tx.clone();
                 let std_stream = match stream.into_std() {
@@ -121,7 +121,7 @@ pub(crate) async fn accept_loop(
 fn session(
     stream: std::net::TcpStream,
     event_tx: tokio::sync::mpsc::UnboundedSender<crate::event::IsographEvent>,
-    client: crate::event::ClientId,
+    client: isograph_compiler::ClientId,
 ) {
     let (connection, io_threads) = match connection_from_stream(stream) {
         Ok(pair) => pair,
@@ -139,7 +139,7 @@ fn session(
 fn run_session(
     connection: &lsp_server::Connection,
     event_tx: tokio::sync::mpsc::UnboundedSender<crate::event::IsographEvent>,
-    client: crate::event::ClientId,
+    client: isograph_compiler::ClientId,
 ) {
     let capabilities = match serde_json::to_value(lsp_types::ServerCapabilities {
         semantic_tokens_provider:
@@ -231,11 +231,12 @@ mod tests {
     use super::{IsographEventNotification, accept_loop};
     use crate::daemon::{run_effect_loop, run_event_loop};
     use crate::event::{
-        ClientConnectionEvent, ClientId, ClientStartedEvent, DiskChanged, DiskFileChanged,
-        InternalEvent, IsographEvent, LiveSessions, Presence,
+        ClientConnectionEvent, ClientStartedEvent, DiskChanged, DiskFileChanged, InternalEvent,
+        IsographEvent, LiveSessions, Presence,
     };
     use crate::send::notify;
     use crate::state::{IsographDb, IsographState};
+    use isograph_compiler::ClientId;
     use isograph_extract_typescript::TypeScriptHostLanguage;
 
     const SETTLE: Duration = Duration::from_millis(250);

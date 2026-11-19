@@ -6,7 +6,8 @@ use lsp_server::{
 use lsp_types::request::Request;
 use serde_json::Value;
 
-use crate::event::{ClientId, LspRequest};
+use crate::event::LspRequest;
+use isograph_compiler::ClientId;
 
 use isograph_lsp::lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult};
 
@@ -122,7 +123,8 @@ mod test {
     };
 
     use super::LSPRequestDispatch;
-    use crate::event::{ClientId, LspRequest};
+    use crate::event::LspRequest;
+    use isograph_compiler::ClientId;
     use isograph_lsp::lsp_runtime_error::LSPRuntimeResult;
 
     #[test]

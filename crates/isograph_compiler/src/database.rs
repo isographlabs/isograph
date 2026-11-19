@@ -8,6 +8,10 @@ use prelude::Postfix;
 
 use crate::HostLanguage;
 
+/// A reader of file text.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct ClientId(pub u64);
+
 #[derive(Debug, Db)]
 pub struct IsographDb<THostLanguage: HostLanguage> {
     storage: Storage<Self>,
