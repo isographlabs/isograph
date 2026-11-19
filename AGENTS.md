@@ -32,7 +32,7 @@ A lookup that misses did not `db.get`. If it also did not `tracked()` the map, a
 
 Commit after every change, small and atomically, without being asked. Each logical change is its own commit.
 
-`git commit` runs `.pre-commit-config.yaml` in the dedicated worktree `<clone>-precommit` (for this clone, `/Users/rbalicki/code/i2-precommit`). The invoking working tree, index, and stash list are not modified. `git commit --no-verify` skips the hooks. This clone needs `git config core.hooksPath "$(git rev-parse --show-toplevel)/githooks"` run from the `i2` worktree so the stored path is absolute and every worktree of this clone runs that hook.
+`git commit` runs `.pre-commit-config.yaml` in the dedicated worktree `<clone>-precommit` (for this clone, `/Users/rbalicki/code/i2-precommit`). The invoking working tree, index, and stash list are not modified. The `cargo clippy` and `cargo test` hooks run on the workspace crates the commit changes plus their reverse dependencies (`scripts/affected-crates.sh`), and on the full workspace when the commit changes `Cargo.toml`, `Cargo.lock`, `clippy.toml`, or `.cargo/`. CI runs both on the full workspace. `git commit --no-verify` skips the hooks. This clone needs `git config core.hooksPath "$(git rev-parse --show-toplevel)/githooks"` run from the `i2` worktree so the stored path is absolute and every worktree of this clone runs that hook.
 
 ## Memory
 
