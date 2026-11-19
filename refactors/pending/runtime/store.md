@@ -168,7 +168,7 @@ The entity, from `target.entity`:
 - `Known`: `target.entity.name`. The discriminator is not read and not compared.
 - `Discriminator`: the value under `discriminatorResponseKey`, which must be a string (else it throws, Errors).
 
-The identity: the `identity` of the `Conditional` among `target.selections` whose condition holds for that entity, when one holds and its identity is not `Omit`; otherwise `target.identity`. The conditional's comes first because it is the identity of the response object's concrete entity; a union target's is `Omit` and its `asBlogItem` conditional's is `Select("id")`. At most one conditional of a selection set holds: the conditions compare the one entity with distinct values (the map keys conditionals by `Condition`). Only direct children are considered, because no condition nests under the current grammar (normalization-ast.md, Merging). The id, by the identity's `kind`:
+The identity: the `identity` of the `Conditional` among `target.selections` whose `condition.entityName` equals that entity, when one does and its identity is not `Omit`; otherwise `target.identity`. The conditional's comes first because it is the identity of the response object's concrete entity; a union target's is `Omit` and its `asBlogItem` conditional's is `Select("id")`. At most one conditional of a selection set matches: the conditions name distinct entities (the map keys conditionals by `Condition`). Only direct children are considered, because no condition nests under the current grammar (normalization-ast.md, Merging). The id, by the identity's `kind`:
 
 - `Fixed`: `identity.id`. The record is a root entity's one record (Nested objects of a root entity).
 - `Select`: the value under `identity.responseKey`, which must be a string (GraphQL serializes `ID` as a string, spec 3.5.5); any other value throws (Errors). An absent key throws as every absent selected key does.
@@ -191,17 +191,9 @@ The rule covers every root operation type, not only the operation's own: a mutat
 
 ## Conditions
 
-```ts
-// from libs/isograph-runtime/src/condition.ts
-/** Whether `condition` holds for an object whose discriminator value is `discriminator`. */
-export function conditionHolds(condition: NormalizationCondition, discriminator: JsonValue | undefined): boolean;
-```
+A `Conditional`'s `condition` is `{ kind: "SelectionEquals", entityName }` (normalization-ast.md, The condition). Every walk compares `condition.entityName` with the entity of the record it is on, inline, with `===`: `normalize` with the entity of the record it is writing (the target's `Known` entity, or the response's discriminator value under `Discriminator`; at the top level, `ast.root.entity`), and `check` and `garbageCollect` with the `entity` of the link they are at. The two agree for every record `normalize` wrote, because the link's entity is the entity `normalize` wrote it under. There is no `conditionHolds` function and no `src/condition.ts`. Upstream inlines the same comparison at each site (`__typename === type`, `cache.ts:356`, `check.ts:193`, `garbageCollection.ts:159`).
 
-`SelectionEquals` holds when `discriminator === condition.value`. `undefined`, `null`, a number, or another string is false. `normalize` has already thrown on a composite response object without a string discriminator (Errors), so it only passes strings; the other values are reachable through the function's type, and the function answers them.
-
-One evaluator serves all three traversals. `normalize` passes `response[condition.responseKey]` of the response object the conditional sits in. `check` and `garbageCollect` pass the current record's entity name, which is the first-layer key the record was reached under: the entity `normalize` read from that same response's discriminator. The two agree for every record `normalize` wrote.
-
-Delta from normalization-ast.md's declaration `conditionHolds(condition, response, variables)` in `normalize.ts`: it takes the discriminator value rather than the response, so check and garbage collection can call it against a stored record, which holds no discriminator; it has no `variables` because no v1 condition reads one (`VariableEquals` is Later there). Open decision 7.
+A switch on `condition.kind` would have one case; the comparison reads `condition.entityName` directly, because `kind` has one value in v1 and TypeScript narrows nothing by it. `VariableEquals` (normalization-ast.md, Later) adds the switch.
 
 ## `normalize`
 
@@ -230,7 +222,7 @@ Behavior, walking `ast.selections` against `response` onto the record `ast.root`
   - An object: its record is `recordLink(value, selection.target, ast.discriminatorResponseKey, position, variables)` (Record ids). The record is written by walking `selection.target.selections` against `value`, and the parent gets the link `{ entity, id }`. `selections` may be `[]` (normalization-ast.md: `stats { X @loadable }`); the record is still created, empty.
   - A list: the value is the list with each item replaced, recursively: `null` stays `null`, an object becomes a link as above with its index path, a nested list recurses. `[]` writes `[]`.
   - A string, number, or boolean, here or as a list item: throws.
-- `Conditional`: when `conditionHolds(condition, response[condition.responseKey])`, walks `selections` against the same response object onto the same record; otherwise nothing.
+- `Conditional`: when `condition.entityName === record.entity`, where `record` is the link of the record the walk is writing, walks `selections` against the same response object onto the same record; otherwise nothing.
 - A selected response key absent from the response object, outside a conditional that does not hold: throws. A well-formed response holds every such key, and conditionals already skip the keys of a fragment that does not apply.
 - The discriminator is never written to a record.
 
@@ -263,7 +255,7 @@ Upstream's semantics (`check.ts:43-215`): `null` is known data, only an absent k
 - `ast.root` absent from the store: `MissingData { record: ast.root }`.
 - Leaf selection: absent key is `MissingData { record: current }`; any value, `null` included, is enough.
 - Composite selection: absent key is `MissingData { record: current }`; `null` is enough; a link whose record is absent is `MissingData { record: link }`; a present record recurses with `selection.target.selections`, even when they are `[]`; a list recurses into every item and nested list, `null` items being enough. A value that is not `null`, a link, or a list of these throws (Errors).
-- `Conditional`: when `conditionHolds(condition, current.entity)`, recurses on the same record; otherwise enough.
+- `Conditional`: when `condition.entityName === current.entity`, recurses on the same record; otherwise enough.
 
 v1 has no `shouldFetch` decision function. The later network layer decides upstream's `'Yes' | 'No' | 'IfNecessary'` (default `IfNecessary`, `check.ts:13-16`; `makeNetworkRequest.ts:67-118`) by calling `check`.
 
@@ -291,7 +283,7 @@ Mark, then sweep (upstream `garbageCollectBaseStoreLayer`, `garbageCollection.ts
 
 - Each retained query marks `ast.root` when that record exists, and walks its AST from it.
 - A leaf selection marks nothing. A composite selection follows each link in its value (every list level), and marks and walks each linked record that exists. An absent key, `null`, or an absent record stops that path. A value that is not `null`, a link, or a list of these throws (Errors).
-- `Conditional`: when `conditionHolds(condition, current.entity)`, walks the same record.
+- `Conditional`: when `condition.entityName === current.entity`, walks the same record.
 - The sweep deletes every unmarked record, then every entity map left empty. Marked records stay whole, including fields no retained AST selects. `retained = []` empties the store.
 - Cyclic data terminates: the walk recurses on the AST, which is finite. A record reached by several paths is walked once per path.
 
@@ -347,13 +339,11 @@ libs/isograph-runtime/
   src/store.ts
   src/storeKey.ts
   src/recordId.ts
-  src/condition.ts
   src/normalize.ts
   src/check.ts
   src/garbageCollection.ts
   test/fixtures.ts
   test/storeKey.test.ts
-  test/condition.test.ts
   test/normalize.test.ts
   test/check.test.ts
   test/garbageCollection.test.ts
@@ -369,9 +359,9 @@ export type {
   Argument,
   Arguments,
   ArgumentValue,
+  Condition,
   NormalizationAst,
   NormalizationCompositeTarget,
-  NormalizationCondition,
   NormalizationConditional,
   NormalizationEntity,
   NormalizationIdentity,
@@ -399,7 +389,7 @@ export { garbageCollect, type RetainedQuery } from "./garbageCollection";
 export { normalize } from "./normalize";
 ```
 
-`storeKey`, `argumentChunks`, `recordLink`, `stableCopy`, and `conditionHolds` are module exports that `normalize`, `check`, and `garbageCollect` import; the package index does not export them. Their tests import the modules directly.
+`storeKey`, `argumentChunks`, `recordLink`, and `stableCopy` are module exports that `normalize`, `check`, and `garbageCollect` import; the package index does not export them. Their tests import the modules directly.
 
 ```json
 // from libs/isograph-runtime/package.json
@@ -613,10 +603,6 @@ Selections are taken from the fixture ASTs by response key.
 - `pet` with `{ id: "1" }` is `pet____id___1`; the response key is `pet____id___v_id`.
 - A variable whose value is an object (`{ q: { b: 1, a: 2 } }`, a test input of the wrong GraphQL type) stringifies with sorted keys.
 
-### Conditions (`test/condition.test.ts`)
-
-For `asBlogItem`'s condition: `"BlogItem"` holds; `"AdItem"`, `undefined`, `null`, `1`, and `"blogitem"` do not.
-
 ### `normalize` (`test/normalize.test.ts`)
 
 Each case asserts the whole resulting store with `storeOf`.
@@ -674,9 +660,9 @@ Each change is one commit. Prerequisite: normalization-ast.md changes 1 to 3.
 
 `vitest` and the `test` script; `target` and `include` in `tsconfig.json`; the CI step and the two pre-commit hooks; `fixtures/store` with its config, schema, sources, and generated artifacts; `test/fixtures.ts`.
 
-### 2. Store, store keys, record ids, conditions
+### 2. Store, store keys, record ids
 
-`src/store.ts`, `src/storeKey.ts`, `src/recordId.ts`, `src/condition.ts`; `test/storeKey.test.ts`, `test/condition.test.ts`. Depends on 1.
+`src/store.ts`, `src/storeKey.ts`, `src/recordId.ts`; `test/storeKey.test.ts`. Depends on 1.
 
 ### 3. `normalize`
 
@@ -692,7 +678,7 @@ Each change is one commit. Prerequisite: normalization-ast.md changes 1 to 3.
 
 ## Docs this doc amends
 
-- `refactors/pending/graphql-protocol/normalization-ast.md`: `conditionHolds` moves to `src/condition.ts` with the signature above (open decision 7); `tsconfig.json` `target` is `ES2022`. Open decision 10 (a) would add the operation's required variables to the AST.
+- `refactors/pending/graphql-protocol/normalization-ast.md`: `conditionHolds` is removed and the condition loses `responseKey` (Conditions; normalization-ast.md's own text says so); `tsconfig.json` `target` is `ES2022`. Open decision 10 (a) would add the operation's required variables to the AST.
 - `refactors/pending/runtime/pico-runtime.md`: the store is `Store` above, not upstream's layered store; `normalize`, `check`, and `garbageCollect` land here; its retained queries with a release buffer (intro, section 10, change 7) and its `log` option are dropped.
 
 ## Later
@@ -707,14 +693,6 @@ Upstream's format (held above) makes distinct arguments share a key: `name: "nul
 
 - (a) Upstream verbatim. Cost: the collisions above; a store key written for `skip: null` is read for unset `$skip` where the server applied `skip = 0`.
 - (b) Each chunk is `JSON.stringify(stableCopy(value))` (`____name___"null"` against `____name___null`), and an unset variable's argument is omitted from the key. Cost: a delta from upstream; `node(id: 1)` and `node(id: "1")` (one value after `ID` coercion) become two keys, which is a cache miss, not wrong data.
-
-### 7. `conditionHolds`'s signature and the condition's `responseKey`
-
-Held above: `conditionHolds(condition, discriminator)`; `normalize` reads `condition.responseKey`, check and collection pass the record's entity.
-
-- (a) As held. Amends normalization-ast.md's signature only.
-- (b) Also drop `responseKey` from `NormalizationCondition`, since it always equals `discriminatorResponseKey`, and `normalize` passes the entity it already read. Cost: amends the approved AST type.
-- (c) Keep normalization-ast.md's `conditionHolds(condition, response, variables)` for `normalize`, and a second comparison against the entity for check and collection. Cost: two evaluators, against the user's one.
 
 ### 8. How the fixture artifacts are generated
 

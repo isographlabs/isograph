@@ -191,17 +191,16 @@ export type ReaderResolverSelection = {
   readonly readerArtifact: ReaderArtifact<ResolverParam, unknown>;
 };
 
-/** When a conditional's selections apply. */
+/** When a conditional's selections apply: the record's entity is `entityName`. */
 export type Condition = {
   readonly kind: 'SelectionEquals';
-  /** The record's entity, the `entity` of the link the read is at, is this entity. */
-  readonly entity: string;
+  readonly entityName: string;
 };
 ```
 
 `Arguments` and `ArgumentValue` are normalization-ast.md's, unchanged; both ASTs print them and the runtime's `storeKey` reads both. `Variables` is store.md's. `index.ts` exports every type above.
 
-`Condition` is the TypeScript form of the core `Condition` (query-generation.md, `Condition::SelectionEquals(EntityName)`). normalization-ast.md's B' revision prints the normalization AST's conditionals from the same Rust type. If that revision prints a different shape, this doc uses that shape: one Rust type has one TypeScript type, in `artifacts.ts`.
+`Condition` is the TypeScript form of the core `Condition` (query-generation.md, `Condition::SelectionEquals(EntityName)`), and is normalization-ast.md's `Condition`, which its conditionals print from the same Rust type: one Rust type has one TypeScript type, in `artifacts.ts`. `index.ts` already exports it with the normalization types.
 
 ### Why `resolver` is a method signature
 
@@ -237,7 +236,7 @@ Upstream reads a refinement `asT` as a `Linked` node whose `condition` is the re
 i2 uses the core's `Condition` as data instead:
 
 ```ts
-{ kind: "Refinement", alias: "asPet", condition: { kind: "SelectionEquals", entity: "Pet" }, selections: [..] }
+{ kind: "Refinement", alias: "asPet", condition: { kind: "SelectionEquals", entityName: "Pet" }, selections: [..] }
 ```
 
 Reasons:
@@ -247,13 +246,13 @@ Reasons:
 - Upstream's condition reads `__link`, which i2 does not have.
 - Tests compare data; a function can only be called.
 
-The cost is one `switch` on `condition.kind` in the runtime (`conditionHolds`, below).
+The runtime compares `condition.entityName` with the record's entity inline, as `normalize`, `check`, and `garbageCollect` do (store.md, Conditions).
 
-The read: the refinement's value is `null` when `root.entity` is not `condition.entity`, and the selections read on the same record otherwise. That matches the param type the type walk already gives `asT` (`({ .. } | null)`, from the refinement's target `Union([Inner(T), Null])`). The link's `entity` is the entity `normalize` read from the response's discriminator (store.md, `normalize`), and store.md's `check` and `garbageCollect` test a conditional against the same value (store.md, Conditions). A refinement reads no store value, so it never reads `MissingData` itself.
+The read: the refinement's value is `null` when `root.entity` is not `condition.entityName`, and the selections read on the same record otherwise. That matches the param type the type walk already gives `asT` (`({ .. } | null)`, from the refinement's target `Union([Inner(T), Null])`). The link's `entity` is the entity `normalize` read from the response's discriminator (store.md, `normalize`), and store.md's `check` and `garbageCollect` test a conditional against the same value (store.md, Conditions). A refinement reads no store value, so it never reads `MissingData` itself.
 
 A link to a root record is an ordinary link. `normalize` writes a nested selection of a root entity (`identity: { kind: "Fixed" }`, normalization-ast.md, The record) as the link `{ entity: "Query", id: "__ROOT" }`, and the reader follows the stored link like any other, so the reader AST carries no record identity: it has no `entity`, no `identity`, and no root record. A `read` call names its root record (`queryRoot` in the tests); the reader AST of an entrypoint's field does not.
 
-The reader does not call store.md's `conditionHolds`: that function takes a `NormalizationCondition`, whose `responseKey` the reader has no use for. `refinementHolds` (The read function) is the reader's one-case comparison.
+The comparison is store.md's: `condition.entityName === root.entity`, inline in `readSelection`, with no function.
 
 Because refinements target concrete entities only (settled), the one condition kind is equality with one entity name. An abstract target would need the normalizer and the reader to agree on a second kind (normalization-ast.md, Abstract refinement targets, Later).
 
@@ -611,7 +610,6 @@ pub(crate) fn reader_artifact_file<TLiteralContext>(
 
 fn selection_set_value(selection_set: &ReaderSelectionSet) -> ArtifactValue;
 fn selection_value(selection: &ReaderSelection) -> ArtifactValue;
-fn condition_value(condition: &Condition) -> ArtifactValue;
 ```
 
 `reader_artifact_file` returns `MissingExport(field.field)` when `export` is `None` and `SourceNotRelative(field.field)` when `source_specifier` (`generate_types.rs`, made `pub(crate)`) returns `None`, as `output_type_file` does. The default export's value is an `Object` with, in this order:
@@ -626,7 +624,7 @@ Node values, keys in the order of the TypeScript types:
 - `Linked`: as `Scalar` with `kind: String("Linked")`, then `selections`.
 - `Refinement`: `kind: String("Refinement")`, `alias`, `condition`, `selections`.
 - `Resolver`: `kind: String("Resolver")`, `alias`, `arguments`, `readerArtifact: Import(ArtifactImport(field_artifact_path(field, RESOLVER_READER)))`.
-- `SelectionEquals(entity)`: `{ kind: String("SelectionEquals"), entity: String(entity) }`.
+- `condition`: normalization-ast.md's `condition_value` (`{ kind: "SelectionEquals", entityName }`), made `pub(crate)`.
 - `arguments`: normalization-ast.md's `arguments_value` (`Null` when empty), made `pub(crate)`.
 
 The module's items, in this order:
@@ -706,7 +704,6 @@ After: per field, `field.resolver_reader` `Some(reader)` adds `printed(reader_ar
 import type {
   ArgumentValue,
   Arguments,
-  Condition,
   ReaderArtifact,
   ReaderSelection,
   ReaderSelectionSet,
@@ -810,7 +807,7 @@ function readSelection(
       return linked.kind === "MissingData" ? missingDataFor(key, root, linked) : linked;
     }
     case "Refinement": {
-      if (!refinementHolds(selection.condition, root)) {
+      if (selection.condition.entityName !== root.entity) {
         return ok(null);
       }
       const refined = readSelectionSet(store, selection.selections, root, variables);
@@ -862,13 +859,6 @@ function readLinkedValue(
   );
 }
 
-function refinementHolds(condition: Condition, record: StoreLink): boolean {
-  switch (condition.kind) {
-    case "SelectionEquals":
-      return record.entity === condition.entity;
-  }
-}
-
 /** A `Resolver` node's variables: each argument with the reader's variables substituted. */
 function childVariables(variables: Variables, args: Arguments | null): Variables {
   return Object.fromEntries(
@@ -915,7 +905,7 @@ Semantics, stated as facts the tests assert:
 - A `Linked` node's stored value is `null`, a link, or a list whose elements are those, at any depth; the read keeps the list structure. Upstream maps one level of list only (`read.ts:707-776`), so a `[[Pet]]` field fails there.
 - A record is looked up only by a node that reads a value from it: a `Resolver` node whose reader AST is empty reads nothing, so it reads `Ok` on a link to a record that does not exist. A `Scalar` or `Linked` node on an absent record is `MissingData` with `reason` `No record for ..`. Upstream returns `MissingData` for an absent root record before reading any node (`read.ts:161-167`); the result differs only for a selection set that reads no store value.
 - A missing value under a `Linked`, `Refinement`, or `Resolver` node is wrapped once per node, as upstream wraps it (`read.ts:579-584`, `:737-747`): `nestedReason` is the inner `MissingData`, and `recordLink` is the innermost record, the one that lacks the value.
-- A refinement compares `root.entity` with `condition.entity` and reads no store value.
+- A refinement compares `root.entity` with `condition.entityName` and reads no store value.
 - A `Resolver` node reads the selected field's reader AST on the same root, with `childVariables`, and calls its resolver with `{ data, parameters: childVariables }`. The resolver's return is the node's value. The resolver is not called when its data is `MissingData`.
 - `childVariables` drops an argument whose top-level value is an absent variable, and writes `null` for an absent variable inside an object, which matches query-generation.md's held open decision 2. Upstream drops the absent variable in both places (`read.ts:465-490`).
 - The first `MissingData` ends the read (upstream's behavior); there is no partial result.
@@ -994,7 +984,7 @@ No snapshots. Facts about the reader AST, the printed artifact, and the read res
 - The text contains `resolver: resolver` and no `discriminator`.
 - `Scalar` prints `kind: "Scalar"`, `alias: "friendName"`, `selectableName: "firstName"`, `arguments: null`.
 - `Linked` prints `kind: "Linked"` and `selections: [`.
-- `Refinement` prints `kind: "Refinement"`, `kind: "SelectionEquals"`, `entity: "Pet"`.
+- `Refinement` prints `kind: "Refinement"`, `kind: "SelectionEquals"`, `entityName: "Pet"`.
 - Two `Resolver` nodes of `Pet.fullName` print `readerArtifact: Pet__fullName__resolver_reader` twice and its default import from `"./../../Pet/fullName/resolver_reader"` once.
 - An export name of `None` is `MissingExport`; a source outside the folder tree is `SourceNotRelative`.
 - `generate_artifacts`: a field with `resolver_reader: None` has no `resolver_reader.ts`; no `resolver_reader.ts` text is `export default {};`; `entrypoint.ts` still has `readerArtifact: Query__HomeRoute__resolver_reader`; `refetch_reader.ts` is still the stub.

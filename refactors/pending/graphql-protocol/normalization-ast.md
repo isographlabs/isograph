@@ -76,7 +76,7 @@ What the AST shows:
 - `discriminatorResponseKey` names, once for the artifact, the response key under which every composite response object holds its concrete entity's name. The `__typename` lines of the query have no node (The discriminator).
 - `id` is both an ordinary `Selection` node, stored like any other leaf, and the `pets` target's `identity`, which the normalizer reads to key `Pet`'s records.
 
-A refinement `asBlogItem { title }` under `newsfeed` is `{ kind: "Conditional", condition: { kind: "SelectionEquals", responseKey: "__typename", value: "BlogItem" }, identity: { kind: "Select", responseKey: "id" }, selections: [..] }` among `newsfeed`'s `target.selections`, after its selection nodes. `newsfeed`'s own target is a union: its `entity` is `{ kind: "Discriminator" }` and its `identity` is `{ kind: "Omit" }`. The conditional's records are of `BlogItem`, the entity its condition names, so it has no `entity`.
+A refinement `asBlogItem { title }` under `newsfeed` is `{ kind: "Conditional", condition: { kind: "SelectionEquals", entityName: "BlogItem" }, identity: { kind: "Select", responseKey: "id" }, selections: [..] }` among `newsfeed`'s `target.selections`, after its selection nodes. `newsfeed`'s own target is a union: its `entity` is `{ kind: "Discriminator" }` and its `identity` is `{ kind: "Omit" }`. The conditional's records are of `BlogItem`, the entity its condition names, so it has no `entity`.
 
 A selection of a root entity below the top level, `query { tags }` in `field Query.NestedQuery { greeting query { tags } }` on `query: Query!`, has the target `{ entity: { kind: "Known", name: "Query" }, identity: { kind: "Fixed", id: "__ROOT" }, selections: [tags] }`: the normalizer writes `tags` onto the `Query` record at `__ROOT`, the record `root` names. With `schema { query: RootQuery }`, the same holds for `RootQuery`, and `root` is `{ entity: "RootQuery", id: "__ROOT" }`.
 
@@ -129,7 +129,7 @@ export type NormalizationCompositeTarget = {
 
 export type NormalizationConditional = {
   readonly kind: "Conditional";
-  readonly condition: NormalizationCondition;
+  readonly condition: Condition;
   readonly identityResponseKey: string | null;
   readonly selections: NormalizationSelectionSet;
 };
@@ -177,7 +177,7 @@ export type NormalizationIdentity =
 
 export type NormalizationConditional = {
   readonly kind: "Conditional";
-  readonly condition: NormalizationCondition;
+  readonly condition: Condition;
   readonly identity: NormalizationIdentity;
   readonly selections: NormalizationSelectionSet;
 };
@@ -311,17 +311,16 @@ export type NormalizationIdentity =
 /** Selections normalized onto the parent's record when `condition` holds. */
 export type NormalizationConditional = {
   readonly kind: "Conditional";
-  readonly condition: NormalizationCondition;
+  readonly condition: Condition;
   /** The identity of the condition's entity. */
   readonly identity: NormalizationIdentity;
   readonly selections: NormalizationSelectionSet;
 };
 
-export type NormalizationCondition = {
+/** When a conditional's selections apply: the record's entity is `entityName`. */
+export type Condition = {
   readonly kind: "SelectionEquals";
-  /** A selection every response object of the parent holds: the discriminator. */
-  readonly responseKey: string;
-  readonly value: string;
+  readonly entityName: string;
 };
 
 export type Arguments = ReadonlyArray<Argument>;
@@ -336,7 +335,7 @@ export type ArgumentValue =
 
 The names follow `docs-website/docs/design-docs/mental-model.md`: a node is a selection of a selectable (`kind: "Selection"`, `selectableName`), and a condition compares a selection's value (`SelectionEquals`). `target: NormalizationCompositeTarget | null` is the TypeScript form of the core's `NormalizationTarget::{Leaf, Composite(NormalizationCompositeTarget)}` (below): `Leaf` is `null`, `Composite` is the object. `NormalizationEntity` is `RecordEntity::{Known, Discriminator}` and `NormalizationIdentity` is `NormalizationIdentity::{Select, Omit, Fixed}`, each variant a `kind`. The entity and identity sit in the target object, not on the selection, so a leaf selection cannot carry them.
 
-`NormalizationCondition` has one kind in v1. Later, `@include` and `@skip` add `VariableEquals` (Later).
+`Condition` has one kind in v1. It is the TypeScript form of the core `Condition` (query-generation.md), the same type the reader AST's refinements print (`refactors/pending/runtime/reader-ast.md`). Later, `@include` and `@skip` add `VariableEquals` (Later).
 
 ## The `@isograph/runtime` package
 
@@ -412,9 +411,9 @@ export type {
   Argument,
   Arguments,
   ArgumentValue,
+  Condition,
   NormalizationAst,
   NormalizationCompositeTarget,
-  NormalizationCondition,
   NormalizationConditional,
   NormalizationEntity,
   NormalizationIdentity,
@@ -492,38 +491,35 @@ Deltas from upstream (`isograph/libs/isograph-react/src/core/entrypoint.ts:122-1
 - `responseKey` is new. Upstream recomputes it per node in `getNetworkResponseKey` (`cache.ts:544-558`).
 - `isFallible` is dropped. Upstream's normalizer never reads it on a normalization node (`cache.ts` reads only `concreteType`, `fieldName`, `arguments`, `selections`, `type`); pico-runtime.md drops it too.
 - `concreteType: string | null` is `entity: { kind: "Known", name } | { kind: "Discriminator" }`. Upstream's normalizer names a linked record's type with `astNode.concreteType ?? networkResponseData.__typename` (`cache.ts:295-296`, `:322-323`); i2's normalizer reads the discriminator only under `Discriminator`. Upstream's `concreteType` is set from `ConcreteTargetEntityName` (`isograph/crates/isograph_schema/src/create_merged_selection_set.rs:820`); i2's `Known` from `Concreteness::Concrete` (query-generation.md).
-- `InlineFragment { type, selections }` is `Conditional { condition, selections }`. Upstream's `normalizeInlineFragment` (`cache.ts:345-370`) tests `response.__typename === type` and normalizes the selections onto the parent record. `SelectionEquals { responseKey: "__typename", value: type }` is that test, named as data.
+- `InlineFragment { type, selections }` is `Conditional { condition, selections }`. Upstream's `normalizeInlineFragment` (`cache.ts:345-370`) tests `response.__typename === type` and normalizes the selections onto the parent record. `SelectionEquals { entityName: type }` is that test, named as data; the walk compares it with the record's entity (Semantics).
 - `ArgumentValue` has no `Enum` kind, because `MergedValue` has none (query-generation.md), and `Literal`'s value is `number | boolean | null` where upstream's is `any`.
 - No `storage` field. pico-runtime.md derives it from an `inline_types` config option that does not exist in i2.
 
 ## The condition
 
-The core's completed map holds `Condition::SelectionEquals(EntityName)` for a refinement `asT` (query-generation.md). The AST's condition adds the discriminator's response key, which the runtime reads:
+The core's completed map holds `Condition::SelectionEquals(EntityName)` for a refinement `asT` (query-generation.md). The AST holds the same `Condition`, unchanged: the entity is the only fact the runtime reads, and the discriminator's response key is already `NormalizationAst.discriminator_response_key`.
+
+Before:
 
 ```rust
 // from crates/isograph_compiler/src/normalization_ast.rs
-/// When a conditional node's selections apply to the response object it is evaluated on.
-#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NormalizationCondition {
-    /// The value under `response_key` in the response object is `value`'s name.
     SelectionEquals(SelectionEqualsCondition),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SelectionEqualsCondition {
-    /// The discriminator's response key.
     pub response_key: NormalizationAlias,
     pub value: EntityName,
 }
 ```
 
-`NormalizationAlias` is query-generation.md's (`crates/isograph_compiler/src/merged_selection.rs`). `Condition::SelectionEquals(t)` is `SelectionEquals(SelectionEqualsCondition { response_key: discriminator_response_key, value: t })`.
+After: both types are deleted, and `NormalizationConditional.condition` is `Condition` (`crates/isograph_compiler/src/merged_selection.rs`).
 
 ### Semantics
 
 - A conditional node writes onto the parent's record. It creates no record and adds no segment to a response key path: its selections read keys of the same response object as the node's siblings, and write fields of the same record.
-- `SelectionEquals` holds when `response[responseKey] === value`. A key that is absent from the response object, or holds `null` or a value of another type, does not equal `value`; the condition is false and the selections are skipped.
-- The discriminator is in every composite response object, so `response[responseKey]` is always present for a well-formed response; `complete` puts the discriminator before every conditional of its selection set in the query (query-generation.md, Completion).
+- `SelectionEquals(entityName)` holds when the record's entity is `entityName`. The record's entity is the one the walk is on: in `normalize`, the entity `recordLink` took for the record (the target's `Known` entity, or the response's discriminator value under `Discriminator`, store.md); in `check`, garbage collection, and `read`, the `entity` of the link the walk is at. Each walk writes the comparison inline as `===`, as upstream inlines `__typename === type` at each site (`isograph/libs/isograph-react/src/core/cache.ts:356`, `check.ts:193`, `garbageCollection.ts:159`). There is no `conditionHolds` function.
+- A record's entity is always known when its conditionals are evaluated, so a condition never reads an absent or non-string value.
 
 ### Merging
 
@@ -540,20 +536,11 @@ Upstream's are concrete too: refinements are created per `concrete_child_entity_
 
 ### Representation in the artifact
 
-The artifact holds the condition as data (`{ kind: "SelectionEquals", responseKey: "__typename", value: "Pet" }`), and one runtime function evaluates every condition:
-
-```ts
-// from libs/isograph-runtime/src/normalize.ts
-export function conditionHolds(
-  condition: NormalizationCondition,
-  response: NetworkResponseObject,
-  variables: Variables,
-): boolean;
-```
+The artifact holds the condition as data (`{ kind: "SelectionEquals", entityName: "Pet" }`).
 
 Reasons: v1 tests assert facts about artifacts, and data compares (`===` on the fields, structural equality on the object) while functions do not; the artifact stays plain object literals (AGENTS.md, TypeScript: "Generated artifacts are plain object literals and types").
 
-The alternative is a generated function per condition, `condition: (response, variables) => response.__typename === "Pet"`. Its costs: `ArtifactValue` gains a function-expression variant and the SWC printer an arrow-function and expression layer (`===`, member access) that no other artifact needs; a test can only call it on inputs, not compare it; two equal conditions are two distinct function objects, so the runtime cannot key or deduplicate by condition; and the artifact contains code, which the TypeScript section excludes. What it buys is one less `switch` on `kind` per evaluation in the runtime.
+The alternative is a generated function per condition, `condition: (response, variables) => response.__typename === "Pet"`. Its costs: `ArtifactValue` gains a function-expression variant and the SWC printer an arrow-function and expression layer (`===`, member access) that no other artifact needs; a test can only call it on inputs, not compare it; two equal conditions are two distinct function objects, so the runtime cannot key or deduplicate by condition; and the artifact contains code, which the TypeScript section excludes. It would also read the response, which `check`, garbage collection, and `read` do not have.
 
 ## The core AST type
 
@@ -616,7 +603,7 @@ pub struct NormalizationCompositeTarget {
 /// The records of a conditional's response objects are of its condition's entity.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NormalizationConditional {
-    pub condition: NormalizationCondition,
+    pub condition: Condition,
     pub identity: NormalizationIdentity,
     pub selections: NormalizationSelectionSet,
 }
@@ -725,7 +712,7 @@ pub struct IntegerOutOfRange(pub i64);
 - `Discriminator` is `None` (The discriminator).
 - `Identity(name)` is `Selection { response_key: SelectionKey { name, arguments: MergedArguments::default() }.normalization_alias(), selectable_name: name, arguments: NormalizationArguments::default(), target: Leaf }`.
 - `Selectable(selection)` is `Selection { response_key: selection.key.normalization_alias(), selectable_name: selection.key.name, arguments: normalization_arguments(selection.key.arguments)?, target }`, with `target` `Leaf` for `CompletedSelectionTarget::Leaf` and, for `Composite(target)`, `Composite(NormalizationCompositeTarget { entity: target.entity.clone(), identity: normalization_identity(target.identity.reference()), selections: normalization_selection_set(target.selections, ..)? })`.
-- `Conditional(conditional)` is `Conditional { condition: SelectionEquals(SelectionEqualsCondition { response_key: discriminator_response_key.clone(), value }), identity: normalization_identity(conditional.identity.reference()), selections }`.
+- `Conditional(conditional)` is `Conditional { condition: conditional.condition.clone(), identity: normalization_identity(conditional.identity.reference()), selections }`.
 
 `normalization_identity` maps `Select(name)` to `NormalizationIdentity::Select(SelectionKey { name, arguments: MergedArguments::default() }.normalization_alias())`, the same response key as the `Identity` node, `Omit` to `Omit`, and `Fixed(id)` to `Fixed(id.clone())`. It decides nothing: `complete` decided both facts (query-generation.md, Completion).
 
@@ -776,7 +763,7 @@ fn composite_target_value(target: &NormalizationCompositeTarget) -> ArtifactValu
 fn root_record_value(root: &NormalizationRootRecord) -> ArtifactValue;
 fn entity_value(entity: &RecordEntity) -> ArtifactValue;
 fn identity_value(identity: &NormalizationIdentity) -> ArtifactValue;
-fn condition_value(condition: &NormalizationCondition) -> ArtifactValue;
+fn condition_value(condition: &Condition) -> ArtifactValue;
 fn arguments_value(arguments: &NormalizationArguments) -> ArtifactValue;
 fn argument_value(value: &NormalizationValue) -> ArtifactValue;
 ```
@@ -791,7 +778,7 @@ fn argument_value(value: &NormalizationValue) -> ArtifactValue;
 - `Conditional`: `kind: String("Conditional")`, `condition`, `identity`, `selections`.
 - `entity`: `{ kind: String("Known"), name: String(name) }` for `Known(name)`, `{ kind: String("Discriminator") }` for `Discriminator`.
 - `identity`: `{ kind: String("Select"), responseKey: String(alias) }` for `Select(alias)`, `{ kind: String("Omit") }` for `Omit`, `{ kind: String("Fixed"), id: String(id) }` for `Fixed(id)`.
-- `SelectionEquals`: `kind: String("SelectionEquals")`, `responseKey: String(alias)`, `value: String(entity name)`.
+- `SelectionEquals(entity_name)`: `kind: String("SelectionEquals")`, `entityName: String(entity_name)`.
 - `arguments`: `Null` when empty, else `Array` of `Array([String(name), value])`.
 - Values: `Variable` is `{ kind: "Variable", name }`; `Integer(n)` is `{ kind: "Literal", value: Number(f64::from(n)) }`; `Boolean` is `{ kind: "Literal", value: Boolean(..) }`; `Null` is `{ kind: "Literal", value: Null }`; `String(s)` is `{ kind: "String", value: String(s) }`; `Object(entries)` is `{ kind: "Object", value: Array([Array([String(name), value]), ..]) }`. Upstream's origin is `get_serialized_field_argument` (`isograph/crates/artifact_content/src/generate_artifacts.rs:497-597`), which writes the same shapes as text.
 
@@ -929,7 +916,7 @@ fn without_discriminator(lines: Vec<SelectionLine>, response_key: &str) -> Vec<S
 
 ```
 
-The asymmetry (The asymmetries) is removed from the text side: the comparison is `ast_lines(ast) == without_discriminator(text_lines(text), "__typename")`. `ast_lines` of a `Conditional` whose condition is `SelectionEquals { response_key: "__typename", value: T }` is `Conditional { entity: T }`; any other response key fails the test. Cases, building `EntrypointOperation` values from hand-built maps as query-generation.md's printer tests do:
+The asymmetry (The asymmetries) is removed from the text side: the comparison is `ast_lines(ast) == without_discriminator(text_lines(text), "__typename")`. `ast_lines` of a `Conditional` whose condition is `SelectionEquals(T)` is `Conditional { entity: T }`. Cases, building `EntrypointOperation` values from hand-built maps as query-generation.md's printer tests do:
 
 - For each of: a `Query` operation with a selection of an object with identity, a union target with a refinement, an interface target with `id`, a nested composite, a nested selection of the root entity `Query`, and arguments of every `MergedValue` kind: the comparison above holds. That asserts every selection's `responseKey` is the alias the query prints, every `... on T` of a refinement is a conditional on the discriminator equal to `T`, the identity appears in the AST exactly where the query has it, and the asymmetry is the only difference.
 - The text of every composite selection's block has `__typename: __typename` as its first line, and no AST node has `selectable_name == "__typename"`.
@@ -939,7 +926,6 @@ The asymmetry (The asymmetries) is removed from the text side: the comparison is
 - Identity: the object-with-identity selection's target has `identity == Select("id")`, and its selections hold a `Selection` node with `response_key == "id"`; the union selection's target has `identity == Omit`, and its `asBlogItem` conditional (on an object with `id: ID!`) has `identity == Select("id")`; the interface target with `id` has `Select("id")`.
 - Entity: the object selection's target has `entity == Known(Pet)`; the union and interface targets have `entity == Discriminator`.
 - Root: `ast.root == NormalizationRootRecord { entity: Query, id: FixedRecordId::root() }` for a `Query` operation and `{ entity: Mutation, .. }` for a `Mutation` one; a nested selection whose target is `Query` has `entity == Known(Query)` and `identity == Fixed(FixedRecordId::root())`, its text block has no `id: id` line even when `Query` has `id: ID!`, and under a `Mutation` operation the same `Query` target is `Fixed(FixedRecordId::root())` too; with `schema { query: RootQuery }`, `ast.root.entity == RootQuery` and a nested `RootQuery` target is `Known(RootQuery)` with `Fixed(FixedRecordId::root())`.
-- In every `Conditional`, the condition's `response_key` is `ast.discriminator_response_key`.
 - A composite selection whose map is empty, on an object with `IdentitySelection::Omit`: its node's target is `Composite(NormalizationCompositeTarget { entity: Known(PetStats), identity: Omit, selections: NormalizationSelectionSet(vec![]) })`, and the text's block is one `__typename: __typename` line.
 - `checkins(limit: 5)` gives `arguments == [limit: Integer(5)]`; `f(n: 4294967296)` is `Err(IntegerOutOfRange(4294967296))` from `query_for_entrypoint`, which returns no text for it.
 
@@ -952,7 +938,7 @@ The asymmetry (The asymmetries) is removed from the text side: the comparison is
 - A leaf `Selection` with no arguments prints `kind: "Selection"`, `responseKey: "firstName"`, `selectableName: "firstName"`, `arguments: null`, `target: null`.
 - The text contains `root: {`, `entity: "Query"`, and `id: "__ROOT"`.
 - A `Composite` with no nodes, `Discriminator`, and `Omit` prints `kind: "Discriminator"`, `kind: "Omit"`, and `selections: []`; with `Known(Pet)` and `Select("id")` it prints `kind: "Known"`, `name: "Pet"`, `kind: "Select"`, and `responseKey: "id"`; with `Fixed(FixedRecordId::root())` it prints `kind: "Fixed"` and `id: "__ROOT"`.
-- A `Conditional` prints `kind: "Conditional"`, `identity`, and `kind: "SelectionEquals"`, `responseKey: "__typename"`, `value: "Pet"`.
+- A `Conditional` prints `kind: "Conditional"`, `identity`, and `kind: "SelectionEquals"`, `entityName: "Pet"`, and no `responseKey` in the condition.
 - Arguments print `kind: "Variable"`, `kind: "Literal"` with `value: 5`, `value: true`, and `value: null`, `kind: "String"`, and `kind: "Object"`.
 - `entrypoint_artifact`'s text is unchanged: it starts with `export default {`.
 - `generate_artifacts` with one entrypoint input writes `Query/HomeRoute/normalization_ast.ts` whose text contains `responseKey: "pets"`, and `Query/HomeRoute/entrypoint.ts` still imports `./normalization_ast`.
@@ -971,7 +957,7 @@ Each change is one commit. Prerequisites: query-generation.md changes 1 to 8 and
 
 ### 2. The AST (isograph_compiler)
 
-`crates/isograph_compiler/src/normalization_ast.rs`: `NormalizationAst`, `NormalizationRootRecord`, `NormalizationSelectionSet`, `NormalizationNode`, `NormalizationSelection`, `NormalizationTarget`, `NormalizationCompositeTarget`, `NormalizationConditional`, `NormalizationIdentity`, `NormalizationCondition`, `SelectionEqualsCondition`, `NormalizationArguments`, `NormalizationArgument`, `NormalizationValue`, `NormalizationObjectEntry`, `IntegerOutOfRange`, `normalization_ast` and its helpers; `QueryArtifact.normalization_ast`; `EntrypointQueryError::IntegerOutOfRange`; the `normalization_ast` step of `query_for_entrypoint`; the comparison helpers and tests in `crates/graphql_network_protocol`. Depends on query-generation.md changes 7 and 10.
+`crates/isograph_compiler/src/normalization_ast.rs`: `NormalizationAst`, `NormalizationRootRecord`, `NormalizationSelectionSet`, `NormalizationNode`, `NormalizationSelection`, `NormalizationTarget`, `NormalizationCompositeTarget`, `NormalizationConditional`, `NormalizationIdentity`, `NormalizationArguments`, `NormalizationArgument`, `NormalizationValue`, `NormalizationObjectEntry`, `IntegerOutOfRange`, `normalization_ast` and its helpers; `QueryArtifact.normalization_ast`; `EntrypointQueryError::IntegerOutOfRange`; the `normalization_ast` step of `query_for_entrypoint`; the comparison helpers and tests in `crates/graphql_network_protocol`. Depends on query-generation.md changes 7 and 10.
 
 ### 3. The TypeScript artifact (typescript_artifacts)
 
@@ -985,7 +971,7 @@ The committed `demos/pet-demo/src/__isograph/` normalization ASTs, generated by 
 
 - Selecting `__typename` only where the normalizer reads it. v1 carries the concrete entity as `entity: Known(..)` (The record) and still selects the discriminator under every composite selection. Selecting it only under `Discriminator` targets and inside refinements, as upstream does (`isograph/crates/isograph_schema/src/create_merged_selection_set.rs:1419-1427`), is an efficiency change: fewer bytes per response. It changes `complete`'s step 4 and the printer tests that expect `__typename` first in every block.
 - `Node`-fetched entrypoints and refetch queries (`node(id: $id) { ... on T { .. } }`): the `... on T` is a `Conditional` (`SelectionEquals(T)`) in the AST, as upstream keeps an `InlineFragment` there (`isograph/demos/pet-demo/src/components/__isograph/BlogItem/BlogItemMoreDetail/normalization_ast.ts:16-41`), because the id comes from the caller and another entity's id returns `{ __typename: "Other" }` without `T`'s fields. entrypoints.md, Later.
-- `VariableEquals`. `@include(if: $x)` and `@skip(if: $x)` become conditionals: the merge key gains the condition, so `f @include(if: $a)` and `f` are two entries; the printer prints the directive; `Condition` and `NormalizationCondition` gain `VariableEquals { name, value }`, which holds when `variables[name] === value`. Nothing produces it in v1, so v1 has no such variant.
+- `VariableEquals`. `@include(if: $x)` and `@skip(if: $x)` become conditionals: the merge key gains the condition, so `f @include(if: $a)` and `f` are two entries; the printer prints the directive; `Condition` gains `VariableEquals { name, value }`, which holds when `variables[name] === value`; every walk then switches on the condition's `kind`, and `check`, garbage collection, and `read` receive the variables. Nothing produces it in v1, so v1 has no such variant.
 - Abstract refinement targets (interfaces, unions). `SelectionEquals` alone cannot express them, because the value the response holds under `__typename` is the concrete type name (`Pet`), never a fixed value that stands for the abstract type. Inside the fragment, the query selects one more aliased selection, `... on Named { __refinement__Named: __typename .. }`. The server returns that key only when the object is of the abstract type, so the condition is "the response object has the key `__refinement__Named`": a variant `SelectionPresent { response_key }`, with no list of concrete types and no subtype check at runtime. The key belongs to the same response object as the fragment's siblings (a fragment adds no path segment), and it is selected inside the fragment rather than before it. The generator owns the `__refinement__` prefix, so the alias cannot collide with a normalization alias: a name starting with `__` is reserved for introspection (GraphQL spec 3.4.1), and every normalization alias starts with its selectable name.
 
 ### Objects without an identity field (open area, not v1)
@@ -1000,6 +986,6 @@ Open question: an object with an identity field nested inside an identity-less o
 
 ## Docs this doc amends
 
-- `refactors/pending/runtime/pico-runtime.md`, Artifacts: `NormalizationScalarField`, `NormalizationLinkedField`, and `NormalizationInlineFragment` become `NormalizationSelection` (with `responseKey`, `selectableName`, and `target: NormalizationCompositeTarget | null`, the target holding `entity`, `identity`, and `selections`) and `NormalizationConditional` (with `identity`) with `NormalizationCondition` and `conditionHolds`; `responseKey` replaces the `getNetworkResponseKey` call in the identity rules; `concreteType` becomes `entity`; `normalize` per `InlineFragment` becomes per `Conditional`. Stored values need no `Scalar`/`Linked` tag: every store walk goes through an AST whose `target` says which selections are links. The identity rules read `identity` instead of `id` and `__typename === 'Query'`, and normalization starts at `ast.root`.
+- `refactors/pending/runtime/pico-runtime.md`, Artifacts: `NormalizationScalarField`, `NormalizationLinkedField`, and `NormalizationInlineFragment` become `NormalizationSelection` (with `responseKey`, `selectableName`, and `target: NormalizationCompositeTarget | null`, the target holding `entity`, `identity`, and `selections`) and `NormalizationConditional` (with `identity`) with `Condition`, compared inline with the record's entity; `responseKey` replaces the `getNetworkResponseKey` call in the identity rules; `concreteType` becomes `entity`; `normalize` per `InlineFragment` becomes per `Conditional`. Stored values need no `Scalar`/`Linked` tag: every store walk goes through an AST whose `target` says which selections are links. The identity rules read `identity` instead of `id` and `__typename === 'Query'`, and normalization starts at `ast.root`.
 - `refactors/pending/runtime/pico-runtime.md`, Changes: change 1 (`libs/isograph-runtime` with `package.json`, `tsconfig.json`, `src/index.ts`) is this doc's change 1; the runtime's changes add modules and the `import` export condition to the existing package. Open decision 11 (package location and name) is settled as `libs/isograph-runtime` and `@isograph/runtime`, private to the workspace rather than published, with no knowledge of React.
 - `refactors/pending/artifact-set-and-types.md`, Per entrypoint: an entrypoint's `normalization_ast.ts` is this doc's artifact once change 3 lands.
