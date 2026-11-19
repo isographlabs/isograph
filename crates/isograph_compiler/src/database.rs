@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 
 use common_lang_types::RelativePathToSourceFile;
 use pico::{Database, SourceId, Storage};
-use pico_macros::{Db, Source};
+use pico_macros::{Db, Source, memo};
 use prelude::Postfix;
 
 use crate::HostLanguage;
@@ -17,6 +17,8 @@ pub struct IsographDb<THostLanguage: HostLanguage> {
     storage: Storage<Self>,
     #[tracked]
     disk_file_map: DiskFileMap,
+    #[tracked]
+    open_file_map: OpenFileMap,
     phantom_data: PhantomData<THostLanguage>,
 }
 
@@ -25,6 +27,7 @@ impl<THostLanguage: HostLanguage> Default for IsographDb<THostLanguage> {
         Self {
             storage: Storage::default(),
             disk_file_map: DiskFileMap::default(),
+            open_file_map: OpenFileMap::default(),
             phantom_data: PhantomData,
         }
     }
@@ -40,7 +43,99 @@ pub struct DiskFile {
     pub contents: String,
 }
 
+/// Every client's open buffers.
+#[derive(Debug, Default)]
+pub struct OpenFileMap(pub HashMap<OpenFileKey, SourceId<OpenFile>>);
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct OpenFileKey {
+    pub client: ClientId,
+    pub path: RelativePathToSourceFile,
+}
+
+/// One client's buffer of one path.
+#[derive(Debug, Clone, PartialEq, Eq, Source)]
+pub struct OpenFile {
+    #[key]
+    pub key: OpenFileKey,
+    pub contents: String,
+}
+
+/// The text of `path` as `client` reads it: that client's open buffer, otherwise disk.
+#[memo]
+pub fn file_contents<THostLanguage: HostLanguage>(
+    db: &IsographDb<THostLanguage>,
+    client: ClientId,
+    path: RelativePathToSourceFile,
+) -> Option<String> {
+    match db.open_file_source_id(OpenFileKey { client, path }) {
+        Some(open_file_id) => db.get(open_file_id).contents.clone().wrap_some(),
+        None => db
+            .get(db.disk_file_source_id(path)?)
+            .contents
+            .clone()
+            .wrap_some(),
+    }
+}
+
 impl<THostLanguage: HostLanguage> IsographDb<THostLanguage> {
+    fn open_file_source_id(&self, key: OpenFileKey) -> Option<SourceId<OpenFile>> {
+        match self.get_open_file_map().untracked().0.get(&key).copied() {
+            Some(open_file_id) => open_file_id.wrap_some(),
+            None => self.get_open_file_map().tracked().0.get(&key).copied(),
+        }
+    }
+
+    fn disk_file_source_id(&self, path: RelativePathToSourceFile) -> Option<SourceId<DiskFile>> {
+        match self.get_disk_file_map().untracked().0.get(&path).copied() {
+            Some(disk_file_id) => disk_file_id.wrap_some(),
+            None => self.get_disk_file_map().tracked().0.get(&path).copied(),
+        }
+    }
+
+    pub fn set_open_file(
+        &mut self,
+        client: ClientId,
+        path: RelativePathToSourceFile,
+        contents: String,
+    ) {
+        let key = OpenFileKey { client, path };
+        let open_file_id = self.set(OpenFile { key, contents });
+        if self.get_open_file_map().untracked().0.contains_key(&key) {
+            return;
+        }
+        self.get_open_file_map_mut()
+            .tracked()
+            .0
+            .insert(key, open_file_id);
+    }
+
+    pub fn remove_open_file(&mut self, client: ClientId, path: RelativePathToSourceFile) {
+        let key = OpenFileKey { client, path };
+        let Some(open_file_id) = self.get_open_file_map().untracked().0.get(&key).copied() else {
+            return;
+        };
+        self.get_open_file_map_mut().tracked().0.remove(&key);
+        self.remove(open_file_id);
+    }
+
+    pub fn remove_open_files_of_client(&mut self, client: ClientId) {
+        let is_client = |key: &OpenFileKey| key.client == client;
+        if !self.get_open_file_map().untracked().0.keys().any(is_client) {
+            return;
+        }
+        let open_file_ids: Vec<SourceId<OpenFile>> = self
+            .get_open_file_map_mut()
+            .tracked()
+            .0
+            .extract_if(|key, _| is_client(key))
+            .map(|(_, open_file_id)| open_file_id)
+            .collect();
+        for open_file_id in open_file_ids {
+            self.remove(open_file_id);
+        }
+    }
+
     pub fn insert_disk_file(&mut self, path: RelativePathToSourceFile, contents: String) {
         let source_id = self.set(DiskFile { path, contents });
         self.get_disk_file_map_mut()
@@ -83,7 +178,7 @@ mod tests {
 
     use std::path::Path;
 
-    use super::IsographDb;
+    use super::{ClientId, IsographDb, file_contents};
     use crate::host_language::{HostLanguage, IsoLiteralExtraction, SkipSourceFile};
 
     #[derive(Clone, Debug, PartialEq, Eq, Error)]
@@ -300,5 +395,311 @@ mod tests {
         state.insert_disk_file(path, "a".to_owned());
         state.remove_disk_files_from_path(intern_path(""));
         assert!(state.disk_file(path).is_none());
+    }
+
+    fn read(
+        db: &IsographDb<TestHostLanguage>,
+        client: ClientId,
+        path: RelativePathToSourceFile,
+    ) -> Option<String> {
+        file_contents(db, client, path).clone()
+    }
+
+    #[test]
+    fn file_contents_with_no_disk_file_and_no_buffer_is_none() {
+        let db = IsographDb::<TestHostLanguage>::default();
+        assert_eq!(
+            read(db.reference(), ClientId(1), intern_path("src/a.ts")),
+            None
+        );
+    }
+
+    #[test]
+    fn file_contents_falls_back_to_disk() {
+        let mut db = IsographDb::<TestHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        db.insert_disk_file(path, "disk".to_owned());
+        assert_eq!(
+            read(db.reference(), ClientId(1), path),
+            "disk".to_owned().wrap_some()
+        );
+    }
+
+    #[test]
+    fn an_open_buffer_wins_over_disk_for_its_client_only() {
+        let mut db = IsographDb::<TestHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        db.insert_disk_file(path, "disk".to_owned());
+        db.set_open_file(ClientId(1), path, "open".to_owned());
+        assert_eq!(
+            read(db.reference(), ClientId(1), path),
+            "open".to_owned().wrap_some()
+        );
+        assert_eq!(
+            read(db.reference(), ClientId(2), path),
+            "disk".to_owned().wrap_some()
+        );
+    }
+
+    #[test]
+    fn an_open_buffer_without_a_disk_file_is_read_by_its_client_only() {
+        let mut db = IsographDb::<TestHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        db.set_open_file(ClientId(1), path, "open".to_owned());
+        assert_eq!(
+            read(db.reference(), ClientId(1), path),
+            "open".to_owned().wrap_some()
+        );
+        assert_eq!(read(db.reference(), ClientId(2), path), None);
+    }
+
+    #[test]
+    fn a_second_set_open_file_of_the_same_key_replaces_the_text() {
+        let mut db = IsographDb::<TestHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        db.set_open_file(ClientId(1), path, "first".to_owned());
+        assert_eq!(
+            read(db.reference(), ClientId(1), path),
+            "first".to_owned().wrap_some()
+        );
+        db.set_open_file(ClientId(1), path, "second".to_owned());
+        assert_eq!(
+            read(db.reference(), ClientId(1), path),
+            "second".to_owned().wrap_some()
+        );
+    }
+
+    #[test]
+    fn two_clients_with_one_path_open_each_read_their_own() {
+        let mut db = IsographDb::<TestHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        db.insert_disk_file(path, "disk".to_owned());
+        db.set_open_file(ClientId(1), path, "one".to_owned());
+        db.set_open_file(ClientId(2), path, "two".to_owned());
+        assert_eq!(
+            read(db.reference(), ClientId(1), path),
+            "one".to_owned().wrap_some()
+        );
+        assert_eq!(
+            read(db.reference(), ClientId(2), path),
+            "two".to_owned().wrap_some()
+        );
+    }
+
+    #[test]
+    fn an_empty_buffer_is_read_and_not_disk() {
+        let mut db = IsographDb::<TestHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        db.insert_disk_file(path, "disk".to_owned());
+        db.set_open_file(ClientId(1), path, String::new());
+        assert_eq!(
+            read(db.reference(), ClientId(1), path),
+            String::new().wrap_some()
+        );
+    }
+
+    #[test]
+    fn a_disk_change_while_open_does_not_change_the_buffer_read() {
+        let mut db = IsographDb::<TestHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        db.insert_disk_file(path, "disk".to_owned());
+        db.set_open_file(ClientId(1), path, "open".to_owned());
+        assert_eq!(
+            read(db.reference(), ClientId(1), path),
+            "open".to_owned().wrap_some()
+        );
+        db.insert_disk_file(path, "disk changed".to_owned());
+        assert_eq!(
+            read(db.reference(), ClientId(1), path),
+            "open".to_owned().wrap_some()
+        );
+        assert_eq!(
+            read(db.reference(), ClientId(2), path),
+            "disk changed".to_owned().wrap_some()
+        );
+    }
+
+    #[test]
+    fn remove_open_file_falls_back_to_the_current_disk_text() {
+        let mut db = IsographDb::<TestHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        db.insert_disk_file(path, "disk".to_owned());
+        db.set_open_file(ClientId(1), path, "open".to_owned());
+        assert_eq!(
+            read(db.reference(), ClientId(1), path),
+            "open".to_owned().wrap_some()
+        );
+        db.insert_disk_file(path, "disk changed".to_owned());
+        db.remove_open_file(ClientId(1), path);
+        assert_eq!(
+            read(db.reference(), ClientId(1), path),
+            "disk changed".to_owned().wrap_some()
+        );
+    }
+
+    #[test]
+    fn remove_open_file_of_a_key_never_opened_leaves_every_read_unchanged() {
+        let mut db = IsographDb::<TestHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        let other = intern_path("src/b.ts");
+        db.insert_disk_file(path, "disk".to_owned());
+        db.set_open_file(ClientId(1), path, "open".to_owned());
+        db.remove_open_file(ClientId(1), other);
+        db.remove_open_file(ClientId(2), path);
+        assert_eq!(
+            read(db.reference(), ClientId(1), path),
+            "open".to_owned().wrap_some()
+        );
+        assert_eq!(
+            read(db.reference(), ClientId(2), path),
+            "disk".to_owned().wrap_some()
+        );
+        assert_eq!(read(db.reference(), ClientId(1), other), None);
+    }
+
+    #[test]
+    fn remove_open_files_of_client_leaves_another_clients_buffers() {
+        let mut db = IsographDb::<TestHostLanguage>::default();
+        let a = intern_path("src/a.ts");
+        let b = intern_path("src/b.ts");
+        db.insert_disk_file(a, "disk a".to_owned());
+        db.insert_disk_file(b, "disk b".to_owned());
+        db.set_open_file(ClientId(1), a, "one a".to_owned());
+        db.set_open_file(ClientId(1), b, "one b".to_owned());
+        db.set_open_file(ClientId(2), a, "two a".to_owned());
+        assert_eq!(
+            read(db.reference(), ClientId(1), a),
+            "one a".to_owned().wrap_some()
+        );
+        assert_eq!(
+            read(db.reference(), ClientId(1), b),
+            "one b".to_owned().wrap_some()
+        );
+        db.remove_open_files_of_client(ClientId(1));
+        assert_eq!(
+            read(db.reference(), ClientId(1), a),
+            "disk a".to_owned().wrap_some()
+        );
+        assert_eq!(
+            read(db.reference(), ClientId(1), b),
+            "disk b".to_owned().wrap_some()
+        );
+        assert_eq!(
+            read(db.reference(), ClientId(2), a),
+            "two a".to_owned().wrap_some()
+        );
+    }
+
+    #[test]
+    fn remove_open_files_of_a_client_with_nothing_open_leaves_every_read_unchanged() {
+        let mut db = IsographDb::<TestHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        db.insert_disk_file(path, "disk".to_owned());
+        db.set_open_file(ClientId(2), path, "two".to_owned());
+        db.remove_open_files_of_client(ClientId(1));
+        assert_eq!(
+            read(db.reference(), ClientId(1), path),
+            "disk".to_owned().wrap_some()
+        );
+        assert_eq!(
+            read(db.reference(), ClientId(2), path),
+            "two".to_owned().wrap_some()
+        );
+        assert_eq!(db.get_open_file_map().untracked().0.len(), 1);
+    }
+
+    #[test]
+    fn remove_disk_file_of_a_path_open_in_one_client() {
+        let mut db = IsographDb::<TestHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        db.insert_disk_file(path, "disk".to_owned());
+        db.set_open_file(ClientId(1), path, "open".to_owned());
+        assert_eq!(
+            read(db.reference(), ClientId(2), path),
+            "disk".to_owned().wrap_some()
+        );
+        db.remove_disk_file(path);
+        assert_eq!(
+            read(db.reference(), ClientId(1), path),
+            "open".to_owned().wrap_some()
+        );
+        assert_eq!(read(db.reference(), ClientId(2), path), None);
+    }
+
+    #[test]
+    fn missing_then_present_on_disk_is_read() {
+        let mut db = IsographDb::<TestHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        // pico records no dependency on a never-written tracked counter; see refactors/pending/pico-missing-key-dependency.md.
+        db.insert_disk_file(intern_path("src/other.ts"), "other".to_owned());
+        assert_eq!(read(db.reference(), ClientId(1), path), None);
+        db.insert_disk_file(path, "disk".to_owned());
+        assert_eq!(
+            read(db.reference(), ClientId(1), path),
+            "disk".to_owned().wrap_some()
+        );
+    }
+
+    #[test]
+    fn read_disk_then_open_then_close_then_remove_disk() {
+        let mut db = IsographDb::<TestHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        // pico records no dependency on a never-written tracked counter; see refactors/pending/pico-missing-key-dependency.md.
+        db.set_open_file(ClientId(2), intern_path("src/other.ts"), "other".to_owned());
+        db.insert_disk_file(path, "disk".to_owned());
+        assert_eq!(
+            read(db.reference(), ClientId(1), path),
+            "disk".to_owned().wrap_some()
+        );
+        db.set_open_file(ClientId(1), path, "open".to_owned());
+        assert_eq!(
+            read(db.reference(), ClientId(1), path),
+            "open".to_owned().wrap_some()
+        );
+        db.set_open_file(ClientId(1), path, "open again".to_owned());
+        assert_eq!(
+            read(db.reference(), ClientId(1), path),
+            "open again".to_owned().wrap_some()
+        );
+        db.remove_open_file(ClientId(1), path);
+        assert_eq!(
+            read(db.reference(), ClientId(1), path),
+            "disk".to_owned().wrap_some()
+        );
+        db.remove_disk_file(path);
+        assert_eq!(read(db.reference(), ClientId(1), path), None);
+    }
+
+    #[test]
+    fn another_clients_open_does_not_change_a_disk_read() {
+        let mut db = IsographDb::<TestHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        db.insert_disk_file(path, "disk".to_owned());
+        assert_eq!(
+            read(db.reference(), ClientId(1), path),
+            "disk".to_owned().wrap_some()
+        );
+        db.set_open_file(ClientId(2), path, "two".to_owned());
+        assert_eq!(
+            read(db.reference(), ClientId(1), path),
+            "disk".to_owned().wrap_some()
+        );
+    }
+
+    #[test]
+    fn read_before_first_open_file_write_misses_the_later_open() {
+        let mut db = IsographDb::<TestHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        db.insert_disk_file(path, "disk".to_owned());
+        assert_eq!(
+            read(db.reference(), ClientId(1), path),
+            "disk".to_owned().wrap_some()
+        );
+        db.set_open_file(ClientId(1), path, "open".to_owned());
+        // pico records no dependency on a never-written tracked counter; see refactors/pending/pico-missing-key-dependency.md; when that lands, flip this assertion to the buffer text.
+        assert_eq!(
+            read(db.reference(), ClientId(1), path),
+            "disk".to_owned().wrap_some()
+        );
     }
 }
