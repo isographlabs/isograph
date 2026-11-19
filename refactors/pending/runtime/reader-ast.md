@@ -2,7 +2,7 @@
 
 Status: not actively worked.
 
-Every `resolver_reader.ts` that `refactors/pending/artifact-set-and-types.md` writes as `export default {};` becomes a real reader artifact: the field's reader AST, its discriminator's selectable name, and its resolver function imported from the user's source file. `@isograph/runtime` gains one function, `read`, which walks a reader AST over the store, calls the resolvers, and returns the root resolver's value or `MissingData`. Client pointers are not read in the base plan, consistent with query generation omitting them (`refactors/pending/graphql-protocol/query-generation.md`, Client pointers); open decision 1 is whether v1 supports them.
+Every `resolver_reader.ts` that `refactors/pending/artifact-set-and-types.md` writes as `export default {};` becomes a real reader artifact: the field's reader AST and its resolver function imported from the user's source file. `@isograph/runtime` gains one function, `read`, which walks a reader AST over the store, calls the resolvers, and returns the root resolver's value or `MissingData`. v1 skips client pointers, consistent with query generation omitting them (`refactors/pending/graphql-protocol/query-generation.md`, Client pointers): the reader AST has no node for a pointer selection, the selecting field's param type has no key for it, and the runtime has no pointer read. v1 has no directives, so the reader never sees `@loadable` or `@component`.
 
 The reader AST is built in the core (`isograph_compiler`) from a field's iso literal, in the same walk that builds the field's param type, so the reader's data and the param type agree by construction. The TypeScript host prints it. No protocol code builds it.
 
@@ -14,16 +14,18 @@ Settled by the user, and assumed throughout:
 - The store is entity, then id, then a record from store key to value. Links are untagged, because every walk goes through an AST that says which values are links.
 - A store key is a selectable name plus its arguments with variable values, computed at runtime.
 - `asT` refinements target concrete entities only.
-- The discriminator (`__typename`) is selected under every composite selection, and a reader reads it through its artifact's discriminator key.
+- The discriminator (`__typename`) is selected under every composite selection, and the store does not keep it (store.md, The store). A refinement compares the entity name the link already carries.
+- v1 has no directives. The parser reports every directive (`@loadable`, `@component`, any other) as a parse error; that parser change is planned separately. No selection or declaration the reader walk receives carries a directive.
 - Artifacts are typed (`const x: T = ...; export default x;`), importing their types from `@isograph/runtime`.
 
 Upstream references are the checkout at `/Users/rbalicki/code/isograph` (commit `79e2a3c0`).
 
 Prerequisites, in their own docs:
 
-- query-generation.md (the B' revision in `/Users/rbalicki/code/i2-worktrees/b-prime-doc`) change 6: `NetworkProtocol::selectable_shape`, `::discriminator`, `SelectableShape`, `Condition`, `MergedArguments`, `FieldVariable`, `SelectionMapError`, `source_field_declaration`; and change 8 (a failed query writes no artifacts), which the acyclicity argument in Reader artifact imports relies on.
+- query-generation.md (the B' revision in `/Users/rbalicki/code/i2-worktrees/b-prime-doc`) change 6: `NetworkProtocol::selectable_shape`, `SelectableShape`, `Condition`, `MergedArguments`, `FieldVariable`, `SelectionMapError`, `source_field_declaration`; and change 8 (a failed query writes no artifacts), which the acyclicity argument in Reader artifact imports relies on.
 - `refactors/pending/graphql-protocol/normalization-ast.md` changes 2 to 4: the argument types `NormalizationArguments` and their builder, the `@isograph/runtime` package, `RUNTIME_PACKAGE`, `TypeScriptItem::DeclaredConst`, `::ExportDefaultBinding`, and `arguments_value`.
-- `refactors/pending/runtime/store.md` (being written): `Store`, `StoreRecord`, `StoreValue`, `StoreLink`, `Variables`, `VariableValue`, `getRecord`, `storeKey`, `isStoreLink`, and `normalize`. Store dependencies, below, lists what this doc needs from it. When store.md's names differ, stop and fix this doc first.
+- `refactors/pending/runtime/store.md` changes 1 to 3: `Store`, `StoreRecord`, `StoreValue`, `StoreLink`, `StoreKey`, `JsonValue`, `Variables`, `storeKey`, `normalize`, and the fixture project `libs/isograph-runtime/fixtures/store`. Store dependencies, below, lists what this doc needs from it and the two amendments it makes. When store.md's names differ, stop and fix this doc first.
+- The parser change that makes every directive a parse error. It removes `@component` and `@loadable` from the pet demo's sources and from store.md's fixture (`StatsCard @loadable` in `Query.EmptyStats`), and with them `ClientFieldKind` (`crates/isograph_compiler/src/schema.rs`), `Loadability` and `SelectedClientField.loadability` (`crates/isograph_compiler/src/artifact_types.rs`), and the `IdentityWithParamComponent` overloads (`crates/typescript_artifacts/src/iso_overloads.rs`). This doc is written against the code after that change.
 
 ## End-user experience
 
@@ -50,7 +52,6 @@ import type { Pet__fullName__output_type } from "./output_type";
 import type { Pet__fullName__param } from "./param_type";
 import { fullName as resolver } from "./../../../Pet";
 const readerArtifact: ReaderArtifact<Pet__fullName__param, Pet__fullName__output_type> = {
-  discriminator: "__typename",
   readerAst: [
     { kind: "Scalar", alias: "firstName", selectableName: "firstName", arguments: null },
     { kind: "Scalar", alias: "lastName", selectableName: "lastName", arguments: null },
@@ -60,7 +61,7 @@ const readerArtifact: ReaderArtifact<Pet__fullName__param, Pet__fullName__output
 export default readerArtifact;
 ```
 
-For `field Query.PetDetailRoute` (demos/pet-demo/src/PetDetailRoute.ts), `Query/PetDetailRoute/resolver_reader.ts` is:
+For `field Query.PetDetailRoute` (demos/pet-demo/src/PetDetailRoute.ts, after the parser change removes `@component` from it and `@loadable(lazyLoadArtifact: true)` from its `PetCheckinsCard(limit: 5)` selection), `Query/PetDetailRoute/resolver_reader.ts` is:
 
 ```ts
 // generated by crates/typescript_artifacts/src/reader_artifact.rs
@@ -69,10 +70,10 @@ import type { Query__PetDetailRoute__output_type } from "./output_type";
 import type { Query__PetDetailRoute__param } from "./param_type";
 import { PetDetailRoute as resolver } from "./../../../PetDetailRoute";
 import Pet__PetBestFriendCard__resolver_reader from "./../../Pet/PetBestFriendCard/resolver_reader";
+import Pet__PetCheckinsCard__resolver_reader from "./../../Pet/PetCheckinsCard/resolver_reader";
 import Pet__PetStatsCard__resolver_reader from "./../../Pet/PetStatsCard/resolver_reader";
 import Pet__fullName__resolver_reader from "./../../Pet/fullName/resolver_reader";
 const readerArtifact: ReaderArtifact<Query__PetDetailRoute__param, Query__PetDetailRoute__output_type> = {
-  discriminator: "__typename",
   readerAst: [
     {
       kind: "Linked",
@@ -83,6 +84,12 @@ const readerArtifact: ReaderArtifact<Query__PetDetailRoute__param, Query__PetDet
         { kind: "Scalar", alias: "id", selectableName: "id", arguments: null },
         { kind: "Resolver", alias: "fullName", arguments: null, readerArtifact: Pet__fullName__resolver_reader },
         { kind: "Resolver", alias: "PetStatsCard", arguments: null, readerArtifact: Pet__PetStatsCard__resolver_reader },
+        {
+          kind: "Resolver",
+          alias: "PetCheckinsCard",
+          arguments: [["limit", { kind: "Literal", value: 5 }]],
+          readerArtifact: Pet__PetCheckinsCard__resolver_reader,
+        },
         { kind: "Resolver", alias: "PetBestFriendCard", arguments: null, readerArtifact: Pet__PetBestFriendCard__resolver_reader },
       ],
     },
@@ -94,25 +101,27 @@ export default readerArtifact;
 
 What the artifact shows:
 
-- One node per selection, in selection order. `PetCheckinsCard(limit: 5) @loadable(lazyLoadArtifact: true)`, `bestFriend { fullName }`, and `owner { OwnerBadge }` have no node: v1 reads neither `@loadable` selections nor client pointers, and under open decision 2 (b) the param type drops their keys too, so `data.pet.bestFriend` is a TypeScript error rather than `undefined` at runtime.
+- One node per selection, in selection order. `bestFriend { fullName }` and `owner { OwnerBadge }` have no node: v1 does not read client pointers. The param type drops their keys too, so `data.pet.bestFriend` is a TypeScript error rather than `undefined` at runtime.
+- `PetCheckinsCard(limit: 5)` is an ordinary client field selection. Its `Resolver` node passes `limit: 5`; `PetCheckinsCard` declares `$limit: Int = 3`, and a passed variable takes no default.
 - `alias` is the key of the value in the resolver's `data`: the reader alias, else the selectable name. `friendName: firstName` in `PetBestFriendCard` is `{ kind: "Scalar", alias: "friendName", selectableName: "firstName", arguments: null }`.
 - `arguments` keep the enclosing field's variables as `Variable`s. The runtime substitutes the reader's variables when it computes the store key.
 - A client field selection is a `Resolver` node that imports the selected field's reader artifact.
-- `discriminator` is the protocol's discriminator selectable. A refinement node reads it (Refinements).
 
 The pet demo's `HomeRoute` reader has a `Linked` `pets` node whose selections are `id` and a `Resolver` for `PetSummaryCard`; `SetTagline`'s `set_pet_tagline` node has `arguments: [["input", { kind: "Object", value: [["id", { kind: "Variable", name: "id" }], ["tagline", { kind: "Variable", name: "tagline" }]] }]]`.
 
-A test (there is no React and no network in v1) normalizes a response and reads:
+A test (there is no React and no network in v1) normalizes a response from store.md's fixture project and reads:
 
 ```ts
-// from libs/isograph-runtime/src/read.test.ts
-const store = createStore();
-normalize(store, petDetailNormalizationAst, response, { id: '1' }, queryRoot);
-const result = read(store, petDetailReaderArtifact, queryRoot, { id: '1' });
-expect(result).toEqual({ kind: 'Ok', value: 'Makayla Balicki' });
+// from libs/isograph-runtime/test/read.test.ts
+const store: Store = new Map();
+normalize(store, petSummaryNormalizationAst, response, { id: "1" }, queryRoot);
+expect(read(store, petSummaryReaderArtifact, queryRoot, { id: "1" })).toEqual({
+  kind: "Ok",
+  value: { pet: { id: "1", PetName: { name: "Rex", nickname: null }, RecentCheckins: { checkins: [/* .. */] } } },
+});
 ```
 
-`createStore`, `normalize`, and `queryRoot` are store.md's. A read whose data is not in the store returns `{ kind: 'MissingData' }`; it does not throw a promise.
+`normalize`, `Store`, and `queryRoot` are store.md's; `Query.PetSummary` is this doc's addition to its fixture (Tests, Runtime). How the test loads `petSummaryReaderArtifact` is open decision 1. A read whose data is not in the store returns `MissingData` naming the record that lacks it (The read function); it does not throw a promise.
 
 `entrypoint.ts` is unchanged: its `readerArtifact` property already imports `./resolver_reader`'s default export, which is now the object above.
 
@@ -122,14 +131,12 @@ expect(result).toEqual({ kind: 'Ok', value: 'Makayla Balicki' });
 // from libs/isograph-runtime/src/artifacts.ts
 /** The default export of a `resolver_reader.ts` artifact. */
 export type ReaderArtifact<TParam, TOutput> = {
-  /** The name of the selectable whose stored value names a record's concrete entity. */
-  readonly discriminator: string;
   readonly readerAst: ReaderSelectionSet;
   /**
    * A method signature, so TypeScript compares its parameter bivariantly: an artifact
    * declared with one field's param type is also a `ReaderArtifact<ResolverParam, TOutput>`.
    */
-  resolver(param: TParam, componentProps: Record<PropertyKey, never>): TOutput;
+  resolver(param: TParam): TOutput;
 };
 
 /** What `read` calls a resolver with. */
@@ -187,7 +194,7 @@ export type ReaderResolverSelection = {
 /** When a conditional's selections apply. */
 export type Condition = {
   readonly kind: 'SelectionEquals';
-  /** The record's discriminator value equals this entity's name. */
+  /** The record's entity, the `entity` of the link the read is at, is this entity. */
   readonly entity: string;
 };
 ```
@@ -198,22 +205,20 @@ export type Condition = {
 
 ### Why `resolver` is a method signature
 
-`ReaderResolverSelection.readerArtifact` holds the reader artifact of any field, and `read` calls its resolver. With a property signature (`readonly resolver: (param: TParam, ...) => TOutput`), `strictFunctionTypes` compares the parameter contravariantly, so `ReaderArtifact<Pet__fullName__param, string>` is not a `ReaderArtifact<ResolverParam, unknown>`, and typing the node needs `any` (banned, AGENTS.md TypeScript) or a cast in the runtime. A method signature is compared bivariantly: `Pet__fullName__param` is assignable to `ResolverParam` (a type literal has an implicit index signature, and `Record<PropertyKey, never>` is assignable to `Variables`), so the assignment type-checks with no cast. The cost is that a method signature cannot be `readonly`.
-
-The second parameter exists because a `@component` resolver has two (`IdentityWithParamComponent`, artifact-set-and-types.md, iso.ts): `(data, componentProps) => R` is not assignable to a one-parameter signature. A plain resolver ignores it. Open decision 8.
+`ReaderResolverSelection.readerArtifact` holds the reader artifact of any field, and `read` calls its resolver. With a property signature (`readonly resolver: (param: TParam) => TOutput`), `strictFunctionTypes` compares the parameter contravariantly, so `ReaderArtifact<Pet__fullName__param, string>` is not a `ReaderArtifact<ResolverParam, unknown>`, and typing the node needs `any` (banned, AGENTS.md TypeScript) or a cast in the runtime. A method signature is compared bivariantly: `Pet__fullName__param` is assignable to `ResolverParam` (a type literal has an implicit index signature, and `Record<PropertyKey, never>` is assignable to `Variables`), so the assignment type-checks with no cast. The cost is that a method signature cannot be `readonly`.
 
 ### Upstream node kinds and what each becomes
 
 Upstream's types are `isograph/libs/isograph-react/src/core/reader.ts`.
 
 - `ReaderScalarField` (`reader.ts:89-96`) is `ReaderScalarSelection`. `fieldName` is `selectableName` (mental-model.md: the node names a selectable). `alias` is always a string, the reader alias or the selectable name, where upstream writes `null` and the runtime computes `alias ?? fieldName` (`read.ts:186`). `isFallible` is dropped: nothing in upstream's runtime reads it (its only occurrence outside artifacts is a literal at `read.ts:874`), and nothing in i2's would. `isUpdatable` is dropped (Later).
-- `ReaderLinkedField` (`reader.ts:103-121`) splits in two. Without `condition` it is `ReaderLinkedSelection`, with `isFallible`, `isUpdatable`, and `refetchQueryIndex` dropped. With a refinement's `condition` it is `ReaderRefinementSelection` (Refinements). With a client pointer's `condition` and `refetchQueryIndex` it has no counterpart in the base plan (open decision 1).
+- `ReaderLinkedField` (`reader.ts:103-121`) splits in two. Without `condition` it is `ReaderLinkedSelection`, with `isFallible`, `isUpdatable`, and `refetchQueryIndex` dropped. With a refinement's `condition` it is `ReaderRefinementSelection` (Refinements). With a client pointer's `condition` and `refetchQueryIndex` it is dropped (Client pointers, Later).
 - `ReaderNonLoadableResolverField` (`reader.ts:127-134`) is `ReaderResolverSelection`. `usedRefetchQueries` is dropped (no refetch queries). `readerArtifact` is the artifact, not a thunk (Reader artifact imports).
 - `ReaderLinkField` (`reader.ts:98-101`, `kind: "Link"`, the `__link` selection) is dropped: i2 has no `__link` selectable (artifact-set-and-types.md, Later), so nothing produces the node. Later: with `__link`, a `Link` node whose value is the root link.
 - `ReaderImperativelyLoadedField` (`reader.ts:136-142`) is dropped. Later: with refetch queries and a fetch path in the runtime.
-- `LoadablySelectedField` (`reader.ts:144-159`) is dropped. Later: with a loadable field's own query and a fetch path. Until then a `@loadable` selection has no node (open decision 2).
-- `EagerReaderArtifact` (`reader.ts:26-37`) is `ReaderArtifact`. `kind` is dropped: v1 has one reader artifact kind, so nothing reads it. `fieldName` is dropped: upstream reads it for log messages and fragment reference ids (`read.ts:88`, `FragmentReference.ts:78`), and v1 has neither. `hasUpdatable` is dropped (Later, with `@updatable`). `discriminator` is new. `resolver`'s second parameter is new (above).
-- `ComponentReaderArtifact` (`reader.ts:39-51`) is dropped: it returns a React node, and the runtime has no React knowledge. Later: a React package depending on `@isograph/runtime` defines components. Until then a `@component` field's reader artifact is a `ReaderArtifact` like any other (open decision 8).
+- `LoadablySelectedField` (`reader.ts:144-159`) is dropped: v1 has no `@loadable` (Selections v1 does not read, Later).
+- `EagerReaderArtifact` (`reader.ts:26-37`) is `ReaderArtifact`. `kind` is dropped: v1 has one reader artifact kind, so nothing reads it. `fieldName` is dropped: upstream reads it for log messages and fragment reference ids (`read.ts:88`, `FragmentReference.ts:78`), and v1 has neither. `hasUpdatable` is dropped (Later, with `@updatable`).
+- `ComponentReaderArtifact` (`reader.ts:39-51`) is dropped: v1 has no `@component`, and the runtime has no React knowledge. Later: a React package depending on `@isograph/runtime` defines components.
 - `RefetchReaderArtifact` (`reader.ts:61-76`) is dropped; `refetch_reader.ts` stays artifact-set-and-types.md's stub. Later, with refetch queries.
 
 ## Refinements
@@ -244,18 +249,34 @@ Reasons:
 
 The cost is one `switch` on `condition.kind` in the runtime (`conditionHolds`, below).
 
-The read: the refinement's value is `null` when the record's discriminator value is not `entity`, and the selections read on the same record otherwise. That matches the param type the type walk already gives `asT` (`({ .. } | null)`, from the refinement's target `Union([Inner(T), Null])`). A record with no stored discriminator value is `MissingData`.
+The read: the refinement's value is `null` when `root.entity` is not `condition.entity`, and the selections read on the same record otherwise. That matches the param type the type walk already gives `asT` (`({ .. } | null)`, from the refinement's target `Union([Inner(T), Null])`). The link's `entity` is the entity `normalize` read from the response's discriminator (store.md, `normalize`), and store.md's `check` and `garbageCollect` test a conditional against the same value (store.md, Conditions). A refinement reads no store value, so it never reads `MissingData` itself.
+
+The reader does not call store.md's `conditionHolds`: that function takes a `NormalizationCondition`, whose `responseKey` the reader has no use for. `refinementHolds` (The read function) is the reader's one-case comparison.
 
 Because refinements target concrete entities only (settled), the one condition kind is equality with one entity name. An abstract target would need the normalizer and the reader to agree on a second kind (normalization-ast.md, Abstract refinement targets, Later).
 
 ## Selections v1 does not read
 
-Two kinds of selection have no reader node in the base plan:
+A client pointer selection (`bestFriend { fullName }`) has no reader node: query generation omits pointers, so the data the pointer's resolver reads is not fetched by construction. The selecting field's param type has no key for it, and the runtime has no pointer read. This differs from artifact-set-and-types.md's decided param types until pointers land.
 
-- A client pointer selection (`bestFriend { fullName }`): query generation omits pointers, so the data the pointer's resolver reads is not fetched by construction. Open decision 1.
-- A `@loadable` client field selection (`PetCheckinsCard(limit: 5) @loadable(..)`): query generation omits its selections (query-generation.md, The walk), and v1 has no loadable field node. Later: `LoadablySelectedField`.
+The type walk still lists a pointer in `FieldTypes.selected`, and the client fields under it, so their own artifacts (param type, output type, reader artifact) are generated as today. A pointer's own artifacts stay: `Pet/bestFriend/{param_type,output_type,resolver_reader}.ts`, `Pet/__link/output_type.ts`, `Owner/__link/output_type.ts`, and the iso overload that constrains a pointer resolver's return to the link type.
 
-Under open decision 2 (b), which the body is written against, neither selection has a key in the selecting field's param type. The type walk still lists them in `FieldTypes.selected`, so the selected field's own artifacts (param type, output type, reader artifact, a `@loadable` field's entrypoint and refetch stub) are generated as today. Delta in the generated pet demo: `Query__PetDetailRoute__param`'s `pet` object loses `PetCheckinsCard`, `bestFriend`, and `owner`, and its imports of `Owner__OwnerBadge__output_type` and `Pet__PetCheckinsCard__output_type`. `PetDetailRoute`'s resolver reads only `data.pet?.fullName`, so the demo type-checks unchanged.
+Delta in the generated pet demo, after the parser change: `Query__PetDetailRoute__param`'s `pet` object loses `bestFriend` and `owner`, and its import of `Owner__OwnerBadge__output_type`. `PetDetailRoute`'s resolver reads only `data.pet?.fullName`, so the demo type-checks unchanged, and it reads real data for `pet { id, fullName, PetStatsCard, PetCheckinsCard(limit: 5), PetBestFriendCard }`.
+
+### Client pointers, Later
+
+Eager pointers, read through the link the pointer's resolver returns, need:
+
+- Query generation: `selection_contribution`'s `ClientPointer` arm inlines the pointer's own selection set as the `ClientField` arm does (upstream `merge_client_object_field`, `isograph/crates/isograph_schema/src/create_merged_selection_set.rs:852-929`). `inlined_fields` then lists pointers, so `field Pet.loop to Pet { loop }` becomes `InlineCycle`. The target-side selections are fetched only if another selection fetches them; otherwise the read is `MissingData`.
+- Reader AST: a `Pointer` node (`alias`, `arguments`, the pointer's reader artifact, `selections`). The runtime reads the pointer's resolver, then `readLinkedValue` of the returned link or links with `selections`. The generated link output types (`E/__link/output_type.ts`) are upstream's `{ __link, __typename }`, and `readLinkedValue` reads store.md's `StoreLink` (`{ entity, id }`), so either those output types change to store.md's shape or the read converts.
+- Reader artifact imports: `field Pet.Card { bestFriend { Card } }` is not an `InlineCycle`, so `Card`'s reader imports itself. That needs thunks (`readerArtifact: () => X`, upstream's shape) or a compile-time error for a cycle of reader imports.
+- Param types: the pointer's key returns, with the nested object under the `to` wrapper.
+
+Upstream's loadable pointers additionally need a refetch query per pointer through `node(id:)` (`insert_client_object_selectable_into_refetch_paths`, `:1135-1289`), a fetch path in the runtime, and `LoadableField` types in param types.
+
+### `@loadable` and `@component`, Later
+
+Neither directive parses in v1, so neither reaches the reader. `@loadable` returns with a loadable field's own query (the field's entrypoint and refetch artifacts), a fetch path in the runtime, a `LoadablySelectedField` node (upstream `reader.ts:144-159`), and a loader in the selecting field's param type. `@component` returns with a React package that defines components over `@isograph/runtime` (upstream `ComponentReaderArtifact`, `reader.ts:39-51`).
 
 ## The core reader AST
 
@@ -319,11 +340,11 @@ pub struct ReaderResolverSelection {
 
 ### Why the core builds it
 
-The B' split (query-generation.md, What the protocol tells the core) puts every protocol-neutral structure in the core and has the protocol report facts as core values. The reader walk needs three facts about protocol data, and each is already a `NetworkProtocol` method: whether a target is a scalar (`entity_kind`, landed), whether a selectable is a refinement (`selectable_shape`, query-generation.md change 6), and the discriminator's name (`discriminator`, change 6). Nothing in the reader AST is GraphQL-specific: `__typename` arrives as `discriminator()`'s value, and `... on T` never exists in the reader (it is the GraphQL printer's form of a `Condition`). `typescript_artifacts` prints the result and cannot depend on `graphql_network_protocol` (AGENTS.md).
+The B' split (query-generation.md, What the protocol tells the core) puts every protocol-neutral structure in the core and has the protocol report facts as core values. The reader walk needs two facts about protocol data, and each is already a `NetworkProtocol` method: whether a target is a scalar (`entity_kind`, landed) and whether a selectable is a refinement (`selectable_shape`, query-generation.md change 6). Nothing in the reader AST is GraphQL-specific: `... on T` never exists in the reader (it is the GraphQL printer's form of a `Condition`). `typescript_artifacts` prints the result and cannot depend on `graphql_network_protocol` (AGENTS.md).
 
 ## The walk
 
-The reader AST is built in `field_types`, the walk that builds the param type (`crates/isograph_compiler/src/artifact_types.rs`), so every data field and every reader node come from one function call on one selection and have the same key and order (open decision 10).
+The reader AST is built in `field_types`, the walk that builds the param type (`crates/isograph_compiler/src/artifact_types.rs`), so every data field and every reader node come from one function call on one selection and have the same key and order. A separate `reader_ast` memo with its own walk would repeat the same lookups and error checks, and the agreement of its keys with the param type's would be a test instead of a construction.
 
 Before (landed):
 
@@ -377,8 +398,7 @@ struct SelectionOutput {
 enum SelectionRead {
     /// Its field of the data type and its reader node, which have the same key.
     Read(ReadSelection),
-    /// A client pointer or a `@loadable` client field: neither the data type nor the reader
-    /// AST has it.
+    /// A client pointer: neither the data type nor the reader AST has it.
     NotRead,
 }
 
@@ -461,7 +481,7 @@ fn resolver_arguments<TProfile: CompilationProfile>(
 
 `selection_field`, with `alias` the reader alias or the selection name (the landed `ArtifactObjectField.key` expression), per `SelectableKind`:
 
-- `ClientField(_)`: a nested selection set is `SelectionSetOnClientField`, as today. `selected` is the field itself with its loadability. `Loadable` is `NotRead`. `Eager` is `Read` with the landed data field (`ClientFieldOutput(field)`) and `Resolver(ReaderResolverSelection { alias, field, arguments: resolver_arguments(..)? })`.
+- `ClientField`: a nested selection set is `SelectionSetOnClientField`, as today. `selected` is the field itself. The result is `Read` with the landed data field (`ClientFieldOutput(field)`) and `Resolver(ReaderResolverSelection { alias, field, arguments: resolver_arguments(..)? })`.
 - `ClientPointer(Parsed(target))`: as today (no nested selection set is `MissingSelectionSet`; the nested `object_type` runs per inner entity of `target`, and its `selected` is appended after the pointer itself), and the result is `NotRead`. The nested walk still runs so that a broken selection under a pointer is still an error and the client fields it selects still get their artifacts.
 - `ClientPointer(Unparsed)`: `IncompleteParse`, as today.
 - `Server(server)`: `arguments` is `reader_arguments(context, selection)?`. The landed `try_map` over `server.target` builds the data type; its closure also records the first inner entity's `ReaderTarget` in a local `Option<ReaderTarget>` (`Scalar` for `EntityKind::Scalar`, `Object(ObjectTarget { entity, reader })` with the nested `object_type`'s `reader` for `EntityKind::Object`). A server selectable's target has one inner entity. An `Option` still `None` after `try_map` (a target with no inner entity) is `NoTargetEntity(key)`. Then, on `TProfile::NetworkProtocol::selectable_shape(server.data.reference())`:
@@ -518,7 +538,7 @@ pub(crate) fn merged_arguments(
 
 `resolver_arguments` starts from `reader_arguments`. It reads `field_variables(db, client, selected.parent_entity_name, selected.selectable_name)`; an argument `selected` does not declare is `SelectionMap` with `UnknownFieldArgument` (located at the argument, as query generation locates it). For each variable of `selected` that the selection does not pass and that has a `default_value`, it adds the default (a `MergedValue` with no variables, so it narrows like a literal). The result is sorted by name.
 
-Why defaults go into the parent's node (open decision 4): query generation inlines `field Pet.X($n: Int = 3) { checkins(limit: $n) }` selected as `X` with `n` replaced by `3`, so the normalizer writes the store key of `checkins(limit: 3)`. `X`'s own reader reads `checkins(limit: $n)` with the variables its `Resolver` node computes. With the default in the node, those variables hold `n: 3` and the reader computes the same key. A variable with no default that is not passed is absent from the child's variables; query generation removes such an argument from the merge key, and `storeKey` omits a top-level argument whose variable is absent (Store dependencies), so both keys omit it.
+Why defaults go into the parent's node: query generation inlines `field Pet.X($n: Int = 3) { checkins(limit: $n) }` selected as `X` with `n` replaced by `3`, so the normalizer writes the store key of `checkins(limit: 3)`. `X`'s own reader reads `checkins(limit: $n)` with the variables its `Resolver` node computes. With the default in the node, those variables hold `n: 3` and the reader computes the same key. The alternative, defaults in the child's reader artifact applied by `read`, would apply them at an entrypoint's top-level read too, where `normalize` receives the caller's variables and applies none, so the two keys would differ. A variable with no default that is not passed is absent from the child's variables; query generation removes such an argument from the merge key, and whether the reader's key omits it too is open decision 2.
 
 At the top of a read (an entrypoint's reader, read with the caller's variables) no default is applied by either side: the normalizer and the reader receive the same `variables`, so their keys agree.
 
@@ -529,25 +549,18 @@ A `Resolver` node imports the selected field's reader artifact as a value, so th
 i2's base plan needs no thunk:
 
 - A reader artifact is generated only for a field reachable from an entrypoint (artifact-set-and-types.md open decision 3 (a)).
-- A `Resolver` node is emitted only for an eager client field selection, which query generation inlines; a cycle of such selections reachable from an entrypoint makes that entrypoint's query `InlineCycle` (query-generation.md, Cycles).
+- A `Resolver` node is emitted only for a client field selection, which query generation inlines; a cycle of such selections reachable from an entrypoint makes that entrypoint's query `InlineCycle` (query-generation.md, Cycles).
 - A failed query writes no artifacts (query-generation.md open decision 4).
-- `@loadable` and pointer selections, the two kinds query generation does not inline, have no node.
+- Pointer selections, the one kind query generation does not inline, have no node.
 
-So every generated reader import graph is acyclic. Open decision 1's option (b) breaks the last point and needs thunks or a cycle check.
+So every generated reader import graph is acyclic. Eager pointers (Client pointers, Later) break the last point and need thunks or a cycle check.
 
-### `ProjectArtifacts` and `FieldArtifacts`
+### `FieldArtifacts`
 
 Before:
 
 ```rust
 // from crates/isograph_compiler/src/artifact_types.rs
-pub struct ProjectArtifacts<TLiteralContext> {
-    pub fields: Vec<FieldArtifacts<TLiteralContext>>,
-    pub entities: Vec<EntityName>,
-    pub entrypoints: Vec<EntityNameAndSelectableName>,
-    pub link_types: Vec<LinkType>,
-}
-
 pub struct FieldArtifacts<TLiteralContext> {
     pub field: EntityNameAndSelectableName,
     pub kind: FieldArtifactKind,
@@ -564,15 +577,6 @@ After:
 
 ```rust
 // from crates/isograph_compiler/src/artifact_types.rs
-pub struct ProjectArtifacts<TLiteralContext> {
-    pub fields: Vec<FieldArtifacts<TLiteralContext>>,
-    pub entities: Vec<EntityName>,
-    pub entrypoints: Vec<EntityNameAndSelectableName>,
-    pub link_types: Vec<LinkType>,
-    /// The protocol's `discriminator()`, which every reader artifact names.
-    pub discriminator: SelectableName,
-}
-
 pub struct FieldArtifacts<TLiteralContext> {
     pub field: EntityNameAndSelectableName,
     pub kind: FieldArtifactKind,
@@ -586,9 +590,9 @@ pub struct FieldArtifacts<TLiteralContext> {
 }
 ```
 
-`project_artifacts` sets `resolver_reader` to `types.reader_ast` when `reachable` contains the field and `None` otherwise, and `discriminator` to `TProfile::NetworkProtocol::discriminator()`. The host cannot call `discriminator()` itself: `HostLanguage::generate_artifacts` is not generic over the protocol. The derives are unchanged (`Clone, Debug, PartialEq, Eq`).
+`project_artifacts` sets `resolver_reader` to `types.reader_ast` when `reachable` contains the field and `None` otherwise. `ProjectArtifacts` is unchanged. `loadable_artifacts` is whatever the parser change leaves it; with no `@loadable`, no field's is `Generated`. The derives are unchanged (`Clone, Debug, PartialEq, Eq`).
 
-Callers: `isograph_cli`'s `compile.rs` `generate_artifacts` calls `project_artifacts`, then `HostLanguage::generate_artifacts`; nothing else calls `field_types` or `project_artifacts`. The test hosts (`crates/isograph_cli/src/watch.rs`, the test profiles) ignore the new fields.
+Callers: `isograph_cli`'s `compile.rs` `generate_artifacts` calls `project_artifacts`, then `HostLanguage::generate_artifacts`; nothing else calls `field_types` or `project_artifacts`. The test hosts (`crates/isograph_cli/src/watch.rs`, the test profiles) ignore the new field.
 
 ## The TypeScript artifact
 
@@ -599,7 +603,6 @@ Callers: `isograph_cli`'s `compile.rs` `generate_artifacts` calls `project_artif
 pub(crate) fn reader_artifact_file<TLiteralContext>(
     field: &FieldArtifacts<TLiteralContext>,
     reader: &ReaderSelectionSet,
-    discriminator: SelectableName,
     export: Option<ConstExportName>,
     options: &Options,
 ) -> Result<TypeScriptModule, TypeScriptGenerationError>;
@@ -611,7 +614,6 @@ fn condition_value(condition: &Condition) -> ArtifactValue;
 
 `reader_artifact_file` returns `MissingExport(field.field)` when `export` is `None` and `SourceNotRelative(field.field)` when `source_specifier` (`generate_types.rs`, made `pub(crate)`) returns `None`, as `output_type_file` does. The default export's value is an `Object` with, in this order:
 
-- `discriminator`: `String(discriminator)`.
 - `readerAst`: `selection_set_value(reader)`.
 - `resolver`: `NamedImport(NamedImport { specifier, imported: export, local: "resolver" })`.
 
@@ -693,7 +695,7 @@ Before:
                 )
 ```
 
-After: per field, `field.resolver_reader` `Some(reader)` adds `printed(reader_artifact_file(field, reader, project.discriminator, export_name(field.resolver.context.reference()), options)?.reference())`; `None` adds nothing. The `?` joins the existing `Result` of the per-field `map`. `refetch_reader.ts` and a loadably selected field's `normalization_ast.ts` stay stubs; `stub_artifact` keeps those two callers.
+After: per field, `field.resolver_reader` `Some(reader)` adds `printed(reader_artifact_file(field, reader, export_name(field.resolver.context.reference()), options)?.reference())`; `None` adds nothing. The `?` joins the existing `Result` of the per-field `map`. `refetch_reader.ts` stays a stub; `stub_artifact` keeps that caller and whatever loadable-artifact caller the parser change leaves.
 
 ## The read function
 
@@ -708,24 +710,24 @@ import type {
   ReaderSelectionSet,
   ResolverParam,
   SelectionSetData,
-} from './artifacts';
-import {
-  getRecord,
-  isStoreLink,
-  storeKey,
-  type Store,
-  type StoreLink,
-  type StoreValue,
-  type Variables,
-  type VariableValue,
-} from './store';
+} from "./artifacts";
+import { isStoreLink, type JsonValue, type Store, type StoreKey, type StoreLink, type StoreValue, type Variables } from "./store";
+import { storeKey } from "./storeKey";
 
 export type ReadResult<T> = ReadOk<T> | ReadMissingData;
 
-export type ReadOk<T> = { readonly kind: 'Ok'; readonly value: T };
+export type ReadOk<T> = { readonly kind: "Ok"; readonly value: T };
 
 /** A value the read needs is not in the store. */
-export type ReadMissingData = { readonly kind: 'MissingData' };
+export type ReadMissingData = {
+  readonly kind: "MissingData";
+  /** What was absent and where, for a person reading it. */
+  readonly reason: string;
+  /** The `MissingData` of the nested read that ended this one. */
+  readonly nestedReason?: ReadMissingData;
+  /** The record that lacks the value, or that a node read a value from and is absent. */
+  readonly recordLink: StoreLink;
+};
 
 /**
  * The value `artifact`'s resolver returns for the record `root`, with `variables` as the
@@ -737,134 +739,131 @@ export function read<TOutput>(
   root: StoreLink,
   variables: Variables,
 ): ReadResult<TOutput> {
-  const data = readSelectionSet(
-    store,
-    artifact.readerAst,
-    artifact.discriminator,
-    root,
-    variables,
-  );
-  if (data.kind === 'MissingData') {
+  const data = readSelectionSet(store, artifact.readerAst, root, variables);
+  if (data.kind === "MissingData") {
     return data;
   }
-  return {
-    kind: 'Ok',
-    value: artifact.resolver({ data: data.value, parameters: variables }, {}),
-  };
+  return ok(artifact.resolver({ data: data.value, parameters: variables }));
 }
 ```
 
-A caller passes a generated artifact directly: `read(store, petDetailReaderArtifact, root, { id: '1' })` infers `TOutput` from the artifact's declared type, by the bivariance above. `index.ts` exports `read`, `ReadResult`, `ReadOk`, and `ReadMissingData`.
+A caller passes a generated artifact directly: `read(store, petSummaryReaderArtifact, queryRoot, { id: "1" })` infers `TOutput` from the artifact's declared type, by the bivariance above. `index.ts` exports `read`, `ReadResult`, `ReadOk`, and `ReadMissingData`.
+
+`ReadMissingData` is upstream's `ReadDataResult`'s `MissingData` case (`isograph/libs/isograph-react/src/core/read.ts:135-143`: `reason: string`, `nestedReason?: ReadDataResult<unknown>`, `recordLink: StoreLink`), with `recordLink` of store.md's `StoreLink` and `nestedReason` narrowed to the `MissingData` case, the only one upstream ever puts there (`read.ts:302-305`, `:579-584`, `:656-662`, `:737-747`). Upstream has no store key field: the absent store key appears only inside `reason` (`'No value for ' + storeRecordName + ' on root ' + root.__link`, `read.ts:626-631`), and this doc does the same. Upstream's caller waits on `recordLink` for that record to change (`onNextChangeToRecord`, `read.ts:118`, `:122`); in i2 a later fetch policy can refetch that record (`refactors/pending/runtime/fetch-policies.md`).
+
+store.md's `CheckResult` keeps its own `MissingData { record: StoreLink }`, because upstream's `check` result differs from its read result (`isograph/libs/isograph-react/src/core/check.ts:37-41`: `kind` and `record` only).
 
 The walk:
 
 ```ts
 // from libs/isograph-runtime/src/read.ts
-const MISSING_DATA: ReadMissingData = { kind: 'MissingData' };
-
 function ok<T>(value: T): ReadOk<T> {
-  return { kind: 'Ok', value };
+  return { kind: "Ok", value };
+}
+
+function recordName(record: StoreLink): string {
+  return `${record.entity}:${record.id}`;
+}
+
+/** `missing` as the cause of a missing value for `name` on `root`. */
+function missingDataFor(name: string, root: StoreLink, missing: ReadMissingData): ReadMissingData {
+  return {
+    kind: "MissingData",
+    reason: `Missing data for ${name} on ${recordName(root)}`,
+    nestedReason: missing,
+    recordLink: missing.recordLink,
+  };
 }
 
 /** Each node's value under its alias; the first `MissingData` ends the read. */
 function readSelectionSet(
   store: Store,
   selections: ReaderSelectionSet,
-  discriminator: string,
   root: StoreLink,
   variables: Variables,
 ): ReadResult<SelectionSetData> {
-  const values = allOk(selections, (selection) =>
-    readSelection(store, selection, discriminator, root, variables),
-  );
-  if (values.kind === 'MissingData') {
+  const values = allOk(selections, (selection) => readSelection(store, selection, root, variables));
+  if (values.kind === "MissingData") {
     return values;
   }
-  return ok(
-    Object.fromEntries(
-      selections.map((selection, index) => [selection.alias, values.value[index]]),
-    ),
-  );
+  return ok(Object.fromEntries(selections.map((selection, index) => [selection.alias, values.value[index]])));
 }
 
 function readSelection(
   store: Store,
   selection: ReaderSelection,
-  discriminator: string,
   root: StoreLink,
   variables: Variables,
 ): ReadResult<unknown> {
   switch (selection.kind) {
-    case 'Scalar':
-      return readStoreValue(store, root, selection.selectableName, selection.arguments, variables);
-    case 'Linked': {
-      const value = readStoreValue(store, root, selection.selectableName, selection.arguments, variables);
-      if (value.kind === 'MissingData') {
+    case "Scalar":
+      return readStoreValue(store, root, storeKey(selection, variables));
+    case "Linked": {
+      const key = storeKey(selection, variables);
+      const value = readStoreValue(store, root, key);
+      if (value.kind === "MissingData") {
         return value;
       }
-      return readLinkedValue(store, value.value, selection.selections, discriminator, variables);
+      const linked = readLinkedValue(store, value.value, selection.selections, root, key, variables);
+      return linked.kind === "MissingData" ? missingDataFor(key, root, linked) : linked;
     }
-    case 'Refinement': {
-      const holds = conditionHolds(store, selection.condition, discriminator, root, variables);
-      if (holds.kind === 'MissingData') {
-        return holds;
+    case "Refinement": {
+      if (!refinementHolds(selection.condition, root)) {
+        return ok(null);
       }
-      return holds.value
-        ? readSelectionSet(store, selection.selections, discriminator, root, variables)
-        : ok(null);
+      const refined = readSelectionSet(store, selection.selections, root, variables);
+      return refined.kind === "MissingData" ? missingDataFor(selection.alias, root, refined) : refined;
     }
-    case 'Resolver':
-      return read(store, selection.readerArtifact, root, childVariables(variables, selection.arguments));
+    case "Resolver": {
+      const resolved = read(store, selection.readerArtifact, root, childVariables(variables, selection.arguments));
+      return resolved.kind === "MissingData" ? missingDataFor(selection.alias, root, resolved) : resolved;
+    }
   }
 }
 
-/** The value stored on `root`'s record under the selectable's store key. */
-function readStoreValue(
-  store: Store,
-  root: StoreLink,
-  selectableName: string,
-  args: Arguments | null,
-  variables: Variables,
-): ReadResult<StoreValue> {
-  const value = getRecord(store, root)?.[storeKey(selectableName, args, variables)];
-  return value === undefined ? MISSING_DATA : ok(value);
+/** The value stored on `root`'s record under `key`. */
+function readStoreValue(store: Store, root: StoreLink, key: StoreKey): ReadResult<StoreValue> {
+  const record = store.get(root.entity)?.get(root.id);
+  if (record === undefined) {
+    return { kind: "MissingData", reason: `No record for ${recordName(root)}`, recordLink: root };
+  }
+  const value = record.get(key);
+  if (value === undefined) {
+    return { kind: "MissingData", reason: `No value for ${key} on ${recordName(root)}`, recordLink: root };
+  }
+  return ok(value);
 }
 
-/** `null` is `null`; a list maps element by element at any depth; a link reads `selections` at its record. */
+/**
+ * `null` is `null`; a list maps element by element at any depth; a link reads `selections` at
+ * its record. `owner` and `key` locate the value, for the broken-invariant message.
+ */
 function readLinkedValue(
   store: Store,
   value: StoreValue,
   selections: ReaderSelectionSet,
-  discriminator: string,
+  owner: StoreLink,
+  key: StoreKey,
   variables: Variables,
 ): ReadResult<unknown> {
   if (value === null) {
     return ok(null);
   }
   if (Array.isArray(value)) {
-    return allOk(value, (item) => readLinkedValue(store, item, selections, discriminator, variables));
+    return allOk(value, (item) => readLinkedValue(store, item, selections, owner, key, variables));
   }
   if (isStoreLink(value)) {
-    return readSelectionSet(store, selections, discriminator, value, variables);
+    return readSelectionSet(store, selections, value, variables);
   }
-  throw new Error('A linked selection read a stored value that is not a link.');
+  throw new Error(
+    `Store record ${recordName(owner)} holds a non-link under the composite store key "${key}"; the store was written with an AST that disagrees with this one.`,
+  );
 }
 
-function conditionHolds(
-  store: Store,
-  condition: Condition,
-  discriminator: string,
-  root: StoreLink,
-  variables: Variables,
-): ReadResult<boolean> {
+function refinementHolds(condition: Condition, record: StoreLink): boolean {
   switch (condition.kind) {
-    case 'SelectionEquals': {
-      const value = readStoreValue(store, root, discriminator, null, variables);
-      if (value.kind === 'MissingData') {
-        return value;
-      }
-      return ok(value.value === condition.entity);
-    }
+    case "SelectionEquals":
+      return record.entity === condition.entity;
   }
 }
 
@@ -879,17 +878,15 @@ function childVariables(variables: Variables, args: Arguments | null): Variables
 }
 
 /** `undefined` when `value` is a variable absent from `variables`. */
-function argumentValue(variables: Variables, value: ArgumentValue): VariableValue | undefined {
+function argumentValue(variables: Variables, value: ArgumentValue): JsonValue | undefined {
   switch (value.kind) {
-    case 'Variable':
-      return variables[value.name];
-    case 'Literal':
-    case 'String':
+    case "Variable":
+      return Object.hasOwn(variables, value.name) ? variables[value.name] : undefined;
+    case "Literal":
+    case "String":
       return value.value;
-    case 'Object':
-      return Object.fromEntries(
-        value.value.map(([name, entry]) => [name, argumentValue(variables, entry) ?? null]),
-      );
+    case "Object":
+      return Object.fromEntries(value.value.map(([name, entry]) => [name, argumentValue(variables, entry) ?? null]));
   }
 }
 
@@ -901,7 +898,7 @@ function allOk<T, U>(items: ReadonlyArray<T>, f: (item: T) => ReadResult<U>): Re
   const values: U[] = [];
   for (const item of items) {
     const result = f(item);
-    if (result.kind === 'MissingData') {
+    if (result.kind === "MissingData") {
       return result;
     }
     values.push(result.value);
@@ -912,46 +909,60 @@ function allOk<T, U>(items: ReadonlyArray<T>, f: (item: T) => ReadResult<U>): Re
 
 Semantics, stated as facts the tests assert:
 
-- A `Scalar` node's value is the stored value whole, `null`, a list, a nested list, and a custom scalar's object included. An absent key is `MissingData`; a stored `null` is `null`.
+- A `Scalar` node's value is the stored value whole, `null`, a list, a nested list, and a `JSON` scalar's object included. An absent key is `MissingData` with `recordLink` the record and `reason` naming the store key; a stored `null` is `null`.
 - A `Linked` node's stored value is `null`, a link, or a list whose elements are those, at any depth; the read keeps the list structure. Upstream maps one level of list only (`read.ts:707-776`), so a `[[Pet]]` field fails there.
-- A record is looked up only by a node that reads a value from it (open decision 5): a `Resolver` node whose reader AST is empty reads nothing, so `displayName` reads `Ok` on a link to a record that does not exist. Upstream returns `MissingData` for an absent root record before reading any node (`read.ts:161-167`).
-- A refinement's condition reads the discriminator under `storeKey(discriminator, null, variables)`. An absent value is `MissingData`.
-- A `Resolver` node reads the selected field's reader AST on the same root, with `childVariables`, and calls its resolver with `{ data, parameters: childVariables }` and `{}`. The resolver's return is the node's value. The resolver is not called when its data is `MissingData`.
-- `childVariables` drops an argument whose top-level value is an absent variable, and writes `null` for an absent variable inside an object, which matches query generation's held open decision 2 and `storeKey` (Store dependencies). Upstream drops the absent variable in both places (`read.ts:465-490`).
+- A record is looked up only by a node that reads a value from it: a `Resolver` node whose reader AST is empty reads nothing, so it reads `Ok` on a link to a record that does not exist. A `Scalar` or `Linked` node on an absent record is `MissingData` with `reason` `No record for ..`. Upstream returns `MissingData` for an absent root record before reading any node (`read.ts:161-167`); the result differs only for a selection set that reads no store value.
+- A missing value under a `Linked`, `Refinement`, or `Resolver` node is wrapped once per node, as upstream wraps it (`read.ts:579-584`, `:737-747`): `nestedReason` is the inner `MissingData`, and `recordLink` is the innermost record, the one that lacks the value.
+- A refinement compares `root.entity` with `condition.entity` and reads no store value.
+- A `Resolver` node reads the selected field's reader AST on the same root, with `childVariables`, and calls its resolver with `{ data, parameters: childVariables }`. The resolver's return is the node's value. The resolver is not called when its data is `MissingData`.
+- `childVariables` drops an argument whose top-level value is an absent variable, and writes `null` for an absent variable inside an object, which matches query-generation.md's held open decision 2. Upstream drops the absent variable in both places (`read.ts:465-490`).
 - The first `MissingData` ends the read (upstream's behavior); there is no partial result.
 - A resolver that throws propagates out of `read`. There is no catching and no log event.
-- A `Linked` node over a stored value that is neither `null`, a list, nor a link throws (open decision 7).
+- A value under a `Linked` node's store key that is not `null`, a link, or a list of these throws store.md's non-link message (store.md, Errors: a store state only a disagreeing AST produces). A switch on a reader node's `kind` or a condition's `kind` is exhaustive, with no `default` (store.md, Errors: artifacts).
 
 ### Store dependencies
 
-What this doc needs from store.md, by name. When store.md lands with other names or shapes, this section and read.ts are fixed first.
+What this doc uses from store.md, by name:
 
 ```ts
 // from libs/isograph-runtime/src/store.ts
-/** `{ __link, __typename }`, the shape a pointer resolver returns (artifact-set-and-types.md, `E/__link/output_type.ts`). */
-export type StoreLink = { readonly __link: string; readonly __typename: string };
+export type Store = Map<EntityName, Map<RecordId, StoreRecord>>;
+export type StoreRecord = Map<StoreKey, StoreValue>;
+export type StoreLink = {
+  readonly entity: EntityName;
+  readonly id: RecordId;
+};
+export type Variables = { readonly [name: string]: JsonValue };
+```
 
-/** The record of `link.__typename` with id `link.__link`, or `undefined`. */
-export function getRecord(store: Store, link: StoreLink): StoreRecord | undefined;
+A record is `store.get(link.entity)?.get(link.id)`; a value is `record.get(key)`, `undefined` when absent. store.md defines no lookup function, and `check` reads the maps the same way.
 
-/**
- * The store key of a selection of `selectableName` with `args`, variables substituted. One
- * function, called by `normalize` and `read`. A top-level argument whose value is an absent
- * variable is omitted; an absent variable inside an object is `null`.
- */
-export function storeKey(selectableName: string, args: Arguments | null, variables: Variables): string;
+The two amendments this doc makes to store.md:
 
+```ts
+// from libs/isograph-runtime/src/storeKey.ts
+/** `selection.selectableName`, then `argumentChunks(selection.arguments, variables)`. */
+export function storeKey(
+  selection: Pick<NormalizationSelection, "selectableName" | "arguments">,
+  variables: Variables,
+): StoreKey;
+```
+
+Delta from store.md: the parameter type is `Pick<NormalizationSelection, "selectableName" | "arguments">` instead of `NormalizationSelection`. The body is unchanged. A `NormalizationSelection`, a `ReaderScalarSelection`, and a `ReaderLinkedSelection` all have those two fields with the same types, so `normalize`, `check`, `garbageCollect`, and `read` compute store keys with one function, and the reader's key equals the normalizer's by construction when the arguments and variables are equal.
+
+```ts
+// from libs/isograph-runtime/src/store.ts
+/** An object whose own keys are exactly `entity` and `id`, both strings. */
 export function isStoreLink(value: StoreValue): value is StoreLink;
 ```
 
-- `StoreRecord` is `{ readonly [storeKey: string]: StoreValue }`, read with `noUncheckedIndexedAccess`, so an index is `StoreValue | undefined`.
-- `Variables` is `{ readonly [name: string]: VariableValue }`, and `VariableValue` includes `null` and objects of `VariableValue`.
-- `normalize` writes the discriminator's value under `storeKey(discriminator, null, {})` on every record it writes from a composite response object. The refinement read depends on it (open decision 3 (c) removes the dependency).
-- The root links the tests read from (`queryRoot`, and a link per `Node` record).
+store.md states this test in its Errors section ("A link is an object whose own keys are exactly `entity` and `id`, both strings") for `check` and `garbageCollect`; this doc names it as a module export of `src/store.ts` so that `check.ts`, `garbageCollection.ts`, and `read.ts` import one function. The package index does not export it.
+
+The reader's store keys come from `storeKey`, so they follow store.md's encoding, including its open decision 6.
 
 ## Memos and invalidation
 
-No new memo besides the prefactor's `field_variables`. The reader AST is part of `field_types`'s value, so it is recomputed exactly when the param type is, and backdates with it. Editing `fullName`'s selection set rewrites `Pet/fullName/param_type.ts` and `Pet/fullName/resolver_reader.ts`; renaming a reader alias rewrites the selecting field's param type and reader; editing a resolver's body rewrites no artifact. `field_types` of a field now also depends on `field_variables` of every client field it selects (for defaults), so adding a default to `PetCheckinsCard($limit: Int = 3)` re-invokes `field_types` of every field selecting it eagerly.
+No new memo besides the prefactor's `field_variables`. The reader AST is part of `field_types`'s value, so it is recomputed exactly when the param type is, and backdates with it. Editing `fullName`'s selection set rewrites `Pet/fullName/param_type.ts` and `Pet/fullName/resolver_reader.ts`; renaming a reader alias rewrites the selecting field's param type and reader; editing a resolver's body rewrites no artifact. `field_types` of a field now also depends on `field_variables` of every client field it selects (for defaults), so adding a default to `PetCheckinsCard($limit: Int = 3)` re-invokes `field_types` of every field selecting it.
 
 ## Tests
 
@@ -964,21 +975,21 @@ No snapshots. Facts about the reader AST, the printed artifact, and the read res
 - `Pet.fullName`: two `Scalar` nodes, aliases `firstName`, `lastName`, equal to their selectables, with empty arguments.
 - For every pet demo field, the reader AST's aliases in order equal the data type's keys in order (the walk's by-construction fact).
 - `Pet.PetBestFriendCard`: `friendName: firstName` is `Scalar` with alias `friendName` and selectable `firstName`; `best_friend_relationship` is `Linked` whose selections are `Scalar picture_together` and `Linked best_friend`, whose last node is `Resolver` with `field == Pet.fullName`.
-- `Query.PetDetailRoute`: one `Linked` node `pet` with arguments `[id: Variable(id)]`; its selections are `id`, `fullName`, `PetStatsCard`, `PetBestFriendCard`; no node and no data key for `PetCheckinsCard`, `bestFriend`, or `owner`; `selected` still contains `Pet.PetCheckinsCard` (`Loadable`), `Pet.bestFriend`, `Pet.owner`, and `Owner.OwnerBadge`.
+- `Query.PetDetailRoute`: one `Linked` node `pet` with arguments `[id: Variable(id)]`; its selections are `id`, `fullName`, `PetStatsCard`, `PetCheckinsCard` (a `Resolver` with arguments `[limit: Integer(5)]`), `PetBestFriendCard`; no node and no data key for `bestFriend` or `owner`; `selected` still contains `Pet.bestFriend`, `Pet.owner`, and `Owner.OwnerBadge`.
 - `Pet.PetCheckinsCard`: `checkins` has arguments `[limit: Variable(limit), skip: Integer(0)]`, sorted by name.
 - `Mutation.SetTagline`: `set_pet_tagline`'s argument `input` is an `Object` with entries `id: Variable(id)` and `tagline: Variable(tagline)`.
 - `Owner.displayName` (no selection set): an empty reader AST.
 - Defaults: with `field Pet.X($n: Int = 3) { id }` and `field Pet.Y($m: Int) { id }`, a selection `X` gives a `Resolver` with arguments `[n: Integer(3)]`; `X(n: 5)` gives `[n: Integer(5)]`; `X(n: $a)` inside `field Pet.Z($a: Int)` gives `[n: Variable(a)]`; `Y` gives empty arguments.
 - A refinement: `field Query.R { node(id: "1") { asPet { firstName } } }` gives `Linked node` whose one selection is `Refinement` with `condition == SelectionEquals(Pet)` and selections `[Scalar firstName]`, and its data type is `({ firstName } | null)`.
 - Errors: `asPet(x: 1)` is `ArgumentsOnRefinement`; `pet(id: $nope)` is `SelectionMap` with `UndefinedVariable(nope)`; `X(q: 1)` is `SelectionMap` with `UnknownFieldArgument`; `checkins(limit: 4294967296)` is `IntegerOutOfRange`.
-- `ProjectArtifacts.discriminator` is `__typename`; a reachable field's `resolver_reader` is `Some` and equals its `field_types` reader AST; an unreachable field's is `None`.
+- A reachable field's `resolver_reader` is `Some` and equals its `field_types` reader AST; an unreachable field's is `None`.
 
 ### Compiler: printing
 
 `crates/typescript_artifacts/src/reader_artifact.rs`, from hand-built `FieldArtifacts` and `ReaderSelectionSet` values:
 
 - The lines, in order: `import type { ReaderArtifact } from "@isograph/runtime";`, `import type { Pet__fullName__output_type } from "./output_type";`, `import type { Pet__fullName__param } from "./param_type";`, `import { fullName as resolver } from "./../../../Pet";`; a later line starts with `const readerArtifact: ReaderArtifact<Pet__fullName__param, Pet__fullName__output_type> = {`; the last line is `export default readerArtifact;`.
-- The text contains `discriminator: "__typename"` and `resolver: resolver`.
+- The text contains `resolver: resolver` and no `discriminator`.
 - `Scalar` prints `kind: "Scalar"`, `alias: "friendName"`, `selectableName: "firstName"`, `arguments: null`.
 - `Linked` prints `kind: "Linked"` and `selections: [`.
 - `Refinement` prints `kind: "Refinement"`, `kind: "SelectionEquals"`, `entity: "Pet"`.
@@ -989,28 +1000,56 @@ No snapshots. Facts about the reader AST, the printed artifact, and the read res
 
 `crates/isograph_cli/src/compile.rs`: editing `fullName`'s selection set returns writes including `Pet/fullName/resolver_reader.ts`; editing only `fullName`'s resolver body returns no `Update`.
 
-`pnpm --filter pet-demo typecheck` passes over the regenerated artifacts, so every reader artifact's literal matches `ReaderArtifact` and every resolver matches its declared param and output types, `@component` resolvers included.
+`pnpm --filter pet-demo typecheck` passes over the regenerated artifacts, so every reader artifact's literal matches `ReaderArtifact` and every resolver matches its declared param and output types.
 
 ### Runtime
 
-`libs/isograph-runtime/src/read.test.ts` (vitest). Each test builds a store with store.md's `createStore` and `normalize` from a hand-written normalization AST and response (fixtures are inputs), then calls `read` with a hand-written `ReaderArtifact` whose resolvers are test functions, and asserts on the result and, where stated, on the store.
+`libs/isograph-runtime/test/read.test.ts` (vitest), in store.md's test infrastructure. Every normalization AST and reader artifact a test uses is generated from store.md's fixture project `libs/isograph-runtime/fixtures/store`; how a test loads a reader artifact is open decision 1. Each test creates its own `new Map()` store, normalizes a hand-built response with the same variables, then calls `read` and asserts on the result. Responses, variables, and hand-edited stores are inputs. There is no read test over the pet demo's artifacts: its schema has no list of lists and no `JSON` scalar, and an edit to the demo would break the runtime's tests (store.md, Test infrastructure).
 
-- Scalars: a `String`, an `Int`, a `Boolean`, a custom scalar whose value is an object (returned whole, `toEqual` the response's), a `[String]` list, and a `[[Int]]` nested list read back equal to the response's values.
-- Nulls: a nullable scalar the response holds as `null` reads `null`; a nullable linked field holding `null` reads `null`; a list of links containing `null` reads `null` at that index.
-- Lists: `pets` of three pets reads an array of three objects in response order; a `[[Pet]]` field (test schema) reads nested arrays of objects.
-- Aliases and arguments: `checkins(limit: 3)` under alias `a` and `checkins(limit: 5)` under alias `b` read their own lists; `pet(id: $id)` read with `{ id: '1' }` and with `{ id: '2' }` after normalizing both reads each pet; a variable absent from the read's variables reads the value normalized with the same absent variable.
-- Refinements: a `node` whose response `__typename` is `Pet` reads `asPet` as an object and `asViewer` as `null`; a store whose record lacks the discriminator (written directly; tests may build store state) reads `MissingData`.
-- Client field chains: `HomeRoute -> pets -> PetSummaryCard -> fullName` reads the array of `PetSummaryCard` outputs; a resolver receives `parameters` equal to its node's substituted arguments (a literal, a parent variable, a compiler-written default); a resolver's return value is what its parent's `data` holds under the alias.
-- Missing data: a read before any normalize is `MissingData`; a field the response did not include is `MissingData`; a missing field inside the second element of a list makes the whole read `MissingData`; a child resolver's `MissingData` propagates and its resolver is not called (its call count is 0).
-- Records that do not exist: a `Resolver` node whose reader AST is empty reads `Ok` on a link to a record not in the store; a `Scalar` node on that link is `MissingData`.
-- `Node` roots: after normalizing a `node(id: $id)` response for `Pet:1`, `read` of a `Pet` field rooted at `{ __typename: 'Pet', __link: '1' }` reads its values without going through the query root.
-- Objects without an identity field: `stats` (`PetStats` has no `id`) normalized under `Pet:1` reads its six values, whatever record store.md stores it in; a union-typed field (`IdentitySelection::Omit`) reads through its link.
-- Shape: a `Linked` node over a stored string throws (open decision 7).
-- Degenerate cases: an empty reader AST reads `Ok({})` passed to the resolver; a `Linked` node over an empty list reads `[]`.
+The fixture's resolvers return `data`, so a read's value is the data its reader AST read. This doc adds to the fixture's sources:
+
+```text
+field Pet.PetName { name nickname }
+
+field Pet.RecentCheckins($n: Int = 2) {
+  checkins(limit: $n) { id location }
+}
+
+field Query.PetSummary($id: ID!) {
+  pet(id: $id) { id PetName RecentCheckins }
+}
+
+field Query.PetSummaries {
+  pets { PetName }
+}
+
+field Pet.Constant
+
+field Query.ConstantPet($id: ID!) {
+  pet(id: $id) { Constant }
+}
+```
+
+with `entrypoint Query.PetSummary`, `entrypoint Query.PetSummaries`, and `entrypoint Query.ConstantPet`. `Pet.Constant` has no selection set, so its reader AST is empty. `RecentCheckins` selected with no argument reads `checkins(limit: $n)` with `n: 2` from its `Resolver` node, and query generation inlines it as `checkins(limit: 2)`, so both keys are `checkins____limit___2`.
+
+- Leaves: `Leaves` reads `greeting`, `literalGreeting`, `nullGreeting`, `variableGreeting`, `tags`, and `settings` equal to the response's values: a `null` leaf is `null`, `tags: ["a", null]` and `tags: []` are returned as stored, and `settings: { entity: "Pet", id: "1" }` (a `JSON` scalar) is returned whole as a leaf.
+- Variables: `variableGreeting` read with `{ name: "Bo" }` after normalizing with `{ name: "Bo" }` is the response's value; read with `{}` after normalizing with `{}` it is the response's value; read with `{ name: "Bo" }` after normalizing only with `{}` is `MissingData` whose `reason` names `greeting____name___Bo`.
+- Linked: `PetDetail` with `{ id: "1" }` reads `pet` with `stats` (an identity-less `PetStats` at `Pet:1.stats`), `bestFriend` two levels deep, `checkins` and `pagedCheckins` as their own lists; `stats: null` reads `null`.
+- Cyclic data: `Pet:1.bestFriend` is `Pet:2`, whose `bestFriend` is `Pet:1`; the read terminates, because it recurses on the reader AST.
+- Lists: `PetLists` reads `pets` in response order, `pets: []` as `[]`, `maybePets: [null, ..]` with `null` at index 0, `petGrid: [[a], [], [null, b]]` as the same nesting, `petGrid: null` as `null`, and `statGrid` as nested arrays of objects.
+- Refinements: `Feed` with a `BlogItem` and an `AdItem` reads, for the `BlogItem`, `asBlogItem` as an object (with `author`) and `asAdItem` as `null`, and for the `AdItem` the reverse; an item whose `__typename` was `Other` reads both as `null`.
+- Object arguments: `Search` with `{ q: "Rex" }` reads the pets normalized under the stable-JSON key.
+- Client field chains: `PetSummary` with `{ id: "1" }` reads `{ pet: { id, PetName: { name, nickname }, RecentCheckins: { checkins } } }`; `PetSummaries` reads one `PetName` object per pet; a test resolver receives `parameters` equal to its node's substituted arguments (`{ n: 2 }`, the compiler-written default).
+- Roots: `PetCard` (`Node` fetch) after normalizing with `{ id: "4" }`, read rooted at `{ entity: "Pet", id: "4" }` with `{}`, reads `name` and `tagline` without going through the query root. `SetTagline` from `mutationRoot` reads the payload's `pet` and `query { greeting }`. `NestedQuery` from `queryRoot` reads `query { tags }` on `Query.__ROOT` itself.
+- Missing data: a read before any `normalize` is `MissingData` with `recordLink` `queryRoot` and `reason` `No record for Query:__ROOT`. A deleted `nickname` key on `Pet:1` under `PetSummary` is `MissingData` with `recordLink` `Pet:1` and nested reasons for `pet____id___1` and then `PetName` around the innermost `No value for nickname on Pet:1`. A deleted `Pet:2` record linked from `pets` is `MissingData` with `recordLink` `Pet:2`. A child resolver whose data is `MissingData` is not called (its call count is 0).
+- Absent records: `ConstantPet` with `{ id: "9" }`, on a store whose `Query.__ROOT` links `pet____id___9` to a `Pet:9` deleted by hand, reads `Ok` with `{ pet: { Constant: {} } }`: `Constant`'s empty reader AST reads no value from the absent record.
+- Shape: `Pet:1.stats` set by hand to `"x"` makes `PetDetail`'s read throw the non-link message naming `Pet:1` and `stats`.
+- Degenerate cases: a `Linked` node over `[]` reads `[]`; an empty reader AST passes `{}` to its resolver.
+- The store is unchanged by every read.
 
 ## Changes
 
-Each change is one commit. Prerequisites: query-generation.md changes 6 to 8, normalization-ast.md changes 2 to 4, store.md's store, `storeKey`, and `normalize` changes.
+Each change is one commit. Prerequisites: query-generation.md changes 6 to 8, normalization-ast.md changes 2 to 4, store.md changes 1 to 3, and the parser change that makes every directive a parse error.
 
 ### 1. Variables and argument conversion as shared functions (isograph_compiler)
 
@@ -1018,95 +1057,44 @@ Each change is one commit. Prerequisites: query-generation.md changes 6 to 8, no
 
 ### 2. The reader AST (isograph_compiler)
 
-`crates/isograph_compiler/src/reader_ast.rs` with `ReaderSelectionSet`, `ReaderSelection`, `ReaderScalarSelection`, `ReaderLinkedSelection`, `ReaderRefinementSelection`, `ReaderResolverSelection`; `FieldTypes.reader_ast`; `ObjectSelections`, `SelectionOutput`, `SelectionRead`, `ReadSelection`, `ReaderTarget`, `ObjectTarget`, `ReaderContext`; `object_type`, `selection_field`, `reader_arguments`, `resolver_arguments`; `NotRead` for pointer and `@loadable` selections in the data type (open decision 2); the five `GenerationError` variants; `ProjectArtifacts.discriminator`; `FieldArtifacts.resolver_reader: Option<ReaderSelectionSet>`; the compiler reader AST tests. The TypeScript host prints the stub for `Some(_)` until change 4. Depends on 1.
+`crates/isograph_compiler/src/reader_ast.rs` with `ReaderSelectionSet`, `ReaderSelection`, `ReaderScalarSelection`, `ReaderLinkedSelection`, `ReaderRefinementSelection`, `ReaderResolverSelection`; `FieldTypes.reader_ast`; `ObjectSelections`, `SelectionOutput`, `SelectionRead`, `ReadSelection`, `ReaderTarget`, `ObjectTarget`, `ReaderContext`; `object_type`, `selection_field`, `reader_arguments`, `resolver_arguments`; `NotRead` for pointer selections in the data type; the five `GenerationError` variants; `FieldArtifacts.resolver_reader: Option<ReaderSelectionSet>`; the compiler reader AST tests. The TypeScript host prints the stub for `Some(_)` until change 4. Depends on 1.
 
-### 3. The read function (libs/isograph-runtime)
+### 3. The reader types (libs/isograph-runtime)
 
-The reader types in `src/artifacts.ts`, `src/read.ts`, the exports in `src/index.ts`, `src/read.test.ts`. If store.md's changes did not add vitest and the `test` script, this change adds them as `libs/isograph-babel-plugin` has them (`"test": "vitest run"`, `vitest` `^2.1.2`) and the `Test` step to `.github/workflows/js.yml`. Independent of 1 and 2.
+The reader types in `src/artifacts.ts` and their exports in `src/index.ts`; `storeKey`'s `Pick<NormalizationSelection, "selectableName" | "arguments">` parameter; `isStoreLink` in `src/store.ts`, imported by `check.ts` and `garbageCollection.ts` in place of their own test. store.md's tests pass unchanged. Independent of 1 and 2.
 
 ### 4. The TypeScript reader artifact (typescript_artifacts)
 
 `NamedImport` (renamed from `NamedTypeImport`), `ArtifactValue::NamedImport`, `TypeScriptItem::NamedImport`, `named_imports_of`, the `TypeOnly` parameter of the named import printer; `reader_artifact.rs`; `source_specifier` and `arguments_value` made `pub(crate)`; `generate_artifacts` writing reader artifacts; the printer and compile tests. Depends on 2 and 3.
 
-### 5. Pet demo output
+### 5. The read function (libs/isograph-runtime)
 
-The regenerated `demos/pet-demo/src/__isograph/`: every `resolver_reader.ts` is a reader artifact, and `Query/PetDetailRoute/param_type.ts` loses `PetCheckinsCard`, `bestFriend`, and `owner`. `pnpm --filter pet-demo typecheck` passes. Depends on 4.
+`src/read.ts`, its exports in `src/index.ts`; the fixture's added sources and regenerated `fixtures/store/src/__isograph/`; the loading of reader artifacts in tests (open decision 1); `test/read.test.ts`. Depends on 4, which writes the fixture's reader artifacts.
+
+### 6. Pet demo output
+
+The regenerated `demos/pet-demo/src/__isograph/`: every `resolver_reader.ts` is a reader artifact, and `Query/PetDetailRoute/param_type.ts` loses `bestFriend` and `owner`. `pnpm --filter pet-demo typecheck` passes. Depends on 4.
 
 ## Docs this doc amends
 
-- `refactors/pending/artifact-set-and-types.md`, Per field: `P/f/resolver_reader.ts` is this doc's artifact, not a stub. Per entrypoint: `readerArtifact` imports an object, not a thunk. Open decision 2 (b): under this doc's open decision 2 (b), a `@loadable` selection and a pointer selection have no key in the selecting field's param type.
+- `refactors/pending/artifact-set-and-types.md`, Per field: `P/f/resolver_reader.ts` is this doc's artifact, not a stub. Per entrypoint: `readerArtifact` imports an object, not a thunk. Its open decision 2 (b): a pointer selection has no key in the selecting field's param type.
+- `refactors/pending/runtime/store.md`: `storeKey` takes `Pick<NormalizationSelection, "selectableName" | "arguments">`; `src/store.ts` exports `isStoreLink`, which `check` and `garbageCollect` use; the fixture project gains `Pet.PetName`, `Pet.RecentCheckins`, `Query.PetSummary`, `Query.PetSummaries`, `Pet.Constant`, and `Query.ConstantPet`, and its `resolver_reader.ts` artifacts are reader artifacts; "v1 has no reader" no longer holds once this doc lands.
 - `refactors/pending/runtime/pico-runtime.md`, 11. Artifacts: `ReaderScalarField`, `ReaderLinkedField`, `ReaderResolverField`, and `EagerReaderArtifact` are this doc's `ReaderScalarSelection`, `ReaderLinkedSelection`, `ReaderResolverSelection`, and `ReaderArtifact`; `ReaderLinkField` does not exist; `ReaderRefinementSelection` is new; `ResolverParameters` is `ResolverParam`; `alias` is always a string and `fieldName` is `selectableName`. Its `computeResolver` and `readSelection` replace this doc's `read` and `readSelection` when memoization lands.
 - `refactors/pending/graphql-protocol/normalization-ast.md`, change 4: the `NamedTypeImport` struct it specifies is the landed one, renamed `NamedImport` (The TypeScript artifact).
 
 ## Open decisions
 
-### 1. Support client pointers in v1
+### 1. How a read test loads a generated reader artifact
 
-The pet demo's `PetDetailRoute` selects `bestFriend { fullName }` (`field Pet.bestFriend to Pet { best_friend_relationship { best_friend { id } } }`) and `owner { OwnerBadge }` (`field Pet.owner to Owner! { id }`, where `Owner` is a source `entity` and `OwnerBadge` reads only `displayName`, a field with no selection set).
+A generated `resolver_reader.ts` imports its resolver as a value from the fixture's source file (`import { PetSummary as resolver } from "./../../../PetSummary"`). That module calls `iso(..)`, and the generated `iso.ts` throws when called (`iso: Unexpected invocation at runtime. Either the Babel transform was not set up, ..`, `demos/pet-demo/src/__isograph/iso.ts`). store.md's tests never hit this: a `normalization_ast.ts` imports no source file.
 
-- (a) No pointers (the body). Query generation omits them (unchanged). The reader has no node; under open decision 2 (b) the selecting field's data type has no key for them. The runtime has nothing. The type artifacts already generated for pointers stay: `Pet/bestFriend/{param_type,output_type,resolver_reader}.ts`, `Pet/__link/output_type.ts`, `Owner/__link/output_type.ts`, and the iso overload that constrains a pointer resolver's return to the link type. `PetDetailRoute` reads real data for `pet { id, fullName, PetStatsCard, PetBestFriendCard }` and has no `bestFriend` or `owner`. Cost: nothing now.
-- (b) Eager pointers, read through the link the resolver returns, the shape i2's types already have.
-  - Query generation: `selection_contribution`'s `ClientPointer` arm becomes the `ClientField` arm: the pointer's own selection set is inlined through `field_selection_map` and `substitute`, so the data its resolver reads is fetched by construction; the selection's nested selection set (target side) is not read, because the record the link names is not known until the resolver runs. `inlined_fields` lists pointers, so `field Pet.loop to Pet { loop }` becomes `InlineCycle` where query-generation.md's test now asserts it is not. Upstream merges the pointer's reader selections the same way (`merge_client_object_field`, `isograph/crates/isograph_schema/src/create_merged_selection_set.rs:852-929`, calling `merge_non_loadable_client_type`, `:1291-1349`). Upstream also records a `ClientObjectSelectable` entry holding the target-side selections (`:1241-1265`), which both printers skip, and a refetch path that fetches the target through `node(id:)` (`insert_client_object_selectable_into_refetch_paths`, `:1135-1289`); (b) has neither.
-  - Reader AST: a fifth node, `ReaderSelection::Pointer(ReaderPointerSelection { alias: SelectionName, field: EntityNameAndSelectableName, arguments: NormalizationArguments, selections: ReaderSelectionSet })`, printed as `{ kind: "Pointer", alias, arguments, readerArtifact: <the pointer's reader artifact>, selections }`; `selection_field`'s `ClientPointer(Parsed(_))` arm returns `Read` with the landed nested object type. Upstream's node is a `Linked` node whose `condition` is the pointer's reader artifact and whose `refetchQueryIndex` is set (`isograph/crates/artifact_content/src/reader_ast.rs:137-177`, `:274-332`; generated in `isograph/demos/pet-demo/src/components/__isograph/Query/SmartestPetRoute/resolver_reader.ts:70-89`).
-  - Runtime read: the value is `read(store, pointerArtifact, root, childVariables(..))`, the resolver's return (`null`, a link, or lists of those, per the `to` wrapper), then `readLinkedValue` of it with `selections`. The resolver's return is used as a `StoreLink`, so store.md's `StoreLink` must be `{ __link, __typename }`, which the generated link output types already are. Upstream instead returns, per link, a `LoadableField` that fetches the target when called (`read.ts:727-750`, `:821-840`, `readClientPointerData` `:859-975`).
-  - Reader artifact imports: `field Pet.Card { bestFriend { Card } }` is not an `InlineCycle` under (b), so `Card`'s reader imports itself and throws at load. (b) needs either thunks (`readerArtifact: () => X`, upstream's shape: `ArtifactValue` gains an arrow-function variant and the SWC printer an arrow expression, and artifacts stop being plain object literals, which the TypeScript section of AGENTS.md states) or a compile-time error for a cycle of reader imports (which rejects recursive data, a common pattern).
-  - Type artifacts: none. The selecting field's param type already has the pointer's key with the nested object under the `to` wrapper (`Query__PetDetailRoute__param`: `bestFriend: ({ fullName } | null)`, `owner: { OwnerBadge }`, in the committed demo), and open decision 2 (b)'s removal does not apply to pointers.
-  - Missing data: target-side selections are fetched only if another selection fetched them; otherwise the read is `MissingData`.
-  - Pet demo: `PetDetailRoute` reads real data. `bestFriend`'s own selections are fetched (and already selected by `PetBestFriendCard`), and the best friend's record has `firstName` and `lastName` because `PetBestFriendCard` selects `best_friend { friendName: firstName fullName }`: that holds because of `PetBestFriendCard`'s selections, not by construction. `owner` links to `Owner:owner-of-<id>`, a record that never exists (`Owner` is a source entity); `OwnerBadge` reads `displayName`, whose reader AST is empty, so it reads `"Owned by The owner"` under open decision 5 (a) and `MissingData` on every read under 5 (b).
-  - Tests: query text gains the pointer's own selections (a pointer whose selections nothing else selects); the `loop` test flips; a `Pointer` node's printed import and nested selections; reads of a pointer to an existing record, a resolver returning `null`, a list pointer, a pointer whose target record lacks a read field (`MissingData`), a pointer to a source entity read through resolver-only selections, and a self-recursive pointer field that loads.
-  - Cost: one arm in query generation and its tests, one node kind in Rust, TypeScript, and the printer, about twenty lines of runtime, and the thunk variant or the cycle check.
-- (c) Upstream's loadable pointers: (b)'s query and reader changes, plus a refetch query per pointer through `node(id:)` (upstream `:1170-1233`) with its query text and normalization AST artifacts, a fetch path in the runtime (v1 has no network), and `LoadableField` types in param types, which reverses artifact-set-and-types.md open decision 2 (b). `PetDetailRoute`'s `bestFriend` is then a loader function per link, and reading the friend's `fullName` needs a network round trip. Cost: a network layer, outside the minimal runtime.
+- (a) vitest runs `@isograph/babel-plugin` (`libs/isograph-babel-plugin`) over the fixture's sources, which turns `iso(`field ..`)(fn)` into `fn` and `iso(`entrypoint ..`)` into an import of the entrypoint artifact (`compileTag.js`). Tests import generated reader artifacts. Cost: a `vitest.config.ts` with a transform that applies the Babel plugin (a hand-written Vite plugin calling `@babel/core`, or a Vite-Babel bridge dev dependency), `@isograph/babel-plugin` and `@babel/core` as dev dependencies of the runtime, and the plugin's config lookup (`cosmiconfig`) finding `fixtures/store/isograph.config.json`.
+- (b) Tests import the generated normalization ASTs and generated param and output types, and declare each `ReaderArtifact` by hand with a test resolver. Cost: no test reads with a reader AST the compiler wrote; the agreement of the compiler's reader with the normalizer is covered by the compiler tests and `typecheck` only.
 
-### 2. Selections v1 does not read
+### 2. The store key of a variable a client field selection leaves unset
 
-A pointer selection (under 1 (a)) and a `@loadable` client field selection have no reader node.
+`field Pet.X($n: Int) { checkins(limit: $n) { id } }` selected as `X` with no argument. Query generation inlines `checkins` without `limit` (query-generation.md open decision 2, held: omit at the top level), so the normalization AST has no `limit` argument and `normalize` writes `checkins`. `X`'s reader reads `checkins(limit: $n)` with `n` absent from its variables, and store.md's held encoding (its open decision 6 (a)) writes an unset variable as `null`: the reader's key is `checkins____limit___null`, and every read of `X` is `MissingData`. Inside an object both sides write `null` (query generation's `null`, `childVariables`'s `null`), and the keys agree.
 
-- (a) Keep their keys in the param type (artifact-set-and-types.md as landed). `data.pet.PetCheckinsCard` is typed `Pet__PetCheckinsCard__output_type` and is `undefined` at runtime: the type states a value the runtime never provides.
-- (b) Remove their keys from the param type (the body). The walk returns `NotRead` for them; a resolver that reads them is a TypeScript error. Cost: the param types differ from artifact-set-and-types.md's decided types for these two selections until pointers and loadable fields land; `PetDetailRoute`'s param type loses three keys.
-- (c) Reject them: a reachable field with a pointer or `@loadable` selection is a generation error. The pet demo's `PetDetailRoute` then writes no artifacts, and the demo changes.
-- (d) For `@loadable` only: read it as a `Resolver` node. Query generation does not fetch its selections, so `PetDetailRoute` reads `MissingData` on every read.
-
-### 3. How a refinement tests the record's entity
-
-- (a) An artifact-level `discriminator` on every reader artifact, read from the record under its store key (the body, the settled wording). A reader artifact with no refinement prints a `discriminator` nothing reads, against AGENTS.md's "we do not have anything we do not use". The store must hold the discriminator's value on every record from a composite response.
-- (b) As (a), with `discriminator: string | null`, `null` when the reader AST has no `Refinement` node at any depth. Nothing is unused; the type has one more case, and `read` passes `null` into a `Refinement` read only if the compiler is wrong.
-- (c) No discriminator in the reader: the condition compares `root.__typename`, the entity of the link the read is at. The normalizer stores a record under the entity its response's discriminator names, so the link's entity and the stored discriminator are equal by the normalizer's construction; the store need not keep the discriminator's value, and a refinement never reads `MissingData` for it. Cost: the reader relies on that normalizer invariant instead of on a stored value; it departs from the settled wording.
-
-### 4. Defaults of a selected client field's variables
-
-- (a) The compiler writes each unpassed variable's default into the parent's `Resolver` node (the body). The reader's store keys equal the normalizer's, which query generation substitutes the same way. Cost: `field_types` depends on the selected fields' `field_variables`.
-- (b) The reader artifact carries its field's defaults and `read` applies them to its variables. Then an entrypoint's top-level read applies defaults that the normalizer, which receives the caller's variables, does not, and their keys differ unless the entrypoint artifact and `normalize` apply defaults too.
-
-### 5. When a missing record is `MissingData`
-
-- (a) Only when a node reads a value from it (the body). A selection set that reads no store value (`displayName`) reads `Ok` on a link to a record that does not exist.
-- (b) Upstream: an absent root record is `MissingData` before any node is read (`read.ts:161-167`). Under 1 (b), `owner { OwnerBadge }` then always reads `MissingData`, because a source entity's record never exists.
-
-### 6. What `MissingData` carries
-
-- (a) Nothing (the body). Nothing in v1 reads a payload: no Suspense, no subscriptions, no log events; tests-only is not a reader.
-- (b) The link and store key of the first absent value (`{ kind: 'MissingData', record: StoreLink, storeKey: string }`, upstream's `recordLink` and `reason`, `read.ts:136-143`). A later subscription or Suspense layer needs it to know which record to wait on; tests could assert where the read stopped.
-
-### 7. A stored value of the wrong shape under a `Linked` node
-
-The store is written only by `normalize` from the same compiler's normalization AST, so a string where a link belongs is a broken invariant between the compiler and the runtime that the types cannot express.
-
-- (a) Throw an `Error` (the body), the runtime's form of a panic.
-- (b) A third `ReadResult` variant (`StoreShapeMismatch`), which every caller then handles.
-
-### 8. Reading a `@component` field
-
-v1 has no React and no `ComponentReaderArtifact`. A component's output type is already `ReturnType<typeof resolver>` (artifact-set-and-types.md open decision 2 (b)).
-
-- (a) A component's reader artifact is a `ReaderArtifact`, and `read` calls its resolver with `{}` as `componentProps` (the body). A component that declares required props fails the generated artifact's type-check (`Record<PropertyKey, never>` lacks them), not at runtime. Every pet demo route is a `@component`, and all read.
-- (b) Keep the stub for `@component` fields until a React package exists. No pet demo route can then be read.
-
-### 9. An end-to-end test over the pet demo's generated artifacts
-
-- (a) None (the body). Runtime tests use hand-written artifacts; `pnpm --filter pet-demo typecheck` checks that the generated artifacts have the runtime's types. Nothing runs a generated reader AST against a normalized generated response.
-- (b) A `node:test` script in `demos/pet-demo/scripts/` that registers Babel as `log-entrypoints.cjs` does (the Isograph plugin turns `iso(..)(fn)` into `fn`), with `only` extended to `libs/isograph-runtime/src`, normalizes a fixed `PetDetailRoute` response with the generated normalization AST, and reads the generated reader artifact. Cost: `@isograph/runtime` needs a `require` export condition, the demo gains a test script and a CI step, and the demo sources log their entrypoints when loaded.
-
-### 10. Where the reader AST is built
-
-- (a) In `field_types`, the walk that builds the param type (the body). One call per selection produces both, so their keys and order agree by construction, and the walk's errors are found once.
-- (b) A separate memo `reader_ast(db, client, field)` with its own walk. Editing a field re-runs both; the two walks repeat the same lookups and error checks, and their agreement is a test, not a construction.
+- (a) store.md open decision 6 (b): an unset variable's argument is omitted from the store key. Both keys are `checkins`. Cost: store.md's costs for 6 (b).
+- (b) Query generation prints `null` for the argument (query-generation.md open decision 2's other option), and `childVariables` writes `null` for an absent top-level variable. Both keys are `checkins____limit___null`. Cost: `null` overrides the schema's default for the argument and is an error for a non-null argument.
+- (c) A generation error for a selection that leaves a variable with no default unpassed when that variable is used as a top-level argument. Cost: rejects a selection GraphQL allows.
