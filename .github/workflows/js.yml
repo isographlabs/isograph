@@ -32,5 +32,9 @@ jobs:
       - uses: ./.github/actions/setup-js
       - name: Typecheck
         run: pnpm --filter @isograph/babel-plugin typecheck
+      - name: Typecheck the runtime
+        run: pnpm --filter @isograph/runtime typecheck
+      - name: Typecheck the pet demo
+        run: pnpm --filter pet-demo typecheck
       - name: Test
         run: pnpm --filter @isograph/babel-plugin test

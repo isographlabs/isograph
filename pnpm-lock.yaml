@@ -28,6 +28,10 @@ importers:
         version: 5.6.3
 
   demos/pet-demo:
+    dependencies:
+      '@isograph/runtime':
+        specifier: workspace:*
+        version: link:../../libs/isograph-runtime
     devDependencies:
       '@babel/core':
         specifier: ^7.28.3
@@ -44,6 +48,9 @@ importers:
       '@isograph/babel-plugin':
         specifier: workspace:*
         version: link:../../libs/isograph-babel-plugin
+      typescript:
+        specifier: 5.6.3
+        version: 5.6.3
 
   docs-website:
     dependencies:
@@ -118,6 +125,12 @@ importers:
       vitest:
         specifier: ^2.1.2
         version: 2.1.9(@types/node@22.17.2)(terser@5.43.1)
+
+  libs/isograph-runtime:
+    devDependencies:
+      typescript:
+        specifier: 5.6.3
+        version: 5.6.3
 
   libs/isograph-swc-plugin:
     devDependencies:
