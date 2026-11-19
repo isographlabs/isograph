@@ -13,6 +13,7 @@ use crate::{
 use boxcar::Vec as BoxcarVec;
 use dashmap::{DashMap, Entry};
 use lru::LruCache;
+use prelude::Postfix;
 
 use crate::derived_node::{DerivedNode, DerivedNodeId, DerivedNodeRevision};
 
@@ -157,7 +158,7 @@ impl<Db: Database> Storage<Db> {
     pub fn remove_singleton<T: Singleton + 'static>(&mut self) {
         self.assert_empty_dependency_stack();
         self.internal
-            .remove_source::<T>(T::get_singleton_key().into());
+            .remove_source::<T>(T::get_singleton_key().to());
     }
 
     pub fn run_garbage_collection(&mut self) {
@@ -195,11 +196,10 @@ impl<Db: Database> Storage<Db> {
 impl<Db: Database> InternalStorage<Db> {
     pub(crate) fn get_param(&self, param_id: ParamId) -> Option<&Box<dyn Any>> {
         let index = self.param_id_to_index.get(&param_id)?;
-        Some(
-            self.params
-                .get(index.idx)
-                .expect("indexes should always be valid. This is indicative of a bug in Pico."),
-        )
+        self.params
+            .get(index.idx)
+            .expect("indexes should always be valid. This is indicative of a bug in Pico.")
+            .wrap_some()
     }
 
     pub(crate) fn get_derived_node(
@@ -227,7 +227,7 @@ impl<Db: Database> InternalStorage<Db> {
 
         let node = self.get_derived_node_from_derived_node_revision(&revision);
 
-        Some((node, revision))
+        (node, revision).wrap_some()
     }
 
     pub(crate) fn get_dependencies(
@@ -319,7 +319,7 @@ impl<Db: Database> InternalStorage<Db> {
         }
         *node = SourceNode {
             time_updated: self.current_epoch.increment(),
-            value: Some(Box::new(source)),
+            value: (source.boxed() as Box<dyn DynEq>).wrap_some(),
         };
     }
 
@@ -343,12 +343,12 @@ pub fn intern_value<Db: Database, T: Clone + Hash + DynEq + 'static>(
     value: T,
 ) -> MemoRef<T> {
     let wrapped_value = InternValueWrapper(value);
-    let param_id = hash(&wrapped_value).into();
+    let param_id = hash(&wrapped_value).to();
     let value = wrapped_value.0;
 
     let mut param_ids = init_param_vec();
     param_ids.push(param_id);
-    let derived_node_id = DerivedNodeId::new(param_id.inner().into(), param_ids);
+    let derived_node_id = DerivedNodeId::new(param_id.inner().to(), param_ids);
 
     let current_epoch = db.get_storage().internal.current_epoch;
 
@@ -363,7 +363,7 @@ pub fn intern_value<Db: Database, T: Clone + Hash + DynEq + 'static>(
                 inner_fn: InnerFn::new(|_, _| {
                     unreachable!("interned derived node should never be executed")
                 }),
-                value: Box::new(value),
+                value: value.boxed(),
             });
 
             let dependency_index = db.get_storage().internal.insert_dependencies(Vec::new());
@@ -465,11 +465,11 @@ pub fn intern_ref<Db: Database, T: Clone + Hash + DynEq + 'static>(
     value: &T,
 ) -> MemoRef<T> {
     // the param_id (identity) of the MemoRef is the hash of the value, *not* of the memory address.
-    let param_id = hash(value).into();
+    let param_id = hash(value).to();
 
     let mut param_ids = init_param_vec();
     param_ids.push(param_id);
-    let derived_node_id = DerivedNodeId::new(param_id.inner().into(), param_ids);
+    let derived_node_id = DerivedNodeId::new(param_id.inner().to(), param_ids);
 
     let new_ptr = RawPtr::from_ref(value);
     let current_epoch = db.get_storage().internal.current_epoch;
@@ -484,7 +484,7 @@ pub fn intern_ref<Db: Database, T: Clone + Hash + DynEq + 'static>(
                 inner_fn: InnerFn::new(|_, _| {
                     unreachable!("intern_ref derived node should never be executed")
                 }),
-                value: Box::new(new_ptr),
+                value: new_ptr.boxed(),
             });
 
             let dependency_index = db.get_storage().internal.insert_dependencies(Vec::new());
@@ -530,7 +530,7 @@ pub fn intern_ref<Db: Database, T: Clone + Hash + DynEq + 'static>(
                     // We do *not* update the time_updated, though.
                     let node_index = db.get_storage().internal.insert_derived_node(DerivedNode {
                         inner_fn: existing_node.inner_fn,
-                        value: Box::new(new_ptr),
+                        value: new_ptr.boxed(),
                     });
                     revision.node_index = node_index;
                 }

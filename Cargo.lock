@@ -1428,6 +1428,7 @@ dependencies = [
  "intern",
  "lru",
  "pico_macros",
+ "prelude",
  "serde",
  "serde_derive",
  "thiserror 1.0.69",

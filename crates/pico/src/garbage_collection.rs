@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use boxcar::Vec as BoxcarVec;
 use dashmap::DashMap;
+use prelude::Postfix;
 use tracing::debug;
 
 use crate::{
@@ -64,7 +65,7 @@ impl<Db: Database> InternalStorage<Db> {
             add_dependencies_to_queue(&mut derived_node_id_queue, old_dependencies.iter());
 
             // We do this to avoid cloning the inner value
-            let derived_node_value = std::mem::replace(&mut old_derived_node.value, Box::new(()));
+            let derived_node_value = std::mem::replace(&mut old_derived_node.value, ().boxed());
             let new_derived_node = DerivedNode {
                 inner_fn: old_derived_node.inner_fn,
                 value: derived_node_value,
@@ -96,7 +97,7 @@ impl<Db: Database> InternalStorage<Db> {
                     );
 
                     // Let's avoid cloning the param, as well
-                    let param = std::mem::replace(old_param, Box::new(()));
+                    let param = std::mem::replace(old_param, ().boxed());
 
                     let new_param_index: Index<ParamId> = Index::new(new_params.push(param));
                     new_param_id_to_index.insert(param_id, new_param_index);

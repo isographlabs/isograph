@@ -1,5 +1,7 @@
 use std::num::NonZeroUsize;
 
+use prelude::Postfix;
+
 const INIT: usize = 1;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -36,7 +38,7 @@ impl From<usize> for Epoch {
 
 impl From<Epoch> for usize {
     fn from(epoch: Epoch) -> Self {
-        epoch.0.into()
+        epoch.0.to()
     }
 }
 

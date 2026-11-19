@@ -4,6 +4,7 @@ use std::hash::{Hash, Hasher};
 use std::io::{self, Write};
 use std::ops::Deref;
 
+use prelude::Postfix;
 use serde::Serialize;
 
 #[repr(transparent)]
@@ -31,11 +32,11 @@ impl<'a, H: Hasher> Write for HasherWrite<'a, H> {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.0.write(buf);
-        Ok(buf.len())
+        buf.len().wrap_ok()
     }
     #[inline]
     fn flush(&mut self) -> io::Result<()> {
-        Ok(())
+        ().wrap_ok()
     }
 }
 
