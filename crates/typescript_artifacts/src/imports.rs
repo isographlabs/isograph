@@ -33,8 +33,14 @@ pub(crate) fn artifact_import_identifier(import: &ArtifactImport) -> String {
 /// The specifier that imports `import` from the module at `from`: the import's path relative
 /// to `from`'s folder, `./`-prefixed, `.ts` dropped.
 pub(crate) fn artifact_import_specifier(from: &ArtifactPath, import: &ArtifactImport) -> String {
-    let from_folder: Vec<&str> = folder_segments(from.reference());
-    let target: Vec<&str> = without_extension(import.0.reference()).split('/').collect();
+    relative_artifact_specifier(from, import.0.reference())
+}
+
+/// The specifier that imports the artifact at `to` from the artifact at `from`: `to` relative
+/// to `from`'s folder, `./`-prefixed, `.ts` dropped.
+pub(crate) fn relative_artifact_specifier(from: &ArtifactPath, to: &ArtifactPath) -> String {
+    let from_folder: Vec<&str> = folder_segments(from);
+    let target: Vec<&str> = without_extension(to).split('/').collect();
     let shared = from_folder
         .iter()
         .zip(target.iter())

@@ -4,14 +4,18 @@ use std::sync::LazyLock;
 use common_lang_types::{ConstExportName, RelativePathToSourceFile};
 use intern::string_key::Intern;
 use isograph_compiler::{
-    ClientId, CompilationProfile, HostLanguage, IncludeFile, IsoLiteralError, IsoLiteralExtraction,
-    IsoLiteralStartIndex, IsographDb, extract_iso_literals, parsed_iso_literal,
+    ArtifactPath, ClientId, CompilationProfile, GenerationOptions, HostLanguage, IncludeFile,
+    IsoLiteralError, IsoLiteralExtraction, IsoLiteralStartIndex, IsographDb, ProjectArtifacts,
+    extract_iso_literals, parsed_iso_literal,
 };
 use isograph_parser::{IsoLiteralItem, IsoLiteralParse, ParsedIsoLiteral, SelectableNameWrapper};
 use prelude::Postfix;
 use regex::Regex;
 use span::WithSpanPostfix;
 use thiserror::Error;
+pub use typescript_artifacts::{
+    ModuleSpecifier, TypeScriptCustomScalarType, TypeScriptGenerationError,
+};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct TypeScriptHostLanguage;
@@ -58,6 +62,8 @@ static EXTRACT_ISO_LITERAL: LazyLock<Regex> = LazyLock::new(|| {
 impl HostLanguage for TypeScriptHostLanguage {
     type LiteralContext = TypeScriptLiteralContext;
     type Error = TypeScriptHostError;
+    type GenerationError = TypeScriptGenerationError;
+    type CustomScalarType = TypeScriptCustomScalarType;
 
     fn extract_iso_literals_from_text(contents: &str) -> Vec<IsoLiteralExtraction<Self>> {
         EXTRACT_ISO_LITERAL
@@ -90,9 +96,12 @@ impl HostLanguage for TypeScriptHostLanguage {
     }
 
     fn generate_artifacts(
-        sources: &std::collections::BTreeSet<isograph_compiler::ArtifactSource>,
-    ) -> Vec<(isograph_compiler::ArtifactPath, String)> {
-        typescript_artifacts::generate_artifacts(sources)
+        project: &ProjectArtifacts<TypeScriptLiteralContext>,
+        options: &GenerationOptions<TypeScriptCustomScalarType>,
+    ) -> Result<Vec<(ArtifactPath, String)>, TypeScriptGenerationError> {
+        typescript_artifacts::generate_artifacts(project, options, |context| {
+            context.const_export_name
+        })
     }
 
     fn should_include_source_file(relative_path: &Path) -> IncludeFile {
@@ -524,6 +533,13 @@ mod memo_tests {
     impl CompilationProfile for TestProfile {
         type HostLanguage = TypeScriptHostLanguage;
         type NetworkProtocol = TestNetworkProtocol;
+
+        fn custom_scalar_types() -> std::collections::BTreeMap<
+            common_lang_types::EntityName,
+            <Self::HostLanguage as isograph_compiler::HostLanguage>::CustomScalarType,
+        > {
+            std::collections::BTreeMap::new()
+        }
     }
 
     fn iso_literal_item(parsed: &ParsedIsoLiteral) -> Option<&IsoLiteralItem> {

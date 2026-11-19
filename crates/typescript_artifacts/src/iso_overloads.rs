@@ -1,14 +1,18 @@
 use std::cmp::Ordering;
-use std::collections::BTreeSet;
 
 use common_lang_types::EntityNameAndSelectableName;
-use isograph_compiler::{ArtifactPath, ArtifactSource};
+use isograph_compiler::{ArtifactPath, ClientFieldKind, FieldArtifactKind, ProjectArtifacts};
 use prelude::Postfix;
 
-use crate::entrypoint::entrypoint_path;
+use crate::entrypoint::{entrypoint_path, field_artifact_path};
+use crate::generate_types::{
+    PARAM_TYPE, link_type_name, link_type_path, param_type_name, record_of_never, sorted_imports,
+    wrapped_type,
+};
+use crate::imports::{artifact_import_identifier, relative_artifact_specifier};
 use crate::module::{
     ArtifactImport, ConditionalType, FunctionParam, FunctionSignature, FunctionType,
-    FunctionTypeParam, TemplateLiteralSpan, TemplateLiteralType, ThrowingFunction, TypeAlias,
+    NamedTypeImport, TemplateLiteralSpan, TemplateLiteralType, ThrowingFunction, TypeAlias,
     TypeParam, TypeScriptItem, TypeScriptKeyword, TypeScriptModule, TypeScriptType,
 };
 
@@ -20,51 +24,120 @@ const UNEXPECTED_INVOCATION: &str = "iso: Unexpected invocation at runtime. Eith
 
 /// `iso.ts`: an `iso` overload per field, entity, and entrypoint literal, and the
 /// implementation.
-pub(crate) fn iso_overload_module(sources: &BTreeSet<ArtifactSource>) -> TypeScriptModule {
-    let fields = sorted(sources.iter().filter_map(|source| match source {
-        ArtifactSource::Field(field) => field_overload_text(field.dereference()).wrap_some(),
-        ArtifactSource::Entity(_) | ArtifactSource::Entrypoint(_) => None,
-    }));
-    let entities = sorted(sources.iter().filter_map(|source| match source {
-        ArtifactSource::Entity(entity) => format!("entity {entity}").wrap_some(),
-        ArtifactSource::Field(_) | ArtifactSource::Entrypoint(_) => None,
-    }));
-    let mut entrypoints: Vec<(String, ArtifactImport)> = sources
+pub(crate) fn iso_overload_module<TLiteralContext>(
+    project: &ProjectArtifacts<TLiteralContext>,
+) -> TypeScriptModule {
+    let path = ArtifactPath(ISO_TS.to_owned());
+    let mut fields: Vec<(String, TypeScriptType)> = project
+        .fields
         .iter()
-        .filter_map(|source| match source {
-            ArtifactSource::Entrypoint(entrypoint) => (
+        .map(|field| {
+            (
+                field_overload_text(field.field),
+                field_overload_return(field.field, field.kind.reference()),
+            )
+        })
+        .collect();
+    fields.sort_by(|(a, _), (b, _)| overload_order(a, b));
+    let entities = sorted(
+        project
+            .entities
+            .iter()
+            .map(|entity| format!("entity {entity}")),
+    );
+    let mut entrypoints: Vec<(String, ArtifactImport)> = project
+        .entrypoints
+        .iter()
+        .map(|entrypoint| {
+            (
                 entrypoint_overload_text(entrypoint.dereference()),
                 ArtifactImport(entrypoint_path(entrypoint.dereference())),
             )
-                .wrap_some(),
-            ArtifactSource::Entity(_) | ArtifactSource::Field(_) => None,
         })
         .collect();
     entrypoints.sort_by(|(a, _), (b, _)| overload_order(a, b));
 
-    let imports = entrypoints
+    let param_imports = sorted_imports(project.fields.iter().map(|field| {
+        let name = param_type_name(field.field);
+        NamedTypeImport {
+            specifier: relative_artifact_specifier(
+                path.reference(),
+                field_artifact_path(field.field, PARAM_TYPE).reference(),
+            ),
+            imported: name.clone(),
+            local: name,
+        }
+    }));
+    let link_imports = sorted_imports(project.link_types.iter().map(|link| {
+        let name = link_type_name(link.entity);
+        NamedTypeImport {
+            specifier: relative_artifact_specifier(
+                path.reference(),
+                link_type_path(link.entity).reference(),
+            ),
+            imported: name.clone(),
+            local: name,
+        }
+    }));
+    let entrypoint_imports = entrypoints
         .iter()
         .map(|(_, import)| TypeScriptItem::TypeImport(import.clone()));
     let field_overloads = fields
         .into_iter()
-        .map(|text| overload(text, TypeScriptType::reference("Identity")));
+        .map(|(text, returns)| overload(text, returns));
     let entity_overloads = entities
         .into_iter()
         .map(|text| overload(text, TypeScriptType::Keyword(TypeScriptKeyword::Void)));
-    let entrypoint_overloads = entrypoints
-        .iter()
-        .map(|(text, import)| overload(text.clone(), TypeScriptType::TypeOf(import.clone())));
+    let entrypoint_overloads = entrypoints.iter().map(|(text, import)| {
+        overload(
+            text.clone(),
+            TypeScriptType::TypeOf(artifact_import_identifier(import)),
+        )
+    });
     TypeScriptModule {
-        path: ArtifactPath(ISO_TS.to_owned()),
-        items: imports
+        items: param_imports
+            .chain(link_imports)
+            .chain(entrypoint_imports)
             .chain(preamble())
             .chain(field_overloads)
             .chain(entity_overloads)
             .chain(entrypoint_overloads)
             .chain(std::iter::once(implementation()))
             .collect(),
+        path,
     }
 }
+
+/// `IdentityWithParam<P__f__param>` for a plain client field,
+/// `IdentityWithParamComponent<P__f__param>` for a component, and
+/// `IdentityWithParam<P__f__param, T>` for a pointer, where `T` is the pointer's target with
+/// each entity's link type.
+fn field_overload_return(
+    field: EntityNameAndSelectableName,
+    kind: &FieldArtifactKind,
+) -> TypeScriptType {
+    let param = TypeScriptType::reference(param_type_name(field).as_str());
+    match kind {
+        FieldArtifactKind::ClientField(ClientFieldKind::Plain) => {
+            TypeScriptType::generic(IDENTITY_WITH_PARAM, param.wrap_vec())
+        }
+        FieldArtifactKind::ClientField(ClientFieldKind::Component) => {
+            TypeScriptType::generic(IDENTITY_WITH_PARAM_COMPONENT, param.wrap_vec())
+        }
+        FieldArtifactKind::Pointer(target) => TypeScriptType::generic(
+            IDENTITY_WITH_PARAM,
+            vec![
+                param,
+                wrapped_type(target, &mut |entity| {
+                    TypeScriptType::reference(link_type_name(entity.dereference()).as_str())
+                }),
+            ],
+        ),
+    }
+}
+
+const IDENTITY_WITH_PARAM: &str = "IdentityWithParam";
+const IDENTITY_WITH_PARAM_COMPONENT: &str = "IdentityWithParamComponent";
 
 fn field_overload_text(field: EntityNameAndSelectableName) -> String {
     format!(
@@ -106,11 +179,7 @@ fn t() -> TypeScriptType {
 fn overload(text: String, returns: TypeScriptType) -> TypeScriptItem {
     TypeScriptItem::ExportedOverload(FunctionSignature {
         name: "iso".to_owned(),
-        type_params: TypeParam {
-            name: "T".to_owned(),
-            constraint: None,
-        }
-        .wrap_vec(),
+        type_params: type_param("T").wrap_vec(),
         params: FunctionParam {
             name: "param".to_owned(),
             type_: TypeScriptType::Intersection(vec![
@@ -137,7 +206,8 @@ fn implementation() -> TypeScriptItem {
             }
             .wrap_vec(),
             return_type: TypeScriptType::Union(vec![
-                TypeScriptType::reference("Identity"),
+                TypeScriptType::generic(IDENTITY_WITH_PARAM, any().wrap_vec()),
+                TypeScriptType::generic(IDENTITY_WITH_PARAM_COMPONENT, any().wrap_vec()),
                 TypeScriptType::Keyword(TypeScriptKeyword::Object),
                 TypeScriptType::Keyword(TypeScriptKeyword::Void),
             ]),
@@ -146,39 +216,94 @@ fn implementation() -> TypeScriptItem {
     })
 }
 
-/// `Identity`, `WhitespaceCharacter`, `Whitespace`, and `MatchesWhitespaceAndString`.
+fn any() -> TypeScriptType {
+    TypeScriptType::Keyword(TypeScriptKeyword::Any)
+}
+
+fn type_param(name: &str) -> TypeParam {
+    TypeParam {
+        name: name.to_owned(),
+        constraint: None,
+        default: None,
+    }
+}
+
+fn named(name: &str, type_: TypeScriptType) -> FunctionParam {
+    FunctionParam {
+        name: name.to_owned(),
+        type_,
+    }
+}
+
+/// `(<params>) => <return>` with no type parameters.
+fn function(params: Vec<FunctionParam>, return_type: TypeScriptType) -> TypeScriptType {
+    TypeScriptType::Function(
+        FunctionType {
+            type_params: Vec::new(),
+            params,
+            return_type,
+        }
+        .boxed(),
+    )
+}
+
+/// Upstream's `IdentityWithParam` and `IdentityWithParamComponent`, then
+/// `WhitespaceCharacter`, `Whitespace`, and `MatchesWhitespaceAndString`.
 fn preamble() -> impl Iterator<Item = TypeScriptItem> {
-    let client_field = || TypeScriptType::reference("TClientField");
+    let t_param = || TypeScriptType::reference("TParam");
+    let t_return = || TypeScriptType::reference("TClientFieldReturn");
+    let t_props = || TypeScriptType::reference("TComponentProps");
+    let object_param = || TypeParam {
+        name: "TParam".to_owned(),
+        constraint: TypeScriptType::Keyword(TypeScriptKeyword::Object).wrap_some(),
+        default: None,
+    };
+    let param_function = || function(named("param", t_param()).wrap_vec(), t_return());
     let identity = TypeAlias {
-        name: "Identity".to_owned(),
-        type_params: Vec::new(),
+        name: IDENTITY_WITH_PARAM.to_owned(),
+        type_params: vec![
+            object_param(),
+            TypeParam {
+                name: "TReturnConstraint".to_owned(),
+                constraint: None,
+                default: TypeScriptType::Keyword(TypeScriptKeyword::Unknown).wrap_some(),
+            },
+        ],
         aliased: TypeScriptType::Function(
             FunctionType {
                 type_params: TypeParam {
-                    name: "TClientField".to_owned(),
-                    constraint: TypeScriptType::Function(
-                        FunctionType {
-                            type_params: Vec::new(),
-                            params: FunctionTypeParam::Rest(FunctionParam {
-                                name: "args".to_owned(),
-                                type_: TypeScriptType::Array(
-                                    TypeScriptType::Keyword(TypeScriptKeyword::Never).boxed(),
-                                ),
-                            })
-                            .wrap_vec(),
-                            return_type: TypeScriptType::Keyword(TypeScriptKeyword::Unknown),
-                        }
-                        .boxed(),
-                    )
-                    .wrap_some(),
+                    name: "TClientFieldReturn".to_owned(),
+                    constraint: TypeScriptType::reference("TReturnConstraint").wrap_some(),
+                    default: None,
                 }
                 .wrap_vec(),
-                params: FunctionTypeParam::Named(FunctionParam {
-                    name: "clientField".to_owned(),
-                    type_: client_field(),
-                })
-                .wrap_vec(),
-                return_type: client_field(),
+                params: named("clientField", param_function()).wrap_vec(),
+                return_type: param_function(),
+            }
+            .boxed(),
+        ),
+    };
+    let component_function = || {
+        function(
+            vec![named("data", t_param()), named("componentProps", t_props())],
+            t_return(),
+        )
+    };
+    let identity_component = TypeAlias {
+        name: IDENTITY_WITH_PARAM_COMPONENT.to_owned(),
+        type_params: object_param().wrap_vec(),
+        aliased: TypeScriptType::Function(
+            FunctionType {
+                type_params: vec![
+                    type_param("TClientFieldReturn"),
+                    TypeParam {
+                        name: "TComponentProps".to_owned(),
+                        constraint: None,
+                        default: record_of_never().wrap_some(),
+                    },
+                ],
+                params: named("clientComponentField", component_function()).wrap_vec(),
+                return_type: component_function(),
             }
             .boxed(),
         ),
@@ -195,11 +320,7 @@ fn preamble() -> impl Iterator<Item = TypeScriptItem> {
     };
     let whitespace = TypeAlias {
         name: "Whitespace".to_owned(),
-        type_params: TypeParam {
-            name: "In".to_owned(),
-            constraint: None,
-        }
-        .wrap_vec(),
+        type_params: type_param("In").wrap_vec(),
         aliased: TypeScriptType::Conditional(
             ConditionalType {
                 check: TypeScriptType::reference("In"),
@@ -231,11 +352,9 @@ fn preamble() -> impl Iterator<Item = TypeScriptItem> {
             TypeParam {
                 name: "TString".to_owned(),
                 constraint: TypeScriptType::Keyword(TypeScriptKeyword::String).wrap_some(),
+                default: None,
             },
-            TypeParam {
-                name: "T".to_owned(),
-                constraint: None,
-            },
+            type_param("T"),
         ],
         aliased: TypeScriptType::Conditional(
             ConditionalType {
@@ -259,7 +378,13 @@ fn preamble() -> impl Iterator<Item = TypeScriptItem> {
             .boxed(),
         ),
     };
-    [identity, whitespace_character, whitespace, matches]
-        .into_iter()
-        .map(TypeScriptItem::TypeAlias)
+    [
+        identity,
+        identity_component,
+        whitespace_character,
+        whitespace,
+        matches,
+    ]
+    .into_iter()
+    .map(TypeScriptItem::TypeAlias)
 }

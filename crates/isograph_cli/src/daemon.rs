@@ -92,14 +92,19 @@ async fn serve<TProfile: CompilationProfile>(
         .parent()
         .expect("a config file path has a parent directory")
         .to_owned();
-    let artifact_folder = config.output_directory.as_ref().map(|output_directory| {
-        crate::state::ArtifactFolder(
-            config_directory
-                .join(output_directory)
-                .join(isograph_config::ISOGRAPH_FOLDER),
-        )
+    let artifact_output = config.output_directory.as_ref().map(|output_directory| {
+        let relative_folder = output_directory.join(isograph_config::ISOGRAPH_FOLDER);
+        crate::state::ArtifactOutput {
+            folder: crate::state::ArtifactFolder(
+                config_directory.join(relative_folder.reference()),
+            ),
+            generation: isograph_compiler::GenerationOptions {
+                artifact_folder: relative_folder,
+                custom_scalar_types: TProfile::custom_scalar_types(),
+            },
+        }
     });
-    let mut state = IsographState::<TProfile>::new(globs.clone(), artifact_folder.clone());
+    let mut state = IsographState::<TProfile>::new(globs.clone(), artifact_output.clone());
     intern_config_directory(&mut state.db, config_path.reference());
     let _hold_watch = watch_tx.clone();
     let started = match crate::watch::start_if_watching::<TProfile>(
@@ -125,7 +130,10 @@ async fn serve<TProfile: CompilationProfile>(
         boot,
         globs.reference(),
     );
-    if let Some(folder) = artifact_folder.as_ref() {
+    if let Some(folder) = artifact_output
+        .as_ref()
+        .map(|output| output.folder.reference())
+    {
         let _ = event_tx.send(
             crate::event::InternalEvent::ArtifactFilesRead(
                 crate::write_artifacts::read_artifact_files(folder),

@@ -7,7 +7,9 @@ use common_lang_types::{
 };
 use intern::Lookup;
 use intern::string_key::Intern;
-use isograph_compiler::{ArtifactPath, ClientId, CompilationProfile};
+use isograph_compiler::{
+    ArtifactPath, ClientId, CompilationProfile, GenerationOptions, HostLanguage,
+};
 use pico::Database;
 use prelude::Postfix;
 
@@ -36,6 +38,17 @@ impl ClientIdSource {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ArtifactFolder(pub std::path::PathBuf);
 
+/// Where and how the daemon writes artifacts.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ArtifactOutput<TCustomScalarType> {
+    pub folder: ArtifactFolder,
+    pub generation: GenerationOptions<TCustomScalarType>,
+}
+
+pub(crate) type ProfileArtifactOutput<TProfile> = ArtifactOutput<
+    <<TProfile as CompilationProfile>::HostLanguage as HostLanguage>::CustomScalarType,
+>;
+
 /// Every file under the artifact folder and its text: what the daemon read there at boot,
 /// then what it last wrote.
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -51,12 +64,15 @@ pub struct IsographState<TProfile: CompilationProfile> {
     /// The compiler's reader of file text. No `LiveSession` and no `OpenFile` has it.
     compiler_client: ClientId,
     /// `None` when the config has no `output_directory`.
-    pub(crate) artifact_folder: Option<ArtifactFolder>,
+    pub(crate) artifact_output: Option<ProfileArtifactOutput<TProfile>>,
     pub(crate) artifact_files: ArtifactFiles,
 }
 
 impl<TProfile: CompilationProfile> IsographState<TProfile> {
-    pub(crate) fn new(globs: ProjectGlobs, artifact_folder: Option<ArtifactFolder>) -> Self {
+    pub(crate) fn new(
+        globs: ProjectGlobs,
+        artifact_output: Option<ProfileArtifactOutput<TProfile>>,
+    ) -> Self {
         let mut client_ids = ClientIdSource::default();
         let compiler_client = client_ids.mint();
         Self {
@@ -67,7 +83,7 @@ impl<TProfile: CompilationProfile> IsographState<TProfile> {
             compile_debounce: None,
             client_ids,
             compiler_client,
-            artifact_folder,
+            artifact_output,
             artifact_files: ArtifactFiles::default(),
         }
     }

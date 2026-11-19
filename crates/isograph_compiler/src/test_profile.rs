@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 use std::convert::Infallible;
 use std::path::Path;
 
@@ -11,8 +11,8 @@ use crate::host_language::{
     NetworkProtocol,
 };
 use crate::{
-    ArtifactPath, ArtifactSource, ClientId, EntityKind, IsographDb, ProtocolEntity,
-    ProtocolSelectable,
+    ArtifactPath, ClientId, EntityKind, GenerationOptions, IsographDb, ProjectArtifacts,
+    ProtocolEntity, ProtocolSelectable,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
@@ -24,6 +24,8 @@ pub(crate) struct TestHostLanguage;
 impl HostLanguage for TestHostLanguage {
     type Error = TestHostError;
     type LiteralContext = ();
+    type GenerationError = TestHostError;
+    type CustomScalarType = ();
 
     /// The text between `` iso(` `` and the next `` ` ``, for each `` iso(` ``.
     fn extract_iso_literals_from_text(contents: &str) -> Vec<IsoLiteralExtraction<Self>> {
@@ -47,8 +49,11 @@ impl HostLanguage for TestHostLanguage {
         IncludeFile::Include
     }
 
-    fn generate_artifacts(_sources: &BTreeSet<ArtifactSource>) -> Vec<(ArtifactPath, String)> {
-        Vec::new()
+    fn generate_artifacts(
+        _project: &ProjectArtifacts<()>,
+        _options: &GenerationOptions<()>,
+    ) -> Result<Vec<(ArtifactPath, String)>, TestHostError> {
+        Vec::new().wrap_ok()
     }
 }
 
@@ -121,4 +126,8 @@ pub(crate) struct TestProfile;
 impl CompilationProfile for TestProfile {
     type HostLanguage = TestHostLanguage;
     type NetworkProtocol = TestNetworkProtocol;
+
+    fn custom_scalar_types() -> BTreeMap<EntityName, ()> {
+        BTreeMap::new()
+    }
 }

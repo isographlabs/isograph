@@ -78,4 +78,11 @@ pub(crate) struct TestProfile;
 impl CompilationProfile for TestProfile {
     type HostLanguage = TypeScriptHostLanguage;
     type NetworkProtocol = TestNetworkProtocol;
+
+    fn custom_scalar_types() -> std::collections::BTreeMap<
+        common_lang_types::EntityName,
+        <Self::HostLanguage as isograph_compiler::HostLanguage>::CustomScalarType,
+    > {
+        std::collections::BTreeMap::new()
+    }
 }

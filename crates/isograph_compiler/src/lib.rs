@@ -16,8 +16,10 @@ mod wrapper;
 
 pub use artifact_types::{
     ArtifactInnerType, ArtifactInputField, ArtifactInputType, ArtifactObjectField,
-    ArtifactObjectType, ArtifactParameter, FieldDeclaration, FieldTypes, GenerationError,
-    Loadability, ParametersType, SelectedClientField, field_declaration, field_types,
+    ArtifactObjectType, ArtifactParameter, FieldArtifactKind, FieldArtifacts, FieldDeclaration,
+    FieldDeclarationSource, FieldTypes, Generation, GenerationError, GenerationOptions, LinkType,
+    Loadability, ParametersType, ProfileGenerationOptions, ProjectArtifacts, SelectedClientField,
+    field_declaration, field_types, project_artifacts,
 };
 pub use artifacts::{ArtifactPath, ArtifactSource, LiteralParseFailed, artifact_sources_in_file};
 pub use compiler_errors::{CompilerError, ProfileCompilerError, compiler_errors_in_file};

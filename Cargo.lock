@@ -2404,6 +2404,7 @@ dependencies = [
 name = "ts_graphql_react_isograph_cli"
 version = "0.5.3"
 dependencies = [
+ "common_lang_types",
  "graphql_network_protocol",
  "isograph_cli",
  "isograph_compiler",
@@ -2423,10 +2424,13 @@ dependencies = [
  "common_lang_types",
  "intern",
  "isograph_compiler",
+ "nonempty",
+ "pathdiff",
  "prelude",
  "swc_common",
  "swc_ecma_ast",
  "swc_ecma_codegen",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

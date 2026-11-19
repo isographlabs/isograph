@@ -706,15 +706,18 @@ mod tests {
     impl HostLanguage for InHost {
         type Error = InHostError;
         type LiteralContext = ();
+        type GenerationError = InHostError;
+        type CustomScalarType = ();
 
         fn extract_iso_literals_from_text(_contents: &str) -> Vec<IsoLiteralExtraction<Self>> {
             Vec::new()
         }
 
         fn generate_artifacts(
-            _sources: &std::collections::BTreeSet<isograph_compiler::ArtifactSource>,
-        ) -> Vec<(isograph_compiler::ArtifactPath, String)> {
-            Vec::new()
+            _project: &isograph_compiler::ProjectArtifacts<()>,
+            _options: &isograph_compiler::GenerationOptions<()>,
+        ) -> Result<Vec<(isograph_compiler::ArtifactPath, String)>, InHostError> {
+            Vec::new().wrap_ok()
         }
 
         fn should_include_source_file(relative_path: &Path) -> IncludeFile {
@@ -730,6 +733,10 @@ mod tests {
     impl CompilationProfile for InHostProfile {
         type HostLanguage = InHost;
         type NetworkProtocol = TestNetworkProtocol;
+
+        fn custom_scalar_types() -> std::collections::BTreeMap<common_lang_types::EntityName, ()> {
+            std::collections::BTreeMap::new()
+        }
     }
 
     fn interned(s: &str) -> common_lang_types::RelativePathToSourceFile {

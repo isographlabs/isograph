@@ -28,6 +28,13 @@ struct GraphQLProfile;
 impl CompilationProfile for GraphQLProfile {
     type HostLanguage = TypeScriptHostLanguage;
     type NetworkProtocol = GraphQLNetworkProtocol;
+
+    fn custom_scalar_types() -> std::collections::BTreeMap<
+        common_lang_types::EntityName,
+        <Self::HostLanguage as isograph_compiler::HostLanguage>::CustomScalarType,
+    > {
+        std::collections::BTreeMap::new()
+    }
 }
 
 type Db = IsographDb<GraphQLProfile>;

@@ -1,5 +1,6 @@
-use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::PathBuf;
 
 use common_lang_types::{
     DescriptionValue, Diagnostic, DiagnosticResult, EntityName, EntityNameAndSelectableName,
@@ -16,8 +17,9 @@ use prelude::Postfix;
 use crate::schema::{LiteralContextOf, source_iso_literal_items};
 use crate::wrapper::wrapper_of_type_annotation;
 use crate::{
-    ClientId, ClientPointerTarget, CompilationProfile, EntityKind, IsographDb, ScalarKind,
-    SelectableKey, SelectableKind, Wrapper, entity_named, selectable_named, selectables_for_entity,
+    ArtifactSource, ClientFieldKind, ClientId, ClientPointerTarget, CompilationProfile, EntityKind,
+    EntityOrigin, HostLanguage, IsographDb, NetworkProtocol, ScalarKind, SelectableKey,
+    SelectableKind, Wrapper, entity_named, selectable_named, selectables_for_entity,
 };
 
 /// The type of a param type's `data`: one field per selection, in selection order.
@@ -449,4 +451,236 @@ fn input_objects<TProfile: CompilationProfile>(
         slot.insert(fields);
     }
     expanded.wrap_ok()
+}
+
+/// Everything a host language needs to print every artifact.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProjectArtifacts<TLiteralContext> {
+    /// Sorted by field.
+    pub fields: Vec<FieldArtifacts<TLiteralContext>>,
+    /// The `entity` literals, sorted.
+    pub entities: Vec<EntityName>,
+    /// The `entrypoint` literals, sorted.
+    pub entrypoints: Vec<EntityNameAndSelectableName>,
+    /// One per entity some pointer points to, sorted by entity.
+    pub link_types: Vec<LinkType>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FieldArtifacts<TLiteralContext> {
+    pub field: EntityNameAndSelectableName,
+    pub kind: FieldArtifactKind,
+    pub resolver: FieldDeclarationSource<TLiteralContext>,
+    pub data: ArtifactObjectType,
+    pub parameters: Option<ParametersType>,
+    pub output_type: Generation,
+    pub resolver_reader: Generation,
+    /// The refetch reader, and the entrypoint and normalization AST of the field itself.
+    pub loadable_artifacts: Generation,
+}
+
+/// Where a field's resolver is: its source file and its literal's host-language context.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FieldDeclarationSource<TLiteralContext> {
+    pub path: RelativePathToSourceFile,
+    pub context: TLiteralContext,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FieldArtifactKind {
+    ClientField(ClientFieldKind),
+    Pointer(Wrapper<EntityName>),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Generation {
+    Generated,
+    NotGenerated,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LinkType {
+    pub entity: EntityName,
+    /// The entity itself when concrete; its concrete types when abstract.
+    pub concrete_types: Vec<EntityName>,
+}
+
+/// Project facts the host language reads when printing.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GenerationOptions<TCustomScalarType> {
+    /// `<output_directory>/__isograph`, relative to the config file's directory.
+    pub artifact_folder: PathBuf,
+    /// The profile's `custom_scalar_types`.
+    pub custom_scalar_types: BTreeMap<EntityName, TCustomScalarType>,
+}
+
+pub type ProfileGenerationOptions<TProfile> = GenerationOptions<
+    <<TProfile as CompilationProfile>::HostLanguage as HostLanguage>::CustomScalarType,
+>;
+
+/// The artifacts of the project whose iso literals are `sources`, as `client` reads it.
+pub fn project_artifacts<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    sources: &BTreeSet<ArtifactSource>,
+) -> Result<ProjectArtifacts<LiteralContextOf<TProfile>>, GenerationError> {
+    let entrypoints: Vec<EntityNameAndSelectableName> = sources
+        .iter()
+        .filter_map(|source| match source {
+            ArtifactSource::Entrypoint(entrypoint) => entrypoint.dereference().wrap_some(),
+            ArtifactSource::Entity(_) | ArtifactSource::Field(_) => None,
+        })
+        .collect();
+    let entities: Vec<EntityName> = sources
+        .iter()
+        .filter_map(|source| match source {
+            ArtifactSource::Entity(entity) => entity.dereference().wrap_some(),
+            ArtifactSource::Field(_) | ArtifactSource::Entrypoint(_) => None,
+        })
+        .collect();
+    let declared: Vec<EntityNameAndSelectableName> = sources
+        .iter()
+        .filter_map(|source| match source {
+            ArtifactSource::Field(field) => field.dereference().wrap_some(),
+            ArtifactSource::Entity(_) | ArtifactSource::Entrypoint(_) => None,
+        })
+        .collect();
+    let types_of = |field: EntityNameAndSelectableName| field_types(db, client, field).clone();
+
+    let mut reachable = BTreeSet::new();
+    let mut pending = entrypoints.clone();
+    while let Some(field) = pending.pop() {
+        if reachable.insert(field) {
+            pending.extend(
+                types_of(field)?
+                    .selected
+                    .iter()
+                    .map(|selected| selected.field),
+            );
+        }
+    }
+    let loadable: BTreeSet<EntityNameAndSelectableName> = reachable
+        .iter()
+        .map(|field| types_of(field.dereference()))
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .flat_map(|types| types.selected)
+        .filter(|selected| selected.loadability == Loadability::Loadable)
+        .map(|selected| selected.field)
+        .collect();
+    let output_types: BTreeSet<EntityNameAndSelectableName> = declared
+        .iter()
+        .map(|field| types_of(field.dereference()))
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .flat_map(|types| types.selected)
+        .map(|selected| selected.field)
+        .chain(entrypoints.iter().copied())
+        .collect();
+    let generation = |set: &BTreeSet<EntityNameAndSelectableName>,
+                      field: EntityNameAndSelectableName| {
+        if set.contains(field.reference()) {
+            Generation::Generated
+        } else {
+            Generation::NotGenerated
+        }
+    };
+
+    let fields = declared
+        .iter()
+        .map(|field| {
+            let field = field.dereference();
+            let types = types_of(field)?;
+            let declaration = field_declaration(db, client, field)
+                .clone()
+                .map_err(GenerationError::Lookup)?;
+            let selectable =
+                selectable_named(db, client, field.parent_entity_name, field.selectable_name)
+                    .clone()
+                    .map_err(GenerationError::Lookup)?;
+            let kind = match selectable.kind {
+                SelectableKind::ClientField(kind) => FieldArtifactKind::ClientField(kind),
+                SelectableKind::ClientPointer(ClientPointerTarget::Parsed(target)) => {
+                    FieldArtifactKind::Pointer(target)
+                }
+                SelectableKind::ClientPointer(ClientPointerTarget::Unparsed) => {
+                    return GenerationError::IncompleteParse(field).wrap_err();
+                }
+                SelectableKind::Server(_) => {
+                    return GenerationError::Lookup(Diagnostic::new(
+                        format!(
+                            "`{}.{}` is declared in a source file and defined by the network protocol.",
+                            field.parent_entity_name, field.selectable_name
+                        ),
+                        None,
+                    ))
+                    .wrap_err();
+                }
+            };
+            FieldArtifacts {
+                field,
+                kind,
+                resolver: FieldDeclarationSource {
+                    path: declaration.path,
+                    context: declaration.context,
+                },
+                data: types.data,
+                parameters: types.parameters,
+                output_type: generation(output_types.reference(), field),
+                resolver_reader: generation(reachable.reference(), field),
+                loadable_artifacts: generation(loadable.reference(), field),
+            }
+            .wrap_ok()
+        })
+        .collect::<Result<Vec<_>, GenerationError>>()?;
+
+    let link_types = fields
+        .iter()
+        .flat_map(|field| match field.kind.reference() {
+            FieldArtifactKind::Pointer(target) => target.inner_values().copied().collect(),
+            FieldArtifactKind::ClientField(_) => Vec::new(),
+        })
+        .collect::<BTreeSet<EntityName>>()
+        .into_iter()
+        .map(|entity| {
+            LinkType {
+                entity,
+                concrete_types: concrete_types(db, client, entity)?,
+            }
+            .wrap_ok()
+        })
+        .collect::<Result<Vec<_>, GenerationError>>()?;
+
+    ProjectArtifacts {
+        fields,
+        entities,
+        entrypoints,
+        link_types,
+    }
+    .wrap_ok()
+}
+
+/// The object types a link to `entity` can name.
+fn concrete_types<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    entity: EntityName,
+) -> Result<Vec<EntityName>, GenerationError> {
+    let named = entity_named(db, client, entity)
+        .clone()
+        .map_err(GenerationError::Lookup)?;
+    match named.kind::<TProfile::NetworkProtocol>() {
+        EntityKind::Scalar(_) => GenerationError::Lookup(Diagnostic::new(
+            format!("A pointer points to `{entity}`, which is a scalar."),
+            None,
+        ))
+        .wrap_err(),
+        EntityKind::Object => match named.origin {
+            EntityOrigin::Source => entity.wrap_vec().wrap_ok(),
+            EntityOrigin::Protocol(data) => {
+                TProfile::NetworkProtocol::concrete_types(db, client, entity, data.reference())
+                    .wrap_ok()
+            }
+        },
+    }
 }

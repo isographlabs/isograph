@@ -6,14 +6,17 @@ license = { workspace = true }
 
 [dependencies]
 common_lang_types = { path = "../common_lang_types" }
+intern = { path = "../../relay-crates/intern" }
 isograph_compiler = { path = "../isograph_compiler" }
+pathdiff = { workspace = true }
 prelude = { path = "../prelude" }
 swc_common = { version = "=27.0.0", default-features = false }
 swc_ecma_ast = { version = "=30.0.2", default-features = false }
 swc_ecma_codegen = { version = "=33.0.2", default-features = false }
+thiserror = { workspace = true }
 
 [dev-dependencies]
-intern = { path = "../../relay-crates/intern" }
+nonempty = { workspace = true }
 
 [lints]
 workspace = true

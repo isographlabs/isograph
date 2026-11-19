@@ -44,14 +44,27 @@ pub(crate) enum TypeScriptItem {
     DefaultImport(ArtifactImport),
     /// `import type <identifier> from "<specifier>";`
     TypeImport(ArtifactImport),
+    /// `import type { <imported> as <local> } from "<specifier>";`, or `{ <imported> }` when
+    /// the two names are equal.
+    NamedTypeImport(NamedTypeImport),
     /// `type <name><params> = <type>;`
     TypeAlias(TypeAlias),
+    /// `export type <name><params> = <type>;`
+    ExportedTypeAlias(TypeAlias),
     /// `export function <name><params>(<params>): <type>;`
     ExportedOverload(FunctionSignature),
     /// `export function <name><params>(<params>): <type> { throw new Error("<message>"); }`
     ExportedThrowingFunction(ThrowingFunction),
     /// `export default <value>;`
     ExportDefault(ArtifactValue),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct NamedTypeImport {
+    /// Printed as written.
+    pub specifier: String,
+    pub imported: String,
+    pub local: String,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -65,6 +78,7 @@ pub(crate) struct TypeAlias {
 pub(crate) struct TypeParam {
     pub name: String,
     pub constraint: Option<TypeScriptType>,
+    pub default: Option<TypeScriptType>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -97,18 +111,43 @@ pub(crate) enum TypeScriptType {
     TemplateLiteral(TemplateLiteralType),
     Union(Vec<TypeScriptType>),
     Intersection(Vec<TypeScriptType>),
-    Array(Box<TypeScriptType>),
     Conditional(Box<ConditionalType>),
     /// `infer Name`
     Infer(String),
-    /// `typeof <the import's identifier>`
-    TypeOf(ArtifactImport),
+    /// `typeof <identifier>`
+    TypeOf(String),
     Function(Box<FunctionType>),
+    /// `{ readonly <key>: <type>; ... }`
+    Object(Vec<PropertySignature>),
+    /// `(<type>)`
+    Parenthesized(Box<TypeScriptType>),
+}
+
+/// `readonly <key>: <type>` or `readonly <key>?: <type>`, after the description as a JSDoc
+/// comment.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct PropertySignature {
+    /// An identifier.
+    pub key: String,
+    pub optionality: Optionality,
+    pub type_: TypeScriptType,
+    pub description: Option<String>,
+}
+
+/// Whether a property may be absent.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Optionality {
+    Required,
+    Optional,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum TypeScriptKeyword {
     String,
+    Number,
+    Boolean,
+    Null,
+    Any,
     Unknown,
     Never,
     Void,
@@ -148,16 +187,8 @@ pub(crate) struct ConditionalType {
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct FunctionType {
     pub type_params: Vec<TypeParam>,
-    pub params: Vec<FunctionTypeParam>,
+    pub params: Vec<FunctionParam>,
     pub return_type: TypeScriptType,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub(crate) enum FunctionTypeParam {
-    /// `name: type`
-    Named(FunctionParam),
-    /// `...name: type`
-    Rest(FunctionParam),
 }
 
 /// `artifact` as a TypeScript module: a default import for each distinct import in its value,

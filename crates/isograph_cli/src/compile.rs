@@ -6,7 +6,8 @@ use common_lang_types::RelativePathToSourceFile;
 use intern::Lookup;
 use isograph_compiler::{
     ArtifactPath, ArtifactSource, ClientId, CompilationProfile, HostLanguage, IsographDb,
-    LiteralParseFailed, artifact_sources_in_file, compiler_errors_in_file, source_file_paths,
+    LiteralParseFailed, artifact_sources_in_file, compiler_errors_in_file, project_artifacts,
+    source_file_paths,
 };
 use prelude::Postfix;
 
@@ -71,29 +72,45 @@ pub(crate) enum ArtifactSourcesError {
 }
 
 /// The write of every artifact whose text differs from the artifact folder's. No effects when
-/// the config has no `output_directory`, when any literal failed, or when nothing changed.
+/// the config has no `output_directory`, when any literal failed, when the project cannot be
+/// typed or printed, or when nothing changed.
 fn generate_artifacts<TProfile: CompilationProfile>(
     state: &mut IsographState<TProfile>,
 ) -> Vec<IsographEffect> {
-    let Some(folder) = state.artifact_folder.clone() else {
+    let Some(output) = state.artifact_output.clone() else {
         return no_effects();
     };
-    let Some(sources) = project_artifact_sources(state.compile_input().reference())
+    let input = state.compile_input();
+    let Some(files) = project_artifact_sources(input.reference())
         .map_err(|error| tracing::warn!(%error, "artifacts not written"))
         .ok()
+        .and_then(|sources| {
+            project_artifacts(input.db, input.client, sources.reference())
+                .map_err(|error| tracing::warn!(%error, "artifacts not written"))
+                .ok()
+        })
+        .and_then(|project| {
+            TProfile::HostLanguage::generate_artifacts(
+                project.reference(),
+                output.generation.reference(),
+            )
+            .map_err(|error| tracing::warn!(%error, "artifacts not written"))
+            .ok()
+        })
     else {
         return no_effects();
     };
-    let next = ArtifactFiles(
-        TProfile::HostLanguage::generate_artifacts(sources.reference())
-            .into_iter()
-            .collect(),
-    );
     state
         .artifact_files
-        .replace(next)
+        .replace(ArtifactFiles(files.into_iter().collect()))
         .map(|changes| {
-            IsographEffect::WriteArtifacts(WriteArtifactsEffect { folder, changes }.boxed())
+            IsographEffect::WriteArtifacts(
+                WriteArtifactsEffect {
+                    folder: output.folder,
+                    changes,
+                }
+                .boxed(),
+            )
         })
         .into_iter()
         .collect()
@@ -498,40 +515,81 @@ mod generation_tests {
     use std::collections::BTreeMap;
     use std::path::{Path, PathBuf};
 
-    use isograph_compiler::ArtifactPath;
+    use common_lang_types::{EntityName, EntityNameAndSelectableName};
+    use intern::string_key::Intern;
+    use isograph_compiler::{
+        ArtifactPath, CompilationProfile, FieldArtifactKind, Generation, GenerationError,
+        GenerationOptions, LinkType, ProjectArtifacts, UnionWrapper, Wrapper, WrapperVariant,
+        project_artifacts,
+    };
+    use isograph_extract_typescript::{
+        TypeScriptCustomScalarType, TypeScriptHostLanguage, TypeScriptLiteralContext,
+    };
     use prelude::Postfix;
 
+    use super::project_artifact_sources;
     use crate::effect::{ArtifactChanges, IsographEffect};
     use crate::event::{DiskChanged, DiskFileChanged, InternalEvent, Presence};
     use crate::state::{
-        ArtifactFiles, ArtifactFolder, IsographState, handle, intern_config_directory,
+        ArtifactFiles, ArtifactFolder, ArtifactOutput, IsographState, handle,
+        intern_config_directory,
     };
     use crate::test_profile::TestProfile;
     use crate::watch::ProjectGlobs;
 
-    const HOME_ROUTE: &str = "export const A = iso(`entrypoint Query.HomeRoute`);\n";
-    const FULL_NAME: &str = "export const fullName = iso(`field Pet.fullName { firstName }`);\n";
+    const HOME_ROUTE: &str = "iso(`entity Query`)\nexport const HomeRoute = iso(`field Query.HomeRoute`)(() => null);\niso(`entrypoint Query.HomeRoute`)\n";
+    const PET: &str = "iso(`entity Pet`)\nexport const firstName = iso(`field Pet.firstName`)(() => 'a');\nexport const lastName = iso(`field Pet.lastName`)(() => 'b');\nexport const fullName = iso(`field Pet.fullName { firstName }`)(() => 'c');\n";
     const BROKEN: &str = "iso(`entrypoint`)";
+
+    const HOME_ROUTE_FILES: [&str; 7] = [
+        "Query/HomeRoute/entrypoint.ts",
+        "Query/HomeRoute/normalization_ast.ts",
+        "Query/HomeRoute/output_type.ts",
+        "Query/HomeRoute/param_type.ts",
+        "Query/HomeRoute/resolver_reader.ts",
+        "iso.ts",
+        "tsconfig.json",
+    ];
 
     fn folder() -> ArtifactFolder {
         ArtifactFolder(PathBuf::from("/tmp/proj/src/__isograph"))
     }
 
-    fn state_with_folder(artifact_folder: Option<ArtifactFolder>) -> IsographState<TestProfile> {
+    fn output<TProfile: CompilationProfile>() -> crate::state::ProfileArtifactOutput<TProfile> {
+        ArtifactOutput {
+            folder: folder(),
+            generation: GenerationOptions {
+                artifact_folder: PathBuf::from("src/__isograph"),
+                custom_scalar_types: TProfile::custom_scalar_types(),
+            },
+        }
+    }
+
+    fn state_of<TProfile: CompilationProfile>(
+        artifact_output: Option<crate::state::ProfileArtifactOutput<TProfile>>,
+    ) -> IsographState<TProfile> {
         let mut state = IsographState::new(
-            ProjectGlobs::parse(&["src/**".to_owned()], &[], Path::new("src").wrap_some())
-                .expect("the test glob is valid"),
-            artifact_folder,
+            ProjectGlobs::parse(
+                &["src/**".to_owned()],
+                &["schema/**".to_owned()],
+                Path::new("src").wrap_some(),
+            )
+            .expect("the test glob is valid"),
+            artifact_output,
         );
         intern_config_directory(&mut state.db, Path::new("/tmp/proj/isograph.config.json"));
         state
     }
 
     fn state() -> IsographState<TestProfile> {
-        state_with_folder(folder().wrap_some())
+        state_of(output::<TestProfile>().wrap_some())
     }
 
-    fn disk_changed(state: &mut IsographState<TestProfile>, path: &str, presence: Presence) {
+    fn disk_changed<TProfile: CompilationProfile>(
+        state: &mut IsographState<TProfile>,
+        path: &str,
+        presence: Presence,
+    ) {
         handle(
             state,
             InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
@@ -542,17 +600,25 @@ mod generation_tests {
         );
     }
 
-    fn present(state: &mut IsographState<TestProfile>, path: &str, contents: &str) {
+    fn present<TProfile: CompilationProfile>(
+        state: &mut IsographState<TProfile>,
+        path: &str,
+        contents: &str,
+    ) {
         disk_changed(state, path, Presence::Present(contents.to_owned()));
     }
 
     /// The effects of the compile fire.
-    fn fire(state: &mut IsographState<TestProfile>) -> Vec<IsographEffect> {
+    fn fire<TProfile: CompilationProfile>(
+        state: &mut IsographState<TProfile>,
+    ) -> Vec<IsographEffect> {
         crate::compile::compile(state)
     }
 
     /// The changes of the one `WriteArtifacts` the compile fire returns.
-    fn changes(state: &mut IsographState<TestProfile>) -> ArtifactChanges {
+    fn changes<TProfile: CompilationProfile>(
+        state: &mut IsographState<TProfile>,
+    ) -> ArtifactChanges {
         let [IsographEffect::WriteArtifacts(write)] =
             <[IsographEffect; 1]>::try_from(fire(state)).expect("the fire returns one effect")
         else {
@@ -574,15 +640,28 @@ mod generation_tests {
         changes.deletes.iter().map(|path| path.0.as_str()).collect()
     }
 
+    fn named(parent: &str, selectable: &str) -> EntityNameAndSelectableName {
+        EntityNameAndSelectableName {
+            parent_entity_name: parent.intern().to(),
+            selectable_name: selectable.intern().to(),
+        }
+    }
+
+    fn project(
+        state: &IsographState<TestProfile>,
+    ) -> Result<ProjectArtifacts<TypeScriptLiteralContext>, GenerationError> {
+        let input = state.compile_input();
+        let sources =
+            project_artifact_sources(input.reference()).expect("every fixture literal parses");
+        project_artifacts(input.db, input.client, sources.reference())
+    }
+
     #[test]
-    fn the_first_fire_writes_iso_ts_and_the_entrypoint_artifact() {
+    fn the_first_fire_writes_iso_ts_tsconfig_and_the_entrypoints_files() {
         let mut state = state();
         present(&mut state, "/tmp/proj/src/Home.ts", HOME_ROUTE);
         let changes = changes(&mut state);
-        assert_eq!(
-            written_paths(changes.reference()),
-            ["Query/HomeRoute/entrypoint.ts", "iso.ts"]
-        );
+        assert_eq!(written_paths(changes.reference()), HOME_ROUTE_FILES);
         assert!(changes.deletes.is_empty());
     }
 
@@ -612,7 +691,7 @@ mod generation_tests {
 
     #[test]
     fn without_an_artifact_folder_the_fire_writes_nothing() {
-        let mut state = state_with_folder(None);
+        let mut state = state_of::<TestProfile>(None);
         present(&mut state, "/tmp/proj/src/Home.ts", HOME_ROUTE);
         assert!(fire(&mut state).is_empty());
     }
@@ -626,41 +705,54 @@ mod generation_tests {
     }
 
     #[test]
-    fn editing_a_selection_set_does_not_change_iso_ts() {
+    fn editing_a_selection_set_writes_that_param_type_and_the_newly_selected_output_type() {
         let mut state = state();
-        present(&mut state, "/tmp/proj/src/Pet.ts", FULL_NAME);
+        present(&mut state, "/tmp/proj/src/Pet.ts", PET);
         changes(&mut state);
         present(
             &mut state,
             "/tmp/proj/src/Pet.ts",
-            "export const fullName = iso(`field Pet.fullName { firstName lastName }`);\n",
+            PET.replace("{ firstName }", "{ firstName, lastName }")
+                .as_str(),
         );
-        assert!(fire(&mut state).is_empty());
+        assert_eq!(
+            written_paths(changes(&mut state).reference()),
+            ["Pet/fullName/param_type.ts", "Pet/lastName/output_type.ts"]
+        );
     }
 
     #[test]
-    fn adding_a_field_rewrites_only_iso_ts() {
+    fn a_description_rewrites_the_param_types_that_select_it_and_not_its_own() {
         let mut state = state();
-        present(&mut state, "/tmp/proj/src/Home.ts", HOME_ROUTE);
+        present(&mut state, "/tmp/proj/src/Pet.ts", PET);
         changes(&mut state);
-        present(&mut state, "/tmp/proj/src/Pet.ts", FULL_NAME);
-        let changes = changes(&mut state);
-        assert_eq!(written_paths(changes.reference()), ["iso.ts"]);
-        assert!(changes.deletes.is_empty());
+        present(
+            &mut state,
+            "/tmp/proj/src/Pet.ts",
+            PET.replace(
+                "field Pet.firstName`",
+                "field Pet.firstName \"The first name.\"`",
+            )
+            .as_str(),
+        );
+        assert_eq!(
+            written_paths(changes(&mut state).reference()),
+            ["Pet/fullName/param_type.ts"]
+        );
     }
 
     #[test]
-    fn removing_an_entrypoint_deletes_its_artifact() {
+    fn removing_an_entrypoint_deletes_its_artifacts() {
         let mut state = state();
         present(&mut state, "/tmp/proj/src/Home.ts", HOME_ROUTE);
-        present(&mut state, "/tmp/proj/src/Pet.ts", FULL_NAME);
+        present(&mut state, "/tmp/proj/src/Pet.ts", PET);
         changes(&mut state);
         disk_changed(&mut state, "/tmp/proj/src/Home.ts", Presence::Absent);
         let changes = changes(&mut state);
         assert_eq!(written_paths(changes.reference()), ["iso.ts"]);
         assert_eq!(
             deleted_paths(changes.reference()),
-            ["Query/HomeRoute/entrypoint.ts"]
+            HOME_ROUTE_FILES[..5].to_vec()
         );
     }
 
@@ -670,10 +762,10 @@ mod generation_tests {
         present(&mut state, "/tmp/proj/src/Home.ts", HOME_ROUTE);
         present(&mut state, "/tmp/proj/src/Broken.ts", BROKEN);
         assert!(fire(&mut state).is_empty());
-        present(&mut state, "/tmp/proj/src/Broken.ts", FULL_NAME);
+        present(&mut state, "/tmp/proj/src/Broken.ts", "");
         assert_eq!(
             written_paths(changes(&mut state).reference()),
-            ["Query/HomeRoute/entrypoint.ts", "iso.ts"]
+            HOME_ROUTE_FILES
         );
     }
 
@@ -684,7 +776,7 @@ mod generation_tests {
         present(&mut state, "/tmp/proj/lib/Broken.ts", BROKEN);
         assert_eq!(
             written_paths(changes(&mut state).reference()),
-            ["Query/HomeRoute/entrypoint.ts", "iso.ts"]
+            HOME_ROUTE_FILES
         );
     }
 
@@ -710,10 +802,193 @@ mod generation_tests {
         );
         assert!(effects.is_empty());
         let changes = changes(&mut state);
-        assert_eq!(
-            written_paths(changes.reference()),
-            ["Query/HomeRoute/entrypoint.ts"]
-        );
+        assert!(!written_paths(changes.reference()).contains(&"iso.ts"));
         assert_eq!(deleted_paths(changes.reference()), ["Old/x.ts"]);
+    }
+
+    const REACHABILITY: &str = "iso(`entity Pet`)\nexport const a = iso(`field Pet.a { b }`)(() => 1);\nexport const b = iso(`field Pet.b`)(() => 1);\nexport const c = iso(`field Pet.c`)(() => 1);\niso(`entrypoint Pet.a`)\n";
+
+    fn generation_of(
+        project: &ProjectArtifacts<TypeScriptLiteralContext>,
+        field: &str,
+    ) -> (Generation, Generation, Generation) {
+        let field = project
+            .fields
+            .iter()
+            .find(|artifacts| artifacts.field == named("Pet", field))
+            .expect("the fixture declares the field");
+        (
+            field.output_type,
+            field.resolver_reader,
+            field.loadable_artifacts,
+        )
+    }
+
+    #[test]
+    fn readers_are_generated_for_reachable_fields_and_output_types_for_selected_ones() {
+        let mut state = state();
+        present(&mut state, "/tmp/proj/src/Pet.ts", REACHABILITY);
+        let project = project(state.reference()).expect("the fixture is valid");
+        assert_eq!(
+            generation_of(project.reference(), "a"),
+            (
+                Generation::Generated,
+                Generation::Generated,
+                Generation::NotGenerated
+            )
+        );
+        assert_eq!(
+            generation_of(project.reference(), "b"),
+            (
+                Generation::Generated,
+                Generation::Generated,
+                Generation::NotGenerated
+            )
+        );
+        assert_eq!(
+            generation_of(project.reference(), "c"),
+            (
+                Generation::NotGenerated,
+                Generation::NotGenerated,
+                Generation::NotGenerated
+            )
+        );
+    }
+
+    #[test]
+    fn a_loadable_selection_generates_loadable_artifacts_only_when_reachable() {
+        let mut state = state();
+        present(
+            &mut state,
+            "/tmp/proj/src/Pet.ts",
+            REACHABILITY
+                .replace("{ b }", "{ b @loadable }")
+                .replace("field Pet.c`", "field Pet.c { b @loadable }`")
+                .as_str(),
+        );
+        let project = project(state.reference()).expect("the fixture is valid");
+        assert_eq!(
+            generation_of(project.reference(), "b").2,
+            Generation::Generated
+        );
+
+        let mut unreachable = self::state();
+        present(
+            &mut unreachable,
+            "/tmp/proj/src/Pet.ts",
+            REACHABILITY
+                .replace("field Pet.c`", "field Pet.c { b @loadable }`")
+                .as_str(),
+        );
+        let project = self::project(unreachable.reference()).expect("the fixture is valid");
+        assert_eq!(
+            generation_of(project.reference(), "b").2,
+            Generation::NotGenerated
+        );
+    }
+
+    #[test]
+    fn a_pointer_has_a_link_type_for_its_target() {
+        let mut state = state();
+        present(
+            &mut state,
+            "/tmp/proj/src/Pet.ts",
+            "iso(`entity Pet`)\nexport const b = iso(`field Pet.b`)(() => 1);\nexport const p = iso(`field Pet.p to Pet { b }`)(() => null);\n",
+        );
+        let project = project(state.reference()).expect("the fixture is valid");
+        let pet: EntityName = "Pet".intern().to();
+        assert_eq!(
+            project.link_types,
+            LinkType {
+                entity: pet,
+                concrete_types: pet.wrap_vec(),
+            }
+            .wrap_vec()
+        );
+        let p = project
+            .fields
+            .iter()
+            .find(|artifacts| artifacts.field == named("Pet", "p"))
+            .expect("the fixture declares p");
+        assert_eq!(
+            p.kind,
+            FieldArtifactKind::Pointer(Wrapper::Union(UnionWrapper(vec![
+                WrapperVariant::Inner(pet),
+                WrapperVariant::Null,
+            ])))
+        );
+    }
+
+    #[test]
+    fn an_entrypoint_with_no_field_is_a_lookup_error() {
+        let mut state = state();
+        present(
+            &mut state,
+            "/tmp/proj/src/Pet.ts",
+            "iso(`entrypoint Pet.missing`)\n",
+        );
+        assert!(matches!(
+            project(state.reference()),
+            Err(GenerationError::Lookup(_))
+        ));
+    }
+
+    struct UrlProfile;
+
+    impl CompilationProfile for UrlProfile {
+        type HostLanguage = TypeScriptHostLanguage;
+        type NetworkProtocol = graphql_network_protocol::GraphQLNetworkProtocol;
+
+        fn custom_scalar_types() -> BTreeMap<EntityName, TypeScriptCustomScalarType> {
+            BTreeMap::from([(
+                "Url".intern().to(),
+                TypeScriptCustomScalarType {
+                    name: "string",
+                    import: None,
+                },
+            )])
+        }
+    }
+
+    /// Every file the first fire writes for a schema with `Url` and two fields, one selecting it.
+    fn url_project_files<TProfile: CompilationProfile>() -> BTreeMap<ArtifactPath, String> {
+        let mut state = state_of::<TProfile>(output::<TProfile>().wrap_some());
+        present(
+            &mut state,
+            "/tmp/proj/schema/schema.graphql",
+            "scalar Url scalar ID type Query { id: ID! picture: Url! }",
+        );
+        present(
+            &mut state,
+            "/tmp/proj/src/Query.ts",
+            "export const Pic = iso(`field Query.Pic { picture }`)(() => 1);\nexport const Id = iso(`field Query.Id { id }`)(() => 1);\n",
+        );
+        changes(&mut state).writes.into_iter().collect()
+    }
+
+    #[test]
+    fn a_custom_scalar_mapping_changes_only_the_param_types_that_select_it() {
+        let mapped = url_project_files::<UrlProfile>();
+        let unmapped = url_project_files::<TestProfile>();
+        assert_eq!(
+            mapped.keys().collect::<Vec<_>>(),
+            unmapped.keys().collect::<Vec<_>>()
+        );
+        let differing: Vec<&str> = mapped
+            .iter()
+            .filter(|(path, text)| {
+                unmapped.get(path.dereference()) != text.dereference().wrap_some()
+            })
+            .map(|(path, _)| path.0.as_str())
+            .collect();
+        assert_eq!(differing, ["Query/Pic/param_type.ts"]);
+        assert!(
+            mapped[&ArtifactPath("Query/Pic/param_type.ts".to_owned())]
+                .contains("readonly picture: string;")
+        );
+        assert!(
+            unmapped[&ArtifactPath("Query/Pic/param_type.ts".to_owned())]
+                .contains("readonly picture: unknown;")
+        );
     }
 }

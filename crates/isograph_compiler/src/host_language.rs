@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 use std::fmt::{self, Debug};
 use std::path::Path;
 
@@ -8,8 +8,8 @@ use thiserror::Error;
 use isograph_parser::ParseError;
 
 use crate::{
-    ArtifactPath, ArtifactSource, ClientId, EntityKind, IsographDb, ProtocolEntity,
-    ProtocolSelectable,
+    ArtifactPath, ClientId, EntityKind, GenerationOptions, IsographDb, ProjectArtifacts,
+    ProtocolEntity, ProtocolSelectable,
 };
 
 /// Byte offset of the iso literal text in its file.
@@ -70,19 +70,31 @@ pub enum IncludeFile {
 pub trait HostLanguage: Send + Sync + Sized + 'static {
     type Error: std::fmt::Display + std::error::Error + Clone + PartialEq + Eq + 'static;
     type LiteralContext: Clone + PartialEq + Eq + Debug + 'static;
+    /// A project this host language cannot print.
+    type GenerationError: std::fmt::Display + std::error::Error + 'static;
+    /// The host-language type a profile gives a custom scalar.
+    type CustomScalarType: Clone + Debug + PartialEq + Eq + 'static;
 
     fn extract_iso_literals_from_text(contents: &str) -> Vec<IsoLiteralExtraction<Self>>;
 
     fn should_include_source_file(relative_path: &Path) -> IncludeFile;
 
-    /// The path and text of every artifact of a project whose iso literals are `sources`.
-    fn generate_artifacts(sources: &BTreeSet<ArtifactSource>) -> Vec<(ArtifactPath, String)>;
+    /// The path and text of every artifact of `project`.
+    fn generate_artifacts(
+        project: &ProjectArtifacts<Self::LiteralContext>,
+        options: &GenerationOptions<Self::CustomScalarType>,
+    ) -> Result<Vec<(ArtifactPath, String)>, Self::GenerationError>;
 }
 
 /// One choice of host language and network protocol. A binary names one.
 pub trait CompilationProfile: 'static {
     type HostLanguage: HostLanguage;
     type NetworkProtocol: NetworkProtocol;
+
+    /// The host-language type of each custom scalar, by the scalar's name. A custom scalar
+    /// not listed has the host language's unknown type.
+    fn custom_scalar_types()
+    -> BTreeMap<EntityName, <Self::HostLanguage as HostLanguage>::CustomScalarType>;
 }
 
 /// The way the compiler communicates with the upstream.
