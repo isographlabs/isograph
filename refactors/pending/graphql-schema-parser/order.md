@@ -31,13 +31,13 @@ thiserror = { workspace = true }
 workspace = true
 ```
 
-Workspace member through `./crates/*`. `lib.rs` modules: `token_kind`, `tokenize`, `string_value`, `token_cursor`, `keyword`, `parse_error`, `ast`, `type_annotation`, `value`, `parse_schema`, `recovery`; `#[cfg(test)]` modules `test_cursor` and `span_of`. Public: `parse_schema`, `ParsedSchema`, `DefinitionError`, `DefinitionName`, every type in ast.md, `ParseError`, `ExpectedFound`, `Expectation`, `Found`, `GraphQLTokenKind` (it is the payload of `Expectation::Token` and `Found::Token`).
+Workspace member through `./crates/*`. `lib.rs` modules: `token_kind`, `tokenize`, `string_value`, `token_cursor`, `keyword`, `parse_error`, `ast`, `type_annotation`, `value`, `parse_schema`, `recovery`; `#[cfg(test)]` modules `test_cursor`, `span_of`, and `demo_schemas`. `lib.rs` re-exports `ast` with `pub use ast::*`. Public: `parse_schema`, `ParsedSchema`, `DefinitionError`, `DefinitionName`, every type in ast.md, `ParseError`, `ExpectedFound`, `Expectation`, `Found`, `GraphQLTokenKind` (it is the payload of `Expectation::Token` and `Found::Token`).
 
 Each change lists the functions it adds. A function's span comes from `spanning` when it returns `WithSpan`. Every `require_*` maps `Err(())` with `expected`; the expectation is `Expectation::Token(kind)` unless the change names another.
 
 ## 1. Tokenizer
 
-Status: pending
+Status: landed
 
 The crate, `GraphQLTokenKind`, `TokenKindExtras`, `StringToken`, `VariableWidthEscape`, `BlockStringToken`, `lex_string`, `lex_block_string`, `fail_with`, `fixed_width_code_unit`, `variable_width_escape`, and `tokenize`, as parsing-standards.md (Tokenizer).
 
@@ -61,7 +61,7 @@ Tests (`tokenize` kinds and spans):
 
 ## 2. String values
 
-Status: pending
+Status: landed
 
 `decode_string_value`, `decode_code_units`, `TokenText` (copied, with `sub_span`, in `token_cursor.rs`), `intern_block_string_value`, `clean_block_string`, `get_common_indent`, `block_string_lines`, `line_is_whitespace`, `is_not_whitespace`, as parsing-standards.md (String values). `ParseError`, `ExpectedFound`, `Expectation`, `Found`, and `ParseError::expected` (parsing-standards.md, Errors) land here because `decode_string_value` returns `WithSpan<ParseError>`. `consume_string_value_if` lands in change 3 with the cursor.
 
@@ -78,7 +78,7 @@ Tests call `decode_string_value` on the interior of a tokenized `StringLiteral` 
 
 ## 3. Cursor and errors
 
-Status: pending
+Status: landed, except the two `'{'` display assertions below. `strum::Display` writes a unit variant's `to_string` verbatim and rejects a lone `{` or `}` in it, so `'{{'` displays as `'{{'` (iso's `OpenBrace` and `CloseBrace` have the same defect). Open question: which representation displays one brace.
 
 `TokenIndex`, `TokenCursor`, `consume_string_value_if`, `DefinitionKeyword`, `ExtensionKeyword`, `BooleanOrNullKeyword` (in `keyword.rs`), the `with_cursor` test helper, and `span_of` (copied), as parsing-standards.md (`TokenCursor`, Keyword dispatch, Errors, String values, Tests).
 
@@ -96,7 +96,7 @@ Tests (through `with_cursor`):
 
 ## 4. Constant values and directives
 
-Status: pending
+Status: landed
 
 ```rust
 // from crates/graphql_schema_parser/src/value.rs
@@ -177,7 +177,7 @@ Tests (through `with_cursor`):
 
 ## 5. Type annotations
 
-Status: pending
+Status: landed
 
 ```rust
 // from crates/graphql_schema_parser/src/type_annotation.rs
@@ -230,7 +230,7 @@ Tests (through `with_cursor`):
 
 ## 6. Definition errors, descriptions, scalars
 
-Status: pending
+Status: landed
 
 `DefinitionError`, `DefinitionName`, `DefinitionError::unnamed`, `parse_after_entity_name` (parsing-standards.md, Recovery), and:
 
@@ -282,7 +282,7 @@ Tests:
 
 ## 7. Objects, interfaces, fields, input values
 
-Status: pending
+Status: landed
 
 ```rust
 // from crates/graphql_schema_parser/src/parse_schema.rs
@@ -366,7 +366,7 @@ Tests (`with_cursor`, the change 6 convention):
 
 ## 8. Unions, enums, input objects
 
-Status: pending
+Status: landed
 
 ```rust
 // from crates/graphql_schema_parser/src/parse_schema.rs
@@ -438,7 +438,7 @@ Tests (`with_cursor`, the change 6 convention):
 
 ## 9. Schema and directive definitions
 
-Status: pending
+Status: landed
 
 ```rust
 // from crates/graphql_schema_parser/src/parse_schema.rs
@@ -495,7 +495,7 @@ Tests (`with_cursor`, the change 6 convention):
 
 ## 10. Extensions
 
-Status: pending
+Status: landed
 
 ```rust
 // from crates/graphql_schema_parser/src/parse_schema.rs
@@ -588,7 +588,7 @@ Tests (`with_cursor`, the change 6 convention):
 
 ## 11. `parse_schema` and recovery
 
-Status: pending
+Status: landed
 
 `parse_schema`, `ParsedSchema`, `parse_definition_or_extension_or_skip`, `BracketDepth`, `skip_failed_definition`, `starts_definition`, `is_top_level_keyword` (parsing-standards.md, Pipeline and Recovery), and:
 
@@ -685,3 +685,5 @@ Recovery tests (`parse_schema`):
 - `foo bar scalar A`: one `Err` covering `foo bar`, then `Ok(A)`.
 - `1 2 3`: one `Err` (a file of only errors).
 - `extend type A { a: ! } extend type B { b: B }`: `Err` named `A`, then `Ok(Extension)`.
+
+Fixture tests (`demo_schemas`, `parse_schema`): `tests/fixtures/github-demo-subset.graphql` (every directive and scalar of upstream isograph `demos/github-demo/schema.graphql`, then its first 12 types, interfaces, unions, enums, and input objects; the full file is over the 500 KB `check-added-large-files` limit), `tests/fixtures/pet-demo-schema.graphql`, and `tests/fixtures/pet-demo-schema-extension.graphql` (copies of `demos/pet-demo/backend/`). Each file has no `Err` entry, and its entry count equals the number of unindented lines whose first word is a definition keyword or `extend`. Prettier skips `**/tests/fixtures/**`.

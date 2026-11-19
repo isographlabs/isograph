@@ -42,7 +42,7 @@ An empty file, or a file of only whitespace and comments, has no entries. Spec 3
 
 Caller: `parsed_schema_file` in `graphql_network_protocol` (integration.md). The unit tests in this crate are the only other caller.
 
-AGENTS.md says no other crate depends on `graphql_schema_parser`. That sentence changes when `graphql_network_protocol` takes the dependency; the AGENTS.md edit is separate from these docs.
+AGENTS.md says no crate depends on `graphql_schema_parser` yet and that `graphql_network_protocol` will call it. That sentence changes when `graphql_network_protocol` takes the dependency; the AGENTS.md edit is separate from these docs.
 
 ## Later
 
@@ -317,7 +317,7 @@ pub(crate) fn decode_string_value(
                 {
                     units.push(unit.with_span(interior.sub_span(range)));
                 }
-                value.push_str(&decode_code_units(&units)?);
+                value.push_str(&decode_code_units(units.reference())?);
             }
             StringToken::EscapedVariableWidthUnicode(VariableWidthEscape::Scalar(scalar)) => {
                 value.push(scalar)
