@@ -357,7 +357,7 @@ Depends on the held architecture (3b) in changes 1 to 3.
 Each change is one commit, in order. Step A is optional and independent of 1 to 4.
 
 - Step A. Re-read every subscription after each write, upstream's mechanism, with v1's `read`. No memoization.
-- 1. `Store` becomes an object, and `normalize` skips an unchanged value (prefactor).
+- 1. `Store` becomes an object, leaf selections in the normalization AST record their list depth, and `normalize` skips an unchanged value (prefactor).
 - 2. Stored resolver results: `read` stores each resolver's result with its dependencies and their inverse; `normalize` and `garbageCollect` mark the entries that read what they changed; a read brings a marked entry up to date (3b).
 - 3. Level 1: `normalize` retains its query, computes the entries its entrypoint reaches, and settles every retained query after each write. `garbageCollect` reads the retained queries from the store and deletes unreached entries.
 - 4. Level 2: `listen` and `snapshot`, called after settlement.
@@ -440,6 +440,8 @@ const result = useSyncExternalStore(
 
 Depends on the held architecture (3b): with epochs, this change would instead tag every value (Candidate 2).
 
+The normalization AST's list depth (List depth on leaf selections) lands in this change, not in a prefactor before it. Its only reader is `isUnchanged`, and a prefactor would add a field nothing reads.
+
 ### The store
 
 Before (store.md, The store):
@@ -469,20 +471,39 @@ export function createStore(): Store;
 
 Before (store.md, `normalize`): every selected value is written with `record.set(key, value)`, and there is no change detection.
 
-After, every write goes through `writeValue`. `normalize` already knows each value's shape from the AST: a selection with `target: null` writes a `LeafValue`, and a selection with a `target` writes a `CompositeValue`. It passes that shape, and the comparison follows it, as upstream's does (`normalizeScalarField` and `normalizeLinkedField`, `cache.ts:232-341`). There is no generic deep equality.
+After, every write goes through `writeValue`. `normalize` already knows each value's shape from the AST: a `NormalizationLeafSelection` (`target: null`) writes a `LeafValue` with its `listDepth`, and a `NormalizationCompositeSelection` writes a `CompositeValue`. It passes that shape, and the comparison follows it, as upstream's does (`normalizeScalarField` and `normalizeLinkedField`, `cache.ts:232-341`). There is no generic deep equality.
 
 ```ts
 // from libs/isograph-runtime/src/normalize.ts
 /** A value `normalize` writes, with the shape its selection gives it. */
 type WrittenValue =
-  | { readonly kind: 'Leaf'; readonly value: LeafValue }
+  | {
+      readonly kind: 'Leaf';
+      readonly value: LeafValue;
+      /** The selection's `listDepth`. */
+      readonly listDepth: number;
+    }
   | { readonly kind: 'Composite'; readonly value: CompositeValue };
 
 /** Writes `written.value` under `key`, unless the stored value is unchanged by `isUnchanged`. */
 function writeValue(record: StoreRecord, key: StoreKey, written: WrittenValue): void;
 
-/** `Leaf`: `stored === written.value`. `Composite`: `compositeUnchanged(stored, written.value)`. */
+/** `Leaf`: `leafUnchanged(stored, written.value, written.listDepth)`.
+ * `Composite`: `compositeUnchanged(stored, written.value)`. */
 function isUnchanged(stored: StoreValue, written: WrittenValue): boolean;
+
+/** `listDepth` 0, or `written` not a list: `stored === written`. Otherwise `stored` is a list
+ * of the same length whose items are `leafUnchanged` at `listDepth - 1` in order. */
+function leafUnchanged(stored: unknown, written: LeafValue, listDepth: number): boolean {
+  if (listDepth === 0 || !isArray(written)) {
+    return stored === written;
+  }
+  return (
+    isArray(stored) &&
+    stored.length === written.length &&
+    written.every((item, index) => leafUnchanged(stored[index], item, listDepth - 1))
+  );
+}
 
 /** `null`: `stored` is `null`. A link: `stored` is a link with the same `entityName` and `id`.
  * A list: `stored` is a list of the same length whose items are `compositeUnchanged` in order. */
@@ -492,13 +513,258 @@ function compositeUnchanged(stored: StoreValue, written: CompositeValue): boolea
 - Absent key, or a value `isUnchanged` rejects: `record.set(key, written.value)`.
 - An unchanged value: nothing; the stored value's identity stays.
 
-`compositeUnchanged` reads `stored` as `StoreValue`, because `record.get` returns that type; it narrows by `isArray` and by `typeof stored === 'object'`, with no cast. Each comparison costs one `===` for a leaf and one step per link for a composite, one comparison per written field.
+`writeSelection` builds the `WrittenValue` from the selection: `selection.target === null` narrows `NormalizationSelection` to `NormalizationLeafSelection`, whose `listDepth` goes into the `Leaf` value.
+
+`compositeUnchanged` reads `stored` as `StoreValue`, because `record.get` returns that type; it narrows by `isArray` and by `typeof stored === 'object'`, with no cast. `leafUnchanged` takes `stored: unknown`, because util's `isArray` narrows to `readonly unknown[]`, so a stored list's items are `unknown`; it compares them only with `===` and `isArray`, so it needs no cast either. Each comparison costs one `===` for a scalar leaf, one `===` per element for a leaf list, and one step per link for a composite, one comparison per written field.
+
+A leaf at depth 0 whose JSON value is an object or a list (a `JSON` custom scalar such as `settings`) compares with `===` and so counts as changed on every rewrite: the AST records the selectable's list wrapping and not its scalar type, so `normalize` does not know whether the JSON value nests further. A leaf list item at depth 0 that is an object or a list (`[JSON]`) is the same case. A depth larger than the value's nesting is sound: `leafUnchanged` answers `true` only when every compared level is equal, and stops at a non-list `written` with `===`.
 
 Its reader is change 2: an unchanged write marks nothing. The check exists because without it every response marks every written field changed, so every refetch of a retained query recomputes every resolver entry under it, and the whole retained tree recomputes on every response. Whether the comparison earns its cost against that recomputation is not measured.
 
-A leaf whose JSON value is an object or a list (a `JSON` custom scalar, or a list of scalars such as `tags: [String!]`) is a new object on every response, so `===` counts it as changed on every rewrite, and every entry that reads it recomputes on every response. The normalization AST does not record a leaf's list wrapping or its scalar type, so `normalize` cannot compare these by shape. Such values are rare.
+A list of scalars (`tags: [String]`) is a new array on every response. Compared with `===`, it would count as changed on every rewrite, and every entry that reads it would recompute on every response. Lists of scalars are common in GraphQL schemas, so the AST records each leaf selection's list depth and `leafUnchanged` compares such a list element by element. A `JSON` custom scalar is also a new object on every response; it stays `===` and recomputes its readers on every response.
 
-Deltas from upstream: upstream compares a scalar with `!==` (`cache.ts:248-249`) and a `null` write as unchanged when the stored value is `null` (`cache.ts:243-246`, `:270-273`); `===` on a leaf covers both. Upstream compares a single link by `__link` and `__typename` (`cache.ts:337-338`) and a list of links by length and then item by item (`dataIdsAreTheSame`, `cache.ts:372-393`). Here a link is compared by `entityName` and `id`, the fields of `StoreLink`, and lists nest at any depth (store.md's `CompositeValue`), so `compositeUnchanged` recurses where upstream's list check is one level. Upstream returns `RecordHasBeenUpdated` up the walk; here `writeValue` acts on the result at the write. The only structural comparison in changes 1 to 4 besides `compositeUnchanged` is `resultsEqual`'s comparison of `MissingData`, which the runtime builds from strings and links (R4).
+Deltas from upstream: upstream compares every scalar field with `!==` only (`cache.ts:248-249`), so a list of scalars counts as changed on every response; here a leaf list is compared by length and then `===` per element, recursing once per list level of the selectable's type. Upstream's `NormalizationScalarField` has no list depth. Upstream counts a `null` write as unchanged when the stored value is `null` (`cache.ts:243-246`, `:270-273`); `===` on a scalar leaf covers both that and the `!==` comparison. Upstream compares a single link by `__link` and `__typename` (`cache.ts:337-338`) and a list of links by length and then item by item (`dataIdsAreTheSame`, `cache.ts:372-393`). Here a link is compared by `entityName` and `id`, the fields of `StoreLink`, and lists nest at any depth (store.md's `CompositeValue`), so `compositeUnchanged` recurses where upstream's list check is one level. Upstream returns `RecordHasBeenUpdated` up the walk; here `writeValue` acts on the result at the write. The only structural comparison in changes 1 to 4 besides `compositeUnchanged` is `resultsEqual`'s comparison of `MissingData`, which the runtime builds from strings and links (R4).
+
+### List depth on leaf selections
+
+The depth is core data. The protocol converts a GraphQL type annotation into the core's `Wrapper<EntityName>` (`wrapper_of_graphql_type`, `crates/graphql_network_protocol/src/protocol_data.rs`), stored as `ServerSelectable.target`. The core reads the depth from that wrapper; the protocol does not change.
+
+```rust
+// from crates/isograph_compiler/src/wrapper.rs
+/// How many list levels a value of a wrapper nests.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ListDepth(pub u32);
+
+impl ListDepth {
+    fn deeper(self) -> ListDepth {
+        ListDepth(self.0.saturating_add(1))
+    }
+}
+
+impl<T> Wrapper<T> {
+    /// 0 for `Inner`, one more than the inner wrapper's for `List`, and the largest of the
+    /// variants' for `Union`.
+    pub fn list_depth(&self) -> ListDepth {
+        match self {
+            Wrapper::Inner(_) => ListDepth::default(),
+            Wrapper::List(list) => list.list_depth().deeper(),
+            Wrapper::Union(union) => union
+                .0
+                .iter()
+                .map(|variant| match variant {
+                    WrapperVariant::Inner(_) | WrapperVariant::Null => ListDepth::default(),
+                    WrapperVariant::List(list) => list.list_depth().deeper(),
+                })
+                .max()
+                .unwrap_or_default(),
+        }
+    }
+}
+```
+
+GraphQL's `String` is `Union([Inner(String), Null])`, depth 0; `[String]` is `Union([List(Union([Inner(String), Null])), Null])`, depth 1; `[[String]!]!` is `List(List(Union([Inner(String), Null])))`, depth 2. A union whose variants differ in depth takes the largest, which is sound (`leafUnchanged`). `saturating_add` keeps the function free of an overflow panic; a depth of `u32::MAX` is not reachable, because the wrapper is built by recursion over source text, and a smaller depth only compares fewer levels.
+
+The depth rides on the leaf variant at each stage:
+
+```rust
+// from crates/isograph_compiler/src/merged_selection.rs
+pub enum MergedSelectionTarget {
+    Leaf(ListDepth),
+    Composite(MergedCompositeTarget),
+}
+
+pub enum CompletedSelectionTarget {
+    Leaf(ListDepth),
+    Composite(CompletedCompositeTarget),
+}
+```
+
+```rust
+// from crates/isograph_compiler/src/normalization_ast.rs
+/// Whether a selection's target entity has selections, and for a leaf, how many list
+/// levels its value nests.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum NormalizationTarget {
+    Leaf(ListDepth),
+    Composite(NormalizationCompositeTarget),
+}
+```
+
+Where each stage sets it:
+
+```rust
+// from crates/isograph_compiler/src/merged_selection.rs
+// server_contribution, before:
+        (SelectableShape::Direct, EntityShape::Leaf) => match selection.selection_set {
+            Some(_) => at_name(SelectionMapErrorKind::SelectionSetOnLeaf(key)).wrap_err(),
+            None => {
+                MergedSelectionMap::single(MergedSelection::Selectable(MergedSelectableSelection {
+                    key: selection_key,
+                    target: MergedSelectionTarget::Leaf,
+                }))
+                .wrap_ok()
+            }
+        },
+// after:
+        (SelectableShape::Direct, EntityShape::Leaf) => match selection.selection_set {
+            Some(_) => at_name(SelectionMapErrorKind::SelectionSetOnLeaf(key)).wrap_err(),
+            None => {
+                MergedSelectionMap::single(MergedSelection::Selectable(MergedSelectableSelection {
+                    key: selection_key,
+                    target: MergedSelectionTarget::Leaf(server.target.list_depth()),
+                }))
+                .wrap_ok()
+            }
+        },
+```
+
+```rust
+// from crates/isograph_compiler/src/merged_selection.rs
+// MergedSelectionTarget::merge, before:
+            (MergedSelectionTarget::Leaf, MergedSelectionTarget::Leaf) => {
+                MergedSelectionTarget::Leaf.wrap_ok()
+            }
+// after:
+            (MergedSelectionTarget::Leaf(first), MergedSelectionTarget::Leaf(second)) => {
+                if first != second {
+                    return MergeError::SelectionMismatch.wrap_err();
+                }
+                MergedSelectionTarget::Leaf(first).wrap_ok()
+            }
+```
+
+Two selections under one key of one map select one selectable, so their depths are equal; the check mirrors the `Composite` arm's `first.entity != second.entity` rather than dropping `second` unread.
+
+```rust
+// from crates/isograph_compiler/src/merged_selection.rs
+// complete_target, before:
+        MergedSelectionTarget::Leaf => CompletedSelectionTarget::Leaf.wrap_ok(),
+// after:
+        MergedSelectionTarget::Leaf(depth) => CompletedSelectionTarget::Leaf(depth.dereference()).wrap_ok(),
+```
+
+```rust
+// from crates/isograph_compiler/src/normalization_ast.rs
+// normalization_node, Identity arm, before:
+                target: NormalizationTarget::Leaf,
+// after:
+                target: NormalizationTarget::Leaf(ListDepth::default()),
+
+// normalization_selection, before:
+            CompletedSelectionTarget::Leaf => NormalizationTarget::Leaf,
+// after:
+            CompletedSelectionTarget::Leaf(depth) => NormalizationTarget::Leaf(depth.dereference()),
+```
+
+`CompletedSelection::Identity` carries only a name. Its depth is 0 because its value is a record id, and `recordLink` throws on an identity value that is not a string, so no response `normalize` accepts holds a list there.
+
+Every other match on a `Leaf` variant becomes `Leaf(_)`: `merged_selection.rs` (the variables walk, `complete_selection`, the query-text and test printers), `graphql_network_protocol/src/print_operation.rs` (`CompletedSelectionTarget::Leaf` in the operation printer, `NormalizationTarget::Leaf` in its tests, and `selection.target == NormalizationTarget::Leaf` becomes `matches!(selection.target, NormalizationTarget::Leaf(_))`). Test constructors of a leaf (`leaf` in `merged_selection.rs` and `print_operation.rs`, `using` in `query.rs`, the leaf nodes in `normalization_ast.rs` and `typescript_artifacts`) pass `ListDepth::default()`.
+
+The printer writes `listDepth` after `target` on a leaf selection:
+
+```rust
+// from crates/typescript_artifacts/src/normalization_ast.rs
+// node_value, Selection arm, before:
+        NormalizationNode::Selection(selection) => ArtifactValue::Object(vec![
+            kind("Selection"),
+            entry(
+                "responseKey",
+                match &selection.response_key {
+                    ResponseKey::SelectableName => ArtifactValue::Null,
+                    ResponseKey::Alias(alias) => string(alias),
+                },
+            ),
+            entry("selectableName", string(selection.selectable_name)),
+            entry("arguments", arguments_value(&selection.arguments)),
+            entry(
+                "target",
+                match &selection.target {
+                    NormalizationTarget::Leaf => ArtifactValue::Null,
+                    NormalizationTarget::Composite(target) => composite_target_value(target),
+                },
+            ),
+        ]),
+// after:
+        NormalizationNode::Selection(selection) => ArtifactValue::Object(
+            [
+                kind("Selection"),
+                entry(
+                    "responseKey",
+                    match &selection.response_key {
+                        ResponseKey::SelectableName => ArtifactValue::Null,
+                        ResponseKey::Alias(alias) => string(alias),
+                    },
+                ),
+                entry("selectableName", string(selection.selectable_name)),
+                entry("arguments", arguments_value(&selection.arguments)),
+            ]
+            .into_iter()
+            .chain(match &selection.target {
+                NormalizationTarget::Leaf(depth) => vec![
+                    entry("target", ArtifactValue::Null),
+                    entry("listDepth", ArtifactValue::Number(f64::from(depth.0))),
+                ],
+                NormalizationTarget::Composite(target) => {
+                    entry("target", composite_target_value(target)).wrap_vec()
+                }
+            })
+            .collect(),
+        ),
+```
+
+`f64::from(u32)` is exact, so `cast_precision_loss` does not apply.
+
+The TypeScript type splits by target, so a composite selection cannot carry a depth:
+
+```ts
+// from libs/isograph-runtime/src/artifacts.ts
+// before:
+/** A selection of a selectable. */
+export type NormalizationSelection = {
+  readonly kind: 'Selection';
+  /** The alias the query text gives this selection, the key of its value in the response;
+   * `null` when the query prints no alias and the key is `selectableName`. */
+  readonly responseKey: string | null;
+  readonly selectableName: string;
+  readonly arguments: Arguments | null;
+  /** `null` when the target entity is a leaf. */
+  readonly target: NormalizationCompositeTarget | null;
+};
+// after:
+/** A selection of a selectable. */
+export type NormalizationSelection =
+  | NormalizationLeafSelection
+  | NormalizationCompositeSelection;
+
+/** A selection of a selectable whose target entity is a leaf. */
+export type NormalizationLeafSelection = {
+  readonly kind: 'Selection';
+  /** The alias the query text gives this selection, the key of its value in the response;
+   * `null` when the query prints no alias and the key is `selectableName`. */
+  readonly responseKey: string | null;
+  readonly selectableName: string;
+  readonly arguments: Arguments | null;
+  readonly target: null;
+  /** How many list levels the selectable's type nests: 0 for `String`, 1 for `[String]`,
+   * 2 for `[[String]]`. */
+  readonly listDepth: number;
+};
+
+/** A selection of a selectable whose target entity is composite. */
+export type NormalizationCompositeSelection = {
+  readonly kind: 'Selection';
+  /** The alias the query text gives this selection, the key of its value in the response;
+   * `null` when the query prints no alias and the key is `selectableName`. */
+  readonly responseKey: string | null;
+  readonly selectableName: string;
+  readonly arguments: Arguments | null;
+  readonly target: NormalizationCompositeTarget;
+};
+```
+
+`target` is the discriminant, so the existing `target == null` and `target != null` tests in `normalize`, `check`, and `garbageCollection` narrow without change, and `RecordPosition.selection` and `storeKey` read only fields both members have.
+
+The artifact a user sees for `field Query.Leaves { tags settings }` holds `{ kind: "Selection", responseKey: null, selectableName: "tags", arguments: null, target: null, listDepth: 1 }` and `{ kind: "Selection", responseKey: null, selectableName: "settings", arguments: null, target: null, listDepth: 0 }`.
 
 ### Tests
 
@@ -508,7 +774,18 @@ store.md's tests change mechanically: `new Map()` becomes `createStore()`; `stor
 - A list of links `checkins` with the same ids in the same order: the first list object stays (`toBe`); one fewer item, or two items swapped, stores the new list.
 - `petGrid` with equal links and `null` items at every depth: the first outer list object stays (`toBe`); one inner item changed stores a new outer list.
 - `stats: null` then `stats: null`: the record holds `null`, and change 2 marks nothing for `stats`.
-- `tags: ["a"]` then `tags: ["a"]` stores the new list (`not.toBe` the first), and a `settings` object written twice stores the new object: a leaf compares by `===`.
+- `tags: ["a", null]` then `tags: ["a", null]` keeps the first list (`toBe`), so change 2 marks nothing for `tags`.
+- `tags: ["a", null]` then `tags: ["b", null]` stores the new list; `["a"]` then `["a", null]` stores the new list; `null` then `["a"]` and `["a"]` then `null` store the new value.
+- `tagGrid: [["a"], [], null]` then an equal response keeps the first outer list (`toBe`); `[["a"], ["b"], null]` after `[["a"], ["c"], null]` stores the new outer list.
+- `settings: ["a"]`, a `JSON` custom scalar holding an array, written twice stores the new array (`not.toBe` the first), and a `settings` object written twice stores the new object: a depth-0 leaf compares by `===`.
+
+Fixture additions to store.md's fixture project: `tagGrid: [[String]]` on `Query` in `fixtures/store/schema/schema.graphql`, and `fixtures/store/src/TagGrid.ts` with `field Query.TagGrid { tagGrid }` and `entrypoint Query.TagGrid`, whose resolver returns `data`.
+
+New cases in the compiler:
+
+- `crates/isograph_compiler/src/wrapper.rs`: `list_depth` of `Inner(String)` is 0, of `Union([Inner(String), Null])` is 0, of `Union([List(Union([Inner(String), Null])), Null])` is 1, of `List(List(Inner(String)))` is 2, of `Union([Inner(String), List(Inner(String)), Null])` is 1, and of `Union([])` is 0.
+- `crates/graphql_network_protocol/src/tests/query.rs`, with the schema `scalar ID\nscalar String\nscalar JSON\ntype Query { greeting: String tags: [String] tagGrid: [[String]!]! settings: JSON pet: Pet } type Pet { id: ID! }` and `field Query.Leaves { greeting tags tagGrid settings pet { id } }`: the normalization AST holds `greeting` and `settings` with `Leaf(ListDepth(0))`, `tags` with `Leaf(ListDepth(1))`, `tagGrid` with `Leaf(ListDepth(2))`, and `pet`'s target's `id` (the identity) with `Leaf(ListDepth(0))`.
+- `crates/typescript_artifacts`: a leaf selection prints `target: null, listDepth: 1` for depth 1, and a composite selection prints no `listDepth`.
 - Normalizing the same `PetDetail` response twice leaves every link and list of links `toBe` the one after the first, and every string, number, boolean, and `null` leaf `toBe` it.
 
 ## 2. Stored resolver results
@@ -955,6 +1232,9 @@ In this change nothing settles after a write; each case writes with `normalize`,
 - Link moved: `Pet:1.bestFriend` changes to `Pet:3` (with `name` and `nickname`); the next read of `FriendPage` calls `PetName` on `Pet:3` once; then `Pet:2.name` changes, and the next read of `FriendPage` calls nothing.
 - Same resolver selected twice: a first read of `TwoNames` calls `PetName` once, and `a.PetName` and `b.PetName` are `===`.
 - An identical response normalized again: no resolver is called on the next read.
+- A list of scalars written twice: after a read of `Leaves` with `{ name: "Bo" }`, normalizing `tags: ["a", null]` again with the other values unchanged leaves the `Leaves` call count unchanged on the next read; `tags: ["b", null]` then calls `Leaves` once.
+- Nested depth: after a read of `TagGrid`, an equal `tagGrid: [["a"], [], null]` calls nothing on the next read; `[["a"], ["b"], null]` calls `TagGrid` once.
+- A `JSON` custom scalar array: `settings: ["a"]` written twice calls `Leaves` once on the next read.
 - Missing then present: a read of `FriendPage` with `Pet:2` lacking `nickname` is `MissingData`; after `nickname` is written, the next read is `Ok` and calls `PetName`.
 - Absent record: `FriendPage` read while `Pet:1.bestFriend` links a `Pet:9` absent from the store is `MissingData` naming `Pet:9`; after `normalize` writes `Pet:9` with `name` and `nickname`, the next read is `Ok`.
 - A deleted record: after `garbageCollect` deletes `Pet:2`, the next read of a stored `FriendPage` result is `MissingData` with `recordLink` `Pet:2`, not the stored `Ok`.
@@ -1184,6 +1464,7 @@ An observer keeps its entry current (settlement brings observed locations up to 
 ## Docs this doc amends
 
 - `refactors/pending/runtime/store.md`: "`pico-runtime.md` stays parked" is replaced by this doc as the step after v1. `Store` becomes `{ records }`, `createStore`, and `writeValue` skipping a value unchanged by its AST shape (change 1); `normalize` and `garbageCollect` call `markChanged`, and `Store` gains `resolvers` and `serverDependents` (change 2); `normalize` becomes `writeResponse` and the exported `normalize` retains and settles, `garbageCollect` reads `store.retained` and deletes unreached resolver entries, and `RetainedQuery` becomes `Retention` (change 3); its test helper `storeOf` returns the new `Store`.
+- `refactors/pending/graphql-protocol/normalization-ast.md`: `MergedSelectionTarget::Leaf`, `CompletedSelectionTarget::Leaf`, and `NormalizationTarget::Leaf` carry a `ListDepth`; the TypeScript `NormalizationSelection` becomes `NormalizationLeafSelection | NormalizationCompositeSelection`, and a leaf selection prints `listDepth` after `target` (change 1).
 - `refactors/pending/runtime/reader-ast.md`: `ReaderArtifact.selectableName` and its printing; `ReadResult` gains `ReadResolverThrew`; `read` stores and reuses resolver results; "The store is unchanged by every read" and "A resolver that throws propagates out of `read`" change as change 2's Tests state. Its note that this doc's `computeResolver` and `readSelection` replace its `read` is superseded by change 2.
 - `refactors/pending/runtime/normalization-ast-mount-markers.md`: candidate 6 is answered by Resolver markers (held: no marker); its open question on how this doc models a mount is answered by `Retention` and settlement.
 
