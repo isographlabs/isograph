@@ -2,22 +2,18 @@
 
 Requires lsp-sessions.md and lsp-outstanding.md (landed). Diagnostics (lsp-diagnostics.md) builds on this file.
 
-A client is a reader of file text. Each LSP connection (one VS Code window) is a client with its own open-file state: the buffers it sent with `didOpen` / `didChange` and has not closed. The compiler is a client whose open-file state is empty. Every read of file text goes through one family of memos keyed by `(ClientId, RelativePathToSourceFile)`: the client's open buffer for that path if it has one, otherwise the `DiskFile`. The compiler client cannot hold an open file because the write path takes `LspClientId`, not `ClientId`. Highlighting, Format Document, and `willSaveWaitUntil` read through that family with the asking client.
+A client is a reader of file text. Each LSP connection (one VS Code window) is a client with its own open-file state: the buffers it sent with `didOpen` / `didChange` and has not closed. Every read of file text goes through one family of memos keyed by `(ClientId, RelativePathToSourceFile)`: the client's open buffer for that path if it has one, otherwise the `DiskFile`. `ClientId` has one variant, `Lsp(LspClientId)`. The file-based compiler will be another variant, added by the artifact-generation work; it reads through the same client-keyed family and has no open files, because the write path takes `LspClientId`, not `ClientId`. Highlighting, Format Document, and `willSaveWaitUntil` read through that family with the asking client.
 
-Origin of the open-file map and handlers: isograph `OpenFileMap` / `OpenFileSource` / `insert_open_file` / `remove_open_file` (`crates/isograph_schema/src/isograph_database.rs`) and `crates/isograph_lsp/src/text_document.rs`. Origin of overlay-then-disk: isograph `read_iso_literals_source` (`crates/isograph_schema/src/validated_isograph_schema/isograph_literals.rs`) and `file_text_at_location`. Delta from isograph: isograph has one client and one path-keyed `OpenFileMap`; its overlay applies to compile as well. Here, open-file state is per LSP client, each client's set of open paths is its own pico source, and the compiler reads the same memos with `ClientId::Compiler`, which never consults an open file. No `expect` on a URI. Full document sync only; any other `didChange` shape is logged with `warn!` and ignored.
+Origin of the open-file map and handlers: isograph `OpenFileMap` / `OpenFileSource` / `insert_open_file` / `remove_open_file` (`crates/isograph_schema/src/isograph_database.rs`) and `crates/isograph_lsp/src/text_document.rs`. Origin of overlay-then-disk: isograph `read_iso_literals_source` (`crates/isograph_schema/src/validated_isograph_schema/isograph_literals.rs`) and `file_text_at_location`. Delta from isograph: isograph has one client and one path-keyed `OpenFileMap`; its overlay applies to compile as well. Here, open-file state is per LSP client, each client's set of open paths is its own pico source, and the memos are keyed by `ClientId`, so a future compiler variant reads memo slots no editor buffer reaches. No `expect` on a URI. Full document sync only; any other `didChange` shape is logged with `warn!` and ignored.
 
 ## Open decisions
 
 These are not approved. The body is written against the first option of each; each other option states its delta.
 
-1. Name and shape of the reader id. (a) `isograph_compiler::ClientId { Compiler, Lsp(LspClientId) }`, with `LspClientId(pub u64)` for a connection. `ClientId` is taken today: `crates/isograph_cli/src/event.rs` has `pub(crate) struct ClientId(pub u64)` meaning a connection. Change 5 deletes that struct and replaces every use with `LspClientId`, so after change 5 `ClientId` means "reader of file text" and nothing else. During review the two meanings coexist in docs. (b) Keep the CLI name for connections and name the enum `FileReader { Compiler, Lsp(LspClientId) }`; no name changes meaning, but "client" in the user's sense is spelled `FileReader` in code. (c) `Client { Compiler, Lsp(LspClientId) }`; a value of it is an id, not a client, so the name reads wrong at call sites (`file_contents(db, client, path)` with `client: Client`).
-2. The compiler client has no production reader. i2 has no artifact generation and no compile command; nothing in production reads file text except the LSP. (a) Ship `ClientId::Compiler` now. Its only constructors are tests (`database.rs`, `isograph_extract_typescript` memo tests, `watch.rs`). `ClientId` is `pub` and re-exported, so rustc's `dead_code` lint does not fire and no `expect` attribute can mark it; nothing enforces that a production reader arrives. This contradicts "we do not have anything we do not use"; the user's direction that the compiler is a client is the reason. (b) Ship the family keyed by `LspClientId`; the artifact-generation change introduces `ClientId` and widens every signature. All existing disk-only tests then register an LSP client to read disk, so they read as LSP tests. (c) Ship (a), and make artifact generation the next pending doc, so the variant gets its production reader in a named change.
-3. Per-client storage shape in pico. (a) A tracked `lsp_client_map: HashMap<LspClientId, SourceId<LspClientOpenFiles>>` written only on connect and disconnect; one `LspClientOpenFiles` source per client holding `HashMap<RelativePathToSourceFile, SourceId<OpenFile>>`; one `OpenFile` source per `(client, path)`. A keystroke writes one `OpenFile`. Open or close writes one client's `LspClientOpenFiles`. Neither touches a tracked map, so neither re-invokes another client's memos or the compiler's. (b) One global tracked `OpenFileMap: HashMap<OpenFileKey, SourceId<OpenFile>>`. `MutView::tracked()` (`crates/pico/src/view.rs:67-74`) increments the counter on every call, so every open, close, and (if it calls `tracked()`) every keystroke of any client re-invokes every memo that missed on that map, which is every disk-fallback read of every client including the compiler. (c) Per-client `LspClientOpenFiles` without `lsp_client_map`: compute `SourceId<LspClientOpenFiles>` from a placeholder value (`SourceId::new(&LspClientOpenFiles { client, open_files: HashMap::new() })`). Removes one map, but constructs a value only to hash it, and `db.get` of that id panics for a client with no state (a `Gone` without `Started`).
-4. A tracked map whose counter was never written. `Storage::get_impl` (`crates/pico/src/database.rs:134-140`) returns `None` before registering a dependency, so a miss-then-`tracked()` read before the first write to that map records nothing, and a later insert is not seen. `missing_then_present_extracts` in `isograph_extract_typescript` inserts an unrelated file first to work around this. (a) `IsographDb::default` calls `tracked()` once on each tracked field, which writes each counter; no pico change. A future tracked field that is not listed there has the bug again, silently. (b) pico prefactor: record a dependency on an absent source. `Dependency` gains the presence observed at read time, `get_impl` registers on a miss, and `source_node_changed_since` reports "changed" only when presence differs or the present node is newer. Fixes every absent read (singletons included) for every tracked field. pico is kept unchanged from upstream isograph per AGENTS.md, so this is an upstream divergence; it would be its own change before change 2, with pico tests.
-5. Memo growth. pico never collects sources (`handle` removes them); derived nodes are collected only by `run_garbage_collection`, which keeps the last 10_000 top-level calls (LRU) and what they reach. Nothing in i2 calls `run_garbage_collection` today, so every re-invocation's new derived node and every `top_level_calls` entry accumulates for the daemon's lifetime. (a) `handle` of `ClientConnectionEvent::Gone` calls `state.db.run_garbage_collection()` after removing the client's sources. A disconnected client's memos are dropped once 10_000 newer top-level calls push them out of the LRU, not at once. Growth during a long session with no disconnect is unchanged. (b) No GC in this doc; a separate GC-policy doc decides when `handle` collects (after each write event, on a timer effect, on `Gone`). (c) pico prefactor: evict LRU entries whose params contain a given value (a disconnected `LspClientId`). Does not exist in pico; upstream divergence.
-6. Order relative to format-file-from-segments.md. (a) This doc first. Change 5's `format_iso_literals` uses `parsed_iso_literals_in_file` and `text_through_last_iso_literal` with the client. format-file-from-segments.md then reads `file_contents(db, client, path)` instead of `state.disk_file(path)` (which change 5 deletes). (b) format-file-from-segments.md first. Change 5's `format_iso_literals` after-snippet is the second one in that section, with `file_contents` replacing `disk_file`. Either order ships; (b) makes change 5's format diff smaller, (a) makes format-file-from-segments.md read the buffer from the start.
-7. `SendLspResponseEffect` as data (change 4). (a) Make it `{ sender, response }` with private fields, `pub(crate) fn response(&self) -> &lsp_server::Response`, and `pub(crate) fn send(self, token: &SideEffectToken)` called by `perform`. `LiveSessions::after_compute` returns it. Tests match the response on the effect without `perform` and a channel; `#[expect(clippy::type_complexity)]` and the hand-written `Debug` go away; `run_event_loop` is unchanged; `send` still takes the token. (b) Keep `Box<dyn FnOnce(&SideEffectToken) + Send>`; change 5's `handle` tests own the crossbeam receiver behind the `LiveSession`, call `perform`, and `recv` the response (the pattern in `lsp_formatting_of_a_live_client_without_a_file_is_null`).
-8. Buffers in the event log. `run_event_loop` (`crates/isograph_cli/src/daemon.rs:170`) runs `tracing::debug!(?event, "event")` on every event. With a derived `Debug`, every `didChange` logs the whole buffer, and every `DiskChanged` already logs the whole file. (a) Hand-written `Debug` for `LspNotification` (client and method) and `Presence` (byte length of `Present`). `run_event_loop` is unchanged. (b) Delete the `?event` line; `handle` logs nothing per event. (c) Lower it to `trace!`; buffers still reach the log at that level.
+1. Per-client storage shape in pico. The pico standard describes one pattern for "which keys currently have a source": a `#[tracked]` database field mapping key to `SourceId<T>` (`pico.md` Tracked maps, "The map is which paths currently have a `DiskFile`. `db.set` of a `DiskFile` does not update the map. `handle` does both"; AGENTS.md "pico tracked maps"). Option (b) is that pattern. Neither document describes a source whose value is a map of `SourceId`s, so option (a) is neither prescribed nor forbidden. Option (c) contradicts `pico.md` "It is a type-level proof that a `T` exists in the database". In every option `file_source` reads the source it returns, so a removed source re-invokes it. (a) A tracked `lsp_client_map: HashMap<LspClientId, SourceId<LspClientOpenFiles>>` written only on `Started` and `Gone`; one `LspClientOpenFiles` source per client holding `HashMap<RelativePathToSourceFile, SourceId<OpenFile>>`; one `OpenFile` source per `(client, path)`. A keystroke writes one `OpenFile`. Open or close by client A writes A's `LspClientOpenFiles`, which re-invokes every `file_source(ClientId::Lsp(A), _)` slot, hit or miss, because each read that source; each backdates unless its answer changed. No other client's memos re-invoke. (b) One tracked `OpenFileMap(pub HashMap<OpenFileKey, SourceId<OpenFile>>)`, the `disk_file_map` pattern: `file_source` looks up `OpenFileKey { client, path }` untracked and `db.get`s the hit; on a miss it reads the map tracked and falls back to disk. Writes follow change 2: `set_open_file` `set`s the `OpenFile` and calls `tracked()` only when the key is absent. The `SourceId` of an `OpenFile` is the hash of `TypeId<OpenFile>` and its `#[key]` (`crates/pico_macros/src/source_macro.rs:51-55`), so a second `set` of the same key returns the same id and needs no map write. A `didChange` of an open path is one `set`; the counter does not move, and no memo that missed the map re-invokes. `didOpen` of a new path, `didClose`, and `Gone` (one `extract_if` over keys whose `client` matches, like `remove_disk_files_from_path`) bump the counter, which re-invokes every `file_source` slot of every client that missed the map, that is every disk-fallback read; each backdates unless its answer changed. Hits do not re-invoke. Without change 2's write rule, `MutView::tracked()` (`crates/pico/src/view.rs:67-74`) bumps on every call, keystrokes included. Delta from the body: `LspClientMap`, `LspClientOpenFiles`, `insert_lsp_client`, and `UnknownLspClientError` are deleted; `set_open_file` and `remove_open_file` return `()`; the database does not record which clients exist, only `LiveSessions` does. (c) Per-client `LspClientOpenFiles` without `lsp_client_map`: compute `SourceId<LspClientOpenFiles>` from a placeholder value (`SourceId::new(&LspClientOpenFiles { client, open_files: HashMap::new() })`). Removes one map, but constructs a value only to hash it, and `db.get` of that id panics for a client with no state (a `Gone` without `Started`).
+2. A tracked map whose counter was never written. `Storage::get_impl` (`crates/pico/src/database.rs:134-140`) returns `None` before registering a dependency, so a miss-then-`tracked()` read before the first write to that map records nothing, and a later insert is not seen. `missing_then_present_extracts` in `isograph_extract_typescript` inserts an unrelated file first to work around this. (a) `IsographDb::default` calls `tracked()` once on each tracked field, which writes each counter; no pico change. A future tracked field that is not listed there has the bug again, silently. (b) pico prefactor: record a dependency on an absent source. `Dependency` gains the presence observed at read time, `get_impl` registers on a miss, and `source_node_changed_since` reports "changed" only when presence differs or the present node is newer. Fixes every absent read (singletons included) for every tracked field. pico is kept unchanged from upstream isograph per AGENTS.md, so this is an upstream divergence; it would be its own change before change 2, with pico tests.
+3. Order relative to format-file-from-segments.md. (a) This doc first. Change 5's `format_iso_literals` uses `parsed_iso_literals_in_file` and `text_through_last_iso_literal` with the client. format-file-from-segments.md then reads `file_contents(db, client, path)` instead of `state.disk_file(path)` (which change 5 deletes). (b) format-file-from-segments.md first. Change 5's `format_iso_literals` after-snippet is the second one in that section, with `file_contents` replacing `disk_file`. Either order ships; (b) makes change 5's format diff smaller, (a) makes format-file-from-segments.md read the buffer from the start.
+4. `SendLspResponseEffect` as data (change 4). The feature does not need it. `SendLspResponseEffect` is how `handle` returns a reply for `perform` to send. Tests already read the response by calling `perform` and `recv`ing on the crossbeam receiver behind the `LiveSession` (`lsp_formatting_of_a_live_client_without_a_file_is_null`, `crates/isograph_cli/src/state.rs:574`), and change 5's tests use that pattern. (a) Ship change 4: `{ sender, response }` with private fields, `pub(crate) fn response(&self) -> &lsp_server::Response`, and `pub(crate) fn send(self, token: &SideEffectToken)` called by `perform`. `LiveSessions::after_compute` returns it. Tests can match the response on the effect without `perform` and a channel; `#[expect(clippy::type_complexity)]` and the hand-written `Debug` go away; `run_event_loop` is unchanged; `send` still takes the token. (b) Do not ship change 4; `Box<dyn FnOnce(&SideEffectToken) + Send>` stays.
 
 ## What the user does
 
@@ -31,13 +27,11 @@ Closing a tab sends `didClose`; that window reads disk for that path again. Clos
 
 A URI with neither a buffer for the asking window nor a `DiskFile` is JSON `null` for tokens and formatting. A non-`file:` URI is `null`. A `file:` URI whose path is not UTF-8, or a request before the config directory is interned, is an error response (`UnknownErrorCode`) naming the cause; the daemon does not panic.
 
-The compiler client reads disk only. An unsaved buffer never reaches anything read with `ClientId::Compiler`. Today no production code reads with it (open decision 2).
-
 `isograph send` is unchanged. A send connection never sends `didOpen`, so it has no buffers.
 
 ## Changes
 
-Five changes, prefactors first. Change 4 ships only if open decision 7 picks (a).
+Five changes, prefactors first. Change 4 ships only if open decision 4 picks (a). Change 5 does not depend on change 4.
 
 1. Typed path conversion.
 2. Tracked counters exist from construction; tracked-map writes only bump on a key change; `disk_file` tracks its miss.
@@ -395,7 +389,7 @@ Three facts about pico tracked maps, each verified in pico source:
 - `MutView::tracked()` (`crates/pico/src/view.rs:67-74`) writes `counter + 1` on every call, whether or not the caller then changes the map. `insert_disk_file` of an already-present path, and `remove_disk_file` of an absent path, re-invoke every memo that missed on the map.
 - `IsographDb::disk_file` reads `untracked()` then `?`. A miss records nothing.
 
-Open decision 4 picks how the first is fixed. This change is option (a).
+Open decision 2 picks how the first is fixed. This change is option (a).
 
 ### `IsographDb::default`
 
@@ -652,7 +646,7 @@ Existing extract, `parsed_iso_literals_in_file`, and tokens tests keep their fac
 
 ## Change 4: `SendLspResponseEffect` is data
 
-Ships only if open decision 7 picks (a).
+Ships only if open decision 4 picks (a). Change 5 does not depend on it.
 
 Before:
 
@@ -804,7 +798,7 @@ After this change:
 
 ### Where the client lives
 
-Connectedness and the reply channel stay in `LiveSessions` on `IsographState`. Open-file state is pico state on `IsographDb`, because memos read it. `handle` of `Started` and `Gone` writes both in one arm. The compiler client has no state anywhere: `ClientId::Compiler` is a constant, always present, and `file_source` of it never reads an open file. `lsp_client_map` is keyed by `LspClientId`, so it cannot hold an entry for the compiler.
+Connectedness and the reply channel stay in `LiveSessions` on `IsographState`. Open-file state is pico state on `IsographDb`, because memos read it. `handle` of `Started` and `Gone` writes both in one arm. `lsp_client_map` and the writers are keyed by `LspClientId`, so a later `ClientId` variant for the compiler cannot hold open-file state.
 
 ### Types
 
@@ -815,7 +809,6 @@ Most important first.
 /// A reader of file text.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ClientId {
-    Compiler,
     Lsp(LspClientId),
 }
 
@@ -824,7 +817,9 @@ pub enum ClientId {
 pub struct LspClientId(pub u64);
 ```
 
-`Compiler` has no production constructor; open decision 2.
+`ClientId` has one variant. The artifact-generation work adds the file-based compiler as a second variant, which reads through `file_contents` and never reads an `OpenFile`.
+
+`ClientId` is taken today: `crates/isograph_cli/src/event.rs` has `pub(crate) struct ClientId(pub u64)` meaning a connection. This change deletes that struct and replaces every use with `LspClientId`, so after this change `ClientId` names only this enum.
 
 ```rust
 // from crates/isograph_compiler/src/database.rs
@@ -886,7 +881,7 @@ Which writes touch which pico node:
 - `Started` / `Gone`: `lsp_client_map` (tracked), that client's `LspClientOpenFiles`, and on `Gone` its `OpenFile`s.
 - `DiskChanged`: one `DiskFile`, and `disk_file_map` only when the key set changes (change 2).
 
-A memo for client B or the compiler never reads client A's `LspClientOpenFiles` or `OpenFile`s. The only reads of `lsp_client_map` tracked are misses (a client with no state), so `Started` / `Gone` re-invoke only those.
+A memo for client B never reads client A's `LspClientOpenFiles` or `OpenFile`s. The only reads of `lsp_client_map` tracked are misses (a client with no state), so `Started` / `Gone` re-invoke only those.
 
 `lib.rs`:
 
@@ -1003,9 +998,9 @@ impl<THostLanguage: HostLanguage> IsographDb<THostLanguage> {
 }
 ```
 
-`insert_lsp_client` of an id already present replaces its state with an empty one. `accept_loop` mints each id once and `run_session` posts `Started` once, so that does not occur.
+`insert_lsp_client` of an id already present replaces its state with an empty one. `accept_loop` mints each id once at TCP accept from a local counter (`crates/isograph_cli/src/lsp_socket.rs:96-101`), and `run_session` posts `Started` once, only after a successful `initialize` / `initialized` handshake (`lsp_socket.rs:185`), so that does not occur. Within one connection the order is `Started`, then that connection's messages, then `Gone`: `run_session` forwards messages only after it posts `Started`, and `session` posts `Gone` after `run_session` returns.
 
-`remove_lsp_client` of an id with no state is a no-op. That case is real: a failed handshake posts `Gone` with no `Started` (`truncated_body_ends_that_connection`). The untracked lookup first keeps that no-op from bumping the counter.
+`remove_lsp_client` of an id with no state is a no-op: the keyed untracked lookup misses and the function returns before any write, `get`, or `remove`. There is no `expect`, panic, or `UnexpectedError` on that path. That case occurs on every `isograph start`: `session` posts `Gone` after every connection that got a transport, including one that never initialized (`lsp_socket.rs:134`), and the readiness probe in `start.rs:68-70` connects and drops without initializing (pinned by `drop_before_initialize_is_gone_without_started`, `lsp_socket.rs:1192`). `handle` already treats an unknown `Gone` as a no-op for `live_sessions` (`state.rs:52-55`, `client_gone_of_an_unknown_id_is_a_noop`). The untracked lookup first also keeps that no-op from bumping the `lsp_client_map` counter.
 
 `set_open_file` `set`s `LspClientOpenFiles` only when the path is new. pico `set_source` of an equal value moves `time_updated` to the current epoch (`crates/pico/src/database.rs` `set_source`, `Entry::Occupied` equal branch), which can report a change to a memo verified at an earlier epoch; writing only on a new path avoids that.
 
@@ -1051,7 +1046,6 @@ pub(crate) fn file_source<THostLanguage: HostLanguage>(
     path: RelativePathToSourceFile,
 ) -> Option<FileSourceId> {
     match client {
-        ClientId::Compiler => db.disk_file_source_id(path).map(FileSourceId::Disk),
         ClientId::Lsp(lsp_client) => match db.open_file_source_id(lsp_client, path) {
             Some(open_file_id) => FileSourceId::Open(open_file_id).wrap_some(),
             None => db.disk_file_source_id(path).map(FileSourceId::Disk),
@@ -1277,7 +1271,7 @@ It takes `LspClientId`, not `ClientId`: only an LSP client requests tokens.
 
 ### Formatting and `willSaveWaitUntil`
 
-With open decision 6 (a), format-file-from-segments.md not landed:
+With open decision 3 (a), format-file-from-segments.md not landed:
 
 ```rust
 // from crates/isograph_cli/src/adapter.rs
@@ -1332,7 +1326,7 @@ fn format_iso_literals<THostLanguage: HostLanguage>(
 }
 ```
 
-With open decision 6 (b), format-file-from-segments.md landed first, `format_iso_literals` is that doc's version with the client and `file_contents`:
+With open decision 3 (b), format-file-from-segments.md landed first, `format_iso_literals` is that doc's version with the client and `file_contents`:
 
 ```rust
 // from crates/isograph_cli/src/adapter.rs
@@ -1475,19 +1469,10 @@ pub struct LspRequest {
     pub request: lsp_server::Request,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct LspNotification {
     pub client: LspClientId,
     pub notification: lsp_server::Notification,
-}
-
-impl std::fmt::Debug for LspNotification {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("LspNotification")
-            .field("client", self.client.reference())
-            .field("method", self.notification.method.reference())
-            .finish_non_exhaustive()
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -1498,27 +1483,7 @@ pub enum LspEvent {
 }
 ```
 
-`LspEvent` derives `Clone` and `Debug`, so `LspNotification` provides both. `Debug` is hand-written so `run_event_loop`'s `debug!(?event)` logs the method, not the buffer (open decision 8 (a)). `ClientId` is deleted from `event.rs`; `LiveSessions`, `BeforeCompute`, `AfterCompute`, `ClientStartedEvent`, `ClientConnectionEvent::Gone`, and `LiveSessions::reply` take `isograph_compiler::LspClientId`.
-
-`Presence` keeps its other derives and replaces `Debug`:
-
-```rust
-// from crates/isograph_cli/src/event.rs
-#[derive(Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
-pub enum Presence {
-    Present(String),
-    Absent,
-}
-
-impl std::fmt::Debug for Presence {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Presence::Present(contents) => f.debug_tuple("Present").field(&contents.len()).finish(),
-            Presence::Absent => f.write_str("Absent"),
-        }
-    }
-}
-```
+`LspEvent` derives `Clone` and `Debug`, so `LspNotification` derives both. `run_event_loop`'s `tracing::debug!(?event, "event")` logs each event with its derived `Debug`, which includes the full text of every `didOpen` / `didChange` and, as today, the full contents of every `DiskChanged`; that is accepted behavior, and `run_event_loop` and `Presence` are unchanged. `ClientId` is deleted from `event.rs`; `LiveSessions`, `BeforeCompute`, `AfterCompute`, `ClientStartedEvent`, `ClientConnectionEvent::Gone`, and `LiveSessions::reply` take `isograph_compiler::LspClientId`.
 
 Before:
 
@@ -1630,7 +1595,28 @@ fn dispatch_lsp_notification<THostLanguage: HostLanguage>(
 }
 ```
 
-`dispatch_lsp` passes `LspEvent::Notification(notification)` through unchanged.
+`dispatch_lsp` drops a notification whose client is not in `live_sessions`, the same as it drops a request (`state.rs:67-69`, through `LiveSessions::reply`). Given the per-connection order above, no notification arrives from such a client today; the check makes `handle` total over that input instead of relying on the socket's ordering.
+
+Before:
+
+```rust
+// from crates/isograph_cli/src/state.rs
+        crate::event::LspEvent::Notification(notification) => {
+            dispatch_lsp_notification(state, notification)
+        }
+```
+
+After:
+
+```rust
+// from crates/isograph_cli/src/state.rs
+        crate::event::LspEvent::Notification(notification) => {
+            if !state.live_sessions.0.contains_key(&notification.client) {
+                return no_effects();
+            }
+            dispatch_lsp_notification(state, notification)
+        }
+```
 
 ### Document sync handlers
 
@@ -1728,7 +1714,7 @@ fn did_close<THostLanguage: HostLanguage>(
 
 `warn!` is `tracing::warn!`, the same as `on_notification_sync`'s params error. `change.text` is moved out of the one-element array, not cloned. `language_id` and `version` are not stored; nothing reads them.
 
-`didChange` of a path the client never opened stores it as open. An unknown client is a broken invariant (`run_session` posts `Started` before any notification, and `Gone` after the last); it is logged, and reads for that client fall back to disk.
+`didChange` of a path the client never opened stores it as open. `dispatch_lsp` has already dropped notifications from a client not in `live_sessions`, and `handle` of `Started` / `Gone` writes `live_sessions` and `lsp_client_map` in the same arm, so `UnknownLspClientError` fires only if those two disagree. It is logged, and reads for that client fall back to disk.
 
 ### `initialize` advertises full sync
 
@@ -1797,17 +1783,16 @@ After:
         ClientConnectionEvent::Gone(client) => {
             state.live_sessions.0.remove(&client);
             state.db.remove_lsp_client(client);
-            state.db.run_garbage_collection();
             no_effects()
         }
     }
 ```
 
-`run_garbage_collection` is open decision 5 (a). It asserts an empty dependency stack; `handle` runs outside memos.
+Memo garbage collection is out of scope; nothing in i2 calls `run_garbage_collection` today.
 
 ### Tests
 
-All feature behavior is asserted at the `handle` seam in `crates/isograph_cli/src/state.rs`: one process, no socket, no filesystem, no clock. Disk arrives as `InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged { path, presence: Presence::Present(..) }))`. Existing helpers: `with_config` (interns `/tmp/proj`), `start_client`, `lsp_request`, `formatting_params`, `perform_send`. Added helpers build `LspEvent::Notification(LspNotification { client, notification })` for `didOpen` / `didChange` / `didClose`, and `response_to(state, rx, client, id, method, params) -> lsp_server::Response` (with change 4: read `effect.response()`; without: `perform` then `rx.recv()`). `KEYWORD` is token type 15. `LspClientId(1)` and `LspClientId(2)` are test ids.
+All feature behavior is asserted at the `handle` seam in `crates/isograph_cli/src/state.rs`: one process, no socket, no filesystem, no clock. Disk arrives as `InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged { path, presence: Presence::Present(..) }))`. Existing helpers: `with_config` (interns `/tmp/proj`), `start_client`, `lsp_request`, `formatting_params`, `perform_send`. Added helpers build `LspEvent::Notification(LspNotification { client, notification })` for `didOpen` / `didChange` / `didClose`, and `response_to(state, rx, client, id, method, params) -> lsp_server::Response`, which calls `handle`, passes the one `SendLspResponse` effect to `perform_send`, and `recv`s the response on the client's crossbeam receiver, the pattern of `lsp_formatting_of_a_live_client_without_a_file_is_null` (`state.rs:574`). `KEYWORD` is token type 15. `LspClientId(1)` and `LspClientId(2)` are test ids.
 
 `state.rs`:
 
@@ -1819,30 +1804,30 @@ All feature behavior is asserted at the `handle` seam in `crates/isograph_cli/sr
 - clients 1 and 2 `didOpen` the same URI with `iso(\`field Query.x{id}\`)` and `iso(\`entrypoint Query.A\`)`: client 1's first token length 5, client 2's length 10
 - client 1 has a buffer; client 2 never opened the URI: client 2's tokens equal disk's
 - client 1 `didOpen` then `Gone(1)`: `live_sessions` lacks 1; `file_contents(&state.db, ClientId::Lsp(LspClientId(1)), path)` is disk's text; client 2 started afterwards reads disk
-- the compiler reads disk: client 1 has a buffer; `file_contents(&state.db, ClientId::Compiler, path)` is disk's text
 - open-only file: no `DiskFile` at `src/new.ts`; client 1 `didOpen` with an iso literal: tokens non-null; `didClose`: JSON `null`
 - `didChange` with `contentChanges: []`, with two full changes, and with one ranged change: `file_contents` for client 1 is the `didOpen` text after each
 - `didOpen` of `https://example.net/a.ts`: no effects, no open file
 - `#[cfg(unix)]` `didOpen` of `file:///tmp/proj/%FF.ts`: no effects, no panic
-- `didOpen` from a client that never `Started`: no effects; `file_contents` for that client is disk's text
-- `Gone` of a client that never `Started`: no effects, `live_sessions` empty, no panic
-- `isograph/event` HelloWorld as an `LspNotification` still returns `Timer`; an unknown notification still returns no effects
+- `didOpen` from a client that never `Started`: no effects (`dispatch_lsp` drops it); `file_contents` for that client is disk's text
+- `Gone` of a client that never `Started` leaves state unchanged: disk `src/x.ts` is `const x = 1;\n`; client 2 `Started` and `didOpen` with `iso(\`field Query.x{id}\`)`; `Gone(LspClientId(7))`: no effects, no panic; `live_sessions` holds only client 2; `lsp_client_map` holds only client 2; `file_contents` for client 2 is its buffer; `file_contents` for client 7 is disk's text
+- `isograph/event` HelloWorld as an `LspNotification` from a started client still returns `Timer`; an unknown notification from a started client still returns no effects. `event_notification` takes `client: LspClientId`; `lsp_isograph_event_hello_world_returns_a_timer`, `lsp_isograph_event_hello_world_then_its_timer_returns_log_hello_world`, and `lsp_unknown_notification_returns_no_effects` call `start_client` first
+- `isograph/event` HelloWorld from a client that never `Started`: no effects, `hello_world_debounce` is `None`
 - an empty buffer: disk has an iso literal; client 1 `didOpen` with `""`: `file_contents` is `Some("")`; tokens are `Some(vec![])`, not disk's
 
 `crates/isograph_compiler/src/database.rs` (the `DiskFile` test shape; intern paths, call writers, read `file_contents`; `TestHostLanguage`):
 
-- `insert_lsp_client(1)`; `set_open_file(1, path, "open")`: `file_contents(Lsp(1), path)` is `"open"`; `file_contents(Compiler, path)` is disk's text or `None`
+- `insert_lsp_client(1)`; `set_open_file(1, path, "open")`: `file_contents(Lsp(1), path)` is `"open"`; `file_contents(Lsp(2), path)` is disk's text, or `None` with no `DiskFile`
 - `set_open_file` for a client with no state is `Err(UnknownLspClientError(LspClientId(9)))`; `file_contents(Lsp(9), path)` is disk's text
 - a second `set_open_file` of the same path replaces the text
 - two clients, one path, different text: each reads its own
 - `remove_open_file` then `file_contents(Lsp(1), path)` is disk's text; `remove_open_file` of a path never opened is `Ok(())`
 - `remove_lsp_client(1)` with two open paths: both read disk for client 1; client 2's buffer at one of those paths is unchanged
 - `remove_lsp_client` of a never-inserted id: no-op; `lsp_client_map` length unchanged
-- `remove_disk_file` of a path client 1 has open: `Lsp(1)` still reads the buffer; `Compiler` reads `None`
+- `remove_disk_file` of a path client 1 has open: `Lsp(1)` still reads the buffer; `Lsp(2)` reads `None`
 - inside a memo (`#[cfg(test)] #[memo] fn contents_of(db, client: ClientId, path) -> Option<String>` calling `file_contents`): `Lsp(1)` reads disk; `set_open_file`; reads the buffer; `remove_open_file`; reads disk; `remove_disk_file`; `None`, no panic. This pins the miss-then-hit transitions and `file_source`'s read of the source it returns.
-- inside the same memo on a fresh database: `Compiler` reads `None`; `insert_disk_file`; reads the text
+- inside the same memo on a fresh database with no client inserted: `Lsp(1)` reads `None`; `insert_disk_file`; reads the text. This pins the tracked misses on both `lsp_client_map` and `disk_file_map`.
 
-`isograph_extract_typescript` memo tests: `TypeScriptHostLanguage::extract_iso_literals(&db, path)` becomes `extract_iso_literals(&db, ClientId::Compiler, path)`; `parsed_iso_literals_in_file`, `text_through_last_iso_literal`, `literal_id_at_location` gain `ClientId::Compiler`; `LiteralId { path, index }` becomes `LiteralId { client: ClientId::Compiler, path, index }`; `file_literals` gains `ClientId::Compiler`. Facts unchanged. Added: a `LiteralId` from `literal_id_at_location` with `Lsp(1)` over a buffer names that buffer's literal in `iso_literal_extraction`, while `Compiler` over disk names disk's.
+`isograph_extract_typescript` memo tests: `TypeScriptHostLanguage::extract_iso_literals(&db, path)` becomes `extract_iso_literals(&db, client(), path)` with `fn client() -> ClientId { ClientId::Lsp(LspClientId(1)) }` and no `insert_lsp_client`, so every read falls back to disk; `parsed_iso_literals_in_file`, `text_through_last_iso_literal`, `literal_id_at_location` gain `client()`; `LiteralId { path, index }` becomes `LiteralId { client: client(), path, index }`; `file_literals` gains `client()`. Facts unchanged. Added: a `LiteralId` from `literal_id_at_location` with `Lsp(1)` over a buffer names that buffer's literal in `iso_literal_extraction`, while `Lsp(2)`, with no buffer, over disk names disk's.
 
 `crates/isograph_lsp/src/file_semantic_tokens.rs`: tests call `db.insert_lsp_client(LspClientId(1))` and pass `LspClientId(1)`; facts unchanged. Added: a buffer whose iso text differs from disk (disk has no iso, buffer has `entrypoint`): first token type 15, length 10; `remove_open_file` then tokens equal disk's.
 
@@ -1859,7 +1844,7 @@ All feature behavior is asserted at the `handle` seam in `crates/isograph_cli/sr
 - added, on one connection, no sleep: `initialize`; an `isograph/event` `DiskChanged` notification for `/tmp/proj/src/Home.ts` with `export const Home = iso(\`entrypoint Query.HomeRoute\`)`; `didOpen` of that URI with `iso(\`field Query.x{id}\`)`; `semanticTokens/full`: first token length 5. One reader thread per connection and one channel to `run_event_loop` deliver the three in order.
 - tests that match `LspEvent::Notification(notification)` match `LspEvent::Notification(LspNotification { notification, .. })`; `client_gone` returns `LspClientId`
 
-`watch.rs`: `contents` reads `file_contents(&state.db, ClientId::Compiler, interned(path)).map(str::to_owned)`; `InHost` drops `extract_iso_literals`.
+`watch.rs`: `contents` asserts what the watcher wrote, so it reads the `DiskFile` directly: `state.db.get_disk_file_map().untracked().0.get(&interned(path)).map(|source_id| state.db.get(source_id.dereference()).contents.clone())`, the map access the file's other assertions already use; `InHost` drops `extract_iso_literals`.
 
 `ts_graphql_react_isograph_cli/tests/cli.rs` e2e send / semantic-tokens tests keep their facts: send never opens a file.
 
@@ -1869,31 +1854,29 @@ No test asserts re-invoke counts; which memo re-runs is pico's behavior.
 
 - `accept_loop` -> `LspClientId` -> `session` / `run_session` -> `LspRequest.client`, `LspNotification.client`, `ClientStartedEvent.client`, `ClientConnectionEvent::Gone`
 - `handle_client_connection` `Started` -> `insert_lsp_client`, `live_sessions.0.insert`
-- `handle_client_connection` `Gone` -> `live_sessions.0.remove`, `remove_lsp_client`, `run_garbage_collection`
+- `handle_client_connection` `Gone` -> `live_sessions.0.remove`, `remove_lsp_client`
+- `dispatch_lsp` -> `live_sessions.0.contains_key`, then `dispatch_lsp_notification`
 - `dispatch_lsp_notification` -> `handle_internal_event` (function item), `on_did_open` / `on_did_change` / `on_did_close` (closures over `client`)
 - `on_did_open` / `on_did_change` -> `relative_from_uri`, `set_open_file`
 - `on_did_close` -> `relative_from_uri`, `remove_open_file`
 - `dispatch_lsp_request` -> `semantic_tokens_response(db, client, params)` -> `lsp_semantic_tokens_for_file(db, client, path)` -> `parsed_iso_literals_in_file` / `text_through_last_iso_literal` (with `ClientId::Lsp(client)`) -> `extract_iso_literals` -> `file_contents` -> `file_source` -> `open_file_source_id` / `disk_file_source_id`
 - `dispatch_lsp_request` -> `formatting_response` / `will_save_wait_until_response` (with `client`) -> `format_iso_literals(db, client, path)` -> the same family
 - `file_literals`, `literal_id_at_location`, `iso_literal_extraction` -> `extract_iso_literals` / `file_contents` with the caller's `ClientId`
-- tests -> `ClientId::Compiler`
 
 ### Docs this change amends
 
-`docs-website/docs/design-docs/pico.md` Source (the `OpenFile` snippet): replace the path-keyed `OpenFile` with `OpenFileKey`, `OpenFile`, `LspClientOpenFiles`, `LspClientMap` as in this change. Replace "A path may have a `DiskFile`, an `OpenFile`, both, or neither. Artifact generation reads `DiskFile`. The LSP reads `OpenFile` when that path has one, otherwise `DiskFile`. Those are different memos. One overlay used by both, as isograph's `read_iso_literals_source` does, makes artifact generation depend on editor buffers." with: "A path may have a `DiskFile`, one `OpenFile` per LSP client that has it open, both, or neither. Every read of file text is `file_contents(db, client, path)`. `ClientId::Lsp(c)` reads `c`'s `OpenFile` if present, otherwise `DiskFile`. `ClientId::Compiler` reads `DiskFile` only. The memos are keyed by `ClientId`, so a compile reads memo slots no editor buffer reaches; isograph's `read_iso_literals_source` overlays buffers for every reader."
+`docs-website/docs/design-docs/pico.md` Source (the `OpenFile` snippet): replace the path-keyed `OpenFile` with `OpenFileKey`, `OpenFile`, `LspClientOpenFiles`, `LspClientMap` as in this change. Replace "A path may have a `DiskFile`, an `OpenFile`, both, or neither. Artifact generation reads `DiskFile`. The LSP reads `OpenFile` when that path has one, otherwise `DiskFile`. Those are different memos. One overlay used by both, as isograph's `read_iso_literals_source` does, makes artifact generation depend on editor buffers." with: "A path may have a `DiskFile`, one `OpenFile` per LSP client that has it open, both, or neither. Every read of file text is `file_contents(db, client, path)`. `ClientId::Lsp(c)` reads `c`'s `OpenFile` if present, otherwise `DiskFile`. The file-based compiler will be another `ClientId` variant with no open files. The memos are keyed by `ClientId`, so that compiler will read memo slots no editor buffer reaches; isograph's `read_iso_literals_source` overlays buffers for every reader."
 
 `pico.md` Tracked maps: the `disk_file` sentences from change 2 name `file_source` instead: "`file_source` looks up one key untracked, reads the source it found, and on a miss reads the map tracked." Add: "Open-file state is one `LspClientOpenFiles` source per client. A keystroke writes one `OpenFile`; open and close write that client's `LspClientOpenFiles`; neither touches a tracked map."
-
-`pico.md` Garbage collection: "`handle` of `ClientConnectionEvent::Gone` runs `run_garbage_collection`." (open decision 5 (a)).
 
 `docs-website/docs/design-docs/event-model.md`:
 
 - Building blocks: "`DiskFile`, and `OpenFile`" stays; add `ClientId`.
-- State: drop the path-keyed `struct OpenFile { path, contents }` and "`OpenFile` and its map land with the adapter." Use this change's types. "Artifact generation and watch mode read `DiskFile`. They do not read `OpenFile`." becomes "Artifact generation and watch mode read with `ClientId::Compiler`, which never reads an `OpenFile`." "The LSP adapter reads `OpenFile` when it exists for that path, otherwise `DiskFile`." becomes "The LSP adapter reads with `ClientId::Lsp(asking client)`."
+- State: drop the path-keyed `struct OpenFile { path, contents }` and "`OpenFile` and its map land with the adapter." Use this change's types. "Artifact generation and watch mode read `DiskFile`. They do not read `OpenFile`." becomes "Watch mode writes `DiskFile`. Artifact generation will read through `file_contents` with its own `ClientId` variant, which has no open files." "The LSP adapter reads `OpenFile` when it exists for that path, otherwise `DiskFile`." becomes "The LSP adapter reads with `ClientId::Lsp(asking client)`."
 - Event: `EditorChanged` and its `Buffer` are not added. "`InternalEvent` values come from outside `handle`: `DiskChanged`, `EditorChanged`." drops `EditorChanged`. "`EditorChanged` is an editor-buffer fact..." is deleted.
 - Dispatch: "`EditorChanged` with `Open` sets `OpenFile`. `EditorChanged` with `Closed` removes it." becomes "`DidOpenTextDocument` and `DidChangeTextDocument` (one change, no range) call `set_open_file` for the notification's client. `DidCloseTextDocument` calls `remove_open_file`. `ClientConnectionEvent::Started` calls `insert_lsp_client`; `Gone` calls `remove_lsp_client`."
 - The test-harness sentence "A test constructs a `DiskChanged` or `EditorChanged`" becomes "A test constructs a `DiskChanged` or an `LspNotification`".
 
-`refactors/pending/format-file-from-segments.md`: "Independent of lsp-open-files.md. Does not add `OpenFile`." becomes the ordering from open decision 6. Its `format_iso_literals` takes `client: LspClientId` and reads `isograph_compiler::file_contents(db, ClientId::Lsp(client), path)`; `state.disk_file(path)` no longer exists after change 5. Its adapter-test section names the renamed extra-`}` test.
+`refactors/pending/format-file-from-segments.md`: "Independent of lsp-open-files.md. Does not add `OpenFile`." becomes the ordering from open decision 3. Its `format_iso_literals` takes `client: LspClientId` and reads `isograph_compiler::file_contents(db, ClientId::Lsp(client), path)`; `state.disk_file(path)` no longer exists after change 5. Its adapter-test section names the renamed extra-`}` test.
 
 `refactors/pending/lsp-diagnostics.md`: `report_diagnostics`, for each `LspClientId` in `live_sessions` whose `PublishDiagnosticsCap` is `Yes`, reads `file_literals(db, ClientId::Lsp(id), path)` over the disk paths and that client's open paths, and publishes that client's set to that client only. `didOpen` / `didChange` arm the debounce like `DiskChanged`.
