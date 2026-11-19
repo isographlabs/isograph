@@ -16,6 +16,7 @@ enum CtorCheck {
 
 const RUST_ROOTS: &[&str] = &[
     "crates/common_lang_types",
+    "crates/graphql_schema_parser",
     "crates/isograph_cli",
     "crates/isograph_config",
     "crates/isograph_lsp",
