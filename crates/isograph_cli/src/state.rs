@@ -1587,12 +1587,12 @@ mod tests {
         let one = live_client(&mut state, ClientId(1));
         let two = live_client(&mut state, ClientId(2));
         handle(&mut state, did_open(one.client, HOME_URI, FIELD_X));
-        let id = column(FIELD_X, "id");
+        let x = column(FIELD_X, "x{");
         assert_eq!(
-            hover_text(&mut state, &one, HOME_URI, 0, id),
-            some("SelectionNameWrapper")
+            hover_text(&mut state, &one, HOME_URI, 0, x),
+            some("SelectableNameWrapper")
         );
-        assert_eq!(hover_text(&mut state, &two, HOME_URI, 0, id), None);
+        assert_eq!(hover_text(&mut state, &two, HOME_URI, 0, x), None);
         let disk_query = column(HOME_DISK, "Query");
         assert_eq!(
             hover_text(&mut state, &two, HOME_URI, 0, disk_query),
@@ -1600,7 +1600,7 @@ mod tests {
         );
         assert_eq!(hover_text(&mut state, &one, HOME_URI, 0, disk_query), None);
         handle(&mut state, did_close(one.client, HOME_URI));
-        assert_eq!(hover_text(&mut state, &one, HOME_URI, 0, id), None);
+        assert_eq!(hover_text(&mut state, &one, HOME_URI, 0, x), None);
         assert_eq!(
             hover_text(&mut state, &one, HOME_URI, 0, disk_query),
             some("EntityNameWrapper")
@@ -1639,8 +1639,8 @@ mod tests {
             some("EntityNameWrapper")
         );
         assert_eq!(
-            hover_on_disk(&text, 1, column(FIELD_X, "id")),
-            some("SelectionNameWrapper")
+            hover_on_disk(&text, 1, column(FIELD_X, "x{")),
+            some("SelectableNameWrapper")
         );
     }
 
@@ -1652,10 +1652,47 @@ mod tests {
             some("EntityNameWrapper")
         );
         assert_eq!(
-            hover_on_disk(&text, 0, column(&text, "id")),
-            some("SelectionNameWrapper")
+            hover_on_disk(&text, 0, column(&text, "x{")),
+            some("SelectableNameWrapper")
         );
         assert_eq!(hover_on_disk(&text, 0, column(&text, ") iso")), None);
+    }
+
+    #[test]
+    fn hover_on_a_selection_name_is_null_until_the_schema_exists() {
+        assert_eq!(hover_on_disk(FIELD_X, 0, column(FIELD_X, "id")), None);
+        for needle in ["id", "name"] {
+            let (line, character) = position_of(PET_ONE_LINE, "{ id", needle, 0);
+            assert_eq!(
+                hover_on_disk(PET_ONE_LINE, line, character),
+                None,
+                "{needle:?}"
+            );
+        }
+        let nested = "iso(`field Pet.fullName { owner { name } }`)";
+        for needle in ["owner", "name"] {
+            assert_eq!(
+                hover_on_disk(nested, 0, column(nested, needle)),
+                None,
+                "{needle:?}"
+            );
+        }
+        assert_eq!(
+            hover_on_disk(nested, 0, column(nested, "Pet")),
+            some("EntityNameWrapper")
+        );
+        assert_eq!(
+            hover_on_disk(nested, 0, column(nested, "fullName")),
+            some("SelectableNameWrapper")
+        );
+        let aliased = "iso(`field Pet.fullName { b: bar }`)";
+        for needle in ["b:", "bar"] {
+            assert_eq!(
+                hover_on_disk(aliased, 0, column(aliased, needle)),
+                None,
+                "{needle:?}"
+            );
+        }
     }
 
     #[test]

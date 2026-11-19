@@ -1,9 +1,9 @@
 use common_lang_types::RelativePathToSourceFile;
 use isograph_compiler::{
     ClientId, CompilationProfile, IsographDb, LiteralId, extract_iso_literals,
-    iso_literal_extraction, parsed_iso_literal_by_id,
+    get_parent_and_selectable_for_selection_path, iso_literal_extraction, parsed_iso_literal_by_id,
 };
-use isograph_parser::{IsographResolutionNode, ParsedIsoLiteral, resolve_offset};
+use isograph_parser::{IsographResolutionNode, ParsedIsoLiteral, SelectionPath, resolve_offset};
 use prelude::Postfix;
 use span::Span;
 
@@ -18,11 +18,12 @@ pub fn hover_for_position<TProfile: CompilationProfile>(
     position: lsp_types::Position,
 ) -> Option<lsp_types::Hover> {
     let (literal_id, node, cursor) = resolved_position_at_lsp_position(db, client, path, position)?;
+    let value = hover_markdown(db, client, node)?;
     let span = file_span_of_literal_span(db, literal_id, cursor)?;
     lsp_types::Hover {
         contents: lsp_types::HoverContents::Markup(lsp_types::MarkupContent {
             kind: lsp_types::MarkupKind::Markdown,
-            value: node.to_string(),
+            value,
         }),
         range: line_index(db, client, path)
             .as_ref()?
@@ -30,6 +31,32 @@ pub fn hover_for_position<TProfile: CompilationProfile>(
             .wrap_some(),
     }
     .wrap_some()
+}
+
+/// The Markdown hover text of `node` as `client` reads the schema. A selection name whose
+/// selectable is not found has none.
+fn hover_markdown<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    node: IsographResolutionNode<'_>,
+) -> Option<String> {
+    match node {
+        IsographResolutionNode::SelectionNameWrapper(selection_name_path) => {
+            selection_hover_markdown(db, client, selection_name_path.parent.reference())
+        }
+        other => other.to_string().wrap_some(),
+    }
+}
+
+/// `name: TargetEntity` for the selectable `selection_path` selects.
+fn selection_hover_markdown<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    selection_path: &SelectionPath<'_>,
+) -> Option<String> {
+    let (_, selectable) =
+        get_parent_and_selectable_for_selection_path(db, client, selection_path).ok()?;
+    format!("{}: {}", selectable.name, selectable.target_entity).wrap_some()
 }
 
 fn resolved_position_at_lsp_position<'db, TProfile: CompilationProfile>(
