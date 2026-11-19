@@ -28,7 +28,9 @@ struct IsographDb<TProfile: CompilationProfile> {
     #[tracked]
     open_file_map: OpenFileMap,
     #[tracked]
-    schema_file_set: SchemaFileSet,
+    source_path_map: SourcePathMap,
+    #[tracked]
+    schema_path_map: SchemaPathMap,
     phantom_data: PhantomData<TProfile>,
 }
 ```
@@ -398,7 +400,7 @@ pub fn file_contents<TProfile: CompilationProfile>(
 ) -> Option<String>
 ```
 
-Nothing else reads `DiskFile.contents` or `OpenFile.contents`. The other readers of `disk_file_map`, `open_file_map`, and `schema_file_set` are the private lookups of `file_contents` (`open_file_source_id`, `disk_file_source_id`), the writers (`insert_disk_file`, `insert_schema_file`, `remove_disk_file`, `remove_disk_files_from_path`, `set_open_file`, `remove_open_file`, `remove_open_files_of_client`), and uses that do not read text, such as listing the paths that exist. `schema_file_set` holds paths, not `SourceId`s: a reader of schema text calls `file_contents` for each listed path. The writers touch `schema_file_set` only when its membership changes, because `MutView::tracked` bumps the counter on every call. A function that lists paths and needs each file's text calls `file_contents` for each path.
+Nothing else reads `DiskFile.contents` or `OpenFile.contents`. The other readers of `disk_file_map`, `open_file_map`, `source_path_map`, and `schema_path_map` are the private lookups of `file_contents` (`open_file_source_id`, `disk_file_source_id`), the writers (`insert_disk_file`, `remove_disk_file`, `remove_disk_files_from_path`, `set_open_file`, `remove_open_file`, `remove_open_files_of_client`), and uses that do not read text, such as listing the paths that exist (`open_source_paths_of_client`). `source_path_map` and `schema_path_map` hold paths and `OpenFileKey`s, not `SourceId`s: a reader of a listed file's text calls `file_contents` for each listed path. `insert_disk_file` and `set_open_file` take the path's `FileMembership` (source file, schema file, both, or neither), which `handle` computes from the config's globs. The writers touch the two path maps only when membership changes, because `MutView::tracked` bumps the counter on every call. A function that lists paths and needs each file's text calls `file_contents` for each path.
 
 ### The client is an input
 

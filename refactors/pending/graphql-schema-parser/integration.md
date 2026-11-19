@@ -34,15 +34,9 @@ pub struct SchemaPathMap {
     #[tracked]
     schema_path_map: SchemaPathMap,
 
-impl<THostLanguage: HostLanguage> IsographDb<THostLanguage> {
-    pub fn insert_schema_disk_path(&mut self, path: RelativePathToSourceFile);
-    pub fn remove_schema_disk_path(&mut self, path: RelativePathToSourceFile);
-    pub fn insert_schema_open_path(&mut self, key: OpenFileKey);
-    pub fn remove_schema_open_path(&mut self, key: OpenFileKey);
-}
 ```
 
-Each method reads `untracked()` first and writes `tracked()` only when the set changes, the pattern of `set_open_file`. `handle` calls them beside `insert_disk_file`, `remove_disk_file`, `set_open_file`, and `remove_open_file` when the path matches the `schema` globs; `remove_open_files_of_client` also removes that client's open schema keys. A TypeScript file change does not write `schema_path_map`.
+`SchemaPathMap`, its twin `SourcePathMap`, and their writers are in i2 (`refactors/past/source-and-schema-path-maps.md`). `insert_disk_file` and `set_open_file` take the path's `FileMembership`, which `handle` computes with `ProjectGlobs::membership`; they list a schema path in `schema_path_map` only when it is not already listed. `remove_disk_file`, `remove_disk_files_from_path`, `remove_open_file`, and `remove_open_files_of_client` drop the listed paths. A TypeScript file change does not write `schema_path_map`.
 
 ```rust
 // from crates/graphql_network_protocol/src/schema_files.rs
@@ -65,7 +59,7 @@ pub fn schema_file_paths<THostLanguage: HostLanguage>(
 
 The memo iterates the map, so it uses `tracked()` (AGENTS.md, pico tracked maps) and re-runs when any schema path is added or removed; it backdates when the list is `==`.
 
-Known gap: pico records no dependency when a memo reads a tracked map whose counter was never written (refactors/pending/lsp-open-files.md, Known gap; the fix is refactors/pending/pico-missing-key-dependency.md). On a database where `schema_path_map` was never written, `schema_file_paths` reads the empty map and does not see the first `insert_schema_disk_path`. Until that pico fix is in i2, tests write `schema_path_map` before the first read, with a comment naming this gap, as the `file_contents` tests do.
+Known gap: pico records no dependency when a memo reads a tracked map whose counter was never written (refactors/pending/lsp-open-files.md, Known gap; the fix is refactors/pending/pico-missing-key-dependency.md). On a database where `schema_path_map` was never written, `schema_file_paths` reads the empty map and does not see the first `insert_disk_file` of a schema path. Until that pico fix is in i2, tests write `schema_path_map` before the first read, with a comment naming this gap, as the `file_contents` tests do.
 
 ## Parsed files
 
@@ -183,7 +177,7 @@ Whole-schema checks (every root operation type exists, every interface a type im
 
 ### 1. `schema` config field and `SchemaPathMap`
 
-`CompilationOptions.schema`, `SchemaPathMap`, the four `IsographDb` methods, the `handle` calls, and the watcher watching `schema` globs. Tests (`crates/isograph_compiler/src/database.rs`, and the daemon's handle tests where `handle` is tested today): inserting a schema disk path twice writes once (a memo reading the map re-runs once); removing an absent path does not write; a TypeScript file event does not change `schema_path_map`; `remove_open_files_of_client` removes that client's open schema keys and no other client's.
+`CompilationOptions.schema` and the watcher watching `schema` globs (`SchemaPathMap` and its writers are in i2). Tests (`crates/isograph_compiler/src/database.rs`, and the daemon's handle tests where `handle` is tested today): inserting a schema disk path twice writes once (a memo reading the map re-runs once); removing an absent path does not write; a TypeScript file event does not change `schema_path_map`; `remove_open_files_of_client` removes that client's open schema keys and no other client's.
 
 ### 2. `schema_file_paths` and `parsed_schema_file`
 
