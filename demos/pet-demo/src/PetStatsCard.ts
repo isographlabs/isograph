@@ -1,5 +1,4 @@
 import { iso } from './__isograph/iso';
-import type { ResolverParameters } from './iso';
 
 export const PetStatsCard = iso(`
   field Pet.PetStatsCard @component {
@@ -14,8 +13,6 @@ export const PetStatsCard = iso(`
       energy
     }
   }
-`)(function PetStatsCard({
-  data,
-}: ResolverParameters<{ stats: { intelligence: number | null } | null }>) {
+`)(function PetStatsCard({ data }) {
   return data.stats?.intelligence ?? 0;
 });

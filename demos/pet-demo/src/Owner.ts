@@ -1,5 +1,4 @@
 import { iso } from './__isograph/iso';
-import type { ResolverParameters } from './iso';
 
 iso(`entity Owner`);
 
@@ -13,7 +12,7 @@ export const OwnerBadge = iso(`
   field Owner.OwnerBadge @component {
     displayName
   }
-`)(function OwnerBadge({ data }: ResolverParameters<{ displayName: string }>) {
+`)(function OwnerBadge({ data }) {
   return `Owned by ${data.displayName}`;
 });
 
@@ -21,6 +20,6 @@ export const owner = iso(`
   field Pet.owner to Owner! {
     id
   }
-`)(function owner({ data }: ResolverParameters<{ id: string }>) {
-  return `owner-of-${data.id}`;
+`)(function owner({ data }) {
+  return { __link: `owner-of-${data.id}`, __typename: 'Owner' as const };
 });

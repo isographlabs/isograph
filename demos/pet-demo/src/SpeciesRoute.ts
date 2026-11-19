@@ -1,5 +1,4 @@
 import { iso } from './__isograph/iso';
-import type { ResolverParameters } from './iso';
 
 export const SpeciesRoute = iso(`
   field Query.SpeciesRoute($species: PetSpecies!) @component {
@@ -15,9 +14,7 @@ export const SpeciesRoute = iso(`
       id
     }
   }
-`)(function SpeciesRoute({
-  data,
-}: ResolverParameters<{ petsBySpecies: { fullName: string }[] }>) {
+`)(function SpeciesRoute({ data }) {
   return data.petsBySpecies.map((pet) => pet.fullName);
 });
 

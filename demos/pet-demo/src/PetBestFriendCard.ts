@@ -1,5 +1,4 @@
 import { iso } from './__isograph/iso';
-import type { ResolverParameters } from './iso';
 
 export const PetBestFriendCard = iso(`
   field Pet.PetBestFriendCard @component {
@@ -13,10 +12,6 @@ export const PetBestFriendCard = iso(`
       }
     }
   }
-`)(function PetBestFriendCard({
-  data,
-}: ResolverParameters<{
-  best_friend_relationship: { best_friend: { friendName: string } } | null;
-}>) {
+`)(function PetBestFriendCard({ data }) {
   return data.best_friend_relationship?.best_friend.friendName ?? 'Nobody';
 });

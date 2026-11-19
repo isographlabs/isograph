@@ -23,17 +23,21 @@ pnpm --filter pet-demo log-entrypoints
 `scripts/log-entrypoints.cjs` registers `@babel/register` with `@babel/preset-typescript`, the local `@isograph/babel-plugin`, and `@babel/plugin-transform-modules-commonjs`, so Node compiles each file under `src/` as it is required. The script then requires `HomeRoute`, `PetDetailRoute`, `SpeciesRoute`, and `SetTagline`. The Babel plugin replaces each ``iso(`entrypoint ...`)`` call with an import of the generated artifact in `src/__isograph/`, and each module logs that artifact:
 
 ```text
-{ kind: 'Entrypoint', name: 'Query.HomeRoute' }
-{ kind: 'Entrypoint', name: 'Query.PetDetailRoute' }
-{ kind: 'Entrypoint', name: 'Query.SpeciesRoute' }
-{ kind: 'Entrypoint', name: 'Mutation.SetTagline' }
+{
+  kind: 'Entrypoint',
+  name: 'Query.HomeRoute',
+  normalizationAst: {},
+  readerArtifact: {}
+}
 ```
+
+and the same object for `Query.PetDetailRoute`, `Query.SpeciesRoute`, and `Mutation.SetTagline`. `normalizationAst` and `readerArtifact` are the default exports of the entrypoint folder's `normalization_ast.ts` and `resolver_reader.ts`, which are empty objects until readers and normalization ASTs are generated.
 
 The script reads the committed artifacts. It does not run the daemon, so after changing a literal, run the daemon in this directory first.
 
 ## Config
 
-`isograph.config.json` sets `source_files` to `src/**/*.ts`, `schema` to `schema/**/*.graphql`, and `output_directory` to `src`, so the daemon writes artifacts into `src/__isograph/`. That folder is generated and committed: running the daemon in this directory rewrites it.
+`isograph.config.json` sets `source_files` to `src/**/*.ts`, `schema` to `schema/**/*.graphql`, and `output_directory` to `src`, so the daemon writes artifacts into `src/__isograph/`. That folder is generated and committed: running the daemon in this directory rewrites it. It holds `iso.ts`, `tsconfig.json`, a param type per field, a parameters type per field with variables, output types and reader stubs per upstream's reachability rules, an entrypoint and normalization AST per entrypoint and per `@loadable` selection, and a link type per pointer target.
 
 ## Schema
 
@@ -43,10 +47,10 @@ The script reads the committed artifacts. It does not run the daemon, so after c
 
 ## Sources
 
-`src/__isograph/iso.ts` is the generated `iso`: a field literal returns the resolver it is passed, with that resolver's type, and an entrypoint literal has the type of its generated entrypoint artifact. `src/iso.ts` defines `ResolverParameters`, which the resolvers use to type their parameter until param types are generated. Every other file calls `iso(...)`. Each `field` literal is exported under its field name and immediately called with a resolver function. Each entrypoint literal's artifact is logged.
+`iso` is generated into `src/__isograph/iso.ts`; resolvers are typed by their field's generated param type. A field literal's overload returns upstream's `IdentityWithParam<P__f__param>` (or `IdentityWithParamComponent` for `@component`), so a resolver's `{ data }` parameter needs no annotation: `data` has the type of the field's selection set, a client field selected by another field has the type its resolver returns, and a pointer's resolver must return a link object (`{ __link, __typename }`) of its target. An entrypoint literal has the type of its generated entrypoint artifact. Every file in `src/` calls `iso(...)`. `tsc --noEmit --strict` over `src` passes. `picture` and `picture_together` select the custom scalar `Url`, which is `unknown` because the `isograph` binary's profile maps no custom scalars. Each `field` literal is exported under its field name and immediately called with a resolver function. Each entrypoint literal's artifact is logged.
 
-- `src/Pet.ts`: `field Pet.fullName` with a string description, and `field Pet.bestFriend to Pet` with a nested selection set.
-- `src/Owner.ts`: `entity Owner`, which exists only in the sources; `field Owner.displayName` with no selection set; `field Owner.OwnerBadge`, which selects `displayName`; and `field Pet.owner to Owner!`.
+- `src/Pet.ts`: `field Pet.fullName` with a string description, and `field Pet.bestFriend to Pet` with a nested selection set, whose resolver returns a link to a `Pet` or `null`.
+- `src/Owner.ts`: `entity Owner`, which exists only in the sources; `field Owner.displayName` with no selection set; `field Owner.OwnerBadge`, which selects `displayName`; and `field Pet.owner to Owner!`, whose resolver returns a link to an `Owner`.
 - `src/PetSummaryCard.ts`: `field Pet.PetSummaryCard` with a block-string description, selecting the source field `fullName` and the extension field `species`.
 - `src/PetStatsCard.ts`: `field Pet.PetStatsCard` with a nested selection on `stats`.
 - `src/PetCheckinsCard.ts`: `field Pet.PetCheckinsCard($limit: Int = 3)`, passing `$limit` and the literal `0` to `checkins`.

@@ -1,14 +1,11 @@
 import { iso } from './__isograph/iso';
-import type { ResolverParameters } from './iso';
 
 export const fullName = iso(`
   field Pet.fullName "The pet's first and last name, for example Makayla Balicki." {
     firstName
     lastName
   }
-`)(function fullName({
-  data,
-}: ResolverParameters<{ firstName: string; lastName: string }>) {
+`)(function fullName({ data }) {
   return `${data.firstName} ${data.lastName}`;
 });
 
@@ -20,10 +17,9 @@ export const bestFriend = iso(`
       }
     }
   }
-`)(function bestFriend({
-  data,
-}: ResolverParameters<{
-  best_friend_relationship: { best_friend: { id: string } } | null;
-}>) {
-  return data.best_friend_relationship?.best_friend.id ?? null;
+`)(function bestFriend({ data }) {
+  const friend = data.best_friend_relationship?.best_friend;
+  return friend == null
+    ? null
+    : { __link: friend.id, __typename: 'Pet' as const };
 });

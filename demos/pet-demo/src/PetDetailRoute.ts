@@ -1,5 +1,4 @@
 import { iso } from './__isograph/iso';
-import type { ResolverParameters } from './iso';
 
 export const PetDetailRoute = iso(`
   field Query.PetDetailRoute($id: ID!) @component {
@@ -17,9 +16,7 @@ export const PetDetailRoute = iso(`
       }
     }
   }
-`)(function PetDetailRoute({
-  data,
-}: ResolverParameters<{ pet: { fullName: string } | null }>) {
+`)(function PetDetailRoute({ data }) {
   return data.pet?.fullName ?? 'No pet with that id';
 });
 

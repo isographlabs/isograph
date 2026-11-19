@@ -1,5 +1,4 @@
 import { iso } from './__isograph/iso';
-import type { ResolverParameters } from './iso';
 
 export const PetSummaryCard = iso(`
   field Pet.PetSummaryCard @component
@@ -15,8 +14,6 @@ export const PetSummaryCard = iso(`
     tagline
     species
   }
-`)(function PetSummaryCard({
-  data,
-}: ResolverParameters<{ fullName: string; tagline: string }>) {
+`)(function PetSummaryCard({ data }) {
   return `${data.fullName}: ${data.tagline}`;
 });

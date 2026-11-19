@@ -1,5 +1,4 @@
 import { iso } from './__isograph/iso';
-import type { ResolverParameters } from './iso';
 
 export const HomeRoute = iso(`
   field Query.HomeRoute @component {
@@ -8,9 +7,7 @@ export const HomeRoute = iso(`
       PetSummaryCard
     }
   }
-`)(function HomeRoute({
-  data,
-}: ResolverParameters<{ pets: { PetSummaryCard: string }[] }>) {
+`)(function HomeRoute({ data }) {
   return data.pets.map((pet) => pet.PetSummaryCard);
 });
 

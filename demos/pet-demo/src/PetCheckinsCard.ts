@@ -1,5 +1,4 @@
 import { iso } from './__isograph/iso';
-import type { ResolverParameters } from './iso';
 
 export const PetCheckinsCard = iso(`
   field Pet.PetCheckinsCard($limit: Int = 3) @component {
@@ -10,8 +9,6 @@ export const PetCheckinsCard = iso(`
       time
     }
   }
-`)(function PetCheckinsCard({
-  data,
-}: ResolverParameters<{ checkins: { location: string }[] }>) {
+`)(function PetCheckinsCard({ data }) {
   return data.checkins.map((checkin) => checkin.location);
 });

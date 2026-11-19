@@ -1,5 +1,4 @@
 import { iso } from './__isograph/iso';
-import type { ResolverParameters } from './iso';
 
 export const SetTagline = iso(`
   field Mutation.SetTagline($id: ID!, $tagline: String!) {
@@ -10,9 +9,7 @@ export const SetTagline = iso(`
       }
     }
   }
-`)(function SetTagline({
-  data,
-}: ResolverParameters<{ set_pet_tagline: { pet: { tagline: string } } }>) {
+`)(function SetTagline({ data }) {
   return data.set_pet_tagline.pet.tagline;
 });
 
