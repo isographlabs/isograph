@@ -1,12 +1,14 @@
 use std::{
     io::{self, BufRead, BufReader, Read},
     net::TcpStream,
+    ops::ControlFlow,
     thread,
 };
 
 use crossbeam::channel::{Receiver, Sender, bounded};
 use lsp_server::Message;
-use lsp_types::notification::{Exit, Notification};
+use lsp_types::notification::{Exit, Initialized, Notification};
+use lsp_types::request::{Initialize, Request};
 use prelude::Postfix;
 use tracing::debug;
 
@@ -256,7 +258,7 @@ fn start_session(
             return None;
         }
     };
-    let params = match connection.initialize(capabilities) {
+    let params = match initialize(connection, capabilities) {
         Ok(params) => params,
         Err(e) => {
             debug!(error = %e, "lsp initialize");
@@ -286,6 +288,91 @@ fn start_session(
         )
         .ok()?;
     assigned.recv().ok()
+}
+
+/// Why the initialize handshake of a session did not finish.
+#[derive(Debug, thiserror::Error)]
+enum InitializeError {
+    #[error("the connection closed during initialize")]
+    Disconnected,
+    #[error("expected the initialize request, got {0:?}")]
+    ExpectedInitialize(Box<Message>),
+    #[error("expected the initialized notification, got {0:?}")]
+    ExpectedInitialized(Box<Message>),
+}
+
+/// The initialize handshake: waits for `initialize`, answers it with `capabilities`, waits
+/// for `initialized`, and returns the initialize params.
+fn initialize(
+    connection: &lsp_server::Connection,
+    capabilities: serde_json::Value,
+) -> Result<serde_json::Value, InitializeError> {
+    let (id, params) = initialize_request(connection)?;
+    connection
+        .sender
+        .send(
+            lsp_server::Response {
+                id,
+                result: serde_json::json!({ "capabilities": capabilities }).wrap_some(),
+                error: None,
+            }
+            .to(),
+        )
+        .map_err(|_| InitializeError::Disconnected)?;
+    match connection
+        .receiver
+        .recv()
+        .map_err(|_| InitializeError::Disconnected)?
+    {
+        Message::Notification(notification) if notification.method == Initialized::METHOD => {
+            params.wrap_ok()
+        }
+        message => InitializeError::ExpectedInitialized(message.boxed()).wrap_err(),
+    }
+}
+
+/// The id and params of the `initialize` request. Each earlier request is answered with
+/// `ServerNotInitialized`; each earlier notification other than `exit` is skipped.
+fn initialize_request(
+    connection: &lsp_server::Connection,
+) -> Result<(lsp_server::RequestId, serde_json::Value), InitializeError> {
+    let outcome = connection
+        .receiver
+        .iter()
+        .try_for_each(|message| match message {
+            Message::Request(request) if request.method == Initialize::METHOD => {
+                ControlFlow::Break((request.id, request.params).wrap_ok())
+            }
+            Message::Request(request) => connection
+                .sender
+                .send(
+                    lsp_server::Response {
+                        error: lsp_server::ResponseError {
+                            code: lsp_server::ErrorCode::ServerNotInitialized as i32,
+                            message: format!("expected initialize request, got {request:?}"),
+                            data: None,
+                        }
+                        .wrap_some(),
+                        id: request.id,
+                        result: None,
+                    }
+                    .to(),
+                )
+                .map_or_else(
+                    |_| ControlFlow::Break(InitializeError::Disconnected.wrap_err()),
+                    |()| ControlFlow::Continue(()),
+                ),
+            Message::Notification(notification) if notification.method != Exit::METHOD => {
+                ControlFlow::Continue(())
+            }
+            message => {
+                ControlFlow::Break(InitializeError::ExpectedInitialize(message.boxed()).wrap_err())
+            }
+        });
+    match outcome {
+        ControlFlow::Break(result) => result,
+        ControlFlow::Continue(()) => InitializeError::Disconnected.wrap_err(),
+    }
 }
 
 fn forward_messages(
