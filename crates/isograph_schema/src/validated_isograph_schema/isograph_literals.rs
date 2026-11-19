@@ -56,14 +56,9 @@ pub fn parse_iso_literals_in_file_content_and_return_all<
 #[memo]
 pub fn parse_iso_literal_in_source<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
-    iso_literals_source_id: SourceId<IsoLiteralsSource>,
+    relative_path: RelativePathToSourceFile,
 ) -> Vec<DiagnosticResult<(IsoLiteralExtractionResult, TextSource)>> {
-    let IsoLiteralsSource {
-        relative_path,
-        content: _,
-    } = read_iso_literals_source(db, iso_literals_source_id);
-
-    parse_iso_literals_in_file_content(db, *relative_path)
+    parse_iso_literals_in_file_content(db, relative_path)
 }
 
 #[memo]
@@ -71,33 +66,28 @@ pub fn read_iso_literals_source_from_relative_path<TCompilationProfile: Compilat
     db: &IsographDatabase<TCompilationProfile>,
     relative_path_to_source_file: RelativePathToSourceFile,
 ) -> Option<IsoLiteralsSource> {
-    let iso_literals_source_id = db.get_iso_literal(relative_path_to_source_file)?;
-    Some(
-        read_iso_literals_source(db, iso_literals_source_id)
-            .to_owned()
-            .note_todo("Do not clone. Use a MemoRef."),
-    )
+    let source = db.get_iso_literal(relative_path_to_source_file)?;
+    Some(with_editor_buffer_content(db, source))
 }
 
-/// We should (probably) never directly read SourceId<IsoLiteralsSource>, since if we do so,
-/// we will ignore editor buffers.
+/// Reads the editor's current text for a known disk source.
 #[memo]
 pub fn read_iso_literals_source<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     iso_literals_source_id: SourceId<IsoLiteralsSource>,
 ) -> IsoLiteralsSource {
-    let IsoLiteralsSource {
-        relative_path,
-        content,
-    } = db.get(iso_literals_source_id);
+    with_editor_buffer_content(db, db.get(iso_literals_source_id))
+}
 
-    let editor_buffer = db.get_editor_buffer(*relative_path);
-
-    // Use the editor buffer's content, if it exists, otherwise use the content of the file from the file system
-    let content = editor_buffer.map_or(content, |file| &file.content);
-
+fn with_editor_buffer_content<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
+    source: &IsoLiteralsSource,
+) -> IsoLiteralsSource {
+    let content = db
+        .get_editor_buffer(source.relative_path)
+        .map_or(&source.content, |buffer| &buffer.content);
     IsoLiteralsSource {
-        relative_path: *relative_path,
+        relative_path: source.relative_path,
         content: content.clone().note_todo("Do not clone. Use a MemoRef."),
     }
 }

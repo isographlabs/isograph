@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashSet},
     marker::PhantomData,
 };
 
@@ -20,14 +20,11 @@ use crate::CompilationProfile;
 pub struct IsographDatabase<TCompilationProfile: CompilationProfile> {
     storage: Storage<Self>,
     #[tracked]
-    iso_literal_map: IsoLiteralMap,
+    iso_literals: HashSet<RelativePathToSourceFile>,
     #[tracked]
     standard_sources: StandardSources,
     phantom_data: PhantomData<TCompilationProfile>,
 }
-
-#[derive(Debug, Default)]
-pub struct IsoLiteralMap(pub HashMap<RelativePathToSourceFile, SourceId<IsoLiteralsSource>>);
 
 #[derive(Debug, Clone, PartialEq, Eq, Source)]
 pub struct SchemaSource {
@@ -99,47 +96,47 @@ impl<TCompilationProfile: CompilationProfile> IsographDatabase<TCompilationProfi
     pub fn get_iso_literal(
         &self,
         relative_path: RelativePathToSourceFile,
-    ) -> Option<SourceId<IsoLiteralsSource>> {
-        self.get_iso_literal_map()
-            .tracked()
-            .0
-            .get(&relative_path)
-            .cloned()
+    ) -> Option<&IsoLiteralsSource> {
+        self.try_get(IsoLiteralsSource::id_for_key(&relative_path))
     }
 
     pub fn insert_iso_literal(&mut self, relative_path: RelativePathToSourceFile, content: String) {
-        let source_id = self.set(IsoLiteralsSource {
+        self.set(IsoLiteralsSource {
             relative_path,
             content,
         });
-        self.get_iso_literal_map_mut()
-            .tracked()
-            .0
-            .insert(relative_path, source_id);
+        if !self.iso_literals.contains(&relative_path) {
+            self.get_iso_literals_mut().tracked().insert(relative_path);
+        }
     }
 
     pub fn remove_iso_literal(
         &mut self,
         relative_path: RelativePathToSourceFile,
     ) -> Option<SourceId<IsoLiteralsSource>> {
-        self.get_iso_literal_map_mut()
-            .tracked()
-            .0
-            .remove(&relative_path)
-            .inspect(|&source_id| self.remove(source_id))
+        if !self.iso_literals.contains(&relative_path) {
+            return None;
+        }
+        self.get_iso_literals_mut().tracked().remove(&relative_path);
+        let id = IsoLiteralsSource::id_for_key(&relative_path);
+        self.remove(id);
+        Some(id)
     }
 
     pub fn remove_iso_literals_from_path(&mut self, relative_path: &str) {
-        let removed_source_ids = self
-            .get_iso_literal_map_mut()
+        let matches_path =
+            |path: &RelativePathToSourceFile| path.as_ref().starts_with(relative_path);
+        if !self.iso_literals.iter().any(matches_path) {
+            return;
+        }
+        let removed_paths = self
+            .get_iso_literals_mut()
             .tracked()
-            .0
-            .extract_if(|k, _| k.to_string().starts_with(relative_path))
-            .map(|(_, v)| v)
+            .extract_if(matches_path)
             .collect::<Vec<_>>();
 
-        for source_id in removed_source_ids {
-            self.remove(source_id);
+        for path in removed_paths {
+            self.remove(IsoLiteralsSource::id_for_key(&path));
         }
     }
 
@@ -244,12 +241,8 @@ fn file_text_at_location<TCompilationProfile: CompilationProfile>(
     }
 
     // Check if it's an iso literal
-    if let Some(iso_literal) = db.get_iso_literal_map().tracked().0.get(&relative_path) {
-        return db
-            .get(iso_literal.dereference())
-            .content
-            .clone()
-            .wrap_some();
+    if let Some(iso_literal) = db.get_iso_literal(relative_path) {
+        return iso_literal.content.clone().wrap_some();
     }
 
     let standard_sources = db.get_standard_sources();
