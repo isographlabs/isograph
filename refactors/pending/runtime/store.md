@@ -4,7 +4,7 @@ Status: under discussion. Not approved for implementation.
 
 This is the first code in `@isograph/runtime` (`libs/isograph-runtime`): a store, `normalize`, `check`, and `garbageCollect`. Each is a function of the store and the normalization AST artifact. The package has no knowledge of React and no React dependency. The store is the only state: nothing is hidden in an environment, a module-level variable, or a closure. `normalize` writes into the store it is passed and `garbageCollect` deletes from it, in place, as upstream does (`normalizeData` writes through `getMutableStoreRecordProxy`, `cache.ts:93`, `:423`; `garbageCollectBaseStoreLayer` deletes with `delete`, `garbageCollection.ts:105`, `:111`, `:116`). `check` only reads.
 
-It plans against `refactors/pending/graphql-protocol/normalization-ast.md` (approved for implementation, including its identity amendment: `target`, `NormalizationCompositeTarget`, `identityResponseKey`) and `query-generation.md`. Prerequisite: normalization-ast.md changes 1 to 3 (the package, the AST, the TypeScript artifact), so `normalization_ast.ts` artifacts are real.
+It plans against `refactors/pending/graphql-protocol/normalization-ast.md` (approved for implementation, including its record amendment: `root`, `NormalizationCompositeTarget` with `entity` and `identity`, `NormalizationIdentity` with `Fixed`) and `query-generation.md`. Prerequisite: normalization-ast.md changes 1 to 3 (the package, the AST, the TypeScript artifact), so `normalization_ast.ts` artifacts are real.
 
 `refactors/pending/runtime/pico-runtime.md` stays parked; v1 has no memoization, no reader, no subscriptions, and no network layer. `refactors/pending/runtime/fetch-policies.md` lists directions beyond `check`.
 
@@ -37,7 +37,6 @@ test("a pet with an identity-less stats object", () => {
       },
     },
     { id: "1" },
-    queryRoot,
   );
   expect(store).toEqual(
     storeOf({
@@ -46,8 +45,8 @@ test("a pet with an identity-less stats object", () => {
       PetStats: { "Pet:1.stats": { weight: 7, energy: null } },
     }),
   );
-  expect(check(store, petDetail, { id: "1" }, queryRoot)).toEqual({ kind: "EnoughData" });
-  expect(check(store, petDetail, { id: "2" }, queryRoot)).toEqual({ kind: "MissingData", record: queryRoot });
+  expect(check(store, petDetail, { id: "1" })).toEqual({ kind: "EnoughData" });
+  expect(check(store, petDetail, { id: "2" })).toEqual({ kind: "MissingData", record: queryRoot });
   garbageCollect(store, []);
   expect(store).toEqual(new Map());
 });
@@ -56,7 +55,8 @@ test("a pet with an identity-less stats object", () => {
 What this shows:
 
 - The response is read by each node's `responseKey` (`pet____id___v_id`); the store is written by the store key, with variable values substituted (`pet____id___1`).
-- `Pet:1` is keyed by the value under its target's `identityResponseKey` (`id`); `PetStats`'s target has `identityResponseKey: null` and gets upstream's derived id `Pet:1.stats`.
+- The top level is written onto `petDetail.root`, `{ entity: "Query", id: "__ROOT" }`; the caller passes no root.
+- `Pet:1`'s entity is its target's `entity` (`Known`, `Pet`), and its id the value under its target's `identity` (`Select`, `id`); `PetStats`'s target has `identity: { kind: "Omit" }` and gets upstream's derived id `Pet:1.stats`.
 - `null` is stored as `null` and is known data. `__typename` is not stored: the record's entity is its first-layer key.
 - `check` with other variables reports the root record, which lacks `pet____id___2`.
 - `normalize` and `garbageCollect` return nothing; the test inspects the same `store` object afterwards. Collecting with nothing retained empties it.
@@ -104,7 +104,7 @@ The type is the two-layer map and nothing else. The empty store is `new Map()`. 
 
 A link carries no tag. A `LeafValue` can have the same shape as a `StoreLink` (a `JSON` scalar `{ entity: "Pet", id: "1" }`); no function confuses them, because each reads a store key only under an AST selection whose `target` is `null` (leaf) or an object (composite). Upstream's links are `{ __link, __typename }` (`IsographEnvironment.ts:122-125`), and its walks also go through the AST.
 
-Root records: an operation's root record is `{ entity: <root operation type>, id: <fixed id> }`, passed by the caller. The fixed id is the caller's convention; v1's tests use `"__ROOT"` (upstream `ROOT_ID`, `IsographEnvironment.ts:163`). The package does not export it, because no v1 function reads it.
+Root records: an operation's root record is `ast.root`, `{ entity: <root operation type>, id: "__ROOT" }`, which the compiler writes (normalization-ast.md, The record). A nested selection of any root operation type has `identity: { kind: "Fixed", id: "__ROOT" }` and is written onto the same record. The runtime defines no root id and no root entity name: both come from the AST (upstream hard-codes `ROOT_ID`, `IsographEnvironment.ts:163`).
 
 Deltas from upstream (`IsographEnvironment.ts:122-169`, `:211-217`):
 
@@ -141,12 +141,10 @@ Delta from upstream: none in the format. Upstream's overloads for `LinkedParentR
 
 ```ts
 // from libs/isograph-runtime/src/recordId.ts
-/** Where a composite response object sits: what `recordId` reads besides the object. */
+/** Where a composite response object sits: what `recordLink` reads besides the object. */
 export type RecordPosition = {
   /** The record the object is linked from. */
   readonly parent: StoreLink;
-  /** The operation's root record. */
-  readonly root: StoreLink;
   readonly selection: NormalizationSelection;
   /** One index per list level, from the outermost; `[]` outside a list. */
   readonly listIndexes: ReadonlyArray<number>;
@@ -154,36 +152,42 @@ export type RecordPosition = {
   readonly path: ReadonlyArray<string | number>;
 };
 
-/** The record id of `response`, whose entity is `entity` and whose identity selection's
- * response key is `identityResponseKey`. Throws on a non-string identity value. */
-export function recordId(
+/** The record of the composite response object `response`, a value of `position.selection`,
+ * whose target is `target`. Throws on a missing discriminator or a non-string identity value. */
+export function recordLink(
   response: JsonObject,
-  entity: EntityName,
-  identityResponseKey: string | null,
+  target: NormalizationCompositeTarget,
+  discriminatorResponseKey: string,
   position: RecordPosition,
   variables: Variables,
-): RecordId;
+): StoreLink;
 ```
 
-In order:
+The entity, from `target.entity`:
 
-- `entity === position.root.entity`: `position.root.id` (Nested objects of the root entity).
-- `identityResponseKey` is a string: the value under that key, which must be a string (GraphQL serializes `ID` as a string, spec 3.5.5); any other value throws (Errors). An absent key throws as every absent selected key does.
-- `identityResponseKey` is `null`: the derived id, upstream's (`getDataIdOfNetworkResponse`, `cache.ts:599-642`): `${parent.entity}:${parent.id}.${selection.selectableName}`, then `.${index}` for each list level from the outermost, then `argumentChunks(selection.arguments, variables)`. Examples: `Pet:1.stats`, `Query:__ROOT.feed.1____limit___2`, `Query:__ROOT.statGrid.0.1`.
+- `Known`: `target.entity.name`. The discriminator is not read and not compared.
+- `Discriminator`: the value under `discriminatorResponseKey`, which must be a string (else it throws, Errors).
 
-`normalize` computes `identityResponseKey` from the AST: the `identityResponseKey` of the `Conditional` among `selection.target.selections` whose condition holds, when one holds and that key is a string, else `selection.target.identityResponseKey`. The conditional's comes first because it is the identity of the response object's concrete entity, which the discriminator names; a union target's is `null` and its `asBlogItem` conditional's is `"id"`. At most one conditional of a selection set holds: the conditions are `SelectionEquals` on the one discriminator key with distinct values (the map keys conditionals by `Condition`). Only direct children are considered, because no condition nests under the current grammar (normalization-ast.md, Merging).
+The identity: the `identity` of the `Conditional` among `target.selections` whose condition holds for that entity, when one holds and its identity is not `Omit`; otherwise `target.identity`. The conditional's comes first because it is the identity of the response object's concrete entity; a union target's is `Omit` and its `asBlogItem` conditional's is `Select("id")`. At most one conditional of a selection set holds: the conditions compare the one entity with distinct values (the map keys conditionals by `Condition`). Only direct children are considered, because no condition nests under the current grammar (normalization-ast.md, Merging). The id, by the identity's `kind`:
+
+- `Fixed`: `identity.id`. The record is a root entity's one record (Nested objects of a root entity).
+- `Select`: the value under `identity.responseKey`, which must be a string (GraphQL serializes `ID` as a string, spec 3.5.5); any other value throws (Errors). An absent key throws as every absent selected key does.
+- `Omit`: the derived id, upstream's (`getDataIdOfNetworkResponse`, `cache.ts:599-642`): `${parent.entity}:${parent.id}.${selection.selectableName}`, then `.${index}` for each list level from the outermost, then `argumentChunks(selection.arguments, variables)`. Examples: `Pet:1.stats`, `Query:__ROOT.feed.1____limit___2`, `Query:__ROOT.statGrid.0.1`.
+
+Each switch on a `kind` is exhaustive, with no `default` (Errors: artifacts).
 
 Deltas from upstream (`getDataIdOfNetworkResponse`, `cache.ts:599-642`):
 
+- The entity comes from `target.entity`, upstream's `astNode.concreteType ?? dataToNormalize.__typename` (`cache.ts:606-607`), as a tagged value instead of `string | null`.
 - The identity's response key comes from the AST, per composite target and conditional; upstream reads `dataToNormalize.id` (`cache.ts:623-626`). The runtime names no GraphQL selectable.
 - One `.${index}` per list level, because upstream's normalizer handles one list level only (`cache.ts:275-309`, and `getDataIdOfNetworkResponse` takes one `index`).
-- The root-entity rule compares with the caller's `root` (below); upstream compares `__typename === 'Query'` and returns `ROOT_ID` (`cache.ts:614-618`).
+- The root rule is `Fixed`, decided by the compiler; upstream compares `__typename === 'Query'` and returns `ROOT_ID` (`cache.ts:614-618`).
 
-### Nested objects of the root entity
+### Nested objects of a root entity
 
-A response object whose entity equals `root.entity` is the root record: `recordId` returns `root.id`, and its selections are written onto the root record, merged with what is there. This is safe because every selection is auto-aliased and selections auto-merge (query-generation.md, Normalization aliases, Merging): one response key in one selection set is one selection key, and one store key on one record is one selectable with one set of argument values. A store key written from the nested object and from the top level therefore holds the same fact about the same record, and the later write holds.
+A response object whose target or conditional identity is `Fixed` is that root entity's one record: its selections are written onto it, merged with what is there. This is safe because every selection is auto-aliased and selections auto-merge (query-generation.md, Normalization aliases, Merging): one response key in one selection set is one selection key, and one store key on one record is one selectable with one set of argument values. A store key written from the nested object and from the top level therefore holds the same fact about the same record, and the later write holds.
 
-Delta from upstream (`cache.ts:614-618`): upstream special-cases the GraphQL name `Query` and the fixed `ROOT_ID`, whatever the operation's root. Here both come from `root`, so the runtime names no GraphQL type. A nested object is merged only into the root of its own operation: under `mutationRoot`, a mutation payload's nested `Query` object is not `Mutation`, so it gets its identity or a derived id (`Mutation:__ROOT.setTagline….query`) and does not update `Query.__ROOT`, which upstream's rule does.
+The rule covers every root operation type, not only the operation's own: a mutation payload's nested `Query` object is written onto `Query.__ROOT`, as upstream's rule does. The compiler decides it from the schema's root operation types, so `schema { query: RootQuery }` makes `RootQuery` the root entity, and the runtime names no GraphQL type.
 
 ## Conditions
 
@@ -203,14 +207,13 @@ Delta from normalization-ast.md's declaration `conditionHolds(condition, respons
 
 ```ts
 // from libs/isograph-runtime/src/normalize.ts
-/** Writes `response` into `store` from `root` down, by `ast` and `variables`. Throws on a
+/** Writes `response` into `store` from `ast.root` down, by `ast` and `variables`. Throws on a
  * response that does not match `ast` (Errors). */
 export function normalize(
   store: Store,
   ast: NormalizationAst,
   response: JsonObject,
   variables: Variables,
-  root: StoreLink,
 ): void;
 ```
 
@@ -218,13 +221,13 @@ export function normalize(
 
 It returns nothing: no v1 caller reads what it wrote (no subscriptions, no `EncounteredIds`), and tests inspect `store`.
 
-Behavior, walking `ast.selections` against `response` onto the record `root`, whose entity is `root.entity` (the top level selects no discriminator, query-generation.md):
+Behavior, walking `ast.selections` against `response` onto the record `ast.root` (`{ entity, id }`; the top level selects no discriminator, query-generation.md):
 
 - The record at a link is the store's record if present, else a new empty record inserted into `store`. Fields the AST does not select are kept. A store key written twice in one call (two paths to `Pet:1`) holds the later write, in AST and list order.
 - `Selection` with `target: null` (leaf): writes `response[responseKey]` under `storeKey(selection, variables)`, as received: a string, number, boolean, `null`, a list of leaves at any depth, or a `JSON` object.
 - `Selection` with a `target` (composite), by the response value:
   - `null`: writes `null`.
-  - An object: its entity is `value[ast.discriminatorResponseKey]`, which must be a string (else it throws), and its id is `recordId(value, entity, identityResponseKey, position, variables)` with `identityResponseKey` as Record ids states. The record is written by walking `selection.target.selections` against `value`, and the parent gets the link `{ entity, id }`. `selections` may be `[]` (normalization-ast.md: `stats { X @loadable }`); the record is still created, empty.
+  - An object: its record is `recordLink(value, selection.target, ast.discriminatorResponseKey, position, variables)` (Record ids). The record is written by walking `selection.target.selections` against `value`, and the parent gets the link `{ entity, id }`. `selections` may be `[]` (normalization-ast.md: `stats { X @loadable }`); the record is still created, empty.
   - A list: the value is the list with each item replaced, recursively: `null` stays `null`, an object becomes a link as above with its index path, a nested list recurses. `[]` writes `[]`.
   - A string, number, or boolean, here or as a list item: throws.
 - `Conditional`: when `conditionHolds(condition, response[condition.responseKey])`, walks `selections` against the same response object onto the same record; otherwise nothing.
@@ -237,7 +240,8 @@ Deltas from upstream (`cache.ts:77-437`):
 
 - Writes the one store in place, as upstream writes a store layer through `getMutableStoreRecordProxy` (`cache.ts:93`, `:423`); there are no layers.
 - No `EncounteredIds` and no change detection (`RecordHasBeenUpdated`, `cache.ts:151`, `:211-219`, `:231-250`, `:309`, `:337-338`, `dataIdsAreTheSame` `:372-393`): nothing reads them without subscriptions.
-- Reads `responseKey` instead of `getNetworkResponseKey` (`cache.ts:538-591`), and `ast.discriminatorResponseKey` instead of `astNode.concreteType ?? response.__typename` (`cache.ts:295-296`, `:322-323`, `:412-413`).
+- Reads `responseKey` instead of `getNetworkResponseKey` (`cache.ts:538-591`), and `target.entity` (`Known`, or the value under `ast.discriminatorResponseKey`) where upstream reads `astNode.concreteType ?? response.__typename` (`cache.ts:295-296`, `:322-323`, `:412-413`).
+- Starts at `ast.root`; upstream's caller passes the root record.
 - Upstream throws only on a missing `__typename` (`cache.ts:297-302`, `:325-330`, `:415-420`) and writes anything else it meets, including `null` for an absent key (`cache.ts:243-246`, `:270-273`, `== null`). Here every mismatch between the response and the AST throws (Errors), an absent key included.
 - Lists of lists and lists of leaves at any depth.
 
@@ -245,8 +249,8 @@ Deltas from upstream (`cache.ts:77-437`):
 
 ```ts
 // from libs/isograph-runtime/src/check.ts
-/** Whether `store` holds every value `ast` selects from `root` with `variables`. */
-export function check(store: Store, ast: NormalizationAst, variables: Variables, root: StoreLink): CheckResult;
+/** Whether `store` holds every value `ast` selects from `ast.root` with `variables`. */
+export function check(store: Store, ast: NormalizationAst, variables: Variables): CheckResult;
 
 export type CheckResult =
   | { readonly kind: "EnoughData" }
@@ -256,7 +260,7 @@ export type CheckResult =
 
 Upstream's semantics (`check.ts:43-215`): `null` is known data, only an absent key or an absent record is missing (`check.ts:88-89`). The walk returns the first missing position in AST order, then list order:
 
-- `root` absent from the store: `MissingData { record: root }`.
+- `ast.root` absent from the store: `MissingData { record: ast.root }`.
 - Leaf selection: absent key is `MissingData { record: current }`; any value, `null` included, is enough.
 - Composite selection: absent key is `MissingData { record: current }`; `null` is enough; a link whose record is absent is `MissingData { record: link }`; a present record recurses with `selection.target.selections`, even when they are `[]`; a list recurses into every item and nested list, `null` items being enough. A value that is not `null`, a link, or a list of these throws (Errors).
 - `Conditional`: when `conditionHolds(condition, current.entity)`, recurses on the same record; otherwise enough.
@@ -273,11 +277,10 @@ Deltas from upstream:
 
 ```ts
 // from libs/isograph-runtime/src/garbageCollection.ts
-/** What the caller keeps: an AST, its variables, and the record it was normalized from. */
+/** What the caller keeps: an AST and its variables. The walk starts at `ast.root`. */
 export type RetainedQuery = {
   readonly ast: NormalizationAst;
   readonly variables: Variables;
-  readonly root: StoreLink;
 };
 
 /** Deletes from `store` every record no query in `retained` reaches. */
@@ -286,7 +289,7 @@ export function garbageCollect(store: Store, retained: ReadonlyArray<RetainedQue
 
 Mark, then sweep (upstream `garbageCollectBaseStoreLayer`, `garbageCollection.ts:88-119`, and `recordReachableIds`, `:125-226`):
 
-- Each retained query marks its root when the root record exists, and walks its AST from it.
+- Each retained query marks `ast.root` when that record exists, and walks its AST from it.
 - A leaf selection marks nothing. A composite selection follows each link in its value (every list level), and marks and walks each linked record that exists. An absent key, `null`, or an absent record stops that path. A value that is not `null`, a link, or a list of these throws (Errors).
 - `Conditional`: when `conditionHolds(condition, current.entity)`, walks the same record.
 - The sweep deletes every unmarked record, then every entity map left empty. Marked records stay whole, including fields no retained AST selects. `retained = []` empties the store.
@@ -320,10 +323,10 @@ Every throw site:
 
 - `normalize`, a selected response key absent from a response object (outside a conditional that does not hold): `Malformed response at ${path}: expected the response key "${responseKey}".` Invariant: a response to the generated query holds every selected key outside a non-matching fragment (GraphQL spec 6.3.2, every field in the collected fields gets a response entry).
 - `normalize`, a composite selection's value, or a list item at any depth, that is a string, number, or boolean: `Malformed response at ${path}: expected an object, a list, or null for "${responseKey}", got ${JSON.stringify(value)}.` Invariant: a composite field's value is an object, a list, or `null`.
-- `normalize`, a composite response object with no string under `ast.discriminatorResponseKey`: `Malformed response at ${path}: expected a string under "${discriminatorResponseKey}".` Invariant: the compiler selects the discriminator in every selection set under a composite selection (query-generation.md, Completion, step 4).
-- `recordId`, an identity value that is not a string: `Malformed response at ${path}: expected a string record id under "${identityResponseKey}", got ${JSON.stringify(value)}.` Invariant: GraphQL serializes `ID` as a string (spec 3.5.5), and the protocol names only an `ID!` selectable as the identity (`IdField::Present`, query-generation.md).
+- `recordLink`, a composite response object whose target's `entity` is `Discriminator`, with no string under `ast.discriminatorResponseKey`: `Malformed response at ${path}: expected a string under "${discriminatorResponseKey}".` Invariant: the compiler selects the discriminator in every selection set under a composite selection (query-generation.md, Completion, step 4). Under a `Known` entity the discriminator is not read, so its absence does not throw.
+- `recordLink`, a `Select` identity value that is not a string: `Malformed response at ${path}: expected a string record id under "${responseKey}", got ${JSON.stringify(value)}.` Invariant: GraphQL serializes `ID` as a string (spec 3.5.5), and the protocol names only an `ID!` selectable as the identity (`IdField::Present`, query-generation.md).
 - `check` and `garbageCollect`, a value under a composite store key that is not `null`, a link, or a list of these at any depth: `Store record ${entity}:${id} holds a non-link under the composite store key "${storeKey}"; the store was written with an AST that disagrees with this one.` Invariant: Store states only our normalizer produces, above. A link is an object whose own keys are exactly `entity` and `id`, both strings.
-- `storeKey` and `recordId` (through `argumentChunks`), a required variable absent from `variables`: open decision 10.
+- `storeKey` and `recordLink` (through `argumentChunks`), a required variable absent from `variables`: open decision 10.
 
 `${path}` is `JSON.stringify(path)`, the response keys and list indexes from the top of the response (`["pet____id___v_id","checkins____limit___2",1]`).
 
@@ -370,7 +373,10 @@ export type {
   NormalizationCompositeTarget,
   NormalizationCondition,
   NormalizationConditional,
+  NormalizationEntity,
+  NormalizationIdentity,
   NormalizationNode,
+  NormalizationRootRecord,
   NormalizationSelection,
   NormalizationSelectionSet,
 } from "./artifacts";
@@ -393,7 +399,7 @@ export { garbageCollect, type RetainedQuery } from "./garbageCollection";
 export { normalize } from "./normalize";
 ```
 
-`storeKey`, `argumentChunks`, `recordId`, `stableCopy`, and `conditionHolds` are module exports that `normalize`, `check`, and `garbageCollect` import; the package index does not export them. Their tests import the modules directly.
+`storeKey`, `argumentChunks`, `recordLink`, `stableCopy`, and `conditionHolds` are module exports that `normalize`, `check`, and `garbageCollect` import; the package index does not export them. Their tests import the modules directly.
 
 ```json
 // from libs/isograph-runtime/package.json
@@ -433,6 +439,7 @@ Tests build responses, variables, and stores by hand; those are inputs. Each tes
 
 ```ts
 // from libs/isograph-runtime/test/fixtures.ts
+/** The root records the fixture's ASTs name, for asserting on results. */
 export const queryRoot: StoreLink = { entity: "Query", id: "__ROOT" };
 export const mutationRoot: StoreLink = { entity: "Mutation", id: "__ROOT" };
 
@@ -580,9 +587,6 @@ field Query.Search($q: String) {
   search(filter: { nameContains: $q, minAge: 2 }) { id name }
 }
 
-field Pet.PetCard { name tagline }
-entrypoint Pet.PetCard
-
 field Mutation.SetTagline($id: ID!, $tagline: String!) {
   setTagline(input: { id: $id, tagline: $tagline }) { pet { id tagline } query { greeting } }
 }
@@ -627,10 +631,9 @@ Each case asserts the whole resulting store with `storeOf`.
 - `Feed`, `limit: 2`, with a `BlogItem` and an `AdItem`: `BlogItem:b1` holds `id`, `title`, `author`, and no `advertiser`; the `AdItem` at index 1 is `Query:__ROOT.feed.1____limit___2` and holds `advertiser` only; a `__typename: "Other"` item creates an empty `Other` record (both conditions false).
 - `Search` with `{ q: "Rex" }` links under the stable-JSON key.
 - `EmptyStats`: `PetStats` `Pet:1.stats` exists with no fields, and `Pet:1.stats` links it.
-- `PetCard` (`Node` fetch) with root `queryRoot` and `{ id: "4" }`: `Query.__ROOT.node____id___4` links `Pet:4`, which holds `id`, `name`, `tagline`.
-- `SetTagline` with root `mutationRoot`: `Mutation.__ROOT` links `SetTaglinePayload` `Mutation:__ROOT.setTagline____input___{"id":"4","tagline":"Hi"}`, which links `Pet:4` with the new `tagline`.
+- `SetTagline`: `Mutation.__ROOT` links `SetTaglinePayload` `Mutation:__ROOT.setTagline____input___{"id":"4","tagline":"Hi"}`, which links `Pet:4` with the new `tagline`.
 - Into a non-empty store: `PetLists` then `PetDetail` for `Pet:1`: `Pet:1` holds the union of both; a field `PetDetail` does not select is kept; a field both write holds `PetDetail`'s value.
-- Nested root entity: `NestedQuery` from `queryRoot` with `query: { __typename: "Query", tags: ["a"] }` writes `greeting` and `tags` onto `Query.__ROOT`, which links itself under `query` (`{ entity: "Query", id: "__ROOT" }`), and creates no other `Query` record. `SetTagline` from `mutationRoot` writes its nested `Query` object at the derived id `Mutation:__ROOT.setTagline____input___{"id":"4","tagline":"Hi"}.query`, not at `Query.__ROOT`.
+- Nested root entity: `NestedQuery` with `query: { __typename: "Query", tags: ["a"] }` writes `greeting` and `tags` onto `Query.__ROOT`, which links itself under `query` (`{ entity: "Query", id: "__ROOT" }`), and creates no other `Query` record. The same with `query: { tags: ["a"] }` (no `__typename`) writes the same store: the `Known` entity reads no discriminator. `SetTagline` writes its nested `Query` object onto `Query.__ROOT` (`greeting`), and the `SetTaglinePayload` record links it under `query`.
 - Malformed responses throw, with the message of Errors: an empty response object `{}` for `Leaves` names `greeting`; `pet____id___v_id: "x"` at `["pet____id___v_id"]`; `petGrid: [[3]]` at `["petGrid",0,0]`; a pet without `__typename`; `id: 4`.
 - A throw part-way leaves the earlier writes: `pets: [{ ..valid Pet:1 }, "x"]` throws at `["pets",1]`, and `store` holds `Pet:1` (open decision 9).
 
@@ -648,7 +651,6 @@ Stores come from `normalize` of fixture responses, then are edited by hand where
 - Conditionals: an `AdItem` record without `title` is `EnoughData`; `BlogItem:b1` without `title` is `MissingData { record: BlogItem:b1 }`.
 - The first missing position in AST order is reported when two are missing.
 - `EmptyStats`: the empty `PetStats` record is `EnoughData`; deleted, it is `MissingData` for it.
-- `PetCard` after only `PetLists` wrote a complete `Pet:4`: `MissingData { record: queryRoot }` (Later, the root of a `Node` fetch).
 - A composite key holding `"x"` in a hand-built store throws the non-link message naming the record and store key.
 - The store is unchanged.
 
@@ -657,12 +659,11 @@ Stores come from `normalize` of fixture responses, then are edited by hand where
 - `retained = []`: the store equals `new Map()` afterwards. Empty store with any retained query: still `new Map()`.
 - One `PetDetail`: exactly `Query.__ROOT`, `Pet:1`, `Pet:2`, `PetStats` `Pet:1.stats`, and the checkins remain; a `Pet:9` written by `PetLists` is deleted, and so is the `PetLists`-only entity whose records were all unreached.
 - `PetDetail` and `PetLists` both normalized, only `PetLists` retained: `Pet:1` stays whole, including fields only `PetDetail` selected; `Checkin` records go.
-- Two roots: `PetDetail` from `queryRoot` and `SetTagline` from `mutationRoot` both retained: both roots and their records remain.
+- Two roots: `PetDetail` and `SetTagline` both retained: `Query.__ROOT`, `Mutation.__ROOT`, and their records remain.
 - Variables: `PetDetail` retained with `{ id: "2" }` when the store has only `pet____id___1`: everything but `Query.__ROOT` is deleted.
 - Conditionals: `Feed` retained keeps `BlogItem:b1` and its `author`; an `AdItem` is kept (reached by the list), and the `asBlogItem` walk does not run on it.
 - A link to an absent record and a retained root whose record is absent end the walk without error.
 - Cyclic `bestFriend` data terminates.
-- `PetCard` retained from `queryRoot` keeps `Pet:4` through `node____id___4`.
 - A composite key holding `"x"` throws the non-link message.
 
 ## Changes
@@ -696,7 +697,7 @@ Each change is one commit. Prerequisite: normalization-ast.md changes 1 to 3.
 
 ## Later
 
-- The root of a `Node` fetch at `(T, id)`. Every query, `Node` fetches included, is rooted at its operation's root record, because the `node(id:)` selection stays in the normalization AST (normalization-ast.md, End-user experience). Starting the walk below `node` with root `(Pet, "4")` would need the AST to name the fetch selection's response key and the caller to know the entity and which variable holds the id. Cost of the current rooting: `check` of `PetCard` for `Pet:4` is `MissingData { record: queryRoot }` whenever `node____id___4` was never written, even when another query wrote all of `Pet:4`. Upstream answers this with `missingFieldHandler` (`read.ts:781-783`), which v1 does not have.
+- `Node`-fetched entrypoints (normalization-ast.md, Later; entrypoints.md, Later). With them, `check` of a `Node` fetch for `Pet:4` is `MissingData { record: queryRoot }` whenever `node____id___4` was never written, even when another query wrote all of `Pet:4`, unless the walk starts below `node`. Upstream answers this with `missingFieldHandler` (`read.ts:781-783`), which v1 does not have.
 
 ## Open decisions
 

@@ -114,7 +114,7 @@ A test (there is no React and no network in v1) normalizes a response from store
 ```ts
 // from libs/isograph-runtime/test/read.test.ts
 const store: Store = new Map();
-normalize(store, petSummaryNormalizationAst, response, { id: "1" }, queryRoot);
+normalize(store, petSummaryNormalizationAst, response, { id: "1" });
 expect(read(store, petSummaryReaderArtifact, queryRoot, { id: "1" })).toEqual({
   kind: "Ok",
   value: { pet: { id: "1", PetName: { name: "Rex", nickname: null }, RecentCheckins: { checkins: [/* .. */] } } },
@@ -250,6 +250,8 @@ Reasons:
 The cost is one `switch` on `condition.kind` in the runtime (`conditionHolds`, below).
 
 The read: the refinement's value is `null` when `root.entity` is not `condition.entity`, and the selections read on the same record otherwise. That matches the param type the type walk already gives `asT` (`({ .. } | null)`, from the refinement's target `Union([Inner(T), Null])`). The link's `entity` is the entity `normalize` read from the response's discriminator (store.md, `normalize`), and store.md's `check` and `garbageCollect` test a conditional against the same value (store.md, Conditions). A refinement reads no store value, so it never reads `MissingData` itself.
+
+A link to a root record is an ordinary link. `normalize` writes a nested selection of a root entity (`identity: { kind: "Fixed" }`, normalization-ast.md, The record) as the link `{ entity: "Query", id: "__ROOT" }`, and the reader follows the stored link like any other, so the reader AST carries no record identity: it has no `entity`, no `identity`, and no root record. A `read` call names its root record (`queryRoot` in the tests); the reader AST of an entrypoint's field does not.
 
 The reader does not call store.md's `conditionHolds`: that function takes a `NormalizationCondition`, whose `responseKey` the reader has no use for. `refinementHolds` (The read function) is the reader's one-case comparison.
 
@@ -1040,7 +1042,7 @@ with `entrypoint Query.PetSummary`, `entrypoint Query.PetSummaries`, and `entryp
 - Refinements: `Feed` with a `BlogItem` and an `AdItem` reads, for the `BlogItem`, `asBlogItem` as an object (with `author`) and `asAdItem` as `null`, and for the `AdItem` the reverse; an item whose `__typename` was `Other` reads both as `null`.
 - Object arguments: `Search` with `{ q: "Rex" }` reads the pets normalized under the stable-JSON key.
 - Client field chains: `PetSummary` with `{ id: "1" }` reads `{ pet: { id, PetName: { name, nickname }, RecentCheckins: { checkins } } }`; `PetSummaries` reads one `PetName` object per pet; a test resolver receives `parameters` equal to its node's substituted arguments (`{ n: 2 }`, the compiler-written default).
-- Roots: `PetCard` (`Node` fetch) after normalizing with `{ id: "4" }`, read rooted at `{ entity: "Pet", id: "4" }` with `{}`, reads `name` and `tagline` without going through the query root. `SetTagline` from `mutationRoot` reads the payload's `pet` and `query { greeting }`. `NestedQuery` from `queryRoot` reads `query { tags }` on `Query.__ROOT` itself.
+- Roots: `PetName`'s reader artifact, after `PetDetail` normalized `Pet:4` with `{ id: "4" }`, read rooted at `{ entity: "Pet", id: "4" }` with `{}`, reads `name` and `nickname` without going through the query root. `SetTagline`'s reader rooted at `mutationRoot` reads the payload's `pet` and `query { greeting }`, the `greeting` on `Query.__ROOT`. `NestedQuery` from `queryRoot` reads `query { tags }` on `Query.__ROOT` itself.
 - Missing data: a read before any `normalize` is `MissingData` with `recordLink` `queryRoot` and `reason` `No record for Query:__ROOT`. A deleted `nickname` key on `Pet:1` under `PetSummary` is `MissingData` with `recordLink` `Pet:1` and nested reasons for `pet____id___1` and then `PetName` around the innermost `No value for nickname on Pet:1`. A deleted `Pet:2` record linked from `pets` is `MissingData` with `recordLink` `Pet:2`. A child resolver whose data is `MissingData` is not called (its call count is 0).
 - Absent records: `ConstantPet` with `{ id: "9" }`, on a store whose `Query.__ROOT` links `pet____id___9` to a `Pet:9` deleted by hand, reads `Ok` with `{ pet: { Constant: {} } }`: `Constant`'s empty reader AST reads no value from the absent record.
 - Shape: `Pet:1.stats` set by hand to `"x"` makes `PetDetail`'s read throw the non-link message naming `Pet:1` and `stats`.
