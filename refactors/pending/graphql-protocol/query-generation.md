@@ -1,7 +1,5 @@
 # GraphQL protocol: query generation
 
-Status: not actively worked; query generation is needed only for the entrypoint artifact's `queryText`.
-
 This is the second of two files; `entrypoints.md` in this directory specifies the protocol data, `NetworkProtocol`'s methods, the fetch plan, and validation. This file specifies how the core turns an entrypoint into a merged selection map, how the GraphQL protocol builds an operation document from that map and prints it, where the text goes, and which functions are memos. The ordered change list for both files is at the end.
 
 Every entrypoint gets a query. The core walks the entrypoint field's selection set, inlines the selection sets of the `field` declarations it selects, and merges the result into one map keyed by selectable name and arguments. That walk is protocol-agnostic: a protocol selection is a node holding the protocol's data, which the core does not inspect. The protocol builds an `OperationDocument` that adds the fields normalization needs (`id`, `__typename`) and prints it with one printer. Entities declared by `entity` in source files contribute nothing to a query.

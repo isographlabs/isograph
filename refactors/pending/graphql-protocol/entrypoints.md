@@ -1,7 +1,5 @@
 # GraphQL protocol: protocol data and entrypoint rules
 
-Status: not actively worked; query generation is needed only for the entrypoint artifact's `queryText`.
-
 This is the first of two files. It specifies the data the GraphQL protocol attaches to entities and selectables, which entities may parent an entrypoint, and the validation error for an entrypoint that cannot be fetched. `query-generation.md` in this directory specifies the merged selection map, the printer, the query artifact, and the memos. The ordered change list for both files is at the end of `query-generation.md`.
 
 Requires: `refactors/past/source-backed-lookups.md` (landed), `refactors/pending/validation-diagnostics.md`, `refactors/past/graphql-schema-parser/integration.md` changes 1 to 3 (`schema_file_paths`, `parsed_schema_file`, the protocol's `entity_named` and `selectable_named`). In this file, `graphql_network_protocol::entity_named` and `graphql_network_protocol::selectable_named` name integration.md's protocol lookups, which return `SchemaEntity` and `InSchemaFile<FieldDefinition>`. `entity_named` and `selectable_named` without a crate name are the core lookups in `crates/isograph_compiler/src/schema.rs`.
