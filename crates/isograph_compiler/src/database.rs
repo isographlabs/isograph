@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 
 use common_lang_types::RelativePathToSourceFile;
@@ -19,6 +19,8 @@ pub struct IsographDb<TProfile: CompilationProfile> {
     disk_file_map: DiskFileMap,
     #[tracked]
     open_file_map: OpenFileMap,
+    #[tracked]
+    schema_file_set: SchemaFileSet,
     phantom_data: PhantomData<TProfile>,
 }
 
@@ -28,6 +30,7 @@ impl<TProfile: CompilationProfile> Default for IsographDb<TProfile> {
             storage: Storage::default(),
             disk_file_map: DiskFileMap::default(),
             open_file_map: OpenFileMap::default(),
+            schema_file_set: SchemaFileSet::default(),
             phantom_data: PhantomData,
         }
     }
@@ -42,6 +45,10 @@ pub struct DiskFile {
     pub path: RelativePathToSourceFile,
     pub contents: String,
 }
+
+/// The disk paths that are schema files. Each is a key of `disk_file_map`.
+#[derive(Debug, Default)]
+pub struct SchemaFileSet(pub HashSet<RelativePathToSourceFile>);
 
 /// Every client's open buffers.
 #[derive(Debug, Default)]
@@ -155,22 +162,47 @@ impl<TProfile: CompilationProfile> IsographDb<TProfile> {
             .insert(path, source_id);
     }
 
+    /// Inserts a disk file that is a schema file.
+    pub fn insert_schema_file(&mut self, path: RelativePathToSourceFile, contents: String) {
+        self.insert_disk_file(path, contents);
+        if self.get_schema_file_set().untracked().0.contains(&path) {
+            return;
+        }
+        self.get_schema_file_set_mut().tracked().0.insert(path);
+    }
+
     pub fn remove_disk_file(&mut self, path: RelativePathToSourceFile) {
         if let Some(source_id) = self.get_disk_file_map_mut().tracked().0.remove(&path) {
             self.remove(source_id);
         }
+        if self.get_schema_file_set().untracked().0.contains(&path) {
+            self.get_schema_file_set_mut().tracked().0.remove(&path);
+        }
     }
 
     pub fn remove_disk_files_from_path(&mut self, path: RelativePathToSourceFile) {
+        let in_folder = |key: &RelativePathToSourceFile| key.as_ref().starts_with(path.as_ref());
         let ids: Vec<_> = self
             .get_disk_file_map_mut()
             .tracked()
             .0
-            .extract_if(|key, _| key.as_ref().starts_with(path.as_ref()))
+            .extract_if(|key, _| in_folder(key))
             .map(|(_, source_id)| source_id)
             .collect();
         for source_id in ids {
             self.remove(source_id);
+        }
+        if self
+            .get_schema_file_set()
+            .untracked()
+            .0
+            .iter()
+            .any(in_folder)
+        {
+            self.get_schema_file_set_mut()
+                .tracked()
+                .0
+                .retain(|key| !in_folder(key));
         }
     }
 }
@@ -687,6 +719,75 @@ mod tests {
             read(db.reference(), ClientId(1), path),
             "disk".to_owned().wrap_some()
         );
+    }
+
+    fn schema_paths(db: &IsographDb<TestProfile>) -> Vec<RelativePathToSourceFile> {
+        db.get_schema_file_set()
+            .untracked()
+            .0
+            .iter()
+            .copied()
+            .collect()
+    }
+
+    #[test]
+    fn insert_schema_file_stores_the_text_and_lists_the_path() {
+        let mut db = IsographDb::<TestProfile>::default();
+        let path = intern_path("schema/a.graphql");
+        db.insert_schema_file(path, "type Query".to_owned());
+        assert_eq!(
+            read(db.reference(), ClientId(1), path),
+            "type Query".to_owned().wrap_some()
+        );
+        assert_eq!(schema_paths(db.reference()), path.wrap_vec());
+    }
+
+    #[test]
+    fn insert_disk_file_does_not_list_a_schema_path() {
+        let mut db = IsographDb::<TestProfile>::default();
+        db.insert_disk_file(intern_path("src/a.ts"), "a".to_owned());
+        assert_eq!(
+            schema_paths(db.reference()),
+            Vec::<RelativePathToSourceFile>::new()
+        );
+    }
+
+    #[test]
+    fn a_second_insert_schema_file_lists_the_path_once_and_reads_the_second_text() {
+        let mut db = IsographDb::<TestProfile>::default();
+        let path = intern_path("schema/a.graphql");
+        db.insert_schema_file(path, "first".to_owned());
+        db.insert_schema_file(path, "second".to_owned());
+        assert_eq!(
+            read(db.reference(), ClientId(1), path),
+            "second".to_owned().wrap_some()
+        );
+        assert_eq!(schema_paths(db.reference()), path.wrap_vec());
+    }
+
+    #[test]
+    fn remove_disk_file_of_a_schema_path_removes_the_text_and_the_listing() {
+        let mut db = IsographDb::<TestProfile>::default();
+        let path = intern_path("schema/a.graphql");
+        db.insert_schema_file(path, "type Query".to_owned());
+        db.remove_disk_file(path);
+        assert!(read(db.reference(), ClientId(1), path).is_none());
+        assert_eq!(
+            schema_paths(db.reference()),
+            Vec::<RelativePathToSourceFile>::new()
+        );
+    }
+
+    #[test]
+    fn remove_disk_files_from_path_removes_listed_descendants_only() {
+        let mut db = IsographDb::<TestProfile>::default();
+        let inside = intern_path("schema/a.graphql");
+        let outside = intern_path("schema2/b.graphql");
+        db.insert_schema_file(inside, "a".to_owned());
+        db.insert_schema_file(outside, "b".to_owned());
+        db.remove_disk_files_from_path(intern_path("schema"));
+        assert!(read(db.reference(), ClientId(1), inside).is_none());
+        assert_eq!(schema_paths(db.reference()), outside.wrap_vec());
     }
 
     #[test]
