@@ -374,7 +374,9 @@ fn walk_errors_reach_the_query() {
         EntrypointQueryError::SelectionMap(FieldSelectionMapError::Located(error)) => {
             error.kind.wrap_some()
         }
-        EntrypointQueryError::SelectionMap(FieldSelectionMapError::FieldLookup(_)) => None,
+        EntrypointQueryError::SelectionMap(
+            FieldSelectionMapError::FieldLookup(_) | FieldSelectionMapError::NotASourceField(_),
+        ) => None,
         EntrypointQueryError::Lookup(_)
         | EntrypointQueryError::NotFetchable(_)
         | EntrypointQueryError::TopLevel(_)

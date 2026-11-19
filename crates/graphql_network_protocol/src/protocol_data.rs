@@ -333,7 +333,8 @@ fn input_field_selectable(
         definition: DefinitionLocation {
             path: field.path,
             span: field.item.item.name.location,
-        },
+        }
+        .wrap_some(),
         data: GraphQLSelectableData::InputField,
     }
 }
@@ -401,7 +402,7 @@ fn refinement_to<TProfile: CompilationProfile>(
                 WrapperVariant::Inner(target),
                 WrapperVariant::Null,
             ])),
-            definition,
+            definition: definition.wrap_some(),
             data: GraphQLSelectableData::Refinement,
         }
         .wrap_some()
@@ -459,7 +460,8 @@ fn field_selectable(
         definition: DefinitionLocation {
             path: field.path,
             span: field.item.item.name.location,
-        },
+        }
+        .wrap_some(),
         data: GraphQLSelectableData::Field,
     }
 }

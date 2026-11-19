@@ -526,7 +526,10 @@ fn a_field_targets_its_type_as_a_wrapper() {
         Wrapper::List(Wrapper::Inner(entity("Pet")).boxed())
     );
     assert_eq!(pets.data, GraphQLSelectableData::Field);
-    assert_eq!(pets.definition, located("a.graphql", schema, "pets"));
+    assert_eq!(
+        pets.definition,
+        located("a.graphql", schema, "pets").wrap_some()
+    );
     assert_eq!(
         field(&db, "Query", "pet").target,
         nullable(WrapperVariant::Inner(entity("Pet")))
@@ -553,7 +556,10 @@ fn a_union_refines_to_each_object_member_of_its_definition_and_extensions() {
     let as_a = field(&db, "U", "asA");
     assert_eq!(as_a.data, GraphQLSelectableData::Refinement);
     assert_eq!(as_a.target, nullable(WrapperVariant::Inner(entity("A"))));
-    assert_eq!(as_a.definition, located_in("a.graphql", schema, "A {", "A"));
+    assert_eq!(
+        as_a.definition,
+        located_in("a.graphql", schema, "A {", "A").wrap_some()
+    );
     assert_eq!(
         field(&db, "U", "asC").target,
         nullable(WrapperVariant::Inner(entity("C")))

@@ -21,9 +21,10 @@ pub(crate) type ProfileEntityOrSelectable<TProfile> = EntityOrSelectable<
 >;
 
 impl<TEntityData, TSelectableData> EntityOrSelectable<TEntityData, TSelectableData> {
-    pub(crate) fn definition(&self) -> DefinitionLocation {
+    /// `None` for a selectable the protocol defines with no text.
+    pub(crate) fn definition(&self) -> Option<DefinitionLocation> {
         match self {
-            EntityOrSelectable::Entity(entity) => entity.definition,
+            EntityOrSelectable::Entity(entity) => entity.definition.wrap_some(),
             EntityOrSelectable::Selectable(selectable) => selectable.definition,
         }
     }
@@ -146,12 +147,12 @@ mod tests {
             name: "owner".intern().to(),
             parent_entity: "Pet".intern().to(),
             description: None,
-            definition: selectable_definition,
+            definition: selectable_definition.wrap_some(),
             kind: SelectableKind::ClientPointer(ClientPointerTarget::Parsed(Wrapper::Inner(
                 "User".intern().to::<EntityName>(),
             ))),
         });
-        assert_eq!(entity.definition(), entity_definition);
-        assert_eq!(selectable.definition(), selectable_definition);
+        assert_eq!(entity.definition(), entity_definition.wrap_some());
+        assert_eq!(selectable.definition(), selectable_definition.wrap_some());
     }
 }

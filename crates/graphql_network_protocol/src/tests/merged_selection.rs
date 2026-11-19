@@ -42,8 +42,9 @@ fn selections(db: &Db, parent: &str, field: &str) -> MergedSelectionMap {
 fn error(db: &Db, parent: &str, field: &str) -> SelectionMapError {
     match field_map(db, parent, field).expect_err("the fixture's field fails") {
         FieldSelectionMapError::Located(error) => error,
-        FieldSelectionMapError::FieldLookup(diagnostic) => {
-            panic!("the fixture's field is found: {}", diagnostic.0.message)
+        error @ (FieldSelectionMapError::FieldLookup(_)
+        | FieldSelectionMapError::NotASourceField(_)) => {
+            panic!("the fixture's field is a source field: {error}")
         }
     }
 }
@@ -789,8 +790,8 @@ fn two_selections_with_one_alias_are_a_collision_at_the_second() {
 fn a_schema_field_has_no_map() {
     let db = demo(&[], &[], &[]);
     assert_eq!(
-        error(&db, "Pet", "age").kind,
-        SelectionMapErrorKind::NotASourceField(key("Pet", "age"))
+        field_map(&db, "Pet", "age"),
+        FieldSelectionMapError::NotASourceField(key("Pet", "age")).wrap_err()
     );
     assert!(matches!(
         field_map(&db, "Pet", "nope"),

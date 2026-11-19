@@ -14,7 +14,7 @@ pub fn definition_at_lsp_position<TProfile: CompilationProfile>(
 ) -> Option<DefinitionLocation> {
     let (_, node, _) = resolved_position_at_lsp_position(db, client, path, position)?;
     let item = entity_or_selectable_of_node(db, client, node.reference())?.ok()?;
-    item.definition().wrap_some()
+    item.definition()
 }
 
 #[cfg(test)]
@@ -326,7 +326,9 @@ mod tests {
             selectable_named(&db, client(), entity("Pet"), selectable("fullName"))
                 .clone()
                 .map(|full_name| full_name.definition),
-            located("src/fullName.ts", broken, "fullName").wrap_ok()
+            located("src/fullName.ts", broken, "fullName")
+                .wrap_some()
+                .wrap_ok()
         );
     }
 
@@ -343,7 +345,9 @@ mod tests {
             selectable_named(&db, client(), entity("Pet"), selectable("fullName"))
                 .clone()
                 .map(|full_name| full_name.definition),
-            located("src/fullName.ts", FULL_NAME, "fullName").wrap_ok()
+            located("src/fullName.ts", FULL_NAME, "fullName")
+                .wrap_some()
+                .wrap_ok()
         );
         assert_eq!(
             selectable_named(&db, ClientId(2), entity("Pet"), selectable("fullName")).clone(),

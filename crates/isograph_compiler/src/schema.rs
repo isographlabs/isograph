@@ -73,7 +73,8 @@ pub struct Selectable<TSelectableData> {
     pub name: SelectableName,
     pub parent_entity: EntityName,
     pub description: Option<DescriptionValue>,
-    pub definition: DefinitionLocation,
+    /// `None`: the protocol defines it and no file has its text.
+    pub definition: Option<DefinitionLocation>,
     pub kind: SelectableKind<TSelectableData>,
 }
 
@@ -165,7 +166,7 @@ impl SourceSelectableDefinition {
             name: self.name,
             parent_entity: self.parent_entity,
             description: self.description,
-            definition: self.definition,
+            definition: self.definition.wrap_some(),
             kind: match self.kind.reference() {
                 SourceSelectableKind::ClientField => SelectableKind::ClientField,
                 SourceSelectableKind::ClientPointer(target) => {
@@ -195,7 +196,8 @@ pub struct ProtocolEntity<TEntityData> {
 pub struct ProtocolSelectable<TSelectableData> {
     pub description: Option<DescriptionValue>,
     pub target: Wrapper<EntityName>,
-    pub definition: DefinitionLocation,
+    /// `None`: the protocol defines it and no file has its text.
+    pub definition: Option<DefinitionLocation>,
     pub data: TSelectableData,
 }
 

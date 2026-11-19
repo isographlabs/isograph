@@ -14,6 +14,7 @@ use pico_macros::memo;
 use prelude::Postfix;
 use span::{WithSpan, WithSpanPostfix};
 
+use crate::schema::source_selectable_definitions;
 use crate::validation::{MissingFieldArgument, SelectableKey};
 use crate::{
     ClientId, CompilationProfile, CompositeShape, Concreteness, DefinitionLocation, EntityOrigin,
@@ -176,6 +177,8 @@ pub enum FieldSelectionMapError {
     /// The lookup of the field itself failed: it has no one definition.
     #[error("{}", .0.0.message)]
     FieldLookup(Diagnostic),
+    #[error("`{0}` comes from the schema and has no selection set to inline.")]
+    NotASourceField(SelectableKey),
     #[error("{0}")]
     Located(SelectionMapError),
 }
@@ -672,19 +675,29 @@ pub fn source_field_declaration<TProfile: CompilationProfile>(
     let found = selectable_named(db, client, entity, selectable)
         .as_ref()
         .map_err(|diagnostic| FieldSelectionMapError::FieldLookup(diagnostic.clone()))?;
-    let definition = found.definition;
+    match found.kind {
+        SelectableKind::Server(_) => {
+            return FieldSelectionMapError::NotASourceField(key).wrap_err();
+        }
+        SelectableKind::ClientField | SelectableKind::ClientPointer(_) => {}
+    }
+    let definition = match source_selectable_definitions(db, client, entity, selectable).as_slice()
+    {
+        [source] => source.definition,
+        _ => {
+            return FieldSelectionMapError::FieldLookup(Diagnostic::new(
+                format!("Field `{key}` has no one declaration in the source files."),
+                None,
+            ))
+            .wrap_err();
+        }
+    };
     let error = |kind| {
         FieldSelectionMapError::Located(SelectionMapError {
             location: definition,
             kind,
         })
     };
-    match found.kind {
-        SelectableKind::Server(_) => {
-            return error(SelectionMapErrorKind::NotASourceField(key)).wrap_err();
-        }
-        SelectableKind::ClientField | SelectableKind::ClientPointer(_) => {}
-    }
     parsed_iso_literals_in_file(db, client, definition.path)
         .iter()
         .flatten()
@@ -1170,6 +1183,10 @@ fn client_field_contribution<TProfile: CompilationProfile>(
         .map_err(|error| match error {
             FieldSelectionMapError::FieldLookup(diagnostic) => context.located(
                 SelectionMapErrorKind::Lookup(diagnostic.clone())
+                    .with_span(selection.name.location),
+            ),
+            FieldSelectionMapError::NotASourceField(key) => context.located(
+                SelectionMapErrorKind::NotASourceField(key.dereference())
                     .with_span(selection.name.location),
             ),
             FieldSelectionMapError::Located(error) => error.clone(),

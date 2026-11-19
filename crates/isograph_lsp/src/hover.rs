@@ -479,7 +479,7 @@ mod tests {
             name: "owner".intern().to(),
             parent_entity: "Pet".intern().to(),
             description: description.map(|description| description.intern().to()),
-            definition: definition(),
+            definition: definition().wrap_some(),
             kind: match target {
                 Some(target) => isograph_compiler::SelectableKind::ClientPointer(
                     isograph_compiler::ClientPointerTarget::Parsed(

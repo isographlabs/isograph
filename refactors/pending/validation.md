@@ -203,7 +203,7 @@ Tests: (`graphql_network_protocol`) a broken definition is one error on its span
 
 ### 5. A protocol selectable may have no definition text
 
-`ProtocolSelectable.definition` and `Selectable.definition` become `Option<DefinitionLocation>`. `None` is a selectable the protocol defines with no text (change 11's `__typename`); AGENTS.md forbids borrowing the parent's span. `source_field_declaration` takes the declaration's location from `source_selectable_definitions(db, client, entity, selectable)`, which is non-optional, instead of from the merged `Selectable`: exactly one entry is the location, any other count is the existing `DefinitionMoved`. Goto definition and references return nothing for `None`. Tests: existing ones pass.
+`ProtocolSelectable.definition` and `Selectable.definition` become `Option<DefinitionLocation>`. `None` is a selectable the protocol defines with no text (change 11's `__typename`); AGENTS.md forbids borrowing the parent's span. `source_field_declaration` takes the declaration's location from `source_selectable_definitions(db, client, entity, selectable)`, which is non-optional, instead of from the merged `Selectable`: exactly one entry is the location, any other count is `FieldSelectionMapError::FieldLookup`. A schema selectable has no declaration to inline, so `NotASourceField` moves from a located `SelectionMapErrorKind` of the field itself to `FieldSelectionMapError::NotASourceField(SelectableKey)`; a parent that inlines one reports it located at its selection, as `SelectionMapErrorKind::NotASourceField`. Goto definition and references return nothing for `None`. Tests: existing ones pass.
 
 ### 6. Generation errors are compiler errors (gap 1)
 

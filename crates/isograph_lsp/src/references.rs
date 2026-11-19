@@ -22,7 +22,8 @@ pub enum ReferencesUnderCursor {
 /// The declaration of an entity or selectable, and every reference to it in the source files.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct References {
-    pub declaration: DefinitionLocation,
+    /// `None` for a selectable the protocol defines with no text.
+    pub declaration: Option<DefinitionLocation>,
     pub references: Vec<ReferencesInFile>,
 }
 

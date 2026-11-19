@@ -108,7 +108,8 @@ pub(crate) fn references_response<TProfile: CompilationProfile>(
                 params
                     .context
                     .include_declaration
-                    .then_some(references.declaration),
+                    .then_some(references.declaration)
+                    .flatten(),
                 references.references,
             ),
             isograph_lsp::ReferencesUnderCursor::NoTarget => Vec::new().wrap_ok(),
