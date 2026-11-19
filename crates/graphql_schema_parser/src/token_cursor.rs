@@ -342,6 +342,14 @@ mod tests {
             Expectation::DefinitionOrExtensionKeyword.to_string(),
             "a definition (schema, scalar, type, interface, union, enum, input, or directive) or extend"
         );
+        assert_eq!(
+            Expectation::ImplementsDirectiveOrOpenBrace.to_string(),
+            "`implements`, a directive, or '{'"
+        );
+        assert_eq!(
+            Expectation::DirectiveOrOpenBrace.to_string(),
+            "a directive or '{'"
+        );
         assert_eq!(Expectation::Keyword("on").to_string(), "the keyword `on`");
         assert_eq!(Found::EndOfFile.to_string(), "end of file");
         assert_eq!(

@@ -72,85 +72,85 @@ pub struct TokenKindExtras {
     pub(crate) error_token: Option<GraphQLTokenKind>,
 }
 
-#[derive(Logos, Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, strum::Display)]
+#[derive(Logos, Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, derive_more::Display)]
 #[logos(extras = TokenKindExtras)]
 pub enum GraphQLTokenKind {
     #[regex(r"[ \t\r\n,\ufeff]+|#[^\r\n]*", logos::skip)]
     #[error]
-    #[strum(to_string = "error")]
+    #[display("error")]
     Error,
 
-    #[strum(to_string = "unterminated string")]
+    #[display("unterminated string")]
     ErrorUnterminatedString,
-    #[strum(to_string = "unsupported character in string")]
+    #[display("unsupported character in string")]
     ErrorUnsupportedStringCharacter,
-    #[strum(to_string = "unterminated block string")]
+    #[display("unterminated block string")]
     ErrorUnterminatedBlockString,
 
     #[token("&")]
-    #[strum(to_string = "ampersand ('&')")]
+    #[display("ampersand ('&')")]
     Ampersand,
     #[token("@")]
-    #[strum(to_string = "at symbol ('@')")]
+    #[display("at symbol ('@')")]
     At,
     #[token("}")]
-    #[strum(to_string = "closing brace ('}}')")]
+    #[display("closing brace ('}}')")]
     CloseBrace,
     #[token("]")]
-    #[strum(to_string = "closing bracket (']')")]
+    #[display("closing bracket (']')")]
     CloseBracket,
     #[token(")")]
-    #[strum(to_string = "closing parenthesis (')')")]
+    #[display("closing parenthesis (')')")]
     CloseParenthesis,
     #[token(":")]
-    #[strum(to_string = "colon (':')")]
+    #[display("colon (':')")]
     Colon,
     #[token("=")]
-    #[strum(to_string = "equals ('=')")]
+    #[display("equals ('=')")]
     Equals,
     #[token("!")]
-    #[strum(to_string = "exclamation mark ('!')")]
+    #[display("exclamation mark ('!')")]
     Exclamation,
 
     #[regex("-?(0|[1-9][0-9]*)(\\.[0-9]+[eE][+-]?[0-9]+|\\.[0-9]+|[eE][+-]?[0-9]+)")]
-    #[strum(to_string = "floating point value (e.g. '3.14')")]
+    #[display("floating point value (e.g. '3.14')")]
     FloatLiteral,
 
     #[regex("[a-zA-Z_][a-zA-Z0-9_]*")]
-    #[strum(to_string = "non-variable identifier (e.g. 'x' or 'Foo')")]
+    #[display("non-variable identifier (e.g. 'x' or 'Foo')")]
     Identifier,
 
     #[regex("-?(0|[1-9][0-9]*)")]
-    #[strum(to_string = "integer value (e.g. '0' or '42')")]
+    #[display("integer value (e.g. '0' or '42')")]
     IntegerLiteral,
     #[regex("-?0[0-9]+(\\.[0-9]+[eE][+-]?[0-9]+|\\.[0-9]+|[eE][+-]?[0-9]+)?")]
-    #[strum(to_string = "unsupported number (int or float) literal")]
+    #[display("unsupported number (int or float) literal")]
     ErrorNumberLiteralLeadingZero,
     #[regex("-?(0|[1-9][0-9]*)(\\.[0-9]+[eE][+-]?[0-9]+|\\.[0-9]+|[eE][+-]?[0-9]+)?[.a-zA-Z_]")]
-    #[strum(to_string = "unsupported number (int or float) literal")]
+    #[display("unsupported number (int or float) literal")]
     ErrorNumberLiteralTrailingInvalid,
     #[regex("-?(\\.[0-9]+[eE][+-]?[0-9]+|\\.[0-9]+)")]
-    #[strum(to_string = "unsupported number (int or float) literal")]
+    #[display("unsupported number (int or float) literal")]
     ErrorFloatLiteralMissingZero,
 
     #[token("{")]
-    #[strum(to_string = "open brace ('{{')")]
+    #[display("open brace ('{{')")]
     OpenBrace,
     #[token("[")]
-    #[strum(to_string = "open bracket ('[')")]
+    #[display("open bracket ('[')")]
     OpenBracket,
     #[token("(")]
-    #[strum(to_string = "open parenthesis ('(')")]
+    #[display("open parenthesis ('(')")]
     OpenParenthesis,
     #[token("|")]
-    #[strum(to_string = "pipe ('|')")]
+    #[display("pipe ('|')")]
     Pipe,
 
     #[token("\"", lex_string)]
-    #[strum(to_string = "string literal (e.g. '\"...\"')")]
+    #[display("string literal (e.g. '\"...\"')")]
     StringLiteral,
     #[token("\"\"\"", lex_block_string)]
-    #[strum(to_string = "block string (e.g. '\"\"\"hi\"\"\"')")]
+    #[display("block string (e.g. '\"\"\"hi\"\"\"')")]
     BlockStringLiteral,
 }
 ```
@@ -750,33 +750,33 @@ pub struct ExpectedFound {
     pub found: Found,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, strum::Display)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, derive_more::Display)]
 pub enum Expectation {
-    #[strum(to_string = "{0}")]
+    #[display("{_0}")]
     Token(GraphQLTokenKind),
-    #[strum(to_string = "the keyword `{0}`")]
+    #[display("the keyword `{_0}`")]
     Keyword(&'static str),
-    #[strum(to_string = "a definition (schema, scalar, type, interface, union, enum, input, or directive)")]
+    #[display("a definition (schema, scalar, type, interface, union, enum, input, or directive)")]
     DefinitionKeyword,
-    #[strum(to_string = "a definition (schema, scalar, type, interface, union, enum, input, or directive) or extend")]
+    #[display("a definition (schema, scalar, type, interface, union, enum, input, or directive) or extend")]
     DefinitionOrExtensionKeyword,
-    #[strum(to_string = "schema, scalar, type, interface, union, enum, or input")]
+    #[display("schema, scalar, type, interface, union, enum, or input")]
     ExtensionKeyword,
-    #[strum(to_string = "a type, like 'String', 'String!', or '[String]'")]
+    #[display("a type, like 'String', 'String!', or '[String]'")]
     TypeAnnotation,
-    #[strum(to_string = "a constant value, like 42, 1.5, \"bar\", true, null, an enum value, a list, or an object")]
+    #[display("a constant value, like 42, 1.5, \"bar\", true, null, an enum value, a list, or an object")]
     ConstantValue,
-    #[strum(to_string = "query, mutation, or subscription")]
+    #[display("query, mutation, or subscription")]
     OperationType,
-    #[strum(to_string = "a directive location, like FIELD_DEFINITION")]
+    #[display("a directive location, like FIELD_DEFINITION")]
     DirectiveLocation,
-    #[strum(to_string = "a directive, like '@deprecated'")]
+    #[display("a directive, like '@deprecated'")]
     Directive,
-    #[strum(to_string = "`implements`, a directive, or '{{'")]
+    #[display("`implements`, a directive, or '{{'")]
     ImplementsDirectiveOrOpenBrace,
-    #[strum(to_string = "a directive or '='")]
+    #[display("a directive or '='")]
     DirectiveOrEquals,
-    #[strum(to_string = "a directive or '{{'")]
+    #[display("a directive or '{{'")]
     DirectiveOrOpenBrace,
 }
 
@@ -798,7 +798,7 @@ impl ParseError {
 Origin: iso `crates/isograph_parser/src/parse_error.rs` (`AstError`, `ExpectedFound`, `Expectation`, `Found`, `AstError::expected`). Delta:
 
 - `ParseError` is the one syntax error enum. Iso's `ParseError` wraps `AstError`, `BracketError`, and `CommaWithoutItem`; the latter two do not exist here. Iso's `EmptyLiteral` has no counterpart (an empty file has no entries, Pipeline above).
-- `Expectation` derives `strum::Display`. Iso hand-writes `Display` (for `OneOf`) and implements `std::error::Error`; `Expectation` is not an error, has no `OneOf`, and has no `Error` impl.
+- `Expectation` derives `derive_more::Display`, which formats its string, so `'{{'` displays one brace (`strum::Display` writes a unit variant's string verbatim). Iso hand-writes `Display` (for `OneOf`) and implements `std::error::Error`; `Expectation` is not an error, has no `OneOf`, and has no `Error` impl.
 - Iso's `Expectation` variants for chunks, selections, variables, and arguments are not here; the variants above are the schema grammar's.
 - `Found::EndOfFile` replaces `Found::EndOfChunk`; there is no `Found::Group`.
 - `InvalidFloat`, `EnumValueCannotBeTrueFalseOrNull` (spec 2.10.6 `EnumValue : Name but not true, false or null`, enforced in spec 3.9 `EnumValueDefinition`), and `InvalidUnicodeEscape` (spec 2.10.4) are new.

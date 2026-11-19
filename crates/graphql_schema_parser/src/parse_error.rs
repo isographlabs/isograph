@@ -23,39 +23,37 @@ pub struct ExpectedFound {
     pub found: Found,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, strum::Display)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, derive_more::Display)]
 pub enum Expectation {
-    #[strum(to_string = "{0}")]
+    #[display("{_0}")]
     Token(GraphQLTokenKind),
-    #[strum(to_string = "the keyword `{0}`")]
+    #[display("the keyword `{_0}`")]
     Keyword(&'static str),
-    #[strum(
-        to_string = "a definition (schema, scalar, type, interface, union, enum, input, or directive)"
-    )]
+    #[display("a definition (schema, scalar, type, interface, union, enum, input, or directive)")]
     DefinitionKeyword,
-    #[strum(
-        to_string = "a definition (schema, scalar, type, interface, union, enum, input, or directive) or extend"
+    #[display(
+        "a definition (schema, scalar, type, interface, union, enum, input, or directive) or extend"
     )]
     DefinitionOrExtensionKeyword,
-    #[strum(to_string = "schema, scalar, type, interface, union, enum, or input")]
+    #[display("schema, scalar, type, interface, union, enum, or input")]
     ExtensionKeyword,
-    #[strum(to_string = "a type, like 'String', 'String!', or '[String]'")]
+    #[display("a type, like 'String', 'String!', or '[String]'")]
     TypeAnnotation,
-    #[strum(
-        to_string = "a constant value, like 42, 1.5, \"bar\", true, null, an enum value, a list, or an object"
+    #[display(
+        "a constant value, like 42, 1.5, \"bar\", true, null, an enum value, a list, or an object"
     )]
     ConstantValue,
-    #[strum(to_string = "query, mutation, or subscription")]
+    #[display("query, mutation, or subscription")]
     OperationType,
-    #[strum(to_string = "a directive location, like FIELD_DEFINITION")]
+    #[display("a directive location, like FIELD_DEFINITION")]
     DirectiveLocation,
-    #[strum(to_string = "a directive, like '@deprecated'")]
+    #[display("a directive, like '@deprecated'")]
     Directive,
-    #[strum(to_string = "`implements`, a directive, or '{{'")]
+    #[display("`implements`, a directive, or '{{'")]
     ImplementsDirectiveOrOpenBrace,
-    #[strum(to_string = "a directive or '='")]
+    #[display("a directive or '='")]
     DirectiveOrEquals,
-    #[strum(to_string = "a directive or '{{'")]
+    #[display("a directive or '{{'")]
     DirectiveOrOpenBrace,
 }
 

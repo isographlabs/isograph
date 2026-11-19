@@ -230,4 +230,13 @@ mod tests {
             GraphQLTokenKind::BlockStringLiteral
         );
     }
+
+    #[test]
+    fn braces_display_one_brace() {
+        assert_eq!(GraphQLTokenKind::OpenBrace.to_string(), "open brace ('{')");
+        assert_eq!(
+            GraphQLTokenKind::CloseBrace.to_string(),
+            "closing brace ('}')"
+        );
+    }
 }

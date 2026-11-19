@@ -78,7 +78,7 @@ Tests call `decode_string_value` on the interior of a tokenized `StringLiteral` 
 
 ## 3. Cursor and errors
 
-Status: landed, except the two `'{'` display assertions below. `strum::Display` writes a unit variant's `to_string` verbatim and rejects a lone `{` or `}` in it, so `'{{'` displays as `'{{'` (iso's `OpenBrace` and `CloseBrace` have the same defect). Open question: which representation displays one brace.
+Status: landed. `GraphQLTokenKind`, `Expectation`, and iso's `IsographLangTokenKind` derive `derive_more::Display`, which formats the string, so `'{{'` displays one brace. `strum::Display` writes a unit variant's `to_string` verbatim and rejects a lone brace.
 
 `TokenIndex`, `TokenCursor`, `consume_string_value_if`, `DefinitionKeyword`, `ExtensionKeyword`, `BooleanOrNullKeyword` (in `keyword.rs`), the `with_cursor` test helper, and `span_of` (copied), as parsing-standards.md (`TokenCursor`, Keyword dispatch, Errors, String values, Tests).
 

@@ -194,4 +194,16 @@ mod tests {
             IsographLangTokenKind::ErrorUnterminatedBlockString
         );
     }
+
+    #[test]
+    fn braces_display_one_brace() {
+        assert_eq!(
+            IsographLangTokenKind::OpenBrace.to_string(),
+            "open brace ('{')"
+        );
+        assert_eq!(
+            IsographLangTokenKind::CloseBrace.to_string(),
+            "closing brace ('}')"
+        );
+    }
 }

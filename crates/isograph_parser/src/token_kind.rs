@@ -6,96 +6,96 @@ pub struct TokenKindExtras {
     pub(crate) error_token: Option<IsographLangTokenKind>,
 }
 
-#[derive(Logos, Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, strum::Display)]
+#[derive(Logos, Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, derive_more::Display)]
 #[logos(extras = TokenKindExtras)]
 pub enum IsographLangTokenKind {
     // TODO don't skip comments and spaces, since we want to auto-format etc
     #[regex(r"[ \t\f\ufeff]+", logos::skip)]
     #[error]
-    #[strum(to_string = "error")]
+    #[display("error")]
     Error,
 
     /// One line break: `\r\n`, `\n`, or `\r`. A blank line is two of these.
     #[regex(r"\r\n|\n|\r")]
-    #[strum(to_string = "line break")]
+    #[display("line break")]
     LineBreak,
 
-    #[strum(to_string = "unterminated string")]
+    #[display("unterminated string")]
     ErrorUnterminatedString,
-    #[strum(to_string = "unsupported character in string")]
+    #[display("unsupported character in string")]
     ErrorUnsupportedStringCharacter,
-    #[strum(to_string = "unterminated block string")]
+    #[display("unterminated block string")]
     ErrorUnterminatedBlockString,
 
     // Valid tokens
     #[token("@")]
-    #[strum(to_string = "at symbol ('@')")]
+    #[display("at symbol ('@')")]
     At,
     #[token("}")]
-    #[strum(to_string = "closing brace ('}}')")]
+    #[display("closing brace ('}}')")]
     CloseBrace,
 
     #[token("]")]
-    #[strum(to_string = "closing bracket (']')")]
+    #[display("closing bracket (']')")]
     CloseBracket,
     #[token(")")]
-    #[strum(to_string = "closing parenthesis (')')")]
+    #[display("closing parenthesis (')')")]
     CloseParenthesis,
     #[token(":")]
-    #[strum(to_string = "colon (':')")]
+    #[display("colon (':')")]
     Colon,
     #[token("$")]
-    #[strum(to_string = "dollar ('$')")]
+    #[display("dollar ('$')")]
     Dollar,
-    #[strum(to_string = "end of file")]
+    #[display("end of file")]
     EndOfFile,
 
     #[token("=")]
-    #[strum(to_string = "equals ('=')")]
+    #[display("equals ('=')")]
     Equals,
 
     #[token("!")]
-    #[strum(to_string = "exclamation mark ('!')")]
+    #[display("exclamation mark ('!')")]
     Exclamation,
 
     // IntegerPart:    -?(0|[1-9][0-9]*)
     // FractionalPart: \\.[0-9]+
     // ExponentPart:   [eE][+-]?[0-9]+
     #[regex("-?(0|[1-9][0-9]*)(\\.[0-9]+[eE][+-]?[0-9]+|\\.[0-9]+|[eE][+-]?[0-9]+)")]
-    #[strum(to_string = "floating point value (e.g. '3.14')")]
+    #[display("floating point value (e.g. '3.14')")]
     FloatLiteral,
 
     #[regex("[a-zA-Z_][a-zA-Z0-9_]*")]
-    #[strum(to_string = "non-variable identifier (e.g. 'x' or 'Foo')")]
+    #[display("non-variable identifier (e.g. 'x' or 'Foo')")]
     Identifier,
 
     #[regex("-?(0|[1-9][0-9]*)")]
-    #[strum(to_string = "integer value (e.g. '0' or '42')")]
+    #[display("integer value (e.g. '0' or '42')")]
     IntegerLiteral,
     #[regex("-?0[0-9]+(\\.[0-9]+[eE][+-]?[0-9]+|\\.[0-9]+|[eE][+-]?[0-9]+)?")]
-    #[strum(to_string = "unsupported number (int or float) literal")]
+    #[display("unsupported number (int or float) literal")]
     ErrorNumberLiteralLeadingZero,
 
     #[regex("-?(0|[1-9][0-9]*)(\\.[0-9]+[eE][+-]?[0-9]+|\\.[0-9]+|[eE][+-]?[0-9]+)?[.a-zA-Z_]")]
-    #[strum(to_string = "unsupported number (int or float) literal")]
+    #[display("unsupported number (int or float) literal")]
     ErrorNumberLiteralTrailingInvalid,
 
     #[regex("-?(\\.[0-9]+[eE][+-]?[0-9]+|\\.[0-9]+)")]
-    #[strum(to_string = "unsupported number (int or float) literal")]
+    #[display("unsupported number (int or float) literal")]
     ErrorFloatLiteralMissingZero,
 
     #[token("{")]
-    #[strum(to_string = "open brace ('{{')")]
+    #[display("open brace ('{{')")]
     OpenBrace,
 
     #[token("[")]
-    #[strum(to_string = "open bracket ('[')")]
+    #[display("open bracket ('[')")]
     OpenBracket,
     #[token("(")]
-    #[strum(to_string = "open parenthesis ('(')")]
+    #[display("open parenthesis ('(')")]
     OpenParenthesis,
     #[token(".")]
-    #[strum(to_string = "period ('.')")]
+    #[display("period ('.')")]
     Period,
     // #[token("..")]
     // PeriodPeriod,
@@ -111,15 +111,15 @@ pub enum IsographLangTokenKind {
     // SingleLineComment,
     // Whitespace
     #[token(",")]
-    #[strum(to_string = "comma (',')")]
+    #[display("comma (',')")]
     Comma,
 
     #[token("\"", lex_string)]
-    #[strum(to_string = "string literal (e.g. '\"...\"')")]
+    #[display("string literal (e.g. '\"...\"')")]
     StringLiteral,
 
     #[token("\"\"\"", lex_block_string)]
-    #[strum(to_string = "block string (e.g. '\"\"\"hi\"\"\"')")]
+    #[display("block string (e.g. '\"\"\"hi\"\"\"')")]
     BlockStringLiteral,
 }
 
