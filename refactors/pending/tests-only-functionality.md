@@ -36,7 +36,7 @@ pub fn iso_literal_extraction<THostLanguage: HostLanguage>(
 ) -> Option<IsoLiteralExtraction<THostLanguage>>
 ```
 
-Diagnostics, in `isograph_extract_typescript`. Callers today: tests in that crate. Production caller: lsp-diagnostics.md via `file_literals`.
+Diagnostics, in `isograph_extract_typescript`. Callers today: tests in that crate. Production caller: a later host-errors change; lsp-diagnostics.md reports parse errors only.
 
 ```rust
 // from crates/isograph_extract_typescript/src/lib.rs
