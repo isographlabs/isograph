@@ -75,7 +75,6 @@ impl<TProfile: CompilationProfile> IsographState<TProfile> {
     pub(crate) fn compile_input(&self) -> crate::compile::CompileInput<'_, TProfile> {
         crate::compile::CompileInput {
             db: self.db.reference(),
-            globs: self.globs.reference(),
             client: self.compiler_client,
         }
     }

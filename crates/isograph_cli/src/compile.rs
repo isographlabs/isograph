@@ -1,12 +1,12 @@
 use std::collections::BTreeSet;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::Duration;
 
 use common_lang_types::RelativePathToSourceFile;
 use intern::Lookup;
 use isograph_compiler::{
-    ArtifactPath, ArtifactSource, ClientId, CompilationProfile, HostLanguage, IncludeFile,
-    IsographDb, LiteralParseFailed, artifact_sources_in_file, compiler_errors_in_file,
+    ArtifactPath, ArtifactSource, ClientId, CompilationProfile, HostLanguage, IsographDb,
+    LiteralParseFailed, artifact_sources_in_file, compiler_errors_in_file, source_file_paths,
 };
 use prelude::Postfix;
 
@@ -14,7 +14,6 @@ use crate::adapter::MissingWorkingDirectory;
 use crate::effect::{ArtifactChanges, IsographEffect, WriteArtifactsEffect, no_effects};
 use crate::state::{ArtifactFiles, IsographState};
 use crate::timer::TimerPayload;
-use crate::watch::ProjectGlobs;
 
 pub(crate) const COMPILE_DEBOUNCE: Duration = Duration::from_millis(100);
 
@@ -31,7 +30,6 @@ pub struct CompilerErrorReport {
 /// What compile reads.
 pub(crate) struct CompileInput<'a, TProfile: CompilationProfile> {
     pub db: &'a IsographDb<TProfile>,
-    pub globs: &'a ProjectGlobs,
     pub client: ClientId,
 }
 
@@ -39,7 +37,7 @@ pub(crate) struct CompileInput<'a, TProfile: CompilationProfile> {
 pub(crate) enum ProjectErrorsError {
     #[error("{0}")]
     MissingWorkingDirectory(MissingWorkingDirectory),
-    #[error("{} is in disk_file_map but has no text", .0.lookup())]
+    #[error("{} is a listed source file but has no text", .0.lookup())]
     ListedPathWithoutText(RelativePathToSourceFile),
 }
 
@@ -68,7 +66,7 @@ pub(crate) fn compile<TProfile: CompilationProfile>(
 pub(crate) enum ArtifactSourcesError {
     #[error("{0}")]
     LiteralParseFailed(LiteralParseFailed),
-    #[error("{} is in disk_file_map but has no text", .0.lookup())]
+    #[error("{} is a listed source file but has no text", .0.lookup())]
     ListedPathWithoutText(RelativePathToSourceFile),
 }
 
@@ -101,26 +99,13 @@ fn generate_artifacts<TProfile: CompilationProfile>(
         .collect()
 }
 
-/// Every source file on disk, by the config's `source_files` globs and the host language.
-fn source_paths<'a, TProfile: CompilationProfile>(
-    input: &'a CompileInput<'_, TProfile>,
-) -> impl Iterator<Item = RelativePathToSourceFile> + 'a {
-    input.db.disk_paths().into_iter().filter(|path| {
-        matches!(
-            input
-                .globs
-                .should_include_source_file::<TProfile>(Path::new(path.lookup())),
-            IncludeFile::Include
-        )
-    })
-}
-
 /// The artifact sources of every source file on disk as `input.client` reads them. `Err` names
 /// the first literal, in path order, that failed.
 pub(crate) fn project_artifact_sources<TProfile: CompilationProfile>(
     input: &CompileInput<'_, TProfile>,
 ) -> Result<BTreeSet<ArtifactSource>, ArtifactSourcesError> {
-    let mut paths: Vec<RelativePathToSourceFile> = source_paths(input).collect();
+    let mut paths: Vec<RelativePathToSourceFile> =
+        source_file_paths(input.db, input.client).clone();
     paths.sort_by(|a, b| a.lookup().cmp(b.lookup()));
     paths
         .into_iter()
@@ -170,7 +155,9 @@ impl ArtifactFiles {
 pub(crate) fn project_errors<TProfile: CompilationProfile>(
     input: &CompileInput<'_, TProfile>,
 ) -> Result<Vec<CompilerErrorReport>, ProjectErrorsError> {
-    let per_file = source_paths(input)
+    let per_file = source_file_paths(input.db, input.client)
+        .iter()
+        .copied()
         .map(|path| file_reports(input.db, input.client, path))
         .collect::<Result<Vec<_>, _>>()?;
     let mut reports: Vec<CompilerErrorReport> = per_file.into_iter().flatten().collect();
