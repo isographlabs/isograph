@@ -1,10 +1,12 @@
 # Artifact generation: iso.ts and entrypoint artifacts
 
-The daemon generates artifacts into an optional output directory. The config field is `artifact_directory`, upstream's name and semantics: the compiler writes into `<config dir>/<artifact_directory>/__isograph/`. The Babel and SWC transforms read the same field (upstream `swc_isograph_plugin` `path_for_artifact` joins `artifact_directory` and `__isograph`). When the field is absent, the daemon writes nothing.
+The daemon generates artifacts into the `__isograph` folder of an optional output directory. The config field is `output_directory`, relative to the config file's directory. Generated files live under `<config dir>/<output_directory>/__isograph/`: `iso.ts` at the top of that folder, and `<Entity>/<selectable>/entrypoint.ts` for each entrypoint, upstream's layout. The Babel transform (`libs/isograph-babel-plugin/compileTag.js`) and the SWC transform (`crates/swc_isograph_plugin/src/lib.rs`, `path_for_artifact`) read the same field and import `<output_directory>/__isograph/<Entity>/<selectable>/entrypoint.ts`. The transforms treat a missing `output_directory` as the config file's directory. Generation writes nothing when the field is missing.
 
-The artifacts in this doc are the top-level `iso.ts` in upstream's format and one entrypoint artifact per entrypoint literal. Per-field param types, output types, readers, query text, and normalization ASTs are later docs. Generation is host-language work: `HostLanguage::generate_artifacts`. `NetworkProtocol` gains nothing.
+The artifacts in this doc are the top-level `iso.ts` and one entrypoint artifact per entrypoint literal. Generation is host-language work: `HostLanguage::generate_artifacts` and `HostLanguage::print_module`. `NetworkProtocol` gains nothing in this doc.
 
-All artifacts are generated in memory. Only when every one was generated (no literal failed) are they written, together, and only the files that changed.
+Artifacts are built as values, not strings. A module artifact is an `ArtifactValue` (its default export) at a path. The TypeScript host language converts it into an SWC module (`swc_ecma_ast`) and prints it with `swc_ecma_codegen`. `iso.ts` has overloads and type aliases, which a value does not describe, so the TypeScript generator builds it directly as an SWC module.
+
+All artifacts are generated and printed in memory. Only when every literal produced its sources are they written, together, and only the files whose text changed.
 
 ## End-user experience
 
@@ -12,7 +14,7 @@ All artifacts are generated in memory. Only when every one was generated (no lit
 {
   "source_files": ["src/**/*.ts"],
   "schema": ["schema/**/*.graphql"],
-  "artifact_directory": "src"
+  "output_directory": "src"
 }
 ```
 
@@ -22,6 +24,15 @@ The user runs the daemon (`isograph lsp` from the editor, or `isograph start`). 
 src/__isograph/iso.ts
 src/__isograph/Query/HomeRoute/entrypoint.ts
 src/__isograph/Mutation/SetTagline/entrypoint.ts
+```
+
+`src/__isograph/Query/HomeRoute/entrypoint.ts` is a module whose default export is an object with `kind` `"Entrypoint"` and `name` `"Query.HomeRoute"`, in `swc_ecma_codegen`'s layout:
+
+```ts
+export default {
+    kind: "Entrypoint",
+    name: "Query.HomeRoute"
+};
 ```
 
 The user imports `iso` from the generated file:
@@ -35,17 +46,16 @@ export const fullName = iso(`
   return `${data.firstName} ${data.lastName}`;
 });
 
-const homeRoute = iso(`entrypoint Query.HomeRoute`);
-// typeof homeRoute is "Query.HomeRoute"
+console.log(iso(`entrypoint Query.HomeRoute`).name);
 ```
 
-A `field` literal returns an identity function: the exported value has exactly the type of the resolver passed to it. An `entrypoint` literal has the type of its entrypoint artifact's default export. `` iso(`entity Owner`) `` returns `void`. A literal whose text matches no overload is a TypeScript error at the call site.
+A `field` literal returns an identity function: the exported value has exactly the type of the resolver passed to it. The resolver's parameter is typed by the user until param types are generated (Later). An `entrypoint` literal has the type of its entrypoint artifact's default export; with a transform, the call becomes an import of that artifact. `` iso(`entity Owner`) `` returns `void`. A literal whose text matches no overload is a TypeScript error at the call site.
 
 If any iso literal in any source file has a parse error, the daemon writes nothing and logs one warning naming the literal. Files already on disk stay as they are. Fixing the literal makes the next compile write.
 
-Only changed files are written. A file whose contents did not change is not touched (its modification time stays). A file that is no longer generated is deleted, and a folder that becomes empty is removed. The first write after the daemon starts deletes `src/__isograph/` and writes every artifact, so stale files from an earlier run are gone. Nothing outside `src/__isograph/` is created, written, or deleted.
+The `__isograph` folder belongs to the compiler. When the daemon starts, it reads every file under `<output_directory>/__isograph/`. The first compile writes each artifact whose text differs from what is there, leaves identical files untouched (their modification time stays), and deletes every other file under the folder, removing folders that become empty. Later compiles do the same against what the daemon last wrote. Nothing outside the `__isograph` folder is created, written, or deleted.
 
-The watcher does not post files under `<config dir>/<artifact_directory>/__isograph/`, so generated files never become source files.
+The watcher does not post files under `<output_directory>/__isograph/`, so generated files never become source files.
 
 ## Config
 
@@ -62,20 +72,21 @@ pub struct IsographProjectConfig {
     /// Glob patterns relative to the config file's directory.
     #[serde(default)]
     pub schema: Vec<String>,
-    /// The directory, relative to the config file's directory, that holds the generated
-    /// `__isograph` folder. Absent: no artifacts are written.
+    /// The directory, relative to the config file's directory, whose `__isograph` folder holds
+    /// the generated artifacts. Absent: the compiler writes no artifacts, and the transforms
+    /// look in the config file's directory.
     #[serde(default)]
-    pub artifact_directory: Option<PathBuf>,
+    pub output_directory: Option<PathBuf>,
 }
 ```
 
-Upstream's `artifact_directory` defaults to `project_root`. i2 has no `project_root`; absent means no output.
+Upstream's field is `artifact_directory` with the same `__isograph` layout; it defaults to `project_root`, which i2 does not have.
 
 ## Prerequisites from compiler-errors.md
 
-refactors/pending/compiler-errors.md changes 1 to 3 land first: the boot scan is posted before the LSP port accepts, `handle` mints every `ClientId` from `IsographState.client_ids` with `compiler_client` minted first in `IsographState::new`, and every applied `DiskChanged` arms `compile_debounce`, whose fire calls `crate::compile::compile`. Generation reads as `compiler_client` through `CompileInput` and runs inside `compile`.
+refactors/pending/compiler-errors.md changes 1 to 3 (landed): the boot scan is posted before the LSP port accepts, `handle` mints every `ClientId` from `IsographState.client_ids` with `compiler_client` minted first in `IsographState::new`, and every applied `DiskChanged` arms `compile_debounce`, whose fire calls `crate::compile::compile`. `compiler_client` is an ordinary client: its id comes from the same counter, it reads through `file_contents` and the same memos, and the only thing particular to it is that its compile writes artifacts.
 
-This doc changes three things in that code. `IsographState::new` takes the artifact directory. `compile` takes `&mut IsographState`, because recording what was written is a state write. The source-file filter of `project_errors` becomes `source_paths`, which both `project_errors` and `project_artifact_sources` call.
+This doc changes three things in that code. `IsographState::new` takes the artifact folder. `compile` takes `&mut IsographState`, because recording what was written is a state write. The source-file filter inside `project_errors` becomes `source_paths`, which both `project_errors` and `project_artifact_sources` call.
 
 ## Artifact sources
 
@@ -227,21 +238,57 @@ After:
 
 `ListedPathWithoutText` is the broken invariant compiler-errors.md names for `project_errors`: a path `disk_paths` listed has a `DiskFile`, and `compiler_client` has no `OpenFile`. `compile` logs it and writes nothing.
 
-## Generation
+## Generated values
 
 ```rust
 // from crates/isograph_compiler/src/artifacts.rs
-/// A path relative to the artifact directory.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct ArtifactPath(pub PathBuf);
+/// A path inside the `__isograph` folder, `/`-separated, with no `.` or `..` component.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+pub struct ArtifactPath(pub String);
 
 /// A generated file.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Artifact {
-    pub path: ArtifactPath,
-    pub contents: String,
+#[derive(Clone, Debug, PartialEq)]
+pub enum ArtifactFile {
+    Module(ArtifactModule),
 }
+
+/// A module whose only export is its default export.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ArtifactModule {
+    pub path: ArtifactPath,
+    pub default_export: ArtifactValue,
+}
+
+/// A value a module exports, in no particular host language.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ArtifactValue {
+    Null,
+    Boolean(bool),
+    Number(f64),
+    String(String),
+    Array(Vec<ArtifactValue>),
+    Object(Vec<ArtifactObjectEntry>),
+    Import(ArtifactImport),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ArtifactObjectEntry {
+    pub key: String,
+    pub value: ArtifactValue,
+}
+
+/// The default export of the module at `path`.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ArtifactImport(pub ArtifactPath);
 ```
+
+`ArtifactValue` is the value layer reader ASTs and query text will also use. Named exports are not in it: nothing imports one. `ArtifactImport` is a newtype over the path because a default import has no other part.
+
+`ArtifactFile` has one variant now. When the network protocol produces a raw query file (`query_text.graphql` for GraphQL), it gains `Raw(RawArtifactFile)` with `RawArtifactFile { path: ArtifactPath, contents: String }`, written and diffed like every other file. Until that producer lands, the variant does not exist. `iso.ts` is not a raw file: the TypeScript host language builds it as an SWC module and prints it with the same emitter.
+
+`ArtifactPath` is a `String` with `/` separators, not a `PathBuf`, because it is also the source of import specifiers, which are `/`-separated on every platform. `write_artifacts` joins its segments onto the folder.
+
+## Host language
 
 ```rust
 // from crates/isograph_compiler/src/host_language.rs
@@ -253,117 +300,184 @@ pub trait HostLanguage: Send + Sync + Sized + 'static {
 
     fn should_include_source_file(relative_path: &Path) -> IncludeFile;
 
-    /// Every artifact of a project whose iso literals are `sources`.
-    fn generate_artifacts(sources: &BTreeSet<ArtifactSource>) -> Vec<Artifact>;
+    /// The path and text of every artifact of a project whose iso literals are `sources`.
+    fn generate_artifacts(sources: &BTreeSet<ArtifactSource>) -> Vec<(ArtifactPath, String)>;
 }
 ```
 
-The `BTreeSet` drops duplicate literals: two `field Pet.fullName` literals produce one overload, and two `entrypoint Query.HomeRoute` literals one artifact and one import. Rejecting duplicates is validation, which this doc does not do.
+`generate_artifacts` returns printed text because `iso.ts` is built as host-language AST, not as an `ArtifactValue`, so only the host language can print the whole set. The `ArtifactFile` values are the TypeScript generator's intermediate layer, printed by `print_module`.
+
+The `BTreeSet` drops duplicate literals: two `field Pet.fullName` literals produce one overload, and two `entrypoint Query.HomeRoute` literals one artifact. Rejecting duplicates is validation, which this doc does not do.
 
 The test hosts (`TestHostLanguage` in isograph_compiler, `InHost` in isograph_cli's watch tests) return `Vec::new()`.
 
-`TypeScriptHostLanguage::generate_artifacts` lives in `crates/isograph_extract_typescript/src/generate_artifacts.rs` and returns the entrypoint artifacts, then `iso.ts`.
+### The TypeScript generator
+
+`crates/isograph_extract_typescript` is the TypeScript host language, so it holds generation and the only SWC dependency of the root workspace:
+
+```toml
+# from crates/isograph_extract_typescript/Cargo.toml
+swc_core = { version = "84.2.0", features = ["ecma_ast", "ecma_codegen", "common"] }
+```
+
+`84.2.0` is the version `crates/swc_isograph_plugin` pins. `ecma_ast` is `swc_ecma_ast` and `swc_atoms`; `ecma_codegen` is `swc_ecma_codegen`; `common` is `swc_common` for `SourceMap` and `DUMMY_SP`, which the emitter requires. No other crate names swc.
+
+```rust
+// from crates/isograph_extract_typescript/src/generate_artifacts.rs
+impl HostLanguage for TypeScriptHostLanguage {
+    // ...
+    fn generate_artifacts(sources: &BTreeSet<ArtifactSource>) -> Vec<(ArtifactPath, String)> {
+        let entrypoints: Vec<EntityNameAndSelectableName> = sorted_entrypoints(sources);
+        entrypoints
+            .iter()
+            .map(|entrypoint| {
+                let module = entrypoint_artifact(entrypoint.dereference());
+                (module.path.clone(), print_module(module.reference()))
+            })
+            .chain(std::iter::once(iso_overload_file(sources)))
+            .collect()
+    }
+}
+```
 
 ### Entrypoint artifact
 
-Path `<Parent>/<name>/entrypoint.ts`, upstream's entrypoint file in the per-field folder. For `entrypoint Query.HomeRoute` the contents are this line and a newline:
+Path `<Entity>/<selectable>/entrypoint.ts`, the path the transforms import:
 
-```ts
-export default "Query.HomeRoute";
+```rust
+// from crates/isograph_extract_typescript/src/generate_artifacts.rs
+fn entrypoint_artifact(entrypoint: EntityNameAndSelectableName) -> ArtifactModule {
+    ArtifactModule {
+        path: entrypoint_path(entrypoint),
+        default_export: ArtifactValue::Object(vec![
+            ArtifactObjectEntry {
+                key: "kind".to_owned(),
+                value: ArtifactValue::String("Entrypoint".to_owned()),
+            },
+            ArtifactObjectEntry {
+                key: "name".to_owned(),
+                value: ArtifactValue::String(format!(
+                    "{}.{}",
+                    entrypoint.parent_entity_name, entrypoint.selectable_name
+                )),
+            },
+        ]),
+    }
+}
+
+fn entrypoint_path(entrypoint: EntityNameAndSelectableName) -> ArtifactPath {
+    ArtifactPath(format!(
+        "{}/{}/entrypoint.ts",
+        entrypoint.parent_entity_name, entrypoint.selectable_name
+    ))
+}
 ```
 
-The default export's type is the string literal type `"Query.HomeRoute"`.
+### Printing a module
+
+```rust
+// from crates/isograph_extract_typescript/src/generate_artifacts.rs
+/// `module` as TypeScript: one default import per distinct `ArtifactImport` in its value, in
+/// path order, then `export default <value>;`.
+fn print_module(module: &ArtifactModule) -> String {
+    let imports: BTreeSet<&ArtifactImport> = imports_of(module.default_export.reference());
+    let items = imports
+        .into_iter()
+        .map(|import| default_import(module.path.reference(), import))
+        .chain(std::iter::once(export_default(expression(
+            module.default_export.reference(),
+        ))))
+        .collect();
+    emit(Module { span: DUMMY_SP, body: items, shebang: None })
+}
+
+/// Every `Import` inside `value`, at any depth.
+fn imports_of(value: &ArtifactValue) -> BTreeSet<&ArtifactImport>;
+
+/// `value` as an SWC expression; an `Import` is the identifier `artifact_import_identifier` gives.
+fn expression(value: &ArtifactValue) -> Expr;
+
+/// `import <identifier> from "<specifier>";`
+fn default_import(from: &ArtifactPath, import: &ArtifactImport) -> ModuleItem;
+
+/// `export default <expression>;`
+fn export_default(expression: Expr) -> ModuleItem;
+
+/// The text `swc_ecma_codegen` emits for `module`, with a `SourceMap` that holds no files.
+fn emit(module: Module) -> String;
+
+/// The local name of `import`: its path's segments joined by `__`, `.ts` dropped
+/// (`Query/HomeRoute/entrypoint.ts` is `Query__HomeRoute__entrypoint`).
+fn artifact_import_identifier(import: &ArtifactImport) -> String;
+
+/// The specifier that imports `import` from the module at `from`: the import's path relative
+/// to `from`'s folder, `./`-prefixed, `.ts` dropped.
+fn artifact_import_specifier(from: &ArtifactPath, import: &ArtifactImport) -> String;
+```
+
+Identifiers are a function of the import's path alone, and imports print in path order, so a module whose value did not change prints byte-identically. `emit` is `swc_ecma_codegen::Emitter` over a `JsWriter` into a `Vec<u8>`, with `Config::default().with_target(EsVersion::latest())` and `ascii_only: false`. String literals are built with `raw: None`, so the emitter writes their escapes: quotes, backslashes, newlines, and non-ASCII characters print as valid JavaScript string literals. An `emit` failure is an `io::Error` from writing into a `Vec`, which cannot happen; `emit` panics with that invariant named, the one panic this doc adds.
 
 ### iso.ts
 
-Path `iso.ts`. Upstream's `build_iso_overload_artifact` (`isograph/crates/artifact_content/src/iso_overload_file.rs`) with these deltas:
+Path `iso.ts`, built as an SWC module and printed by `emit`. Upstream's `build_iso_overload_artifact` (`isograph/crates/artifact_content/src/iso_overload_file.rs`) prints the same declarations from strings; the deltas:
 
 - No `import type { IsographEntrypoint } from '@isograph/react';`. Nothing refers to it: entrypoint overloads return the artifact's type, and the implementation signature does not name it. A project without `@isograph/react` installed type-checks.
 - No param-type imports and no `__link` output-type imports: those files are not generated yet.
 - `IdentityWithParam<TParam>` and `IdentityWithParamComponent<TParam>` are replaced by one `Identity` type with no param type. `@component` fields, fields with a `to` clause (upstream's `pointer`, whose overload names the target's `__link` output type), and other fields get the same overload.
 - `entity` literals get an overload returning `void`. Upstream has no `entity` keyword.
 - There is no `no_babel_transform` switch form, because i2 has no such option. The implementation throws, as upstream's default does, without the sentence naming `options.no_babel_transform`.
+- Entrypoint imports are `import type`, with `artifact_import_identifier`'s name and `artifact_import_specifier(iso.ts, ..)`'s specifier (`./Query/HomeRoute/entrypoint`). Upstream writes `'../__isograph/...'`, which names the same file.
+- Upstream's comments are not printed: the emitter prints the AST, and the AST carries no comments.
 - Overloads are ordered by comparing the matched strings byte by byte with end-of-string after every byte. That is upstream's `sort_field_name` rule (a string sorts before every string it is a prefix of) applied to the whole `field Parent.name` text, so `field Pet.Avatar` cannot shadow `field Pet.AvatarCard`.
 
-For sources `Field(Pet.fullName)`, `Entity(Owner)`, `Entrypoint(Query.HomeRoute)`, the file is exactly:
+```rust
+// from crates/isograph_extract_typescript/src/generate_artifacts.rs
+/// `iso.ts` for `sources`.
+fn iso_overload_file(sources: &BTreeSet<ArtifactSource>) -> (ArtifactPath, String);
 
-````ts
-import entrypoint_Query__HomeRoute from '../__isograph/Query/HomeRoute/entrypoint';
+/// The text an overload's `MatchesWhitespaceAndString` matches: `field Pet.fullName`,
+/// `entity Owner`, `entrypoint Query.HomeRoute`.
+fn overload_match_text(source: &ArtifactSource) -> String;
 
-// This is the type given to client fields. The exported iso literal
-// has exactly the type of the passed-in function.
-type Identity = <TClientField extends (...args: never[]) => unknown>(
-  clientField: TClientField
-) => TClientField;
-
-type WhitespaceCharacter = ' ' | '\t' | '\n';
-type Whitespace<In> = In extends `${WhitespaceCharacter}${infer In}`
-  ? Whitespace<In>
-  : In;
-
-// This is a recursive TypeScript type that matches strings that
-// start with whitespace, followed by TString. So e.g. if we have
-// ```
-// export function iso<T>(
-//   isographLiteralText: T & MatchesWhitespaceAndString<'field Query.foo', T>
-// ): Bar;
-// ```
-// then, when you call
-// ```
-// const x = iso(`
-//   field Query.foo ...
-// `);
-// ```
-// then the type of `x` will be `Bar`, both in VSCode and when running
-// tsc. This is how we achieve type safety — you can only use fields
-// that you have explicitly selected.
-type MatchesWhitespaceAndString<
-  TString extends string,
-  T
-> = Whitespace<T> extends `${TString}${string}` ? T : never;
-
-export function iso<T>(
-  param: T & MatchesWhitespaceAndString<'field Pet.fullName', T>
-): Identity;
-
-export function iso<T>(
-  param: T & MatchesWhitespaceAndString<'entity Owner', T>
-): void;
-
-export function iso<T>(
-  param: T & MatchesWhitespaceAndString<'entrypoint Query.HomeRoute', T>
-): typeof entrypoint_Query__HomeRoute;
-
-export function iso(_isographLiteralText: string):
-  | Identity
-  | string
-  | void
-{
-  throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
-      'was not set up, or it failed to identify this call site. Make sure it ' +
-      'is being used verbatim as `iso`.');
+/// Upstream's `sort_field_name` rule over the whole match text.
+fn overload_order(a: &str, b: &str) -> std::cmp::Ordering {
+    let key = |text: &str| text.bytes().map(u16::from).chain(std::iter::once(256));
+    key(a).cmp(key(b))
 }
-````
+```
 
-followed by one newline. Sections are field overloads, then entity overloads, then entrypoint overloads, each sorted by the rule above. The import list is the entrypoint imports in entrypoint-overload order, one per line, then one blank line. With no entrypoints the file starts with the blank line, as upstream's does. The import path `'../__isograph/<Parent>/<name>/entrypoint'` is upstream's. The identifier is `entrypoint_` followed by `EntityNameAndSelectableName::underscore_separated()`.
+For sources `Field(Pet.fullName)`, `Entity(Owner)`, `Entrypoint(Query.HomeRoute)`, the declarations are, in this order (shown as TypeScript; the exact spacing is the emitter's):
 
-The preamble keeps the comment block above `MatchesWhitespaceAndString` verbatim. It contains the text `` iso(` ``, which the TypeScript extractor would read as a literal; the watcher skip below keeps generated files out of the source files.
+```ts
+import type Query__HomeRoute__entrypoint from "./Query/HomeRoute/entrypoint";
+type Identity = <TClientField extends (...args: never[]) => unknown>(clientField: TClientField) => TClientField;
+type WhitespaceCharacter = " " | "\t" | "\n";
+type Whitespace<In> = In extends `${WhitespaceCharacter}${infer In}` ? Whitespace<In> : In;
+type MatchesWhitespaceAndString<TString extends string, T> = Whitespace<T> extends `${TString}${string}` ? T : never;
+export function iso<T>(param: T & MatchesWhitespaceAndString<"field Pet.fullName", T>): Identity;
+export function iso<T>(param: T & MatchesWhitespaceAndString<"entity Owner", T>): void;
+export function iso<T>(param: T & MatchesWhitespaceAndString<"entrypoint Query.HomeRoute", T>): typeof Query__HomeRoute__entrypoint;
+export function iso(_isographLiteralText: string): Identity | object | void {
+    throw new Error("iso: Unexpected invocation at runtime. Either the Babel transform was not set up, or it failed to identify this call site. Make sure it is being used verbatim as `iso`.");
+}
+```
+
+`import type X from` a module whose default export is a value lets `typeof X` name that value's type with no runtime import. The implementation's return union has `object` because every entrypoint artifact's default export is an object. Sections are field overloads, then entity overloads, then entrypoint overloads, each sorted by `overload_order`. Imports are the entrypoint imports in entrypoint-overload order.
+
+The emitted `iso.ts` has no comment containing `` iso(` ``; the watcher skip keeps generated files out of the source files regardless.
 
 ## Compiling and writing
 
 ```rust
 // from crates/isograph_cli/src/state.rs
-/// The absolute path of the generated `__isograph` folder.
+/// The absolute path of `<output_directory>/__isograph`.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ArtifactDirectory(pub PathBuf);
+pub struct ArtifactFolder(pub PathBuf);
 
-/// What the daemon last wrote into the artifact directory.
-#[derive(Debug)]
-pub enum WrittenArtifacts {
-    /// Nothing written since the daemon started, or the last write failed.
-    Unknown,
-    Written(BTreeMap<ArtifactPath, String>),
-}
+/// Every file under the artifact folder and its text: what the daemon read there at boot,
+/// then what it last wrote.
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ArtifactFiles(pub BTreeMap<ArtifactPath, String>);
 
 pub struct IsographState<TProfile: CompilationProfile> {
     pub db: IsographDb<TProfile>,
@@ -374,13 +488,13 @@ pub struct IsographState<TProfile: CompilationProfile> {
     client_ids: ClientIdSource,
     /// The compiler's reader of file text. No `LiveSession` and no `OpenFile` has it.
     compiler_client: ClientId,
-    /// `None` when the config has no `artifact_directory`.
-    pub(crate) artifact_directory: Option<ArtifactDirectory>,
-    pub(crate) written_artifacts: WrittenArtifacts,
+    /// `None` when the config has no `output_directory`.
+    pub(crate) artifact_folder: Option<ArtifactFolder>,
+    pub(crate) artifact_files: ArtifactFiles,
 }
 
 impl<TProfile: CompilationProfile> IsographState<TProfile> {
-    pub(crate) fn new(globs: ProjectGlobs, artifact_directory: Option<ArtifactDirectory>) -> Self {
+    pub(crate) fn new(globs: ProjectGlobs, artifact_folder: Option<ArtifactFolder>) -> Self {
         let mut client_ids = ClientIdSource::default();
         let compiler_client = client_ids.mint();
         Self {
@@ -391,14 +505,36 @@ impl<TProfile: CompilationProfile> IsographState<TProfile> {
             compile_debounce: None,
             client_ids,
             compiler_client,
-            artifact_directory,
-            written_artifacts: WrittenArtifacts::Unknown,
+            artifact_folder,
+            artifact_files: ArtifactFiles::default(),
         }
     }
 }
 ```
 
-`serve` passes `config.artifact_directory.map(|directory| ArtifactDirectory(config_directory.join(directory).join(ISOGRAPH_FOLDER)))`. Tests pass `None` unless they test generation.
+`serve` builds the folder as `config_directory.join(output_directory).join(ISOGRAPH_FOLDER)`. isograph_compiler gains a `serde` dependency for `ArtifactPath`, because `ArtifactFiles` rides in an `InternalEvent`.
+
+The folder's files are external truth, so they arrive as an event, like the boot scan:
+
+```rust
+// from crates/isograph_cli/src/event.rs
+pub enum InternalEvent {
+    HelloWorld,
+    Quit,
+    DiskChanged(DiskChanged),
+    ArtifactFilesRead(ArtifactFiles),
+}
+```
+
+```rust
+// from crates/isograph_cli/src/write_artifacts.rs
+/// Every file under `folder` and its text. A missing folder has no files. A file that is not
+/// UTF-8 is listed with its lossy text, which matches no artifact, so the next write replaces
+/// it.
+pub(crate) fn read_artifact_files(folder: &ArtifactFolder) -> ArtifactFiles;
+```
+
+`serve` posts `ArtifactFilesRead(read_artifact_files(&folder))` right after the boot scan's `DiskChanged`s, before `select!`, when the config has an output directory. `handle` of `ArtifactFilesRead` replaces `artifact_files` and returns no effects. Every boot `DiskChanged` arms the compile debounce before this event, and the fire comes 100 ms later, so the first compile diffs against the files on disk.
 
 `compile` before (compiler-errors.md change 3):
 
@@ -430,12 +566,12 @@ pub(crate) fn compile<TProfile: CompilationProfile>(
     generate_artifacts(state)
 }
 
-/// The write of every artifact that changed since the last write. No effects when the config
-/// has no `artifact_directory`, when any literal failed, or when nothing changed.
+/// The write of every artifact whose text differs from the artifact folder's. No effects when
+/// the config has no `output_directory`, when any literal failed, or when nothing changed.
 fn generate_artifacts<TProfile: CompilationProfile>(
     state: &mut IsographState<TProfile>,
 ) -> Vec<IsographEffect> {
-    let Some(directory) = state.artifact_directory.clone() else {
+    let Some(folder) = state.artifact_folder.clone() else {
         return no_effects();
     };
     let Some(sources) = project_artifact_sources(state.compile_input().reference())
@@ -444,49 +580,44 @@ fn generate_artifacts<TProfile: CompilationProfile>(
     else {
         return no_effects();
     };
-    let artifacts = TProfile::HostLanguage::generate_artifacts(sources.reference());
+    let next = ArtifactFiles(
+        TProfile::HostLanguage::generate_artifacts(sources.reference())
+            .into_iter()
+            .collect(),
+    );
     state
-        .written_artifacts
-        .replace(artifacts)
-        .map(|changes| {
-            IsographEffect::WriteArtifacts(WriteArtifactsEffect { directory, changes }.boxed())
-        })
+        .artifact_files
+        .replace(next)
+        .map(|changes| IsographEffect::WriteArtifacts(WriteArtifactsEffect { folder, changes }.boxed()))
         .into_iter()
         .collect()
 }
 ```
 
-`handle_timer_fired` calls `crate::compile::compile(state)` with `state: &mut`, which it already holds.
+`handle_timer_fired` already holds `state: &mut` and passes it.
 
 ```rust
 // from crates/isograph_cli/src/compile.rs
-impl WrittenArtifacts {
-    /// Records `artifacts` as written and returns how the directory must change. `None` when
-    /// nothing changes.
-    pub(crate) fn replace(&mut self, artifacts: Vec<Artifact>) -> Option<ArtifactChanges>;
+impl ArtifactFiles {
+    /// Records `next` as the artifact folder's files and returns how the folder must change.
+    /// `None` when nothing changes.
+    pub(crate) fn replace(&mut self, next: ArtifactFiles) -> Option<ArtifactChanges>;
 }
 ```
 
-`Unknown` becomes `Written` and the result is `Replace(artifacts)`. From `Written(old)`: `writes` is every artifact whose path is not in `old` or whose contents differ; `deletes` is every path of `old` not among `artifacts`; both empty is `None`. The new map replaces `old` in every case.
+`writes` is every file of `next` whose path is not in `self` or whose text differs; `deletes` is every path of `self` not in `next`; both empty is `None`. `next` replaces `self` in every case.
 
 ```rust
 // from crates/isograph_cli/src/effect.rs
 #[derive(Debug)]
 pub struct WriteArtifactsEffect {
-    pub directory: ArtifactDirectory,
+    pub folder: ArtifactFolder,
     pub changes: ArtifactChanges,
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum ArtifactChanges {
-    /// Delete the directory, then write every artifact.
-    Replace(Vec<Artifact>),
-    Update(ArtifactUpdate),
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct ArtifactUpdate {
-    pub writes: Vec<Artifact>,
+pub struct ArtifactChanges {
+    pub writes: Vec<(ArtifactPath, String)>,
     pub deletes: Vec<ArtifactPath>,
 }
 
@@ -507,9 +638,15 @@ pub enum IsographEffect {
 ```rust
 // from crates/isograph_cli/src/daemon.rs
         IsographEffect::WriteArtifacts(write) => {
+            let folder = write.folder.clone();
             crate::write_artifacts::write_artifacts(*write).unwrap_or_else(|error| {
                 tracing::error!(%error, "could not write the artifacts");
-                let _ = event_tx.send(crate::event::InternalEvent::ArtifactWriteFailed.to());
+                let _ = event_tx.send(
+                    crate::event::InternalEvent::ArtifactFilesRead(
+                        crate::write_artifacts::read_artifact_files(folder.reference()),
+                    )
+                    .to(),
+                );
             });
             ControlFlow::Continue(())
         }
@@ -517,39 +654,27 @@ pub enum IsographEffect {
 
 ```rust
 // from crates/isograph_cli/src/write_artifacts.rs
-/// Applies `effect.changes` under `effect.directory`. Every path it touches is the directory
-/// joined with an `ArtifactPath`.
+/// Applies `effect.changes` under `effect.folder`. Every path it touches is the folder joined
+/// with an `ArtifactPath`'s segments.
 pub(crate) fn write_artifacts(effect: WriteArtifactsEffect) -> std::io::Result<()>;
 ```
 
-`Replace`: `remove_dir_all(directory)` (`NotFound` is fine), then for each artifact `create_dir_all` of its parent and `fs::write`. `Update`: each write the same way; each delete `remove_file`, then `remove_dir` of each ancestor below the directory, innermost first, stopping at the first that is not empty.
+Each write is `create_dir_all` of the parent and `fs::write`. Each delete is `remove_file`, then `remove_dir` of each ancestor below the folder, innermost first, stopping at the first that is not empty. After a failed write, `perform` reads the folder again and posts what is there, so the next compile diffs against the truth. Reading the folder in `perform` is outer I/O whose result arrives as an event, the shape the watcher has.
 
-```rust
-// from crates/isograph_cli/src/event.rs
-pub enum InternalEvent {
-    HelloWorld,
-    Quit,
-    DiskChanged(DiskChanged),
-    ArtifactWriteFailed,
-}
-```
-
-`handle` of `ArtifactWriteFailed` sets `written_artifacts` to `Unknown`, so the next compile replaces the directory. It arms nothing; the next `DiskChanged` compiles.
-
-`ArtifactPath`s are built from entity and selectable names (`Query/HomeRoute/entrypoint.ts`) and the fixed `iso.ts`. The tokenizer admits only `[_A-Za-z][_0-9A-Za-z]*` as a name, so no `ArtifactPath` has `/` in a name segment or a `..` component, and no write leaves the directory.
+`ArtifactPath`s are built from entity and selectable names and fixed file names. The tokenizer admits only `[a-zA-Z_][a-zA-Z0-9_]*` as a name, so no generated `ArtifactPath` has a `..` component, and no write leaves the folder. `read_artifact_files` builds paths from entries under the folder, so no delete leaves it either.
 
 ### Watcher skip
 
-Before: `is_skipped_isograph(path, config_directory)` skips `<config dir>/__isograph`. After, `ProjectGlobs` carries the generated folder relative to the config directory, and every caller of `is_skipped_isograph` asks it:
+Before: `is_skipped_isograph(path, config_directory)` skips `<config dir>/__isograph`. After, `ProjectGlobs` carries the artifact folder relative to the config directory, and every caller of `is_skipped_isograph` asks it:
 
 ```rust
 // from crates/isograph_cli/src/watch.rs
-/// The config's `source_files` and `schema` globs, and the generated folder the watcher skips.
+/// The config's `source_files` and `schema` globs, and the artifact folder the watcher skips.
 #[derive(Clone)]
 pub(crate) struct ProjectGlobs {
     source_files: Globs,
     schema: Globs,
-    /// `<artifact_directory>/__isograph`, or `__isograph` when the config has none.
+    /// `<output_directory>/__isograph`, or `__isograph` when the config has none.
     artifact_folder: PathBuf,
 }
 
@@ -557,76 +682,84 @@ impl ProjectGlobs {
     pub(crate) fn parse(
         source_files: &[String],
         schema: &[String],
-        artifact_directory: Option<&Path>,
+        output_directory: Option<&Path>,
     ) -> Result<Self, WatchError>;
 
-    /// `path` is inside the generated folder.
+    /// `path` is inside the artifact folder.
     fn is_in_artifact_folder(&self, path: &Path, config_directory: &Path) -> bool {
         path.starts_with(config_directory.join(self.artifact_folder.reference()))
     }
 }
 ```
 
-`visit_dirs_skipping_isograph` and `visit_dirs_skipping_isograph_from` take `&ProjectGlobs`. With no `artifact_directory`, the skipped folder is `<config dir>/__isograph`, today's behavior.
+`visit_dirs_skipping_isograph` and `visit_dirs_skipping_isograph_from` take `&ProjectGlobs`. With no `output_directory`, the skipped folder is `<config dir>/__isograph`, today's behavior and where the transforms look.
 
 ## Pet demo
 
-`demos/pet-demo/isograph.config.json` gains `"artifact_directory": "src"`. `src/iso.ts` keeps only `ResolverParameters`; every source imports `iso` from `./__isograph/iso`. Upstream commits its demos' `__isograph` folders, so `demos/pet-demo/src/__isograph/` is committed, generated by running the daemon on a copy of the demo. `tsc --noEmit --strict` over the demo's `src` passes.
+`demos/pet-demo/isograph.config.json` gains `"output_directory": "src"`, so artifacts are in `src/__isograph/`, upstream's demo layout. The hand-written `iso` in `src/iso.ts` is deleted; every source imports `iso` from `./__isograph/iso`. `src/iso.ts` keeps only `ResolverParameters`, and the resolvers keep their `ResolverParameters<...>` annotations while field overloads return `Identity`. Each entrypoint literal's value is logged (`console.log(iso(\`entrypoint Query.HomeRoute\`).name)`), so the demo reads the artifact. Upstream commits its demos' `__isograph` folders, so `demos/pet-demo/src/__isograph/` is committed, generated by running the daemon on a copy of the demo. `tsc --noEmit --strict` over the demo's `src` passes.
 
 ## Changes
 
-Each change is one commit. compiler-errors.md changes 1 to 3 come first, as written there.
+Each change is one commit. compiler-errors.md changes 1 to 3 come first (landed).
 
-### 1. `artifact_directory` and the watcher skip
+### 1. `output_directory` and the watcher skip
 
-The config field, `ProjectGlobs::artifact_folder`, `is_in_artifact_folder`, `visit_dirs_skipping_isograph*` taking `&ProjectGlobs`.
+The config field, `ProjectGlobs::artifact_folder`, `is_in_artifact_folder`, `visit_dirs_skipping_isograph*` taking `&ProjectGlobs`, `serve` passing the field to `ProjectGlobs::parse`.
 
-Tests: a config with `"artifact_directory": "src"` parses to `Some("src")`; without it, `None`. Watch harness with `artifact_directory` `src`: a file under `src/__isograph/` is not posted and the boot scan skips it; a file under `__isograph/` at the config root is posted. Without `artifact_directory`, `__isograph/` at the root is skipped and `src/__isograph/` is posted (today's test).
+Tests: a config with `"output_directory": "src"` parses to `Some("src")`; without it, `None`. Watch harness with `output_directory` `src`: a file under `src/__isograph/` is not posted and the boot scan skips it; a file under `__isograph/` at the config root is posted. Without `output_directory`, `__isograph/` at the root is skipped and `src/__isograph/` is posted (today's test).
 
 ### 2. `artifact_sources_in_file`
 
 `ArtifactSource`, `LiteralParseFailed`, `artifact_sources_in_file` in `crates/isograph_compiler/src/artifacts.rs`.
 
-Tests (`crates/isograph_extract_typescript`, whose host extracts literals): a file with `field Pet.fullName`, `entity Owner`, and `entrypoint Query.HomeRoute` lists the three sources in order; a literal with a parse error is `Err(LiteralParseFailed { path, index })` and its siblings are `Ok`; `field Pet.bestFriend to Pet { id }` is `Field(Pet.bestFriend)`; a file with no literals is `Some(vec![])`; a path with no text is `None`.
+Tests (`crates/isograph_compiler`, whose test host extracts `` iso(`...`) ``): a file with `field Pet.fullName`, `entity Owner`, and `entrypoint Query.HomeRoute` lists the three sources in order; a literal with a parse error is `Err(LiteralParseFailed { path, index })` and its siblings are `Ok`; `field Pet.bestFriend to Pet { id }` is `Field(Pet.bestFriend)`; a file with no literals is `Some(vec![])`; a path with no text is `None`.
 
-### 3. `generate_artifacts` for TypeScript
+### 3. TypeScript generation
 
-`ArtifactPath`, `Artifact`, the trait method, the test hosts' empty implementations, `TypeScriptHostLanguage::generate_artifacts` in `crates/isograph_extract_typescript/src/generate_artifacts.rs`.
+`ArtifactPath`, `ArtifactFile`, `ArtifactModule`, `ArtifactValue`, `ArtifactObjectEntry`, `ArtifactImport`, the trait method and the test hosts' implementations, the swc_core dependency, `TypeScriptHostLanguage::generate_artifacts`, `entrypoint_artifact`, `print_module` and its helpers, `iso_overload_file`.
 
-Tests, facts about the text:
+Tests (`crates/isograph_extract_typescript/src/generate_artifacts.rs`), facts about values and text:
 
-- `Entrypoint(Query.HomeRoute)` yields an artifact at `Query/HomeRoute/entrypoint.ts` whose contents are `export default "Query.HomeRoute";\n`.
-- `iso.ts` contains `import entrypoint_Query__HomeRoute from '../__isograph/Query/HomeRoute/entrypoint';` and the overload whose matched string is `'entrypoint Query.HomeRoute'` returns `typeof entrypoint_Query__HomeRoute;`.
-- `Field(Pet.fullName)` yields the overload matching `'field Pet.fullName'` returning `Identity;`, and no import.
-- `Entity(Owner)` yields the overload matching `'entity Owner'` returning `void;`.
+- `Entrypoint(Query.HomeRoute)` yields `Query/HomeRoute/entrypoint.ts` whose text has `export default`, `kind: "Entrypoint"`, and `name: "Query.HomeRoute"`.
+- `print_module` of an object holding the same `Import` twice and a second `Import` has exactly two import declarations, in path order, and the value names each by its identifier.
+- `print_module` of the same module twice is the same text.
+- `artifact_import_specifier` from `Query/A/reader.ts` to `Query/A/entrypoint.ts` is `./entrypoint`; from `iso.ts` to `Query/A/entrypoint.ts` is `./Query/A/entrypoint`; from `Query/A/x.ts` to `Pet/B/y.ts` is `./../../Pet/B/y`.
+- A string with `"`, `'`, `\`, a newline, and `é` prints as a literal that a JSON string parse of the printed literal returns unchanged; nested arrays and objects print with their nesting; `Null`, `Boolean`, and `Number` print as `null`, `true`/`false`, and the number.
+- `iso.ts` contains an import type of `./Query/HomeRoute/entrypoint` named `Query__HomeRoute__entrypoint`, and the overload matching `"entrypoint Query.HomeRoute"` returns `typeof Query__HomeRoute__entrypoint`.
+- `Field(Pet.fullName)` yields the overload matching `"field Pet.fullName"` returning `Identity`, and no import.
+- `Entity(Owner)` yields the overload matching `"entity Owner"` returning `void`.
 - `Field(Pet.Avatar)` and `Field(Pet.AvatarCard)`: the `AvatarCard` overload comes first.
 - Field overloads precede entity overloads, which precede entrypoint overloads.
-- No sources: `iso.ts` is the only artifact, it has no `import`, and it ends with `}\n`.
-- Every entrypoint import path names an artifact the same call returned.
-- No line of any artifact ends in whitespace.
+- No sources: `iso.ts` is the only artifact and it has no import.
 
 ### 4. Generate on the compile fire and write
 
-`ArtifactDirectory`, `WrittenArtifacts`, `IsographState::new` taking the directory, `serve` building it, `source_paths`, `ArtifactSourcesError`, `project_artifact_sources`, `compile` taking `&mut`, `generate_artifacts`, `ArtifactChanges`, `ArtifactUpdate`, `WriteArtifactsEffect`, `write_artifacts`, `InternalEvent::ArtifactWriteFailed`.
+`ArtifactFolder`, `ArtifactFiles`, `IsographState::new` taking the folder, `serve` building it and posting `ArtifactFilesRead`, `InternalEvent::ArtifactFilesRead`, `source_paths`, `ArtifactSourcesError`, `project_artifact_sources`, `compile` taking `&mut`, `generate_artifacts`, `ArtifactChanges`, `WriteArtifactsEffect`, `read_artifact_files`, `write_artifacts`.
 
-Handle tests (`crates/isograph_cli/src/compile.rs`, TypeScript test profile, artifact directory `/tmp/proj/src/__isograph`):
+Handle tests (`crates/isograph_cli/src/compile.rs`, TypeScript test profile, artifact folder `/tmp/proj/src/__isograph`):
 
-- The compile fire after the first source file returns one `WriteArtifacts` with `Replace`, containing `iso.ts` and `Query/HomeRoute/entrypoint.ts`.
-- Without an artifact directory the fire returns no effects.
+- The compile fire after the first source file returns one `WriteArtifacts` whose `writes` are `iso.ts` and `Query/HomeRoute/entrypoint.ts` and whose `deletes` is empty.
+- Without an artifact folder the fire returns no effects.
 - A second fire with no change returns no effects.
 - Editing one field literal's selection set (the iso.ts text does not change) returns no effects.
-- Adding a field literal returns `Update` whose `writes` is only `iso.ts` and whose `deletes` is empty.
-- Removing the file with `entrypoint Query.HomeRoute` returns `Update` with `iso.ts` in `writes` and `Query/HomeRoute/entrypoint.ts` in `deletes`.
+- Adding a field literal returns a write of only `iso.ts`.
+- Removing the file with `entrypoint Query.HomeRoute` writes `iso.ts` and deletes `Query/HomeRoute/entrypoint.ts`.
 - A source with a parse error returns no effects; fixing it returns the write.
 - A file outside the `source_files` globs with a broken literal does not block the write.
-- `ArtifactWriteFailed` followed by a fire returns `Replace`.
+- `ArtifactFilesRead` with `iso.ts` already holding the generated text and a stale `Old/x.ts`, then a fire: the write omits `iso.ts` and deletes `Old/x.ts`.
 
-`write_artifacts` tests (a `tempfile` directory): `Replace` removes a pre-existing file in the directory and writes every artifact; `Update` leaves an unlisted file's modification time unchanged, overwrites the listed one, deletes the stale file, and removes its emptied folders; a file beside the directory is untouched by both.
+`write_artifacts` and `read_artifact_files` tests (a `tempfile` directory): `read_artifact_files` of a missing folder is empty and of a nested tree lists every file with its text; `write_artifacts` overwrites a listed file, leaves an unlisted file's modification time unchanged, creates a nested file's folders, deletes a stale file and removes its emptied folders, and leaves a file beside the folder untouched.
 
 ### 5. Pet demo output
 
-The demo config, `src/iso.ts`, the imports, and the committed generated folder.
+The demo config, `src/iso.ts`, the imports, the logged entrypoints, and the committed generated folder.
+
+## Later
+
+- Query generation adds `queryText: Import(query_text.ts)` to the entrypoint artifact, where `query_text.ts` is a `Module` whose default export is the protocol-produced query string. When the network protocol also produces a raw query file (`query_text.graphql` for GraphQL), `ArtifactFile` gains `Raw(RawArtifactFile)` for it, written and diffed like every other file.
+- Param types per field (upstream's `param_type.ts`): field overloads return `IdentityWithParam<Parent__field__param>` and type the resolver's parameter. Then `ResolverParameters` and every use of it are deleted from the pet demo.
+- The SWC transform's literal regex accepts `entrypoint`, `field`, and `pointer`; an `entity` literal is a transform error there. Teaching the transform `entity` is separate work.
 
 ## Docs this doc amends
 
-docs-website/docs/design-docs/event-model.md, in change 4: the `IsographEffect` listing gains `WriteArtifacts(Box<WriteArtifactsEffect>)`; `InternalEvent` gains `ArtifactWriteFailed`; the Inner paragraph gains "After computing errors, the compile fire generates every artifact when the config names an `artifact_directory`, and returns `WriteArtifacts` with what changed since the last write." The Outer effect-loop bullet gains `WriteArtifacts`.
+docs-website/docs/design-docs/event-model.md, in change 4: the `IsographEffect` listing gains `WriteArtifacts(Box<WriteArtifactsEffect>)`; `InternalEvent` gains `ArtifactFilesRead(ArtifactFiles)`; the Inner paragraph gains "After computing errors, the compile fire generates every artifact when the config names an `output_directory`, and returns `WriteArtifacts` with the files whose text differs from `artifact_files`." The State paragraph's "Artifact generation will be an effect `handle` returns after compile." becomes "Artifact generation is the `WriteArtifacts` effect `handle` returns after compile." The Outer effect-loop bullet gains `WriteArtifacts`.
