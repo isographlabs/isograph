@@ -6,7 +6,10 @@ mod selectable_for_path;
 #[cfg(test)]
 mod test_profile;
 
-pub use database::{ClientId, DiskFile, DiskFileMap, IsographDb, SchemaFileSet, file_contents};
+pub use database::{
+    ClientId, DiskFile, DiskFileMap, FileMembership, IsographDb, OpenFileKey, SchemaPathMap,
+    SourcePathMap, file_contents,
+};
 pub use host_language::*;
 pub use iso_literals::{
     LiteralId, extract_iso_literals, iso_literal_extraction, iso_literal_parse_errors_in_file,

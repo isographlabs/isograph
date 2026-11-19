@@ -154,6 +154,11 @@ mod tests {
         iso_literal_at_lsp_position, selectable_hover_markdown,
     };
 
+    const SOURCE_FILE: isograph_compiler::FileMembership = isograph_compiler::FileMembership {
+        source_file: isograph_compiler::IncludeFile::Include,
+        schema_file: isograph_compiler::IncludeFile::Skip,
+    };
+
     fn client() -> ClientId {
         ClientId(1)
     }
@@ -165,7 +170,7 @@ mod tests {
     fn db_with(contents: &str) -> (IsographDb<TestProfile>, RelativePathToSourceFile) {
         let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
-        db.insert_disk_file(path, contents.to_owned());
+        db.insert_disk_file(path, SOURCE_FILE, contents.to_owned());
         (db, path)
     }
 
@@ -319,8 +324,8 @@ mod tests {
         let mut db = IsographDb::<TestProfile>::default();
         let a = intern_path("src/a.ts");
         let b = intern_path("src/b.ts");
-        db.insert_disk_file(a, contents.to_owned());
-        db.insert_disk_file(b, contents.to_owned());
+        db.insert_disk_file(a, SOURCE_FILE, contents.to_owned());
+        db.insert_disk_file(b, SOURCE_FILE, contents.to_owned());
         let position = at(0, column_of(contents, "entrypoint"));
         let (_, in_a, _) =
             ast_at_lsp_position(&db, client(), a, position).expect("file a has the literal");
@@ -335,7 +340,7 @@ mod tests {
         let (mut db, path) = db_with(contents);
         let character = column_of(contents, "entrypoint");
         let before = literal_at(&db, path, at(0, character));
-        db.insert_disk_file(path, "const x = 1;\n".to_owned() + contents);
+        db.insert_disk_file(path, SOURCE_FILE, "const x = 1;\n".to_owned() + contents);
         assert_eq!(literal_at(&db, path, at(1, character)), before);
         assert_eq!(literal_at(&db, path, at(0, character)), None);
     }
@@ -347,6 +352,7 @@ mod tests {
         assert_eq!(before, (index(path, 0), Span::new(0, 1)).wrap_some());
         db.insert_disk_file(
             path,
+            SOURCE_FILE,
             "const x = 1; const y = 2;\niso(`entrypoint Query.HomeRoute`)".to_owned(),
         );
         assert_eq!(literal_at(&db, path, at(1, 5)), before);
@@ -355,7 +361,12 @@ mod tests {
     #[test]
     fn a_buffer_names_its_literal_for_its_client_and_disk_for_another() {
         let (mut db, path) = db_with("iso(`entrypoint Query.Disk`)");
-        db.set_open_file(client(), path, "iso(`entrypoint Query.Buffer`)".to_owned());
+        db.set_open_file(
+            client(),
+            path,
+            SOURCE_FILE,
+            "iso(`entrypoint Query.Buffer`)".to_owned(),
+        );
         let position = at(0, "iso(`".len() as u32);
         let text_for = |client: ClientId| {
             let (literal_id, _) = iso_literal_at_lsp_position(&db, client, path, position)

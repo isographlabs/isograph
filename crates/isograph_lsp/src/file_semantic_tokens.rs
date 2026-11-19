@@ -35,6 +35,11 @@ mod tests {
 
     use super::lsp_semantic_tokens_for_file;
 
+    const SOURCE_FILE: isograph_compiler::FileMembership = isograph_compiler::FileMembership {
+        source_file: isograph_compiler::IncludeFile::Include,
+        schema_file: isograph_compiler::IncludeFile::Skip,
+    };
+
     fn client() -> ClientId {
         ClientId(1)
     }
@@ -48,7 +53,7 @@ mod tests {
         path: RelativePathToSourceFile,
         contents: &str,
     ) {
-        db.insert_disk_file(path, contents.to_owned());
+        db.insert_disk_file(path, SOURCE_FILE, contents.to_owned());
     }
 
     const KEYWORD: u32 = 15;
@@ -202,7 +207,12 @@ mod tests {
         let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         intern_file(&mut db, path, "iso(`field Query.x { id }`)");
-        db.set_open_file(client(), path, "iso(`entrypoint Query.A`)".to_owned());
+        db.set_open_file(
+            client(),
+            path,
+            SOURCE_FILE,
+            "iso(`entrypoint Query.A`)".to_owned(),
+        );
         let buffer = lsp_semantic_tokens_for_file::<TestProfile>(&db, client(), path)
             .as_ref()
             .expect("the client has a buffer")

@@ -2,7 +2,9 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use globset::Glob;
-use isograph_compiler::{CompilationProfile, HostLanguage, IncludeFile, NetworkProtocol};
+use isograph_compiler::{
+    CompilationProfile, FileMembership, HostLanguage, IncludeFile, NetworkProtocol,
+};
 use isograph_config::ISOGRAPH_FOLDER;
 use notify::event::{CreateKind, ModifyKind, RemoveKind, RenameMode};
 use notify::{EventKind, RecommendedWatcher, RecursiveMode};
@@ -219,6 +221,17 @@ impl ProjectGlobs {
             return IncludeFile::Skip;
         }
         TProfile::NetworkProtocol::should_include_schema_file(relative)
+    }
+
+    /// Which of the config's file lists `relative` belongs to.
+    pub(crate) fn membership<TProfile: CompilationProfile>(
+        &self,
+        relative: &Path,
+    ) -> FileMembership {
+        FileMembership {
+            source_file: self.should_include_source_file::<TProfile>(relative),
+            schema_file: self.should_include_schema_file::<TProfile>(relative),
+        }
     }
 
     /// A source file or a schema file.
@@ -1051,9 +1064,9 @@ mod tests {
     fn schema_paths(state: &IsographState<InHostProfile>) -> Vec<String> {
         let mut paths: Vec<String> = state
             .db
-            .get_schema_file_set()
+            .get_schema_path_map()
             .untracked()
-            .0
+            .disk
             .iter()
             .map(|path| path.lookup().to_owned())
             .collect();

@@ -44,6 +44,11 @@ mod tests {
 
     use super::lsp_diagnostics_for_file;
 
+    const SOURCE_FILE: isograph_compiler::FileMembership = isograph_compiler::FileMembership {
+        source_file: isograph_compiler::IncludeFile::Include,
+        schema_file: isograph_compiler::IncludeFile::Skip,
+    };
+
     fn client() -> ClientId {
         ClientId(1)
     }
@@ -55,7 +60,7 @@ mod tests {
     fn diagnostics_of(contents: &str) -> Vec<lsp_types::Diagnostic> {
         let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
-        db.insert_disk_file(path, contents.to_owned());
+        db.insert_disk_file(path, SOURCE_FILE, contents.to_owned());
         lsp_diagnostics_for_file(&db, client(), path)
             .clone()
             .expect("the test interned this path")
@@ -77,7 +82,7 @@ mod tests {
     fn each_diagnostic_is_an_error_from_isograph_with_the_parse_error_message() {
         let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
-        db.insert_disk_file(path, "iso(`entrypoint`)".to_owned());
+        db.insert_disk_file(path, SOURCE_FILE, "iso(`entrypoint`)".to_owned());
         let errors = iso_literal_parse_errors_in_file(&db, client(), path)
             .clone()
             .expect("the test interned this path");

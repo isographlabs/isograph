@@ -13,6 +13,7 @@ use tracing::warn;
 
 use crate::effect::{IsographEffect, no_effects};
 use crate::state::IsographState;
+use crate::watch::ProjectGlobs;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
 pub(crate) enum UriPathError {
@@ -128,7 +129,7 @@ pub(crate) fn on_did_open<TProfile: CompilationProfile>(
     client: ClientId,
     params: lsp_types::DidOpenTextDocumentParams,
 ) -> Vec<IsographEffect> {
-    did_open(&mut state.db, client, params).map_or_else(
+    did_open(&mut state.db, state.globs.reference(), client, params).map_or_else(
         |error| {
             warn!(%error, "didOpen");
             no_effects()
@@ -142,7 +143,7 @@ pub(crate) fn on_did_change<TProfile: CompilationProfile>(
     client: ClientId,
     params: lsp_types::DidChangeTextDocumentParams,
 ) -> Vec<IsographEffect> {
-    did_change(&mut state.db, client, params).map_or_else(
+    did_change(&mut state.db, state.globs.reference(), client, params).map_or_else(
         |error| {
             warn!(%error, "didChange");
             no_effects()
@@ -167,16 +168,23 @@ pub(crate) fn on_did_close<TProfile: CompilationProfile>(
 
 fn did_open<TProfile: CompilationProfile>(
     db: &mut IsographDb<TProfile>,
+    globs: &ProjectGlobs,
     client: ClientId,
     params: lsp_types::DidOpenTextDocumentParams,
 ) -> Result<(), UriPathError> {
     let path = relative_from_uri(db, params.text_document.uri.reference())?;
-    db.set_open_file(client, path, params.text_document.text);
+    db.set_open_file(
+        client,
+        path,
+        globs.membership::<TProfile>(Path::new(path.lookup())),
+        params.text_document.text,
+    );
     ().wrap_ok()
 }
 
 fn did_change<TProfile: CompilationProfile>(
     db: &mut IsographDb<TProfile>,
+    globs: &ProjectGlobs,
     client: ClientId,
     params: lsp_types::DidChangeTextDocumentParams,
 ) -> Result<(), DidChangeError> {
@@ -187,7 +195,12 @@ fn did_change<TProfile: CompilationProfile>(
         return DidChangeError::RangedChange.wrap_err();
     }
     let path = relative_from_uri(db, params.text_document.uri.reference())?;
-    db.set_open_file(client, path, change.text);
+    db.set_open_file(
+        client,
+        path,
+        globs.membership::<TProfile>(Path::new(path.lookup())),
+        change.text,
+    );
     ().wrap_ok()
 }
 
@@ -323,13 +336,22 @@ pub(crate) mod tests {
     use crate::test_profile::TestProfile;
     use common_lang_types::RelativePathToSourceFile;
     use intern::string_key::Intern;
-    use isograph_compiler::{ClientId, IsographDb};
+    use isograph_compiler::{ClientId, FileMembership, IncludeFile, IsographDb};
     use prelude::Postfix;
 
     use super::{
         PathUriError, definition_lsp_location, format_iso_literals, relative_from_uri, uri_for_path,
     };
     use crate::state::intern_config_directory;
+
+    const SOURCE_FILE: FileMembership = FileMembership {
+        source_file: IncludeFile::Include,
+        schema_file: IncludeFile::Skip,
+    };
+    const SCHEMA_FILE: FileMembership = FileMembership {
+        source_file: IncludeFile::Skip,
+        schema_file: IncludeFile::Include,
+    };
 
     const PRETTY: &str = "export const fullName = iso(`\n  field Pet.fullName @foo(\n    bar: 123,\n    baz: $qux,\n  ) {\n    id,\n  }\n`);\n";
 
@@ -339,7 +361,7 @@ pub(crate) mod tests {
             &mut db,
             std::path::Path::new("/tmp/proj/isograph.config.json"),
         );
-        db.insert_disk_file("src/Pet.ts".intern().to(), contents);
+        db.insert_disk_file("src/Pet.ts".intern().to(), SOURCE_FILE, contents);
         db
     }
 
@@ -511,7 +533,7 @@ pub(crate) mod tests {
         let mut db = db_with(PRETTY.to_owned());
         (0usize..=4).for_each(|spaces| {
             let buffer = source_with_blank_spaces(spaces);
-            db.set_open_file(client(), path(), buffer.clone());
+            db.set_open_file(client(), path(), SOURCE_FILE, buffer.clone());
             let edits = format_iso_literals(&db, client(), path()).expect("edits");
             assert_eq!(apply_text_edits(&buffer, &edits), PRETTY, "spaces={spaces}");
         });
@@ -524,7 +546,7 @@ pub(crate) mod tests {
 
     /// Formats `buffer` as client 1's open buffer, checks the edits, and returns the edited text.
     fn formatted_buffer(db: &mut IsographDb<TestProfile>, buffer: &str) -> String {
-        db.set_open_file(client(), path(), buffer.to_owned());
+        db.set_open_file(client(), path(), SOURCE_FILE, buffer.to_owned());
         let edits = format_iso_literals(db, client(), path()).expect("edits");
         assert_edits_replace_disjoint_interiors(buffer, &edits);
         apply_text_edits(buffer, &edits)
@@ -540,7 +562,7 @@ pub(crate) mod tests {
     #[test]
     fn two_literals_where_the_first_grows_are_two_edits_that_format_both() {
         let mut db = db_with(String::new());
-        db.set_open_file(client(), path(), TWO_LITERALS.to_owned());
+        db.set_open_file(client(), path(), SOURCE_FILE, TWO_LITERALS.to_owned());
         let edits = format_iso_literals(&db, client(), path()).expect("edits");
         assert_eq!(edits.len(), 2);
         assert_formats_to(TWO_LITERALS, TWO_LITERALS_PRETTY);
@@ -711,7 +733,11 @@ pub(crate) mod tests {
     #[test]
     fn a_definition_maps_to_the_defining_files_uri_and_range() {
         let mut db = config_db();
-        db.insert_disk_file("src/schema.graphql".intern().to(), SCHEMA.to_owned());
+        db.insert_disk_file(
+            "src/schema.graphql".intern().to(),
+            SCHEMA_FILE,
+            SCHEMA.to_owned(),
+        );
         assert_eq!(
             definition_lsp_location(db.reference(), client(), owner_definition()),
             lsp_types::Location {
@@ -728,8 +754,8 @@ pub(crate) mod tests {
     fn a_definition_range_comes_from_the_clients_buffer_of_the_defining_file() {
         let mut db = config_db();
         let schema_path: RelativePathToSourceFile = "src/schema.graphql".intern().to();
-        db.insert_disk_file(schema_path, SCHEMA.to_owned());
-        db.set_open_file(client(), schema_path, format!("\n{SCHEMA}"));
+        db.insert_disk_file(schema_path, SCHEMA_FILE, SCHEMA.to_owned());
+        db.set_open_file(client(), schema_path, SCHEMA_FILE, format!("\n{SCHEMA}"));
         let range_for = |client: ClientId| {
             definition_lsp_location(db.reference(), client, owner_definition())
                 .map(|location| location.range)

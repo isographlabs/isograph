@@ -7,7 +7,7 @@ use common_lang_types::{
 };
 use intern::Lookup;
 use intern::string_key::Intern;
-use isograph_compiler::{ClientId, CompilationProfile, IncludeFile};
+use isograph_compiler::{ClientId, CompilationProfile};
 use pico::Database;
 use prelude::Postfix;
 
@@ -294,12 +294,11 @@ fn apply_disk_changed<TProfile: CompilationProfile>(
         DiskChanged::File(change) => {
             let path = relative_path_to_source_file(db, &change.path)?;
             match change.presence {
-                Presence::Present(contents) => {
-                    match globs.should_include_schema_file::<TProfile>(Path::new(path.lookup())) {
-                        IncludeFile::Include => db.insert_schema_file(path, contents),
-                        IncludeFile::Skip => db.insert_disk_file(path, contents),
-                    }
-                }
+                Presence::Present(contents) => db.insert_disk_file(
+                    path,
+                    globs.membership::<TProfile>(Path::new(path.lookup())),
+                    contents,
+                ),
                 Presence::Absent => db.remove_disk_file(path),
             }
         }
@@ -315,6 +314,7 @@ fn apply_disk_changed<TProfile: CompilationProfile>(
 mod tests {
     use std::path::{Path, PathBuf};
 
+    use intern::Lookup;
     use intern::string_key::Intern;
     use lsp_types::notification::Notification;
     use lsp_types::request::Request;
@@ -333,6 +333,11 @@ mod tests {
     use crate::timer::TimerPayload;
     use isograph_compiler::ClientId;
     use std::collections::HashMap;
+
+    const SOURCE_FILE: isograph_compiler::FileMembership = isograph_compiler::FileMembership {
+        source_file: isograph_compiler::IncludeFile::Include,
+        schema_file: isograph_compiler::IncludeFile::Skip,
+    };
 
     fn interned(s: &str) -> common_lang_types::RelativePathToSourceFile {
         s.intern().to()
@@ -961,7 +966,7 @@ mod tests {
         let mut state = with_config();
         state
             .db
-            .insert_disk_file(interned("src/x.ts"), "disk".to_owned());
+            .insert_disk_file(interned("src/x.ts"), SOURCE_FILE, "disk".to_owned());
         state
     }
 
@@ -1104,6 +1109,105 @@ mod tests {
         assert_eq!(
             read(state.reference(), ClientId(2), "src/x.ts"),
             "two".to_owned().wrap_some()
+        );
+    }
+
+    fn with_schema_glob() -> IsographState<TestProfile> {
+        let mut state = with_config();
+        state.globs =
+            crate::watch::ProjectGlobs::parse(&["src/**".to_owned()], &["schema/**".to_owned()])
+                .expect("the test globs are valid");
+        state
+    }
+
+    fn disk_file_changed(path: &str, presence: Presence) -> IsographEvent {
+        InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
+            path: PathBuf::from(path),
+            presence,
+        }))
+        .to()
+    }
+
+    fn source_disk_paths(state: &IsographState<TestProfile>) -> Vec<&'static str> {
+        state
+            .db
+            .get_source_path_map()
+            .untracked()
+            .disk
+            .iter()
+            .map(|path| path.lookup())
+            .collect()
+    }
+
+    fn schema_disk_paths(state: &IsographState<TestProfile>) -> Vec<&'static str> {
+        state
+            .db
+            .get_schema_path_map()
+            .untracked()
+            .disk
+            .iter()
+            .map(|path| path.lookup())
+            .collect()
+    }
+
+    #[test]
+    fn disk_changed_lists_source_and_schema_paths_by_the_globs() {
+        let mut state = with_schema_glob();
+        handle(
+            &mut state,
+            disk_file_changed("/tmp/proj/src/a.ts", Presence::Present("a".to_owned())),
+        );
+        handle(
+            &mut state,
+            disk_file_changed(
+                "/tmp/proj/schema/a.graphql",
+                Presence::Present("type Query".to_owned()),
+            ),
+        );
+        handle(
+            &mut state,
+            disk_file_changed("/tmp/proj/other/a.ts", Presence::Present("b".to_owned())),
+        );
+        assert_eq!(source_disk_paths(state.reference()), "src/a.ts".wrap_vec());
+        assert_eq!(
+            schema_disk_paths(state.reference()),
+            "schema/a.graphql".wrap_vec()
+        );
+        handle(
+            &mut state,
+            disk_file_changed("/tmp/proj/src/a.ts", Presence::Absent),
+        );
+        handle(
+            &mut state,
+            disk_file_changed("/tmp/proj/schema/a.graphql", Presence::Absent),
+        );
+        assert_eq!(source_disk_paths(state.reference()), Vec::<&str>::new());
+        assert_eq!(schema_disk_paths(state.reference()), Vec::<&str>::new());
+    }
+
+    #[test]
+    fn did_open_lists_only_a_source_file_and_did_close_and_gone_drop_it() {
+        let mut state = with_config();
+        started(&mut state, ClientId(1));
+        handle(&mut state, did_open(ClientId(1), X_URI, "open"));
+        handle(
+            &mut state,
+            did_open(ClientId(1), "file:///tmp/proj/other/a.ts", "open"),
+        );
+        assert_eq!(
+            state.db.open_source_paths_of_client(ClientId(1)),
+            interned("src/x.ts").wrap_vec()
+        );
+        handle(&mut state, did_close(ClientId(1), X_URI));
+        assert_eq!(
+            state.db.open_source_paths_of_client(ClientId(1)),
+            Vec::<common_lang_types::RelativePathToSourceFile>::new()
+        );
+        handle(&mut state, did_open(ClientId(1), X_URI, "open"));
+        handle(&mut state, ClientConnectionEvent::Gone(ClientId(1)).to());
+        assert_eq!(
+            state.db.open_source_paths_of_client(ClientId(1)),
+            Vec::<common_lang_types::RelativePathToSourceFile>::new()
         );
     }
 
@@ -2929,7 +3033,7 @@ mod tests {
             if let Some(disk) = disk {
                 state
                     .db
-                    .insert_disk_file(interned("src/x.ts"), disk.to_owned());
+                    .insert_disk_file(interned("src/x.ts"), SOURCE_FILE, disk.to_owned());
             }
             let rx = diagnostics_client(&mut state, ClientId(1));
             let armed = handle(&mut state, did_open(ClientId(1), X_URI, EMPTY_LITERAL));

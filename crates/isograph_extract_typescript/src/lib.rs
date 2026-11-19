@@ -439,6 +439,11 @@ mod memo_tests {
         TypeScriptLiteralContext, file_literals, host_errors_for_extraction,
     };
 
+    const SOURCE_FILE: isograph_compiler::FileMembership = isograph_compiler::FileMembership {
+        source_file: isograph_compiler::IncludeFile::Include,
+        schema_file: isograph_compiler::IncludeFile::Skip,
+    };
+
     struct TestNetworkProtocol;
 
     impl NetworkProtocol for TestNetworkProtocol {
@@ -477,7 +482,7 @@ mod memo_tests {
         path: RelativePathToSourceFile,
         contents: &str,
     ) {
-        db.insert_disk_file(path, contents.to_owned());
+        db.insert_disk_file(path, SOURCE_FILE, contents.to_owned());
     }
 
     fn interned_export(name: &str) -> common_lang_types::ConstExportName {
@@ -1347,7 +1352,12 @@ iso(`entrypoint Query.HomeRoute`)";
         let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         intern_file(&mut db, path, "iso(`entrypoint Query.HomeRoute`)");
-        db.set_open_file(ClientId(1), path, "iso(`entrypoint`)".to_owned());
+        db.set_open_file(
+            ClientId(1),
+            path,
+            SOURCE_FILE,
+            "iso(`entrypoint`)".to_owned(),
+        );
         assert!(
             !iso_literal_parse_errors_in_file(&db, ClientId(1), path)
                 .as_ref()
