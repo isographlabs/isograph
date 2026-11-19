@@ -3,8 +3,11 @@ use std::collections::BTreeSet;
 
 use isograph_compiler::{
     CompletedIdentity, CompletedSelection, CompletedSelectionMap, CompletedSelectionTarget,
-    EntrypointNotFetchableError, EntrypointQueryError, FixedRecordId, QueryArtifact, RecordEntity,
-    RootEntities, SelectionMapErrorKind, TopLevelError, field_selection_map, query_for_entrypoint,
+    EntrypointNotFetchableError, EntrypointQueryError, FixedRecordId, IntegerOutOfRange,
+    NormalizationAlias, NormalizationAst, NormalizationCompositeTarget, NormalizationNode,
+    NormalizationRootRecord, NormalizationSelection, NormalizationTarget, QueryArtifact,
+    RecordEntity, ResponseKey, RootEntities, SelectionMapErrorKind, TopLevelError,
+    field_selection_map, query_for_entrypoint,
 };
 use prelude::Postfix;
 
@@ -12,6 +15,7 @@ use super::{
     CLIENT, Db, PET_DEMO_SCHEMA, PET_DEMO_SOURCES, entity, located, pet_demo_sources, project_db,
     selectable, validation_errors,
 };
+use crate::print_operation::{ast_lines, text_lines, without_discriminator};
 use crate::{
     GraphQLNetworkProtocol, GraphQLNotFetchable, QUERY_TEXT_FILE_NAME, graphql_fetch_plan,
 };
@@ -370,7 +374,8 @@ fn walk_errors_reach_the_query() {
         EntrypointQueryError::SelectionMap(error) => error.kind.wrap_some(),
         EntrypointQueryError::Lookup(_)
         | EntrypointQueryError::NotFetchable(_)
-        | EntrypointQueryError::TopLevel(_) => None,
+        | EntrypointQueryError::TopLevel(_)
+        | EntrypointQueryError::IntegerOutOfRange(_) => None,
     };
     assert!(matches!(
         kind("Query", "UndefinedVariable"),
@@ -539,4 +544,114 @@ fn a_renamed_query_root_is_the_root_entity() {
         .expect("me is composite");
     assert_eq!(me.entity, RecordEntity::Known(entity("RootQuery")));
     assert_eq!(me.identity, CompletedIdentity::Fixed(FixedRecordId::root()));
+}
+
+fn ast(db: &Db, parent: &str, field: &str) -> NormalizationAst {
+    query(db, parent, field)
+        .expect("the fixture's entrypoint has a query")
+        .normalization_ast
+}
+
+#[test]
+fn the_pet_demo_asts_are_their_queries_without_the_discriminator() {
+    let db = demo(&[], &[], &[]);
+    for (parent, field) in [
+        ("Query", "HomeRoute"),
+        ("Query", "PetDetailRoute"),
+        ("Query", "SpeciesRoute"),
+        ("Mutation", "SetTagline"),
+    ] {
+        let artifact = query(&db, parent, field).expect("the demo's queries generate");
+        assert_eq!(
+            ast_lines(artifact.normalization_ast.reference()),
+            without_discriminator(text_lines(artifact.text.reference()), "__typename"),
+            "{field}"
+        );
+        assert_eq!(
+            artifact.normalization_ast.root,
+            NormalizationRootRecord {
+                entity_name: entity(parent),
+                id: FixedRecordId::root(),
+            },
+            "{field}"
+        );
+        assert_eq!(
+            artifact.normalization_ast.discriminator_response_key,
+            selectable("__typename")
+        );
+    }
+}
+
+/// The top-level `Selection` node of `ast` whose selectable is `name`.
+fn top_selection<'a>(ast: &'a NormalizationAst, name: &str) -> &'a NormalizationSelection {
+    ast.selections
+        .0
+        .iter()
+        .find_map(|node| match node {
+            NormalizationNode::Selection(selection)
+                if selection.selectable_name == selectable(name) =>
+            {
+                selection.wrap_some()
+            }
+            NormalizationNode::Selection(_) | NormalizationNode::Conditional(_) => None,
+        })
+        .expect("the AST selects this at the top level")
+}
+
+fn composite(selection: &NormalizationSelection) -> &NormalizationCompositeTarget {
+    match selection.target.reference() {
+        NormalizationTarget::Composite(target) => target,
+        NormalizationTarget::Leaf => unreachable!("the fixture's selection is composite"),
+    }
+}
+
+#[test]
+fn species_route_s_node_selection_reads_the_discriminator_and_the_id() {
+    let db = demo(&[], &[], &[]);
+    let ast = ast(&db, "Query", "SpeciesRoute");
+    let node = composite(top_selection(ast.reference(), "node"));
+    assert_eq!(node.entity, RecordEntity::Discriminator);
+    assert_eq!(node.identity, CompletedIdentity::Select(selectable("id")));
+    let viewer = composite(top_selection(ast.reference(), "viewer"));
+    assert_eq!(viewer.entity, RecordEntity::Known(entity("Viewer")));
+}
+
+#[test]
+fn pet_detail_route_s_top_node_is_the_aliased_pet_selection_without_pointers() {
+    let db = demo(&[], &[], &[]);
+    let ast = ast(&db, "Query", "PetDetailRoute");
+    let [NormalizationNode::Selection(pet)] = ast.selections.0.as_slice() else {
+        unreachable!("PetDetailRoute selects only pet")
+    };
+    assert_eq!(pet.selectable_name, selectable("pet"));
+    assert_eq!(
+        pet.response_key,
+        ResponseKey::Alias(NormalizationAlias("pet____id___v_id".to_owned()))
+    );
+    let names: Vec<String> = ast_lines(ast.reference())
+        .into_iter()
+        .map(|line| format!("{line:?}"))
+        .collect();
+    assert!(
+        names
+            .iter()
+            .all(|line| !line.contains("\"owner\"") && !line.contains("\"bestFriend\""))
+    );
+    assert_eq!(composite(pet).entity, RecordEntity::Known(entity("Pet")));
+}
+
+#[test]
+fn an_integer_outside_i32_fails_the_query() {
+    let db = demo(
+        &[],
+        &[(
+            "src/Big.ts",
+            "iso(`field Query.Big { pet(id: 4294967296) { id } }`)",
+        )],
+        &[],
+    );
+    assert_eq!(
+        error(&db, "Query", "Big"),
+        EntrypointQueryError::IntegerOutOfRange(IntegerOutOfRange(4_294_967_296))
+    );
 }

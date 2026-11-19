@@ -669,14 +669,24 @@ pub fn normalization_ast(
 /// One node per selection of `selections`, in key order, without the discriminator.
 fn normalization_selection_set(
     selections: &CompletedSelectionMap,
-    discriminator_response_key: SelectableName,
 ) -> Result<NormalizationSelectionSet, IntegerOutOfRange>;
 
 /// `selection` as a node; `None` for the discriminator.
 fn normalization_node(
     selection: &CompletedSelection,
-    discriminator_response_key: SelectableName,
 ) -> Option<Result<NormalizationNode, IntegerOutOfRange>>;
+
+/// The node of a selection of `selectable_name` with `arguments` and `target`.
+fn normalization_selection(
+    response_key: ResponseKey,
+    selectable_name: SelectableName,
+    arguments: &MergedArguments,
+    target: &CompletedSelectionTarget,
+) -> Result<NormalizationSelection, IntegerOutOfRange>;
+
+fn normalization_composite_target(
+    target: &CompletedCompositeTarget,
+) -> Result<NormalizationCompositeTarget, IntegerOutOfRange>;
 
 fn normalization_arguments(
     arguments: &MergedArguments,
@@ -691,7 +701,7 @@ pub struct IntegerOutOfRange(pub i64);
 
 `normalization_ast` is `NormalizationAst { discriminator_response_key, root: NormalizationRootRecord { entity_name: root_entity, id: FixedRecordId::root() }, selections: normalization_selection_set(selections, ..)? }`. `query_for_entrypoint` passes `roots.operation` as `root_entity` (query-generation.md, The operation's selections and variables).
 
-`normalization_selection_set` is `selections.iter().filter_map(normalization_node)` collected into a `Result<Vec<_>, _>`. `normalization_node`:
+`normalization_selection_set` is `selections.iter().filter_map(normalization_node)` collected into a `Result<Vec<_>, _>`. The helpers take no `discriminator_response_key`: the discriminator is the `Discriminator` variant, and a parameter only passed down the recursion is clippy's `only_used_in_recursion`. `normalization_selection` and `normalization_composite_target` are the `Selectable` arm and its composite target, split out of `normalization_node`. `normalization_node`:
 
 - `Discriminator` is `None` (The discriminator).
 - `Identity(name)` is `Selection { response_key: ResponseKey::SelectableName, selectable_name: name, arguments: NormalizationArguments::default(), target: Leaf }`.

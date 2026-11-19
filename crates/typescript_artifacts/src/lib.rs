@@ -138,9 +138,10 @@ mod tests {
     use isograph_compiler::{
         ArtifactInnerType, ArtifactInputField, ArtifactInputType, ArtifactObjectField,
         ArtifactObjectType, ArtifactParameter, ArtifactPath, EntrypointArtifacts,
-        FieldArtifactKind, FieldArtifacts, FieldDeclarationSource, Generation, GenerationOptions,
-        LinkType, ParametersType, ProjectArtifacts, QueryArtifact, ScalarKind, ScalarValueKind,
-        UnionWrapper, Wrapper, WrapperVariant,
+        FieldArtifactKind, FieldArtifacts, FieldDeclarationSource, FixedRecordId, Generation,
+        GenerationOptions, LinkType, NormalizationAst, NormalizationRootRecord,
+        NormalizationSelectionSet, ParametersType, ProjectArtifacts, QueryArtifact, ScalarKind,
+        ScalarValueKind, UnionWrapper, Wrapper, WrapperVariant,
     };
     use nonempty::NonEmpty;
     use prelude::Postfix;
@@ -525,6 +526,14 @@ mod tests {
             query: QueryArtifact {
                 text: QueryText(QUERY_TEXT.to_owned()),
                 file_name: file_name.map(|name| name.intern().to::<ArtifactFileName>()),
+                normalization_ast: NormalizationAst {
+                    discriminator_response_key: "__typename".intern().to(),
+                    root: NormalizationRootRecord {
+                        entity_name: entity("Query"),
+                        id: FixedRecordId::root(),
+                    },
+                    selections: NormalizationSelectionSet(Vec::new()),
+                },
             },
         }
     }

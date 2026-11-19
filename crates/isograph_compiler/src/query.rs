@@ -6,6 +6,7 @@ use crate::merged_selection::{
     CompletedSelectionMap, FieldSelectionMap, FieldVariable, SelectionMapError, TopLevelError,
     field_selection_map,
 };
+use crate::normalization_ast::{IntegerOutOfRange, NormalizationAst, normalization_ast};
 use crate::validation::EntrypointNotFetchableError;
 use crate::{
     ClientId, CompilationProfile, IsographDb, NetworkProtocol, entity_named, entrypoint_fetch_plan,
@@ -30,11 +31,13 @@ pub struct ProtocolQueryText {
     pub file_name: Option<ArtifactFileName>,
 }
 
-/// One entrypoint's query: its text and the protocol's file name for the text.
+/// One entrypoint's query: its text, the protocol's file name for the text, and the
+/// normalization AST of its response.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct QueryArtifact {
     pub text: QueryText,
     pub file_name: Option<ArtifactFileName>,
+    pub normalization_ast: NormalizationAst,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
@@ -47,6 +50,8 @@ pub enum EntrypointQueryError<TNotFetchable: std::fmt::Display> {
     SelectionMap(SelectionMapError),
     #[error("{0}")]
     TopLevel(TopLevelError),
+    #[error("{0}")]
+    IntegerOutOfRange(IntegerOutOfRange),
 }
 
 pub type ProfileEntrypointQueryError<TProfile> = EntrypointQueryError<
@@ -84,6 +89,12 @@ pub fn query_for_entrypoint<TProfile: CompilationProfile>(
         roots.reference(),
     )
     .map_err(EntrypointQueryError::TopLevel)?;
+    let normalization_ast = normalization_ast(
+        selections.reference(),
+        TProfile::NetworkProtocol::discriminator(),
+        roots.operation,
+    )
+    .map_err(EntrypointQueryError::IntegerOutOfRange)?;
     let ProtocolQueryText { text, file_name } =
         TProfile::NetworkProtocol::query_text(&EntrypointOperation {
             name: selectable,
@@ -91,7 +102,12 @@ pub fn query_for_entrypoint<TProfile: CompilationProfile>(
             variables: variables.as_slice(),
             selections: selections.reference(),
         });
-    QueryArtifact { text, file_name }.wrap_ok()
+    QueryArtifact {
+        text,
+        file_name,
+        normalization_ast,
+    }
+    .wrap_ok()
 }
 
 /// The entrypoint field's variables that its selections use, in declaration order.

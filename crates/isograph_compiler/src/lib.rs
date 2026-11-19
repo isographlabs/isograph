@@ -6,6 +6,7 @@ mod entrypoint;
 mod host_language;
 mod iso_literals;
 mod merged_selection;
+mod normalization_ast;
 mod protocol_shape;
 mod query;
 mod references;
@@ -50,6 +51,12 @@ pub use merged_selection::{
     SelectionMapError, SelectionMapErrorKind, SourceFieldDeclaration, TopLevelError,
     UnknownFieldArgument, VariableType, complete, field_selection_map, inlined_fields,
     source_field_declaration,
+};
+pub use normalization_ast::{
+    IntegerOutOfRange, NormalizationArgument, NormalizationArguments, NormalizationAst,
+    NormalizationCompositeTarget, NormalizationConditional, NormalizationNode,
+    NormalizationObjectEntry, NormalizationRootRecord, NormalizationSelection,
+    NormalizationSelectionSet, NormalizationTarget, NormalizationValue, normalization_ast,
 };
 pub use protocol_shape::{
     CompositeShape, Concreteness, EntityShape, IdentitySelection, SelectableShape,

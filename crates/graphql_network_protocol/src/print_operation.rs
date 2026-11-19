@@ -189,6 +189,128 @@ fn print_non_null_variable_type(variable_type: &NonNullVariableType) -> String {
 }
 
 #[cfg(test)]
+/// One line of a query's selection sets: its depth and what it selects.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum SelectionLine {
+    /// `alias: name...`
+    Selection(SelectionLineData),
+    /// `... on entity {`
+    Conditional(ConditionalLine),
+}
+
+#[cfg(test)]
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct SelectionLineData {
+    depth: usize,
+    /// The alias the line prints before `:`, or the selectable name when it prints none.
+    response_key: String,
+    selectable_name: String,
+}
+
+#[cfg(test)]
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct ConditionalLine {
+    depth: usize,
+    entity: String,
+}
+
+#[cfg(test)]
+/// The selection lines of `text`, skipping the header and `}` lines.
+pub(crate) fn text_lines(text: &QueryText) -> Vec<SelectionLine> {
+    text.0
+        .split('\n')
+        .skip(1)
+        .filter(|line| line.trim() != "}")
+        .map(|line| {
+            let depth = (line.len() - line.trim_start().len()) / 2;
+            let content = line.trim().trim_end_matches(" {");
+            match content.strip_prefix("... on ") {
+                Some(entity) => SelectionLine::Conditional(ConditionalLine {
+                    depth,
+                    entity: entity.to_owned(),
+                }),
+                None => {
+                    let (response_key, rest) =
+                        content.split_once(": ").unwrap_or((content, content));
+                    SelectionLine::Selection(SelectionLineData {
+                        depth,
+                        response_key: response_key.to_owned(),
+                        selectable_name: rest.split('(').next().unwrap_or(rest).to_owned(),
+                    })
+                }
+            }
+        })
+        .collect()
+}
+
+#[cfg(test)]
+/// The AST's nodes in pre-order, a `Conditional` as the line its `... on` prints.
+pub(crate) fn ast_lines(ast: &isograph_compiler::NormalizationAst) -> Vec<SelectionLine> {
+    selection_set_lines(ast.selections.reference(), 1)
+}
+
+#[cfg(test)]
+fn selection_set_lines(
+    selections: &isograph_compiler::NormalizationSelectionSet,
+    depth: usize,
+) -> Vec<SelectionLine> {
+    use isograph_compiler::{NormalizationNode, NormalizationTarget};
+    selections
+        .0
+        .iter()
+        .flat_map(|node| match node {
+            NormalizationNode::Selection(selection) => {
+                std::iter::once(SelectionLine::Selection(SelectionLineData {
+                    depth,
+                    response_key: match selection.response_key.reference() {
+                        ResponseKey::SelectableName => selection.selectable_name.to_string(),
+                        ResponseKey::Alias(alias) => alias.to_string(),
+                    },
+                    selectable_name: selection.selectable_name.to_string(),
+                }))
+                .chain(match selection.target.reference() {
+                    NormalizationTarget::Leaf => Vec::new(),
+                    NormalizationTarget::Composite(target) => {
+                        selection_set_lines(target.selections.reference(), depth + 1)
+                    }
+                })
+                .collect::<Vec<_>>()
+            }
+            NormalizationNode::Conditional(conditional) => {
+                let Condition::SelectionEquals(entity) = conditional.condition;
+                std::iter::once(SelectionLine::Conditional(ConditionalLine {
+                    depth,
+                    entity: entity.to_string(),
+                }))
+                .chain(selection_set_lines(
+                    conditional.selections.reference(),
+                    depth + 1,
+                ))
+                .collect()
+            }
+        })
+        .collect()
+}
+
+#[cfg(test)]
+/// `lines` without the discriminator's lines, which the AST leaves implicit.
+pub(crate) fn without_discriminator(
+    lines: Vec<SelectionLine>,
+    response_key: &str,
+) -> Vec<SelectionLine> {
+    lines
+        .into_iter()
+        .filter(|line| match line {
+            SelectionLine::Selection(selection) => {
+                !(selection.response_key == response_key
+                    && selection.selectable_name == response_key)
+            }
+            SelectionLine::Conditional(_) => true,
+        })
+        .collect()
+}
+
+#[cfg(test)]
 mod tests {
     use common_lang_types::{EntityName, QueryText, SelectableName, VariableName};
     use graphql_schema_parser::OperationType;
@@ -196,16 +318,20 @@ mod tests {
     use std::collections::BTreeSet;
 
     use isograph_compiler::{
-        CompletedSelectionMap, CompositeShape, Concreteness, Condition, EntrypointOperation,
-        FieldVariable, IdentitySelection, MergedArgument, MergedArguments, MergedCompositeTarget,
-        MergedConditional, MergedObject, MergedObjectEntry, MergedSelectableSelection,
-        MergedSelection, MergedSelectionMap, MergedSelectionTarget, MergedValue,
-        NonNullVariableType, RootEntities, SelectionKey, VariableType,
+        CompletedIdentity, CompletedSelectionMap, CompositeShape, Concreteness, Condition,
+        EntrypointOperation, FieldVariable, FixedRecordId, IdentitySelection, IntegerOutOfRange,
+        MergedArgument, MergedArguments, MergedCompositeTarget, MergedConditional, MergedObject,
+        MergedObjectEntry, MergedSelectableSelection, MergedSelection, MergedSelectionMap,
+        MergedSelectionTarget, MergedValue, NonNullVariableType, NormalizationAst,
+        NormalizationCompositeTarget, NormalizationNode, NormalizationObjectEntry,
+        NormalizationRootRecord, NormalizationSelectionSet, NormalizationTarget,
+        NormalizationValue, RecordEntity, ResponseKey, RootEntities, SelectionKey, VariableType,
+        normalization_ast,
     };
     use isograph_parser::Boolean;
     use prelude::Postfix;
 
-    use super::print_operation;
+    use super::{SelectionLine, ast_lines, print_operation, text_lines, without_discriminator};
     use crate::{GraphQLFetchPlan, GraphQLNetworkProtocol};
 
     fn name(s: &str) -> SelectableName {
@@ -315,7 +441,7 @@ mod tests {
         GraphQLFetchPlan {
             operation_type,
             roots: RootEntities {
-                operation: entity(operation_type.to_string().as_str()),
+                operation: entity(root_type_name(operation_type)),
                 others: BTreeSet::new(),
             },
         }
@@ -710,6 +836,412 @@ mod tests {
             lines(text.reference())
                 .iter()
                 .all(|line| line.trim_end() == *line)
+        );
+    }
+
+    /// The conventional root type of `operation_type`.
+    fn root_type_name(operation_type: OperationType) -> &'static str {
+        match operation_type {
+            OperationType::Query => "Query",
+            OperationType::Mutation => "Mutation",
+            OperationType::Subscription => "Subscription",
+        }
+    }
+
+    /// A selection of `s` whose target is `target` with `concreteness` and `identity`.
+    fn composite_of(
+        s: &str,
+        arguments: Vec<(&str, MergedValue)>,
+        target: &str,
+        concreteness: Concreteness,
+        identity: IdentitySelection,
+        selections: Vec<MergedSelection>,
+    ) -> MergedSelection {
+        MergedSelection::Selectable(MergedSelectableSelection {
+            key: key(s, arguments),
+            target: MergedSelectionTarget::Composite(MergedCompositeTarget {
+                entity: entity(target),
+                shape: CompositeShape {
+                    concreteness,
+                    identity,
+                },
+                selections: map(selections),
+            }),
+        })
+    }
+
+    /// The query text and the normalization AST of an operation of `operation_type` whose
+    /// top-level selections are `selections`, with `Query` and `Mutation` as root entities.
+    fn artifact(
+        operation_type: OperationType,
+        selections: Vec<MergedSelection>,
+    ) -> (QueryText, NormalizationAst) {
+        let operation = entity(root_type_name(operation_type));
+        let plan = GraphQLFetchPlan {
+            operation_type,
+            roots: RootEntities {
+                operation,
+                others: [entity("Query"), entity("Mutation")]
+                    .into_iter()
+                    .filter(|other| *other != operation)
+                    .collect(),
+            },
+        };
+        let completed = CompletedSelectionMap::top_level::<GraphQLNetworkProtocol>(
+            map(selections).reference(),
+            plan.roots.reference(),
+        )
+        .expect("the test's top level completes");
+        let ast = normalization_ast(completed.reference(), name("__typename"), operation)
+            .expect("the test's integers fit");
+        (print(plan.reference(), &[], completed.reference()), ast)
+    }
+
+    fn assert_lines_match(text: &QueryText, ast: &NormalizationAst) {
+        assert_eq!(
+            ast_lines(ast),
+            without_discriminator(text_lines(text), "__typename"),
+            "{}",
+            text.0
+        );
+    }
+
+    fn union_feed() -> MergedSelection {
+        composite_of(
+            "newsfeed",
+            vec![("limit", MergedValue::Integer(2))],
+            "NewsfeedItem",
+            Concreteness::Abstract,
+            IdentitySelection::Omit,
+            vec![
+                conditional("BlogItem", id(), vec![leaf("title")]),
+                leaf("cursor"),
+            ],
+        )
+    }
+
+    fn every_kind_of_argument() -> MergedSelection {
+        let entry = |name: &str, value: MergedValue| MergedObjectEntry {
+            name: name.intern().to(),
+            value,
+        };
+        leaf_with(
+            "f",
+            vec![
+                ("b", MergedValue::Boolean(Boolean::True)),
+                ("i", MergedValue::Integer(-5)),
+                ("n", MergedValue::Null),
+                (
+                    "o",
+                    MergedValue::Object(
+                        MergedObject::new(vec![
+                            entry("v", MergedValue::Variable("x".intern().to())),
+                            entry("s", MergedValue::String("a b".intern().to())),
+                        ])
+                        .expect("distinct keys"),
+                    ),
+                ),
+                ("s", MergedValue::String("\"q\"".intern().to())),
+                ("v", MergedValue::Variable("x".intern().to())),
+            ],
+        )
+    }
+
+    fn cases() -> Vec<(OperationType, Vec<MergedSelection>)> {
+        vec![
+            (
+                OperationType::Query,
+                vec![composite_of(
+                    "pets",
+                    vec![],
+                    "Pet",
+                    Concreteness::Concrete,
+                    id(),
+                    vec![leaf("id"), leaf("age")],
+                )],
+            ),
+            (OperationType::Query, vec![union_feed()]),
+            (
+                OperationType::Query,
+                vec![composite_of(
+                    "checkin",
+                    vec![],
+                    "ICheckin",
+                    Concreteness::Abstract,
+                    id(),
+                    vec![leaf("time")],
+                )],
+            ),
+            (
+                OperationType::Query,
+                vec![composite_of(
+                    "pet",
+                    vec![("id", MergedValue::Variable("id".intern().to()))],
+                    "Pet",
+                    Concreteness::Concrete,
+                    id(),
+                    vec![composite_of(
+                        "stats",
+                        vec![],
+                        "PetStats",
+                        Concreteness::Concrete,
+                        IdentitySelection::Omit,
+                        vec![leaf("weight")],
+                    )],
+                )],
+            ),
+            (
+                OperationType::Query,
+                vec![composite_of(
+                    "query",
+                    vec![],
+                    "Query",
+                    Concreteness::Concrete,
+                    id(),
+                    vec![leaf("tags")],
+                )],
+            ),
+            (OperationType::Mutation, vec![every_kind_of_argument()]),
+        ]
+    }
+
+    /// The composite target of the top-level selection named `s`.
+    fn top_target<'a>(ast: &'a NormalizationAst, s: &str) -> &'a NormalizationCompositeTarget {
+        ast.selections
+            .0
+            .iter()
+            .find_map(|node| match node {
+                NormalizationNode::Selection(selection) if selection.selectable_name == name(s) => {
+                    match selection.target.reference() {
+                        NormalizationTarget::Composite(target) => target.wrap_some(),
+                        NormalizationTarget::Leaf => None,
+                    }
+                }
+                NormalizationNode::Selection(_) | NormalizationNode::Conditional(_) => None,
+            })
+            .expect("the AST has this composite selection")
+    }
+
+    #[test]
+    fn the_ast_lines_are_the_query_lines_without_the_discriminator() {
+        for (operation_type, selections) in cases() {
+            let (text, ast) = artifact(operation_type, selections);
+            assert_lines_match(text.reference(), ast.reference());
+        }
+    }
+
+    #[test]
+    fn every_composite_block_starts_with_the_discriminator_and_no_node_is_the_discriminator() {
+        for (operation_type, selections) in cases() {
+            let (text, ast) = artifact(operation_type, selections);
+            let lines: Vec<&str> = text.0.split('\n').collect();
+            for (index, line) in lines.iter().enumerate() {
+                if line.ends_with('{') && index > 0 {
+                    assert_eq!(lines[index + 1].trim(), "__typename", "{}", text.0);
+                }
+            }
+            assert!(
+                ast_lines(ast.reference()).iter().all(|line| match line {
+                    SelectionLine::Selection(selection) =>
+                        selection.selectable_name != "__typename",
+                    SelectionLine::Conditional(_) => true,
+                }),
+                "{}",
+                text.0
+            );
+            assert_eq!(ast.discriminator_response_key, name("__typename"));
+        }
+    }
+
+    #[test]
+    fn every_response_key_is_the_key_s_response_key() {
+        let (_, ast) = artifact(OperationType::Mutation, vec![every_kind_of_argument()]);
+        let NormalizationNode::Selection(f) = &ast.selections.0[0] else {
+            unreachable!("the top-level selection is f")
+        };
+        assert!(matches!(f.response_key, ResponseKey::Alias(_)));
+        let (_, ast) = artifact(OperationType::Query, cases().remove(0).1);
+        let pets = top_target(ast.reference(), "pets");
+        assert!(pets.selections.0.iter().all(|node| matches!(
+            node,
+            NormalizationNode::Selection(selection) if selection.response_key == ResponseKey::SelectableName
+        )));
+    }
+
+    #[test]
+    fn targets_carry_their_record_entity_and_identity() {
+        let id_identity = CompletedIdentity::Select(name("id"));
+        let (_, pets) = artifact(OperationType::Query, cases().remove(0).1);
+        let pets_target = top_target(pets.reference(), "pets");
+        assert_eq!(pets_target.entity, RecordEntity::Known(entity("Pet")));
+        assert_eq!(pets_target.identity, id_identity);
+        assert!(pets_target.selections.0.iter().any(|node| matches!(
+            node,
+            NormalizationNode::Selection(selection)
+                if selection.selectable_name == name("id")
+                    && selection.response_key == ResponseKey::SelectableName
+                    && selection.target == NormalizationTarget::Leaf
+        )));
+
+        let (_, feed) = artifact(OperationType::Query, vec![union_feed()]);
+        let newsfeed = top_target(feed.reference(), "newsfeed");
+        assert_eq!(newsfeed.entity, RecordEntity::Discriminator);
+        assert_eq!(newsfeed.identity, CompletedIdentity::Omit);
+        let conditional = newsfeed
+            .selections
+            .0
+            .iter()
+            .find_map(|node| match node {
+                NormalizationNode::Conditional(conditional) => conditional.wrap_some(),
+                NormalizationNode::Selection(_) => None,
+            })
+            .expect("newsfeed has the BlogItem conditional");
+        assert_eq!(
+            conditional.condition,
+            Condition::SelectionEquals(entity("BlogItem"))
+        );
+        assert_eq!(conditional.identity, id_identity);
+        assert!(matches!(
+            newsfeed.selections.0.last(),
+            Some(NormalizationNode::Conditional(_))
+        ));
+
+        let (_, checkin) = artifact(OperationType::Query, cases().remove(2).1);
+        let checkin = top_target(checkin.reference(), "checkin");
+        assert_eq!(checkin.entity, RecordEntity::Discriminator);
+        assert_eq!(checkin.identity, id_identity);
+    }
+
+    #[test]
+    fn the_root_record_is_the_operation_s_root_and_a_nested_root_target_is_fixed() {
+        let root = |entity_name: &str| NormalizationRootRecord {
+            entity_name: entity(entity_name),
+            id: FixedRecordId::root(),
+        };
+        let nested_query = || {
+            vec![composite_of(
+                "query",
+                vec![],
+                "Query",
+                Concreteness::Concrete,
+                id(),
+                vec![leaf("tags")],
+            )]
+        };
+        let (text, ast) = artifact(OperationType::Query, nested_query());
+        assert_eq!(ast.root, root("Query"));
+        let query = top_target(ast.reference(), "query");
+        assert_eq!(query.entity, RecordEntity::Known(entity("Query")));
+        assert_eq!(
+            query.identity,
+            CompletedIdentity::Fixed(FixedRecordId::root())
+        );
+        assert!(
+            !text.0.split('\n').any(|line| line.trim() == "id"),
+            "{}",
+            text.0
+        );
+
+        let (_, ast) = artifact(OperationType::Mutation, nested_query());
+        assert_eq!(ast.root, root("Mutation"));
+        assert_eq!(
+            top_target(ast.reference(), "query").identity,
+            CompletedIdentity::Fixed(FixedRecordId::root())
+        );
+    }
+
+    #[test]
+    fn an_empty_composite_without_identity_is_an_empty_target_and_one_discriminator_line() {
+        let (text, ast) = artifact(
+            OperationType::Query,
+            vec![composite_of(
+                "stats",
+                vec![],
+                "PetStats",
+                Concreteness::Concrete,
+                IdentitySelection::Omit,
+                vec![],
+            )],
+        );
+        assert_eq!(
+            top_target(ast.reference(), "stats"),
+            &NormalizationCompositeTarget {
+                entity: RecordEntity::Known(entity("PetStats")),
+                identity: CompletedIdentity::Omit,
+                selections: NormalizationSelectionSet(Vec::new()),
+            }
+        );
+        assert_eq!(
+            lines(text.reference()),
+            vec!["query X {", "  stats {", "    __typename", "  }", "}"]
+        );
+    }
+
+    #[test]
+    fn arguments_narrow_every_value_kind_in_key_order() {
+        let (_, ast) = artifact(OperationType::Mutation, vec![every_kind_of_argument()]);
+        let NormalizationNode::Selection(f) = &ast.selections.0[0] else {
+            unreachable!("the top-level selection is f")
+        };
+        let object_entry = |name: &str, value: NormalizationValue| NormalizationObjectEntry {
+            name: name.intern().to(),
+            value,
+        };
+        assert_eq!(
+            f.arguments
+                .0
+                .iter()
+                .map(|argument| (argument.name.to_string(), argument.value.clone()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("b".to_owned(), NormalizationValue::Boolean(Boolean::True)),
+                ("i".to_owned(), NormalizationValue::Integer(-5)),
+                ("n".to_owned(), NormalizationValue::Null),
+                (
+                    "o".to_owned(),
+                    NormalizationValue::Object(vec![
+                        object_entry("s", NormalizationValue::String("a b".intern().to())),
+                        object_entry("v", NormalizationValue::Variable("x".intern().to())),
+                    ])
+                ),
+                (
+                    "s".to_owned(),
+                    NormalizationValue::String("\"q\"".intern().to())
+                ),
+                (
+                    "v".to_owned(),
+                    NormalizationValue::Variable("x".intern().to())
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn an_integer_outside_i32_is_out_of_range() {
+        let completed = CompletedSelectionMap::top_level::<GraphQLNetworkProtocol>(
+            map(vec![leaf_with(
+                "f",
+                vec![("n", MergedValue::Integer(4_294_967_296))],
+            )])
+            .reference(),
+            root(OperationType::Query).roots.reference(),
+        )
+        .expect("the map has a selection");
+        assert_eq!(
+            normalization_ast(completed.reference(), name("__typename"), entity("Query")),
+            IntegerOutOfRange(4_294_967_296).wrap_err()
+        );
+        let in_range = CompletedSelectionMap::top_level::<GraphQLNetworkProtocol>(
+            map(vec![leaf_with(
+                "f",
+                vec![("n", MergedValue::Integer(i64::from(i32::MIN)))],
+            )])
+            .reference(),
+            root(OperationType::Query).roots.reference(),
+        )
+        .expect("the map has a selection");
+        assert!(
+            normalization_ast(in_range.reference(), name("__typename"), entity("Query")).is_ok()
         );
     }
 }
