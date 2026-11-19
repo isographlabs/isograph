@@ -1202,3 +1202,29 @@ fn send_prefix_increments_delta_line_and_keeps_keyword() {
     assert_eq!(after[0].token_type, KEYWORD);
     assert_eq!(after[0].length, 10);
 }
+
+#[test]
+fn semantic_tokens_right_after_a_watch_start_see_the_boot_scan() {
+    let dir = tempfile::tempdir().expect("a test can create a temp directory");
+    std::fs::create_dir_all(dir.path().join("src")).expect("a test can create src");
+    std::fs::write(dir.path().join("src/Home.ts"), CONTENTS).expect("a test can write a source");
+    std::fs::write(
+        dir.path().join("isograph.config.json"),
+        "{\"source_files\":[\"src/**\"]}",
+    )
+    .expect("a test can write a config file");
+    let daemon = Daemon { dir };
+    let output = daemon.isograph(["start"].reference());
+    assert!(
+        output.status.success(),
+        "start failed: {}",
+        String::from_utf8_lossy(output.stderr.reference())
+    );
+    let path = source_path(daemon.reference(), "src/Home.ts");
+    let mut client = LspClient::connect(daemon_port(daemon.reference()));
+    let tokens = client
+        .semantic_tokens_full(file_uri(path.reference()).as_str())
+        .expect("the boot scan interned this path");
+    assert_eq!(tokens[0].token_type, KEYWORD);
+    assert_eq!(tokens[0].length, 10);
+}

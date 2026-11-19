@@ -97,18 +97,29 @@ async fn serve<TProfile: CompilationProfile>(
         .expect("a config file path has a parent directory")
         .to_owned();
     let _hold_watch = watch_tx.clone();
-    let _watcher = match crate::watch::start_if_watching::<TProfile>(
+    let started = match crate::watch::start_if_watching::<TProfile>(
         filesystem,
         watch_tx,
         config_path.reference(),
         globs.clone(),
     ) {
-        Ok(watcher) => watcher,
+        Ok(started) => started,
         Err(e) => {
             tracing::error!(error = %e, "could not start the watcher");
             return;
         }
     };
+    let (_watcher, boot) = match started {
+        Some(crate::watch::StartedWatcher { watcher, boot }) => (watcher.wrap_some(), boot),
+        None => (None, Vec::new()),
+    };
+    // accept_loop is first polled inside select!, so every session's events queue behind these.
+    crate::watch::apply::<TProfile>(
+        event_tx.reference(),
+        config_directory.reference(),
+        boot,
+        globs.reference(),
+    );
 
     // `isograph stop` without `--force` is SIGTERM on unix, App::ask_to_quit on Windows
     // (InternalEvent::Quit on the socket). Route SIGTERM into the event channel as Quit,

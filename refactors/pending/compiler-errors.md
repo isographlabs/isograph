@@ -64,7 +64,7 @@ The request handler computes the errors in `handle` from the memos. It does not 
 
 Each change is one commit, prefactors first. Each lists its tests. Each amends the design docs named in Docs this doc amends, in the same commit.
 
-1. The watcher returns the boot scan, and `serve` posts it before the LSP port accepts.
+1. The watcher returns the boot scan, and `serve` posts it before the LSP port accepts. Landed.
 2. `handle` mints every `ClientId` from `IsographState`.
 3. The daemon compiles after every applied `DiskChanged`.
 4. Shared LSP client handshake and `isograph start` spawning.
@@ -74,7 +74,7 @@ Each change is one commit, prefactors first. Each lists its tests. Each amends t
 8. Validation errors are compiler errors (after the validation memo lands).
 9. Schema parse errors are compiler errors (after schema integration change 2 lands).
 
-## Change 1: the boot scan is posted before the LSP port accepts
+## Change 1: the boot scan is posted before the LSP port accepts (landed)
 
 ### `StartedWatcher`
 

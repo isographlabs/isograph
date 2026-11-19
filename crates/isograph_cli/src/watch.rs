@@ -64,16 +64,22 @@ pub struct Watcher {
     _debouncer: Debouncer<RecommendedWatcher, RecommendedCache>,
 }
 
+/// A running watcher and the files that matched when it started.
+pub struct StartedWatcher {
+    pub watcher: Watcher,
+    pub boot: Vec<SourceFileEvent>,
+}
+
 pub fn start_if_watching<TProfile: CompilationProfile>(
     filesystem: Filesystem,
     watch_tx: UnboundedSender<Vec<SourceFileEvent>>,
     config_path: &Path,
     globs: ProjectGlobs,
-) -> Result<Option<Watcher>, WatchError> {
+) -> Result<Option<StartedWatcher>, WatchError> {
     match filesystem {
         Filesystem::Injected => None.wrap_ok(),
         Filesystem::Watch => {
-            start::<TProfile>(watch_tx, config_path, globs).map(|watcher| watcher.wrap_some())
+            start::<TProfile>(watch_tx, config_path, globs).map(|started| started.wrap_some())
         }
     }
 }
@@ -83,7 +89,7 @@ pub fn start<TProfile: CompilationProfile>(
     watch_tx: UnboundedSender<Vec<SourceFileEvent>>,
     config_path: &Path,
     globs: ProjectGlobs,
-) -> Result<Watcher, WatchError> {
+) -> Result<StartedWatcher, WatchError> {
     let config_directory = config_path
         .parent()
         .expect("a config file path has a parent directory")
@@ -139,11 +145,11 @@ pub fn start<TProfile: CompilationProfile>(
         })
         .collect();
     info!(n = boot.len(), "scan finished");
-    if !boot.is_empty() {
-        let _ = watch_tx.send(boot);
-    }
-    Watcher {
-        _debouncer: debouncer,
+    StartedWatcher {
+        watcher: Watcher {
+            _debouncer: debouncer,
+        },
+        boot,
     }
     .wrap_ok()
 }
@@ -949,8 +955,9 @@ mod tests {
         let h = Harness::new(&[]);
         h.write("src/a.in", "a");
         let (watch_tx, mut watch_rx) = unbounded_channel();
-        let _watcher = start::<InHostProfile>(watch_tx, h.config_path.reference(), h.globs.clone())
+        let started = start::<InHostProfile>(watch_tx, h.config_path.reference(), h.globs.clone())
             .expect("the watcher starts");
+        assert!(started.boot.is_empty());
         assert!(watch_rx.try_recv().is_err());
         assert!(contents(h.state.reference(), "src/a.in").is_none());
     }
@@ -1026,11 +1033,10 @@ mod tests {
     fn boot_interns_a_file_written_before_start() {
         let mut h = Harness::new(&["src/**/*.in"]);
         h.write("src/a.in", "a");
-        let (watch_tx, mut watch_rx) = unbounded_channel();
-        let _watcher = start::<InHostProfile>(watch_tx, h.config_path.reference(), h.globs.clone())
+        let (watch_tx, _watch_rx) = unbounded_channel();
+        let started = start::<InHostProfile>(watch_tx, h.config_path.reference(), h.globs.clone())
             .expect("the watcher starts");
-        let events = watch_rx.try_recv().expect("boot posted matching files");
-        h.ingest(events);
+        h.ingest(started.boot);
         assert_eq!(
             contents(h.state.reference(), "src/a.in").as_deref(),
             "a".wrap_some()
@@ -1038,13 +1044,34 @@ mod tests {
     }
 
     #[test]
+    fn boot_is_not_sent_on_the_watch_channel() {
+        let h = Harness::new(&["src/**/*.in"]);
+        h.write("src/a.in", "a");
+        let (watch_tx, mut watch_rx) = unbounded_channel();
+        let started = start::<InHostProfile>(watch_tx, h.config_path.reference(), h.globs.clone())
+            .expect("the watcher starts");
+        let [(SourceEventKind::CreateOrModify(path), ChangedFileKind::File)] =
+            started.boot.as_slice()
+        else {
+            panic!(
+                "expected one CreateOrModify of src/a.in, got {:?}",
+                started.boot
+            );
+        };
+        assert_eq!(path, &h.abs("src/a.in"));
+        assert!(matches!(
+            watch_rx.try_recv(),
+            Err(tokio::sync::mpsc::error::TryRecvError::Empty)
+        ));
+    }
+
+    #[test]
     fn notify_interns_a_file_written_after_start() {
         let mut h = Harness::new(&["src/**/*.in"]);
         std::fs::create_dir_all(h.abs("src")).expect("a test can create src");
         let (watch_tx, mut watch_rx) = unbounded_channel();
-        let _watcher = start::<InHostProfile>(watch_tx, h.config_path.reference(), h.globs.clone())
+        let _started = start::<InHostProfile>(watch_tx, h.config_path.reference(), h.globs.clone())
             .expect("the watcher starts");
-        let _ = watch_rx.try_recv();
         h.write("src/a.in", "a");
         let deadline = Instant::now() + Duration::from_secs(10);
         let events = loop {
@@ -1170,11 +1197,10 @@ mod tests {
         let mut h = Harness::with_schema(&["src/**/*.in"], &["schema/**"]);
         h.write("schema/a.graphql", "type Query");
         h.write("other/b.graphql", "type Query");
-        let (watch_tx, mut watch_rx) = unbounded_channel();
-        let _watcher = start::<InHostProfile>(watch_tx, h.config_path.reference(), h.globs.clone())
+        let (watch_tx, _watch_rx) = unbounded_channel();
+        let started = start::<InHostProfile>(watch_tx, h.config_path.reference(), h.globs.clone())
             .expect("the watcher starts");
-        let events = watch_rx.try_recv().expect("boot posted the schema file");
-        h.ingest(events);
+        h.ingest(started.boot);
         assert_eq!(
             contents(h.state.reference(), "schema/a.graphql").as_deref(),
             "type Query".wrap_some()
