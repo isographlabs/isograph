@@ -9,6 +9,7 @@ mod merged_selection;
 mod normalization_ast;
 mod protocol_shape;
 mod query;
+mod reader_ast;
 mod references;
 mod schema;
 mod selectable_for_path;
@@ -64,6 +65,10 @@ pub use protocol_shape::{
 pub use query::{
     EntrypointOperation, EntrypointQueryError, ProfileEntrypointQueryError, ProtocolQueryText,
     QueryArtifact, query_for_entrypoint,
+};
+pub use reader_ast::{
+    ReaderLinkedSelection, ReaderRefinementSelection, ReaderResolverSelection,
+    ReaderScalarSelection, ReaderSelection, ReaderSelectionSet,
 };
 pub use references::{ReferenceTarget, references_in_file};
 pub use schema::{

@@ -628,6 +628,23 @@ fn resolver_arguments<TProfile: CompilationProfile>(
   - `Refinement` and `Object(object)`: non-empty `arguments` is `ArgumentsOnRefinement(key)`; otherwise `Refinement(ReaderRefinementSelection { alias, condition: Condition::SelectionEquals(object.entity), selections: object.reader })`.
   - `Refinement` and `Scalar`: `RefinementToScalar(key)`. GraphQL's refinements target object types only (`refinement_to`), so GraphQL does not reach it.
 
+Deltas from the plan as first written (landed in change 2):
+
+- `selected` is `Vec<EntityNameAndSelectableName>` in `FieldTypes`, `ObjectSelections`, and `SelectionOutput`. The parser change removed `SelectedClientField` with `Loadability`, and the landed `FieldTypes.selected` was already that type.
+- `resolver_arguments` adds the defaults with `MergedArguments::with_absent`, new in `merged_selection.rs`, before the narrowing. It cannot fail, so the walk has no unreachable duplicate-argument error:
+
+```rust
+// from crates/isograph_compiler/src/merged_selection.rs
+impl MergedArguments {
+    /// These arguments and each of `arguments` whose name none of them has, sorted by name.
+    pub fn with_absent(self, arguments: impl Iterator<Item = MergedArgument>) -> Self;
+}
+```
+
+- normalization-ast.md's narrowing is the landed `normalization_arguments` (`crates/isograph_compiler/src/normalization_ast.rs`), made `pub(crate)`.
+- The `ClientPointer(Parsed(target))` arm walks `target.inner_values()` with `object_type` and keeps only each walk's `selected`, because the pointer has no data field to build with `try_map`.
+- `resolver_arguments` does not check that every variable without a default is passed (the Defaults test's `Y` reads with empty arguments); the merge walk and validation report `MissingFieldArgument`.
+
 `GenerationError` gains:
 
 ```rust
@@ -1226,7 +1243,7 @@ No snapshots. Facts about the reader AST, the printed artifact, and the read res
 - A refinement: `field Query.R { node(id: "1") { asPet { firstName } } }` gives `Linked node` whose one selection is `Refinement` with `condition == SelectionEquals(Pet)` and selections `[Scalar firstName]`, and its data type is `({ firstName } | null)`.
 - Errors: `asPet(x: 1)` is `ArgumentsOnRefinement`; `pet(id: $nope)` is `SelectionMap` with `UndefinedVariable(nope)`; `X(q: 1)` is `SelectionMap` with `UnknownFieldArgument`; `checkins(limit: 4294967296)` is `IntegerOutOfRange`.
 - A reachable field's `resolver_reader` is `Some` and equals its `field_types` reader AST; an unreachable field's is `None`.
-- `concrete_entities`: `Pet.fullName`'s is `[Pet]`; a field declared on the fixture's `Node` has `[BlogItem, Checkin, Pet]`. The pet demo's `link_types` are `Mutation`, `Owner`, `Pet`, `Query`, each concrete with itself as its one concrete type; `Query` and `Mutation` are there though no pointer points to them.
+- `concrete_entities`: `Pet.fullName`'s is `[Pet]`; a field declared on the pet demo's `Node` has `[AdItem, BlogItem, Checkin, Image, Pet, Viewer]` (landed against the pet demo's schema, because these tests read the demo, not store.md's fixture). The pet demo's `link_types` are `Mutation`, `Owner`, `Pet`, `Query`, each concrete with itself as its one concrete type; `Query` and `Mutation` are there though no pointer points to them.
 
 ### Compiler: printing
 

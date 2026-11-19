@@ -1236,26 +1236,24 @@ mod field_types {
     }
 
     #[test]
-    fn a_selected_pointer_is_its_target_wrapper_of_the_nested_object() {
+    fn a_selected_pointer_is_selected_and_neither_typed_nor_read() {
         let db = db_with_literals(&[
+            "field Pet.f { firstName }",
             "field Pet.p to Pet { id }",
-            "field Pet.g { p { firstName } }",
+            "field Pet.g { id, p { f } }",
         ]);
         let types = types(&db, "Pet", "g").expect("the fixture is valid");
         assert_eq!(
-            data_field(&types.data, "p").type_,
-            nullable(WrapperVariant::Inner(ArtifactInnerType::Object(
-                ArtifactObjectType(
-                    ArtifactObjectField {
-                        key: key("firstName"),
-                        description: None,
-                        type_: Wrapper::Inner(string()),
-                    }
-                    .wrap_vec()
-                )
-            )))
+            types
+                .data
+                .0
+                .iter()
+                .map(|field| field.key)
+                .collect::<Vec<_>>(),
+            key("id").wrap_vec()
         );
-        assert_eq!(types.selected, vec![named("Pet", "p")]);
+        assert_eq!(types.reader_ast.0.len(), 1);
+        assert_eq!(types.selected, vec![named("Pet", "p"), named("Pet", "f")]);
     }
 
     #[test]
@@ -1354,3 +1352,4 @@ mod field_types {
 
 mod merged_selection;
 mod query;
+mod reader_ast;

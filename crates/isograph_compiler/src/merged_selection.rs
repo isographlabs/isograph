@@ -269,6 +269,17 @@ impl MergedArguments {
         self.0.iter()
     }
 
+    /// These arguments and each of `arguments` whose name none of them has, sorted by name.
+    pub fn with_absent(self, arguments: impl Iterator<Item = MergedArgument>) -> Self {
+        let MergedArguments(mut present) = self;
+        let absent: Vec<MergedArgument> = arguments
+            .filter(|argument| !present.iter().any(|other| other.name == argument.name))
+            .collect();
+        present.extend(absent);
+        present.sort_by_key(|argument| argument.name);
+        MergedArguments(present)
+    }
+
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }

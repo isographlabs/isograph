@@ -201,7 +201,8 @@ fn normalization_composite_target(
     .wrap_ok()
 }
 
-fn normalization_arguments(
+/// `arguments` with every integer narrowed to GraphQL's 32-bit `Int`.
+pub(crate) fn normalization_arguments(
     arguments: &MergedArguments,
 ) -> Result<NormalizationArguments, IntegerOutOfRange> {
     arguments

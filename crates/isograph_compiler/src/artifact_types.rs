@@ -13,13 +13,24 @@ use nonempty::NonEmpty;
 use pico_macros::memo;
 use prelude::Postfix;
 
+use crate::merged_selection::{
+    Condition, DeclarationContext, MergedArgument, SelectionMapError, field_variables,
+    merged_arguments, source_field_declaration, undeclared_argument,
+};
+use crate::normalization_ast::{
+    IntegerOutOfRange, NormalizationArguments, normalization_arguments,
+};
 use crate::query::{EntrypointQueryError, QueryArtifact, query_for_entrypoint};
+use crate::reader_ast::{
+    ReaderLinkedSelection, ReaderRefinementSelection, ReaderResolverSelection,
+    ReaderScalarSelection, ReaderSelection, ReaderSelectionSet,
+};
 use crate::schema::{LiteralContextOf, source_iso_literal_items};
 use crate::wrapper::wrapper_of_type_annotation;
 use crate::{
     ArtifactSource, ClientId, ClientPointerTarget, CompilationProfile, EntityKind, EntityOrigin,
-    HostLanguage, IsographDb, NetworkProtocol, ScalarKind, SelectableKey, SelectableKind, Wrapper,
-    entity_named, selectable_named, selectables_for_entity,
+    HostLanguage, IsographDb, NetworkProtocol, ScalarKind, SelectableKey, SelectableKind,
+    SelectableShape, Wrapper, entity_named, selectable_named, selectables_for_entity,
 };
 
 /// The type of a param type's `data`: one field per selection, in selection order.
@@ -119,11 +130,14 @@ pub fn field_declaration<TProfile: CompilationProfile>(
     declaration.wrap_ok()
 }
 
-/// What a field's generated types say, and which client fields its selection set selects.
+/// What a field's generated types and reader say, and which client fields its selection set
+/// selects.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FieldTypes {
     pub data: ArtifactObjectType,
     pub parameters: Option<ParametersType>,
+    /// One node per field of `data`, with the same keys in the same order.
+    pub reader_ast: ReaderSelectionSet,
     /// Every client field or pointer the selection set selects at any depth, in selection order.
     pub selected: Vec<EntityNameAndSelectableName>,
 }
@@ -140,9 +154,63 @@ pub enum GenerationError {
     MissingSelectionSet(SelectableKey),
     #[error("The declaration of `{}.{}` did not parse completely.", .0.parent_entity_name, .0.selectable_name)]
     IncompleteParse(EntityNameAndSelectableName),
+    #[error("{0}")]
+    SelectionMap(SelectionMapError),
+    #[error("{0}")]
+    IntegerOutOfRange(IntegerOutOfRange),
+    #[error("`{}.{}` has no entity to select into.", .0.entity, .0.selectable)]
+    NoTargetEntity(SelectableKey),
+    #[error("The refinement `{}.{}` takes no arguments.", .0.entity, .0.selectable)]
+    ArgumentsOnRefinement(SelectableKey),
+    #[error("The refinement `{}.{}` targets a scalar.", .0.entity, .0.selectable)]
+    RefinementToScalar(SelectableKey),
 }
 
-/// The types of `field` as `client` reads the project.
+/// What a selection set on one entity contributes.
+struct ObjectSelections {
+    type_: ArtifactObjectType,
+    reader: ReaderSelectionSet,
+    selected: Vec<EntityNameAndSelectableName>,
+}
+
+/// What one selection contributes.
+struct SelectionOutput {
+    read: SelectionRead,
+    selected: Vec<EntityNameAndSelectableName>,
+}
+
+/// Whether v1 reads a selection.
+enum SelectionRead {
+    /// Its field of the data type and its reader node, which have the same key.
+    Read(ReadSelection),
+    /// A client pointer: neither the data type nor the reader AST has it.
+    NotRead,
+}
+
+struct ReadSelection {
+    field: ArtifactObjectField,
+    node: ReaderSelection,
+}
+
+/// What a server selection's target entity is, as the reader reads it.
+enum ReaderTarget {
+    Scalar,
+    Object(ObjectTarget),
+}
+
+struct ObjectTarget {
+    entity: EntityName,
+    reader: ReaderSelectionSet,
+}
+
+/// The field whose selection set is being walked, and what its arguments are checked against.
+#[derive(Clone, Copy)]
+struct ReaderContext<'a> {
+    field: EntityNameAndSelectableName,
+    declaration: DeclarationContext<'a>,
+}
+
+/// The types and reader AST of `field` as `client` reads the project.
 #[memo]
 pub fn field_types<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
@@ -153,13 +221,38 @@ pub fn field_types<TProfile: CompilationProfile>(
         .clone()
         .map_err(GenerationError::Lookup)?
         .declaration;
-    let (data, selected) = match declaration.selection_set.as_ref() {
-        None => (ArtifactObjectType(Vec::new()), Vec::new()),
+    let EntityNameAndSelectableName {
+        parent_entity_name,
+        selectable_name,
+    } = field;
+    let source = source_field_declaration(db, client, parent_entity_name, selectable_name)
+        .map_err(GenerationError::SelectionMap)?;
+    let variables = field_variables(db, client, parent_entity_name, selectable_name)
+        .as_ref()
+        .map_err(|error| GenerationError::SelectionMap(error.clone()))?;
+    let context = ReaderContext {
+        field,
+        declaration: DeclarationContext {
+            path: source.path,
+            literal_start: source.literal_start,
+            variables: variables.as_slice(),
+        },
+    };
+    let ObjectSelections {
+        type_: data,
+        reader: reader_ast,
+        selected,
+    } = match declaration.selection_set.as_ref() {
+        None => ObjectSelections {
+            type_: ArtifactObjectType(Vec::new()),
+            reader: ReaderSelectionSet(Vec::new()),
+            selected: Vec::new(),
+        },
         Some(selection_set) => object_type(
             db,
             client,
-            field,
-            field.parent_entity_name,
+            context,
+            parent_entity_name,
             selection_set.item.reference(),
         )?,
     };
@@ -172,20 +265,21 @@ pub fn field_types<TProfile: CompilationProfile>(
     FieldTypes {
         data,
         parameters,
+        reader_ast,
         selected,
     }
     .wrap_ok()
 }
 
-/// The object type of `selection_set` on `entity`, and the client fields it selects.
+/// The data type, reader AST, and selected client fields of `selection_set` on `entity`.
 fn object_type<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
-    field: EntityNameAndSelectableName,
+    context: ReaderContext<'_>,
     entity: EntityName,
     selection_set: &SelectionSet,
-) -> Result<(ArtifactObjectType, Vec<EntityNameAndSelectableName>), GenerationError> {
-    let fields = selection_set
+) -> Result<ObjectSelections, GenerationError> {
+    selection_set
         .0
         .iter()
         .map(|slot| {
@@ -193,26 +287,38 @@ fn object_type<TProfile: CompilationProfile>(
                 .item
                 .item
                 .as_ref()
-                .ok_or(GenerationError::IncompleteParse(field))?;
-            selection_field(db, client, field, entity, selection.item.reference())
+                .ok_or(GenerationError::IncompleteParse(context.field))?;
+            selection_field(db, client, context, entity, selection.item.reference())
         })
-        .collect::<Result<Vec<_>, _>>()?;
-    let (object_fields, selected): (Vec<_>, Vec<_>) = fields.into_iter().unzip();
-    (
-        ArtifactObjectType(object_fields),
-        selected.into_iter().flatten().collect(),
-    )
-        .wrap_ok()
+        .try_fold(
+            ObjectSelections {
+                type_: ArtifactObjectType(Vec::new()),
+                reader: ReaderSelectionSet(Vec::new()),
+                selected: Vec::new(),
+            },
+            |mut object, output| {
+                let SelectionOutput { read, selected } = output?;
+                match read {
+                    SelectionRead::Read(ReadSelection { field, node }) => {
+                        object.type_.0.push(field);
+                        object.reader.0.push(node);
+                    }
+                    SelectionRead::NotRead => {}
+                }
+                object.selected.extend(selected);
+                object.wrap_ok()
+            },
+        )
 }
 
-/// One selection's field of the object type, and the client fields it selects.
+/// What one selection on `entity` contributes.
 fn selection_field<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
-    field: EntityNameAndSelectableName,
+    context: ReaderContext<'_>,
     entity: EntityName,
     selection: &Selection,
-) -> Result<(ArtifactObjectField, Vec<EntityNameAndSelectableName>), GenerationError> {
+) -> Result<SelectionOutput, GenerationError> {
     let name = selection.name.item.0;
     let selectable = selectable_named(db, client, entity, name.unchecked_conversion())
         .clone()
@@ -221,46 +327,79 @@ fn selection_field<TProfile: CompilationProfile>(
         entity,
         selectable: selectable.name,
     };
-    let selected_self = || EntityNameAndSelectableName {
+    let selected_self = EntityNameAndSelectableName {
         parent_entity_name: entity,
         selectable_name: selectable.name,
+    };
+    let alias = selection
+        .reader_alias
+        .map_or(name, |reader_alias| reader_alias.item.0);
+    let data_field = |type_| ArtifactObjectField {
+        key: alias,
+        description: selectable.description,
+        type_,
     };
     let nested_selection_set = selection
         .selection_set
         .as_ref()
         .map(|selection_set| selection_set.item.reference());
-    let (type_, selected) = match selectable.kind.reference() {
+    match selectable.kind.reference() {
         SelectableKind::ClientField => {
             if nested_selection_set.is_some() {
                 return GenerationError::SelectionSetOnClientField(key).wrap_err();
             }
-            (
-                Wrapper::Inner(ArtifactInnerType::ClientFieldOutput(selected_self())),
-                selected_self().wrap_vec(),
-            )
+            SelectionOutput {
+                read: SelectionRead::Read(ReadSelection {
+                    field: data_field(Wrapper::Inner(ArtifactInnerType::ClientFieldOutput(
+                        selected_self,
+                    ))),
+                    node: ReaderSelection::Resolver(ReaderResolverSelection {
+                        alias,
+                        field: selected_self,
+                        arguments: resolver_arguments(
+                            db,
+                            client,
+                            context,
+                            selected_self,
+                            selection,
+                        )?,
+                    }),
+                }),
+                selected: selected_self.wrap_vec(),
+            }
+            .wrap_ok()
         }
         SelectableKind::ClientPointer(ClientPointerTarget::Parsed(target)) => {
             let nested_selection_set =
                 nested_selection_set.ok_or(GenerationError::MissingSelectionSet(key))?;
-            let mut selected = selected_self().wrap_vec();
-            let type_ = target.try_map(&mut |inner_entity| {
-                let (object, nested_selected) = object_type(
-                    db,
-                    client,
-                    field,
-                    inner_entity.dereference(),
-                    nested_selection_set,
-                )?;
-                selected.extend(nested_selected);
-                ArtifactInnerType::Object(object).wrap_ok()
-            })?;
-            (type_, selected)
+            let nested_selected = target
+                .inner_values()
+                .map(|inner_entity| {
+                    object_type(
+                        db,
+                        client,
+                        context,
+                        inner_entity.dereference(),
+                        nested_selection_set,
+                    )
+                    .map(|nested| nested.selected)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            SelectionOutput {
+                read: SelectionRead::NotRead,
+                selected: std::iter::once(selected_self)
+                    .chain(nested_selected.into_iter().flatten())
+                    .collect(),
+            }
+            .wrap_ok()
         }
         SelectableKind::ClientPointer(ClientPointerTarget::Unparsed) => {
-            return GenerationError::IncompleteParse(field).wrap_err();
+            GenerationError::IncompleteParse(context.field).wrap_err()
         }
         SelectableKind::Server(server) => {
+            let arguments = reader_arguments(context, selection)?;
             let mut selected = Vec::new();
+            let mut reader_target = None;
             let type_ = server.target.try_map(&mut |inner_entity| {
                 let inner = entity_named(db, client, inner_entity.dereference())
                     .clone()
@@ -273,38 +412,129 @@ fn selection_field<TProfile: CompilationProfile>(
                         GenerationError::SelectionSetOnScalar(key).wrap_err()
                     }
                     (EntityKind::Scalar(scalar), None) => {
+                        reader_target.get_or_insert(ReaderTarget::Scalar);
                         ArtifactInnerType::Scalar(scalar).wrap_ok()
                     }
                     (EntityKind::Object, None) => {
                         GenerationError::MissingSelectionSet(key).wrap_err()
                     }
                     (EntityKind::Object, Some(nested_selection_set)) => {
-                        let (object, nested_selected) = object_type(
+                        let nested = object_type(
                             db,
                             client,
-                            field,
+                            context,
                             inner_entity.dereference(),
                             nested_selection_set,
                         )?;
-                        selected.extend(nested_selected);
-                        ArtifactInnerType::Object(object).wrap_ok()
+                        selected.extend(nested.selected);
+                        reader_target.get_or_insert(ReaderTarget::Object(ObjectTarget {
+                            entity: inner_entity.dereference(),
+                            reader: nested.reader,
+                        }));
+                        ArtifactInnerType::Object(nested.type_).wrap_ok()
                     }
                 }
             })?;
-            (type_, selected)
+            let reader_target = reader_target.ok_or(GenerationError::NoTargetEntity(key))?;
+            let node = match (
+                TProfile::NetworkProtocol::selectable_shape(server.data.reference()),
+                reader_target,
+            ) {
+                (SelectableShape::Direct, ReaderTarget::Scalar) => {
+                    ReaderSelection::Scalar(ReaderScalarSelection {
+                        alias,
+                        selectable: selectable.name,
+                        arguments,
+                    })
+                }
+                (SelectableShape::Direct, ReaderTarget::Object(object)) => {
+                    ReaderSelection::Linked(ReaderLinkedSelection {
+                        alias,
+                        selectable: selectable.name,
+                        arguments,
+                        selections: object.reader,
+                    })
+                }
+                (SelectableShape::Refinement, ReaderTarget::Object(object)) => {
+                    if !arguments.0.is_empty() {
+                        return GenerationError::ArgumentsOnRefinement(key).wrap_err();
+                    }
+                    ReaderSelection::Refinement(ReaderRefinementSelection {
+                        alias,
+                        condition: Condition::SelectionEquals(object.entity),
+                        selections: object.reader,
+                    })
+                }
+                (SelectableShape::Refinement, ReaderTarget::Scalar) => {
+                    return GenerationError::RefinementToScalar(key).wrap_err();
+                }
+            };
+            SelectionOutput {
+                read: SelectionRead::Read(ReadSelection {
+                    field: data_field(type_),
+                    node,
+                }),
+                selected,
+            }
+            .wrap_ok()
         }
-    };
-    (
-        ArtifactObjectField {
-            key: selection
-                .reader_alias
-                .map_or(name, |reader_alias| reader_alias.item.0),
-            description: selectable.description,
-            type_,
-        },
-        selected,
+    }
+}
+
+/// `selection`'s arguments as the reader AST holds them: the enclosing field's variables stay
+/// variables.
+fn reader_arguments(
+    context: ReaderContext<'_>,
+    selection: &Selection,
+) -> Result<NormalizationArguments, GenerationError> {
+    let arguments = merged_arguments(context.declaration, selection.arguments.as_ref())
+        .map_err(GenerationError::SelectionMap)?;
+    normalization_arguments(arguments.merged.reference())
+        .map_err(GenerationError::IntegerOutOfRange)
+}
+
+/// The arguments of a `Resolver` node for `selection`, a selection of the client field
+/// `selected`: the arguments it passes, then the default of each of `selected`'s variables
+/// it does not pass, sorted by name.
+fn resolver_arguments<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    context: ReaderContext<'_>,
+    selected: EntityNameAndSelectableName,
+    selection: &Selection,
+) -> Result<NormalizationArguments, GenerationError> {
+    let arguments = merged_arguments(context.declaration, selection.arguments.as_ref())
+        .map_err(GenerationError::SelectionMap)?;
+    let variables = field_variables(
+        db,
+        client,
+        selected.parent_entity_name,
+        selected.selectable_name,
     )
-        .wrap_ok()
+    .as_ref()
+    .map_err(|error| GenerationError::SelectionMap(error.clone()))?;
+    if let Some(unknown) = undeclared_argument(
+        context.declaration,
+        SelectableKey {
+            entity: selected.parent_entity_name,
+            selectable: selected.selectable_name,
+        },
+        arguments.reference(),
+        variables.as_slice(),
+    ) {
+        return GenerationError::SelectionMap(unknown).wrap_err();
+    }
+    let defaults = variables.iter().filter_map(|variable| {
+        variable
+            .default_value
+            .clone()
+            .map(|default_value| MergedArgument {
+                name: variable.name.unchecked_conversion(),
+                value: default_value,
+            })
+    });
+    normalization_arguments(arguments.merged.with_absent(defaults).reference())
+        .map_err(GenerationError::IntegerOutOfRange)
 }
 
 /// The parameters type of `variable_definitions`; `None` when it declares no variable.
@@ -430,7 +660,7 @@ pub struct ProjectArtifacts<TLiteralContext> {
     pub entities: Vec<EntityName>,
     /// The `entrypoint` literals with their queries, sorted by entrypoint.
     pub entrypoints: Vec<EntrypointArtifacts>,
-    /// One per entity some pointer points to, sorted by entity.
+    /// One per entity some field is declared on or some pointer points to, sorted by entity.
     pub link_types: Vec<LinkType>,
 }
 
@@ -474,7 +704,11 @@ pub struct FieldArtifacts<TLiteralContext> {
     pub data: ArtifactObjectType,
     pub parameters: Option<ParametersType>,
     pub output_type: Generation,
-    pub resolver_reader: Generation,
+    /// The reader AST, when the field is reachable from an entrypoint.
+    pub resolver_reader: Option<ReaderSelectionSet>,
+    /// The entities a link to `field.parent_entity_name` can name: the entity itself when
+    /// concrete, its concrete entities when abstract, sorted.
+    pub concrete_entities: Vec<EntityName>,
 }
 
 /// Where a field's resolver is: its source file and its literal's host-language context.
@@ -610,7 +844,8 @@ pub fn project_artifacts<TProfile: CompilationProfile>(
                 data: types.data,
                 parameters: types.parameters,
                 output_type: generation(output_types.reference(), field),
-                resolver_reader: generation(reachable.reference(), field),
+                resolver_reader: reachable.contains(field.reference()).then_some(types.reader_ast),
+                concrete_entities: concrete_types(db, client, field.parent_entity_name)?,
             }
             .wrap_ok()
         })
@@ -618,9 +853,12 @@ pub fn project_artifacts<TProfile: CompilationProfile>(
 
     let link_types = fields
         .iter()
-        .flat_map(|field| match field.kind.reference() {
-            FieldArtifactKind::Pointer(target) => target.inner_values().copied().collect(),
-            FieldArtifactKind::ClientField => Vec::new(),
+        .flat_map(|field| {
+            let pointed_to: Vec<EntityName> = match field.kind.reference() {
+                FieldArtifactKind::Pointer(target) => target.inner_values().copied().collect(),
+                FieldArtifactKind::ClientField => Vec::new(),
+            };
+            std::iter::once(field.field.parent_entity_name).chain(pointed_to)
         })
         .collect::<BTreeSet<EntityName>>()
         .into_iter()
@@ -670,7 +908,7 @@ fn concrete_types<TProfile: CompilationProfile>(
         .map_err(GenerationError::Lookup)?;
     match named.kind::<TProfile::NetworkProtocol>() {
         EntityKind::Scalar(_) => GenerationError::Lookup(Diagnostic::new(
-            format!("A pointer points to `{entity}`, which is a scalar."),
+            format!("`{entity}` is a scalar; a link names a record of an object entity."),
             None,
         ))
         .wrap_err(),

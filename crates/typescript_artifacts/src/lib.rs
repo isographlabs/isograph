@@ -75,8 +75,10 @@ pub fn generate_artifacts<TLiteralContext>(
                 .chain(output_type)
                 .map(|module| printed(module.reference()))
                 .chain(
-                    generated(field.resolver_reader)
-                        .then(|| printed_artifact(stub_artifact(field.field, RESOLVER_READER))),
+                    field
+                        .resolver_reader
+                        .as_ref()
+                        .map(|_| printed_artifact(stub_artifact(field.field, RESOLVER_READER))),
                 )
                 .collect::<Vec<_>>();
             modules.wrap_ok()
@@ -151,8 +153,8 @@ mod tests {
         FieldArtifactKind, FieldArtifacts, FieldDeclarationSource, FixedRecordId, Generation,
         GenerationOptions, LinkType, NormalizationAst, NormalizationNode, NormalizationRootRecord,
         NormalizationSelection, NormalizationSelectionSet, NormalizationTarget, ParametersType,
-        ProjectArtifacts, QueryArtifact, ResponseKey, ScalarKind, ScalarValueKind, UnionWrapper,
-        Wrapper, WrapperVariant,
+        ProjectArtifacts, QueryArtifact, ReaderSelectionSet, ResponseKey, ScalarKind,
+        ScalarValueKind, UnionWrapper, Wrapper, WrapperVariant,
     };
     use nonempty::NonEmpty;
     use prelude::Postfix;
@@ -211,7 +213,8 @@ mod tests {
             data: ArtifactObjectType(data),
             parameters: None,
             output_type: Generation::NotGenerated,
-            resolver_reader: Generation::NotGenerated,
+            resolver_reader: None,
+            concrete_entities: entity(parent).wrap_vec(),
         }
     }
 
@@ -605,7 +608,7 @@ mod tests {
     #[test]
     fn a_reader_is_an_empty_object_and_the_normalization_ast_is_the_query_s_ast() {
         let mut checkins = field("Pet", "Checkins", Vec::new());
-        checkins.resolver_reader = Generation::Generated;
+        checkins.resolver_reader = ReaderSelectionSet(Vec::new()).wrap_some();
         let artifacts = generated(
             ProjectArtifacts {
                 entrypoints: entrypoint("Pet", "Checkins", QUERY_FILE.wrap_some()).wrap_vec(),
@@ -630,7 +633,7 @@ mod tests {
     #[test]
     fn an_entrypoint_imports_its_normalization_ast_and_reader() {
         let mut home = field("Query", "HomeRoute", Vec::new());
-        home.resolver_reader = Generation::Generated;
+        home.resolver_reader = ReaderSelectionSet(Vec::new()).wrap_some();
         let artifacts = generated(
             ProjectArtifacts {
                 entrypoints: entrypoint("Query", "HomeRoute", QUERY_FILE.wrap_some()).wrap_vec(),
@@ -805,7 +808,7 @@ mod tests {
     #[test]
     fn no_path_is_generated_twice() {
         let mut checkins = field("Pet", "Checkins", Vec::new());
-        checkins.resolver_reader = Generation::Generated;
+        checkins.resolver_reader = ReaderSelectionSet(Vec::new()).wrap_some();
         checkins.output_type = Generation::Generated;
         let artifacts = generated(
             ProjectArtifacts {

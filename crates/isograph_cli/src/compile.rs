@@ -543,7 +543,7 @@ mod generation_tests {
     const PET: &str = "iso(`entity Pet`)\nexport const firstName = iso(`field Pet.firstName`)(() => 'a');\nexport const lastName = iso(`field Pet.lastName`)(() => 'b');\nexport const fullName = iso(`field Pet.fullName { firstName }`)(() => 'c');\n";
     const BROKEN: &str = "iso(`entrypoint`)";
 
-    const HOME_ROUTE_FILES: [&str; 9] = [
+    const HOME_ROUTE_FILES: [&str; 10] = [
         "Query/HomeRoute/entrypoint.ts",
         "Query/HomeRoute/normalization_ast.ts",
         "Query/HomeRoute/output_type.ts",
@@ -551,6 +551,7 @@ mod generation_tests {
         "Query/HomeRoute/query_text.graphql",
         "Query/HomeRoute/query_text.ts",
         "Query/HomeRoute/resolver_reader.ts",
+        "Query/__link/output_type.ts",
         "iso.ts",
         "tsconfig.json",
     ];
@@ -761,7 +762,7 @@ mod generation_tests {
         assert_eq!(written_paths(changes.reference()), ["iso.ts"]);
         assert_eq!(
             deleted_paths(changes.reference()),
-            HOME_ROUTE_FILES[..7].to_vec()
+            HOME_ROUTE_FILES[..8].to_vec()
         );
     }
 
@@ -908,13 +909,16 @@ mod generation_tests {
     fn generation_of(
         project: &ProjectArtifacts<TypeScriptLiteralContext>,
         field: &str,
-    ) -> (Generation, Generation) {
+    ) -> (Generation, Option<usize>) {
         let field = project
             .fields
             .iter()
             .find(|artifacts| artifacts.field == named("Query", field))
             .expect("the fixture declares the field");
-        (field.output_type, field.resolver_reader)
+        (
+            field.output_type,
+            field.resolver_reader.as_ref().map(|reader| reader.0.len()),
+        )
     }
 
     #[test]
@@ -924,15 +928,15 @@ mod generation_tests {
         let project = project(state.reference()).expect("the fixture is valid");
         assert_eq!(
             generation_of(project.reference(), "a"),
-            (Generation::Generated, Generation::Generated)
+            (Generation::Generated, 2.wrap_some())
         );
         assert_eq!(
             generation_of(project.reference(), "b"),
-            (Generation::Generated, Generation::Generated)
+            (Generation::Generated, 0.wrap_some())
         );
         assert_eq!(
             generation_of(project.reference(), "c"),
-            (Generation::NotGenerated, Generation::NotGenerated)
+            (Generation::NotGenerated, None)
         );
     }
 
