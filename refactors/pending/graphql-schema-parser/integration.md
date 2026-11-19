@@ -334,7 +334,7 @@ pub fn graphql_entity<TProfile: CompilationProfile>(
 ) -> Result<Option<ProtocolEntity<GraphQLEntityData>>, EntityLookupError>
 ```
 
-`graphql_entity` maps `entity_named`'s `Ok(Some(schema_entity))`: `definition` is the definition's path and name span; the variant follows `type_definition_kind` (`Scalar` and `Enum` are `Leaf`); `interfaces` is the definition's `interfaces` then each object or interface extension's `interfaces`. `GraphQLCompositeData` gains `id_field` with query-generation.md change 7 (the printer reads it) and `fetchable_directives` with change 4 (the fetch plan reads it).
+`graphql_entity` maps `entity_named`'s `Ok(Some(schema_entity))`: `definition` is the definition's path and name span; the variant follows `type_definition_kind` (`Scalar` and `Enum` are `Leaf`); `interfaces` is the definition's `interfaces` then each object or interface extension's `interfaces`. `GraphQLCompositeData` gains `id_field` with query-generation.md change 7 (the printer reads it).
 
 ```rust
 // from crates/graphql_network_protocol/src/protocol_data.rs
