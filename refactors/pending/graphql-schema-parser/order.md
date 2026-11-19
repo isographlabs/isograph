@@ -63,7 +63,7 @@ Tests (`tokenize` kinds and spans):
 
 Status: pending
 
-`decode_string_value`, `decode_code_units`, `TokenText` (copied, with `sub_span`), `intern_block_string_value`, `clean_block_string`, `get_common_indent`, `block_string_lines`, `line_is_whitespace`, `is_not_whitespace`, as parsing-standards.md (String values). `consume_string_value_if` lands in change 3 with the cursor.
+`decode_string_value`, `decode_code_units`, `TokenText` (copied, with `sub_span`, in `token_cursor.rs`), `intern_block_string_value`, `clean_block_string`, `get_common_indent`, `block_string_lines`, `line_is_whitespace`, `is_not_whitespace`, as parsing-standards.md (String values). `ParseError`, `ExpectedFound`, `Expectation`, `Found`, and `ParseError::expected` (parsing-standards.md, Errors) land here because `decode_string_value` returns `WithSpan<ParseError>`. `consume_string_value_if` lands in change 3 with the cursor.
 
 Tests call `decode_string_value` on the interior of a tokenized `StringLiteral` (`TokenText` built from the token's span, `exclude_ends(1)`) and `clean_block_string` on literal interiors:
 
@@ -80,7 +80,7 @@ Tests call `decode_string_value` on the interior of a tokenized `StringLiteral` 
 
 Status: pending
 
-`TokenIndex`, `TokenCursor`, `ParseError`, `ExpectedFound`, `Expectation`, `Found`, `ParseError::expected`, `consume_string_value_if`, `DefinitionKeyword`, `ExtensionKeyword`, `BooleanOrNullKeyword` (in `keyword.rs`), the `with_cursor` test helper, and `span_of` (copied), as parsing-standards.md (`TokenCursor`, Keyword dispatch, Errors, String values, Tests).
+`TokenIndex`, `TokenCursor`, `consume_string_value_if`, `DefinitionKeyword`, `ExtensionKeyword`, `BooleanOrNullKeyword` (in `keyword.rs`), the `with_cursor` test helper, and `span_of` (copied), as parsing-standards.md (`TokenCursor`, Keyword dispatch, Errors, String values, Tests).
 
 Tests (through `with_cursor`):
 
