@@ -6,7 +6,7 @@ use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientPointerDeclaration, NonConstantValue,
     SelectionSet, SelectionType,
 };
-use pico::MemoRef;
+use pico::{MemoRef, MemoRefPostfix};
 use prelude::Postfix;
 
 use pico_macros::memo;

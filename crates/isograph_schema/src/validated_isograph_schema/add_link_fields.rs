@@ -7,7 +7,7 @@ use crate::{
 use common_lang_types::{EntityName, SelectableName, WithLocationPostfix};
 use intern::string_key::Intern;
 use isograph_lang_types::Description;
-use pico::MemoRef;
+use pico::{MemoRef, MemoRefPostfix};
 use pico_macros::memo;
 use prelude::Postfix;
 

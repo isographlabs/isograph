@@ -19,6 +19,7 @@ use isograph_schema::{
     imperative_field_subfields_or_inline_fragments,
     insert_selectable_or_multiple_definition_diagnostic,
 };
+use pico::MemoRefPostfix;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
