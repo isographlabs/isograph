@@ -47,7 +47,7 @@ pub fn parse_schema(text: &str) -> ParsedSchema {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct DefinitionError {
     /// The name the failed definition declared; `None` when the parse failed before the
-    /// name, and for a schema definition or extension, which has no name.
+    /// name.
     pub name: Option<DefinitionName>,
     pub error: WithSpan<ParseError>,
 }
@@ -57,11 +57,20 @@ pub struct DefinitionError {
 pub enum DefinitionName {
     Entity(EntityName),
     Directive(DirectiveName),
+    /// `schema` or `extend schema`, which declare the one schema.
+    Schema,
 }
 
 impl DefinitionError {
     fn unnamed(error: WithSpan<ParseError>) -> Self {
         DefinitionError { name: None, error }
+    }
+
+    fn of_schema(error: WithSpan<ParseError>) -> Self {
+        DefinitionError {
+            name: DefinitionName::Schema.wrap_some(),
+            error,
+        }
     }
 }
 
@@ -402,11 +411,11 @@ fn parse_schema_definition(
     cursor: &mut TokenCursor<'_>,
     description: Option<WithSpan<Description>>,
 ) -> Result<SchemaDefinition, DefinitionError> {
-    let directives = parse_directives(cursor).map_err(DefinitionError::unnamed)?;
+    let directives = parse_directives(cursor).map_err(DefinitionError::of_schema)?;
     cursor
         .require_token(GraphQLTokenKind::OpenBrace)
         .map_err(|()| {
-            DefinitionError::unnamed(
+            DefinitionError::of_schema(
                 cursor.expected(Expectation::Token(GraphQLTokenKind::OpenBrace)),
             )
         })?;
@@ -414,7 +423,7 @@ fn parse_schema_definition(
         description,
         directives,
         root_operation_types: parse_root_operation_types_after_open(cursor)
-            .map_err(DefinitionError::unnamed)?,
+            .map_err(DefinitionError::of_schema)?,
     }
     .wrap_ok()
 }
@@ -540,15 +549,15 @@ fn parse_type_system_extension(
 fn parse_schema_extension(
     cursor: &mut TokenCursor<'_>,
 ) -> Result<SchemaExtension, DefinitionError> {
-    let directives = parse_directives(cursor).map_err(DefinitionError::unnamed)?;
+    let directives = parse_directives(cursor).map_err(DefinitionError::of_schema)?;
     let root_operation_types = match cursor.consume_token_if(GraphQLTokenKind::OpenBrace) {
         Some(_) => {
-            parse_root_operation_types_after_open(cursor).map_err(DefinitionError::unnamed)?
+            parse_root_operation_types_after_open(cursor).map_err(DefinitionError::of_schema)?
         }
         None => Vec::new(),
     };
     if directives.is_empty() && root_operation_types.is_empty() {
-        return DefinitionError::unnamed(cursor.expected(Expectation::DirectiveOrOpenBrace))
+        return DefinitionError::of_schema(cursor.expected(Expectation::DirectiveOrOpenBrace))
             .wrap_err();
     }
     SchemaExtension {
@@ -1381,11 +1390,11 @@ mod tests {
     }
 
     #[test]
-    fn an_invalid_schema_is_an_unnamed_error() {
+    fn an_invalid_schema_is_an_error_of_the_schema() {
         assert_eq!(
             schema_error("schema {}"),
             DefinitionError {
-                name: None,
+                name: DefinitionName::Schema.wrap_some(),
                 error: ParseError::expected(
                     Expectation::OperationType,
                     Found::Token(GraphQLTokenKind::CloseBrace)
@@ -1394,7 +1403,7 @@ mod tests {
             }
         );
         let error = schema_error("schema");
-        assert_eq!(error.name, None);
+        assert_eq!(error.name, DefinitionName::Schema.wrap_some());
         assert_eq!(
             error.error.item,
             ParseError::expected(
@@ -1710,7 +1719,7 @@ mod tests {
         };
         assert_eq!(directed.directives.len(), 1);
         let error = extension_error("extend schema");
-        assert_eq!(error.name, None);
+        assert_eq!(error.name, DefinitionName::Schema.wrap_some());
         assert_eq!(
             error.error.item,
             ParseError::expected(Expectation::DirectiveOrOpenBrace, Found::EndOfFile)
@@ -1769,7 +1778,7 @@ mod tests {
                 )) => DefinitionName::Directive(directive.name.item.0).wrap_some(),
                 TypeSystemDefinitionOrExtension::Definition(TypeSystemDefinition::Schema(_))
                 | TypeSystemDefinitionOrExtension::Extension(TypeSystemExtension::Schema(_)) => {
-                    None
+                    DefinitionName::Schema.wrap_some()
                 }
                 TypeSystemDefinitionOrExtension::Extension(TypeSystemExtension::Type(
                     extension,
@@ -1986,6 +1995,15 @@ mod tests {
                 TypeSystemExtension::Type(TypeExtension::Object(_))
             ))
         ));
+    }
+
+    #[test]
+    fn a_failed_schema_definition_or_extension_names_the_schema() {
+        let schema = DefinitionName::Schema.wrap_some();
+        assert_eq!(
+            outline("schema { query: } extend schema { mutation: } type { a: A }"),
+            vec![schema.wrap_err(), schema.wrap_err(), None.wrap_err()]
+        );
     }
 
     #[test]
