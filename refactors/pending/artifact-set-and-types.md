@@ -1,6 +1,8 @@
 # The full artifact set: stub runtime ASTs, generated types, and scalar type mapping
 
-This doc extends `refactors/pending/artifact-generation.md` (v0: `output_directory`, `iso.ts`, `{ kind: "Entrypoint", name }` entrypoint artifacts, `ArtifactValue` printed through SWC, all-or-nothing write with a diff) to every file upstream isograph generates. Files the runtime reads (reader ASTs, normalization ASTs, refetch readers) are generated at upstream's paths as modules whose default export is an empty object. Files TypeScript reads (param types, parameters types, output types, link types, the typed `iso.ts` overloads) are generated in full, by upstream's algorithm. The knowledge that GraphQL `String` is TypeScript `string` is split: the network protocol reports how a scalar's values are represented as data, and the host language maps that data to its own types.
+Status: not actively worked; it records decisions and will be brought current when work on it starts.
+
+This doc extends `refactors/pending/artifact-generation.md` (v0: `output_directory`, `iso.ts`, `{ kind: "Entrypoint", name }` entrypoint artifacts, `ArtifactValue` printed through SWC, all-or-nothing write with a diff) to every file upstream isograph generates. Files the runtime reads (reader ASTs, normalization ASTs, refetch readers) are generated at upstream's paths as modules whose default export is an empty object. Files TypeScript reads (param types, parameters types, output types, link types, the typed `iso.ts` overloads) are generated in full, by upstream's algorithm. The knowledge that GraphQL `String` is TypeScript `string` is split: the network protocol reports how a built-in scalar's values are represented as data, and the host language maps that data to its own types. A custom scalar's type comes from the compilation profile.
 
 Upstream references are the checkout at `/Users/rbalicki/code/isograph` (commit `79e2a3c0`): `crates/artifact_content/src/` and the generated tree `demos/pet-demo/src/components/__isograph/`.
 
@@ -10,8 +12,7 @@ Upstream references are the checkout at `/Users/rbalicki/code/isograph` (commit 
 {
   "source_files": ["src/**/*.ts"],
   "schema": ["schema/**/*.graphql"],
-  "output_directory": "src",
-  "custom_scalars": { "Url": "String" }
+  "output_directory": "src"
 }
 ```
 
@@ -31,7 +32,7 @@ export const fullName = iso(`
 });
 ```
 
-`data.firstName` is `string`. Selecting a field that does not exist, or reading `data.nickname` without selecting it, is a TypeScript error at the resolver. A resolver that reads `data.nickname` where the schema says `nickname: String` gets `string | null`. A field selected under a list is a `ReadonlyArray`. A client field selected by another field has the type its resolver returns. A field with variables gets `parameters` typed from its variable definitions. `picture: Url!` is `string` because the config maps the custom scalar `Url` to `String`; without that entry it is `unknown`.
+`data.firstName` is `string`. Selecting a field that does not exist, or reading `data.nickname` without selecting it, is a TypeScript error at the resolver. A resolver that reads `data.nickname` where the schema says `nickname: String` gets `string | null`. A field selected under a list is a `ReadonlyArray`. A client field selected by another field has the type its resolver returns. A field with variables gets `parameters` typed from its variable definitions. `picture: Url!` is `unknown`, because the `isograph` binary's profile maps no custom scalars; a project whose own profile maps `Url` to `string` gets `string` (Scalars, Custom scalars).
 
 After the daemon compiles the pet demo, `src/__isograph/` holds:
 
@@ -264,43 +265,30 @@ lazy_static! {
 
 The GraphQL protocol crate writes TypeScript names, and the TypeScript printer reads them as opaque text. This is the coupling i2 removes.
 
-### The options
+### Built-in scalars
 
-1. Every scalar is `unknown`. Nothing is coupled. Every resolver casts every string and number. Rejected: it discards what the GraphQL spec defines for its built-in scalars.
-2. The five built-in scalars map to `string`, `number`, `boolean`, custom scalars are `unknown`. This is upstream's behavior. `Url`, `DateTime`, `JSON` are `unknown`.
-3. Option 2, plus a config map from a custom scalar's entity name to how its values are represented. `"custom_scalars": { "Url": "String" }` makes `Url` `string`. The config is keyed by entity name, which is compiler vocabulary, and valued by a value kind, which is neither GraphQL nor TypeScript. A user whose server sends a JSON object for a scalar has no value kind for it and keeps `unknown`.
-4. Option 2, plus a schema directive on the scalar: `scalar Url @javascriptType(name: "string")`. The TypeScript type is written in the GraphQL schema, so the protocol has to carry host-language text through a directive whose meaning it does not know. A schema downloaded from the server needs an `extend scalar Url @javascriptType(...)` extension file the user owns. A second host language needs a second directive.
-5. Option 3 with arbitrary host-language type text as the config value (Relay's `customScalarTypes`: `"Url": "string"`, or an imported branded type). The TypeScript generator has to parse type text into SWC AST, which needs `swc_ecma_parser`, and the config value is TypeScript text, so it is host-language config.
-
-### The option held: 3
-
-The protocol reports a scalar entity's representation as data, in a vocabulary that names how values arrive, not what they are called in GraphQL or in TypeScript:
+The built-in mapping is hard-coded and not configurable: `String` and `ID` are `string`, `Int` and `Float` are `number`, `Boolean` is `boolean`, and every enum is `string`. The protocol reports a built-in scalar's representation as data, in a vocabulary that names how values arrive, and the TypeScript host maps that vocabulary to keyword types:
 
 ```rust
-// from crates/common_lang_types/src/scalar_value_kind.rs
+// from crates/isograph_compiler/src/schema.rs
 /// How the values of a scalar arrive in the data a network protocol returns.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum ScalarValueKind {
     String,
     Number,
     Boolean,
 }
-```
 
-```rust
-// from crates/isograph_compiler/src/schema.rs
 /// What the compiler knows about the values of a scalar entity.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ScalarKind {
     /// The protocol defines how this scalar's values arrive.
     Known(ScalarValueKind),
-    /// A scalar the protocol knows only by name. The config's `custom_scalars` may say how its
-    /// values arrive.
+    /// A scalar the protocol knows only by name. The profile's `custom_scalar_types` may give
+    /// its host-language type.
     Custom(EntityName),
 }
 ```
-
-`ScalarValueKind` lives in `common_lang_types` because both `isograph_config` (the config's map values) and `isograph_compiler` name it, and neither depends on the other. `common_lang_types` enables serde's `derive` feature for it.
 
 The GraphQL protocol maps its entity data to an entity kind (Schema model, Entity). `GraphQLEntityData::Leaf` splits into `Scalar` and `Enum` with this change, the first reader of the difference:
 
@@ -330,18 +318,109 @@ fn scalar_kind(name: EntityName) -> ScalarKind {
 }
 ```
 
-The TypeScript host language maps the kind to a TypeScript keyword type and reads the config for `Custom`:
+i2's schemas declare the built-in scalars (`demos/pet-demo/schema/scalars.graphql`). `scalar_kind` keys on the name, so a declared `scalar String` is the built-in `String`. Whether the GraphQL protocol also defines the five when the schema does not declare them (upstream does; the spec says a schema omits them) is the schema integration's decision; `entity_kind` gives the same kind either way.
+
+### Custom scalars
+
+The type of a custom scalar comes from the compilation profile: the crate that pairs a host language with a network protocol (`crates/ts_graphql_react_isograph_cli` for the `isograph` binary, whose `main` calls `isograph_cli::run::<TypeScriptGraphQL>()`). The profile is the one place that names both GraphQL scalars and TypeScript types, and a custom scalar's type can come from a package. The config has no scalar option.
+
+```rust
+// from crates/isograph_compiler/src/host_language.rs
+pub trait CompilationProfile: 'static {
+    type HostLanguage: HostLanguage;
+    type NetworkProtocol: NetworkProtocol;
+
+    /// The host-language type of each custom scalar, by the scalar's name. A custom scalar
+    /// not listed has the host language's unknown type.
+    fn custom_scalar_types()
+    -> BTreeMap<EntityName, <Self::HostLanguage as HostLanguage>::CustomScalarType>;
+}
+
+// on HostLanguage
+    /// The host-language type a profile gives a custom scalar.
+    type CustomScalarType: Clone + Debug + PartialEq + Eq + 'static;
+```
+
+Before, `CompilationProfile` had only the two associated types. Every profile is a unit struct and `run` takes no value, so the map is an associated function rather than an argument to `run`. `serve` calls it once (Compiling). The test profiles return `BTreeMap::new()`; the test hosts set `type CustomScalarType = ()`.
+
+```rust
+// from crates/isograph_extract_typescript/src/custom_scalar.rs
+/// The TypeScript type of a custom scalar's values: a named type, imported from a module
+/// when `import` is `Some`, otherwise a global or keyword type (`string`, `Date`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TypeScriptCustomScalarType {
+    pub name: &'static str,
+    pub import: Option<ModuleSpecifier>,
+}
+
+/// A module specifier, printed as written in every artifact that imports from it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ModuleSpecifier(pub &'static str);
+```
+
+`TypeScriptHostLanguage` sets `type CustomScalarType = TypeScriptCustomScalarType`. A specifier prints unchanged in artifacts at every depth of the artifact folder, so it is a package specifier (`"decimal.js"`) or a path alias the project's resolver maps; a relative specifier would resolve differently from each artifact. A `name` with no import prints as a type reference to that identifier; `string` prints as `string`, which TypeScript reads as the keyword.
+
+The `isograph` binary's profile maps nothing:
+
+```rust
+// from crates/ts_graphql_react_isograph_cli/src/main.rs
+impl CompilationProfile for TypeScriptGraphQL {
+    type HostLanguage = TypeScriptHostLanguage;
+    type NetworkProtocol = GraphQLNetworkProtocol;
+
+    fn custom_scalar_types() -> BTreeMap<EntityName, TypeScriptCustomScalarType> {
+        BTreeMap::new()
+    }
+}
+```
+
+A project that maps custom scalars builds its own binary with its own profile:
+
+```rust
+// from crates/pet_isograph_cli/src/main.rs, a user's crate
+struct PetProfile;
+
+impl CompilationProfile for PetProfile {
+    type HostLanguage = TypeScriptHostLanguage;
+    type NetworkProtocol = GraphQLNetworkProtocol;
+
+    fn custom_scalar_types() -> BTreeMap<EntityName, TypeScriptCustomScalarType> {
+        BTreeMap::from([
+            (
+                "Url".intern().to(),
+                TypeScriptCustomScalarType { name: "string", import: None },
+            ),
+            (
+                "Price".intern().to(),
+                TypeScriptCustomScalarType {
+                    name: "Decimal",
+                    import: ModuleSpecifier("decimal.js").wrap_some(),
+                },
+            ),
+        ])
+    }
+}
+
+fn main() -> ExitCode {
+    isograph_cli::run::<PetProfile>()
+}
+```
+
+The TypeScript host maps a known kind to a keyword type and reads the profile's map for `Custom`:
 
 ```rust
 // from crates/isograph_extract_typescript/src/generate_types.rs
 /// The TypeScript type of a scalar's values.
-fn scalar_type(kind: ScalarKind, options: &GenerationOptions) -> TsType {
+fn scalar_type(
+    kind: ScalarKind,
+    options: &GenerationOptions<TypeScriptCustomScalarType>,
+) -> TsType {
     match kind {
         ScalarKind::Known(value_kind) => value_kind_type(value_kind),
         ScalarKind::Custom(name) => options
-            .custom_scalars
+            .custom_scalar_types
             .get(name.reference())
-            .map(|value_kind| value_kind_type(value_kind.dereference()))
+            .map(|custom| custom_scalar_type(name, custom))
             .unwrap_or_else(|| keyword_type(TsKeywordTypeKind::TsUnknownKeyword)),
     }
 }
@@ -353,40 +432,36 @@ fn value_kind_type(value_kind: ScalarValueKind) -> TsType {
         ScalarValueKind::Boolean => TsKeywordTypeKind::TsBooleanKeyword,
     })
 }
+
+/// A type reference to `custom.name` when it has no import, else to the import's local name
+/// `<scalar>__custom_scalar`.
+fn custom_scalar_type(scalar: EntityName, custom: &TypeScriptCustomScalarType) -> TsType;
+
+/// `import type { <name> as <scalar>__custom_scalar } from "<module>"` for each scalar in
+/// `scalars` whose entry has an import.
+fn custom_scalar_imports(
+    scalars: &BTreeSet<EntityName>,
+    options: &GenerationOptions<TypeScriptCustomScalarType>,
+) -> Vec<ModuleItem>;
 ```
 
-Reasons: the protocol knows how its built-in scalars are serialized, and nothing else in the pipeline can know it; it reports that as `ScalarValueKind`, which TypeScript, Python, or Rust output can each map. The user knows how a custom scalar is serialized, and the project config is where per-project facts go; the config names no TypeScript, so one config serves any host language. A custom scalar not in the map keeps upstream's `unknown`, so a project without the key gets upstream's types. Option 5 is Later: it needs a type-text parser and is host-language config.
+An imported type's local name is `<scalar>__custom_scalar` (`Price__custom_scalar`). Scalar names are unique in the schema, so two scalars mapped to the same export name of different packages get different local names, and the `__` suffix keeps an import from shadowing a global the generated file names (`ReadonlyArray`, `Record`, `ReturnType`). `param_type_file` and `parameters_type_file` collect every `Custom(name)` their types name into a `BTreeSet` and add `custom_scalar_imports` of it to their imports, which print in specifier order with the rest.
 
-i2's schemas declare the built-in scalars (`demos/pet-demo/schema/scalars.graphql`). `scalar_kind` keys on the name, so a declared `scalar String` is the built-in `String`. Whether the GraphQL protocol also defines the five when the schema does not declare them (upstream does; the spec says a schema omits them) is the schema integration's decision; `entity_kind` gives the same kind either way.
+With `PetProfile`, a field selecting `price: Price!` prints:
 
-### Config
-
-```rust
-// from crates/isograph_config/src/compilation_options.rs
-#[derive(Deserialize, Debug)]
-#[serde(deny_unknown_fields)]
-pub struct IsographProjectConfig {
-    /// The user may hard-code the JSON Schema for their version of the config.
-    #[serde(rename = "$schema")]
-    pub json_schema: Option<String>,
-    /// Glob patterns relative to the config file's directory.
-    pub source_files: Vec<String>,
-    /// Glob patterns relative to the config file's directory.
-    #[serde(default)]
-    pub schema: Vec<String>,
-    /// The directory, relative to the config file's directory, whose `__isograph` folder holds
-    /// the generated artifacts. Absent: the compiler writes no artifacts, and the transforms
-    /// look in the config file's directory.
-    #[serde(default)]
-    pub output_directory: Option<PathBuf>,
-    /// How the values of each custom scalar arrive, by the scalar's name. A custom scalar not
-    /// listed has the host language's unknown type.
-    #[serde(default)]
-    pub custom_scalars: BTreeMap<String, ScalarValueKind>,
-}
+```ts
+// generated by crates/isograph_extract_typescript/src/generate_artifacts.rs
+// Pet/PriceTag/param_type.ts
+import type { Decimal as Price__custom_scalar } from "decimal.js";
+export type Pet__PriceTag__param = {
+    readonly data: {
+        readonly price: Price__custom_scalar;
+    };
+    readonly parameters: Record<PropertyKey, never>;
+};
 ```
 
-`"custom_scalars": { "Url": "String" }` deserializes through serde's unit-variant names. A value other than `"String"`, `"Number"`, `"Boolean"` is a config error naming the variants, as serde reports it.
+A custom scalar the map does not list is `unknown`, upstream's type, so a profile with an empty map gets upstream's types.
 
 ## Schema model
 
@@ -851,6 +926,8 @@ pub trait HostLanguage: Send + Sync + Sized + 'static {
     type LiteralContext: Clone + PartialEq + Eq + Debug + 'static;
     /// A project this host language cannot print.
     type GenerationError: std::fmt::Display + std::error::Error + 'static;
+    /// The host-language type a profile gives a custom scalar.
+    type CustomScalarType: Clone + Debug + PartialEq + Eq + 'static;
 
     fn extract_iso_literals_from_text(contents: &str) -> Vec<IsoLiteralExtraction<Self>>;
 
@@ -859,7 +936,7 @@ pub trait HostLanguage: Send + Sync + Sized + 'static {
     /// The path and text of every artifact of `project`.
     fn generate_artifacts(
         project: &ProjectArtifacts<Self::LiteralContext>,
-        options: &GenerationOptions,
+        options: &GenerationOptions<Self::CustomScalarType>,
     ) -> Result<Vec<(ArtifactPath, String)>, Self::GenerationError>;
 }
 ```
@@ -868,15 +945,19 @@ pub trait HostLanguage: Send + Sync + Sized + 'static {
 // from crates/isograph_compiler/src/artifact_types.rs
 /// Project facts the host language reads when printing.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct GenerationOptions {
+pub struct GenerationOptions<TCustomScalarType> {
     /// `<output_directory>/__isograph`, relative to the config file's directory.
     pub artifact_folder: PathBuf,
-    /// The config's `custom_scalars`.
-    pub custom_scalars: BTreeMap<EntityName, ScalarValueKind>,
+    /// The profile's `custom_scalar_types`.
+    pub custom_scalar_types: BTreeMap<EntityName, TCustomScalarType>,
 }
+
+pub type ProfileGenerationOptions<TProfile> = GenerationOptions<
+    <<TProfile as CompilationProfile>::HostLanguage as HostLanguage>::CustomScalarType,
+>;
 ```
 
-The test hosts (`TestHostLanguage` in isograph_compiler, `InHost` in isograph_cli's watch tests) return `Vec::new().wrap_ok()`. Their `GenerationError` is their existing `Error` type (`TestHostError`), not `Infallible`, which AGENTS.md rejects; a test host is a fixture that never fails, and that is the fixture's property, not a production `Result` that cannot fail.
+The test hosts (`TestHostLanguage` in isograph_compiler, `InHost` in isograph_cli's watch tests) return `Vec::new().wrap_ok()` and set `type CustomScalarType = ()`. Their `GenerationError` is their existing `Error` type (`TestHostError`), not `Infallible`, which AGENTS.md rejects; a test host is a fixture that never fails, and that is the fixture's property, not a production `Result` that cannot fail.
 
 ```rust
 // from crates/isograph_extract_typescript/src/generate_artifacts.rs
@@ -898,19 +979,19 @@ pub enum TypeScriptGenerationError {
 ```rust
 // from crates/isograph_extract_typescript/src/generate_types.rs
 /// `P/f/param_type.ts`.
-fn param_type_file(field: &FieldArtifacts<TypeScriptLiteralContext>, options: &GenerationOptions) -> (ArtifactPath, String);
+fn param_type_file(field: &FieldArtifacts<TypeScriptLiteralContext>, options: &GenerationOptions<TypeScriptCustomScalarType>) -> (ArtifactPath, String);
 
 /// `P/f/parameters_type.ts`.
-fn parameters_type_file(field: EntityNameAndSelectableName, parameters: &ParametersType, options: &GenerationOptions) -> (ArtifactPath, String);
+fn parameters_type_file(field: EntityNameAndSelectableName, parameters: &ParametersType, options: &GenerationOptions<TypeScriptCustomScalarType>) -> (ArtifactPath, String);
 
 /// `P/f/output_type.ts`.
-fn output_type_file(field: &FieldArtifacts<TypeScriptLiteralContext>, options: &GenerationOptions) -> Result<(ArtifactPath, String), TypeScriptGenerationError>;
+fn output_type_file(field: &FieldArtifacts<TypeScriptLiteralContext>, options: &GenerationOptions<TypeScriptCustomScalarType>) -> Result<(ArtifactPath, String), TypeScriptGenerationError>;
 
 /// `E/__link/output_type.ts`.
 fn link_type_file(link: &LinkType) -> (ArtifactPath, String);
 
 /// `{ readonly k: T; ... }`, each property with its description as a leading JSDoc comment.
-fn object_type(object: &ArtifactObjectType, options: &GenerationOptions, comment_at: &mut impl FnMut(DescriptionValue) -> Span) -> TsType;
+fn object_type(object: &ArtifactObjectType, options: &GenerationOptions<TypeScriptCustomScalarType>, comment_at: &mut impl FnMut(DescriptionValue) -> Span) -> TsType;
 
 /// `wrapper` with `inner` printed at each `Inner`: `List` is `ReadonlyArray<T>`, a `Union`
 /// of two or more variants is `(A | B)`, `Null` is `null`, a one-variant union is its variant.
@@ -919,13 +1000,13 @@ fn wrapped_type<T>(wrapper: &Wrapper<T>, inner: &mut impl FnMut(&T) -> TsType) -
 /// A parameter's type: like `wrapped_type`, except that a top-level nullable union prints its
 /// variants then `null | void` with no parentheses (upstream's `format_parameter_type`), and
 /// the property is optional.
-fn parameter_type(wrapper: &Wrapper<ArtifactInputType>, options: &GenerationOptions) -> TsType;
+fn parameter_type(wrapper: &Wrapper<ArtifactInputType>, options: &GenerationOptions<TypeScriptCustomScalarType>) -> TsType;
 
 /// The specifier that imports the source file `source` from the artifact at `from`:
 /// `pathdiff::diff_paths(source, artifact_folder.join(from's folder))`, `/`-separated, the
 /// extension dropped (`./../../../Pet` from `Pet/fullName/output_type.ts` to `src/Pet.ts` with
 /// folder `src/__isograph`).
-fn source_specifier(from: &ArtifactPath, source: RelativePathToSourceFile, options: &GenerationOptions) -> Option<String>;
+fn source_specifier(from: &ArtifactPath, source: RelativePathToSourceFile, options: &GenerationOptions<TypeScriptCustomScalarType>) -> Option<String>;
 ```
 
 Names: `P__f__param`, `P__f__parameters`, `P__f__output_type`, `E____link__output_type` (`__link` is upstream's field name, so the name has four underscores), each `EntityNameAndSelectableName::underscore_separated()` plus the suffix. A type import's local name is the exported name. Specifiers between artifacts are v0's `artifact_import_specifier`, generalized to `relative_artifact_specifier(from: &ArtifactPath, to: &ArtifactPath) -> String`, which `artifact_import_specifier` now calls.
@@ -1010,16 +1091,16 @@ v0's `IsographState.artifact_folder: Option<ArtifactFolder>` becomes the folder 
 // from crates/isograph_cli/src/state.rs
 /// Where and how the daemon writes artifacts.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ArtifactOutput {
+pub(crate) struct ArtifactOutput<TProfile: CompilationProfile> {
     pub folder: ArtifactFolder,
-    pub generation: GenerationOptions,
+    pub generation: ProfileGenerationOptions<TProfile>,
 }
 
     /// `None` when the config has no `output_directory`.
-    pub(crate) artifact_output: Option<ArtifactOutput>,
+    pub(crate) artifact_output: Option<ArtifactOutput<TProfile>>,
 ```
 
-`serve` builds `GenerationOptions { artifact_folder: output_directory.join(ISOGRAPH_FOLDER), custom_scalars }`, interning each `custom_scalars` key as an `EntityName`.
+`serve` builds `GenerationOptions { artifact_folder: output_directory.join(ISOGRAPH_FOLDER), custom_scalar_types: TProfile::custom_scalar_types() }`, the one call of `custom_scalar_types`.
 
 v0's `generate_artifacts` after this doc:
 
@@ -1074,8 +1155,7 @@ fn generate_artifacts<TProfile: CompilationProfile>(
 {
   "source_files": ["src/**/*.ts"],
   "schema": ["schema/**/*.graphql"],
-  "output_directory": "src",
-  "custom_scalars": { "Url": "String" }
+  "output_directory": "src"
 }
 ```
 
@@ -1128,7 +1208,7 @@ export const owner = iso(`
 });
 ```
 
-The other resolvers' bodies are unchanged. `demos/pet-demo/src/__isograph/` is regenerated and committed. `tsc --noEmit --strict` over the demo's `src` passes. The README's Sources section loses the sentence about `src/iso.ts` defining `iso` and gains: "`iso` is generated into `src/__isograph/iso.ts`; resolvers are typed by their field's generated param type." The Config section names `output_directory` and `custom_scalars`.
+The other resolvers' bodies are unchanged. `demos/pet-demo/src/__isograph/` is regenerated and committed. `tsc --noEmit --strict` over the demo's `src` passes. The README's Sources section loses the sentence about `src/iso.ts` defining `iso` and gains: "`iso` is generated into `src/__isograph/iso.ts`; resolvers are typed by their field's generated param type." The Config section names `output_directory`. `picture` and `picture_together` are `unknown` under the `isograph` binary's profile; no resolver reads them.
 
 ## Dependencies
 
@@ -1148,7 +1228,7 @@ Tests (`crates/isograph_compiler`, landed): `to Pet` is `Union([Inner(Pet), Null
 
 ### 2. Entity kinds and the type walk
 
-After the schema integration. `ScalarValueKind` (`common_lang_types`), `ScalarKind`, `EntityKind`, `Entity::kind` (source entities `Object`), `NetworkProtocol::entity_kind` and the concrete-types method, `GraphQLEntityData::Leaf` split into `Scalar` and `Enum`, `scalar_kind` in `graphql_network_protocol`, `ClientFieldKind`, `Nullability`, `try_map`, `nullability`, input object fields as server selectables, `artifact_types.rs` (every type above through `GenerationError`), `field_declaration`, `field_types`, `SourceIsoLiteralItem.context`.
+After the schema integration. `ScalarValueKind`, `ScalarKind`, `EntityKind`, `Entity::kind` (source entities `Object`), `NetworkProtocol::entity_kind` and the concrete-types method, `GraphQLEntityData::Leaf` split into `Scalar` and `Enum`, `scalar_kind` in `graphql_network_protocol`, `ClientFieldKind`, `Nullability`, `try_map`, `nullability`, input object fields as server selectables, `artifact_types.rs` (every type above through `GenerationError`), `field_declaration`, `field_types`, `SourceIsoLiteralItem.context`.
 
 Tests (`crates/graphql_network_protocol`, `#[cfg(test)]`, a profile of `TypeScriptHostLanguage` and `GraphQLNetworkProtocol` with `isograph_extract_typescript` as a dev-dependency; facts about `FieldTypes` values):
 
@@ -1165,7 +1245,7 @@ Tests (`crates/graphql_network_protocol`, `#[cfg(test)]`, a profile of `TypeScri
 
 ### 3. The full artifact set
 
-`ProjectArtifacts`, `FieldArtifacts`, `FieldDeclarationSource`, `FieldArtifactKind`, `Generation`, `LinkType`, `project_artifacts`, `GenerationOptions`, `HostLanguage::GenerationError` and the new `generate_artifacts` signature, the test hosts, `TypeScriptGenerationError`, `generate_types.rs`, `relative_artifact_specifier`, `emit` with comments, `ArtifactFile::Raw`, `RawArtifactFile`, the stubs, `tsconfig.json`, the link types, the typed `iso.ts`, the entrypoint's imports, `custom_scalars` in the config, `ArtifactOutput`, `serve`, `compile.rs`.
+`ProjectArtifacts`, `FieldArtifacts`, `FieldDeclarationSource`, `FieldArtifactKind`, `Generation`, `LinkType`, `project_artifacts`, `GenerationOptions`, `ProfileGenerationOptions`, `HostLanguage::GenerationError`, `HostLanguage::CustomScalarType`, `CompilationProfile::custom_scalar_types` (every profile), `TypeScriptCustomScalarType`, `ModuleSpecifier`, `custom_scalar_type`, `custom_scalar_imports`, and the new `generate_artifacts` signature, the test hosts, `TypeScriptGenerationError`, `generate_types.rs`, `relative_artifact_specifier`, `emit` with comments, `ArtifactFile::Raw`, `RawArtifactFile`, the stubs, `tsconfig.json`, the link types, the typed `iso.ts`, the entrypoint's imports, `ArtifactOutput`, `serve`, `compile.rs`.
 
 Tests for `project_artifacts` (`crates/isograph_cli/src/compile.rs`, the TypeScript test profile; source entities only, so every type is a client field or pointer over `entity` declarations):
 
@@ -1177,7 +1257,7 @@ Tests for `project_artifacts` (`crates/isograph_cli/src/compile.rs`, the TypeScr
 Tests for the TypeScript generator (`crates/isograph_extract_typescript`, hand-built `ProjectArtifacts`; facts about text):
 
 - A field with data `{ firstName: Known(String), nickname: Union([Known(String), Null]), friends: List(Object({ id })) }` prints `readonly firstName: string`, `readonly nickname: (string | null)`, and `readonly friends: ReadonlyArray<{` with `readonly id: string` inside.
-- `Custom(Url)` prints `unknown`, and `string` when `custom_scalars` maps `Url` to `String`. `Known(Number)` prints `number`, `Known(Boolean)` `boolean`.
+- `Known(String)` prints `string`, `Known(Number)` `number`, `Known(Boolean)` `boolean`. `Custom(Url)` with an empty map prints `unknown`. With `Url` mapped to `{ name: "string", import: None }` it prints `string` and the file has no import for it. With `Price` mapped to `{ name: "Decimal", import: Some("decimal.js") }`, two fields selecting `Price` print `Price__custom_scalar` and the file has exactly one `import type { Decimal as Price__custom_scalar } from "decimal.js"`; a `parameters_type.ts` whose variable is `$p: Price` has the same import.
 - `ClientFieldOutput(Pet.fullName)` prints `Pet__fullName__output_type` and the file imports it with `import type { Pet__fullName__output_type } from "./../../Pet/fullName/output_type"`. The same output type named twice is imported once.
 - A description `The pet's ID` prints `/**` then `The pet's ID` then `*/` immediately before that property's `readonly`; a description containing `*/` prints `*\/`; a property with no description has no comment before it.
 - No parameters: `readonly parameters: Record<PropertyKey, never>` and no `parameters_type.ts`. With `$id: ID!` and `$limit: Int`: `parameters_type.ts` has `readonly id: string` and `readonly limit?: number | null | void`, and `param_type.ts` imports `Pet__f__parameters` from `"./parameters_type"`.
@@ -1190,7 +1270,7 @@ Tests for the TypeScript generator (`crates/isograph_extract_typescript`, hand-b
 - `tsconfig.json` is upstream's text byte for byte.
 - No file's path is generated twice in one result.
 
-Handle tests (`crates/isograph_cli/src/compile.rs`): v0's tests with the new file set (the first fire writes `iso.ts`, `tsconfig.json`, and every file of `Query/HomeRoute/`); editing a selection set that changes a param type writes only that `param_type.ts`; adding a description to a field writes the param types that select it and not its own; a config without `custom_scalars` and one with it differ only in the param types that select the custom scalar.
+Handle tests (`crates/isograph_cli/src/compile.rs`): v0's tests with the new file set (the first fire writes `iso.ts`, `tsconfig.json`, and every file of `Query/HomeRoute/`); editing a selection set that changes a param type writes only that `param_type.ts`; adding a description to a field writes the param types that select it and not its own; a profile whose `custom_scalar_types` maps `Url` and one whose map is empty differ only in the param types that select `Url`.
 
 ### 4. Pet demo
 
@@ -1200,23 +1280,23 @@ The config, the deleted `src/iso.ts`, the sources without `ResolverParameters`, 
 
 ### 1. Scalar type mapping
 
-Options and consequences are in Scalars above. I hold option 3: the protocol reports `ScalarKind` (`Known(ScalarValueKind)` or `Custom(name)`), the config's `custom_scalars` maps a custom scalar's name to a `ScalarValueKind`, and the host language maps the value kind to its type, with `unknown` for an unmapped custom scalar.
+Decided by the user. Built-in scalars are hard-coded: the protocol reports `Known(ScalarValueKind)` for `String` and `ID` (`String`), `Int` and `Float` (`Number`), `Boolean` (`Boolean`), and every enum (`String`), and the TypeScript host prints `string`, `number`, `boolean`. A custom scalar is `Custom(name)`; its type comes from the compilation profile's `custom_scalar_types`, a map from scalar name to a `TypeScriptCustomScalarType` (a type name and an optional module specifier to import it from, which may be a package). An unmapped custom scalar is `unknown`. The config has no scalar option (Scalars).
 
 ### 2. Types upstream imports from `@isograph/react` and `react`
 
 Upstream's type files import `Link`, `ExtractSecondParam`, `CombineWithIntrinsicAttributes`, `LoadableField`, `ExtractParameters` from `@isograph/react` and `React` from `react`. They appear in: component output types (`(React.FC<CombineWithIntrinsicAttributes<ExtractSecondParam<typeof resolver>>>)`), link output types (`Link<"Pet">`), and param types that select a field with `@loadable` or select a pointer (`LoadableField<P__f__param, T, ...>`).
 
 - (a) Print upstream's types and imports verbatim. The generated text matches upstream's. Every project that type-checks the generated files needs `@isograph/react` and `@types/react` installed; the pet demo becomes a pnpm workspace package with both as dev dependencies. i2 deleted `@isograph/react` from this repo (180ec76f, "Delete the libs and demos trees"), v0 dropped the `IsographEntrypoint` import so a project without it type-checks, and the planned runtime (`refactors/pending/runtime/pico-runtime.md`) has no `ComponentReaderArtifact`, no React, and no loadable fields, so each of these imports changes again when that runtime lands.
-- (b) Print only types that need no package. A component's output type is `ReturnType<typeof resolver>`, as a plain field's. A link is the structural object `{ readonly __link: string; readonly __typename: "Pet" }` in `Pet/__link/output_type.ts`, with no brand. A `@loadable` selection has the field's output type, and a pointer selection has the nested object type under the pointer's wrapper, as an eager selection would. Generated files type-check with nothing installed. The component, loadable, and pointer selection types differ from upstream's, and a later framework (pluggable-compiler.md's `FrameworkBindings`) or runtime supplies its own forms.
+- (b) Print only types that need no package, for the types the generator derives itself. A component's output type is `ReturnType<typeof resolver>`, as a plain field's. A link is the structural object `{ readonly __link: string; readonly __typename: "Pet" }` in `Pet/__link/output_type.ts`, with no brand. A `@loadable` selection has the field's output type, and a pointer selection has the nested object type under the pointer's wrapper, as an eager selection would. Generated files type-check with nothing installed, except a package a profile's custom scalar entry imports from, which is then that project's dependency. The component, loadable, and pointer selection types differ from upstream's, and a later framework (pluggable-compiler.md's `FrameworkBindings`) or runtime supplies its own forms.
 
-I hold (b), for the three reasons in (a)'s consequences: the package is gone from i2, v0 already set the rule that generated files reference only the artifact folder and the user's sources, and the runtime i2 is building does not have the types (a) imports.
+I hold (b), for the three reasons in (a)'s consequences: the package is gone from i2, v0 already set the rule that generated files reference only the artifact folder and the user's sources, and the runtime i2 is building does not have the types (a) imports. The no-package rule covers built-in types only: a custom scalar entry in the profile may import from a package (open decision 1), and that import is the one package import a generated file can have.
 
 ### 3. Which per-field files exist
 
 - (a) Upstream's rules: `resolver_reader.ts` only for fields reachable from an entrypoint, `output_type.ts` only for entrypoints and selected fields, `refetch_reader.ts` and a field's own entrypoint only for loadably selected reachable fields. Adding an entrypoint adds reader files of every field it reaches; generation needs the reachability worklist, which query generation also walks.
 - (b) Every file for every field. Each file depends on one literal, so an edit changes only that literal's files; the generated tree is larger than upstream's and has readers no runtime loads.
 
-I hold (a): the user's direction is upstream's artifact set, and the worklist is a few lines over `field_types`.
+Open. The decision is moot until this doc is actively worked; the sections above are written against (a).
 
 ### 4. The entrypoint artifact's content
 
@@ -1248,6 +1328,5 @@ docs-website/docs/design-docs/mental-model.md, in change 1: the Wrapper section'
 
 - `__link` as a selectable on every object entity (upstream's `add_link_fields`), with description `A store Link for the <E> type.`, typed `E____link__output_type`. Then pointer resolvers select `__link` instead of building link objects.
 - `@updatable` selections (upstream's `startUpdate` and `StartUpdate` in the param type): they need a runtime write path.
-- Arbitrary host-language type text for custom scalars (Scalars, option 5).
 - `as<Member>` refinement selectables and their reader stubs, when the protocol defines them.
 - `persisted_documents.json`, when the config has the option.
