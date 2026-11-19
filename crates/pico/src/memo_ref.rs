@@ -4,6 +4,7 @@
 use std::marker::PhantomData;
 
 use intern::InternId;
+use prelude::Postfix;
 
 use crate::{DatabaseDyn, DerivedNodeId, ParamId, RawPtr, dependency::NodeKind};
 
@@ -114,7 +115,7 @@ impl<T: 'static, E: Clone + 'static> MemoRef<Result<T, E>> {
 
 impl<T> From<MemoRef<T>> for ParamId {
     fn from(val: MemoRef<T>) -> Self {
-        let idx: u64 = val.derived_node_id.index().into();
+        let idx: u64 = val.derived_node_id.index().to();
         ParamId::from(idx)
     }
 }

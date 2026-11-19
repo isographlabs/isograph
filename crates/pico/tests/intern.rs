@@ -1,5 +1,6 @@
 use pico::{Database, MemoRef, SourceId, Storage};
 use pico_macros::{Db, Source, memo};
+use prelude::Postfix;
 use thiserror::Error;
 
 #[derive(Db, Default)]
@@ -59,5 +60,5 @@ fn process_input(
     input_id: SourceId<Input>,
 ) -> Result<MemoRef<char>, ProcessInputError> {
     let result = *first_letter(db, input_id).try_lookup(db)?;
-    Ok(result)
+    result.wrap_ok()
 }

@@ -7,6 +7,7 @@ license.workspace = true
 [dependencies]
 intern = { path = "../../relay-crates/intern" }
 pico_macros = { path = "../pico_macros" }
+prelude = { path = "../prelude" }
 u64_newtypes = { path = "../u64_newtypes" }
 bincode = { workspace = true }
 boxcar = { workspace = true }

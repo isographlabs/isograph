@@ -3,6 +3,8 @@ use std::{
     marker::PhantomData,
 };
 
+use prelude::Postfix;
+
 use crate::{HashId, ParamId, dyn_eq::DynEq, epoch::Epoch, intern::Key};
 
 pub trait Source {
@@ -71,7 +73,7 @@ impl<T> From<Key> for SourceId<T> {
 impl<T> From<ParamId> for SourceId<T> {
     fn from(value: ParamId) -> Self {
         Self {
-            key: value.inner().into(),
+            key: value.inner().to(),
             phantom: PhantomData,
         }
     }

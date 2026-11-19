@@ -5,6 +5,7 @@ use std::{
 
 use pico::{Database, SourceId, Storage};
 use pico_macros::{Db, Source, memo};
+use prelude::Postfix;
 
 #[derive(Default)]
 pub struct TestMap(HashMap<String, SourceId<Input>>);
@@ -56,7 +57,7 @@ fn iteration_before_first_write_then_insert_reruns() {
 
     insert(&mut db, "a", "asdf");
 
-    assert_eq!(*values_tracked(&db), vec!["asdf".to_string()]);
+    assert_eq!(*values_tracked(&db), "asdf".to_string().wrap_vec());
     assert_eq!(ITERATION.load(Ordering::SeqCst), 2);
 }
 
@@ -71,7 +72,7 @@ fn lookup_a(db: &TestDatabase) -> Option<String> {
         Some(input_id) => input_id,
         None => db.get_map().tracked().0.get("a").copied()?,
     };
-    Some(db.get(input_id).value.clone())
+    db.get(input_id).value.clone().wrap_some()
 }
 
 #[test]
@@ -81,6 +82,6 @@ fn untracked_miss_then_tracked_then_insert_reruns() {
 
     insert(&mut db, "a", "asdf");
 
-    assert_eq!(*lookup_a(&db), Some("asdf".to_string()));
+    assert_eq!(*lookup_a(&db), "asdf".to_string().wrap_some());
     assert_eq!(LOOKUP.load(Ordering::SeqCst), 2);
 }

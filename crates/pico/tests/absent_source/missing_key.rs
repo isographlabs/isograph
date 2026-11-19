@@ -2,6 +2,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use pico::{Database, Storage};
 use pico_macros::{Db, Singleton, Source, memo};
+use prelude::Postfix;
 
 #[derive(Db, Default)]
 struct TestDatabase {
@@ -60,7 +61,7 @@ fn missing_then_set_reruns() {
 
     db.set(config("a"));
 
-    assert_eq!(*missing_then_set_reader(&db), Some("a".to_string()));
+    assert_eq!(*missing_then_set_reader(&db), "a".to_string().wrap_some());
     assert_eq!(MISSING_THEN_SET.load(Ordering::SeqCst), 2);
 }
 
@@ -136,7 +137,10 @@ fn set_reruns_only_readers_of_that_key() {
 
     db.set(config("a"));
 
-    assert_eq!(*only_that_key_config_reader(&db), Some("a".to_string()));
+    assert_eq!(
+        *only_that_key_config_reader(&db),
+        "a".to_string().wrap_some()
+    );
     assert_eq!(ONLY_THAT_KEY_CONFIG.load(Ordering::SeqCst), 2);
     assert_eq!(*only_that_key_other_reader(&db), None);
     assert_eq!(ONLY_THAT_KEY_OTHER.load(Ordering::SeqCst), 1);
@@ -165,7 +169,7 @@ fn same_missing_key_twice_in_one_memo() {
 
     assert_eq!(
         *twice_reader(&db),
-        (Some("a".to_string()), Some("a".to_string()))
+        ("a".to_string().wrap_some(), "a".to_string().wrap_some())
     );
     assert_eq!(TWICE.load(Ordering::SeqCst), 2);
 }
@@ -191,7 +195,7 @@ fn parent_of_missing_reader_reruns() {
 
     db.set(config("a"));
 
-    assert_eq!(*parent_reader(&db), Some("a".to_string()));
+    assert_eq!(*parent_reader(&db), "a".to_string().wrap_some());
     assert_eq!(PARENT.load(Ordering::SeqCst), 2);
 }
 
@@ -211,9 +215,12 @@ fn read_outside_a_memo_then_set() {
 
     db.set(config("a"));
 
-    assert_eq!(*outside_then_set_reader(&db), Some("a".to_string()));
+    assert_eq!(*outside_then_set_reader(&db), "a".to_string().wrap_some());
     assert_eq!(OUTSIDE_THEN_SET.load(Ordering::SeqCst), 1);
-    assert_eq!(db.get_singleton::<Config>(), Some(&config("a")));
+    assert_eq!(
+        db.get_singleton::<Config>(),
+        config("a").reference().wrap_some()
+    );
 }
 
 #[memo]

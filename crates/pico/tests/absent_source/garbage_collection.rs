@@ -2,6 +2,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use pico::{Database, Storage};
 use pico_macros::{Db, Singleton, memo};
+use prelude::Postfix;
 
 #[derive(Db)]
 struct TestDatabase {
@@ -54,7 +55,7 @@ fn collected_reader_of_missing_key_sees_set() {
 
     db.set(config("a"));
 
-    assert_eq!(*collected_reader(&db), Some("a".to_string()));
+    assert_eq!(*collected_reader(&db), "a".to_string().wrap_some());
     assert_eq!(COLLECTED.load(Ordering::SeqCst), 2);
 }
 
@@ -79,7 +80,7 @@ fn retained_reader_of_missing_key_sees_set() {
 
     db.set(config("a"));
 
-    assert_eq!(*retained_reader(&db), Some("a".to_string()));
+    assert_eq!(*retained_reader(&db), "a".to_string().wrap_some());
     assert_eq!(RETAINED.load(Ordering::SeqCst), 2);
 }
 
@@ -96,7 +97,10 @@ fn remove_after_collection_reader(db: &TestDatabase) -> Option<String> {
 fn remove_after_collection() {
     let mut db = TestDatabase::new();
     db.set(config("a"));
-    assert_eq!(*remove_after_collection_reader(&db), Some("a".to_string()));
+    assert_eq!(
+        *remove_after_collection_reader(&db),
+        "a".to_string().wrap_some()
+    );
 
     db.run_garbage_collection();
     db.remove_singleton::<Config>();
