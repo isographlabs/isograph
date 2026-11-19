@@ -43,16 +43,19 @@ const normalizationAst: NormalizationAst = {
       responseKey: "node____id___v_id",
       selectableName: "node",
       arguments: [["id", { kind: "Variable", name: "id" }]],
-      selections: [
-        { kind: "Selection", responseKey: "id", selectableName: "id", arguments: null, selections: null },
-        { kind: "Selection", responseKey: "age", selectableName: "age", arguments: null, selections: null },
-        { kind: "Selection", responseKey: "firstName", selectableName: "firstName", arguments: null, selections: null },
-        { kind: "Selection", responseKey: "lastName", selectableName: "lastName", arguments: null, selections: null },
-        { kind: "Selection", responseKey: "nickname", selectableName: "nickname", arguments: null, selections: null },
-        { kind: "Selection", responseKey: "picture", selectableName: "picture", arguments: null, selections: null },
-        { kind: "Selection", responseKey: "species", selectableName: "species", arguments: null, selections: null },
-        { kind: "Selection", responseKey: "tagline", selectableName: "tagline", arguments: null, selections: null },
-      ],
+      target: {
+        identityResponseKey: "id",
+        selections: [
+          { kind: "Selection", responseKey: "id", selectableName: "id", arguments: null, target: null },
+          { kind: "Selection", responseKey: "age", selectableName: "age", arguments: null, target: null },
+          { kind: "Selection", responseKey: "firstName", selectableName: "firstName", arguments: null, target: null },
+          { kind: "Selection", responseKey: "lastName", selectableName: "lastName", arguments: null, target: null },
+          { kind: "Selection", responseKey: "nickname", selectableName: "nickname", arguments: null, target: null },
+          { kind: "Selection", responseKey: "picture", selectableName: "picture", arguments: null, target: null },
+          { kind: "Selection", responseKey: "species", selectableName: "species", arguments: null, target: null },
+          { kind: "Selection", responseKey: "tagline", selectableName: "tagline", arguments: null, target: null },
+        ],
+      },
     },
   ],
 };
@@ -68,11 +71,12 @@ What the AST shows:
 - The nodes appear in the order of the query's lines, including the identity (`id`) the query adds.
 - `responseKey` is the exact alias the query text prints before `:`. The normalizer reads `response[responseKey]` and never recomputes an alias from `selectableName` and `arguments`.
 - `selectableName` and `arguments` remain because the store key resolves variables to their values (upstream `getParentRecordKey`, `isograph/libs/isograph-react/src/core/cache.ts:454-521`), which the response key does not.
-- `selections` is `null` for a selection of a leaf entity and the target's selections otherwise.
+- `target` is `null` for a selection of a leaf entity. Otherwise it holds the target's selections and `identityResponseKey`, the response key of the target entity's identity selection (The identity).
 - `discriminatorResponseKey` names, once for the artifact, the response key under which every composite response object holds its concrete entity's name. The `__typename` lines of the query have no node (The discriminator).
 - The `... on Pet` line has no node: the `node` selection's selections are `Pet`'s, directly (The asymmetries).
+- `id` is both an ordinary `Selection` node, stored like any other leaf, and the `node` target's `identityResponseKey`, which the normalizer reads to key `Pet`'s record.
 
-A refinement `asBlogItem { title }` under `newsfeed` is `{ kind: "Conditional", condition: { kind: "SelectionEquals", responseKey: "__typename", value: "BlogItem" }, selections: [..] }` among `newsfeed`'s `selections`, after its selection nodes.
+A refinement `asBlogItem { title }` under `newsfeed` is `{ kind: "Conditional", condition: { kind: "SelectionEquals", responseKey: "__typename", value: "BlogItem" }, identityResponseKey: "id", selections: [..] }` among `newsfeed`'s `target.selections`, after its selection nodes. `identityResponseKey` is `"id"` because `BlogItem` has `id: ID!`; `newsfeed`'s own target is a union, so its `identityResponseKey` is `null`.
 
 A query whose completed map fails fails its AST too; there is no AST without query text and no query text without an AST.
 
@@ -82,7 +86,122 @@ Every selection set under a composite selection selects the protocol's discrimin
 
 The runtime is protocol-neutral and hardcodes no GraphQL name. The AST carries the discriminator's response key once, as `discriminatorResponseKey`, which the core writes from `NetworkProtocol::discriminator()` (`SelectionKey { name: discriminator(), arguments: MergedArguments::default() }.normalization_alias()`). The alternative, a runtime environment option holding one string per environment, keeps the key out of every artifact, at the cost of a value the user configures to match the protocol the compiler used, with no check that the two agree.
 
-Store values need no tag that marks a link: every store walk (normalize, read, check, garbage collection) goes through an AST whose `selections` says which selections are links.
+Store values need no tag that marks a link: every store walk (normalize, read, check, garbage collection) goes through an AST whose `target` says which selections are links.
+
+## The identity
+
+The protocol decides which selectable identifies a record; the runtime hardcodes no name. The core already holds that decision per entity: `NetworkProtocol::entity_shape` returns `EntityShape::Composite(IdentitySelection)`, and `complete` adds `CompletedSelection::Identity(name)` to a selection set exactly when the entity's `IdentitySelection` is `Select(name)` (query-generation.md, Completion, step 4). The AST states it where a record is keyed: on every composite target and on every conditional, each the selection set of one entity.
+
+- `Select(response_key)`: the response key of the identity selection, which is also one of that selection set's `Selection` nodes. The normalizer keys the record by that value.
+- `Omit`: the entity has no identity selection. The normalizer derives the record id from the parent record and the path (upstream `getDataIdOfNetworkResponse`, `isograph/libs/isograph-react/src/core/cache.ts:599-642`).
+
+The conditional carries one because the response object's entity can have an identity its parent's target lacks: a union target (`IdentitySelection::Omit`) whose `asBlogItem` refinement selects on `BlogItem`, whose identity is `id`. The operation's top-level `selections` carries none: it is written onto the root record the caller passes.
+
+Before, TypeScript:
+
+```ts
+// from libs/isograph-runtime/src/artifacts.ts
+export type NormalizationSelection = {
+  readonly kind: "Selection";
+  readonly responseKey: string;
+  readonly selectableName: string;
+  readonly arguments: Arguments | null;
+  /** `null` when the target entity is a leaf; otherwise the selections on the target. */
+  readonly selections: NormalizationSelectionSet | null;
+};
+
+export type NormalizationConditional = {
+  readonly kind: "Conditional";
+  readonly condition: NormalizationCondition;
+  readonly selections: NormalizationSelectionSet;
+};
+```
+
+After, TypeScript:
+
+```ts
+// from libs/isograph-runtime/src/artifacts.ts
+export type NormalizationSelection = {
+  readonly kind: "Selection";
+  readonly responseKey: string;
+  readonly selectableName: string;
+  readonly arguments: Arguments | null;
+  /** `null` when the target entity is a leaf. */
+  readonly target: NormalizationCompositeTarget | null;
+};
+
+/** The selections on a composite target entity, and how its records are keyed. */
+export type NormalizationCompositeTarget = {
+  /** The response key of the target entity's identity selection, one of `selections`; `null`
+   * when the entity has none, and the normalizer derives the record id. */
+  readonly identityResponseKey: string | null;
+  readonly selections: NormalizationSelectionSet;
+};
+
+export type NormalizationConditional = {
+  readonly kind: "Conditional";
+  readonly condition: NormalizationCondition;
+  /** The response key of the condition entity's identity selection, one of `selections`;
+   * `null` when the entity has none. */
+  readonly identityResponseKey: string | null;
+  readonly selections: NormalizationSelectionSet;
+};
+```
+
+Before, Rust:
+
+```rust
+// from crates/isograph_compiler/src/normalization_ast.rs
+/// Whether a selection's target entity has selections.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum NormalizationTarget {
+    Leaf,
+    Composite(NormalizationSelectionSet),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NormalizationConditional {
+    pub condition: NormalizationCondition,
+    pub selections: NormalizationSelectionSet,
+}
+```
+
+After, Rust:
+
+```rust
+// from crates/isograph_compiler/src/normalization_ast.rs
+/// Whether a selection's target entity has selections.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum NormalizationTarget {
+    Leaf,
+    Composite(NormalizationCompositeTarget),
+}
+
+/// The selections on a composite target entity, and how its records are keyed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NormalizationCompositeTarget {
+    pub identity: NormalizationIdentity,
+    pub selections: NormalizationSelectionSet,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NormalizationConditional {
+    pub condition: NormalizationCondition,
+    pub identity: NormalizationIdentity,
+    pub selections: NormalizationSelectionSet,
+}
+
+/// Which response key holds a response object's record id.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum NormalizationIdentity {
+    /// The response key of the identity selection, one of the selection set's nodes.
+    Select(NormalizationAlias),
+    /// The entity has no identity selection; the normalizer derives the record id.
+    Omit,
+}
+```
+
+`NormalizationIdentity` mirrors `IdentitySelection` (`crates/isograph_compiler/src/protocol_shape.rs`) with the selectable name replaced by its response key, which is what the runtime reads. It is an enum, not `Option<NormalizationAlias>`, so the two cases carry their names.
 
 ## The asymmetries
 
@@ -114,14 +233,25 @@ export type NormalizationSelection = {
   readonly responseKey: string;
   readonly selectableName: string;
   readonly arguments: Arguments | null;
-  /** `null` when the target entity is a leaf; otherwise the selections on the target. */
-  readonly selections: NormalizationSelectionSet | null;
+  /** `null` when the target entity is a leaf. */
+  readonly target: NormalizationCompositeTarget | null;
+};
+
+/** The selections on a composite target entity, and how its records are keyed. */
+export type NormalizationCompositeTarget = {
+  /** The response key of the target entity's identity selection, one of `selections`; `null`
+   * when the entity has none, and the normalizer derives the record id. */
+  readonly identityResponseKey: string | null;
+  readonly selections: NormalizationSelectionSet;
 };
 
 /** Selections normalized onto the parent's record when `condition` holds. */
 export type NormalizationConditional = {
   readonly kind: "Conditional";
   readonly condition: NormalizationCondition;
+  /** The response key of the condition entity's identity selection, one of `selections`;
+   * `null` when the entity has none. */
+  readonly identityResponseKey: string | null;
   readonly selections: NormalizationSelectionSet;
 };
 
@@ -142,7 +272,7 @@ export type ArgumentValue =
   | { readonly kind: "Object"; readonly value: Arguments };
 ```
 
-The names follow `docs-website/docs/design-docs/mental-model.md`: a node is a selection of a selectable (`kind: "Selection"`, `selectableName`), and a condition compares a selection's value (`SelectionEquals`). `selections: NormalizationSelectionSet | null` is the TypeScript form of the core's `NormalizationTarget::{Leaf, Composite(NormalizationSelectionSet)}` (below): `Leaf` is `null`, `Composite` is the array. A `target` object around `selections` would hold nothing else, since the record's entity comes from the discriminator.
+The names follow `docs-website/docs/design-docs/mental-model.md`: a node is a selection of a selectable (`kind: "Selection"`, `selectableName`), and a condition compares a selection's value (`SelectionEquals`). `target: NormalizationCompositeTarget | null` is the TypeScript form of the core's `NormalizationTarget::{Leaf, Composite(NormalizationCompositeTarget)}` (below): `Leaf` is `null`, `Composite` is the object. `identityResponseKey: string | null` is `NormalizationIdentity::{Select, Omit}`: `Select(key)` is the string, `Omit` is `null`. The identity sits in the target object, not on the selection, so a leaf selection cannot carry one.
 
 `NormalizationCondition` has one kind in v1. Later, `@include` and `@skip` add `VariableEquals` (Later).
 
@@ -221,6 +351,7 @@ export type {
   Arguments,
   ArgumentValue,
   NormalizationAst,
+  NormalizationCompositeTarget,
   NormalizationCondition,
   NormalizationConditional,
   NormalizationNode,
@@ -290,7 +421,8 @@ The alternative is `export default {..} satisfies NormalizationAst;`. `satisfies
 Deltas from upstream (`isograph/libs/isograph-react/src/core/entrypoint.ts:122-159`, `util.ts:10-33`):
 
 - Upstream's `NormalizationAst` is `{ kind: "NormalizationAst", selections }` (`isograph/crates/artifact_content/src/entrypoint_artifact.rs:272-278`), whose `kind` distinguishes it from `NormalizationAstLoader`. i2 has no loader, so there is no `kind`; `discriminatorResponseKey` is new.
-- Upstream's `Scalar` and `Linked` nodes are one `Selection` node. Upstream's normalizer tells them apart by `kind`; i2's by `selections === null`. `fieldName` is `selectableName`.
+- Upstream's `Scalar` and `Linked` nodes are one `Selection` node. Upstream's normalizer tells them apart by `kind`; i2's by `target === null`. `fieldName` is `selectableName`; a `Linked` node's `selections` is `target.selections`.
+- `identityResponseKey` is new, on every composite target and conditional. Upstream's normalizer reads `id` by name (`getDataIdOfNetworkResponse`, `cache.ts:623-626`).
 - `responseKey` is new. Upstream recomputes it per node in `getNetworkResponseKey` (`cache.ts:544-558`).
 - `isFallible` is dropped. Upstream's normalizer never reads it on a normalization node (`cache.ts` reads only `concreteType`, `fieldName`, `arguments`, `selections`, `type`); pico-runtime.md drops it too.
 - `concreteType` is dropped. Upstream's normalizer names a linked record's type with `astNode.concreteType ?? networkResponseData.__typename` (`cache.ts:295-296`, `:322-323`); i2's query selects the discriminator under every composite selection, so the normalizer always reads it.
@@ -397,13 +529,30 @@ pub struct NormalizationSelection {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NormalizationTarget {
     Leaf,
-    Composite(NormalizationSelectionSet),
+    Composite(NormalizationCompositeTarget),
+}
+
+/// The selections on a composite target entity, and how its records are keyed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NormalizationCompositeTarget {
+    pub identity: NormalizationIdentity,
+    pub selections: NormalizationSelectionSet,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NormalizationConditional {
     pub condition: NormalizationCondition,
+    pub identity: NormalizationIdentity,
     pub selections: NormalizationSelectionSet,
+}
+
+/// Which response key holds a response object's record id.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum NormalizationIdentity {
+    /// The response key of the identity selection, one of the selection set's nodes.
+    Select(NormalizationAlias),
+    /// The entity has no identity selection; the normalizer derives the record id.
+    Omit,
 }
 
 /// Arguments in `MergedArguments` order: sorted by name, no name twice.
@@ -434,7 +583,7 @@ pub struct NormalizationObjectEntry {
 }
 ```
 
-`NormalizationSelectionSet` is a `Vec`, not a `NonEmpty`: the query's selection set under a composite selection is never empty, because it holds the discriminator, but the AST leaves the discriminator implicit, so `stats { X @loadable }` on an entity with no identity is a node whose `selections` is `[]`. `Boolean` is `isograph_parser::Boolean`. `NormalizationArguments` keeps `MergedArguments`' order because the TypeScript `Arguments` is a list, and the store key upstream builds from it (`getParentRecordKey`) depends on its order; sorted arguments give one store key per selection key. An empty `NormalizationArguments` prints as `arguments: null` (upstream `get_serialized_field_arguments`, `isograph/crates/artifact_content/src/generate_artifacts.rs:483-485`).
+`NormalizationSelectionSet` is a `Vec`, not a `NonEmpty`: the query's selection set under a composite selection is never empty, because it holds the discriminator, but the AST leaves the discriminator implicit, so `stats { X @loadable }` on an entity with no identity is a node whose target's `selections` is `[]` and whose `identity` is `Omit`. `Boolean` is `isograph_parser::Boolean`. `NormalizationArguments` keeps `MergedArguments`' order because the TypeScript `Arguments` is a list, and the store key upstream builds from it (`getParentRecordKey`) depends on its order; sorted arguments give one store key per selection key. An empty `NormalizationArguments` prints as `arguments: null` (upstream `get_serialized_field_arguments`, `isograph/crates/artifact_content/src/generate_artifacts.rs:483-485`).
 
 `Integer(i32)` is narrower than `MergedValue::Integer(i64)` because the TypeScript value is a `number` (`f64`), which represents every `i32` exactly (`f64::from(i32)`), and the workspace denies `cast_precision_loss`. GraphQL `Int` is 32-bit (spec 3.5.1), so a literal outside `i32` is a query the server rejects; the builder returns `IntegerOutOfRange`, which fails the query. The alternative, an `ArtifactValue` integer variant printed from its decimal text that keeps `i64`, is not taken: the server rejects such a query anyway, and a value beyond 2^53 loses precision once the TypeScript source is parsed as a `number`.
 
@@ -477,6 +626,10 @@ fn normalization_node(
     discriminator_response_key: &NormalizationAlias,
 ) -> Option<Result<NormalizationNode, IntegerOutOfRange>>;
 
+/// The identity of a selection set under a selection: `Select` with the response key of its
+/// `Identity` selection, or `Omit` when it has none.
+fn normalization_identity(selections: &CompletedSelectionMap) -> NormalizationIdentity;
+
 fn normalization_arguments(
     arguments: &MergedArguments,
 ) -> Result<NormalizationArguments, IntegerOutOfRange>;
@@ -492,8 +645,21 @@ pub struct IntegerOutOfRange(pub i64);
 
 - `Discriminator` is `None` (The discriminator).
 - `Identity(name)` is `Selection { response_key: SelectionKey { name, arguments: MergedArguments::default() }.normalization_alias(), selectable_name: name, arguments: NormalizationArguments::default(), target: Leaf }`.
-- `Selectable(selection)` is `Selection { response_key: selection.key.normalization_alias(), selectable_name: selection.key.name, arguments: normalization_arguments(selection.key.arguments)?, target }`, with `target` `Leaf` for `CompletedSelectionTarget::Leaf` and `Composite(normalization_selection_set(..)?)` for `Composite`.
-- `Conditional(conditional)` is `Conditional { condition: SelectionEquals(SelectionEqualsCondition { response_key: discriminator_response_key.clone(), value }), selections }`.
+- `Selectable(selection)` is `Selection { response_key: selection.key.normalization_alias(), selectable_name: selection.key.name, arguments: normalization_arguments(selection.key.arguments)?, target }`, with `target` `Leaf` for `CompletedSelectionTarget::Leaf` and, for `Composite(map)`, `Composite(NormalizationCompositeTarget { identity: normalization_identity(map), selections: normalization_selection_set(map, ..)? })`.
+- `Conditional(conditional)` is `Conditional { condition: SelectionEquals(SelectionEqualsCondition { response_key: discriminator_response_key.clone(), value }), identity: normalization_identity(conditional.selections), selections }`.
+
+`normalization_identity` reads the map's identity through a method this change adds beside `CompletedSelectionMap::iter`:
+
+```rust
+// from crates/isograph_compiler/src/merged_selection.rs
+impl CompletedSelectionMap {
+    /// The identity selection `complete` added: `Select(name)` when the map holds
+    /// `Identity(name)`, `Omit` otherwise.
+    pub fn identity(&self) -> IdentitySelection;
+}
+```
+
+Its body is `self.iter().find_map(|selection| match selection { CompletedSelection::Identity(name) => name.dereference().wrap_some(), CompletedSelection::Discriminator | CompletedSelection::Selectable(_) | CompletedSelection::Conditional(_) => None })`, then `Some(name)` is `Select(name)` and `None` is `Omit`. The lookup is total, with no panic. In key order `Identity` is at most the second entry, after `Discriminator`, so the search stops within two entries when the map has one; without one it walks the map. `normalization_identity` maps `Select(name)` to `NormalizationIdentity::Select(SelectionKey { name, arguments: MergedArguments::default() }.normalization_alias())`, the same response key as the `Identity` node, and `Omit` to `Omit`. The map holds `Identity` exactly when `complete` was called with `Select` (Completion, step 4), so this reads back the protocol's `IdentitySelection` and decides nothing. The operation's top-level map has no `Identity` (it is not under a selection), and `normalization_ast` does not call `normalization_identity` on it.
 
 `normalization_value` maps `MergedValue` variant for variant; `Integer(n)` is `i32::try_from(n)`, `Err` is `IntegerOutOfRange(n)`.
 
@@ -538,6 +704,8 @@ pub(crate) fn normalization_ast_path(entrypoint: EntityNameAndSelectableName) ->
 fn ast_value(ast: &NormalizationAst) -> ArtifactValue;
 fn selection_set_value(selection_set: &NormalizationSelectionSet) -> ArtifactValue;
 fn node_value(node: &NormalizationNode) -> ArtifactValue;
+fn composite_target_value(target: &NormalizationCompositeTarget) -> ArtifactValue;
+fn identity_value(identity: &NormalizationIdentity) -> ArtifactValue;
 fn condition_value(condition: &NormalizationCondition) -> ArtifactValue;
 fn arguments_value(arguments: &NormalizationArguments) -> ArtifactValue;
 fn argument_value(value: &NormalizationValue) -> ArtifactValue;
@@ -547,8 +715,10 @@ fn argument_value(value: &NormalizationValue) -> ArtifactValue;
 
 - The AST is `Object` with `discriminatorResponseKey: String(key)` and `selections`.
 - A selection set is `Array` of its nodes.
-- `Selection`: `Object` with `kind: String("Selection")`, `responseKey: String(alias)`, `selectableName: String(name)`, `arguments`, and `selections`: `Null` for `Leaf`, the selection set for `Composite`.
-- `Conditional`: `kind: String("Conditional")`, `condition`, `selections`.
+- `Selection`: `Object` with `kind: String("Selection")`, `responseKey: String(alias)`, `selectableName: String(name)`, `arguments`, and `target`: `Null` for `Leaf`, the composite target for `Composite`.
+- A composite target: `Object` with `identityResponseKey` and `selections`.
+- `Conditional`: `kind: String("Conditional")`, `condition`, `identityResponseKey`, `selections`.
+- `identityResponseKey`: `String(alias)` for `Select(alias)`, `Null` for `Omit`.
 - `SelectionEquals`: `kind: String("SelectionEquals")`, `responseKey: String(alias)`, `value: String(entity name)`.
 - `arguments`: `Null` when empty, else `Array` of `Array([String(name), value])`.
 - Values: `Variable` is `{ kind: "Variable", name }`; `Integer(n)` is `{ kind: "Literal", value: Number(f64::from(n)) }`; `Boolean` is `{ kind: "Literal", value: Boolean(..) }`; `Null` is `{ kind: "Literal", value: Null }`; `String(s)` is `{ kind: "String", value: String(s) }`; `Object(entries)` is `{ kind: "Object", value: Array([Array([String(name), value]), ..]) }`. Upstream's origin is `get_serialized_field_argument` (`isograph/crates/artifact_content/src/generate_artifacts.rs:497-597`), which writes the same shapes as text.
@@ -699,8 +869,10 @@ The asymmetries (The asymmetries) are removed from the text side: the comparison
 - `ast.discriminator_response_key == "__typename"`.
 - Every `Selection` node's `response_key` equals `SelectionKey { name: selectable_name, arguments }.normalization_alias()` of its own name and the arguments the map holds.
 - The union selection's node has `target == Composite(..)` and its first child is not `__typename`; a leaf selection's node has `target == Leaf`.
+- Identity: the object-with-identity selection's target has `identity == Select("id")`, and its selections hold a `Selection` node with `response_key == "id"`; the union selection's target has `identity == Omit`, and its `asBlogItem` conditional (on an object with `id: ID!`) has `identity == Select("id")`; the interface target with `id` has `Select("id")`; `Node` with `InlineFragment(Pet)` gives the `node` selection's target `Select("id")`.
 - In every `Conditional`, the condition's `response_key` is `ast.discriminator_response_key`.
-- A composite selection whose map is empty, on an entity with `IdentitySelection::Omit`: its node's target is `Composite(NormalizationSelectionSet(vec![]))`, and the text's block is one `__typename: __typename` line.
+- A composite selection whose map is empty, on an entity with `IdentitySelection::Omit`: its node's target is `Composite(NormalizationCompositeTarget { identity: Omit, selections: NormalizationSelectionSet(vec![]) })`, and the text's block is one `__typename: __typename` line.
+- `CompletedSelectionMap::identity` of `complete(map, Select(id))` is `Select(id)` and of `complete(map, Omit)` is `Omit`.
 - `checkins(limit: 5)` gives `arguments == [limit: Integer(5)]`; `f(n: 4294967296)` is `Err(IntegerOutOfRange(4294967296))` from `query_for_entrypoint`, which returns no text for it.
 - `Node` with `InlineFragment(Pet)`: the top node is a `Selection` with `selectable_name == "node"` whose children are `Pet`'s selections, with no `Conditional` among them.
 
@@ -710,9 +882,9 @@ The asymmetries (The asymmetries) are removed from the text side: the comparison
 
 - The first line is `import type { NormalizationAst } from "@isograph/runtime";`, a later line starts with `const normalizationAst: NormalizationAst = {`, and the last line is `export default normalizationAst;`.
 - The text contains `discriminatorResponseKey: "__typename"`.
-- A leaf `Selection` with no arguments prints `kind: "Selection"`, `responseKey: "firstName"`, `selectableName: "firstName"`, `arguments: null`, `selections: null`.
-- A `Composite` with no nodes prints `selections: []`.
-- A `Conditional` prints `kind: "Conditional"` and `kind: "SelectionEquals"`, `responseKey: "__typename"`, `value: "Pet"`.
+- A leaf `Selection` with no arguments prints `kind: "Selection"`, `responseKey: "firstName"`, `selectableName: "firstName"`, `arguments: null`, `target: null`.
+- A `Composite` with no nodes and `Omit` prints `identityResponseKey: null` and `selections: []`; with `Select("id")` it prints `identityResponseKey: "id"`.
+- A `Conditional` prints `kind: "Conditional"`, `identityResponseKey`, and `kind: "SelectionEquals"`, `responseKey: "__typename"`, `value: "Pet"`.
 - Arguments print `kind: "Variable"`, `kind: "Literal"` with `value: 5`, `value: true`, and `value: null`, `kind: "String"`, and `kind: "Object"`.
 - `entrypoint_artifact`'s text is unchanged: it starts with `export default {`.
 - `generate_artifacts` with one entrypoint input writes `Query/HomeRoute/normalization_ast.ts` whose text contains `responseKey: "pets"`, and `Query/HomeRoute/entrypoint.ts` still imports `./normalization_ast`.
@@ -731,7 +903,7 @@ Each change is one commit. Prerequisites: query-generation.md changes 1 to 8, an
 
 ### 2. The AST (isograph_compiler)
 
-`crates/isograph_compiler/src/normalization_ast.rs`: `NormalizationAst`, `NormalizationSelectionSet`, `NormalizationNode`, `NormalizationSelection`, `NormalizationTarget`, `NormalizationConditional`, `NormalizationCondition`, `SelectionEqualsCondition`, `NormalizationArguments`, `NormalizationArgument`, `NormalizationValue`, `NormalizationObjectEntry`, `IntegerOutOfRange`, `normalization_ast` and its helpers; `QueryArtifact.normalization_ast`; `EntrypointQueryError::IntegerOutOfRange`; the `normalization_ast` step of `query_for_entrypoint`; the comparison helpers and tests in `crates/graphql_network_protocol`. Depends on query-generation.md change 7.
+`crates/isograph_compiler/src/normalization_ast.rs`: `NormalizationAst`, `NormalizationSelectionSet`, `NormalizationNode`, `NormalizationSelection`, `NormalizationTarget`, `NormalizationCompositeTarget`, `NormalizationConditional`, `NormalizationIdentity`, `NormalizationCondition`, `SelectionEqualsCondition`, `NormalizationArguments`, `NormalizationArgument`, `NormalizationValue`, `NormalizationObjectEntry`, `IntegerOutOfRange`, `normalization_ast` and its helpers; `CompletedSelectionMap::identity`; `QueryArtifact.normalization_ast`; `EntrypointQueryError::IntegerOutOfRange`; the `normalization_ast` step of `query_for_entrypoint`; the comparison helpers and tests in `crates/graphql_network_protocol`. Depends on query-generation.md change 7.
 
 ### 3. The TypeScript artifact (typescript_artifacts)
 
@@ -746,13 +918,12 @@ The committed `demos/pet-demo/src/__isograph/` normalization ASTs, generated by 
 - The concrete entity, where the compiler knows it. A composite selection whose target is an object type (or a `node` selection, whose entity the id determines) could carry `concreteEntity: "Pet"` in the AST, and the normalizer would write that entity instead of reading the discriminator; `null` or absent means read the discriminator. Selecting `__typename` only where it is needed then follows: under abstract types and inside refinements, as upstream does (`isograph/crates/isograph_schema/src/create_merged_selection_set.rs:1419-1427`). It is an efficiency change: fewer bytes per response, at the cost of the per-selection field this doc removes.
 - `VariableEquals`. `@include(if: $x)` and `@skip(if: $x)` become conditionals: the merge key gains the condition, so `f @include(if: $a)` and `f` are two entries; the printer prints the directive; `Condition` and `NormalizationCondition` gain `VariableEquals { name, value }`, which holds when `variables[name] === value`. Nothing produces it in v1, so v1 has no such variant.
 - Abstract refinement targets (interfaces, unions). `SelectionEquals` alone cannot express them, because the value the response holds under `__typename` is the concrete type name (`Pet`), never a fixed value that stands for the abstract type. Inside the fragment, the query selects one more aliased selection, `... on Named { __refinement__Named: __typename .. }`. The server returns that key only when the object is of the abstract type, so the condition is "the response object has the key `__refinement__Named`": a variant `SelectionPresent { response_key }`, with no list of concrete types and no subtype check at runtime. The key belongs to the same response object as the fragment's siblings (a fragment adds no path segment), and it is selected inside the fragment rather than before it. The generator owns the `__refinement__` prefix, so the alias cannot collide with a normalization alias: a name starting with `__` is reserved for introspection (GraphQL spec 3.4.1), and every normalization alias starts with its selectable name.
-- The identity in the AST. The identity is an ordinary `Selection` node; upstream's runtime keys a record by `id` when the response holds one (`getDataIdOfNetworkResponse`). `IdentityFieldSelection::NodeOnly` and `KeyDirective` (query-generation.md, Config) need the AST to say which selections are the identity, which the AST can carry once per artifact as it carries `discriminatorResponseKey`.
 
 ### Objects without an identity field (open area, not v1)
 
 This is not a v1 change and has no held option. It is an optimization that does not matter for v1, and an open area of thinking.
 
-What v1 does, upstream's behavior: a linked field whose target has no identity field (a `date` object with `day`, `hour`, `minute`) is a `Selection` node whose `selections` list every selection of it, like any other composite selection. The normalizer writes it as its own record, whose identity is derived from the parent record, the field name, and the arguments (`getDataIdOfNetworkResponse`, `isograph/libs/isograph-react/src/core/cache.ts:599-642`: `<parent typename>:<parent id>.<fieldName>`, then `.<index>` in a list, then one chunk per argument). The parent record holds a link to that record.
+What v1 does, upstream's behavior: a linked field whose target has no identity field (a `date` object with `day`, `hour`, `minute`) is a `Selection` node whose target has `identityResponseKey: null` and whose `selections` list every selection of it, like any other composite selection. The normalizer writes it as its own record, whose identity is derived from the parent record, the field name, and the arguments (`getDataIdOfNetworkResponse`, `isograph/libs/isograph-react/src/core/cache.ts:599-642`: `<parent typename>:<parent id>.<fieldName>`, then `.<index>` in a list, then one chunk per argument). The parent record holds a link to that record.
 
 The open idea: such an object has no identity of its own, so the normalizer could merge it directly into the parent record, possibly deeply (a `date` inside a `schedule` inside a `Pet`, all stored on `Pet`'s record). The normalization AST then might not need to list the object's subfields: the normalizer would copy the response object's value under the parent's `responseKey` without walking it.
 
@@ -760,6 +931,6 @@ Open question: an object with an identity field nested inside an identity-less o
 
 ## Docs this doc amends
 
-- `refactors/pending/runtime/pico-runtime.md`, Artifacts: `NormalizationScalarField`, `NormalizationLinkedField`, and `NormalizationInlineFragment` become `NormalizationSelection` (with `responseKey`, `selectableName`, and `selections: NormalizationSelectionSet | null`) and `NormalizationConditional` with `NormalizationCondition` and `conditionHolds`; `responseKey` replaces the `getNetworkResponseKey` call in the identity rules; `concreteType` is gone, and a record's entity is `response[ast.discriminatorResponseKey]`; `normalize` per `InlineFragment` becomes per `Conditional`. Stored values need no `Scalar`/`Linked` tag: every store walk goes through an AST whose `selections` says which selections are links.
+- `refactors/pending/runtime/pico-runtime.md`, Artifacts: `NormalizationScalarField`, `NormalizationLinkedField`, and `NormalizationInlineFragment` become `NormalizationSelection` (with `responseKey`, `selectableName`, and `target: NormalizationCompositeTarget | null`, the target holding `identityResponseKey` and `selections`) and `NormalizationConditional` (with `identityResponseKey`) with `NormalizationCondition` and `conditionHolds`; `responseKey` replaces the `getNetworkResponseKey` call in the identity rules; `concreteType` is gone, and a record's entity is `response[ast.discriminatorResponseKey]`; `normalize` per `InlineFragment` becomes per `Conditional`. Stored values need no `Scalar`/`Linked` tag: every store walk goes through an AST whose `target` says which selections are links. The identity rules read `identityResponseKey` instead of `id`.
 - `refactors/pending/runtime/pico-runtime.md`, Changes: change 1 (`libs/isograph-runtime` with `package.json`, `tsconfig.json`, `src/index.ts`) is this doc's change 1; the runtime's changes add modules and the `import` export condition to the existing package. Open decision 11 (package location and name) is settled as `libs/isograph-runtime` and `@isograph/runtime`, private to the workspace rather than published, with no knowledge of React.
 - `refactors/pending/artifact-set-and-types.md`, Per entrypoint: an entrypoint's `normalization_ast.ts` is this doc's artifact once change 3 lands.
