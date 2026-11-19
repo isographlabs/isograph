@@ -26,3 +26,6 @@ export function joinCleanups<
   };
   return [items, dispose];
 }
+
+export * from './CacheItem';
+export * from './ParentCache';

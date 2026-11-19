@@ -1424,7 +1424,7 @@ Each change is one commit, in order. Prerequisites: store.md changes 1 to 7 and 
 
 ### 2. `CacheItem` and `ParentCache` in `@isograph/disposable-types`
 
-`CacheItem.ts`, `ParentCache.ts`, `CacheItem.test.ts`, `ParentCache.test.ts` moved unchanged from upstream's `@isograph/react-disposable-state` at `9d72f6fc`, with two import lines changed: `from '@isograph/disposable-types'` is `from './index'` in the four files, because the files now live in that package. `src/index.ts` gains `export * from './CacheItem';` and `export * from './ParentCache';`. Depends on 1.
+`CacheItem.ts`, `ParentCache.ts`, `CacheItem.test.ts`, `ParentCache.test.ts` moved unchanged from upstream's `@isograph/react-disposable-state` at `072af275` (identical at `9d72f6fc`), with two import lines changed: `from '@isograph/disposable-types'` is `from './index'` in the four files, because the files now live in that package. `src/index.ts` gains `export * from './CacheItem';` and `export * from './ParentCache';`. Depends on 1.
 
 ### 3. `readButDoNotEvaluate` (libs/isograph-runtime)
 
