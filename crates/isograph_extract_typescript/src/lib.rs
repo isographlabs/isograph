@@ -421,12 +421,13 @@ mod memo_tests {
     use intern::string_key::Intern;
     use isograph_compiler::{
         ClientId, HostLanguage, IsoLiteralError, IsoLiteralExtraction, IsoLiteralStartIndex,
-        IsographDb, LiteralId, extract_iso_literals, iso_literal_extraction, parsed_iso_literal,
-        parsed_iso_literals_in_file, text_through_last_iso_literal,
+        IsographDb, LiteralId, extract_iso_literals, iso_literal_extraction,
+        iso_literal_parse_errors_in_file, parsed_iso_literal, parsed_iso_literals_in_file,
+        text_through_last_iso_literal,
     };
     use isograph_parser::{
         AstError, IsoLiteralItem, IsographSemanticToken, ParseError, ParsedIsoLiteral,
-        SelectableNameWrapper,
+        SelectableNameWrapper, parse_iso_literal,
     };
     use prelude::Postfix;
     use span::{Span, WithSpanPostfix};
@@ -1227,6 +1228,119 @@ iso(`entrypoint Query.HomeRoute`)";
         assert!(text_through_last_iso_literal(&db, client(), path).is_some());
         db.remove_disk_file(path);
         assert!(text_through_last_iso_literal(&db, client(), path).is_none());
+    }
+
+    /// `parse_iso_literal(text).errors` with each span shifted by `offset`.
+    fn shifted_parse_errors(text: &str, offset: u32) -> Vec<span::WithSpan<ParseError>> {
+        parse_iso_literal(text)
+            .errors
+            .into_iter()
+            .map(|error| error.item.with_span(error.location.with_offset(offset)))
+            .collect()
+    }
+
+    #[test]
+    fn missing_file_has_no_iso_literal_parse_errors() {
+        let db = IsographDb::<TypeScriptHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        assert_eq!(
+            iso_literal_parse_errors_in_file(&db, client(), path).as_ref(),
+            None
+        );
+    }
+
+    #[test]
+    fn file_with_no_literals_has_empty_iso_literal_parse_errors() {
+        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        intern_file(&mut db, path, "const a = 1;");
+        assert_eq!(
+            iso_literal_parse_errors_in_file(&db, client(), path).as_ref(),
+            Vec::new().reference().wrap_some()
+        );
+    }
+
+    #[test]
+    fn iso_literal_parse_errors_are_the_parse_errors_shifted_to_the_file() {
+        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        intern_file(&mut db, path, "iso(`entrypoint`)");
+        let expected = shifted_parse_errors("entrypoint", "iso(`".len() as u32);
+        assert!(!expected.is_empty());
+        assert_eq!(
+            iso_literal_parse_errors_in_file(&db, client(), path).as_ref(),
+            expected.reference().wrap_some()
+        );
+    }
+
+    #[test]
+    fn prepending_text_shifts_iso_literal_parse_errors() {
+        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        intern_file(&mut db, path, "iso(`entrypoint`)");
+        let before = iso_literal_parse_errors_in_file(&db, client(), path)
+            .clone()
+            .expect("the test interned this path");
+        let prefix = "const x = 1;\n";
+        intern_file(&mut db, path, format!("{prefix}iso(`entrypoint`)").as_str());
+        let after = iso_literal_parse_errors_in_file(&db, client(), path)
+            .clone()
+            .expect("the test interned this path");
+        assert!(!before.is_empty());
+        assert_eq!(
+            after,
+            before
+                .into_iter()
+                .map(|error| error
+                    .item
+                    .with_span(error.location.with_offset(prefix.len() as u32)))
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn iso_literal_parse_errors_cover_every_literal_in_the_file() {
+        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        let first = "iso(`entrypoint`)";
+        let separator = ";\n";
+        intern_file(
+            &mut db,
+            path,
+            format!("{first}{separator}iso(` `)").as_str(),
+        );
+        let second_start = (first.len() + separator.len() + "iso(`".len()) as u32;
+        let expected: Vec<_> = shifted_parse_errors("entrypoint", "iso(`".len() as u32)
+            .into_iter()
+            .chain(shifted_parse_errors(" ", second_start))
+            .collect();
+        assert!(
+            expected
+                .iter()
+                .any(|error| error.item == ParseError::Ast(AstError::EmptyLiteral))
+        );
+        assert_eq!(
+            iso_literal_parse_errors_in_file(&db, client(), path).as_ref(),
+            expected.reference().wrap_some()
+        );
+    }
+
+    #[test]
+    fn iso_literal_parse_errors_follow_each_clients_text() {
+        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        intern_file(&mut db, path, "iso(`entrypoint Query.HomeRoute`)");
+        db.set_open_file(ClientId(1), path, "iso(`entrypoint`)".to_owned());
+        assert!(
+            !iso_literal_parse_errors_in_file(&db, ClientId(1), path)
+                .as_ref()
+                .expect("client 1 has a buffer")
+                .is_empty()
+        );
+        assert_eq!(
+            iso_literal_parse_errors_in_file(&db, ClientId(2), path).as_ref(),
+            Vec::new().reference().wrap_some()
+        );
     }
 
     #[test]

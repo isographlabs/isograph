@@ -1,7 +1,8 @@
 use common_lang_types::RelativePathToSourceFile;
-use isograph_parser::{ParsedIsoLiteral, parse_iso_literal};
+use isograph_parser::{ParseError, ParsedIsoLiteral, parse_iso_literal};
 use pico_macros::memo;
 use prelude::Postfix;
+use span::{WithSpan, WithSpanPostfix};
 
 use crate::host_language::{HostLanguage, IsoLiteralExtraction};
 use crate::{ClientId, IsographDb, file_contents};
@@ -45,6 +46,29 @@ pub fn parsed_iso_literals_in_file<THostLanguage: HostLanguage>(
                 extraction.clone(),
                 parsed_iso_literal(db, extraction.iso_literal_text.clone()).clone(),
             )
+        })
+        .collect::<Vec<_>>()
+        .wrap_some()
+}
+
+/// Parse errors of every iso literal in `path` as `client` reads it, as file-absolute spans.
+#[memo]
+pub fn iso_literal_parse_errors_in_file<THostLanguage: HostLanguage>(
+    db: &IsographDb<THostLanguage>,
+    client: ClientId,
+    path: RelativePathToSourceFile,
+) -> Option<Vec<WithSpan<ParseError>>> {
+    let literals = parsed_iso_literals_in_file(db, client, path).as_ref()?;
+    literals
+        .iter()
+        .flat_map(|(extraction, parsed)| {
+            let offset = extraction.iso_literal_start_index.0 as u32;
+            parsed.errors.iter().map(move |error| {
+                error
+                    .item
+                    .clone()
+                    .with_span(error.location.with_offset(offset))
+            })
         })
         .collect::<Vec<_>>()
         .wrap_some()
