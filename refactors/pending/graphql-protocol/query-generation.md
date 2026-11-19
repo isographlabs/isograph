@@ -721,6 +721,70 @@ Values print as GraphQL: `$name`, integers in decimal, `true`, `false`, `null`, 
 
 Upstream's origin for the completion rules is `select_typename_and_id_fields_in_merged_selection` and `selection_map_wrapped` (`isograph/crates/isograph_schema/src/create_merged_selection_set.rs:1414`, `:1477`) and `GraphQLNetworkProtocol::wrap_merged_selection_map` (`isograph/crates/graphql_network_protocol/src/graphql_network_protocol.rs:305`) for the `node` wrapping. Deltas: `id` and `__typename` are added when the document is built, from entity data, rather than inserted into the map during the merge; every field is aliased (Normalization aliases); the text comes from one printer over `OperationDocument`.
 
+### Config: which types get an identity field
+
+No doc owns GraphQL config yet, and `crates/isograph_config` has no GraphQL section (`IsographProjectConfig` has `source_files`, `schema`, `output_directory`). This section documents the option that decides `completed_selection_set` step 2. v1 implements only the default, `auto`, which is the rule step 2 states (a type with a field `id: ID!`, `IdField::Present`, entrypoints.md). v1 does not add the field to `IsographProjectConfig`; the other two variants are documented and not implemented.
+
+```json
+{
+  "source_files": ["src/**"],
+  "schema": ["schema/**"],
+  "graphql": {
+    "identity_field_selection": "auto"
+  }
+}
+```
+
+```rust
+// from crates/isograph_config/src/compilation_options.rs
+/// This struct is deserialized from an isograph.config.json file.
+#[derive(Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct IsographProjectConfig {
+    // `json_schema`, `source_files`, `schema`, `output_directory` unchanged
+    /// Options the GraphQL network protocol reads.
+    #[serde(default)]
+    pub graphql: GraphQLConfig,
+}
+
+/// The `graphql` section of the config.
+#[derive(Deserialize, Debug, Default)]
+#[serde(default, deny_unknown_fields)]
+pub struct GraphQLConfig {
+    /// Which types the query selects an identity field on, whether or not a selection asked
+    /// for it.
+    pub identity_field_selection: IdentityFieldSelection,
+}
+
+/// Which types the query selects an identity field on.
+#[derive(Deserialize, Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum IdentityFieldSelection {
+    /// `id` on every object and interface type with a field `id: ID!`. v1 implements only this.
+    #[default]
+    Auto,
+    /// `id` only on types that are `Node` or implement `Node`. Documented; not implemented in v1.
+    NodeOnly,
+    /// The key field or fields only on types marked with a key directive in the schema,
+    /// `type Pet @key(fields: "id")`, and no identity field on any other type. Documented; not
+    /// implemented in v1.
+    KeyDirective,
+}
+```
+
+Naming follows `isograph_config`: snake_case serde field names (`source_files`, `output_directory`), and upstream's config enums are `rename_all = "snake_case"` or `"lowercase"` (`isograph/crates/isograph_config/src/compilation_options.rs:252`, `:265`), so the JSON values are `"auto"`, `"node_only"`, `"key_directive"`. `GraphQLConfig` keeps a named field because serde reads the JSON key from it. The `graphql` key holds options of one protocol; `isograph_config` already names `schema`, which only a schema-reading protocol uses.
+
+`@key(fields: "...")` is the Apollo Federation directive spelling: `fields` is a selection of the key fields, so `@key(fields: "id")` and `@key(fields: "owner_id name")` both name a key. The directive's definition (`directive @key(fields: String!) on OBJECT | INTERFACE`) comes from the user's schema.
+
+What each variant changes when it is implemented:
+
+- `Auto` and `NodeOnly` decide only `IdField` in `graphql_entity` (entrypoints.md): `NodeOnly` is `Present` when the type has `id: ID!` and is `Node` or lists `Node` in `interfaces`. `completed_selection_set` step 2 is unchanged.
+- `KeyDirective` changes `IdField::Present` to carry the key fields, because the key may be several fields or a field not named `id`; step 2 selects each of them.
+- `NodeOnly` and `KeyDirective` select no identity field on some types that have an `id`. Upstream's runtime keys a record by `dataToNormalize.id` whenever the response holds one (`getDataIdOfNetworkResponse`, `isograph/libs/isograph-react/src/core/cache.ts:623-626`), so a user selection of `id` on such a type would still key the record. Under these variants the normalization AST must say which fields are the identity, rather than the runtime reading `id`; normalization-ast.md does not have that yet.
+- An `id` that a selection asks for with no arguments is still selected, by step 2's second clause, under every variant.
+
+The option reaches `graphql_entity` as a database input read by the protocol's memos; how config values enter the database is not specified in i2 yet, and is the first thing a change implementing a non-default variant specifies.
+
 ## Where the query text goes
 
 The protocol produces the text and the file name; the host language writes the files. The artifact work replaces artifact-generation.md's string contents with structured values printed by a generic TypeScript printer: an `ArtifactFile` holds an `ArtifactValue`, which has `String`, object, and `Import(ArtifactImport { path, export })` variants, and the entrypoint artifact's value today is `{ kind: "Entrypoint", name }`. This section is written against those names; when the landed code differs, stop and fix this section first.
