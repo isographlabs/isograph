@@ -1,0 +1,19 @@
+[package]
+name = "graphql_schema_parser"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+common_lang_types = { path = "../common_lang_types" }
+derive_more = { workspace = true }
+intern = { path = "../../relay-crates/intern" }
+logos = { workspace = true }
+nonempty = { workspace = true }
+prelude = { path = "../prelude" }
+span = { path = "../span" }
+strum = { workspace = true }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true

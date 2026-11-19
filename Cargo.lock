@@ -562,6 +562,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "graphql_schema_parser"
+version = "0.5.3"
+dependencies = [
+ "common_lang_types",
+ "derive_more",
+ "intern",
+ "logos",
+ "nonempty",
+ "prelude",
+ "span",
+ "strum",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
