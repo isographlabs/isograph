@@ -203,7 +203,7 @@ fn validate_selection<'a, TProfile: CompilationProfile>(
                 .with_span(selection.name.location),
         )
         .boxed(),
-        [selectable] => match (selection.selection_set.as_ref(), selectable.target_entity) {
+        [selectable] => match (selection.selection_set.as_ref(), selectable.target_entity()) {
             (None, _) => std::iter::empty().boxed(),
             (Some(nested), None) => std::iter::once(
                 ValidationError::SelectionSetOnFieldWithoutTarget(

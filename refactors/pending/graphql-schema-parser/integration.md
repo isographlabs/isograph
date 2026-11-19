@@ -1,6 +1,6 @@
 # GraphQL schema parser: integration
 
-Requires parsing-standards.md, ast.md, and every change in order.md. This file is how `graphql_network_protocol` reads schema files and how the core lookups (`entity_named`, `selectable_named`, `selectables_for_entity` in `crates/isograph_compiler/src/schema.rs`) merge what the schema defines with what source files declare. The protocol data the core carries (`EntityOrigin`, `SelectableOrigin`, `GraphQLEntityData`, `GraphQLSelectableData`) is `refactors/pending/graphql-protocol/entrypoints.md`; its changes 2 and 3 (query-generation.md, Changes) land with this doc's changes 2 and 3.
+Requires parsing-standards.md, ast.md, and every change in order.md. This file is how `graphql_network_protocol` reads schema files and how the core lookups (`entity_named`, `selectable_named`, `selectables_for_entity` in `crates/isograph_compiler/src/schema.rs`) merge what the schema defines with what source files declare. The protocol data the core carries (`EntityOrigin`, `SelectableKind::Server`, `GraphQLEntityData`, `GraphQLSelectableData`) is `refactors/pending/graphql-protocol/entrypoints.md`; its changes 2 and 3 (query-generation.md, Changes) land with this doc's changes 2 and 3.
 
 The goal is isolation: many schema files, any of them broken in places, and a lookup succeeds whenever the definitions on its own path parse and agree. A lookup uses `?` only on the parse results of the name it asks for.
 
@@ -396,9 +396,9 @@ pub fn object_types_implementing<TProfile: CompilationProfile>(
 ) -> Vec<EntityName>
 ```
 
-A field becomes `ProtocolSelectable { description, target_entity, definition, data: Field }`: `target_entity` is the named type under the type annotation's list and non-null wrappers, `definition` is the path and the field name's span.
+A field becomes `ProtocolSelectable { description, target, definition, data: Field }`: `target` is the type annotation as a `Wrapper<EntityName>` by mental-model.md's table (`Foo!` is `Inner(Foo)`, `Foo` is `Union([Inner(Foo), Null])`, `[Foo!]` is `Union([List(Inner(Foo)), Null])`), `definition` is the path and the field name's span.
 
-`graphql_selectable` computes the field (`selectable_named`) and the refinement, then: both is `RefinementCollision`; one is that one; neither is `Ok(None)`. The refinement of `selectable` on `entity`: `selectable` must be `as` followed by a name `T`. On a union (`entity_named(entity)` is a `Union` definition), `T` must be a member of the definition or a union extension. On an interface, `graphql_entity(T)` must be `Object` whose `interfaces` contain `entity`. Then `graphql_entity(T)`: `Err` is `RefinementTarget`; `Ok(Some)` of an `Object` is the refinement `ProtocolSelectable { description: None, target_entity: T, definition: T's definition, data: Refinement }`; anything else is no refinement.
+`graphql_selectable` computes the field (`selectable_named`) and the refinement, then: both is `RefinementCollision`; one is that one; neither is `Ok(None)`. The refinement of `selectable` on `entity`: `selectable` must be `as` followed by a name `T`. On a union (`entity_named(entity)` is a `Union` definition), `T` must be a member of the definition or a union extension. On an interface, `graphql_entity(T)` must be `Object` whose `interfaces` contain `entity`. Then `graphql_entity(T)`: `Err` is `RefinementTarget`; `Ok(Some)` of an `Object` is the refinement `ProtocolSelectable { description: None, target: Union([Inner(T), Null]), definition: T's definition, data: Refinement }`; anything else is no refinement.
 
 `graphql_selectables` lists `schema_entity_fields` of the entity, then the refinements of each union member (deduplicated) or each of `object_types_implementing(entity)`, keeping the ones whose `graphql_entity` is `Ok(Some)` of an `Object`. A collision or a duplicate field shows as a repeated name; the core keeps names defined exactly once.
 
@@ -527,7 +527,7 @@ Status: landed.
 
 Status: landed.
 
-query-generation.md change 2: `Entity<TEntityData>`, `EntityOrigin`, `Selectable<TSelectableData>`, `SelectableOrigin`, `SourceSelectableOrigin`, `ProtocolSelectableOrigin`, `Selectable::target_entity()`, `ProfileEntity`, `ProfileSelectable`, `SourceSelectableDefinition`; `NetworkProtocol::EntityData`, `SelectableData`. Lookups still read source files only. Tests: the existing lookup, hover, completion, and validation tests pass unchanged in their facts.
+query-generation.md change 2 and artifact-set-and-types.md change 1: `Entity<TEntityData>`, `EntityOrigin`, `Selectable<TSelectableData>`, `SelectableKind`, `ClientPointerTarget`, `ServerSelectable`, `Selectable::target_entity()`, `ProfileEntity`, `ProfileSelectable`, `SourceSelectableDefinition`, `SourceSelectableKind`; `Wrapper`, `UnionWrapper`, `WrapperVariant`, `inner_values`, `wrapper_of_type_annotation`; `NetworkProtocol::EntityData`, `SelectableData`. Lookups still read source files only. Tests: the existing lookup, hover, completion, and validation tests pass unchanged in their facts.
 
 ### 3. Schema lookups and protocol lookups in the core
 

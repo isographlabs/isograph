@@ -6,6 +6,7 @@ mod selectable_for_path;
 #[cfg(test)]
 mod test_profile;
 mod validation;
+mod wrapper;
 
 pub use database::{
     ClientId, DiskFile, DiskFileMap, FileMembership, IsographDb, OpenFileKey, SchemaPathMap,
@@ -18,9 +19,9 @@ pub use iso_literals::{
     text_through_last_iso_literal,
 };
 pub use schema::{
-    DefinitionLocation, Entity, EntityOrigin, ProfileEntity, ProfileSelectable,
-    ProtocolSelectableOrigin, Selectable, SelectableOrigin, SourceSelectableDefinition,
-    SourceSelectableOrigin, entity_named, selectable_named, selectables_for_entity,
+    ClientPointerTarget, DefinitionLocation, Entity, EntityOrigin, ProfileEntity,
+    ProfileSelectable, Selectable, SelectableKind, ServerSelectable, SourceSelectableDefinition,
+    SourceSelectableKind, entity_named, selectable_named, selectables_for_entity,
 };
 pub use selectable_for_path::{
     entity_for_selection_set_path, selectable_for_selectable_name_path,
@@ -31,3 +32,4 @@ pub use validation::{
     UnknownEntityError, UnknownSelectableError, ValidationError,
     iso_literal_validation_errors_in_file,
 };
+pub use wrapper::{UnionWrapper, Wrapper, WrapperVariant};

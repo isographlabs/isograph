@@ -31,22 +31,22 @@ trait RuntimeFramework {}
 A wrapper is a type former over an entity. Wrappers nest.
 
 ```rust
-enum Wrapper {
-    Entity(Entity),
-    List(Box<Wrapper>),
-    Union(UnionWrapper),
+enum Wrapper<T> {
+    Inner(T),
+    List(Box<Wrapper<T>>),
+    Union(UnionWrapper<T>),
 }
 
-struct UnionWrapper(pub Vec<WrapperVariant>);
+struct UnionWrapper<T>(pub Vec<WrapperVariant<T>>);
 
-enum WrapperVariant {
-    Entity(Entity),
-    List(Box<Wrapper>),
+enum WrapperVariant<T> {
+    Inner(T),
+    List(Box<Wrapper<T>>),
     Null,
 }
 ```
 
-`List` is `[W]`. `Union([W, Null])` is `W | null`. Schema types are not located.
+`List` is `[W]`. `Union([W, Null])` is `W | null`. Schema types are not located. A selectable's target is a `Wrapper<EntityName>`; a generated type is the same structure over a host-language-neutral type.
 
 ```text
 Foo
@@ -59,12 +59,12 @@ Union([[Foo], Null])
 A GraphQL type annotation is a wrapper:
 
 ```text
-Foo!      ->  Entity(Foo)
-Foo       ->  Union([Entity(Foo), Null])
-[Foo!]!   ->  List(Entity(Foo))
-[Foo]     ->  Union([List(Union([Entity(Foo), Null])), Null])
-[Foo!]    ->  Union([List(Entity(Foo)), Null])
-[Foo]!    ->  List(Union([Entity(Foo), Null]))
+Foo!      ->  Inner(Foo)
+Foo       ->  Union([Inner(Foo), Null])
+[Foo!]!   ->  List(Inner(Foo))
+[Foo]     ->  Union([List(Union([Inner(Foo), Null])), Null])
+[Foo!]    ->  Union([List(Inner(Foo)), Null])
+[Foo]!    ->  List(Union([Inner(Foo), Null]))
 ```
 
 A selectable's target is a `Wrapper`. Nested selections select on the inner entity, not on the wrapper.
@@ -172,7 +172,7 @@ field User.bestFriend to User {
 }
 ```
 
-This creates the selectable `User.bestFriend` whose target is Union([Entity(User), Null]). The selection set selects selectables of the parent `User`. It is how the declaration computes which `User` to point at.
+This creates the selectable `User.bestFriend` whose target is Union([Inner(User), Null]). The selection set selects selectables of the parent `User`. It is how the declaration computes which `User` to point at.
 
 ## Arguments
 
@@ -317,10 +317,10 @@ Anonymous entities from in-project selectable declarations: the result of `User.
 Selectables from upstream:
 
 ```text
-Query.user       ->  Union([Entity(User), Null])
-User.id          ->  Entity(ID)
-User.name        ->  Entity(String)
-User.friends     ->  List(Entity(User))
+Query.user       ->  Union([Inner(User), Null])
+User.id          ->  Inner(ID)
+User.name        ->  Inner(String)
+User.friends     ->  List(Inner(User))
 ```
 
 Selectables from in-project declarations:

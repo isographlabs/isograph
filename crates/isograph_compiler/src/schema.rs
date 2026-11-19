@@ -4,13 +4,12 @@ use common_lang_types::{
     DescriptionValue, Diagnostic, DiagnosticResult, EntityName, RelativePathToSourceFile,
     SelectableName,
 };
-use isograph_parser::{
-    IsoLiteralItem, ListTypeAnnotation, SelectableDeclaration, TypeAnnotation, UnionVariant,
-};
+use isograph_parser::{IsoLiteralItem, SelectableDeclaration};
 use pico_macros::memo;
 use prelude::Postfix;
 use span::Span;
 
+use crate::wrapper::{Wrapper, wrapper_of_type_annotation};
 use crate::{
     ClientId, CompilationProfile, IsographDb, NetworkProtocol, parsed_iso_literals_in_file,
     source_file_paths,
@@ -32,42 +31,58 @@ pub enum EntityOrigin<TEntityData> {
     Protocol(TEntityData),
 }
 
-/// A named pointer from an entity to an entity.
+/// A named pointer from an entity to a wrapper of an entity.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Selectable<TSelectableData> {
     pub name: SelectableName,
     pub parent_entity: EntityName,
     pub description: Option<DescriptionValue>,
     pub definition: DefinitionLocation,
-    pub origin: SelectableOrigin<TSelectableData>,
+    pub kind: SelectableKind<TSelectableData>,
 }
 
 /// Who defines a selectable, and what it points at.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum SelectableOrigin<TSelectableData> {
-    /// A `field` declaration in a source file.
-    Source(SourceSelectableOrigin),
-    Protocol(ProtocolSelectableOrigin<TSelectableData>),
+pub enum SelectableKind<TSelectableData> {
+    /// `field P.f` with no `to`: its value is what its resolver returns.
+    ClientField,
+    /// `field P.f to T`: its resolver returns a link to a `T`.
+    ClientPointer(ClientPointerTarget),
+    /// Defined by the network protocol.
+    Server(ServerSelectable<TSelectableData>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SourceSelectableOrigin {
-    /// `None` for a field declared without `to`.
-    pub target_entity: Option<EntityName>,
+pub enum ClientPointerTarget {
+    Parsed(Wrapper<EntityName>),
+    /// A `to` type with a list whose inner type did not parse (`to [!]`).
+    Unparsed,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ProtocolSelectableOrigin<TSelectableData> {
-    pub target_entity: EntityName,
+pub struct ServerSelectable<TSelectableData> {
+    pub target: Wrapper<EntityName>,
     pub data: TSelectableData,
 }
 
 impl<TSelectableData> Selectable<TSelectableData> {
-    /// The entity selections under a selection of this selectable select on.
+    /// The entity selections under a selection of this selectable select on: the first
+    /// inner entity of its target.
     pub fn target_entity(&self) -> Option<EntityName> {
-        match self.origin.reference() {
-            SelectableOrigin::Source(source) => source.target_entity,
-            SelectableOrigin::Protocol(protocol) => protocol.target_entity.wrap_some(),
+        match self.kind.reference() {
+            SelectableKind::ClientField => None,
+            SelectableKind::ClientPointer(target) => target.target_entity(),
+            SelectableKind::Server(server) => server.target.inner_values().next().copied(),
+        }
+    }
+}
+
+impl ClientPointerTarget {
+    /// The first inner entity of the `to` type.
+    pub fn target_entity(&self) -> Option<EntityName> {
+        match self {
+            ClientPointerTarget::Parsed(target) => target.inner_values().next().copied(),
+            ClientPointerTarget::Unparsed => None,
         }
     }
 }
@@ -85,21 +100,38 @@ pub struct SourceSelectableDefinition {
     pub name: SelectableName,
     pub parent_entity: EntityName,
     pub description: Option<DescriptionValue>,
-    /// `None` for a field declared without `to`.
-    pub target_entity: Option<EntityName>,
+    pub kind: SourceSelectableKind,
     pub definition: DefinitionLocation,
 }
 
+/// The kinds of selectable a `field` declaration defines.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SourceSelectableKind {
+    ClientField,
+    ClientPointer(ClientPointerTarget),
+}
+
 impl SourceSelectableDefinition {
+    /// The entity selections under a selection of this selectable select on.
+    pub fn target_entity(&self) -> Option<EntityName> {
+        match self.kind.reference() {
+            SourceSelectableKind::ClientField => None,
+            SourceSelectableKind::ClientPointer(target) => target.target_entity(),
+        }
+    }
+
     fn selectable<TSelectableData>(&self) -> Selectable<TSelectableData> {
         Selectable {
             name: self.name,
             parent_entity: self.parent_entity,
             description: self.description,
             definition: self.definition,
-            origin: SelectableOrigin::Source(SourceSelectableOrigin {
-                target_entity: self.target_entity,
-            }),
+            kind: match self.kind.reference() {
+                SourceSelectableKind::ClientField => SelectableKind::ClientField,
+                SourceSelectableKind::ClientPointer(target) => {
+                    SelectableKind::ClientPointer(target.clone())
+                }
+            },
         }
     }
 }
@@ -287,36 +319,16 @@ fn selectable_of_declaration(
         description: declaration
             .description
             .map(|description| description.item.0),
-        target_entity: declaration
-            .target_type
-            .as_ref()
-            .and_then(|target_type| named_entity_of_type_annotation(target_type.item.reference())),
+        kind: match declaration.target_type.as_ref() {
+            None => SourceSelectableKind::ClientField,
+            Some(target_type) => SourceSelectableKind::ClientPointer(
+                wrapper_of_type_annotation(target_type.item.reference())
+                    .map_or(ClientPointerTarget::Unparsed, ClientPointerTarget::Parsed),
+            ),
+        },
         definition: DefinitionLocation {
             path,
             span: declaration.name.location.with_offset(literal_start),
         },
     }
-}
-
-/// The entity a type annotation names, under its list and nullability wrappers. `None` for
-/// a list whose inner type did not parse (`[!]`), which names no entity.
-fn named_entity_of_type_annotation(type_annotation: &TypeAnnotation) -> Option<EntityName> {
-    match type_annotation {
-        TypeAnnotation::Named(named) => named.name.item.0.wrap_some(),
-        TypeAnnotation::List(list) => named_entity_of_list(list),
-        TypeAnnotation::Union(union) => {
-            union
-                .0
-                .iter()
-                .find_map(|variant| match variant.item.reference() {
-                    UnionVariant::Named(named) => named.name.item.0.wrap_some(),
-                    UnionVariant::List(list) => named_entity_of_list(list),
-                    UnionVariant::Null(_) => None,
-                })
-        }
-    }
-}
-
-fn named_entity_of_list(list: &ListTypeAnnotation) -> Option<EntityName> {
-    named_entity_of_type_annotation(list.inner.as_ref()?.item.reference())
 }

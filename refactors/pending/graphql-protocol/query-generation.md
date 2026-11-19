@@ -330,7 +330,7 @@ pub fn source_field_declaration<TProfile: CompilationProfile>(
 ) -> Result<SourceFieldDeclaration<'_>, SelectionMapError>;
 ```
 
-It calls `selectable_named(db, client, entity, selectable)`; `Err` is `Lookup`, `SelectableOrigin::Protocol` is `NotASourceField`. The selectable's `definition` is a path and the file span of the declaration's name. The function reads `parsed_iso_literals_in_file(db, client, path)` and takes the literal whose span contains that span, then its item, which is a `SelectableDeclaration`. A literal that no longer contains it is `DefinitionMoved`: an invariant between two memo results of one revision, which cannot fail while both are current; `LSPRuntimeError::UnexpectedError` is not available in a memo, so it is an error variant here.
+It calls `selectable_named(db, client, entity, selectable)`; `Err` is `Lookup`, `SelectableKind::Server` is `NotASourceField`. The selectable's `definition` is a path and the file span of the declaration's name. The function reads `parsed_iso_literals_in_file(db, client, path)` and takes the literal whose span contains that span, then its item, which is a `SelectableDeclaration`. A literal that no longer contains it is `DefinitionMoved`: an invariant between two memo results of one revision, which cannot fail while both are current; `LSPRuntimeError::UnexpectedError` is not available in a memo, so it is an error variant here.
 
 ```rust
 // from crates/isograph_compiler/src/merged_selection.rs
@@ -365,9 +365,9 @@ fn selection_contribution<TProfile: CompilationProfile>(
 
 - Looks up `selectable_named(db, client, parent, selection.name)`; `Err` is `Lookup`.
 - Converts `selection.arguments` to `MergedArguments` against `context.variables`: a variable not declared is `UndefinedVariable`, a repeated argument `DuplicateArgument`, a repeated object key `DuplicateObjectKey`, a list `ListArgument`, a slot with no item `UnparsedArgument`.
-- `SelectableOrigin::Protocol`: looks up `entity_named(db, client, target_entity)`. `Err` is `Lookup`; `EntityOrigin::Source` is `TargetIsSourceEntity`. The nested selection set, when present, is `merge_selection_set` on the target. The result is a map of one entry.
-- `SelectableOrigin::Source`, with a directive named `loadable` on the selection: the empty map.
-- `SelectableOrigin::Source` otherwise: `field_selection_map(db, client, parent, selection.name)`, then `substitute` with the context built from the converted arguments and that map's `variables`. An argument the field does not declare is `UnknownFieldArgument`. The selection's own nested selection set is not read.
+- `SelectableKind::Server`: looks up `entity_named(db, client, target_entity())`. `Err` is `Lookup`; `EntityOrigin::Source` is `TargetIsSourceEntity`. The nested selection set, when present, is `merge_selection_set` on the target. The result is a map of one entry.
+- `SelectableKind::ClientField` or `ClientPointer`, with a directive named `loadable` on the selection: the empty map.
+- `SelectableKind::ClientField` or `ClientPointer` otherwise: `field_selection_map(db, client, parent, selection.name)`, then `substitute` with the context built from the converted arguments and that map's `variables`. An argument the field does not declare is `UnknownFieldArgument`. The selection's own nested selection set is not read.
 
 The recursion through `field_selection_map` is a memo call, so pico records the dependency on the inlined field.
 
@@ -778,7 +778,7 @@ entrypoints.md, Prefactor. Independent of every other change.
 
 Status: landed with integration.md change 2. `NetworkProtocol` gained `EntityData` and `SelectableData` here and `LookupError` in change 3; `FetchPlan`, `NotFetchable`, and `QueryError` land with changes 4, 5, and 7, which read them.
 
-`NetworkProtocol`'s six associated types; `Entity<TEntityData>`, `EntityOrigin`, `Selectable<TSelectableData>`, `SelectableOrigin`, `SourceSelectableOrigin`, `ProtocolSelectableOrigin`, `Selectable::target_entity()`, the `Profile*` aliases; `SourceSelectableDefinition`; readers of `target_entity` switched to the method; the test protocol's types. Lookups still read source files only; every entity is `EntityOrigin::Source`. Depends on source-backed-lookups.md. Tests: the existing lookup, hover, and validation tests pass unchanged in their facts.
+`NetworkProtocol`'s six associated types; `Entity<TEntityData>`, `EntityOrigin`, `Selectable<TSelectableData>`, `SelectableKind`, `ClientPointerTarget`, `ServerSelectable`, `Selectable::target_entity()`, artifact-set-and-types.md change 1's `Wrapper`, the `Profile*` aliases; `SourceSelectableDefinition`; readers of `target_entity` switched to the method; the test protocol's types. Lookups still read source files only; every entity is `EntityOrigin::Source`. Depends on source-backed-lookups.md. Tests: the existing lookup, hover, and validation tests pass unchanged in their facts.
 
 ### 3. Protocol lookups in the core (isograph_compiler, graphql_network_protocol)
 

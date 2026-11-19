@@ -104,8 +104,8 @@ mod tests {
     use common_lang_types::{EntityName, RelativePathToSourceFile};
     use intern::string_key::Intern;
     use isograph_compiler::{
-        DefinitionLocation, Entity, EntityOrigin, Selectable, SelectableOrigin,
-        SourceSelectableOrigin,
+        ClientPointerTarget, DefinitionLocation, Entity, EntityOrigin, Selectable, SelectableKind,
+        Wrapper,
     };
     use prelude::Postfix;
     use span::Span;
@@ -133,9 +133,9 @@ mod tests {
             parent_entity: "Pet".intern().to(),
             description: None,
             definition: selectable_definition,
-            origin: SelectableOrigin::Source(SourceSelectableOrigin {
-                target_entity: "User".intern().to::<EntityName>().wrap_some(),
-            }),
+            kind: SelectableKind::ClientPointer(ClientPointerTarget::Parsed(Wrapper::Inner(
+                "User".intern().to::<EntityName>(),
+            ))),
         });
         assert_eq!(entity.definition(), entity_definition);
         assert_eq!(selectable.definition(), selectable_definition);

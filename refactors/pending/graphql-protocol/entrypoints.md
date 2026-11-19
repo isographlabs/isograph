@@ -122,7 +122,7 @@ pub struct ProtocolEntity<TEntityData> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ProtocolSelectable<TSelectableData> {
     pub description: Option<DescriptionValue>,
-    pub target_entity: EntityName,
+    pub target: Wrapper<EntityName>,
     pub definition: DefinitionLocation,
     pub data: TSelectableData,
 }
@@ -143,42 +143,48 @@ pub enum EntityOrigin<TEntityData> {
     Protocol(TEntityData),
 }
 
-/// A named pointer from an entity to an entity.
+/// A named pointer from an entity to a wrapper of an entity.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Selectable<TSelectableData> {
     pub name: SelectableName,
     pub parent_entity: EntityName,
     pub description: Option<DescriptionValue>,
     pub definition: DefinitionLocation,
-    pub origin: SelectableOrigin<TSelectableData>,
+    pub kind: SelectableKind<TSelectableData>,
 }
 
 /// Who defines a selectable, and what it points at.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum SelectableOrigin<TSelectableData> {
-    /// A `field` declaration in a source file.
-    Source(SourceSelectableOrigin),
-    Protocol(ProtocolSelectableOrigin<TSelectableData>),
+pub enum SelectableKind<TSelectableData> {
+    /// `field P.f` with no `to`: its value is what its resolver returns.
+    ClientField,
+    /// `field P.f to T`: its resolver returns a link to a `T`.
+    ClientPointer(ClientPointerTarget),
+    /// Defined by the network protocol.
+    Server(ServerSelectable<TSelectableData>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SourceSelectableOrigin {
-    /// `None` for a field declared without `to`.
-    pub target_entity: Option<EntityName>,
+pub enum ClientPointerTarget {
+    Parsed(Wrapper<EntityName>),
+    /// A `to` type with a list whose inner type did not parse (`to [!]`).
+    Unparsed,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ProtocolSelectableOrigin<TSelectableData> {
-    pub target_entity: EntityName,
+pub struct ServerSelectable<TSelectableData> {
+    pub target: Wrapper<EntityName>,
     pub data: TSelectableData,
 }
 
 impl<TSelectableData> Selectable<TSelectableData> {
-    /// The entity selections under a selection of this selectable select on.
+    /// The entity selections under a selection of this selectable select on: the first
+    /// inner entity of its target.
     pub fn target_entity(&self) -> Option<EntityName> {
-        match self.origin.reference() {
-            SelectableOrigin::Source(source) => source.target_entity,
-            SelectableOrigin::Protocol(protocol) => protocol.target_entity.wrap_some(),
+        match self.kind.reference() {
+            SelectableKind::ClientField => None,
+            SelectableKind::ClientPointer(target) => target.target_entity(),
+            SelectableKind::Server(server) => server.target.inner_values().next().copied(),
         }
     }
 }
@@ -210,7 +216,7 @@ pub struct Selectable {
 }
 ```
 
-The structs are generic over the data type, not over the protocol, so `#[derive(Clone, PartialEq, Eq, Debug)]` applies with the bounds the associated types already have. The `target_entity` field moves into the origin: a protocol selectable always has a target, a source one may not. Readers of `selectable.target_entity` (`selectable_target`, hover, `validate_selection`) call `selectable.target_entity()`. `entity_named` returns `DiagnosticResult<ProfileEntity<TProfile>>`; `selectable_named` returns `DiagnosticResult<ProfileSelectable<TProfile>>`.
+The structs are generic over the data type, not over the protocol, so `#[derive(Clone, PartialEq, Eq, Debug)]` applies with the bounds the associated types already have. `Wrapper` is artifact-set-and-types.md's (Schema model, Wrapper). The target moves into the kind: a server selectable always has a target, a client field has none, and a client pointer's `to` type may not have parsed. Readers of `selectable.target_entity` (`selectable_target`, hover, `validate_selection`) call `selectable.target_entity()`. `entity_named` returns `DiagnosticResult<ProfileEntity<TProfile>>`; `selectable_named` returns `DiagnosticResult<ProfileSelectable<TProfile>>`.
 
 `entity_named` matches on the source definitions chained with the protocol's definition (source-backed-lookups.md, Later):
 
@@ -249,7 +255,7 @@ pub fn entity_named<TProfile: CompilationProfile>(
 }
 ```
 
-`selectable_named` is the same shape over `source_selectable_definitions` and `TProfile::NetworkProtocol::selectable`, building `SelectableOrigin::Source(SourceSelectableOrigin { target_entity })` from the source definition and `SelectableOrigin::Protocol(ProtocolSelectableOrigin { target_entity, data })` from the protocol's. `source_selectable_definitions` keeps returning the source-only list; its element type becomes `SourceSelectableDefinition { name, parent_entity, description, target_entity: Option<EntityName>, definition }`, the old `Selectable` fields under a name that says what it is.
+`selectable_named` is the same shape over `source_selectable_definitions` and `TProfile::NetworkProtocol::selectable`, building `SelectableKind::ClientField` or `SelectableKind::ClientPointer(target)` from the source definition and `SelectableKind::Server(ServerSelectable { target, data })` from the protocol's. `source_selectable_definitions` keeps returning the source-only list; its element type becomes `SourceSelectableDefinition { name, parent_entity, description, kind: SourceSelectableKind, definition }`, where `SourceSelectableKind` is `ClientField` or `ClientPointer(ClientPointerTarget)`, the kinds a `field` declaration can define.
 
 The test protocol (`crates/isograph_compiler/src/test_profile.rs`) defines nothing: every associated type is `()` except `NotFetchable`, `QueryError`, and `LookupError`, which are a unit struct `TestProtocolError` with `#[error("test protocol")]`; `entity` and `selectable` return `Ok(None)`; `fetch_plan` and `query_artifact` return `Err(TestProtocolError)`.
 
@@ -321,7 +327,7 @@ pub enum GraphQLSelectableData {
 }
 ```
 
-Field arguments are not here. The printer prints the arguments the selection passed; checking them against the definition is a later validation pass, and the fetch plan reads the root field's definition through its own lookup. A refinement's concrete type is the selectable's `target_entity`.
+Field arguments are not here. The printer prints the arguments the selection passed; checking them against the definition is a later validation pass, and the fetch plan reads the root field's definition through its own lookup. A refinement's concrete type is the selectable's `target_entity()`.
 
 ```rust
 // from crates/graphql_network_protocol/src/protocol_data.rs
@@ -336,7 +342,7 @@ pub fn graphql_selectable<TProfile: CompilationProfile>(
 ) -> Result<Option<ProtocolSelectable<GraphQLSelectableData>>, GraphQLSelectableLookupError>
 ```
 
-A field is `graphql_network_protocol::selectable_named`'s result: `target_entity` is the type annotation's named type, `definition` is the field's path and name span, `description` the field's. A refinement is the decision of the integration step: `asX` on union `U` when `U`'s member types include `X`, on interface `I` when `X` is an object whose `interfaces` include `I`; no interface-on-interface refinements. Its `definition` is the target type's definition: `X`'s definition name, so go-to-definition on `asUser` jumps to `type User`. `GraphQLSelectableLookupError` is `SelectableLookupError` plus `RefinementTarget` (the target's own lookup failed) and `RefinementCollision` (a field named `asX` collides with a refinement), as integration.md specifies.
+A field is `graphql_network_protocol::selectable_named`'s result: `target` is the type annotation as a wrapper by mental-model.md's table (`Foo!` is `Inner(Foo)`, `Foo` is `Union([Inner(Foo), Null])`), `definition` is the field's path and name span, `description` the field's. A refinement is the decision of the integration step: `asX` on union `U` when `U`'s member types include `X`, on interface `I` when `X` is an object whose `interfaces` include `I`; no interface-on-interface refinements. Its `target` is `Union([Inner(X), Null])`, nullable as upstream's refinements are, and its `definition` is the target type's definition: `X`'s definition name, so go-to-definition on `asUser` jumps to `type User`. `GraphQLSelectableLookupError` is `SelectableLookupError` plus `RefinementTarget` (the target's own lookup failed) and `RefinementCollision` (a field named `asX` collides with a refinement), as integration.md specifies.
 
 `GraphQLNetworkProtocol::entity` and `::selectable` clone these memos' results; `LookupError` is an enum of `EntityLookupError` and `GraphQLSelectableLookupError` with `derive_more::From`.
 
@@ -421,7 +427,7 @@ A schema definition or extension whose keyword parsed and whose body then failed
 An entrypoint `entrypoint E.f` is allowed when:
 
 1. `E` is defined by the protocol (`EntityOrigin::Protocol`). An `entity` declaration in a source file has nothing to fetch from.
-2. `E.f` is a `field` declaration (`SelectableOrigin::Source`). A schema field has no selection set to read.
+2. `E.f` is a `field` declaration (`SelectableKind::ClientField` or `ClientPointer`). A schema field has no selection set to read.
 3. The protocol's `fetch_plan(E)` is `Ok`.
 
 Rules 1 and 2 are the core's; rule 3 is the protocol's. For GraphQL, `fetch_plan(E)` is `Ok` when `E` is an object or interface and one of these holds, checked in this order, the first that applies deciding:
@@ -693,7 +699,7 @@ pub fn entrypoint_fetch_plan<TProfile: CompilationProfile>(
     if let EntityOrigin::Source = entity.origin {
         return EntrypointNotFetchableError::SourceEntity(entity.name).wrap_err();
     }
-    if let SelectableOrigin::Protocol(_) = selectable.origin {
+    if let SelectableKind::Server(_) = selectable.kind {
         return EntrypointNotFetchableError::ProtocolSelectable(SelectableKey {
             entity: selectable.parent_entity,
             selectable: selectable.name,

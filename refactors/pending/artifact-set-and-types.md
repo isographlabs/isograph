@@ -302,24 +302,22 @@ pub enum ScalarKind {
 
 `ScalarValueKind` lives in `common_lang_types` because both `isograph_config` (the config's map values) and `isograph_compiler` name it, and neither depends on the other. `common_lang_types` enables serde's `derive` feature for it.
 
-The GraphQL protocol maps a type definition to an entity kind:
+The GraphQL protocol maps its entity data to an entity kind (Schema model, Entity). `GraphQLEntityData::Leaf` splits into `Scalar` and `Enum` with this change, the first reader of the difference:
 
 ```rust
-// from crates/graphql_network_protocol/src/entity_kind.rs
-/// The kind of the entity `definition` defines. `concrete_types` are the object types that
-/// implement `definition` when it is an interface, or its members when it is a union.
-pub fn entity_kind(definition: &TypeDefinition, concrete_types: Vec<EntityName>) -> EntityKind {
-    match definition {
-        TypeDefinition::Scalar(scalar) => EntityKind::Scalar(scalar_kind(scalar.name.item.0)),
-        TypeDefinition::Enum(_) => EntityKind::Scalar(ScalarKind::Known(ScalarValueKind::String)),
-        TypeDefinition::Object(_) | TypeDefinition::InputObject(_) => {
-            EntityKind::Object(ObjectEntityKind::Concrete)
-        }
-        TypeDefinition::Interface(_) | TypeDefinition::Union(_) => {
-            EntityKind::Object(ObjectEntityKind::Abstract(concrete_types))
+// from crates/graphql_network_protocol/src/lib.rs, in impl NetworkProtocol for GraphQLNetworkProtocol
+    fn entity_kind(data: &GraphQLEntityData) -> EntityKind {
+        match data {
+            GraphQLEntityData::Scalar(name) => EntityKind::Scalar(scalar_kind(name.dereference())),
+            GraphQLEntityData::Enum => {
+                EntityKind::Scalar(ScalarKind::Known(ScalarValueKind::String))
+            }
+            GraphQLEntityData::InputObject
+            | GraphQLEntityData::Object(_)
+            | GraphQLEntityData::Interface(_)
+            | GraphQLEntityData::Union => EntityKind::Object,
         }
     }
-}
 
 /// GraphQL's built-in scalars (spec 3.5) by name; every other scalar is custom.
 fn scalar_kind(name: EntityName) -> ScalarKind {
@@ -436,7 +434,7 @@ pub enum Nullability {
 }
 ```
 
-`try_map` takes `&mut impl FnMut` so it can recurse without boxing the closure. `inner_values` is a boxed iterator over the recursive structure (`Box<dyn Iterator<Item = &T> + '_>` behind the `impl`).
+`Wrapper`, `UnionWrapper`, `WrapperVariant`, `inner_values`, and `wrapper_of_type_annotation` landed with integration.md change 2; `try_map`, `nullability`, and `Nullability` land with change 2 here, the type walk, their first reader. `try_map` takes `&mut impl FnMut` so it can recurse without boxing the closure. `inner_values` is a boxed iterator over the recursive structure (`Box<dyn Iterator<Item = &T> + '_>` behind the `impl`).
 
 The iso type annotation converts structurally. A list whose inner type did not parse (`[!]`) has no wrapper:
 
@@ -487,33 +485,29 @@ pub struct Selectable {
 }
 ```
 
-After:
+After (landed with integration.md change 2):
 
 ```rust
 // from crates/isograph_compiler/src/schema.rs
 /// A named pointer from an entity to a wrapper of an entity.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Selectable {
+pub struct Selectable<TSelectableData> {
     pub name: SelectableName,
     pub parent_entity: EntityName,
     pub description: Option<DescriptionValue>,
-    pub kind: SelectableKind,
     pub definition: DefinitionLocation,
+    pub kind: SelectableKind<TSelectableData>,
 }
 
+/// Who defines a selectable, and what it points at.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum SelectableKind {
+pub enum SelectableKind<TSelectableData> {
     /// `field P.f` with no `to`: its value is what its resolver returns.
-    ClientField(ClientFieldKind),
+    ClientField,
     /// `field P.f to T`: its resolver returns a link to a `T`.
     ClientPointer(ClientPointerTarget),
-}
-
-/// Whether a client field's declaration has `@component`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ClientFieldKind {
-    Component,
-    Plain,
+    /// Defined by the network protocol.
+    Server(ServerSelectable<TSelectableData>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -522,77 +516,79 @@ pub enum ClientPointerTarget {
     /// A `to` type with a list whose inner type did not parse (`to [!]`).
     Unparsed,
 }
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ServerSelectable<TSelectableData> {
+    pub target: Wrapper<EntityName>,
+    pub data: TSelectableData,
+}
 ```
 
-`selectable_of_declaration` sets `kind`: `target_type` `None` is `ClientField`, with `Component` when `directive_set` has a directive named `component`; `Some(annotation)` is `ClientPointer`, `Parsed` when `wrapper_of_type_annotation` returns a wrapper. `named_entity_of_type_annotation` and `named_entity_of_list` are deleted.
+`selectable_of_declaration` sets the kind: `target_type` `None` is `ClientField`; `Some(annotation)` is `ClientPointer`, `Parsed` when `wrapper_of_type_annotation` returns a wrapper. `named_entity_of_type_annotation` and `named_entity_of_list` are deleted. `Selectable::target_entity()` is the first `inner_values()` of a `Parsed` or `Server` target and `None` otherwise; `selectable_target`, the hover text that prints `: **Pet**`, and validation read it. A union of two entities in a `to` clause selects on its first; rejecting it is validation.
 
-`selectable_target` (`crates/isograph_compiler/src/selectable_for_path.rs`) keeps its result: the first `inner_values()` of a `Parsed` target, and the no-target diagnostic for `ClientField` and `Unparsed`. The hover text that prints `: **Pet**` reads the same first inner entity. A union of two entities in a `to` clause selects on its first; rejecting it is validation.
-
-The schema integration adds the third variant, which this doc's type walk reads:
+`ClientField` becomes `ClientField(ClientFieldKind)` with change 2, whose type walk is the first reader of plain versus `@component`:
 
 ```rust
 // from crates/isograph_compiler/src/schema.rs
-    /// Defined by the network protocol: a server field, or an input object's field.
-    Server(Wrapper<EntityName>),
+/// Whether a client field's declaration has `@component`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ClientFieldKind {
+    Component,
+    Plain,
+}
 ```
+
+`ServerSelectable.data` is the protocol's `SelectableData` (query-generation.md); type generation reads only `target`. Server selectables are fields of objects and interfaces and refinements; input object fields become server selectables with change 2's input-object parameter types (open decision 6), their first reader.
 
 ### Entity
 
-The schema integration produces entities with a kind, which the walk reads:
+```rust
+// from crates/isograph_compiler/src/schema.rs
+/// A node of the schema graph.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Entity<TEntityData> {
+    pub name: EntityName,
+    pub definition: DefinitionLocation,
+    pub origin: EntityOrigin<TEntityData>,
+}
+
+/// Who defines an entity.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum EntityOrigin<TEntityData> {
+    /// `entity Owner` in a source file.
+    Source,
+    Protocol(TEntityData),
+}
+```
+
+This is the shape integration.md change 2 landed. The protocol's `EntityData` (`GraphQLEntityData`: `Leaf`, `InputObject`, `Object`, `Interface`, `Union`) is the one record of a protocol entity's kind. Change 2 adds the compiler's vocabulary as a function of that data, not a second stored field:
 
 ```rust
 // from crates/isograph_compiler/src/schema.rs
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum EntityKind {
     /// Selections under a selection of this entity select its selectables.
-    Object(ObjectEntityKind),
+    Object,
     /// Read whole. A selection of a selectable whose target is a scalar has no selection set.
     Scalar(ScalarKind),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ObjectEntityKind {
-    /// The entity is the type of the records it names (`type Pet`, `input SetPetTaglineParams`,
-    /// `entity Owner`).
-    Concrete,
-    /// An interface or union: a record has one of these concrete types.
-    Abstract(Vec<EntityName>),
-}
-```
+// from crates/isograph_compiler/src/host_language.rs, on NetworkProtocol
+    /// The compiler's kind of an entity the protocol defines.
+    fn entity_kind(data: &Self::EntityData) -> EntityKind;
 
-`Entity` gains `pub kind: EntityKind`. A source `entity Owner` is `Object(Concrete)`. The mental model still has one kind of entity: `EntityKind` is a fact about an entity's values (read whole, or read through selectables), which every entity has, not a second entity type.
-
-### Protocol data on entities and selectables
-
-The final shape carries the protocol's own data on what the protocol defines:
-
-```rust
-// from crates/isograph_compiler/src/host_language.rs
-pub trait NetworkProtocol: 'static {
-    /// What the protocol records about an entity it defines, beyond the compiler's fields.
-    type EntityData: Clone + Debug + PartialEq + Eq + 'static;
-    /// What the protocol records about a selectable it defines.
-    type SelectableData: Clone + Debug + PartialEq + Eq + 'static;
-
-    fn should_include_schema_file(relative_path: &Path) -> IncludeFile;
-}
-```
-
-```rust
 // from crates/isograph_compiler/src/schema.rs
-pub enum EntityDefinition<TEntityData> {
-    /// `entity Owner` in an iso literal.
-    Source(DefinitionLocation),
-    Protocol(ProtocolDefinition<TEntityData>),
-}
-
-pub struct ProtocolDefinition<TData> {
-    pub location: DefinitionLocation,
-    pub data: TData,
+impl<TEntityData> Entity<TEntityData> {
+    pub fn kind<TProtocol: NetworkProtocol<EntityData = TEntityData>>(&self) -> EntityKind {
+        match self.origin.reference() {
+            EntityOrigin::Source => EntityKind::Object,
+            EntityOrigin::Protocol(data) => TProtocol::entity_kind(data),
+        }
+    }
 }
 ```
 
-`Entity<TEntityData>` holds `definition: EntityDefinition<TEntityData>`. `SelectableKind::Server(Wrapper<EntityName>)` becomes `Server(ServerSelectable<TSelectableData>)`, with `ServerSelectable { target: Wrapper<EntityName>, protocol: ProtocolDefinition<TSelectableData> }`; the walk below reads `target`. The data's first reader is GraphQL query generation (an entity's root operation kind, upstream's `GraphQLNetworkProtocolEntityAssociatedData { fetchable }`), so these slots land with the schema integration and that reader, not in this doc. Type generation reads only `Entity.kind` and `Selectable.kind`, which are compiler vocabulary: the TypeScript generator never sees protocol data.
+A source `entity Owner` is `Object`. The GraphQL protocol's `entity_kind` maps `Leaf` to `Scalar(scalar_kind(name))` for a scalar and `Scalar(Known(String))` for an enum (so `Leaf` carries which of the two it is when this lands, or `scalar_kind` reads the name and an enum name is never a built-in scalar's), and `InputObject`, `Object`, `Interface`, and `Union` to `Object`. An entity never stores its concrete types: an interface's implementors depend on every schema file, and storing them would make `entity_named(Node)` fail when any implementing type is broken. `link_types` reads the concrete types of an abstract target through the protocol memo `object_types_implementing` (interfaces) and the union's members, behind a `NetworkProtocol` method this change adds. `ScalarKind`, `EntityKind`, and `entity_kind` land with change 2, their first reader.
 
 ## The type layer
 
@@ -762,7 +758,7 @@ fn selection_field<TProfile: CompilationProfile>(
    - `ClientField(_)`: a selection set is `SelectionSetOnClientField`. The type is `Inner(ClientFieldOutput(P.f))`. It selects `P.f` with the selection's loadability.
    - `ClientPointer(Parsed(target))`: no selection set is `MissingSelectionSet`. The type is `target.try_map` over each inner entity: `object_type` of the selection set on that entity, wrapped as `Object`. It selects the pointer with the selection's loadability, followed by what each nested `object_type` selects, in inner-entity order.
    - `ClientPointer(Unparsed)`: `IncompleteParse`.
-   - `Server(target)`: `target.try_map` over each inner entity: `entity_named` of it (`Err` is `Lookup`); `Scalar(kind)` with a selection set is `SelectionSetOnScalar`, without one is `Scalar(kind)`; `Object(_)` without a selection set is `MissingSelectionSet`, with one is `Object` of the nested `object_type`. It selects what the nested sets select.
+   - `Server(server)`: `server.target.try_map` over each inner entity: `entity_named` of it (`Err` is `Lookup`); `Scalar(kind)` with a selection set is `SelectionSetOnScalar`, without one is `Scalar(kind)`; `Object(_)` without a selection set is `MissingSelectionSet`, with one is `Object` of the nested `object_type`. It selects what the nested sets select.
 
 Loadability is `Loadable` when the selection's `directive_set` has a directive named `loadable`, else `Eager`. A client field selected with `@loadable` has the same `ClientFieldOutput` type as an eager one; see open decision 2.
 
@@ -842,7 +838,7 @@ pub fn project_artifacts<TProfile: CompilationProfile>(
 - Output types `O`: `E`, plus every field in any field's `selected` list (upstream's `encountered_output_types`, which also visits fields not reachable from an entrypoint).
 - `output_type` is `Generated` for `O`, `resolver_reader` for `R`, `loadable_artifacts` for `L`.
 - `kind`: `selectable_named` of the field's own name; `ClientField(kind)` is `ClientField(kind)`, `ClientPointer(Parsed(target))` is `Pointer(target)`, `Unparsed` is `IncompleteParse`.
-- `link_types`: for each distinct inner entity of every pointer's target, `entity_named`; `Object(Concrete)` gives `[entity]`, `Object(Abstract(types))` gives `types`; `Scalar(_)` is `Lookup` with a diagnostic that a pointer points to a scalar.
+- `link_types`: for each distinct inner entity of every pointer's target, `entity_named` and its `kind`; `Object` gives the protocol's concrete types of the entity (`[entity]` for a source entity and an object type, the implementors or members of an interface or union, through a `NetworkProtocol` method over `object_types_implementing` and the union's members); `Scalar(_)` is `Lookup` with a diagnostic that a pointer points to a scalar.
 
 ## The host language
 
@@ -1137,7 +1133,7 @@ The other resolvers' bodies are unchanged. `demos/pet-demo/src/__isograph/` is r
 ## Dependencies
 
 - `refactors/pending/artifact-generation.md` (v0), every change. This doc edits its types (`HostLanguage::generate_artifacts`, `ArtifactFile`, `emit`, `IsographState.artifact_folder`, the entrypoint artifact).
-- The schema integration: `refactors/pending/graphql-schema-parser/integration.md` (protocol lookups) and the merge of protocol definitions into `entity_named` and `selectable_named` (`refactors/past/source-backed-lookups.md`, Later: the protocol's entities). This doc needs from it: `SelectableKind::Server(Wrapper<EntityName>)` on every GraphQL field and input field, with the field's description; `Entity.kind` from `entity_kind` above, with an interface's implementors and a union's members as its concrete types; input objects' fields from `selectables_for_entity`. Change 2 and later need it; change 1 does not.
+- The schema integration: `refactors/pending/graphql-schema-parser/integration.md` (protocol lookups) and the merge of protocol definitions into `entity_named` and `selectable_named` (`refactors/past/source-backed-lookups.md`, Later: the protocol's entities). This doc needs from it: `SelectableKind::Server(ServerSelectable { target, data })` on every GraphQL field, with the field's description (landed); `NetworkProtocol::entity_kind` over the protocol's entity data, and a protocol method for the concrete types of an abstract entity (change 2 here adds both); input objects' fields as server selectables (change 2 here adds them, with open decision 6). Change 2 and later need it.
 - Query generation (the GraphQL protocol plan): `query_text.ts`, `raw_response_type.ts`, and the refetch artifacts. Upstream's raw response type (`crates/artifact_content/src/raw_response_type.rs`) is printed from the merged selection set with a nullable field's key optional (`name?:`) and no `readonly`; that plan computes the merged set, and the TypeScript host prints it with `wrapped_type`. Nothing in this doc waits on it.
 
 ## Changes
@@ -1146,17 +1142,17 @@ Each change is one commit.
 
 ### 1. `Wrapper` and `SelectableKind`
 
-`crates/isograph_compiler/src/wrapper.rs` (`Wrapper`, `UnionWrapper`, `WrapperVariant`, `Nullability`, `try_map`, `inner_values`, `nullability`, `wrapper_of_type_annotation`), `Selectable.kind`, `SelectableKind` without `Server`, `ClientFieldKind`, `ClientPointerTarget`, `selectable_of_declaration`, `selectable_target`, the hover text's target. Independent of v0 and of the schema integration.
+Status: landed with integration.md change 2: `crates/isograph_compiler/src/wrapper.rs` (`Wrapper`, `UnionWrapper`, `WrapperVariant`, `inner_values`, `wrapper_of_type_annotation`), `Selectable.kind`, `SelectableKind` with `Server`, `ClientPointerTarget`, `ServerSelectable`, `selectable_of_declaration`, `selectable_target`, the hover text's target. `ClientFieldKind`, `Nullability`, `try_map`, and `nullability` move to change 2, their first reader.
 
-Tests (`crates/isograph_compiler`): `to Pet` is `Union([Inner(Pet), Null])`; `to Pet!` is `Inner(Pet)`; `to [Pet!]!` is `List(Inner(Pet))`; `to [Pet]` is `Union([List(Union([Inner(Pet), Null])), Null])`; `to [!]` is `Unparsed`; no `to` with `@component` is `ClientField(Component)`, with no directive `ClientField(Plain)`, with `@loadable` `ClientField(Plain)`. `nullability` of `to Pet` is `Nullable` and of `to [Pet]!` is `NonNull`. `try_map` of `[Pet]` with a function that fails returns that error; `inner_values` of `Union([Inner(A), List(Inner(B)), Null])` is `[A, B]`. The existing hover and `selectable_target` tests keep their expectations.
+Tests (`crates/isograph_compiler`, landed): `to Pet` is `Union([Inner(Pet), Null])`; `to Pet!` is `Inner(Pet)`; `to [Pet!]!` is `List(Inner(Pet))`; `to [Pet]` is `Union([List(Union([Inner(Pet), Null])), Null])`; `to [!]` is `None`; `inner_values` of `Union([Inner(A), List(Inner(B)), Null])` is `[A, B]`. The existing hover and `selectable_target` tests keep their expectations. Change 2 adds: no `to` with `@component` is `ClientField(Component)`, with no directive `ClientField(Plain)`, with `@loadable` `ClientField(Plain)`; `nullability` of `to Pet` is `Nullable` and of `to [Pet]!` is `NonNull`; `try_map` of `[Pet]` with a function that fails returns that error.
 
 ### 2. Entity kinds and the type walk
 
-After the schema integration. `ScalarValueKind` (`common_lang_types`), `ScalarKind`, `EntityKind`, `ObjectEntityKind`, `Entity.kind` (source entities `Object(Concrete)`), `entity_kind` and `scalar_kind` in `graphql_network_protocol` called where the integration builds protocol entities, `artifact_types.rs` (every type above through `GenerationError`), `field_declaration`, `field_types`, `SourceIsoLiteralItem.context`.
+After the schema integration. `ScalarValueKind` (`common_lang_types`), `ScalarKind`, `EntityKind`, `Entity::kind` (source entities `Object`), `NetworkProtocol::entity_kind` and the concrete-types method, `GraphQLEntityData::Leaf` split into `Scalar` and `Enum`, `scalar_kind` in `graphql_network_protocol`, `ClientFieldKind`, `Nullability`, `try_map`, `nullability`, input object fields as server selectables, `artifact_types.rs` (every type above through `GenerationError`), `field_declaration`, `field_types`, `SourceIsoLiteralItem.context`.
 
 Tests (`crates/graphql_network_protocol`, `#[cfg(test)]`, a profile of `TypeScriptHostLanguage` and `GraphQLNetworkProtocol` with `isograph_extract_typescript` as a dev-dependency; facts about `FieldTypes` values):
 
-- `scalar_kind`: `String` and `ID` are `Known(String)`, `Int` and `Float` `Known(Number)`, `Boolean` `Known(Boolean)`, `Url` `Custom(Url)`. `entity_kind` of an enum is `Scalar(Known(String))`, of a union with members `A`, `B` is `Object(Abstract([A, B]))`.
+- `scalar_kind`: `String` and `ID` are `Known(String)`, `Int` and `Float` `Known(Number)`, `Boolean` `Known(Boolean)`, `Url` `Custom(Url)`. `entity_kind` of an enum is `Scalar(Known(String))`, of a union is `Object`; the concrete types of a union with members `A`, `B` are `[A, B]`.
 - `type Pet { firstName: String! nickname: String friends: [Pet!]! }` and `field Pet.f { firstName nickname friends { firstName } }`: `firstName` is `Inner(Scalar(Known(String)))`; `nickname` is `Union([Inner(Scalar(..)), Null])`; `friends` is `List(Inner(Object([firstName])))`.
 - An alias `n: nickname` has key `n`. A selection order `b a` keeps `[b, a]`. A described schema field carries its description; an undescribed one `None`.
 - `field Pet.g { f }` with `field Pet.f`: `f` is `Inner(ClientFieldOutput(Pet.f))` and `selected` is `[Pet.f Eager]`; `f @loadable` is `Loadable`. A client field nested under `friends { f }` is in `selected`.

@@ -480,11 +480,14 @@ mod tests {
             parent_entity: "Pet".intern().to(),
             description: description.map(|description| description.intern().to()),
             definition: definition(),
-            origin: isograph_compiler::SelectableOrigin::Source(
-                isograph_compiler::SourceSelectableOrigin {
-                    target_entity: target.map(|target| target.intern().to()),
-                },
-            ),
+            kind: match target {
+                Some(target) => isograph_compiler::SelectableKind::ClientPointer(
+                    isograph_compiler::ClientPointerTarget::Parsed(
+                        isograph_compiler::Wrapper::Inner(target.intern().to()),
+                    ),
+                ),
+                None => isograph_compiler::SelectableKind::ClientField,
+            },
         }
     }
 
