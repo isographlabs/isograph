@@ -105,10 +105,7 @@ pub enum ArtifactSource {
 /// An iso literal with at least one parse error: its file and its index among that file's
 /// literals.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
-#[error(
-    "The iso literal at index {index} in {} has a parse error, so no artifacts are written.",
-    .path.lookup()
-)]
+#[error("The iso literal at index {index} in {path} has a parse error, so no artifacts are written.")]
 pub struct LiteralParseFailed {
     pub path: RelativePathToSourceFile,
     pub index: usize,
