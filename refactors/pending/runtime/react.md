@@ -993,7 +993,7 @@ export type ExtractParameters<T> = T extends {
 export type StableIdForFragmentReference = string;
 
 export function stableIdForFragmentReference(
-  fragmentReference: FragmentReference<ResolverParam<EntityName>, unknown, EntityName>,
+  fragmentReference: FragmentReference<ResolverParam, unknown, EntityName>,
 ): StableIdForFragmentReference {
   return stableStringify([
     fragmentReference.root.entityName,
@@ -1016,7 +1016,7 @@ import type {
 import type { FragmentReference } from './FragmentReference';
 
 export type FragmentReferenceOfEntrypoint<
-  TEntrypoint extends IsographEntrypoint<ResolverParam<EntityName>, unknown, EntityName>,
+  TEntrypoint extends IsographEntrypoint<ResolverParam, unknown, EntityName>,
 > =
   TEntrypoint extends IsographEntrypoint<
     infer TReadFromStore extends ResolverParam<infer TEntityName extends EntityName>,
@@ -1028,19 +1028,19 @@ export type FragmentReferenceOfEntrypoint<
 
 export type ExtractReadFromStore<Type> =
   Type extends IsographEntrypoint<
-    infer X extends ResolverParam<EntityName>,
+    infer X extends ResolverParam,
     unknown,
     EntityName
   >
     ? X
     : never;
 export type ExtractClientFieldValue<Type> =
-  Type extends IsographEntrypoint<ResolverParam<EntityName>, infer X, EntityName>
+  Type extends IsographEntrypoint<ResolverParam, infer X, EntityName>
     ? X
     : never;
 ```
 
-Delta from `core/entrypoint.ts:95-100`, `:200-203`: three type parameters, and `unknown`, `EntityName`, or `ResolverParam<EntityName>` where upstream writes `any`. `FragmentReferenceOfEntrypoint` infers the three parameters in one conditional type: `FragmentReference<ExtractReadFromStore<T>, ExtractClientFieldValue<T>, ..>` fails `tsc` 5.6.3, because a conditional type is not known to satisfy `ResolverParam<TEntityName>`.
+Delta from `core/entrypoint.ts:95-100`, `:200-203`: three type parameters, and `unknown`, `EntityName`, or `ResolverParam` where upstream writes `any`. `FragmentReferenceOfEntrypoint` infers the three parameters in one conditional type: `FragmentReference<ExtractReadFromStore<T>, ExtractClientFieldValue<T>, ..>` fails `tsc` 5.6.3, because a conditional type is not known to satisfy `ResolverParam<TEntityName>`.
 
 ## Fetching with `useLazyReference`
 
@@ -1613,7 +1613,7 @@ Before (pico-runtime.md, Step A):
 ```ts
 // from libs/isograph-runtime/src/subscribe.ts
 export type Subscription = {
-  readonly artifact: ReaderArtifact<ResolverParam<EntityName>, unknown, EntityName>;
+  readonly artifact: ReaderArtifact<ResolverParam, unknown, EntityName>;
   readonly root: StoreLink;
   readonly variables: Variables;
   /** The data the callback last received the result of. */
@@ -1626,7 +1626,7 @@ export type Subscription = {
 export function subscribe<TOutput>(
   store: Store,
   subscriptions: Set<Subscription>,
-  artifact: ReaderArtifact<ResolverParam<EntityName>, TOutput, EntityName>,
+  artifact: ReaderArtifact<ResolverParam, TOutput, EntityName>,
   root: StoreLink,
   variables: Variables,
   callback: (result: ReadResult<TOutput>) => void,
@@ -1644,7 +1644,7 @@ After:
 ```ts
 // from libs/isograph-runtime/src/subscribe.ts
 export type Subscription = {
-  readonly artifact: ReaderArtifact<ResolverParam<EntityName>, unknown, EntityName>;
+  readonly artifact: ReaderArtifact<ResolverParam, unknown, EntityName>;
   readonly root: StoreLink;
   readonly variables: Variables;
   /** The read the callback last received, or the caller rendered with. */
@@ -1659,7 +1659,7 @@ export type Subscription = {
 export function subscribe(
   store: Store,
   subscriptions: Set<Subscription>,
-  artifact: ReaderArtifact<ResolverParam<EntityName>, unknown, EntityName>,
+  artifact: ReaderArtifact<ResolverParam, unknown, EntityName>,
   root: StoreLink,
   variables: Variables,
   delivered: ReadResult<SelectionSetData>,

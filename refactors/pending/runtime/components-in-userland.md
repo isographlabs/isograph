@@ -106,7 +106,7 @@ The rest of this doc asks how much of that userland can do without `@component` 
 
 ```ts
 // from libs/isograph-runtime/src/artifacts.ts
-export type ResolverParam<TEntityName extends EntityName> = {
+export type ResolverParam<TEntityName extends EntityName = EntityName> = {
   readonly data: SelectionSetData;
   readonly parameters: Variables;
   /** The record the resolver's reader AST was read at. */

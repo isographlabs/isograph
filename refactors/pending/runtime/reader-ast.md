@@ -19,6 +19,8 @@ Settled by the user, and assumed throughout:
 - Artifacts are typed (`const x: T = ...; export default x;`), importing their types from `@isograph/runtime`.
 - Every reader artifact carries its parent entity's name as a type parameter, `ReaderArtifact<TParam, TOutput, TEntityName extends EntityName>`, and a generated reader artifact sets it to the string literal of its parent entity (`"Pet"`, `"Query"`). A link is `Link<TEntityName>` (store.md, The store), and `E/__link/output_type.ts` is the link type of `E`. `read` takes the link and the artifact with one `TEntityName`, so a `Pet` link passed to a `Query` reader fails `tsc` (The parent entity's name).
 - A resolver receives its own record's link: `ResolverParam` has `link` next to `data` and `parameters`, and `read` passes the link it reads at. There is no `__link` selectable (A resolver's own link).
+- For a field on an abstract entity, `TEntityName` is the union of its concrete entities' names (`"BlogItem" | "Checkin" | "Pet"` for `Node`), because a store link always names the concrete entity (The parent entity's name).
+- `ResolverParam`'s type parameter defaults to `EntityName` (`ResolverParam<TEntityName extends EntityName = EntityName>`), as the landed `NormalizationAst<TEntityName extends EntityName = EntityName>` does.
 
 Upstream references are the checkout at `/Users/rbalicki/code/isograph` (commit `79e2a3c0`).
 
@@ -168,13 +170,13 @@ export type ReaderArtifact<
   /**
    * A method signature, so TypeScript compares its parameter bivariantly: an artifact
    * declared with one field's param type is also a
-   * `ReaderArtifact<ResolverParam<EntityName>, TOutput, EntityName>`.
+   * `ReaderArtifact<ResolverParam, TOutput, EntityName>`.
    */
   resolver(param: TParam): TOutput;
 };
 
 /** What `read` calls a resolver with. */
-export type ResolverParam<TEntityName extends EntityName> = {
+export type ResolverParam<TEntityName extends EntityName = EntityName> = {
   readonly data: SelectionSetData;
   readonly parameters: Variables;
   /** The record the resolver's reader AST was read at. */
@@ -224,7 +226,7 @@ export type ReaderResolverSelection = {
   readonly alias: string;
   /** The values the selection passes to the field's variables, in terms of the reader's own. */
   readonly arguments: Arguments | null;
-  readonly readerArtifact: ReaderArtifact<ResolverParam<EntityName>, unknown, EntityName>;
+  readonly readerArtifact: ReaderArtifact<ResolverParam, unknown, EntityName>;
 };
 
 /** When a conditional's selections apply: the record's entity is `entityName`. */
@@ -234,13 +236,13 @@ export type Condition = {
 };
 ```
 
-`Arguments`, `ArgumentValue`, and `EntityName` are normalization-ast.md's, unchanged; both ASTs print the arguments and the runtime's `storeKey` reads both. `Variables` and `Link` are store.md's (`artifacts.ts` imports `Link` from `./store` as a type; `store.ts` already imports `EntityName` from `./artifacts` as a type, and a cycle of type-only imports is erased). `index.ts` exports every type above. `ResolverParam` has no default type argument: a use that admits any entity writes `ResolverParam<EntityName>`.
+`Arguments`, `ArgumentValue`, and `EntityName` are normalization-ast.md's, unchanged; both ASTs print the arguments and the runtime's `storeKey` reads both. `Variables` and `Link` are store.md's (`artifacts.ts` imports `Link` from `./store` as a type; `store.ts` already imports `EntityName` from `./artifacts` as a type, and a cycle of type-only imports is erased). `index.ts` exports every type above. `ResolverParam`'s `TEntityName` defaults to `EntityName`, as the landed `NormalizationAst<TEntityName extends EntityName = EntityName>` (`libs/isograph-runtime/src/artifacts.ts`) does: a use that admits any entity writes `ResolverParam`, which is `ResolverParam<EntityName>`. A use tied to one entity writes the argument (`ResolverParam<TEntityName>` in `ReaderArtifact`'s constraint and in `read`).
 
 `Condition` is the TypeScript form of the core `Condition` (query-generation.md, `Condition::SelectionEquals(EntityName)`), and is normalization-ast.md's `Condition`, which its conditionals print from the same Rust type: one Rust type has one TypeScript type, in `artifacts.ts`. `index.ts` already exports it with the normalization types.
 
 ### Why `resolver` is a method signature
 
-`ReaderResolverSelection.readerArtifact` holds the reader artifact of any field, and `read` calls its resolver. With a property signature (`readonly resolver: (param: TParam) => TOutput`), `strictFunctionTypes` compares the parameter contravariantly, so `ReaderArtifact<Pet__fullName__param, string, "Pet">` is not a `ReaderArtifact<ResolverParam<EntityName>, unknown, EntityName>`, and typing the node needs `any` (banned, AGENTS.md TypeScript) or a cast in the runtime. A method signature is compared bivariantly: `Pet__fullName__param` is assignable to `ResolverParam<EntityName>` (a type literal has an implicit index signature, `Record<PropertyKey, never>` is assignable to `Variables`, and `Link<"Pet">` is assignable to `Link<EntityName>` because `"Pet"` is a string), so the assignment type-checks with no cast. The third type argument changes nothing here: the node's `ReaderArtifact<.., EntityName>` constrains its first argument by `ResolverParam<EntityName>`, which every generated param type satisfies. The cost is that a method signature cannot be `readonly`.
+`ReaderResolverSelection.readerArtifact` holds the reader artifact of any field, and `read` calls its resolver. With a property signature (`readonly resolver: (param: TParam) => TOutput`), `strictFunctionTypes` compares the parameter contravariantly, so `ReaderArtifact<Pet__fullName__param, string, "Pet">` is not a `ReaderArtifact<ResolverParam, unknown, EntityName>`, and typing the node needs `any` (banned, AGENTS.md TypeScript) or a cast in the runtime. A method signature is compared bivariantly: `Pet__fullName__param` is assignable to `ResolverParam` (a type literal has an implicit index signature, `Record<PropertyKey, never>` is assignable to `Variables`, and `Link<"Pet">` is assignable to `Link<EntityName>` because `"Pet"` is a string), so the assignment type-checks with no cast. The third type argument changes nothing here: the node's `ReaderArtifact<.., EntityName>` constrains its first argument by `ResolverParam`, which every generated param type satisfies. The default type argument changes nothing here either: `ResolverParam` is the same type as `ResolverParam<EntityName>`, so the comparisons above are the ones `tsc` made with the argument written out. The cost is that a method signature cannot be `readonly`.
 
 ### The parent entity's name
 
@@ -257,11 +259,11 @@ export function read<TEntityName extends EntityName, TOutput>(
 ```
 
 - TypeScript infers `TEntityName` from the declared type of the artifact (`ReaderArtifact<.., .., "Query">`), and `NoInfer` (TypeScript 5.4; the workspace pins 5.6.3) keeps the link out of the inference. Without `NoInfer`, a `Pet` link and a `Query` artifact infer `TEntityName` as `"Pet" | "Query"`: the link is a `Link<"Pet" | "Query">`, and the bivariant `resolver` accepts `Query__R__param` as a `ResolverParam<"Pet" | "Query">`, so the mismatched call type-checks.
-- A link whose entity name is not a literal (`StoreLink`, `Link<EntityName>`) is rejected for a generated artifact, because `string` is not assignable to `"Query"`. store.md's `queryRoot` and `mutationRoot` are declared `Link<"Query">` and `Link<"Mutation">` for this reason. Inside the runtime, the `Resolver` case passes the node's `ReaderArtifact<ResolverParam<EntityName>, unknown, EntityName>` and a `StoreLink`, so `TEntityName` is `EntityName` and the call type-checks.
+- A link whose entity name is not a literal (`StoreLink`, `Link<EntityName>`) is rejected for a generated artifact, because `string` is not assignable to `"Query"`. store.md's `queryRoot` and `mutationRoot` are declared `Link<"Query">` and `Link<"Mutation">` for this reason. Inside the runtime, the `Resolver` case passes the node's `ReaderArtifact<ResolverParam, unknown, EntityName>` and a `StoreLink`, so `TEntityName` is `EntityName` and the call type-checks.
 
 Checked with `tsc` 5.6.3 (`strict`, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`) on these declarations and hand-written param types of the generated shape: `read` of a `Pet` artifact with a `Link<"Pet">`, of a `Query` artifact that has a `Pet` `Resolver` node with `queryRoot`, and of an artifact whose third argument is `"Pet" | "Checkin"` with a `Link<"Pet">` type-check; a `Pet` link to the `Query` artifact, a `Query` link to the `Pet` artifact, a `Query` link to the `"Pet" | "Checkin"` artifact, and a `StoreLink` to the `Query` artifact are each an error; `const x: ReaderArtifact<Pet__fullName__param, string, "Query"> = ..` is an error at the constraint.
 
-An abstract parent entity has no record of its own: a record's link names its concrete entity (store.md, Record ids). A field on `Node` is read at a link `{ entityName: "Pet", id }`, so its third type argument and its link type are the union of its concrete entities' names, `"BlogItem" | "Checkin" | "Pet"`, printed by store.md's `entity_name_type` from the same `LinkType.concrete_types` list. An entity with no concrete entity is `never`, and no link can be passed. A concrete entity's union has one member, the entity's own name.
+Settled: for a field on an abstract entity, `TEntityName` is the union of the abstract entity's concrete entities' names. The reason is that a store link always names the concrete entity: an abstract parent entity has no record of its own, and a record's link names its concrete entity (store.md, Record ids). A field on `Node` is read at a link `{ entityName: "Pet", id }`, never `{ entityName: "Node", id }`, so its third type argument and its link type are the union of its concrete entities' names, `"BlogItem" | "Checkin" | "Pet"`, printed by store.md's `entity_name_type` from the same `LinkType.concrete_types` list. An entity with no concrete entity is `never`, and no link can be passed. A concrete entity's union has one member, the entity's own name.
 
 Delta from upstream: upstream's `EagerReaderArtifact<TReadFromStore, TClientFieldValue>` (`isograph/libs/isograph-react/src/core/reader.ts:26-37`) has no parent type name, its `StoreLink` is `{ readonly __link: DataId; readonly __typename: TypeName }` with `TypeName` a `string` (`isograph/libs/isograph-react/src/core/IsographEnvironment.ts:122-125`), and `FragmentReference.root` is a `StoreLink` (`isograph/libs/isograph-react/src/core/FragmentReference.ts:58`), so nothing ties a fragment to its parent's type name. Upstream's `Link<T extends TypeName>` (`IsographEnvironment.ts:117-120`, with `__link` branded `Brand<DataId, T>`) types only the value of a `__link` selection and a client pointer's return (`isograph/crates/artifact_content/src/eager_reader_artifact.rs:236`). i2's `Link` has no brand: an id is a plain `RecordId`.
 
@@ -1405,7 +1407,7 @@ Each change is one commit. Prerequisites: query-generation.md changes 6 to 8, no
 
 ### 3. The reader types (libs/isograph-runtime)
 
-The reader types in `src/artifacts.ts` and their exports in `src/index.ts`: `ReaderArtifact` with `TEntityName`, `ResolverParam<TEntityName>` with `link`. The landed `IsographEntrypoint<TParam, TOutput, TEntityName>` (normalization-ast.md, The artifact's TypeScript type) gets its reader artifact typed in this change (The entrypoint's reader artifact). `storeKey`'s `Pick<NormalizationSelection, "selectableName" | "arguments">` parameter; `isStoreLink` in `src/store.ts`, imported by `check.ts` and `garbageCollection.ts` in place of their own test. store.md's tests pass unchanged. Independent of 1 and 2.
+The reader types in `src/artifacts.ts` and their exports in `src/index.ts`: `ReaderArtifact` with `TEntityName`, `ResolverParam<TEntityName extends EntityName = EntityName>` with `link`. The landed `IsographEntrypoint<TParam, TOutput, TEntityName>` (normalization-ast.md, The artifact's TypeScript type) gets its reader artifact typed in this change (The entrypoint's reader artifact). `storeKey`'s `Pick<NormalizationSelection, "selectableName" | "arguments">` parameter; `isStoreLink` in `src/store.ts`, imported by `check.ts` and `garbageCollection.ts` in place of their own test. store.md's tests pass unchanged. Independent of 1 and 2.
 
 ### 4. The TypeScript reader artifact (typescript_artifacts)
 
