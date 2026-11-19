@@ -397,6 +397,34 @@ mod tests {
     }
 
     #[test]
+    fn project_errors_follow_a_schema_change() {
+        let mut state = state();
+        present(
+            &mut state,
+            "/tmp/proj/schema/schema.graphql",
+            "type Query {\n  a: String\n}\n",
+        );
+        present(
+            &mut state,
+            "/tmp/proj/src/a.ts",
+            "iso(`field Query.x { nope }`)",
+        );
+        assert_eq!(
+            errors(state.reference())
+                .into_iter()
+                .map(|report| report.message)
+                .collect::<Vec<_>>(),
+            "Field `Query.nope` is not defined.".to_owned().wrap_vec()
+        );
+        present(
+            &mut state,
+            "/tmp/proj/schema/schema.graphql",
+            "type Query {\n  a: String\n  nope: String\n}\n",
+        );
+        assert_eq!(errors(state.reference()), vec![]);
+    }
+
+    #[test]
     fn project_errors_of_a_clean_pet_demo_like_project_is_empty() {
         let mut state = state();
         present(&mut state, "/tmp/proj/schema/schema.graphql", PET_SCHEMA);
