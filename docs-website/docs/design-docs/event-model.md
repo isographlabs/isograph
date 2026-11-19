@@ -204,9 +204,9 @@ struct OpenFile {
 
 A path may have a `DiskFile`, one `OpenFile` per client that has it open, both, or neither. The tracked maps are which paths currently have a `DiskFile` and which `(client, path)` pairs have an `OpenFile`. `handle` is the only writer of `DiskFile` and `OpenFile`.
 
-Artifact generation and watch mode read `DiskFile`. They do not read `OpenFile`.
+Artifact generation will read through `file_contents` as its own client with no `OpenFile`; how it gets its `ClientId` is not designed yet.
 
-`file_contents(db, client, path)` reads that client's `OpenFile` when it exists, otherwise `DiskFile`. Semantic tokens and formatting still read `DiskFile`; they read through `file_contents` with the asking client's `ClientId` after lsp-open-files.md change 7. The LSP adapter does not generate artifacts.
+`file_contents(db, client, path)` reads that client's `OpenFile` when it exists, otherwise `DiskFile`. It is the only reader of file text. Semantic tokens, formatting, and `willSaveWaitUntil` read through it with the asking client's `ClientId`. The LSP adapter does not generate artifacts.
 
 event-loop.md ships `IsographDb` with no fields. filesystem-events.md makes `IsographDb` the pico database and interns `DiskFile`. lsp-open-files.md adds `OpenFile` and `open_file_map`.
 
