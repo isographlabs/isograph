@@ -12,7 +12,7 @@ Before writing a type, function, error, or pass, check the isograph checkout (`.
 
 Schema data model: `docs-website/docs/design-docs/mental-model.md`. Read it before working on entities, entity declarations, wrappers, selectables, selectable declarations, selections, selection sets, or entrypoints.
 
-pico: `docs-website/docs/design-docs/pico.md`. Read it before working on sources, memos, or `IsographDb`.
+pico: `docs-website/docs/design-docs/pico.md`. Read it before working on sources, memos, or `IsographDb`. Read its "Structuring functions and memos" section before writing a memo or an LSP handler.
 
 ## pico tracked maps
 
