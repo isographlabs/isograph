@@ -166,16 +166,15 @@ fn format_iso_literals<THostLanguage: HostLanguage>(
     let literals = isograph_compiler::parsed_iso_literals_in_file(db, client, path).as_ref()?;
     let page_content =
         isograph_compiler::text_through_last_iso_literal(db, client, path).as_ref()?;
+    let line_index = isograph_lsp::LineIndex::new(page_content);
     literals
         .iter()
         .filter_map(|(extraction, parsed)| {
             if !parsed.errors.is_empty() {
                 return None;
             }
-            let start = extraction.iso_literal_start_index.0 as u32;
-            let end = start + extraction.iso_literal_text.len() as u32;
             lsp_types::TextEdit {
-                range: isograph_lsp::lsp_range_for_byte_range(page_content, start, end),
+                range: line_index.range(extraction.span()),
                 new_text: isograph_parser::format_recorded(
                     extraction.iso_literal_text.as_str(),
                     parsed.tokens.as_slice(),

@@ -1,7 +1,10 @@
 use isograph_compiler::IsoLiteralStartIndex;
 use isograph_parser::IsographSemanticToken;
 use lsp_types::{SemanticTokenModifier, SemanticTokenType, SemanticTokensLegend};
+use prelude::Postfix;
 use span::{Span, WithOptionalSpan, WithSpan, WithSpanPostfix};
+
+use crate::line_index::{LineBreak, LineIndex};
 
 /// Parser tokens whose spans are relative to each iso interior.
 /// `literals` is every interior in `page_content`, left to right, with its file start.
@@ -15,15 +18,16 @@ pub fn lsp_semantic_tokens<'a>(
     >,
 ) -> Vec<lsp_types::SemanticToken> {
     let index = LineIndex::new(page_content);
+    let cursor = LineCursor::new(page_content, index.reference());
     if page_content.is_ascii() {
-        lsp_semantic_tokens_with(&index, literals, |text| text.len() as u32)
+        lsp_semantic_tokens_with(cursor, literals, |text| text.len() as u32)
     } else {
-        lsp_semantic_tokens_with(&index, literals, |text| text.encode_utf16().count() as u32)
+        lsp_semantic_tokens_with(cursor, literals, |text| text.encode_utf16().count() as u32)
     }
 }
 
 fn lsp_semantic_tokens_with<'a>(
-    index: &LineIndex,
+    mut cursor: LineCursor<'_>,
     literals: impl IntoIterator<
         Item = (
             IsoLiteralStartIndex,
@@ -32,7 +36,6 @@ fn lsp_semantic_tokens_with<'a>(
     >,
     utf16_len: impl Fn(&str) -> u32,
 ) -> Vec<lsp_types::SemanticToken> {
-    let mut cursor = index.cursor();
     let mut previous_token_end = 0u32;
     let mut last_start = LastStart { line: 0, offset: 0 };
     let mut encoded = Vec::new();
@@ -54,32 +57,6 @@ fn lsp_semantic_tokens_with<'a>(
         }
     }
     encoded
-}
-
-pub fn lsp_range_for_byte_range(page_content: &str, start: u32, end: u32) -> lsp_types::Range {
-    let index = LineIndex::new(page_content);
-    let utf16_len = |text: &str| {
-        if page_content.is_ascii() {
-            text.len() as u32
-        } else {
-            text.encode_utf16().count() as u32
-        }
-    };
-    let mut cursor = index.cursor();
-    cursor.advance_to(start);
-    let start_pos = lsp_types::Position {
-        line: cursor.break_index as u32,
-        character: cursor.column(start, utf16_len),
-    };
-    cursor.advance_to(end);
-    let end_pos = lsp_types::Position {
-        line: cursor.break_index as u32,
-        character: cursor.column(end, utf16_len),
-    };
-    lsp_types::Range {
-        start: start_pos,
-        end: end_pos,
-    }
 }
 
 fn emit_pieces(
@@ -137,11 +114,11 @@ fn lsp_semantic_token(
     utf16_len: impl Fn(&str) -> u32,
 ) -> lsp_types::SemanticToken {
     let line = cursor.break_index as u32;
-    let length = utf16_len(&cursor.index.text[(piece_start as usize)..(piece_end as usize)]);
+    let length = utf16_len(&cursor.text[(piece_start as usize)..(piece_end as usize)]);
     let (delta_line, delta_start) = match line - last_start.line {
         0 => (
             0,
-            utf16_len(&cursor.index.text[(last_start.offset as usize)..(piece_start as usize)]),
+            utf16_len(&cursor.text[(last_start.offset as usize)..(piece_start as usize)]),
         ),
         delta_line => (delta_line, cursor.column(piece_start, &utf16_len)),
     };
@@ -165,36 +142,18 @@ struct LastStart {
     offset: u32,
 }
 
-struct LineIndex<'a> {
-    text: &'a str,
-    breaks: Vec<LineBreak>,
-}
-
 /// `break_index` is the current line. Offsets must not go backward.
 struct LineCursor<'a> {
-    index: &'a LineIndex<'a>,
+    text: &'a str,
+    index: &'a LineIndex,
     break_index: usize,
 }
 
-/// One line terminator. `start` is the first byte of `\n`, `\r`, or `\r\n`.
-/// `after` is the first byte of the next line.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-struct LineBreak {
-    start: u32,
-    after: u32,
-}
-
-impl<'a> LineIndex<'a> {
-    fn new(text: &'a str) -> Self {
+impl<'a> LineCursor<'a> {
+    fn new(text: &'a str, index: &'a LineIndex) -> Self {
         Self {
             text,
-            breaks: line_breaks(text),
-        }
-    }
-
-    fn cursor(&self) -> LineCursor<'_> {
-        LineCursor {
-            index: self,
+            index,
             break_index: 0,
         }
     }
@@ -229,7 +188,7 @@ impl LineCursor<'_> {
     }
 
     fn check_offset(&mut self, offset: u32) {
-        let len = self.index.text.len() as u32;
+        let len = self.text.len() as u32;
         assert!(
             offset <= len,
             "byte {} is out of range for a document of length {}",
@@ -237,7 +196,7 @@ impl LineCursor<'_> {
             len,
         );
         assert!(
-            self.index.text.is_char_boundary(offset as usize),
+            self.text.is_char_boundary(offset as usize),
             "byte {} is not a char boundary",
             offset,
         );
@@ -287,44 +246,12 @@ impl LineCursor<'_> {
             0 => 0,
             n => self.index.breaks[n - 1].after,
         };
-        utf16_len(&self.index.text[(line_start as usize)..(offset as usize)])
+        utf16_len(&self.text[(line_start as usize)..(offset as usize)])
     }
 
     fn current_line_break(&self) -> Option<LineBreak> {
         self.index.breaks.get(self.break_index).copied()
     }
-}
-
-/// `\n`, `\r`, and `\r\n` (one break). Same set as `IsographLangTokenKind::LineBreak`.
-fn line_breaks(text: &str) -> Vec<LineBreak> {
-    let bytes = text.as_bytes();
-    let mut index = 0usize;
-    let mut breaks = Vec::new();
-    while index < bytes.len() {
-        match bytes[index] {
-            b'\n' => {
-                let start = index as u32;
-                index += 1;
-                breaks.push(LineBreak {
-                    start,
-                    after: index as u32,
-                });
-            }
-            b'\r' => {
-                let start = index as u32;
-                index += 1;
-                if matches!(bytes.get(index), Some(&b'\n')) {
-                    index += 1;
-                }
-                breaks.push(LineBreak {
-                    start,
-                    after: index as u32,
-                });
-            }
-            _ => index += 1,
-        }
-    }
-    breaks
 }
 
 /// Index in this slice is `token_type`. Unused slots keep the origin numbering.
@@ -422,9 +349,9 @@ mod tests {
     use span::{Span, WithGenericLocation, WithOptionalSpan};
 
     use super::{
-        CLASS, COMMENT, DECORATOR, FUNCTION, KEYWORD, LineBreak, METHOD, NUMBER, OPERATOR,
-        PARAMETER, PROPERTY, STRING, TYPE, TYPE_PARAMETER, VARIABLE, line_breaks,
-        lsp_semantic_tokens, lsp_type_index, semantic_token_legend,
+        CLASS, COMMENT, DECORATOR, FUNCTION, KEYWORD, METHOD, NUMBER, OPERATOR, PARAMETER,
+        PROPERTY, STRING, TYPE, TYPE_PARAMETER, VARIABLE, lsp_semantic_tokens, lsp_type_index,
+        semantic_token_legend,
     };
 
     fn encoded(source: &str) -> Vec<SemanticToken> {
@@ -452,18 +379,6 @@ mod tests {
                 .find(interior)
                 .expect("the fixture contains the interior"),
         )
-    }
-
-    #[test]
-    fn line_breaks_records_crlf_as_one_break() {
-        assert_eq!(
-            line_breaks("a\r\nb\nc\rd"),
-            vec![
-                LineBreak { start: 1, after: 3 },
-                LineBreak { start: 4, after: 5 },
-                LineBreak { start: 6, after: 7 },
-            ],
-        );
     }
 
     #[test]
