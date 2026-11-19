@@ -1,4 +1,4 @@
-use std::{any::Any, hash::Hash, num::NonZeroUsize};
+use std::{any::Any, collections::HashMap, hash::Hash, num::NonZeroUsize};
 
 use crate::{
     InnerFn, MemoRef, MemoRefKind, RawPtr, Singleton,
@@ -69,11 +69,10 @@ impl<Db: Database> StorageDyn for Storage<Db> {
 pub(crate) struct InternalStorage<Db: Database> {
     pub(crate) param_id_to_index: DashMap<ParamId, Index<ParamId>>,
     pub(crate) derived_node_id_to_revision: DashMap<DerivedNodeId, DerivedNodeRevision>,
-    pub(crate) source_node_key_to_index: DashMap<Key, Index<SourceNode>>,
 
     pub(crate) derived_nodes: BoxcarVec<DerivedNode<Db>>,
     pub(crate) derived_node_dependencies: BoxcarVec<Vec<Dependency>>,
-    pub(crate) source_nodes: BoxcarVec<SourceNode>,
+    pub(crate) source_nodes: HashMap<Key, SourceNode>,
     pub(crate) params: BoxcarVec<Box<dyn Any>>,
     pub(crate) current_epoch: Epoch,
 }
@@ -91,9 +90,8 @@ impl<Db: Database> Storage<Db> {
             internal: InternalStorage {
                 param_id_to_index: DashMap::new(),
                 derived_node_id_to_revision: DashMap::new(),
-                source_node_key_to_index: DashMap::new(),
+                source_nodes: HashMap::new(),
 
-                source_nodes: BoxcarVec::new(),
                 derived_nodes: BoxcarVec::new(),
                 derived_node_dependencies: BoxcarVec::new(),
                 params: BoxcarVec::new(),
@@ -132,17 +130,10 @@ impl<Db: Database> Storage<Db> {
     }
 
     fn get_impl<T: 'static>(&self, key: Key) -> Option<&T> {
-        // A read of a missing key inserts an absent node, so that a memoized function
-        // that reads the key depends on it, and a later set of the key is a change.
-        let source_node = self.internal.get_or_insert_absent_source_node(key);
-
-        self.register_dependency_in_parent_memoized_fn(
-            NodeKind::Source(key),
-            source_node.time_updated,
-        );
-        source_node.value.as_ref().map(|value| {
+        let (value, time_updated) = self.internal.source_value_and_epoch(key);
+        self.register_dependency_in_parent_memoized_fn(NodeKind::Source(key), time_updated);
+        value.map(|value| {
             value
-                .as_ref()
                 .as_any()
                 .downcast_ref::<T>()
                 .expect("unexpected struct type. This is indicative of a bug in Pico.")
@@ -303,82 +294,41 @@ impl<Db: Database> InternalStorage<Db> {
         Index::new(self.derived_nodes.push(derived_node))
     }
 
-    pub fn get_source_node(&self, key: Key) -> Option<&SourceNode> {
-        let index = self.source_node_key_to_index.get(&key)?;
-        Some(
-            self.source_nodes
-                .get(index.idx)
-                .expect("indexes should always be valid. This is indicative of a bug in Pico."),
-        )
-    }
-
-    pub(crate) fn get_or_insert_absent_source_node(&self, key: Key) -> &SourceNode {
-        let idx = self
-            .source_node_key_to_index
-            .entry(key)
-            .or_insert_with(|| {
-                self.insert_source_node(SourceNode {
-                    time_updated: self.current_epoch,
-                    value: None,
-                })
-            })
-            .idx;
-        self.source_nodes
-            .get(idx)
-            .expect("indexes should always be valid. This is indicative of a bug in Pico.")
-    }
-
-    pub(crate) fn insert_source_node(&self, source_node: SourceNode) -> Index<SourceNode> {
-        Index::new(self.source_nodes.push(source_node))
-    }
-
-    /// Sets a source in the database. If the key has an absent node, or a source that
-    /// does not equal the new source, increment the current epoch. If the key has a source
-    /// that equals the new source, leave the node unchanged.
-    ///
-    /// A key with no node has never been read, so no memoized function depends on it,
-    /// and inserting it does not increment the epoch.
-    fn set_source<T: DynEq>(&mut self, source: T, source_id: SourceId<T>) {
-        match self.source_node_key_to_index.entry(source_id.key) {
-            Entry::Occupied(occupied_entry) => {
-                let source_node = self
-                    .source_nodes
-                    .get_mut(occupied_entry.get().idx)
-                    .expect("indexes should always be valid. This is indicative of a bug in Pico.");
-                if !source_node
-                    .value
-                    .as_deref()
-                    .is_some_and(|value| value.dyn_eq(&source))
-                {
-                    // We cannot call self.increment_epoch() because that borrows
-                    // the entire struct, but self.source_nodes is already borrowed
-                    let next_epoch = self.current_epoch.increment();
-                    *source_node = SourceNode {
-                        time_updated: next_epoch,
-                        value: Some(Box::new(source)),
-                    };
-                }
-            }
-            Entry::Vacant(vacant_entry) => {
-                let index = self.insert_source_node(SourceNode {
-                    time_updated: self.current_epoch,
-                    value: Some(Box::new(source)),
-                });
-                vacant_entry.insert(index);
-            }
+    pub(crate) fn source_value_and_epoch(&self, key: Key) -> (Option<&dyn DynEq>, Epoch) {
+        match self.source_nodes.get(&key) {
+            Some(node) => (node.value.as_deref(), node.time_updated),
+            // A key that has never been set has been absent since the initial epoch.
+            None => (None, Epoch::new()),
         }
     }
 
-    /// Removes a source from the database. The key keeps its node, which becomes absent.
+    /// Inserting a source or changing its value advances the epoch.
+    fn set_source<T: DynEq>(&mut self, source: T, source_id: SourceId<T>) {
+        let node = self
+            .source_nodes
+            .entry(source_id.key)
+            .or_insert(SourceNode {
+                time_updated: self.current_epoch,
+                value: None,
+            });
+        if node
+            .value
+            .as_deref()
+            .is_some_and(|value| value.dyn_eq(&source))
+        {
+            return;
+        }
+        *node = SourceNode {
+            time_updated: self.current_epoch.increment(),
+            value: Some(Box::new(source)),
+        };
+    }
+
     pub fn remove_source<T>(&mut self, id: SourceId<T>) {
-        if let Some(index) = self.source_node_key_to_index.get(&id.key) {
-            let source_node = self
-                .source_nodes
-                .get_mut(index.idx)
-                .expect("indexes should always be valid. This is indicative of a bug in Pico.");
-            if source_node.value.take().is_some() {
-                source_node.time_updated = self.current_epoch.increment();
-            }
+        if let Some(node) = self.source_nodes.get_mut(&id.key)
+            && node.value.take().is_some()
+        {
+            node.time_updated = self.current_epoch.increment();
         }
     }
 }
