@@ -774,12 +774,18 @@ fn shape_errors_are_located_at_the_selection_name() {
 
 #[test]
 fn two_selections_with_one_alias_are_a_collision_at_the_second() {
-    let (kind, at) = query_error(r#"pet(id: "a b") { id }, pet(id: "a_b") { id }"#, &[]);
+    let (kind, at) = query_error(
+        r#"pet(id: "a") { id }, pet____id___s_a { id }"#,
+        &[(
+            "schema/test.graphql",
+            "extend type Query { pet____id___s_a: Pet }",
+        )],
+    );
     assert!(matches!(
         kind,
         SelectionMapErrorKind::Merge(MergeError::AliasCollision(_))
     ));
-    assert_eq!(at, "pet");
+    assert_eq!(at, "pet____id___s_a");
 }
 
 #[test]

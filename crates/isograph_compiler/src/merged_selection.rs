@@ -320,12 +320,32 @@ impl SelectionKey {
         NormalizationAlias(
             std::iter::once(self.name.to_string())
                 .chain(self.arguments.iter().map(|argument| {
-                    format!("{}___{}", argument.name, argument.value.alias_chunk())
+                    format!(
+                        "{}___{}",
+                        alias_text(argument.name.lookup()),
+                        argument.value.alias_chunk()
+                    )
                 }))
                 .collect::<Vec<_>>()
                 .join("____"),
         )
     }
+}
+
+/// `text` with each ASCII letter and digit kept and every other character, `_` included,
+/// written as `_<its code point in decimal>_`. The result matches `[_0-9A-Za-z]*`, and an `_`
+/// that opens an escape is followed by a digit, so the text ends before the first `_` outside an
+/// escape that is followed by a letter or another `_`.
+fn alias_text(text: &str) -> String {
+    text.chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() {
+                character.to_string()
+            } else {
+                format!("_{}_", u32::from(character))
+            }
+        })
+        .collect()
 }
 
 /// The key of a selection's value in the response object.
@@ -351,30 +371,30 @@ impl SelectionKey {
 }
 
 impl MergedValue {
-    /// The part of a normalization alias that names this value.
+    /// The part of a normalization alias that names this value: `v_<name>`, `l_<n>` for an
+    /// integer `n` of at least 0, `l_n<n>` for the integer `-n`, `l_true`, `l_false`, `l_null`,
+    /// `s_<text>`, `o_<entries>_c` with each entry `<key>__<chunk>` joined by `_`, and
+    /// `a_<chunks>_c` joined by `_`, with every name, key, and text written by `alias_text`.
     fn alias_chunk(&self) -> String {
         match self {
-            MergedValue::Variable(name) => format!("v_{name}"),
+            MergedValue::Variable(name) => format!("v_{}", alias_text(name.lookup())),
+            MergedValue::Integer(integer) if *integer < 0 => {
+                format!("l_n{}", integer.unsigned_abs())
+            }
             MergedValue::Integer(integer) => format!("l_{integer}"),
             MergedValue::Boolean(Boolean::True) => "l_true".to_owned(),
             MergedValue::Boolean(Boolean::False) => "l_false".to_owned(),
             MergedValue::Null => "l_null".to_owned(),
-            MergedValue::String(string) => format!(
-                "s_{}",
-                string
-                    .lookup()
-                    .chars()
-                    .map(|character| match character {
-                        'A'..='Z' | 'a'..='z' | '0'..='9' | '_' => character,
-                        _ => '_',
-                    })
-                    .collect::<String>()
-            ),
+            MergedValue::String(string) => format!("s_{}", alias_text(string.lookup())),
             MergedValue::Object(object) => format!(
                 "o_{}_c",
                 object
                     .iter()
-                    .map(|entry| format!("{}__{}", entry.name, entry.value.alias_chunk()))
+                    .map(|entry| format!(
+                        "{}__{}",
+                        alias_text(entry.name.lookup()),
+                        entry.value.alias_chunk()
+                    ))
                     .collect::<Vec<_>>()
                     .join("_")
             ),
@@ -1880,11 +1900,11 @@ mod tests {
                     argument("d", MergedValue::Integer(-3)),
                 ]
             )),
-            "f____a___l_true____b___l_false____c___l_null____d___l_-3"
+            "f____a___l_true____b___l_false____c___l_null____d___l_n3"
         );
         assert_eq!(
             alias(key("f", vec![argument("s", string("a b-c.Ü_1"))])),
-            "f____s___s_a_b_c___1"
+            "f____s___s_a_32_b_45_c_46__220__95_1"
         );
         assert_eq!(
             alias(key(
@@ -1903,6 +1923,150 @@ mod tests {
             alias(key("f", vec![argument("o", object(vec![]))])),
             "f____o___o__c"
         );
+    }
+
+    #[test]
+    fn a_negative_integer_aliases_to_a_graphql_name_apart_from_its_absolute_value() {
+        let alias = |integer: i64| {
+            key(
+                "checkins",
+                vec![argument("i", MergedValue::Integer(integer))],
+            )
+            .normalization_alias()
+            .0
+        };
+        assert_eq!(alias(-5), "checkins____i___l_n5");
+        assert_eq!(alias(5), "checkins____i___l_5");
+        assert_eq!(alias(i64::MIN), "checkins____i___l_n9223372036854775808");
+    }
+
+    /// Variables, integers, booleans, null, and strings, chosen so that a naive encoding of
+    /// one reads as another or as the structure around it.
+    fn atoms() -> Vec<MergedValue> {
+        ["x", "c", "x_c", "x_v_y", "_x", "x__v", "n5"]
+            .into_iter()
+            .map(var)
+            .chain(
+                [0, 1, 5, -1, -5, 50, -50, i64::MIN, i64::MAX]
+                    .into_iter()
+                    .map(MergedValue::Integer),
+            )
+            .chain([
+                MergedValue::Boolean(Boolean::True),
+                MergedValue::Boolean(Boolean::False),
+                MergedValue::Null,
+            ])
+            .chain(
+                [
+                    "", "a", "a b", "a_b", "a-b", "a.b", "a_32_b", "a_95_b", "_", "__", "_95_",
+                    "Ü", "U", "日本", "😀", "a\0b", "\"q\"", "-5", "5", "n5", "null", "true", "c",
+                    "x_c", "a\nb", "a__l_1",
+                ]
+                .into_iter()
+                .map(string),
+            )
+            .collect()
+    }
+
+    /// The atoms, lists and objects of them, and nested lists and objects.
+    fn values() -> Vec<MergedValue> {
+        let atoms = atoms();
+        let few = || atoms.iter().step_by(4).cloned();
+        let keys = ["a", "c", "a_b", "_", "a__c", "c__l_1"];
+        atoms
+            .iter()
+            .cloned()
+            .chain([MergedValue::List(vec![]), object(vec![])])
+            .chain(
+                atoms
+                    .iter()
+                    .map(|atom| MergedValue::List(atom.clone().wrap_vec())),
+            )
+            .chain(few().flat_map(|first| {
+                few().map(move |second| MergedValue::List(vec![first.clone(), second]))
+            }))
+            .chain(keys.into_iter().flat_map(|name| {
+                atoms
+                    .iter()
+                    .map(move |atom| object(vec![(name, atom.clone())]))
+            }))
+            .chain(few().flat_map(|first| {
+                few().map(move |second| object(vec![("a", first.clone()), ("c", second)]))
+            }))
+            .chain(few().flat_map(|atom| {
+                [
+                    MergedValue::List(MergedValue::List(atom.clone().wrap_vec()).wrap_vec()),
+                    MergedValue::List(vec![object(vec![("c", atom.clone())]), atom.clone()]),
+                    object(vec![("a", object(vec![("c", atom.clone())]))]),
+                    object(vec![("a", object(vec![])), ("c", atom.clone())]),
+                    object(vec![("a", MergedValue::List(atom.wrap_vec()))]),
+                ]
+            }))
+            .collect()
+    }
+
+    /// One argument of each value under a few names, two arguments of a few values, and argument
+    /// names that contain the separators.
+    fn argument_sets() -> Vec<Vec<MergedArgument>> {
+        let values = values();
+        let few = || values.iter().step_by(37).cloned();
+        ["a", "c", "a_b", "a___l_1"]
+            .into_iter()
+            .flat_map(|name| {
+                values
+                    .iter()
+                    .map(move |value| argument(name, value.clone()).wrap_vec())
+            })
+            .chain(few().flat_map(|first| {
+                few().map(move |second| vec![argument("a", first.clone()), argument("b", second)])
+            }))
+            .chain([
+                vec![
+                    argument("a", MergedValue::Integer(1)),
+                    argument("b", MergedValue::Integer(2)),
+                ],
+                argument("a___l_1____b", MergedValue::Integer(2)).wrap_vec(),
+                vec![],
+            ])
+            .collect()
+    }
+
+    #[test]
+    fn every_alias_is_a_graphql_name() {
+        argument_sets()
+            .into_iter()
+            .map(|list| key("f", list).normalization_alias().0)
+            .for_each(|alias| {
+                let mut characters = alias.chars();
+                assert!(
+                    characters
+                        .next()
+                        .is_some_and(|first| first.is_ascii_alphabetic() || first == '_'),
+                    "{alias}"
+                );
+                assert!(
+                    characters.all(|rest| rest.is_ascii_alphanumeric() || rest == '_'),
+                    "{alias}"
+                );
+            });
+    }
+
+    #[test]
+    fn distinct_argument_sets_have_distinct_aliases() {
+        let keys: BTreeSet<SelectionKey> = argument_sets()
+            .into_iter()
+            .map(|list| key("f", list))
+            .collect();
+        let by_alias: BTreeMap<String, &SelectionKey> = keys
+            .iter()
+            .map(|key| (key.normalization_alias().0, key))
+            .collect();
+        let collisions: Vec<&SelectionKey> = keys
+            .iter()
+            .filter(|key| by_alias[&key.normalization_alias().0] != *key)
+            .collect();
+        assert_eq!(collisions, Vec::<&SelectionKey>::new());
+        assert!(keys.len() > 1000, "{}", keys.len());
     }
 
     #[test]
@@ -2106,17 +2270,6 @@ mod tests {
     fn two_keys_with_one_alias_collide() {
         assert_eq!(
             try_map(vec![
-                leaf("f", vec![argument("s", string("a b"))]),
-                leaf("f", vec![argument("s", string("a_b"))]),
-            ]),
-            MergeError::AliasCollision(AliasCollision {
-                first: key("f", vec![argument("s", string("a b"))]),
-                second: key("f", vec![argument("s", string("a_b"))]),
-            })
-            .wrap_err()
-        );
-        assert_eq!(
-            try_map(vec![
                 leaf("f", vec![argument("s", string("a"))]),
                 leaf("f____s___s_a", vec![]),
             ])
@@ -2137,14 +2290,9 @@ mod tests {
                     "pet",
                     vec![],
                     id(),
-                    vec![leaf("f", vec![argument("s", string("a b"))])]
+                    vec![leaf("f", vec![argument("s", string("a"))])]
                 ),
-                composite(
-                    "pet",
-                    vec![],
-                    id(),
-                    vec![leaf("f", vec![argument("s", string("a_b"))])]
-                ),
+                composite("pet", vec![], id(), vec![leaf("f____s___s_a", vec![])]),
             ]),
             Err(MergeError::AliasCollision(_))
         ));
@@ -2340,12 +2488,12 @@ mod tests {
     fn substitution_that_makes_aliases_equal_is_a_collision() {
         let field = map(vec![
             leaf("f", vec![argument("s", var("a"))]),
-            leaf("f", vec![argument("s", var("b"))]),
+            leaf("f____s___s_a", vec![]),
         ]);
         assert!(matches!(
             substitute(
                 field.reference(),
-                context(vec![("a", string("a b")), ("b", string("a_b")),]).reference()
+                context(vec![("a", string("a"))]).reference()
             ),
             Err(SelectionMapErrorKind::Merge(MergeError::AliasCollision(_)))
         ));

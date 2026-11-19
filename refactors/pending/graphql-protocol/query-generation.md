@@ -606,7 +606,7 @@ pub struct AliasCollision {
 }
 ```
 
-The only other conflict merging can find is two different selectable keys in one map whose normalization aliases are equal: `f(s: "a b")` and `f(s: "a_b")` both alias to `f____s___s_a_b`, and a field named `f____s___s_a` selected with no arguments aliases to the same text as `f(s: "a")`. That is `AliasCollision`, an error of the query. Different arguments to one field are two keys, not a conflict; a reader alias does not take part. Open decision 1 is the alternative where they are. Conditionals have no alias.
+The only other conflict merging can find is two different selectable keys in one map whose normalization aliases are equal: a field named `f____s___s_a` selected with no arguments aliases to the same text as `f(s: "a")`. Two different argument sets of one field never have equal aliases. That is `AliasCollision`, an error of the query. Different arguments to one field are two keys, not a conflict; a reader alias does not take part. Open decision 1 is the alternative where they are. Conditionals have no alias.
 
 ### Normalization aliases
 
@@ -650,7 +650,20 @@ A selection with arguments prints with its normalization alias (`pet____id___v_i
 
 This is upstream's rule: `MergedScalarFieldSelection::normalization_alias` and `MergedLinkedFieldSelection::normalization_alias` return `None` when `arguments` is empty (`isograph/crates/isograph_schema/src/create_merged_selection_set.rs:124-131` and `:159-166`), and `write_selections_for_query_text` writes `alias: ` only for `Some` (`isograph/crates/graphql_network_protocol/src/query_text.rs:90-92` and `:100-102`). The runtime reads a field's value from the response under the field name followed by the same per-argument chunks (`getNetworkResponseKey`, `isograph/libs/isograph-react/src/core/cache.ts:538-552`, with `____`, `___`, `__` at `:594-596`), which for a field with no arguments is the field name.
 
-The format is upstream's `get_aliased_mutation_field_name` and `to_alias_str_chunk` (`isograph/crates/isograph_schema/src/create_merged_selection_set.rs`, `isograph/crates/isograph_lang_types/src/declarations/selection_argument.rs`): the name, then per argument `____`, the argument name, `___`, and the value chunk. Chunks: `v_<name>` for a variable, `l_<n>` for an integer, `l_true` and `l_false`, `l_null`, `s_<text>` with every character outside `[A-Za-z0-9_]` replaced by `_`, and `o_<entries>_c` with each entry `<name>__<chunk>` joined by `_`. The alias lives in the core because the runtime's normalization keys and the query must agree, whatever the protocol.
+```rust
+// from crates/isograph_compiler/src/merged_selection.rs
+/// `text` with each ASCII letter and digit kept and every other character, `_` included,
+/// written as `_<its code point in decimal>_`. The result matches `[_0-9A-Za-z]*`, and an `_`
+/// that opens an escape is followed by a digit, so the text ends before the first `_` outside an
+/// escape that is followed by a letter or another `_`.
+fn alias_text(text: &str) -> String;
+```
+
+The layout is upstream's `get_aliased_mutation_field_name` and `to_alias_str_chunk` (`isograph/crates/isograph_schema/src/create_merged_selection_set.rs`, `isograph/crates/isograph_lang_types/src/declarations/selection_argument.rs`): the selectable name, then per argument `____`, the argument name, `___`, and the value chunk. Chunks: `v_<name>` for a variable, `l_<n>` for an integer `n` of at least 0, `l_n<n>` for the integer `-n` (`l_n5` for `-5`), `l_true` and `l_false`, `l_null`, `s_<text>` for a string, `o_<entries>_c` with each entry `<key>__<chunk>` joined by `_`, and `a_<chunks>_c` joined by `_`. Every argument name, variable name, object key, and string is written by `alias_text`; the selectable name is written as is, because it is the response key of the same field selected without arguments.
+
+Delta from upstream: upstream writes `l_-5` for `-5`, replaces each character of a string outside `[A-Za-z0-9_]` with `_`, and writes names as they are. `-` is not a GraphQL name character, so upstream's alias of a negative integer argument makes the query invalid; `"a b"` and `"a_b"` alias the same; and a variable named `x_v_y` in a list aliases as the two variables `x` and `y` (`a_v_x_v_y_c`). i2's chunks are injective: after `l_`, a digit starts a non-negative integer, `n` and a digit a negative one, and `n` and `u` is `null`; `alias_text` keeps only letters and digits and escapes every `_`, so a text cannot contain a separator and two texts never encode the same; and after a chunk inside an object, `_c` followed by a letter, or by `__` and a letter, starts an entry whose key starts with `c`, and `_c` followed by anything else closes the object.
+
+The alias lives in the core because the query and the response key in the normalization AST must agree, whatever the protocol. The runtime's store keys are its own: `storeKey` writes `____<name>___<JSON of the value>` (`libs/isograph-runtime/src/storeKey.ts`) and never reads the alias.
 
 ## Source fields and variables
 
@@ -1773,7 +1786,7 @@ Facts about generated text, not snapshots. A helper in the test module returns t
 - A string argument `a"b\c` followed by a newline prints `"a\"b\\c\n"`.
 - An object argument `{ id: $id, tagline: $tagline }` prints in key order with `{ ` and ` }`.
 - No line ends in whitespace; the text does not end in a newline.
-- The tests above print `Expanded`. For every operation the printer tests build (the `cases()` fixtures, which cover a union refinement, an abstract target, nested composites, a mutation, and every value kind; the variable definitions fixture with defaults and list types; and a list and an empty object argument), `Collapsed` text contains no `\n` and no two consecutive spaces, and graphql-parser (`graphql-parser = "0.4.1"`, a dev-dependency) parses both texts and prints the two parses identically. graphql-parser's `Document` carries source positions in its `PartialEq`; its printer writes none, so equal printed parses is the assertion that both texts are one operation. The round-trip fixtures use `i: 5` where `cases()` has `i: -5`, because the normalization alias of a negative integer argument (`i___l_-5`) contains `-` and is not a GraphQL name, in either format.
+- The tests above print `Expanded`. For every operation the printer tests build (the `cases()` fixtures, which cover a union refinement, an abstract target, nested composites, a mutation, and every value kind; the variable definitions fixture with defaults and list types; and a list and an empty object argument), `Collapsed` text contains no `\n` and no two consecutive spaces, and graphql-parser (`graphql-parser = "0.4.1"`, a dev-dependency) parses both texts and prints the two parses identically. graphql-parser's `Document` carries source positions in its `PartialEq`; its printer writes none, so equal printed parses is the assertion that both texts are one operation. The every-value-kind fixture passes `i: -5`, whose alias chunk is `i___l_n5`.
 - `Collapsed` of `pets { __typename id tagline }` under `query X` is `query X{pets{__typename id tagline}}`; of `f(b: true, i: -5, n: null, o: { s: "a b", v: $x }, s: "\"q\"", v: $x)` the arguments are `(b:true i:-5 n:null o:{s:"a b"v:$x}s:"\"q\""v:$x)`; the variable definitions fixture's header is `query X($limit:Int=3$ids:[ID!]!$maybe:[ID]$nested:[[Int!]]!$flag:Boolean!=false){a}`; the union fixture prints `__typename cursor...on BlogItem{__typename id title}`.
 
 `crates/isograph_compiler/src/query.rs` and `merged_selection.rs`, the core's operation rules (GraphQL profile in the next group where a case needs a schema):
@@ -1789,7 +1802,9 @@ Facts about generated text, not snapshots. A helper in the test module returns t
 
 - `MergedArguments::new` sorts `b, a` to `a, b`, and returns `Err(a)` for `a, a`.
 - `normalization_alias` of `pet(id: $id)` is `pet____id___v_id`; of `checkins(limit: 5, skip: 0)` is `checkins____limit___l_5____skip___l_0`; of `set_pet_tagline(input: { id: $id, tagline: $tagline })` is `set_pet_tagline____input___o_id__v_id_tagline__v_tagline_c`; of a key `firstName` with no arguments is `firstName`.
-- Merging `f(s: "a b")` and `f(s: "a_b")` into one map is `AliasCollision`; so is merging `f(s: "a")` with a no-argument selection of a field named `f____s___s_a`.
+- Merging `f(s: "a")` with a no-argument selection of a field named `f____s___s_a` is `AliasCollision`, at the top level and inside a composite, and so is substituting `$a = "a"` into `f(s: $a)` beside `f____s___s_a`.
+- `normalization_alias` of `checkins(i: -5)` is `checkins____i___l_n5`, of `checkins(i: 5)` is `checkins____i___l_5`, and of `i64::MIN` is `checkins____i___l_n9223372036854775808`; of `f(s: "a b-c.Ü_1")` is `f____s___s_a_32_b_45_c_46__220__95_1`.
+- Over argument sets built from variables, integers (negative, zero, `i64::MIN`, `i64::MAX`), booleans, null, and strings with spaces, punctuation, `_`, digits, strings shaped like an escape (`a_32_b`), and non-ASCII text, alone, in lists, in objects with keys `c` and `a_b`, and nested, under argument names with `_` and `___`: every alias matches `[_A-Za-z][_0-9A-Za-z]*`, and no two distinct sets have the same alias.
 - Merging a `Leaf` and a `Composite` entry at one key is `SelectionMismatch`.
 
 `crates/graphql_network_protocol/tests` or the crate's test module (GraphQL profile, TypeScript host, the pet demo's schema and source files inserted before the first lookup, and `query_text_format: Expanded` set, as the pet demo's config sets it):

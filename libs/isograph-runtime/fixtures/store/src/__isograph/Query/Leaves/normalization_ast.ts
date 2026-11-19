@@ -17,7 +17,7 @@ const normalizationAst: NormalizationAst<'Query'> = {
     {
       kind: 'Selection',
       responseKey:
-        'greeting____loud___l_true____name___s_Ada_Lovelace____times___l_3',
+        'greeting____loud___l_true____name___s_Ada_32_Lovelace____times___l_3',
       selectableName: 'greeting',
       arguments: [
         [

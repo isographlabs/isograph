@@ -59,7 +59,8 @@ test('every fixture entrypoint has enough data after normalizing its response', 
       leaves,
       {
         greeting: 'hi',
-        greeting____loud___l_true____name___s_Ada_Lovelace____times___l_3: 'HI',
+        greeting____loud___l_true____name___s_Ada_32_Lovelace____times___l_3:
+          'HI',
         greeting____name___v_name: null,
         greeting____name___l_null: null,
         settings: null,

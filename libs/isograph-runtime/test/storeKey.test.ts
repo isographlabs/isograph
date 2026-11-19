@@ -9,7 +9,7 @@ import { selectionAt } from './fixtures';
 const greeting = selectionAt(leaves.selections, 'greeting');
 const literalGreeting = selectionAt(
   leaves.selections,
-  'greeting____loud___l_true____name___s_Ada_Lovelace____times___l_3',
+  'greeting____loud___l_true____name___s_Ada_32_Lovelace____times___l_3',
 );
 const nullGreeting = selectionAt(
   leaves.selections,

@@ -1045,11 +1045,6 @@ mod tests {
     }
 
     fn every_kind_of_argument() -> MergedSelection {
-        every_kind_of_argument_with(-5)
-    }
-
-    /// A selection of `f` with an argument of every value kind, `i` being `integer`.
-    fn every_kind_of_argument_with(integer: i64) -> MergedSelection {
         let entry = |name: &str, value: MergedValue| MergedObjectEntry {
             name: name.intern().to(),
             value,
@@ -1058,7 +1053,7 @@ mod tests {
             "f",
             vec![
                 ("b", MergedValue::Boolean(Boolean::True)),
-                ("i", MergedValue::Integer(integer)),
+                ("i", MergedValue::Integer(-5)),
                 ("n", MergedValue::Null),
                 (
                     "o",
@@ -1396,9 +1391,8 @@ mod tests {
         }
     }
 
-    /// The operations the printer tests build, with a non-negative integer where `cases()` has
-    /// `-5` (its normalization alias `i___l_-5` is not a GraphQL name), the variable
-    /// definitions, and a list and an empty object argument.
+    /// The operations the printer tests build, the variable definitions, and a list and an
+    /// empty object argument.
     fn format_fixtures() -> Vec<(GraphQLFetchPlan, Vec<FieldVariable>, CompletedSelectionMap)> {
         let lists = leaf_with(
             "g",
@@ -1429,14 +1423,7 @@ mod tests {
         };
         cases()
             .into_iter()
-            .filter(|(_, selections)| *selections != every_kind_of_argument().wrap_vec())
-            .chain([
-                (
-                    OperationType::Mutation,
-                    every_kind_of_argument_with(5).wrap_vec(),
-                ),
-                (OperationType::Query, lists.wrap_vec()),
-            ])
+            .chain(std::iter::once((OperationType::Query, lists.wrap_vec())))
             .map(|(operation_type, selections)| {
                 let (plan, completed) = complete(operation_type, selections);
                 (plan, Vec::new(), completed)
@@ -1529,7 +1516,7 @@ mod tests {
                 &[],
                 top_level(vec![every_kind_of_argument()]).reference(),
             ),
-            "mutation X{f____b___l_true____i___l_-5____n___l_null____o___o_s__s_a_b_v__v_x_c____s___s__q_____v___v_x:f(b:true i:-5 n:null o:{s:\"a b\"v:$x}s:\"\\\"q\\\"\"v:$x)}"
+            "mutation X{f____b___l_true____i___l_n5____n___l_null____o___o_s__s_a_32_b_v__v_x_c____s___s__34_q_34_____v___v_x:f(b:true i:-5 n:null o:{s:\"a b\"v:$x}s:\"\\\"q\\\"\"v:$x)}"
         );
         assert_eq!(
             print_in(
