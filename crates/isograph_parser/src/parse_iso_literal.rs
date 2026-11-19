@@ -1,9 +1,9 @@
 use common_lang_types::SelectableName;
 use nonempty::NonEmpty;
 use prelude::Postfix;
-use resolve_position::PositionResolutionPath;
+use resolve_position::{PositionResolutionPath, ResolvePosition};
 use resolve_position_macros::ResolvePosition;
-use span::{WithOptionalSpan, WithSpan, WithSpanPostfix};
+use span::{Span, WithOptionalSpan, WithSpan, WithSpanPostfix};
 
 use crate::chunk_stream::{ChunkStream, ItemCursor};
 use crate::{
@@ -148,6 +148,12 @@ pub fn parse_iso_literal(text: &str) -> ParsedIsoLiteral {
         errors,
         tokens,
     }
+}
+
+/// The resolution leaf of `span`, a range within the literal text. `None` for an empty
+/// or whitespace-only literal.
+pub fn resolve_offset(parsed: &ParsedIsoLiteral, span: Span) -> Option<IsographResolutionNode<'_>> {
+    parsed.item.as_ref().map(|item| item.resolve((), span))
 }
 
 pub(crate) fn parse_chunked_iso_literal(
@@ -4781,5 +4787,50 @@ mod tests {
             .expect("the fixture passes arguments");
         assert_eq!(arguments.item.0.len(), 1);
         assert_eq!(arguments.location, span_of(text, "(x: 1)"));
+    }
+
+    fn resolved_name(text: &str, span: Span) -> Option<String> {
+        resolve_offset(parse_iso_literal(text).reference(), span).map(|node| node.to_string())
+    }
+
+    #[test]
+    fn resolve_offset_of_entrypoint_names_and_punctuation() {
+        let text = "entrypoint Query.HomeRoute";
+        assert_eq!(
+            resolved_name(text, span_of(text, "Query")),
+            "EntityNameWrapper".to_owned().wrap_some()
+        );
+        assert_eq!(
+            resolved_name(text, span_of(text, "HomeRoute")),
+            "SelectableNameWrapper".to_owned().wrap_some()
+        );
+        assert_eq!(
+            resolved_name(text, span_of(text, ".")),
+            "EntrypointDeclaration".to_owned().wrap_some()
+        );
+    }
+
+    #[test]
+    fn resolve_offset_of_a_selection_name() {
+        let text = "field Query.x{id}";
+        assert_eq!(
+            resolved_name(text, span_of(text, "id")),
+            "SelectionNameWrapper".to_owned().wrap_some()
+        );
+    }
+
+    #[test]
+    fn resolve_offset_of_an_empty_or_whitespace_only_literal_is_none() {
+        assert_eq!(resolved_name("", Span::new(0, 0)), None);
+        assert_eq!(resolved_name("  ", Span::new(0, 1)), None);
+    }
+
+    #[test]
+    fn resolve_offset_of_an_unknown_keyword_is_the_slot() {
+        let text = "fieldd Query.foo";
+        assert_eq!(
+            resolved_name(text, span_of(text, "fieldd")),
+            "IsoLiteralSlot".to_owned().wrap_some()
+        );
     }
 }

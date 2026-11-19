@@ -52,7 +52,7 @@ pub use parse_iso_literal::{
     EntityNameWrapperPath, EntrypointDeclaration, EntrypointDeclarationPath, IsoLiteralItem,
     IsoLiteralParse, IsoLiteralParsePath, ParsedIsoLiteral, SelectableDeclaration,
     SelectableDeclarationPath, SelectableNameWrapper, SelectableNameWrapperParent,
-    SelectableNameWrapperPath, parse_iso_literal,
+    SelectableNameWrapperPath, parse_iso_literal, resolve_offset,
 };
 pub use selections::{
     Selection, SelectionNameWrapper, SelectionNameWrapperPath, SelectionPath, SelectionSet,
