@@ -150,7 +150,7 @@ impl<'a> TokenCursor<'a> {
         item.location.wrap_some()
     }
 
-    #[expect(dead_code)]
+    #[cfg_attr(not(test), expect(dead_code))]
     pub(crate) fn require_keyword(&mut self, word: &'static str) -> Result<Span, ()> {
         self.consume_keyword_if(word).ok_or(())
     }

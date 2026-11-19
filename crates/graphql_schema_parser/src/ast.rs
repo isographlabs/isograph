@@ -90,6 +90,79 @@ pub struct InputObjectTypeDefinition {
     pub fields: Vec<WithSpan<InputValueDefinition>>,
 }
 
+/// Spec 3.3 `SchemaDefinition`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SchemaDefinition {
+    pub description: Option<WithSpan<Description>>,
+    pub directives: Vec<WithSpan<Directive>>,
+    pub root_operation_types: Vec<WithSpan<RootOperationTypeDefinition>>,
+}
+
+/// Spec 3.3 `RootOperationTypeDefinition : OperationType : NamedType`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RootOperationTypeDefinition {
+    pub operation_type: WithSpan<OperationTypeWrapper>,
+    pub type_name: WithSpan<EntityNameWrapper>,
+}
+
+/// Spec 2.4 `OperationType`.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, strum::EnumString)]
+#[strum(serialize_all = "lowercase")]
+pub enum OperationType {
+    Query,
+    Mutation,
+    Subscription,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct OperationTypeWrapper(pub OperationType);
+
+/// Spec 3.13 `DirectiveDefinition`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DirectiveDefinition {
+    pub description: Option<WithSpan<Description>>,
+    pub name: WithSpan<DirectiveNameWrapper>,
+    pub arguments: Vec<WithSpan<InputValueDefinition>>,
+    pub repeatable: DirectiveRepeatability,
+    pub locations: Vec<WithSpan<DirectiveLocationWrapper>>,
+}
+
+/// Whether a directive definition has the `repeatable` keyword (spec 3.13).
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum DirectiveRepeatability {
+    Repeatable,
+    NotRepeatable,
+}
+
+/// Spec 3.13 `DirectiveLocation`: `ExecutableDirectiveLocation` then
+/// `TypeSystemDirectiveLocation`.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, strum::EnumString)]
+#[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
+pub enum DirectiveLocation {
+    Query,
+    Mutation,
+    Subscription,
+    Field,
+    FragmentDefinition,
+    FragmentSpread,
+    InlineFragment,
+    VariableDefinition,
+    Schema,
+    Scalar,
+    Object,
+    FieldDefinition,
+    ArgumentDefinition,
+    Interface,
+    Union,
+    Enum,
+    EnumValue,
+    InputObject,
+    InputFieldDefinition,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub struct DirectiveLocationWrapper(pub DirectiveLocation);
+
 /// Spec 2.13 `Directive[Const] : @ Name Arguments[Const]?`. The span runs from `@` through
 /// the arguments.
 #[derive(Clone, Debug, PartialEq, Eq)]

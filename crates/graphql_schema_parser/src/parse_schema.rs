@@ -8,11 +8,13 @@ use crate::token_cursor::TokenCursor;
 use crate::type_annotation::parse_type_annotation;
 use crate::value::parse_constant_value;
 use crate::{
-    Argument, ArgumentNameWrapper, Description, Directive, DirectiveNameWrapper, EntityNameWrapper,
+    Argument, ArgumentNameWrapper, Description, Directive, DirectiveDefinition, DirectiveLocation,
+    DirectiveLocationWrapper, DirectiveNameWrapper, DirectiveRepeatability, EntityNameWrapper,
     EnumLiteralValueWrapper, EnumTypeDefinition, EnumValueDefinition, Expectation, FieldDefinition,
     GraphQLTokenKind, InputObjectTypeDefinition, InputValueDefinition, InputValueNameWrapper,
-    InterfaceTypeDefinition, ObjectTypeDefinition, ParseError, ScalarTypeDefinition,
-    SelectableNameWrapper, UnionTypeDefinition,
+    InterfaceTypeDefinition, ObjectTypeDefinition, OperationType, OperationTypeWrapper, ParseError,
+    RootOperationTypeDefinition, ScalarTypeDefinition, SchemaDefinition, SelectableNameWrapper,
+    UnionTypeDefinition,
 };
 
 /// A top-level definition or extension whose parse failed. The wrapping span is the text the
@@ -316,6 +318,117 @@ fn parse_input_fields_definition(
     )
 }
 
+#[cfg_attr(not(test), expect(dead_code))]
+fn parse_schema_definition(
+    cursor: &mut TokenCursor<'_>,
+    description: Option<WithSpan<Description>>,
+) -> Result<SchemaDefinition, DefinitionError> {
+    let directives = parse_directives(cursor).map_err(DefinitionError::unnamed)?;
+    cursor
+        .require_token(GraphQLTokenKind::OpenBrace)
+        .map_err(|()| {
+            DefinitionError::unnamed(
+                cursor.expected(Expectation::Token(GraphQLTokenKind::OpenBrace)),
+            )
+        })?;
+    SchemaDefinition {
+        description,
+        directives,
+        root_operation_types: parse_root_operation_types_after_open(cursor)
+            .map_err(DefinitionError::unnamed)?,
+    }
+    .wrap_ok()
+}
+
+fn parse_root_operation_types_after_open(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<Vec<WithSpan<RootOperationTypeDefinition>>, WithSpan<ParseError>> {
+    parse_nonempty_group_after_open(cursor, GraphQLTokenKind::CloseBrace, |cursor| {
+        cursor.spanning(parse_root_operation_type_definition)
+    })
+}
+
+fn parse_root_operation_type_definition(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<RootOperationTypeDefinition, WithSpan<ParseError>> {
+    let operation_type = cursor
+        .consume_identifier_of::<OperationType>()
+        .ok_or_else(|| cursor.expected(Expectation::OperationType))?
+        .map(OperationTypeWrapper);
+    cursor
+        .require_token(GraphQLTokenKind::Colon)
+        .map_err(|()| cursor.expected(Expectation::Token(GraphQLTokenKind::Colon)))?;
+    RootOperationTypeDefinition {
+        operation_type,
+        type_name: parse_entity_name(cursor)?,
+    }
+    .wrap_ok()
+}
+
+fn parse_after_directive_name<T>(
+    cursor: &mut TokenCursor<'_>,
+    parse_rest: impl FnOnce(
+        &mut TokenCursor<'_>,
+        WithSpan<DirectiveNameWrapper>,
+    ) -> Result<T, WithSpan<ParseError>>,
+) -> Result<T, DefinitionError> {
+    let name = parse_directive_definition_name(cursor).map_err(DefinitionError::unnamed)?;
+    parse_rest(cursor, name).map_err(|error| DefinitionError {
+        name: DefinitionName::Directive(name.item.0).wrap_some(),
+        error,
+    })
+}
+
+#[cfg_attr(not(test), expect(dead_code))]
+fn parse_directive_definition(
+    cursor: &mut TokenCursor<'_>,
+    description: Option<WithSpan<Description>>,
+) -> Result<DirectiveDefinition, DefinitionError> {
+    parse_after_directive_name(cursor, |cursor, name| {
+        let arguments = parse_arguments_definition(cursor)?;
+        let repeatable = match cursor.consume_keyword_if("repeatable") {
+            Some(_) => DirectiveRepeatability::Repeatable,
+            None => DirectiveRepeatability::NotRepeatable,
+        };
+        cursor
+            .require_keyword("on")
+            .map_err(|()| cursor.expected(Expectation::Keyword("on")))?;
+        DirectiveDefinition {
+            description,
+            name,
+            arguments,
+            repeatable,
+            locations: parse_separated_nonempty(
+                cursor,
+                GraphQLTokenKind::Pipe,
+                parse_directive_location,
+            )?,
+        }
+        .wrap_ok()
+    })
+}
+
+fn parse_directive_definition_name(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<WithSpan<DirectiveNameWrapper>, WithSpan<ParseError>> {
+    cursor
+        .require_token(GraphQLTokenKind::At)
+        .map_err(|()| cursor.expected(Expectation::Token(GraphQLTokenKind::At)))?;
+    cursor
+        .require_token(GraphQLTokenKind::Identifier)
+        .map(|name| name.interned().map(DirectiveNameWrapper))
+        .map_err(|()| cursor.expected(Expectation::Token(GraphQLTokenKind::Identifier)))
+}
+
+fn parse_directive_location(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<WithSpan<DirectiveLocationWrapper>, WithSpan<ParseError>> {
+    cursor
+        .consume_identifier_of::<DirectiveLocation>()
+        .map(|location| location.map(DirectiveLocationWrapper))
+        .ok_or_else(|| cursor.expected(Expectation::DirectiveLocation))
+}
+
 fn parse_directives(
     cursor: &mut TokenCursor<'_>,
 ) -> Result<Vec<WithSpan<Directive>>, WithSpan<ParseError>> {
@@ -412,25 +525,26 @@ pub(crate) fn parse_group_after_open<T>(
 
 #[cfg(test)]
 mod tests {
-    use common_lang_types::{DescriptionValue, EntityName};
+    use common_lang_types::{DescriptionValue, DirectiveName, EntityName};
     use intern::string_key::Intern;
     use prelude::Postfix;
     use span::{Span, WithSpan, WithSpanPostfix};
 
     use super::{
-        DefinitionError, DefinitionName, consume_description, parse_directives,
-        parse_enum_type_definition, parse_input_object_type_definition,
+        DefinitionError, DefinitionName, consume_description, parse_directive_definition,
+        parse_directives, parse_enum_type_definition, parse_input_object_type_definition,
         parse_interface_type_definition, parse_object_type_definition,
-        parse_scalar_type_definition, parse_union_type_definition,
+        parse_scalar_type_definition, parse_schema_definition, parse_union_type_definition,
     };
     use crate::span_of::span_of;
     use crate::test_cursor::with_cursor;
     use crate::token_cursor::TokenCursor;
     use crate::{
-        ConstantValue, Description, Directive, EntityNameWrapper, EnumValueDefinition, Expectation,
+        ConstantValue, Description, Directive, DirectiveDefinition, DirectiveLocation,
+        DirectiveRepeatability, EntityNameWrapper, EnumValueDefinition, Expectation,
         FieldDefinition, Found, GraphQLTokenKind, InputObjectTypeDefinition, IntegerValue,
-        NullableTypeAnnotation, ObjectTypeDefinition, ParseError, TypeAnnotation,
-        UnionTypeDefinition,
+        NullableTypeAnnotation, ObjectTypeDefinition, OperationType, ParseError, SchemaDefinition,
+        TypeAnnotation, UnionTypeDefinition,
     };
 
     /// Runs `parse` on `text` after its description, when it has one, and its keyword.
@@ -969,5 +1083,229 @@ mod tests {
             object.0[1].item.value.item,
             ConstantValue::Enum(_)
         ));
+    }
+
+    fn schema(text: &str) -> SchemaDefinition {
+        after_keyword(text, parse_schema_definition)
+            .expect("the fixture is a schema definition")
+            .item
+    }
+
+    fn schema_error(text: &str) -> DefinitionError {
+        after_keyword(text, parse_schema_definition)
+            .expect_err("the fixture is an invalid schema definition")
+    }
+
+    fn root_operation_types(schema: &SchemaDefinition) -> Vec<(OperationType, &'static str)> {
+        schema
+            .root_operation_types
+            .iter()
+            .map(|root| {
+                (
+                    root.item.operation_type.item.0,
+                    intern::Lookup::lookup(root.item.type_name.item.0),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_schema_lists_its_root_operation_types() {
+        assert_eq!(
+            root_operation_types(
+                schema("schema { query: Query mutation: Mutation subscription: Subscription }")
+                    .reference()
+            ),
+            vec![
+                (OperationType::Query, "Query"),
+                (OperationType::Mutation, "Mutation"),
+                (OperationType::Subscription, "Subscription"),
+            ]
+        );
+        let described = schema("\"the schema\" schema @a { query: Query }");
+        assert_eq!(
+            described.description.map(|description| description.item.0),
+            DescriptionValue::from("the schema".intern()).wrap_some()
+        );
+        assert_eq!(described.directives.len(), 1);
+        assert_eq!(
+            root_operation_types(schema("schema { query: Query query: Other }").reference()),
+            vec![
+                (OperationType::Query, "Query"),
+                (OperationType::Query, "Other")
+            ]
+        );
+    }
+
+    #[test]
+    fn an_invalid_schema_is_an_unnamed_error() {
+        assert_eq!(
+            schema_error("schema {}"),
+            DefinitionError {
+                name: None,
+                error: ParseError::expected(
+                    Expectation::OperationType,
+                    Found::Token(GraphQLTokenKind::CloseBrace)
+                )
+                .with_span(Span::new(8, 9)),
+            }
+        );
+        let error = schema_error("schema");
+        assert_eq!(error.name, None);
+        assert_eq!(
+            error.error.item,
+            ParseError::expected(
+                Expectation::Token(GraphQLTokenKind::OpenBrace),
+                Found::EndOfFile
+            )
+        );
+        let text = "schema { foo: Query }";
+        assert_eq!(
+            schema_error(text).error,
+            ParseError::expected(
+                Expectation::OperationType,
+                Found::Token(GraphQLTokenKind::Identifier)
+            )
+            .with_span(span_of(text, "foo"))
+        );
+    }
+
+    fn directive_definition(text: &str) -> DirectiveDefinition {
+        after_keyword(text, parse_directive_definition)
+            .expect("the fixture is a directive definition")
+            .item
+    }
+
+    fn directive_error(text: &str) -> DefinitionError {
+        after_keyword(text, parse_directive_definition)
+            .expect_err("the fixture is an invalid directive definition")
+    }
+
+    fn locations(definition: &DirectiveDefinition) -> Vec<DirectiveLocation> {
+        definition
+            .locations
+            .iter()
+            .map(|location| location.item.0)
+            .collect()
+    }
+
+    fn directive_named(name: &str) -> Option<DefinitionName> {
+        DefinitionName::Directive(DirectiveName::from(name.intern())).wrap_some()
+    }
+
+    #[test]
+    fn a_directive_definition_has_its_parts() {
+        let one_of = directive_definition("directive @oneOf on INPUT_OBJECT");
+        assert_eq!(one_of.name.item.0, "oneOf");
+        assert!(one_of.arguments.is_empty());
+        assert_eq!(one_of.repeatable, DirectiveRepeatability::NotRepeatable);
+        assert_eq!(
+            locations(one_of.reference()),
+            DirectiveLocation::InputObject.wrap_vec()
+        );
+        for text in [
+            "directive @a(x: Int = 1) repeatable on FIELD | OBJECT",
+            "directive @a on | FIELD | OBJECT",
+        ] {
+            let definition = directive_definition(text);
+            assert_eq!(
+                locations(definition.reference()),
+                vec![DirectiveLocation::Field, DirectiveLocation::Object],
+                "for text {text:?}"
+            );
+        }
+        let repeatable = directive_definition("directive @a(x: Int = 1) repeatable on FIELD");
+        assert_eq!(repeatable.arguments.len(), 1);
+        assert_eq!(repeatable.repeatable, DirectiveRepeatability::Repeatable);
+    }
+
+    #[test]
+    fn every_directive_location_parses() {
+        let definition = directive_definition(
+            "directive @a on QUERY | MUTATION | SUBSCRIPTION | FIELD | FRAGMENT_DEFINITION | FRAGMENT_SPREAD | INLINE_FRAGMENT | VARIABLE_DEFINITION | SCHEMA | SCALAR | OBJECT | FIELD_DEFINITION | ARGUMENT_DEFINITION | INTERFACE | UNION | ENUM | ENUM_VALUE | INPUT_OBJECT | INPUT_FIELD_DEFINITION",
+        );
+        assert_eq!(
+            locations(definition.reference()),
+            vec![
+                DirectiveLocation::Query,
+                DirectiveLocation::Mutation,
+                DirectiveLocation::Subscription,
+                DirectiveLocation::Field,
+                DirectiveLocation::FragmentDefinition,
+                DirectiveLocation::FragmentSpread,
+                DirectiveLocation::InlineFragment,
+                DirectiveLocation::VariableDefinition,
+                DirectiveLocation::Schema,
+                DirectiveLocation::Scalar,
+                DirectiveLocation::Object,
+                DirectiveLocation::FieldDefinition,
+                DirectiveLocation::ArgumentDefinition,
+                DirectiveLocation::Interface,
+                DirectiveLocation::Union,
+                DirectiveLocation::Enum,
+                DirectiveLocation::EnumValue,
+                DirectiveLocation::InputObject,
+                DirectiveLocation::InputFieldDefinition,
+            ]
+        );
+    }
+
+    #[test]
+    fn an_unknown_directive_location_is_an_error() {
+        for (text, word) in [
+            ("directive @a on FOO", "FOO"),
+            ("directive @a on field", "field"),
+        ] {
+            assert_eq!(
+                directive_error(text),
+                DefinitionError {
+                    name: directive_named("a"),
+                    error: ParseError::expected(
+                        Expectation::DirectiveLocation,
+                        Found::Token(GraphQLTokenKind::Identifier)
+                    )
+                    .with_span(span_of(text, word)),
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn an_invalid_directive_definition_is_an_error() {
+        assert_eq!(
+            directive_error("directive @a FIELD").error.item,
+            ParseError::expected(
+                Expectation::Keyword("on"),
+                Found::Token(GraphQLTokenKind::Identifier)
+            )
+        );
+        assert_eq!(
+            directive_error("directive @a on").error.item,
+            ParseError::expected(Expectation::DirectiveLocation, Found::EndOfFile)
+        );
+        assert_eq!(
+            directive_error("directive @a() on FIELD").error.item,
+            ParseError::expected(
+                Expectation::Token(GraphQLTokenKind::Identifier),
+                Found::Token(GraphQLTokenKind::CloseParenthesis)
+            )
+        );
+        let error = directive_error("directive a on FIELD");
+        assert_eq!(error.name, None);
+        assert_eq!(
+            error.error.item,
+            ParseError::expected(
+                Expectation::Token(GraphQLTokenKind::At),
+                Found::Token(GraphQLTokenKind::Identifier)
+            )
+        );
+    }
+
+    #[test]
+    fn a_directive_named_like_a_keyword_parses() {
+        let text = "directive @type on FIELD";
+        let definition = directive_definition(text);
+        assert_eq!(definition.name.item.0, "type");
+        assert_eq!(definition.name.location, span_of(text, "type"));
     }
 }
