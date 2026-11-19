@@ -947,6 +947,8 @@ Before:
                 )
 ```
 
+Delta (landed): i2 generates no `refetch_reader.ts` (the loadable path was removed with `@loadable`), so after this change `stub_artifact` has no caller and is deleted; no stub artifact remains. `entry`, `string`, and `kind` in `normalization_ast.rs` are made `pub(crate)` with `condition_value` and `arguments_value`, and `reader_artifact.rs` builds its object entries with them.
+
 After: per field, `field.resolver_reader` `Some(reader)` adds `printed(reader_artifact_file(field, reader, export_name(field.resolver.context.reference()), options)?.reference())`; `None` adds nothing. The `?` joins the existing `Result` of the per-field `map`. `refetch_reader.ts` stays a stub; `stub_artifact` keeps that caller and whatever loadable-artifact caller the parser change leaves.
 
 ## The read function

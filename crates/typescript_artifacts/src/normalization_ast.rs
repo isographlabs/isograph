@@ -9,7 +9,7 @@ use isograph_parser::Boolean;
 use crate::entrypoint::{RUNTIME_PACKAGE, normalization_ast_path};
 use crate::module::{
     ArtifactModule, ArtifactObjectEntry, ArtifactValue, DeclaredExportType, DeclaredTypeArgument,
-    DefaultExportType, NamedTypeImport,
+    DefaultExportType, NamedImport,
 };
 
 const NORMALIZATION_AST_TYPE: &str = "NormalizationAst";
@@ -25,7 +25,7 @@ pub(crate) fn normalization_ast_artifact(
         default_export: ast_value(ast),
         default_export_type: DefaultExportType::Declared(DeclaredExportType {
             binding: "normalizationAst".to_owned(),
-            type_import: NamedTypeImport {
+            type_import: NamedImport {
                 specifier: RUNTIME_PACKAGE.to_owned(),
                 imported: NORMALIZATION_AST_TYPE.to_owned(),
                 local: NORMALIZATION_AST_TYPE.to_owned(),
@@ -37,18 +37,18 @@ pub(crate) fn normalization_ast_artifact(
     }
 }
 
-fn entry(key: &str, value: ArtifactValue) -> ArtifactObjectEntry {
+pub(crate) fn entry(key: &str, value: ArtifactValue) -> ArtifactObjectEntry {
     ArtifactObjectEntry {
         key: key.to_owned(),
         value,
     }
 }
 
-fn string(value: impl ToString) -> ArtifactValue {
+pub(crate) fn string(value: impl ToString) -> ArtifactValue {
     ArtifactValue::String(value.to_string())
 }
 
-fn kind(value: &str) -> ArtifactObjectEntry {
+pub(crate) fn kind(value: &str) -> ArtifactObjectEntry {
     entry("kind", string(value))
 }
 
@@ -134,7 +134,7 @@ fn identity_value(identity: &CompletedIdentity) -> ArtifactValue {
     }
 }
 
-fn condition_value(condition: &Condition) -> ArtifactValue {
+pub(crate) fn condition_value(condition: &Condition) -> ArtifactValue {
     match condition {
         Condition::SelectionEquals(entity_name) => ArtifactValue::Object(vec![
             kind("SelectionEquals"),
@@ -143,7 +143,7 @@ fn condition_value(condition: &Condition) -> ArtifactValue {
     }
 }
 
-fn arguments_value(arguments: &NormalizationArguments) -> ArtifactValue {
+pub(crate) fn arguments_value(arguments: &NormalizationArguments) -> ArtifactValue {
     if arguments.0.is_empty() {
         return ArtifactValue::Null;
     }

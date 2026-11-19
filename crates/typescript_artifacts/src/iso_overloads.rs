@@ -10,9 +10,9 @@ use crate::generate_types::{
 };
 use crate::imports::{artifact_import_identifier, relative_artifact_specifier};
 use crate::module::{
-    ArtifactImport, ConditionalType, FunctionParam, FunctionSignature, FunctionType,
-    NamedTypeImport, TemplateLiteralSpan, TemplateLiteralType, ThrowingFunction, TypeAlias,
-    TypeParam, TypeScriptItem, TypeScriptKeyword, TypeScriptModule, TypeScriptType,
+    ArtifactImport, ConditionalType, FunctionParam, FunctionSignature, FunctionType, NamedImport,
+    TemplateLiteralSpan, TemplateLiteralType, ThrowingFunction, TypeAlias, TypeParam,
+    TypeScriptItem, TypeScriptKeyword, TypeScriptModule, TypeScriptType,
 };
 
 const ISO_TS: &str = "iso.ts";
@@ -58,7 +58,7 @@ pub(crate) fn iso_overload_module<TLiteralContext>(
 
     let param_imports = sorted_imports(project.fields.iter().map(|field| {
         let name = param_type_name(field.field);
-        NamedTypeImport {
+        NamedImport {
             specifier: relative_artifact_specifier(
                 path.reference(),
                 field_artifact_path(field.field, PARAM_TYPE).reference(),
@@ -69,7 +69,7 @@ pub(crate) fn iso_overload_module<TLiteralContext>(
     }));
     let link_imports = sorted_imports(project.link_types.iter().map(|link| {
         let name = link_type_name(link.entity);
-        NamedTypeImport {
+        NamedImport {
             specifier: relative_artifact_specifier(
                 path.reference(),
                 link_type_path(link.entity).reference(),

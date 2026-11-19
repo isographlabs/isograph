@@ -26,7 +26,7 @@ pub enum DefaultExportType {
 pub struct DeclaredExportType {
     /// The name of the `const` that holds the value.
     pub binding: String,
-    pub type_import: NamedTypeImport,
+    pub type_import: NamedImport,
     pub type_arguments: Vec<DeclaredTypeArgument>,
 }
 
@@ -34,7 +34,7 @@ pub struct DeclaredExportType {
 #[derive(Clone, Debug, PartialEq)]
 pub enum DeclaredTypeArgument {
     /// A type imported by name; the module imports it.
-    Import(NamedTypeImport),
+    Import(NamedImport),
     /// A string literal type.
     StringLiteral(String),
 }
@@ -49,6 +49,8 @@ pub enum ArtifactValue {
     Array(Vec<ArtifactValue>),
     Object(Vec<ArtifactObjectEntry>),
     Import(ArtifactImport),
+    /// The binding `local` of a named import, which the module declares.
+    NamedImport(NamedImport),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -76,7 +78,10 @@ pub(crate) enum TypeScriptItem {
     TypeImport(ArtifactImport),
     /// `import type { <imported> as <local> } from "<specifier>";`, or `{ <imported> }` when
     /// the two names are equal.
-    NamedTypeImport(NamedTypeImport),
+    NamedTypeImport(NamedImport),
+    /// `import { <imported> as <local> } from "<specifier>";`, or `{ <imported> }` when the two
+    /// names are equal.
+    NamedImport(NamedImport),
     /// `type <name><params> = <type>;`
     TypeAlias(TypeAlias),
     /// `export type <name><params> = <type>;`
@@ -100,10 +105,10 @@ pub(crate) struct DeclaredConst {
     pub value: ArtifactValue,
 }
 
-/// `import type { <imported> as <local> } from "<specifier>";`, or `{ <imported> }` when the
-/// two names are equal.
+/// `{ <imported> as <local> } from "<specifier>"`, or `{ <imported> }` when the two names are
+/// equal.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct NamedTypeImport {
+pub struct NamedImport {
     /// Printed as written.
     pub specifier: String,
     pub imported: String,

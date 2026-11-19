@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use isograph_compiler::ArtifactPath;
 use prelude::Postfix;
 
-use crate::module::{ArtifactImport, ArtifactValue};
+use crate::module::{ArtifactImport, ArtifactValue, NamedImport};
 
 /// Every `Import` inside `value`, at any depth.
 pub(crate) fn imports_of(value: &ArtifactValue) -> BTreeSet<&ArtifactImport> {
@@ -11,13 +11,31 @@ pub(crate) fn imports_of(value: &ArtifactValue) -> BTreeSet<&ArtifactImport> {
         ArtifactValue::Null
         | ArtifactValue::Boolean(_)
         | ArtifactValue::Number(_)
-        | ArtifactValue::String(_) => BTreeSet::new(),
+        | ArtifactValue::String(_)
+        | ArtifactValue::NamedImport(_) => BTreeSet::new(),
         ArtifactValue::Array(items) => items.iter().flat_map(imports_of).collect(),
         ArtifactValue::Object(entries) => entries
             .iter()
             .flat_map(|entry| imports_of(&entry.value))
             .collect(),
         ArtifactValue::Import(import) => std::iter::once(import).collect(),
+    }
+}
+
+/// Every `NamedImport` inside `value`, at any depth.
+pub(crate) fn named_imports_of(value: &ArtifactValue) -> BTreeSet<&NamedImport> {
+    match value {
+        ArtifactValue::Null
+        | ArtifactValue::Boolean(_)
+        | ArtifactValue::Number(_)
+        | ArtifactValue::String(_)
+        | ArtifactValue::Import(_) => BTreeSet::new(),
+        ArtifactValue::Array(items) => items.iter().flat_map(named_imports_of).collect(),
+        ArtifactValue::Object(entries) => entries
+            .iter()
+            .flat_map(|entry| named_imports_of(&entry.value))
+            .collect(),
+        ArtifactValue::NamedImport(import) => std::iter::once(import).collect(),
     }
 }
 

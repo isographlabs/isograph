@@ -844,8 +844,8 @@ mod generation_tests {
     const INLINED: &str = "export const Inner = iso(`field Query.Inner { id }`)(() => null);\nexport const Outer = iso(`field Query.Outer { Inner }`)(() => null);\niso(`entrypoint Query.Outer`)\n";
 
     #[test]
-    fn editing_an_inlined_field_rewrites_its_param_type_the_query_files_and_the_normalization_ast()
-    {
+    fn editing_an_inlined_field_rewrites_its_param_type_reader_the_query_files_and_the_normalization_ast()
+     {
         let mut state = state();
         present(&mut state, "/tmp/proj/src/Query.ts", INLINED);
         changes(&mut state);
@@ -861,6 +861,7 @@ mod generation_tests {
             written_paths(changes.reference()),
             [
                 "Query/Inner/param_type.ts",
+                "Query/Inner/resolver_reader.ts",
                 "Query/Outer/normalization_ast.ts",
                 "Query/Outer/query_text.graphql",
                 "Query/Outer/query_text.ts",
@@ -870,6 +871,24 @@ mod generation_tests {
             written_text(changes.reference(), "Query/Outer/query_text.graphql"),
             "query Outer {\n  id\n  name\n}\n"
         );
+    }
+
+    #[test]
+    fn editing_only_a_resolver_body_rewrites_no_artifact() {
+        let mut state = state();
+        present(&mut state, "/tmp/proj/src/Query.ts", INLINED);
+        changes(&mut state);
+        present(
+            &mut state,
+            "/tmp/proj/src/Query.ts",
+            INLINED
+                .replace(
+                    "Query.Inner { id }`)(() => null)",
+                    "Query.Inner { id }`)(() => 1)",
+                )
+                .as_str(),
+        );
+        assert!(fire(&mut state).is_empty());
     }
 
     #[test]

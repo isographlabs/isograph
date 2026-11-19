@@ -17,7 +17,7 @@ use crate::custom_scalar::TypeScriptCustomScalarType;
 use crate::entrypoint::{RUNTIME_PACKAGE, field_artifact_path};
 use crate::imports::relative_artifact_specifier;
 use crate::module::{
-    NamedTypeImport, Optionality, PropertySignature, TypeAlias, TypeScriptItem, TypeScriptKeyword,
+    NamedImport, Optionality, PropertySignature, TypeAlias, TypeScriptItem, TypeScriptKeyword,
     TypeScriptModule, TypeScriptType,
 };
 
@@ -64,7 +64,7 @@ pub(crate) fn param_type_file<TLiteralContext>(
         .into_iter()
         .map(|selected| {
             let name = output_type_name(selected);
-            NamedTypeImport {
+            NamedImport {
                 specifier: relative_artifact_specifier(
                     path.reference(),
                     field_artifact_path(selected, OUTPUT_TYPE).reference(),
@@ -83,7 +83,7 @@ pub(crate) fn param_type_file<TLiteralContext>(
         .collect::<BTreeSet<_>>();
     let parameters_import = field.parameters.as_ref().map(|_| {
         let name = parameters_type_name(field.field);
-        NamedTypeImport {
+        NamedImport {
             specifier: relative_artifact_specifier(
                 path.reference(),
                 field_artifact_path(field.field, PARAMETERS_TYPE).reference(),
@@ -102,13 +102,26 @@ pub(crate) fn param_type_file<TLiteralContext>(
         aliased: TypeScriptType::Object(vec![
             required("data", object_type(field.data.reference(), options)),
             required("parameters", parameters),
+            required(
+                "link",
+                TypeScriptType::reference(link_type_name(field.field.parent_entity_name).as_str()),
+            ),
         ]),
+    };
+    let link_import = NamedImport {
+        specifier: relative_artifact_specifier(
+            path.reference(),
+            link_type_path(field.field.parent_entity_name).reference(),
+        ),
+        imported: link_type_name(field.field.parent_entity_name),
+        local: link_type_name(field.field.parent_entity_name),
     };
     TypeScriptModule {
         items: sorted_imports(
             output_type_imports
                 .chain(custom_scalar_imports(custom_scalars.reference(), options))
-                .chain(parameters_import),
+                .chain(parameters_import)
+                .chain(std::iter::once(link_import)),
         )
         .chain(std::iter::once(TypeScriptItem::ExportedTypeAlias(param)))
         .collect(),
@@ -199,7 +212,7 @@ pub(crate) fn output_type_file(
         .ok_or(TypeScriptGenerationError::SourceNotRelative(field))?;
     TypeScriptModule {
         items: vec![
-            TypeScriptItem::NamedTypeImport(NamedTypeImport {
+            TypeScriptItem::NamedTypeImport(NamedImport {
                 specifier,
                 imported: export.to_string(),
                 local: "resolver".to_owned(),
@@ -233,7 +246,7 @@ pub(crate) fn link_type_file(link: &LinkType) -> TypeScriptModule {
         items: match link.concrete_types.as_slice() {
             [] => alias(TypeScriptType::Keyword(TypeScriptKeyword::Never)).wrap_vec(),
             concrete => vec![
-                TypeScriptItem::NamedTypeImport(NamedTypeImport {
+                TypeScriptItem::NamedTypeImport(NamedImport {
                     specifier: RUNTIME_PACKAGE.to_owned(),
                     imported: "Link".to_owned(),
                     local: "Link".to_owned(),
@@ -462,11 +475,11 @@ fn custom_scalar_local_name(scalar: EntityName) -> String {
 fn custom_scalar_imports<'a>(
     scalars: &'a BTreeSet<EntityName>,
     options: &'a Options,
-) -> impl Iterator<Item = NamedTypeImport> + 'a {
+) -> impl Iterator<Item = NamedImport> + 'a {
     scalars.iter().filter_map(|scalar| {
         let custom = options.custom_scalar_types.get(scalar)?;
         let module = custom.import?;
-        NamedTypeImport {
+        NamedImport {
             specifier: module.0.to_owned(),
             imported: custom.name.to_owned(),
             local: custom_scalar_local_name(scalar.dereference()),
@@ -477,7 +490,7 @@ fn custom_scalar_imports<'a>(
 
 /// `imports` in specifier order.
 pub(crate) fn sorted_imports(
-    imports: impl Iterator<Item = NamedTypeImport>,
+    imports: impl Iterator<Item = NamedImport>,
 ) -> impl Iterator<Item = TypeScriptItem> {
     imports
         .collect::<BTreeSet<_>>()
@@ -508,7 +521,7 @@ pub(crate) fn record_of_never() -> TypeScriptType {
 /// The specifier that imports the source file `source` from the artifact at `from`: `source`
 /// relative to `from`'s folder inside the artifact folder, `/`-separated, `./`-prefixed, the
 /// extension dropped. `None` when no relative path leads there.
-fn source_specifier(
+pub(crate) fn source_specifier(
     from: &ArtifactPath,
     source: RelativePathToSourceFile,
     options: &Options,

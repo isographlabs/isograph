@@ -7,7 +7,7 @@ use crate::generate_types::{OUTPUT_TYPE, PARAM_TYPE, output_type_name, param_typ
 use crate::imports::relative_artifact_specifier;
 use crate::module::{
     ArtifactImport, ArtifactModule, ArtifactObjectEntry, ArtifactValue, DeclaredExportType,
-    DeclaredTypeArgument, DefaultExportType, NamedTypeImport,
+    DeclaredTypeArgument, DefaultExportType, NamedImport,
 };
 
 /// The package the artifact types and the runtime live in.
@@ -26,7 +26,7 @@ pub(crate) fn entrypoint_artifact(
     root_entity: EntityName,
 ) -> ArtifactModule {
     let path = entrypoint_path(entrypoint);
-    let type_import = |file: &str, name: String| NamedTypeImport {
+    let type_import = |file: &str, name: String| NamedImport {
         specifier: relative_artifact_specifier(
             path.reference(),
             field_artifact_path(entrypoint, file).reference(),
@@ -37,7 +37,7 @@ pub(crate) fn entrypoint_artifact(
     ArtifactModule {
         default_export_type: DefaultExportType::Declared(DeclaredExportType {
             binding: "artifact".to_owned(),
-            type_import: NamedTypeImport {
+            type_import: NamedImport {
                 specifier: RUNTIME_PACKAGE.to_owned(),
                 imported: ISOGRAPH_ENTRYPOINT.to_owned(),
                 local: ISOGRAPH_ENTRYPOINT.to_owned(),
@@ -112,15 +112,6 @@ pub(crate) fn raw_query_text_file(
 /// `<Entity>/<selectable>/normalization_ast.ts`.
 pub(crate) fn normalization_ast_path(entrypoint: EntityNameAndSelectableName) -> ArtifactPath {
     field_artifact_path(entrypoint, NORMALIZATION_AST)
-}
-
-/// A module whose default export is an empty object, at `P/f/<file>`.
-pub(crate) fn stub_artifact(field: EntityNameAndSelectableName, file: &str) -> ArtifactModule {
-    ArtifactModule {
-        path: field_artifact_path(field, file),
-        default_export: ArtifactValue::Object(Vec::new()),
-        default_export_type: DefaultExportType::Inferred,
-    }
 }
 
 pub(crate) fn entrypoint_path(entrypoint: EntityNameAndSelectableName) -> ArtifactPath {

@@ -7,6 +7,7 @@ mod imports;
 mod iso_overloads;
 mod module;
 mod normalization_ast;
+mod reader_artifact;
 mod swc;
 
 use common_lang_types::{ConstExportName, EntityNameAndSelectableName};
@@ -18,10 +19,9 @@ use prelude::Postfix;
 pub use custom_scalar::{ModuleSpecifier, TypeScriptCustomScalarType};
 pub use module::{
     ArtifactImport, ArtifactModule, ArtifactObjectEntry, ArtifactValue, DeclaredExportType,
-    DeclaredTypeArgument, DefaultExportType, NamedTypeImport,
+    DeclaredTypeArgument, DefaultExportType, NamedImport,
 };
 
-use crate::entrypoint::{RESOLVER_READER, stub_artifact};
 use crate::module::{TypeScriptModule, module_of_artifact};
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
@@ -68,18 +68,25 @@ pub fn generate_artifacts<TLiteralContext>(
             } else {
                 None
             };
+            let resolver_reader = field
+                .resolver_reader
+                .as_ref()
+                .map(|reader| {
+                    reader_artifact::reader_artifact_file(
+                        field,
+                        reader,
+                        export_name(field.resolver.context.reference()),
+                        options,
+                    )
+                })
+                .transpose()?;
             let modules = std::iter::once(generate_types::param_type_file(field, options))
                 .chain(field.parameters.as_ref().map(|parameters| {
                     generate_types::parameters_type_file(field.field, parameters, options)
                 }))
                 .chain(output_type)
+                .chain(resolver_reader)
                 .map(|module| printed(module.reference()))
-                .chain(
-                    field
-                        .resolver_reader
-                        .as_ref()
-                        .map(|_| printed_artifact(stub_artifact(field.field, RESOLVER_READER))),
-                )
                 .collect::<Vec<_>>();
             modules.wrap_ok()
         })
@@ -320,7 +327,7 @@ mod tests {
             text.contains("readonly parameters: Record<PropertyKey, never>;"),
             "{text}"
         );
-        assert!(!text.contains("import"), "{text}");
+        assert_eq!(text.matches("import").count(), 1, "{text}");
         assert!(!has_path(artifacts.as_slice(), "Pet/f/parameters_type.ts"));
     }
 
@@ -373,7 +380,7 @@ mod tests {
         );
         assert!(param.contains("readonly url: string;"), "{param}");
         assert_eq!(param.matches(import).count(), 1, "{param}");
-        assert_eq!(param.matches("import").count(), 2, "{param}");
+        assert_eq!(param.matches("import").count(), 3, "{param}");
         let parameters = text_at(artifacts.as_slice(), "Pet/f/parameters_type.ts");
         assert_eq!(parameters.matches(import).count(), 1, "{parameters}");
     }
@@ -607,7 +614,7 @@ mod tests {
     }
 
     #[test]
-    fn a_reader_is_an_empty_object_and_the_normalization_ast_is_the_query_s_ast() {
+    fn a_reader_is_a_reader_artifact_and_the_normalization_ast_is_the_query_s_ast() {
         let mut checkins = field("Pet", "Checkins", Vec::new());
         checkins.resolver_reader = ReaderSelectionSet(Vec::new()).wrap_some();
         let artifacts = generated(
@@ -617,9 +624,14 @@ mod tests {
             }
             .reference(),
         );
-        assert_eq!(
-            text_at(artifacts.as_slice(), "Pet/Checkins/resolver_reader.ts"),
-            "export default {};\n"
+        assert!(
+            text_at(artifacts.as_slice(), "Pet/Checkins/resolver_reader.ts")
+                .contains("readerAst: []"),
+        );
+        assert!(
+            !artifacts
+                .iter()
+                .any(|(_, text)| text.contains("export default {};"))
         );
         let ast = text_at(artifacts.as_slice(), "Pet/Checkins/normalization_ast.ts");
         assert!(ast.contains("selectableName: \"pets\""), "{ast}");

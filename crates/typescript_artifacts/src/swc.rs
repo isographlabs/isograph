@@ -22,9 +22,9 @@ use swc_ecma_codegen::{Config, Emitter};
 
 use crate::imports::{artifact_import_identifier, artifact_import_specifier};
 use crate::module::{
-    ArtifactImport, ArtifactValue, DeclaredConst, FunctionParam, FunctionSignature,
-    NamedTypeImport, Optionality, TypeAlias, TypeParam, TypeScriptItem, TypeScriptKeyword,
-    TypeScriptModule, TypeScriptType,
+    ArtifactImport, ArtifactValue, DeclaredConst, FunctionParam, FunctionSignature, NamedImport,
+    Optionality, TypeAlias, TypeParam, TypeScriptItem, TypeScriptKeyword, TypeScriptModule,
+    TypeScriptType,
 };
 
 /// Gives a property's description a leading comment and returns the span to attach it to.
@@ -192,7 +192,8 @@ fn module_item(from: &ArtifactPath, item: &TypeScriptItem, comment_at: CommentAt
     match item {
         TypeScriptItem::DefaultImport(import) => default_import(from, import, TypeOnly::No),
         TypeScriptItem::TypeImport(import) => default_import(from, import, TypeOnly::Yes),
-        TypeScriptItem::NamedTypeImport(import) => named_type_import(import),
+        TypeScriptItem::NamedTypeImport(import) => named_import(import, TypeOnly::Yes),
+        TypeScriptItem::NamedImport(import) => named_import(import, TypeOnly::No),
         TypeScriptItem::TypeAlias(alias) => {
             ModuleItem::Stmt(Stmt::Decl(Decl::TsTypeAlias(type_alias(alias, comment_at))))
         }
@@ -280,7 +281,7 @@ fn type_alias(alias: &TypeAlias, comment_at: CommentAt) -> Box<TsTypeAliasDecl> 
     .boxed()
 }
 
-fn named_type_import(import: &NamedTypeImport) -> ModuleItem {
+fn named_import(import: &NamedImport, type_only: TypeOnly) -> ModuleItem {
     ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
         span: DUMMY_SP,
         specifiers: ImportSpecifier::Named(ImportNamedSpecifier {
@@ -292,7 +293,10 @@ fn named_type_import(import: &NamedTypeImport) -> ModuleItem {
         })
         .wrap_vec(),
         src: string(import.specifier.as_str()).boxed(),
-        type_only: true,
+        type_only: match type_only {
+            TypeOnly::Yes => true,
+            TypeOnly::No => false,
+        },
         with: None,
         phase: ImportPhase::Evaluation,
     }))
@@ -402,6 +406,7 @@ fn expression(value: &ArtifactValue) -> Expr {
         ArtifactValue::Import(import) => {
             Expr::Ident(ident(artifact_import_identifier(import).as_str()))
         }
+        ArtifactValue::NamedImport(import) => Expr::Ident(ident(import.local.as_str())),
     }
 }
 
@@ -669,8 +674,9 @@ mod tests {
     use super::print;
     use crate::module::{
         ArtifactImport, ArtifactModule, ArtifactObjectEntry, ArtifactValue, DefaultExportType,
-        Optionality, PropertySignature, TemplateLiteralSpan, TemplateLiteralType, TypeAlias,
-        TypeScriptItem, TypeScriptKeyword, TypeScriptModule, TypeScriptType, module_of_artifact,
+        NamedImport, Optionality, PropertySignature, TemplateLiteralSpan, TemplateLiteralType,
+        TypeAlias, TypeScriptItem, TypeScriptKeyword, TypeScriptModule, TypeScriptType,
+        module_of_artifact,
     };
 
     fn path(text: &str) -> ArtifactPath {
@@ -738,6 +744,41 @@ mod tests {
         assert!(text.contains("b: Query__A__query_text"), "{text}");
         assert!(text.contains("again: Query__A__query_text"), "{text}");
         assert!(text.contains("a: Query__A__normalization_ast"), "{text}");
+    }
+
+    #[test]
+    fn a_named_import_prints_its_local_name_and_one_value_import() {
+        let named = |imported: &str, local: &str| NamedImport {
+            specifier: "x".to_owned(),
+            imported: imported.to_owned(),
+            local: local.to_owned(),
+        };
+        let renamed = print(
+            TypeScriptModule {
+                path: path("Query/A/resolver_reader.ts"),
+                items: vec![
+                    TypeScriptItem::NamedImport(named("a", "b")),
+                    TypeScriptItem::ExportDefault(ArtifactValue::Object(
+                        entry("value", ArtifactValue::NamedImport(named("a", "b"))).wrap_vec(),
+                    )),
+                ],
+            }
+            .reference(),
+        );
+        assert!(
+            renamed.contains("import { a as b } from \"x\";"),
+            "{renamed}"
+        );
+        assert!(renamed.contains("value: b"), "{renamed}");
+        assert!(!renamed.contains("import type"), "{renamed}");
+        let same = print(
+            TypeScriptModule {
+                path: path("Query/A/resolver_reader.ts"),
+                items: TypeScriptItem::NamedImport(named("a", "a")).wrap_vec(),
+            }
+            .reference(),
+        );
+        assert!(same.contains("import { a } from \"x\";"), "{same}");
     }
 
     #[test]
