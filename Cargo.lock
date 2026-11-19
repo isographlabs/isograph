@@ -864,6 +864,7 @@ dependencies = [
 name = "isograph_config"
 version = "0.5.3"
 dependencies = [
+ "prelude",
  "serde",
  "serde_json",
 ]

@@ -77,8 +77,11 @@ async fn serve<TProfile: CompilationProfile>(
     }
     tracing::info!(config = %config_path.display(), port, "isograph daemon up");
 
-    let globs = match ProjectGlobs::parse(config.source_files.as_slice(), config.schema.as_slice())
-    {
+    let globs = match ProjectGlobs::parse(
+        config.source_files.as_slice(),
+        config.schema.as_slice(),
+        config.output_directory.as_deref(),
+    ) {
         Ok(globs) => globs,
         Err(e) => {
             tracing::error!(error = %e, "invalid config globs");
@@ -282,7 +285,7 @@ mod tests {
 
     fn empty_state() -> IsographState<TestProfile> {
         IsographState::new(
-            crate::watch::ProjectGlobs::parse(&["src/**".to_owned()], &[])
+            crate::watch::ProjectGlobs::parse(&["src/**".to_owned()], &[], None)
                 .expect("the test glob is valid"),
         )
     }

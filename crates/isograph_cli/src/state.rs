@@ -403,7 +403,7 @@ mod tests {
 
     fn empty() -> IsographState<TestProfile> {
         IsographState::new(
-            crate::watch::ProjectGlobs::parse(&["src/**".to_owned()], &[])
+            crate::watch::ProjectGlobs::parse(&["src/**".to_owned()], &[], None)
                 .expect("the test glob is valid"),
         )
     }
@@ -1176,9 +1176,12 @@ mod tests {
 
     fn with_schema_glob() -> IsographState<TestProfile> {
         let mut state = with_config();
-        state.globs =
-            crate::watch::ProjectGlobs::parse(&["src/**".to_owned()], &["schema/**".to_owned()])
-                .expect("the test globs are valid");
+        state.globs = crate::watch::ProjectGlobs::parse(
+            &["src/**".to_owned()],
+            &["schema/**".to_owned()],
+            None,
+        )
+        .expect("the test globs are valid");
         state
     }
 

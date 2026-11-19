@@ -8,6 +8,7 @@ license = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
+prelude = { path = "../prelude" }
 serde_json = { workspace = true }
 
 [lints]

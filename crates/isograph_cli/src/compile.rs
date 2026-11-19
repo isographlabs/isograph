@@ -147,7 +147,7 @@ mod tests {
     fn state_with(source_files: &[&str]) -> IsographState<TestProfile> {
         let owned = |globs: &[&str]| globs.iter().map(|g| (*g).to_owned()).collect::<Vec<_>>();
         let mut state = IsographState::new(
-            ProjectGlobs::parse(&owned(source_files), &owned(&["schema/**"]))
+            ProjectGlobs::parse(&owned(source_files), &owned(&["schema/**"]), None)
                 .expect("the test globs are valid"),
         );
         intern_config_directory(&mut state.db, Path::new("/tmp/proj/isograph.config.json"));
@@ -326,7 +326,7 @@ mod tests {
     #[test]
     fn project_errors_without_a_working_directory_is_missing_working_directory() {
         let mut state = IsographState::<TestProfile>::new(
-            ProjectGlobs::parse(&["src/**".to_owned()], &[]).expect("the test glob is valid"),
+            ProjectGlobs::parse(&["src/**".to_owned()], &[], None).expect("the test glob is valid"),
         );
         state
             .db

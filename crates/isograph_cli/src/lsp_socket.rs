@@ -305,7 +305,7 @@ mod tests {
                 .build()
                 .expect("a test can start a tokio runtime");
             let mut state = IsographState::<TestProfile>::new(
-                crate::watch::ProjectGlobs::parse(&["src/**".to_owned()], &[])
+                crate::watch::ProjectGlobs::parse(&["src/**".to_owned()], &[], None)
                     .expect("the test glob is valid"),
             );
             crate::state::intern_config_directory(

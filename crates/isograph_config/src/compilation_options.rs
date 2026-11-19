@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use serde::Deserialize;
 
 pub static ISOGRAPH_FOLDER: &str = "__isograph";
@@ -14,10 +16,19 @@ pub struct IsographProjectConfig {
     /// Glob patterns relative to the config file's directory.
     #[serde(default)]
     pub schema: Vec<String>,
+    /// The directory, relative to the config file's directory, whose `__isograph` folder holds
+    /// the generated artifacts. Absent: the compiler writes no artifacts, and the transforms
+    /// look in the config file's directory.
+    #[serde(default)]
+    pub output_directory: Option<PathBuf>,
 }
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
+    use prelude::Postfix;
+
     use super::{ISOGRAPH_FOLDER, IsographProjectConfig};
 
     #[test]
@@ -39,6 +50,21 @@ mod tests {
             serde_json::from_str(r#"{"source_files":[],"schema":["schema/**","!schema/old/**"]}"#)
                 .expect("the config is valid");
         assert_eq!(config.schema, ["schema/**", "!schema/old/**"]);
+    }
+
+    #[test]
+    fn a_config_with_an_output_directory_has_it() {
+        let config: IsographProjectConfig =
+            serde_json::from_str(r#"{"source_files":[],"output_directory":"src"}"#)
+                .expect("the config is valid");
+        assert_eq!(config.output_directory, PathBuf::from("src").wrap_some());
+    }
+
+    #[test]
+    fn a_config_without_an_output_directory_has_none() {
+        let config: IsographProjectConfig =
+            serde_json::from_str(r#"{"source_files":[]}"#).expect("the config is valid");
+        assert_eq!(config.output_directory, None);
     }
 
     #[test]

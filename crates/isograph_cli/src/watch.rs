@@ -128,9 +128,13 @@ pub fn start<TProfile: CompilationProfile>(
             })
         })?;
     let mut paths = Vec::new();
-    visit_dirs_skipping_isograph(config_directory.reference(), &mut |entry| {
-        paths.push(entry.path());
-    });
+    visit_dirs_skipping_isograph(
+        config_directory.reference(),
+        globs.reference(),
+        &mut |entry| {
+            paths.push(entry.path());
+        },
+    );
     let boot: Vec<SourceFileEvent> = paths
         .into_iter()
         .filter_map(|path| {
@@ -191,20 +195,34 @@ pub fn apply<TProfile: CompilationProfile>(
     }
 }
 
-/// The config's `source_files` and `schema` globs.
+/// The config's `source_files` and `schema` globs, and the artifact folder the watcher skips.
 #[derive(Clone)]
 pub(crate) struct ProjectGlobs {
     source_files: Globs,
     schema: Globs,
+    /// `<output_directory>/__isograph`, or `__isograph` when the config has none.
+    artifact_folder: PathBuf,
 }
 
 impl ProjectGlobs {
-    pub(crate) fn parse(source_files: &[String], schema: &[String]) -> Result<Self, WatchError> {
+    pub(crate) fn parse(
+        source_files: &[String],
+        schema: &[String],
+        output_directory: Option<&Path>,
+    ) -> Result<Self, WatchError> {
         ProjectGlobs {
             source_files: Globs::parse(source_files).map_err(WatchError::SourceFilesGlob)?,
             schema: Globs::parse(schema).map_err(WatchError::SchemaGlob)?,
+            artifact_folder: output_directory
+                .unwrap_or(Path::new(""))
+                .join(ISOGRAPH_FOLDER),
         }
         .wrap_ok()
+    }
+
+    /// `path` is inside the artifact folder.
+    fn is_in_artifact_folder(&self, path: &Path, config_directory: &Path) -> bool {
+        path.starts_with(config_directory.join(self.artifact_folder.reference()))
     }
 
     /// Matches `source_files` and the host language includes it.
@@ -465,7 +483,7 @@ fn categorize_file(
         return ChangedFileKind::Config.wrap_some();
     }
     let config_directory = config_path.parent()?;
-    if is_skipped_isograph(path, config_directory) {
+    if globs.is_in_artifact_folder(path, config_directory) {
         return None;
     }
     let relative = pathdiff::diff_paths(path, config_directory)?;
@@ -488,7 +506,7 @@ fn categorize_folder(
         return ChangedFileKind::Config.wrap_some();
     }
     let config_directory = config_path.parent()?;
-    if is_skipped_isograph(path, config_directory) {
+    if globs.is_in_artifact_folder(path, config_directory) {
         return None;
     }
     if path.starts_with(config_directory) {
@@ -498,19 +516,19 @@ fn categorize_folder(
     }
 }
 
-fn is_skipped_isograph(path: &Path, config_directory: &Path) -> bool {
-    pathdiff::diff_paths(path, config_directory)
-        .is_some_and(|relative| relative.starts_with(ISOGRAPH_FOLDER))
-}
-
-fn visit_dirs_skipping_isograph(dir: &Path, cb: &mut dyn FnMut(&std::fs::DirEntry)) {
+fn visit_dirs_skipping_isograph(
+    dir: &Path,
+    globs: &ProjectGlobs,
+    cb: &mut dyn FnMut(&std::fs::DirEntry),
+) {
     let config_directory = dir;
-    visit_dirs_skipping_isograph_from(dir, config_directory, cb);
+    visit_dirs_skipping_isograph_from(dir, config_directory, globs, cb);
 }
 
 fn visit_dirs_skipping_isograph_from(
     dir: &Path,
     config_directory: &Path,
+    globs: &ProjectGlobs,
     cb: &mut dyn FnMut(&std::fs::DirEntry),
 ) {
     let entries = match std::fs::read_dir(dir) {
@@ -530,10 +548,10 @@ fn visit_dirs_skipping_isograph_from(
         };
         let path = entry.path();
         if path.is_dir() {
-            if is_skipped_isograph(path.reference(), config_directory) {
+            if globs.is_in_artifact_folder(path.reference(), config_directory) {
                 continue;
             }
-            visit_dirs_skipping_isograph_from(path.reference(), config_directory, cb);
+            visit_dirs_skipping_isograph_from(path.reference(), config_directory, globs, cb);
         } else {
             cb(&entry);
         }
@@ -547,7 +565,7 @@ fn scan_folder<TProfile: CompilationProfile>(
     folder: &Path,
 ) {
     let mut paths = Vec::new();
-    visit_dirs_skipping_isograph_from(folder, config_directory, &mut |entry| {
+    visit_dirs_skipping_isograph_from(folder, config_directory, globs, &mut |entry| {
         paths.push(entry.path());
     });
     for path in paths {
@@ -584,7 +602,7 @@ fn post_file<TProfile: CompilationProfile>(
         warn!(path = %path.display(), "skipping non-UTF8 path");
         return;
     }
-    if is_skipped_isograph(path.reference(), config_directory) {
+    if globs.is_in_artifact_folder(path.reference(), config_directory) {
         return;
     }
     let relative = match pathdiff::diff_paths(path.reference(), config_directory) {
@@ -741,9 +759,20 @@ mod tests {
         }
 
         fn with_schema(source_files: &[&str], schema: &[&str]) -> Self {
-            let globs =
-                ProjectGlobs::parse(owned(source_files).as_slice(), owned(schema).as_slice())
-                    .expect("the test globs are valid");
+            Self::with_output(source_files, schema, None)
+        }
+
+        fn with_output(
+            source_files: &[&str],
+            schema: &[&str],
+            output_directory: Option<&Path>,
+        ) -> Self {
+            let globs = ProjectGlobs::parse(
+                owned(source_files).as_slice(),
+                owned(schema).as_slice(),
+                output_directory,
+            )
+            .expect("the test globs are valid");
             let dir = tempfile::tempdir().expect("a test can create a temp directory");
             let config_path = dir.path().join("isograph.config.json");
             std::fs::write(config_path.reference(), "{}\n").expect("a test can write a config");
@@ -811,7 +840,8 @@ mod tests {
 
     #[test]
     fn folder_src_under_the_config_directory_is_a_source_folder() {
-        let globs = ProjectGlobs::parse(&["src/**/*.in".to_owned()], &[]).expect("valid glob");
+        let globs =
+            ProjectGlobs::parse(&["src/**/*.in".to_owned()], &[], None).expect("valid glob");
         let dir = tempfile::tempdir().expect("a test can create a temp directory");
         let config_path = dir.path().join("isograph.config.json");
         std::fs::write(config_path.reference(), "{}\n").expect("a test can write a config");
@@ -977,6 +1007,48 @@ mod tests {
         assert!(contents(h.state.reference(), &format!("{ISOGRAPH_FOLDER}/a.in")).is_none());
         assert_eq!(
             contents(h.state.reference(), "src/__isograph/b.in").as_deref(),
+            "keep".wrap_some()
+        );
+    }
+
+    #[test]
+    fn the_output_directorys_isograph_folder_is_out_of_scope_and_the_root_one_is_not() {
+        let mut h = Harness::with_output(&["**/*.in"], &[], Path::new("src").wrap_some());
+        h.write("src/__isograph/a.in", "skip");
+        h.write(&format!("{ISOGRAPH_FOLDER}/b.in"), "keep");
+        h.ingest(
+            (
+                SourceEventKind::CreateOrModify(h.abs("src/__isograph/a.in")),
+                ChangedFileKind::File,
+            )
+                .wrap_vec(),
+        );
+        h.ingest(
+            (
+                SourceEventKind::CreateOrModify(h.abs(&format!("{ISOGRAPH_FOLDER}/b.in"))),
+                ChangedFileKind::File,
+            )
+                .wrap_vec(),
+        );
+        assert!(contents(h.state.reference(), "src/__isograph/a.in").is_none());
+        assert_eq!(
+            contents(h.state.reference(), &format!("{ISOGRAPH_FOLDER}/b.in")).as_deref(),
+            "keep".wrap_some()
+        );
+    }
+
+    #[test]
+    fn boot_skips_the_output_directorys_isograph_folder() {
+        let mut h = Harness::with_output(&["**/*.in"], &[], Path::new("src").wrap_some());
+        h.write("src/__isograph/a.in", "skip");
+        h.write("src/b.in", "keep");
+        let (watch_tx, _watch_rx) = unbounded_channel();
+        let started = start::<InHostProfile>(watch_tx, h.config_path.reference(), h.globs.clone())
+            .expect("the watcher starts");
+        h.ingest(started.boot);
+        assert!(contents(h.state.reference(), "src/__isograph/a.in").is_none());
+        assert_eq!(
+            contents(h.state.reference(), "src/b.in").as_deref(),
             "keep".wrap_some()
         );
     }
@@ -1204,7 +1276,7 @@ mod tests {
 
     #[test]
     fn an_invalid_schema_glob_is_a_schema_glob_error() {
-        let error = ProjectGlobs::parse(&["src/**".to_owned()], &["schema/[".to_owned()])
+        let error = ProjectGlobs::parse(&["src/**".to_owned()], &["schema/[".to_owned()], None)
             .err()
             .expect("schema/[ is not a glob");
         let WatchError::SchemaGlob(invalid) = error else {
