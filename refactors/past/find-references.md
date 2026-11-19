@@ -347,7 +347,7 @@ fn references_in_file_to<TProfile: CompilationProfile>(
         .filter(|reference| reference.item == target)
         .map(|reference| line_index.range(reference.location))
         .collect::<Vec<_>>();
-    (!ranges.is_empty()).then(|| ReferencesInFile { path, ranges })
+    (!ranges.is_empty()).then_some(ReferencesInFile { path, ranges })
 }
 ```
 
@@ -454,3 +454,5 @@ Handle seam, `crates/isograph_cli/src/state.rs`, over `textDocument/references`:
 - outside every literal is `null`; on `field` and on an undefined field's selection is `[]`.
 
 `lsp_socket.rs`: the `initialize` capabilities test asserts `referencesProvider: true`.
+
+The tests that sent `textDocument/references` as a method with no handler (`lsp_request_returns_method_not_found` in `state.rs`; `unknown_request_after_initialize_is_method_not_found_then_hello_world`, `unknown_request_is_still_method_not_found`, `dropping_one_connection_leaves_the_other_answered` in `lsp_socket.rs`) send `textDocument/rename` instead.
