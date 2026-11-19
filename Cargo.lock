@@ -837,6 +837,7 @@ name = "isograph_config"
 version = "0.5.3"
 dependencies = [
  "serde",
+ "serde_json",
 ]
 
 [[package]]
