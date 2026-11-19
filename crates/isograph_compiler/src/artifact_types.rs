@@ -6,7 +6,6 @@ use common_lang_types::{
     DescriptionValue, Diagnostic, DiagnosticResult, EntityName, EntityNameAndSelectableName,
     RelativePathToSourceFile, SelectableName, SelectionName, VariableName,
 };
-use intern::Lookup;
 use isograph_parser::{
     IsoLiteralItem, SelectableDeclaration, Selection, SelectionSet, VariableDeclarationList,
 };
@@ -125,20 +124,7 @@ pub struct FieldTypes {
     pub data: ArtifactObjectType,
     pub parameters: Option<ParametersType>,
     /// Every client field or pointer the selection set selects at any depth, in selection order.
-    pub selected: Vec<SelectedClientField>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct SelectedClientField {
-    pub field: EntityNameAndSelectableName,
-    pub loadability: Loadability,
-}
-
-/// Whether a selection has `@loadable`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Loadability {
-    Loadable,
-    Eager,
+    pub selected: Vec<EntityNameAndSelectableName>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
@@ -197,7 +183,7 @@ fn object_type<TProfile: CompilationProfile>(
     field: EntityNameAndSelectableName,
     entity: EntityName,
     selection_set: &SelectionSet,
-) -> Result<(ArtifactObjectType, Vec<SelectedClientField>), GenerationError> {
+) -> Result<(ArtifactObjectType, Vec<EntityNameAndSelectableName>), GenerationError> {
     let fields = selection_set
         .0
         .iter()
@@ -225,7 +211,7 @@ fn selection_field<TProfile: CompilationProfile>(
     field: EntityNameAndSelectableName,
     entity: EntityName,
     selection: &Selection,
-) -> Result<(ArtifactObjectField, Vec<SelectedClientField>), GenerationError> {
+) -> Result<(ArtifactObjectField, Vec<EntityNameAndSelectableName>), GenerationError> {
     let name = selection.name.item.0;
     let selectable = selectable_named(db, client, entity, name.unchecked_conversion())
         .clone()
@@ -234,12 +220,9 @@ fn selection_field<TProfile: CompilationProfile>(
         entity,
         selectable: selectable.name,
     };
-    let selected_self = || SelectedClientField {
-        field: EntityNameAndSelectableName {
-            parent_entity_name: entity,
-            selectable_name: selectable.name,
-        },
-        loadability: loadability(selection),
+    let selected_self = || EntityNameAndSelectableName {
+        parent_entity_name: entity,
+        selectable_name: selectable.name,
     };
     let nested_selection_set = selection
         .selection_set
@@ -251,7 +234,7 @@ fn selection_field<TProfile: CompilationProfile>(
                 return GenerationError::SelectionSetOnClientField(key).wrap_err();
             }
             (
-                Wrapper::Inner(ArtifactInnerType::ClientFieldOutput(selected_self().field)),
+                Wrapper::Inner(ArtifactInnerType::ClientFieldOutput(selected_self())),
                 selected_self().wrap_vec(),
             )
         }
@@ -321,22 +304,6 @@ fn selection_field<TProfile: CompilationProfile>(
         selected,
     )
         .wrap_ok()
-}
-
-const LOADABLE_DIRECTIVE: &str = "loadable";
-
-/// `Loadable` when `selection` has `@loadable`.
-fn loadability(selection: &Selection) -> Loadability {
-    let is_loadable = selection
-        .directive_set
-        .iter()
-        .flat_map(|directives| directives.item.0.iter())
-        .any(|directive| directive.item.name.item.0.lookup() == LOADABLE_DIRECTIVE);
-    if is_loadable {
-        Loadability::Loadable
-    } else {
-        Loadability::Eager
-    }
 }
 
 /// The parameters type of `variable_definitions`; `None` when it declares no variable.
@@ -475,8 +442,6 @@ pub struct FieldArtifacts<TLiteralContext> {
     pub parameters: Option<ParametersType>,
     pub output_type: Generation,
     pub resolver_reader: Generation,
-    /// The refetch reader, and the entrypoint and normalization AST of the field itself.
-    pub loadable_artifacts: Generation,
 }
 
 /// Where a field's resolver is: its source file and its literal's host-language context.
@@ -551,30 +516,15 @@ pub fn project_artifacts<TProfile: CompilationProfile>(
     let mut pending = entrypoints.clone();
     while let Some(field) = pending.pop() {
         if reachable.insert(field) {
-            pending.extend(
-                types_of(field)?
-                    .selected
-                    .iter()
-                    .map(|selected| selected.field),
-            );
+            pending.extend(types_of(field)?.selected.iter().copied());
         }
     }
-    let loadable: BTreeSet<EntityNameAndSelectableName> = reachable
-        .iter()
-        .map(|field| types_of(field.dereference()))
-        .collect::<Result<Vec<_>, _>>()?
-        .into_iter()
-        .flat_map(|types| types.selected)
-        .filter(|selected| selected.loadability == Loadability::Loadable)
-        .map(|selected| selected.field)
-        .collect();
     let output_types: BTreeSet<EntityNameAndSelectableName> = declared
         .iter()
         .map(|field| types_of(field.dereference()))
         .collect::<Result<Vec<_>, _>>()?
         .into_iter()
         .flat_map(|types| types.selected)
-        .map(|selected| selected.field)
         .chain(entrypoints.iter().copied())
         .collect();
     let generation = |set: &BTreeSet<EntityNameAndSelectableName>,
@@ -628,7 +578,6 @@ pub fn project_artifacts<TProfile: CompilationProfile>(
                 parameters: types.parameters,
                 output_type: generation(output_types.reference(), field),
                 resolver_reader: generation(reachable.reference(), field),
-                loadable_artifacts: generation(loadable.reference(), field),
             }
             .wrap_ok()
         })

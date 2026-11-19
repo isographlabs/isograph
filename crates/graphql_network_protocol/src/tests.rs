@@ -1123,8 +1123,8 @@ mod field_types {
     use intern::string_key::Intern;
     use isograph_compiler::{
         ArtifactInnerType, ArtifactInputType, ArtifactObjectField, ArtifactObjectType, FieldTypes,
-        FileMembership, GenerationError, IncludeFile, Loadability, ScalarKind, ScalarValueKind,
-        SelectedClientField, UnionWrapper, Wrapper, WrapperVariant, field_types,
+        FileMembership, GenerationError, IncludeFile, ScalarKind, ScalarValueKind, UnionWrapper,
+        Wrapper, WrapperVariant, field_types,
     };
     use prelude::Postfix;
 
@@ -1236,26 +1236,14 @@ mod field_types {
     fn a_selected_client_field_is_its_output_type_and_is_selected() {
         let db = db_with_literals(&[
             "field Pet.f { firstName }",
-            "field Pet.g { f, friends { f @loadable } }",
+            "field Pet.g { f, friends { f } }",
         ]);
         let types = types(&db, "Pet", "g").expect("the fixture is valid");
         assert_eq!(
             data_field(&types.data, "f").type_,
             Wrapper::Inner(ArtifactInnerType::ClientFieldOutput(named("Pet", "f")))
         );
-        assert_eq!(
-            types.selected,
-            vec![
-                SelectedClientField {
-                    field: named("Pet", "f"),
-                    loadability: Loadability::Eager,
-                },
-                SelectedClientField {
-                    field: named("Pet", "f"),
-                    loadability: Loadability::Loadable,
-                },
-            ]
-        );
+        assert_eq!(types.selected, vec![named("Pet", "f"), named("Pet", "f")]);
     }
 
     #[test]
@@ -1278,14 +1266,7 @@ mod field_types {
                 )
             )))
         );
-        assert_eq!(
-            types
-                .selected
-                .iter()
-                .map(|selected| selected.field)
-                .collect::<Vec<_>>(),
-            vec![named("Pet", "p")]
-        );
+        assert_eq!(types.selected, vec![named("Pet", "p")]);
     }
 
     #[test]

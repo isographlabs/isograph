@@ -5,7 +5,6 @@ use crate::module::{ArtifactImport, ArtifactModule, ArtifactObjectEntry, Artifac
 
 pub(crate) const NORMALIZATION_AST: &str = "normalization_ast.ts";
 pub(crate) const RESOLVER_READER: &str = "resolver_reader.ts";
-pub(crate) const REFETCH_READER: &str = "refetch_reader.ts";
 
 /// The entrypoint artifact of `entrypoint`, at the path the iso transforms import.
 pub(crate) fn entrypoint_artifact(entrypoint: EntityNameAndSelectableName) -> ArtifactModule {

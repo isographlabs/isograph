@@ -8,8 +8,6 @@ mod iso_overloads;
 mod module;
 mod swc;
 
-use std::collections::BTreeSet;
-
 use common_lang_types::{ConstExportName, EntityNameAndSelectableName};
 use isograph_compiler::{ArtifactPath, Generation, GenerationOptions, ProjectArtifacts};
 use prelude::Postfix;
@@ -17,7 +15,7 @@ use prelude::Postfix;
 pub use custom_scalar::{ModuleSpecifier, TypeScriptCustomScalarType};
 pub use module::{ArtifactImport, ArtifactModule, ArtifactObjectEntry, ArtifactValue};
 
-use crate::entrypoint::{NORMALIZATION_AST, REFETCH_READER, RESOLVER_READER, stub_artifact};
+use crate::entrypoint::{NORMALIZATION_AST, RESOLVER_READER, stub_artifact};
 use crate::module::{TypeScriptModule, module_of_artifact};
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
@@ -39,8 +37,8 @@ pub enum TypeScriptGenerationError {
 const TSCONFIG_JSON: &str = "{\n    \"compilerOptions\": {\n        \"noUnusedLocals\": false,\n        \"noUnusedParameters\": false,\n        \"jsx\": \"preserve\",\n        \"esModuleInterop\": true\n    }\n}\n";
 
 /// The path and text of every artifact of `project`, in this order: per field its param type,
-/// parameters type, output type, resolver reader, and refetch reader; per entrypoint and
-/// loadably selected field its entrypoint and normalization AST; per link type its output type;
+/// parameters type, output type, and resolver reader; per entrypoint its entrypoint and
+/// normalization AST; per link type its output type;
 /// `iso.ts`; `tsconfig.json`. `export_name` reads a literal's `export const` name.
 pub fn generate_artifacts<TLiteralContext>(
     project: &ProjectArtifacts<TLiteralContext>,
@@ -73,27 +71,11 @@ pub fn generate_artifacts<TLiteralContext>(
                     generated(field.resolver_reader)
                         .then(|| printed_artifact(stub_artifact(field.field, RESOLVER_READER))),
                 )
-                .chain(
-                    generated(field.loadable_artifacts)
-                        .then(|| printed_artifact(stub_artifact(field.field, REFETCH_READER))),
-                )
                 .collect::<Vec<_>>();
             modules.wrap_ok()
         })
         .collect::<Result<Vec<_>, TypeScriptGenerationError>>()?;
-    let entrypoints: BTreeSet<EntityNameAndSelectableName> = project
-        .entrypoints
-        .iter()
-        .copied()
-        .chain(
-            project
-                .fields
-                .iter()
-                .filter(|field| generated(field.loadable_artifacts))
-                .map(|field| field.field),
-        )
-        .collect();
-    let per_entrypoint = entrypoints.into_iter().flat_map(|entrypoint| {
+    let per_entrypoint = project.entrypoints.iter().copied().flat_map(|entrypoint| {
         [
             printed_artifact(entrypoint::entrypoint_artifact(entrypoint)),
             printed_artifact(stub_artifact(entrypoint, NORMALIZATION_AST)),
@@ -200,7 +182,6 @@ mod tests {
             parameters: None,
             output_type: Generation::NotGenerated,
             resolver_reader: Generation::NotGenerated,
-            loadable_artifacts: Generation::NotGenerated,
         }
     }
 
@@ -517,26 +498,31 @@ mod tests {
     }
 
     #[test]
-    fn readers_refetch_readers_and_normalization_asts_are_empty_objects() {
+    fn readers_and_normalization_asts_are_empty_objects() {
         let mut checkins = field("Pet", "Checkins", Vec::new());
         checkins.resolver_reader = Generation::Generated;
-        checkins.loadable_artifacts = Generation::Generated;
-        let artifacts = generated(project(checkins.wrap_vec()).reference());
-        let texts: Vec<&str> = [
-            "resolver_reader.ts",
-            "refetch_reader.ts",
-            "normalization_ast.ts",
-        ]
-        .into_iter()
-        .map(|file| {
-            text_at(
-                artifacts.as_slice(),
-                format!("Pet/Checkins/{file}").as_str(),
-            )
-        })
-        .collect();
-        assert_eq!(texts, ["export default {};\n"; 3]);
+        let artifacts = generated(
+            ProjectArtifacts {
+                entrypoints: named("Pet", "Checkins").wrap_vec(),
+                ..project(checkins.wrap_vec())
+            }
+            .reference(),
+        );
+        let texts: Vec<&str> = ["resolver_reader.ts", "normalization_ast.ts"]
+            .into_iter()
+            .map(|file| {
+                text_at(
+                    artifacts.as_slice(),
+                    format!("Pet/Checkins/{file}").as_str(),
+                )
+            })
+            .collect();
+        assert_eq!(texts, ["export default {};\n"; 2]);
         assert!(has_path(artifacts.as_slice(), "Pet/Checkins/entrypoint.ts"));
+        assert!(!has_path(
+            artifacts.as_slice(),
+            "Pet/Checkins/refetch_reader.ts"
+        ));
     }
 
     #[test]
@@ -718,7 +704,6 @@ mod tests {
     fn no_path_is_generated_twice() {
         let mut checkins = field("Pet", "Checkins", Vec::new());
         checkins.resolver_reader = Generation::Generated;
-        checkins.loadable_artifacts = Generation::Generated;
         checkins.output_type = Generation::Generated;
         let artifacts = generated(
             ProjectArtifacts {

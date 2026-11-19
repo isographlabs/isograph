@@ -811,17 +811,13 @@ mod generation_tests {
     fn generation_of(
         project: &ProjectArtifacts<TypeScriptLiteralContext>,
         field: &str,
-    ) -> (Generation, Generation, Generation) {
+    ) -> (Generation, Generation) {
         let field = project
             .fields
             .iter()
             .find(|artifacts| artifacts.field == named("Pet", field))
             .expect("the fixture declares the field");
-        (
-            field.output_type,
-            field.resolver_reader,
-            field.loadable_artifacts,
-        )
+        (field.output_type, field.resolver_reader)
     }
 
     #[test]
@@ -831,59 +827,15 @@ mod generation_tests {
         let project = project(state.reference()).expect("the fixture is valid");
         assert_eq!(
             generation_of(project.reference(), "a"),
-            (
-                Generation::Generated,
-                Generation::Generated,
-                Generation::NotGenerated
-            )
+            (Generation::Generated, Generation::Generated)
         );
         assert_eq!(
             generation_of(project.reference(), "b"),
-            (
-                Generation::Generated,
-                Generation::Generated,
-                Generation::NotGenerated
-            )
+            (Generation::Generated, Generation::Generated)
         );
         assert_eq!(
             generation_of(project.reference(), "c"),
-            (
-                Generation::NotGenerated,
-                Generation::NotGenerated,
-                Generation::NotGenerated
-            )
-        );
-    }
-
-    #[test]
-    fn a_loadable_selection_generates_loadable_artifacts_only_when_reachable() {
-        let mut state = state();
-        present(
-            &mut state,
-            "/tmp/proj/src/Pet.ts",
-            REACHABILITY
-                .replace("{ b }", "{ b @loadable }")
-                .replace("field Pet.c`", "field Pet.c { b @loadable }`")
-                .as_str(),
-        );
-        let project = project(state.reference()).expect("the fixture is valid");
-        assert_eq!(
-            generation_of(project.reference(), "b").2,
-            Generation::Generated
-        );
-
-        let mut unreachable = self::state();
-        present(
-            &mut unreachable,
-            "/tmp/proj/src/Pet.ts",
-            REACHABILITY
-                .replace("field Pet.c`", "field Pet.c { b @loadable }`")
-                .as_str(),
-        );
-        let project = self::project(unreachable.reference()).expect("the fixture is valid");
-        assert_eq!(
-            generation_of(project.reference(), "b").2,
-            Generation::NotGenerated
+            (Generation::NotGenerated, Generation::NotGenerated)
         );
     }
 

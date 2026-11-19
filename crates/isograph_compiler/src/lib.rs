@@ -18,8 +18,8 @@ pub use artifact_types::{
     ArtifactInnerType, ArtifactInputField, ArtifactInputType, ArtifactObjectField,
     ArtifactObjectType, ArtifactParameter, FieldArtifactKind, FieldArtifacts, FieldDeclaration,
     FieldDeclarationSource, FieldTypes, Generation, GenerationError, GenerationOptions, LinkType,
-    Loadability, ParametersType, ProfileGenerationOptions, ProjectArtifacts, SelectedClientField,
-    field_declaration, field_types, project_artifacts,
+    ParametersType, ProfileGenerationOptions, ProjectArtifacts, field_declaration, field_types,
+    project_artifacts,
 };
 pub use artifacts::{ArtifactPath, ArtifactSource, LiteralParseFailed, artifact_sources_in_file};
 pub use compiler_errors::{CompilerError, ProfileCompilerError, compiler_errors_in_file};

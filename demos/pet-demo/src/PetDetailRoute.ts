@@ -6,7 +6,7 @@ export const PetDetailRoute = iso(`
       id
       fullName
       PetStatsCard
-      PetCheckinsCard(limit: 5) @loadable(lazyLoadArtifact: true)
+      PetCheckinsCard(limit: 5)
       PetBestFriendCard
       bestFriend {
         fullName

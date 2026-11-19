@@ -6,9 +6,9 @@ Upstream supports `@component`, `@loadable`, and `@updatable`. Upstream's parser
 
 This plan deviates from upstream in two ways. v1 supports no directive, by user decision: v1 scope is a minimal compiler. The error is one per directive on that directive's span, by user decision, so each unsupported directive is marked on its own. The check stays in the parser, as upstream's selection check is.
 
-Open decision 1 below shows that the premise "nothing in v1 reads a directive" is false for `@loadable`. Changes 1 and 2 do not depend on it. Change 3 does.
+v1 also drops everything `@loadable` drove (change 3), by user decision.
 
-## Open decision 1: `@loadable` has a reader in v1
+## Why `@loadable` goes too
 
 `crates/isograph_compiler/src/artifact_types.rs` reads `@loadable` on a selection:
 
@@ -35,11 +35,7 @@ fn loadability(selection: &Selection) -> Loadability {
 
 A literal with any parse error contributes no artifact source (`crates/isograph_compiler/src/artifacts.rs`, `artifact_source` returns `None` when `parsed.errors` is non-empty). With an empty supported set, `field Query.PetDetailRoute` stops generating artifacts, and `loadability` can never return `Loadable` for a literal that generates artifacts. The `@loadable` path becomes code nothing reaches.
 
-Option A, the empty set as decided. A prefactor before change 3 removes `Loadability`, `SelectedClientField::loadability` (leaving `SelectedClientField` a newtype over `EntityNameAndSelectableName`, or `selected: Vec<EntityNameAndSelectableName>`), `FieldArtifacts::loadable_artifacts`, the `loadable` set in `project_artifacts`, the loadable artifact writing in `typescript_artifacts`, the two tests above, the `@loadable(lazyLoadArtifact: true)` in `PetDetailRoute.ts`, and the regenerated `Pet/PetCheckinsCard/{entrypoint,normalization_ast,refetch_reader}.ts`. This touches `crates/isograph_compiler`, `crates/typescript_artifacts`, `crates/isograph_cli`, and `crates/graphql_network_protocol/src/tests.rs`, which the query-generation work in `i2-worktrees/normalization-impl` also edits. Query generation for loadable fields then has no input until `@loadable` returns.
-
-Option B, a supported set of `{ Loadable }`. This is upstream's behavior for selections. `@loadable` on a selection parses without error; on an entrypoint or a field declaration it is unexpected, which needs a supported set per directive position (three enums, one empty pair and one with `Loadable`) instead of the single enum below. `loadability` keeps reading the directive; it should read the checked `SupportedSelectionDirectiveName::Loadable` instead of comparing a string, which needs the AST to carry the checked name. `lazyLoadArtifact` is not read by i2 today; under B it stays unread.
-
-This plan does not choose. Change 3 is written for option A's parser side. Option A's prefactor and option B's per-position sets are written out after the user chooses.
+The user chose to remove the `@loadable` path from v1 (change 3) rather than support `@loadable` on selections, which is upstream's behavior and would need one supported set per directive position.
 
 ## Change 1: remove `@component` from the pet demo
 
@@ -191,7 +187,51 @@ pub enum FieldArtifactKind {
 
 The daemon regenerates `demos/pet-demo/src/__isograph/iso.ts`, which loses the `IdentityWithParamComponent` alias and union arm.
 
-## Change 3: report every directive as unexpected (after open decision 1)
+## Change 3: remove the `@loadable` path
+
+`Loadability`, `loadability`, and `LOADABLE_DIRECTIVE` in `crates/isograph_compiler/src/artifact_types.rs` are deleted. `SelectedClientField` would be left with one field, so it is deleted and `FieldTypes::selected` holds the selected fields directly:
+
+```rust
+// from crates/isograph_compiler/src/artifact_types.rs
+pub struct FieldTypes {
+    pub data: ArtifactObjectType,
+    pub parameters: Option<ParametersType>,
+    /// Every client field or pointer the selection set selects at any depth, in selection order.
+    pub selected: Vec<SelectedClientField>,
+}
+
+pub struct SelectedClientField {
+    pub field: EntityNameAndSelectableName,
+    pub loadability: Loadability,
+}
+```
+
+```rust
+// from crates/isograph_compiler/src/artifact_types.rs
+pub struct FieldTypes {
+    pub data: ArtifactObjectType,
+    pub parameters: Option<ParametersType>,
+    /// Every client field or pointer the selection set selects at any depth, in selection order.
+    pub selected: Vec<EntityNameAndSelectableName>,
+}
+```
+
+`object_type` and `selection_field` return `Vec<EntityNameAndSelectableName>`; `selected_self` builds the `EntityNameAndSelectableName`. `FieldArtifacts::loadable_artifacts` and the `loadable` set in `project_artifacts` are deleted; the reachability walk and the `output_types` set read `selected` without `.field`. `crates/isograph_compiler/src/lib.rs` stops re-exporting `Loadability` and `SelectedClientField`.
+
+`crates/typescript_artifacts/src/lib.rs` `generate_artifacts` no longer writes `refetch_reader.ts`, and writes an entrypoint and normalization AST per `project.entrypoints` only:
+
+```rust
+// from crates/typescript_artifacts/src/lib.rs
+    let per_entrypoint = project.entrypoints.iter().copied().flat_map(|entrypoint| {
+```
+
+`REFETCH_READER` in `entrypoint.rs` is deleted. The test `readers_refetch_readers_and_normalization_asts_are_empty_objects` becomes `readers_and_normalization_asts_are_empty_objects`, which generates `Pet.Checkins` as an entrypoint with a resolver reader and asserts that no `refetch_reader.ts` is written. `no_path_is_generated_twice` drops `loadable_artifacts`.
+
+`crates/isograph_cli/src/compile.rs`: `generation_of` returns `(output_type, resolver_reader)`; `a_loadable_selection_generates_loadable_artifacts_only_when_reachable` is deleted. `crates/graphql_network_protocol/src/tests.rs` `a_selected_client_field_is_its_output_type_and_is_selected` selects `friends { f }` and asserts `selected == vec![named("Pet", "f"), named("Pet", "f")]`.
+
+`demos/pet-demo/src/PetDetailRoute.ts` selects `PetCheckinsCard(limit: 5)`. The daemon deletes `src/__isograph/Pet/PetCheckinsCard/{entrypoint,normalization_ast,refetch_reader}.ts`. `demos/pet-demo/README.md` drops `@loadable`.
+
+## Change 4: report every directive as unexpected
 
 ### The supported set
 
@@ -204,7 +244,7 @@ enum SupportedDirectiveName {}
 
 An empty enum with `strum::EnumString`. `"x".parse::<SupportedDirectiveName>()` is always `Err(strum::ParseError::VariantNotFound)` (strum 0.27's `ParseError` has that one variant). Adding `@loadable` later is a variant `#[strum(serialize = "loadable")] Loadable`, and the `match supported {}` arm in `parse_directive_after_at` stops compiling until the new variant is handled there. A `const SUPPORTED: &[&str] = &[]` would give the later reader a string to compare instead of a variant to match. A `bool` predicate `is_supported` is the boolean AGENTS.md rules out, and it also hands the reader no variant. `strum` is already a dependency of `isograph_parser`. The type is private to `directives.rs`; nothing outside reads it.
 
-One set covers the three positions a directive list can sit in (`EntrypointDeclaration`, `SelectableDeclaration`, `Selection`). Upstream's sets differ by position; with an empty set the positions agree. The first directive that is valid in only some positions splits the set per position (option B above shows that shape).
+One set covers the three positions a directive list can sit in (`EntrypointDeclaration`, `SelectableDeclaration`, `Selection`). Upstream's sets differ by position; with an empty set the positions agree. The first directive that is valid in only some positions splits the set into one enum per position.
 
 ### The error
 
@@ -303,7 +343,7 @@ The error span is the directive's span: `@` through the name, or through the clo
 
 Recovery is the existing parse. `@name` and its argument list are consumed, the directive is pushed, and `consume_directives` continues with the next `@`. Then the host continues: a field declaration's description and selection set, a selection's selection set, an entrypoint's end. `@` with no name stays the existing host failure (`at_without_a_name_fails_the_host`). A directive after the description stays the existing leftover error (`a_directive_after_the_description_is_leftover`); the grammar never parses it as a directive, so it reports no `unexpected directive`.
 
-Unchanged: `IsographSemanticToken::DirectiveName` and `At`, the `DECORATOR` mapping in `crates/isograph_lsp/src/semantic_tokens.rs`, `IsographFieldDirectiveList`, `IsographFieldDirective`, `IsographDirectiveNameWrapper` and their resolve paths, `IsographResolutionNode`'s three directive variants, and the `completion.rs` / `entity_or_selectable.rs` arms for them. After open decision 1's prefactor, the readers of the directive AST are resolve and the check.
+Unchanged: `IsographSemanticToken::DirectiveName` and `At`, the `DECORATOR` mapping in `crates/isograph_lsp/src/semantic_tokens.rs`, `IsographFieldDirectiveList`, `IsographFieldDirective`, `IsographDirectiveNameWrapper` and their resolve paths, `IsographResolutionNode`'s three directive variants, and the `completion.rs` / `entity_or_selectable.rs` arms for them. After change 3, the readers of the directive AST are resolve and the check.
 
 Users see a diagnostic `unexpected directive` under `@component`, `@loadable(lazyLoadArtifact: true)`, or any other directive, in the editor and in the daemon's compile errors. The rest of the literal highlights, hovers, and validates. The literal produces no artifacts, as any literal with a parse error does, and the LSP does not format it.
 
@@ -517,5 +557,5 @@ Each is one commit that passes the pre-commit hook.
 
 1. `demos/pet-demo/src/*.ts` drop `@component`; regenerate `demos/pet-demo/src/__isograph/`; `demos/pet-demo/README.md`.
 2. Remove `ClientFieldKind` and `IdentityWithParamComponent` (`crates/isograph_compiler/src/schema.rs`, `artifact_types.rs`, `lib.rs`; `crates/typescript_artifacts/src/iso_overloads.rs`, `lib.rs`; `crates/isograph_lsp/src/hover.rs`); regenerate `demos/pet-demo/src/__isograph/iso.ts`.
-3. After open decision 1: option A's prefactor (remove the `@loadable` path and the demo's `@loadable`), or option B's per-position supported sets.
+3. Remove the `@loadable` path (`crates/isograph_compiler/src/artifact_types.rs`, `lib.rs`; `crates/typescript_artifacts/src/lib.rs`, `entrypoint.rs`; `crates/isograph_cli/src/compile.rs`; `crates/graphql_network_protocol/src/tests.rs`; `demos/pet-demo/src/PetDetailRoute.ts`, the regenerated `src/__isograph/`, `README.md`).
 4. `SupportedDirectiveName`, `AstError::UnexpectedDirective`, the check in `parse_directive_after_at`, and the test changes in `crates/isograph_parser`, `crates/isograph_cli/src/compile.rs`, and `crates/isograph_lsp/src/file_diagnostics.rs`. `docs-website/docs/design-docs/mental-model.md` line 225 states that v1 supports no directive and reports each as `unexpected directive`.

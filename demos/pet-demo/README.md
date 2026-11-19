@@ -37,7 +37,7 @@ The script reads the committed artifacts. It does not run the daemon, so after c
 
 ## Config
 
-`isograph.config.json` sets `source_files` to `src/**/*.ts`, `schema` to `schema/**/*.graphql`, and `output_directory` to `src`, so the daemon writes artifacts into `src/__isograph/`. That folder is generated and committed: running the daemon in this directory rewrites it. It holds `iso.ts`, `tsconfig.json`, a param type per field, a parameters type per field with variables, output types and reader stubs per upstream's reachability rules, an entrypoint and normalization AST per entrypoint and per `@loadable` selection, and a link type per pointer target.
+`isograph.config.json` sets `source_files` to `src/**/*.ts`, `schema` to `schema/**/*.graphql`, and `output_directory` to `src`, so the daemon writes artifacts into `src/__isograph/`. That folder is generated and committed: running the daemon in this directory rewrites it. It holds `iso.ts`, `tsconfig.json`, a param type per field, a parameters type per field with variables, output types and reader stubs per upstream's reachability rules, an entrypoint and normalization AST per entrypoint, and a link type per pointer target.
 
 ## Schema
 
@@ -56,7 +56,7 @@ The script reads the committed artifacts. It does not run the daemon, so after c
 - `src/PetCheckinsCard.ts`: `field Pet.PetCheckinsCard($limit: Int = 3)`, passing `$limit` and the literal `0` to `checkins`.
 - `src/PetBestFriendCard.ts`: `field Pet.PetBestFriendCard` with two levels of nesting and the aliased selection `friendName: firstName`.
 - `src/HomeRoute.ts`: `field Query.HomeRoute`, selecting `PetSummaryCard`, and `entrypoint Query.HomeRoute`.
-- `src/PetDetailRoute.ts`: `field Query.PetDetailRoute($id: ID!)`, selecting `pet(id: $id)` and under it the source fields `fullName`, `PetStatsCard`, `PetCheckinsCard(limit: 5) @loadable(lazyLoadArtifact: true)`, `PetBestFriendCard`, `bestFriend { fullName }`, and `owner { OwnerBadge }`; and `entrypoint Query.PetDetailRoute`.
+- `src/PetDetailRoute.ts`: `field Query.PetDetailRoute($id: ID!)`, selecting `pet(id: $id)` and under it the source fields `fullName`, `PetStatsCard`, `PetCheckinsCard(limit: 5)`, `PetBestFriendCard`, `bestFriend { fullName }`, and `owner { OwnerBadge }`; and `entrypoint Query.PetDetailRoute`.
 - `src/SpeciesRoute.ts`: `field Query.SpeciesRoute($species: PetSpecies!)`, selecting the extension field `petsBySpecies(species: $species)`, `viewer`, and `node(id: "1")` on the interface `Node`; and `entrypoint Query.SpeciesRoute`.
 - `src/SetTagline.ts`: `field Mutation.SetTagline($id: ID!, $tagline: String!)`, passing the object literal `{ id: $id, tagline: $tagline }` to `set_pet_tagline`; and `entrypoint Mutation.SetTagline`.
 
