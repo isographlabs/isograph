@@ -34,6 +34,7 @@ url = { workspace = true }
 
 [dev-dependencies]
 isograph_extract_typescript = { path = "../isograph_extract_typescript" }
+span = { path = "../span" }
 tempfile = "3"
 tokio = { workspace = true, features = ["rt", "macros", "sync", "time", "test-util"] }
 

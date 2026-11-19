@@ -112,6 +112,9 @@ fn dispatch_lsp_request<TProfile: CompilationProfile>(
             .on_request_sync::<lsp_types::request::HoverRequest>(
                 crate::adapter::hover_response::<TProfile>,
             )?
+            .on_request_sync::<lsp_types::request::GotoDefinition>(
+                crate::adapter::definition_response::<TProfile>,
+            )?
             .on_request_sync::<lsp_types::request::DocumentHighlightRequest>(
                 crate::adapter::document_highlight_response::<TProfile>,
             )?
@@ -1540,8 +1543,8 @@ mod tests {
         let one = live_client(&mut state, ClientId(1));
         let mut hover =
             |needle: &str| hover_text(&mut state, &one, HOME_URI, 0, column(HOME_DISK, needle));
-        assert_eq!(hover("Query"), some("EntityNameWrapper"));
-        assert_eq!(hover("HomeRoute"), some("SelectableNameWrapper"));
+        assert_eq!(hover("Query"), None);
+        assert_eq!(hover("HomeRoute"), None);
         assert_eq!(hover("entrypoint"), some("EntrypointDeclaration"));
         assert_eq!(hover("."), some("EntrypointDeclaration"));
     }
@@ -1572,12 +1575,12 @@ mod tests {
             &mut state,
             &one,
             lsp_types::request::HoverRequest::METHOD,
-            hover_params(HOME_URI, 0, column(HOME_DISK, "Query")),
+            hover_params(HOME_URI, 0, column(HOME_DISK, "entrypoint")),
         );
         assert_eq!(result["contents"]["kind"], serde_json::json!("markdown"));
         assert_eq!(
             result["contents"]["value"],
-            serde_json::json!("EntityNameWrapper")
+            serde_json::json!("EntrypointDeclaration")
         );
     }
 
@@ -1587,23 +1590,26 @@ mod tests {
         let one = live_client(&mut state, ClientId(1));
         let two = live_client(&mut state, ClientId(2));
         handle(&mut state, did_open(one.client, HOME_URI, FIELD_X));
-        let x = column(FIELD_X, "x{");
+        let brace = column(FIELD_X, "{");
         assert_eq!(
-            hover_text(&mut state, &one, HOME_URI, 0, x),
-            some("SelectableNameWrapper")
+            hover_text(&mut state, &one, HOME_URI, 0, brace),
+            some("SelectionSet")
         );
-        assert_eq!(hover_text(&mut state, &two, HOME_URI, 0, x), None);
-        let disk_query = column(HOME_DISK, "Query");
+        assert_eq!(hover_text(&mut state, &two, HOME_URI, 0, brace), None);
+        let disk_keyword = column(HOME_DISK, "entrypoint");
         assert_eq!(
-            hover_text(&mut state, &two, HOME_URI, 0, disk_query),
-            some("EntityNameWrapper")
+            hover_text(&mut state, &two, HOME_URI, 0, disk_keyword),
+            some("EntrypointDeclaration")
         );
-        assert_eq!(hover_text(&mut state, &one, HOME_URI, 0, disk_query), None);
+        assert_eq!(
+            hover_text(&mut state, &one, HOME_URI, 0, disk_keyword),
+            None
+        );
         handle(&mut state, did_close(one.client, HOME_URI));
-        assert_eq!(hover_text(&mut state, &one, HOME_URI, 0, x), None);
+        assert_eq!(hover_text(&mut state, &one, HOME_URI, 0, brace), None);
         assert_eq!(
-            hover_text(&mut state, &one, HOME_URI, 0, disk_query),
-            some("EntityNameWrapper")
+            hover_text(&mut state, &one, HOME_URI, 0, disk_keyword),
+            some("EntrypointDeclaration")
         );
     }
 
@@ -1612,10 +1618,10 @@ mod tests {
         let mut state = with_disk_home();
         let one = live_client(&mut state, ClientId(1));
         handle(&mut state, did_open(one.client, HOME_URI, FIELD_X));
-        let character = column(FIELD_X, "x{");
+        let character = column(FIELD_X, "field");
         assert_eq!(
             hover_text(&mut state, &one, HOME_URI, 0, character),
-            some("SelectableNameWrapper")
+            some("SelectableDeclaration")
         );
         handle(
             &mut state,
@@ -1627,7 +1633,7 @@ mod tests {
         );
         assert_eq!(
             hover_text(&mut state, &one, HOME_URI, 0, character),
-            some("EntityNameWrapper")
+            some("EntrypointDeclaration")
         );
     }
 
@@ -1635,12 +1641,12 @@ mod tests {
     fn hover_in_two_literals_on_two_lines_resolves_in_each() {
         let text = format!("{ENTRYPOINT_A}\n{FIELD_X}");
         assert_eq!(
-            hover_on_disk(&text, 0, column(ENTRYPOINT_A, "Query")),
-            some("EntityNameWrapper")
+            hover_on_disk(&text, 0, column(ENTRYPOINT_A, "entrypoint")),
+            some("EntrypointDeclaration")
         );
         assert_eq!(
-            hover_on_disk(&text, 1, column(FIELD_X, "x{")),
-            some("SelectableNameWrapper")
+            hover_on_disk(&text, 1, column(FIELD_X, "field")),
+            some("SelectableDeclaration")
         );
     }
 
@@ -1648,49 +1654,87 @@ mod tests {
     fn hover_in_two_literals_on_one_line_resolves_in_each() {
         let text = format!("{ENTRYPOINT_A} {FIELD_X}");
         assert_eq!(
-            hover_on_disk(&text, 0, column(&text, "Query.A")),
-            some("EntityNameWrapper")
+            hover_on_disk(&text, 0, column(&text, "entrypoint")),
+            some("EntrypointDeclaration")
         );
         assert_eq!(
-            hover_on_disk(&text, 0, column(&text, "x{")),
-            some("SelectableNameWrapper")
+            hover_on_disk(&text, 0, column(&text, "field")),
+            some("SelectableDeclaration")
         );
         assert_eq!(hover_on_disk(&text, 0, column(&text, ") iso")), None);
     }
 
+    const DECLARED: &str = "iso(`field Pet.x($id: ID!) { id }`)";
+    const ENTRYPOINT_QUERY_X: &str = "iso(`entrypoint Query.X`)";
+    const NESTED: &str = "iso(`field Pet.fullName { owner { name } }`)";
+    const ALIASED: &str = "iso(`field Pet.fullName { b: bar }`)";
+
+    /// Each one-line fixture with the UTF-16 column of every entity, selectable, and selection
+    /// name in it.
+    fn schema_name_positions() -> Vec<(&'static str, u32)> {
+        vec![
+            (DECLARED, column(DECLARED, "Pet")),
+            (DECLARED, column(DECLARED, "x(")),
+            (DECLARED, column(DECLARED, "ID")),
+            (DECLARED, column(DECLARED, "{ id") + 2),
+            (ENTRYPOINT_QUERY_X, column(ENTRYPOINT_QUERY_X, "Query")),
+            (ENTRYPOINT_QUERY_X, column(ENTRYPOINT_QUERY_X, "X")),
+            (NESTED, column(NESTED, "owner")),
+            (NESTED, column(NESTED, "name")),
+            (ALIASED, column(ALIASED, "b:")),
+            (ALIASED, column(ALIASED, "bar")),
+        ]
+    }
+
     #[test]
-    fn hover_on_a_selection_name_is_null_until_the_schema_exists() {
-        assert_eq!(hover_on_disk(FIELD_X, 0, column(FIELD_X, "id")), None);
-        for needle in ["id", "name"] {
-            let (line, character) = position_of(PET_ONE_LINE, "{ id", needle, 0);
+    fn hover_on_a_schema_name_is_null_until_the_schema_exists() {
+        for (text, character) in schema_name_positions() {
             assert_eq!(
-                hover_on_disk(PET_ONE_LINE, line, character),
+                hover_on_disk(text, 0, character),
                 None,
-                "{needle:?}"
-            );
-        }
-        let nested = "iso(`field Pet.fullName { owner { name } }`)";
-        for needle in ["owner", "name"] {
-            assert_eq!(
-                hover_on_disk(nested, 0, column(nested, needle)),
-                None,
-                "{needle:?}"
+                "{text:?} at {character}"
             );
         }
         assert_eq!(
-            hover_on_disk(nested, 0, column(nested, "Pet")),
-            some("EntityNameWrapper")
+            hover_on_disk(DECLARED, 0, column(DECLARED, "field")),
+            some("SelectableDeclaration")
         );
         assert_eq!(
-            hover_on_disk(nested, 0, column(nested, "fullName")),
-            some("SelectableNameWrapper")
+            hover_on_disk(
+                ENTRYPOINT_QUERY_X,
+                0,
+                column(ENTRYPOINT_QUERY_X, "entrypoint")
+            ),
+            some("EntrypointDeclaration")
         );
-        let aliased = "iso(`field Pet.fullName { b: bar }`)";
-        for needle in ["b:", "bar"] {
+    }
+
+    /// Client 1's `textDocument/definition` result at `line:character` of `src/x.ts` on disk
+    /// as `text`.
+    fn definition_on_disk(text: &str, line: u32, character: u32) -> serde_json::Value {
+        let mut state = with_config();
+        disk_changed(&mut state, "/tmp/proj/src/x.ts", text);
+        let one = live_client(&mut state, ClientId(1));
+        request_result(
+            &mut state,
+            &one,
+            lsp_types::request::GotoDefinition::METHOD,
+            hover_params(X_URI, line, character),
+        )
+    }
+
+    #[test]
+    fn definition_is_null_until_the_schema_exists() {
+        let others = [
+            (DECLARED, column(DECLARED, "field")),
+            (DECLARED, column(DECLARED, "{")),
+            (ENTRYPOINT_QUERY_X, column(ENTRYPOINT_QUERY_X, "entrypoint")),
+        ];
+        for (text, character) in schema_name_positions().into_iter().chain(others) {
             assert_eq!(
-                hover_on_disk(aliased, 0, column(aliased, needle)),
-                None,
-                "{needle:?}"
+                definition_on_disk(text, 0, character),
+                serde_json::Value::Null,
+                "{text:?} at {character}"
             );
         }
     }
@@ -1708,8 +1752,8 @@ mod tests {
         for prefix in ["const s = \"😀\"; ", "const s = \"é\"; "] {
             let text = format!("{prefix}{ENTRYPOINT_A}");
             assert_eq!(
-                hover_on_disk(&text, 0, column(&text, "Query")),
-                some("EntityNameWrapper"),
+                hover_on_disk(&text, 0, column(&text, ".")),
+                some("EntrypointDeclaration"),
                 "after {prefix:?}"
             );
         }
@@ -1720,8 +1764,8 @@ mod tests {
         for line_break in ["\r\n", "\r"] {
             let text = format!("const x = 1;{line_break}{ENTRYPOINT_A}");
             assert_eq!(
-                hover_on_disk(&text, 1, column(ENTRYPOINT_A, "Query")),
-                some("EntityNameWrapper"),
+                hover_on_disk(&text, 1, column(ENTRYPOINT_A, ".")),
+                some("EntrypointDeclaration"),
                 "after {line_break:?}"
             );
         }
@@ -1810,14 +1854,14 @@ mod tests {
 
     #[test]
     fn hover_range_is_the_first_and_the_last_interior_char() {
-        let first = column(HOME_DISK, "entrypoint");
-        let last = column(HOME_DISK, "`)") - 1;
+        let first = column(FIELD_X, "field");
+        let last = column(FIELD_X, "`)") - 1;
         assert_eq!(
-            hover_range_on_disk(HOME_DISK, 0, first),
+            hover_range_on_disk(FIELD_X, 0, first),
             hover_char_range(0, first, first + 1)
         );
         assert_eq!(
-            hover_range_on_disk(HOME_DISK, 0, last),
+            hover_range_on_disk(FIELD_X, 0, last),
             hover_char_range(0, last, last + 1)
         );
     }
@@ -1826,10 +1870,10 @@ mod tests {
     fn hover_range_after_wide_chars_is_in_utf16_columns() {
         for prefix in ["const s = \"😀\"; ", "const s = \"é\"; "] {
             let text = format!("{prefix}{ENTRYPOINT_A}");
-            let query = column(&text, "Query");
+            let dot = column(&text, ".");
             assert_eq!(
-                hover_range_on_disk(&text, 0, query),
-                hover_char_range(0, query, query + 1),
+                hover_range_on_disk(&text, 0, dot),
+                hover_char_range(0, dot, dot + 1),
                 "after {prefix:?}"
             );
         }
@@ -1854,10 +1898,10 @@ mod tests {
     fn hover_range_after_crlf_and_cr_is_on_the_next_line() {
         for line_break in ["\r\n", "\r"] {
             let text = format!("const x = 1;{line_break}{ENTRYPOINT_A}");
-            let query = column(ENTRYPOINT_A, "Query");
+            let dot = column(ENTRYPOINT_A, ".");
             assert_eq!(
-                hover_range_on_disk(&text, 1, query),
-                hover_char_range(1, query, query + 1),
+                hover_range_on_disk(&text, 1, dot),
+                hover_char_range(1, dot, dot + 1),
                 "after {line_break:?}"
             );
         }

@@ -5,7 +5,7 @@ use common_lang_types::{
     relative_path_from_absolute_and_working_directory,
 };
 use intern::Lookup;
-use isograph_compiler::{ClientId, CompilationProfile, IsographDb};
+use isograph_compiler::{ClientId, CompilationProfile, DefinitionLocation, IsographDb};
 use isograph_lsp::lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult};
 use pico::Database;
 use prelude::Postfix;
@@ -51,6 +51,45 @@ pub(crate) fn hover_response<TProfile: CompilationProfile>(
     let position = params.text_document_position_params;
     let path = relative_from_uri(db, position.text_document.uri.reference()).map_err(lsp_error)?;
     isograph_lsp::hover_for_position(db, client, path, position.position).wrap_ok()
+}
+
+pub(crate) fn definition_response<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    params: lsp_types::GotoDefinitionParams,
+) -> LSPRuntimeResult<<lsp_types::request::GotoDefinition as lsp_types::request::Request>::Result> {
+    let position = params.text_document_position_params;
+    let path = relative_from_uri(db, position.text_document.uri.reference()).map_err(lsp_error)?;
+    isograph_lsp::definition_at_lsp_position(db, client, path, position.position)
+        .map(|definition| {
+            definition_lsp_location(db, client, definition)
+                .map(lsp_types::GotoDefinitionResponse::Scalar)
+        })
+        .transpose()
+}
+
+/// The LSP location of `definition`, in the line index of the defining file as `client`
+/// reads it.
+fn definition_lsp_location<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    definition: DefinitionLocation,
+) -> LSPRuntimeResult<lsp_types::Location> {
+    let uri = uri_for_path(db, definition.path)
+        .map_err(|error| LSPRuntimeError::UnexpectedError(error.to_string()))?;
+    let line_index = isograph_lsp::line_index(db, client, definition.path)
+        .as_ref()
+        .ok_or_else(|| {
+            LSPRuntimeError::UnexpectedError(format!(
+                "the defining file `{}` has no text",
+                definition.path
+            ))
+        })?;
+    lsp_types::Location {
+        uri,
+        range: line_index.range(definition.span),
+    }
+    .wrap_ok()
 }
 
 pub(crate) fn document_highlight_response<TProfile: CompilationProfile>(
@@ -287,7 +326,9 @@ pub(crate) mod tests {
     use isograph_compiler::{ClientId, IsographDb};
     use prelude::Postfix;
 
-    use super::{PathUriError, format_iso_literals, relative_from_uri, uri_for_path};
+    use super::{
+        PathUriError, definition_lsp_location, format_iso_literals, relative_from_uri, uri_for_path,
+    };
     use crate::state::intern_config_directory;
 
     const PRETTY: &str = "export const fullName = iso(`\n  field Pet.fullName @foo(\n    bar: 123,\n    baz: $qux,\n  ) {\n    id,\n  }\n`);\n";
@@ -641,5 +682,68 @@ pub(crate) mod tests {
             uri_for_path(db.reference(), "src/a.ts".intern().to()),
             PathUriError::MissingWorkingDirectory.wrap_err()
         );
+    }
+
+    const SCHEMA: &str = "type Pet {\n  owner: User\n}\n";
+
+    /// The definition of `owner` in `src/schema.graphql` as `SCHEMA` holds it on disk.
+    fn owner_definition() -> isograph_compiler::DefinitionLocation {
+        let start = SCHEMA.find("owner").expect("the fixture names owner") as u32;
+        isograph_compiler::DefinitionLocation {
+            path: "src/schema.graphql".intern().to(),
+            span: span::Span::new(start, start + "owner".len() as u32),
+        }
+    }
+
+    fn line_range(line: u32, start: u32, end: u32) -> lsp_types::Range {
+        lsp_types::Range {
+            start: lsp_types::Position {
+                line,
+                character: start,
+            },
+            end: lsp_types::Position {
+                line,
+                character: end,
+            },
+        }
+    }
+
+    #[test]
+    fn a_definition_maps_to_the_defining_files_uri_and_range() {
+        let mut db = config_db();
+        db.insert_disk_file("src/schema.graphql".intern().to(), SCHEMA.to_owned());
+        assert_eq!(
+            definition_lsp_location(db.reference(), client(), owner_definition()),
+            lsp_types::Location {
+                uri: "file:///tmp/proj/src/schema.graphql"
+                    .parse::<lsp_types::Uri>()
+                    .expect("the fixture URI parses"),
+                range: line_range(1, 2, 7),
+            }
+            .wrap_ok()
+        );
+    }
+
+    #[test]
+    fn a_definition_range_comes_from_the_clients_buffer_of_the_defining_file() {
+        let mut db = config_db();
+        let schema_path: RelativePathToSourceFile = "src/schema.graphql".intern().to();
+        db.insert_disk_file(schema_path, SCHEMA.to_owned());
+        db.set_open_file(client(), schema_path, format!("\n{SCHEMA}"));
+        let range_for = |client: ClientId| {
+            definition_lsp_location(db.reference(), client, owner_definition())
+                .map(|location| location.range)
+        };
+        assert_eq!(range_for(client()), line_range(2, 1, 6).wrap_ok());
+        assert_eq!(range_for(ClientId(2)), line_range(1, 2, 7).wrap_ok());
+    }
+
+    #[test]
+    fn a_definition_in_a_file_with_no_text_is_an_unexpected_error() {
+        let db = config_db();
+        assert!(matches!(
+            definition_lsp_location(db.reference(), client(), owner_definition()),
+            Err(isograph_lsp::lsp_runtime_error::LSPRuntimeError::UnexpectedError(_))
+        ));
     }
 }

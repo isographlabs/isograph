@@ -810,6 +810,7 @@ dependencies = [
  "prelude",
  "serde",
  "serde_json",
+ "span",
  "tempfile",
  "thiserror 2.0.20",
  "tokio",

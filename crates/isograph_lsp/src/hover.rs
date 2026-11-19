@@ -1,12 +1,13 @@
 use common_lang_types::RelativePathToSourceFile;
 use isograph_compiler::{
-    ClientId, CompilationProfile, IsographDb, LiteralId, extract_iso_literals,
-    iso_literal_extraction, parsed_iso_literal_by_id, selectable_for_selection_path,
+    ClientId, CompilationProfile, Entity, IsographDb, LiteralId, Selectable, extract_iso_literals,
+    iso_literal_extraction, parsed_iso_literal_by_id,
 };
-use isograph_parser::{IsographResolutionNode, ParsedIsoLiteral, SelectionPath, resolve_offset};
+use isograph_parser::{IsographResolutionNode, ParsedIsoLiteral, resolve_offset};
 use prelude::Postfix;
 use span::Span;
 
+use crate::entity_or_selectable::{EntityOrSelectable, entity_or_selectable_of_node};
 use crate::line_index::{byte_offset_at_lsp_position, line_index};
 
 /// The hover at `position` in `path` as `client` reads it. Its range is the char under
@@ -33,32 +34,44 @@ pub fn hover_for_position<TProfile: CompilationProfile>(
     .wrap_some()
 }
 
-/// The Markdown hover text of `node` as `client` reads the schema. A selection name whose
-/// selectable is not found has none.
+/// The Markdown hover text of `node` as `client` reads the schema. A schema name whose
+/// lookup fails has none.
 fn hover_markdown<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
     node: IsographResolutionNode<'_>,
 ) -> Option<String> {
-    match node {
-        IsographResolutionNode::SelectionNameWrapper(selection_name_path) => {
-            selection_hover_markdown(db, client, selection_name_path.parent.reference())
-        }
-        other => other.to_string().wrap_some(),
+    match entity_or_selectable_of_node(db, client, node.reference()) {
+        Some(lookup) => lookup
+            .ok()
+            .map(|item| entity_or_selectable_hover_markdown(item.reference())),
+        None => node.to_string().wrap_some(),
     }
 }
 
-/// `name: TargetEntity` for the selectable `selection_path` selects.
-fn selection_hover_markdown<TProfile: CompilationProfile>(
-    db: &IsographDb<TProfile>,
-    client: ClientId,
-    selection_path: &SelectionPath<'_>,
-) -> Option<String> {
-    let selectable = selectable_for_selection_path(db, client, selection_path).ok()?;
-    format!("{}: {}", selectable.name, selectable.target_entity).wrap_some()
+fn entity_or_selectable_hover_markdown(item: &EntityOrSelectable) -> String {
+    match item {
+        EntityOrSelectable::Entity(entity) => entity_hover_markdown(entity),
+        EntityOrSelectable::Selectable(selectable) => selectable_hover_markdown(selectable),
+    }
 }
 
-fn resolved_position_at_lsp_position<'db, TProfile: CompilationProfile>(
+fn entity_hover_markdown(entity: &Entity) -> String {
+    format!("entity **{}**", entity.name)
+}
+
+fn selectable_hover_markdown(selectable: &Selectable) -> String {
+    let description = selectable
+        .description
+        .map(|description| format!("\n\n{description}"))
+        .unwrap_or_default();
+    format!(
+        "field **{}.{}**: **{}**{description}",
+        selectable.parent_entity, selectable.name, selectable.target_entity
+    )
+}
+
+pub(crate) fn resolved_position_at_lsp_position<'db, TProfile: CompilationProfile>(
     db: &'db IsographDb<TProfile>,
     client: ClientId,
     path: RelativePathToSourceFile,
@@ -136,7 +149,10 @@ mod tests {
     use prelude::Postfix;
     use span::Span;
 
-    use super::{ast_at_lsp_position, hover_for_position, iso_literal_at_lsp_position};
+    use super::{
+        ast_at_lsp_position, entity_hover_markdown, hover_for_position,
+        iso_literal_at_lsp_position, selectable_hover_markdown,
+    };
 
     fn client() -> ClientId {
         ClientId(1)
@@ -356,9 +372,9 @@ mod tests {
 
     #[test]
     fn hover_range_is_the_first_and_the_last_interior_char() {
-        let contents = "iso(`entrypoint Query.HomeRoute`)";
+        let contents = "iso(`field Query.x{id}`)";
         let (db, path) = db_with(contents);
-        let start = column_of(contents, "entrypoint");
+        let start = column_of(contents, "field");
         let last = column_of(contents, "`)") - 1;
         assert_eq!(
             hover_range(&db, path, at(0, start)),
@@ -375,10 +391,10 @@ mod tests {
         for prefix in ["const s = \"😀\"; ", "const s = \"é\"; "] {
             let contents = format!("{prefix}iso(`entrypoint Query.A`)");
             let (db, path) = db_with(&contents);
-            let query = utf16_column_of(&contents, "Query", 0);
+            let dot = utf16_column_of(&contents, ".", 0);
             assert_eq!(
-                hover_range(&db, path, at(0, query)),
-                char_range(0, query, query + 1),
+                hover_range(&db, path, at(0, dot)),
+                char_range(0, dot, dot + 1),
                 "after {prefix:?}"
             );
         }
@@ -417,7 +433,7 @@ mod tests {
     #[test]
     fn hover_range_in_a_multiline_literal_is_on_the_cursor_line() {
         let (db, path) = db_with("iso(`\nentrypoint Query.HomeRoute\n`)");
-        assert_eq!(hover_range(&db, path, at(1, 11)), char_range(1, 11, 12));
+        assert_eq!(hover_range(&db, path, at(1, 16)), char_range(1, 16, 17));
     }
 
     #[test]
@@ -429,5 +445,43 @@ mod tests {
             .expect("the fixture has a closing backtick") as u32;
         assert_eq!(hover_range(&db, path, at(0, 0)), None);
         assert_eq!(hover_range(&db, path, at(0, closing)), None);
+    }
+
+    fn definition() -> isograph_compiler::DefinitionLocation {
+        isograph_compiler::DefinitionLocation {
+            path: intern_path("src/schema.graphql"),
+            span: Span::new(0, 3),
+        }
+    }
+
+    fn pet_owner(description: Option<&str>) -> isograph_compiler::Selectable {
+        isograph_compiler::Selectable {
+            name: "owner".intern().to(),
+            parent_entity: "Pet".intern().to(),
+            description: description.map(|description| description.intern().to()),
+            target_entity: "User".intern().to(),
+            definition: definition(),
+        }
+    }
+
+    #[test]
+    fn entity_hover_names_the_entity() {
+        let entity = isograph_compiler::Entity {
+            name: "Pet".intern().to(),
+            definition: definition(),
+        };
+        assert_eq!(entity_hover_markdown(entity.reference()), "entity **Pet**");
+    }
+
+    #[test]
+    fn selectable_hover_names_parent_name_and_target_then_the_description() {
+        assert_eq!(
+            selectable_hover_markdown(pet_owner("The owner".wrap_some()).reference()),
+            "field **Pet.owner**: **User**\n\nThe owner"
+        );
+        assert_eq!(
+            selectable_hover_markdown(pet_owner(None).reference()),
+            "field **Pet.owner**: **User**"
+        );
     }
 }
