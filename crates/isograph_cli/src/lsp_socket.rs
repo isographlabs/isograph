@@ -1,5 +1,5 @@
 use std::{
-    io::{self, BufReader},
+    io::{self, BufRead, BufReader, Read},
     net::TcpStream,
     thread,
 };
@@ -27,11 +27,78 @@ fn socket_transport(
     (writer_sender, reader_receiver, io_threads).wrap_ok()
 }
 
-fn make_reader(stream: TcpStream) -> (Receiver<Message>, thread::JoinHandle<io::Result<()>>) {
+/// A frame on the LSP socket that is not one JSON-RPC message.
+#[derive(Debug, thiserror::Error)]
+enum ReadMessageError {
+    #[error("{0}")]
+    Io(#[from] io::Error),
+    #[error("malformed header: {0:?}")]
+    MalformedHeader(String),
+    #[error("invalid Content-Length: {0}")]
+    ContentLength(std::num::ParseIntError),
+    #[error("no Content-Length")]
+    NoContentLength,
+    #[error("the stream ended before the end of the body")]
+    TruncatedBody,
+    #[error("malformed LSP payload: {0}")]
+    Payload(serde_json::Error),
+}
+
+/// One message from `reader`, `None` at the end of the stream.
+fn read_message(reader: &mut impl BufRead) -> Result<Option<Message>, ReadMessageError> {
+    let Some(size) = read_content_length(reader)? else {
+        return None.wrap_ok();
+    };
+    let mut body_reader = reader.take(size);
+    let mut body = Vec::new();
+    body_reader.read_to_end(&mut body)?;
+    if body_reader.limit() > 0 {
+        return ReadMessageError::TruncatedBody.wrap_err();
+    }
+    serde_json::from_slice::<Message>(body.as_slice())
+        .map(Postfix::wrap_some)
+        .map_err(ReadMessageError::Payload)
+}
+
+/// The Content-Length of the next message's headers, `None` at the end of the stream.
+fn read_content_length(reader: &mut impl BufRead) -> Result<Option<u64>, ReadMessageError> {
+    let mut size = None;
+    let mut line = String::new();
+    loop {
+        line.clear();
+        if reader.read_line(&mut line)? == 0 {
+            return None.wrap_ok();
+        }
+        let Some(header) = line.strip_suffix("\r\n") else {
+            return ReadMessageError::MalformedHeader(line).wrap_err();
+        };
+        if header.is_empty() {
+            return size
+                .ok_or(ReadMessageError::NoContentLength)
+                .map(Postfix::wrap_some);
+        }
+        let Some((name, value)) = header.split_once(": ") else {
+            return ReadMessageError::MalformedHeader(header.to_owned()).wrap_err();
+        };
+        if name.eq_ignore_ascii_case("Content-Length") {
+            size = value
+                .parse::<u64>()
+                .map_err(ReadMessageError::ContentLength)?
+                .wrap_some();
+        }
+    }
+}
+
+fn make_reader(
+    stream: TcpStream,
+) -> (
+    Receiver<Message>,
+    thread::JoinHandle<Result<(), ReadMessageError>>,
+) {
     let (reader_sender, reader_receiver) = bounded::<Message>(0);
     let reader = thread::spawn(move || {
         let mut buf_read = BufReader::new(stream);
-        while let Some(msg) = Message::read(&mut buf_read)? {
+        while let Some(msg) = read_message(&mut buf_read)? {
             let is_exit = matches!(&msg, Message::Notification(n) if n.method == Exit::METHOD);
             if reader_sender.send(msg).is_err() {
                 break;
@@ -56,29 +123,35 @@ fn make_write(mut stream: TcpStream) -> (Sender<Message>, thread::JoinHandle<io:
 }
 
 fn make_io_threads(
-    reader: thread::JoinHandle<io::Result<()>>,
+    reader: thread::JoinHandle<Result<(), ReadMessageError>>,
     writer: thread::JoinHandle<io::Result<()>>,
 ) -> IoThreads {
     IoThreads { reader, writer }
 }
 
 struct IoThreads {
-    reader: thread::JoinHandle<io::Result<()>>,
+    reader: thread::JoinHandle<Result<(), ReadMessageError>>,
     writer: thread::JoinHandle<io::Result<()>>,
 }
 
+/// Why the reader or the writer thread of a session stopped.
+#[derive(Debug, thiserror::Error)]
+enum IoThreadsError {
+    #[error("reading: {0}")]
+    Read(#[from] ReadMessageError),
+    #[error("writing: {0}")]
+    Write(#[from] io::Error),
+}
+
 impl IoThreads {
-    fn join(self) -> io::Result<()> {
-        match self.reader.join() {
-            Ok(r) => r?,
-            Err(err) => std::panic::panic_any(err),
-        }
-        match self.writer.join() {
-            Ok(r) => r,
-            Err(err) => {
-                std::panic::panic_any(err);
-            }
-        }
+    fn join(self) -> Result<(), IoThreadsError> {
+        self.reader
+            .join()
+            .unwrap_or_else(|err| std::panic::panic_any(err))?;
+        self.writer
+            .join()
+            .unwrap_or_else(|err| std::panic::panic_any(err))?;
+        ().wrap_ok()
     }
 }
 
