@@ -302,11 +302,13 @@ fn on_isograph_event_notification<THostLanguage: HostLanguage>(
 
 ## Change 2: requests and responses carry the client
 
-After this change every LSP request reaches its handler with the `ClientId` of the connection that sent it, and every LSP response from a client reaches `dispatch_lsp` with that `ClientId`. No handler reads the client yet; each takes `_client: ClientId`. Change 7 reads it in the request handlers.
+After this change every LSP request reaches its handler with the `ClientId` of the connection that sent it, and every LSP response reaches `dispatch_lsp` tagged with that `ClientId`. No handler reads the client yet; each request handler takes `_client: ClientId`. Change 7 reads it in the request handlers.
+
+Every handler takes the client as a separate parameter, not a tuple and not a struct: requests `fn(&TState, ClientId, TRequest::Params) -> LSPRuntimeResult<TRequest::Result>`, notifications (change 1) `fn(&mut TState, ClientId, TNotification::Params) -> Vec<IsographEffect>`. `LspRequest`, `LspNotification`, and `LspResponse` are only the payloads `run_session` sends on the event channel; dispatch destructures each and passes `client` and the message separately. A handler's output never contains a `ClientId`.
 
 The request dispatcher moves to `isograph_cli`, next to the notification dispatcher, because its struct carries `ClientId`. `ClientId` is `pub(crate)` in `crates/isograph_cli/src/event.rs`, and `isograph_lsp` cannot name it: `isograph_cli` depends on `isograph_lsp` (`crates/isograph_cli/Cargo.toml`), not the reverse. With both dispatchers in `isograph_cli`, `ClientId` stays where it is until change 4.
 
-Today `dispatch_lsp` drops every response (`crates/isograph_cli/src/state.rs:79`, `crate::event::LspEvent::Response(_response) => no_effects()`), and `lsp_response_returns_no_effects` (`state.rs:1007`) pins that. Nothing else matches `LspEvent::Response`. After this change the only reader of `LspResponse.client` is a liveness check, the same as for notifications: a response from a client not in `LiveSessions` is dropped before `on_lsp_response`. Both paths return no effects, so the check changes nothing a test can observe until `on_lsp_response` does something. The client becomes necessary once the daemon sends server-to-client requests (for example `workspace/configuration` or `workspace/semanticTokens/refresh`): the response to such a request names a `RequestId` the daemon minted for one connection, and matching it requires knowing which connection answered.
+Today `dispatch_lsp` drops every response (`crates/isograph_cli/src/state.rs:79`, `crate::event::LspEvent::Response(_response) => no_effects()`), and `lsp_response_returns_no_effects` (`state.rs:1007`) pins that. Nothing else matches `LspEvent::Response`. No response handler exists, and this change does not add one. After this change the only reader of `LspResponse.client` is a liveness check, the same as for notifications: `dispatch_lsp` drops a response from a client not in `LiveSessions`. A response from a live client is also no effects, so the check changes nothing a test can observe until a response handler exists. The arm binds `response: _response`, as today's arm binds `_response`; a struct field that no pattern binds is `dead_code`. The client becomes necessary once the daemon sends server-to-client requests (for example `workspace/configuration` or `workspace/semanticTokens/refresh`): the response to such a request names a `RequestId` the daemon minted for one connection, and matching it requires knowing which connection answered.
 
 The change ships as two commits: the move, then the client.
 
@@ -646,19 +648,15 @@ After:
 
 ```rust
 // from crates/isograph_cli/src/state.rs
-        crate::event::LspEvent::Response(incoming) => {
-            if !state.live_sessions.0.contains_key(&incoming.client) {
+        crate::event::LspEvent::Response(crate::event::LspResponse {
+            client,
+            response: _response,
+        }) => {
+            if !state.live_sessions.0.contains_key(&client) {
                 return no_effects();
             }
-            on_lsp_response(incoming.client, incoming.response)
+            no_effects()
         }
-```
-
-```rust
-// from crates/isograph_cli/src/state.rs
-fn on_lsp_response(_client: ClientId, _response: lsp_server::Response) -> Vec<IsographEffect> {
-    no_effects()
-}
 ```
 
 ```rust
@@ -684,14 +682,15 @@ fn dispatch_lsp_request<THostLanguage: HostLanguage>(
 }
 ```
 
-`on_lsp_response` takes no state; nothing in it reads state. The request liveness check is unchanged: `LiveSessions::reply` returns `None` for a client not in the map.
+The request liveness check is unchanged: `LiveSessions::reply` returns `None` for a client not in the map.
 
 ### Tests
 
 `crates/isograph_cli/src/state.rs` (`handle` seam, no sleep):
 
-- `lsp_response_returns_no_effects` is renamed `lsp_response_from_a_live_client_returns_no_effects`; it starts a client with `start_a_client` and sends `LspEvent::Response(LspResponse { client, response })`: no effects
-- added `lsp_response_from_a_client_that_never_started_returns_no_effects`: `LspResponse` from `ClientId(1)` with no `Started`: no effects
+- added helper `lsp_response(client: ClientId) -> IsographEvent` builds `LspEvent::Response(LspResponse { client, response })` with id 1 and neither result nor error
+- `lsp_response_returns_no_effects` is renamed `lsp_response_from_a_live_client_returns_no_effects`; it starts a client with `start_a_client` and sends `lsp_response(client)`: no effects
+- added `lsp_response_from_a_client_that_never_started_returns_no_effects`: `lsp_response(ClientId(1))` with no `Started`: no effects
 - the request case is already covered: `lsp_request_without_a_live_session_returns_no_effects` sends a request from `ClientId(1)` with no `Started` and asserts no effects; `lsp_formatting_from_a_client_that_is_not_live_returns_no_effects`, `lsp_request_from_a_sibling_client_returns_no_effects`, and `lsp_request_after_gone_returns_no_effects` cover the other cases. Facts unchanged.
 
 `crates/isograph_cli/src/lsp_request_dispatch.rs`: `calls_first_matching_request_handler` builds `LspRequest { client: ClientId(1), request }` for `LSPRequestDispatch::new`; `hover_handler` and `goto_definition_handler` take `_client: ClientId`. Facts unchanged. `test_extract_request_params_error` is unchanged.
@@ -699,7 +698,7 @@ fn dispatch_lsp_request<THostLanguage: HostLanguage>(
 ### Call sites
 
 - `run_session` -> `LspEvent::Response(LspResponse { client, response })`
-- `dispatch_lsp` -> `live_sessions.0.contains_key`, then `on_lsp_response`
+- `dispatch_lsp` -> `live_sessions.0.contains_key` on the response's client
 - `dispatch_lsp` -> `live_sessions.reply`, then `dispatch_lsp_request` -> `LSPRequestDispatch::new(incoming, &state.db)` -> `on_request_sync` -> `semantic_tokens_response` / `formatting_response` / `will_save_wait_until_response`
 
 ### Docs this change amends
