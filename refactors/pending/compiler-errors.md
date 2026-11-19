@@ -1050,7 +1050,7 @@ A `TimerId` matches at most one guard. A stale firing of either timer matches ne
 `crates/isograph_cli/src/state.rs`:
 
 - Every test that asserted `effects.is_empty()` after an applied `DiskChanged` asserts that `only_timer(effects)` succeeds instead.
-- `disk_changed_does_not_arm_the_debounce` becomes `disk_changed_arms_the_compile_debounce_and_not_the_diagnostics_debounce`: each of `Present`, `Absent`, and `FolderRemoved` returns one `Timer` whose firing matches `compile_debounce`; `diagnostics_debounce` stays `None`.
+- `an_applied_disk_changed_arms_the_debounce` becomes `an_applied_disk_changed_arms_the_compile_and_diagnostics_debounces`: each of `Present`, `Absent`, and `FolderRemoved` returns two `Timer`s, one whose firing matches `compile_debounce` and one whose firing matches `diagnostics_debounce`.
 - `firing_the_compile_debounce_returns_no_effects_and_clears_it`.
 - `a_superseded_compile_firing_returns_no_effects`: two `DiskChanged`, fire the first timer; no effects; `compile_debounce` is still `Some`.
 - `a_compile_firing_does_not_clear_the_diagnostics_debounce` and the converse.

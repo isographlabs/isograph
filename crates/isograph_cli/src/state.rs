@@ -187,9 +187,7 @@ fn handle_internal_event<TProfile: CompilationProfile>(
     match internal {
         InternalEvent::HelloWorld => IsographEffect::LogHelloWorld.wrap_vec(),
         InternalEvent::Quit => IsographEffect::Kill.wrap_vec(),
-        InternalEvent::DiskChanged(change) => {
-            handle_disk_changed(&mut state.db, state.globs.reference(), change)
-        }
+        InternalEvent::DiskChanged(change) => handle_disk_changed(state, change),
     }
 }
 
@@ -279,13 +277,16 @@ fn relative_path_to_source_file(
 }
 
 fn handle_disk_changed<TProfile: CompilationProfile>(
-    db: &mut IsographDb<TProfile>,
-    globs: &ProjectGlobs,
+    state: &mut IsographState<TProfile>,
     change: DiskChanged,
 ) -> Vec<IsographEffect> {
-    apply_disk_changed(db, globs, change)
-        .unwrap_or_else(|error| tracing::warn!(%error, "DiskChanged path"));
-    no_effects()
+    apply_disk_changed(&mut state.db, state.globs.reference(), change).map_or_else(
+        |error| {
+            tracing::warn!(%error, "DiskChanged path");
+            no_effects()
+        },
+        |()| crate::diagnostics::arm_diagnostics_debounce(state),
+    )
 }
 
 fn apply_disk_changed<TProfile: CompilationProfile>(
@@ -407,7 +408,7 @@ mod tests {
             }))
             .to(),
         );
-        assert!(effects.is_empty());
+        only_timer(effects);
         assert_eq!(
             contents(state.reference(), interned("src/a.ts")),
             "export const a = 1;\n".wrap_some()
@@ -425,7 +426,7 @@ mod tests {
             }))
             .to(),
         );
-        assert!(effects.is_empty());
+        only_timer(effects);
         assert_eq!(
             contents(state.reference(), interned("../other/a.ts")),
             "outside".wrap_some()
@@ -451,7 +452,7 @@ mod tests {
             }))
             .to(),
         );
-        assert!(effects.is_empty());
+        only_timer(effects);
         assert!(contents(state.reference(), interned("src/a.ts")).is_none());
     }
 
@@ -763,7 +764,7 @@ mod tests {
             }))
             .to(),
         );
-        assert!(effects.is_empty());
+        only_timer(effects);
         assert!(contents(state.reference(), interned("src/a.ts")).is_none());
         assert!(contents(state.reference(), interned("src/b.ts")).is_none());
         assert_eq!(
@@ -798,7 +799,7 @@ mod tests {
             }))
             .to(),
         );
-        assert!(effects.is_empty());
+        only_timer(effects);
         assert!(contents(state.reference(), interned("src/a.ts")).is_none());
         assert!(contents(state.reference(), interned("src2/c.ts")).is_none());
     }
@@ -821,7 +822,7 @@ mod tests {
             }))
             .to(),
         );
-        assert!(effects.is_empty());
+        only_timer(effects);
         assert_eq!(
             contents(state.reference(), interned("src/a.ts")),
             "a".wrap_some()
@@ -2415,7 +2416,7 @@ mod tests {
             }))
             .to(),
         );
-        assert!(effects.is_empty());
+        only_timer(effects);
         assert_eq!(
             contents(state.reference(), interned("src/a.ts")),
             "a".wrap_some()
@@ -2488,7 +2489,7 @@ mod tests {
                 .expect("serializes"),
             ),
         );
-        assert!(effects.is_empty());
+        only_timer(effects);
         assert_eq!(
             contents(state.reference(), interned("src/a.ts")),
             "export const a = 1;\n".wrap_some()
@@ -3214,17 +3215,15 @@ mod tests {
             }))
             .to(),
         );
-        assert!(effects.is_empty());
+        assert!(fire(&mut state, effects).is_empty());
         let armed = handle(&mut state, did_open(ClientId(1), X_URI, CLEAN));
         assert!(fire(&mut state, armed).is_empty());
     }
 
     #[test]
-    fn disk_changed_does_not_arm_the_debounce() {
+    fn an_applied_disk_changed_arms_the_debounce() {
         let mut state = with_config();
         let _rx = diagnostics_client(&mut state, ClientId(1));
-        handle(&mut state, did_open(ClientId(1), X_URI, BROKEN));
-        state.diagnostics_debounce = None;
         let present = handle(
             &mut state,
             InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
@@ -3233,6 +3232,9 @@ mod tests {
             }))
             .to(),
         );
+        assert!(state.diagnostics_debounce.is_some());
+        only_timer(present);
+        state.diagnostics_debounce = None;
         let absent = handle(
             &mut state,
             InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
@@ -3241,6 +3243,9 @@ mod tests {
             }))
             .to(),
         );
+        assert!(state.diagnostics_debounce.is_some());
+        only_timer(absent);
+        state.diagnostics_debounce = None;
         let folder_removed = handle(
             &mut state,
             InternalEvent::DiskChanged(DiskChanged::FolderRemoved(FolderRemoved {
@@ -3248,9 +3253,23 @@ mod tests {
             }))
             .to(),
         );
-        assert!(present.is_empty());
-        assert!(absent.is_empty());
-        assert!(folder_removed.is_empty());
+        assert!(state.diagnostics_debounce.is_some());
+        only_timer(folder_removed);
+    }
+
+    #[test]
+    fn a_disk_changed_whose_path_is_rejected_does_not_arm_the_debounce() {
+        let mut state = with_config();
+        let _rx = diagnostics_client(&mut state, ClientId(1));
+        let effects = handle(
+            &mut state,
+            InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
+                path: PathBuf::from("src/x.ts"),
+                presence: Presence::Present(CLEAN.to_owned()),
+            }))
+            .to(),
+        );
+        assert!(effects.is_empty());
         assert!(state.diagnostics_debounce.is_none());
     }
 
