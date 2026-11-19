@@ -4,7 +4,7 @@ The daemon generates artifacts into the `__isograph` folder of an optional outpu
 
 The artifacts in this doc are the top-level `iso.ts` and one entrypoint artifact per entrypoint literal. Generation is host-language work: `HostLanguage::generate_artifacts`, which the TypeScript host language implements with the new crate `typescript_artifacts`. `NetworkProtocol` gains nothing in this doc.
 
-Artifacts are built as values, not strings. A module artifact is an `ArtifactValue` (its default export) at a path. `iso.ts` has overloads and type aliases, which a value does not describe, so it is built from a small TypeScript declaration and type layer. One module converts both into swc nodes (`swc_ecma_ast`) and prints them with `swc_ecma_codegen`.
+Artifacts are built as values, not strings. A module artifact is an `ArtifactValue` (its default export) at a path. `iso.ts` has overloads and type aliases, which a value does not describe, so it is built from a small TypeScript declaration and type layer. One module converts both into swc nodes (`swc_ecma_ast`) and prints them with `swc_ecma_codegen`. `dprint-plugin-typescript` then formats the printed text to the repo's `.prettierrc.json` style.
 
 All artifacts are generated and printed in memory. Only when every literal produced its sources are they written, together, and only the files whose text changed.
 
@@ -30,8 +30,8 @@ src/__isograph/Mutation/SetTagline/entrypoint.ts
 
 ```ts
 export default {
-  kind: "Entrypoint",
-  name: "Query.HomeRoute"
+  kind: 'Entrypoint',
+  name: 'Query.HomeRoute',
 };
 ```
 
@@ -284,6 +284,7 @@ The test hosts (`TestHostLanguage` in isograph_compiler, `InHost` in isograph_cl
 
 ```toml
 # from crates/typescript_artifacts/Cargo.toml
+dprint-plugin-typescript = { version = "=0.101.0", default-features = false }
 swc_common = { version = "=27.0.0", default-features = false }
 swc_ecma_ast = { version = "=30.0.2", default-features = false }
 swc_ecma_codegen = { version = "=33.0.2", default-features = false }
@@ -493,6 +494,93 @@ The conversion:
 - A union, intersection, function, or conditional type in an operand position (array element, union or intersection member, conditional check or extends type) is wrapped in `TsParenthesizedType`. swc's emitter adds no parentheses in types: without this, `("a" | "b")[]` prints as `"a" | "b"[]`.
 - Template literal type text escapes `\`, `` ` ``, and `${` in `raw`; `cooked` is the text.
 
+### Formatting
+
+`swc_ecma_codegen` writes one line per statement with no line width: `const artifact: IsographEntrypoint<Query__HomeRoute__param, Query__HomeRoute__output_type, "Query"> = {` is one line, `readerArtifact: ()=>Query__HomeRoute__resolver_reader()` has no spaces, strings are double-quoted, no trailing commas, and no blank line follows the imports. Its `Config` has no option for any of these. `generate_artifacts` therefore formats every module `swc::print` returns with `dprint-plugin-typescript` before returning it. This is option (a), approved with the user, and the dependency's reason: dprint is a Rust TypeScript formatter whose configuration covers the repo's prettier settings, so generation stays in-process, deterministic, and free of a Node dependency. Its AST crate is `dprint-swc-ext` 0.28.1, which uses the same `swc_ecma_ast` 30.0.2 as `swc.rs`, so the dependency adds `swc_ecma_parser` 47.1.0 and `swc_ecma_lexer` 46.0.0 and duplicates no swc crate. dprint parses the printed text: it formats from source positions and tokens, which a printed-from-AST module with `DUMMY_SP` spans does not have.
+
+```rust
+// from crates/typescript_artifacts/src/format.rs
+/// The repo's `.prettierrc.json` as dprint settings.
+pub(crate) fn configuration() -> Configuration {
+    ConfigurationBuilder::new()
+        .line_width(80)
+        .indent_width(2)
+        .use_tabs(false)
+        .quote_style(QuoteStyle::PreferSingle)
+        .quote_props(QuoteProps::AsNeeded)
+        .semicolons(Semicolons::Always)
+        .trailing_commas(TrailingCommas::OnlyMultiLine)
+        .arrow_function_use_parentheses(UseParentheses::Force)
+        .binary_expression_operator_position(OperatorPosition::SameLine)
+        .module_sort_import_declarations(SortOrder::Maintain)
+        .module_blank_lines_after_imports(1)
+        .build()
+}
+
+/// dprint could not format the text swc printed for the artifact at `path`.
+#[derive(Debug, thiserror::Error)]
+#[error("The generated artifact `{}` could not be formatted: {error}", .path.0)]
+pub struct ArtifactFormatError {
+    pub path: ArtifactPath,
+    pub error: FormatError,
+}
+
+/// `text`, the module at `path`, formatted with `configuration`.
+pub(crate) fn formatted(
+    configuration: &Configuration,
+    path: &ArtifactPath,
+    text: String,
+) -> Result<String, Box<ArtifactFormatError>>;
+```
+
+`generate_artifacts` builds the `Configuration` once per call and passes it to each `printed` call; it is a local, not a `static`. `format_text` returns `Ok(None)` when the text is already formatted, and `formatted` then returns `text`. `tsconfig.json` and the raw query text file are not TypeScript and are not formatted.
+
+The settings against `.prettierrc.json` (`printWidth` 80, `tabWidth` 2, `singleQuote`, `semi`, `trailingComma` `all`, and prettier's defaults for the rest):
+
+- `line_width(80)`, `indent_width(2)`, `use_tabs(false)` are `printWidth`, `tabWidth`, and prettier's `useTabs` default. dprint's newline default is `\n`, prettier's `endOfLine` `lf`.
+- `QuoteStyle::PreferSingle` is `singleQuote`: single quotes unless the string holds more single quotes than double quotes. `QuoteProps::AsNeeded` is prettier's `quoteProps` default.
+- `Semicolons::Always` is `semi`.
+- `TrailingCommas::OnlyMultiLine` is `trailingComma` `all`: a trailing comma after the last element, argument, parameter, type parameter, or property of every list that spans lines, and none on one line.
+- `UseParentheses::Force` is prettier's `arrowParens` default `always`. `OperatorPosition::SameLine` for binary expressions is prettier's operator-at-line-end; dprint's default is the next line.
+- `module_blank_lines_after_imports(1)` differs from prettier, which keeps the blank lines the input has and inserts none. The swc output has none, and we want one blank line between the import block and the first statement.
+- `SortOrder::Maintain` differs from the repo's `@ianvs/prettier-plugin-sort-imports`. Imports print in the generator's path order, which makes each identifier's position a function of the module's value; dprint's default sorts case-insensitively by specifier. `__isograph` is in `.prettierignore`, so prettier never re-sorts artifacts.
+- Line breaking is dprint's algorithm, not prettier's. A node that exceeds 80 columns breaks one item per line, as prettier does, but a long type alias or conditional type can break at a different point than prettier picks. A node printed on several lines stays on several lines (`prefer_single_line` false); swc prints objects and type literals one property per line, which matches prettier's rule of keeping an object expanded when the input has a newline after `{`.
+
+Descriptions stay on `OwnLineBlockComments`. dprint re-indents the lines of a JSDoc comment, but it keeps a property on the same line as a comment's `*/` when the input has them on one line (`/** x */ readonly b: string;` stays one line), so the writer still breaks the line after `*/`.
+
+`TypeScriptGenerationError` is what `generate_artifacts` returns. The module builders (`output_type_file`, `reader_artifact_file`) return the narrower `TypeScriptModuleError`, since they never format:
+
+```rust
+// from crates/typescript_artifacts/src/lib.rs
+/// A project `generate_artifacts` cannot print.
+#[derive(Debug, thiserror::Error, derive_more::From)]
+pub enum TypeScriptGenerationError {
+    #[error("{0}")]
+    Module(TypeScriptModuleError),
+    #[error("{0}")]
+    Format(Box<ArtifactFormatError>),
+}
+
+/// A field whose artifact modules cannot be built.
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum TypeScriptModuleError {
+    #[error(
+        "`{}.{}` is not exported with `export const`, so its type cannot import its resolver.",
+        .0.parent_entity_name,
+        .0.selectable_name
+    )]
+    MissingExport(EntityNameAndSelectableName),
+    #[error(
+        "No relative path leads from the artifact folder to the source file of `{}.{}`.",
+        .0.parent_entity_name,
+        .0.selectable_name
+    )]
+    SourceNotRelative(EntityNameAndSelectableName),
+}
+```
+
+A format failure means `swc.rs` printed text dprint cannot parse, which is a defect in `swc.rs`. `compile` logs it like every other generation error and writes nothing.
+
 ### Entrypoint artifact
 
 Path `<Entity>/<selectable>/entrypoint.ts`, the path the transforms import:
@@ -531,8 +619,8 @@ Its text:
 
 ```ts
 export default {
-  kind: "Entrypoint",
-  name: "Query.HomeRoute"
+  kind: 'Entrypoint',
+  name: 'Query.HomeRoute',
 };
 ```
 
@@ -833,7 +921,7 @@ Tests (`crates/isograph_compiler`, whose test host extracts `` iso(`...`) ``): a
 
 Tests (`crates/typescript_artifacts`), facts about values and text:
 
-- `Entrypoint(Query.HomeRoute)` yields `Query/HomeRoute/entrypoint.ts` whose text starts with `export default {` and has `kind: "Entrypoint"` and `name: "Query.HomeRoute"`.
+- `Entrypoint(Query.HomeRoute)` yields `Query/HomeRoute/entrypoint.ts` whose text starts with `export default {` and has `kind: 'Entrypoint'` and `name: 'Query.HomeRoute'`.
 - A module whose value holds one `Import` twice and another once has exactly two import declarations, in path order, and the value names each by its identifier.
 - Printing the same module twice is the same text.
 - `artifact_import_specifier` from `Query/A/reader.ts` to `Query/A/entrypoint.ts` is `./entrypoint`; from `iso.ts` to `Query/A/entrypoint.ts` is `./Query/A/entrypoint`; from `Query/A/x.ts` to `Pet/B/y.ts` is `./../../Pet/B/y`; from `Query/A/x.ts` to `Query/B/y.ts` is `./../B/y`. The identifier of `Query/HomeRoute/entrypoint.ts` is `Query__HomeRoute__entrypoint`.

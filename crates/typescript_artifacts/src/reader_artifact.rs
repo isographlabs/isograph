@@ -2,7 +2,7 @@ use common_lang_types::ConstExportName;
 use isograph_compiler::{FieldArtifacts, ReaderSelection, ReaderSelectionSet};
 use prelude::Postfix;
 
-use crate::TypeScriptGenerationError;
+use crate::TypeScriptModuleError;
 use crate::entrypoint::{RESOLVER_READER, RUNTIME_PACKAGE, field_artifact_path};
 use crate::generate_types::{
     OUTPUT_TYPE, Options, PARAM_TYPE, entity_name_type, output_type_name, param_type_name,
@@ -25,11 +25,11 @@ pub(crate) fn reader_artifact_file<TLiteralContext>(
     reader: &ReaderSelectionSet,
     export: Option<ConstExportName>,
     options: &Options,
-) -> Result<TypeScriptModule, TypeScriptGenerationError> {
+) -> Result<TypeScriptModule, TypeScriptModuleError> {
     let path = field_artifact_path(field.field, RESOLVER_READER);
-    let export = export.ok_or(TypeScriptGenerationError::MissingExport(field.field))?;
+    let export = export.ok_or(TypeScriptModuleError::MissingExport(field.field))?;
     let specifier = source_specifier(path.reference(), field.resolver.path, options)
-        .ok_or(TypeScriptGenerationError::SourceNotRelative(field.field))?;
+        .ok_or(TypeScriptModuleError::SourceNotRelative(field.field))?;
     let value = ArtifactValue::Object(vec![
         entry("readerAst", selection_set_value(reader)),
         entry(
@@ -159,7 +159,7 @@ mod tests {
     use prelude::Postfix;
 
     use super::reader_artifact_file;
-    use crate::TypeScriptGenerationError;
+    use crate::TypeScriptModuleError;
     use crate::generate_types::{Options, param_type_file};
     use crate::swc::print;
 
@@ -209,7 +209,7 @@ mod tests {
     fn printed(
         field: &FieldArtifacts<()>,
         reader: Vec<ReaderSelection>,
-    ) -> Result<String, TypeScriptGenerationError> {
+    ) -> Result<String, TypeScriptModuleError> {
         reader_artifact_file(
             field,
             ReaderSelectionSet(reader).reference(),
@@ -387,7 +387,7 @@ mod tests {
                 None,
                 options().reference(),
             ),
-            TypeScriptGenerationError::MissingExport(field.field).wrap_err()
+            TypeScriptModuleError::MissingExport(field.field).wrap_err()
         );
         let outside = field_in("Pet", "fullName", "/elsewhere/Pet.ts");
         assert_eq!(
@@ -397,7 +397,7 @@ mod tests {
                 export("fullName"),
                 options().reference(),
             ),
-            TypeScriptGenerationError::SourceNotRelative(outside.field).wrap_err()
+            TypeScriptModuleError::SourceNotRelative(outside.field).wrap_err()
         );
     }
 }

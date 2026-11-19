@@ -12,7 +12,7 @@ use isograph_compiler::{
 };
 use prelude::Postfix;
 
-use crate::TypeScriptGenerationError;
+use crate::TypeScriptModuleError;
 use crate::custom_scalar::TypeScriptCustomScalarType;
 use crate::entrypoint::{RUNTIME_PACKAGE, field_artifact_path};
 use crate::imports::relative_artifact_specifier;
@@ -205,11 +205,11 @@ pub(crate) fn output_type_file(
     source: RelativePathToSourceFile,
     export: Option<ConstExportName>,
     options: &Options,
-) -> Result<TypeScriptModule, TypeScriptGenerationError> {
+) -> Result<TypeScriptModule, TypeScriptModuleError> {
     let path = field_artifact_path(field, OUTPUT_TYPE);
-    let export = export.ok_or(TypeScriptGenerationError::MissingExport(field))?;
+    let export = export.ok_or(TypeScriptModuleError::MissingExport(field))?;
     let specifier = source_specifier(path.reference(), source, options)
-        .ok_or(TypeScriptGenerationError::SourceNotRelative(field))?;
+        .ok_or(TypeScriptModuleError::SourceNotRelative(field))?;
     TypeScriptModule {
         items: vec![
             TypeScriptItem::NamedTypeImport(NamedImport {

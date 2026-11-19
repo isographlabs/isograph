@@ -955,7 +955,7 @@ mod generation_tests {
         assert!(module.contains("query HomeRoute {"), "{module}");
         let entrypoint = written_text(changes.reference(), "Query/HomeRoute/entrypoint.ts");
         assert!(entrypoint.contains("queryText: "), "{entrypoint}");
-        assert!(entrypoint.contains("from \"./query_text\""), "{entrypoint}");
+        assert!(entrypoint.contains("from './query_text'"), "{entrypoint}");
     }
 
     const INLINED: &str = "export const Inner = iso(`field Query.Inner { id }`)(() => null);\nexport const Outer = iso(`field Query.Outer { Inner }`)(() => null);\niso(`entrypoint Query.Outer`)\n";

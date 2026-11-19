@@ -2,6 +2,7 @@
 
 mod custom_scalar;
 mod entrypoint;
+mod format;
 mod generate_types;
 mod imports;
 mod iso_overloads;
@@ -11,12 +12,14 @@ mod reader_artifact;
 mod swc;
 
 use common_lang_types::{ConstExportName, EntityNameAndSelectableName};
+use dprint_plugin_typescript::configuration::Configuration;
 use isograph_compiler::{
     ArtifactPath, EntrypointArtifacts, Generation, GenerationOptions, ProjectArtifacts,
 };
 use prelude::Postfix;
 
 pub use custom_scalar::{ModuleSpecifier, TypeScriptCustomScalarType};
+pub use format::ArtifactFormatError;
 pub use module::{
     ArtifactImport, ArtifactModule, ArtifactObjectEntry, ArtifactValue, DeclaredExportType,
     DeclaredTypeArgument, DefaultExportType, NamedImport,
@@ -24,8 +27,18 @@ pub use module::{
 
 use crate::module::{TypeScriptModule, module_of_artifact};
 
-#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+/// A project `generate_artifacts` cannot print.
+#[derive(Debug, thiserror::Error, derive_more::From)]
 pub enum TypeScriptGenerationError {
+    #[error("{0}")]
+    Module(TypeScriptModuleError),
+    #[error("{0}")]
+    Format(Box<ArtifactFormatError>),
+}
+
+/// A field whose artifact modules cannot be built.
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum TypeScriptModuleError {
     #[error(
         "`{}.{}` is not exported with `export const`, so its type cannot import its resolver.",
         .0.parent_entity_name,
@@ -52,8 +65,10 @@ pub fn generate_artifacts<TLiteralContext>(
     options: &GenerationOptions<TypeScriptCustomScalarType>,
     export_name: impl Fn(&TLiteralContext) -> Option<ConstExportName>,
 ) -> Result<Vec<(ArtifactPath, String)>, TypeScriptGenerationError> {
+    let configuration = format::configuration();
+    let printed = |module: TypeScriptModule| printed(configuration.reference(), module);
     let generated = |generation: Generation| matches!(generation, Generation::Generated);
-    let per_field = project
+    let field_modules = project
         .fields
         .iter()
         .map(|field| {
@@ -80,68 +95,75 @@ pub fn generate_artifacts<TLiteralContext>(
                     )
                 })
                 .transpose()?;
-            let modules = std::iter::once(generate_types::param_type_file(field, options))
+            std::iter::once(generate_types::param_type_file(field, options))
                 .chain(field.parameters.as_ref().map(|parameters| {
                     generate_types::parameters_type_file(field.field, parameters, options)
                 }))
                 .chain(output_type)
                 .chain(resolver_reader)
-                .map(|module| printed(module.reference()))
-                .collect::<Vec<_>>();
-            modules.wrap_ok()
+                .collect::<Vec<_>>()
+                .wrap_ok()
         })
-        .collect::<Result<Vec<_>, TypeScriptGenerationError>>()?;
+        .collect::<Result<Vec<_>, TypeScriptModuleError>>()?;
     let per_entrypoint = project.entrypoints.iter().flat_map(|artifacts| {
         let EntrypointArtifacts { entrypoint, query } = artifacts;
         [
-            printed_artifact(entrypoint::entrypoint_artifact(
+            entrypoint::entrypoint_artifact(
                 entrypoint.dereference(),
                 query.normalization_ast.root.entity_name,
-            )),
-            printed_artifact(entrypoint::query_text_artifact(
-                entrypoint.dereference(),
-                query.text.reference(),
-            )),
-            printed_artifact(normalization_ast::normalization_ast_artifact(
+            ),
+            entrypoint::query_text_artifact(entrypoint.dereference(), query.text.reference()),
+            normalization_ast::normalization_ast_artifact(
                 entrypoint.dereference(),
                 query.normalization_ast.reference(),
-            )),
+            ),
         ]
         .into_iter()
+        .map(|artifact| printed(module_of_artifact(artifact.reference())))
         .chain(query.file_name.map(|file_name| {
             entrypoint::raw_query_text_file(
                 entrypoint.dereference(),
                 file_name,
                 query.text.reference(),
             )
+            .wrap_ok()
         }))
     });
     let link_types = project
         .link_types
         .iter()
-        .map(|link| printed(generate_types::link_type_file(link).reference()));
-    per_field
+        .map(|link| printed(generate_types::link_type_file(link)));
+    field_modules
         .into_iter()
         .flatten()
+        .map(printed)
         .chain(per_entrypoint)
         .chain(link_types)
         .chain(std::iter::once(printed(
-            iso_overloads::iso_overload_module(project).reference(),
+            iso_overloads::iso_overload_module(project),
         )))
-        .chain(std::iter::once((
-            ArtifactPath("tsconfig.json".to_owned()),
-            TSCONFIG_JSON.to_owned(),
-        )))
-        .collect::<Vec<_>>()
+        .chain(std::iter::once(
+            (
+                ArtifactPath("tsconfig.json".to_owned()),
+                TSCONFIG_JSON.to_owned(),
+            )
+                .wrap_ok(),
+        ))
+        .collect::<Result<Vec<_>, Box<ArtifactFormatError>>>()?
         .wrap_ok()
 }
 
-fn printed(module: &TypeScriptModule) -> (ArtifactPath, String) {
-    (module.path.clone(), swc::print(module))
-}
-
-fn printed_artifact(artifact: ArtifactModule) -> (ArtifactPath, String) {
-    printed(module_of_artifact(artifact.reference()).reference())
+/// The path of `module` and its text, printed by swc and formatted by dprint.
+fn printed(
+    configuration: &Configuration,
+    module: TypeScriptModule,
+) -> Result<(ArtifactPath, String), Box<ArtifactFormatError>> {
+    let text = format::formatted(
+        configuration,
+        module.path.reference(),
+        swc::print(module.reference()),
+    )?;
+    (module.path, text).wrap_ok()
 }
 
 #[cfg(test)]
@@ -167,7 +189,8 @@ mod tests {
     use prelude::Postfix;
 
     use super::{
-        ModuleSpecifier, TypeScriptCustomScalarType, TypeScriptGenerationError, generate_artifacts,
+        ModuleSpecifier, TypeScriptCustomScalarType, TypeScriptGenerationError,
+        TypeScriptModuleError, generate_artifacts,
     };
 
     type Context = Option<ConstExportName>;
@@ -272,12 +295,17 @@ mod tests {
             .any(|(artifact_path, _)| artifact_path.0 == path)
     }
 
-    /// The `iso` overload line whose matched string is `text`.
-    fn overload_line<'a>(iso: &'a str, text: &str) -> &'a str {
-        let needle = format!("MatchesWhitespaceAndString<\"{text}\", T>");
-        iso.lines()
-            .find(|line| line.contains(needle.as_str()))
-            .expect("the test generated this overload")
+    /// The text of the `iso` overload whose matched string is `text`, from that string to the
+    /// overload's `;`, exclusive.
+    fn overload<'a>(iso: &'a str, text: &str) -> &'a str {
+        let needle = format!("MatchesWhitespaceAndString<'{text}', T>");
+        let start = iso
+            .find(needle.as_str())
+            .expect("the test generated this overload");
+        iso[start..]
+            .split_once(';')
+            .map(|(overload, _)| overload)
+            .expect("an overload ends with `;`")
     }
 
     fn position(iso: &str, text: &str) -> usize {
@@ -314,10 +342,7 @@ mod tests {
         );
         let text = text_at(artifacts.as_slice(), "Pet/f/param_type.ts");
         assert!(text.contains("readonly firstName: string;"), "{text}");
-        assert!(
-            text.contains("readonly nickname: (string | null);"),
-            "{text}"
-        );
+        assert!(text.contains("readonly nickname: string | null;"), "{text}");
         assert!(text.contains("readonly friends: ReadonlyArray<{"), "{text}");
         assert!(text.contains("readonly id: string;"), "{text}");
         assert!(text.contains("readonly age: number;"), "{text}");
@@ -372,7 +397,7 @@ mod tests {
             ]),
         )
         .expect("the fixture prints");
-        let import = "import type { Decimal as Price__custom_scalar } from \"decimal.js\";";
+        let import = "import type { Decimal as Price__custom_scalar } from 'decimal.js';";
         let param = text_at(artifacts.as_slice(), "Pet/f/param_type.ts");
         assert!(
             param.contains("readonly price: Price__custom_scalar;"),
@@ -413,7 +438,7 @@ mod tests {
         );
         let text = text_at(artifacts.as_slice(), "Query/Home/param_type.ts");
         let import =
-            "import type { Pet__fullName__output_type } from \"./../../Pet/fullName/output_type\";";
+            "import type { Pet__fullName__output_type } from './../../Pet/fullName/output_type';";
         assert_eq!(text.matches(import).count(), 1, "{text}");
         assert!(
             text.contains("readonly fullName: Pet__fullName__output_type;"),
@@ -508,7 +533,7 @@ mod tests {
         );
         let param = text_at(artifacts.as_slice(), "Pet/f/param_type.ts");
         assert!(
-            param.contains("import type { Pet__f__parameters } from \"./parameters_type\";"),
+            param.contains("import type { Pet__f__parameters } from './parameters_type';"),
             "{param}"
         );
         assert!(
@@ -524,7 +549,7 @@ mod tests {
         let artifacts = generated(project(full_name.clone().wrap_vec()).reference());
         let text = text_at(artifacts.as_slice(), "Pet/fullName/output_type.ts");
         assert!(
-            text.contains("import type { fullName as resolver } from \"./../../../Pet\";"),
+            text.contains("import type { fullName as resolver } from './../../../Pet';"),
             "{text}"
         );
         assert!(
@@ -532,10 +557,11 @@ mod tests {
             "{text}"
         );
         full_name.resolver.context = None;
-        assert_eq!(
+        assert!(matches!(
             generated_with(project(full_name.wrap_vec()).reference(), BTreeMap::new()),
-            TypeScriptGenerationError::MissingExport(named("Pet", "fullName")).wrap_err()
-        );
+            Err(TypeScriptGenerationError::Module(TypeScriptModuleError::MissingExport(field)))
+                if field == named("Pet", "fullName")
+        ));
     }
 
     const QUERY_TEXT: &str = "query HomeRoute {\n  pets {\n    \"quoted\"\n  }\n}";
@@ -589,7 +615,7 @@ mod tests {
         assert!(module.contains("\\n  pets {"), "{module}");
         assert!(module.contains("\"quoted\""), "{module}");
         let entrypoint = text_at(artifacts.as_slice(), "Query/HomeRoute/entrypoint.ts");
-        assert!(entrypoint.contains("from \"./query_text\""), "{entrypoint}");
+        assert!(entrypoint.contains("from './query_text'"), "{entrypoint}");
         assert!(entrypoint.contains("queryText: "), "{entrypoint}");
     }
 
@@ -634,7 +660,7 @@ mod tests {
                 .any(|(_, text)| text.contains("export default {};"))
         );
         let ast = text_at(artifacts.as_slice(), "Pet/Checkins/normalization_ast.ts");
-        assert!(ast.contains("selectableName: \"pets\""), "{ast}");
+        assert!(ast.contains("selectableName: 'pets'"), "{ast}");
         assert!(ast.contains("responseKey: null"), "{ast}");
         assert!(has_path(artifacts.as_slice(), "Pet/Checkins/entrypoint.ts"));
         assert!(!has_path(
@@ -655,24 +681,22 @@ mod tests {
             .reference(),
         );
         let text = text_at(artifacts.as_slice(), "Query/HomeRoute/entrypoint.ts");
-        assert!(text.contains("kind: \"Entrypoint\""), "{text}");
-        assert!(text.contains("name: \"Query.HomeRoute\""), "{text}");
+        assert!(text.contains("kind: 'Entrypoint'"), "{text}");
+        assert!(text.contains("name: 'Query.HomeRoute'"), "{text}");
         assert!(
             text.contains("normalizationAst: Query__HomeRoute__normalization_ast"),
             "{text}"
         );
         assert!(
-            text.contains("readerArtifact: ()=>Query__HomeRoute__resolver_reader()"),
+            text.contains("readerArtifact: () => Query__HomeRoute__resolver_reader()"),
             "{text}"
         );
         assert!(
-            text.contains(
-                "import Query__HomeRoute__normalization_ast from \"./normalization_ast\";"
-            ),
+            text.contains("import Query__HomeRoute__normalization_ast from './normalization_ast';"),
             "{text}"
         );
         assert!(
-            text.contains("import Query__HomeRoute__resolver_reader from \"./resolver_reader\";"),
+            text.contains("import Query__HomeRoute__resolver_reader from './resolver_reader';"),
             "{text}"
         );
     }
@@ -696,11 +720,11 @@ mod tests {
         );
         assert_eq!(
             text_at(artifacts.as_slice(), "Pet/__link/output_type.ts"),
-            "import type { Link } from \"@isograph/runtime\";\nexport type Pet____link__output_type = Link<\"Pet\">;\n"
+            "import type { Link } from '@isograph/runtime';\n\nexport type Pet____link__output_type = Link<'Pet'>;\n"
         );
         assert_eq!(
             text_at(artifacts.as_slice(), "Node/__link/output_type.ts"),
-            "import type { Link } from \"@isograph/runtime\";\nexport type Node____link__output_type = Link<\"Owner\" | \"Pet\">;\n"
+            "import type { Link } from '@isograph/runtime';\n\nexport type Node____link__output_type = Link<'Owner' | 'Pet'>;\n"
         );
         assert_eq!(
             text_at(artifacts.as_slice(), "Empty/__link/output_type.ts"),
@@ -741,47 +765,44 @@ mod tests {
         );
         let iso = text_at(artifacts.as_slice(), "iso.ts");
         assert!(
-            overload_line(iso, "field Pet.fullName")
-                .ends_with("): IdentityWithParam<Pet__fullName__param>;"),
+            overload(iso, "field Pet.fullName")
+                .ends_with("): IdentityWithParam<Pet__fullName__param>"),
             "{iso}"
         );
         assert!(
-            overload_line(iso, "field Query.HomeRoute")
-                .ends_with("): IdentityWithParam<Query__HomeRoute__param>;"),
+            overload(iso, "field Query.HomeRoute")
+                .ends_with("): IdentityWithParam<Query__HomeRoute__param>"),
             "{iso}"
         );
         assert!(!iso.contains("IdentityWithParamComponent"), "{iso}");
         assert!(
-            overload_line(iso, "field Pet.bestFriend").ends_with(
-                "): IdentityWithParam<Pet__bestFriend__param, (Pet____link__output_type | null)>;"
+            overload(iso, "field Pet.bestFriend").ends_with(
+                "): IdentityWithParam<Pet__bestFriend__param, (Pet____link__output_type | null)>"
             ),
             "{iso}"
         );
         assert!(
-            overload_line(iso, "field Pet.owner")
-                .ends_with("): IdentityWithParam<Pet__owner__param, Owner____link__output_type>;"),
+            overload(iso, "field Pet.owner")
+                .ends_with("): IdentityWithParam<Pet__owner__param, Owner____link__output_type>"),
             "{iso}"
         );
+        assert!(overload(iso, "entity Owner").ends_with("): void"), "{iso}");
         assert!(
-            overload_line(iso, "entity Owner").ends_with("): void;"),
-            "{iso}"
-        );
-        assert!(
-            overload_line(iso, "entrypoint Query.HomeRoute")
-                .ends_with("): typeof Query__HomeRoute__entrypoint;"),
+            overload(iso, "entrypoint Query.HomeRoute")
+                .ends_with("): typeof Query__HomeRoute__entrypoint"),
             "{iso}"
         );
         let param_import = position(
             iso,
-            "import type { Query__HomeRoute__param } from \"./Query/HomeRoute/param_type\";",
+            "import type { Query__HomeRoute__param } from './Query/HomeRoute/param_type';",
         );
         let link_import = position(
             iso,
-            "import type { Pet____link__output_type } from \"./Pet/__link/output_type\";",
+            "import type { Pet____link__output_type } from './Pet/__link/output_type';",
         );
         let entrypoint_import = position(
             iso,
-            "import type Query__HomeRoute__entrypoint from \"./Query/HomeRoute/entrypoint\";",
+            "import type Query__HomeRoute__entrypoint from './Query/HomeRoute/entrypoint';",
         );
         assert!(
             param_import < link_import && link_import < entrypoint_import,
@@ -801,8 +822,7 @@ mod tests {
         );
         let iso = text_at(artifacts.as_slice(), "iso.ts");
         assert!(
-            position(iso, "<\"field Pet.AvatarCard\", T>")
-                < position(iso, "<\"field Pet.Avatar\", T>")
+            position(iso, "<'field Pet.AvatarCard', T>") < position(iso, "<'field Pet.Avatar', T>")
         );
     }
 
