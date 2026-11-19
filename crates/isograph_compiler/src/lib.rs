@@ -89,7 +89,7 @@ pub use selectable_for_path::{
 };
 pub use validation::{
     DuplicateDefinitionError, DuplicateResponseName, EntrypointNotFetchableError,
-    MissingFieldArgument, ProfileValidationError, SelectableKey,
+    InvalidEntityError, MissingFieldArgument, ProfileValidationError, SelectableKey,
     SelectionSetOnFieldWithoutTargetError, UnknownEntityError, UnknownSelectableError,
     ValidationError, iso_literal_validation_errors_in_file,
 };

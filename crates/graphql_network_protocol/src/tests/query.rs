@@ -480,10 +480,19 @@ fn an_entrypoint_on_a_leaf_is_a_validation_error_on_the_parent() {
     let db = demo(&[], &[("src/Leaf.ts", contents)], &[]);
     assert_eq!(
         validation_errors(&db, "src/Leaf.ts", contents),
-        vec![(
-            "`String` has no selectables, so it cannot parent an entrypoint.".to_owned(),
-            "String".to_owned()
-        )]
+        vec![
+            (
+                "Invalid parent type. `String` is a leaf. You are attempting to define a client \
+                field on it. In order to do so, the parent object must be an object, interface or \
+                union."
+                    .to_owned(),
+                "String".to_owned()
+            ),
+            (
+                "`String` has no selectables, so it cannot parent an entrypoint.".to_owned(),
+                "String".to_owned()
+            )
+        ]
     );
 }
 

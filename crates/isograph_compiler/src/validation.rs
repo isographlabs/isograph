@@ -6,8 +6,8 @@ use common_lang_types::{
 };
 use intern::Lookup;
 use isograph_parser::{
-    EntityNameWrapper, EntrypointDeclaration, IsoLiteralItem, SelectableDeclaration, Selection,
-    SelectionSet,
+    EntityNameWrapper, EntrypointDeclaration, IsoLiteralItem, ListTypeAnnotation,
+    SelectableDeclaration, Selection, SelectionSet, TypeAnnotation, UnionVariant,
 };
 use pico_macros::memo;
 use prelude::Postfix;
@@ -43,6 +43,33 @@ pub enum ValidationError<TNotFetchable: std::fmt::Display> {
     InputTarget(EntityName),
     #[error("{0}")]
     DuplicateResponseName(DuplicateResponseName),
+    #[error("{0}")]
+    InvalidEntity(InvalidEntityError),
+}
+
+/// An entity that cannot parent a `field` declaration or be the target of its `to` clause.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum InvalidEntityError {
+    #[error(
+        "Invalid parent type. `{0}` is a leaf. You are attempting to define a client field on it. \
+        In order to do so, the parent object must be an object, interface or union."
+    )]
+    LeafParent(EntityName),
+    #[error(
+        "Invalid parent type. `{0}` is an input type. You are attempting to define a client field \
+        on it. In order to do so, the parent object must be an object, interface or union."
+    )]
+    InputParent(EntityName),
+    #[error(
+        "Invalid client pointer target type. `{0}` is a leaf. You are attempting to define a \
+        pointer to it. In order to do so, the type must be an object, interface or union."
+    )]
+    LeafTarget(EntityName),
+    #[error(
+        "Invalid client pointer target type. `{0}` is an input type. You are attempting to define \
+        a pointer to it. In order to do so, the type must be an object, interface or union."
+    )]
+    InputTarget(EntityName),
 }
 
 /// A selection whose response name, its alias or else its name, an earlier selection in the
@@ -223,8 +250,18 @@ fn selectable_declaration_errors<'a, TProfile: CompilationProfile>(
             None
         }
     };
+    let parent = parent_error(db, client, entity).map(|error| {
+        ValidationError::InvalidEntity(error).with_span(declaration.parent_type.location)
+    });
+    let targets = declaration.target_type.iter().flat_map(move |target_type| {
+        named_types(target_type.item.reference())
+            .into_iter()
+            .filter_map(move |name| pointer_target_error(db, client, name))
+    });
     duplicate
         .into_iter()
+        .chain(parent)
+        .chain(targets)
         .chain(
             declaration
                 .selection_set
@@ -234,6 +271,68 @@ fn selectable_declaration_errors<'a, TProfile: CompilationProfile>(
                 }),
         )
         .boxed()
+}
+
+/// `InvalidEntityError` when the defined entity `parent` cannot parent a `field` declaration.
+fn parent_error<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    parent: EntityName,
+) -> Option<InvalidEntityError> {
+    let entity = entity_named(db, client, parent).as_ref().ok()?;
+    match target_shape::<TProfile>(entity) {
+        TargetShape::Composite => None,
+        TargetShape::Leaf => InvalidEntityError::LeafParent(parent).wrap_some(),
+        TargetShape::Input => InvalidEntityError::InputParent(parent).wrap_some(),
+    }
+}
+
+/// The error of `name`, a type a `to` clause names: undefined, or not an entity a pointer can
+/// point to.
+fn pointer_target_error<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    name: WithSpan<EntityNameWrapper>,
+) -> Option<WithSpan<ProfileValidationError<TProfile>>> {
+    let target = name.item.0;
+    if let EntityDefinedness::Undefined = entity_definedness(db, client, target) {
+        return ValidationError::UnknownEntity(UnknownEntityError(target))
+            .with_span(name.location)
+            .wrap_some();
+    }
+    let entity = entity_named(db, client, target).as_ref().ok()?;
+    let error = match target_shape::<TProfile>(entity) {
+        TargetShape::Composite => return None,
+        TargetShape::Leaf => InvalidEntityError::LeafTarget(target),
+        TargetShape::Input => InvalidEntityError::InputTarget(target),
+    };
+    ValidationError::InvalidEntity(error)
+        .with_span(name.location)
+        .wrap_some()
+}
+
+/// Every named type in `annotation`, in source order.
+fn named_types(annotation: &TypeAnnotation) -> Vec<WithSpan<EntityNameWrapper>> {
+    match annotation {
+        TypeAnnotation::Named(named) => named.name.wrap_vec(),
+        TypeAnnotation::List(list) => list_named_types(list),
+        TypeAnnotation::Union(union) => union
+            .0
+            .iter()
+            .flat_map(|variant| match variant.item.reference() {
+                UnionVariant::Named(named) => named.name.wrap_vec(),
+                UnionVariant::List(list) => list_named_types(list),
+                UnionVariant::Null(_) => Vec::new(),
+            })
+            .collect(),
+    }
+}
+
+fn list_named_types(list: &ListTypeAnnotation) -> Vec<WithSpan<EntityNameWrapper>> {
+    list.inner
+        .iter()
+        .flat_map(|inner| named_types(inner.item.reference()))
+        .collect()
 }
 
 /// `entrypoint E.f`: `E` and `E.f` are defined, `E` comes from the protocol, `E.f` is a

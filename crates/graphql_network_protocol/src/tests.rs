@@ -1155,6 +1155,40 @@ fn a_response_name_twice_in_one_selection_set_is_an_error_on_the_second() {
 }
 
 #[test]
+fn a_field_parent_and_pointer_target_must_be_composite() {
+    let leaf_target = "Invalid client pointer target type. `String` is a leaf. You are attempting to define a pointer to it. In order to do so, the type must be an object, interface or union.";
+    let input_target = "Invalid client pointer target type. `SetPetTaglineParams` is an input type. You are attempting to define a pointer to it. In order to do so, the type must be an object, interface or union.";
+    let leaf_parent = "Invalid parent type. `String` is a leaf. You are attempting to define a client field on it. In order to do so, the parent object must be an object, interface or union.";
+    let cases = [
+        (
+            "field Pet.p to Pett",
+            ("Entity `Pett` is not defined.", "Pett").wrap_vec(),
+        ),
+        ("field Pet.p to String", (leaf_target, "String").wrap_vec()),
+        (
+            "field Pet.p to [String!]",
+            (leaf_target, "String").wrap_vec(),
+        ),
+        (
+            "field Pet.p to SetPetTaglineParams",
+            (input_target, "SetPetTaglineParams").wrap_vec(),
+        ),
+        ("field Pet.p to [Pet]", vec![]),
+        ("field Pet.p to Owner", vec![]),
+        ("field String.p", (leaf_parent, "String").wrap_vec()),
+    ];
+    for (declaration, expected) in cases {
+        let contents = format!("export const p = iso(`{declaration}`)(() => 1)");
+        let db = pet_demo_with(&[("src/a.ts", contents.as_str())]);
+        assert_eq!(
+            compiler_errors(&db, "src/a.ts", contents.as_str()),
+            messages(&expected),
+            "{declaration}"
+        );
+    }
+}
+
+#[test]
 fn the_pet_demo_has_no_validation_errors() {
     let db = project_db(&PET_DEMO_SCHEMA, &PET_DEMO_SOURCES);
     for (file, contents) in PET_DEMO_SOURCES {
