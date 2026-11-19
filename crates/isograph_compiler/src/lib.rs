@@ -3,6 +3,7 @@ mod artifacts;
 mod compiler_errors;
 mod database;
 mod entrypoint;
+mod generation_errors;
 mod host_language;
 mod iso_literals;
 mod merged_selection;
@@ -38,6 +39,7 @@ pub use database::{
 pub use entrypoint::{
     ProfileEntrypointNotFetchableError, ProfileFetchPlan, RootEntities, entrypoint_fetch_plan,
 };
+pub use generation_errors::{QueryGenerationError, iso_literal_generation_errors_in_file};
 pub use host_language::*;
 pub use iso_literals::{
     LiteralId, extract_iso_literals, iso_literal_extraction, iso_literal_host_errors_in_file,

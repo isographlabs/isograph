@@ -12,8 +12,9 @@ use span::{WithSpan, WithSpanPostfix};
 
 use crate::schema::{Definitions, entity_definitions, selectable_definitions};
 use crate::{
-    ClientId, CompilationProfile, IsographDb, NetworkProtocol, SelectableKind, entity_named,
-    entrypoint_fetch_plan, field_declaration, parsed_iso_literals_in_file, selectable_named,
+    ClientId, CompilationProfile, EntityOrigin, EntityShape, IsographDb, NetworkProtocol,
+    ProfileEntity, SelectableKind, entity_named, entrypoint_fetch_plan, field_declaration,
+    parsed_iso_literals_in_file, selectable_named,
 };
 
 /// A reference in an iso literal that the source declarations do not satisfy.
@@ -31,6 +32,12 @@ pub enum ValidationError<TNotFetchable: std::fmt::Display> {
     EntrypointNotFetchable(EntrypointNotFetchableError<TNotFetchable>),
     #[error("{0}")]
     MissingFieldArgument(MissingFieldArgument),
+    #[error("`{0}` returns a leaf and takes no selection set.")]
+    SelectionSetOnLeaf(SelectableKey),
+    #[error("`{0}` returns an entity with selectables and needs a selection set.")]
+    MissingSelectionSet(SelectableKey),
+    #[error("`{0}` is an input type, which cannot be selected.")]
+    InputTarget(EntityName),
 }
 
 /// A selection of `field` that passes no value for `variable`, which has no default.
@@ -304,7 +311,7 @@ fn validate_selection<'a, TProfile: CompilationProfile>(
             };
             let nested: ValidationErrors<'a, TProfile> =
                 match (selection.selection_set.as_ref(), selectable.target_entity()) {
-                    (None, _) => std::iter::empty().boxed(),
+                    (None, None) => std::iter::empty().boxed(),
                     (Some(nested), None) => std::iter::once(
                         ValidationError::SelectionSetOnFieldWithoutTarget(
                             SelectionSetOnFieldWithoutTargetError(key),
@@ -312,13 +319,9 @@ fn validate_selection<'a, TProfile: CompilationProfile>(
                         .with_span(nested.location),
                     )
                     .boxed(),
-                    (Some(nested), Some(target)) => match entity_definedness(db, client, target) {
-                        EntityDefinedness::Undefined => std::iter::empty().boxed(),
-                        EntityDefinedness::Defined => {
-                            validate_selection_set(db, client, target, nested.item.reference())
-                                .boxed()
-                        }
-                    },
+                    (selection_set, Some(target)) => {
+                        target_errors(db, client, key, selection, selection_set, target)
+                    }
                 };
             missing
                 .into_iter()
@@ -331,6 +334,67 @@ fn validate_selection<'a, TProfile: CompilationProfile>(
         }
         Definitions::Duplicated | Definitions::ProtocolLookupFailed(_) => {
             std::iter::empty().boxed()
+        }
+    }
+}
+
+/// What a selection of a selectable whose target entity has this shape needs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TargetShape {
+    /// Selected whole: no selection set.
+    Leaf,
+    /// Never selected.
+    Input,
+    /// Selected through a selection set.
+    Composite,
+}
+
+/// The shape of `entity` as a selection's target. A source entity is composite.
+fn target_shape<TProfile: CompilationProfile>(entity: &ProfileEntity<TProfile>) -> TargetShape {
+    match entity.origin.reference() {
+        EntityOrigin::Source => TargetShape::Composite,
+        EntityOrigin::Protocol(data) => match TProfile::NetworkProtocol::entity_shape(data) {
+            EntityShape::Leaf => TargetShape::Leaf,
+            EntityShape::Input => TargetShape::Input,
+            EntityShape::Composite(_) => TargetShape::Composite,
+        },
+    }
+}
+
+/// The errors of `selection`, a selection of `key` whose target entity is `target`, and of its
+/// `selection_set`: the target's shape decides whether it takes one.
+fn target_errors<'a, TProfile: CompilationProfile>(
+    db: &'a IsographDb<TProfile>,
+    client: ClientId,
+    key: SelectableKey,
+    selection: &'a Selection,
+    selection_set: Option<&'a WithSpan<SelectionSet>>,
+    target: EntityName,
+) -> ValidationErrors<'a, TProfile> {
+    let Ok(entity) = entity_named(db, client, target) else {
+        return match (selection_set, entity_definedness(db, client, target)) {
+            (Some(nested), EntityDefinedness::Defined) => {
+                validate_selection_set(db, client, target, nested.item.reference()).boxed()
+            }
+            (None, _) | (Some(_), EntityDefinedness::Undefined) => std::iter::empty().boxed(),
+        };
+    };
+    match (target_shape::<TProfile>(entity), selection_set) {
+        (TargetShape::Input, _) => {
+            std::iter::once(ValidationError::InputTarget(target).with_span(selection.name.location))
+                .boxed()
+        }
+        (TargetShape::Leaf, None) => std::iter::empty().boxed(),
+        (TargetShape::Leaf, Some(nested)) => {
+            std::iter::once(ValidationError::SelectionSetOnLeaf(key).with_span(nested.location))
+                .boxed()
+        }
+        (TargetShape::Composite, None) => std::iter::once(
+            ValidationError::MissingSelectionSet(key).with_span(selection.name.location),
+        )
+        .boxed(),
+        (TargetShape::Composite, Some(nested)) => {
+            validate_selection_set(db, client, target, nested.item.reference()).boxed()
         }
     }
 }

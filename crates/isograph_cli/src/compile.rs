@@ -53,15 +53,25 @@ pub(crate) fn arm_compile_debounce<TProfile: CompilationProfile>(
     IsographEffect::Timer(effect).wrap_vec()
 }
 
-/// Computes every source file's errors and logs the count, then generates the artifacts.
+/// Computes every file's errors and logs the count, then generates the artifacts when there
+/// are none.
 pub(crate) fn compile<TProfile: CompilationProfile>(
     state: &mut IsographState<TProfile>,
 ) -> Vec<IsographEffect> {
-    project_errors(state.compile_input().reference()).map_or_else(
-        |error| tracing::error!(%error, "compile"),
-        |reports| tracing::info!(errors = reports.len(), "compiled"),
-    );
-    generate_artifacts(state)
+    match project_errors(state.compile_input().reference()) {
+        Err(error) => {
+            tracing::error!(%error, "compile");
+            no_effects()
+        }
+        Ok(reports) => {
+            tracing::info!(errors = reports.len(), "compiled");
+            if reports.is_empty() {
+                generate_artifacts(state)
+            } else {
+                no_effects()
+            }
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
@@ -83,11 +93,11 @@ fn generate_artifacts<TProfile: CompilationProfile>(
     };
     let input = state.compile_input();
     let Some(files) = project_artifact_sources(input.reference())
-        .map_err(|error| tracing::warn!(%error, "artifacts not written"))
+        .map_err(|error| tracing::error!(%error, "artifacts not written"))
         .ok()
         .and_then(|sources| {
             project_artifacts(input.db, input.client, sources.reference())
-                .map_err(|error| tracing::warn!(%error, "artifacts not written"))
+                .map_err(|error| tracing::error!(%error, "artifacts not written"))
                 .ok()
         })
         .and_then(|project| {
@@ -95,7 +105,7 @@ fn generate_artifacts<TProfile: CompilationProfile>(
                 project.reference(),
                 output.generation.reference(),
             )
-            .map_err(|error| tracing::warn!(%error, "artifacts not written"))
+            .map_err(|error| tracing::error!(%error, "artifacts not written"))
             .ok()
         })
     else {
@@ -259,7 +269,7 @@ mod tests {
     const UNDEFINED_FIELD: &str =
         "iso(`entity Query`) export const x = iso(`field Query.x { nope }`)(() => null)";
 
-    const PET_SCHEMA: &str = "type Query {\n  pets: [Pet!]!\n  pet(id: ID!): Pet\n}\n\ntype Pet {\n  id: ID!\n  firstName: String!\n  lastName: String!\n  best_friend: Pet\n}\n";
+    const PET_SCHEMA: &str = "scalar ID\nscalar String\ntype Query {\n  pets: [Pet!]!\n  pet(id: ID!): Pet\n}\n\ntype Pet {\n  id: ID!\n  firstName: String!\n  lastName: String!\n  best_friend: Pet\n}\n";
     const PET: &str = "export const fullName = iso(`\n  field Pet.fullName {\n    firstName\n    lastName\n  }\n`)(() => null);\n\nexport const bestFriend = iso(`\n  field Pet.bestFriend to Pet {\n    best_friend {\n      id\n    }\n  }\n`)(() => null);\n";
     const HOME_ROUTE: &str = "export const HomeRoute = iso(`\n  field Query.HomeRoute {\n    pets {\n      id\n      fullName\n      bestFriend {\n        firstName\n      }\n    }\n  }\n`)(() => null);\n\nconsole.log(iso(`entrypoint Query.HomeRoute`));\n";
 
@@ -468,7 +478,7 @@ mod tests {
         present(
             &mut state,
             "/tmp/proj/schema/schema.graphql",
-            "type Query {\n  a: String\n}\n",
+            "scalar String\ntype Query {\n  a: String\n}\n",
         );
         present(
             &mut state,
@@ -485,7 +495,7 @@ mod tests {
         present(
             &mut state,
             "/tmp/proj/schema/schema.graphql",
-            "type Query {\n  a: String\n  nope: String\n}\n",
+            "scalar String\ntype Query {\n  a: String\n  nope: String\n}\n",
         );
         assert_eq!(errors(state.reference()), vec![]);
     }
@@ -505,6 +515,26 @@ mod tests {
                     lsp_types::Position::new(0, start + 9)
                 ),
                 message: "This isograph field literal must be exported as a named export, for example as `export const HomeRoute`".to_owned(),
+            }
+            .wrap_vec()
+        );
+    }
+
+    #[test]
+    fn project_errors_include_a_generation_error_with_its_absolute_range() {
+        let mut state = state();
+        present(&mut state, "/tmp/proj/schema/schema.graphql", PET_SCHEMA);
+        let text = "export const Only = iso(`field Query.Only`)(() => null);\niso(`entrypoint Query.Only`);\n";
+        present(&mut state, "/tmp/proj/src/a.ts", text);
+        assert_eq!(
+            errors(state.reference()),
+            CompilerErrorReport {
+                path: PathBuf::from("/tmp/proj/src/a.ts"),
+                range: lsp_types::Range::new(
+                    lsp_types::Position::new(1, 22),
+                    lsp_types::Position::new(1, 26)
+                ),
+                message: "The entrypoint selects nothing the server returns.".to_owned(),
             }
             .wrap_vec()
         );
@@ -843,6 +873,23 @@ mod generation_tests {
         present(&mut state, "/tmp/proj/src/Broken.ts", BROKEN);
         assert!(fire(&mut state).is_empty());
         present(&mut state, "/tmp/proj/src/Broken.ts", "");
+        assert_eq!(
+            written_paths(changes(&mut state).reference()),
+            HOME_ROUTE_FILES
+        );
+    }
+
+    #[test]
+    fn a_validation_error_writes_nothing_until_it_is_fixed() {
+        let mut state = state();
+        present(&mut state, "/tmp/proj/src/Home.ts", HOME_ROUTE);
+        present(
+            &mut state,
+            "/tmp/proj/src/Other.ts",
+            "export const Other = iso(`field Query.Other { nope }`)(() => null);\n",
+        );
+        assert!(fire(&mut state).is_empty());
+        present(&mut state, "/tmp/proj/src/Other.ts", "");
         assert_eq!(
             written_paths(changes(&mut state).reference()),
             HOME_ROUTE_FILES

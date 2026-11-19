@@ -7,7 +7,8 @@ use isograph_compiler::{
     ClientId, CompilationProfile, CompositeShape, Concreteness, DefinitionLocation, EntityKind,
     EntityShape, FileMembership, IdentitySelection, IncludeFile, IsographDb, NetworkProtocol,
     ProtocolSelectable, RootEntities, ScalarKind, ScalarValueKind, SelectableShape, UnionWrapper,
-    Wrapper, WrapperVariant, iso_literal_validation_errors_in_file, schema_file_paths,
+    Wrapper, WrapperVariant, compiler_errors_in_file, iso_literal_validation_errors_in_file,
+    schema_file_paths,
 };
 use isograph_extract_typescript::TypeScriptHostLanguage;
 use prelude::Postfix;
@@ -1001,6 +1002,121 @@ fn validation_errors(db: &Db, file: &str, contents: &str) -> Vec<(String, String
             )
         })
         .collect()
+}
+
+/// Each compiler error message of `file` and the text its span covers.
+fn compiler_errors(db: &Db, file: &str, contents: &str) -> Vec<(String, String)> {
+    compiler_errors_in_file(db, CLIENT, path(file))
+        .clone()
+        .expect("the test inserted the file")
+        .into_iter()
+        .map(|error| {
+            (
+                error.item.to_string(),
+                contents[error.location.as_usize_range()].to_owned(),
+            )
+        })
+        .collect()
+}
+
+/// The pet demo with `added` source files.
+fn pet_demo_with(added: &[(&str, &str)]) -> Db {
+    project_db(&PET_DEMO_SCHEMA, &pet_demo_sources(&[], added))
+}
+
+fn messages(errors: &[(&str, &str)]) -> Vec<(String, String)> {
+    errors
+        .iter()
+        .map(|(message, covered)| {
+            (
+                message.dereference().to_owned(),
+                covered.dereference().to_owned(),
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn the_pet_demo_has_no_compiler_errors() {
+    let db = project_db(&PET_DEMO_SCHEMA, &PET_DEMO_SOURCES);
+    for (file, contents) in PET_DEMO_SOURCES {
+        assert_eq!(compiler_errors(&db, file, contents), vec![], "{file}");
+    }
+}
+
+#[test]
+fn an_inline_cycle_is_a_generation_error_of_each_field_at_its_name() {
+    let contents = "export const a = iso(`field Pet.a { b }`)(() => 1)\nexport const b = iso(`field Pet.b { a }`)(() => 1)";
+    let db = pet_demo_with(&[("src/a.ts", contents)]);
+    assert_eq!(
+        compiler_errors(&db, "src/a.ts", contents),
+        messages(&[
+            ("These fields inline each other: Pet.a -> Pet.b.", "a"),
+            ("These fields inline each other: Pet.b -> Pet.a.", "b"),
+        ])
+    );
+}
+
+#[test]
+fn a_field_inlining_a_broken_field_in_another_file_has_no_error_of_its_own() {
+    let broken = "export const broken = iso(`field Pet.broken { a }`)(() => 1)\nexport const a = iso(`field Pet.a { broken }`)(() => 1)";
+    let user = "export const user = iso(`field Pet.user { broken }`)(() => 1)";
+    let db = pet_demo_with(&[("src/broken.ts", broken), ("src/user.ts", user)]);
+    assert_eq!(compiler_errors(&db, "src/user.ts", user), vec![]);
+    assert_eq!(compiler_errors(&db, "src/broken.ts", broken).len(), 2);
+}
+
+#[test]
+fn a_file_with_a_validation_error_reports_no_generation_error() {
+    let contents = "export const a = iso(`field Pet.a { b, nope }`)(() => 1)\nexport const b = iso(`field Pet.b { a }`)(() => 1)";
+    let db = pet_demo_with(&[("src/a.ts", contents)]);
+    assert_eq!(
+        compiler_errors(&db, "src/a.ts", contents),
+        messages(&[("Field `Pet.nope` is not defined.", "nope")])
+    );
+}
+
+#[test]
+fn an_entrypoint_that_selects_nothing_is_an_error_at_its_name() {
+    let contents =
+        "export const Only = iso(`field Query.Only`)(() => 1)\niso(`entrypoint Query.Only`)";
+    let db = pet_demo_with(&[("src/a.ts", contents)]);
+    assert_eq!(
+        compiler_errors(&db, "src/a.ts", contents),
+        messages(&[("The entrypoint selects nothing the server returns.", "Only")])
+    );
+}
+
+#[test]
+fn a_selection_is_checked_against_its_targets_shape() {
+    let schema = (
+        "schema/input.graphql",
+        "extend type Query { badInput: SetPetTaglineParams }",
+    );
+    let contents =
+        "export const a = iso(`field Query.a { pets { stats, id { x } }, badInput }`)(() => 1)";
+    let schema_files: Vec<(&str, &str)> = PET_DEMO_SCHEMA.iter().copied().chain([schema]).collect();
+    let db = project_db(
+        &schema_files,
+        &pet_demo_sources(&[], &[("src/a.ts", contents)]),
+    );
+    assert_eq!(
+        compiler_errors(&db, "src/a.ts", contents),
+        messages(&[
+            (
+                "`Pet.stats` returns an entity with selectables and needs a selection set.",
+                "stats"
+            ),
+            (
+                "`Pet.id` returns a leaf and takes no selection set.",
+                "{ x }"
+            ),
+            (
+                "`SetPetTaglineParams` is an input type, which cannot be selected.",
+                "badInput"
+            ),
+        ])
+    );
 }
 
 #[test]

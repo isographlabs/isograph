@@ -765,7 +765,10 @@ pub fn field_selection_map<TProfile: CompilationProfile>(
         }
         .located(error)
     };
-    if let Some(cycle) = inline_cycle(db, client, SelectableKey { entity, selectable }) {
+    let key = SelectableKey { entity, selectable };
+    if let Some(cycle) =
+        inline_cycle(db, client, key).filter(|cycle| cycle.0.contains(key.reference()))
+    {
         return FieldSelectionMapError::Located(located(
             SelectionMapErrorKind::InlineCycle(cycle).with_span(field.declaration.name.location),
         ))

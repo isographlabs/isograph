@@ -211,7 +211,7 @@ Tests: (`graphql_network_protocol`) a broken definition is one error on its span
 // from crates/isograph_compiler/src/generation_errors.rs
 /// A query generation error of a declaration in a source file.
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
-pub enum GenerationError {
+pub enum QueryGenerationError {
     #[error("{0}")]
     SelectionMap(SelectionMapErrorKind),
     /// The lookup of the declared field failed after validation accepted it.
@@ -230,16 +230,16 @@ pub fn iso_literal_generation_errors_in_file<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
     path: RelativePathToSourceFile,
-) -> Option<Vec<WithSpan<GenerationError>>>;
+) -> Option<Vec<WithSpan<QueryGenerationError>>>;
 ```
 
 The memo returns `Some(vec![])` when any of the three earlier lists is non-empty. Otherwise, per literal:
 
-- `field E.f`: `field_selection_map(db, client, E, f)`. `Located(e)` is reported at `e.location.span` when `e.location.path == path` and the literal's span contains it; `FieldLookup(d)` is reported at the declaration's name.
+- `field E.f`: `field_selection_map(db, client, E, f)`. `Located(e)` is reported at `e.location.span` when `e.location.path == path` and the literal's span contains it; `FieldLookup(d)` is reported at the declaration's name; `NotASourceField` is not reached for a declaration (a source declaration beside a schema field is `DuplicateDefinition`).
 - `entrypoint E.f`: `query_for_entrypoint`. `TopLevel(t)` and `IntegerOutOfRange(i)` are reported at the entrypoint's name: they are properties of the entrypoint's operation, which no selection span holds. `SelectionMap` is reported by the field's own declaration, and `Lookup` and `NotFetchable` by validation, so those arms report nothing.
 - `entity E`: nothing.
 
-The existing `GenerationError` of `artifact_types.rs` is renamed `FieldTypesError`; this doc does not change `field_types` (other work owns `artifact_types.rs`). Its selection shape errors become unreachable in a clean project because validation reports them first: `validate_selection` gains, for a selection of a protocol selectable or a client pointer, the target's shape check, with the merge's messages.
+This doc does not change `field_types` or its `GenerationError` (other work owns `artifact_types.rs`). Its selection shape errors become unreachable in a clean project because validation reports them first: `validate_selection` gains, for a selection of a protocol selectable or a client pointer, the target's shape check, with the merge's messages.
 
 ```rust
 // from crates/isograph_compiler/src/validation.rs
@@ -254,7 +254,7 @@ pub enum ValidationError<TNotFetchable, TArgumentError> {
 }
 ```
 
-`CompilerError` gains `Generation(GenerationError)`, chained last. `compile` writes artifacts only when `project_errors` is `Ok` and empty. A generation failure that still occurs logs `tracing::error!` with the error (a broken invariant, the `ListedPathWithoutText` precedent), except `TypeScriptGenerationError::SourceNotRelative`, which depends on the output folder and is logged with its field (open decision 1).
+`CompilerError` gains `Generation(QueryGenerationError)`, chained last. `field_selection_map` reports `InlineCycle` only when the cycle contains the field itself; a field that reaches a cycle through another field returns that member's error, located at the member, so the cycle is reported once per member. `compile` writes artifacts only when `project_errors` is `Ok` and empty. A generation failure that still occurs logs `tracing::error!` with the error (a broken invariant, the `ListedPathWithoutText` precedent), except `TypeScriptGenerationError::SourceNotRelative`, which depends on the output folder and is logged with its field (open decision 1).
 
 Tests (`graphql_network_protocol`): an inline cycle is one error per field at its name; a field inlining a broken field in another file has no error of its own; a field whose file has a validation error has no generation error; an entrypoint whose field selects only a client pointer is `TopLevel(Empty)` at the entrypoint's name; `pets { stats }` without a selection set is `MissingSelectionSet` from validation and no generation error. (`compile.rs`): a project with a validation error writes nothing, then writes once fixed; `project_errors` includes a generation error with its absolute range.
 

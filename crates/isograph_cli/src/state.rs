@@ -3734,6 +3734,8 @@ union FeedItem = Pet | Owner
 type Owner {
   id: ID!
 }
+scalar String
+scalar ID
 ";
     const SCHEMA_SELECTING: &str =
         "iso(`field Query.HomeRoute { pet { name }, feed { asPet { name } } }`)";
@@ -4168,7 +4170,7 @@ type Owner {
             &mut state,
             disk_file_changed(
                 SCHEMA_PATH,
-                Presence::Present(SCHEMA.replace("nickname: String", "nope: Int")),
+                Presence::Present(SCHEMA.replace("nickname: String", "nope: String")),
             ),
         ));
         assert_eq!(
