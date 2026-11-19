@@ -12,6 +12,25 @@ pnpm open-pet-demo
 
 The command builds `target/debug/isograph`, builds the extension, restarts a running pet-demo daemon, and opens this directory in VS Code with the extension loaded from source. `vscode-extension/README.md` describes the script and the restart workflow.
 
+## Logging the entrypoint artifacts
+
+From the i2 repo root, after `pnpm install`:
+
+```sh
+pnpm --filter pet-demo log-entrypoints
+```
+
+`scripts/log-entrypoints.cjs` registers `@babel/register` with `@babel/preset-typescript`, the local `@isograph/babel-plugin`, and `@babel/plugin-transform-modules-commonjs`, so Node compiles each file under `src/` as it is required. The script then requires `HomeRoute`, `PetDetailRoute`, `SpeciesRoute`, and `SetTagline`. The Babel plugin replaces each ``iso(`entrypoint ...`)`` call with an import of the generated artifact in `src/__isograph/`, and each module logs that artifact:
+
+```text
+{ kind: 'Entrypoint', name: 'Query.HomeRoute' }
+{ kind: 'Entrypoint', name: 'Query.PetDetailRoute' }
+{ kind: 'Entrypoint', name: 'Query.SpeciesRoute' }
+{ kind: 'Entrypoint', name: 'Mutation.SetTagline' }
+```
+
+The script reads the committed artifacts. It does not run the daemon, so after changing a literal, run the daemon in this directory first.
+
 ## Config
 
 `isograph.config.json` sets `source_files` to `src/**/*.ts`, `schema` to `schema/**/*.graphql`, and `output_directory` to `src`, so the daemon writes artifacts into `src/__isograph/`. That folder is generated and committed: running the daemon in this directory rewrites it.

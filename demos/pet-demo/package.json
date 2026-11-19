@@ -1,0 +1,14 @@
+{
+  "name": "pet-demo",
+  "private": true,
+  "scripts": {
+    "log-entrypoints": "node scripts/log-entrypoints.cjs"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.28.3",
+    "@babel/plugin-transform-modules-commonjs": "^7.27.1",
+    "@babel/preset-typescript": "^7.27.1",
+    "@babel/register": "^7.28.3",
+    "@isograph/babel-plugin": "workspace:*"
+  }
+}
