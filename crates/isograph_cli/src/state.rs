@@ -1732,6 +1732,76 @@ mod tests {
         }
     }
 
+    const PET_MULTILINE: &str = "const iso: any = null;\n\nexport const fullName = iso(`\n    field Pet.fullName @foo(bar: 123, baz: $qux)\n    {\n        id\n    }\n`);\n";
+    const PET_ONE_LINE: &str = "export const fullName = iso(`field Pet.fullName @foo(bar: 123, baz: $qux) { id, name }`);\n";
+
+    /// The line and UTF-16 column of the `nth` (0-based) `needle` after `after` in `text`.
+    fn position_of(text: &str, after: &str, needle: &str, nth: usize) -> (u32, u32) {
+        let from = text.find(after).expect("the fixture contains `after`");
+        let (byte, _) = text[from..]
+            .match_indices(needle)
+            .nth(nth)
+            .expect("the fixture contains the needle");
+        let byte = from + byte;
+        let line_start = text[..byte].rfind('\n').map_or(0, |newline| newline + 1);
+        (
+            text[..byte].matches('\n').count() as u32,
+            text[line_start..byte].encode_utf16().count() as u32,
+        )
+    }
+
+    /// Client 1's hover at the `nth` `needle` after `after`, through a didOpen buffer of `text`.
+    fn hover_in_buffer(text: &str, after: &str, needle: &str, nth: usize) -> Option<String> {
+        let mut state = with_config();
+        let one = live_client(&mut state, ClientId(1));
+        handle(&mut state, did_open(one.client, X_URI, text));
+        let (line, character) = position_of(text, after, needle, nth);
+        hover_text(&mut state, &one, X_URI, line, character)
+    }
+
+    #[test]
+    fn hover_on_argument_colons_and_commas_of_the_pet_literal() {
+        for text in [PET_MULTILINE, PET_ONE_LINE] {
+            for nth in [0, 1] {
+                let (line, character) = position_of(text, "iso(`", ":", nth);
+                assert_eq!(
+                    hover_on_disk(text, line, character),
+                    some("Argument"),
+                    "colon {nth} of {text:?}"
+                );
+                assert_eq!(
+                    hover_in_buffer(text, "iso(`", ":", nth),
+                    some("Argument"),
+                    "colon {nth} of the buffer {text:?}"
+                );
+            }
+            let (line, character) = position_of(text, "iso(`", ",", 0);
+            assert_eq!(
+                hover_on_disk(text, line, character),
+                some("ArgumentList"),
+                "argument comma of {text:?}"
+            );
+            assert_eq!(
+                hover_in_buffer(text, "iso(`", ",", 0),
+                some("ArgumentList"),
+                "argument comma of the buffer {text:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn hover_on_a_comma_between_selections_is_the_selection_set() {
+        let (line, character) = position_of(PET_ONE_LINE, "{ id", ",", 0);
+        assert_eq!(
+            hover_on_disk(PET_ONE_LINE, line, character),
+            some("SelectionSet")
+        );
+        assert_eq!(
+            hover_in_buffer(PET_ONE_LINE, "{ id", ",", 0),
+            some("SelectionSet")
+        );
+    }
+
     #[test]
     fn hover_on_an_unknown_keyword_is_the_slot() {
         let text = "iso(`fieldd Query.foo`)";
