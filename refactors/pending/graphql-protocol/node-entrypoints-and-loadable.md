@@ -1,6 +1,6 @@
 # GraphQL protocol: entrypoints on Node entities, and `@loadable` validation
 
-This doc specifies which entities the network protocol can fetch by themselves, and two uses of that answer. For GraphQL an entity can be fetched by itself when it is a root operation type, or an object type that implements `Node` while the query root has `node(id: ID!)`. The first use is `@loadable`: the iso parser accepts `@loadable` on a selection, and validation checks that the selection's parent can be fetched by itself. That check is the only effect of `@loadable`; the selection otherwise behaves exactly as it does without the directive. The second use is an `entrypoint` on such an entity. In the first version, an entrypoint on a root operation type generates as before, and an entrypoint on a Node entity passes the fetchability rules but is reported as not supported yet, at the entrypoint's parent type, and generates no artifacts. Later, the operation of an entrypoint on a Node entity reaches the entity's record through `node(id:)`, and its artifacts are generated (Later: entrypoints on Node entities).
+This doc specifies which entities the network protocol can fetch by themselves, and two uses of that answer. For GraphQL an entity can be fetched by itself when it is a root operation type, or an object type that implements `Node` while the query root has `node(id: ID!)`. The first use is `@loadable`: the iso parser accepts `@loadable` on a selection, and validation checks that the selection's parent can be fetched by itself, whatever the selected selectable is. That check is the only effect of `@loadable`; the selection otherwise behaves exactly as it does without the directive. The second use is an `entrypoint` on such an entity. In the first version, an entrypoint on a root operation type generates as before, and an entrypoint on a Node entity passes the fetchability rules but is reported as not supported yet, at the entrypoint's parent type, and generates no artifacts. Later, the operation of an entrypoint on a Node entity reaches the entity's record through `node(id:)`, and its artifacts are generated (Later: entrypoints on Node entities).
 
 The core has no concept of a root operation type and no concept of `node`. The protocol tells the core, per fetchable entity, whether the operation reaches the record the entrypoint's selections are on directly or through a wrapper the protocol selects (the entrypoint wrapper). Later, the core completes the selections under that record, builds the normalization AST with the wrapper's path, and hands both to the protocol to print.
 
@@ -55,7 +55,8 @@ iso(`
     }
   }
 `); // error on `@loadable`: PetStats cannot be fetched by itself
-iso(`field Pet.X { tagline @loadable }`); // error on `@loadable`: `tagline` is a schema field
+iso(`field Pet.X { tagline @loadable }`); // ok: Pet implements Node; a schema field may be @loadable
+iso(`field Node.Card { id @loadable }`); // error on `@loadable`: Node is an interface (Open decision 9)
 iso(`field Pet.Y { PetCheckinsCard @loadable(lazyLoadArtifact: true) }`); // parse error on `(lazyLoadArtifact: true)`
 iso(`field Pet.Z @loadable { name }`); // parse error `unexpected directive`, unchanged
 ```
@@ -67,7 +68,7 @@ The diagnostics, each an LSP diagnostic published like every other validation or
 - `Node`: `` `Node` is not an object type, so it cannot be fetched by itself. ``
 - `Owner`: `` `Owner` is declared in source files, so the network protocol cannot fetch it. ``
 - `@loadable` under `stats`: `` `@loadable` on `PetStats.StatsBadge` needs its parent to be fetchable by itself. `PetStats` is not a root operation type and does not implement `Node`, so it cannot be fetched by itself. ``
-- `@loadable` on `tagline`: `` `Pet.tagline` comes from the schema; `@loadable` selects a `field` declaration. ``
+- `@loadable` under `Node`: `` `@loadable` on `Node.id` needs its parent to be fetchable by itself. `Node` is not an object type, so it cannot be fetched by itself. ``
 - `(lazyLoadArtifact: true)`: `` `@loadable` takes no arguments. ``
 
 `PetDetailRoute`'s query selects `PetCheckinsCard`'s selections under `pet`, its reader reads `PetCheckinsCard`, and its data type has the `PetCheckinsCard` key, all as without `@loadable`.
@@ -76,7 +77,7 @@ The diagnostics, each an LSP diagnostic published like every other validation or
 
 The user's direction was that the compiler "might panic on entrypoints on items that impl Node". This doc holds a located error instead. The parser and the compiler never panic on user input (AGENTS.md, Panic and UnexpectedError), and the compiler runs inside the daemon, where a panic ends the LSP for every connected client. An entrypoint on a Node entity is user input, so it is a representable state: `EntrypointNotFetchableError::WrappedNotSupported`.
 
-The error is reported through the entrypoint's existing fetchability check, `entrypoint_fetch_plan`, which both validation and generation call. Validation (`entrypoint_declaration_error`) publishes it as a diagnostic at the entrypoint's `parent_type`. Generation (`query_for_entrypoint`) returns it as `EntrypointQueryError::NotFetchable`, so `project_artifacts` fails and no artifacts are written. Generation alone cannot show it: a generation error today is a `tracing::warn` in `generate_artifacts` (`crates/isograph_cli/src/compile.rs`), not an LSP diagnostic and not located; the only located diagnostics are the parse and validation errors that `compiler_errors_in_file` returns. The fetchability rules pass for `Pet` (it implements `Node` and `Query.node(id: ID!)` exists), which is why a `@loadable` selection on a `Pet` field passes.
+The error is reported through the entrypoint's existing fetchability check, `entrypoint_fetch_plan`, which both validation and generation call. Validation (`entrypoint_declaration_error`) publishes it as a diagnostic at the entrypoint's `parent_type`. Generation (`query_for_entrypoint`) returns it as `EntrypointQueryError::NotFetchable`, so `project_artifacts` fails and no artifacts are written. `iso_literal_generation_errors_in_file` does not report `NotFetchable`, because validation already reports it at `parent_type`, and the compile writes artifacts only for a project without errors. The fetchability rules pass for `Pet` (it implements `Node` and `Query.node(id: ID!)` exists), which is why a `@loadable` selection on a `Pet` field passes.
 
 The message says "fetched by its id" instead of "Node": the core has no concept of `Node`, and for GraphQL the entities fetched by id are exactly the Node entities.
 
@@ -238,57 +239,41 @@ Unchanged: the AST types, semantic tokens, resolve paths, the formatter. A liter
 
 ## `@loadable` validation
 
-A `@loadable` selection is valid when:
+A `@loadable` selection is valid when its parent entity can be fetched by itself: `entity_fetch_plan(parent)` is `Ok`. This is the same question an entrypoint on the parent asks (Which entities can be fetched by themselves). For GraphQL that is a root operation type, or an object type implementing `Node` while the query root has `node(id: ID!)`.
 
-1. Its selectable is a `field` declaration: `SelectableKind::ClientField` or `ClientPointer`. Upstream allows only client fields (it cannot parse `@loadable` on a selection with a selection set); i2 also allows client pointers, by user decision.
-2. Its parent entity can be fetched by itself: `entity_fetch_plan(parent)` is `Ok`. This is the same question an entrypoint on the parent asks (Which entities can be fetched by themselves). For GraphQL that is a root operation type, or an object type implementing `Node` while the query root has `node(id: ID!)`.
+The selected selectable is not checked, by user decision: a schema field (`tagline @loadable`), a client field, and a client pointer may each be `@loadable`. Upstream rejects a server scalar field, an exposed field, and `__link` (`isograph/crates/isograph_schema/src/validate_selection_sets.rs:177-216`) and parses `@loadable` only on a selection without a selection set; i2 does neither, because `@loadable` has no other effect yet (`@loadable` has no other effect), so nothing depends on the selectable's kind.
 
-Rule 2 allows a `@loadable` selection on a field of a root operation type, by user decision, as upstream refetches such a field from the root (`RefetchFromRoot`, `isograph/crates/isograph_schema/src/process_client_field_declaration.rs:219-231`). `@loadable` on a `Pet` field passes because `Pet` implements `Node`; `entrypoint_fetch_plan`'s `WrappedNotSupported` is an entrypoint error and is not part of rule 2.
+The rule allows a `@loadable` selection on a field of a root operation type, by user decision, as upstream refetches such a field from the root (`RefetchFromRoot`, `isograph/crates/isograph_schema/src/process_client_field_declaration.rs:219-231`). `@loadable` on a `Pet` field passes because `Pet` implements `Node`; `entrypoint_fetch_plan`'s `WrappedNotSupported` is an entrypoint error and is not part of the rule. A parent that is an interface, even one implementing `Node`, fails the rule (`NotObject`); Open decision 9.
 
 ```rust
 // from crates/isograph_compiler/src/validation.rs
-pub enum ValidationError<TNotFetchable: std::fmt::Display> {
+pub enum ValidationError<TNotFetchable: std::fmt::Display, TArgumentError: std::fmt::Display> {
     // .. unchanged variants
     #[error("{0}")]
-    EntrypointNotFetchable(EntrypointNotFetchableError<TNotFetchable>),
-    #[error("{0}")]
-    MissingFieldArgument(MissingFieldArgument),
-    #[error("{0}")]
-    Loadable(LoadableError<TNotFetchable>),
+    LoadableParentNotFetchable(LoadableParentNotFetchable<TNotFetchable>),
 }
 
-/// Why a `@loadable` selection is invalid.
+/// A `@loadable` selection of `selection` whose parent entity cannot be fetched by itself.
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
-pub enum LoadableError<TNotFetchable: std::fmt::Display> {
-    #[error("`{0}` comes from the schema; `@loadable` selects a `field` declaration.")]
-    ProtocolSelectable(SelectableKey),
-    #[error(
-        "`@loadable` on `{}` needs its parent to be fetchable by itself. {}",
-        .0.selection, .0.reason
-    )]
-    ParentNotFetchable(LoadableParentNotFetchable<TNotFetchable>),
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[error(
+    "`@loadable` on `{selection}` needs its parent to be fetchable by itself. {reason}"
+)]
 pub struct LoadableParentNotFetchable<TNotFetchable: std::fmt::Display> {
     pub selection: SelectableKey,
     pub reason: EntityNotFetchableError<TNotFetchable>,
 }
 ```
 
-Both variants are located at the `@loadable` directive's span (`Loadability::Loadable(span)`). Upstream locates its server-field error at the selection's name; the directive is the part to remove, so i2 marks it.
+With the selectable check dropped, a `LoadableError` enum would have one variant, `ParentNotFetchable`; the struct is the error itself and `ValidationError` holds it directly. A second `@loadable` check adds the enum then.
+
+The error is located at the `@loadable` directive's span (`Loadability::Loadable(span)`): the directive is the part to remove.
 
 `validate_selection` (`crates/isograph_compiler/src/validation.rs`), `Definitions::Unique(selectable)` arm, before and after:
 
 ```rust
 // from crates/isograph_compiler/src/validation.rs
         Definitions::Unique(selectable) => {
-            let missing = match selectable.kind {
-                SelectableKind::ClientField | SelectableKind::ClientPointer(_) => {
-                    missing_field_arguments(db, client, key, selection)
-                }
-                SelectableKind::Server(_) => Vec::new(),
-            };
+            let arguments = match selectable.kind {
 ```
 
 ```rust
@@ -296,46 +281,34 @@ Both variants are located at the `@loadable` directive's span (`Loadability::Loa
         Definitions::Unique(selectable) => {
             let loadable = match selection.loadability() {
                 Loadability::Eager => None,
-                Loadability::Loadable(span) => {
-                    loadable_error(db, client, key, selectable.kind.reference())
-                        .map(|error| ValidationError::Loadable(error).with_span(span))
-                }
+                Loadability::Loadable(span) => loadable_parent_error(db, client, key)
+                    .map(|error| ValidationError::LoadableParentNotFetchable(error).with_span(span)),
             };
-            let missing = match selectable.kind {
-                SelectableKind::ClientField | SelectableKind::ClientPointer(_) => {
-                    missing_field_arguments(db, client, key, selection)
-                }
-                SelectableKind::Server(_) => Vec::new(),
-            };
+            let arguments = match selectable.kind {
 ```
 
-The arm then chains `loadable` before `missing` and `nested`. A `@loadable` selection is checked for missing arguments like any selection, because its selections are part of the parent's query. The nested selection set of a `@loadable` client pointer is validated as before.
+The arm then chains `loadable` before `arguments` and `nested`. A `@loadable` selection's arguments are checked like any selection's, because its selections are part of the parent's query. The nested selection set of a `@loadable` selection is validated as before.
 
 ```rust
 // from crates/isograph_compiler/src/validation.rs
-/// Why the `@loadable` selection of `key`, whose selectable has `kind`, is invalid; `None` when
-/// it is valid, or when the parent's lookup fails, which the declaration's own checks report.
-fn loadable_error<TProfile: CompilationProfile>(
+/// Why the `@loadable` selection of `key` is invalid: its parent cannot be fetched by itself.
+/// `None` when the parent can, or when the parent's lookup fails, which the declaration's own
+/// checks report.
+fn loadable_parent_error<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
     key: SelectableKey,
-    kind: &SelectableKind<<TProfile::NetworkProtocol as NetworkProtocol>::SelectableData>,
-) -> Option<ProfileLoadableError<TProfile>> {
-    match kind {
-        SelectableKind::Server(_) => LoadableError::ProtocolSelectable(key).wrap_some(),
-        SelectableKind::ClientField | SelectableKind::ClientPointer(_) => {
-            let parent = entity_named(db, client, key.entity).as_ref().ok()?;
-            entity_fetch_plan(db, client, parent).err().map(|reason| {
-                LoadableError::ParentNotFetchable(LoadableParentNotFetchable {
-                    selection: key,
-                    reason,
-                })
-            })
-        }
-    }
+) -> Option<ProfileLoadableParentNotFetchable<TProfile>> {
+    let parent = entity_named(db, client, key.entity).as_ref().ok()?;
+    entity_fetch_plan(db, client, parent)
+        .err()
+        .map(|reason| LoadableParentNotFetchable {
+            selection: key,
+            reason,
+        })
 }
 
-pub type ProfileLoadableError<TProfile> = LoadableError<
+pub type ProfileLoadableParentNotFetchable<TProfile> = LoadableParentNotFetchable<
     <<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::NotFetchable,
 >;
 ```
@@ -732,7 +705,7 @@ Memo invalidation: `graphql_fetch_plan(Pet)` now also reads `Query.node`'s defin
 - `GraphQLNotFetchable::NotObject`: `` `Node` is not an object type, so it cannot be fetched by itself. ``
 - `GraphQLNotFetchable::NeitherRootNorNode`: `` `PetStats` is not a root operation type and does not implement `Node`, so it cannot be fetched by itself. ``
 - `GraphQLNotFetchable::NodeField(_)`: the `NodeFieldError` text, for example `` `Query.node` is not defined. ``, `` `Query.node` returns a list; it returns one value. ``, `` `Query.node` returns `Viewer`, which is not `Pet` or an interface or union containing it. ``, `` `Query.node` has no argument `id: ID!`. ``, `` `Query.node` requires `tenant`, which a fetch by id does not pass. ``
-- `LoadableError::ProtocolSelectable`, `LoadableError::ParentNotFetchable`: at the `@loadable` directive.
+- `ValidationError::LoadableParentNotFetchable`: at the `@loadable` directive.
 - `AstError::LoadableArguments`: at the argument list, a parse error. The literal produces no artifacts, as with any parse error.
 - `AstError::UnexpectedDirective`: unchanged, now also for `@loadable` on a declaration.
 
@@ -757,7 +730,7 @@ Memo invalidation: `graphql_fetch_plan(Pet)` now also reads `Query.node`'s defin
 - `graphql_fetch_plan`: `Query` is `{ Query, Unwrapped({ Query, {Mutation} }) }`; `Pet`, `Checkin`, `Viewer`, `BlogItem`, `AdItem`, `Image` are `{ Query, Wrapped }`; `PetStats` and `BestFriendRelationship` are `NeitherRootNorNode`; `Node`, `ICheckin`, `NewsfeedItem`, `String`, `PetSpecies`, `SetPetTaglineParams` are `NotObject`; `Nobody` is `UnknownEntity`. Replaces `only_the_root_operation_types_of_the_pet_demo_are_fetchable`.
 - Restored from `dddbc8ef3^` with the new variants: `a_broken_node_field_fails_node_fetches_only` (`node(id: ID!): [Node]` is `ReturnsList`, `node(id: ID!): Viewer` is `TypeMismatch`, no `node` is `NotFound`, `node(key: ID!): Node` is `IdArgument`, `node(id: ID): Node` is `IdArgument`, `node(id: ID!, tenant: String!): Node` is `RequiredArgument(tenant)`, `node(id: ID!): [Node]!` is `ReturnsList`, `node(id: ID!): Missing` is `UnknownTarget`, `node(id: String!): Node` and `node: Node` are `IdArgument`, and in each case `Query` and `Mutation` keep their plans and `Viewer` without `implements Node` is `NeitherRootNorNode`); `node` returning `Node`, `Node!`, a union containing the entity, or the entity itself gives a plan; `a_syntax_error_in_the_query_root_fails_node_fetches_and_not_other_roots`; `node(id: ID!, hint: Int = 0, ids: [ID!], tenant: String! = "a"): Node` gives `Pet` a plan.
 - `query_for_entrypoint(Pet, PetTagline)` is `NotFetchable(WrappedNotSupported(Pet))`, and `project_artifacts` of the pet demo plus `entrypoint Pet.PetTagline` is `EntrypointQuery` naming `Pet.PetTagline`.
-- Validation (`iso_literal_validation_errors_in_file`): `entrypoint Pet.PetTagline` has one at `Pet` (`WrappedNotSupported`); `entrypoint PetStats.Card`, `entrypoint Node.Card`, `entrypoint Owner.OwnerBadge` each have one at the parent with the texts above; with `node(id: ID!): [Node]`, `entrypoint Pet.PetTagline` has one at `Pet` (`ReturnsList`) and `entrypoint Query.HomeRoute` none. `PetCheckinsCard @loadable` on `pet` has none; `StatsBadge @loadable` under `stats` has one at `@loadable`; `tagline @loadable` has one at `@loadable`; a `@loadable` selection omitting a required argument of its field has `MissingFieldArgument`, as without the directive; a `@loadable` selection on a `Query` field has none.
+- Validation (`iso_literal_validation_errors_in_file`): `entrypoint Pet.PetTagline` has one at `Pet` (`WrappedNotSupported`); `entrypoint PetStats.Card`, `entrypoint Node.Card`, `entrypoint Owner.OwnerBadge` each have one at the parent with the texts above; with `node(id: ID!): [Node]`, `entrypoint Pet.PetTagline` has one at `Pet` (`ReturnsList`) and `entrypoint Query.HomeRoute` none. `PetCheckinsCard @loadable` on `pet` has none; `tagline @loadable` on `pet` has none; `StatsBadge @loadable` under `stats` has one at `@loadable`; `id @loadable` in `field Node.Card` has one at `@loadable` (`NotObject`); `OwnerBadge @loadable` in `field Owner.X` has one at `@loadable` (`SourceEntity`); with `node(id: ID!): [Node]`, `PetCheckinsCard @loadable` on `pet` has one at `@loadable` (`ReturnsList`); a `@loadable` selection omitting a required argument of its field has `MissingFieldArgument`, as without the directive; a `@loadable` selection on a `Query` field has none.
 
 ## Changes
 
@@ -775,7 +748,7 @@ This plan's earlier change 2 (root access in the normalization AST, the TS root,
 
 ### 3. `@loadable` (isograph_parser, isograph_compiler)
 
-`SelectionDirectiveName`, `DeclarationDirectiveName`, `DirectivePosition`, `AstError::LoadableArguments`, `Loadability`, `Selection::loadability`; `LoadableError`, `LoadableParentNotFetchable`, `loadable_error`, and the `validate_selection` arm. Tests above. Depends on 1; after 2, `@loadable` under a `Pet` passes.
+`SelectionDirectiveName`, `DeclarationDirectiveName`, `DirectivePosition`, `AstError::LoadableArguments`, `Loadability`, `Selection::loadability`; `ValidationError::LoadableParentNotFetchable`, `LoadableParentNotFetchable`, `loadable_parent_error`, and the `validate_selection` arm. Tests above. Depends on 1; after 2, `@loadable` under a `Pet` passes.
 
 ### Later. Entrypoints on Node entities (isograph_compiler, graphql_network_protocol, typescript_artifacts, libs/isograph-runtime, demos)
 
@@ -1678,7 +1651,7 @@ Later:
 
 ## Open decisions
 
-Decisions 1 and 6 apply to the first version; the others apply to Later.
+Decisions 1, 6, and 9 apply to the first version; the others apply to Later.
 
 1. `@loadable` arguments. Options: none, `LoadableArguments` on any (held: nothing reads `lazyLoadArtifact`); accept upstream's `lazyLoadArtifact: Boolean` and ignore it. Consequences: upstream literals with `@loadable(lazyLoadArtifact: true)` fail to parse under the held option until loadable artifacts read it.
 2. The wrapper variable's operation name. Options: the core picks `id`, `id_1`, … avoiding the field's declared variables (held); the protocol renames in the printed text only and returns the mapping from `query_text`; always a reserved name (`$__wrapper_id`) with field variables starting `__` rejected; a field declaring `$id` is a validation error on Node entrypoints. Consequences: the held option keeps the alias, the AST path, and the artifact's `wrapperVariableNames` computed from one value in the core, with one namespace that the runtime's single variables object already assumes; the protocol-only option must hand the name back for the AST's response key and the artifact; the reserved name adds a rule on user names; the error forbids a natural field variable.
@@ -1688,3 +1661,4 @@ Decisions 1 and 6 apply to the first version; the others apply to Later.
 6. Interfaces implementing `Node` as entrypoint parents. Options: not allowed (held); allowed, with the record's entity read from `__typename`. Consequences: allowing it makes the root record's entity a response value, so `check` and `read` cannot name the record before the fetch.
 7. `fetchEntrypoint`'s wrapper variables. Options: a positional parameter before the field's variables (held); one object `{ wrapper, field }`; an overload without the parameter for `Unwrapped` entrypoints. Consequences: every root call passes `{}` under the held option; the object form changes every call site's shape; overloads need a type-level test of the wrapper variables type.
 8. The record id when the server returns another `id`. Options: the selections are written onto `(T, $id)` from the caller's variable (held); onto the record the response's `id` names. Consequences: under the held option a server that answers `node(id: "1")` with `id: "2"` writes `Pet:1` with `id: "2"`; under the other, `Pet:1` stays absent and every read of the entrypoint misses.
+9. Interfaces implementing `Node` as `@loadable` parents. Held: excluded. `graphql_fetch_plan` of an interface is `NotObject`, so `@loadable` in `field Node.Card { id @loadable }` or under a selection whose target is `ICheckin` is `LoadableParentNotFetchable`. Why they were excluded: the fetch by id is `node(id: $id) { ... on T { .. } }`, and Later represents `... on T` as `WrapperStep::Conditional(Condition::SelectionEquals(T))`, which normalization satisfies only when the response's `__typename` equals `T`'s name exactly. `__typename` is always a concrete object type, so for an interface `T` that comparison never holds: the response's record would be skipped and every read would miss. The record is also named `(T, id)`, which needs `T` concrete. Upstream does not exclude them: it gives every interface with an `id` field the `Node` wrap strategy (`isograph/crates/graphql_network_protocol/src/nested_server_schema/parse_nested_server_schema.rs:254-263`, `:200-207`), wraps the selections in `InlineFragment(interface)` (`isograph/crates/graphql_network_protocol/src/graphql_network_protocol.rs:334-354`), and normalizes an inline fragment only when `__typename === astNode.type` (`isograph/libs/isograph-react/src/core/cache.ts:355-356`), so upstream's refetch of an interface parent writes nothing. What allowing them at validation time would mean now: `@loadable` is validation-only and Node entrypoint generation is deferred, so no conditional is generated and the exact-comparison problem does not arise yet; allowing them changes only `graphql_fetch_plan`'s object check (an interface implementing `Node`, or `Node` itself, would get `Wrapped`) and makes `entrypoint Node.Card` `WrappedNotSupported` instead of `NotObject`. The cost is that validation would accept a `@loadable` that Later cannot generate unless Later also handles it. What generation would need later: a wrapper condition over the interface's concrete entities (`__typename` is one of `NetworkProtocol::concrete_types(interface)`, a new `Condition` variant, with the record named by the response's `__typename` and the caller's id, which Open decision 6 says makes the root record's entity a response value), or upstream's `InlineFragment(interface)` with its exact comparison, which normalizes nothing. Not decided; the code holds the exclusion.
