@@ -236,16 +236,29 @@ pub(crate) enum PathUriError {
     InvalidUri(<lsp_types::Uri as std::str::FromStr>::Err),
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
+#[error("CurrentWorkingDirectory is not interned")]
+pub(crate) struct MissingWorkingDirectory;
+
+/// `path` joined onto the config directory, with `.` and `..` resolved lexically.
+pub(crate) fn absolute_path<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    path: RelativePathToSourceFile,
+) -> Result<PathBuf, MissingWorkingDirectory> {
+    let cwd = db
+        .get_singleton::<CurrentWorkingDirectory>()
+        .ok_or(MissingWorkingDirectory)?
+        .dereference();
+    normalize_lexically(Path::new(cwd.lookup()).join(path.lookup()).as_path()).wrap_ok()
+}
+
 /// The `file:` URI of `path` under the config directory.
 pub(crate) fn uri_for_path<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     path: RelativePathToSourceFile,
 ) -> Result<lsp_types::Uri, PathUriError> {
-    let cwd = db
-        .get_singleton::<CurrentWorkingDirectory>()
-        .ok_or(PathUriError::MissingWorkingDirectory)?
-        .dereference();
-    let absolute = normalize_lexically(Path::new(cwd.lookup()).join(path.lookup()).as_path());
+    let absolute = absolute_path(db, path)
+        .map_err(|MissingWorkingDirectory| PathUriError::MissingWorkingDirectory)?;
     let url =
         url::Url::from_file_path(absolute.as_path()).map_err(|()| PathUriError::NotAbsolute)?;
     url.as_str()

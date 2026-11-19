@@ -6,7 +6,8 @@ use prelude::Postfix;
 use thiserror::Error;
 
 use crate::host_language::{
-    CompilationProfile, HostLanguage, IncludeFile, IsoLiteralExtraction, NetworkProtocol,
+    CompilationProfile, HostLanguage, IncludeFile, IsoLiteralExtraction, IsoLiteralStartIndex,
+    NetworkProtocol,
 };
 use crate::{ClientId, IsographDb, ProtocolEntity, ProtocolSelectable};
 
@@ -20,8 +21,22 @@ impl HostLanguage for TestHostLanguage {
     type Error = TestHostError;
     type LiteralContext = ();
 
-    fn extract_iso_literals_from_text(_contents: &str) -> Vec<IsoLiteralExtraction<Self>> {
-        Vec::new()
+    /// The text between `` iso(` `` and the next `` ` ``, for each `` iso(` ``.
+    fn extract_iso_literals_from_text(contents: &str) -> Vec<IsoLiteralExtraction<Self>> {
+        const OPEN: &str = "iso(`";
+        contents
+            .match_indices(OPEN)
+            .filter_map(|(open, _)| {
+                let start = open + OPEN.len();
+                let length = contents[start..].find('`')?;
+                IsoLiteralExtraction {
+                    iso_literal_text: contents[start..start + length].to_owned(),
+                    iso_literal_start_index: IsoLiteralStartIndex(start),
+                    context: (),
+                }
+                .wrap_some()
+            })
+            .collect()
     }
 
     fn should_include_source_file(_relative_path: &Path) -> IncludeFile {

@@ -7,6 +7,7 @@ use isograph_compiler::CompilationProfile;
 use prelude::Postfix;
 
 mod adapter;
+mod compile;
 mod config_path;
 mod daemon;
 mod diagnostics;

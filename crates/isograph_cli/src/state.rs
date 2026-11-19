@@ -37,17 +37,32 @@ pub struct IsographState<TProfile: CompilationProfile> {
     pub live_sessions: LiveSessions,
     pub(crate) globs: ProjectGlobs,
     pub(crate) diagnostics_debounce: Option<freddie_timer::TimerGuard>,
+    pub(crate) compile_debounce: Option<freddie_timer::TimerGuard>,
     client_ids: ClientIdSource,
+    /// The compiler's reader of file text. No `LiveSession` and no `OpenFile` has it.
+    compiler_client: ClientId,
 }
 
 impl<TProfile: CompilationProfile> IsographState<TProfile> {
     pub(crate) fn new(globs: ProjectGlobs) -> Self {
+        let mut client_ids = ClientIdSource::default();
+        let compiler_client = client_ids.mint();
         Self {
             db: IsographDb::default(),
             live_sessions: LiveSessions::default(),
             globs,
             diagnostics_debounce: None,
-            client_ids: ClientIdSource::default(),
+            compile_debounce: None,
+            client_ids,
+            compiler_client,
+        }
+    }
+
+    pub(crate) fn compile_input(&self) -> crate::compile::CompileInput<'_, TProfile> {
+        crate::compile::CompileInput {
+            db: self.db.reference(),
+            globs: self.globs.reference(),
+            client: self.compiler_client,
         }
     }
 }
@@ -222,10 +237,17 @@ fn handle_timer_fired<TProfile: CompilationProfile>(
     state: &mut IsographState<TProfile>,
     fired: freddie_timer::TimerFired<TimerPayload>,
 ) -> Vec<IsographEffect> {
-    match fired.trigger_if_matching(state.diagnostics_debounce.as_ref()) {
+    let payload = fired
+        .trigger_if_matching(state.diagnostics_debounce.as_ref())
+        .or_else(|| fired.trigger_if_matching(state.compile_debounce.as_ref()));
+    match payload {
         Some(&TimerPayload::DiagnosticsDebounce) => {
             state.diagnostics_debounce = None;
             crate::diagnostics::publish_diagnostics(state)
+        }
+        Some(&TimerPayload::CompileDebounce) => {
+            state.compile_debounce = None;
+            crate::compile::compile(state)
         }
         None => no_effects(),
     }
@@ -312,7 +334,12 @@ fn handle_disk_changed<TProfile: CompilationProfile>(
             tracing::warn!(%error, "DiskChanged path");
             no_effects()
         },
-        |()| crate::diagnostics::arm_diagnostics_debounce(state),
+        |()| {
+            crate::diagnostics::arm_diagnostics_debounce(state)
+                .into_iter()
+                .chain(crate::compile::arm_compile_debounce(state))
+                .collect()
+        },
     )
 }
 
@@ -391,7 +418,8 @@ mod tests {
         state: &IsographState<TestProfile>,
         path: common_lang_types::RelativePathToSourceFile,
     ) -> Option<&str> {
-        isograph_compiler::file_contents(state.db.reference(), ClientId(1), path).as_deref()
+        isograph_compiler::file_contents(state.db.reference(), state.compiler_client, path)
+            .as_deref()
     }
 
     #[test]
@@ -432,7 +460,7 @@ mod tests {
             }))
             .to(),
         );
-        only_timer(effects);
+        disk_changed_timers(effects);
         assert_eq!(
             contents(state.reference(), interned("src/a.ts")),
             "export const a = 1;\n".wrap_some()
@@ -450,7 +478,7 @@ mod tests {
             }))
             .to(),
         );
-        only_timer(effects);
+        disk_changed_timers(effects);
         assert_eq!(
             contents(state.reference(), interned("../other/a.ts")),
             "outside".wrap_some()
@@ -476,7 +504,7 @@ mod tests {
             }))
             .to(),
         );
-        only_timer(effects);
+        disk_changed_timers(effects);
         assert!(contents(state.reference(), interned("src/a.ts")).is_none());
     }
 
@@ -800,7 +828,7 @@ mod tests {
             }))
             .to(),
         );
-        only_timer(effects);
+        disk_changed_timers(effects);
         assert!(contents(state.reference(), interned("src/a.ts")).is_none());
         assert!(contents(state.reference(), interned("src/b.ts")).is_none());
         assert_eq!(
@@ -835,7 +863,7 @@ mod tests {
             }))
             .to(),
         );
-        only_timer(effects);
+        disk_changed_timers(effects);
         assert!(contents(state.reference(), interned("src/a.ts")).is_none());
         assert!(contents(state.reference(), interned("src2/c.ts")).is_none());
     }
@@ -858,7 +886,7 @@ mod tests {
             }))
             .to(),
         );
-        only_timer(effects);
+        disk_changed_timers(effects);
         assert_eq!(
             contents(state.reference(), interned("src/a.ts")),
             "a".wrap_some()
@@ -2446,7 +2474,7 @@ mod tests {
             }))
             .to(),
         );
-        only_timer(effects);
+        disk_changed_timers(effects);
         assert_eq!(
             contents(state.reference(), interned("src/a.ts")),
             "a".wrap_some()
@@ -2517,7 +2545,7 @@ mod tests {
                 .expect("serializes"),
             ),
         );
-        only_timer(effects);
+        disk_changed_timers(effects);
         assert_eq!(
             contents(state.reference(), interned("src/a.ts")),
             "export const a = 1;\n".wrap_some()
@@ -2914,6 +2942,27 @@ mod tests {
         timer
     }
 
+    /// The two timers an applied `DiskChanged` returns.
+    struct DiskChangedTimers {
+        diagnostics: freddie_timer::TimerEffect<TimerPayload>,
+        compile: freddie_timer::TimerEffect<TimerPayload>,
+    }
+
+    fn disk_changed_timers(effects: Vec<IsographEffect>) -> DiskChangedTimers {
+        let [
+            IsographEffect::Timer(diagnostics),
+            IsographEffect::Timer(compile),
+        ] = <[IsographEffect; 2]>::try_from(effects)
+            .expect("an applied DiskChanged returns exactly two effects")
+        else {
+            panic!("an applied DiskChanged returns two Timers");
+        };
+        DiskChangedTimers {
+            diagnostics,
+            compile,
+        }
+    }
+
     fn fire(
         state: &mut IsographState<TestProfile>,
         effects: Vec<IsographEffect>,
@@ -3197,50 +3246,98 @@ mod tests {
             }))
             .to(),
         );
-        assert!(fire(&mut state, effects).is_empty());
+        let timers = disk_changed_timers(effects);
+        assert!(handle(&mut state, timers.diagnostics.event.to()).is_empty());
         let armed = handle(&mut state, did_open(client_1, X_URI, CLEAN));
         assert!(fire(&mut state, armed).is_empty());
     }
 
+    fn present(path: &str, contents: &str) -> IsographEvent {
+        InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
+            path: PathBuf::from(path),
+            presence: Presence::Present(contents.to_owned()),
+        }))
+        .to()
+    }
+
+    /// `timer` is the pending compile timer: firing it matches `compile_debounce`.
+    fn is_the_compile_timer(
+        state: &IsographState<TestProfile>,
+        timer: &freddie_timer::TimerEffect<TimerPayload>,
+    ) -> bool {
+        matches!(
+            timer
+                .event
+                .trigger_if_matching(state.compile_debounce.as_ref()),
+            Some(TimerPayload::CompileDebounce)
+        )
+    }
+
+    /// `timer` is the pending diagnostics timer: firing it matches `diagnostics_debounce`.
+    fn is_the_diagnostics_timer(
+        state: &IsographState<TestProfile>,
+        timer: &freddie_timer::TimerEffect<TimerPayload>,
+    ) -> bool {
+        matches!(
+            timer
+                .event
+                .trigger_if_matching(state.diagnostics_debounce.as_ref()),
+            Some(TimerPayload::DiagnosticsDebounce)
+        )
+    }
+
     #[test]
-    fn an_applied_disk_changed_arms_the_debounce() {
+    fn an_applied_disk_changed_arms_the_diagnostics_and_compile_debounces() {
         let mut state = with_config();
         let (_, _rx) = diagnostics_client(&mut state);
-        let present = handle(
-            &mut state,
-            InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
-                path: PathBuf::from("/tmp/proj/src/x.ts"),
-                presence: Presence::Present(CLEAN.to_owned()),
-            }))
-            .to(),
-        );
-        assert!(state.diagnostics_debounce.is_some());
-        only_timer(present);
+        let present = disk_changed_timers(handle(&mut state, present("/tmp/proj/src/x.ts", CLEAN)));
+        assert!(is_the_diagnostics_timer(
+            state.reference(),
+            present.diagnostics.reference()
+        ));
+        assert!(is_the_compile_timer(
+            state.reference(),
+            present.compile.reference()
+        ));
         state.diagnostics_debounce = None;
-        let absent = handle(
+        state.compile_debounce = None;
+        let absent = disk_changed_timers(handle(
             &mut state,
             InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
                 path: PathBuf::from("/tmp/proj/src/x.ts"),
                 presence: Presence::Absent,
             }))
             .to(),
-        );
-        assert!(state.diagnostics_debounce.is_some());
-        only_timer(absent);
+        ));
+        assert!(is_the_diagnostics_timer(
+            state.reference(),
+            absent.diagnostics.reference()
+        ));
+        assert!(is_the_compile_timer(
+            state.reference(),
+            absent.compile.reference()
+        ));
         state.diagnostics_debounce = None;
-        let folder_removed = handle(
+        state.compile_debounce = None;
+        let folder_removed = disk_changed_timers(handle(
             &mut state,
             InternalEvent::DiskChanged(DiskChanged::FolderRemoved(FolderRemoved {
                 path: PathBuf::from("/tmp/proj/src"),
             }))
             .to(),
-        );
-        assert!(state.diagnostics_debounce.is_some());
-        only_timer(folder_removed);
+        ));
+        assert!(is_the_diagnostics_timer(
+            state.reference(),
+            folder_removed.diagnostics.reference()
+        ));
+        assert!(is_the_compile_timer(
+            state.reference(),
+            folder_removed.compile.reference()
+        ));
     }
 
     #[test]
-    fn a_disk_changed_whose_path_is_rejected_does_not_arm_the_debounce() {
+    fn a_disk_changed_whose_path_is_rejected_does_not_arm_either_debounce() {
         let mut state = with_config();
         let (_, _rx) = diagnostics_client(&mut state);
         let effects = handle(
@@ -3252,7 +3349,58 @@ mod tests {
             .to(),
         );
         assert!(effects.is_empty());
+        assert!(state.compile_debounce.is_none());
         assert!(state.diagnostics_debounce.is_none());
+    }
+
+    #[test]
+    fn firing_the_compile_debounce_returns_no_effects_and_clears_it() {
+        let mut state = with_config();
+        let timer =
+            disk_changed_timers(handle(&mut state, present("/tmp/proj/src/a.ts", BROKEN))).compile;
+        assert!(handle(&mut state, timer.event.to()).is_empty());
+        assert!(state.compile_debounce.is_none());
+    }
+
+    #[test]
+    fn a_superseded_compile_firing_returns_no_effects() {
+        let mut state = with_config();
+        let first =
+            disk_changed_timers(handle(&mut state, present("/tmp/proj/src/a.ts", CLEAN))).compile;
+        let _second =
+            disk_changed_timers(handle(&mut state, present("/tmp/proj/src/b.ts", CLEAN))).compile;
+        assert!(handle(&mut state, first.event.to()).is_empty());
+        assert!(state.compile_debounce.is_some());
+    }
+
+    #[test]
+    fn a_compile_firing_does_not_clear_the_diagnostics_debounce() {
+        let mut state = with_config();
+        let (client_1, _rx) = diagnostics_client(&mut state);
+        let _diagnostics = only_timer(handle(&mut state, did_open(client_1, X_URI, BROKEN)));
+        let compile =
+            disk_changed_timers(handle(&mut state, present("/tmp/proj/src/a.ts", CLEAN))).compile;
+        handle(&mut state, compile.event.to());
+        assert!(state.diagnostics_debounce.is_some());
+    }
+
+    #[test]
+    fn a_diagnostics_firing_does_not_clear_the_compile_debounce() {
+        let mut state = with_config();
+        let (client_1, _rx) = diagnostics_client(&mut state);
+        let _compile =
+            disk_changed_timers(handle(&mut state, present("/tmp/proj/src/a.ts", CLEAN))).compile;
+        let diagnostics = only_timer(handle(&mut state, did_open(client_1, X_URI, BROKEN)));
+        handle(&mut state, diagnostics.event.to());
+        assert!(state.compile_debounce.is_some());
+    }
+
+    #[test]
+    fn did_open_does_not_arm_the_compile_debounce() {
+        let mut state = with_config();
+        let (client_1, _rx) = diagnostics_client(&mut state);
+        handle(&mut state, did_open(client_1, X_URI, BROKEN));
+        assert!(state.compile_debounce.is_none());
     }
 
     #[test]
@@ -3560,15 +3708,18 @@ type Owner {
                 .wrap_vec()
             )])
         );
-        let armed = handle(
+        let timers = disk_changed_timers(handle(
             &mut state,
             disk_file_changed(
                 SCHEMA_PATH,
                 Presence::Present(SCHEMA.replace("nickname: String", "nope: Int")),
             ),
-        );
+        ));
         assert_eq!(
-            published(fire(&mut state, armed), rx.reference()),
+            published(
+                handle(&mut state, timers.diagnostics.event.to()),
+                rx.reference()
+            ),
             HashMap::from([(X_URI.to_owned(), vec![])])
         );
     }

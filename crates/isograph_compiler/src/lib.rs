@@ -1,3 +1,4 @@
+mod compiler_errors;
 mod database;
 mod host_language;
 mod iso_literals;
@@ -8,6 +9,7 @@ mod test_profile;
 mod validation;
 mod wrapper;
 
+pub use compiler_errors::{CompilerError, compiler_errors_in_file};
 pub use database::{
     ClientId, DiskFile, DiskFileMap, FileMembership, IsographDb, OpenFileKey, SchemaPathMap,
     SourcePathMap, file_contents, source_file_paths,

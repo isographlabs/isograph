@@ -85,7 +85,7 @@ A path is not a proof. Looking up by path can miss and return `None`. The tracke
 
 `get_singleton<T>()` returns `Option<&T>`. A singleton has no `SourceId` you hold as a proof of presence. You ask by type. The config may not have been set.
 
-A path may have a `DiskFile`, one `OpenFile` per client that has it open, both, or neither. A read of file text through `file_contents(db, client, path)` reads client `c`'s `OpenFile` if present, otherwise `DiskFile`. The file-based compiler will be another client with its own `ClientId`.
+A path may have a `DiskFile`, one `OpenFile` per client that has it open, both, or neither. A read of file text through `file_contents(db, client, path)` reads client `c`'s `OpenFile` if present, otherwise `DiskFile`. The compiler is another client, `IsographState.compiler_client`.
 
 A singleton has no key field. There is at most one. `CompilerConfig` and `CurrentWorkingDirectory` are singletons. `CurrentWorkingDirectory` is the parent directory of the config file, interned at process start. `handle` reads it to convert an event `PathBuf`. Memos do not. They receive `RelativePathToSourceFile` as an argument.
 

@@ -1,0 +1,106 @@
+use common_lang_types::RelativePathToSourceFile;
+use isograph_parser::ParseError;
+use pico_macros::memo;
+use prelude::Postfix;
+use span::WithSpan;
+
+use crate::{ClientId, CompilationProfile, IsographDb, iso_literal_parse_errors_in_file};
+
+/// An error the compiler reports for a source file.
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum CompilerError {
+    #[error("{0}")]
+    Parse(ParseError),
+}
+
+/// Every compiler error of `path` as `client` reads it, as file-absolute spans.
+#[memo]
+pub fn compiler_errors_in_file<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    path: RelativePathToSourceFile,
+) -> Option<Vec<WithSpan<CompilerError>>> {
+    let parse_errors = iso_literal_parse_errors_in_file(db, client, path).as_ref()?;
+    parse_errors
+        .iter()
+        .map(|error| error.clone().map(CompilerError::Parse))
+        .collect::<Vec<_>>()
+        .wrap_some()
+}
+
+#[cfg(test)]
+mod tests {
+    use common_lang_types::RelativePathToSourceFile;
+    use intern::string_key::Intern;
+    use isograph_parser::{AstError, ParseError};
+    use prelude::Postfix;
+    use span::WithSpan;
+
+    use super::{CompilerError, compiler_errors_in_file};
+    use crate::test_profile::TestProfile;
+    use crate::{
+        ClientId, FileMembership, IncludeFile, IsographDb, iso_literal_parse_errors_in_file,
+    };
+
+    const CLIENT: ClientId = ClientId(1);
+
+    const SOURCE_FILE: FileMembership = FileMembership {
+        source_file: IncludeFile::Include,
+        schema_file: IncludeFile::Skip,
+    };
+
+    fn path() -> RelativePathToSourceFile {
+        "src/a.ts".intern().to()
+    }
+
+    fn errors(db: &IsographDb<TestProfile>) -> Option<Vec<WithSpan<CompilerError>>> {
+        compiler_errors_in_file(db, CLIENT, path()).clone()
+    }
+
+    #[test]
+    fn missing_file_has_no_errors() {
+        let mut db = IsographDb::<TestProfile>::default();
+        // pico records no dependency on a never-written tracked counter; see refactors/pending/pico-missing-key-dependency.md.
+        db.insert_disk_file("src/other.ts".intern().to(), SOURCE_FILE, String::new());
+        assert_eq!(errors(db.reference()), None);
+    }
+
+    #[test]
+    fn a_file_with_no_literals_has_no_errors() {
+        let mut db = IsographDb::<TestProfile>::default();
+        db.insert_disk_file(path(), SOURCE_FILE, "export const a = 1;\n".to_owned());
+        assert_eq!(errors(db.reference()), Vec::new().wrap_some());
+    }
+
+    #[test]
+    fn parse_errors_are_compiler_errors_with_the_same_spans() {
+        let mut db = IsographDb::<TestProfile>::default();
+        db.insert_disk_file(path(), SOURCE_FILE, "iso(`entrypoint`)".to_owned());
+        let parse_errors = iso_literal_parse_errors_in_file(db.reference(), CLIENT, path())
+            .clone()
+            .expect("the file has text");
+        assert!(!parse_errors.is_empty());
+        assert_eq!(
+            errors(db.reference()),
+            parse_errors
+                .into_iter()
+                .map(|error| error.map(CompilerError::Parse))
+                .collect::<Vec<_>>()
+                .wrap_some()
+        );
+    }
+
+    #[test]
+    fn a_whitespace_only_literal_is_the_empty_literal_error() {
+        let mut db = IsographDb::<TestProfile>::default();
+        db.insert_disk_file(path(), SOURCE_FILE, "iso(` `)".to_owned());
+        let errors = errors(db.reference()).expect("the file has text");
+        assert_eq!(
+            errors
+                .into_iter()
+                .map(|error| error.item)
+                .collect::<Vec<_>>(),
+            CompilerError::Parse(ParseError::Ast(AstError::EmptyLiteral)).wrap_vec()
+        );
+    }
+}

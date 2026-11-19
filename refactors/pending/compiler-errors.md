@@ -66,7 +66,7 @@ Each change is one commit, prefactors first. Each lists its tests. Each amends t
 
 1. The watcher returns the boot scan, and `serve` posts it before the LSP port accepts. Landed.
 2. `handle` mints every `ClientId` from `IsographState`. Landed.
-3. The daemon compiles after every applied `DiskChanged`.
+3. The daemon compiles after every applied `DiskChanged`. Landed.
 4. Shared LSP client handshake and `isograph start` spawning.
 5. The `isograph/errors` request.
 6. The `isograph errors` verb.
@@ -620,7 +620,7 @@ fn assigned(effects: Vec<IsographEffect>) -> ClientId {
 
 The `listen_and_reply` tests run `run_event_loop` and `run_effect_loop`, so they exercise the real assignment and pass unchanged.
 
-## Change 3: the daemon compiles after every applied `DiskChanged`
+## Change 3: the daemon compiles after every applied `DiskChanged` (landed)
 
 ### `CompilerErrorReport`
 

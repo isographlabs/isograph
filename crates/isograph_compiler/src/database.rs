@@ -237,6 +237,16 @@ impl<TProfile: CompilationProfile> IsographDb<TProfile> {
             .collect()
     }
 
+    /// Every path that has a `DiskFile`.
+    pub fn disk_paths(&self) -> Vec<RelativePathToSourceFile> {
+        self.get_disk_file_map()
+            .tracked()
+            .0
+            .keys()
+            .copied()
+            .collect()
+    }
+
     pub fn insert_disk_file(
         &mut self,
         path: RelativePathToSourceFile,
@@ -340,6 +350,45 @@ mod tests {
 
     fn intern_path(s: &str) -> RelativePathToSourceFile {
         s.intern().to()
+    }
+
+    fn sorted_disk_paths(db: &IsographDb<TestProfile>) -> Vec<String> {
+        let mut paths: Vec<String> = db
+            .disk_paths()
+            .into_iter()
+            .map(|path| intern::Lookup::lookup(path).to_owned())
+            .collect();
+        paths.sort();
+        paths
+    }
+
+    #[test]
+    fn disk_paths_lists_every_disk_file_and_no_open_file() {
+        let mut db = IsographDb::<TestProfile>::default();
+        db.insert_disk_file(intern_path("src/b.ts"), SOURCE_FILE, "b".to_owned());
+        db.insert_disk_file(intern_path("src/a.ts"), SOURCE_FILE, "a".to_owned());
+        db.set_open_file(
+            ClientId(1),
+            intern_path("src/open.ts"),
+            SOURCE_FILE,
+            "open".to_owned(),
+        );
+        assert_eq!(sorted_disk_paths(db.reference()), ["src/a.ts", "src/b.ts"]);
+    }
+
+    #[test]
+    fn disk_paths_after_remove_disk_files_from_path_omits_the_folder() {
+        let mut db = IsographDb::<TestProfile>::default();
+        db.insert_disk_file(intern_path("src/a.ts"), SOURCE_FILE, "a".to_owned());
+        db.insert_disk_file(intern_path("lib/b.ts"), SOURCE_FILE, "b".to_owned());
+        db.remove_disk_files_from_path(intern_path("src"));
+        assert_eq!(sorted_disk_paths(db.reference()), ["lib/b.ts"]);
+    }
+
+    #[test]
+    fn disk_paths_of_an_empty_db_is_empty() {
+        let db = IsographDb::<TestProfile>::default();
+        assert!(db.disk_paths().is_empty());
     }
 
     #[test]
