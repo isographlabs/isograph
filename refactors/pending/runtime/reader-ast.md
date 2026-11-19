@@ -17,6 +17,8 @@ Settled by the user, and assumed throughout:
 - The discriminator (`__typename`) is selected under every composite selection, and the store does not keep it (store.md, The store). A refinement compares the entity name the link already carries.
 - v1 has no directives. The parser reports every directive (`@loadable`, `@component`, any other) as a parse error; that parser change is planned separately. No selection or declaration the reader walk receives carries a directive.
 - Artifacts are typed (`const x: T = ...; export default x;`), importing their types from `@isograph/runtime`.
+- Every reader artifact carries its parent entity's name as a type parameter, `ReaderArtifact<TParam, TOutput, TEntityName extends EntityName>`, and a generated reader artifact sets it to the string literal of its parent entity (`"Pet"`, `"Query"`). A link is `Link<TEntityName>` (store.md, The store), and `E/__link/output_type.ts` is the link type of `E`. `read` takes the link and the artifact with one `TEntityName`, so a `Pet` link passed to a `Query` reader fails `tsc` (The parent entity's name).
+- A resolver receives its own record's link: `ResolverParam` has `link` next to `data` and `parameters`, and `read` passes the link it reads at. There is no `__link` selectable (A resolver's own link).
 
 Upstream references are the checkout at `/Users/rbalicki/code/isograph` (commit `79e2a3c0`).
 
@@ -24,7 +26,7 @@ Prerequisites, in their own docs:
 
 - query-generation.md (the B' revision in `/Users/rbalicki/code/i2-worktrees/b-prime-doc`) change 6: `NetworkProtocol::selectable_shape`, `SelectableShape`, `Condition`, `MergedArguments`, `FieldVariable`, `SelectionMapError`, `source_field_declaration`; and change 8 (a failed query writes no artifacts), which the acyclicity argument in Reader artifact imports relies on.
 - `refactors/pending/graphql-protocol/normalization-ast.md` changes 2 to 4: the argument types `NormalizationArguments` and their builder, the `@isograph/runtime` package, `RUNTIME_PACKAGE`, `TypeScriptItem::DeclaredConst`, `::ExportDefaultBinding`, and `arguments_value`.
-- `refactors/pending/runtime/store.md` changes 1 to 3: `Store`, `StoreRecord`, `StoreValue`, `StoreLink`, `StoreKey`, `JsonValue`, `Variables`, `storeKey`, `normalize`, and the fixture project `libs/isograph-runtime/fixtures/store`. Store dependencies, below, lists what this doc needs from it and the two amendments it makes. When store.md's names differ, stop and fix this doc first.
+- `refactors/pending/runtime/store.md` changes 1 to 3 and 6: `Store`, `StoreRecord`, `StoreValue`, `Link`, `StoreLink`, `entity_name_type`, the `Link<..>` link types, `StoreKey`, `JsonValue`, `Variables`, `storeKey`, `normalize`, and the fixture project `libs/isograph-runtime/fixtures/store`. Store dependencies, below, lists what this doc needs from it and the two amendments it makes. When store.md's names differ, stop and fix this doc first.
 - The parser change that makes every directive a parse error. It removes `@component` and `@loadable` from the pet demo's sources and from store.md's fixture (`StatsCard @loadable` in `Query.EmptyStats`), and with them `ClientFieldKind` (`crates/isograph_compiler/src/schema.rs`), `Loadability` and `SelectedClientField.loadability` (`crates/isograph_compiler/src/artifact_types.rs`), and the `IdentityWithParamComponent` overloads (`crates/typescript_artifacts/src/iso_overloads.rs`). This doc is written against the code after that change.
 
 ## End-user experience
@@ -51,7 +53,7 @@ import type { ReaderArtifact } from "@isograph/runtime";
 import type { Pet__fullName__output_type } from "./output_type";
 import type { Pet__fullName__param } from "./param_type";
 import { fullName as resolver } from "./../../../Pet";
-const readerArtifact: ReaderArtifact<Pet__fullName__param, Pet__fullName__output_type> = {
+const readerArtifact: ReaderArtifact<Pet__fullName__param, Pet__fullName__output_type, "Pet"> = {
   readerAst: [
     { kind: "Scalar", alias: "firstName", selectableName: "firstName", arguments: null },
     { kind: "Scalar", alias: "lastName", selectableName: "lastName", arguments: null },
@@ -73,7 +75,7 @@ import Pet__PetBestFriendCard__resolver_reader from "./../../Pet/PetBestFriendCa
 import Pet__PetCheckinsCard__resolver_reader from "./../../Pet/PetCheckinsCard/resolver_reader";
 import Pet__PetStatsCard__resolver_reader from "./../../Pet/PetStatsCard/resolver_reader";
 import Pet__fullName__resolver_reader from "./../../Pet/fullName/resolver_reader";
-const readerArtifact: ReaderArtifact<Query__PetDetailRoute__param, Query__PetDetailRoute__output_type> = {
+const readerArtifact: ReaderArtifact<Query__PetDetailRoute__param, Query__PetDetailRoute__output_type, "Query"> = {
   readerAst: [
     {
       kind: "Linked",
@@ -106,6 +108,30 @@ What the artifact shows:
 - `alias` is the key of the value in the resolver's `data`: the reader alias, else the selectable name. `friendName: firstName` in `PetBestFriendCard` is `{ kind: "Scalar", alias: "friendName", selectableName: "firstName", arguments: null }`.
 - `arguments` keep the enclosing field's variables as `Variable`s. The runtime substitutes the reader's variables when it computes the store key.
 - A client field selection is a `Resolver` node that imports the selected field's reader artifact.
+- The third type argument is the parent entity's name. `ReaderArtifact<Pet__fullName__param, Pet__fullName__output_type, "Query">` is a `tsc` error, because `Pet__fullName__param`'s `link` is not a `Link<"Query">`.
+
+The param type gains the field's own link. `Pet/fullName/param_type.ts`:
+
+```ts
+// generated by crates/typescript_artifacts/src/generate_types.rs
+import type { Pet____link__output_type } from "./../__link/output_type";
+export type Pet__fullName__param = {
+  readonly data: {
+    /**
+     * What do you call the pet when you're happy?
+     */
+    readonly firstName: string;
+    /**
+     * What do you call the pet when you're angry?
+     */
+    readonly lastName: string;
+  };
+  readonly parameters: Record<PropertyKey, never>;
+  readonly link: Pet____link__output_type;
+};
+```
+
+`Pet/__link/output_type.ts` is `export type Pet____link__output_type = Link<"Pet">;` (store.md, The store). A resolver that needs its record's link destructures it: `function PetLink({ link }) { return link; }`.
 
 The pet demo's `HomeRoute` reader has a `Linked` `pets` node whose selections are `id` and a `Resolver` for `PetSummaryCard`; `SetTagline`'s `set_pet_tagline` node has `arguments: [["input", { kind: "Object", value: [["id", { kind: "Variable", name: "id" }], ["tagline", { kind: "Variable", name: "tagline" }]] }]]`.
 
@@ -129,20 +155,30 @@ expect(read(store, petSummaryReaderArtifact, queryRoot, { id: "1" })).toEqual({
 
 ```ts
 // from libs/isograph-runtime/src/artifacts.ts
-/** The default export of a `resolver_reader.ts` artifact. */
-export type ReaderArtifact<TParam, TOutput> = {
+/**
+ * The default export of a `resolver_reader.ts` artifact. `TEntityName` is the name of the
+ * field's parent entity, or the union of its concrete entities' names when it is abstract.
+ */
+export type ReaderArtifact<
+  TParam extends ResolverParam<TEntityName>,
+  TOutput,
+  TEntityName extends EntityName,
+> = {
   readonly readerAst: ReaderSelectionSet;
   /**
    * A method signature, so TypeScript compares its parameter bivariantly: an artifact
-   * declared with one field's param type is also a `ReaderArtifact<ResolverParam, TOutput>`.
+   * declared with one field's param type is also a
+   * `ReaderArtifact<ResolverParam<EntityName>, TOutput, EntityName>`.
    */
   resolver(param: TParam): TOutput;
 };
 
 /** What `read` calls a resolver with. */
-export type ResolverParam = {
+export type ResolverParam<TEntityName extends EntityName> = {
   readonly data: SelectionSetData;
   readonly parameters: Variables;
+  /** The record the resolver's reader AST was read at. */
+  readonly link: Link<TEntityName>;
 };
 
 /** The resolver's `data`: one value per reader node, under the node's `alias`. */
@@ -188,7 +224,7 @@ export type ReaderResolverSelection = {
   readonly alias: string;
   /** The values the selection passes to the field's variables, in terms of the reader's own. */
   readonly arguments: Arguments | null;
-  readonly readerArtifact: ReaderArtifact<ResolverParam, unknown>;
+  readonly readerArtifact: ReaderArtifact<ResolverParam<EntityName>, unknown, EntityName>;
 };
 
 /** When a conditional's selections apply: the record's entity is `entityName`. */
@@ -198,13 +234,81 @@ export type Condition = {
 };
 ```
 
-`Arguments` and `ArgumentValue` are normalization-ast.md's, unchanged; both ASTs print them and the runtime's `storeKey` reads both. `Variables` is store.md's. `index.ts` exports every type above.
+`Arguments`, `ArgumentValue`, and `EntityName` are normalization-ast.md's, unchanged; both ASTs print the arguments and the runtime's `storeKey` reads both. `Variables` and `Link` are store.md's (`artifacts.ts` imports `Link` from `./store` as a type; `store.ts` already imports `EntityName` from `./artifacts` as a type, and a cycle of type-only imports is erased). `index.ts` exports every type above. `ResolverParam` has no default type argument: a use that admits any entity writes `ResolverParam<EntityName>`.
 
 `Condition` is the TypeScript form of the core `Condition` (query-generation.md, `Condition::SelectionEquals(EntityName)`), and is normalization-ast.md's `Condition`, which its conditionals print from the same Rust type: one Rust type has one TypeScript type, in `artifacts.ts`. `index.ts` already exports it with the normalization types.
 
 ### Why `resolver` is a method signature
 
-`ReaderResolverSelection.readerArtifact` holds the reader artifact of any field, and `read` calls its resolver. With a property signature (`readonly resolver: (param: TParam) => TOutput`), `strictFunctionTypes` compares the parameter contravariantly, so `ReaderArtifact<Pet__fullName__param, string>` is not a `ReaderArtifact<ResolverParam, unknown>`, and typing the node needs `any` (banned, AGENTS.md TypeScript) or a cast in the runtime. A method signature is compared bivariantly: `Pet__fullName__param` is assignable to `ResolverParam` (a type literal has an implicit index signature, and `Record<PropertyKey, never>` is assignable to `Variables`), so the assignment type-checks with no cast. The cost is that a method signature cannot be `readonly`.
+`ReaderResolverSelection.readerArtifact` holds the reader artifact of any field, and `read` calls its resolver. With a property signature (`readonly resolver: (param: TParam) => TOutput`), `strictFunctionTypes` compares the parameter contravariantly, so `ReaderArtifact<Pet__fullName__param, string, "Pet">` is not a `ReaderArtifact<ResolverParam<EntityName>, unknown, EntityName>`, and typing the node needs `any` (banned, AGENTS.md TypeScript) or a cast in the runtime. A method signature is compared bivariantly: `Pet__fullName__param` is assignable to `ResolverParam<EntityName>` (a type literal has an implicit index signature, `Record<PropertyKey, never>` is assignable to `Variables`, and `Link<"Pet">` is assignable to `Link<EntityName>` because `"Pet"` is a string), so the assignment type-checks with no cast. The third type argument changes nothing here: the node's `ReaderArtifact<.., EntityName>` constrains its first argument by `ResolverParam<EntityName>`, which every generated param type satisfies. The cost is that a method signature cannot be `readonly`.
+
+### The parent entity's name
+
+`TEntityName` does not occur in the body of `ReaderArtifact`. It reaches the artifact's structure through the constraint `TParam extends ResolverParam<TEntityName>`: the generated param type's `link` is `E____link__output_type`, which is `Link<TEntityName>`. Two consequences follow, and `read` is written for both:
+
+```ts
+// from libs/isograph-runtime/src/read.ts
+export function read<TEntityName extends EntityName, TOutput>(
+  store: Store,
+  artifact: ReaderArtifact<ResolverParam<TEntityName>, TOutput, TEntityName>,
+  root: NoInfer<Link<TEntityName>>,
+  variables: Variables,
+): ReadResult<TOutput>;
+```
+
+- TypeScript infers `TEntityName` from the declared type of the artifact (`ReaderArtifact<.., .., "Query">`), and `NoInfer` (TypeScript 5.4; the workspace pins 5.6.3) keeps the link out of the inference. Without `NoInfer`, a `Pet` link and a `Query` artifact infer `TEntityName` as `"Pet" | "Query"`: the link is a `Link<"Pet" | "Query">`, and the bivariant `resolver` accepts `Query__R__param` as a `ResolverParam<"Pet" | "Query">`, so the mismatched call type-checks.
+- A link whose entity name is not a literal (`StoreLink`, `Link<EntityName>`) is rejected for a generated artifact, because `string` is not assignable to `"Query"`. store.md's `queryRoot` and `mutationRoot` are declared `Link<"Query">` and `Link<"Mutation">` for this reason. Inside the runtime, the `Resolver` case passes the node's `ReaderArtifact<ResolverParam<EntityName>, unknown, EntityName>` and a `StoreLink`, so `TEntityName` is `EntityName` and the call type-checks.
+
+Checked with `tsc` 5.6.3 (`strict`, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`) on these declarations and hand-written param types of the generated shape: `read` of a `Pet` artifact with a `Link<"Pet">`, of a `Query` artifact that has a `Pet` `Resolver` node with `queryRoot`, and of an artifact whose third argument is `"Pet" | "Checkin"` with a `Link<"Pet">` type-check; a `Pet` link to the `Query` artifact, a `Query` link to the `Pet` artifact, a `Query` link to the `"Pet" | "Checkin"` artifact, and a `StoreLink` to the `Query` artifact are each an error; `const x: ReaderArtifact<Pet__fullName__param, string, "Query"> = ..` is an error at the constraint.
+
+An abstract parent entity has no record of its own: a record's link names its concrete entity (store.md, Record ids). A field on `Node` is read at a link `{ entityName: "Pet", id }`, so its third type argument and its link type are the union of its concrete entities' names, `"BlogItem" | "Checkin" | "Pet"`, printed by store.md's `entity_name_type` from the same `LinkType.concrete_types` list. An entity with no concrete entity is `never`, and no link can be passed. A concrete entity's union has one member, the entity's own name.
+
+Delta from upstream: upstream's `EagerReaderArtifact<TReadFromStore, TClientFieldValue>` (`isograph/libs/isograph-react/src/core/reader.ts:26-37`) has no parent type name, its `StoreLink` is `{ readonly __link: DataId; readonly __typename: TypeName }` with `TypeName` a `string` (`isograph/libs/isograph-react/src/core/IsographEnvironment.ts:122-125`), and `FragmentReference.root` is a `StoreLink` (`isograph/libs/isograph-react/src/core/FragmentReference.ts:58`), so nothing ties a fragment to its parent's type name. Upstream's `Link<T extends TypeName>` (`IsographEnvironment.ts:117-120`, with `__link` branded `Brand<DataId, T>`) types only the value of a `__link` selection and a client pointer's return (`isograph/crates/artifact_content/src/eager_reader_artifact.rs:236`). i2's `Link` has no brand: an id is a plain `RecordId`.
+
+### The entrypoint's reader artifact
+
+`IsographEntrypoint` landed with `readerArtifact: unknown` and the type-only fields `~param?: TParam` and `~output?: TOutput`, which exist so that `TParam` and `TOutput` occur in the type while the reader artifact is a stub (normalization-ast.md, The artifact's TypeScript type). Before:
+
+```ts
+// from libs/isograph-runtime/src/artifacts.ts
+export type IsographEntrypoint<
+  TParam,
+  TOutput,
+  TEntityName extends EntityName,
+> = {
+  readonly kind: 'Entrypoint';
+  /** `<Entity>.<selectable>`. */
+  readonly name: string;
+  readonly queryText: string;
+  readonly normalizationAst: NormalizationAst<TEntityName>;
+  /** Typed by `TParam` and `TOutput` once reader artifacts exist. */
+  readonly readerArtifact: unknown;
+  /** Type-only, absent at runtime, as upstream's `~TRawResponseType`. */
+  readonly '~param'?: TParam;
+  /** Type-only, absent at runtime. */
+  readonly '~output'?: TOutput;
+};
+```
+
+After (change 3):
+
+```ts
+// from libs/isograph-runtime/src/artifacts.ts
+export type IsographEntrypoint<
+  TParam extends ResolverParam<TEntityName>,
+  TOutput,
+  TEntityName extends EntityName,
+> = {
+  readonly kind: 'Entrypoint';
+  /** `<Entity>.<selectable>`. */
+  readonly name: string;
+  readonly queryText: string;
+  readonly normalizationAst: NormalizationAst<TEntityName>;
+  readonly readerArtifact: ReaderArtifact<TParam, TOutput, TEntityName>;
+};
+```
+
+`readerArtifact` now carries `TParam` and `TOutput`, so `~param` and `~output` have no reader and are removed. The generated `entrypoint.ts` is unchanged (`IsographEntrypoint<Query__HomeRoute__param, Query__HomeRoute__output_type, "Query">`); it now also checks that `resolver_reader.ts`'s default export is a `ReaderArtifact` of the same param type, output type, and root entity. `normalizationAst.root` is a `NormalizationRootRecord<TEntityName>`, `{ readonly entityName: TEntityName; readonly id: string }`, which is structurally `Link<TEntityName>`, so `read(store, entrypoint.readerArtifact, entrypoint.normalizationAst.root, variables)` type-checks with no conversion.
 
 ### Upstream node kinds and what each becomes
 
@@ -213,12 +317,43 @@ Upstream's types are `isograph/libs/isograph-react/src/core/reader.ts`.
 - `ReaderScalarField` (`reader.ts:89-96`) is `ReaderScalarSelection`. `fieldName` is `selectableName` (mental-model.md: the node names a selectable). `alias` is always a string, the reader alias or the selectable name, where upstream writes `null` and the runtime computes `alias ?? fieldName` (`read.ts:186`). `isFallible` is dropped: nothing in upstream's runtime reads it (its only occurrence outside artifacts is a literal at `read.ts:874`), and nothing in i2's would. `isUpdatable` is dropped (Later).
 - `ReaderLinkedField` (`reader.ts:103-121`) splits in two. Without `condition` it is `ReaderLinkedSelection`, with `isFallible`, `isUpdatable`, and `refetchQueryIndex` dropped. With a refinement's `condition` it is `ReaderRefinementSelection` (Refinements). With a client pointer's `condition` and `refetchQueryIndex` it is dropped (Client pointers, Later).
 - `ReaderNonLoadableResolverField` (`reader.ts:127-134`) is `ReaderResolverSelection`. `usedRefetchQueries` is dropped (no refetch queries). `readerArtifact` is the artifact, not a thunk (Reader artifact imports).
-- `ReaderLinkField` (`reader.ts:98-101`, `kind: "Link"`, the `__link` selection) is dropped: i2 has no `__link` selectable (artifact-set-and-types.md, Later), so nothing produces the node. Later: with `__link`, a `Link` node whose value is the root link.
+- `ReaderLinkField` (`reader.ts:98-101`, `kind: "Link"`, the `__link` selection) is dropped: i2 has no `__link` selectable, so nothing produces the node. A resolver receives its own record's link as `link` instead (A resolver's own link).
 - `ReaderImperativelyLoadedField` (`reader.ts:136-142`) is dropped. Later: with refetch queries and a fetch path in the runtime.
 - `LoadablySelectedField` (`reader.ts:144-159`) is dropped: v1 has no `@loadable` (Selections v1 does not read, Later).
 - `EagerReaderArtifact` (`reader.ts:26-37`) is `ReaderArtifact`. `kind` is dropped: v1 has one reader artifact kind, so nothing reads it. `fieldName` is dropped: upstream reads it for log messages and fragment reference ids (`read.ts:88`, `FragmentReference.ts:78`), and v1 has neither. `hasUpdatable` is dropped (Later, with `@updatable`).
 - `ComponentReaderArtifact` (`reader.ts:39-51`) is dropped: v1 has no `@component`, and the runtime has no React knowledge. Later: a React package depending on `@isograph/runtime` defines components.
 - `RefetchReaderArtifact` (`reader.ts:61-76`) is dropped; `refetch_reader.ts` stays artifact-set-and-types.md's stub. Later, with refetch queries.
+
+## A resolver's own link
+
+`read` calls the resolver with the link it reads at: `artifact.resolver({ data, parameters: variables, link: root })`. The link is not a store read, so it never adds a `MissingData`, and `read` has already returned `MissingData` when the root record is absent (The read function), so a resolver is called only with a link to a record the store holds. Which link that is, per position of the `Resolver` node:
+
+- At the top of a read, the caller's root (`queryRoot` for an entrypoint's field).
+- Under a `Linked` node, the link stored under the node's store key: `pet(id: $id) { PetLink }` passes `{ entityName: "Pet", id: "1" }`.
+- On a record with a derived id, that id: `stats { StatsLink }` on `Pet:1` passes `{ entityName: "PetStats", id: "Pet:1.stats" }` (store.md, Record ids). Userland cannot build this link from a selection, because no selectable holds the id.
+- On a record of an abstract entity, the concrete entity: `node(id: $id) { NodeLink }` with a response `__typename` of `Pet` passes `{ entityName: "Pet", id: "1" }`.
+- Under a `Refinement` node, the same record, whose entity is the refinement's target.
+
+The resolver gets only its own record's link. A selecting field obtains a nested record's link through a one-line client field on that record's entity, selected in the nested selection set:
+
+```ts
+// from libs/isograph-runtime/fixtures/store/src/PetLink.ts
+export const PetLink = iso(`
+  field Pet.PetLink
+`)(function PetLink({ link }) {
+  return link;
+});
+```
+
+`pet(id: $id) { bestFriend { PetLink } }` gives the selecting resolver `data.pet.bestFriend.PetLink`, typed `Pet__PetLink__output_type`, which is `ReturnType` of the resolver, `Pet____link__output_type`. `PetLink` has no selection set, so its reader AST is empty and query generation adds nothing for it besides the record's identity, which every composite selection already selects.
+
+Upstream's shape is a `__link` client field on every object entity (`isograph/crates/isograph_schema/src/validated_isograph_schema/add_link_fields.rs:14-40`), selected like any field, printed as a `{ kind: "Link", alias }` node (`isograph/crates/artifact_content/src/reader_ast.rs:412-426`, `reader.ts:98-101`), whose value is the root link (`read.ts:189-191`: `target[field.alias] = root`). Upstream's refinement condition readers select `__typename` and `__link` (`isograph/crates/isograph_schema/src/create_merged_selection_set.rs:1565-1584`) and return `data.__link` (`eager_reader_artifact.rs:251`). i2 deviates: a `link` on `ResolverParam` reserves no name in the selection namespace and is nothing to select. Upstream's `__link` is special-cased in selectable lookup (`isograph/crates/isograph_schema/src/memoized/client_selectable_access.rs:41-53`), the merge walk (`create_merged_selection_set.rs:1022`), param types (`isograph/crates/artifact_content/src/generate_updatable_and_parameter_type.rs:605`), and the reader AST (`reader_ast.rs:392`); i2 has none of those cases. Later: a `__link`-style selection, if the one-line client field for a nested link turns out to be common.
+
+The compiler side has no selectable and no validation case. It has three changes, in the TypeScript host and in `project_artifacts`:
+
+- Every field's param type has `readonly link: E____link__output_type`, `E` the field's parent entity (The param type's link).
+- `E/__link/output_type.ts` is generated for every entity some field is declared on, as well as every entity a pointer points to (`FieldArtifacts`).
+- The reader artifact's third type argument is `entity_name_type` of the parent's concrete entities (The TypeScript artifact).
 
 ## Refinements
 
@@ -269,7 +404,7 @@ Delta in the generated pet demo, after the parser change: `Query__PetDetailRoute
 Eager pointers, read through the link the pointer's resolver returns, need:
 
 - Query generation: `selection_contribution`'s `ClientPointer` arm inlines the pointer's own selection set as the `ClientField` arm does (upstream `merge_client_object_field`, `isograph/crates/isograph_schema/src/create_merged_selection_set.rs:852-929`). `inlined_fields` then lists pointers, so `field Pet.loop to Pet { loop }` becomes `InlineCycle`. The target-side selections are fetched only if another selection fetches them; otherwise the read is `MissingData`.
-- Reader AST: a `Pointer` node (`alias`, `arguments`, the pointer's reader artifact, `selections`). The runtime reads the pointer's resolver, then `readLinkedValue` of the returned link or links with `selections`. The generated link output types (`E/__link/output_type.ts`) are upstream's `{ __link, __typename }`, and `readLinkedValue` reads store.md's `StoreLink` (`{ entityName, id }`), so either those output types change to store.md's shape or the read converts.
+- Reader AST: a `Pointer` node (`alias`, `arguments`, the pointer's reader artifact, `selections`). The runtime reads the pointer's resolver, then `readLinkedValue` of the returned link or links with `selections`. The pointer's output type is `E____link__output_type`, `Link<..>` (store.md change 6), the shape `readLinkedValue` reads, so the read converts nothing.
 - Reader artifact imports: `field Pet.Card { bestFriend { Card } }` is not an `InlineCycle`, so `Card`'s reader imports itself. That needs thunks (`readerArtifact: () => X`, upstream's shape) or a compile-time error for a cycle of reader imports.
 - Param types: the pointer's key returns, with the nested object under the `to` wrapper.
 
@@ -588,10 +723,55 @@ pub struct FieldArtifacts<TLiteralContext> {
     /// The reader AST, when the field is reachable from an entrypoint.
     pub resolver_reader: Option<ReaderSelectionSet>,
     pub loadable_artifacts: Generation,
+    /// The entities a link to `field.parent_entity_name` can name: the entity itself when
+    /// concrete, its concrete entities when abstract, sorted.
+    pub concrete_entities: Vec<EntityName>,
 }
 ```
 
-`project_artifacts` sets `resolver_reader` to `types.reader_ast` when `reachable` contains the field and `None` otherwise. `ProjectArtifacts` is unchanged. `loadable_artifacts` is whatever the parser change leaves it; with no `@loadable`, no field's is `Generated`. The derives are unchanged (`Clone, Debug, PartialEq, Eq`).
+`project_artifacts` sets `resolver_reader` to `types.reader_ast` when `reachable` contains the field and `None` otherwise, and `concrete_entities` to `concrete_types(db, client, field.parent_entity_name)?`.
+
+`ProjectArtifacts.link_types` is one `LinkType` per entity some field is declared on or some pointer points to, sorted by entity:
+
+```rust
+// from crates/isograph_compiler/src/artifact_types.rs
+pub struct ProjectArtifacts<TLiteralContext> {
+    // other fields unchanged
+    /// One per entity some field is declared on or some pointer points to, sorted by entity.
+    pub link_types: Vec<LinkType>,
+}
+```
+
+Before (landed, in `project_artifacts`):
+
+```rust
+// from crates/isograph_compiler/src/artifact_types.rs
+    let link_types = fields
+        .iter()
+        .flat_map(|field| match field.kind.reference() {
+            FieldArtifactKind::Pointer(target) => target.inner_values().copied().collect(),
+            FieldArtifactKind::ClientField => Vec::new(),
+        })
+        .collect::<BTreeSet<EntityName>>()
+```
+
+After:
+
+```rust
+// from crates/isograph_compiler/src/artifact_types.rs
+    let link_types = fields
+        .iter()
+        .flat_map(|field| {
+            let pointed_to: Vec<EntityName> = match field.kind.reference() {
+                FieldArtifactKind::Pointer(target) => target.inner_values().copied().collect(),
+                FieldArtifactKind::ClientField => Vec::new(),
+            };
+            std::iter::once(field.field.parent_entity_name).chain(pointed_to)
+        })
+        .collect::<BTreeSet<EntityName>>()
+```
+
+The rest of the expression (`concrete_types` per entity) is unchanged. `concrete_types`'s scalar message names a link instead of a pointer: "`{entity}` is a scalar; a link names a record of an object entity." In the pet demo, `Query/__link/output_type.ts` and `Mutation/__link/output_type.ts` are new; `Pet` and `Owner` already have one. `loadable_artifacts` is whatever the parser change leaves it; with no `@loadable`, no field's is `Generated`. The derives are unchanged (`Clone, Debug, PartialEq, Eq`).
 
 Callers: `isograph_cli`'s `compile.rs` `generate_artifacts` calls `project_artifacts`, then `HostLanguage::generate_artifacts`; nothing else calls `field_types` or `project_artifacts`. The test hosts (`crates/isograph_cli/src/watch.rs`, the test profiles) ignore the new field.
 
@@ -633,10 +813,52 @@ The module's items, in this order:
 2. `NamedTypeImport` of `P__f__output_type` from `./output_type` and of `P__f__param` from `./param_type`, in specifier order. `output_type.ts` exists for every field with a reader: a reachable field is an entrypoint or selected by a declared field, and both are in `output_types` (`project_artifacts`).
 3. `NamedImport` of the resolver, from `named_imports_of(value)`.
 4. `DefaultImport` of each distinct `imports_of(value)`, in path order.
-5. `DeclaredConst { binding: "readerArtifact", type_: TypeScriptType::generic("ReaderArtifact", [reference(param), reference(output)]), value }`.
+5. `DeclaredConst { binding: "readerArtifact", type_: TypeScriptType::generic("ReaderArtifact", [reference(param), reference(output), entity_name_type(&field.concrete_entities)]), value }`. `entity_name_type` is store.md change 6's, made available to `reader_artifact.rs` (`pub(crate)` in `generate_types.rs`).
 6. `ExportDefaultBinding("readerArtifact")`.
 
 `DeclaredConst` and `ExportDefaultBinding` are normalization-ast.md change 4's `TypeScriptItem` variants; `DeclaredConst.type_` is already a `TypeScriptType`, so a generic reference needs no change to them.
+
+### The param type's link
+
+`param_type_file` (`crates/typescript_artifacts/src/generate_types.rs`) adds the parent entity's link type. Before (landed):
+
+```rust
+// from crates/typescript_artifacts/src/generate_types.rs
+        aliased: TypeScriptType::Object(vec![
+            required("data", object_type(field.data.reference(), options)),
+            required("parameters", parameters),
+        ]),
+```
+
+After:
+
+```rust
+// from crates/typescript_artifacts/src/generate_types.rs
+        aliased: TypeScriptType::Object(vec![
+            required("data", object_type(field.data.reference(), options)),
+            required("parameters", parameters),
+            required(
+                "link",
+                TypeScriptType::reference(link_type_name(field.field.parent_entity_name).as_str()),
+            ),
+        ]),
+```
+
+and its imports gain
+
+```rust
+// from crates/typescript_artifacts/src/generate_types.rs
+    let link_import = NamedImport {
+        specifier: relative_artifact_specifier(
+            path.reference(),
+            link_type_path(field.field.parent_entity_name).reference(),
+        ),
+        imported: link_type_name(field.field.parent_entity_name),
+        local: link_type_name(field.field.parent_entity_name),
+    };
+```
+
+chained after `parameters_import` into `sorted_imports`, which orders all of them by specifier. `link_type_path(E)` exists for every field's parent (`FieldArtifacts`, `link_types`). `ResolverParam`'s generated form is this type: `data`, `parameters`, `link`, in the order of `ResolverParam`. Every `param_type.ts` of the pet demo and the fixture gains the import and the `link` line; nothing else in them changes. The iso overloads (`IdentityWithParam<P__f__param, ..>`, `crates/typescript_artifacts/src/iso_overloads.rs`) type a resolver's parameter from this type, so `function PetLink({ link })` is typed with no overload change.
 
 ### Value imports in `module.rs`
 
@@ -704,13 +926,23 @@ After: per field, `field.resolver_reader` `Some(reader)` adds `printed(reader_ar
 import type {
   ArgumentValue,
   Arguments,
+  EntityName,
   ReaderArtifact,
   ReaderSelection,
   ReaderSelectionSet,
   ResolverParam,
   SelectionSetData,
 } from "./artifacts";
-import { isStoreLink, type JsonValue, type Store, type StoreKey, type StoreLink, type StoreValue, type Variables } from "./store";
+import {
+  isStoreLink,
+  type JsonValue,
+  type Link,
+  type Store,
+  type StoreKey,
+  type StoreLink,
+  type StoreValue,
+  type Variables,
+} from "./store";
 import { storeKey } from "./storeKey";
 
 export type ReadResult<T> = ReadOk<T> | ReadMissingData;
@@ -731,11 +963,12 @@ export type ReadMissingData = {
 /**
  * The value `artifact`'s resolver returns for the record `root`, with `variables` as the
  * field's parameters, or `MissingData` when the store lacks a value its reader AST reads.
+ * `root`'s entity is `artifact`'s parent entity (The parent entity's name).
  */
-export function read<TOutput>(
+export function read<TEntityName extends EntityName, TOutput>(
   store: Store,
-  artifact: ReaderArtifact<ResolverParam, TOutput>,
-  root: StoreLink,
+  artifact: ReaderArtifact<ResolverParam<TEntityName>, TOutput, TEntityName>,
+  root: NoInfer<Link<TEntityName>>,
   variables: Variables,
 ): ReadResult<TOutput> {
   if (store.get(root.entityName)?.get(root.id) === undefined) {
@@ -745,11 +978,11 @@ export function read<TOutput>(
   if (data.kind === "MissingData") {
     return data;
   }
-  return ok(artifact.resolver({ data: data.value, parameters: variables }));
+  return ok(artifact.resolver({ data: data.value, parameters: variables, link: root }));
 }
 ```
 
-A caller passes a generated artifact directly: `read(store, petSummaryReaderArtifact, queryRoot, { id: "1" })` infers `TOutput` from the artifact's declared type, by the bivariance above. `index.ts` exports `read`, `ReadResult`, `ReadOk`, and `ReadMissingData`.
+A caller passes a generated artifact directly: `read(store, petSummaryReaderArtifact, queryRoot, { id: "1" })` infers `TEntityName` (`"Query"`) and `TOutput` from the artifact's declared type, by the bivariance above, and checks `queryRoot` against `Link<"Query">`. `index.ts` also exports `Link` (store.md). Upstream's `read` passes no link to the resolver (`read.ts:189-191` puts the root link in `data` only under a `__link` selection). `index.ts` exports `read`, `ReadResult`, `ReadOk`, and `ReadMissingData`.
 
 `ReadMissingData` is upstream's `ReadDataResult`'s `MissingData` case (`isograph/libs/isograph-react/src/core/read.ts:135-143`: `reason: string`, `nestedReason?: ReadDataResult<unknown>`, `recordLink: StoreLink`), with `recordLink` of store.md's `StoreLink` and `nestedReason` narrowed to the `MissingData` case, the only one upstream ever puts there (`read.ts:302-305`, `:579-584`, `:656-662`, `:737-747`). Upstream has no store key field: the absent store key appears only inside `reason` (`'No value for ' + storeRecordName + ' on root ' + root.__link`, `read.ts:626-631`), and this doc does the same. Upstream's caller waits on `recordLink` for that record to change (`onNextChangeToRecord`, `read.ts:118`, `:122`); in i2 a later fetch policy can refetch that record (`refactors/pending/runtime/fetch-policies.md`).
 
@@ -909,7 +1142,8 @@ Semantics, stated as facts the tests assert:
 - `read` of an absent root record is `MissingData` with `recordLink` the root and `reason` `No record for ..`, before any node is read, as upstream (`read.ts:161-167`). This holds for every `Resolver` node too, because it calls `read` on the same root: a field whose reader AST is empty is `MissingData` on a link to a record that does not exist. `readStoreValue` keeps its own absent-record case for the records `Linked` nodes reach.
 - A missing value under a `Linked`, `Refinement`, or `Resolver` node is wrapped once per node, as upstream wraps it (`read.ts:579-584`, `:737-747`): `nestedReason` is the inner `MissingData`, and `recordLink` is the innermost record, the one that lacks the value.
 - A refinement compares `root.entityName` with `condition.entityName` and reads no store value.
-- A `Resolver` node reads the selected field's reader AST on the same root, with `childVariables`, and calls its resolver with `{ data, parameters: childVariables }`. The resolver's return is the node's value. The resolver is not called when its data is `MissingData`.
+- A `Resolver` node reads the selected field's reader AST on the same root, with `childVariables`, and calls its resolver with `{ data, parameters: childVariables, link: root }`. The resolver's return is the node's value. The resolver is not called when its data is `MissingData`.
+- Every resolver's `link` is the record its reader AST was read at: the caller's root at the top, the stored link under a `Linked` node, the same record under a `Refinement` node (A resolver's own link). It is the same object `read` received or `readLinkedValue` read from the store; tests compare it with `toEqual`.
 - `childVariables` holds a value for every variable of the selected field: the node passes it or carries its default, and a selection that passes neither does not compile (`MissingFieldArgument`). Upstream drops an absent variable (`read.ts:465-490`); i2 has none.
 - The first `MissingData` ends the read (upstream's behavior); there is no partial result.
 - A resolver that throws propagates out of `read`. There is no catching and no log event.
@@ -923,10 +1157,11 @@ What this doc uses from store.md, by name:
 // from libs/isograph-runtime/src/store.ts
 export type Store = Map<EntityName, Map<RecordId, StoreRecord>>;
 export type StoreRecord = Map<StoreKey, StoreValue>;
-export type StoreLink = {
-  readonly entityName: EntityName;
+export type Link<TEntityName extends EntityName> = {
+  readonly entityName: TEntityName;
   readonly id: RecordId;
 };
+export type StoreLink = Link<EntityName>;
 export type Variables = { readonly [name: string]: JsonValue };
 ```
 
@@ -978,24 +1213,27 @@ No snapshots. Facts about the reader AST, the printed artifact, and the read res
 - A refinement: `field Query.R { node(id: "1") { asPet { firstName } } }` gives `Linked node` whose one selection is `Refinement` with `condition == SelectionEquals(Pet)` and selections `[Scalar firstName]`, and its data type is `({ firstName } | null)`.
 - Errors: `asPet(x: 1)` is `ArgumentsOnRefinement`; `pet(id: $nope)` is `SelectionMap` with `UndefinedVariable(nope)`; `X(q: 1)` is `SelectionMap` with `UnknownFieldArgument`; `checkins(limit: 4294967296)` is `IntegerOutOfRange`.
 - A reachable field's `resolver_reader` is `Some` and equals its `field_types` reader AST; an unreachable field's is `None`.
+- `concrete_entities`: `Pet.fullName`'s is `[Pet]`; a field declared on the fixture's `Node` has `[BlogItem, Checkin, Pet]`. The pet demo's `link_types` are `Mutation`, `Owner`, `Pet`, `Query`, each concrete with itself as its one concrete type; `Query` and `Mutation` are there though no pointer points to them.
 
 ### Compiler: printing
 
 `crates/typescript_artifacts/src/reader_artifact.rs`, from hand-built `FieldArtifacts` and `ReaderSelectionSet` values:
 
-- The lines, in order: `import type { ReaderArtifact } from "@isograph/runtime";`, `import type { Pet__fullName__output_type } from "./output_type";`, `import type { Pet__fullName__param } from "./param_type";`, `import { fullName as resolver } from "./../../../Pet";`; a later line starts with `const readerArtifact: ReaderArtifact<Pet__fullName__param, Pet__fullName__output_type> = {`; the last line is `export default readerArtifact;`.
+- The lines, in order: `import type { ReaderArtifact } from "@isograph/runtime";`, `import type { Pet__fullName__output_type } from "./output_type";`, `import type { Pet__fullName__param } from "./param_type";`, `import { fullName as resolver } from "./../../../Pet";`; a later line starts with `const readerArtifact: ReaderArtifact<Pet__fullName__param, Pet__fullName__output_type, "Pet"> = {`; the last line is `export default readerArtifact;`.
+- `concrete_entities` of `[BlogItem, Checkin, Pet]` prints the third type argument `"BlogItem" | "Checkin" | "Pet"`; an empty `concrete_entities` prints `never`.
+- `param_type_file` of `Pet.fullName`: the text contains `import type { Pet____link__output_type } from "./../__link/output_type";`, and its last property is `readonly link: Pet____link__output_type;`, after `readonly parameters`. A field of `Query` imports `Query____link__output_type` from `"./../__link/output_type"`.
 - The text contains `resolver: resolver` and no `discriminator`.
 - `Scalar` prints `kind: "Scalar"`, `alias: "friendName"`, `selectableName: "firstName"`, `arguments: null`.
 - `Linked` prints `kind: "Linked"` and `selections: [`.
 - `Refinement` prints `kind: "Refinement"`, `kind: "SelectionEquals"`, `entityName: "Pet"`.
 - Two `Resolver` nodes of `Pet.fullName` print `readerArtifact: Pet__fullName__resolver_reader` twice and its default import from `"./../../Pet/fullName/resolver_reader"` once.
 - An export name of `None` is `MissingExport`; a source outside the folder tree is `SourceNotRelative`.
-- `generate_artifacts`: a field with `resolver_reader: None` has no `resolver_reader.ts`; no `resolver_reader.ts` text is `export default {};`; `entrypoint.ts` still has `readerArtifact: Query__HomeRoute__resolver_reader`; `refetch_reader.ts` is still the stub.
+- `generate_artifacts`: `Query/__link/output_type.ts` is `import type { Link } from "@isograph/runtime";` then `export type Query____link__output_type = Link<"Query">;` for a project whose only fields are on `Query` and which has no pointer. A field with `resolver_reader: None` has no `resolver_reader.ts`; no `resolver_reader.ts` text is `export default {};`; `entrypoint.ts` still has `readerArtifact: Query__HomeRoute__resolver_reader`; `refetch_reader.ts` is still the stub.
 - `module.rs` and `swc.rs`: a `NamedImport` value prints its `local` identifier and one `import { a as b } from "x";` line; `NamedImport` with equal names prints `{ a }`; `iso.ts` and the type files print unchanged text.
 
 `crates/isograph_cli/src/compile.rs`: editing `fullName`'s selection set returns writes including `Pet/fullName/resolver_reader.ts`; editing only `fullName`'s resolver body returns no `Update`.
 
-`pnpm --filter pet-demo typecheck` passes over the regenerated artifacts, so every reader artifact's literal matches `ReaderArtifact` and every resolver matches its declared param and output types.
+`pnpm --filter pet-demo typecheck` passes over the regenerated artifacts, so every reader artifact's literal matches `ReaderArtifact`, every param type satisfies `ResolverParam` of the artifact's third type argument, and every resolver matches its declared param and output types.
 
 ### Runtime
 
@@ -1031,9 +1269,24 @@ field Pet.NullableCheckins($n: Int) {
 field Query.NullPassedPet($id: ID!) {
   pet(id: $id) { NullableCheckins(n: null) }
 }
+
+field Pet.PetLink
+
+field PetStats.StatsLink
+
+field Node.NodeLink
+
+field Query.Links($id: ID!) {
+  pet(id: $id) {
+    PetLink
+    stats { StatsLink }
+    bestFriend { PetLink }
+  }
+  node(id: $id) { NodeLink }
+}
 ```
 
-with `entrypoint Query.PetSummary`, `entrypoint Query.PetSummaries`, `entrypoint Query.ConstantPet`, and `entrypoint Query.NullPassedPet`. `Pet.Constant` has no selection set, so its reader AST is empty. `RecentCheckins` selected with no argument reads `checkins(limit: $n)` with `n: 2` from its `Resolver` node, and query generation inlines it as `checkins(limit: 2)`, so both keys are `checkins____limit___2`.
+with `entrypoint Query.PetSummary`, `entrypoint Query.PetSummaries`, `entrypoint Query.ConstantPet`, `entrypoint Query.NullPassedPet`, and `entrypoint Query.Links`. The resolvers of `PetLink`, `StatsLink`, and `NodeLink` return `link` (A resolver's own link); every other fixture resolver returns `data`. `Pet.Constant` has no selection set, so its reader AST is empty. `RecentCheckins` selected with no argument reads `checkins(limit: $n)` with `n: 2` from its `Resolver` node, and query generation inlines it as `checkins(limit: 2)`, so both keys are `checkins____limit___2`.
 
 - Leaves: `Leaves` reads `greeting`, `literalGreeting`, `nullGreeting`, `variableGreeting`, `tags`, and `settings` equal to the response's values: a `null` leaf is `null`, `tags: ["a", null]` and `tags: []` are returned as stored, and `settings: { entityName: "Pet", id: "1" }` (a `JSON` scalar) is returned whole as a leaf.
 - Variables: `variableGreeting` read with `{ name: "Bo" }` after normalizing with `{ name: "Bo" }` is the response's value; read with `{ name: null }` after normalizing with `{ name: null }` it is the response's value; read with `{ name: "Bo" }` after normalizing only with `{ name: null }` is `MissingData` whose `reason` names `greeting____name___"Bo"`.
@@ -1048,9 +1301,42 @@ with `entrypoint Query.PetSummary`, `entrypoint Query.PetSummaries`, `entrypoint
 - Missing data: a read before any `normalize` is `MissingData` with `recordLink` `queryRoot` and `reason` `No record for Query:__ROOT`. A deleted `nickname` key on `Pet:1` under `PetSummary` is `MissingData` with `recordLink` `Pet:1` and nested reasons for `pet____id___"1"` and then `PetName` around the innermost `No value for nickname on Pet:1`. A deleted `Pet:2` record linked from `pets` is `MissingData` with `recordLink` `Pet:2`. A child resolver whose data is `MissingData` is not called (its call count is 0).
 - Absent records: `ConstantPet` with `{ id: "9" }`, on a store whose `Query.__ROOT` links `pet____id___"9"` to a `Pet:9` deleted by hand, is `MissingData` with `recordLink` `Pet:9` and innermost `reason` `No record for Pet:9`, though `Constant`'s reader AST is empty. `Constant`'s reader artifact read rooted at an existing `Pet:1` is `Ok` with `{}`.
 - Shape: `Pet:1.stats` set by hand to `"x"` makes `PetDetail`'s read throw the non-link message naming `Pet:1` and `stats`.
-- Degenerate cases: a `Linked` node over `[]` reads `[]`; an empty reader AST passes `{}` to its resolver.
+- Own links: `Links` with `{ id: "1" }`, after normalizing a response whose `pet` is `Pet:1` with a `stats` object and a `bestFriend` `Pet:2`, and whose `node` has `__typename: "Pet"` and `id: "1"`, reads `{ pet: { PetLink: { entityName: "Pet", id: "1" }, stats: { StatsLink: { entityName: "PetStats", id: "Pet:1.stats" } }, bestFriend: { PetLink: { entityName: "Pet", id: "2" } } }, node: { NodeLink: { entityName: "Pet", id: "1" } } }`. These are, in order, the own link on a nested record, on a record with a derived id, a nested record's link through the one-line `PetLink` selected in the nested selection set, and the own link on a record of an abstract entity, which names the concrete entity. With `stats: null` the value is `stats: null` and `StatsLink`'s resolver is not called. A `vi.spyOn` on `Links`'s reader artifact's `resolver` sees one call whose `link` equals `queryRoot`. `PetLink`'s reader artifact read rooted at `{ entityName: "Pet", id: "4" }` (after `PetDetail` normalized `Pet:4`) is `Ok` with that link.
+- Degenerate cases: a `Linked` node over `[]` reads `[]`; an empty reader AST passes `{}` as `data` to its resolver, with `link` the root.
 - The store is unchanged by every read.
 - No caching: `PetSummary` with `{ id: "1" }` is normalized and read once, with `vi.spyOn(artifact, "resolver")` on the imported reader artifacts of `Query.PetSummary`, `Pet.PetName`, and `Pet.RecentCheckins` (the objects the `Resolver` nodes' `readerArtifact` imports reach, so the spies see the nested calls; `PetSummary` resolves `PetName` and `RecentCheckins`, a chain of two levels). Each spy has one call. Then `normalize` writes data no read selects (`PetLists` writing `Pet:9`) and data the read selects (`PetDetail` changing `Pet:1`'s `name`), and the test reads again with the same variables: every spy has two calls, `PetName`'s whose input changed and `RecentCheckins`'s whose input did not. v1 has no memoization, so every resolver runs on every read. This test is expected to change when the pico-style runtime lands (`refactors/pending/runtime/pico-runtime.md`): then only resolvers whose inputs changed run again, and `RecentCheckins`'s spy stays at one call.
+
+### Types
+
+`libs/isograph-runtime/test/read.test-d.ts`, a vitest type test. The workspace's vitest is 2.1.9 (`libs/isograph-babel-plugin`, `^2.1.2`), which supports type tests: with `typecheck.enabled`, `vitest run` runs `tsc --noEmit` over the files matching `typecheck.include` (default `**/*.{test,spec}-d.?(c|m)[jt]s?(x)`) and fails on any type error, including an unused `@ts-expect-error` (TS2578). The files are type-checked, not executed. `vitest.config.ts` sets `test: { typecheck: { enabled: true } }` (Loading reader artifacts). `pnpm --filter @isograph/runtime typecheck` checks the file too, because store.md's `tsconfig.json` includes `test`.
+
+```ts
+// from libs/isograph-runtime/test/read.test-d.ts
+import { expectTypeOf, test } from "vitest";
+import nodeLinkReaderArtifact from "../fixtures/store/src/__isograph/Node/NodeLink/resolver_reader";
+import petLinkReaderArtifact from "../fixtures/store/src/__isograph/Pet/PetLink/resolver_reader";
+import linksReaderArtifact from "../fixtures/store/src/__isograph/Query/Links/resolver_reader";
+import { type Link, read, type ReadResult, type Store, type StoreLink } from "../src/index";
+import { queryRoot } from "./fixtures";
+
+const store: Store = new Map();
+const petLink: Link<"Pet"> = { entityName: "Pet", id: "1" };
+const storeLink: StoreLink = petLink;
+
+test("read takes a link to a record of the reader artifact's parent entity", () => {
+  read(store, linksReaderArtifact, queryRoot, { id: "1" });
+  read(store, nodeLinkReaderArtifact, petLink, {});
+  expectTypeOf(read(store, petLinkReaderArtifact, petLink, {})).toEqualTypeOf<ReadResult<Link<"Pet">>>();
+  // @ts-expect-error a Pet link to a Query reader artifact
+  read(store, linksReaderArtifact, petLink, { id: "1" });
+  // @ts-expect-error a Query link to a Pet reader artifact
+  read(store, petLinkReaderArtifact, queryRoot, {});
+  // @ts-expect-error a Query link to a reader artifact of Node, which Query does not implement
+  read(store, nodeLinkReaderArtifact, queryRoot, {});
+  // @ts-expect-error a link whose entity name is any string
+  read(store, petLinkReaderArtifact, storeLink, {});
+});
+```
 
 ### Loading reader artifacts
 
@@ -1068,6 +1354,7 @@ const fixtureSources = path.join(fixtureDirectory, "src") + path.sep;
 const generatedArtifacts = path.join(fixtureSources, "__isograph") + path.sep;
 
 export default defineConfig({
+  test: { typecheck: { enabled: true } },
   plugins: [
     {
       name: "isograph-babel-plugin",
@@ -1099,13 +1386,14 @@ export default defineConfig({
 - `enforce: "pre"` runs it before Vite's esbuild transform. Babel parses TypeScript with the `typescript` parser plugin and leaves the types in place; esbuild strips them afterwards, so no Babel TypeScript preset is needed.
 - `sourceType: "module"` makes the plugin emit an ES `import` of the artifact (`addDefault`, `compileTag.js:167-177`) rather than `require(..)`.
 - `searchFrom: fixtureDirectory` makes the plugin's `cosmiconfig` lookup find `fixtures/store/isograph.config.json`, whose `output_directory` is `src`, so the import paths it writes point into `fixtures/store/src/__isograph/`.
+- `typecheck.enabled` runs the type tests (Types); the Babel transform does not apply to them, because vitest type-checks them with `tsc` and does not load them.
 - The pet demo's `scripts/log-entrypoints.cjs` applies the same plugin through `@babel/register`; vitest needs a Vite plugin instead, because it loads modules through Vite.
 
 `libs/isograph-runtime/package.json` gains the dev dependencies `"@isograph/babel-plugin": "workspace:*"` and `"@babel/core": "^7.28.3"` (the pet demo's version). `tsconfig.json`'s `include` stays `src` and `test`; `vitest.config.ts` is not type-checked, as `libs/isograph-babel-plugin` type-checks no config file. store.md's tests need no transform, because a `normalization_ast.ts` imports no source file; the transform runs for them too and returns `null` for every file outside the fixture's sources.
 
 ## Changes
 
-Each change is one commit. Prerequisites: query-generation.md changes 6 to 8, normalization-ast.md changes 2 to 4, store.md changes 1 to 3, and the parser change that makes every directive a parse error.
+Each change is one commit. Prerequisites: query-generation.md changes 6 to 8, normalization-ast.md changes 2 to 4, store.md changes 1 to 3 and 6, and the parser change that makes every directive a parse error.
 
 ### 1. Variables and argument conversion as shared functions (isograph_compiler)
 
@@ -1113,27 +1401,29 @@ Each change is one commit. Prerequisites: query-generation.md changes 6 to 8, no
 
 ### 2. The reader AST (isograph_compiler)
 
-`crates/isograph_compiler/src/reader_ast.rs` with `ReaderSelectionSet`, `ReaderSelection`, `ReaderScalarSelection`, `ReaderLinkedSelection`, `ReaderRefinementSelection`, `ReaderResolverSelection`; `FieldTypes.reader_ast`; `ObjectSelections`, `SelectionOutput`, `SelectionRead`, `ReadSelection`, `ReaderTarget`, `ObjectTarget`, `ReaderContext`; `object_type`, `selection_field`, `reader_arguments`, `resolver_arguments`; `NotRead` for pointer selections in the data type; the five `GenerationError` variants; `FieldArtifacts.resolver_reader: Option<ReaderSelectionSet>`; the compiler reader AST tests. The TypeScript host prints the stub for `Some(_)` until change 4. Depends on 1.
+`crates/isograph_compiler/src/reader_ast.rs` with `ReaderSelectionSet`, `ReaderSelection`, `ReaderScalarSelection`, `ReaderLinkedSelection`, `ReaderRefinementSelection`, `ReaderResolverSelection`; `FieldTypes.reader_ast`; `ObjectSelections`, `SelectionOutput`, `SelectionRead`, `ReadSelection`, `ReaderTarget`, `ObjectTarget`, `ReaderContext`; `object_type`, `selection_field`, `reader_arguments`, `resolver_arguments`; `NotRead` for pointer selections in the data type; the five `GenerationError` variants; `FieldArtifacts.resolver_reader: Option<ReaderSelectionSet>`; `FieldArtifacts.concrete_entities`; `link_types` for every field's parent entity, and `concrete_types`'s message; the compiler reader AST tests. The TypeScript host prints the stub for `Some(_)` until change 4. Depends on 1.
 
 ### 3. The reader types (libs/isograph-runtime)
 
-The reader types in `src/artifacts.ts` and their exports in `src/index.ts`; `storeKey`'s `Pick<NormalizationSelection, "selectableName" | "arguments">` parameter; `isStoreLink` in `src/store.ts`, imported by `check.ts` and `garbageCollection.ts` in place of their own test. store.md's tests pass unchanged. Independent of 1 and 2.
+The reader types in `src/artifacts.ts` and their exports in `src/index.ts`: `ReaderArtifact` with `TEntityName`, `ResolverParam<TEntityName>` with `link`. The landed `IsographEntrypoint<TParam, TOutput, TEntityName>` (normalization-ast.md, The artifact's TypeScript type) gets its reader artifact typed in this change (The entrypoint's reader artifact). `storeKey`'s `Pick<NormalizationSelection, "selectableName" | "arguments">` parameter; `isStoreLink` in `src/store.ts`, imported by `check.ts` and `garbageCollection.ts` in place of their own test. store.md's tests pass unchanged. Independent of 1 and 2.
 
 ### 4. The TypeScript reader artifact (typescript_artifacts)
 
-`NamedImport` (renamed from `NamedTypeImport`), `ArtifactValue::NamedImport`, `TypeScriptItem::NamedImport`, `named_imports_of`, the `TypeOnly` parameter of the named import printer; `reader_artifact.rs`; `source_specifier` and `arguments_value` made `pub(crate)`; `generate_artifacts` writing reader artifacts; the printer and compile tests. Depends on 2 and 3.
+`NamedImport` (renamed from `NamedTypeImport`), `ArtifactValue::NamedImport`, `TypeScriptItem::NamedImport`, `named_imports_of`, the `TypeOnly` parameter of the named import printer; `reader_artifact.rs`, with the third type argument from `entity_name_type`; `param_type_file`'s `link` property and its import; `source_specifier` and `arguments_value` made `pub(crate)`; `generate_artifacts` writing reader artifacts; the printer and compile tests. Depends on 2 and 3, and on store.md change 6 (`entity_name_type`).
 
 ### 5. The read function (libs/isograph-runtime)
 
-`src/read.ts`, its exports in `src/index.ts`; the fixture's added sources and regenerated `fixtures/store/src/__isograph/`; `vitest.config.ts` and the `@isograph/babel-plugin` and `@babel/core` dev dependencies (Loading reader artifacts); `test/read.test.ts`. Depends on 4, which writes the fixture's reader artifacts.
+`src/read.ts`, its exports in `src/index.ts`; the fixture's added sources and regenerated `fixtures/store/src/__isograph/`; `vitest.config.ts` with `typecheck.enabled`, and the `@isograph/babel-plugin` and `@babel/core` dev dependencies (Loading reader artifacts); `test/read.test.ts` and `test/read.test-d.ts`. Depends on 4, which writes the fixture's reader artifacts.
 
 ### 6. Pet demo output
 
-The regenerated `demos/pet-demo/src/__isograph/`: every `resolver_reader.ts` is a reader artifact, and `Query/PetDetailRoute/param_type.ts` loses `bestFriend` and `owner`. `pnpm --filter pet-demo typecheck` passes. Depends on 4.
+The regenerated `demos/pet-demo/src/__isograph/`: every `resolver_reader.ts` is a reader artifact, every `param_type.ts` has `link`, `Query/__link/output_type.ts` and `Mutation/__link/output_type.ts` are new, and `Query/PetDetailRoute/param_type.ts` loses `bestFriend` and `owner`. `pnpm --filter pet-demo typecheck` passes. Depends on 4.
 
 ## Docs this doc amends
 
-- `refactors/pending/artifact-set-and-types.md`, Per field: `P/f/resolver_reader.ts` is this doc's artifact, not a stub. Per entrypoint: `readerArtifact` imports an object, not a thunk. Its open decision 2 (b): a pointer selection has no key in the selecting field's param type.
-- `refactors/pending/runtime/store.md`: `storeKey` takes `Pick<NormalizationSelection, "selectableName" | "arguments">`; `src/store.ts` exports `isStoreLink`, which `check` and `garbageCollect` use; the fixture project gains `Pet.PetName`, `Pet.RecentCheckins`, `Query.PetSummary`, `Query.PetSummaries`, `Pet.Constant`, `Query.ConstantPet`, `Pet.NullableCheckins`, and `Query.NullPassedPet`, and its `resolver_reader.ts` artifacts are reader artifacts; "v1 has no reader" no longer holds once this doc lands; the package gains `vitest.config.ts` and the `@isograph/babel-plugin` and `@babel/core` dev dependencies (Loading reader artifacts).
-- `refactors/pending/runtime/pico-runtime.md`, 11. Artifacts: `ReaderScalarField`, `ReaderLinkedField`, `ReaderResolverField`, and `EagerReaderArtifact` are this doc's `ReaderScalarSelection`, `ReaderLinkedSelection`, `ReaderResolverSelection`, and `ReaderArtifact`; `ReaderLinkField` does not exist; `ReaderRefinementSelection` is new; `ResolverParameters` is `ResolverParam`; `alias` is always a string and `fieldName` is `selectableName`. Its `computeResolver` and `readSelection` replace this doc's `read` and `readSelection` when memoization lands.
+- `refactors/pending/artifact-set-and-types.md`, Per field: `P/f/resolver_reader.ts` is this doc's artifact, not a stub; `P/f/param_type.ts` is `{ readonly data: <data>; readonly parameters: <parameters>; readonly link: P____link__output_type; }` and imports `P____link__output_type` from `P/__link/output_type` (The param type's link). `E/__link/output_type.ts` is generated for every entity a field is declared on as well as every pointer target, and is `Link<..>` (store.md, The store); i2 has no `__link` selectable, and a resolver's `link` replaces it (A resolver's own link). Per entrypoint: `readerArtifact` imports an object, not a thunk. Its open decision 2 (b): a pointer selection has no key in the selecting field's param type.
+- `refactors/pending/runtime/store.md`: `storeKey` takes `Pick<NormalizationSelection, "selectableName" | "arguments">`; `src/store.ts` exports `isStoreLink`, which `check` and `garbageCollect` use; the fixture project gains `Pet.PetName`, `Pet.RecentCheckins`, `Query.PetSummary`, `Query.PetSummaries`, `Pet.Constant`, `Query.ConstantPet`, `Pet.NullableCheckins`, `Query.NullPassedPet`, `Pet.PetLink`, `PetStats.StatsLink`, `Node.NodeLink`, and `Query.Links`, and its `resolver_reader.ts` artifacts are reader artifacts; "v1 has no reader" no longer holds once this doc lands; the package gains `vitest.config.ts` and the `@isograph/babel-plugin` and `@babel/core` dev dependencies (Loading reader artifacts).
+- `refactors/pending/runtime/pico-runtime.md`, 11. Artifacts: `ReaderScalarField`, `ReaderLinkedField`, `ReaderResolverField`, and `EagerReaderArtifact` are this doc's `ReaderScalarSelection`, `ReaderLinkedSelection`, `ReaderResolverSelection`, and `ReaderArtifact`; `ReaderLinkField` does not exist; `ReaderRefinementSelection` is new; `ResolverParameters` is `ResolverParam<TEntityName>`, which has `link`; `ReaderArtifact` takes the parent entity's name as a third type argument and `read` takes a `NoInfer<Link<TEntityName>>`; `alias` is always a string and `fieldName` is `selectableName`. Its `computeResolver` and `readSelection` replace this doc's `read` and `readSelection` when memoization lands.
 - `refactors/pending/graphql-protocol/normalization-ast.md`, change 4: the `NamedTypeImport` struct it specifies is the landed one, renamed `NamedImport` (The TypeScript artifact).
+- `refactors/pending/graphql-protocol/normalization-ast.md`, The artifact's TypeScript type: `IsographEntrypoint.readerArtifact` is `ReaderArtifact<TParam, TOutput, TEntityName>`, `TParam` is constrained by `ResolverParam<TEntityName>`, and the type-only `~param` and `~output` fields are removed (The entrypoint's reader artifact).
+- `refactors/pending/runtime/components-in-userland.md`: open questions 2 and 3 are settled (What a resolver has in i2).

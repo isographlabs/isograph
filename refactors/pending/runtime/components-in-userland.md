@@ -106,20 +106,17 @@ The rest of this doc asks how much of that userland can do without `@component` 
 
 ```ts
 // from libs/isograph-runtime/src/artifacts.ts
-export type ResolverParam = {
+export type ResolverParam<TEntityName extends EntityName> = {
   readonly data: SelectionSetData;
   readonly parameters: Variables;
+  /** The record the resolver's reader AST was read at. */
+  readonly link: Link<TEntityName>;
 };
 ```
 
-(reader-ast.md, The artifact's TypeScript types.) A resolver receives its selections and its variables. It does not receive the store, the record, or a link to the record: i2 has no `__link` selectable (reader-ast.md, Upstream node kinds, `ReaderLinkField`). A resolver that wants a link selects `id` and writes the entity name by hand:
+(reader-ast.md, The artifact's TypeScript types; A resolver's own link.) A resolver receives its selections, its variables, and its own record's link. It does not receive the store or the record. The link works for every record: a `PetStats` record's link carries its derived id `Pet:1.stats` (store.md, Record ids), which no selectable holds, and on a field of an abstract entity the link names the concrete entity, which the store does not otherwise keep (store.md, The store). `link` is typed `Pet____link__output_type`, `Link<"Pet">` (store.md change 6). A nested record's link comes from a one-line client field on that entity that returns `link`, selected in the nested selection set (reader-ast.md, A resolver's own link).
 
-```ts
-// from demos/pet-demo/src/PetCard.tsx
-const link: Pet____link__output_type = { entityName: 'Pet', id: data.id };
-```
-
-`Pet____link__output_type` is store.md change 6's link type, `{ readonly entityName: "Pet"; readonly id: string }`. This works only for a record whose entity has an identity selectable. A `PetStats` record, whose id is the derived `Pet:1.stats` (store.md, Record ids), has no selectable holding its id, so userland cannot build its link. On a field of an abstract entity the resolver cannot learn the concrete entity name: the store does not keep the discriminator (store.md, The store).
+The examples below select `id` and build the link by hand (`{ entityName: 'Pet', id: data.id }`). With `link` on `ResolverParam`, each of them reads `link` instead and drops the `id` selection; nothing else in them changes.
 
 The fixture used below is store.md's `Pet` entity (`id`, `name`, `nickname`, `tagline`) and the field `Pet.PetName`.
 
@@ -204,9 +201,9 @@ The resolver's result depends only on the link. The component reads its data at 
  * The stored result of `artifact` on `link` with `variables`, re-rendering when it changes.
  * Suspends on `MissingData` and throws on `ResolverThrew`.
  */
-export function useFragment<TOutput>(
-  artifact: ReaderArtifact<ResolverParam, TOutput>,
-  link: StoreLink,
+export function useFragment<TEntityName extends EntityName, TOutput>(
+  artifact: ReaderArtifact<ResolverParam<TEntityName>, TOutput, TEntityName>,
+  link: NoInfer<Link<TEntityName>>,
   variables: Variables,
 ): TOutput {
   const store = useStore();
@@ -433,10 +430,10 @@ Option 1, string-keyed memo, v1 or later:
 Option 2 under change 2 (`id`, a constant-returning field, a data field, and `useFragment`):
 
 - Ergonomics: three iso literals per component, a hand-built link, and arguments repeated in the hook call.
-- Type safety: `useFragment` checks the artifact's output type. It does not check that the link's entity is the artifact's parent entity (`ReaderArtifact<TParam, TOutput>` carries no entity name), nor that the variables are the ones the selection passed (`Variables` is any JSON map).
+- Type safety: `useFragment` checks the artifact's output type, and, typed as reader-ast.md's `read` is (`ReaderArtifact<ResolverParam<TEntityName>, TOutput, TEntityName>` and `NoInfer<Link<TEntityName>>`), that the link's entity is the artifact's parent entity. It does not check that the variables are the ones the selection passed (`Variables` is any JSON map).
 - Garbage collection: the component lives in `PetCard`'s resolver entry on `Pet:1` and is deleted with the record or by change 3's sweep.
 - React: stable across data changes; the component re-renders alone on its own data; the parent does not re-render. The component suspends at its own boundary only when its data goes missing after the parent rendered; data missing at the parent's read blocks the parent.
-- Support needed: changes 2 to 4, and a React package with `useStore`, `useFragment`, and a store provider. No compiler change. Records without an identity selectable and fields on abstract entities need a link the runtime supplies (`__link`, reader-ast.md, Later, or a `link` on `ResolverParam`), which is general-purpose.
+- Support needed: changes 2 to 4, and a React package with `useStore`, `useFragment`, and a store provider. No compiler change. Records without an identity selectable and fields on abstract entities get their link from `ResolverParam.link` (reader-ast.md, A resolver's own link).
 
 Option 2 with a module-level component (`PetCardView`):
 
@@ -485,7 +482,7 @@ export const PetCard = iso(`
 In i2 terms the directive could compile to option 2 under change 2, and it would supply what userland writes by hand or cannot reach:
 
 - The split between fetching and depending. The parent's `Resolver` node for a component reads only the component's entry, as upstream's read does (`read.ts:603-612`); the component's selections are still inlined into the query. The runtime computes the component's data in a second entry on the same record, which the mounted component observes. Userland needs `PetCardFetched` and `PetCardData` for this.
-- The link. The runtime holds `root` when it reads the component's entry, so the component needs no `id` selection and works for records with derived ids and for fields on abstract entities.
+- The link. The runtime holds `root` when it reads the component's entry and passes it as the resolver's `link`, as it does for every resolver, so this is no longer a difference from userland.
 - Arguments. The data entry's variables are the component field's own, computed once by the runtime (`childVariables`), so the hook cannot be called with other values.
 - `MissingData` that does not block the parent. The component's entry does not read the data, so it is `Ok` while the data is missing; the parent renders, and the component suspends at its own boundary. The userland chain propagates `MissingData` through `PetCardFetched`.
 - Typing. The output type is a component over the props (upstream's `React.FC<CombineWithIntrinsicAttributes<ExtractSecondParam<typeof resolver>>>` admits `key`), and the iso overload types the two parameters (`IdentityWithParamComponent`). Userland annotates the returned function's props by hand, and TypeScript's JSX check admits `key` through `JSX.IntrinsicAttributes`, so the typing gap is the second parameter's inference, not `key`.
@@ -501,8 +498,8 @@ What it costs:
 ## Open questions
 
 1. Is option 2's three-literal pattern acceptable as the userland answer, or is the cost to the user the reason to add `@component` after v1?
-2. Should the runtime give resolvers the record's link (`__link` as a selectable, upstream's shape, or `link` on `ResolverParam`)? It is general-purpose, and without it option 2 does not work for records with derived ids or for fields on abstract entities.
-3. Should `ReaderArtifact` carry its parent entity name in its type, so `useFragment(artifact, link)` rejects a link of another entity? That is a compiler change with no directive.
+2. Settled: the runtime gives every resolver its own record's link as `link` on `ResolverParam`, with no `__link` selectable (reader-ast.md, A resolver's own link).
+3. Settled: `ReaderArtifact<TParam, TOutput, TEntityName>` carries its parent entity's name, and a link is `Link<TEntityName>`, so a hook typed like `read` rejects a link of another entity (reader-ast.md, The parent entity's name).
 4. Should a field be able to select another field for the query without its own result depending on it? That is what `PetCardFetched` emulates. As syntax it is a directive or a new selection form, which v1 does not have.
 5. Under v1 and Step A, is a React demo with components in scope? If it is, only option 2's module-level variant or option 3 gives stable identity, since nothing stores resolver results.
 6. Identity across garbage collection: upstream keeps the component across a collection and refetch of its record; record-bound storage does not. Is a remount after the record was collected and fetched again acceptable?

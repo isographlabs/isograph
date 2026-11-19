@@ -240,10 +240,10 @@ From `index.ts:1-183`. Keep means the name, signature, and behavior are upstream
 - `RetainedQuery` (`core/garbageCollection.ts:20-24`): store.md's `{ ast, variables }`.
 - `StoreLink`, `StoreRecord`, `TypeName`, `DataId`, `DataTypeValueLinked`, `DataTypeValueScalar`, `IsographStore` (`core/IsographEnvironment.ts:122-175`): store.md's `StoreLink`, `StoreRecord`, `EntityName`, `RecordId`, `StoreValue`, `Store`.
 - `Variables`, `VariableValue` (`core/FragmentReference.ts:10-21`): store.md's `Variables`, `JsonValue`.
-- `UnknownTReadFromStore` (`core/FragmentReference.ts:23-27`): reader-ast.md's `ResolverParam`, which every type parameter below is constrained by.
+- `UnknownTReadFromStore` (`core/FragmentReference.ts:23-27`): reader-ast.md's `ResolverParam<TEntityName>`, which every type parameter below is constrained by.
 - `EagerReaderArtifact`, `TopLevelReaderArtifact`, `ReaderAst`, `ReaderAstNode`, `ReaderLinkedField`, `ReaderScalarField`, `ReaderNonLoadableResolverField`, `ResolverFirstParameter` (`core/reader.ts`): reader-ast.md's reader types.
 - `NormalizationAst`, `NormalizationAstNode`, `NormalizationAstNodes`, `NormalizationLinkedField`, `NormalizationScalarField`, `NormalizationInlineFragment`, `Argument`, `ArgumentName`, `ArgumentValue`, `Arguments` (`core/entrypoint.ts`, `core/util.ts`): normalization-ast.md's types.
-- `IsographEntrypoint` (`core/entrypoint.ts:77-93`): adapted, in `@isograph/runtime`'s `artifacts.ts` (The entrypoint artifact type).
+- `IsographEntrypoint` (`core/entrypoint.ts:77-93`): adapted, in `@isograph/runtime`'s `artifacts.ts`, landed with normalization-ast.md (The entrypoint artifact type).
 
 ### Dropped
 
@@ -251,7 +251,7 @@ From `index.ts:1-183`. Keep means the name, signature, and behavior are upstream
 - `LoadableFieldReader`, `LoadableFieldRenderer`, `LoadableField`, `ReaderLoadableField`, `useClientSideDefer`, `useImperativeLoadableField`, `UseImperativeLoadableFieldReturn`, `useSkipLimitPagination`, `useConnectionSpecPagination` and their types, `NormalizationAstLoader`, `IsographEntrypointLoader`, `RequiredFetchOptions`, `RequiredShouldFetch`: v1 has no `@loadable` and no lazily loaded artifacts.
 - `useImperativeExposedMutationField`, `UseImperativeExposedMutationFieldReturn`: v1 has no directives (`@exposeField`).
 - `RefetchReaderArtifact`, `RefetchQueryNormalizationArtifact`, `RefetchQueryNormalizationArtifactWrapper`, `ReaderWithRefetchQueries`, `ReaderImperativelyLoadedField`, `NetworkRequestInfo`: v1 has no refetch queries.
-- `ReaderLinkField`, `Link`, `StableId`: v1 has no `__link` selectable and no pointers (reader-ast.md).
+- `ReaderLinkField`, `StableId`: v1 has no `__link` selectable and no pointers (reader-ast.md). Upstream's `Link<T>` (`IsographEnvironment.ts:117-120`) is store.md's `Link<TEntityName>`, without the brand on the id.
 - `StartUpdate`, `ExtractStartUpdate`: v1 has no `@updatable`.
 - `ROOT_ID`, `createIsographStore`: the root record comes from the AST, and the empty store is `new Map()` (store.md).
 - `MissingFieldHandler`: store.md, Later.
@@ -276,7 +276,7 @@ From `index.ts:1-183`. Keep means the name, signature, and behavior are upstream
 - No release buffer: disposal unretains and collects at once (`garbageCollection.ts:39-53` and `makeNetworkRequest.ts:565-577` become two calls).
 - No log events: every `logMessage` call is dropped (`useLazyReference.ts:42-48`, `makeNetworkRequest.ts:201-206`, `:218-222`, `:265-269`, `:300-304`), with the module-level counter `networkRequestId` (`makeNetworkRequest.ts:44`) that only the logs read.
 - Store shape: the environment holds store.md's `Store` (a `Map`), and the root record is `entrypoint.normalizationAst.root` (`{ entityName, id }`), not `{ __link: ROOT_ID, __typename: entrypoint.concreteType }` (`getOrCreateCacheForArtifact.ts:77`).
-- Links `{ entityName, id }`: `FragmentReference.root` and the stable id read `entityName` and `id` (`FragmentReference.ts:78`).
+- Links `{ entityName, id }`, typed `Link<TEntityName>`: `FragmentReference.root` and the stable id read `entityName` and `id` (`FragmentReference.ts:78`), and every hook over a reference carries the reference's `TEntityName`.
 - `read` returns `MissingData` instead of throwing: the runtime's `readButDoNotEvaluate` returns a `ReadResult`, and the React package turns `MissingData` into the thrown promise upstream's `readButDoNotEvaluate` throws (`read.ts:92-122`).
 - No subscriptions in store.md: the suspend-until-change promise and re-render on write use Step A's subscriptions, amended (Re-rendering on writes).
 - Required variables (store.md, Variables): the hooks' `variables: ExtractParameters<TReadFromStore>` is unchanged; the generated parameters type requires every variable, so a caller passes nullable ones too.
@@ -459,73 +459,27 @@ export { useResult } from './react/useResult';
 
 ## The entrypoint artifact type
 
-Upstream declares every `entrypoint.ts` as `IsographEntrypoint<P__f__param, P__f__output_type, NormalizationAst, P__f__raw_response_type>` (`isograph/demos/pet-demo/src/components/__isograph/Query/PetDetailRoute/entrypoint.ts:23-28`), so `useLazyReference` infers the variables type and the result type from its argument. i2's `entrypoint.ts` is an untyped `export default { .. }`, whose `kind` widens to `string` and which carries no param or output type. reader-ast.md's settled rule is that artifacts are typed (`const x: T = ..; export default x;`, importing their types from `@isograph/runtime`), so the entrypoint artifact is declared too.
+`IsographEntrypoint<TParam, TOutput, TEntityName>` landed in `@isograph/runtime` with normalization-ast.md (The artifact's TypeScript type), and the generated `entrypoint.ts` is declared with it: `const artifact: IsographEntrypoint<Query__HomeRoute__param, Query__HomeRoute__output_type, "Query"> = {..}; export default artifact;`. reader-ast.md change 3 types its reader artifact (reader-ast.md, The entrypoint's reader artifact):
 
 ```ts
 // from libs/isograph-runtime/src/artifacts.ts
-/** The default export of an `entrypoint.ts` artifact. */
 export type IsographEntrypoint<
-  TReadFromStore extends ResolverParam,
-  TClientFieldValue,
+  TParam extends ResolverParam<TEntityName>,
+  TOutput,
+  TEntityName extends EntityName,
 > = {
   readonly kind: 'Entrypoint';
-  /** The entrypoint's field, `Query.HomeRoute`. */
+  /** `<Entity>.<selectable>`. */
   readonly name: string;
-  /** What the network function sends. */
   readonly queryText: string;
-  readonly normalizationAst: NormalizationAst;
-  readonly readerArtifact: ReaderArtifact<TReadFromStore, TClientFieldValue>;
+  readonly normalizationAst: NormalizationAst<TEntityName>;
+  readonly readerArtifact: ReaderArtifact<TParam, TOutput, TEntityName>;
 };
 ```
 
-Deltas from upstream (`core/entrypoint.ts:77-93`): two type parameters, not four (`TNormalizationAst` existed for `NormalizationAstLoader`; `TRawResponseType` for `optimisticNetworkResponse`); `networkRequestInfo` is `queryText` and `normalizationAst`, the keys the i2 artifact already has (query-generation.md); `readerWithRefetchQueries` is `readerArtifact`; `concreteType` is gone because the root is `normalizationAst.root`; `name` is new and read by `stableIdForFragmentReference`. `kind` stays because the artifact prints it (artifact-set-and-types.md); nothing reads it. pico-runtime.md's structural `Entrypoint<TOutput>` is this type.
+`useLazyReference` infers the variables type, the result type, and the root entity from its argument, as upstream's infers the first two from `IsographEntrypoint<P__f__param, P__f__output_type, NormalizationAst, P__f__raw_response_type>` (`isograph/demos/pet-demo/src/components/__isograph/Query/PetDetailRoute/entrypoint.ts:23-28`). Deltas from upstream (`core/entrypoint.ts:77-93`): three type parameters, `TEntityName` new and `TNormalizationAst` and `TRawResponseType` gone (`TNormalizationAst` existed for `NormalizationAstLoader`; `TRawResponseType` for `optimisticNetworkResponse`); `networkRequestInfo` is `queryText` and `normalizationAst`; `readerWithRefetchQueries` is `readerArtifact`; `concreteType` is gone because the root is `normalizationAst.root`; `name` is new and read by `stableIdForFragmentReference`. `kind` stays because the artifact prints it; nothing reads it. pico-runtime.md's structural `Entrypoint<TOutput>` is this type.
 
-`TReadFromStore extends ResolverParam` makes `ReaderArtifact<TReadFromStore, V>` assignable to `ReaderArtifact<ResolverParam, V>` by the method bivariance reader-ast.md relies on (Why `resolver` is a method signature), so the package calls `read` and the resolver with no cast.
-
-Generated, after change 3:
-
-```ts
-// generated by crates/typescript_artifacts/src/entrypoint.rs
-import type { IsographEntrypoint } from '@isograph/runtime';
-import type { Query__HomeRoute__output_type } from './output_type';
-import type { Query__HomeRoute__param } from './param_type';
-import Query__HomeRoute__normalization_ast from './normalization_ast';
-import Query__HomeRoute__query_text from './query_text';
-import Query__HomeRoute__resolver_reader from './resolver_reader';
-const artifact: IsographEntrypoint<
-  Query__HomeRoute__param,
-  Query__HomeRoute__output_type
-> = {
-  kind: 'Entrypoint',
-  name: 'Query.HomeRoute',
-  queryText: Query__HomeRoute__query_text,
-  normalizationAst: Query__HomeRoute__normalization_ast,
-  readerArtifact: Query__HomeRoute__resolver_reader,
-};
-export default artifact;
-```
-
-(Quotes and spacing are `swc_ecma_codegen`'s.)
-
-```rust
-// from crates/typescript_artifacts/src/entrypoint.rs
-/// `P/f/entrypoint.ts`: the entrypoint object declared as an `IsographEntrypoint` of the
-/// field's param and output types.
-pub(crate) fn entrypoint_artifact_file(entrypoint: EntityNameAndSelectableName) -> TypeScriptModule;
-
-/// The entrypoint object: `kind`, `name`, `queryText`, `normalizationAst`, `readerArtifact`.
-fn entrypoint_value(entrypoint: EntityNameAndSelectableName) -> ArtifactValue;
-```
-
-`entrypoint_value` is the body of today's `entrypoint_artifact` (`crates/typescript_artifacts/src/entrypoint.rs:12-49`), returning the `ArtifactValue::Object` instead of wrapping it in an `ArtifactModule`. `entrypoint_artifact` is removed. The module's items, in order, the same shape as reader-ast.md's `reader_artifact_file`:
-
-1. The type-only named import of `IsographEntrypoint` from `RUNTIME_PACKAGE`.
-2. The type-only named imports of `P__f__output_type` from `./output_type` and of `P__f__param` from `./param_type`, in specifier order. `output_type.ts` exists for every entrypoint's field (reader-ast.md, The TypeScript artifact, item 2).
-3. `DefaultImport` of each of `imports_of(&value)`, in path order.
-4. `DeclaredConst { binding: "artifact", type_: TypeScriptType::generic("IsographEntrypoint", [reference(param), reference(output)]), value }`.
-5. `ExportDefaultBinding("artifact")`.
-
-The binding is upstream's (`artifact`). `output_type_name` in `generate_types.rs` becomes `pub(crate)`; `param_type_name` already is. In `generate_artifacts` (`crates/typescript_artifacts/src/lib.rs:84`), `printed_artifact(entrypoint::entrypoint_artifact(entrypoint.dereference()))` becomes `printed(entrypoint::entrypoint_artifact_file(entrypoint.dereference()).reference())`. `iso.ts` is unchanged: its entrypoint overloads return `typeof Query__HomeRoute__entrypoint`, which is now `IsographEntrypoint<Query__HomeRoute__param, Query__HomeRoute__output_type>`.
+`TParam extends ResolverParam<TEntityName>` makes `ReaderArtifact<TParam, V, TEntityName>` assignable to `ReaderArtifact<ResolverParam<TEntityName>, V, TEntityName>` by the method bivariance reader-ast.md relies on (Why `resolver` is a method signature), so the package calls `read` and the resolver with no cast. `normalizationAst.root` is a `NormalizationRootRecord<TEntityName>`, structurally `Link<TEntityName>`, so a `FragmentReference`'s `root` is the entrypoint's root with its entity name's literal type.
 
 If `tsc` rejects a generated param type as a `ResolverParam` (a parameters type whose input object has a `readonly w?: T | null | void` field, open decision 10), the implementer stops and raises it. The pet demo and the fixtures have no such variable.
 
@@ -803,6 +757,7 @@ import type { ItemCleanupPair } from '@isograph/disposable-types';
 import {
   callSubscriptions,
   check,
+  type EntityName,
   type IsographEntrypoint,
   type NormalizationAst,
   normalize,
@@ -826,11 +781,12 @@ import {
 } from './PromiseWrapper';
 
 export function maybeMakeNetworkRequest<
-  TReadFromStore extends ResolverParam,
+  TReadFromStore extends ResolverParam<TEntityName>,
   TClientFieldValue,
+  TEntityName extends EntityName,
 >(
   environment: IsographEnvironment,
-  entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue>,
+  entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue, TEntityName>,
   variables: ExtractParameters<TReadFromStore>,
   fetchOptions: FetchOptions<TClientFieldValue> | null,
 ): ItemCleanupPair<PromiseWrapper<void, unknown>> {
@@ -875,11 +831,12 @@ export function retainQueryWithoutMakingNetworkRequest(
 }
 
 export function makeNetworkRequest<
-  TReadFromStore extends ResolverParam,
+  TReadFromStore extends ResolverParam<TEntityName>,
   TClientFieldValue,
+  TEntityName extends EntityName,
 >(
   environment: IsographEnvironment,
-  entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue>,
+  entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue, TEntityName>,
   variables: ExtractParameters<TReadFromStore>,
   fetchOptions: FetchOptions<TClientFieldValue> | null,
 ): ItemCleanupPair<PromiseWrapper<void, unknown>> {
@@ -946,11 +903,12 @@ type NetworkRequestStatus =
 
 /** The resolver's value for the response just normalized. */
 function readDataForOnComplete<
-  TReadFromStore extends ResolverParam,
+  TReadFromStore extends ResolverParam<TEntityName>,
   TClientFieldValue,
+  TEntityName extends EntityName,
 >(
   environment: IsographEnvironment,
-  entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue>,
+  entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue, TEntityName>,
   variables: ExtractParameters<TReadFromStore>,
 ): TClientFieldValue {
   const result = read(
@@ -1003,23 +961,25 @@ Deltas from `core/makeNetworkRequest.ts`:
 ```ts
 // from libs/isograph-react/src/core/FragmentReference.ts
 import {
+  type EntityName,
+  type Link,
   type ReaderArtifact,
   type ResolverParam,
   stableStringify,
-  type StoreLink,
   type Variables,
 } from '@isograph/runtime';
 import type { PromiseWrapper } from './PromiseWrapper';
 
 /** A fetched or retained entrypoint's reader, at its root, with its variables. */
 export type FragmentReference<
-  TReadFromStore extends ResolverParam,
+  TReadFromStore extends ResolverParam<TEntityName>,
   TClientFieldValue,
+  TEntityName extends EntityName,
 > = {
-  readonly readerArtifact: ReaderArtifact<TReadFromStore, TClientFieldValue>;
+  readonly readerArtifact: ReaderArtifact<TReadFromStore, TClientFieldValue, TEntityName>;
   /** The entrypoint's name, `Query.HomeRoute`. */
   readonly fieldName: string;
-  readonly root: StoreLink;
+  readonly root: Link<TEntityName>;
   readonly variables: ExtractParameters<TReadFromStore>;
   readonly networkRequest: PromiseWrapper<void, unknown>;
 };
@@ -1033,7 +993,7 @@ export type ExtractParameters<T> = T extends {
 export type StableIdForFragmentReference = string;
 
 export function stableIdForFragmentReference(
-  fragmentReference: FragmentReference<ResolverParam, unknown>,
+  fragmentReference: FragmentReference<ResolverParam<EntityName>, unknown, EntityName>,
 ): StableIdForFragmentReference {
   return stableStringify([
     fragmentReference.root.entityName,
@@ -1044,36 +1004,54 @@ export function stableIdForFragmentReference(
 }
 ```
 
-Deltas from `core/FragmentReference.ts:35-79`: `kind` is dropped (nothing reads it); `readerWithRefetchQueries` is `readerArtifact` (no refetch queries, no lazily loaded readers); `readerArtifactKind` is dropped (one kind); `root` is store.md's link; `TReadFromStore` is constrained by `ResolverParam` instead of `UnknownTReadFromStore`; `ExtractParameters` falls back to store.md's `Variables`. The stable id is the stable JSON of a list instead of `/`-joined text, so an id or a name containing `/` cannot make two ids equal; it is the key form pico-runtime.md uses for `Store.observed`.
+Deltas from `core/FragmentReference.ts:35-79`: `kind` is dropped (nothing reads it); `readerWithRefetchQueries` is `readerArtifact` (no refetch queries, no lazily loaded readers); `readerArtifactKind` is dropped (one kind); `TEntityName` is new, and `root` is a `Link<TEntityName>` where upstream's is a `StoreLink` (`{ __link, __typename: string }`, `core/FragmentReference.ts:58`, `core/IsographEnvironment.ts:122-125`), so `readerArtifact` and `root` name the same entity and `read` of the two type-checks (reader-ast.md, The parent entity's name); `TReadFromStore` is constrained by `ResolverParam<TEntityName>` instead of `UnknownTReadFromStore`; `ExtractParameters` falls back to store.md's `Variables`. The stable id is the stable JSON of a list instead of `/`-joined text, so an id or a name containing `/` cannot make two ids equal; it is the key form pico-runtime.md uses for `Store.observed`.
 
 ```ts
 // from libs/isograph-react/src/core/entrypoint.ts
-import type { IsographEntrypoint, ResolverParam } from '@isograph/runtime';
+import type {
+  EntityName,
+  IsographEntrypoint,
+  ResolverParam,
+} from '@isograph/runtime';
 import type { FragmentReference } from './FragmentReference';
 
 export type FragmentReferenceOfEntrypoint<
-  TEntrypoint extends IsographEntrypoint<ResolverParam, unknown>,
-> = FragmentReference<
-  ExtractReadFromStore<TEntrypoint>,
-  ExtractClientFieldValue<TEntrypoint>
->;
+  TEntrypoint extends IsographEntrypoint<ResolverParam<EntityName>, unknown, EntityName>,
+> =
+  TEntrypoint extends IsographEntrypoint<
+    infer TReadFromStore extends ResolverParam<infer TEntityName extends EntityName>,
+    infer TClientFieldValue,
+    infer TEntityName
+  >
+    ? FragmentReference<TReadFromStore, TClientFieldValue, TEntityName>
+    : never;
 
 export type ExtractReadFromStore<Type> =
-  Type extends IsographEntrypoint<infer X extends ResolverParam, unknown>
+  Type extends IsographEntrypoint<
+    infer X extends ResolverParam<EntityName>,
+    unknown,
+    EntityName
+  >
     ? X
     : never;
 export type ExtractClientFieldValue<Type> =
-  Type extends IsographEntrypoint<ResolverParam, infer X> ? X : never;
+  Type extends IsographEntrypoint<ResolverParam<EntityName>, infer X, EntityName>
+    ? X
+    : never;
 ```
 
-Delta from `core/entrypoint.ts:95-100`, `:200-203`: two type parameters, and `unknown` or `ResolverParam` where upstream writes `any`.
+Delta from `core/entrypoint.ts:95-100`, `:200-203`: three type parameters, and `unknown`, `EntityName`, or `ResolverParam<EntityName>` where upstream writes `any`. `FragmentReferenceOfEntrypoint` infers the three parameters in one conditional type: `FragmentReference<ExtractReadFromStore<T>, ExtractClientFieldValue<T>, ..>` fails `tsc` 5.6.3, because a conditional type is not known to satisfy `ResolverParam<TEntityName>`.
 
 ## Fetching with `useLazyReference`
 
 ```ts
 // from libs/isograph-react/src/react/useLazyReference.ts
 import { useLazyDisposableState } from '@isograph/react-disposable-state';
-import type { IsographEntrypoint, ResolverParam } from '@isograph/runtime';
+import type {
+  EntityName,
+  IsographEntrypoint,
+  ResolverParam,
+} from '@isograph/runtime';
 import { useMemo } from 'react';
 import type { FetchOptions } from '../core/check';
 import type {
@@ -1084,14 +1062,15 @@ import { getOrCreateCacheForArtifact } from '../core/getOrCreateCacheForArtifact
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
 
 export function useLazyReference<
-  TReadFromStore extends ResolverParam,
+  TReadFromStore extends ResolverParam<TEntityName>,
   TClientFieldValue,
+  TEntityName extends EntityName,
 >(
-  entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue>,
+  entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue, TEntityName>,
   variables: ExtractParameters<TReadFromStore>,
   fetchOptions?: FetchOptions<TClientFieldValue>,
 ): {
-  fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue>;
+  fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue, TEntityName>;
 } {
   const environment = useIsographEnvironment();
   const cache = getOrCreateCacheForArtifact(
@@ -1120,6 +1099,7 @@ export function useLazyReference<
 import type { Factory } from '@isograph/disposable-types';
 import { ParentCache } from '@isograph/react-disposable-state';
 import {
+  type EntityName,
   type IsographEntrypoint,
   type ResolverParam,
   stableStringify,
@@ -1131,11 +1111,12 @@ import { maybeMakeNetworkRequest } from './makeNetworkRequest';
 import type { PromiseWrapper } from './PromiseWrapper';
 
 export function getOrCreateCacheForArtifact<
-  TReadFromStore extends ResolverParam,
+  TReadFromStore extends ResolverParam<TEntityName>,
   TClientFieldValue,
+  TEntityName extends EntityName,
 >(
   environment: IsographEnvironment,
-  entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue>,
+  entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue, TEntityName>,
   variables: ExtractParameters<TReadFromStore>,
   fetchOptions?: FetchOptions<TClientFieldValue>,
 ): ParentCache<PromiseWrapper<void, unknown>> {
@@ -1183,7 +1164,11 @@ import {
   UNASSIGNED_STATE,
   useUpdatableDisposableState,
 } from '@isograph/react-disposable-state';
-import type { IsographEntrypoint, ResolverParam } from '@isograph/runtime';
+import type {
+  EntityName,
+  IsographEntrypoint,
+  ResolverParam,
+} from '@isograph/runtime';
 import type { FetchOptions } from '../core/check';
 import type {
   ExtractParameters,
@@ -1193,10 +1178,11 @@ import { maybeMakeNetworkRequest } from '../core/makeNetworkRequest';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
 
 export type UseImperativeReferenceResult<
-  TReadFromStore extends ResolverParam,
+  TReadFromStore extends ResolverParam<TEntityName>,
   TClientFieldValue,
+  TEntityName extends EntityName,
 > = {
-  fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue> | null;
+  fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue, TEntityName> | null;
   loadFragmentReference: (
     variables: ExtractParameters<TReadFromStore>,
     fetchOptions?: FetchOptions<TClientFieldValue>,
@@ -1204,14 +1190,15 @@ export type UseImperativeReferenceResult<
 };
 
 export function useImperativeReference<
-  TReadFromStore extends ResolverParam,
+  TReadFromStore extends ResolverParam<TEntityName>,
   TClientFieldValue,
+  TEntityName extends EntityName,
 >(
-  entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue>,
-): UseImperativeReferenceResult<TReadFromStore, TClientFieldValue> {
+  entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue, TEntityName>,
+): UseImperativeReferenceResult<TReadFromStore, TClientFieldValue, TEntityName> {
   const { state, setState } =
     useUpdatableDisposableState<
-      FragmentReference<TReadFromStore, TClientFieldValue>
+      FragmentReference<TReadFromStore, TClientFieldValue, TEntityName>
     >();
   const environment = useIsographEnvironment();
   return {
@@ -1251,7 +1238,11 @@ Delta from `react/useImperativeReference.ts:25-100`: two type parameters; `fetch
 
 ```ts
 // from libs/isograph-react/src/react/useResult.ts
-import type { ReaderArtifact, ResolverParam } from '@isograph/runtime';
+import type {
+  EntityName,
+  ReaderArtifact,
+  ResolverParam,
+} from '@isograph/runtime';
 import type { FragmentReference } from '../core/FragmentReference';
 import {
   getNetworkRequestOptionsWithDefaults,
@@ -1261,10 +1252,11 @@ import { maybeUnwrapNetworkRequest } from './maybeUnwrapNetworkRequest';
 import { useReadAndSubscribe } from './useReadAndSubscribe';
 
 export function useResult<
-  TReadFromStore extends ResolverParam,
+  TReadFromStore extends ResolverParam<TEntityName>,
   TClientFieldValue,
+  TEntityName extends EntityName,
 >(
-  fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue>,
+  fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue, TEntityName>,
   partialNetworkRequestOptions?: Partial<NetworkRequestReaderOptions> | void,
 ): TClientFieldValue {
   const networkRequestOptions = getNetworkRequestOptionsWithDefaults(
@@ -1275,20 +1267,25 @@ export function useResult<
     networkRequestOptions,
   );
   const data = useReadAndSubscribe(fragmentReference, networkRequestOptions);
-  const readerArtifact: ReaderArtifact<ResolverParam, TClientFieldValue> =
-    fragmentReference.readerArtifact;
+  const readerArtifact: ReaderArtifact<
+    ResolverParam<TEntityName>,
+    TClientFieldValue,
+    TEntityName
+  > = fragmentReference.readerArtifact;
   return readerArtifact.resolver({
     data,
     parameters: fragmentReference.variables,
+    link: fragmentReference.root,
   });
 }
 ```
 
-Delta from `react/useResult.ts:16-67`: the `ComponentReaderArtifact` case (`:29-36`) is gone (no `@component`), and with it the `switch` and the `useIsographEnvironment` call it needed; no `readPromise` of the reader (`:42-44`, no lazily loaded readers); no `startUpdate` (`:53-61`, no `@updatable`); the resolver is called through a `ReaderArtifact<ResolverParam, TClientFieldValue>` binding, which the method bivariance accepts with no `@ts-expect-error` (upstream `:63`).
+Delta from `react/useResult.ts:16-67`: the `ComponentReaderArtifact` case (`:29-36`) is gone (no `@component`), and with it the `switch` and the `useIsographEnvironment` call it needed; no `readPromise` of the reader (`:42-44`, no lazily loaded readers); no `startUpdate` (`:53-61`, no `@updatable`); the resolver is called through a `ReaderArtifact<ResolverParam<TEntityName>, TClientFieldValue, TEntityName>` binding, which the method bivariance accepts with no `@ts-expect-error` (upstream `:63`), and receives the reference's `root` as its `link` (reader-ast.md, A resolver's own link).
 
 ```ts
 // from libs/isograph-react/src/core/read.ts
 import {
+  type EntityName,
   readButDoNotEvaluate,
   type ReadMissingData,
   type ResolverParam,
@@ -1315,9 +1312,12 @@ export function getNetworkRequestOptionsWithDefaults(
 
 /** The data `fragmentReference`'s reader AST reads. On `MissingData`, throws the promise
  * that resolves when that read changes, or the network error. */
-export function readOrSuspend<TReadFromStore extends ResolverParam>(
+export function readOrSuspend<
+  TReadFromStore extends ResolverParam<TEntityName>,
+  TEntityName extends EntityName,
+>(
   environment: IsographEnvironment,
-  fragmentReference: FragmentReference<TReadFromStore, unknown>,
+  fragmentReference: FragmentReference<TReadFromStore, unknown, TEntityName>,
   networkRequestOptions: NetworkRequestReaderOptions,
 ): SelectionSetData {
   const result = readButDoNotEvaluate(
@@ -1350,10 +1350,11 @@ export function readOrSuspend<TReadFromStore extends ResolverParam>(
 /** Resolves at the first write after which `fragmentReference`'s read is no longer
  * `MissingData`. */
 export function onNextChangeToFragmentData<
-  TReadFromStore extends ResolverParam,
+  TReadFromStore extends ResolverParam<TEntityName>,
+  TEntityName extends EntityName,
 >(
   environment: IsographEnvironment,
-  fragmentReference: FragmentReference<TReadFromStore, unknown>,
+  fragmentReference: FragmentReference<TReadFromStore, unknown, TEntityName>,
   missing: ReadMissingData,
 ): Promise<void> {
   return new Promise((resolve) => {
@@ -1406,7 +1407,11 @@ What the two options do, upstream's semantics: `suspendIfInFlight` (default `fal
 
 ```ts
 // from libs/isograph-react/src/react/useReadAndSubscribe.ts
-import type { ResolverParam, SelectionSetData } from '@isograph/runtime';
+import type {
+  EntityName,
+  ResolverParam,
+  SelectionSetData,
+} from '@isograph/runtime';
 import { useState } from 'react';
 import {
   type FragmentReference,
@@ -1426,8 +1431,11 @@ type ReadOutData = {
 /**
  * Read the data from a fragment reference and subscribe to updates.
  */
-export function useReadAndSubscribe<TReadFromStore extends ResolverParam>(
-  fragmentReference: FragmentReference<TReadFromStore, unknown>,
+export function useReadAndSubscribe<
+  TReadFromStore extends ResolverParam<TEntityName>,
+  TEntityName extends EntityName,
+>(
+  fragmentReference: FragmentReference<TReadFromStore, unknown, TEntityName>,
   networkRequestOptions: NetworkRequestReaderOptions,
 ): SelectionSetData {
   const environment = useIsographEnvironment();
@@ -1454,6 +1462,7 @@ export function useReadAndSubscribe<TReadFromStore extends ResolverParam>(
 ```ts
 // from libs/isograph-react/src/react/useRerenderOnChange.ts
 import {
+  type EntityName,
   type ResolverParam,
   type SelectionSetData,
   subscribe,
@@ -1465,9 +1474,12 @@ import {
 } from '../core/FragmentReference';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
 
-export function useRerenderOnChange<TReadFromStore extends ResolverParam>(
+export function useRerenderOnChange<
+  TReadFromStore extends ResolverParam<TEntityName>,
+  TEntityName extends EntityName,
+>(
   data: SelectionSetData,
-  fragmentReference: FragmentReference<TReadFromStore, unknown>,
+  fragmentReference: FragmentReference<TReadFromStore, unknown, TEntityName>,
   setData: (data: SelectionSetData) => void,
 ): void {
   const environment = useIsographEnvironment();
@@ -1499,21 +1511,22 @@ Deltas from `react/useReadAndSubscribe.ts:25-43` and `react/useRerenderOnChange.
 
 ```tsx
 // from libs/isograph-react/src/react/FragmentReader.tsx
-import type { ResolverParam } from '@isograph/runtime';
+import type { EntityName, ResolverParam } from '@isograph/runtime';
 import type { FragmentReference } from '../core/FragmentReference';
 import type { NetworkRequestReaderOptions } from '../core/read';
 import { useResult } from './useResult';
 
 export function FragmentReader<
-  TReadFromStore extends ResolverParam,
+  TReadFromStore extends ResolverParam<TEntityName>,
   TResult,
+  TEntityName extends EntityName,
   TChildrenResult,
 >({
   fragmentReference,
   networkRequestOptions,
   children,
 }: {
-  readonly fragmentReference: FragmentReference<TReadFromStore, TResult>;
+  readonly fragmentReference: FragmentReference<TReadFromStore, TResult, TEntityName>;
   readonly networkRequestOptions?: Partial<NetworkRequestReaderOptions>;
   readonly children: (data: TResult) => TChildrenResult;
 }): TChildrenResult {
@@ -1532,10 +1545,10 @@ Before (reader-ast.md, The read function):
 
 ```ts
 // from libs/isograph-runtime/src/read.ts
-export function read<TOutput>(
+export function read<TEntityName extends EntityName, TOutput>(
   store: Store,
-  artifact: ReaderArtifact<ResolverParam, TOutput>,
-  root: StoreLink,
+  artifact: ReaderArtifact<ResolverParam<TEntityName>, TOutput, TEntityName>,
+  root: NoInfer<Link<TEntityName>>,
   variables: Variables,
 ): ReadResult<TOutput> {
   if (store.get(root.entityName)?.get(root.id) === undefined) {
@@ -1549,7 +1562,7 @@ export function read<TOutput>(
   if (data.kind === 'MissingData') {
     return data;
   }
-  return ok(artifact.resolver({ data: data.value, parameters: variables }));
+  return ok(artifact.resolver({ data: data.value, parameters: variables, link: root }));
 }
 ```
 
@@ -1559,10 +1572,10 @@ After:
 // from libs/isograph-runtime/src/read.ts
 /** What `artifact`'s reader AST reads at `root` with `variables`, with every nested resolver
  * called and `artifact`'s own resolver not called. */
-export function readButDoNotEvaluate(
+export function readButDoNotEvaluate<TEntityName extends EntityName>(
   store: Store,
-  artifact: ReaderArtifact<ResolverParam, unknown>,
-  root: StoreLink,
+  artifact: ReaderArtifact<ResolverParam<TEntityName>, unknown, TEntityName>,
+  root: NoInfer<Link<TEntityName>>,
   variables: Variables,
 ): ReadResult<SelectionSetData> {
   if (store.get(root.entityName)?.get(root.id) === undefined) {
@@ -1575,17 +1588,17 @@ export function readButDoNotEvaluate(
   return readSelectionSet(store, artifact.readerAst, root, variables);
 }
 
-export function read<TOutput>(
+export function read<TEntityName extends EntityName, TOutput>(
   store: Store,
-  artifact: ReaderArtifact<ResolverParam, TOutput>,
-  root: StoreLink,
+  artifact: ReaderArtifact<ResolverParam<TEntityName>, TOutput, TEntityName>,
+  root: NoInfer<Link<TEntityName>>,
   variables: Variables,
 ): ReadResult<TOutput> {
   const data = readButDoNotEvaluate(store, artifact, root, variables);
   if (data.kind === 'MissingData') {
     return data;
   }
-  return ok(artifact.resolver({ data: data.value, parameters: variables }));
+  return ok(artifact.resolver({ data: data.value, parameters: variables, link: root }));
 }
 ```
 
@@ -1600,7 +1613,7 @@ Before (pico-runtime.md, Step A):
 ```ts
 // from libs/isograph-runtime/src/subscribe.ts
 export type Subscription = {
-  readonly artifact: ReaderArtifact<ResolverParam, unknown>;
+  readonly artifact: ReaderArtifact<ResolverParam<EntityName>, unknown, EntityName>;
   readonly root: StoreLink;
   readonly variables: Variables;
   /** The data the callback last received the result of. */
@@ -1613,7 +1626,7 @@ export type Subscription = {
 export function subscribe<TOutput>(
   store: Store,
   subscriptions: Set<Subscription>,
-  artifact: ReaderArtifact<ResolverParam, TOutput>,
+  artifact: ReaderArtifact<ResolverParam<EntityName>, TOutput, EntityName>,
   root: StoreLink,
   variables: Variables,
   callback: (result: ReadResult<TOutput>) => void,
@@ -1631,7 +1644,7 @@ After:
 ```ts
 // from libs/isograph-runtime/src/subscribe.ts
 export type Subscription = {
-  readonly artifact: ReaderArtifact<ResolverParam, unknown>;
+  readonly artifact: ReaderArtifact<ResolverParam<EntityName>, unknown, EntityName>;
   readonly root: StoreLink;
   readonly variables: Variables;
   /** The read the callback last received, or the caller rendered with. */
@@ -1646,7 +1659,7 @@ export type Subscription = {
 export function subscribe(
   store: Store,
   subscriptions: Set<Subscription>,
-  artifact: ReaderArtifact<ResolverParam, unknown>,
+  artifact: ReaderArtifact<ResolverParam<EntityName>, unknown, EntityName>,
   root: StoreLink,
   variables: Variables,
   delivered: ReadResult<SelectionSetData>,
@@ -2053,7 +2066,7 @@ with `entrypoint Query.PetNames`, `Query.PetName`, `Mutation.SetName`, one sourc
 
 ### Compiler (`crates/typescript_artifacts`)
 
-- `entrypoint.ts`'s lines, in order: `import type { IsographEntrypoint } from "@isograph/runtime";`, `import type { Query__HomeRoute__output_type } from "./output_type";`, `import type { Query__HomeRoute__param } from "./param_type";`, the three default imports; a line starting with `const artifact: IsographEntrypoint<Query__HomeRoute__param, Query__HomeRoute__output_type> = {`; the last line `export default artifact;`. The existing assertions (`kind: "Entrypoint"`, `name: "Query.HomeRoute"`, the three keys and imports) are unchanged.
+- `entrypoint.ts`'s lines, in order: `import type { IsographEntrypoint } from "@isograph/runtime";`, `import type { Query__HomeRoute__output_type } from "./output_type";`, `import type { Query__HomeRoute__param } from "./param_type";`, the three default imports; a line starting with `const artifact: IsographEntrypoint<Query__HomeRoute__param, Query__HomeRoute__output_type, "Query"> = {`; the last line `export default artifact;`. The existing assertions (`kind: "Entrypoint"`, `name: "Query.HomeRoute"`, the three keys and imports) are unchanged.
 - `pnpm --filter pet-demo typecheck` passes over the regenerated artifacts.
 
 ### `@isograph/react` core (`test/makeNetworkRequest.test.ts`, no React)
@@ -2123,7 +2136,7 @@ Each change is one commit, in order. Each package change adds its CI steps to `.
 
 ### 3. The entrypoint artifact type (libs/isograph-runtime, typescript_artifacts)
 
-`IsographEntrypoint` in `artifacts.ts` and its export; `entrypoint_artifact_file` and `entrypoint_value` replace `entrypoint_artifact`; `output_type_name` made `pub(crate)`; the printer test; the regenerated `entrypoint.ts` of the pet demo and both fixtures. Depends on reader-ast.md change 4.
+No work of its own: `IsographEntrypoint<TParam, TOutput, TEntityName>`, its printing in `entrypoint.ts`, and the regenerated artifacts landed with normalization-ast.md, and reader-ast.md change 3 types its `readerArtifact` (The entrypoint artifact type). The compiler test below is that landed one. Changes 6 and 7 depend on reader-ast.md change 3 in its place.
 
 ### 4. `@isograph/disposable-types` (libs/isograph-disposable-types)
 
@@ -2147,10 +2160,10 @@ The package files; `src/core/*`; `src/index.ts` exporting the core names; the fi
 
 ## Docs this doc amends
 
-- `refactors/pending/runtime/pico-runtime.md`: Step A is implemented by this doc's change 2 with the three amendments (Step A, amended); `Entrypoint<TOutput>` (section 3) is `IsographEntrypoint<TReadFromStore, TOutput>`, a declared type of the artifact rather than a structural one; open decision 10 is taken as (a) by this doc's dependency on it.
+- `refactors/pending/runtime/pico-runtime.md`: Step A is implemented by this doc's change 2 with the three amendments (Step A, amended); `Entrypoint<TOutput>` (section 3) is `IsographEntrypoint<TReadFromStore, TOutput, TEntityName>`, a declared type of the artifact rather than a structural one; open decision 10 is taken as (a) by this doc's dependency on it.
 - `refactors/pending/runtime/reader-ast.md`: `read` is `readButDoNotEvaluate` then the resolver; `index.ts` exports `readButDoNotEvaluate`.
 - `refactors/pending/runtime/store.md`: `stableStringify` is exported from the package index; `exports` gains the `import` condition. Its "No `IsographEnvironment`" holds for the runtime; the environment is `@isograph/react`'s.
-- `refactors/pending/artifact-set-and-types.md`, Per entrypoint: `entrypoint.ts` is declared `IsographEntrypoint<P__f__param, P__f__output_type>` and imports those two types and the type from `@isograph/runtime`.
+- `refactors/pending/artifact-set-and-types.md`, Per entrypoint: `entrypoint.ts` is declared `IsographEntrypoint<P__f__param, P__f__output_type, "<root entity>">` and imports those two types and the type from `@isograph/runtime`.
 
 ## Later
 
