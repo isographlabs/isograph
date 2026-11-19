@@ -283,18 +283,8 @@ impl From<Position> for LineChar {
 
 /// If the position is in range, returns an offset we can use
 fn position_in_range(start: (u32, u32), end: (u32, u32), target: LineChar) -> bool {
-    let (start_line_count, start_char_count) = start;
-    let (end_line_count, end_char_count) = end;
-
-    if target.line < start_line_count
-        || (target.line == start_line_count && target.character < start_char_count)
-        || target.line > end_line_count
-        || (target.line == end_line_count && target.character > end_char_count)
-    {
-        return false;
-    }
-
-    true
+    let target = (target.line, target.character);
+    start <= target && target <= end
 }
 
 fn get_index_of_line_char(source: &str, line_char: LineChar) -> u32 {
