@@ -596,6 +596,29 @@ impl SelectionKey {
 }
 ```
 
+Change 10 adds the response key the normalization AST carries, which states whether the query prints an alias:
+
+```rust
+// from crates/isograph_compiler/src/merged_selection.rs
+/// The key of a selection's value in the response object.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ResponseKey {
+    /// The selection has no arguments: the query prints no alias, and the key is the
+    /// selectable name.
+    SelectableName,
+    /// The selection has arguments: the query prints this alias.
+    Alias(NormalizationAlias),
+}
+
+impl SelectionKey {
+    /// `SelectableName` when the key has no arguments, otherwise `Alias` of
+    /// `normalization_alias`.
+    pub fn response_key(&self) -> ResponseKey;
+}
+```
+
+`print_selection_head` prints `<alias>: ` exactly for `ResponseKey::Alias`, so the printer and the AST read one decision. `ResponseKey` is an enum rather than `Option<NormalizationAlias>` so the case with no alias names what the key is.
+
 A selection with arguments prints with its normalization alias (`pet____id___v_id: pet(id: $id)`); a selection without arguments prints its bare name (`firstName`), and so do the discriminator and identity selections. `normalization_alias` is defined for every key, and for a key with no arguments it is the selectable name, the response key under which GraphQL returns the value. Collision detection compares these response keys for every selectable key, with or without arguments, so a field literally named `f____s___s_a` still collides with `f(s: "a")`.
 
 This is upstream's rule: `MergedScalarFieldSelection::normalization_alias` and `MergedLinkedFieldSelection::normalization_alias` return `None` when `arguments` is empty (`isograph/crates/isograph_schema/src/create_merged_selection_set.rs:124-131` and `:159-166`), and `write_selections_for_query_text` writes `alias: ` only for `Some` (`isograph/crates/graphql_network_protocol/src/query_text.rs:90-92` and `:100-102`). The runtime reads a field's value from the response under the field name followed by the same per-argument chunks (`getNetworkResponseKey`, `isograph/libs/isograph-react/src/core/cache.ts:538-552`, with `____`, `___`, `__` at `:594-596`), which for a field with no arguments is the field name.
@@ -1557,6 +1580,7 @@ The committed `demos/pet-demo/src/__isograph/` gains the query files for `HomeRo
 The delta from landed change 7 that normalization-ast.md change 2 builds on:
 
 - Core: `CompositeShape`, `Concreteness`, and `EntityShape::Composite(CompositeShape)` in `protocol_shape.rs`; `MergedCompositeTarget { entity, shape, selections }` and the walk writing it; merging comparing `entity` and `shape`; `CompletedCompositeTarget`, `RecordEntity`, `CompletedIdentity`, `FixedRecordId` with `root`, `CompletedSelectionTarget::Composite(CompletedCompositeTarget)`, `CompletedConditional.identity`; `complete` and `top_level` taking `roots`; `RootEntities` with `identity_of` in `entrypoint.rs`; `NetworkProtocol::root_entities`, and the test protocols' (`crates/isograph_compiler`, `crates/isograph_cli`, `crates/isograph_lsp` test profiles); `query_for_entrypoint` reading `root_entities` and passing `roots` to `top_level`. `entrypoint_fetch_plan`'s `EntityShape::Composite(_)` arm is unchanged.
+- Core: `ResponseKey` and `SelectionKey::response_key`, which `print_selection_head` reads.
 - GraphQL: `graphql_entity_shape` returning `CompositeShape`; `GraphQLFetchPlan { operation_type, roots }`; `RootOperationTypes::root_entities`; `GraphQLNetworkProtocol::root_entities`; the printer reading `plan.operation_type` and `Composite(target).selections`.
 - Tests: the completion tests above with `roots`, the `NestedQuery` and `RootQuery` profile tests, and the fetch plan tests asserting `roots` (entrypoints.md).
 

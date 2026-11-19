@@ -54,7 +54,7 @@ test("a pet with an identity-less stats object", () => {
 
 What this shows:
 
-- The response is read by each node's `responseKey` (`pet____id___v_id`); the store is written by the store key, with variable values substituted (`pet____id___1`).
+- The response is read by each node's response key, `responseKey ?? selectableName` (`pet____id___v_id` for `pet(id: $id)`, `name` for `name`, which the query prints with no alias); the store is written by the store key, with variable values substituted (`pet____id___1`).
 - The top level is written onto `petDetail.root`, `{ entity: "Query", id: "__ROOT" }`; the caller passes no root.
 - `Pet:1`'s entity is its target's `entity` (`Known`, `Pet`), and its id the value under its target's `identity` (`Select`, `id`); `PetStats`'s target has `identity: { kind: "Omit" }` and gets upstream's derived id `Pet:1.stats`.
 - `null` is stored as `null` and is known data. `__typename` is not stored: the record's entity is its first-layer key.
@@ -171,7 +171,7 @@ The entity, from `target.entity`:
 The identity: the `identity` of the `Conditional` among `target.selections` whose `condition.entityName` equals that entity, when one does and its identity is not `Omit`; otherwise `target.identity`. The conditional's comes first because it is the identity of the response object's concrete entity; a union target's is `Omit` and its `asBlogItem` conditional's is `Select("id")`. At most one conditional of a selection set matches: the conditions name distinct entities (the map keys conditionals by `Condition`). Only direct children are considered, because no condition nests under the current grammar (normalization-ast.md, Merging). The id, by the identity's `kind`:
 
 - `Fixed`: `identity.id`. The record is a root entity's one record (Nested objects of a root entity).
-- `Select`: the value under `identity.responseKey`, which must be a string (GraphQL serializes `ID` as a string, spec 3.5.5); any other value throws (Errors). An absent key throws as every absent selected key does.
+- `Select`: the value under `identity.selectableName` (the identity selection has no arguments, so the query prints it with no alias), which must be a string (GraphQL serializes `ID` as a string, spec 3.5.5); any other value throws (Errors). An absent key throws as every absent selected key does.
 - `Omit`: the derived id, upstream's (`getDataIdOfNetworkResponse`, `cache.ts:599-642`): `${parent.entity}:${parent.id}.${selection.selectableName}`, then `.${index}` for each list level from the outermost, then `argumentChunks(selection.arguments, variables)`. Examples: `Pet:1.stats`, `Query:__ROOT.feed.1____limit___2`, `Query:__ROOT.statGrid.0.1`.
 
 Each switch on a `kind` is exhaustive, with no `default` (Errors: artifacts).
@@ -213,6 +213,8 @@ export function normalize(
 
 It returns nothing: no v1 caller reads what it wrote (no subscriptions, no `EncounteredIds`), and tests inspect `store`.
 
+A selection's response key is `selection.responseKey ?? selection.selectableName`: the alias the query prints for a selection with arguments, and the selectable name for one without (normalization-ast.md, End-user experience). Below, `response[responseKey]` means the value under that key.
+
 Behavior, walking `ast.selections` against `response` onto the record `ast.root` (`{ entity, id }`; the top level selects no discriminator, query-generation.md):
 
 - The record at a link is the store's record if present, else a new empty record inserted into `store`. Fields the AST does not select are kept. A store key written twice in one call (two paths to `Pet:1`) holds the later write, in AST and list order.
@@ -232,7 +234,7 @@ Deltas from upstream (`cache.ts:77-437`):
 
 - Writes the one store in place, as upstream writes a store layer through `getMutableStoreRecordProxy` (`cache.ts:93`, `:423`); there are no layers.
 - No `EncounteredIds` and no change detection (`RecordHasBeenUpdated`, `cache.ts:151`, `:211-219`, `:231-250`, `:309`, `:337-338`, `dataIdsAreTheSame` `:372-393`): nothing reads them without subscriptions.
-- Reads `responseKey` instead of `getNetworkResponseKey` (`cache.ts:538-591`), and `target.entity` (`Known`, or the value under `ast.discriminatorResponseKey`) where upstream reads `astNode.concreteType ?? response.__typename` (`cache.ts:295-296`, `:322-323`, `:412-413`).
+- Reads `responseKey ?? selectableName` instead of `getNetworkResponseKey` (`cache.ts:538-591`), which computes the same key, and `target.entity` (`Known`, or the value under `ast.discriminatorResponseKey`) where upstream reads `astNode.concreteType ?? response.__typename` (`cache.ts:295-296`, `:322-323`, `:412-413`).
 - Starts at `ast.root`; upstream's caller passes the root record.
 - Upstream throws only on a missing `__typename` (`cache.ts:297-302`, `:325-330`, `:415-420`) and writes anything else it meets, including `null` for an absent key (`cache.ts:243-246`, `:270-273`, `== null`). Here every mismatch between the response and the AST throws (Errors), an absent key included.
 - Lists of lists and lists of leaves at any depth.
@@ -316,7 +318,7 @@ Every throw site:
 - `normalize`, a selected response key absent from a response object (outside a conditional that does not hold): `Malformed response at ${path}: expected the response key "${responseKey}".` Invariant: a response to the generated query holds every selected key outside a non-matching fragment (GraphQL spec 6.3.2, every field in the collected fields gets a response entry).
 - `normalize`, a composite selection's value, or a list item at any depth, that is a string, number, or boolean: `Malformed response at ${path}: expected an object, a list, or null for "${responseKey}", got ${JSON.stringify(value)}.` Invariant: a composite field's value is an object, a list, or `null`.
 - `recordLink`, a composite response object whose target's `entity` is `Discriminator`, with no string under `ast.discriminatorResponseKey`: `Malformed response at ${path}: expected a string under "${discriminatorResponseKey}".` Invariant: the compiler selects the discriminator in every selection set under a composite selection (query-generation.md, Completion, step 4). Under a `Known` entity the discriminator is not read, so its absence does not throw.
-- `recordLink`, a `Select` identity value that is not a string: `Malformed response at ${path}: expected a string record id under "${responseKey}", got ${JSON.stringify(value)}.` Invariant: GraphQL serializes `ID` as a string (spec 3.5.5), and the protocol names only an `ID!` selectable as the identity (`IdField::Present`, query-generation.md).
+- `recordLink`, a `Select` identity value that is not a string: `Malformed response at ${path}: expected a string record id under "${selectableName}", got ${JSON.stringify(value)}.` Invariant: GraphQL serializes `ID` as a string (spec 3.5.5), and the protocol names only an `ID!` selectable as the identity (`IdField::Present`, query-generation.md).
 - `check` and `garbageCollect`, a value under a composite store key that is not `null`, a link, or a list of these at any depth: `Store record ${entity}:${id} holds a non-link under the composite store key "${storeKey}"; the store was written with an AST that disagrees with this one.` Invariant: Store states only our normalizer produces, above. A link is an object whose own keys are exactly `entity` and `id`, both strings.
 - `storeKey` and `recordLink` (through `argumentChunks`), a required variable absent from `variables`: open decision 10.
 
