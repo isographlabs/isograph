@@ -176,6 +176,9 @@ fn dispatch_lsp_request<TProfile: CompilationProfile>(
             .on_request_sync::<lsp_types::request::Completion>(
                 crate::adapter::completion_response::<TProfile>,
             )?
+            .on_request_sync::<lsp_types::request::References>(
+                crate::adapter::references_response::<TProfile>,
+            )?
             .request();
         ControlFlow::Continue(request)
     };
@@ -592,7 +595,7 @@ mod tests {
             lsp_request(
                 client,
                 id.clone(),
-                "textDocument/references",
+                "textDocument/rename",
                 serde_json::json!({}),
             ),
         );
@@ -621,7 +624,7 @@ mod tests {
         assert_eq!(error.code, lsp_server::ErrorCode::MethodNotFound as i32);
         assert_eq!(
             error.message,
-            "No handler registered for method 'textDocument/references'"
+            "No handler registered for method 'textDocument/rename'"
         );
         assert!(
             state
@@ -3703,6 +3706,285 @@ type Owner {
             items(&mut state, "asPet"),
             ("asOwner".to_owned(), "Owner".to_owned()).wrap_vec()
         );
+    }
+
+    const Y_URI: &str = "file:///tmp/proj/src/y.ts";
+
+    fn include_declaration() -> serde_json::Value {
+        serde_json::json!({ "includeDeclaration": true })
+    }
+
+    fn exclude_declaration() -> serde_json::Value {
+        serde_json::json!({ "includeDeclaration": false })
+    }
+
+    /// `client`'s `textDocument/references` result at `0:character` of `uri`.
+    fn references_result(
+        state: &mut IsographState<TestProfile>,
+        client: &TestClient,
+        uri: &str,
+        character: u32,
+        context: serde_json::Value,
+    ) -> serde_json::Value {
+        let mut params = hover_params(uri, 0, character);
+        params["context"] = context;
+        request_result(
+            state,
+            client,
+            lsp_types::request::References::METHOD,
+            params,
+        )
+    }
+
+    /// A location as `(uri, start line, start character, end line, end character)`.
+    type LocationKey = (String, u32, u32, u32, u32);
+
+    /// The locations of a `textDocument/references` result, sorted.
+    fn sorted_locations(result: serde_json::Value) -> Vec<LocationKey> {
+        sorted(
+            serde_json::from_value::<Vec<lsp_types::Location>>(result)
+                .expect("references returns Location[]")
+                .into_iter()
+                .map(|location| {
+                    (
+                        location.uri.as_str().to_owned(),
+                        location.range.start.line,
+                        location.range.start.character,
+                        location.range.end.line,
+                        location.range.end.character,
+                    )
+                })
+                .collect(),
+        )
+    }
+
+    fn sorted(mut locations: Vec<LocationKey>) -> Vec<LocationKey> {
+        locations.sort();
+        locations
+    }
+
+    /// The column of the `nth` (0-based) `needle` in the one-line `text`.
+    fn nth_column(text: &str, needle: &str, nth: usize) -> u32 {
+        text.match_indices(needle)
+            .nth(nth)
+            .expect("the fixture contains the needle")
+            .0 as u32
+    }
+
+    /// The location of the `nth` (0-based) `needle` in the one-line ASCII `text` of `src/<file>`.
+    fn reference_at(file: &str, text: &str, needle: &str, nth: usize) -> LocationKey {
+        let start = nth_column(text, needle, nth);
+        (
+            format!("file:///tmp/proj/src/{file}"),
+            0,
+            start,
+            0,
+            start + needle.len() as u32,
+        )
+    }
+
+    #[test]
+    fn references_to_an_entity_come_from_field_parents_and_to_across_files() {
+        let mut state = with_config();
+        disk_changed(&mut state, "/tmp/proj/src/Pet.ts", PET_FILE);
+        disk_changed(&mut state, "/tmp/proj/src/fullName.ts", FULL_NAME_FILE);
+        disk_changed(&mut state, "/tmp/proj/src/x.ts", SELECTING_FILE);
+        let one = live_client(&mut state);
+        let at = column(SELECTING_FILE, "Pet");
+        let uses = vec![
+            reference_at("Pet.ts", PET_FILE, "Pet", 1),
+            reference_at("Pet.ts", PET_FILE, "Pet", 2),
+            reference_at("fullName.ts", FULL_NAME_FILE, "Pet", 0),
+            reference_at("x.ts", SELECTING_FILE, "Pet", 0),
+        ];
+        assert_eq!(
+            sorted_locations(references_result(
+                &mut state,
+                &one,
+                X_URI,
+                at,
+                exclude_declaration()
+            )),
+            sorted(uses.clone())
+        );
+        assert_eq!(
+            sorted_locations(references_result(
+                &mut state,
+                &one,
+                X_URI,
+                at,
+                include_declaration()
+            )),
+            sorted([uses, reference_at("Pet.ts", PET_FILE, "Pet", 0).wrap_vec()].concat())
+        );
+    }
+
+    #[test]
+    fn references_to_a_field_come_from_selections_in_every_file_by_field_name() {
+        let aliasing = "iso(`field Pet.y { owner { n: fullName }, fullName }`)";
+        let mut state = with_config();
+        disk_changed(&mut state, "/tmp/proj/src/Pet.ts", PET_FILE);
+        disk_changed(&mut state, "/tmp/proj/src/fullName.ts", FULL_NAME_FILE);
+        disk_changed(&mut state, "/tmp/proj/src/x.ts", SELECTING_FILE);
+        disk_changed(&mut state, "/tmp/proj/src/y.ts", aliasing);
+        let one = live_client(&mut state);
+        let uses = vec![
+            reference_at("x.ts", SELECTING_FILE, "fullName", 0),
+            reference_at("y.ts", aliasing, "fullName", 0),
+            reference_at("y.ts", aliasing, "fullName", 1),
+        ];
+        let with_declaration = sorted(
+            [
+                uses.clone(),
+                reference_at("fullName.ts", FULL_NAME_FILE, "fullName", 0).wrap_vec(),
+            ]
+            .concat(),
+        );
+        assert_eq!(
+            sorted_locations(references_result(
+                &mut state,
+                &one,
+                X_URI,
+                column(SELECTING_FILE, "fullName"),
+                exclude_declaration()
+            )),
+            sorted(uses)
+        );
+        let from = [
+            (X_URI, column(SELECTING_FILE, "fullName")),
+            (Y_URI, column(aliasing, "n:")),
+            (Y_URI, nth_column(aliasing, "fullName", 1)),
+            (
+                "file:///tmp/proj/src/fullName.ts",
+                column(FULL_NAME_FILE, "fullName"),
+            ),
+        ];
+        for (uri, character) in from {
+            assert_eq!(
+                sorted_locations(references_result(
+                    &mut state,
+                    &one,
+                    uri,
+                    character,
+                    include_declaration()
+                )),
+                with_declaration,
+                "{uri} at {character}"
+            );
+        }
+    }
+
+    #[test]
+    fn references_to_a_refinement_field_have_the_schema_declaration() {
+        let refining = "iso(`field Query.y { feed { asPet { nickname } } }`)";
+        let mut state = with_schema(SCHEMA_SELECTING);
+        disk_changed(&mut state, "/tmp/proj/src/y.ts", refining);
+        let one = live_client(&mut state);
+        let at = column(SCHEMA_SELECTING, "asPet");
+        let uses = vec![
+            reference_at("x.ts", SCHEMA_SELECTING, "asPet", 0),
+            reference_at("y.ts", refining, "asPet", 0),
+        ];
+        assert_eq!(
+            sorted_locations(references_result(
+                &mut state,
+                &one,
+                X_URI,
+                at,
+                exclude_declaration()
+            )),
+            sorted(uses.clone())
+        );
+        assert_eq!(
+            sorted_locations(references_result(
+                &mut state,
+                &one,
+                X_URI,
+                at,
+                include_declaration()
+            )),
+            sorted_locations(serde_json::Value::Array(
+                [
+                    uses.iter()
+                        .map(|(uri, line, start, _, end)| {
+                            serde_json::json!({
+                                "uri": uri,
+                                "range": {
+                                    "start": { "line": line, "character": start },
+                                    "end": { "line": line, "character": end },
+                                },
+                            })
+                        })
+                        .collect::<Vec<_>>(),
+                    schema_definition_json("type Pet", "Pet").wrap_vec(),
+                ]
+                .concat()
+            ))
+        );
+    }
+
+    #[test]
+    fn references_read_the_clients_buffer_and_another_client_reads_disk() {
+        let buffer = "iso(`field Pet.y { fullName }`)";
+        let mut state = with_config();
+        disk_changed(&mut state, "/tmp/proj/src/Pet.ts", PET_FILE);
+        disk_changed(&mut state, "/tmp/proj/src/fullName.ts", FULL_NAME_FILE);
+        disk_changed(&mut state, "/tmp/proj/src/x.ts", SELECTING_FILE);
+        disk_changed(&mut state, "/tmp/proj/src/y.ts", "const y = 1;");
+        let one = live_client(&mut state);
+        let two = live_client(&mut state);
+        handle(&mut state, did_open(one.client, Y_URI, buffer));
+        let at = column(SELECTING_FILE, "fullName");
+        let on_disk = reference_at("x.ts", SELECTING_FILE, "fullName", 0);
+        assert_eq!(
+            sorted_locations(references_result(
+                &mut state,
+                &one,
+                X_URI,
+                at,
+                exclude_declaration()
+            )),
+            sorted(vec![
+                on_disk.clone(),
+                reference_at("y.ts", buffer, "fullName", 0)
+            ])
+        );
+        assert_eq!(
+            sorted_locations(references_result(
+                &mut state,
+                &two,
+                X_URI,
+                at,
+                exclude_declaration()
+            )),
+            on_disk.wrap_vec()
+        );
+    }
+
+    #[test]
+    fn references_outside_every_literal_are_null_and_without_a_target_are_empty() {
+        let undefined = "iso(`field Pet.z { bogus }`)";
+        let mut state = with_config();
+        disk_changed(&mut state, "/tmp/proj/src/Pet.ts", PET_FILE);
+        disk_changed(&mut state, "/tmp/proj/src/x.ts", undefined);
+        let one = live_client(&mut state);
+        assert_eq!(
+            references_result(&mut state, &one, X_URI, 0, include_declaration()),
+            serde_json::Value::Null
+        );
+        for needle in ["field", "{", "bogus"] {
+            assert_eq!(
+                references_result(
+                    &mut state,
+                    &one,
+                    X_URI,
+                    column(undefined, needle),
+                    include_declaration()
+                ),
+                serde_json::json!([]),
+                "{needle}"
+            );
+        }
     }
 
     #[test]

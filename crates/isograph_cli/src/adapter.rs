@@ -93,6 +93,66 @@ fn definition_lsp_location<TProfile: CompilationProfile>(
     .wrap_ok()
 }
 
+pub(crate) fn references_response<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    params: lsp_types::ReferenceParams,
+) -> LSPRuntimeResult<<lsp_types::request::References as lsp_types::request::Request>::Result> {
+    let position = params.text_document_position;
+    let path = relative_from_uri(db, position.text_document.uri.reference()).map_err(lsp_error)?;
+    isograph_lsp::references_at_lsp_position(db, client, path, position.position)
+        .map(|under_cursor| match under_cursor {
+            isograph_lsp::ReferencesUnderCursor::Target(references) => reference_lsp_locations(
+                db,
+                client,
+                params
+                    .context
+                    .include_declaration
+                    .then_some(references.declaration),
+                references.references,
+            ),
+            isograph_lsp::ReferencesUnderCursor::NoTarget => Vec::new().wrap_ok(),
+        })
+        .transpose()
+}
+
+/// `declaration`, then every reference, as LSP locations.
+fn reference_lsp_locations<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    declaration: Option<DefinitionLocation>,
+    references: Vec<isograph_lsp::ReferencesInFile>,
+) -> LSPRuntimeResult<Vec<lsp_types::Location>> {
+    let declaration = declaration
+        .map(|declaration| definition_lsp_location(db, client, declaration))
+        .transpose()?;
+    let references = references
+        .into_iter()
+        .map(|file| file_lsp_locations(db, file))
+        .collect::<LSPRuntimeResult<Vec<_>>>()?;
+    declaration
+        .into_iter()
+        .chain(references.into_iter().flatten())
+        .collect::<Vec<_>>()
+        .wrap_ok()
+}
+
+fn file_lsp_locations<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    file: isograph_lsp::ReferencesInFile,
+) -> LSPRuntimeResult<Vec<lsp_types::Location>> {
+    let uri = uri_for_path(db, file.path)
+        .map_err(|error| LSPRuntimeError::UnexpectedError(error.to_string()))?;
+    file.ranges
+        .into_iter()
+        .map(|range| lsp_types::Location {
+            uri: uri.clone(),
+            range,
+        })
+        .collect::<Vec<_>>()
+        .wrap_ok()
+}
+
 pub(crate) fn completion_response<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,

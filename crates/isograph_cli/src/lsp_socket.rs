@@ -156,6 +156,7 @@ fn start_session(
         definition_provider: lsp_types::OneOf::Left(true).wrap_some(),
         document_highlight_provider: lsp_types::OneOf::Left(true).wrap_some(),
         completion_provider: lsp_types::CompletionOptions::default().wrap_some(),
+        references_provider: lsp_types::OneOf::Left(true).wrap_some(),
         text_document_sync: lsp_types::TextDocumentSyncCapability::Options(
             lsp_types::TextDocumentSyncOptions {
                 open_close: true.wrap_some(),
@@ -635,7 +636,7 @@ mod tests {
             &mut writer,
             Message::Request(Request {
                 id: RequestId::from(2),
-                method: "textDocument/references".to_owned(),
+                method: "textDocument/rename".to_owned(),
                 params: serde_json::json!({}),
             }),
         );
@@ -958,7 +959,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn initialize_advertises_formatting_will_save_wait_until_hover_highlight_definition_and_completion()
+    async fn initialize_advertises_formatting_will_save_wait_until_hover_highlight_definition_completion_and_references()
      {
         let (port, _event_rx) = listen_for_events().await;
         let stream = connect(port);
@@ -995,6 +996,10 @@ mod tests {
         assert_eq!(
             result["capabilities"]["completionProvider"],
             serde_json::json!({})
+        );
+        assert_eq!(
+            result["capabilities"]["referencesProvider"],
+            serde_json::json!(true)
         );
     }
 
@@ -1179,7 +1184,7 @@ mod tests {
             &mut writer,
             Message::Request(Request {
                 id: RequestId::from(2),
-                method: "textDocument/references".to_owned(),
+                method: "textDocument/rename".to_owned(),
                 params: serde_json::json!({}),
             }),
         );
@@ -1434,7 +1439,7 @@ mod tests {
             &mut writer2,
             Message::Request(Request {
                 id: RequestId::from(2),
-                method: "textDocument/references".to_owned(),
+                method: "textDocument/rename".to_owned(),
                 params: serde_json::json!({}),
             }),
         );
