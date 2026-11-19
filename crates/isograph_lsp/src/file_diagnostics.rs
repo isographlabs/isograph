@@ -1,13 +1,10 @@
 use common_lang_types::RelativePathToSourceFile;
-use isograph_compiler::{
-    ClientId, CompilationProfile, IsographDb, iso_literal_parse_errors_in_file,
-    iso_literal_validation_errors_in_file,
-};
+use isograph_compiler::{ClientId, CompilationProfile, IsographDb, compiler_errors_in_file};
 use pico_macros::memo;
 use prelude::Postfix;
 use span::Span;
 
-use crate::line_index;
+use crate::{LineIndex, line_index};
 
 const DIAGNOSTIC_SOURCE: &str = "isograph";
 
@@ -18,29 +15,27 @@ pub fn lsp_diagnostics_for_file<TProfile: CompilationProfile>(
     client: ClientId,
     path: RelativePathToSourceFile,
 ) -> Option<Vec<lsp_types::Diagnostic>> {
-    let parse_errors = iso_literal_parse_errors_in_file(db, client, path).as_ref()?;
-    let validation_errors = iso_literal_validation_errors_in_file(db, client, path).as_ref()?;
-    if parse_errors.is_empty() && validation_errors.is_empty() {
+    let errors = compiler_errors_in_file(db, client, path).as_ref()?;
+    if errors.is_empty() {
         return Vec::new().wrap_some();
     }
     let line_index = line_index(db, client, path).as_ref()?;
-    let diagnostic = |location: Span, message: String| lsp_types::Diagnostic {
+    errors
+        .iter()
+        .map(|error| diagnostic(line_index, error.location, error.item.to_string()))
+        .collect::<Vec<_>>()
+        .wrap_some()
+}
+
+/// An error diagnostic from isograph at `location`.
+fn diagnostic(line_index: &LineIndex, location: Span, message: String) -> lsp_types::Diagnostic {
+    lsp_types::Diagnostic {
         range: line_index.range(location),
         severity: lsp_types::DiagnosticSeverity::ERROR.wrap_some(),
         source: DIAGNOSTIC_SOURCE.to_owned().wrap_some(),
         message,
         ..Default::default()
-    };
-    parse_errors
-        .iter()
-        .map(|error| diagnostic(error.location, error.item.to_string()))
-        .chain(
-            validation_errors
-                .iter()
-                .map(|error| diagnostic(error.location, error.item.to_string())),
-        )
-        .collect::<Vec<_>>()
-        .wrap_some()
+    }
 }
 
 #[cfg(test)]
