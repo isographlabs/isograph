@@ -1120,6 +1120,41 @@ fn a_selection_is_checked_against_its_targets_shape() {
 }
 
 #[test]
+fn a_response_name_twice_in_one_selection_set_is_an_error_on_the_second() {
+    let cases = [
+        ("pets { firstName, firstName }", vec!["firstName"]),
+        ("pets { a: firstName, a: lastName }", vec!["a"]),
+        ("pets { firstName, f: firstName }", vec![]),
+        (
+            "pets { firstName, potential_new_best_friends { firstName } }",
+            vec![],
+        ),
+        (
+            "pets { firstName, firstName, firstName }",
+            vec!["firstName", "firstName"],
+        ),
+    ];
+    for (body, covered) in cases {
+        let contents = format!("export const a = iso(`field Query.a {{ {body} }}`)(() => 1)");
+        let db = pet_demo_with(&[("src/a.ts", contents.as_str())]);
+        let errors = compiler_errors(&db, "src/a.ts", contents.as_str());
+        assert_eq!(
+            errors
+                .iter()
+                .map(|(_, covered)| covered.as_str())
+                .collect::<Vec<_>>(),
+            covered,
+            "{body}"
+        );
+        assert!(
+            errors.iter().all(|(message, covered)| *message
+                == format!("A field with name or alias `{covered}` has already been defined")),
+            "{body}"
+        );
+    }
+}
+
+#[test]
 fn the_pet_demo_has_no_validation_errors() {
     let db = project_db(&PET_DEMO_SCHEMA, &PET_DEMO_SOURCES);
     for (file, contents) in PET_DEMO_SOURCES {

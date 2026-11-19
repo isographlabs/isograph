@@ -1,5 +1,8 @@
+use std::collections::BTreeSet;
+
 use common_lang_types::{
-    EntityName, EntityNameAndSelectableName, RelativePathToSourceFile, SelectableName, VariableName,
+    EntityName, EntityNameAndSelectableName, RelativePathToSourceFile, SelectableName,
+    SelectionName, VariableName,
 };
 use intern::Lookup;
 use isograph_parser::{
@@ -38,7 +41,15 @@ pub enum ValidationError<TNotFetchable: std::fmt::Display> {
     MissingSelectionSet(SelectableKey),
     #[error("`{0}` is an input type, which cannot be selected.")]
     InputTarget(EntityName),
+    #[error("{0}")]
+    DuplicateResponseName(DuplicateResponseName),
 }
+
+/// A selection whose response name, its alias or else its name, an earlier selection in the
+/// same selection set has.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[error("A field with name or alias `{0}` has already been defined")]
+pub struct DuplicateResponseName(pub SelectionName);
 
 /// A selection of `field` that passes no value for `variable`, which has no default.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
@@ -277,13 +288,30 @@ fn validate_selection_set<'a, TProfile: CompilationProfile>(
     parent: EntityName,
     selection_set: &'a SelectionSet,
 ) -> impl Iterator<Item = WithSpan<ProfileValidationError<TProfile>>> + 'a {
-    selection_set
-        .0
-        .iter()
-        .filter_map(|slot| slot.item.item.as_ref())
-        .flat_map(move |selection| {
-            validate_selection(db, client, parent, selection.item.reference())
+    let selections = || {
+        selection_set
+            .0
+            .iter()
+            .filter_map(|slot| slot.item.item.as_ref())
+    };
+    let duplicates = selections()
+        .scan(BTreeSet::new(), |seen, selection| {
+            let name = selection
+                .item
+                .reader_alias
+                .as_ref()
+                .unwrap_or(selection.item.name.reference());
+            (!seen.insert(name.item.0))
+                .then(|| {
+                    ValidationError::DuplicateResponseName(DuplicateResponseName(name.item.0))
+                        .with_span(name.location)
+                })
+                .wrap_some()
         })
+        .flatten();
+    duplicates.chain(selections().flat_map(move |selection| {
+        validate_selection(db, client, parent, selection.item.reference())
+    }))
 }
 
 fn validate_selection<'a, TProfile: CompilationProfile>(
