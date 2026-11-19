@@ -121,7 +121,7 @@ expect(read(store, petSummaryReaderArtifact, queryRoot, { id: "1" })).toEqual({
 });
 ```
 
-`normalize`, `Store`, and `queryRoot` are store.md's; `Query.PetSummary` is this doc's addition to its fixture (Tests, Runtime). How the test loads `petSummaryReaderArtifact` is open decision 1. A read whose data is not in the store returns `MissingData` naming the record that lacks it (The read function); it does not throw a promise.
+`normalize`, `Store`, and `queryRoot` are store.md's; `Query.PetSummary` is this doc's addition to its fixture (Tests, Runtime). The test imports `petSummaryReaderArtifact` from the generated `resolver_reader.ts`, which vitest loads through `@isograph/babel-plugin` (Runtime, Loading reader artifacts). A read whose data is not in the store returns `MissingData` naming the record that lacks it (The read function); it does not throw a promise.
 
 `entrypoint.ts` is unchanged: its `readerArtifact` property already imports `./resolver_reader`'s default export, which is now the object above.
 
@@ -738,6 +738,9 @@ export function read<TOutput>(
   root: StoreLink,
   variables: Variables,
 ): ReadResult<TOutput> {
+  if (store.get(root.entityName)?.get(root.id) === undefined) {
+    return { kind: "MissingData", reason: `No record for ${recordName(root)}`, recordLink: root };
+  }
   const data = readSelectionSet(store, artifact.readerAst, root, variables);
   if (data.kind === "MissingData") {
     return data;
@@ -903,7 +906,7 @@ Semantics, stated as facts the tests assert:
 
 - A `Scalar` node's value is the stored value whole, `null`, a list, a nested list, and a `JSON` scalar's object included. An absent key is `MissingData` with `recordLink` the record and `reason` naming the store key; a stored `null` is `null`.
 - A `Linked` node's stored value is `null`, a link, or a list whose elements are those, at any depth; the read keeps the list structure. Upstream maps one level of list only (`read.ts:707-776`), so a `[[Pet]]` field fails there.
-- A record is looked up only by a node that reads a value from it: a `Resolver` node whose reader AST is empty reads nothing, so it reads `Ok` on a link to a record that does not exist. A `Scalar` or `Linked` node on an absent record is `MissingData` with `reason` `No record for ..`. Upstream returns `MissingData` for an absent root record before reading any node (`read.ts:161-167`); the result differs only for a selection set that reads no store value.
+- `read` of an absent root record is `MissingData` with `recordLink` the root and `reason` `No record for ..`, before any node is read, as upstream (`read.ts:161-167`). This holds for every `Resolver` node too, because it calls `read` on the same root: a field whose reader AST is empty is `MissingData` on a link to a record that does not exist. `readStoreValue` keeps its own absent-record case for the records `Linked` nodes reach.
 - A missing value under a `Linked`, `Refinement`, or `Resolver` node is wrapped once per node, as upstream wraps it (`read.ts:579-584`, `:737-747`): `nestedReason` is the inner `MissingData`, and `recordLink` is the innermost record, the one that lacks the value.
 - A refinement compares `root.entityName` with `condition.entityName` and reads no store value.
 - A `Resolver` node reads the selected field's reader AST on the same root, with `childVariables`, and calls its resolver with `{ data, parameters: childVariables }`. The resolver's return is the node's value. The resolver is not called when its data is `MissingData`.
@@ -996,7 +999,7 @@ No snapshots. Facts about the reader AST, the printed artifact, and the read res
 
 ### Runtime
 
-`libs/isograph-runtime/test/read.test.ts` (vitest), in store.md's test infrastructure. Every normalization AST and reader artifact a test uses is generated from store.md's fixture project `libs/isograph-runtime/fixtures/store`; how a test loads a reader artifact is open decision 1. Each test creates its own `new Map()` store, normalizes a hand-built response with the same variables, then calls `read` and asserts on the result. Responses, variables, and hand-edited stores are inputs. There is no read test over the pet demo's artifacts: its schema has no list of lists and no `JSON` scalar, and an edit to the demo would break the runtime's tests (store.md, Test infrastructure).
+`libs/isograph-runtime/test/read.test.ts` (vitest), in store.md's test infrastructure. Every normalization AST and reader artifact a test uses is generated from store.md's fixture project `libs/isograph-runtime/fixtures/store`, and tests import them from `fixtures/store/src/__isograph/` (Loading reader artifacts, below). Each test creates its own `new Map()` store, normalizes a hand-built response with the same variables, then calls `read` and asserts on the result. Responses, variables, and hand-edited stores are inputs. There is no read test over the pet demo's artifacts: its schema has no list of lists and no `JSON` scalar, and an edit to the demo would break the runtime's tests (store.md, Test infrastructure).
 
 The fixture's resolvers return `data`, so a read's value is the data its reader AST read. This doc adds to the fixture's sources:
 
@@ -1020,13 +1023,21 @@ field Pet.Constant
 field Query.ConstantPet($id: ID!) {
   pet(id: $id) { Constant }
 }
+
+field Pet.UnpassedCheckins($n: Int) {
+  checkins(limit: $n) { id }
+}
+
+field Query.UnpassedPet($id: ID!) {
+  pet(id: $id) { UnpassedCheckins }
+}
 ```
 
-with `entrypoint Query.PetSummary`, `entrypoint Query.PetSummaries`, and `entrypoint Query.ConstantPet`. `Pet.Constant` has no selection set, so its reader AST is empty. `RecentCheckins` selected with no argument reads `checkins(limit: $n)` with `n: 2` from its `Resolver` node, and query generation inlines it as `checkins(limit: 2)`, so both keys are `checkins____limit___2`.
+with `entrypoint Query.PetSummary`, `entrypoint Query.PetSummaries`, `entrypoint Query.ConstantPet`, and `entrypoint Query.UnpassedPet`. `Pet.Constant` has no selection set, so its reader AST is empty. `RecentCheckins` selected with no argument reads `checkins(limit: $n)` with `n: 2` from its `Resolver` node, and query generation inlines it as `checkins(limit: 2)`, so both keys are `checkins____limit___2`.
 
 - Leaves: `Leaves` reads `greeting`, `literalGreeting`, `nullGreeting`, `variableGreeting`, `tags`, and `settings` equal to the response's values: a `null` leaf is `null`, `tags: ["a", null]` and `tags: []` are returned as stored, and `settings: { entityName: "Pet", id: "1" }` (a `JSON` scalar) is returned whole as a leaf.
 - Variables: `variableGreeting` read with `{ name: "Bo" }` after normalizing with `{ name: "Bo" }` is the response's value; read with `{ name: null }` after normalizing with `{ name: null }` it is the response's value; read with `{ name: "Bo" }` after normalizing only with `{ name: null }` is `MissingData` whose `reason` names `greeting____name___"Bo"`.
-- Unpassed variable: `field Pet.X($n: Int) { checkins(limit: $n) { id } }` selected as `X` with no argument under `pet(id: $id)` reads `checkins` (store.md, Store keys: the argument is omitted), the key `normalize` wrote.
+- Unpassed variable: `UnpassedPet` with `{ id: "1" }` normalizes `Pet:1.checkins` and reads it back through `UnpassedCheckins`, whose `$n` its `Resolver` node does not pass: both store keys are `checkins` (store.md, Store keys: the argument is omitted).
 - Linked: `PetDetail` with `{ id: "1", skip: null }` reads `pet` with `stats` (an identity-less `PetStats` at `Pet:1.stats`), `bestFriend` two levels deep, `checkins` and `pagedCheckins` as their own lists; `stats: null` reads `null`.
 - Cyclic data: `Pet:1.bestFriend` is `Pet:2`, whose `bestFriend` is `Pet:1`; the read terminates, because it recurses on the reader AST.
 - Lists: `PetLists` reads `pets` in response order, `pets: []` as `[]`, `maybePets: [null, ..]` with `null` at index 0, `petGrid: [[a], [], [null, b]]` as the same nesting, `petGrid: null` as `null`, and `statGrid` as nested arrays of objects.
@@ -1035,10 +1046,61 @@ with `entrypoint Query.PetSummary`, `entrypoint Query.PetSummaries`, and `entryp
 - Client field chains: `PetSummary` with `{ id: "1" }` reads `{ pet: { id, PetName: { name, nickname }, RecentCheckins: { checkins } } }`; `PetSummaries` reads one `PetName` object per pet; a test resolver receives `parameters` equal to its node's substituted arguments (`{ n: 2 }`, the compiler-written default).
 - Roots: `PetName`'s reader artifact, after `PetDetail` normalized `Pet:4` with `{ id: "4" }`, read rooted at `{ entityName: "Pet", id: "4" }` with `{}`, reads `name` and `nickname` without going through the query root. `SetTagline`'s reader rooted at `mutationRoot` reads the payload's `pet` and `query { greeting }`, the `greeting` on `Query.__ROOT`. `NestedQuery` from `queryRoot` reads `query { tags }` on `Query.__ROOT` itself.
 - Missing data: a read before any `normalize` is `MissingData` with `recordLink` `queryRoot` and `reason` `No record for Query:__ROOT`. A deleted `nickname` key on `Pet:1` under `PetSummary` is `MissingData` with `recordLink` `Pet:1` and nested reasons for `pet____id___"1"` and then `PetName` around the innermost `No value for nickname on Pet:1`. A deleted `Pet:2` record linked from `pets` is `MissingData` with `recordLink` `Pet:2`. A child resolver whose data is `MissingData` is not called (its call count is 0).
-- Absent records: `ConstantPet` with `{ id: "9" }`, on a store whose `Query.__ROOT` links `pet____id___"9"` to a `Pet:9` deleted by hand, reads `Ok` with `{ pet: { Constant: {} } }`: `Constant`'s empty reader AST reads no value from the absent record.
+- Absent records: `ConstantPet` with `{ id: "9" }`, on a store whose `Query.__ROOT` links `pet____id___"9"` to a `Pet:9` deleted by hand, is `MissingData` with `recordLink` `Pet:9` and innermost `reason` `No record for Pet:9`, though `Constant`'s reader AST is empty. `Constant`'s reader artifact read rooted at an existing `Pet:1` is `Ok` with `{}`.
 - Shape: `Pet:1.stats` set by hand to `"x"` makes `PetDetail`'s read throw the non-link message naming `Pet:1` and `stats`.
 - Degenerate cases: a `Linked` node over `[]` reads `[]`; an empty reader AST passes `{}` to its resolver.
 - The store is unchanged by every read.
+
+### Loading reader artifacts
+
+A generated `resolver_reader.ts` imports its resolver as a value from the fixture's source file (`import { PetSummary as resolver } from "./../../../PetSummary"`). That module calls `iso(..)`, and the generated `iso.ts` throws when called (`iso: Unexpected invocation at runtime. Either the Babel transform was not set up, ..`, `demos/pet-demo/src/__isograph/iso.ts`). vitest therefore runs `@isograph/babel-plugin` (`libs/isograph-babel-plugin`) over the fixture's source files, which turns `` iso(`field ..`)(fn) `` into `fn` and `` iso(`entrypoint ..`) `` into an import of the entrypoint artifact (`compileTag.js`), and tests import the generated reader artifacts the compiler wrote.
+
+```ts
+// from libs/isograph-runtime/vitest.config.ts
+import { transformAsync } from "@babel/core";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { defineConfig } from "vitest/config";
+
+const fixtureDirectory = fileURLToPath(new URL("./fixtures/store/", import.meta.url));
+const fixtureSources = path.join(fixtureDirectory, "src") + path.sep;
+const generatedArtifacts = path.join(fixtureSources, "__isograph") + path.sep;
+
+export default defineConfig({
+  plugins: [
+    {
+      name: "isograph-babel-plugin",
+      enforce: "pre",
+      async transform(code, id) {
+        if (!id.endsWith(".ts") || !id.startsWith(fixtureSources) || id.startsWith(generatedArtifacts)) {
+          return null;
+        }
+        const result = await transformAsync(code, {
+          filename: id,
+          babelrc: false,
+          configFile: false,
+          sourceType: "module",
+          parserOpts: { plugins: ["typescript"] },
+          plugins: [["@isograph/babel-plugin", { searchFrom: fixtureDirectory }]],
+          sourceMaps: true,
+        });
+        if (result?.code == null) {
+          throw new Error(`@isograph/babel-plugin returned no code for ${id}`);
+        }
+        return { code: result.code, map: result.map };
+      },
+    },
+  ],
+});
+```
+
+- The transform applies only to the fixture's own source files (`fixtures/store/src/*.ts`), not to the generated artifacts under `__isograph/` and not to `src/` or `test/` of the package.
+- `enforce: "pre"` runs it before Vite's esbuild transform. Babel parses TypeScript with the `typescript` parser plugin and leaves the types in place; esbuild strips them afterwards, so no Babel TypeScript preset is needed.
+- `sourceType: "module"` makes the plugin emit an ES `import` of the artifact (`addDefault`, `compileTag.js:167-177`) rather than `require(..)`.
+- `searchFrom: fixtureDirectory` makes the plugin's `cosmiconfig` lookup find `fixtures/store/isograph.config.json`, whose `output_directory` is `src`, so the import paths it writes point into `fixtures/store/src/__isograph/`.
+- The pet demo's `scripts/log-entrypoints.cjs` applies the same plugin through `@babel/register`; vitest needs a Vite plugin instead, because it loads modules through Vite.
+
+`libs/isograph-runtime/package.json` gains the dev dependencies `"@isograph/babel-plugin": "workspace:*"` and `"@babel/core": "^7.28.3"` (the pet demo's version). `tsconfig.json`'s `include` stays `src` and `test`; `vitest.config.ts` is not type-checked, as `libs/isograph-babel-plugin` type-checks no config file. store.md's tests need no transform, because a `normalization_ast.ts` imports no source file; the transform runs for them too and returns `null` for every file outside the fixture's sources.
 
 ## Changes
 
@@ -1062,7 +1124,7 @@ The reader types in `src/artifacts.ts` and their exports in `src/index.ts`; `sto
 
 ### 5. The read function (libs/isograph-runtime)
 
-`src/read.ts`, its exports in `src/index.ts`; the fixture's added sources and regenerated `fixtures/store/src/__isograph/`; the loading of reader artifacts in tests (open decision 1); `test/read.test.ts`. Depends on 4, which writes the fixture's reader artifacts.
+`src/read.ts`, its exports in `src/index.ts`; the fixture's added sources and regenerated `fixtures/store/src/__isograph/`; `vitest.config.ts` and the `@isograph/babel-plugin` and `@babel/core` dev dependencies (Loading reader artifacts); `test/read.test.ts`. Depends on 4, which writes the fixture's reader artifacts.
 
 ### 6. Pet demo output
 
@@ -1071,15 +1133,6 @@ The regenerated `demos/pet-demo/src/__isograph/`: every `resolver_reader.ts` is 
 ## Docs this doc amends
 
 - `refactors/pending/artifact-set-and-types.md`, Per field: `P/f/resolver_reader.ts` is this doc's artifact, not a stub. Per entrypoint: `readerArtifact` imports an object, not a thunk. Its open decision 2 (b): a pointer selection has no key in the selecting field's param type.
-- `refactors/pending/runtime/store.md`: `storeKey` takes `Pick<NormalizationSelection, "selectableName" | "arguments">`; `src/store.ts` exports `isStoreLink`, which `check` and `garbageCollect` use; the fixture project gains `Pet.PetName`, `Pet.RecentCheckins`, `Query.PetSummary`, `Query.PetSummaries`, `Pet.Constant`, and `Query.ConstantPet`, and its `resolver_reader.ts` artifacts are reader artifacts; "v1 has no reader" no longer holds once this doc lands.
+- `refactors/pending/runtime/store.md`: `storeKey` takes `Pick<NormalizationSelection, "selectableName" | "arguments">`; `src/store.ts` exports `isStoreLink`, which `check` and `garbageCollect` use; the fixture project gains `Pet.PetName`, `Pet.RecentCheckins`, `Query.PetSummary`, `Query.PetSummaries`, `Pet.Constant`, `Query.ConstantPet`, `Pet.UnpassedCheckins`, and `Query.UnpassedPet`, and its `resolver_reader.ts` artifacts are reader artifacts; "v1 has no reader" no longer holds once this doc lands; the package gains `vitest.config.ts` and the `@isograph/babel-plugin` and `@babel/core` dev dependencies (Loading reader artifacts).
 - `refactors/pending/runtime/pico-runtime.md`, 11. Artifacts: `ReaderScalarField`, `ReaderLinkedField`, `ReaderResolverField`, and `EagerReaderArtifact` are this doc's `ReaderScalarSelection`, `ReaderLinkedSelection`, `ReaderResolverSelection`, and `ReaderArtifact`; `ReaderLinkField` does not exist; `ReaderRefinementSelection` is new; `ResolverParameters` is `ResolverParam`; `alias` is always a string and `fieldName` is `selectableName`. Its `computeResolver` and `readSelection` replace this doc's `read` and `readSelection` when memoization lands.
 - `refactors/pending/graphql-protocol/normalization-ast.md`, change 4: the `NamedTypeImport` struct it specifies is the landed one, renamed `NamedImport` (The TypeScript artifact).
-
-## Open decisions
-
-### 1. How a read test loads a generated reader artifact
-
-A generated `resolver_reader.ts` imports its resolver as a value from the fixture's source file (`import { PetSummary as resolver } from "./../../../PetSummary"`). That module calls `iso(..)`, and the generated `iso.ts` throws when called (`iso: Unexpected invocation at runtime. Either the Babel transform was not set up, ..`, `demos/pet-demo/src/__isograph/iso.ts`). store.md's tests never hit this: a `normalization_ast.ts` imports no source file.
-
-- (a) vitest runs `@isograph/babel-plugin` (`libs/isograph-babel-plugin`) over the fixture's sources, which turns `iso(`field ..`)(fn)` into `fn` and `iso(`entrypoint ..`)` into an import of the entrypoint artifact (`compileTag.js`). Tests import generated reader artifacts. Cost: a `vitest.config.ts` with a transform that applies the Babel plugin (a hand-written Vite plugin calling `@babel/core`, or a Vite-Babel bridge dev dependency), `@isograph/babel-plugin` and `@babel/core` as dev dependencies of the runtime, and the plugin's config lookup (`cosmiconfig`) finding `fixtures/store/isograph.config.json`.
-- (b) Tests import the generated normalization ASTs and generated param and output types, and declare each `ReaderArtifact` by hand with a test resolver. Cost: no test reads with a reader AST the compiler wrote; the agreement of the compiler's reader with the normalizer is covered by the compiler tests and `typecheck` only.
