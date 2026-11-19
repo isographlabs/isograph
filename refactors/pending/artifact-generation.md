@@ -237,7 +237,7 @@ After:
         .collect::<Result<Vec<_>, _>>()?;
 ```
 
-`ListedPathWithoutText` is the broken invariant compiler-errors.md names for `project_errors`: a path `disk_paths` listed has a `DiskFile`, and `compiler_client` has no `OpenFile`. `compile` logs it and writes nothing.
+`ListedPathWithoutText` is the broken invariant compiler-errors.md names for `project_errors`: a path `disk_paths` listed has a `DiskFile`, and `compiler_client` has no `EditorBuffer`. `compile` logs it and writes nothing.
 
 ## Host language
 
@@ -599,7 +599,7 @@ pub struct IsographState<TProfile: CompilationProfile> {
     pub(crate) diagnostics_debounce: Option<freddie_timer::TimerGuard>,
     pub(crate) compile_debounce: Option<freddie_timer::TimerGuard>,
     client_ids: ClientIdSource,
-    /// The compiler's reader of file text. No `LiveSession` and no `OpenFile` has it.
+    /// The compiler's reader of file text. No `LiveSession` and no `EditorBuffer` has it.
     compiler_client: ClientId,
     /// `None` when the config has no `output_directory`.
     pub(crate) artifact_folder: Option<ArtifactFolder>,

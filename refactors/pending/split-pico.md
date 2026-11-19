@@ -42,7 +42,7 @@ isograph is the map. i2's graph after extract-iso-literals-from-file.md and the 
 `pico` and `pico_macros`, not `pico_source`:
 
 - `isograph_extract_typescript`: `#[memo] fn extract_iso_literals`. Reads a `DiskFile` with `db.get`. Does not define a source type.
-- `isograph_lsp`: `#[memo]` hover, tokens, goto. Calls `insert_open_file` on `IsographDb` (a method the compiler crate owns). Does not `#[derive(Source)]`.
+- `isograph_lsp`: `#[memo]` hover, tokens, goto. Calls `set_editor_buffer` on `IsographDb` (a method the compiler crate owns). Does not `#[derive(Source)]`.
 - `isograph_protocol_graphql`: `#[memo]` parse of the schema. Takes `SourceId<SchemaSource>`. Does not intern that source.
 
 `pico` only (no macros):

@@ -332,13 +332,13 @@ mod tests {
     }
 
     #[test]
-    fn project_errors_ignore_an_open_buffer() {
+    fn project_errors_ignore_an_editor_buffer() {
         let mut state = state();
         present(&mut state, "/tmp/proj/src/a.ts", CLEAN);
         let client = started(&mut state);
         state
             .db
-            .set_open_file(client, path("src/a.ts"), SOURCE_FILE, BROKEN.to_owned());
+            .set_editor_buffer(client, path("src/a.ts"), SOURCE_FILE, BROKEN.to_owned());
         assert_eq!(errors(state.reference()), vec![]);
     }
 
@@ -349,7 +349,7 @@ mod tests {
         let client = started(&mut state);
         state
             .db
-            .set_open_file(client, path("src/a.ts"), SOURCE_FILE, CLEAN.to_owned());
+            .set_editor_buffer(client, path("src/a.ts"), SOURCE_FILE, CLEAN.to_owned());
         assert!(!errors(state.reference()).is_empty());
     }
 

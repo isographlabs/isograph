@@ -1461,7 +1461,7 @@ iso(`entrypoint Query.HomeRoute`)";
         let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         intern_file(&mut db, path, "iso(`entrypoint Query.HomeRoute`)");
-        db.set_open_file(
+        db.set_editor_buffer(
             ClientId(1),
             path,
             SOURCE_FILE,

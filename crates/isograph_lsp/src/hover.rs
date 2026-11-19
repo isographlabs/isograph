@@ -367,7 +367,7 @@ mod tests {
     #[test]
     fn a_buffer_names_its_literal_for_its_client_and_disk_for_another() {
         let (mut db, path) = db_with("iso(`entrypoint Query.Disk`)");
-        db.set_open_file(
+        db.set_editor_buffer(
             client(),
             path,
             SOURCE_FILE,

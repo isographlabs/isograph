@@ -207,7 +207,7 @@ mod tests {
         let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         intern_file(&mut db, path, "iso(`field Query.x { id }`)");
-        db.set_open_file(
+        db.set_editor_buffer(
             client(),
             path,
             SOURCE_FILE,
@@ -219,7 +219,7 @@ mod tests {
             .clone();
         assert_eq!(buffer[0].token_type, KEYWORD);
         assert_eq!(buffer[0].length, 10);
-        db.remove_open_file(client(), path);
+        db.remove_editor_buffer(client(), path);
         let disk = lsp_semantic_tokens_for_file::<TestProfile>(&db, client(), path)
             .as_ref()
             .expect("the disk file is present");

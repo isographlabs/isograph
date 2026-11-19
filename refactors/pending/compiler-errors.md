@@ -1,6 +1,6 @@
 # The daemon compiles continuously; `isograph errors` shows the errors
 
-The compiler is not a separate process. It is work the daemon does while it runs. Every applied `DiskChanged` arms a compile debounce. When the debounce fires, `handle` computes the errors of every source file through the same memos the LSP uses, as read by the compiler's own `ClientId`, which never has an open buffer, so it reads the disk view. The source files are the paths `source_file_paths(db, client)` lists from `source_path_map`; `handle` classified each path once, with `ProjectGlobs::membership`, when it applied the `DiskChanged` or the `didOpen`. Nothing is stored beyond memo results. After the errors, the same compile fire generates artifacts (refactors/pending/artifact-generation.md).
+The compiler is not a separate process. It is work the daemon does while it runs. Every applied `DiskChanged` arms a compile debounce. When the debounce fires, `handle` computes the errors of every source file through the same memos the LSP uses, as read by the compiler's own `ClientId`, which never has an editor buffer, so it reads the disk view. The source files are the paths `source_file_paths(db, client)` lists from `source_path_map`; `handle` classified each path once, with `ProjectGlobs::membership`, when it applied the `DiskChanged` or the `didOpen`. Nothing is stored beyond memo results. After the errors, the same compile fire generates artifacts (refactors/pending/artifact-generation.md).
 
 `isograph errors` is a CLI verb. It starts the daemon if needed, connects to the LSP port like `isograph send`, performs the LSP initialize handshake, sends the custom request `isograph/errors`, prints one line per error, prints a count, and exits 1 if any error exists and 0 otherwise. `handle` answers `isograph/errors` synchronously from the memos, as the requesting connection's `ClientId` reads them, so the command never waits on the debounce. The CLI connection opens no buffers, so its answer is the disk view. `isograph errors --watch` keeps the connection open and prints the errors each time they change, through a server-to-client notification that `handle` returns after each compile.
 
@@ -58,7 +58,7 @@ Change 1 removes this. `start` returns the boot batch instead of sending it, and
 
 ### `isograph/errors` computes the requesting client's errors
 
-`errors_response` is one more arm of the existing request dispatch chain over `&IsographDb`. It receives the requesting connection's `ClientId`, like every other request handler, and returns `project_errors` as that client reads the files: the source files `source_file_paths(db, client)` lists, each read through `file_contents(db, client, path)`. A connection with no open buffers, which is every `isograph errors` connection, reads disk. An editor connection that sent the request would see its own buffers. There is no second dispatch chain, and the compiler's `ClientId` is not stored in the database as a singleton for the handler to read; `compiler_client` stays a field on `IsographState` that only the compile fire reads.
+`errors_response` is one more arm of the existing request dispatch chain over `&IsographDb`. It receives the requesting connection's `ClientId`, like every other request handler, and returns `project_errors` as that client reads the files: the source files `source_file_paths(db, client)` lists, each read through `file_contents(db, client, path)`. A connection with no editor buffers, which is every `isograph errors` connection, reads disk. An editor connection that sent the request would see its own buffers. There is no second dispatch chain, and the compiler's `ClientId` is not stored in the database as a singleton for the handler to read; `compiler_client` stays a field on `IsographState` that only the compile fire reads.
 
 ### `isograph/errors` does not wait
 
@@ -655,7 +655,7 @@ The compile lists source files through the existing memo over `source_path_map`.
 
 ```rust
 // from crates/isograph_compiler/src/database.rs
-/// Every source file path `client` reads: disk paths and `client`'s open paths, sorted.
+/// Every source file path `client` reads: disk paths and `client`'s editor buffer paths, sorted.
 #[memo]
 pub fn source_file_paths<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
@@ -667,7 +667,7 @@ pub fn source_file_paths<TProfile: CompilationProfile>(
         .iter()
         .copied()
         .chain(
-            map.open
+            map.editor_buffers
                 .iter()
                 .filter(|key| key.client == client)
                 .map(|key| key.path),
@@ -678,7 +678,7 @@ pub fn source_file_paths<TProfile: CompilationProfile>(
 }
 ```
 
-It iterates the map, so it reads `tracked()` (AGENTS.md, pico tracked maps). For `compiler_client`, which has no `OpenFileKey`, the list is `source_path_map.disk`. "Sorted" is the `Ord` of the interned path, not the text order, so `project_errors` sorts its reports and `project_artifact_sources` sorts its paths by `lookup()`. `IsographDb::disk_paths` is removed; nothing reads it.
+It iterates the map, so it reads `tracked()` (AGENTS.md, pico tracked maps). For `compiler_client`, which has no `EditorBufferKey`, the list is `source_path_map.disk`. "Sorted" is the `Ord` of the interned path, not the text order, so `project_errors` sorts its reports and `project_artifact_sources` sorts its paths by `lookup()`. `IsographDb::disk_paths` is removed; nothing reads it.
 
 ### `absolute_path`
 
@@ -754,7 +754,7 @@ pub struct IsographState<TProfile: CompilationProfile> {
     pub(crate) diagnostics_debounce: Option<freddie_timer::TimerGuard>,
     pub(crate) compile_debounce: Option<freddie_timer::TimerGuard>,
     client_ids: ClientIdSource,
-    /// The compiler's reader of file text. No `LiveSession` and no `OpenFile` has it.
+    /// The compiler's reader of file text. No `LiveSession` and no `EditorBuffer` has it.
     compiler_client: ClientId,
 }
 
@@ -784,7 +784,7 @@ impl<TProfile: CompilationProfile> IsographState<TProfile> {
 
 Artifact generation later added `artifact_folder` and `artifact_files` (refactors/pending/artifact-generation.md).
 
-`compiler_client` is minted once and never inserted into `live_sessions`. `set_open_file` is called only by `didOpen` and `didChange` of a client in `live_sessions`, so no `OpenFile` has `compiler_client`, and `file_contents(db, compiler_client, path)` is always the `DiskFile`.
+`compiler_client` is minted once and never inserted into `live_sessions`. `set_editor_buffer` is called only by `didOpen` and `didChange` of a client in `live_sessions`, so no `EditorBuffer` has `compiler_client`, and `file_contents(db, compiler_client, path)` is always the `DiskFile`.
 
 ### `CompileInput`
 
@@ -906,7 +906,7 @@ fn file_reports<TProfile: CompilationProfile>(
 
 `sort_by` is stable, so two errors with one start keep the memo's order. `lsp_types::Position` is `Ord` (line, then character); `Range` is not, so the key is `range.start`.
 
-`ListedPathWithoutText` is a broken invariant: `source_file_paths(db, client)` and the per-path reads run in one `handle` call on one database, and every listed path is in `source_path_map.disk`, which `insert_disk_file` writes only beside a `DiskFile`, or is an `OpenFileKey` of `client`, which `set_open_file` writes only beside that client's `OpenFile`. Either way `file_contents(db, client, path)` is `Some`. The type system cannot express that a listed key's lookup hits. It is an error value, not a panic, and change 5 surfaces it as `LSPRuntimeError::UnexpectedError`.
+`ListedPathWithoutText` is a broken invariant: `source_file_paths(db, client)` and the per-path reads run in one `handle` call on one database, and every listed path is in `source_path_map.disk`, which `insert_disk_file` writes only beside a `DiskFile`, or is an `EditorBufferKey` of `client`, which `set_editor_buffer` writes only beside that client's `EditorBuffer`. Either way `file_contents(db, client, path)` is `Some`. The type system cannot express that a listed key's lookup hits. It is an error value, not a panic, and change 5 surfaces it as `LSPRuntimeError::UnexpectedError`.
 
 ### `handle_disk_changed`
 
@@ -1018,7 +1018,7 @@ A `TimerId` matches at most one guard. A stale firing of either timer matches ne
 `crates/isograph_cli/src/compile.rs` (state built with `IsographState::new` and `intern_config_directory` of `/tmp/proj/isograph.config.json`, globs `src/**` and schema `schema/**`):
 
 - `project_errors_of_a_broken_disk_file_has_its_absolute_path_range_and_message`: path `/tmp/proj/src/a.ts`; the ranges and messages equal `lsp_diagnostics_for_file(db, compiler_client, path)` of the same file.
-- `project_errors_ignore_an_open_buffer`: a started client opens `src/a.ts` with `BROKEN` while disk is `CLEAN`; empty. `CLEAN` is `` iso(`entity Query`) iso(`entrypoint Query.HomeRoute`) iso(`field Query.HomeRoute`) ``, which also has no validation error.
+- `project_errors_ignore_an_editor_buffer`: a started client opens `src/a.ts` with `BROKEN` while disk is `CLEAN`; empty. `CLEAN` is `` iso(`entity Query`) iso(`entrypoint Query.HomeRoute`) iso(`field Query.HomeRoute`) ``, which also has no validation error.
 - `project_errors_read_disk_when_a_client_has_a_clean_buffer`: disk `BROKEN`, buffer `CLEAN`; non-empty.
 - `project_errors_skip_files_outside_the_source_globs`: `lib/a.ts` broken; empty.
 - `project_errors_skip_schema_files`: `schema/a.graphql` containing `` iso(` `) ``; empty.
@@ -1218,7 +1218,7 @@ pub(crate) fn errors_response<TProfile: CompilationProfile>(
 }
 ```
 
-Same signature as the adapter handlers (`hover_response`), so it registers on the existing chain over `&IsographDb`. The connection's own `ClientId` selects the view: `source_file_paths(db, client)` and `file_contents(db, client, path)` read that client's open buffers over disk. An `isograph errors` connection never sends `didOpen`, so it reads disk.
+Same signature as the adapter handlers (`hover_response`), so it registers on the existing chain over `&IsographDb`. The connection's own `ClientId` selects the view: `source_file_paths(db, client)` and `file_contents(db, client, path)` read that client's editor buffers over disk. An `isograph errors` connection never sends `didOpen`, so it reads disk.
 
 ### `dispatch_lsp_request`
 
@@ -1617,7 +1617,7 @@ fn send_errors(session: &mut LiveSession, reports: Vec<CompilerErrorReport>) -> 
 }
 ```
 
-`compile` already takes `&mut IsographState`. `notify_subscribers` borrows `state.db` and `state.live_sessions` as two disjoint fields. Each subscriber's errors are computed as its own client reads them, the same view `isograph/errors` answers with, and compared with the list that session was last sent. The `--watch` connection opens no buffers, so its errors change only when the disk changes, and every applied `DiskChanged` arms the compile debounce, so the subscriber is notified of every change without polling. A subscriber that has open buffers is not notified on `didChange`, which does not arm the compile debounce; its next notification follows the next compile fire. A second `watchErrors` from a subscribed session resends the current list. The `compiled errors=N` log line stays the `compiler_client` count.
+`compile` already takes `&mut IsographState`. `notify_subscribers` borrows `state.db` and `state.live_sessions` as two disjoint fields. Each subscriber's errors are computed as its own client reads them, the same view `isograph/errors` answers with, and compared with the list that session was last sent. The `--watch` connection opens no buffers, so its errors change only when the disk changes, and every applied `DiskChanged` arms the compile debounce, so the subscriber is notified of every change without polling. A subscriber that has editor buffers is not notified on `didChange`, which does not arm the compile debounce; its next notification follows the next compile fire. A second `watchErrors` from a subscribed session resends the current list. The `compiled errors=N` log line stays the `compiler_client` count.
 
 `dispatch_lsp_notification` registers `.on_notification_sync::<crate::compile::WatchErrorsNotification>(crate::compile::on_watch_errors::<TProfile>)?` after `DidCloseTextDocument`.
 
@@ -1887,8 +1887,8 @@ docs-website/docs/design-docs/event-model.md, in the change that makes each stat
 
 - Change 1, Outer, Watcher bullet: append "The boot scan's `DiskChanged`s are posted before the LSP port accepts its first connection, so every session's events follow them."
 - Change 2, Inner: "`ClientConnectionEvent::Started` carries the session and a channel; `handle` mints the `ClientId` from `IsographState.client_ids`, stores the session under it, and returns `AssignClientId`. The session forwards nothing until it receives the id." Effect: the `IsographEffect` listing gains `AssignClientId(AssignClientIdEffect)`.
-- Change 3, Inner: the `IsographState` field list gains `compile_debounce`, `client_ids`, and `compiler_client`; add "An applied `DiskChanged` arms the compile debounce. `handle` of that `TimerFired` computes every source file's errors as `compiler_client` reads them." State: replace "Artifact generation will read through `file_contents` as its own client with no `OpenFile`; how it gets its `ClientId` is not designed yet." with "The compiler reads through `file_contents` as its own client, `compiler_client`, which `IsographState::new` mints first. No `LiveSession` and no `OpenFile` has it, so it reads disk. Artifact generation will be an effect `handle` returns after compile."
-- Change 5, Outer, LSP port bullet: add "`isograph/errors` is a request arm. Its result is every compiler error of every source file as the requesting client reads it; a connection with no open buffers reads disk."
+- Change 3, Inner: the `IsographState` field list gains `compile_debounce`, `client_ids`, and `compiler_client`; add "An applied `DiskChanged` arms the compile debounce. `handle` of that `TimerFired` computes every source file's errors as `compiler_client` reads them." State: replace "Artifact generation will read through `file_contents` as its own client with no `EditorBuffer`; how it gets its `ClientId` is not designed yet." with "The compiler reads through `file_contents` as its own client, `compiler_client`, which `IsographState::new` mints first. No `LiveSession` and no `EditorBuffer` has it, so it reads disk. Artifact generation will be an effect `handle` returns after compile."
+- Change 5, Outer, LSP port bullet: add "`isograph/errors` is a request arm. Its result is every compiler error of every source file as the requesting client reads it; a connection with no editor buffers reads disk."
 - Change 6, Outer: add "`isograph errors` starts the daemon if needed, sends `isograph/errors`, prints the result, and exits 0, 1, or 2."
 - Change 7, Effect: the listing gains `PublishErrors(Box<PublishErrorsEffect>)`. Outer, LSP port bullet: add "`isograph/watchErrors` subscribes a session; after each compile fire, `handle` computes each subscriber's errors as its client reads them and returns `isograph/errorsChanged` to each subscriber whose errors differ from what it was last sent."
 

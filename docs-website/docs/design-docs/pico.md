@@ -26,7 +26,7 @@ struct IsographDb<TProfile: CompilationProfile> {
     #[tracked]
     disk_file_map: DiskFileMap,
     #[tracked]
-    open_file_map: OpenFileMap,
+    editor_buffer_map: EditorBufferMap,
     #[tracked]
     source_path_map: SourcePathMap,
     #[tracked]
@@ -60,15 +60,15 @@ struct DiskFile {
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-struct OpenFileKey {
+struct EditorBufferKey {
     client: ClientId,
     path: RelativePathToSourceFile,
 }
 
 #[derive(Clone, PartialEq, Eq, Source)]
-struct OpenFile {
+struct EditorBuffer {
     #[key]
-    key: OpenFileKey,
+    key: EditorBufferKey,
     contents: String,
 }
 ```
@@ -85,7 +85,7 @@ A path is not a proof. Looking up by path can miss and return `None`. `#[derive(
 
 `get_singleton<T>()` returns `Option<&T>`. A singleton has no `SourceId` you hold as a proof of presence. You ask by type. The config may not have been set.
 
-A path may have a `DiskFile`, one `OpenFile` per client that has it open, both, or neither. A read of file text through `file_contents(db, client, path)` reads client `c`'s `OpenFile` if present, otherwise `DiskFile`. The compiler is another client, `IsographState.compiler_client`.
+A path may have a `DiskFile`, one `EditorBuffer` per client that has it open, both, or neither. A read of file text through `file_contents(db, client, path)` reads client `c`'s `EditorBuffer` if present, otherwise `DiskFile`. The compiler is another client, `IsographState.compiler_client`.
 
 A singleton has no key field. There is at most one. `CompilerConfig` and `CurrentWorkingDirectory` are singletons. `CurrentWorkingDirectory` is the parent directory of the config file, interned at process start. `handle` reads it to convert an event `PathBuf`. Memos do not. They receive `RelativePathToSourceFile` as an argument.
 
@@ -113,7 +113,7 @@ What the body reads becomes a dependency. `db.get(source_id)` is a dependency on
 
 pico changes the written return type `T` to `&T`. The value lives in the database. The caller does not clone it. `T` must be `PartialEq` so pico can compare a re-invocation to the stored value.
 
-The result is owned. A memo cannot return a `&str` into a `DiskFile` or an `OpenFile`. The source can be replaced; the stored result has to survive that. `IsoLiteralExtraction.iso_literal_text` is a `String`. isograph made `IsoLiteralExtraction` owned for this reason.
+The result is owned. A memo cannot return a `&str` into a `DiskFile` or an `EditorBuffer`. The source can be replaced; the stored result has to survive that. `IsoLiteralExtraction.iso_literal_text` is a `String`. isograph made `IsoLiteralExtraction` owned for this reason.
 
 `#[memo(raw)]` returns `MemoRef<T>` instead of `&T`. Pass that `MemoRef` as an argument to another memo when the identity of the result is the key, not a copy of the value.
 
@@ -144,7 +144,7 @@ A memo result `T` is stored once in that derived node and returned as `&T`.
 
 A value read from the database is not an argument to another function that has `db`. The argument is the identity the caller already has (`client` and `path`, `LiteralId`, `EntityName`). The inner function reads again.
 
-Source text is `file_contents(db, client, path)`. A function that needs the file takes `client` and `path` and calls `file_contents`. `file_contents` is the only reader of `DiskFile.contents` and `OpenFile.contents`. The caller does not read the file and pass `contents`. Hover is `client`, `path`, and a position. Semantic tokens for a file is `client` and `path`. Neither takes the file text. `line_index` and `extract_iso_literals` read the file. `text_through_last_iso_literal` reads the file and stores bytes from the start through the last iso interior. `lsp_semantic_tokens_for_file` reads that memo, not the full file text. A helper they call that also takes `db` takes `client` and `path` and reads the file itself.
+Source text is `file_contents(db, client, path)`. A function that needs the file takes `client` and `path` and calls `file_contents`. `file_contents` is the only reader of `DiskFile.contents` and `EditorBuffer.contents`. The caller does not read the file and pass `contents`. Hover is `client`, `path`, and a position. Semantic tokens for a file is `client` and `path`. Neither takes the file text. `line_index` and `extract_iso_literals` read the file. `text_through_last_iso_literal` reads the file and stores bytes from the start through the last iso interior. `lsp_semantic_tokens_for_file` reads that memo, not the full file text. A helper they call that also takes `db` takes `client` and `path` and reads the file itself.
 
 File text as a `String` memo argument is an interned owned param: a new intern per unique file, cloned on every execute. `path` is `Copy`. `db.get` records the source on the memo that uses the text. If the parent reads the file and passes the string, the child's key is the whole file (every edit is a new derived node) and the child does not record a dependency on `file_contents`.
 
@@ -400,7 +400,7 @@ pub fn file_contents<TProfile: CompilationProfile>(
 ) -> Option<String>
 ```
 
-Nothing else reads `DiskFile.contents` or `OpenFile.contents`. `file_contents` does not read `disk_file_map` or `open_file_map`; it calls `try_get` of `DiskFile::id_for_key` and `OpenFile::id_for_key`. The readers of `disk_file_map`, `open_file_map`, `source_path_map`, and `schema_path_map` are the writers (`insert_disk_file`, `remove_disk_file`, `remove_disk_files_from_path`, `set_open_file`, `remove_open_file`, `remove_open_files_of_client`), and uses that do not read text, such as listing the paths that exist (`open_source_paths_of_client`). `source_path_map` and `schema_path_map` hold paths and `OpenFileKey`s, not `SourceId`s: a reader of a listed file's text calls `file_contents` for each listed path. `insert_disk_file` and `set_open_file` take the path's `FileMembership` (source file, schema file, both, or neither), which `handle` computes from the config's globs. The writers touch the two path maps only when membership changes, because `MutView::tracked` bumps the counter on every call. A function that lists paths and needs each file's text calls `file_contents` for each path.
+Nothing else reads `DiskFile.contents` or `EditorBuffer.contents`. `file_contents` does not read `disk_file_map` or `editor_buffer_map`; it calls `try_get` of `DiskFile::id_for_key` and `EditorBuffer::id_for_key`. The readers of `disk_file_map`, `editor_buffer_map`, `source_path_map`, and `schema_path_map` are the writers (`insert_disk_file`, `remove_disk_file`, `remove_disk_files_from_path`, `set_editor_buffer`, `remove_editor_buffer`, `remove_editor_buffers_of_client`), and uses that do not read text, such as listing the paths that exist (`editor_buffer_paths_of_client`). `source_path_map` and `schema_path_map` hold paths and `EditorBufferKey`s, not `SourceId`s: a reader of a listed file's text calls `file_contents` for each listed path. `insert_disk_file` and `set_editor_buffer` take the path's `FileMembership` (source file, schema file, both, or neither), which `handle` computes from the config's globs. The writers touch the two path maps only when membership changes, because `MutView::tracked` bumps the counter on every call. A function that lists paths and needs each file's text calls `file_contents` for each path.
 
 ### The client is an input
 
@@ -471,8 +471,8 @@ A keyed lookup is `db.try_get(T::id_for_key(&key))`. It does not read a tracked 
 
 ```rust
 // from crates/isograph_compiler/src/database.rs
-match db.try_get(OpenFile::id_for_key(&OpenFileKey { client, path })) {
-    Some(open_file) => open_file.contents.clone().wrap_some(),
+match db.try_get(EditorBuffer::id_for_key(&EditorBufferKey { client, path })) {
+    Some(editor_buffer) => editor_buffer.contents.clone().wrap_some(),
     None => db
         .try_get(DiskFile::id_for_key(&path))
         .map(|disk_file| disk_file.contents.clone()),
@@ -496,7 +496,7 @@ pub struct IsographState<TProfile: CompilationProfile> {
 }
 ```
 
-State that exists to perform outbound I/O (connections, reply channels, outstanding request ids, timer guards, and the planned last-published diagnostics per client) is a field on `IsographState`, not a pico source. Memos take `&IsographDb` and never read it. `IsographState` holds the database, so no memo can reach `IsographState`. Request handlers receive `&state.db`. Data that memos read (file text, open buffers) lives in the database, keyed by client.
+State that exists to perform outbound I/O (connections, reply channels, outstanding request ids, timer guards, and the planned last-published diagnostics per client) is a field on `IsographState`, not a pico source. Memos take `&IsographDb` and never read it. `IsographState` holds the database, so no memo can reach `IsographState`. Request handlers receive `&state.db`. Data that memos read (file text, editor buffers) lives in the database, keyed by client.
 
 ### One line model
 
@@ -513,7 +513,7 @@ pico re-invokes a memo when a dependency's `time_updated` is newer than this mem
 If they are equal, pico keeps the old `time_updated`. Dependents see no change and do not re-invoke. That is backdating.
 
 ```text
-syntax highlighting  ->  lsp_semantic_tokens_for_file  ->  parsed_iso_literals_in_file + text_through_last_iso_literal  ->  extract  ->  file_contents  ->  OpenFile or DiskFile
+syntax highlighting  ->  lsp_semantic_tokens_for_file  ->  parsed_iso_literals_in_file + text_through_last_iso_literal  ->  extract  ->  file_contents  ->  EditorBuffer or DiskFile
 ```
 
 Typing JavaScript after the last iso literal re-invokes extract. If the `Vec<IsoLiteralExtraction>` is `==` (same texts, same start indices, same context), extract is backdated. `parsed_iso_literals_in_file` does not re-invoke. `parsed_iso_literal` of the same text does not. `text_through_last_iso_literal` re-invokes because the file text changed, then `==` and backdates. Encoded tokens do not re-invoke.
@@ -540,7 +540,7 @@ The map is which paths currently have a `DiskFile`. `db.set` of a `DiskFile` doe
 
 A memo that reads one key does not use the map. It calls `db.try_get(T::id_for_key(&key))` (Keyed reads depend on their key, present or absent). Adding an unrelated file does not re-invoke a per-file `file_contents`. Iterating `untracked()` is wrong: a newly inserted path is not seen. `file_contents` is the one per-path lookup of text; every other memo that needs text calls it.
 
-`open_file_map` is keyed by `OpenFileKey { client, path }`, the `#[key]` of `OpenFile`. `file_contents` reads `OpenFile::id_for_key` of that key, then `DiskFile::id_for_key` of the path on a miss. A keystroke re-invokes only the derived node that read that `OpenFile`. An open or close re-invokes only the `file_contents` derived nodes of that client and path. The maps exist for the writers and memos that iterate them (`remove_open_files_of_client`, `remove_disk_files_from_path`, `source_file_paths`), so `handle` still inserts into and removes from them.
+`editor_buffer_map` is keyed by `EditorBufferKey { client, path }`, the `#[key]` of `EditorBuffer`. `file_contents` reads `EditorBuffer::id_for_key` of that key, then `DiskFile::id_for_key` of the path on a miss. A keystroke re-invokes only the derived node that read that `EditorBuffer`. An open or close re-invokes only the `file_contents` derived nodes of that client and path. The maps exist for the writers and memos that iterate them (`remove_editor_buffers_of_client`, `remove_disk_files_from_path`, `source_file_paths`), so `handle` still inserts into and removes from them.
 
 A tracked read of a map whose counter was never written records a dependency on the counter's key at the initial epoch. The first counter write inserts that key and advances the epoch. On a fresh database, a `source_file_paths` call before the first insert sees that later insert.
 
@@ -564,7 +564,7 @@ Derived nodes accumulate until `run_garbage_collection`. i2 never calls `run_gar
 
 ## Parser and extract
 
-The parser takes `&str`. Tests call `parse_iso_literal` with a string. Extract is a memo that reads `file_contents` and calls `HostLanguage::extract_iso_literals_from_text`. Tests call `extract_iso_literals_from_text` with a string, or intern `"src/a.ts"`, `insert_disk_file` or `set_open_file`, and call the memo with a `ClientId`. They do not pass a `PathBuf`.
+The parser takes `&str`. Tests call `parse_iso_literal` with a string. Extract is a memo that reads `file_contents` and calls `HostLanguage::extract_iso_literals_from_text`. Tests call `extract_iso_literals_from_text` with a string, or intern `"src/a.ts"`, `insert_disk_file` or `set_editor_buffer`, and call the memo with a `ClientId`. They do not pass a `PathBuf`.
 
 A caller that needs a parse tree calls the parse memo with the key it has. pico returns `&T`. The caller does not clone a whole file's AST out of the database to hand to another memo. That is the same as source text: the inner function has the key and reads; the parent does not pass a value it already read. `iso_literal_at_lsp_position` does not clone the AST either. It returns `LiteralId`.
 

@@ -61,7 +61,7 @@ pub struct IsographState<TProfile: CompilationProfile> {
     pub(crate) diagnostics_debounce: Option<freddie_timer::TimerGuard>,
     pub(crate) compile_debounce: Option<freddie_timer::TimerGuard>,
     client_ids: ClientIdSource,
-    /// The compiler's reader of file text. No `LiveSession` and no `OpenFile` has it.
+    /// The compiler's reader of file text. No `LiveSession` and no `EditorBuffer` has it.
     compiler_client: ClientId,
     /// `None` when the config has no `output_directory`.
     pub(crate) artifact_output: Option<ProfileArtifactOutput<TProfile>>,
@@ -124,7 +124,7 @@ fn handle_client_connection<TProfile: CompilationProfile>(
         }
         ClientConnectionEvent::Gone(client) => {
             state.live_sessions.0.remove(&client);
-            state.db.remove_open_files_of_client(client);
+            state.db.remove_editor_buffers_of_client(client);
             no_effects()
         }
     }
@@ -1367,18 +1367,18 @@ mod tests {
             did_open(client_1, "file:///tmp/proj/other/a.ts", "open"),
         );
         assert_eq!(
-            state.db.open_source_paths_of_client(client_1),
+            state.db.editor_buffer_paths_of_client(client_1),
             interned("src/x.ts").wrap_vec()
         );
         handle(&mut state, did_close(client_1, X_URI));
         assert_eq!(
-            state.db.open_source_paths_of_client(client_1),
+            state.db.editor_buffer_paths_of_client(client_1),
             Vec::<common_lang_types::RelativePathToSourceFile>::new()
         );
         handle(&mut state, did_open(client_1, X_URI, "open"));
         handle(&mut state, ClientConnectionEvent::Gone(client_1).to());
         assert_eq!(
-            state.db.open_source_paths_of_client(client_1),
+            state.db.editor_buffer_paths_of_client(client_1),
             Vec::<common_lang_types::RelativePathToSourceFile>::new()
         );
     }
@@ -1403,7 +1403,7 @@ mod tests {
             did_open(client_1, "https://example.net/a.ts", "open"),
         );
         assert!(effects.is_empty());
-        assert!(state.db.get_open_file_map().untracked().0.is_empty());
+        assert!(state.db.get_editor_buffer_map().untracked().0.is_empty());
     }
 
     #[cfg(unix)]
@@ -1416,7 +1416,7 @@ mod tests {
             did_open(client_1, "file:///tmp/proj/%FF.ts", "open"),
         );
         assert!(effects.is_empty());
-        assert!(state.db.get_open_file_map().untracked().0.is_empty());
+        assert!(state.db.get_editor_buffer_map().untracked().0.is_empty());
     }
 
     #[test]
@@ -1425,7 +1425,7 @@ mod tests {
         let client_1 = started(&mut state);
         let effects = handle(&mut state, did_open(client_1, X_URI, "open"));
         assert!(effects.is_empty());
-        assert!(state.db.get_open_file_map().untracked().0.is_empty());
+        assert!(state.db.get_editor_buffer_map().untracked().0.is_empty());
     }
 
     const HOME_URI: &str = "file:///tmp/proj/src/Home.ts";
@@ -1702,7 +1702,7 @@ mod tests {
     }
 
     #[test]
-    fn semantic_tokens_of_an_open_file_with_no_disk_file_are_null_after_did_close() {
+    fn semantic_tokens_of_an_editor_buffer_with_no_disk_file_are_null_after_did_close() {
         const NEW_URI: &str = "file:///tmp/proj/src/new.ts";
         let mut state = with_config();
         let one = live_client(&mut state);
@@ -3254,7 +3254,7 @@ mod tests {
     }
 
     #[test]
-    fn an_open_file_selecting_an_undefined_field_publishes_that_validation_error() {
+    fn an_editor_buffer_selecting_an_undefined_field_publishes_that_validation_error() {
         let mut state = with_config();
         let (client_1, rx) = diagnostics_client(&mut state);
         let text = "iso(`entity Query`) iso(`field Query.x { nope }`)";
@@ -3557,7 +3557,7 @@ mod tests {
     }
 
     #[test]
-    fn open_files_outside_the_globs_or_skipped_by_the_host_publish_nothing() {
+    fn editor_buffers_outside_the_globs_or_skipped_by_the_host_publish_nothing() {
         let mut state = with_config();
         let (client_1, _rx) = diagnostics_client(&mut state);
         handle(
@@ -3618,7 +3618,7 @@ mod tests {
     }
 
     #[test]
-    fn another_clients_open_file_is_not_published_to_a_client() {
+    fn another_clients_editor_buffer_is_not_published_to_a_client() {
         let mut state = with_config();
         let (client_1, rx_1) = diagnostics_client(&mut state);
         let (_, rx_2) = diagnostics_client(&mut state);

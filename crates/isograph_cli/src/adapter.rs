@@ -245,7 +245,7 @@ fn did_open<TProfile: CompilationProfile>(
     params: lsp_types::DidOpenTextDocumentParams,
 ) -> Result<(), UriPathError> {
     let path = relative_from_uri(db, params.text_document.uri.reference())?;
-    db.set_open_file(
+    db.set_editor_buffer(
         client,
         path,
         globs.membership::<TProfile>(Path::new(path.lookup())),
@@ -267,7 +267,7 @@ fn did_change<TProfile: CompilationProfile>(
         return DidChangeError::RangedChange.wrap_err();
     }
     let path = relative_from_uri(db, params.text_document.uri.reference())?;
-    db.set_open_file(
+    db.set_editor_buffer(
         client,
         path,
         globs.membership::<TProfile>(Path::new(path.lookup())),
@@ -282,7 +282,7 @@ fn did_close<TProfile: CompilationProfile>(
     params: lsp_types::DidCloseTextDocumentParams,
 ) -> Result<(), UriPathError> {
     let path = relative_from_uri(db, params.text_document.uri.reference())?;
-    db.remove_open_file(client, path);
+    db.remove_editor_buffer(client, path);
     ().wrap_ok()
 }
 
@@ -618,7 +618,7 @@ pub(crate) mod tests {
         let mut db = db_with(PRETTY.to_owned());
         (0usize..=4).for_each(|spaces| {
             let buffer = source_with_blank_spaces(spaces);
-            db.set_open_file(client(), path(), SOURCE_FILE, buffer.clone());
+            db.set_editor_buffer(client(), path(), SOURCE_FILE, buffer.clone());
             let edits = format_iso_literals(&db, client(), path()).expect("edits");
             assert_eq!(apply_text_edits(&buffer, &edits), PRETTY, "spaces={spaces}");
         });
@@ -629,9 +629,9 @@ pub(crate) mod tests {
     pub(crate) const THREE_LITERALS: &str = "const a = iso(`field Query.x{id,name}`);\nconst b = 1;\nconst c = iso(`field Query.y{id}`);\nfoo(c);\nconst d = iso(`field Query.z{a,b,c}`);\nexport default d;\n";
     pub(crate) const THREE_LITERALS_PRETTY: &str = "const a = iso(`\n  field Query.x {\n    id,\n    name,\n  }\n`);\nconst b = 1;\nconst c = iso(`\n  field Query.y {\n    id,\n  }\n`);\nfoo(c);\nconst d = iso(`\n  field Query.z {\n    a,\n    b,\n    c,\n  }\n`);\nexport default d;\n";
 
-    /// Formats `buffer` as client 1's open buffer, checks the edits, and returns the edited text.
+    /// Formats `buffer` as client 1's editor buffer, checks the edits, and returns the edited text.
     fn formatted_buffer(db: &mut IsographDb<TestProfile>, buffer: &str) -> String {
-        db.set_open_file(client(), path(), SOURCE_FILE, buffer.to_owned());
+        db.set_editor_buffer(client(), path(), SOURCE_FILE, buffer.to_owned());
         let edits = format_iso_literals(db, client(), path()).expect("edits");
         assert_edits_replace_disjoint_interiors(buffer, &edits);
         apply_text_edits(buffer, &edits)
@@ -647,7 +647,7 @@ pub(crate) mod tests {
     #[test]
     fn two_literals_where_the_first_grows_are_two_edits_that_format_both() {
         let mut db = db_with(String::new());
-        db.set_open_file(client(), path(), SOURCE_FILE, TWO_LITERALS.to_owned());
+        db.set_editor_buffer(client(), path(), SOURCE_FILE, TWO_LITERALS.to_owned());
         let edits = format_iso_literals(&db, client(), path()).expect("edits");
         assert_eq!(edits.len(), 2);
         assert_formats_to(TWO_LITERALS, TWO_LITERALS_PRETTY);
@@ -840,7 +840,7 @@ pub(crate) mod tests {
         let mut db = config_db();
         let schema_path: RelativePathToSourceFile = "src/schema.graphql".intern().to();
         db.insert_disk_file(schema_path, SCHEMA_FILE, SCHEMA.to_owned());
-        db.set_open_file(client(), schema_path, SCHEMA_FILE, format!("\n{SCHEMA}"));
+        db.set_editor_buffer(client(), schema_path, SCHEMA_FILE, format!("\n{SCHEMA}"));
         let range_for = |client: ClientId| {
             definition_lsp_location(db.reference(), client, owner_definition())
                 .map(|location| location.range)

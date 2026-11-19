@@ -333,7 +333,7 @@ mod tests {
     #[test]
     fn a_clients_buffer_counts_for_that_client_only() {
         let mut db = db_with(&[("src/fullName.ts", "iso(`field Pet.other { id }`)")]);
-        db.set_open_file(
+        db.set_editor_buffer(
             client(),
             path("src/fullName.ts"),
             SOURCE_FILE,
@@ -355,7 +355,7 @@ mod tests {
     fn a_file_that_is_not_a_source_file_contributes_nothing() {
         let mut db = IsographDb::<TestProfile>::default();
         db.insert_disk_file(path("other/Pet.ts"), NEITHER_FILE, PET.to_owned());
-        db.set_open_file(
+        db.set_editor_buffer(
             client(),
             path("other/Open.ts"),
             NEITHER_FILE,

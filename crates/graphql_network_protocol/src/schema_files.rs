@@ -9,7 +9,7 @@ use pico_macros::memo;
 use prelude::Postfix;
 use span::WithSpan;
 
-/// Every schema file `client` reads: disk paths and this client's open paths, sorted.
+/// Every schema file `client` reads: disk paths and this client's editor buffer paths, sorted.
 #[memo]
 pub fn schema_file_paths<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
@@ -21,7 +21,7 @@ pub fn schema_file_paths<TProfile: CompilationProfile>(
         .iter()
         .copied()
         .chain(
-            map.open
+            map.editor_buffers
                 .iter()
                 .filter(|key| key.client == client)
                 .map(|key| key.path),

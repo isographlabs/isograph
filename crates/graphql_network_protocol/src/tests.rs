@@ -125,14 +125,14 @@ fn should_include_schema_file_includes_graphql_and_graphqls() {
 }
 
 #[test]
-fn schema_file_paths_are_disk_paths_and_the_clients_open_paths_sorted() {
+fn schema_file_paths_are_disk_paths_and_the_clients_editor_buffer_paths_sorted() {
     let mut db = db_with(&[("b.graphql", ""), ("a.graphql", "")]);
     assert_eq!(
         schema_file_paths(&db, CLIENT).clone(),
         vec![path("a.graphql"), path("b.graphql")]
     );
-    db.set_open_file(CLIENT, path("c.graphql"), SCHEMA_FILE, String::new());
-    db.set_open_file(CLIENT, path("a.graphql"), SCHEMA_FILE, String::new());
+    db.set_editor_buffer(CLIENT, path("c.graphql"), SCHEMA_FILE, String::new());
+    db.set_editor_buffer(CLIENT, path("a.graphql"), SCHEMA_FILE, String::new());
     assert_eq!(
         schema_file_paths(&db, CLIENT).clone(),
         vec![path("a.graphql"), path("b.graphql"), path("c.graphql")]
@@ -151,7 +151,7 @@ fn schema_file_paths_are_disk_paths_and_the_clients_open_paths_sorted() {
 #[test]
 fn parsed_schema_file_parses_the_clients_buffer_and_is_none_without_text() {
     let mut db = db_with(&[("a.graphql", "type Disk { a: A }")]);
-    db.set_open_file(
+    db.set_editor_buffer(
         CLIENT,
         path("a.graphql"),
         SCHEMA_FILE,
@@ -335,9 +335,9 @@ fn a_field_defined_twice_is_an_error_of_that_field_only() {
 }
 
 #[test]
-fn an_open_buffer_that_breaks_a_type_breaks_it_for_that_client_only() {
+fn an_editor_buffer_that_breaks_a_type_breaks_it_for_that_client_only() {
     let mut db = db_with(&[("a.graphql", "type User { id: ID! }")]);
-    db.set_open_file(
+    db.set_editor_buffer(
         CLIENT,
         path("a.graphql"),
         SCHEMA_FILE,

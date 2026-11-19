@@ -98,7 +98,7 @@ fn client_diagnostics<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
 ) -> HashMap<RelativePathToSourceFile, Vec<lsp_types::Diagnostic>> {
-    db.open_source_paths_of_client(client)
+    db.editor_buffer_paths_of_client(client)
         .into_iter()
         .filter_map(|path| {
             let diagnostics = isograph_lsp::lsp_diagnostics_for_file(db, client, path).as_ref()?;

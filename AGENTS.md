@@ -22,7 +22,7 @@ pico: `docs-website/docs/design-docs/pico.md`. Read it before working on sources
 
 A memo that iterates the map (compile, every file) uses `tracked()`. That records a dependency on the whole map. Inserting or removing any key re-invokes it.
 
-A one-key lookup does not read the map. It is `db.try_get(T::id_for_key(&key))`, which returns `Option<&T>` and records a dependency on that key whether or not it is set. A later set or remove of that key re-invokes the reader. A set or remove of another key does not. `file_contents` reads `OpenFile::id_for_key(&OpenFileKey { client, path })`, then `DiskFile::id_for_key(&path)`.
+A one-key lookup does not read the map. It is `db.try_get(T::id_for_key(&key))`, which returns `Option<&T>` and records a dependency on that key whether or not it is set. A later set or remove of that key re-invokes the reader. A set or remove of another key does not. `file_contents` reads `EditorBuffer::id_for_key(&EditorBufferKey { client, path })`, then `DiskFile::id_for_key(&path)`.
 
 Do not iterate `untracked()`. A newly inserted key is not seen. pico `tracking_field::correctness` pins this.
 

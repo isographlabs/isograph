@@ -28,7 +28,7 @@ pub use artifact_types::{
 pub use artifacts::{ArtifactPath, ArtifactSource, LiteralParseFailed, artifact_sources_in_file};
 pub use compiler_errors::{CompilerError, ProfileCompilerError, compiler_errors_in_file};
 pub use database::{
-    ClientId, DiskFile, DiskFileMap, FileMembership, IsographDb, OpenFileKey, SchemaPathMap,
+    ClientId, DiskFile, DiskFileMap, EditorBufferKey, FileMembership, IsographDb, SchemaPathMap,
     SourcePathMap, file_contents, source_file_paths,
 };
 pub use entrypoint::{
