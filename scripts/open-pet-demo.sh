@@ -21,6 +21,7 @@ if [[ ! -x "$extension_dir/node_modules/.bin/esbuild" ]]; then
 fi
 
 (cd "$repo_root" && cargo build -p ts_graphql_react_isograph_cli)
+"$repo_root/scripts/restart-daemon-if-running.sh" "$pet_demo_dir/isograph.config.json"
 
 (cd "$extension_dir" && ./node_modules/.bin/esbuild \
   ./src/extension.ts \
