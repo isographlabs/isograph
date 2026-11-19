@@ -1,5 +1,7 @@
 # Debounced `publishDiagnostics` per client
 
+Landed: `2288d586` (`iso_literal_parse_errors_in_file`), `ed543cdc` (`lsp_diagnostics_for_file`), `33cfb453` (`open_paths_of_client`), `a65358c1` (publish), `7e0531c4` (event-model.md and tests-only-functionality.md amendments). The pico.md amendment below is not applied.
+
 Each live LSP client that declares the `textDocument.publishDiagnostics` client capability receives `textDocument/publishDiagnostics` for the files that client has open, computed from that client's buffers through `file_contents(db, client, path)`. A `didOpen`, `didChange`, or `didClose` that changed a buffer arms one 100ms debounce timer. When the timer fires, `handle` computes each client's current diagnostics, compares them with what that client was last sent, and returns one `PublishDiagnosticsEffect` per client that has a difference. A path whose errors went away, or that the client closed, is sent an empty list.
 
 Diagnostics are per client and reflect what that client sees. Client A's diagnostics cover only A's open files and are computed from A's buffers via `file_contents(A, path)`. Client B's open files and unsaved edits never affect A's diagnostics. Disk-only files (a `DiskFile` that no buffer of that client overlays) are never reported.
@@ -444,7 +446,7 @@ fn changed_diagnostics<'a>(
 ) -> impl Iterator<Item = (RelativePathToSourceFile, Vec<lsp_types::Diagnostic>)> + 'a {
     let changed = current
         .iter()
-        .filter(|(path, diagnostics)| published.0.get(*path) != diagnostics.reference().wrap_some())
+        .filter(|(path, diagnostics)| published.0.get(*path) != diagnostics.dereference().wrap_some())
         .map(|(path, diagnostics)| (path.dereference(), diagnostics.clone()));
     let cleared = published
         .0
@@ -708,12 +710,12 @@ fn send_notifications(publish: PublishDiagnosticsEffect) {
     notifications
         .into_iter()
         .map(lsp_server::Message::Notification)
-        .try_for_each(|message| sender.send(message))
-        .unwrap_or_else(|_disconnected| tracing::debug!("publishDiagnostics to a closed session"));
+        .try_for_each(|message| sender.send(message).map_err(drop))
+        .unwrap_or_else(|()| tracing::debug!("publishDiagnostics to a closed session"));
 }
 ```
 
-`run_event_loop` and `run_effect_loop` are unchanged.
+`map_err(drop)` discards the `SendError<Message>`, which clippy `result_large_err` rejects as a closure's error type. `run_event_loop` and `run_effect_loop` are unchanged.
 
 ## Panics
 
@@ -779,7 +781,7 @@ No sleeps, no polling. A timer fires by the test injecting `IsographEvent::Timer
 
 ### `handle` tests (`crates/isograph_cli/src/state.rs`)
 
-Helpers: `dummy_session(sender, capabilities)` keeps its parameters and writes `published_diagnostics: PublishedDiagnostics::default()`; `diagnostics_capabilities() -> lsp_types::ClientCapabilities` is the default with `text_document: Some(TextDocumentClientCapabilities { publish_diagnostics: Some(Default::default()), ..Default::default() })`; `diagnostics_client(state, client) -> TestClient` starts a client with `diagnostics_capabilities()`; `only_timer(effects) -> TimerEffect<TimerPayload>` panics unless `effects` is exactly one `Timer`; `fire(state, effects) -> Vec<IsographEffect>` is `handle(state, IsographEvent::Timer(only_timer(effects).event))`; `published(client, effects) -> HashMap<String, Vec<Diagnostic>>` performs and drains. Fixture URIs are under `file:///tmp/proj` (`with_config`); `empty` sets `source_globs` to `src/**`.
+Helpers: `dummy_session(sender, capabilities)` keeps its parameters and writes `published_diagnostics: PublishedDiagnostics::default()`; `diagnostics_capabilities() -> lsp_types::ClientCapabilities` is the default with `text_document: Some(TextDocumentClientCapabilities { publish_diagnostics: Some(Default::default()), ..Default::default() })`; `start_with_capabilities(state, client, capabilities) -> crossbeam::channel::Receiver<lsp_server::Message>` starts a client and asserts `Started` returned no effects; `diagnostics_client(state, client)` is that with `diagnostics_capabilities()`; `only_timer(effects) -> TimerEffect<TimerPayload>` panics unless `effects` is exactly one `Timer`; `fire(state, effects) -> Vec<IsographEffect>` is `handle(state, IsographEvent::Timer(only_timer(effects).event))`; `published(effects, rx) -> HashMap<String, Vec<Diagnostic>>` is `perform_all(effects)` then `drained(rx)`, which reads every notification `rx` received, asserts its method and `version: None`, and keys its diagnostics by URI. Fixture URIs are under `file:///tmp/proj` (`with_config`); `empty` sets `source_globs` to `src/**`.
 
 - `didOpen` of `src/x.ts` with `iso(\`entrypoint\`)` returns one `Timer`; firing it returns one `PublishDiagnostics` whose one notification is `file:///tmp/proj/src/x.ts` with non-empty diagnostics, all `ERROR`, source `isograph`, no `code`.
 - UTF-16 range: `didOpen` of `"const é = 1;\nconst 😀 = iso(\`entrypoint\`)"`; with `parsed = parse_iso_literal("entrypoint")`, the first diagnostic starts at line 1, character `"const 😀 = iso(\`".encode_utf16().count() as u32 + parsed.errors[0].location.start`.
