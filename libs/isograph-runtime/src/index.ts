@@ -70,7 +70,14 @@ export {
   retainQuery,
   unretainQuery,
 } from './environment';
-export type { NetworkRequestKey } from './network';
+export {
+  DEFAULT_SHOULD_FETCH_VALUE,
+  fetchEntrypoint,
+  type FetchOptions,
+  getOrCreateCacheForArtifact,
+  type NetworkRequestKey,
+  type ShouldFetch,
+} from './network';
 export {
   callSubscriptions,
   listenToSubscription,

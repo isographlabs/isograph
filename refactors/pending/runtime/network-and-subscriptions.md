@@ -45,7 +45,7 @@ test("render, commit, write, release, collect", async () => {
   expect(network.calls).toHaveLength(1);
   const onResult = vi.fn();
   const [subscriptionItem, releaseSubscriptionRender] = createTemporarilyRetainedCacheItem(
-    () => readAndSubscribe(environment, petDetail.readerArtifact, queryRoot, variables, onResult),
+    () => readAndSubscribe(environment, petDetail.readerArtifact(), queryRoot, variables, onResult),
     () => {},
   );
   const subscription = subscriptionItem.getValue();
@@ -352,7 +352,7 @@ export function getOrCreateCacheForArtifact<
   variables: ExtractParameters<TParam>,
   fetchOptions: FetchOptions<TOutput> | null,
 ): ParentCache<PromiseWrapper<void, unknown>> {
-  const key: NetworkRequestKey = entrypoint.queryText + stableStringify(variables);
+  const key: NetworkRequestKey = entrypoint.queryText + JSON.stringify(stableCopy(variables));
   const existing = environment.networkRequestCache.get(key);
   if (existing !== undefined) {
     return existing;
@@ -363,7 +363,7 @@ export function getOrCreateCacheForArtifact<
 }
 ```
 
-The key is upstream's: `operation.text + JSON.stringify(stableCopy(variables))` (`getOrCreateCacheForArtifact.ts:42-54`). store.md's `stableStringify` is `JSON.stringify` with every object's keys sorted at every depth and arrays in order, which is the text `JSON.stringify(stableCopy(value))` writes for every `JsonValue` (`util.ts:44-59`: `stableCopy` copies each object with its keys sorted, at every depth).
+The key is upstream's: `operation.text + JSON.stringify(stableCopy(variables))` (`getOrCreateCacheForArtifact.ts:42-54`), with the landed `util.ts` `stableCopy`, which copies each object with its keys sorted, at every depth. store.md's `stableStringify` did not land; `storeKey.ts` writes argument values with the same `JSON.stringify(stableCopy(..))`.
 
 The render and commit sequence over it, upstream's `useCachedResponsivePrecommitValue` (`disposable-state/useCachedResponsivePrecommitValue.ts:55-115`) and `useLazyDisposableState` (`disposable-state/useLazyDisposableState.ts:18-57`), with no React:
 
@@ -391,8 +391,8 @@ import { normalize } from "./normalize";
 import { type PromiseWrapper, wrapPromise, wrapResolvedValue } from "./PromiseWrapper";
 import { read } from "./read";
 import type { Variables } from "./store";
-import { stableStringify } from "./storeKey";
 import { callSubscriptions, reportCallbackError } from "./subscribe";
+import { stableCopy } from "./util";
 
 /**
  * Sends `entrypoint`'s query with `variables`, or retains it without sending, by
@@ -447,8 +447,9 @@ function makeNetworkRequest<
   variables: ExtractParameters<TParam>,
   fetchOptions: FetchOptions<TOutput> | null,
 ): ItemCleanupPair<PromiseWrapper<void, unknown>> {
-  const promise = environment.networkFunction({ text: entrypoint.queryText }, variables).then(
-    (response) => {
+  const promise = environment
+    .networkFunction({ text: entrypoint.queryText }, variables)
+    .then((response) => {
       if (status.kind === "Disposed") {
         return;
       }
@@ -459,15 +460,14 @@ function makeNetworkRequest<
         const data = readDataForOnComplete(environment, entrypoint, variables);
         reportCallbackError(() => onComplete(data));
       }
-    },
-    (error: unknown) => {
+    })
+    .catch((error: unknown) => {
       const onError = fetchOptions?.onError;
       if (onError !== undefined) {
         reportCallbackError(onError);
       }
       throw error;
-    },
-  );
+    });
   let status: NetworkRequestStatus = {
     kind: "Undisposed",
     retainedQuery: retainArtifact(environment, entrypoint.normalizationAst, variables),
@@ -504,7 +504,7 @@ function readDataForOnComplete<
   entrypoint: IsographEntrypoint<TParam, TOutput, TEntityName>,
   variables: ExtractParameters<TParam>,
 ): TOutput {
-  const result = read(environment.store, entrypoint.readerArtifact, entrypoint.normalizationAst.root, variables);
+  const result = read(environment.store, entrypoint.readerArtifact(), entrypoint.normalizationAst.root, variables);
   if (result.kind === "MissingData") {
     throw new Error(
       `Reading ${entrypoint.name} right after normalizing its response found missing data: ` +
@@ -520,6 +520,8 @@ function retainArtifact(environment: IsographEnvironment, ast: NormalizationAst,
   return retainedQuery;
 }
 ```
+
+The `onError` arm is a `.catch` after the `.then`, upstream's shape (`makeNetworkRequest.ts:217-307`), so a `normalize` that throws on a malformed response, or a `readDataForOnComplete` that throws, also calls `onError` before the wrapper becomes `Err`; a second argument to `.then` would see only the network function's rejection. `entrypoint.readerArtifact` is a function that returns the reader artifact (the landed `IsographEntrypoint`), so `readDataForOnComplete` calls it.
 
 `status` is declared after the network call so that a network function that throws synchronously, instead of returning a promise, propagates out of `fetchEntrypoint` before anything is retained. The `.then` arms run in a later microtask, after the `let` is initialized. `read` infers `TEntityName` from `entrypoint.readerArtifact`, and `entrypoint.normalizationAst.root` is a `NormalizationRootRecord<TEntityName>`, which `NoInfer<Link<TEntityName>>` accepts (reader-ast.md, The entrypoint's reader artifact).
 

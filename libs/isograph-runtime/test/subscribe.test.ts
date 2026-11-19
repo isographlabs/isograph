@@ -5,16 +5,20 @@ import feedNormalizationAst from '../fixtures/store/src/__isograph/Query/Feed/no
 import feedReaderArtifact from '../fixtures/store/src/__isograph/Query/Feed/resolver_reader';
 import leavesNormalizationAst from '../fixtures/store/src/__isograph/Query/Leaves/normalization_ast';
 import leavesReaderArtifact from '../fixtures/store/src/__isograph/Query/Leaves/resolver_reader';
+import petDetailEntrypoint from '../fixtures/store/src/__isograph/Query/PetDetail/entrypoint';
 import petDetailNormalizationAst from '../fixtures/store/src/__isograph/Query/PetDetail/normalization_ast';
 import petDetailReaderArtifact from '../fixtures/store/src/__isograph/Query/PetDetail/resolver_reader';
 import petListsNormalizationAst from '../fixtures/store/src/__isograph/Query/PetLists/normalization_ast';
 import petSummaryNormalizationAst from '../fixtures/store/src/__isograph/Query/PetSummary/normalization_ast';
 import petSummaryReaderArtifact from '../fixtures/store/src/__isograph/Query/PetSummary/resolver_reader';
+import throwingPetEntrypoint from '../fixtures/store/src/__isograph/Query/ThrowingPet/entrypoint';
 import throwingPetNormalizationAst from '../fixtures/store/src/__isograph/Query/ThrowingPet/normalization_ast';
 import throwingPetReaderArtifact from '../fixtures/store/src/__isograph/Query/ThrowingPet/resolver_reader';
 import {
   callSubscriptions,
   createIsographEnvironment,
+  fetchEntrypoint,
+  getPromiseState,
   type IsographEnvironment,
   type JsonObject,
   type JsonValue,
@@ -596,5 +600,61 @@ describe('degenerate', () => {
     writePetDetail(environment, { name: 'Rexford' });
     writePet9(environment);
     expect(onResult).not.toHaveBeenCalled();
+  });
+});
+
+describe('through fetchEntrypoint', () => {
+  test('the response a request normalizes reaches a subscription made before it', async () => {
+    const network = deferredNetwork();
+    const environment = createIsographEnvironment(
+      new Map(),
+      network.networkFunction,
+    );
+    const onResult = callback();
+    const [subscription] = subscribeToPetDetail(environment, onResult);
+    const [networkRequest] = fetchEntrypoint(
+      environment,
+      petDetailEntrypoint,
+      petDetailVariables,
+      null,
+    );
+
+    network.calls[0]?.resolve(petDetailResponse());
+    await networkRequest.promise;
+    expect(onResult).toHaveBeenCalledTimes(1);
+    expect(onResult.mock.calls[0]?.[0].kind).toBe('Ok');
+    expect(subscriptionSnapshot(subscription)).toBe(
+      onResult.mock.calls[0]?.[0],
+    );
+  });
+
+  test('a read that throws after a response leaves the request Ok', async () => {
+    const network = deferredNetwork();
+    const environment = createIsographEnvironment(
+      new Map(),
+      network.networkFunction,
+    );
+    const onResult = callback();
+    readAndSubscribe(
+      environment,
+      throwingPetEntrypoint.readerArtifact(),
+      queryRoot,
+      { id: '1' },
+      onResult,
+    );
+    const [networkRequest] = fetchEntrypoint(
+      environment,
+      throwingPetEntrypoint,
+      { id: '1' },
+      null,
+    );
+
+    network.calls[0]?.resolve({
+      pet____id___v_id: { __typename: 'Pet', id: '1', name: 'Throw' },
+    });
+    await networkRequest.promise;
+    expect(onResult).toHaveBeenCalledTimes(1);
+    expect(onResult.mock.calls[0]?.[0].kind).toBe('Err');
+    expect(getPromiseState(networkRequest).kind).toBe('Ok');
   });
 });
