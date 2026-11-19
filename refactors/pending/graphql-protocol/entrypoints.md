@@ -34,17 +34,19 @@ iso(`entrypoint Query.HomeRoute`); // ok: Query is the query root
 iso(`entrypoint Mutation.SetTagline`); // ok: Mutation is the mutation root
 iso(`entrypoint Pet.PetSummaryCard`); // ok: Pet implements Node
 iso(`entrypoint PetStats.Card`); // error on `PetStats`
+iso(`entrypoint Node.Card`); // error on `Node` (an interface)
 iso(`entrypoint Owner.Badge`); // error on `Owner` (declared by `entity Owner`)
 iso(`entrypoint Query.pets`); // error on `pets` (a schema field, not a `field` declaration)
 ```
 
-The three errors are LSP diagnostics, published like every other validation error:
+The four errors are LSP diagnostics, published like every other validation error:
 
 - `PetStats`: `` `PetStats` cannot be fetched: it is not a root operation type and does not implement `Node`. ``
+- `Node`: `` `Node` cannot be fetched: only object types can parent an entrypoint. ``
 - `Owner`: `` `Owner` is declared in source files; only entities from the schema can parent an entrypoint. ``
 - `pets`: `` `Query.pets` comes from the schema; an entrypoint names a `field` declaration. ``
 
-`entrypoint Pet.PetSummaryCard` is valid because `Pet` implements `Node` and `Query` has `node(id: ID!): Node`; its query is `node(id: $id) { ... on Pet { ... } }`. `petByName` is not used to fetch `Pet`: in v0 the only entrypoint parents are the root operation types and types that are or implement `Node`.
+`entrypoint Pet.PetSummaryCard` is valid because `Pet` implements `Node` and `Query` has `node(id: ID!): Node`; its query is `node(id: $id) { ... on Pet { ... } }`. `petByName` is not used to fetch `Pet`: in v0 the only entrypoint parents are the root operation types and object types that implement `Node`. Interfaces and unions are not entrypoint parents in v0: an interface implementing `Node` is fetched as `node(id: $id) { ... on ICheckin { .. } }`, where the response's `__typename` is a concrete object type and never `ICheckin`, so the normalizer could not tell which fields the fragment wrote.
 
 A broken `Query.node` is an error on every entrypoint whose parent is fetched through it, and on no root operation type's entrypoint: `node(id: ID!): [Node]` gives `` `Query.node` returns a list; it returns one value. `` on `entrypoint Pet.PetSummaryCard`.
 
@@ -287,7 +289,7 @@ pub enum IdField {
 }
 ```
 
-Scalars and enums are one variant because nothing reads the difference: both print as a bare field name. Object versus interface versus union is read: the printer adds `__typename` under an interface or union, the fetch plan accepts objects and interfaces only. `IdField::Present` is upstream's `server_id_selectable` rule (`isograph/crates/isograph_schema/src/memoized/server_selectable_access.rs`): the type has a field named `id`. Delta: the type must be exactly `ID!`; upstream checks the inner type and has a config option for other types. A field `id: String` is `Absent`, so the printer does not add it.
+Scalars and enums are one variant because nothing reads the difference: both print as a bare field name. Object versus interface versus union is read: `GraphQLNetworkProtocol::entity_shape` (query-generation.md) selects `__typename` under an interface or union, and the fetch plan accepts objects only. `IdField::Present` is upstream's `server_id_selectable` rule (`isograph/crates/isograph_schema/src/memoized/server_selectable_access.rs`): the type has a field named `id`. Delta: the type must be exactly `ID!`; upstream checks the inner type and has a config option for other types. A field `id: String` is `Absent`, so the printer does not add it.
 
 Root operation kind is not entity data, and neither is fetchability. Both depend on definitions other than the entity's own (the schema definition, the query root's fields). Putting them in `GraphQLEntityData` would make `entity_named(Pet)` fail when the schema definition or `type Query` has a syntax error, which breaks integration.md's isolation rule. They are the memos `root_operation_types` and `graphql_fetch_plan` below.
 
@@ -427,10 +429,10 @@ An entrypoint `entrypoint E.f` is allowed when:
 2. `E.f` is a `field` declaration (`SelectableKind::ClientField` or `ClientPointer`). A schema field has no selection set to read.
 3. The protocol's `fetch_plan(E)` is `Ok`.
 
-Rules 1 and 2 are the core's; rule 3 is the protocol's. For GraphQL, `fetch_plan(E)` is `Ok` when `E` is an object or interface and one of these holds, checked in this order, the first that applies deciding:
+Rules 1 and 2 are the core's; rule 3 is the protocol's. For GraphQL, `fetch_plan(E)` is `Ok` when `E` is an object type and one of these holds, checked in this order, the first that applies deciding:
 
 1. `E` is a root operation type: the operation is `query`, `mutation`, or `subscription` with the entrypoint's selections at the top level.
-2. `E` is `Node` or implements `Node`: the operation is a `query` whose top-level selection is the query root's field `node`.
+2. `E` implements `Node`: the operation is a `query` whose top-level selection is the query root's field `node`.
 
 No other entity can parent an entrypoint (Later: fetch fields other than `node`).
 
@@ -499,9 +501,9 @@ pub fn graphql_fetch_plan<TProfile: CompilationProfile>(
 
 The body:
 
-1. `graphql_entity(db, client, entity)`: `Err` is `GraphQLNotFetchable::Entity`, `Ok(None)` is `UnknownEntity`, a variant other than `Object` or `Interface` is `NotObjectOrInterface`.
+1. `graphql_entity(db, client, entity)`: `Err` is `GraphQLNotFetchable::Entity`, `Ok(None)` is `UnknownEntity`, a variant other than `Object` is `NotObject`.
 2. `root_operation_types(db, client)`, `Err` is `RootOperationTypes`. `entity` equal to `query`, `mutation`, or `subscription` is `Root` of that operation type, with `entity` and step 1's data as `entity`.
-3. `entity` named `Node`, or `interfaces` containing `Node`: `node_fetch(db, client, roots.query, entity)`, `Err` is `NodeField`.
+3. `interfaces` containing `Node`: `node_fetch(db, client, roots.query, entity)`, `Err` is `NodeField`.
 4. Otherwise `NoFetchRoot`.
 
 ```rust
@@ -541,8 +543,8 @@ pub enum GraphQLNotFetchable {
     Entity(EntityLookupError),
     #[error("`{0}` is not defined in the schema.")]
     UnknownEntity(EntityName),
-    #[error("`{0}` cannot be fetched: only object and interface types can parent an entrypoint.")]
-    NotObjectOrInterface(EntityName),
+    #[error("`{0}` cannot be fetched: only object types can parent an entrypoint.")]
+    NotObject(EntityName),
     #[error("`{0}` cannot be fetched: it is not a root operation type and does not implement `Node`.")]
     NoFetchRoot(EntityName),
     #[error("{0}")]
@@ -708,7 +710,7 @@ pub type ProfileEntrypointNotFetchableError<TProfile> = EntrypointNotFetchableEr
 
 - `root_operation_types`: pet demo's `schema { query: Query mutation: Mutation }` is `{ Query, Some(Mutation), None }`; no schema definition is `{ Query, Some(Mutation), Some(Subscription) }`; `schema { query: RootQuery }` plus `extend schema { subscription: S }` is `{ RootQuery, None, Some(S) }`; two `schema` definitions in two files is `DuplicateSchemaDefinition` with first from the earlier path; `extend schema { query: A }` with a definition naming `query` is `DuplicateOperation(Query)`; `schema { mutation: M }` is `MissingQuery`; `schema { query: }` is `Syntax`; a broken `type Broken { a: ! }` in the same file does not change the result.
 - `graphql_entity`: `Pet` is `Object` with `interfaces == [Node, Namable]` and `id_field == Present`; `PetStats` is `Object` with `Absent`; a type with `id: String!` is `Absent`; `NewsfeedItem` is `Union`; `ICheckin` is `Interface` with `interfaces == [Node]`; `PetSpecies` and `ID` are `Leaf`; `SetPetTaglineParams` is `InputObject`.
-- `graphql_fetch_plan` over the pet demo schema: `Query` is `Root` with operation type `Query` and `entity.name == Query`; `Mutation` is `Root` with `Mutation`; `Pet` is `Node` with one argument `id` of type `ID!`, refinement `InlineFragment(Pet)`, and `field_target.name == Node`; `ICheckin` (an interface implementing `Node`) is the same with `InlineFragment(ICheckin)`; `Node` itself is `Node` with `Exact`; `PetStats` is `NoFetchRoot`; `NewsfeedItem` is `NotObjectOrInterface`; `String` is `NotObjectOrInterface`; `Nobody` is `UnknownEntity`.
+- `graphql_fetch_plan` over the pet demo schema: `Query` is `Root` with operation type `Query` and `entity.name == Query`; `Mutation` is `Root` with `Mutation`; `Pet` is `Node` with one argument `id` of type `ID!`, refinement `InlineFragment(Pet)`, and `field_target.name == Node`; `ICheckin` (an interface implementing `Node`) is `NotObject`; `Node` itself is `NotObject`; `PetStats` is `NoFetchRoot`; `NewsfeedItem` is `NotObject`; `String` is `NotObject`; with `node(id: ID!): Pet` in place of the demo's `node`, `Pet` is `Node` with `Exact`; `Nobody` is `UnknownEntity`.
 - `petByName(name: String!): Pet` on `Query` changes no plan: `Pet` stays `Node`, `PetStats` stays `NoFetchRoot`.
 - With `node(id: ID!): [Node]`: `Pet` is `NodeField(ReturnsList(Query))`. With `node(id: ID!): Viewer`: `NodeField(TypeMismatch(..))` naming `Viewer` and `Pet`. With no `node` field: `NodeField(NotFound(Query))`. In each failing case, `graphql_fetch_plan(Query)` and `graphql_fetch_plan(Mutation)` are unchanged.
 - `node(id: ID!, hint: Int = 0): Node` gives arguments `id` of type `ID!` and `hint` of type `Int` (nullable, because it has a default).
@@ -723,9 +725,21 @@ pub type ProfileEntrypointNotFetchableError<TProfile> = EntrypointNotFetchableEr
 
 - The pet demo's `entrypoint Query.HomeRoute`, `entrypoint Query.PetDetailRoute`, `entrypoint Query.SpeciesRoute`, and `entrypoint Mutation.SetTagline` have no diagnostics.
 - `entrypoint PetStats.Card` with `field PetStats.Card { weight }` has one diagnostic, on `PetStats`, whose message is the `NoFetchRoot` text.
+- `entrypoint Node.Card` with `field Node.Card { id }` has one diagnostic, on `Node`, whose message is the `NotObject` text.
 - `entrypoint Owner.OwnerBadge` has one diagnostic, on `Owner`, the `SourceEntity` text.
 - `entrypoint Query.pets` has one diagnostic, on `pets`, the `ProtocolSelectable` text.
 - `entrypoint Pet.PetSummaryCard` has no diagnostic; changing `Query.node` to return `[Node]` gives one on `Pet` with the `ReturnsList` text, and `entrypoint Query.HomeRoute` still has none.
+
+## Delta from the landed fetch plan (changes 4 and 5)
+
+Changes 4 and 5 landed with interfaces as entrypoint parents. This section's revision of them is part of query-generation.md change 7:
+
+- `graphql_fetch_plan` step 1 accepts only `Object`; `Interface` joins `Leaf`, `InputObject`, and `Union` in `NotObject`, which replaces `NotObjectOrInterface` and its message.
+- Step 3 drops the `entity == Node` clause: `Node` is an interface and fails step 1.
+- `contains` reads the entity's interfaces only from `GraphQLEntityData::Object`, so its `Interface` arm on the entity's data goes away (query-generation.md, The fetch plan).
+- Tests: `ICheckin` and `Node` are `NotObject` where they were `Node` fetches; `NotObjectOrInterface` assertions become `NotObject`.
+
+`EntrypointNotFetchableError` and `entrypoint_declaration_error` report the new variant with no change of their own: `Protocol(GraphQLNotFetchable::NotObject(_))` is located at `parent_type`, as every `Protocol` reason is.
 
 ## Later
 
