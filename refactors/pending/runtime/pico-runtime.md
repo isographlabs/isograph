@@ -28,7 +28,7 @@ With React, components are resolver results too (`@component`, Later): a compone
 
 ## Recomputation architecture
 
-How level 1 keeps its entries current after a write. pico's algorithm (global epoch, `time_updated` and `time_verified`, verification of dependencies before an entry, backdating) is one candidate, not a given. pico was built for the compiler, where an LSP request demands one memo and everything else stays unverified; the runtime's goal makes every observed entry demanded after every write. This section states the requirements, lays out five candidates against three examples, and compares them. The option it ends on, 3a with compile-time heights and `Stale` marks for entries nobody needs, is held by the user's direction; it is not approved for implementation. The candidates are written against the store's functions: a write is a `normalize` or a `garbageCollect`, and the state a candidate keeps is described without saying where it lives. Under the held design that state lives in `environment.graph`, and the writes are `normalizeData` and `garbageCollectEnvironment`, which call the store's functions (The engine, the store, and the environment).
+How level 1 keeps its entries current after a write. pico's algorithm (global epoch, `time_updated` and `time_verified`, verification of dependencies before an entry, backdating) is one candidate, not a given. pico was built for the compiler, where an LSP request demands one memo and everything else stays unverified; the runtime's goal makes every observed entry demanded after every write. This section states the requirements, lays out five candidates against three examples, and compares them. The option it ends on, 3a with heights computed per entry at run time and `Stale` marks for entries nobody needs, is held by the user's direction; it is not approved for implementation. The candidates are written against the store's functions: a write is a `normalize` or a `garbageCollect`, and the state a candidate keeps is described without saying where it lives. Under the held design that state lives in `environment.graph`, and the writes are `normalizeData` and `garbageCollectEnvironment`, which call the store's functions (The engine, the store, and the environment).
 
 ### Requirements
 
@@ -237,11 +237,19 @@ What remains is order. Three ways.
 
 Jane Street's Incremental: "stabilize traverses the DAG in topological order starting at variables that changed", taking "the lowest-height node" from a recompute heap, recomputing it, and enqueueing its parents when its value changed; a node's height is less than its parents' (`src/incremental_intf.ml` of `janestreet/incremental`). Its heights are dynamic: `bind` creates nodes whose height must exceed the bind's left-hand side, and heights are adjusted as the graph changes.
 
-In isograph the height is static, and the compiler writes it into each reader artifact (change 4, Heights). `height(F)` is 0 when `F`'s reader AST has no `Resolver` node, else `1 + max(height(G))` over the client fields `G` its `Resolver` nodes select. The static reader graph has no cycle: every `Resolver` node of `F`'s reader AST selects a field that query generation inlines into `F` (`inlined_fields`, `crates/isograph_compiler/src/merged_selection.rs`), and a cycle of inlined fields is an `InlineCycle` error, which `reader_height` checks before it recurses. So `height(F) > height(G)` for every `G` that `F`'s reader AST selects.
+In isograph each entry's height is computed at run time from the entries it read (change 4, Heights). When an entry's computation finishes, its height is 0 when it read no other stored resolver result, else `1 + max(height)` over the entries it read. Every entry it read was brought up to date by that read, so their heights are known. An entry's height is above the height of every entry it reads.
 
-The static height orders the runtime graph whatever the data. An entry of `F` on a record is computed by reading `F`'s reader AST from that record and calling `F`'s resolver with the data read. The resolver receives `data` and `parameters` and no store (open decision 8 covers a closure that reaches one), so every stored result the entry reads is read by a `Resolver` node of `F`'s reader AST: an entry of one of the fields `G`, on whichever record the links lead to. Links choose the record, never the field. So every `Resolver` dependency goes from an entry of height `h` to an entry of height below `h`, for every record and every link value, and the runtime graph has no cycle. This argument is this doc's, not Incremental's. It holds while the reader reads no client pointer (open decision 14).
+Heights depend on data, because what an entry reads depends on data:
 
-A write: each entry that read a changed input goes into bucket `height`; buckets are drained lowest first; each entry recomputes, and when its result is unequal (`===`, R4) its dependents go into their buckets; when it is equal nothing is queued. An entry read during a recomputation has a lower height, so its bucket is already drained and it is current. Nothing is marked before it is known to need recomputing: the work of a write is the entries that recompute and the direct dependents of the ones whose result changed.
+- A nullable link. `FriendLabel` on a pet whose `bestFriend` is `null` reads no `PetName` entry, so its height is 0. `FriendLabel` on `Pet:1`, whose `bestFriend` is `Pet:2`, reads `PetName` on `Pet:2`, so its height is 1.
+- A refinement. A `Refinement` node reads its selections only when the record's entity is the condition's entity, and is `null` otherwise (`ReaderRefinementSelection`, `libs/isograph-runtime/src/artifacts.ts`; `read.ts:150-153`). An entry of a field whose `Resolver` node sits under `asPet` reads that resolver's entry on a `Pet` record and reads no entry under the refinement on a record of another entity, so two entries of one field have different heights when their records' entities differ.
+- An eager client pointer (Later). The entry of `field Pet.Card { bestFriend { Card } }` on `Pet:1` reads the entry of `Card` on `Pet:2`, so its height is one more than that entry's.
+
+A height set by one computation can be too low for a later one: after a write sets a `null` `bestFriend` to `Pet:2`, `FriendLabel`'s recomputation reads `PetName` on `Pet:2`, whose height 0 equals its own. Height adjustment restores the order, as Incremental's `adjust_heights` does (`src/adjust_heights_heap.ml` of `janestreet/incremental`). When a recomputation records a dependency whose height is at or above the entry's own, the entry's height rises to one more than that dependency's. Then each dependent whose height is now at or below the height of the entry it reads rises to one more than it, transitively. A dependent queued in the bucket queue moves to its new bucket, as Incremental's `adjust_heights` calls `Recompute_heap.increase_height` on a node in the recompute heap. Heights only rise: a recomputation that reads lower entries, or fewer, keeps its height. Outside a call that is computing a node, every entry's height is above the height of every entry it reads.
+
+Under changes 1 to 4 the runtime graph has no cycle. Every `Resolver` node of `F`'s reader AST selects a field that query generation inlines into `F` (`inlined_fields`, `crates/isograph_compiler/src/merged_selection.rs`), and a cycle of inlined fields is an `InlineCycle` query error (query-generation.md, Cycles). An entry of `F` on a record is computed by reading `F`'s reader AST from that record and calling `F`'s resolver with the data read. The resolver receives `data` and `parameters` and no store (open decision 8 covers a closure that reaches one), so every stored result the entry reads is read by a `Resolver` node of `F`'s reader AST: an entry of one of the fields it selects, on whichever record the links lead to. Links choose the record, never the field, so a cycle of entries would be a cycle of client field selections, and there is none. So adjustment never reaches the dependency that started it. This argument is this doc's, not Incremental's. An eager client pointer makes a cycle of entries possible (open decision 18).
+
+A write: each entry that read a changed input goes into bucket `height`; buckets are drained lowest first; each entry recomputes, and when its result is unequal (`===`, R4) its dependents go into their buckets; when it is equal nothing is queued. An entry read during a recomputation usually has a lower height, so its bucket is already drained and it is current. An entry read at or above the reader's height (an upward read, one of the data-dependent cases above) is brought up to date by the read, and adjustment raises the reader above it (Ordering; open decision 19). Nothing is marked before it is known to need recomputing: the work of a write is the entries that recompute and the direct dependents of the ones whose result changed.
 
 Diamond, with an observer at `BadgePage`, so every entry is needed. Heights `Initial` 0, `Monogram` 1, `Signature` 1, `Badge` 2, `BadgePage` 3. `Rex` to `Max`:
 
@@ -271,7 +279,9 @@ New object, an observer at `ShapePage`, `Rex` to `Ray`: `NameShape` (0) recomput
 
 Chain, observers at `FriendPage` and `PetSummary`, `Pet:2.name`: `PetName` on `Pet:2` (0); then `FriendLabel` (1) and `PetSummary` (1; it also selects `RecentCheckins`, 0, which is not queued); `FriendCard` (2); `FriendPage` (3). Each once. The link move: `Pet:1.bestFriend` queues `FriendLabel` (1), whose recomputation reads `PetName` on `Pet:3`, height 0; absent, it is computed by the read, and its dependencies move from `PetName` on `Pet:2` to `PetName` on `Pet:3`.
 
-- Cost per write: `O(|A'| + dependents of A')` plus one step per bucket up to the largest height queued. Nothing that will not recompute is visited.
+A link set from `null`, an observer at `FriendPage` with `{ id: "4" }`, `Pet:4.bestFriend` `null`: `FriendLabel` on `Pet:4` has height 0, `FriendCard` 1, `FriendPage` 2. A write that sets `Pet:4.bestFriend` to `Pet:2` queues `FriendLabel` at 0. Its recomputation reads `PetName` on `Pet:2`, height 0, so `FriendLabel` rises to 1, `FriendCard` to 2, and `FriendPage` to 3. `FriendLabel`'s result changed, so `FriendCard` is queued at 2, its new height, and `FriendPage` after it at 3.
+
+- Cost per write: `O(|A'| + dependents of A')` plus one step per bucket up to the largest height queued, plus the adjustment walk after each upward read. Nothing that will not recompute is visited, except the dependents adjustment raises.
 - Failure mode of plain 3a: it recomputes every entry with a changed input, whether or not anything needs it. An entry whose retention was disposed, or that a plain `read` stored, recomputes on every relevant write until `garbageCollect` deletes it.
 
 Held 3a adds `Stale` marks for entries nobody needs (change 4). Each entry counts the observers at its location plus its needed dependents (`neededCount`); it is needed when the count is above 0. An entry whose input changed is queued when it is needed. Otherwise it and its dependents, transitively, are marked `Stale` and not queued; the marking stops at an entry already `Stale`. A read of a `Stale` entry recomputes it, and each `Stale` entry it reads is brought up to date by that read first. Every dependent of an entry nobody needs is itself not needed, so `Stale` marking never reaches a needed entry, and the queue never holds an entry nobody needs.
@@ -370,20 +380,20 @@ The simplest eager baseline. No dependencies stored at all. After every write, s
 - R6: 1 fails; the rest meet it.
 - R8, what each does with `C`: 1 needs it at record granularity; 2 turns it into stamps and rediscovers it by walking `E`; 3a, 3b, 3c, 4 start from it; 5 ignores it.
 - Per write with a small change on a large screen: 1 `O(overlapping subscription trees)`; 2 `O(R + E)`; held 3a the `A'` recomputations among needed entries plus the dependents of those whose result changed, and one `Stale` mark per entry nobody needs that the write reaches and that is not `Stale` already; 3b and 3c `O(A)` (3b starts settlement from the marked roots); 5 `O(L)` resolver calls.
-- Memory beyond the results: 2 a tag and epoch on all `S` server values, two epochs and forward edges per entry; 3a, 3b, 3c, 4 forward and reverse edges, plus a dependents index for the server locations live entries read (only those, not all of `S`); held 3a a state and a needed count per entry, the bucket queue, and a height per artifact, written by the compiler; 3b a state per entry; 4 a version per edge.
-- Machinery (R9): 2 has the fewest invariants (no inverse to keep). Held 3a adds the inverse, a three-valued state, the needed count, and the bucket queue; the runtime never computes or adjusts a height. 3b adds the inverse, a three-valued state, mark, and bring-up-to-date. 3c and 4 add 3b's pieces plus counters or versions.
+- Memory beyond the results: 2 a tag and epoch on all `S` server values, two epochs and forward edges per entry; 3a, 3b, 3c, 4 forward and reverse edges, plus a dependents index for the server locations live entries read (only those, not all of `S`); held 3a a state, a needed count, and a height per entry, and the bucket queue; 3b a state per entry; 4 a version per edge.
+- Machinery (R9): 2 has the fewest invariants (no inverse to keep). Held 3a adds the inverse, a three-valued state, the needed count, the bucket queue, and height adjustment after an upward read. 3b adds the inverse, a three-valued state, mark, and bring-up-to-date. 3c and 4 add 3b's pieces plus counters or versions.
 - Unreached entries (a disposed retention before `garbageCollect`, a plain `read` outside any retention, a retained query nobody observes): 2, held 3a, 3b, 4 do not recompute them until read; held 3a marks each `Stale` once and later writes stop at it. Plain 3a and 3c recompute them.
 - A read of an entry nobody needs, after a write that reached it: 3b brings its dependencies up to date in order and skips the recomputation when none changed; held 3a recomputes every `Stale` entry the read reaches (open decision 15).
 
 For a sense of scale, from no measurement: a screen with 2,000 live entries averaging 5 dependencies is 10,000 epoch comparisons, each two or three `Map` lookups, for every write under 2, including a write of one field that one entry reads; under held 3a the same write recomputes that entry, and visits its dependents only if its result changed.
 
-### Held: 3a, height-ordered push with compile-time heights and `Stale` marks
+### Held: 3a, height-ordered push with per-entry heights and `Stale` marks
 
 The eager requirement removes the one thing pico's epochs are for: pull verification exists so that undemanded memos are never visited, and R2 demands every observed entry after every write, so 2 visits every edge under the observed roots on every write while `normalize` already holds the exact set of changed locations and discards it into stamps. Push from that set bounds each write by what it affects.
 
 Among the push orderings, held 3a does the least work. A write recomputes the needed entries that read a changed input; an entry whose result changed queues its direct dependents, and one whose result is `===` its previous one queues nothing. Nothing is marked in advance: there are no `Check` marks to set while writing and none to clear above an unchanged result, which 3b pays for with a walk over `A` (Candidate 3b, Why `Check` marks exist). In the diamond with `Rex` to `Ray`, held 3a visits `Initial`; 3b marks and then clears `Monogram`, `Signature`, `Badge`, and `BadgePage`. With no cutoff (every resolver returns a new object), `A'` is `A` and the two make the same recomputations; held 3a still skips 3b's marking walk. Its ordering state is one bucket queue, an array indexed by height, drained lowest first.
 
-The classic objection to 3a is the cost of maintaining heights: Incremental keeps heights consistent as `bind` changes the graph, adjusting a node's height and its parents' when a new edge would point upward. That cost does not exist here. The compiler writes each reader artifact's height, and the runtime graph only gains edges from an entry to entries of fields its reader AST selects, which are lower by construction (Candidate 3a). A dependency that moves with a link (`PetName` on `Pet:2` to `PetName` on `Pet:3`) keeps its height. The runtime never computes, compares, or adjusts a height.
+The classic objection to 3a is the cost of maintaining heights: Incremental keeps heights consistent as `bind` changes the graph, adjusting a node's height and its parents' when a new edge would point upward. Held 3a pays that cost only where data makes an edge point upward. An entry's height comes from what its computation read (Candidate 3a). Most recomputations read only entries below the entry: a dependency that moves with a link (`PetName` on `Pet:2` to `PetName` on `Pet:3`) keeps its height, and the recomputation compares one height per entry it read. A recomputation that reads an entry at or above its own height (a link set from `null`, a refinement on a record of another entity, an eager client pointer) runs the adjustment walk over the dependents whose heights rise (change 4, Heights).
 
 The earlier objection to 3a here was its lack of a lazy mode: it recomputed entries no root reaches until `garbageCollect`, and R10's laziness needed 3b's marks. `Stale` marks for entries nobody needs remove it from day one. A needed entry is never `Stale`, an entry nobody needs is never queued, and the needed count that separates them is the observed count R10 asks for. Laziness costs one `Stale` mark per entry nobody needs that a write reaches; marking stops at an entry already `Stale`, so a second write to the same input marks nothing new.
 
@@ -395,7 +405,7 @@ Held 3a's bound does not depend on equality cutoff, which stays a `===` optimiza
 
 ### What depends on this choice
 
-Written for held 3a, and changed if another candidate is chosen: Steps; change 2 except The resolver store key and Results, equality, and a resolver that throws; Ordering; change 3's Computing the new root, Unobserved results are lazy, and Garbage collection; change 4 except `listen`, `snapshot`, and `Observed`; the engine's functions in changes 2 to 4; Values with lifecycles' Replacement and release; the mentions of `dependents` and marking in Follow-ups 1, 8, and 9; and open decisions 2, 3, 4, 6, 8, 11, 14, 15, and 16. Each of those sections in Steps and changes 2 to 4 opens with a line saying so.
+Written for held 3a, and changed if another candidate is chosen: Steps; change 2 except The resolver store key and Results, equality, and a resolver that throws; Ordering; change 3's Computing the new root, Unobserved results are lazy, and Garbage collection; change 4 except `listen`, `snapshot`, and `Observed`; the engine's functions in changes 2 to 4; Values with lifecycles' Replacement and release; the mentions of `dependents` and marking in Follow-ups 1, 8, and 9; and open decisions 2, 3, 4, 6, 8, 11, 14, 15, 16, 18, and 19. Each of those sections in Steps and changes 2 to 4 opens with a line saying so.
 
 Independent of it: Two levels, Step A, End-user experience, change 1, The resolver store key with `ReaderArtifact.selectableName`, Results, equality, and a resolver that throws, change 3's `normalizeData` signature, `Retention`, and Resolver markers, change 4's `listen`, `snapshot`, and `Observed`, The engine, the store, and the environment, Other node kinds, Later, the rest of Follow-ups, and open decisions 1, 5, 7, 9, 10, 12, 13, and 17.
 
@@ -570,7 +580,7 @@ A cleanup is never called twice by the engine; a handle's own second-call throw 
 
 ## Steps
 
-Depends on the held architecture (3a with compile-time heights and `Stale` marks) in changes 2 to 4.
+Depends on the held architecture (3a with per-entry heights and `Stale` marks) in changes 2 to 4.
 
 Each change is one commit, in order; change 2 is two. Step A is optional and independent of 1 to 4.
 
@@ -579,7 +589,7 @@ Each change is one commit, in order; change 2 is two. Step A is optional and ind
 - 2a. `graph.ts`, the engine's lazy half, over opaque `InputId`s and `NodeId`s, importing nothing from the store, the reader, or the environment: nodes, `setDependencies`, `markChanged` marking `Stale`, `bringUpToDate`, `track`, `deleteInput`. Its tests use literal ids.
 - 2b. Stored resolver results. The environment gains `graph`. The reader's walk takes `ReadHooks`, and `readStoredResult` reads a resolver through the graph, storing each resolver's result with its dependencies and their inverse. `normalizeData` marks `Stale` every node that read what `normalize` changed and every node that reads those, transitively, stopping at a node already `Stale`; `garbageCollectEnvironment` does the same for each record `garbageCollect` deleted and disposes the nodes the record owned. A read of a `Stale` node recomputes it, each node it reads brought up to date by that read first. There are no observers, so nothing is needed, nothing is queued, and no height exists.
 - 3. Level 1 retention. `normalizeData` takes the entrypoint, computes its root result and every result that result reaches by a read of the root, holds the root in the graph, and adds its `Retention` to `environment.retainedQueries`. `garbageCollectEnvironment` disposes the nodes no held root reaches. A later write marks a retained query's affected nodes `Stale`.
-- 4. Level 2 and the height-ordered push. The compiler writes each reader artifact's `height` (Rust and TypeScript). Nodes gain `height`, `neededCount`, and the state `Queued`; the graph gains the bucket queue and the observers. `listen` brings its node up to date and adds to the needed counts; `snapshot` is a lookup. A write queues each needed node whose input changed and marks the others `Stale`; `settle` drains the queue lowest height first, queuing the direct dependents of each node whose result changed. Observers are notified once, after the pass. `garbageCollectEnvironment` settles and notifies after its deletions.
+- 4. Level 2 and the height-ordered push. Nodes gain `height`, set from what each computation read and raised by adjustment after an upward read, `neededCount`, and the state `Queued`; the graph gains the bucket queue and the observers. `listen` brings its node up to date and adds to the needed counts; `snapshot` is a lookup. A write queues each needed node whose input changed and marks the others `Stale`; `settle` drains the queue lowest height first, queuing the direct dependents of each node whose result changed. Observers are notified once, after the pass. `garbageCollectEnvironment` settles and notifies after its deletions.
 
 Values with lifecycles (open decision 13) adds no change here: it is a later change, with the first feature that produces a disposable value, and adds `Disposable` computations, `holding`, `pendingReleases`, and `flushReleases` to the engine.
 
@@ -1751,11 +1761,12 @@ New in `test/garbageCollection.test.ts`: `garbageCollect` with nothing retained 
 
 Depends on the held architecture.
 
-A write can make several stored results stale at once. R3 holds on both paths, and observers (change 4) add nothing that could break it:
+A write can make several stored results stale at once. R3 holds on the read path, and on the push for every read of an entry below the reader's height; an upward read during the push is the exception (Once per pass, below; open decision 19):
 
-- Heights. A reader artifact's height is above the height of every client field its `Resolver` nodes select (change 4, Heights), and an entry reads only entries of those fields, on whatever records the links lead to (Candidate 3a). So every entry an entry reads has a lower height, for every record and link value.
-- The read path (change 2, The engine). A `Stale` entry recomputes when read, and each entry its computation reads is brought up to date by that read first. It recomputes once: it ends `Clean`, and only marking, which does not run during a read, makes it `Stale` again. The recursion terminates because heights decrease along it.
-- The push (change 4, Settlement). `settle` drains bucket 0, then bucket 1, and so on. An entry of height `h` recomputes after every bucket below `h` is empty. Each entry it reads has a lower height and is `Clean` (recomputed in this pass, or not invalidated), or `Stale` or absent, in which case the read computes it before returning. A recomputation during the drain of bucket `h` queues only dependents of the entry it recomputed: an entry of height `h` queues entries of greater height, and an entry the read path recomputes queues nothing, because its dependents are `Stale` (change 2's invariant) or the entry being computed. So no bucket at or below `h` gains an entry once its drain has started, and an entry recomputes at most once per pass.
+- Heights (change 4, Heights). An entry's height is above the height of every entry it reads. Its computation sets the height from what it read, and adjustment raises it and its dependents, transitively, when a recomputation reads an entry at or above it. Change 2 has no heights.
+- The read path (change 2, The engine). A `Stale` entry recomputes when read, and each entry its computation reads is brought up to date by that read first. It recomputes once: it ends `Clean`, and only marking, which does not run during a read, makes it `Stale` again. The recursion terminates because the runtime graph has no cycle (Cycles, below).
+- The push (change 4, Settlement). `settle` drains bucket 0, then bucket 1, and so on. An entry of height `h` recomputes after every bucket below `h` is empty. Each entry it reads is `Clean`, `Queued`, `Stale`, or absent, and the read brings a `Queued`, `Stale`, or absent one up to date before returning. An entry it reads below `h` is current: everything that entry reads is lower still, and those buckets are empty. During the drain of bucket `h`, two things add to the queue, and both add above `h`. First, a recomputed entry whose result changed queues its dependents. That entry was `Queued` at a height at or above `h`, so its dependents are above `h`, or it was `Stale`, so its dependents are `Stale` (change 2's invariant) or the entry computing, and it queues none. Second, adjustment moves a raised `Queued` entry to a higher bucket. The entry that started the raise recomputed during the drain of `h`, so it was `Queued` at a height at or above `h` or was `Stale`. Its `Queued` dependents are above its old height, so above `h`, and adjustment only raises them. A `Stale` entry's dependents are `Stale` or computing, and neither is in a bucket. So no bucket at or below `h` gains an entry once its drain has started.
+- Once per pass. An entry recomputes at most once per pass when every entry it reads is below it. An upward read can break this. An entry `X` of `field Pet.Y { bestFriend { FriendCard } }` on `Pet:5`, observed, with `Pet:5.bestFriend` `null`, has height 0, and `FriendCard` on `Pet:1` is needed by an observer at `FriendPage`, at height 2. One write sets `Pet:5.bestFriend` to `Pet:1` and changes `Pet:2.name`, which queues `X` and `PetName` on `Pet:2` at 0. When `X` drains first, it reads `FriendCard` on `Pet:1`, `Clean`, which returns its result from before the write, because `PetName` on `Pet:2` below it has not recomputed; `X` rises to 3. Then `PetName` on `Pet:2` recomputes and its change queues `FriendLabel` at 1, `FriendLabel` queues `FriendCard` at 2, and `FriendCard` queues `X` at 3, which recomputes a second time. Every result is current when `settle` returns, and observers are notified once, after it; `X`'s resolver was called twice, once with stale data, which R3 excludes. Open decision 19.
 
 Equality cutoff is `recompute`'s, by `resultsEqual`, on the push: an entry whose result is `===` its previous one queues nothing. A new object always queues its dependents. The read path has no cutoff (open decision 15). Cutoff is an optimization (R4); R3 holds whether or not any result cuts off. The traces are in Candidate 3a.
 
@@ -1768,7 +1779,7 @@ Two selections of one client field on one record with equal argument values are 
 - A level 2 callback never runs during recalculation: change 4 calls callbacks only after `settle` has emptied the queue, so every needed entry is `Clean`. A callback that calls `snapshot` receives the stored result, which is current for every needed entry; one that calls `readStoredResult` receives a current result for any entry, because the read recomputes a `Stale` one. A callback that calls `normalizeData` runs a nested write, settlement, and notification; when it returns, the outer notification loop compares each remaining observer's stored result with the one it last notified, so no observer is called twice for one result or receives an older result after a newer one.
 - A `readStoredResult` outside a write is the read path. It meets no `Queued` entry, because `normalizeData` and `garbageCollectEnvironment` empty the queue before they return.
 - A resolver that reads or writes the store (through a closure, since its parameter holds no store) during its own computation breaks the guarantee: its inner `readStoredResult` records no dependency on the outer entry, and an inner `normalizeData` marks and queues entries while an outer recomputation is reading them. Open decision 8.
-- Cycles: none. The static reader graph has none (a cycle of client field selections is an `InlineCycle` query error, query-generation.md, Cycles, which `reader_height` also checks), and every runtime dependency goes to a lower height, so no entry is reached again while it computes, and marking terminates.
+- Cycles: none under changes 1 to 4. The static reader graph has none (a cycle of client field selections is an `InlineCycle` query error, query-generation.md, Cycles), and every runtime dependency goes to an entry of a field the reader AST selects (Candidate 3a), so no entry is reached again while it computes, marking terminates, and adjustment never reaches the dependency that started it. An eager client pointer makes a cycle of entries possible (open decision 18).
 
 ## 3. Level 1: `normalizeData` retains and computes its root
 
@@ -1959,170 +1970,67 @@ This change adds observers, and with them needed entries: an entry is needed whe
 
 ### Heights
 
-The compiler writes each reader artifact's height. Its reader is the bucket queue (Settlement), so it lands in this change.
-
-```rust
-// from crates/isograph_compiler/src/reader_ast.rs
-/// A reader artifact's height: 0 when its reader AST has no `Resolver` node, else one more
-/// than the largest height of the client fields its `Resolver` nodes select.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ReaderHeight(pub u32);
-
-impl ReaderHeight {
-    pub(crate) fn above(self) -> ReaderHeight {
-        ReaderHeight(self.0.saturating_add(1))
-    }
-}
-
-/// The client fields of `selection_set`'s `Resolver` nodes, at any depth, in selection order.
-pub(crate) fn resolver_fields(
-    selection_set: &ReaderSelectionSet,
-) -> Box<dyn Iterator<Item = EntityNameAndSelectableName> + '_> {
-    selection_set
-        .0
-        .iter()
-        .flat_map(
-            |selection| -> Box<dyn Iterator<Item = EntityNameAndSelectableName> + '_> {
-                match selection {
-                    ReaderSelection::Scalar(_) => std::iter::empty().boxed(),
-                    ReaderSelection::Linked(linked) => resolver_fields(linked.selections.reference()),
-                    ReaderSelection::Refinement(refinement) => {
-                        resolver_fields(refinement.selections.reference())
-                    }
-                    ReaderSelection::Resolver(resolver) => std::iter::once(resolver.field).boxed(),
-                }
-            },
-        )
-        .boxed()
-}
-```
-
-The iterator is boxed because it recurses into nested selection sets.
-
-```rust
-// from crates/isograph_compiler/src/artifact_types.rs
-/// The height of `field`'s reader artifact.
-#[memo]
-pub fn reader_height<TProfile: CompilationProfile>(
-    db: &IsographDb<TProfile>,
-    client: ClientId,
-    field: EntityNameAndSelectableName,
-) -> Result<ReaderHeight, GenerationError> {
-    let key = SelectableKey {
-        entity: field.parent_entity_name,
-        selectable: field.selectable_name,
-    };
-    if let Some(cycle) = inline_cycle(db, client, key) {
-        return GenerationError::InlineCycle(cycle).wrap_err();
-    }
-    let types = field_types(db, client, field)
-        .as_ref()
-        .map_err(GenerationError::clone)?;
-    resolver_fields(types.reader_ast.reference())
-        .map(|selected| {
-            reader_height(db, client, selected)
-                .clone()
-                .map(ReaderHeight::above)
-        })
-        .try_fold(ReaderHeight::default(), |highest, height| {
-            height.map(|height| highest.max(height))
-        })
-}
-```
-
-`inline_cycle` (`merged_selection.rs`) becomes `pub(crate)`. `GenerationError` gains:
-
-```rust
-// from crates/isograph_compiler/src/artifact_types.rs
-    #[error("These fields inline each other: {}.", .0.display())]
-    InlineCycle(InlineCycle),
-```
-
-The guard comes first because pico panics on a memo cycle (pico.md). `inline_cycle` returns the first cycle reachable from `key` in the graph of `inlined_fields`, whether or not it contains `key`. When `field_types` succeeds, every `Resolver` node of its reader AST selects a field of `inlined_fields(entity, selectable)`: both walk the declaration's selection set, recurse into server selections with a nested selection set, list client field selections, and skip client pointers, and a failed lookup fails `field_types`. So the recursion runs on a subgraph of a graph `inline_cycle` found acyclic, and terminates. A field reachable from an entrypoint whose query compiled has no reachable cycle; for one that has, `reader_height` returns the cycle `field_selection_map` also reports, `project_artifacts` returns it, and no artifact is written (reader-ast.md relies on the same rule: a failed query writes no artifacts).
-
-The height rides with the reader AST, because it exists exactly when a reader artifact is generated:
-
-```rust
-// from crates/isograph_compiler/src/artifact_types.rs
-/// What a field's `resolver_reader.ts` holds besides its resolver.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ResolverReader {
-    pub reader_ast: ReaderSelectionSet,
-    pub height: ReaderHeight,
-}
-
-// FieldArtifacts, before:
-    /// The reader AST, when the field is reachable from an entrypoint.
-    pub resolver_reader: Option<ReaderSelectionSet>,
-// after:
-    /// The reader, when the field is reachable from an entrypoint.
-    pub resolver_reader: Option<ResolverReader>,
-```
-
-```rust
-// from crates/isograph_compiler/src/artifact_types.rs
-// project_artifacts, before:
-                resolver_reader: reachable.contains(field.reference()).then_some(types.reader_ast),
-// after:
-                resolver_reader: reachable
-                    .contains(field.reference())
-                    .then(|| {
-                        reader_height(db, client, field)
-                            .clone()
-                            .map(|height| ResolverReader {
-                                reader_ast: types.reader_ast,
-                                height,
-                            })
-                    })
-                    .transpose()?,
-```
-
-`isograph_compiler`'s `lib.rs` exports `ReaderHeight`, `ResolverReader`, and `reader_height`.
-
-The printer writes `height` after change 2's `selectableName`:
-
-```rust
-// from crates/typescript_artifacts/src/reader_artifact.rs
-// reader_artifact_file, before:
-    reader: &ReaderSelectionSet,
-    // ..
-    let value = ArtifactValue::Object(vec![
-        entry("readerAst", selection_set_value(reader)),
-        entry(
-            "resolver",
-            // .. unchanged
-        ),
-    ]);
-// after:
-    reader: &ResolverReader,
-    // ..
-    let value = ArtifactValue::Object(vec![
-        entry("selectableName", string(field.field.selectable_name)),
-        entry("height", ArtifactValue::Number(f64::from(reader.height.0))),
-        entry("readerAst", selection_set_value(reader.reader_ast.reference())),
-        entry(
-            "resolver",
-            // .. unchanged
-        ),
-    ]);
-```
-
-`f64::from(u32)` is exact. The caller in `typescript_artifacts/src/lib.rs` passes `field.resolver_reader.as_ref()` unchanged, now a `&ResolverReader`. Test constructors that build `resolver_reader: ReaderSelectionSet(..).wrap_some()` (`reader_artifact.rs` `field_in` and `printed`, `lib.rs`) build `ResolverReader { reader_ast: ReaderSelectionSet(..), height: ReaderHeight::default() }` instead.
+A node's height comes from what its computation read. `createNode` sets it; `recompute` raises it when the computation read a node at or above it. Its reader is the bucket queue (Settlement), so it lands in this change.
 
 ```ts
-// from libs/isograph-runtime/src/artifacts.ts
-export type ReaderArtifact<TParam, TOutput> = {
-  /** The client field's selectable name: the prefix of its resolver store key. */
-  readonly selectableName: string;
-  /** 0 when `readerAst` has no `Resolver` node, else one more than the largest `height` of the
-   * reader artifacts its `Resolver` nodes import. */
-  readonly height: number;
-  readonly readerAst: ReaderSelectionSet;
-  resolver(param: TParam): TOutput;
-};
+// from libs/isograph-runtime/src/graph.ts
+/** 0 when `dependencies` hold no `Node` dependency, else one more than the largest `height` among them. */
+function heightAbove<TValue>(dependencies: ReadonlyArray<GraphDependency<TValue>>): number {
+  return dependencies.reduce(
+    (height, dependency) =>
+      dependency.kind === 'Node' ? Math.max(height, dependency.node.height + 1) : height,
+    0,
+  );
+}
+
+/** Sets `node.height` to `height`, moving the node to `graph.queue[height]` when it is in its
+ * bucket, then raises each dependent whose height is not above `height` to one more, transitively. */
+function raiseHeight<TValue>(
+  graph: RecomputationGraph<TValue>,
+  node: GraphNode<TValue>,
+  height: number,
+): void {
+  if (graph.queue[node.height]?.delete(node) === true) {
+    bucket(graph, height).add(node);
+  }
+  node.height = height;
+  node.dependents.forEach((dependent) => {
+    if (dependent.height <= height) {
+      raiseHeight(graph, dependent, height + 1);
+    }
+  });
+}
 ```
 
-Delta from the landed type: it has a third parameter, `TEntityName` (reader-ast.md), which this doc's snippets omit, as change 2's do. `Pet/fullName/resolver_reader.ts` gains `height: 0,` after `selectableName: "fullName",`. The runtime reads `artifact.height` and never computes one.
+```ts
+// from libs/isograph-runtime/src/graph.ts
+// createNode, before (change 2):
+    value: computed.value,
+    state: 'Clean',
+// after:
+    value: computed.value,
+    state: 'Clean',
+    height: heightAbove(computed.dependencies),
+
+// recompute, before (change 2):
+  const computed = compute(graph, node.computation);
+  setDependencies(graph, node, computed.dependencies);
+// after:
+  const computed = compute(graph, node.computation);
+  setDependencies(graph, node, computed.dependencies);
+  const height = heightAbove(computed.dependencies);
+  if (height > node.height) {
+    raiseHeight(graph, node, height);
+  }
+```
+
+Every node a computation read was brought up to date by `readNode` before the computation used its value, so `heightAbove` reads final heights. A new node has no dependents yet, so `createNode` raises nothing. `recompute` raises before Propagation's `invalidate` of its dependents, so a dependent is queued at its raised height. A node that is computing is not in a bucket (`bringUpToDate` removed it), so `raiseHeight` moves only `Queued` nodes waiting in their buckets.
+
+Raising during `settle` never adds to a drained bucket. The node that starts a raise recomputed during the drain of bucket `h`, so it was `Queued` at a height at or above `h` or was `Stale`. A `Queued` dependent of it has a height above its old height, so above `h`, and moves only upward; the dependents of a `Stale` node are `Stale` or the node computing, and neither is in a bucket (Ordering).
+
+Cost: `heightAbove` is one comparison per dependency of every computation. `raiseHeight` runs only after a recomputation that read a node at or above its own height, and visits the raised nodes and their dependents. A dependent reachable along several paths of the raised region can be raised once per path that raises it further. Nothing lowers a height, so a node whose computation later reads lower nodes keeps the bucket it reached.
+
+`raiseHeight` reaching the dependency that started the raise is a cycle of entries. Changes 1 to 4 cannot reach it (Ordering, Cycles); without a check the recursion would not terminate on one. What the runtime does there is open decision 18.
 
 ### Needed nodes
 
@@ -2130,19 +2038,11 @@ Delta from the landed type: it has a third parameter, `TEntityName` (reader-ast.
 // from libs/isograph-runtime/src/graph.ts
 export type GraphNode<TValue> = {
   // .. change 2 and 3's fields, and:
-  /** Every node this one reads has a lower height. `NodeDefinition.height`, copied at creation. */
-  readonly height: number;
+  /** Above the height of every node this one reads. Set by `createNode`, raised by `recompute` (Heights). */
+  height: number;
   /** The callbacks `observe` holds at this node plus the dependents whose `neededCount` is
    * above 0. The node is needed when it is above 0. */
   neededCount: number;
-};
-
-/** What creating an absent node needs. */
-export type NodeDefinition<TValue> = {
-  readonly owner: InputId;
-  /** For a resolver entry, the reader artifact's `height`. */
-  readonly height: number;
-  readonly computation: Computation<TValue>;
 };
 
 /**
@@ -2152,8 +2052,6 @@ export type NodeDefinition<TValue> = {
  */
 export type NodeState = 'Clean' | 'Queued' | 'Stale';
 ```
-
-`resolverDefinition` (change 2) adds `height: artifact.height`.
 
 ```ts
 // from libs/isograph-runtime/src/graph.ts
@@ -2188,6 +2086,7 @@ Invariants, outside a call that is computing a node:
 
 - `neededCount` is the callbacks at the node's id plus the number of its dependents whose `neededCount` is above 0.
 - Every dependent of a `Stale` node is `Stale` (change 2). So every node a `Clean` node reads is `Clean`, and so is everything below it.
+- Every node's height is above the height of every node it reads (Heights).
 - No needed node is `Stale`, and every `Queued` node is needed.
 - When `normalizeData` and `garbageCollectEnvironment` return, no node is `Queued`.
 
@@ -2377,13 +2276,7 @@ An observer keeps its node current (it makes the node needed, so a write that re
 
 ### Tests
 
-New cases in the compiler:
-
-- `crates/graphql_network_protocol/src/tests/reader_ast.rs`, with change 2's fixture sources: `reader_height` of `Pet.Initial` is `ReaderHeight(0)`, of `Pet.Monogram` and `Pet.Signature` `ReaderHeight(1)`, of `Pet.Badge` `ReaderHeight(2)`, of `Query.BadgePage` `ReaderHeight(3)` (its `Resolver` node is under `pet`), of `Pet.FriendLabel` `ReaderHeight(1)` (under `bestFriend`), and of a field whose only client selection is a client pointer `ReaderHeight(0)`.
-- The same file, with `field Pet.A { B }` and `field Pet.B { A }`: `reader_height` of `Pet.A` is `Err(GenerationError::InlineCycle(..))` naming `Pet.A` and `Pet.B`, and returns (no pico cycle panic).
-- `crates/typescript_artifacts`: a reader artifact whose `ResolverReader` has `ReaderHeight(2)` prints `height: 2` after `selectableName`.
-
-`test/graph.test.ts` gains, with literal ids and heights: two needed nodes of heights 0 and 1 that both read input `a`, the second also reading the first: `markChanged([a])` then `settle` runs the height-0 computation before the height-1 one, each once. A node nobody needs that read `a` is `Stale` after `markChanged([a])` and is not recomputed by `settle`. `observe` of an absent id registers only; the node created later starts with `rootCount` and `neededCount` 1.
+`test/graph.test.ts` gains, with literal ids: a node that reads no node has height 0, and one that reads nodes of heights 0 and 2 has height 3. Two needed nodes that both read input `a`, the second also reading the first (heights 0 and 1): `markChanged([a])` then `settle` runs the height-0 computation before the height-1 one, each once. A node nobody needs that read `a` is `Stale` after `markChanged([a])` and is not recomputed by `settle`. `observe` of an absent id registers only; the node created later starts with `rootCount` and `neededCount` 1. Adjustment: a needed node of height 0 whose recomputation after `markChanged` reads a node of height 1 has height 2, and its dependent of height 1 has height 3; a `Queued` dependent it raises is recomputed after the nodes below its new height. A node of height 2 whose recomputation reads no node keeps height 2.
 
 `test/level2.test.ts`, over an environment built with `createIsographEnvironment(new Map(), deferredNetwork().networkFunction)`:
 
@@ -2396,6 +2289,7 @@ New cases in the compiler:
 - One of two paths needed: an observer at `FriendPage`, `PetSummary` with `{ id: "2" }` retained and not observed; `Pet:2.name` changes: `PetName` on `Pet:2`, `FriendLabel`, `FriendCard`, and `FriendPage` are called once each inside the `normalizeData`, and `PetSummary` zero times; the next `readStoredResult` of `PetSummary` calls `PetSummary` once and `PetName` zero times.
 - Retained, not observed: `BadgePage` retained, `Rex` to `Max` through a `PetDetail` response: none of `BadgePage`'s resolvers is called inside that `normalizeData`, and `snapshot` at `BadgePage` returns the previous result; `listen` at `BadgePage` then calls each of the five once and calls no callback, and `snapshot` returns the new result.
 - The stop function: after the only observer at `BadgePage` stops, `Rex` to `Max` calls no resolver; `snapshot` still works.
+- A link set from `null` under an observer at `FriendPage` with `{ id: "4" }`, `Pet:4.bestFriend` `null`: a write that sets it to `Pet:2` calls `FriendLabel` on `Pet:4`, `PetName` on `Pet:2`, `FriendCard`, and `FriendPage` once each. Then `Pet:2.name` changes: `PetName` on `Pet:2`, `FriendLabel` on `Pet:4`, `FriendCard`, and `FriendPage` are called once each, in that order.
 - Link move under an observer at `FriendPage`: `Pet:1.bestFriend` moves to `Pet:3` (with `name` and `nickname`): inside that `normalizeData`, `FriendLabel` is called once and `PetName` on `Pet:3` once. Then `Pet:2.name` changes: no resolver is called. Then `Pet:3.name` changes: `PetName` on `Pet:3`, `FriendLabel`, `FriendCard`, and `FriendPage` are called once each.
 - An observer at `FriendPage` whose retention was disposed: `garbageCollectEnvironment` deletes the records, calls the observer once inside it, `snapshot` returns `undefined`, and `environment.store` is `toEqual(new Map())`.
 - A callback that calls `normalizeData` with another change: the nested call notifies; each observer receives each result once.
@@ -2406,27 +2300,27 @@ New cases in the compiler:
 - `refactors/pending/runtime/store.md`: "`pico-runtime.md` stays parked" is replaced by this doc as the step after v1. `Store` is unchanged, and its functions keep their parameters and its tests hold. `normalize` writes through `writeValue`, skipping a value unchanged by its AST shape, returns `ReadonlyArray<StoreChange>`, and throws `PartialWriteError` (change 1); `garbageCollect` returns the links of the records it deleted (change 2).
 - `refactors/pending/runtime/network-and-subscriptions.md`: `IsographEnvironment` gains `graph`, which `createIsographEnvironment` creates (change 2). `environment.ts` gains `normalizeData` (change 2), which takes the entrypoint and returns a `Retention` that `environment.retainedQueries` also holds (change 3), and settles and notifies (change 4); `garbageCollectEnvironment` deletes the nodes of deleted records (change 2), collects unreached nodes (change 3), and settles and notifies (change 4). `makeNetworkRequest` calls `normalizeData` where it called `normalize` (change 2), and from change 3 holds the returned `Retention` and disposes it in its cleanup. Its Why the store-only functions stay store-only holds: the functions that need the graph take the environment. Its change 7 is the only change that makes `Store` an object; this doc adds no field to `Store`.
 - `refactors/pending/graphql-protocol/normalization-ast.md`: `MergedSelectionTarget::Leaf`, `CompletedSelectionTarget::Leaf`, and `NormalizationTarget::Leaf` carry a `ListDepth`; the TypeScript `NormalizationSelection` becomes `NormalizationLeafSelection | NormalizationCompositeSelection`, and a leaf selection prints `listDepth` after `target` (change 1).
-- `refactors/pending/runtime/reader-ast.md`: `ReaderArtifact.selectableName` and its printing; the walk takes `ReadHooks<TFailure>` and `readButDoNotEvaluate` passes v1's hooks, so `read` and `readButDoNotEvaluate` keep their behavior and its tests hold unchanged; `ResolverResult` adds `ReadResolverThrew` to `ReadResult` for stored results, and `ReadResult` is unchanged (change 2). `ReaderArtifact.height`, printed after `selectableName`; `FieldArtifacts.resolver_reader` becomes `Option<ResolverReader>`, the reader AST with its `ReaderHeight`; the `reader_height` memo and `GenerationError::InlineCycle` (change 4). Its Client pointers, Later, note on reader artifact imports holds for imports and not for heights: an eager pointer that reads client fields on its target breaks static heights (open decision 14). Its note that this doc's `computeResolver` and `readSelection` replace its `read` is superseded: its `read` stays, and `readStoredResult` is the stored read beside it (change 2).
+- `refactors/pending/runtime/reader-ast.md`: `ReaderArtifact.selectableName` and its printing; the walk takes `ReadHooks<TFailure>` and `readButDoNotEvaluate` passes v1's hooks, so `read` and `readButDoNotEvaluate` keep their behavior and its tests hold unchanged; `ResolverResult` adds `ReadResolverThrew` to `ReadResult` for stored results, and `ReadResult` is unchanged (change 2). Its note that this doc's `computeResolver` and `readSelection` replace its `read` is superseded: its `read` stays, and `readStoredResult` is the stored read beside it (change 2).
 - `refactors/pending/runtime/normalization-ast-mount-markers.md`: candidate 6 is answered by Resolver markers (held: no marker); its open question on how this doc models a mount is answered by `Retention` and settlement.
 
 ## Other node kinds
 
 `check` stays the plain function from store.md; caching it as a node of the graph was considered and rejected by the user (no need).
 
-The engine is general over node kinds only as far as the follow-ups that add nodes need: a caller supplies each node's id, owner, height, and computation, and the engine never inspects a value except through `valuesEqual`. Resolver entries are the only kind changes 1 to 4 create. The parts of the API that serve the follow-ups:
+The engine is general over node kinds only as far as the follow-ups that add nodes need: a caller supplies each node's id, owner, and computation, and the engine never inspects a value except through `valuesEqual`. Resolver entries are the only kind changes 1 to 4 create. The parts of the API that serve the follow-ups:
 
 - `graph.ts` imports nothing from the store, the reader, or the environment, and names no resolver, record, or artifact. This is open decision 12's held design, which changes 2 to 4 need on their own.
-- A node's owner is a caller-supplied `InputId` (`NodeDefinition.owner`). Closure-component entries (components-in-userland.md) need it: the wrapper is a node at the closure field's resolver store key, owned by the record's `recordInput`, whose computation reads only the record's presence (The engine, the store, and the environment, Lifetime still follows records), and a second node per closure entry for its data read is that doc's open question 3. Both are resolver-shaped nodes with compile-time heights, so they need nothing else beyond change 2's resolver nodes.
+- A node's owner is a caller-supplied `InputId` (`NodeDefinition.owner`). Closure-component entries (components-in-userland.md) need it: the wrapper is a node at the closure field's resolver store key, owned by the record's `recordInput`, whose computation reads only the record's presence (The engine, the store, and the environment, Lifetime still follows records), and a second node per closure entry for its data read is that doc's open question 3. Both are resolver-shaped nodes, so they need nothing else beyond change 2's resolver nodes.
 - A node's computation and id come from its creator (`NodeDefinition`, `track`, `readNode`, `retainRoot`); no engine function builds one. Follow-up 10 needs it: a runtime-defined computation is not a resolver and has no resolver store key.
 - The graph's value type is a parameter, `TValue`. Follow-up 10 needs it: a derived value or a selector's value is not a `ResolverResult`, so that follow-up widens the environment's graph to a union of the kinds' values, and `valuesEqual` to a function that compares two values of one kind and answers unequal for two kinds.
-- Heights are the caller's: `NodeDefinition.height` is a `number` in change 4, because every kind changes 1 to 4 create has a height the compiler wrote. Follow-up 10 widens it for a node without a static height.
+- Heights are the engine's: `createNode` and `recompute` set a node's height from what its computation read (change 4, Heights), so a caller supplies none. Follow-up 10 needs it: a runtime-defined computation has no artifact that could carry a height.
 
 ## Later
 
 - `@component`: a component is a resolver result, stored and settled like any other; a mounted component observes its own entry.
 - Client pointers, `@loadable`, refetch queries (reader-ast.md, Later): each adds entries or retentions, and the markers of normalization-ast-mount-markers.md.
 - Optimistic writes: a layer of server entries that settlement reads through. What the layered store must report to the recomputation engine is The engine, the store, and the environment, What the environment must report.
-- Eager client pointers: a pointer node that reads client fields on its target lets an entry of a field read an entry of the same field on another record, so static heights no longer order the graph. Open decision 14.
+- Eager client pointers: a pointer node that reads client fields on its target lets an entry of a field read an entry of the same field on another record. Height adjustment orders it (change 4, Heights; open decision 14); a cycle of entries through the pointer is open decision 18.
 
 ## Follow-ups
 
@@ -2493,7 +2387,7 @@ Costs:
 - A key per selection set: the compiler emits it into the reader artifact, and two selection sets must get equal keys exactly when they read the same fields with the same arguments.
 - Equality of selection-set results: the stored result is a fresh object on each computation, so it needs upstream's `mergeObjectsUsingReaderAst` (`areEqualWithDeepComparison.ts:55-121`) applied to the read result, keeping the old object where the new data is equal, or every recomputation is unequal and invalidates every resolver that depends on it. The merge is well-defined here because a selection set's result is store data shaped by the reader AST; a nested resolver value in it is compared by `===`, as upstream does (`:84-95`).
 
-Relation to changes 2 and 3: the stored selection-set result is an extra level between server values and resolver entries. A resolver entry depends on a selection-set entry, the selection-set entry depends on server values and on the resolver entries of the `Resolver` nodes it contains, and marking and bringing up to date walk that level as they walk a resolver entry. Under held 3a the level needs heights: the compiler would write a selection-set entry's height as one more than the largest height of the fields its `Resolver` nodes select, and a resolver entry's as one more than its selection set's.
+Relation to changes 2 and 3: the stored selection-set result is an extra level between server values and resolver entries. A resolver entry depends on a selection-set entry, the selection-set entry depends on server values and on the resolver entries of the `Resolver` nodes it contains, and marking and bringing up to date walk that level as they walk a resolver entry. Under held 3a the level needs no rule of its own for heights: a selection-set entry's height comes from the resolver entries it reads, and a resolver entry's from its selection-set entry (change 4, Heights).
 
 ### 9. Scheduled recalculation
 
@@ -2524,12 +2418,7 @@ React constraint: `useSyncExternalStore` performs a store update as blocking eve
 
 ### 10. Runtime-defined computations
 
-A memoized computation the runtime or a user defines at run time, which reads other nodes: a derived value over several resolver results, a selector a hook creates. The compiler writes no height for it, so the bucket queue cannot place it.
-
-- (a) A creation-time height: one more than the largest height of the nodes its first computation read. Cost: a later computation can read a node of equal or greater height (a dependency that moved upward), which needs open decision 14 (a)'s runtime adjustment, raising its height and its dependents' transitively and moving each queued one to its new bucket.
-- (b) The pull path: a node without a compile-time height is never queued. A write that reaches it marks it, and a read or a settlement pass brings it up to date by 3b's rule, with a `Check` state: bring each `Node` dependency up to date in recorded order, and recompute only when one of them changed (Candidate 3b, open decision 15 (b)). Cost: a fourth state value and the dependency walk on reads of such nodes; an observed pull node is brought up to date after `settle` drains the queue, so it reads only settled height-ordered nodes.
-
-Held: (b). Heights stay an optimization for the node kinds whose heights the compiler knows, and a node kind without one costs no height maintenance. It needs `NodeDefinition.height` to say which case a node is in, as an enum whose variants name the two (`{ kind: 'Static'; height: number } | { kind: 'Pulled' }`), and `invalidate` to mark a `Pulled` node instead of queuing it. Changes 1 to 4 keep `height: number`, because no node they create lacks one; widening it is this follow-up's change, and touches `NodeDefinition`, `GraphNode`, and `invalidate` only.
+A memoized computation the runtime or a user defines at run time, which reads other nodes: a derived value over several resolver results, a selector a hook creates. Its height comes from what its computation reads, as every node's does (change 4, Heights), so the bucket queue places it. What it needs from the engine is a caller-supplied id and computation and a wider value type (Other node kinds).
 
 ## Open decisions
 
@@ -2542,7 +2431,7 @@ Held: (b). Heights stay an optimization for the node kinds whose heights the com
 
 The candidates and their comparison are Recomputation architecture.
 
-- (a) 3a with compile-time heights and `Stale` marks (held, the user's direction). A write queues each needed entry that read a changed input, drains the queue lowest height first, and queues an entry's direct dependents only when its result changed; an entry nobody needs is marked `Stale` with its dependents and recomputed when read. Cost: the inverse of every dependency list, kept by `setDependencies`; a state and a needed count per entry; a height per artifact, written by the compiler; no cutoff on a read of a `Stale` entry (open decision 15); heights that eager pointers break (open decision 14).
+- (a) 3a with per-entry heights and `Stale` marks (held, the user's direction). A write queues each needed entry that read a changed input, drains the queue lowest height first, and queues an entry's direct dependents only when its result changed; an entry nobody needs is marked `Stale` with its dependents and recomputed when read. Cost: the inverse of every dependency list, kept by `setDependencies`; a state, a needed count, and a height per entry; height adjustment after a recomputation reads an entry at or above its own height; no cutoff on a read of a `Stale` entry (open decision 15); a second recomputation in one pass after an upward read (open decision 19).
 - (b) 3b, mark along reverse edges, then bring up to date (the considered alternative). Cost: the inverse, a state per entry, and every transitive dependent of a changed input marked `Check` on every write and walked again by settlement. Benefit: no height, and cutoff on reads of entries nobody needs.
 - (c) 2, pico's pull with epochs. Cost: every live edge under the observed roots compared on every write, and a tag and epoch on every server value; benefit: no inverse to keep.
 - (d) 5, full re-run per write. Cost: every live resolver on every write, and no equality cutoff below the roots.
@@ -2624,15 +2513,9 @@ The analysis is Values with lifecycles.
 
 Not decided: the user's choice.
 
-### 14. Static heights and eager client pointers
+### 14. Heights and eager client pointers
 
-Changes 1 to 4 read no client pointer (reader-ast.md, `SelectionRead::NotRead`), so every `Resolver` dependency goes to a field the reader AST selects, at a lower height. An eager pointer (reader-ast.md, Client pointers, Later) reads client fields on its target: `field Pet.Card { bestFriend { Card } }`, with `bestFriend` a pointer, is not an `InlineCycle`, and the entry of `Card` on `Pet:1` reads the entry of `Card` on `Pet:2`, of the same height. The bucket queue cannot order the two.
-
-- (a) Dynamic heights where pointers require them, Incremental's scheme: the artifact's height is the initial value, and a computation that reads a node whose height is not below its own raises its own height above it, and its dependents' transitively, moving each queued one to its new bucket. Cost: the adjust walk on such an edge, and an entry height that can differ from its artifact's. A data cycle (`Pet:1.bestFriend` is `Pet:2` and `Pet:2.bestFriend` is `Pet:1`) is then a cycle of entries, which the read must detect and report; upstream's eager reads have the same case.
-- (b) The selection through a pointer is not a dependency of the reading entry: it is its own root, the follow-up retention of Follow-ups 2, observed by the component that renders it. Cost: a parent's resolver cannot read data through an eager pointer.
-- (c) The compiler rejects a pointer read that closes a cycle of client field selections, and a pointer's height counts the fields read through it. Cost: `field Pet.Card { bestFriend { Card } }` does not compile.
-
-Not decided; it arises with client pointers.
+Settled: heights are per entry and adjusted at run time (change 4, Heights). An eager pointer (reader-ast.md, Client pointers, Later) reads client fields on its target: `field Pet.Card { bestFriend { Card } }`, with `bestFriend` a pointer, is not an `InlineCycle`, and the entry of `Card` on `Pet:1` reads the entry of `Card` on `Pet:2`. That read is one more data-dependent dependency, and adjustment raises the entry of `Card` on `Pet:1` above it. A cycle of entries through the pointer is open decision 18.
 
 ### 15. Cutoff on a read of a `Stale` entry
 
@@ -2653,3 +2536,19 @@ Not decided; it arises with client pointers.
 - (b) No wrapping: the changes are lost with the throw. Cost: every node that read a value written before the throw returns its old result until another write reaches the same input, with no error.
 - (c) `normalize` validates the whole response against the AST before it writes. Cost: a second walk of every response, and `recordLink`'s checks run in both walks.
 - (d) On any throw, `normalizeData` marks every node. Cost: every live node recomputes or is marked `Stale` after one malformed response.
+
+### 18. A cycle of entries
+
+Changes 1 to 4 cannot form one (Ordering, Cycles). An eager client pointer can: with `field Pet.Card { bestFriend { Card } }`, `Pet:1.bestFriend` `Pet:2`, and `Pet:2.bestFriend` `Pet:1`, the entry of `Card` on `Pet:1` reads the entry of `Card` on `Pet:2`, which reads the entry on `Pet:1`. Two places reach it. A `Stale` or absent entry's computation reads an entry that is computing, and `bringUpToDate` would recompute that entry again inside its own computation. And `raiseHeight` reaches the dependency that started the raise. Neither has a check today; both recurse without end. Incremental fails at the second place with "adding edge made graph cyclic" (`ensure_height_requirement`, `src/adjust_heights_heap.ml` of `janestreet/incremental`).
+
+Not decided; it arises with client pointers.
+
+### 19. An upward read during `settle`
+
+An entry that recomputes during the drain of bucket `h` and reads an entry at or above `h` can read a `Clean` entry whose own dependency, at any depth, is still `Queued`, and receives that entry's result from before the write. Every result is current when `settle` returns, because the `Queued` dependency's change reaches the reading entry, raised by then, in a bucket not yet drained; but the reading entry recomputes twice in one pass, once from a stale input (Ordering, Once per pass).
+
+- (a) Accept it. Cost: R3's "no entry is computed from a stale input, and no entry is computed twice for one write" holds only for reads below the reader's height; the resolver is called with stale data, and that result is stored and queues its dependents before the second recomputation replaces it. Observers are notified once, after `settle`, so none receives the stale result.
+- (b) Before a read returns an entry at or above the reader's height, bring up to date every `Queued` entry it reads, transitively, lowest height first. Cost: a walk of the entries that entry reads, transitively, on every upward read during `settle`, and `Queued` entries recomputed out of bucket order.
+- (c) Discard the computation: after a recomputation that read an entry at or above its own height, store neither its result nor its dependents' invalidation, raise the entry, and queue it at its new height. Cost: the resolver is still called twice, and the discarded call still receives stale data; nothing stale is stored.
+
+Not decided.
