@@ -1,4 +1,4 @@
-use common_lang_types::{ArgumentName, DirectiveName, ValueKeyName};
+use common_lang_types::{ArgumentName, DirectiveName, EntityName, ValueKeyName};
 use span::WithSpan;
 
 use crate::ConstantValue;
@@ -17,6 +17,11 @@ pub struct Argument {
     pub name: WithSpan<ArgumentNameWrapper>,
     pub value: WithSpan<ConstantValue>,
 }
+
+/// The name of an entity: a type's own name, an implemented interface, a union member, a
+/// root operation type, or a named type in a type annotation.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct EntityNameWrapper(pub EntityName);
 
 /// A directive argument's name.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

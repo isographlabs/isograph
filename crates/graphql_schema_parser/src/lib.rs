@@ -6,6 +6,7 @@ mod string_value;
 mod token_cursor;
 mod token_kind;
 mod tokenize;
+mod type_annotation;
 mod value;
 
 #[cfg(test)]
@@ -14,10 +15,15 @@ mod span_of;
 mod test_cursor;
 
 pub use ast::{
-    Argument, ArgumentNameWrapper, Directive, DirectiveNameWrapper, ValueKeyNameWrapper,
+    Argument, ArgumentNameWrapper, Directive, DirectiveNameWrapper, EntityNameWrapper,
+    ValueKeyNameWrapper,
 };
 pub use parse_error::{Expectation, ExpectedFound, Found, ParseError};
 pub use token_kind::GraphQLTokenKind;
+pub use type_annotation::{
+    ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation, NullableTypeAnnotation,
+    TypeAnnotation,
+};
 pub use value::{
     Boolean, BooleanValue, ConstantValue, EnumLiteralValueWrapper, FloatValue, IntegerValue,
     ListValue, NullValue, ObjectField, ObjectValue, StringLiteralValueWrapper,
