@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt::{self, Debug};
 use std::path::Path;
 
-use common_lang_types::{EntityName, SelectableName};
+use common_lang_types::{EntityName, RelativePathToSourceFile, SelectableName};
 
 use isograph_parser::ParsedIsoLiteral;
 use span::WithSpan;
@@ -116,8 +116,18 @@ pub trait NetworkProtocol: Sized + 'static {
     type NotFetchable: Clone + Debug + PartialEq + Eq + std::fmt::Display + 'static;
     /// Why the protocol's lookup of an entity or selectable failed.
     type LookupError: Clone + Debug + PartialEq + Eq + std::fmt::Display + 'static;
+    /// An error the protocol reports for a schema file.
+    type SchemaFileError: Clone + Debug + PartialEq + Eq + std::fmt::Display + 'static;
 
     fn should_include_schema_file(relative_path: &Path) -> IncludeFile;
+
+    /// The errors of the schema file `path` as `client` reads it, in file-absolute spans;
+    /// `None` when the file has no text.
+    fn schema_file_errors<TProfile: CompilationProfile<NetworkProtocol = Self>>(
+        db: &IsographDb<TProfile>,
+        client: ClientId,
+        path: RelativePathToSourceFile,
+    ) -> Option<Vec<WithSpan<Self::SchemaFileError>>>;
 
     /// The compiler's kind of an entity the protocol defines.
     fn entity_kind(data: &Self::EntityData) -> EntityKind;

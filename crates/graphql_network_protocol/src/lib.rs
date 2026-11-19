@@ -10,7 +10,7 @@ mod tests;
 
 use std::path::Path;
 
-use common_lang_types::{EntityName, SelectableName};
+use common_lang_types::{EntityName, RelativePathToSourceFile, SelectableName};
 use intern::Lookup;
 use intern::string_key::Intern;
 use isograph_compiler::{
@@ -19,6 +19,7 @@ use isograph_compiler::{
     RootEntities, ScalarKind, ScalarValueKind, SelectableShape,
 };
 use prelude::Postfix;
+use span::WithSpan;
 
 pub use fetch_plan::{GraphQLFetchPlan, GraphQLNotFetchable, graphql_fetch_plan};
 pub use protocol_data::{
@@ -32,7 +33,7 @@ pub use root_operation_types::{
     DuplicateOperation, DuplicateSchemaDefinition, RootOperationTypes, RootOperationTypesError,
     root_operation_types,
 };
-pub use schema_files::{parsed_schema_file, schema_file_paths};
+pub use schema_files::{GraphQLSchemaFileError, graphql_schema_file_errors, parsed_schema_file};
 pub use schema_lookup::{
     DuplicateDefinition, DuplicateField, EntityLookupError, EntitySyntaxError,
     ExtensionKindMismatch, ExtensionWithoutDefinition, InSchemaFile, SchemaEntity,
@@ -65,12 +66,21 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
     type FetchPlan = GraphQLFetchPlan;
     type NotFetchable = GraphQLNotFetchable;
     type LookupError = GraphQLLookupError;
+    type SchemaFileError = GraphQLSchemaFileError;
 
     fn should_include_schema_file(relative_path: &Path) -> IncludeFile {
         match relative_path.extension().and_then(|e| e.to_str()) {
             Some("graphql" | "graphqls") => IncludeFile::Include,
             _ => IncludeFile::Skip,
         }
+    }
+
+    fn schema_file_errors<TProfile: CompilationProfile<NetworkProtocol = Self>>(
+        db: &IsographDb<TProfile>,
+        client: ClientId,
+        path: RelativePathToSourceFile,
+    ) -> Option<Vec<WithSpan<GraphQLSchemaFileError>>> {
+        graphql_schema_file_errors(db, client, path).clone()
     }
 
     fn entity_kind(data: &GraphQLEntityData) -> EntityKind {

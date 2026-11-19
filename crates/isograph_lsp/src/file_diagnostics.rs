@@ -1,5 +1,7 @@
 use common_lang_types::RelativePathToSourceFile;
-use isograph_compiler::{ClientId, CompilationProfile, IsographDb, compiler_errors_in_file};
+use isograph_compiler::{
+    ClientId, CompilationProfile, IsographDb, compiler_errors_in_file, schema_errors_in_file,
+};
 use pico_macros::memo;
 use prelude::Postfix;
 use span::Span;
@@ -16,6 +18,25 @@ pub fn lsp_diagnostics_for_file<TProfile: CompilationProfile>(
     path: RelativePathToSourceFile,
 ) -> Option<Vec<lsp_types::Diagnostic>> {
     let errors = compiler_errors_in_file(db, client, path).as_ref()?;
+    if errors.is_empty() {
+        return Vec::new().wrap_some();
+    }
+    let line_index = line_index(db, client, path).as_ref()?;
+    errors
+        .iter()
+        .map(|error| diagnostic(line_index, error.location, error.item.to_string()))
+        .collect::<Vec<_>>()
+        .wrap_some()
+}
+
+/// `lsp_types::Diagnostic`s of the schema file `path` as `client` reads it.
+#[memo]
+pub fn lsp_diagnostics_for_schema_file<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    path: RelativePathToSourceFile,
+) -> Option<Vec<lsp_types::Diagnostic>> {
+    let errors = schema_errors_in_file(db, client, path).as_ref()?;
     if errors.is_empty() {
         return Vec::new().wrap_some();
     }

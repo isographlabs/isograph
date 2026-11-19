@@ -27,10 +27,13 @@ pub use artifact_types::{
     ProjectArtifactsError, field_declaration, field_types, project_artifacts,
 };
 pub use artifacts::{ArtifactPath, ArtifactSource, LiteralParseFailed, artifact_sources_in_file};
-pub use compiler_errors::{CompilerError, ProfileCompilerError, compiler_errors_in_file};
+pub use compiler_errors::{
+    CompilerError, ProfileCompilerError, ProfileSchemaFileError, compiler_errors_in_file,
+    schema_errors_in_file,
+};
 pub use database::{
     ClientId, DiskFile, DiskFileMap, EditorBufferKey, FileMembership, IsographDb, SchemaPathMap,
-    SourcePathMap, file_contents, source_file_paths,
+    SourcePathMap, file_contents, schema_file_paths, source_file_paths,
 };
 pub use entrypoint::{
     ProfileEntrypointNotFetchableError, ProfileFetchPlan, RootEntities, entrypoint_fetch_plan,

@@ -1,35 +1,13 @@
-use std::collections::BTreeSet;
-
 use common_lang_types::RelativePathToSourceFile;
 use graphql_schema_parser::{
     DefinitionError, ParsedSchema, TypeSystemDefinitionOrExtension, parse_schema,
 };
-use isograph_compiler::{ClientId, CompilationProfile, IsographDb, file_contents};
+use isograph_compiler::{
+    ClientId, CompilationProfile, IsographDb, file_contents, schema_file_paths,
+};
 use pico_macros::memo;
 use prelude::Postfix;
-use span::WithSpan;
-
-/// Every schema file `client` reads: disk paths and this client's editor buffer paths, sorted.
-#[memo]
-pub fn schema_file_paths<TProfile: CompilationProfile>(
-    db: &IsographDb<TProfile>,
-    client: ClientId,
-) -> Vec<RelativePathToSourceFile> {
-    let view = db.get_schema_path_map();
-    let map = view.tracked();
-    map.disk
-        .iter()
-        .copied()
-        .chain(
-            map.editor_buffers
-                .iter()
-                .filter(|key| key.client == client)
-                .map(|key| key.path),
-        )
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect()
-}
+use span::{WithSpan, WithSpanPostfix};
 
 /// The parse of one schema file as `client` reads it; `None` when the file has no text.
 #[memo]
@@ -61,4 +39,32 @@ pub(crate) fn schema_entries<TProfile: CompilationProfile>(
                 entry,
             })
     })
+}
+
+/// An error the GraphQL protocol reports for a schema file.
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum GraphQLSchemaFileError {
+    #[error("{0}")]
+    Parse(graphql_schema_parser::ParseError),
+}
+
+/// The errors of the schema file `path` as `client` reads it, file-absolute; `None` when the
+/// file has no text.
+#[memo]
+pub fn graphql_schema_file_errors<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    path: RelativePathToSourceFile,
+) -> Option<Vec<WithSpan<GraphQLSchemaFileError>>> {
+    let parsed = parsed_schema_file(db, client, path).as_ref()?;
+    parsed
+        .definitions
+        .iter()
+        .filter_map(|entry| entry.as_ref().err())
+        .map(|failed| {
+            GraphQLSchemaFileError::Parse(failed.item.error.item)
+                .with_span(failed.item.error.location)
+        })
+        .collect::<Vec<_>>()
+        .wrap_some()
 }

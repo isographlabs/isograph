@@ -27,6 +27,7 @@ pico = { path = "../pico" }
 prelude = { path = "../prelude" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+span = { path = "../span" }
 thiserror = "2"
 tokio = { workspace = true, features = ["rt", "macros", "signal", "sync", "time", "net"] }
 tracing = { workspace = true }
@@ -35,7 +36,6 @@ url = { workspace = true }
 [dev-dependencies]
 graphql_network_protocol = { path = "../graphql_network_protocol" }
 isograph_extract_typescript = { path = "../isograph_extract_typescript" }
-span = { path = "../span" }
 tempfile = "3"
 tokio = { workspace = true, features = ["rt", "macros", "sync", "time", "test-util"] }
 

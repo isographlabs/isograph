@@ -15,7 +15,7 @@ mod test_profile;
 pub use completion::completion_at_lsp_position;
 pub use definition::definition_at_lsp_position;
 pub use document_highlight::{TokenUnderCursor, token_range_at_lsp_position};
-pub use file_diagnostics::lsp_diagnostics_for_file;
+pub use file_diagnostics::{lsp_diagnostics_for_file, lsp_diagnostics_for_schema_file};
 pub use file_semantic_tokens::lsp_semantic_tokens_for_file;
 pub use hover::hover_for_position;
 pub use line_index::{LineIndex, line_index};

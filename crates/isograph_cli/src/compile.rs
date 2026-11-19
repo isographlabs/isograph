@@ -7,9 +7,10 @@ use intern::Lookup;
 use isograph_compiler::{
     ArtifactPath, ArtifactSource, ClientId, CompilationProfile, HostLanguage, IsographDb,
     LiteralParseFailed, artifact_sources_in_file, compiler_errors_in_file, project_artifacts,
-    source_file_paths,
+    schema_errors_in_file, schema_file_paths, source_file_paths,
 };
 use prelude::Postfix;
+use span::WithSpan;
 
 use crate::adapter::MissingWorkingDirectory;
 use crate::effect::{ArtifactChanges, IsographEffect, WriteArtifactsEffect, no_effects};
@@ -172,10 +173,30 @@ impl ArtifactFiles {
 pub(crate) fn project_errors<TProfile: CompilationProfile>(
     input: &CompileInput<'_, TProfile>,
 ) -> Result<Vec<CompilerErrorReport>, ProjectErrorsError> {
-    let per_file = source_file_paths(input.db, input.client)
+    let source_reports = source_file_paths(input.db, input.client)
         .iter()
         .copied()
-        .map(|path| file_reports(input.db, input.client, path))
+        .map(|path| {
+            file_reports(
+                input.db,
+                input.client,
+                path,
+                compiler_errors_in_file(input.db, input.client, path).as_ref(),
+            )
+        });
+    let schema_reports = schema_file_paths(input.db, input.client)
+        .iter()
+        .copied()
+        .map(|path| {
+            file_reports(
+                input.db,
+                input.client,
+                path,
+                schema_errors_in_file(input.db, input.client, path).as_ref(),
+            )
+        });
+    let per_file = source_reports
+        .chain(schema_reports)
         .collect::<Result<Vec<_>, _>>()?;
     let mut reports: Vec<CompilerErrorReport> = per_file.into_iter().flatten().collect();
     reports.sort_by(|a, b| {
@@ -186,14 +207,14 @@ pub(crate) fn project_errors<TProfile: CompilationProfile>(
     reports.wrap_ok()
 }
 
-fn file_reports<TProfile: CompilationProfile>(
+/// The reports of `errors`, the errors of `path`; `None` when the path has no text.
+fn file_reports<TProfile: CompilationProfile, TError: std::fmt::Display>(
     db: &IsographDb<TProfile>,
     client: ClientId,
     path: RelativePathToSourceFile,
+    errors: Option<&Vec<WithSpan<TError>>>,
 ) -> Result<Vec<CompilerErrorReport>, ProjectErrorsError> {
-    let errors = compiler_errors_in_file(db, client, path)
-        .as_ref()
-        .ok_or(ProjectErrorsError::ListedPathWithoutText(path))?;
+    let errors = errors.ok_or(ProjectErrorsError::ListedPathWithoutText(path))?;
     if errors.is_empty() {
         return Vec::new().wrap_ok();
     }
@@ -363,9 +384,36 @@ mod tests {
     }
 
     #[test]
-    fn project_errors_skip_schema_files() {
+    fn project_errors_of_a_schema_file_are_its_schema_errors() {
         let mut state = state();
-        present(&mut state, "/tmp/proj/schema/a.graphql", "iso(` `)");
+        present(
+            &mut state,
+            "/tmp/proj/schema/a.graphql",
+            "type Query {\n  a: String\n}\ntype {",
+        );
+        assert_eq!(
+            errors(state.reference())
+                .into_iter()
+                .map(|report| (report.path, report.range.start, report.message))
+                .collect::<Vec<_>>(),
+            (
+                PathBuf::from("/tmp/proj/schema/a.graphql"),
+                lsp_types::Position::new(3, 5),
+                "Expected non-variable identifier (e.g. 'x' or 'Foo'), found open brace ('{')."
+                    .to_owned()
+            )
+                .wrap_vec()
+        );
+    }
+
+    #[test]
+    fn project_errors_of_a_clean_schema_file_are_empty() {
+        let mut state = state();
+        present(
+            &mut state,
+            "/tmp/proj/schema/a.graphql",
+            "type Query { a: String }",
+        );
         assert_eq!(errors(state.reference()), vec![]);
     }
 

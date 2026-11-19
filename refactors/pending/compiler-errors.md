@@ -76,7 +76,7 @@ Each change is one commit, prefactors first. Each lists its tests. Each amends t
 6. The `isograph errors` verb.
 7. `isograph errors --watch`.
 8. Validation errors are compiler errors. Landed.
-9. Schema parse errors are compiler errors (after schema integration change 2 lands).
+9. Schema parse errors are compiler errors. Landed (validation.md change 4).
 
 ## Change 1: the boot scan is posted before the LSP port accepts (landed)
 
@@ -1849,7 +1849,7 @@ Change 6 adds the e2e `errors_of_a_bad_selection_prints_the_validation_message`.
 
 ## Change 9: schema parse errors are compiler errors
 
-Ships after refactors/past/graphql-schema-parser/integration.md change 2 (`parsed_schema_file`). `CompilerError` gains `SchemaParse(<the schema parser's error type>)`. `project_errors` also iterates `schema_file_paths(db, input.client)` (`schema_path_map`, the client's view) and skips a path that `source_file_paths(db, input.client)` also lists (a path in both is reported once, through `compiler_errors_in_file`), reading `parsed_schema_file(db, input.client, path)` errors through a new memo `schema_file_errors(db, client, path) -> Option<Vec<WithSpan<CompilerError>>>`. Classification stays in `handle`: neither listing re-reads the globs. The exact types are written when integration change 2 lands; this section is updated then. Same command, same output format.
+Landed as refactors/pending/validation.md change 4: `NetworkProtocol::schema_file_errors`, the core memo `schema_errors_in_file`, `project_errors` over `schema_file_paths`, and editor diagnostics of schema buffers.
 
 ## Panics
 

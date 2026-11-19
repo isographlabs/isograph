@@ -21,12 +21,23 @@ impl NetworkProtocol for TestNetworkProtocol {
     type FetchPlan = ();
     type NotFetchable = TestProtocolError;
     type LookupError = Infallible;
+    type SchemaFileError = Infallible;
 
     fn should_include_schema_file(relative_path: &Path) -> IncludeFile {
         match relative_path.extension().and_then(|e| e.to_str()) {
             Some("graphql") => IncludeFile::Include,
             _ => IncludeFile::Skip,
         }
+    }
+
+    fn schema_file_errors<TProfile: CompilationProfile<NetworkProtocol = Self>>(
+        db: &IsographDb<TProfile>,
+        client: ClientId,
+        path: common_lang_types::RelativePathToSourceFile,
+    ) -> Option<Vec<span::WithSpan<Infallible>>> {
+        isograph_compiler::file_contents(db, client, path)
+            .as_ref()
+            .map(|_| Vec::new())
     }
 
     fn entity_kind(_data: &()) -> EntityKind {

@@ -93,15 +93,33 @@ fn publish_to_client<TProfile: CompilationProfile>(
     .wrap_some()
 }
 
-/// Non-empty diagnostics of every source file `client` has open.
+/// Non-empty diagnostics of every source file and schema file `client` has open.
 fn client_diagnostics<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
 ) -> HashMap<RelativePathToSourceFile, Vec<lsp_types::Diagnostic>> {
-    db.editor_buffer_paths_of_client(client)
+    let source = db
+        .editor_buffer_paths_of_client(client)
         .into_iter()
-        .filter_map(|path| {
-            let diagnostics = isograph_lsp::lsp_diagnostics_for_file(db, client, path).as_ref()?;
+        .map(|path| {
+            (
+                path,
+                isograph_lsp::lsp_diagnostics_for_file(db, client, path),
+            )
+        });
+    let schema = db
+        .editor_buffer_schema_paths_of_client(client)
+        .into_iter()
+        .map(|path| {
+            (
+                path,
+                isograph_lsp::lsp_diagnostics_for_schema_file(db, client, path),
+            )
+        });
+    source
+        .chain(schema)
+        .filter_map(|(path, diagnostics)| {
+            let diagnostics = diagnostics.as_ref()?;
             (!diagnostics.is_empty()).then(|| (path, diagnostics.clone()))
         })
         .collect()

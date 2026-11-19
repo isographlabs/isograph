@@ -3297,6 +3297,29 @@ mod tests {
     }
 
     #[test]
+    fn a_broken_schema_buffer_publishes_its_schema_error() {
+        let mut state = with_schema_glob();
+        let (client_1, rx) = diagnostics_client(&mut state);
+        let uri = "file:///tmp/proj/schema/a.graphql";
+        let armed = handle(&mut state, did_open(client_1, uri, "type {"));
+        let effects = fire(&mut state, armed);
+        assert_eq!(
+            published(effects, rx.reference())[uri]
+                .iter()
+                .map(|diagnostic| (diagnostic.range, diagnostic.message.as_str()))
+                .collect::<Vec<_>>(),
+            (
+                lsp_types::Range::new(
+                    lsp_types::Position::new(0, 5),
+                    lsp_types::Position::new(0, 6)
+                ),
+                "Expected non-variable identifier (e.g. 'x' or 'Foo'), found open brace ('{')."
+            )
+                .wrap_vec()
+        );
+    }
+
+    #[test]
     fn fixing_a_published_file_publishes_an_empty_list_once() {
         let mut state = with_config();
         let (client_1, rx) = diagnostics_client(&mut state);

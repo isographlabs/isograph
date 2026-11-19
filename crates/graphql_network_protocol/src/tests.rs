@@ -7,7 +7,7 @@ use isograph_compiler::{
     ClientId, CompilationProfile, CompositeShape, Concreteness, DefinitionLocation, EntityKind,
     EntityShape, FileMembership, IdentitySelection, IncludeFile, IsographDb, NetworkProtocol,
     ProtocolSelectable, RootEntities, ScalarKind, ScalarValueKind, SelectableShape, UnionWrapper,
-    Wrapper, WrapperVariant, iso_literal_validation_errors_in_file,
+    Wrapper, WrapperVariant, iso_literal_validation_errors_in_file, schema_file_paths,
 };
 use isograph_extract_typescript::TypeScriptHostLanguage;
 use prelude::Postfix;
@@ -17,9 +17,9 @@ use crate::{
     DuplicateOperation, EntityLookupError, GraphQLCompositeData, GraphQLEntityData,
     GraphQLFetchPlan, GraphQLNetworkProtocol, GraphQLNotFetchable, GraphQLSelectableData,
     GraphQLSelectableLookupError, IdField, RootOperationTypes, RootOperationTypesError,
-    SelectableLookupError, entity_named, graphql_entity, graphql_fetch_plan, graphql_selectable,
-    graphql_selectables, parsed_schema_file, root_operation_types, scalar_kind, schema_file_paths,
-    selectable_named,
+    SelectableLookupError, entity_named, graphql_entity, graphql_fetch_plan,
+    graphql_schema_file_errors, graphql_selectable, graphql_selectables, parsed_schema_file,
+    root_operation_types, scalar_kind, selectable_named,
 };
 
 struct GraphQLProfile;
@@ -182,6 +182,31 @@ fn parsed_schema_file_parses_the_clients_buffer_and_is_none_without_text() {
     assert_eq!(
         parsed_schema_file(&db, CLIENT, path("missing.graphql")).clone(),
         None
+    );
+}
+
+#[test]
+fn a_failed_schema_definition_is_one_schema_file_error_on_its_span() {
+    let text = "type A { id: ID! }\ntype { x: Int }\nscalar ID";
+    let db = db_with(&[("a.graphql", text)]);
+    let errors = graphql_schema_file_errors(&db, CLIENT, path("a.graphql"))
+        .clone()
+        .expect("the test inserted the file");
+    assert_eq!(
+        errors
+            .iter()
+            .map(|error| &text[error.location.as_usize_range()])
+            .collect::<Vec<_>>(),
+        vec!["{"]
+    );
+    assert_eq!(
+        graphql_schema_file_errors(&db, CLIENT, path("b.graphql")).clone(),
+        None
+    );
+    let clean = db_with(&[("a.graphql", "type A { id: ID! }")]);
+    assert_eq!(
+        graphql_schema_file_errors(&clean, CLIENT, path("a.graphql")).clone(),
+        Vec::new().wrap_some()
     );
 }
 

@@ -26,6 +26,20 @@ pub type ProfileCompilerError<TProfile> = CompilerError<
     <<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::NotFetchable,
 >;
 
+pub type ProfileSchemaFileError<TProfile> =
+    <<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::SchemaFileError;
+
+/// Every error the protocol reports for the schema file `path` as `client` reads it, as
+/// file-absolute spans; `None` when the file has no text.
+#[memo]
+pub fn schema_errors_in_file<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    path: RelativePathToSourceFile,
+) -> Option<Vec<WithSpan<ProfileSchemaFileError<TProfile>>>> {
+    TProfile::NetworkProtocol::schema_file_errors(db, client, path)
+}
+
 /// Every compiler error of `path` as `client` reads it, as file-absolute spans.
 #[memo]
 pub fn compiler_errors_in_file<TProfile: CompilationProfile>(

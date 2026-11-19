@@ -125,6 +125,28 @@ pub fn source_file_paths<TProfile: CompilationProfile>(
         .collect()
 }
 
+/// Every schema file `client` reads: disk paths and this client's editor buffer paths, sorted.
+#[memo]
+pub fn schema_file_paths<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+) -> Vec<RelativePathToSourceFile> {
+    let view = db.get_schema_path_map();
+    let map = view.tracked();
+    map.disk
+        .iter()
+        .copied()
+        .chain(
+            map.editor_buffers
+                .iter()
+                .filter(|key| key.client == client)
+                .map(|key| key.path),
+        )
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
+}
+
 impl<TProfile: CompilationProfile> IsographDb<TProfile> {
     pub fn set_editor_buffer(
         &mut self,
@@ -255,6 +277,20 @@ impl<TProfile: CompilationProfile> IsographDb<TProfile> {
         for editor_buffer_id in editor_buffer_ids {
             self.remove(editor_buffer_id);
         }
+    }
+
+    /// Every schema file path `client` has an editor buffer of.
+    pub fn editor_buffer_schema_paths_of_client(
+        &self,
+        client: ClientId,
+    ) -> Vec<RelativePathToSourceFile> {
+        self.get_schema_path_map()
+            .tracked()
+            .editor_buffers
+            .iter()
+            .filter(|key| key.client == client)
+            .map(|key| key.path)
+            .collect()
     }
 
     /// Every source file path `client` has an editor buffer of.
