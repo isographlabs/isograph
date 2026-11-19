@@ -129,3 +129,23 @@ test('stableCopy of scalars and empty containers', () => {
   expect(JSON.stringify(stableCopy({}))).toBe('{}');
   expect(JSON.stringify(stableCopy([]))).toBe('[]');
 });
+
+test('a list is an array of its items, in order, with variables substituted', () => {
+  const tagged = {
+    selectableName: 'tagged',
+    arguments: [
+      [
+        'tags',
+        {
+          kind: 'List',
+          value: [
+            { kind: 'String', value: 'a' },
+            { kind: 'Variable', name: 't' },
+            { kind: 'List', value: [] },
+          ],
+        },
+      ],
+    ],
+  } as const;
+  expect(storeKey(tagged, { t: 'b' })).toBe('tagged____tags___["a","b",[]]');
+});

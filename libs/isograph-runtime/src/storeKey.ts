@@ -48,6 +48,8 @@ function argumentValue(value: ArgumentValue, variables: Variables): JsonValue {
           argumentValue(item, variables),
         ]),
       );
+    case 'List':
+      return value.value.map((item) => argumentValue(item, variables));
   }
 }
 
