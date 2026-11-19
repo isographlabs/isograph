@@ -29,25 +29,27 @@ pub fn selectable_for_selection_parent<TProfile: CompilationProfile>(
     selection_set_path: &SelectionSetPath<'_>,
     selectable_name: SelectableName,
 ) -> DiagnosticResult<Selectable> {
-    match selection_set_path.parent.reference() {
+    let entity_name = entity_for_selection_set_path(db, client, selection_set_path)?;
+    selectable_named(db, client, entity_name, selectable_name).clone()
+}
+
+/// The entity the selection set at `selection_set_path` selects on.
+pub fn entity_for_selection_set_path<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    selection_set_path: &SelectionSetPath<'_>,
+) -> DiagnosticResult<EntityName> {
+    let entity_name = match selection_set_path.parent.reference() {
         SelectionSetParent::SelectableDeclaration(selectable_declaration_path) => {
-            selectable_for_entity(
-                db,
-                client,
-                selectable_declaration_path.inner.parent_type.item.0,
-                selectable_name,
-            )
+            selectable_declaration_path.inner.parent_type.item.0
         }
-        SelectionSetParent::Selection(selection_path) => {
-            let parent_selectable = selectable_for_selection_path(db, client, selection_path)?;
-            selectable_for_entity(
-                db,
-                client,
-                selectable_target(parent_selectable.reference())?,
-                selectable_name,
-            )
-        }
-    }
+        SelectionSetParent::Selection(selection_path) => selectable_target(
+            selectable_for_selection_path(db, client, selection_path)?.reference(),
+        )?,
+    };
+    entity_named(db, client, entity_name)
+        .clone()
+        .map(|entity| entity.name)
 }
 
 /// The entity selections under a selection of `selectable` select on.
@@ -61,17 +63,6 @@ pub fn selectable_target(selectable: &Selectable) -> DiagnosticResult<EntityName
             None,
         )
     })
-}
-
-/// The selectable named `selectable_name` on the entity named `entity_name`.
-pub fn selectable_for_entity<TProfile: CompilationProfile>(
-    db: &IsographDb<TProfile>,
-    client: ClientId,
-    entity_name: EntityName,
-    selectable_name: SelectableName,
-) -> DiagnosticResult<Selectable> {
-    entity_named(db, client, entity_name).clone()?;
-    selectable_named(db, client, entity_name, selectable_name).clone()
 }
 
 /// The selectable that the entrypoint or selectable declaration at the parent of

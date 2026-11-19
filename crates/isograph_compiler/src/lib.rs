@@ -19,8 +19,8 @@ pub use iso_literals::{
 };
 pub use schema::{DefinitionLocation, Entity, Selectable, entity_named, selectable_named};
 pub use selectable_for_path::{
-    selectable_for_entity, selectable_for_selectable_name_path, selectable_for_selection_parent,
-    selectable_for_selection_path, selectable_target,
+    entity_for_selection_set_path, selectable_for_selectable_name_path,
+    selectable_for_selection_parent, selectable_for_selection_path, selectable_target,
 };
 pub use validation::{
     DuplicateDefinitionError, SelectableKey, SelectionSetOnFieldWithoutTargetError,
