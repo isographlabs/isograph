@@ -36,6 +36,8 @@ jobs:
         run: pnpm --filter @isograph/runtime tsc
       - name: Build the runtime
         run: pnpm --filter @isograph/runtime compile-libs
+      - name: Test the runtime
+        run: pnpm --filter @isograph/runtime test
       - name: Typecheck the pet demo
         run: pnpm --filter pet-demo typecheck
       - name: Test

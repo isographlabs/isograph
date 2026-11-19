@@ -83,6 +83,12 @@ repos:
         language: system
         files: '^libs/isograph-babel-plugin/'
         pass_filenames: false
+      - id: runtime-test
+        name: runtime test
+        entry: pnpm --filter @isograph/runtime test
+        language: system
+        files: '^libs/isograph-runtime/'
+        pass_filenames: false
       - id: runtime-typecheck
         name: runtime typecheck
         entry: pnpm --filter @isograph/runtime tsc

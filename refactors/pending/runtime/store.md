@@ -102,6 +102,19 @@ export type JsonObject = { readonly [key: string]: JsonValue };
 export type Variables = { readonly [name: string]: JsonValue };
 ```
 
+```ts
+// from libs/isograph-runtime/src/store.ts
+/** The record `link` points at, when the store holds it. */
+export function storeRecord(store: Store, link: StoreLink): StoreRecord | undefined;
+
+/** Every link in `value`, the value under the composite store key `storeKey` of the record
+ * `owner`, in list order at every depth. Throws on a value that is not `null`, a link, or a
+ * list of these. */
+export function* linksIn(value: StoreValue, owner: StoreLink, storeKey: StoreKey): Generator<StoreLink, void, undefined>;
+```
+
+`check` and `garbageCollect` both read composite values through `linksIn`, so the non-link throw (Errors) has one site.
+
 The type is the two-layer map and nothing else. The empty store is `new Map()`. There is no root record until a function writes one, and no record is ever `null`.
 
 `Map` at all three layers, mutable because `normalize` and `garbageCollect` write in place; `check` takes the same `Store` and does not write. Maps, not plain objects, because ids and store keys are arbitrary strings: a record id `"constructor"` or a selectable named `constructor` (a valid GraphQL name) would read `Object.prototype.constructor` from a plain object. For the same reason every read of a response object or of `variables` goes through `Object.hasOwn(object, key) ? object[key] : undefined` (ES2022).
@@ -156,14 +169,47 @@ Deltas from upstream (`IsographEnvironment.ts:122-169`, `:211-217`):
 export function storeKey(selection: NormalizationSelection, variables: Variables): StoreKey;
 
 /** One `____<name>___<value>` chunk per argument, in the AST's order (sorted by name), with
- * `<value>` the argument's value as `stableStringify` writes it. */
+ * `<value>` the argument's value as `JSON.stringify(stableCopy(value))` writes it. */
 export function argumentChunks(args: Arguments | null, variables: Variables): string;
-
-/** `JSON.stringify(value)` with every object's keys in code unit order, at every depth. */
-export function stableStringify(value: JsonValue): string;
 ```
 
-The value of an argument, before `stableStringify`:
+```ts
+// from libs/isograph-runtime/src/util.ts
+/**
+ * Creates a copy of the provided value, ensuring any nested objects have their
+ * keys sorted such that equivalent values would have identical JSON.stringify
+ * results.
+ */
+export function stableCopy(value: JsonValue): JsonValue {
+  if (value == null || typeof value !== 'object') {
+    return value;
+  }
+  if (isArray(value)) {
+    return value.map(stableCopy);
+  }
+  return Object.fromEntries(
+    Object.entries(value)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([key, item]) => [key, stableCopy(item)]),
+  );
+}
+```
+
+`stableCopy` is upstream's (`util.ts:44-59`, `isograph/libs/isograph-react/src/core/util.ts`), typed over `JsonValue` with no `any`, cast, or `@ts-ignore`. Delta: `value: T` returning `T` is `value: JsonValue` returning `JsonValue`, and the `for` loop over `Object.keys(value).sort()` is `Object.entries`, sorted by key, mapped, and collected with `Object.fromEntries`, which types each value as `JsonValue` where `value[keys[i]]` would be `JsonValue | undefined` under `noUncheckedIndexedAccess`. The comparator sorts by code unit, as `.sort()` with no comparator does on strings. `src/util.ts` also holds upstream's `isArray` (`util.ts:35-37`) and two helpers of this package:
+
+```ts
+// from libs/isograph-runtime/src/util.ts
+/** `object[key]` when `key` is an own property of `object`, so that a key such as
+ * `constructor` does not read `Object.prototype`. */
+export function ownValue(object: JsonObject, key: string): JsonValue | undefined;
+
+/** The value under `key`, inserting `create()` first when `map` has none. */
+export function getOrInsert<K, V>(map: Map<K, V>, key: K, create: () => V): V;
+```
+
+`getOrInsert` is upstream's `insertEmptySetIfMissing` (`cache.ts:202-209`) over any value.
+
+The value of an argument, before `stableCopy`:
 
 - `Literal`: its value (`5`, `true`, `null`).
 - `String`: the string.
@@ -172,9 +218,9 @@ The value of an argument, before `stableStringify`:
 
 So `limit: 5` is `____limit___5`, `name: "Ada Lovelace"` is `____name___"Ada Lovelace"`, `name: null` is `____name___null`, `name: "null"` is `____name___"null"`, `id: 1` is `____id___1` and `id: "1"` is `____id___"1"`, and `filter: { nameContains: $q, minAge: 2 }` with `q: "Rex"` is `____filter___{"minAge":2,"nameContains":"Rex"}`.
 
-`stableStringify` is `JSON.stringify(value, (_key, v) => isJsonObject(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) : v)`: the replacer returns each object with its keys sorted, and `JSON.stringify` recurses into what the replacer returns, so nested objects are sorted at every depth; arrays keep their order; a key whose value is `undefined` is omitted, as `JSON.stringify` omits it; `isJsonObject` is `typeof v === "object" && v !== null && !Array.isArray(v)`. The sort is code unit order, not `localeCompare`, so the key does not depend on the locale. The sort runs at runtime because a variable whose value is an object comes from the caller in any key order; literal object arguments are already sorted by the compiler (`MergedObject`), and one function covers both.
+`stableCopy` sorts every object's keys at every depth; arrays keep their order. The sort is code unit order, not `localeCompare`, so the key does not depend on the locale. A number keeps its JSON form (`3`, `1.5`). The sort runs at runtime because a variable whose value is an object comes from the caller in any key order; literal object arguments are already sorted by the compiler (`MergedObject`), and one function covers both.
 
-Every variable is present in `variables`. An operation's variables are required by its generated parameters type (Variables, below), and a missing one is undefined behavior, as any input outside its type is. A client field's variables are computed by its parent's `Resolver` node, and every one has a value: a selection that leaves a variable with no default unpassed is a compile error (`MissingFieldArgument`, query-generation.md, Source fields and variables; open decision 11, settled), and a default fills an unpassed variable that has one. `storeKey` has no rule for an absent variable.
+Every variable is present in `variables`. An operation's variables are required by its generated parameters type (Variables, below). A client field's variables are computed by its parent's `Resolver` node, and every one has a value: a selection that leaves a variable with no default unpassed is a compile error (`MissingFieldArgument`, query-generation.md, Source fields and variables; open decision 11, settled), and a default fills an unpassed variable that has one. `storeKey` has no rule for an absent variable: reading one, `ownValue(variables, name)` is `JsonValue | undefined` under `noUncheckedIndexedAccess`, and `undefined` throws (Errors), because a variable outside the parameters type breaks that invariant and the type system cannot express "every variable the AST names is a key of `variables`".
 
 `noPropertyAccessFromIndexSignature` and the `Object.hasOwn` read apply to `variables`.
 
@@ -399,7 +445,7 @@ The runtime throws when something we generate is malformed, and when input break
 - Artifacts (the normalization AST, later the reader AST): the compiler generated them, and the `NormalizationAst` annotation type-checks each one. A switch on `kind` is exhaustive over the union, with no `default` and no throw.
 - Store states only our normalizer produces: one store key on one entity is one selectable, whose target is leaf or composite in every AST of one schema, so `normalize` never writes a non-link under a composite store key. A store that holds one was written with an AST that disagrees.
 - The network response: the server answered the query text the compiler generated with this AST. A response that does not match the AST means the server broke that query's contract (schema skew between the compiler and the server, a broken server or proxy, or a wrong test fixture). A correct server never produces one.
-- Caller-supplied variables: no check. Variables arrive typed by the generated parameters type, which requires each one, so a missing variable is undefined behavior, as any input outside its type is.
+- Caller-supplied variables: variables arrive typed by the generated parameters type, which requires each one. The one check is the read of a variable the AST names, which throws when it is absent (Store keys).
 
 This replaces, for the runtime, AGENTS.md's rule that socket reads return a typed error: the user's decision is that a response the generated query's contract excludes is a broken invariant, like a malformed artifact.
 
@@ -409,6 +455,8 @@ Every throw site:
 - `normalize`, a composite selection's value, or a list item at any depth, that is a string, number, or boolean: `Malformed response at ${path}: expected an object, a list, or null for "${responseKey}", got ${JSON.stringify(value)}.` Invariant: a composite field's value is an object, a list, or `null`.
 - `recordLink`, a composite response object whose target's `entity` is `Discriminator`, with no string under `ast.discriminatorResponseKey`: `Malformed response at ${path}: expected a string under "${discriminatorResponseKey}".` Invariant: the compiler selects the discriminator in every selection set under a composite selection (query-generation.md, Completion, step 4). Under a `Known` entity the discriminator is not read, so its absence does not throw.
 - `recordLink`, a `Select` identity value that is not a string: `Malformed response at ${path}: expected a string record id under "${selectableName}", got ${JSON.stringify(value)}.` Invariant: GraphQL serializes `ID` as a string (spec 3.5.5), and the protocol names only an `ID!` selectable as the identity (`IdField::Present`, query-generation.md).
+- `storeKey`, a `Variable` argument whose variable is not an own key of `variables`: `Missing variable "${name}": every variable of the operation is required.` Invariant: the generated parameters type requires every variable, and a parent's `Resolver` node passes every variable of a selected field (Store keys).
+- `recordLink`, a `Select` identity whose key is absent from the response object: the absent-key message above, with the identity's selectable name as the response key. Invariant: the identity selection is among the selections (normalization-ast.md, `NormalizationIdentity`).
 - `check` and `garbageCollect`, a value under a composite store key that is not `null`, a link, or a list of these at any depth: `Store record ${entityName}:${id} holds a non-link under the composite store key "${storeKey}"; the store was written with an AST that disagrees with this one.` Invariant: Store states only our normalizer produces, above. A link is an object whose own keys are exactly `entityName` and `id`, both strings.
 
 `${path}` is `JSON.stringify(path)`, the response keys and list indexes from the top of the response (`["pet____id___v_id","checkins____limit___2",1]`).
@@ -428,6 +476,7 @@ Files added to the package normalization-ast.md change 1 creates:
 ```text
 libs/isograph-runtime/
   src/store.ts
+  src/util.ts
   src/storeKey.ts
   src/recordId.ts
   src/normalize.ts
@@ -481,7 +530,7 @@ export { garbageCollect, type RetainedQuery } from "./garbageCollection";
 export { normalize } from "./normalize";
 ```
 
-`storeKey`, `argumentChunks`, `stableStringify`, and `recordLink` are module exports that `normalize`, `check`, and `garbageCollect` import; the package index does not export them. Their tests import the modules directly.
+`storeKey`, `argumentChunks`, `stableCopy`, `recordLink`, `storeRecord`, `linksIn`, and the `src/util.ts` helpers are module exports that `normalize`, `check`, and `garbageCollect` import; the package index does not export them. Their tests import the modules directly.
 
 The package builds as upstream's `libs` packages do (`isograph/libs/isograph-react/package.json`, `tsconfig.json`, `tsconfig.package.json`, `tsconfig.test.json`, `tsdown.config.ts`; `isograph/tsconfig.build.json`; `isograph/tsdown.config.ts`): the same scripts, `exports`, and `dist` layout, emitted by `tsdown`, with `tsconfig.build.json` and `tsdown.config.ts` at the repository root and `tsdown` `0.20.1` in the root `devDependencies`, as upstream has them. The package has no React dependency, imports nothing from React, and defines no hook (`use*`).
 
@@ -586,6 +635,14 @@ export const mutationRoot: Link<"Mutation"> = { entityName: "Mutation", id: "__R
 export function storeOf(records: {
   readonly [entityName: string]: { readonly [id: string]: { readonly [storeKey: string]: StoreValue } };
 }): Store;
+
+/** The `Selection` reached from `selections` by `responseKeys`, each a response key
+ * (`responseKey ?? selectableName`) among the previous selection's target's selections. */
+export function selectionAt(
+  selections: NormalizationSelectionSet,
+  responseKey: string,
+  ...rest: ReadonlyArray<string>
+): NormalizationSelection;
 ```
 
 ```json
@@ -750,9 +807,11 @@ Selections are taken from the fixture ASTs by response key.
 - `variableGreeting` with `{ name: "Bo" }` is `greeting____name___"Bo"`; with `{ name: null }` it is `greeting____name___null`, equal to `nullGreeting`'s; with `{ name: "null" }` it is `greeting____name___"null"`, a different key.
 - `search` with `{ q: "Rex" }` is `search____filter___{"minAge":2,"nameContains":"Rex"}`, keys sorted.
 - `pet` with `{ id: "1" }` is `pet____id___"1"`; with `{ id: 1 }` (a test input of the wrong GraphQL type) it is `pet____id___1`, a different key; the response key is `pet____id___v_id`.
-- `stableStringify` of `{ b: 1, a: { d: [3, { f: 1, e: 2 }], c: 2 } }` and of `{ a: { c: 2, d: [3, { e: 2, f: 1 }] }, b: 1 }` are both `{"a":{"c":2,"d":[3,{"e":2,"f":1}]},"b":1}`: key order is independent at every depth, and array order is kept (`[2, 1]` stays `[2,1]`).
-- `stableStringify` of `{ a: undefined, b: 1 }`, a value outside `JsonValue` built by a cast, is `{"b":1}`, as `JSON.stringify` writes it.
-- A `Variable` argument whose variable is `null` is `null`: `checkins(limit: $n)` with `{ n: null }` is `checkins____limit___null`; inside an object, `search(filter: { nameContains: $q, minAge: 2 })` with `{ q: null }` is `search____filter___{"minAge":2,"nameContains":null}`.
+- `JSON.stringify(stableCopy(..))` of `{ b: 1, a: { d: [3, { f: 1, e: 2 }], c: 2 } }` and of `{ a: { c: 2, d: [3, { e: 2, f: 1 }] }, b: 1 }` are both `{"a":{"c":2,"d":[3,{"e":2,"f":1}]},"b":1}`: key order is independent at every depth, and array order is kept (`[2, 1]` stays `[2,1]`).
+- `stableCopy` sorts by code unit: `{ b, B, a, é }` is `{"B":..,"a":..,"b":..,"é":..}`. Own `constructor` and `__proto__` keys are kept as data. `null`, a string, a number, `{}`, and `[]` are copied as they are.
+- A variable whose value is an object is sorted at every depth in the key.
+- A `Variable` argument whose variable is `null` is `null`: `pagedCheckins: checkins(limit: 2, skip: $skip)` with `{ skip: null }` is `checkins____limit___2____skip___null`; inside an object, `search(filter: { nameContains: $q, minAge: 2 })` with `{ q: null }` is `search____filter___{"minAge":2,"nameContains":null}`.
+- An absent variable throws the missing-variable message.
 
 ### `normalize` (`test/normalize.test.ts`)
 

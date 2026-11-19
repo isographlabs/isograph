@@ -15,3 +15,17 @@ export type {
   NormalizationSelection,
   NormalizationSelectionSet,
 } from './artifacts';
+export type {
+  CompositeValue,
+  JsonObject,
+  JsonValue,
+  LeafValue,
+  Link,
+  RecordId,
+  Store,
+  StoreKey,
+  StoreLink,
+  StoreRecord,
+  StoreValue,
+  Variables,
+} from './store';
