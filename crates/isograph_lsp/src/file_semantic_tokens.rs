@@ -1,6 +1,6 @@
 use common_lang_types::RelativePathToSourceFile;
 use isograph_compiler::{
-    HostLanguage, IsographDb, parsed_iso_literals_in_file, text_through_last_iso_literal,
+    ClientId, HostLanguage, IsographDb, parsed_iso_literals_in_file, text_through_last_iso_literal,
 };
 use pico_macros::memo;
 use prelude::Postfix;
@@ -10,10 +10,11 @@ use crate::lsp_semantic_tokens;
 #[memo]
 pub fn lsp_semantic_tokens_for_file<THostLanguage: HostLanguage>(
     db: &IsographDb<THostLanguage>,
+    client: ClientId,
     path: RelativePathToSourceFile,
 ) -> Option<Vec<lsp_types::SemanticToken>> {
-    let literals = parsed_iso_literals_in_file(db, path).as_ref()?;
-    let page_content = text_through_last_iso_literal(db, path).as_ref()?;
+    let literals = parsed_iso_literals_in_file(db, client, path).as_ref()?;
+    let page_content = text_through_last_iso_literal(db, client, path).as_ref()?;
     lsp_semantic_tokens(
         page_content,
         literals.iter().map(|(extraction, parsed)| {
@@ -27,11 +28,15 @@ pub fn lsp_semantic_tokens_for_file<THostLanguage: HostLanguage>(
 mod tests {
     use common_lang_types::RelativePathToSourceFile;
     use intern::string_key::Intern;
-    use isograph_compiler::IsographDb;
+    use isograph_compiler::{ClientId, IsographDb};
     use isograph_extract_typescript::TypeScriptHostLanguage;
     use prelude::Postfix;
 
     use super::lsp_semantic_tokens_for_file;
+
+    fn client() -> ClientId {
+        ClientId(1)
+    }
 
     fn intern_path(s: &str) -> RelativePathToSourceFile {
         s.intern().to()
@@ -56,7 +61,7 @@ mod tests {
             path,
             "export const Home = iso(`entrypoint Query.HomeRoute`)",
         );
-        let lsp = lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, path)
+        let lsp = lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, client(), path)
             .as_ref()
             .expect("the test interned this path");
         assert_eq!(lsp[0].delta_line, 0);
@@ -77,7 +82,7 @@ mod tests {
             path,
             "iso(`entrypoint Query.A`)\niso(`entrypoint Query.B`)",
         );
-        let lsp = lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, path)
+        let lsp = lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, client(), path)
             .as_ref()
             .expect("the test interned this path");
         let mut keywords = lsp.iter().filter(|token| token.token_type == KEYWORD);
@@ -96,7 +101,7 @@ mod tests {
         let mut db = IsographDb::<TypeScriptHostLanguage>::default();
         let path = intern_path("src/a.ts");
         intern_file(&mut db, path, "");
-        let lsp = lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, path)
+        let lsp = lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, client(), path)
             .as_ref()
             .expect("the test interned this path");
         assert!(lsp.is_empty());
@@ -107,7 +112,7 @@ mod tests {
         let mut db = IsographDb::<TypeScriptHostLanguage>::default();
         let path = intern_path("src/a.ts");
         intern_file(&mut db, path, "iso(` `)");
-        let lsp = lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, path)
+        let lsp = lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, client(), path)
             .as_ref()
             .expect("the test interned this path");
         assert!(lsp.is_empty());
@@ -118,16 +123,22 @@ mod tests {
         let mut db = IsographDb::<TypeScriptHostLanguage>::default();
         let path = intern_path("src/a.ts");
         intern_file(&mut db, path, "iso(`entrypoint Query.HomeRoute`)");
-        assert!(lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, path).is_some());
+        assert!(
+            lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, client(), path).is_some()
+        );
         db.remove_disk_file(path);
-        assert!(lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, path).is_none());
+        assert!(
+            lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, client(), path).is_none()
+        );
     }
 
     #[test]
     fn no_disk_file_is_none() {
         let db = IsographDb::<TypeScriptHostLanguage>::default();
         let path = intern_path("src/a.ts");
-        assert!(lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, path).is_none());
+        assert!(
+            lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, client(), path).is_none()
+        );
     }
 
     #[test]
@@ -136,12 +147,12 @@ mod tests {
         let path = intern_path("src/a.ts");
         let contents = "export const Home = iso(`entrypoint Query.HomeRoute`)";
         intern_file(&mut db, path, contents);
-        let before = lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, path)
+        let before = lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, client(), path)
             .as_ref()
             .expect("the test interned this path")
             .clone();
         intern_file(&mut db, path, &(contents.to_owned() + "\nconst y = 1;\n"));
-        let after = lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, path)
+        let after = lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, client(), path)
             .as_ref()
             .expect("the test interned this path");
         assert_eq!(&before, after);
@@ -153,12 +164,12 @@ mod tests {
         let path = intern_path("src/a.ts");
         let contents = "export const Home = iso(`entrypoint Query.HomeRoute`)";
         intern_file(&mut db, path, contents);
-        let before = lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, path)
+        let before = lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, client(), path)
             .as_ref()
             .expect("the test interned this path")
             .clone();
         intern_file(&mut db, path, &("const x = 1;\n".to_owned() + contents));
-        let after = lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, path)
+        let after = lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, client(), path)
             .as_ref()
             .expect("the test interned this path");
         assert_eq!(after[0].delta_line, 1);
@@ -176,7 +187,7 @@ mod tests {
             path,
             "export const Home = iso(`entrypoint Query.HomeRoute`)",
         );
-        let before = lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, path)
+        let before = lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, client(), path)
             .as_ref()
             .expect("the test interned this path")
             .clone();
@@ -185,9 +196,29 @@ mod tests {
             path,
             "export const Page = iso(`entrypoint Query.HomeRoute`)",
         );
-        let after = lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, path)
+        let after = lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, client(), path)
             .as_ref()
             .expect("the test interned this path");
         assert_eq!(&before, after);
+    }
+
+    #[test]
+    fn a_buffer_is_encoded_until_it_is_removed() {
+        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let path = intern_path("src/a.ts");
+        intern_file(&mut db, path, "iso(`field Query.x { id }`)");
+        db.set_open_file(client(), path, "iso(`entrypoint Query.A`)".to_owned());
+        let buffer = lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, client(), path)
+            .as_ref()
+            .expect("the client has a buffer")
+            .clone();
+        assert_eq!(buffer[0].token_type, KEYWORD);
+        assert_eq!(buffer[0].length, 10);
+        db.remove_open_file(client(), path);
+        let disk = lsp_semantic_tokens_for_file::<TypeScriptHostLanguage>(&db, client(), path)
+            .as_ref()
+            .expect("the disk file is present");
+        assert_eq!(disk[0].token_type, KEYWORD);
+        assert_eq!(disk[0].length, 5);
     }
 }

@@ -645,14 +645,6 @@ mod tests {
         type Error = InHostError;
         type LiteralContext = ();
 
-        fn extract_iso_literals(
-            _db: &IsographDb<Self>,
-            _path: common_lang_types::RelativePathToSourceFile,
-        ) -> &Option<Vec<IsoLiteralExtraction<Self>>> {
-            const NONE: Option<Vec<IsoLiteralExtraction<InHost>>> = None;
-            &NONE
-        }
-
         fn extract_iso_literals_from_text(_contents: &str) -> Vec<IsoLiteralExtraction<Self>> {
             Vec::new()
         }

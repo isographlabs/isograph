@@ -23,13 +23,13 @@ pub(crate) enum UriPathError {
 
 pub(crate) fn semantic_tokens_response<THostLanguage: HostLanguage>(
     db: &IsographDb<THostLanguage>,
-    _client: ClientId,
+    client: ClientId,
     params: lsp_types::SemanticTokensParams,
 ) -> LSPRuntimeResult<
     <lsp_types::request::SemanticTokensFullRequest as lsp_types::request::Request>::Result,
 > {
     let path = relative_from_uri(db, params.text_document.uri.reference()).map_err(lsp_error)?;
-    isograph_lsp::lsp_semantic_tokens_for_file::<THostLanguage>(db, path)
+    isograph_lsp::lsp_semantic_tokens_for_file::<THostLanguage>(db, client, path)
         .clone()
         .map(|data| {
             lsp_types::SemanticTokensResult::Tokens(lsp_types::SemanticTokens {
@@ -141,29 +141,31 @@ fn lsp_error(error: UriPathError) -> LSPRuntimeError {
 
 pub(crate) fn formatting_response<THostLanguage: HostLanguage>(
     db: &IsographDb<THostLanguage>,
-    _client: ClientId,
+    client: ClientId,
     params: lsp_types::DocumentFormattingParams,
 ) -> LSPRuntimeResult<<lsp_types::request::Formatting as lsp_types::request::Request>::Result> {
     let path = relative_from_uri(db, params.text_document.uri.reference()).map_err(lsp_error)?;
-    format_iso_literals(db, path).wrap_ok()
+    format_iso_literals(db, client, path).wrap_ok()
 }
 
 pub(crate) fn will_save_wait_until_response<THostLanguage: HostLanguage>(
     db: &IsographDb<THostLanguage>,
-    _client: ClientId,
+    client: ClientId,
     params: lsp_types::WillSaveTextDocumentParams,
 ) -> LSPRuntimeResult<<lsp_types::request::WillSaveWaitUntil as lsp_types::request::Request>::Result>
 {
     let path = relative_from_uri(db, params.text_document.uri.reference()).map_err(lsp_error)?;
-    format_iso_literals(db, path).wrap_ok()
+    format_iso_literals(db, client, path).wrap_ok()
 }
 
 fn format_iso_literals<THostLanguage: HostLanguage>(
     db: &IsographDb<THostLanguage>,
+    client: ClientId,
     path: RelativePathToSourceFile,
 ) -> Option<Vec<lsp_types::TextEdit>> {
-    let literals = isograph_compiler::parsed_iso_literals_in_file(db, path).as_ref()?;
-    let page_content = isograph_compiler::text_through_last_iso_literal(db, path).as_ref()?;
+    let literals = isograph_compiler::parsed_iso_literals_in_file(db, client, path).as_ref()?;
+    let page_content =
+        isograph_compiler::text_through_last_iso_literal(db, client, path).as_ref()?;
     literals
         .iter()
         .filter_map(|(extraction, parsed)| {
@@ -186,10 +188,10 @@ fn format_iso_literals<THostLanguage: HostLanguage>(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use common_lang_types::RelativePathToSourceFile;
     use intern::string_key::Intern;
-    use isograph_compiler::IsographDb;
+    use isograph_compiler::{ClientId, IsographDb};
     use isograph_extract_typescript::TypeScriptHostLanguage;
     use prelude::Postfix;
 
@@ -206,6 +208,10 @@ mod tests {
         );
         db.insert_disk_file("src/Pet.ts".intern().to(), contents);
         db
+    }
+
+    fn client() -> ClientId {
+        ClientId(1)
     }
 
     fn path() -> RelativePathToSourceFile {
@@ -240,7 +246,7 @@ mod tests {
         offset + line.len()
     }
 
-    fn apply_text_edits(source: &str, edits: &[lsp_types::TextEdit]) -> String {
+    pub(crate) fn apply_text_edits(source: &str, edits: &[lsp_types::TextEdit]) -> String {
         let mut ordered: Vec<&lsp_types::TextEdit> = edits.iter().collect();
         ordered.sort_by(|left, right| {
             right
@@ -262,7 +268,7 @@ mod tests {
 
     fn formatted_source(contents: String) -> String {
         let db = db_with(contents.clone());
-        let edits = format_iso_literals(&db, path()).expect("edits");
+        let edits = format_iso_literals(&db, client(), path()).expect("edits");
         apply_text_edits(&contents, &edits)
     }
 
@@ -287,7 +293,7 @@ mod tests {
         (0usize..=4).for_each(|spaces| {
             let source = source_with_blank_spaces(spaces);
             let db = db_with(source.clone());
-            let edits = format_iso_literals(&db, path()).expect("edits");
+            let edits = format_iso_literals(&db, client(), path()).expect("edits");
             let once = apply_text_edits(&source, &edits);
             assert_eq!(once, PRETTY, "spaces={spaces}");
             let twice = apply_text_edits(&once, &edits);
@@ -296,10 +302,10 @@ mod tests {
     }
 
     #[test]
-    fn pretty_disk_edits_applied_to_a_buffer_with_an_extra_blank_line_leave_an_extra_brace() {
+    fn edits_for_a_client_without_a_buffer_applied_to_a_longer_buffer_leave_an_extra_brace() {
         const EXTRA_BRACE: &str = "export const fullName = iso(`\n  field Pet.fullName @foo(\n    bar: 123,\n    baz: $qux,\n  ) {\n    id,\n  }\n  }\n`);\n";
         let db = db_with(PRETTY.to_owned());
-        let edits = format_iso_literals(&db, path()).expect("edits");
+        let edits = format_iso_literals(&db, client(), path()).expect("edits");
         (0usize..=4).for_each(|spaces| {
             assert_eq!(
                 apply_text_edits(&source_with_blank_spaces(spaces), &edits),
@@ -310,11 +316,71 @@ mod tests {
     }
 
     #[test]
+    fn edits_for_a_client_with_that_buffer_open_are_pretty_when_applied_to_it() {
+        let mut db = db_with(PRETTY.to_owned());
+        (0usize..=4).for_each(|spaces| {
+            let buffer = source_with_blank_spaces(spaces);
+            db.set_open_file(client(), path(), buffer.clone());
+            let edits = format_iso_literals(&db, client(), path()).expect("edits");
+            assert_eq!(apply_text_edits(&buffer, &edits), PRETTY, "spaces={spaces}");
+        });
+    }
+
+    const TWO_LITERALS: &str =
+        "const a = iso(`field Query.x{id}`);\nconst b = 1;\nconst c = iso(`field Query.y{id}`);\n";
+    const TWO_LITERALS_SECOND_PRETTY: &str = "const a = iso(`field Query.x{id}`);\nconst b = 1;\nconst c = iso(`\n  field Query.y {\n    id,\n  }\n`);\n";
+    const TWO_LITERALS_PRETTY: &str = "const a = iso(`\n  field Query.x {\n    id,\n  }\n`);\nconst b = 1;\nconst c = iso(`\n  field Query.y {\n    id,\n  }\n`);\n";
+
+    fn formatted_buffer(db: &mut IsographDb<TypeScriptHostLanguage>, buffer: &str) -> String {
+        db.set_open_file(client(), path(), buffer.to_owned());
+        let edits = format_iso_literals(db, client(), path()).expect("edits");
+        apply_text_edits(buffer, &edits)
+    }
+
+    #[test]
+    fn two_literals_are_two_disjoint_edits_that_leave_the_javascript_unchanged() {
+        let mut db = db_with(String::new());
+        db.set_open_file(client(), path(), TWO_LITERALS.to_owned());
+        let edits = format_iso_literals(&db, client(), path()).expect("edits");
+        let [first, second] = edits.as_slice() else {
+            panic!("expected two edits, got {edits:?}");
+        };
+        let start =
+            |edit: &lsp_types::TextEdit| (edit.range.start.line, edit.range.start.character);
+        let end = |edit: &lsp_types::TextEdit| (edit.range.end.line, edit.range.end.character);
+        assert!(
+            end(first) <= start(second) || end(second) <= start(first),
+            "{first:?} overlaps {second:?}"
+        );
+        assert_eq!(apply_text_edits(TWO_LITERALS, &edits), TWO_LITERALS_PRETTY);
+    }
+
+    #[test]
+    fn two_literals_with_the_second_already_pretty_format_to_both_pretty() {
+        let mut db = db_with(String::new());
+        assert_eq!(
+            formatted_buffer(&mut db, TWO_LITERALS_SECOND_PRETTY),
+            TWO_LITERALS_PRETTY
+        );
+    }
+
+    #[test]
+    fn formatting_two_formatted_literals_again_changes_no_text() {
+        let mut db = db_with(String::new());
+        let once = formatted_buffer(&mut db, TWO_LITERALS);
+        assert_eq!(once, TWO_LITERALS_PRETTY);
+        assert_eq!(
+            formatted_buffer(&mut db, once.as_str()),
+            TWO_LITERALS_PRETTY
+        );
+    }
+
+    #[test]
     fn formatting_disk_applied_to_a_buffer_with_a_different_blank_width_is_pretty() {
         (0usize..=4).for_each(|disk_spaces| {
             let disk = source_with_blank_spaces(disk_spaces);
             let db = db_with(disk);
-            let edits = format_iso_literals(&db, path()).expect("edits");
+            let edits = format_iso_literals(&db, client(), path()).expect("edits");
             (0usize..=4).for_each(|buffer_spaces| {
                 let applied = apply_text_edits(&source_with_blank_spaces(buffer_spaces), &edits);
                 assert_eq!(

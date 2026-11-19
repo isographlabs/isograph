@@ -1232,6 +1232,258 @@ mod tests {
         assert!(state.db.get_open_file_map().untracked().0.is_empty());
     }
 
+    const HOME_URI: &str = "file:///tmp/proj/src/Home.ts";
+    const HOME_DISK: &str = "export const Home = iso(`entrypoint Query.HomeRoute`)";
+    const FIELD_X: &str = "iso(`field Query.x{id}`)";
+    const ENTRYPOINT_A: &str = "iso(`entrypoint Query.A`)";
+    const KEYWORD: u32 = 15;
+
+    fn disk_changed(state: &mut IsographState<TypeScriptHostLanguage>, path: &str, text: &str) {
+        handle(
+            state,
+            InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
+                path: PathBuf::from(path),
+                presence: Presence::Present(text.to_owned()),
+            }))
+            .to(),
+        );
+    }
+
+    struct TestClient {
+        client: ClientId,
+        rx: crossbeam::channel::Receiver<lsp_server::Message>,
+    }
+
+    fn live_client(
+        state: &mut IsographState<TypeScriptHostLanguage>,
+        client: ClientId,
+    ) -> TestClient {
+        let (tx, rx) = crossbeam::channel::unbounded();
+        start_client(state, client, tx);
+        TestClient { client, rx }
+    }
+
+    fn request_result(
+        state: &mut IsographState<TypeScriptHostLanguage>,
+        client: &TestClient,
+        method: &str,
+        params: serde_json::Value,
+    ) -> serde_json::Value {
+        let effects = handle(
+            state,
+            lsp_request(
+                client.client,
+                lsp_server::RequestId::from(1),
+                method,
+                params,
+            ),
+        );
+        only_response(effects, client.rx.reference())
+            .result
+            .expect("the request succeeds")
+    }
+
+    fn formatting_edits(
+        state: &mut IsographState<TypeScriptHostLanguage>,
+        client: &TestClient,
+        uri: &str,
+    ) -> Option<Vec<lsp_types::TextEdit>> {
+        let result = request_result(
+            state,
+            client,
+            lsp_types::request::Formatting::METHOD,
+            serde_json::json!({
+                "textDocument": { "uri": uri },
+                "options": { "tabSize": 2, "insertSpaces": true }
+            }),
+        );
+        serde_json::from_value(result).expect("Formatting returns TextEdit[] | null")
+    }
+
+    fn will_save_edits(
+        state: &mut IsographState<TypeScriptHostLanguage>,
+        client: &TestClient,
+        uri: &str,
+    ) -> Option<Vec<lsp_types::TextEdit>> {
+        let result = request_result(
+            state,
+            client,
+            lsp_types::request::WillSaveWaitUntil::METHOD,
+            serde_json::json!({ "textDocument": { "uri": uri }, "reason": 1 }),
+        );
+        serde_json::from_value(result).expect("willSaveWaitUntil returns TextEdit[] | null")
+    }
+
+    fn semantic_tokens(
+        state: &mut IsographState<TypeScriptHostLanguage>,
+        client: &TestClient,
+        uri: &str,
+    ) -> Option<Vec<lsp_types::SemanticToken>> {
+        let result = request_result(
+            state,
+            client,
+            lsp_types::request::SemanticTokensFullRequest::METHOD,
+            serde_json::json!({ "textDocument": { "uri": uri } }),
+        );
+        serde_json::from_value::<Option<lsp_types::SemanticTokens>>(result)
+            .expect("semanticTokens/full returns SemanticTokens | null")
+            .map(|tokens| tokens.data)
+    }
+
+    fn with_disk_home() -> IsographState<TypeScriptHostLanguage> {
+        let mut state = with_config();
+        disk_changed(&mut state, "/tmp/proj/src/Home.ts", HOME_DISK);
+        state
+    }
+
+    fn first_token(tokens: Option<Vec<lsp_types::SemanticToken>>) -> lsp_types::SemanticToken {
+        *tokens
+            .expect("the file has text")
+            .first()
+            .expect("the literal has a token")
+    }
+
+    #[test]
+    fn formatting_reads_the_clients_buffer_over_disk() {
+        let mut state = with_config();
+        disk_changed(&mut state, "/tmp/proj/src/x.ts", "const x = 1;\n");
+        let one = live_client(&mut state, ClientId(1));
+        handle(&mut state, did_open(one.client, X_URI, FIELD_X));
+        let edits = formatting_edits(&mut state, &one, X_URI).expect("the buffer has text");
+        let [edit] = edits.as_slice() else {
+            panic!("expected one edit, got {edits:?}");
+        };
+        assert_eq!(edit.new_text, "\n  field Query.x {\n    id,\n  }\n");
+    }
+
+    #[test]
+    fn will_save_wait_until_returns_the_formatting_edits_of_the_buffer() {
+        let mut state = with_config();
+        disk_changed(&mut state, "/tmp/proj/src/x.ts", "const x = 1;\n");
+        let one = live_client(&mut state, ClientId(1));
+        handle(&mut state, did_open(one.client, X_URI, FIELD_X));
+        let formatting = formatting_edits(&mut state, &one, X_URI);
+        let will_save = will_save_edits(&mut state, &one, X_URI);
+        assert_eq!(will_save, formatting);
+        assert_eq!(will_save.map(|edits| edits.len()), 1.wrap_some());
+    }
+
+    #[test]
+    fn formatting_after_did_close_reads_disk() {
+        let mut state = with_config();
+        disk_changed(&mut state, "/tmp/proj/src/x.ts", "const x = 1;\n");
+        let one = live_client(&mut state, ClientId(1));
+        handle(&mut state, did_open(one.client, X_URI, FIELD_X));
+        assert_eq!(
+            formatting_edits(&mut state, &one, X_URI).map(|edits| edits.len()),
+            1.wrap_some()
+        );
+        handle(&mut state, did_close(one.client, X_URI));
+        assert_eq!(
+            formatting_edits(&mut state, &one, X_URI),
+            Vec::new().wrap_some()
+        );
+    }
+
+    #[test]
+    fn formatting_two_literals_in_a_buffer_leaves_the_javascript_between_them() {
+        const TWO_LITERALS: &str = "const a = iso(`field Query.x{id}`);\nconst b = 1;\nconst c = iso(`field Query.y{id}`);\n";
+        const TWO_LITERALS_PRETTY: &str = "const a = iso(`\n  field Query.x {\n    id,\n  }\n`);\nconst b = 1;\nconst c = iso(`\n  field Query.y {\n    id,\n  }\n`);\n";
+        let mut state = with_config();
+        disk_changed(&mut state, "/tmp/proj/src/x.ts", "const x = 1;\n");
+        let one = live_client(&mut state, ClientId(1));
+        handle(&mut state, did_open(one.client, X_URI, TWO_LITERALS));
+        let edits = formatting_edits(&mut state, &one, X_URI).expect("the buffer has text");
+        assert_eq!(edits.len(), 2);
+        assert_eq!(
+            crate::adapter::tests::apply_text_edits(TWO_LITERALS, &edits),
+            TWO_LITERALS_PRETTY
+        );
+    }
+
+    #[test]
+    fn semantic_tokens_follow_did_open_did_change_and_did_close() {
+        let mut state = with_disk_home();
+        let one = live_client(&mut state, ClientId(1));
+        let two = live_client(&mut state, ClientId(2));
+        handle(&mut state, did_open(one.client, HOME_URI, FIELD_X));
+        let opened = first_token(semantic_tokens(&mut state, &one, HOME_URI));
+        assert_eq!(opened.token_type, KEYWORD);
+        assert_eq!(opened.length, 5);
+        handle(
+            &mut state,
+            did_change(
+                one.client,
+                HOME_URI,
+                serde_json::json!([{ "text": ENTRYPOINT_A }]),
+            ),
+        );
+        let changed = first_token(semantic_tokens(&mut state, &one, HOME_URI));
+        assert_eq!(changed.token_type, KEYWORD);
+        assert_eq!(changed.length, 10);
+        handle(&mut state, did_close(one.client, HOME_URI));
+        assert_eq!(
+            semantic_tokens(&mut state, &one, HOME_URI),
+            semantic_tokens(&mut state, &two, HOME_URI)
+        );
+    }
+
+    #[test]
+    fn two_clients_with_one_uri_open_get_tokens_of_their_own_buffers() {
+        let mut state = with_disk_home();
+        let one = live_client(&mut state, ClientId(1));
+        let two = live_client(&mut state, ClientId(2));
+        handle(&mut state, did_open(one.client, HOME_URI, FIELD_X));
+        handle(&mut state, did_open(two.client, HOME_URI, ENTRYPOINT_A));
+        assert_eq!(
+            first_token(semantic_tokens(&mut state, &one, HOME_URI)).length,
+            5
+        );
+        assert_eq!(
+            first_token(semantic_tokens(&mut state, &two, HOME_URI)).length,
+            10
+        );
+    }
+
+    #[test]
+    fn a_client_that_never_opened_the_uri_gets_disk_tokens() {
+        let mut disk_only = with_disk_home();
+        let reader = live_client(&mut disk_only, ClientId(2));
+        let disk_tokens = semantic_tokens(&mut disk_only, &reader, HOME_URI);
+        let mut state = with_disk_home();
+        let one = live_client(&mut state, ClientId(1));
+        let two = live_client(&mut state, ClientId(2));
+        handle(&mut state, did_open(one.client, HOME_URI, FIELD_X));
+        assert_eq!(
+            first_token(semantic_tokens(&mut state, &one, HOME_URI)).length,
+            5
+        );
+        assert_eq!(semantic_tokens(&mut state, &two, HOME_URI), disk_tokens);
+        assert_eq!(first_token(disk_tokens).length, 10);
+    }
+
+    #[test]
+    fn semantic_tokens_of_an_open_file_with_no_disk_file_are_null_after_did_close() {
+        const NEW_URI: &str = "file:///tmp/proj/src/new.ts";
+        let mut state = with_config();
+        let one = live_client(&mut state, ClientId(1));
+        handle(&mut state, did_open(one.client, NEW_URI, FIELD_X));
+        assert!(semantic_tokens(&mut state, &one, NEW_URI).is_some());
+        handle(&mut state, did_close(one.client, NEW_URI));
+        assert_eq!(semantic_tokens(&mut state, &one, NEW_URI), None);
+    }
+
+    #[test]
+    fn an_empty_buffer_over_a_disk_literal_has_no_tokens() {
+        let mut state = with_disk_home();
+        let one = live_client(&mut state, ClientId(1));
+        handle(&mut state, did_open(one.client, HOME_URI, ""));
+        assert_eq!(
+            semantic_tokens(&mut state, &one, HOME_URI),
+            Vec::new().wrap_some()
+        );
+    }
+
     #[test]
     fn file_absent_of_a_directory_path_does_not_remove_files_under_it() {
         let mut state = with_config();

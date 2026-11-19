@@ -3,10 +3,7 @@ use std::path::Path;
 
 use thiserror::Error;
 
-use common_lang_types::RelativePathToSourceFile;
 use isograph_parser::ParseError;
-
-use crate::IsographDb;
 
 /// Byte offset of the iso literal text in its file.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -66,11 +63,6 @@ pub enum SkipSourceFile {
 pub trait HostLanguage: Send + Sync + Sized + 'static {
     type Error: std::fmt::Display + std::error::Error + Clone + PartialEq + Eq + 'static;
     type LiteralContext: Clone + PartialEq + Eq + Debug + 'static;
-
-    fn extract_iso_literals(
-        db: &IsographDb<Self>,
-        path: RelativePathToSourceFile,
-    ) -> &Option<Vec<IsoLiteralExtraction<Self>>>;
 
     fn extract_iso_literals_from_text(contents: &str) -> Vec<IsoLiteralExtraction<Self>>;
 

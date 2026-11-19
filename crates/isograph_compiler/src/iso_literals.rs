@@ -3,8 +3,8 @@ use isograph_parser::{ParsedIsoLiteral, parse_iso_literal};
 use pico_macros::memo;
 use prelude::Postfix;
 
-use crate::IsographDb;
 use crate::host_language::{HostLanguage, IsoLiteralExtraction};
+use crate::{ClientId, IsographDb, file_contents};
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 pub struct LineChar {
@@ -14,6 +14,7 @@ pub struct LineChar {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct LiteralId {
+    pub client: ClientId,
     pub path: RelativePathToSourceFile,
     pub index: usize,
 }
@@ -27,11 +28,22 @@ pub fn parsed_iso_literal<THostLanguage: HostLanguage>(
 }
 
 #[memo]
+pub fn extract_iso_literals<THostLanguage: HostLanguage>(
+    db: &IsographDb<THostLanguage>,
+    client: ClientId,
+    path: RelativePathToSourceFile,
+) -> Option<Vec<IsoLiteralExtraction<THostLanguage>>> {
+    let contents = file_contents(db, client, path).as_ref()?;
+    THostLanguage::extract_iso_literals_from_text(contents).wrap_some()
+}
+
+#[memo]
 pub fn parsed_iso_literals_in_file<THostLanguage: HostLanguage>(
     db: &IsographDb<THostLanguage>,
+    client: ClientId,
     path: RelativePathToSourceFile,
 ) -> Option<Vec<(IsoLiteralExtraction<THostLanguage>, ParsedIsoLiteral)>> {
-    let extractions = THostLanguage::extract_iso_literals(db, path).as_ref()?;
+    let extractions = extract_iso_literals(db, client, path).as_ref()?;
     extractions
         .iter()
         .map(|extraction| {
@@ -47,10 +59,11 @@ pub fn parsed_iso_literals_in_file<THostLanguage: HostLanguage>(
 #[memo]
 pub fn text_through_last_iso_literal<THostLanguage: HostLanguage>(
     db: &IsographDb<THostLanguage>,
+    client: ClientId,
     path: RelativePathToSourceFile,
 ) -> Option<String> {
-    let extractions = THostLanguage::extract_iso_literals(db, path).as_ref()?;
-    let contents = db.disk_file(path)?.contents.reference();
+    let extractions = extract_iso_literals(db, client, path).as_ref()?;
+    let contents = file_contents(db, client, path).as_ref()?;
     let end = extractions
         .last()
         .map(|last| last.span().as_usize_range().end)
@@ -61,13 +74,19 @@ pub fn text_through_last_iso_literal<THostLanguage: HostLanguage>(
 #[memo]
 pub fn literal_id_at_location<THostLanguage: HostLanguage>(
     db: &IsographDb<THostLanguage>,
+    client: ClientId,
     path: RelativePathToSourceFile,
     line_char: LineChar,
 ) -> Option<LiteralId> {
-    let extractions = THostLanguage::extract_iso_literals(db, path).as_ref()?;
-    let file_content = db.disk_file(path)?.contents.reference();
+    let extractions = extract_iso_literals(db, client, path).as_ref()?;
+    let file_content = file_contents(db, client, path).as_ref()?;
     let index = find_iso_literal_index(line_char, file_content, extractions)?;
-    LiteralId { path, index }.wrap_some()
+    LiteralId {
+        client,
+        path,
+        index,
+    }
+    .wrap_some()
 }
 
 #[memo]
@@ -75,7 +94,7 @@ pub fn iso_literal_extraction<THostLanguage: HostLanguage>(
     db: &IsographDb<THostLanguage>,
     literal_id: LiteralId,
 ) -> Option<IsoLiteralExtraction<THostLanguage>> {
-    let extractions = THostLanguage::extract_iso_literals(db, literal_id.path).as_ref()?;
+    let extractions = extract_iso_literals(db, literal_id.client, literal_id.path).as_ref()?;
     extractions.get(literal_id.index).cloned()
 }
 

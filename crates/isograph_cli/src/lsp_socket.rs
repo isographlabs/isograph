@@ -1122,6 +1122,59 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    async fn semantic_tokens_after_did_open_read_the_buffer_over_disk() {
+        let (port, _event_rx) = listen_and_reply().await;
+        let stream = connect(port);
+        let (mut writer, mut reader) = split(stream);
+        initialize(&mut writer, &mut reader);
+        let uri = "file:///tmp/proj/src/Home.ts";
+        write_message(
+            &mut writer,
+            Message::Notification(lsp_server::Notification {
+                method: IsographEventNotification::METHOD.to_owned(),
+                params: serde_json::to_value(InternalEvent::DiskChanged(DiskChanged::File(
+                    DiskFileChanged {
+                        path: PathBuf::from("/tmp/proj/src/Home.ts"),
+                        presence: Presence::Present(
+                            "export const Home = iso(`entrypoint Query.HomeRoute`)".to_owned(),
+                        ),
+                    },
+                )))
+                .expect("DiskChanged serializes"),
+            }),
+        );
+        write_message(
+            &mut writer,
+            Message::Notification(lsp_server::Notification {
+                method: lsp_types::notification::DidOpenTextDocument::METHOD.to_owned(),
+                params: serde_json::json!({
+                    "textDocument": {
+                        "uri": uri,
+                        "languageId": "typescript",
+                        "version": 1,
+                        "text": "iso(`field Query.x{id}`)"
+                    }
+                }),
+            }),
+        );
+        let response = semantic_tokens_full(
+            &mut writer,
+            &mut reader,
+            2,
+            serde_json::json!({ "textDocument": { "uri": uri } }),
+        );
+        assert!(response.error.is_none(), "{response:?}");
+        let tokens: lsp_types::SemanticTokensResult =
+            serde_json::from_value(response.result.expect("tokens result"))
+                .expect("SemanticTokensResult");
+        let lsp_types::SemanticTokensResult::Tokens(tokens) = tokens else {
+            panic!("full is Tokens");
+        };
+        assert_eq!(tokens.data[0].token_type, 15);
+        assert_eq!(tokens.data[0].length, 5);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn unknown_request_is_still_method_not_found() {
         let (port, _event_rx) = listen_and_reply().await;
         let stream = connect(port);
