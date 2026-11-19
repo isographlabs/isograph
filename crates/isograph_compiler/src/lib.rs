@@ -17,7 +17,9 @@ pub use iso_literals::{
     parsed_iso_literal, parsed_iso_literal_by_id, parsed_iso_literals_in_file,
     text_through_last_iso_literal,
 };
-pub use schema::{DefinitionLocation, Entity, Selectable, entity_named, selectable_named};
+pub use schema::{
+    DefinitionLocation, Entity, Selectable, entity_named, selectable_named, selectables_for_entity,
+};
 pub use selectable_for_path::{
     entity_for_selection_set_path, selectable_for_selectable_name_path,
     selectable_for_selection_parent, selectable_for_selection_path, selectable_target,

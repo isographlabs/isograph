@@ -93,6 +93,18 @@ fn definition_lsp_location<TProfile: CompilationProfile>(
     .wrap_ok()
 }
 
+pub(crate) fn completion_response<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    params: lsp_types::CompletionParams,
+) -> LSPRuntimeResult<<lsp_types::request::Completion as lsp_types::request::Request>::Result> {
+    let position = params.text_document_position;
+    let path = relative_from_uri(db, position.text_document.uri.reference()).map_err(lsp_error)?;
+    isograph_lsp::completion_at_lsp_position(db, client, path, position.position)
+        .map(lsp_types::CompletionResponse::Array)
+        .wrap_ok()
+}
+
 pub(crate) fn document_highlight_response<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,

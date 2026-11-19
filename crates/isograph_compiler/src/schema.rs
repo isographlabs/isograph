@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use common_lang_types::{
     DescriptionValue, Diagnostic, DiagnosticResult, EntityName, RelativePathToSourceFile,
     SelectableName,
@@ -82,6 +84,45 @@ pub fn selectable_named<TProfile: CompilationProfile>(
         )
         .wrap_err(),
     }
+}
+
+/// Every selectable on the entity named `entity_name` that exactly one source file
+/// declaration defines, by name.
+#[memo]
+pub fn selectables_for_entity<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    entity_name: EntityName,
+) -> DiagnosticResult<Vec<Selectable>> {
+    entity_named(db, client, entity_name).clone()?;
+    source_iso_literal_items(db, client)
+        .filter_map(|source_item| match source_item.item {
+            IsoLiteralItem::Selectable(declaration) => {
+                (declaration.parent_type.item.0 == entity_name).then(|| {
+                    selectable_of_declaration(
+                        source_item.path,
+                        source_item.literal_start,
+                        declaration,
+                    )
+                })
+            }
+            IsoLiteralItem::Entity(_) | IsoLiteralItem::Entrypoint(_) => None,
+        })
+        .fold(
+            BTreeMap::<SelectableName, Vec<Selectable>>::new(),
+            |mut by_name, selectable| {
+                by_name.entry(selectable.name).or_default().push(selectable);
+                by_name
+            },
+        )
+        .into_values()
+        .filter_map(|definitions| {
+            <[Selectable; 1]>::try_from(definitions)
+                .ok()
+                .map(|[selectable]| selectable)
+        })
+        .collect::<Vec<_>>()
+        .wrap_ok()
 }
 
 /// Where `entity <entity_name>` is declared in the source files `client` reads.

@@ -1,3 +1,4 @@
+mod completion;
 mod definition;
 mod document_highlight;
 mod entity_or_selectable;
@@ -10,6 +11,7 @@ mod semantic_tokens;
 #[cfg(test)]
 mod test_profile;
 
+pub use completion::completion_at_lsp_position;
 pub use definition::definition_at_lsp_position;
 pub use document_highlight::{TokenUnderCursor, token_range_at_lsp_position};
 pub use file_diagnostics::lsp_diagnostics_for_file;

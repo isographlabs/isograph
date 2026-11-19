@@ -118,6 +118,9 @@ fn dispatch_lsp_request<TProfile: CompilationProfile>(
             .on_request_sync::<lsp_types::request::DocumentHighlightRequest>(
                 crate::adapter::document_highlight_response::<TProfile>,
             )?
+            .on_request_sync::<lsp_types::request::Completion>(
+                crate::adapter::completion_response::<TProfile>,
+            )?
             .request();
         ControlFlow::Continue(request)
     };
@@ -1903,6 +1906,47 @@ mod tests {
         assert_eq!(
             definition(&mut state, "Pet"),
             definition_json("Pet.ts", PET_FILE, "Pet")
+        );
+    }
+
+    #[test]
+    fn completion_in_a_selection_set_returns_the_fields_of_its_entity() {
+        let mut state = with_config();
+        disk_changed(&mut state, "/tmp/proj/src/Pet.ts", PET_FILE);
+        disk_changed(&mut state, "/tmp/proj/src/fullName.ts", FULL_NAME_FILE);
+        disk_changed(&mut state, "/tmp/proj/src/x.ts", SELECTING_FILE);
+        let one = live_client(&mut state, ClientId(1));
+        let in_owner = column(SELECTING_FILE, "fullName");
+        let labels = |result: serde_json::Value| -> Vec<String> {
+            result
+                .as_array()
+                .expect("completion returns an array")
+                .iter()
+                .map(|item| {
+                    item["label"]
+                        .as_str()
+                        .expect("an item has a label")
+                        .to_owned()
+                })
+                .collect()
+        };
+        assert_eq!(
+            labels(request_result(
+                &mut state,
+                &one,
+                lsp_types::request::Completion::METHOD,
+                hover_params(X_URI, 0, in_owner),
+            )),
+            vec!["owner", "x"]
+        );
+        assert_eq!(
+            request_result(
+                &mut state,
+                &one,
+                lsp_types::request::Completion::METHOD,
+                hover_params(X_URI, 0, 0),
+            ),
+            serde_json::Value::Null
         );
     }
 

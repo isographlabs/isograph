@@ -156,6 +156,7 @@ fn run_session(
         hover_provider: lsp_types::HoverProviderCapability::Simple(true).wrap_some(),
         definition_provider: lsp_types::OneOf::Left(true).wrap_some(),
         document_highlight_provider: lsp_types::OneOf::Left(true).wrap_some(),
+        completion_provider: lsp_types::CompletionOptions::default().wrap_some(),
         text_document_sync: lsp_types::TextDocumentSyncCapability::Options(
             lsp_types::TextDocumentSyncOptions {
                 open_close: true.wrap_some(),
@@ -986,8 +987,8 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn initialize_advertises_formatting_will_save_wait_until_hover_highlight_and_definition()
-    {
+    async fn initialize_advertises_formatting_will_save_wait_until_hover_highlight_definition_and_completion()
+     {
         let (port, _event_rx) = listen_for_events().await;
         let stream = connect(port);
         let (mut writer, mut reader) = split(stream);
@@ -1019,6 +1020,10 @@ mod tests {
         assert_eq!(
             result["capabilities"]["textDocumentSync"]["change"],
             serde_json::json!(1)
+        );
+        assert_eq!(
+            result["capabilities"]["completionProvider"],
+            serde_json::json!({})
         );
     }
 
