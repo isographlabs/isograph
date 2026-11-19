@@ -1,0 +1,171 @@
+# Bugs in upstream isograph that i2 found or fixed
+
+This doc is a reference list, not a plan. Each entry is a bug that i2 found or fixed and that also exists in upstream isograph, with the smallest fix upstream could take. Nobody has committed to sending these upstream.
+
+Upstream is the checkout at `/Users/rbalicki/code/isograph`, origin/main at `072af275`. Upstream paths are written `isograph/<path>:<line>` and were read at that commit. i2 paths are relative to this repo at `58599d0a1`.
+
+Entries are ordered by severity: panics first, then wrong data, then generated code that does not compile, then leaks and wasted work, then user errors reported as panics. Every entry is open upstream unless its status says otherwise.
+
+## Panics
+
+### 1. `@loadable` on a client field whose parent is neither a root type nor has an `id` panics the compiler
+
+- Upstream evidence. `get_refetch_stategy` (`isograph/crates/isograph_schema/src/process_client_field_declaration.rs:215-247`) returns `RefetchFromRoot` for a root operation type, `UseRefetchField` for a type with an `id` field, and `Ok(None)` otherwise. Every consumer unwraps the `None`: `isograph/crates/isograph_schema/src/create_merged_selection_set.rs:1102-1116`, `isograph/crates/artifact_content/src/generate_artifacts.rs:270-284`, `isograph/crates/artifact_content/src/reader_ast.rs:611-625`, `isograph/crates/artifact_content/src/refetch_reader_artifact.rs:38-51`, and `isograph/crates/isograph_schema/src/selection_set_for_parent_query.rs:37-58`, each with `.expect("Expected refetch strategy. This is indicative of a bug in Isograph.")` or the "refetch selection set" variant. Validation of `@loadable` (`isograph/crates/isograph_schema/src/validate_selection_sets.rs:170-216`) rejects it only on server scalar fields, exposed fields, and `__link`.
+- What goes wrong. With `type Stats { weight: Int }` (no `id`), `field Stats.Heavy { weight }` and a selection `stats { Heavy @loadable }` in any client field, the compiler panics with "Expected refetch strategy." instead of reporting an error at the directive. In the LSP the panic ends the server.
+- How i2 handles it. `eb4050e7b` reports `LoadableParentNotFetchable` at the directive when the selection's parent cannot be fetched by itself (`refactors/pending/graphql-protocol/node-entrypoints-and-loadable.md`, `@loadable` validation).
+- Smallest upstream fix. In `validate_selection_set`, in the `ScalarSelectionDirectiveSet::Loadable(_)` arm for a user-written client field, call `get_refetch_stategy(db, parent_entity_name)` and push a diagnostic at the selection when it returns `Ok(None)`.
+
+### 2. An entrypoint on a non-root type panics the compiler
+
+- Upstream evidence. `validated_entrypoints` says "We also validate that it is a fetchable type." (`isograph/crates/isograph_schema/src/memoized/entrypoint_access.rs:45`) but checks only that the selectable exists and is a client scalar (`:46-90`). Artifact generation then calls `wrap_merged_selection_map(..).expect("Expected merged selection map to be wrappable. ..")` (`isograph/crates/artifact_content/src/entrypoint_artifact.rs:124-134`), which is `Err("Type X is not fetchable.")` for a type with no `id` (`isograph/crates/graphql_network_protocol/src/graphql_network_protocol.rs:323-327`). For a type with an `id`, the wrapper selects `node(id: $id)` (`:334-354`), and `get_used_variable_definitions` panics with "Expected to find a variable defined at the root with name id." (`entrypoint_artifact.rs:341-356`) unless the client field happens to declare `$id`. Only the loadable path adds `$id` (`generate_artifacts.rs:258-293`).
+- What goes wrong. `iso(`entrypoint Pet.PetSummary`)` panics the compiler; so does an entrypoint on any object without `id`.
+- How i2 handles it. `ed1cd87af` and `f3f32eec8`: `entity_fetch_plan` returns `EntityNotFetchableError`, and an entrypoint on a Node entity is reported as not supported yet (`refactors/pending/graphql-protocol/node-entrypoints-and-loadable.md`, Entrypoints on Node entities).
+- Smallest upstream fix. In `validated_entrypoints`, call `wrap_merged_selection_map`'s fetchability check (or read `network_protocol.fetchable`) for the parent and return a diagnostic at the parent type when it is `None`. For `GraphQLWrapStrategy::Node`, add the `$id: ID!` definition to the entrypoint's variable definitions, as `generate_artifacts.rs:258-293` does for the loadable path.
+
+### 3. An integer literal outside i64 in an iso literal panics the parser
+
+- Upstream evidence. `NonConstantValue::Integer(number.parse().expect("Expected valid integer"))` (`isograph/crates/isograph_lang_parser/src/parse_iso_literal.rs:636`). The token regex `-?(0|[1-9][0-9]*)` (`isograph/crates/isograph_lang_parser/src/token_kind.rs:48`) has no length bound.
+- What goes wrong. Typing `pet(id: 99999999999999999999)` in an editor panics the LSP on the next parse; the CLI panics on the same file.
+- How i2 handles it. `91b2e35ad`: the parser reports `IntegerDoesNotFitI64` at the value (`crates/isograph_parser/src/arguments.rs:308`).
+- Smallest upstream fix. Replace the `expect` with a `Diagnostic` at the token's location ("This integer does not fit in 64 bits").
+
+### 4. LSP handlers panic on a document path they cannot convert
+
+- Upstream evidence. Every handler calls `uri.to_file_path().expect("Expected file path to be valid.")` (`isograph/crates/isograph_lsp/src/text_document.rs:26`, `:44`, `:72`, and the same line in `hover.rs:55`, `format.rs:33`, `completion.rs:35`, `goto_definition.rs:51`, `semantic_tokens.rs:67`, `document_highlight.rs:48`). On Windows, `to_file_path` calls `std::fs::canonicalize` (`isograph/crates/isograph_lsp/src/uri_file_path_ext.rs:13-15`), which fails for a path that does not exist. `relative_path_from_absolute_and_working_directory` then panics on a non-UTF-8 relative path (`isograph/crates/common_lang_types/src/location.rs:119-132`).
+- What goes wrong. On Windows, deleting or renaming an open `.ts` file on disk makes the editor send `didClose` for a path that no longer exists, and the LSP panics. On any platform, a project path that is not UTF-8 panics on the first request.
+- How i2 handles it. `0ecc7e2f8`: relative path conversion returns `RelativePathError`, and LSP requests and `DiskChanged` report a bad path instead of panicking. `ead2a90a6` strips Windows verbatim prefixes before `pathdiff`.
+- Smallest upstream fix. Make `relative_path_from_absolute_and_working_directory` return a `Result`, and in each handler map a failed `to_file_path` or conversion to `LSPRuntimeError` (a response error for requests, a logged error for notifications).
+
+### 5. The LSP transport allocates the whole `Content-Length` and unwraps sends during `initialize`
+
+- Upstream evidence. The server uses `Connection::stdio()` (`isograph/crates/isograph_lsp/src/lib.rs:33`) and `connection.initialize(..)` (`isograph/crates/isograph_lsp/src/server.rs:91-93`), both from `lsp-server` 0.7.8 (upstream's `Cargo.lock`). `read_msg_text` calls `buf.resize(size, 0)` with the header's `Content-Length` before reading the body (`lsp-server-0.7.8/src/msg.rs:281-284`). `Connection::initialize_start_while` and `initialize_finish` call `self.sender.send(..).unwrap()` (`lsp-server-0.7.8/src/lib.rs:174`, `:200`, `:223`).
+- What goes wrong. A frame with `Content-Length: 18446744073709551615` panics the reader thread with "capacity overflow"; a large value that fits asks the allocator for that many zeroed bytes. If the writer thread has exited because the client's stdout pipe closed, the next send during the handshake panics the main thread. Both need a misbehaving or dying client, so the severity is lower than entries 1 to 4.
+- How i2 handles it. `84ef2f7d6` reads the body through `Read::take`, so the buffer grows only with bytes that arrive. `abf07fb93` runs the handshake with a copy of `initialize` that returns `InitializeError::Disconnected` on a failed send. Both live in `crates/isograph_cli/src/lsp_socket.rs`.
+- Smallest upstream fix. The bug is in `lsp-server`, so the smallest fix is a patch to `lsp-server` (rust-analyzer's repository): read the body with `take(size).read_to_end`, and return `ProtocolError` from the sends in `initialize_*`. Without that, upstream can copy i2's two functions.
+
+## Wrong data
+
+### 6. A client field variable with a default, selected without passing it, is written and read under different store keys
+
+- Upstream evidence. Query generation substitutes the default: `child_variable_context` maps an unpassed variable to its `default_value` (`isograph/crates/isograph_schema/src/variable_context.rs:56-57`), so the query prints the literal and the normalization AST carries `{ kind: "Literal", value: 3 }`. The reader does not: the `Resolver` node's `arguments` are only the arguments the selection passes (`isograph/crates/artifact_content/src/reader_ast.rs:459-470`), the child's reader AST keeps `{ kind: "Variable", name: "limit" }` (`initial_variable_context`, `variable_context.rs:88-125`), `generateChildVariableMap` skips the absent variable (`isograph/libs/isograph-react/src/core/read.ts:465-490`), and `getStoreKeyChunkForArgumentValue` turns the absent variable into `'null'` (`isograph/libs/isograph-react/src/core/cache.ts:500-502`).
+- What goes wrong. `field Pet.RecentCheckins($limit: Int = 3) { checkins(limit: $limit) { id } }` selected as `RecentCheckins` with no argument: the query sends `checkins(limit: 3)`, the normalizer writes `Pet:1.checkins____limit___3`, and the reader looks up `Pet:1.checkins____limit___null`. The read is `MissingData` forever: the component suspends after a successful fetch, or reads another selection's `limit: null` data.
+- How i2 handles it. `df32b078a` writes the default into the parent's `Resolver` node arguments, so the child's variables hold `limit: 3` and both sides compute the same key (`refactors/pending/runtime/reader-ast.md`, Arguments and variable defaults).
+- Smallest upstream fix. In `user_written_variant_ast_node` (`reader_ast.rs:428-495`), append to `arguments` each variable of `nested_client_scalar_selectable.arguments` that the selection does not pass and that has a `default_value`, as a literal argument.
+
+### 7. Different argument values share one store key
+
+- Upstream evidence. `getStoreKeyChunkForArgumentValue` and `getStoreKeyChunkForArgument` (`isograph/libs/isograph-react/src/core/cache.ts:481-521`) write a scalar value with a template string: a `Literal` returns its value (`:497-499`), a `String` returns its text (`:503-505`), and a `Variable` returns `variables[name] ?? 'null'` (`:500-502`). Only an object value is `JSON.stringify(stableCopy(..))` (`:516-518`). Inside an object, a variable that is unset or `null` becomes the string `'null'` (`:485-494` recursing into `:501`).
+- What goes wrong. Each group below is one store key, so a read of one returns the value written for another:
+  - `greeting(name: null)`, `greeting(name: "null")`, `greeting(name: $n)` with `n: null`, and `greeting(name: $n)` with `n` unset are all `greeting____name___null`. Unset and `null` also differ on the server: an unset variable lets the schema default apply, and `null` does not.
+  - `pet(id: 1)` and `pet(id: "1")` are both `pet____id___1`.
+  - `search(filter: { q: $q })` with `q: null` is `{"q":"null"}`, the same key as the literal `search(filter: { q: "null" })`, and a different key from the literal `search(filter: { q: null })`, which is `{"q":null}`.
+  - A loadable field's request id uses `stableStringifyArgs` (`isograph/libs/isograph-react/src/core/read.ts:986-1000`), which sorts only top-level keys ("TODO call stableStringifyArgs on the variable values, as well."). Two argument objects with equal nested values in a different key order are two requests. This is a cache miss, not wrong data.
+- How i2 handles it. `faa7ac084`: `argumentChunks` writes every value as `JSON.stringify(stableCopy(value))` (`libs/isograph-runtime/src/storeKey.ts:22-35`), and an absent variable throws (`:57-62`), because every variable is required (`refactors/pending/runtime/store.md`, Store keys).
+- Smallest upstream fix. In `getStoreKeyChunkForArgument`, stringify every chunk with `JSON.stringify(stableCopy(chunk))`, and return `null` (not `'null'`) for a `null` variable. To keep unset distinct from `null`, write an unset variable as a chunk that no JSON value produces, such as the argument name with no `___` value part. In `stableStringifyArgs`, stringify `stableCopy(args)`. Existing persisted stores change keys, so this is a breaking change for anyone who persists the store.
+
+### 8. Normalization aliases are invalid GraphQL names or collide
+
+- Upstream evidence. `NonConstantValueInner::to_alias_str_chunk` (`isograph/crates/isograph_lang_types/src/declarations/selection_argument.rs:64-104`) writes `l_{int_value}` for an integer (`:68`), and the iso lexer accepts negative integers (`isograph/crates/isograph_lang_parser/src/token_kind.rs:48`). A string maps each `char` outside `[A-Za-z0-9_]` to `_` (`:70-83`, with its own "This clearly isn't correct" TODO at `:77-79`). The runtime recomputes the same alias in `getArgumentValueChunk` (`isograph/libs/isograph-react/src/core/cache.ts:560-590`), with `'l_' + value` (`:578`) and `replaceAll(/\W/g, '_')` (`:585`), a regex without the `u` flag.
+- What goes wrong.
+  - `pets(offset: -5)` prints `pets____offset___l_-5: pets(offset: -5)`. `-` is not a name character, so the server rejects the whole query. The same holds for a negative integer inside an object argument (`o_x__l_-5_c`).
+  - `f(s: "a b")` and `f(s: "a_b")` in one query are two merged selections that both print the alias `f____s___s_a_b`. The server rejects the query, because one response name has two different argument sets (GraphQL validation, Field Selection Merging).
+  - A character outside the Basic Multilingual Plane gives different aliases in the compiler and the runtime: Rust's `chars()` maps `"😀"` to one `_`, and JavaScript's `/\W/g` replaces each UTF-16 code unit, giving `__`. The query aliases `f____s___s__`, the normalizer looks for `f____s___s___`, and the response value is never stored.
+- How i2 handles it. The negative-integer chunk is being fixed in i2 now (no commit yet); `MergedValue::alias_chunk` (`crates/isograph_compiler/src/merged_selection.rs:353-388`) still writes `l_{integer}` today. i2 reports two keys with one alias as `AliasCollision` (`d3defd680`, `merged_selection.rs:133-140`, `:540-560`), and the runtime never recomputes an alias: the normalization AST carries `responseKey` and `normalize` reads it (`306e26bb5`, `libs/isograph-runtime/src/normalize.ts:89-90`).
+- Smallest upstream fix. Write a negative integer as `l_n5` (a prefix that cannot occur in a non-negative integer) in both `to_alias_str_chunk` and `getArgumentValueChunk`. For strings, write a collision-free encoding (for example each non-name character as `_` followed by its hex code point) in both places, or emit the alias into the normalization AST so that only the compiler computes it. Reject two selections whose aliases are equal and whose arguments differ.
+
+### 9. An unpassed nullable variable is sent as `null`, which disables the schema default
+
+- Upstream evidence. `child_variable_context` maps a variable that the selection does not pass, has no default, and is not selected loadably to `NonConstantValue::Null` (`isograph/crates/isograph_schema/src/variable_context.rs:58-61`, "TODO this is only valid if the arg is nullable, which we should validate"). `get_missing_and_provided_arguments` treats a nullable variable as optional (`isograph/crates/isograph_schema/src/validate_use_of_arguments.rs:380-383`), so no error is reported.
+- What goes wrong. With `checkins(limit: Int = 10)` in the schema and `field Pet.Checkins($n: Int) { checkins(limit: $n) { id } }` selected as `Checkins`, the query sends `checkins(limit: null)`. GraphQL applies the default only when the argument is absent, so the server returns what `limit: null` means (often every checkin) instead of 10.
+- How i2 handles it. `8b3b7d7d0` makes a selection that leaves a variable with no default unpassed a compile error (`MissingFieldArgument`), in the merge walk and in validation (`refactors/pending/graphql-protocol/query-generation.md`, Source fields and variables).
+- Smallest upstream fix. In `get_missing_and_provided_arguments`, count a nullable variable with no default as missing unless the selection is loadable. The alternative, omitting the argument from the query when its value is an unpassed variable, needs the printer to drop arguments and the store key to describe an omitted argument.
+
+### 10. Any object with an `id` is fetched through `node`, and the user's `$id` is overwritten
+
+- Upstream evidence. `graphql_network_protocol_associated_data_for_object` gives every non-root object and interface with a field named `id` the `Node` wrap strategy (`isograph/crates/graphql_network_protocol/src/nested_server_schema/parse_nested_server_schema.rs:200-207`, `has_id_field.note_todo("Check node implementation instead")`, called for interfaces at `:259-264`). It checks neither that the type implements `Node` nor that `Query.node` exists. The refetch path skips a user variable named `id` ("HACK", `isograph/crates/artifact_content/src/imperatively_loaded_fields.rs:188-190`), and at runtime `includeReadOutData` sets `variables.id = readOutData.id` on the caller's arguments object (`isograph/libs/isograph-react/src/core/read.ts:316-324` and `:909-917`).
+- What goes wrong. A schema whose `Pet` has `id: ID!` but no `Query.node`, or whose `Pet` does not implement `Node`, compiles; the `@loadable` refetch query `node(id: $id) { ... on Pet { .. } }` is rejected by the server at runtime. A loadable field `field Pet.Friend($id: ID!) { friend(id: $id) { name } }` called with `{ id: "7" }` fetches with the pet's own id, so it shows the wrong friend, and the caller's object is mutated.
+- How i2 handles it. `f3f32eec8`: `graphql_fetch_plan` requires the entity to be `Node` or implement it (`NeitherRootNorNode`) and checks that the query root's `node` field exists, returns one value, and accepts `id` (`NodeFieldError`, `crates/graphql_network_protocol/src/fetch_plan.rs:36-131`). The separation of the user's variables from the protocol's `id` is specified in `refactors/pending/graphql-protocol/node-entrypoints-and-loadable.md` (Upstream, Collisions).
+- Smallest upstream fix. Give the `Node` strategy only to a type that is `Node` or lists `Node` in `implements`, and only when the query root has a `node` field; report a diagnostic at a loadable selection otherwise. Report a declared `$id` on a loadable client field as an error, and copy `args` before setting `id` in `includeReadOutData`.
+
+### 11. An inline fragment on an interface never normalizes
+
+- Upstream evidence. `normalizeInlineFragment` writes the fragment's selections only when `networkResponseParentRecord.__typename === astNode.type` (`isograph/libs/isograph-react/src/core/cache.ts:355-356`). The response's `__typename` is always a concrete type. The `Node` wrapper emits `InlineFragment(root_entity)` for the fetched entity (`isograph/crates/graphql_network_protocol/src/graphql_network_protocol.rs:334-338`), and an interface with an `id` field gets that strategy (entry 10).
+- What goes wrong. A `@loadable` client field on an interface with an `id` (for example `interface Named { id: ID! name: String! }` and `field Named.Greeting { name }` selected as `Greeting @loadable`) fetches `node(id: $id) { ... on Named { name } }`. The server returns `{ __typename: "Pet", name: "Rex" }`, the comparison `"Pet" === "Named"` is false, nothing is written, and the read stays `MissingData`. The client pointers `asPet` are created only for concrete types (`parse_nested_server_schema.rs:362-406`), so they do not hit this.
+- How i2 handles it. i2 never emits a refinement to an abstract type: `refinement_to` returns a selectable only for an object type (`crates/graphql_network_protocol/src/protocol_data.rs:210-240`), and Node entrypoints and `@loadable` on interfaces are reported, not generated (`f3f32eec8`, `eb4050e7b`; `refactors/pending/graphql-protocol/node-entrypoints-and-loadable.md`, open decision 9). The planned support is a `SelectionPresent` condition on an aliased `__typename` selected inside the fragment (`refactors/pending/graphql-protocol/normalization-ast.md`, Later, Abstract refinement targets).
+- Smallest upstream fix. Write the abstract type's concrete subtypes on the `InlineFragment` normalization node (the compiler has them in the subtype map) and compare with `includes`; or skip the `InlineFragment` wrapper in `wrap_merged_selection_map` when `root_entity` is not concrete.
+
+### 12. A nested root object is stored as the root record only when its type is named `Query`
+
+- Upstream evidence. `getDataIdOfNetworkResponse` returns `ROOT_ID` when `__typename === 'Query'` (`isograph/libs/isograph-react/src/core/cache.ts:614-618`, under "TODO do not hard code this value here"). Entrypoint roots use `{ __link: ROOT_ID, __typename: entrypoint.concreteType }` (`isograph/libs/isograph-react/src/core/getOrCreateCacheForArtifact.ts:77`).
+- What goes wrong. With `schema { query: RootQuery }`, a mutation payload's `query: RootQuery { greeting }` is written to a separate `RootQuery` record whose id is derived from the parent (`<parent typename>:<parent id>.query`, `cache.ts:628-641`), not to `RootQuery.__ROOT`. A component reading `greeting` from the root does not see the mutation's update.
+- How i2 handles it. `e73b6726f`: the compiler writes `identity: { kind: "Fixed", id: "__ROOT" }` on every nested selection of a root operation type, decided from the schema's root operation types (`refactors/pending/graphql-protocol/normalization-ast.md`, The record), and the runtime names no GraphQL type (`libs/isograph-runtime/src/recordId.ts:93`).
+- Smallest upstream fix. Emit the root operation type names into the normalization AST (or a `concreteType` plus an `isRoot` flag on linked fields whose target is a root type) and compare against that instead of `'Query'`.
+
+### 13. `useResult` and `useReadAndSubscribe` keep stale data when the fragment reference changes
+
+- Upstream evidence. `useReadAndSubscribe` reads once in a `useState` initializer (`isograph/libs/isograph-react/src/react/useReadAndSubscribe.ts:33-35`), and `useRerenderOnChange` subscribes in `useEffect(.., [])` (`isograph/libs/isograph-react/src/react/useRerenderOnChange.ts:21-37`), whose comment assumes "the fragment reference is stable for the life of the component". `useResult` calls `useReadAndSubscribe` with whatever reference it receives (`isograph/libs/isograph-react/src/react/useResult.ts:45-49`).
+- What goes wrong. A component that renders `useResult(fragmentReference)` for an eager field keeps rendering the first reference's data after its parent passes a new reference (new variables from `useLazyReference`, or another record), and its subscription stays on the first reference's records, so updates to the new one do not re-render it.
+- How i2 handles it. Not implemented in i2. `refactors/pending/runtime/react.md` (Reading, `useReadAndSubscribe`) keeps the read result in the runtime's subscription, keyed by the reference, instead of in React state.
+- Smallest upstream fix. Key the state by `stableIdForFragmentReference(fragmentReference)`: re-read when the id changes (store the id with the state and compare during render), and pass the id in `useRerenderOnChange`'s dependency array.
+
+### 14. `useSubscribeToMultiple` never re-subscribes when its fragment references change
+
+- Upstream evidence. The effect's dependency is `items.map(({ fragmentReference }) => { stableIdForFragmentReference(fragmentReference); }).join('.')` (`isograph/libs/isograph-react/src/react/useReadAndSubscribe.ts:78-84`). The arrow has a block body and no `return`, so every element is `undefined` and the string depends only on `items.length`.
+- What goes wrong. The pagination hooks (`isograph/libs/isograph-react/src/loadable-hooks/useSkipLimitPagination.ts`, `useConnectionSpecPagination.ts`) re-subscribe only when the number of pages changes. A page whose fragment reference is replaced without changing the count keeps the old subscription and the old callback. This was found while writing this doc; i2 has no port of the hook.
+- Smallest upstream fix. Drop the braces: `.map(({ fragmentReference }) => stableIdForFragmentReference(fragmentReference))`.
+
+### 15. The component cache keeps the first request's network request and options
+
+- Upstream evidence. `getOrCreateCachedComponent` stores one component per `stableIdForFragmentReference` with `??=` (`isograph/libs/isograph-react/src/core/componentCache.ts:19-26`). The key is the record, field name, and variables (`isograph/libs/isograph-react/src/core/FragmentReference.ts:75-79`); it excludes `networkRequest` and the read options. The component suspends on the captured reference's request (`maybeUnwrapNetworkRequest(fragmentReference.networkRequest, ..)`, `react/useReadAndSubscribe.ts:95-98`). `eagerReaderCache` has the same shape (`isograph/libs/isograph-react/src/core/startUpdate.ts:48-54`). `getOrCreateCachedComponent` also builds a `startUpdate` on every call and drops it on a cache hit (`componentCache.ts:13-17`).
+- What goes wrong. Reading `Pet.PetCard` on `Pet:1` under a second request (a refetch, or another route) returns the component created for the first request; it waits on the first request's promise and applies the first call's `networkRequestOptions`, so it does not suspend on, or surface the error of, the request that is actually loading. Neither cache frees entries (entry 18).
+- How i2 handles it. Not implemented in i2. `refactors/pending/runtime/components-in-userland.md` (What upstream does; What is stored, and how it is freed) records the analysis and stores the wrapper as a store entry that garbage collection deletes.
+- Smallest upstream fix. Do not capture `networkRequest` in the cached component: pass the current fragment reference's `networkRequest` and options as props or through a ref the cache updates on every `getOrCreateCachedComponent` call. Build `startUpdate` inside the `??=` initializer.
+
+### 16. Fields in `extend type` are dropped
+
+- Upstream evidence. The data model ignores object type extensions: `GraphQLTypeSystemExtension::ObjectTypeExtension(_graphql_object_type_extension) => { // TODO extensions }` (`isograph/crates/graphql_network_protocol/src/nested_server_schema/parse_nested_server_schema.rs:672-678`). The older path applies only an extension's directives (`isograph/crates/graphql_network_protocol/src/process_type_system_definition.rs:268-276`).
+- What goes wrong. A `schemaExtensions` file with `extend type Pet { nickname: String }` compiles without a diagnostic, and selecting `nickname` reports that `Pet.nickname` is not defined. An extension that adds an interface to `implements` is dropped the same way.
+- How i2 handles it. `63c465f86` parses schema, scalar, type, interface, union, enum, and input extensions, and `482bd5210` merges their contents with the definition (`crates/graphql_network_protocol/src/protocol_data.rs:147-150`).
+- Smallest upstream fix. In the `ObjectTypeExtension` arm, run `process_fields` on the extension's fields and insert them into the extended entity's selectables, with the same multiple-definitions diagnostic as a definition.
+
+## Generated code that does not compile
+
+### 17. Description comments are not escaped or indented
+
+- Upstream evidence. `write_optional_description` writes `/**`, the description verbatim, and `*/` (`isograph/crates/artifact_content/src/generate_updatable_and_parameter_type.rs:705-718`). The description's lines are not indented and get no ` * ` prefix (`isograph/demos/pet-demo/src/components/__isograph/Mutation/SetTagline/param_type.ts:7-9`), and `*/` inside the description is not escaped.
+- What goes wrong. A schema description containing `*/` (for example `"""Matches a/*/b paths."""`) ends the comment early, and the generated `param_type.ts` does not parse, which breaks the user's build. The lesser defect is formatting: description lines start at column 0 inside an indented type.
+- How i2 handles it. `8200a26e3` escapes `*/` as `*\/`; `ee6ccd7c4` writes one ` * ` line per description line at the property's indentation (`jsdoc_text`, `crates/typescript_artifacts/src/swc.rs`).
+- Smallest upstream fix. In `write_optional_description`, replace `*/` with `*\/`, and write each line of the description as `{indent} * {line}`, then `{indent} */`.
+
+## Leaks and wasted work
+
+### 18. Request cache entries and cached components are never removed
+
+- Upstream evidence. `getOrCreateItemInSuspenseCache` adds one `ParentCache` per query text and stable-stringified variables to `environment.fragmentCache` (`isograph/libs/isograph-react/src/core/cache.ts:34-47`, keyed in `getOrCreateCacheForArtifact.ts:42-54`), and nothing deletes it; `ParentCache` says "Though we do not do so, it is always safe to call parentCache.delete()" (`isograph/libs/isograph-react-disposable-state/src/ParentCache.ts:21`). The only references to `componentCache` and `eagerReaderCache` are their types, their creation, and the `??=` (`isograph/libs/isograph-react/src/core/IsographEnvironment.ts:78-79`, `:199-200`; `componentCache.ts:19`; `startUpdate.ts:48`). `garbageCollectBaseStoreLayer` deletes store records only.
+- What goes wrong. A search box whose query runs `useLazyReference(SearchEntrypoint, { q })` per keystroke keeps one `ParentCache` (and its factory closure over the variables) per distinct `q` for the environment's lifetime. Every (record, field, variables) ever read as a component keeps its component function and the `FragmentReference` it closed over, after the record is garbage collected.
+- How i2 handles it. Found, not fixed. i2's `networkRequestCache` has the same lifetime today (`libs/isograph-runtime/src/network.ts:56-63`). The held design moves request entries into the store so that `garbageCollect` deletes them with the records (`refactors/pending/runtime/network-and-subscriptions.md`, Request entries in the store, change 7, not approved). Component wrappers become store entries (entry 15).
+- Smallest upstream fix. In `garbageCollectEnvironment`, delete each `fragmentCache` entry whose `ParentCache` holds no item, and delete `componentCache` and `eagerReaderCache` entries whose root record was collected.
+
+### 19. `AnyChangesToRecord` subscriptions fire for unrelated records of the same type
+
+- Status. PR #965 on upstream (by another contributor, "[FIX] `AnyChangesToRecord` triggering for unrelated records of the same type") fixes this and was open on 2026-11-19.
+- Upstream evidence. `recordsEncounteredWhenNormalizing.get(subscription.recordLink.__typename)?.has(subscription.recordLink.__link) != null` (`isograph/libs/isograph-react/src/core/subscribe.ts:93-97`). `Set.has` returns `true` or `false`, both `!= null`, so the condition is true whenever any record of that type was written.
+- What goes wrong. `onNextChangeToRecord` (`isograph/libs/isograph-react/src/core/cache.ts:135-149`) is what a suspended read waits on. A read suspended on `Pet:1` wakes on a write to `Pet:2`, re-renders, and suspends again. This is wasted renders, not wrong data.
+- How i2 handles it. i2 has no per-record subscription. A suspended read subscribes with `readAndSubscribe` and resumes at the first write after which the read is no longer `MissingData` (`refactors/pending/runtime/react.md`, Reading).
+- Smallest upstream fix. Drop `!= null`, or merge PR #965.
+
+## User errors reported as panics
+
+### 20. Bad config and bad SWC plugin options panic
+
+- Upstream evidence. `create_config` panics on a missing config, on invalid JSON, and when a configured path cannot be canonicalized (`isograph/crates/isograph_config/src/compilation_options.rs:144-224`, `panic!` and `unwrap_or_else(|_| panic!(..))`). The SWC plugin panics on missing or invalid options (`isograph/crates/swc_isograph_plugin/src/lib.rs:50-55`) and on a file path it cannot diff (`:246`).
+- What goes wrong. `"schema": "./schema.graphq"` (a typo) panics with "Unable to canonicalize schema path.", in the CLI and at LSP startup alike. In a Next.js build, a typo in the SWC plugin options panics the WASM plugin instead of reporting an SWC diagnostic.
+- How i2 handles it. Config discovery and loading return typed `DiscoverError` and `LoadError` with a nonzero exit (`crates/isograph_cli/src/discover.rs:39`, `refactors/past/config-discovery.md`). The SWC plugin reports `PluginSetupError` through `HANDLER` and returns the program unchanged (`crates/swc_isograph_plugin/src/lib.rs:58-107`).
+- Smallest upstream fix. Make `create_config` return `Result<CompilerConfig, Diagnostic>` and print it at the CLI and LSP entry points. In the SWC plugin, report through `HANDLER.with(|handler| handler.err(..))` and return `program`.
+
+## Fixed upstream
+
+### 21. A missed lookup in a tracked map did not depend on the map
+
+- Status. Fixed upstream.
+- Upstream evidence. `get_iso_literal` read the iso literal map untracked, returned `None` for a path not yet inserted, and the next request reused that `None` (AGENTS.md, pico tracked maps). At `072af275` it reads `self.get_iso_literal_map().tracked()` (`isograph/crates/isograph_schema/src/isograph_database.rs:99-108`), and pico records a dependency on a missing source key (upstream #994, #1000, #1003, brought into i2 as `c17d9e396`, `f81153e60`, `6650c6530`).
