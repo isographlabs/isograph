@@ -98,6 +98,7 @@ pub trait NetworkProtocol: Sized + 'static {
     fn entity_shape(data: &Self::EntityData) -> EntityShape;
     fn selectable_shape(data: &Self::SelectableData) -> SelectableShape;
     fn discriminator() -> SelectableName;
+    fn root_entities(plan: &Self::FetchPlan) -> RootEntities;
     fn query_text(operation: &EntrypointOperation<'_, Self>) -> ProtocolQueryText;
 }
 ```
@@ -435,12 +436,16 @@ Every field of the mutation and subscription root can thus parent an entrypoint,
 ```rust
 // from crates/graphql_network_protocol/src/fetch_plan.rs
 /// How the GraphQL protocol fetches an entity that parents an entrypoint: the entity is the
-/// root type of this operation type, and its selections are the operation's.
+/// root type of `operation_type`, and its selections are the operation's.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct GraphQLFetchPlan(pub OperationType);
+pub struct GraphQLFetchPlan {
+    pub operation_type: OperationType,
+    /// The schema's root operation types, with the entity as `operation`.
+    pub roots: RootEntities,
+}
 ```
 
-This is the type after query-generation.md change 7; before it, the struct has fields `operation_type` and `entity: MergedTarget<GraphQLEntityData>`, and change 7 deletes `entity` (query-generation.md, The fetch plan).
+This is the type after query-generation.md change 10. Change 7 landed it as `GraphQLFetchPlan(pub OperationType)`; before change 7 the struct had fields `operation_type` and `entity: MergedTarget<GraphQLEntityData>`, and change 7 deleted `entity` (query-generation.md, The fetch plan). `RootEntities` is a core type (query-generation.md, Root entities).
 
 `OperationType` is the parser's (`crates/graphql_schema_parser/src/ast.rs`); it has `strum::Display` with `serialize_all = "lowercase"`, so the printer writes `query`, `mutation`, `subscription`.
 
@@ -460,7 +465,7 @@ The body:
 1. `graphql_entity(db, client, entity)`: `Err` is `GraphQLNotFetchable::Entity`, `Ok(None)` is `UnknownEntity`.
 2. `root_operation_types(db, client)`, `Err` is `RootOperationTypes`. `roots.operation_type_of(entity)` of `None` is `NotRootOperationType`.
 3. A root whose data is not `Object` is `NotObject`: the spec requires root operation types to be object types (spec 3.3.1), so only a schema that breaks that rule reaches it.
-4. Otherwise `GraphQLFetchPlan(operation_type)`.
+4. Otherwise `GraphQLFetchPlan { operation_type, roots: roots.root_entities(entity) }`.
 
 ```rust
 // from crates/graphql_network_protocol/src/fetch_plan.rs
@@ -609,10 +614,10 @@ pub type ProfileEntrypointNotFetchableError<TProfile> = EntrypointNotFetchableEr
 
 - `root_operation_types`: pet demo's `schema { query: Query mutation: Mutation }` is `{ Query, Some(Mutation), None }`; no schema definition is `{ Query, Some(Mutation), Some(Subscription) }`; `schema { query: RootQuery }` plus `extend schema { subscription: S }` is `{ RootQuery, None, Some(S) }`; two `schema` definitions in two files is `DuplicateSchemaDefinition` with first from the earlier path; `extend schema { query: A }` with a definition naming `query` is `DuplicateOperation(Query)`; `schema { mutation: M }` is `MissingQuery`; `schema { query: }` is `Syntax`; a broken `type Broken { a: ! }` in the same file does not change the result.
 - `graphql_entity`: `Pet` is `Object` with `interfaces == [Node, Namable]` and `id_field == Present`; `PetStats` is `Object` with `Absent`; a type with `id: String!` is `Absent`; `NewsfeedItem` is `Union`; `ICheckin` is `Interface` with `interfaces == [Node]`; `PetSpecies` and `ID` are `Leaf`; `SetPetTaglineParams` is `InputObject`.
-- `graphql_fetch_plan` over the pet demo schema: `Query` is `GraphQLFetchPlan(Query)`; `Mutation` is `GraphQLFetchPlan(Mutation)`; `Pet`, `PetStats`, `Node`, `ICheckin`, `Viewer`, `NewsfeedItem`, `String`, `PetSpecies`, and `SetPetTaglineParams` are `NotRootOperationType`; `Nobody` is `UnknownEntity`.
-- With no `schema` definition and `type Subscription { petAdded: Pet }`, `Subscription` is `GraphQLFetchPlan(Subscription)`; with `schema { query: Query }`, a `type Mutation` is `NotRootOperationType`.
+- `graphql_fetch_plan` over the pet demo schema: `Query` is `{ operation_type: Query, roots: { operation: Query, others: {Mutation} } }`; `Mutation` is `{ operation_type: Mutation, roots: { operation: Mutation, others: {Query} } }`; `Pet`, `PetStats`, `Node`, `ICheckin`, `Viewer`, `NewsfeedItem`, `String`, `PetSpecies`, and `SetPetTaglineParams` are `NotRootOperationType`; `Nobody` is `UnknownEntity`.
+- With no `schema` definition and `type Subscription { petAdded: Pet }`, `Subscription` has `operation_type: Subscription` and `others` `{Query, Mutation}`; with `schema { query: Query }`, a `type Mutation` is `NotRootOperationType`.
 - `schema { query: Q }` with `union Q` is `NotObject(Q)`.
-- A syntax error in `type Query` makes `Query`'s plan `Entity(..)` and leaves `Mutation`'s plan `GraphQLFetchPlan(Mutation)`.
+- A syntax error in `type Query` makes `Query`'s plan `Entity(..)` and leaves `Mutation`'s plan unchanged.
 
 `crates/isograph_compiler` (test protocol):
 
@@ -637,4 +642,4 @@ Changes 4 and 5 landed with `Node`-fetched entrypoints. The commit "Remove Node-
 
 ## Later
 
-- Entrypoints on entities other than root operation types: through `node(id:)` (upstream's `wrap_merged_selection_map`) or a query root field the schema names, with the normalization AST shape of the fetched entity decided then. Neither is in v1.
+- Entrypoints on entities other than root operation types: through `node(id:)` (upstream's `wrap_merged_selection_map`) or a query root field the schema names. Neither is in v1. `Node`-fetched entrypoints and refetch queries share the shape `node(id: $id) { ... on T { .. } }`. When they arrive, the `... on T` is a `Conditional` (`SelectionEquals(T)`) in the normalization AST, as upstream keeps an `InlineFragment` there (`isograph/demos/pet-demo/src/components/__isograph/BlogItem/BlogItemMoreDetail/normalization_ast.ts:16-41`): the id comes from the caller, and for another entity's id the server returns `{ __typename: "Other" }` without `T`'s fields, which the conditional skips instead of throwing. The fetch's arguments, read from the schema's `node` field (the removed `node_fetch`, `crates/graphql_network_protocol/src/fetch_plan.rs:156-215` at `103a23b9`), must reach the generated parameters type of the entrypoint, because the entrypoint field declares no `$id`.

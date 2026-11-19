@@ -86,7 +86,7 @@ A query that cannot be generated is an error of that entrypoint only. Selecting 
 
 ## What the protocol tells the core
 
-The core walks selections without matching on the protocol's data. Four facts about that data change the walk's result: whether a selection's target entity is a leaf or has selectables, whether a selectable is a refinement, the discriminator the protocol selects in every selection set on a composite entity, and the identity it selects on each entity. The protocol states them as core values, through `NetworkProtocol` methods (entrypoints.md, Protocol data on entities and selectables):
+The core walks selections without matching on the protocol's data. Six facts about that data change the result: whether a selection's target entity is a leaf or has selectables, whether that entity is concrete or abstract, whether a selectable is a refinement, the discriminator the protocol selects in every selection set on a composite entity, the identity it selects on each entity, and which entities are root entities. The protocol states them as core values, through `NetworkProtocol` methods (entrypoints.md, Protocol data on entities and selectables). The first five depend only on one entity's or selectable's data and are read in the walk; the root entities depend on the schema definition and arrive with the fetch plan (Root entities, below).
 
 ```rust
 // from crates/isograph_compiler/src/host_language.rs
@@ -94,8 +94,8 @@ pub trait NetworkProtocol: Sized + 'static {
     // associated types and the lookup and fetch plan methods unchanged
 
     /// What the core reads about an entity with `data`: whether a selection of it has
-    /// selections, and for one that does, the identity selection the protocol adds to every
-    /// selection set on it.
+    /// selections, and for one that does, whether the entity is concrete and the identity
+    /// selection the protocol adds to every selection set on it.
     fn entity_shape(data: &Self::EntityData) -> EntityShape;
 
     /// What a selection of a selectable with `data` is in a merged selection map.
@@ -104,8 +104,13 @@ pub trait NetworkProtocol: Sized + 'static {
     /// The selectable the protocol selects in every selection set on a composite entity,
     /// whose value names the response object's concrete entity.
     fn discriminator() -> SelectableName;
+
+    /// The root entities of the operation `plan` describes.
+    fn root_entities(plan: &Self::FetchPlan) -> RootEntities;
 }
 ```
+
+Before (landed): `entity_shape`, `selectable_shape`, and `discriminator`, with `EntityShape::Composite(IdentitySelection)`. After: `root_entities` is new, and `EntityShape::Composite` holds a `CompositeShape` (change 10).
 
 ```rust
 // from crates/isograph_compiler/src/protocol_shape.rs
@@ -117,8 +122,25 @@ pub enum EntityShape {
     /// Never the target of a selection (GraphQL input objects).
     Input,
     /// A selection of it selects its selectables; the protocol adds the discriminator and
-    /// this identity selection to every selection set on it.
-    Composite(IdentitySelection),
+    /// the shape's identity selection to every selection set on it.
+    Composite(CompositeShape),
+}
+
+/// What the core reads about a composite entity.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CompositeShape {
+    pub concreteness: Concreteness,
+    pub identity: IdentitySelection,
+}
+
+/// Whether the entity is the concrete entity of every response object of it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Concreteness {
+    /// Every response object of it is of this entity (GraphQL object types).
+    Concrete,
+    /// A response object of it is of one of several entities, which its discriminator names
+    /// (GraphQL interfaces and unions).
+    Abstract,
 }
 
 /// Whether the protocol selects the identity, the selectable whose value identifies the
@@ -144,6 +166,36 @@ The core decides nothing about which identity an entity has; it inserts the sele
 
 `IdentitySelection` carries the name, so a later identity rule that names a different selectable per entity (`IdentityFieldSelection::KeyDirective`, Config below) changes only the protocol's `entity_shape`. `KeyDirective` with several key selectables changes `IdentitySelection::Select` to carry a non-empty list.
 
+`Concreteness` is upstream's `ConcreteTargetEntityName` (`isograph/crates/isograph_schema/src/create_merged_selection_set.rs:155`, `:820`), which the normalization AST prints as `concreteType` (`isograph/crates/artifact_content/src/normalization_ast_text.rs:68`) and the normalizer reads as `astNode.concreteType ?? response.__typename` (`isograph/libs/isograph-react/src/core/cache.ts:296`, `:323`, `:413`, `:607`). The completed map and the normalization AST carry the target's entity name when the target is `Concrete` (`RecordEntity`, Completion).
+
+### Root entities
+
+A root entity has exactly one record, at a fixed id (`FixedRecordId::root()`, Completion). Every selection whose target entity, or conditional whose entity, is a root entity is normalized onto that record, at any depth, as the operation's top level is. The compiler decides this when it generates the query; the runtime compares no discriminator value and holds no list of root entities.
+
+```rust
+// from crates/isograph_compiler/src/entrypoint.rs
+/// The root entities of one operation. Each has one record, at `FixedRecordId::root()`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RootEntities {
+    /// The root entity whose record holds the operation's top-level selections.
+    pub operation: EntityName,
+    /// The other root entities.
+    pub others: BTreeSet<EntityName>,
+}
+
+impl RootEntities {
+    /// `Fixed(FixedRecordId::root())` when `entity` is `operation` or one of `others`;
+    /// otherwise `identity`'s `Select(name)` as `Select(name)` and `Omit` as `Omit`.
+    pub fn identity_of(&self, entity: EntityName, identity: IdentitySelection) -> CompletedIdentity;
+}
+```
+
+`root_entities` reads the plan, not the database: the plan exists only when `fetch_plan` returned `Ok`, so the root operation types it was decided against were readable, and no lookup is left to fail. Reading the root operation types in `entity_shape` instead would make every `field_selection_map` depend on the schema definition, and a broken `schema {}` would fail every field map, which entrypoints.md keeps out of entity data for the same reason (GraphQL entity data). The test protocol's `root_entities` returns `RootEntities { operation: "Query".intern().to(), others: BTreeSet::new() }`; its `fetch_plan` never returns `Ok`, so it is not reached.
+
+GraphQL's root entities are the schema's root operation types (`GraphQLFetchPlan.roots`, The fetch plan). `schema { query: RootQuery }` makes `RootQuery` the root entity; the name `Query` is not special.
+
+Delta from upstream: upstream's normalizer compares `__typename === 'Query'` and returns `ROOT_ID` (`isograph/libs/isograph-react/src/core/cache.ts:614-618`, under the comment `// TODO do not hard code this value here`). i2 decides it from the schema's root operation types when the query is generated.
+
 ### GraphQL's shapes
 
 ```rust
@@ -152,16 +204,24 @@ The core decides nothing about which identity an entity has; it inserts the sele
 pub(crate) const TYPENAME: &str = "__typename";
 const ID: &str = "id";
 
-/// An object, interface, or union is composite; `id` is its identity where `IdField` is
-/// `Present`.
+/// An object, interface, or union is composite; an object is concrete; `id` is the identity
+/// where `IdField` is `Present`.
 pub(crate) fn graphql_entity_shape(data: &GraphQLEntityData) -> EntityShape {
     match data {
         GraphQLEntityData::Scalar(_) | GraphQLEntityData::Enum => EntityShape::Leaf,
         GraphQLEntityData::InputObject => EntityShape::Input,
-        GraphQLEntityData::Object(composite) | GraphQLEntityData::Interface(composite) => {
-            EntityShape::Composite(identity_selection(composite.id_field))
-        }
-        GraphQLEntityData::Union => EntityShape::Composite(IdentitySelection::Omit),
+        GraphQLEntityData::Object(composite) => EntityShape::Composite(CompositeShape {
+            concreteness: Concreteness::Concrete,
+            identity: identity_selection(composite.id_field),
+        }),
+        GraphQLEntityData::Interface(composite) => EntityShape::Composite(CompositeShape {
+            concreteness: Concreteness::Abstract,
+            identity: identity_selection(composite.id_field),
+        }),
+        GraphQLEntityData::Union => EntityShape::Composite(CompositeShape {
+            concreteness: Concreteness::Abstract,
+            identity: IdentitySelection::Omit,
+        }),
     }
 }
 
@@ -190,11 +250,11 @@ Delta from entrypoints.md's `GraphQLEntityData`: the landed enum has `Scalar(Ent
 GraphQL selects `__typename` in every selection set under a selection of an object, interface, or union, and inside every refinement. Consequences:
 
 - Every record is self-describing: its response object holds its concrete entity's name.
-- The normalizer always takes a record's entity from the response's discriminator selection. The normalization AST has no concrete entity on a selection's target, and no node for the discriminator: the normalizer reads it from every composite response object without being told (normalization-ast.md, the asymmetry its tests account for).
+- The normalizer takes a record's entity from the AST when the target is `Concrete` (`RecordEntity::Known`) and from the response's discriminator selection when it is `Abstract` (`RecordEntity::Discriminator`). The normalization AST has no node for the discriminator: the normalizer reads it from a composite response object without being told (normalization-ast.md, the asymmetry its tests account for).
 - A composite selection always selects at least `__typename`, so no selection set under a selection is empty, and upstream's filler (`__typename` for an empty map, `query_text.rs:81-84`) has no counterpart.
 - Each response object carries one more key, which costs bytes per response.
 
-Delta from upstream: upstream adds `__typename` only under abstract types (`isograph/crates/isograph_schema/src/create_merged_selection_set.rs:1419-1427`) and inside inline fragments, and its AST names `concreteType` for object targets. Later: selecting `__typename` only where the compiler does not know the concrete entity, with the concrete entity back in the AST (normalization-ast.md, Later), is an efficiency change.
+Delta from upstream: upstream adds `__typename` only under abstract types (`isograph/crates/isograph_schema/src/create_merged_selection_set.rs:1419-1427`) and inside inline fragments. Both name the concrete entity of object targets in the AST (`concreteType`; i2's `RecordEntity::Known`). Later: selecting `__typename` only under `Abstract` targets and inside refinements (normalization-ast.md, Later) is an efficiency change.
 
 The test protocol defines no entity, so the core never calls its shape methods with data: its `entity_shape` returns `EntityShape::Leaf`, its `selectable_shape` returns `SelectableShape::Direct`, and its `discriminator` returns `"__typename"`.
 
@@ -247,8 +307,12 @@ pub enum MergedSelectionTarget {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MergedCompositeTarget {
-    /// The identity the protocol adds to a selection set on the target entity.
-    pub identity: IdentitySelection,
+    /// The target entity, which completion compares with the root entities and names in
+    /// `RecordEntity::Known`.
+    pub entity: EntityName,
+    /// The target entity's concreteness and the identity the protocol adds to a selection
+    /// set on it.
+    pub shape: CompositeShape,
     pub selections: MergedSelectionMap,
 }
 
@@ -334,13 +398,55 @@ pub struct CompletedSelectableSelection {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CompletedSelectionTarget {
     Leaf,
-    Composite(CompletedSelectionMap),
+    Composite(CompletedCompositeTarget),
 }
 
+/// A completed selection set on a composite target entity, and how its response objects'
+/// records are found.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CompletedCompositeTarget {
+    pub entity: RecordEntity,
+    pub identity: CompletedIdentity,
+    pub selections: CompletedSelectionMap,
+}
+
+/// The conditional's records are of the condition's entity, so it carries no `RecordEntity`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CompletedConditional {
     pub condition: Condition,
+    pub identity: CompletedIdentity,
     pub selections: CompletedSelectionMap,
+}
+
+/// Which entity a response object's record is of.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RecordEntity {
+    /// The target entity is `Concrete`: every response object is of this entity.
+    Known(EntityName),
+    /// The target entity is `Abstract`: the response object's discriminator names its entity.
+    Discriminator,
+}
+
+/// How a response object's record id is found.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CompletedIdentity {
+    /// The value of the identity selection, which the map holds as `Identity(name)`.
+    Select(SelectableName),
+    /// The entity has no identity selection; the normalizer derives the record id from the
+    /// parent record and the path.
+    Omit,
+    /// The entity is a root entity: every response object of it is the record with this id.
+    Fixed(FixedRecordId),
+}
+
+/// A record id the compiler assigns.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, derive_more::Display)]
+pub struct FixedRecordId(pub String);
+
+impl FixedRecordId {
+    /// `"__ROOT"`: the id of a root entity's one record, upstream's `ROOT_ID`
+    /// (`isograph/libs/isograph-react/src/core/IsographEnvironment.ts:163`).
+    pub fn root() -> Self;
 }
 
 impl CompletedSelection {
@@ -353,7 +459,11 @@ impl CompletedSelectionMap {
 }
 ```
 
-The field is private; `complete` and `top_level` (The operation) are the only constructors, which keeps a key and its selection in agreement and the map non-empty.
+The field is private; `complete` and `top_level` (The operation) are the only constructors, which keeps a key and its selection in agreement and the map non-empty. `CompletedCompositeTarget` and `CompletedConditional` are built only by `complete` and `top_level`, which write `identity` and the map's `Identity(name)` entry from one `CompletedIdentity`, so `Select(name)` holds exactly when the map holds `Identity(name)`.
+
+`RecordEntity` and `CompletedIdentity` are two independent facts. A root entity's selection is `Known(Query)` with `Fixed(FixedRecordId::root())`; an object with `id: ID!` is `Known(Pet)` with `Select(id)`; a union is `Discriminator` with `Omit`. `CompletedIdentity` is wider than `IdentitySelection` by `Fixed`: `entity_shape` cannot return `Fixed`, because rootness is not entity data (Root entities).
+
+Before (landed change 7): `CompletedSelectionTarget::Composite(CompletedSelectionMap)`, `CompletedConditional { condition, selections }`, and `MergedCompositeTarget { identity, selections }`. After: the types above (change 10).
 
 `MergedArguments`, `MergedArgument`, `MergedValue`, `MergedObject`, and `MergedObjectEntry` are unchanged:
 
@@ -446,10 +556,10 @@ Upstream's origin is `MergedSelectionMap`, `MergedServerSelection`, and `Normali
 
 Two maps merge by key. For a key in both:
 
-- `Selectable` with `Leaf` and `Leaf` is `Leaf`. `Composite` and `Composite` with equal `identity` merge their `selections` recursively. Any other pair is `SelectionMismatch`.
+- `Selectable` with `Leaf` and `Leaf` is `Leaf`. `Composite` and `Composite` with equal `entity` and `shape` merge their `selections` recursively. Any other pair is `SelectionMismatch`.
 - `Conditional` and `Conditional` with equal `identity` merge their `selections`; different `identity` is `SelectionMismatch`.
 
-Both selections of one key came from `selectable_named` and `entity_named` of the same parent entity and name in the same database revision, so their targets and `identity` are equal and `SelectionMismatch` is not reached; it is an error variant, as `DefinitionMoved` is, because a memo cannot return `LSPRuntimeError::UnexpectedError`.
+Both selections of one key came from `selectable_named` and `entity_named` of the same parent entity and name in the same database revision, so their targets, `shape`, and `identity` are equal and `SelectionMismatch` is not reached; it is an error variant, as `DefinitionMoved` is, because a memo cannot return `LSPRuntimeError::UnexpectedError`.
 
 ```rust
 // from crates/isograph_compiler/src/merged_selection.rs
@@ -632,8 +742,8 @@ fn selection_contribution<TProfile: CompilationProfile>(
 - Converts `selection.arguments` to `MergedArguments` against `context.variables`: a variable not declared is `UndefinedVariable`, a repeated argument `DuplicateArgument`, a repeated object key `DuplicateObjectKey`, a list `ListArgument`, a slot with no item `UnparsedArgument`.
 - `SelectableKind::Server(server)`: the target entity is the first inner entity of `server.target` (none is `NoTargetEntity`); `entity_named(db, client, target)`'s `Err` is `Lookup`, and `EntityOrigin::Source` is `TargetIsSourceEntity`. The target's data gives `entity_shape`, and `server.data` gives `selectable_shape`:
   - `Direct` on a `Leaf` target: a selection set on the selection is `SelectionSetOnLeaf`; otherwise one entry `Selectable(MergedSelectableSelection { key, target: Leaf })`.
-  - `Direct` on a `Composite(identity)` target: no selection set is `MissingSelectionSet`; otherwise one entry `Selectable { key, target: Composite(MergedCompositeTarget { identity, selections }) }`, with `selections` the nested selection set's `merge_selection_set` on the target.
-  - `Refinement` on a `Composite(identity)` target: arguments on the selection are `ArgumentsOnRefinement`, no selection set is `MissingSelectionSet`; otherwise one entry `Conditional(MergedConditional { condition: Condition::SelectionEquals(target), identity, selections })`.
+  - `Direct` on a `Composite(shape)` target: no selection set is `MissingSelectionSet`; otherwise one entry `Selectable { key, target: Composite(MergedCompositeTarget { entity: target, shape, selections }) }`, with `selections` the nested selection set's `merge_selection_set` on the target.
+  - `Refinement` on a `Composite(shape)` target: arguments on the selection are `ArgumentsOnRefinement`, no selection set is `MissingSelectionSet`; otherwise one entry `Conditional(MergedConditional { condition: Condition::SelectionEquals(target), identity: shape.identity, selections })`. `shape.concreteness` is not kept: the conditional's records are of `target`, the entity the condition names.
   - `Refinement` on a `Leaf` target is `RefinementToNonComposite(target)`; GraphQL's refinements target only object types (`refinement_to`), so GraphQL does not reach it.
   - Either shape on an `Input` target is `InputTarget(target)`.
 - `SelectableKind::ClientField`: `field_selection_map(db, client, parent, selection.name)`, then `substitute` with the context built from the converted arguments and that map's `variables`. An argument the field does not declare is `UnknownFieldArgument`. The selection's own nested selection set is not read.
@@ -792,16 +902,42 @@ pub struct GraphQLFetchPlan(pub OperationType);
 
 The struct has one field once `entity` is gone, so it is a newtype (AGENTS.md). `graphql_fetch_plan` checks the root first and then that the root is an object type (`NotObject`, replacing `NotObjectOrInterface`); entrypoints.md has the body.
 
+Change 10 gives the plan the root entities, which the core reads through `root_entities` (Root entities):
+
+```rust
+// from crates/graphql_network_protocol/src/fetch_plan.rs
+/// How the GraphQL protocol fetches an entity that parents an entrypoint: the entity is the
+/// root type of `operation_type`, and its selections are the operation's.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GraphQLFetchPlan {
+    pub operation_type: OperationType,
+    /// The schema's root operation types, with the entity as `operation`.
+    pub roots: RootEntities,
+}
+```
+
+```rust
+// from crates/graphql_network_protocol/src/root_operation_types.rs
+impl RootOperationTypes {
+    /// `operation` as the operation's root, and every other root operation type the schema
+    /// names (`query`, then `mutation` and `subscription` when present) as `others`.
+    pub fn root_entities(&self, operation: EntityName) -> RootEntities;
+}
+```
+
+`graphql_fetch_plan`'s last step (entrypoints.md) is `GraphQLFetchPlan { operation_type, roots: roots.root_entities(entity) }` where it was `GraphQLFetchPlan(operation_type)`. `root_entities`'s body collects `[self.query.wrap_some(), self.mutation, self.subscription].into_iter().flatten().filter(|root| *root != operation)` as `others`; the spec requires the three root types to be distinct types (spec 3.3.1). `GraphQLNetworkProtocol::root_entities(plan)` is `plan.roots.clone()`. The printer reads `plan.operation_type` where it read `plan.0`. The memo already reads `root_operation_types`, so it re-runs exactly when it did.
+
 ### Completion
 
 ```rust
 // from crates/isograph_compiler/src/merged_selection.rs
-/// `map`, a selection set under a selection of an entity whose identity is `identity`, with
-/// the discriminator, the identity, and every composite target and conditional below it
-/// completed.
+/// `map`, a selection set under a selection of an entity whose record id is found by
+/// `identity`, with the discriminator, the identity, and every composite target and
+/// conditional below it completed against `roots`.
 pub fn complete<TProtocol: NetworkProtocol>(
     map: &MergedSelectionMap,
-    identity: IdentitySelection,
+    identity: &CompletedIdentity,
+    roots: &RootEntities,
 ) -> Result<CompletedSelectionMap, AddedSelectionCollision>;
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
@@ -811,23 +947,28 @@ pub struct AddedSelectionCollision(pub SelectionKey);
 
 `complete`, in order:
 
-1. Each `Selectable` entry: `Leaf` is `CompletedSelectionTarget::Leaf`; `Composite(target)` is `Composite(complete::<TProtocol>(target.selections, target.identity)?)`.
-2. Each `Conditional` entry: `CompletedConditional { condition, selections: complete::<TProtocol>(c.selections, c.identity)? }`.
-3. A `Leaf` selectable entry with no arguments named `TProtocol::discriminator()` becomes `Discriminator`; one named `identity`'s `Select` name becomes `Identity(name)`. The selection a user wrote and the one the protocol adds are one selection.
-4. `Discriminator` is added. `IdentitySelection::Select(i)` adds `Identity(i)`.
+Before (landed change 7): `complete(map: &MergedSelectionMap, identity: IdentitySelection)`; after: the signature above (change 10).
+
+1. Each `Selectable` entry: `Leaf` is `CompletedSelectionTarget::Leaf`. `Composite(target)` is `Composite(CompletedCompositeTarget { entity, identity, selections })` with `entity` `RecordEntity::Known(target.entity)` when `target.shape.concreteness` is `Concrete` and `RecordEntity::Discriminator` when it is `Abstract`, `identity` `roots.identity_of(target.entity, target.shape.identity)`, and `selections` `complete::<TProtocol>(target.selections, &identity, roots)?`.
+2. Each `Conditional` entry `c` with `c.condition` `SelectionEquals(entity)`: `CompletedConditional { condition: c.condition, identity, selections: complete::<TProtocol>(c.selections, &identity, roots)? }` with `identity` `roots.identity_of(entity, c.identity)`.
+3. A `Leaf` selectable entry with no arguments named `TProtocol::discriminator()` becomes `Discriminator`; when `identity` is `Select(name)`, one named `name` becomes `Identity(name)`. The selection a user wrote and the one the protocol adds are one selection.
+4. `Discriminator` is added. `CompletedIdentity::Select(name)` adds `Identity(name)`; `Omit` and `Fixed` add nothing.
 5. A remaining `Selectable` key whose normalization alias equals the discriminator's or the identity's name is `AddedSelectionCollision(key)`. Step 3 has absorbed the leaf selection with no arguments; what remains is a composite selectable named like one of them, which GraphQL excludes (`__typename` is not a schema field, and `IdField::Present` requires `id: ID!`).
 
-Step 4 makes the map non-empty and puts the discriminator before every conditional in the same selection set, which the condition reads. The steps run per selection in the private `complete_selection` (steps 1 to 3 and 5 for one entry) and `complete_target` (a selectable's target, which `top_level` also calls); `CompletedSelectionMap::from_selections`, private, keys a list of completed selections by `CompletedSelection::key`, and is how `complete` and `top_level` build the map. Under `IdentitySelection::Omit` (a type whose `id` is not `ID!`), a selection of `id` stays a `Selectable` entry, in name order.
+Step 4 makes the map non-empty and puts the discriminator before every conditional in the same selection set, which the condition reads. The steps run per selection in the private `complete_selection` (steps 1 to 3 and 5 for one entry) and `complete_target` (a selectable's target, which `top_level` also calls); `CompletedSelectionMap::from_selections`, private, keys a list of completed selections by `CompletedSelection::key`, and is how `complete` and `top_level` build the map. Under `Omit` (a type whose `id` is not `ID!`) and under `Fixed` (a root entity, whose record id is known), a selection of `id` stays a `Selectable` entry, in name order. The discriminator is selected under a `Known` entity too: the query selects it in every selection set under a selection (GraphQL's shapes), and the normalizer reads it only under `Discriminator`.
+
+For `field Query.NestedQuery { greeting query { tags } }` on `type Query { greeting: String query: Query! tags: [String] }`, the `query` entry's target is `CompletedCompositeTarget { entity: Known(Query), identity: Fixed(FixedRecordId::root()), selections }`, whose map holds `Discriminator` and `tags` and no `Identity`, even when `Query` has `id: ID!`.
 
 Completion runs once, on the entrypoint's whole map, after all inlining and substitution, so a selection set merged from several selections receives the protocol's additions once. A `field` declaration's map is not completed: it is merged into its selection's parent and completed with it.
 
 ```rust
 // from crates/isograph_compiler/src/merged_selection.rs
 impl CompletedSelectionMap {
-    /// The operation's top-level map: every selection completed, and nothing added at the top
-    /// level itself.
+    /// The operation's top-level map: every selection completed against `roots`, and nothing
+    /// added at the top level itself.
     pub fn top_level<TProtocol: NetworkProtocol>(
         map: &MergedSelectionMap,
+        roots: &RootEntities,
     ) -> Result<Self, TopLevelError>;
 }
 
@@ -842,7 +983,7 @@ pub enum TopLevelError {
 }
 ```
 
-The operation's top level is not under a selection, so it gets no discriminator and no identity. GraphQL forbids an introspection field as a subscription's root field (spec 5.2.3.1), so `__typename` at the top level of `subscription` would be invalid, and the root record's entity is the root type, known without a discriminator. `top_level` completes each `Selectable` entry as `complete`'s step 1 does. A `Conditional` entry is `Conditional`, because its condition would read a discriminator the top level does not select; a GraphQL root type is an object type (spec 3.3.1) and has no refinements, so GraphQL does not reach it. An empty map is `Empty`: GraphQL rejects an empty selection set, and the top level has no discriminator to fill it. `entrypoint Query.X` on a `field Query.X` with no selection set, or whose selections are only client pointers, is `Empty`.
+The operation's top level is not under a selection, so it gets no discriminator and no identity. GraphQL forbids an introspection field as a subscription's root field (spec 5.2.3.1), so `__typename` at the top level of `subscription` would be invalid, and the root record is `roots.operation` at `FixedRecordId::root()`, known without a discriminator or an identity (normalization-ast.md, `NormalizationAst.root`). `top_level` completes each `Selectable` entry as `complete`'s step 1 does. A `Conditional` entry is `Conditional`, because its condition would read a discriminator the top level does not select; a GraphQL root type is an object type (spec 3.3.1) and has no refinements, so GraphQL does not reach it. An empty map is `Empty`: GraphQL rejects an empty selection set, and the top level has no discriminator to fill it. `entrypoint Query.X` on a `field Query.X` with no selection set, or whose selections are only client pointers, is `Empty`.
 
 ### The operation's selections and variables
 
@@ -940,17 +1081,17 @@ pub fn query_for_entrypoint<TProfile: CompilationProfile>(
     let field = field_selection_map(db, client, entity, selectable)
         .as_ref()
         .map_err(|error| EntrypointQueryError::SelectionMap(error.clone()))?;
+    let roots = TProfile::NetworkProtocol::root_entities(fetch_plan.reference());
     let variables = operation_variables(field);
-    let selections =
-        CompletedSelectionMap::top_level::<TProfile::NetworkProtocol>(field.selections.reference())
-            .map_err(EntrypointQueryError::TopLevel)?;
+    let selections = CompletedSelectionMap::top_level::<TProfile::NetworkProtocol>(
+        field.selections.reference(),
+        roots.reference(),
+    )
+    .map_err(EntrypointQueryError::TopLevel)?;
     let normalization_ast = normalization_ast(
         selections.reference(),
-        SelectionKey {
-            name: TProfile::NetworkProtocol::discriminator(),
-            arguments: MergedArguments::default(),
-        }
-        .normalization_alias(),
+        TProfile::NetworkProtocol::discriminator(),
+        roots.operation,
     )
     .map_err(EntrypointQueryError::IntegerOutOfRange)?;
     let ProtocolQueryText { text, file_name } =
@@ -969,7 +1110,7 @@ pub fn query_for_entrypoint<TProfile: CompilationProfile>(
 }
 ```
 
-`normalization_ast`, `NormalizationAst`, and `IntegerOutOfRange` are normalization-ast.md's, and land with its change 2: until then `QueryArtifact` is `{ text, file_name }` and `query_for_entrypoint` has no `normalization_ast` step. The AST carries the discriminator's response key, so the runtime names no GraphQL selectable. Only used variables are declared, because GraphQL rejects an operation that declares a variable it does not use (spec 5.8.4); upstream's `get_used_variable_definitions` does the same. A variable is used when a `MergedValue::Variable` of that name is in `selections`, at any depth or inside an object. The operation name is the selectable name, upstream's (`isograph/crates/artifact_content/src/entrypoint_artifact.rs`, `query_name = entrypoint.name`); open decision 3.
+`normalization_ast`, `NormalizationAst`, and `IntegerOutOfRange` are normalization-ast.md's, and land with its change 2: until then `QueryArtifact` is `{ text, file_name }` and `query_for_entrypoint` has no `normalization_ast` step. The AST carries the discriminator's response key and the root record, so the runtime names no GraphQL selectable or type. Only used variables are declared, because GraphQL rejects an operation that declares a variable it does not use (spec 5.8.4); upstream's `get_used_variable_definitions` does the same. A variable is used when a `MergedValue::Variable` of that name is in `selections`, at any depth or inside an object. The operation name is the selectable name, upstream's (`isograph/crates/artifact_content/src/entrypoint_artifact.rs`, `query_name = entrypoint.name`); open decision 3.
 
 ### The entrypoint's parent shape
 
@@ -1101,7 +1242,7 @@ The header is `<operation_type> <name>(<variable definitions>) {`, with the oper
 `print_selection`:
 
 - `Discriminator` prints `__typename`; `Identity(name)` prints `<name>`.
-- `Selectable(selection)` prints `print_selection_head(selection.key)`; with a `Composite` target, then ` {`, its selections at `depth + 1`, and `}` on its own line. `print_selection_head` is `<alias>: <name>(<arguments>)` with the alias `selection.key.normalization_alias()` when the key has arguments, and `<name>` otherwise.
+- `Selectable(selection)` prints `print_selection_head(selection.key)`; with a `Composite(target)` target, then ` {`, `target.selections` at `depth + 1`, and `}` on its own line. `target.entity` and `target.identity` print nothing; the identity's selection is the map's `Identity` entry. `print_selection_head` is `<alias>: <name>(<arguments>)` with the alias `selection.key.normalization_alias()` when the key has arguments, and `<name>` otherwise.
 - `Conditional(conditional)` with `SelectionEquals(entity)` prints `... on <entity> {`, its selections at `depth + 1`, and `}`.
 
 Values print as GraphQL: `$name`, integers in decimal, `true`, `false`, `null`, `{ key: value, key: value }` (an object with no entries prints `{}`), and strings in double quotes with `"`, `\`, and the control characters U+0000 to U+001F escaped (`\"`, `\\`, `\n`, `\r`, `\t`, `\b`, `\f`, and `\u00XX` for the rest; spec 2.9.4). Upstream writes the string's text between quotes without escaping (`query_text.rs:164`, whose comment notes the bug).
@@ -1313,6 +1454,8 @@ Facts about generated text, not snapshots. A helper in the test module returns t
 - `complete` of a map holding a composite selection named `id` with no arguments under `Select(id)` is `AddedSelectionCollision`.
 - `top_level` of an empty map is `Empty`; of a map with a `Conditional` entry is `Conditional`; of a map with `pets` has no `Discriminator` entry at its own level and one under `pets`.
 - `operation_variables` declares only the used variables, in declaration order, each once.
+- With `roots` `{ operation: Query, others: {Mutation} }`: a composite entry targeting `Query` whose shape is `Concrete` with `Select(id)` completes to `CompletedCompositeTarget { entity: Known(Query), identity: Fixed(FixedRecordId::root()), .. }` whose map has a `Discriminator` entry and no `Identity` entry; a leaf `id` selected under it stays a `Selectable` entry. One targeting `Mutation` is `Fixed(FixedRecordId::root())` too. One targeting `Pet` (`Concrete`, `Select(id)`) is `Known(Pet)` with `Select(id)` and an `Identity(id)` entry. One targeting a union (`Abstract`, `Omit`) is `Discriminator` with `Omit`, and its conditional `SelectionEquals(BlogItem)` with `Select(id)` has `identity == Select(id)`.
+- `RootEntities::identity_of` of `operation`, of each of `others`, and of another entity under `Select(id)` and `Omit`.
 
 `crates/isograph_compiler/src/merged_selection.rs` (test protocol with `()` data where a case needs no protocol fields; otherwise the GraphQL profile in the next group):
 
@@ -1328,6 +1471,7 @@ Facts about generated text, not snapshots. A helper in the test module returns t
 - `SpeciesRoute`: the header is `query SpeciesRoute($species: PetSpecies!) {`; lines include `  petsBySpecies____species___v_species: petsBySpecies(species: $species) {`, `    favorite_phrase`, `  viewer {`, and `  node____id___s_1: node(id: "1") {`, whose block's first two lines are `__typename` and `id`.
 - `SetTagline`: the header is `mutation SetTagline($id: ID!, $tagline: String!) {`; the second line is the `set_pet_tagline____input___o_id__v_id_tagline__v_tagline_c: set_pet_tagline(input: { id: $id, tagline: $tagline }) {` line.
 - `entrypoint Pet.PetSummaryCard`, `entrypoint PetStats.Card`, and `entrypoint Node.Card` are `NotFetchable(Protocol(NotRootOperationType))`.
+- `field Query.NestedQuery { greeting query { tags } }` on a schema whose `Query` has `query: Query!`: the `query {` block is `__typename` then `tags`, with no `id` line even when `Query` has `id: ID!`. With `schema { query: RootQuery }` and `type RootQuery { me: RootQuery! name: String }`, `field RootQuery.Me { me { name } }` gives the `me` target `Known(RootQuery)` with `Fixed(FixedRecordId::root())`; `graphql_fetch_plan(RootQuery).roots` is `{ operation: RootQuery, others: {} }`.
 - Selecting `PetCheckinsCard(limit: 5)` in `PetDetailRoute` adds the line `    checkins____limit___l_5____skip___l_0: checkins(limit: 5, skip: 0) {`. A second selection `PetCheckinsCard` with no arguments adds `checkins____limit___l_3____skip___l_0` (the default); both blocks are present.
 - `field Pet.Opt($x: Int) { checkins(limit: $x) { id } }` selected as `Opt` with no argument prints `checkins {` with no arguments.
 - An entrypoint field declaring `$unused: Int` that nothing reads has no `$unused` in its header.
@@ -1407,6 +1551,16 @@ Depends on 4, 5, and 6.
 ### 9. Pet demo output
 
 The committed `demos/pet-demo/src/__isograph/` gains the query files for `HomeRoute`, `PetDetailRoute`, `SpeciesRoute`, and `SetTagline`, generated by the daemon. Depends on 8.
+
+### 10. Record entities and root identity (isograph_compiler, graphql_network_protocol)
+
+The delta from landed change 7 that normalization-ast.md change 2 builds on:
+
+- Core: `CompositeShape`, `Concreteness`, and `EntityShape::Composite(CompositeShape)` in `protocol_shape.rs`; `MergedCompositeTarget { entity, shape, selections }` and the walk writing it; merging comparing `entity` and `shape`; `CompletedCompositeTarget`, `RecordEntity`, `CompletedIdentity`, `FixedRecordId` with `root`, `CompletedSelectionTarget::Composite(CompletedCompositeTarget)`, `CompletedConditional.identity`; `complete` and `top_level` taking `roots`; `RootEntities` with `identity_of` in `entrypoint.rs`; `NetworkProtocol::root_entities`, and the test protocols' (`crates/isograph_compiler`, `crates/isograph_cli`, `crates/isograph_lsp` test profiles); `query_for_entrypoint` reading `root_entities` and passing `roots` to `top_level`. `entrypoint_fetch_plan`'s `EntityShape::Composite(_)` arm is unchanged.
+- GraphQL: `graphql_entity_shape` returning `CompositeShape`; `GraphQLFetchPlan { operation_type, roots }`; `RootOperationTypes::root_entities`; `GraphQLNetworkProtocol::root_entities`; the printer reading `plan.operation_type` and `Composite(target).selections`.
+- Tests: the completion tests above with `roots`, the `NestedQuery` and `RootQuery` profile tests, and the fetch plan tests asserting `roots` (entrypoints.md).
+
+Depends on 7.
 
 ## Open decisions
 
