@@ -2,6 +2,7 @@ mod absent_source {
     mod garbage_collection;
     mod missing_key;
     mod remove;
+    mod try_get;
 }
 
 mod garbage_collection {
