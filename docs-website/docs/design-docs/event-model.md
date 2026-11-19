@@ -10,7 +10,7 @@ The process does not read the filesystem inside `handle`. Facts about files arri
 
 This is figaro's shape. Figaro's events are keys and OS reports. Isograph's events are file changes, editor buffers, and completed work.
 
-The building blocks are `Config`, `IsographEvent`, `IsographEffect`, `DiskFile`, and `OpenFile`. The state is a pico database.
+The building blocks are `Config`, `IsographEvent`, `IsographEffect`, `ClientId`, `DiskFile`, and `OpenFile`. The state is a pico database.
 
 A binary is compiled with one `HostLanguage`, one `NetworkProtocol`, and one `RuntimeFramework`. Those are the type parameters in the mental model. They are static for the process. The config file's fields depend on them.
 
@@ -49,7 +49,7 @@ enum Filesystem {
 fn handle(state: &mut IsographState, event: IsographEvent) -> Vec<IsographEffect>
 ```
 
-`IsographState` is the process wrapper (`db: IsographDb`, live sessions, timer guards). The guard is not a pico source. `IsographDb` is the pico database. The test harness calls `handle`. It does not start a daemon, open a socket, or write a file. A test constructs a `DiskChanged` or `EditorChanged`, runs `handle`, and asserts the effects and the `DiskFile` sources. The binary's event loop calls the same `handle` with the same types.
+`IsographState` is the process wrapper (`db: IsographDb`, live sessions, timer guards). The guard is not a pico source. `IsographDb` is the pico database. The test harness calls `handle`. It does not start a daemon, open a socket, or write a file. A test constructs a `DiskChanged` or an `LspNotification`, runs `handle`, and asserts the effects and the `DiskFile` sources. The binary's event loop calls the same `handle` with the same types.
 
 `IsographEvent` is `Lsp(LspEvent)` | `Internal(InternalEvent)` | `ClientConnection(ClientConnectionEvent)` | `Timer(TimerFired<TimerPayload>)`. `LspEvent` is `Request` / `Notification` / `Response`. `handle` of `Lsp` matches those and runs isograph request/notification dispatch. A request leftover is `method_not_found`: one immediate `SendLspResponseEffect`. HelloWorld arms a timer; `handle` of that `TimerFired` is `trigger_if_matching` and `LogHelloWorld`. That is the plumbing the previous sentence named: a handler returns a timer plus an event. A notification leftover is no effects. A notification that matches returns `Vec<IsographEffect>` and not `SendLspResponseEffect`. Bad `isograph/event` params are leftover (empty effects). An LSP request and an LSP response carry the `ClientId` of their connection. `handle` drops a response from a client not in `LiveSessions`; a response from a live client is no effects. `handle` of `Internal` is `HelloWorld` / `Quit` / `DiskChanged`. `handle` of `Timer` uses `trigger_if_matching`. `handle` does not sleep. `handle` does not touch the socket. The effect loop writes the `Response`.
 
@@ -104,7 +104,6 @@ struct LspRequest {
 #[serde(tag = "kind", content = "value")]
 enum InternalEvent {
     DiskChanged(DiskChanged),
-    EditorChanged(EditorChanged),
     AsyncWorkFinished,
     Quit,
 }
@@ -131,31 +130,17 @@ enum Presence {
     Present(String),
     Absent,
 }
-
-#[derive(serde::Deserialize, serde::Serialize)]
-struct EditorChanged {
-    path: PathBuf,
-    buffer: Buffer,
-}
-
-#[derive(serde::Deserialize, serde::Serialize)]
-enum Buffer {
-    Open(String),
-    Closed,
-}
 ```
 
 `DiskFileChanged.path` and `FolderRemoved.path` are absolute and canonical. A relative path is resolved by the source that constructed the event, never by `handle`.
 
 `File` `Present` is create or modify or the destination of a move of a file. `File` `Absent` is delete or the source of a move of a file. `FolderRemoved` is delete or the source of a move of a directory: notify does not deliver one `Remove` per child. There is no `Moved` variant. A rename the watcher sees becomes `FolderRemoved` then file `Present`s, or file `Absent` then file `Present`. pico sources are keyed by path; a rename is remove old plus intern new. A directory is not a `DiskFile`.
 
-`InternalEvent` values come from outside `handle`: `DiskChanged`, `EditorChanged`. The CLI submits `Internal`. The watcher submits `DiskChanged`. The LSP adapter submits `EditorChanged`. `Lsp` is not `Internal`; the session posts it from the socket.
+`InternalEvent` values come from outside `handle`: `DiskChanged`. The CLI submits `Internal`. The watcher submits `DiskChanged`. `Lsp` is not `Internal`; the session posts it from the socket.
 
 The wire is `serde_json` of `InternalEvent`. A frame that is not a valid `InternalEvent` is logged and dropped. The connection stays up. `Lsp` is not a wire kind.
 
 `DiskChanged` is a filesystem fact. `File` `Present` carries the contents. `handle` does not open the path. Boot scan is a burst of `File` `Present`. Injected mode has no such burst. `FolderRemoved` is a directory gone from disk.
-
-`EditorChanged` is an editor-buffer fact. The LSP adapter produces it from `didOpen` / `didChange` / `didClose`. The CLI can produce the same event without an editor.
 
 `AsyncWorkFinished` is the answer to work `handle` asked the effect loop to do off-thread: a compilation, a schema fetch. Tests and the CLI may inject it.
 
@@ -188,6 +173,8 @@ struct IsographDb<THostLanguage: HostLanguage> {
     storage: Storage<Self>,
     #[tracked]
     disk_file_map: DiskFileMap,
+    #[tracked]
+    open_file_map: OpenFileMap,
     phantom_data: PhantomData<THostLanguage>,
 }
 
@@ -200,23 +187,32 @@ struct DiskFile {
     contents: String,
 }
 
+struct OpenFileMap(pub HashMap<OpenFileKey, SourceId<OpenFile>>);
+
+struct OpenFileKey {
+    client: ClientId,
+    path: RelativePathToSourceFile,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Source)]
 struct OpenFile {
-    path: PathBuf,
+    #[key]
+    key: OpenFileKey,
     contents: String,
 }
 ```
 
-A path may have a `DiskFile`, an `OpenFile`, both, or neither. The tracked map is which paths currently have a `DiskFile`. `handle` is the only writer of `DiskFile`. `OpenFile` and its map land with the adapter.
+A path may have a `DiskFile`, one `OpenFile` per client that has it open, both, or neither. The tracked maps are which paths currently have a `DiskFile` and which `(client, path)` pairs have an `OpenFile`. `handle` is the only writer of `DiskFile` and `OpenFile`.
 
 Artifact generation and watch mode read `DiskFile`. They do not read `OpenFile`.
 
-The LSP adapter reads `OpenFile` when it exists for that path, otherwise `DiskFile`. The LSP adapter does not generate artifacts.
+`file_contents(db, client, path)` reads that client's `OpenFile` when it exists, otherwise `DiskFile`. Semantic tokens and formatting still read `DiskFile`; they read through `file_contents` with the asking client's `ClientId` after lsp-open-files.md change 7. The LSP adapter does not generate artifacts.
 
-event-loop.md ships `IsographDb` with no fields. filesystem-events.md makes `IsographDb` the pico database and interns `DiskFile`. `OpenFile` lands with the adapter.
+event-loop.md ships `IsographDb` with no fields. filesystem-events.md makes `IsographDb` the pico database and interns `DiskFile`. lsp-open-files.md adds `OpenFile` and `open_file_map`.
 
 ## Dispatch
 
-`DiskChanged::File` with `Present` sets `DiskFile` from the payload. `DiskChanged::File` with `Absent` calls `remove_disk_file`. `DiskChanged::FolderRemoved` calls `remove_disk_files_from_path`. `EditorChanged` with `Open` sets `OpenFile`. `EditorChanged` with `Closed` removes it. `AsyncWorkFinished` records the result. `Quit` returns `Kill`.
+`DiskChanged::File` with `Present` sets `DiskFile` from the payload. `DiskChanged::File` with `Absent` calls `remove_disk_file`. `DiskChanged::FolderRemoved` calls `remove_disk_files_from_path`. `DidOpenTextDocument` and `DidChangeTextDocument` (one change, no range) call `set_open_file` for the notification's client. `DidCloseTextDocument` calls `remove_open_file`. `ClientConnectionEvent::Gone` calls `remove_open_files_of_client`. An LSP notification carries the `ClientId` of its connection. `handle` drops a notification from a client not in `LiveSessions`. `AsyncWorkFinished` records the result. `Quit` returns `Kill`.
 
 ## Watch and batch
 

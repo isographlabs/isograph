@@ -25,6 +25,8 @@ struct IsographDb<THostLanguage: HostLanguage> {
     storage: Storage<Self>,
     #[tracked]
     disk_file_map: DiskFileMap,
+    #[tracked]
+    open_file_map: OpenFileMap,
     phantom_data: PhantomData<THostLanguage>,
 }
 ```
@@ -53,10 +55,16 @@ struct DiskFile {
     contents: String,
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct OpenFileKey {
+    client: ClientId,
+    path: RelativePathToSourceFile,
+}
+
 #[derive(Clone, PartialEq, Eq, Source)]
 struct OpenFile {
     #[key]
-    path: RelativePathToSourceFile,
+    key: OpenFileKey,
     contents: String,
 }
 ```
@@ -73,7 +81,7 @@ A path is not a proof. Looking up by path can miss and return `None`. The tracke
 
 `get_singleton<T>()` returns `Option<&T>`. A singleton has no `SourceId` you hold as a proof of presence. You ask by type. The config may not have been set.
 
-A path may have a `DiskFile`, an `OpenFile`, both, or neither. Artifact generation reads `DiskFile`. The LSP reads `OpenFile` when that path has one, otherwise `DiskFile`. Those are different memos. One overlay used by both, as isograph's `read_iso_literals_source` does, makes artifact generation depend on editor buffers.
+A path may have a `DiskFile`, one `OpenFile` per client that has it open, both, or neither. A read of file text through `file_contents(db, client, path)` reads client `c`'s `OpenFile` if present, otherwise `DiskFile`. The file-based compiler will be another client with its own `ClientId`.
 
 A singleton has no key field. There is at most one. `CompilerConfig` and `CurrentWorkingDirectory` are singletons. `CurrentWorkingDirectory` is the parent directory of the config file, interned at process start. `handle` reads it to convert an event `PathBuf`. Memos do not. They receive `RelativePathToSourceFile` as an argument.
 
@@ -346,6 +354,10 @@ The map is which paths currently have a `DiskFile`. `db.set` of a `DiskFile` doe
 `untracked()` does not record the map. It is correct when the memo is already keyed by `path`, looks up that one `SourceId`, and then `db.get(source_id)` (which tracks the source). Adding an unrelated file must not re-invoke a per-file extract. Iterating `untracked()` is wrong: a newly inserted path is not seen. `IsographDb::disk_file` is that untracked lookup. Callers that already resolved the path (extract or `parsed_iso_literals_in_file` returned `Some`) write `db.disk_file(path)`. Extract is the first lookup of a path and does not use it.
 
 A lookup that misses did not `db.get`. If it also did not `tracked()` the map, a later `Present` of that path is not seen and the memo stays `None`. isograph hit this: an autofix created a file, `get_iso_literal` ran untracked, returned `None`, and the next request reused that `None` and panicked. On miss, `tracked()` the map so a later insert of that key is seen. The intended dependency of a per-file memo that hits is that file, not the set of all files.
+
+`open_file_map` is keyed by `OpenFileKey { client, path }`. `file_contents` looks up untracked and `db.get`s the hit; on a miss it reads the map tracked. A write of a key already present does not write the map, so a keystroke re-invokes only the slot that read that `OpenFile`. Any open or close re-invokes every open-miss slot of every client; each backdates when its text is `==`.
+
+A tracked read of a map whose counter was never written records no dependency (`refactors/pending/pico-missing-key-dependency.md`). On a fresh database, a `file_contents` miss before the first `set_open_file` does not see that later open.
 
 ## Intern
 
