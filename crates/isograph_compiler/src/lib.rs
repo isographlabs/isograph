@@ -37,7 +37,8 @@ pub use database::{
     SourcePathMap, file_contents, schema_file_paths, source_file_paths,
 };
 pub use entrypoint::{
-    ProfileEntrypointNotFetchableError, ProfileFetchPlan, RootEntities, entrypoint_fetch_plan,
+    ProfileEntityNotFetchableError, ProfileEntrypointNotFetchableError, ProfileFetchPlan,
+    RootEntities, entity_fetch_plan, entrypoint_fetch_plan,
 };
 pub use generation_errors::{QueryGenerationError, iso_literal_generation_errors_in_file};
 pub use host_language::*;
@@ -88,9 +89,9 @@ pub use selectable_for_path::{
     selectable_for_selection_parent, selectable_for_selection_path, selectable_target,
 };
 pub use validation::{
-    DuplicateDefinitionError, DuplicateResponseName, EntrypointNotFetchableError,
-    InvalidEntityError, MissingFieldArgument, ProfileValidationError, SelectableKey,
-    SelectionSetOnFieldWithoutTargetError, UnknownEntityError, UnknownSelectableError,
-    ValidationError, iso_literal_validation_errors_in_file,
+    DuplicateDefinitionError, DuplicateResponseName, EntityNotFetchableError,
+    EntrypointNotFetchableError, InvalidEntityError, MissingFieldArgument, ProfileValidationError,
+    SelectableKey, SelectionSetOnFieldWithoutTargetError, UnknownEntityError,
+    UnknownSelectableError, ValidationError, iso_literal_validation_errors_in_file,
 };
 pub use wrapper::{Nullability, UnionWrapper, Wrapper, WrapperVariant};

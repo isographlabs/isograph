@@ -215,8 +215,8 @@ mod validation_tests {
     use common_lang_types::{EntityName, RelativePathToSourceFile, SelectableName};
     use intern::string_key::Intern;
     use isograph_compiler::{
-        ClientId, DuplicateDefinitionError, EntrypointNotFetchableError, FileMembership,
-        IncludeFile, IsographDb, ProfileValidationError, SelectableKey,
+        ClientId, DuplicateDefinitionError, EntityNotFetchableError, EntrypointNotFetchableError,
+        FileMembership, IncludeFile, IsographDb, ProfileValidationError, SelectableKey,
         SelectionSetOnFieldWithoutTargetError, UnknownEntityError, UnknownSelectableError,
         iso_literal_validation_errors_in_file,
     };
@@ -442,8 +442,8 @@ mod validation_tests {
         assert_eq!(
             errors_in("iso(`entrypoint Owner.displayName`)", &[]),
             (
-                ValidationError::EntrypointNotFetchable(EntrypointNotFetchableError::SourceEntity(
-                    entity("Owner")
+                ValidationError::EntrypointNotFetchable(EntrypointNotFetchableError::Entity(
+                    EntityNotFetchableError::SourceEntity(entity("Owner"))
                 )),
                 "Owner".to_owned()
             )

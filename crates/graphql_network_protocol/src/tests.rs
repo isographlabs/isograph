@@ -1464,7 +1464,7 @@ fn an_entrypoint_whose_parent_cannot_be_fetched_is_an_error_on_the_parent() {
         ),
         (
             "iso(`entrypoint Owner.OwnerBadge`)",
-            "`Owner` is declared in source files; only entities from the schema can parent an entrypoint.",
+            "`Owner` is declared in source files, so the network protocol cannot fetch it.",
             "Owner",
         ),
         (

@@ -96,14 +96,18 @@ pub struct MissingFieldArgument {
 /// Why `entrypoint E.f` cannot be fetched.
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum EntrypointNotFetchableError<TNotFetchable: std::fmt::Display> {
-    #[error(
-        "`{0}` is declared in source files; only entities from the schema can parent an \
-        entrypoint."
-    )]
-    SourceEntity(EntityName),
     #[error("`{}.{}` comes from the schema; an entrypoint names a `field` declaration.", .0.entity, .0.selectable)]
     ProtocolSelectable(SelectableKey),
-    #[error("`{0}` has no selectables, so it cannot parent an entrypoint.")]
+    #[error("{0}")]
+    Entity(EntityNotFetchableError<TNotFetchable>),
+}
+
+/// Why an entity cannot be fetched by itself.
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum EntityNotFetchableError<TNotFetchable: std::fmt::Display> {
+    #[error("`{0}` is declared in source files, so the network protocol cannot fetch it.")]
+    SourceEntity(EntityName),
+    #[error("`{0}` has no selectables, so it cannot be fetched.")]
     NotComposite(EntityName),
     #[error("{0}")]
     Protocol(TNotFetchable),
@@ -381,9 +385,7 @@ fn entrypoint_declaration_error<TProfile: CompilationProfile>(
         .ok()?;
     let location = |error: &EntrypointNotFetchableError<_>| match error {
         EntrypointNotFetchableError::ProtocolSelectable(_) => declaration.name.location,
-        EntrypointNotFetchableError::SourceEntity(_)
-        | EntrypointNotFetchableError::NotComposite(_)
-        | EntrypointNotFetchableError::Protocol(_) => declaration.parent_type.location,
+        EntrypointNotFetchableError::Entity(_) => declaration.parent_type.location,
     };
     entrypoint_fetch_plan(db, client, entity, selectable)
         .err()

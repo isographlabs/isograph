@@ -4,11 +4,12 @@ use std::collections::BTreeSet;
 
 use isograph_compiler::{
     CompletedIdentity, CompletedSelection, CompletedSelectionMap, CompletedSelectionTarget,
-    EntrypointNotFetchableError, EntrypointQueryError, FieldSelectionMapError, FixedRecordId,
-    IntegerOutOfRange, NormalizationAlias, NormalizationAst, NormalizationCompositeTarget,
-    NormalizationNode, NormalizationRootRecord, NormalizationSelection, NormalizationTarget,
-    NormalizationValue, QueryArtifact, RecordEntity, ResponseKey, RootEntities,
-    SelectionMapErrorKind, TopLevelError, field_selection_map, query_for_entrypoint,
+    EntityNotFetchableError, EntrypointNotFetchableError, EntrypointQueryError,
+    FieldSelectionMapError, FixedRecordId, IntegerOutOfRange, NormalizationAlias, NormalizationAst,
+    NormalizationCompositeTarget, NormalizationNode, NormalizationRootRecord,
+    NormalizationSelection, NormalizationTarget, NormalizationValue, QueryArtifact, RecordEntity,
+    ResponseKey, RootEntities, SelectionMapErrorKind, TopLevelError, field_selection_map,
+    query_for_entrypoint,
 };
 use prelude::Postfix;
 
@@ -421,9 +422,9 @@ fn an_entrypoint_parent_that_cannot_be_fetched_is_not_fetchable() {
     );
     assert_eq!(
         error(&db, "Owner", "OwnerBadge"),
-        EntrypointQueryError::NotFetchable(EntrypointNotFetchableError::SourceEntity(entity(
-            "Owner"
-        )))
+        EntrypointQueryError::NotFetchable(EntrypointNotFetchableError::Entity(
+            EntityNotFetchableError::SourceEntity(entity("Owner"))
+        ))
     );
     for (parent, field) in [
         ("PetStats", "Card"),
@@ -432,17 +433,19 @@ fn an_entrypoint_parent_that_cannot_be_fetched_is_not_fetchable() {
     ] {
         assert_eq!(
             error(&db, parent, field),
-            EntrypointQueryError::NotFetchable(EntrypointNotFetchableError::Protocol(
-                GraphQLNotFetchable::NotRootOperationType(entity(parent))
+            EntrypointQueryError::NotFetchable(EntrypointNotFetchableError::Entity(
+                EntityNotFetchableError::Protocol(GraphQLNotFetchable::NotRootOperationType(
+                    entity(parent)
+                ))
             )),
             "{parent}"
         );
     }
     assert_eq!(
         error(&db, "String", "X"),
-        EntrypointQueryError::NotFetchable(EntrypointNotFetchableError::NotComposite(entity(
-            "String"
-        )))
+        EntrypointQueryError::NotFetchable(EntrypointNotFetchableError::Entity(
+            EntityNotFetchableError::NotComposite(entity("String"))
+        ))
     );
     assert!(matches!(
         error(&db, "Query", "pets"),
@@ -490,7 +493,7 @@ fn an_entrypoint_on_a_leaf_is_a_validation_error_on_the_parent() {
                 "String".to_owned()
             ),
             (
-                "`String` has no selectables, so it cannot parent an entrypoint.".to_owned(),
+                "`String` has no selectables, so it cannot be fetched.".to_owned(),
                 "String".to_owned()
             )
         ]

@@ -110,9 +110,9 @@ pub trait NetworkProtocol: Sized + 'static {
     type EntityData: Clone + Debug + PartialEq + Eq + 'static;
     /// What the protocol records about a selectable it defines.
     type SelectableData: Clone + Debug + PartialEq + Eq + 'static;
-    /// How the protocol fetches an entity that parents an entrypoint.
+    /// How the protocol fetches an entity by itself.
     type FetchPlan: Clone + Debug + PartialEq + Eq + 'static;
-    /// Why an entity defined by the protocol cannot parent an entrypoint.
+    /// Why an entity defined by the protocol cannot be fetched by itself.
     type NotFetchable: Clone + Debug + PartialEq + Eq + std::fmt::Display + 'static;
     /// Why the protocol's lookup of an entity or selectable failed.
     type LookupError: Clone + Debug + PartialEq + Eq + std::fmt::Display + 'static;
@@ -190,7 +190,7 @@ pub trait NetworkProtocol: Sized + 'static {
         entity: EntityName,
     ) -> Vec<(SelectableName, ProtocolSelectable<Self::SelectableData>)>;
 
-    /// How `entity`, which the protocol defines, is fetched when it parents an entrypoint.
+    /// How `entity`, which the protocol defines, is fetched by itself.
     fn fetch_plan<TProfile: CompilationProfile<NetworkProtocol = Self>>(
         db: &IsographDb<TProfile>,
         client: ClientId,

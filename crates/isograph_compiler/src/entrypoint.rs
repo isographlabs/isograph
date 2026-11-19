@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use common_lang_types::EntityName;
 use prelude::Postfix;
 
-use crate::validation::{EntrypointNotFetchableError, SelectableKey};
+use crate::validation::{EntityNotFetchableError, EntrypointNotFetchableError, SelectableKey};
 use crate::{
     ClientId, CompilationProfile, CompletedIdentity, EntityOrigin, EntityShape, FixedRecordId,
     IdentitySelection, IsographDb, NetworkProtocol, ProfileEntity, ProfileSelectable,
@@ -37,6 +37,28 @@ impl RootEntities {
     }
 }
 
+/// The protocol's plan for fetching `entity` by itself.
+pub fn entity_fetch_plan<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    entity: &ProfileEntity<TProfile>,
+) -> Result<ProfileFetchPlan<TProfile>, ProfileEntityNotFetchableError<TProfile>> {
+    let data = match entity.origin.reference() {
+        EntityOrigin::Source => {
+            return EntityNotFetchableError::SourceEntity(entity.name).wrap_err();
+        }
+        EntityOrigin::Protocol(data) => data,
+    };
+    match TProfile::NetworkProtocol::entity_shape(data) {
+        EntityShape::Composite(_) => {}
+        EntityShape::Leaf | EntityShape::Input => {
+            return EntityNotFetchableError::NotComposite(entity.name).wrap_err();
+        }
+    }
+    TProfile::NetworkProtocol::fetch_plan(db, client, entity.name)
+        .map_err(EntityNotFetchableError::Protocol)
+}
+
 /// The protocol's plan for fetching `entity` as the parent of the entrypoint `selectable`.
 pub fn entrypoint_fetch_plan<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
@@ -44,12 +66,6 @@ pub fn entrypoint_fetch_plan<TProfile: CompilationProfile>(
     entity: &ProfileEntity<TProfile>,
     selectable: &ProfileSelectable<TProfile>,
 ) -> Result<ProfileFetchPlan<TProfile>, ProfileEntrypointNotFetchableError<TProfile>> {
-    let data = match entity.origin.reference() {
-        EntityOrigin::Source => {
-            return EntrypointNotFetchableError::SourceEntity(entity.name).wrap_err();
-        }
-        EntityOrigin::Protocol(data) => data,
-    };
     if let SelectableKind::Server(_) = selectable.kind {
         return EntrypointNotFetchableError::ProtocolSelectable(SelectableKey {
             entity: selectable.parent_entity,
@@ -57,18 +73,14 @@ pub fn entrypoint_fetch_plan<TProfile: CompilationProfile>(
         })
         .wrap_err();
     }
-    match TProfile::NetworkProtocol::entity_shape(data) {
-        EntityShape::Composite(_) => {}
-        EntityShape::Leaf | EntityShape::Input => {
-            return EntrypointNotFetchableError::NotComposite(entity.name).wrap_err();
-        }
-    }
-    TProfile::NetworkProtocol::fetch_plan(db, client, entity.name)
-        .map_err(EntrypointNotFetchableError::Protocol)
+    entity_fetch_plan(db, client, entity).map_err(EntrypointNotFetchableError::Entity)
 }
 
 pub type ProfileFetchPlan<TProfile> =
     <<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::FetchPlan;
+pub type ProfileEntityNotFetchableError<TProfile> = EntityNotFetchableError<
+    <<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::NotFetchable,
+>;
 pub type ProfileEntrypointNotFetchableError<TProfile> = EntrypointNotFetchableError<
     <<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::NotFetchable,
 >;
@@ -81,7 +93,7 @@ mod tests {
 
     use super::entrypoint_fetch_plan;
     use crate::test_profile::TestProfile;
-    use crate::validation::EntrypointNotFetchableError;
+    use crate::validation::{EntityNotFetchableError, EntrypointNotFetchableError};
     use crate::{
         ClientId, FileMembership, IncludeFile, IsographDb, entity_named, selectable_named,
     };
@@ -116,7 +128,8 @@ mod tests {
                 entity.reference(),
                 selectable.reference()
             ),
-            EntrypointNotFetchableError::SourceEntity(owner).wrap_err()
+            EntrypointNotFetchableError::Entity(EntityNotFetchableError::SourceEntity(owner))
+                .wrap_err()
         );
     }
 }
