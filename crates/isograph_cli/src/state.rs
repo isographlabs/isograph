@@ -5,8 +5,9 @@ use common_lang_types::{
     CurrentWorkingDirectory, RelativePathError, RelativePathToSourceFile,
     relative_path_from_absolute_and_working_directory,
 };
+use intern::Lookup;
 use intern::string_key::Intern;
-use isograph_compiler::{ClientId, CompilationProfile};
+use isograph_compiler::{ClientId, CompilationProfile, IncludeFile};
 use pico::Database;
 use prelude::Postfix;
 
@@ -15,13 +16,14 @@ use crate::event::{
     ClientConnectionEvent, DiskChanged, InternalEvent, IsographEvent, LiveSessions, Presence,
 };
 use crate::timer::TimerPayload;
+use crate::watch::ProjectGlobs;
 
 pub use isograph_compiler::IsographDb;
 
 pub struct IsographState<TProfile: CompilationProfile> {
     pub db: IsographDb<TProfile>,
     pub live_sessions: LiveSessions,
-    pub(crate) source_globs: crate::watch::SourceGlobs,
+    pub(crate) globs: ProjectGlobs,
     pub(crate) diagnostics_debounce: Option<freddie_timer::TimerGuard>,
 }
 
@@ -179,7 +181,9 @@ fn handle_internal_event<TProfile: CompilationProfile>(
     match internal {
         InternalEvent::HelloWorld => IsographEffect::LogHelloWorld.wrap_vec(),
         InternalEvent::Quit => IsographEffect::Kill.wrap_vec(),
-        InternalEvent::DiskChanged(change) => handle_disk_changed(&mut state.db, change),
+        InternalEvent::DiskChanged(change) => {
+            handle_disk_changed(&mut state.db, state.globs.reference(), change)
+        }
     }
 }
 
@@ -269,29 +273,36 @@ fn relative_path_to_source_file(
 }
 
 fn handle_disk_changed<TProfile: CompilationProfile>(
-    state: &mut IsographDb<TProfile>,
+    db: &mut IsographDb<TProfile>,
+    globs: &ProjectGlobs,
     change: DiskChanged,
 ) -> Vec<IsographEffect> {
-    apply_disk_changed(state, change)
+    apply_disk_changed(db, globs, change)
         .unwrap_or_else(|error| tracing::warn!(%error, "DiskChanged path"));
     no_effects()
 }
 
 fn apply_disk_changed<TProfile: CompilationProfile>(
-    state: &mut IsographDb<TProfile>,
+    db: &mut IsographDb<TProfile>,
+    globs: &ProjectGlobs,
     change: DiskChanged,
 ) -> Result<(), DiskChangedPathError> {
     match change {
         DiskChanged::File(change) => {
-            let path = relative_path_to_source_file(state, &change.path)?;
+            let path = relative_path_to_source_file(db, &change.path)?;
             match change.presence {
-                Presence::Present(contents) => state.insert_disk_file(path, contents),
-                Presence::Absent => state.remove_disk_file(path),
+                Presence::Present(contents) => {
+                    match globs.should_include_schema_file::<TProfile>(Path::new(path.lookup())) {
+                        IncludeFile::Include => db.insert_schema_file(path, contents),
+                        IncludeFile::Skip => db.insert_disk_file(path, contents),
+                    }
+                }
+                Presence::Absent => db.remove_disk_file(path),
             }
         }
         DiskChanged::FolderRemoved(folder) => {
-            let path = relative_path_to_source_file(state, &folder.path)?;
-            state.remove_disk_files_from_path(path);
+            let path = relative_path_to_source_file(db, &folder.path)?;
+            db.remove_disk_files_from_path(path);
         }
     }
     ().wrap_ok()
@@ -328,7 +339,7 @@ mod tests {
         IsographState {
             db: IsographDb::<TestProfile>::default(),
             live_sessions: LiveSessions::default(),
-            source_globs: crate::watch::SourceGlobs::parse(&["src/**".to_owned()])
+            globs: crate::watch::ProjectGlobs::parse(&["src/**".to_owned()], &[])
                 .expect("the test glob is valid"),
             diagnostics_debounce: None,
         }

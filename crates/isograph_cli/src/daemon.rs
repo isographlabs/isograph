@@ -13,7 +13,7 @@ use crate::effect::{IsographEffect, PublishDiagnosticsEffect};
 use crate::event::{IsographEvent, LiveSessions};
 use crate::state::{IsographDb, IsographState, handle, intern_config_directory};
 use crate::timer::TimerPayload;
-use crate::watch::SourceFileEvent;
+use crate::watch::{ProjectGlobs, SourceFileEvent};
 
 pub fn run<TProfile: CompilationProfile>(
     config_path: PathBuf,
@@ -77,17 +77,18 @@ async fn serve<TProfile: CompilationProfile>(
     }
     tracing::info!(config = %config_path.display(), port, "isograph daemon up");
 
-    let source_globs = match crate::watch::SourceGlobs::parse(config.source_files.as_slice()) {
-        Ok(source_globs) => source_globs,
+    let globs = match ProjectGlobs::parse(config.source_files.as_slice(), config.schema.as_slice())
+    {
+        Ok(globs) => globs,
         Err(e) => {
-            tracing::error!(error = %e, "invalid source_files");
+            tracing::error!(error = %e, "invalid config globs");
             return;
         }
     };
     let mut state = IsographState {
         db: IsographDb::<TProfile>::default(),
         live_sessions: LiveSessions::default(),
-        source_globs,
+        globs: globs.clone(),
         diagnostics_debounce: None,
     };
     intern_config_directory(&mut state.db, config_path.reference());
@@ -95,13 +96,12 @@ async fn serve<TProfile: CompilationProfile>(
         .parent()
         .expect("a config file path has a parent directory")
         .to_owned();
-    let source_files = config.source_files.clone();
     let _hold_watch = watch_tx.clone();
     let _watcher = match crate::watch::start_if_watching::<TProfile>(
         filesystem,
         watch_tx,
         config_path.reference(),
-        config.source_files.as_slice(),
+        globs.clone(),
     ) {
         Ok(watcher) => watcher,
         Err(e) => {
@@ -146,7 +146,7 @@ async fn serve<TProfile: CompilationProfile>(
             watch_rx,
             event_tx,
             config_directory,
-            source_files,
+            globs,
         ) => {}
     }
     let _ = std::fs::remove_file(port_path.reference());
@@ -157,14 +157,14 @@ async fn run_filesystem_watcher<TProfile: CompilationProfile>(
     mut watch_rx: UnboundedReceiver<Vec<SourceFileEvent>>,
     event_tx: UnboundedSender<IsographEvent>,
     config_directory: PathBuf,
-    source_files: Vec<String>,
+    globs: ProjectGlobs,
 ) {
     while let Some(events) = watch_rx.recv().await {
         crate::watch::apply::<TProfile>(
             event_tx.reference(),
             config_directory.reference(),
             events,
-            source_files.as_slice(),
+            globs.reference(),
         );
     }
 }
@@ -274,7 +274,7 @@ mod tests {
         IsographState {
             db: IsographDb::<TestProfile>::default(),
             live_sessions: LiveSessions::default(),
-            source_globs: crate::watch::SourceGlobs::parse(&["src/**".to_owned()])
+            globs: crate::watch::ProjectGlobs::parse(&["src/**".to_owned()], &[])
                 .expect("the test glob is valid"),
             diagnostics_debounce: None,
         }

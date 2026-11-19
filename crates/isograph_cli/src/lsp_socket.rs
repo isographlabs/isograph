@@ -300,7 +300,7 @@ mod tests {
             let state = IsographState {
                 db,
                 live_sessions: LiveSessions::default(),
-                source_globs: crate::watch::SourceGlobs::parse(&["src/**".to_owned()])
+                globs: crate::watch::ProjectGlobs::parse(&["src/**".to_owned()], &[])
                     .expect("the test glob is valid"),
                 diagnostics_debounce: None,
             };

@@ -4,14 +4,14 @@ use std::time::Duration;
 
 use common_lang_types::RelativePathToSourceFile;
 use intern::Lookup;
-use isograph_compiler::{ClientId, CompilationProfile, HostLanguage, IncludeFile, IsographDb};
+use isograph_compiler::{ClientId, CompilationProfile, IncludeFile, IsographDb};
 use prelude::Postfix;
 
 use crate::effect::{IsographEffect, PublishDiagnosticsEffect};
 use crate::event::LiveSession;
 use crate::state::IsographState;
 use crate::timer::TimerPayload;
-use crate::watch::SourceGlobs;
+use crate::watch::ProjectGlobs;
 
 pub(crate) const DIAGNOSTICS_DEBOUNCE: Duration = Duration::from_millis(100);
 
@@ -44,20 +44,18 @@ pub(crate) fn publish_diagnostics<TProfile: CompilationProfile>(
     state: &mut IsographState<TProfile>,
 ) -> Vec<IsographEffect> {
     let db = state.db.reference();
-    let source_globs = state.source_globs.reference();
+    let globs = state.globs.reference();
     state
         .live_sessions
         .0
         .iter_mut()
-        .filter_map(|(client, session)| {
-            publish_to_client(db, source_globs, client.dereference(), session)
-        })
+        .filter_map(|(client, session)| publish_to_client(db, globs, client.dereference(), session))
         .collect()
 }
 
 fn publish_to_client<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
-    source_globs: &SourceGlobs,
+    globs: &ProjectGlobs,
     client: ClientId,
     session: &mut LiveSession,
 ) -> Option<IsographEffect> {
@@ -67,7 +65,7 @@ fn publish_to_client<TProfile: CompilationProfile>(
         .as_ref()
         .and_then(|text_document| text_document.publish_diagnostics.as_ref())?;
     let previous = std::mem::take(&mut session.published_diagnostics);
-    let mut current = client_diagnostics(db, source_globs, client);
+    let mut current = client_diagnostics(db, globs, client);
     let outcomes: Vec<_> = changed_diagnostics(previous.reference(), current.reference())
         .map(|(path, diagnostics)| (path, publish_notification(db, path, diagnostics)))
         .collect();
@@ -102,18 +100,16 @@ fn publish_to_client<TProfile: CompilationProfile>(
 /// Non-empty diagnostics of every source file `client` has open.
 fn client_diagnostics<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
-    source_globs: &SourceGlobs,
+    globs: &ProjectGlobs,
     client: ClientId,
 ) -> HashMap<RelativePathToSourceFile, Vec<lsp_types::Diagnostic>> {
     db.open_paths_of_client(client)
         .into_iter()
         .filter(|path| {
-            let relative = Path::new(path.lookup());
-            source_globs.contains(relative)
-                && matches!(
-                    TProfile::HostLanguage::should_include_source_file(relative),
-                    IncludeFile::Include
-                )
+            matches!(
+                globs.should_include_source_file::<TProfile>(Path::new(path.lookup())),
+                IncludeFile::Include
+            )
         })
         .filter_map(|path| {
             let diagnostics = isograph_lsp::lsp_diagnostics_for_file(db, client, path).as_ref()?;

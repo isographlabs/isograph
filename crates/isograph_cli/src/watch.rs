@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use globset::Glob;
-use isograph_compiler::{CompilationProfile, HostLanguage, IncludeFile};
+use isograph_compiler::{CompilationProfile, HostLanguage, IncludeFile, NetworkProtocol};
 use isograph_config::ISOGRAPH_FOLDER;
 use notify::event::{CreateKind, ModifyKind, RemoveKind, RenameMode};
 use notify::{EventKind, RecommendedWatcher, RecursiveMode};
@@ -30,11 +30,16 @@ pub enum WatchError {
     Watch(WatchRoot),
     #[error("could not start the notify watcher: {0}")]
     Notify(notify::Error),
-    #[error("invalid source_files glob {glob}: {source}")]
-    Glob {
-        glob: String,
-        source: globset::Error,
-    },
+    #[error("invalid source_files glob {}: {}", .0.glob, .0.source)]
+    SourceFilesGlob(InvalidGlob),
+    #[error("invalid schema glob {}: {}", .0.glob, .0.source)]
+    SchemaGlob(InvalidGlob),
+}
+
+#[derive(Debug)]
+pub struct InvalidGlob {
+    pub glob: String,
+    pub source: globset::Error,
 }
 
 #[derive(Debug, Clone)]
@@ -47,8 +52,8 @@ pub enum SourceEventKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChangedFileKind {
     Config,
-    SourceFile,
-    SourceFolder,
+    File,
+    Folder,
 }
 
 pub type SourceFileEvent = (SourceEventKind, ChangedFileKind);
@@ -61,12 +66,13 @@ pub fn start_if_watching<TProfile: CompilationProfile>(
     filesystem: Filesystem,
     watch_tx: UnboundedSender<Vec<SourceFileEvent>>,
     config_path: &Path,
-    source_files: &[String],
+    globs: ProjectGlobs,
 ) -> Result<Option<Watcher>, WatchError> {
     match filesystem {
         Filesystem::Injected => None.wrap_ok(),
-        Filesystem::Watch => start::<TProfile>(watch_tx, config_path, source_files)
-            .map(|watcher| watcher.wrap_some()),
+        Filesystem::Watch => {
+            start::<TProfile>(watch_tx, config_path, globs).map(|watcher| watcher.wrap_some())
+        }
     }
 }
 
@@ -74,13 +80,12 @@ pub fn start_if_watching<TProfile: CompilationProfile>(
 pub fn start<TProfile: CompilationProfile>(
     watch_tx: UnboundedSender<Vec<SourceFileEvent>>,
     config_path: &Path,
-    source_files: &[String],
+    globs: ProjectGlobs,
 ) -> Result<Watcher, WatchError> {
     let config_directory = config_path
         .parent()
         .expect("a config file path has a parent directory")
         .to_owned();
-    let globs = SourceGlobs::parse(source_files)?;
     let tx = watch_tx.clone();
     let globs_for_events = globs.clone();
     let config_path_for_events = config_path.to_owned();
@@ -123,11 +128,9 @@ pub fn start<TProfile: CompilationProfile>(
         .filter_map(|path| {
             categorize_file(path.reference(), globs.reference(), config_path).and_then(|kind| {
                 match kind {
-                    ChangedFileKind::SourceFile => (
-                        SourceEventKind::CreateOrModify(path),
-                        ChangedFileKind::SourceFile,
-                    )
-                        .wrap_some(),
+                    ChangedFileKind::File => {
+                        (SourceEventKind::CreateOrModify(path), ChangedFileKind::File).wrap_some()
+                    }
                     _ => None,
                 }
             })
@@ -147,57 +150,30 @@ pub fn apply<TProfile: CompilationProfile>(
     event_tx: &UnboundedSender<IsographEvent>,
     config_directory: &Path,
     events: Vec<SourceFileEvent>,
-    source_files: &[String],
+    globs: &ProjectGlobs,
 ) {
-    let globs = match SourceGlobs::parse(source_files) {
-        Ok(globs) => globs,
-        Err(e) => {
-            tracing::error!(error = %e, "invalid source_files");
-            return;
-        }
-    };
     for (kind, changed) in events {
         match changed {
             ChangedFileKind::Config => {}
-            ChangedFileKind::SourceFile => match kind {
+            ChangedFileKind::File => match kind {
                 SourceEventKind::CreateOrModify(path) => {
-                    post_file::<TProfile>(
-                        event_tx,
-                        config_directory,
-                        globs.reference(),
-                        path.reference(),
-                    );
+                    post_file::<TProfile>(event_tx, config_directory, globs, path.reference());
                 }
                 SourceEventKind::Rename((from, to)) => {
                     post_file_absent(event_tx, from.reference());
-                    post_file::<TProfile>(
-                        event_tx,
-                        config_directory,
-                        globs.reference(),
-                        to.reference(),
-                    );
+                    post_file::<TProfile>(event_tx, config_directory, globs, to.reference());
                 }
                 SourceEventKind::Remove(path) => {
                     post_file_absent(event_tx, path.reference());
                 }
             },
-            ChangedFileKind::SourceFolder => match kind {
+            ChangedFileKind::Folder => match kind {
                 SourceEventKind::CreateOrModify(folder) => {
-                    scan_folder::<TProfile>(
-                        event_tx,
-                        config_directory,
-                        globs.reference(),
-                        folder.reference(),
-                    );
+                    scan_folder::<TProfile>(event_tx, config_directory, globs, folder.reference());
                 }
                 SourceEventKind::Rename((from, to)) => {
                     post_folder_removed(event_tx, from.reference());
-                    scan_folder::<TProfile>(
-                        event_tx,
-                        config_directory,
-                        globs.reference(),
-                        to.reference(),
-                    );
+                    scan_folder::<TProfile>(event_tx, config_directory, globs, to.reference());
                 }
                 SourceEventKind::Remove(path) => {
                     post_folder_removed(event_tx, path.reference());
@@ -207,8 +183,56 @@ pub fn apply<TProfile: CompilationProfile>(
     }
 }
 
+/// The config's `source_files` and `schema` globs.
 #[derive(Clone)]
-pub(crate) struct SourceGlobs {
+pub(crate) struct ProjectGlobs {
+    source_files: Globs,
+    schema: Globs,
+}
+
+impl ProjectGlobs {
+    pub(crate) fn parse(source_files: &[String], schema: &[String]) -> Result<Self, WatchError> {
+        ProjectGlobs {
+            source_files: Globs::parse(source_files).map_err(WatchError::SourceFilesGlob)?,
+            schema: Globs::parse(schema).map_err(WatchError::SchemaGlob)?,
+        }
+        .wrap_ok()
+    }
+
+    /// Matches `source_files` and the host language includes it.
+    pub(crate) fn should_include_source_file<TProfile: CompilationProfile>(
+        &self,
+        relative: &Path,
+    ) -> IncludeFile {
+        if !self.source_files.contains(relative) {
+            return IncludeFile::Skip;
+        }
+        TProfile::HostLanguage::should_include_source_file(relative)
+    }
+
+    /// Matches `schema` and the network protocol includes it.
+    pub(crate) fn should_include_schema_file<TProfile: CompilationProfile>(
+        &self,
+        relative: &Path,
+    ) -> IncludeFile {
+        if !self.schema.contains(relative) {
+            return IncludeFile::Skip;
+        }
+        TProfile::NetworkProtocol::should_include_schema_file(relative)
+    }
+
+    /// A source file or a schema file.
+    fn should_include_file<TProfile: CompilationProfile>(&self, relative: &Path) -> IncludeFile {
+        match self.should_include_source_file::<TProfile>(relative) {
+            IncludeFile::Include => IncludeFile::Include,
+            IncludeFile::Skip => self.should_include_schema_file::<TProfile>(relative),
+        }
+    }
+}
+
+/// Include and `!`-exclude globs; the last match wins.
+#[derive(Clone)]
+pub(crate) struct Globs {
     patterns: Vec<GlobPattern>,
 }
 
@@ -224,9 +248,9 @@ enum ExcludeGlob {
     Exclude,
 }
 
-impl SourceGlobs {
-    pub(crate) fn parse(source_files: &[String]) -> Result<Self, WatchError> {
-        let patterns = source_files
+impl Globs {
+    pub(crate) fn parse(globs: &[String]) -> Result<Self, InvalidGlob> {
+        let patterns = globs
             .iter()
             .map(|raw| {
                 let (exclude, glob_str) = match raw.strip_prefix('!') {
@@ -234,7 +258,7 @@ impl SourceGlobs {
                     None => (ExcludeGlob::Include, raw.as_str()),
                 };
                 let matcher = Glob::new(glob_str)
-                    .map_err(|source| WatchError::Glob {
+                    .map_err(|source| InvalidGlob {
                         glob: raw.clone(),
                         source,
                     })?
@@ -242,7 +266,7 @@ impl SourceGlobs {
                 GlobPattern { exclude, matcher }.wrap_ok()
             })
             .collect::<Result<Vec<_>, _>>()?;
-        SourceGlobs { patterns }.wrap_ok()
+        Globs { patterns }.wrap_ok()
     }
 
     pub(crate) fn contains(&self, relative: &Path) -> bool {
@@ -261,14 +285,14 @@ impl SourceGlobs {
 
 fn categorize_and_filter_events(
     events: &[DebouncedEvent],
-    globs: &SourceGlobs,
+    globs: &ProjectGlobs,
     config_path: &Path,
 ) -> Option<Vec<SourceFileEvent>> {
     if events.iter().any(|event| event.need_rescan()) {
         let config_directory = config_path.parent()?;
         return (
             SourceEventKind::CreateOrModify(config_directory.to_owned()),
-            ChangedFileKind::SourceFolder,
+            ChangedFileKind::Folder,
         )
             .wrap_vec()
             .wrap_some();
@@ -303,7 +327,7 @@ fn categorize_and_filter_events(
 }
 
 fn process_create_event(
-    globs: &SourceGlobs,
+    globs: &ProjectGlobs,
     config_path: &Path,
     create_kind: CreateKind,
     paths: &[PathBuf],
@@ -321,7 +345,7 @@ fn process_create_event(
 }
 
 fn process_modify_event(
-    globs: &SourceGlobs,
+    globs: &ProjectGlobs,
     config_path: &Path,
     modify_kind: ModifyKind,
     paths: &[PathBuf],
@@ -368,7 +392,7 @@ fn process_modify_event(
 }
 
 fn process_remove_event(
-    globs: &SourceGlobs,
+    globs: &ProjectGlobs,
     config_path: &Path,
     remove_kind: RemoveKind,
     paths: &[PathBuf],
@@ -384,7 +408,7 @@ fn process_remove_event(
 }
 
 fn process_create_or_modify(
-    globs: &SourceGlobs,
+    globs: &ProjectGlobs,
     config_path: &Path,
     path: &Path,
 ) -> Option<SourceFileEvent> {
@@ -393,7 +417,7 @@ fn process_create_or_modify(
 }
 
 fn process_remove_path(
-    globs: &SourceGlobs,
+    globs: &ProjectGlobs,
     config_path: &Path,
     path: &Path,
 ) -> Option<SourceFileEvent> {
@@ -403,7 +427,7 @@ fn process_remove_path(
 
 fn categorize_path(
     path: &Path,
-    globs: &SourceGlobs,
+    globs: &ProjectGlobs,
     config_path: &Path,
 ) -> Option<ChangedFileKind> {
     if path.is_file() {
@@ -415,7 +439,7 @@ fn categorize_path(
 
 fn categorize_file(
     path: &Path,
-    globs: &SourceGlobs,
+    globs: &ProjectGlobs,
     config_path: &Path,
 ) -> Option<ChangedFileKind> {
     if path == config_path {
@@ -426,8 +450,10 @@ fn categorize_file(
         return None;
     }
     let relative = pathdiff::diff_paths(path, config_directory)?;
-    if globs.contains(relative.reference()) {
-        ChangedFileKind::SourceFile.wrap_some()
+    if globs.source_files.contains(relative.reference())
+        || globs.schema.contains(relative.reference())
+    {
+        ChangedFileKind::File.wrap_some()
     } else {
         None
     }
@@ -435,7 +461,7 @@ fn categorize_file(
 
 fn categorize_folder(
     path: &Path,
-    globs: &SourceGlobs,
+    globs: &ProjectGlobs,
     config_path: &Path,
 ) -> Option<ChangedFileKind> {
     let _ = globs;
@@ -447,7 +473,7 @@ fn categorize_folder(
         return None;
     }
     if path.starts_with(config_directory) {
-        ChangedFileKind::SourceFolder.wrap_some()
+        ChangedFileKind::Folder.wrap_some()
     } else {
         None
     }
@@ -498,7 +524,7 @@ fn visit_dirs_skipping_isograph_from(
 fn scan_folder<TProfile: CompilationProfile>(
     event_tx: &UnboundedSender<IsographEvent>,
     config_directory: &Path,
-    globs: &SourceGlobs,
+    globs: &ProjectGlobs,
     folder: &Path,
 ) {
     let mut paths = Vec::new();
@@ -513,7 +539,7 @@ fn scan_folder<TProfile: CompilationProfile>(
 fn post_file<TProfile: CompilationProfile>(
     event_tx: &UnboundedSender<IsographEvent>,
     config_directory: &Path,
-    globs: &SourceGlobs,
+    globs: &ProjectGlobs,
     path: &Path,
 ) {
     let path = match path.canonicalize() {
@@ -546,10 +572,7 @@ fn post_file<TProfile: CompilationProfile>(
         Some(relative) => relative,
         None => return,
     };
-    if !globs.contains(relative.reference()) {
-        return;
-    }
-    match TProfile::HostLanguage::should_include_source_file(relative.reference()) {
+    match globs.should_include_file::<TProfile>(relative.reference()) {
         IncludeFile::Skip => return,
         IncludeFile::Include => {}
     }
@@ -621,6 +644,7 @@ mod tests {
     use std::path::{Path, PathBuf};
     use std::time::{Duration, Instant};
 
+    use intern::Lookup;
     use intern::string_key::Intern;
     use isograph_compiler::{
         CompilationProfile, HostLanguage, IncludeFile, IsoLiteralExtraction, IsographDb,
@@ -631,8 +655,8 @@ mod tests {
     use tokio::sync::mpsc::unbounded_channel;
 
     use super::{
-        ChangedFileKind, SourceEventKind, SourceGlobs, apply, categorize_and_filter_events,
-        categorize_folder, start,
+        ChangedFileKind, Globs, ProjectGlobs, SourceEventKind, WatchError, apply,
+        categorize_and_filter_events, categorize_folder, start,
     };
     use crate::event::{IsographEvent, LiveSessions};
     use crate::state::{IsographState, handle, intern_config_directory};
@@ -687,11 +711,22 @@ mod tests {
         state: IsographState<InHostProfile>,
         event_tx: tokio::sync::mpsc::UnboundedSender<IsographEvent>,
         event_rx: tokio::sync::mpsc::UnboundedReceiver<IsographEvent>,
-        source_files: Vec<String>,
+        globs: ProjectGlobs,
+    }
+
+    fn owned(globs: &[&str]) -> Vec<String> {
+        globs.iter().map(|s| (*s).to_owned()).collect()
     }
 
     impl Harness {
         fn new(source_files: &[&str]) -> Self {
+            Self::with_schema(source_files, &[])
+        }
+
+        fn with_schema(source_files: &[&str], schema: &[&str]) -> Self {
+            let globs =
+                ProjectGlobs::parse(owned(source_files).as_slice(), owned(schema).as_slice())
+                    .expect("the test globs are valid");
             let dir = tempfile::tempdir().expect("a test can create a temp directory");
             let config_path = dir.path().join("isograph.config.json");
             std::fs::write(config_path.reference(), "{}\n").expect("a test can write a config");
@@ -710,19 +745,12 @@ mod tests {
                 state: IsographState {
                     db,
                     live_sessions: LiveSessions::default(),
-                    source_globs: crate::watch::SourceGlobs::parse(
-                        source_files
-                            .iter()
-                            .map(|s| (*s).to_owned())
-                            .collect::<Vec<_>>()
-                            .as_slice(),
-                    )
-                    .expect("the test glob is valid"),
+                    globs: globs.clone(),
                     diagnostics_debounce: None,
                 },
                 event_tx,
                 event_rx,
-                source_files: source_files.iter().map(|s| (*s).to_owned()).collect(),
+                globs,
             }
         }
 
@@ -743,7 +771,7 @@ mod tests {
                 self.event_tx.reference(),
                 self.config_directory.reference(),
                 events,
-                self.source_files.as_slice(),
+                self.globs.reference(),
             );
             while let Ok(event) = self.event_rx.try_recv() {
                 handle(&mut self.state, event);
@@ -753,25 +781,25 @@ mod tests {
 
     #[test]
     fn globs_last_match_wins_and_empty_contains_nothing() {
-        let ts = SourceGlobs::parse(&["src/**/*.ts".to_owned()]).expect("valid glob");
+        let ts = Globs::parse(&["src/**/*.ts".to_owned()]).expect("valid glob");
         assert!(ts.contains(Path::new("src/a.ts")));
         assert!(!ts.contains(Path::new("src/a.tsx")));
         assert!(!ts.contains(Path::new("lib/a.ts")));
         let with_exclude =
-            SourceGlobs::parse(&["src/**/*.ts".to_owned(), "!src/**/*.test.ts".to_owned()])
+            Globs::parse(&["src/**/*.ts".to_owned(), "!src/**/*.test.ts".to_owned()])
                 .expect("valid glob");
         assert!(with_exclude.contains(Path::new("src/a.ts")));
         assert!(!with_exclude.contains(Path::new("src/a.test.ts")));
-        let empty = SourceGlobs::parse(&[]).expect("empty is valid");
+        let empty = Globs::parse(&[]).expect("empty is valid");
         assert!(!empty.contains(Path::new("src/a.ts")));
-        let inn = SourceGlobs::parse(&["src/**/*.in".to_owned()]).expect("valid glob");
+        let inn = Globs::parse(&["src/**/*.in".to_owned()]).expect("valid glob");
         assert!(inn.contains(Path::new("src/a.in")));
         assert!(!inn.contains(Path::new("src")));
     }
 
     #[test]
     fn folder_src_under_the_config_directory_is_a_source_folder() {
-        let globs = SourceGlobs::parse(&["src/**/*.in".to_owned()]).expect("valid glob");
+        let globs = ProjectGlobs::parse(&["src/**/*.in".to_owned()], &[]).expect("valid glob");
         let dir = tempfile::tempdir().expect("a test can create a temp directory");
         let config_path = dir.path().join("isograph.config.json");
         std::fs::write(config_path.reference(), "{}\n").expect("a test can write a config");
@@ -779,7 +807,7 @@ mod tests {
         std::fs::create_dir_all(src.reference()).expect("a test can create src");
         assert_eq!(
             categorize_folder(src.reference(), globs.reference(), config_path.reference()),
-            ChangedFileKind::SourceFolder.wrap_some()
+            ChangedFileKind::Folder.wrap_some()
         );
     }
 
@@ -790,20 +818,8 @@ mod tests {
         h.write("src/b.rs", "b");
         let a = h.abs("src/a.in");
         let b = h.abs("src/b.rs");
-        h.ingest(
-            (
-                SourceEventKind::CreateOrModify(a),
-                ChangedFileKind::SourceFile,
-            )
-                .wrap_vec(),
-        );
-        h.ingest(
-            (
-                SourceEventKind::CreateOrModify(b),
-                ChangedFileKind::SourceFile,
-            )
-                .wrap_vec(),
-        );
+        h.ingest((SourceEventKind::CreateOrModify(a), ChangedFileKind::File).wrap_vec());
+        h.ingest((SourceEventKind::CreateOrModify(b), ChangedFileKind::File).wrap_vec());
         assert_eq!(
             contents(h.state.reference(), "src/a.in").as_deref(),
             "a".wrap_some()
@@ -833,7 +849,7 @@ mod tests {
         h.ingest(
             (
                 SourceEventKind::CreateOrModify(src),
-                ChangedFileKind::SourceFolder,
+                ChangedFileKind::Folder,
             )
                 .wrap_vec(),
         );
@@ -852,11 +868,11 @@ mod tests {
         h.ingest(
             (
                 SourceEventKind::CreateOrModify(a.clone()),
-                ChangedFileKind::SourceFile,
+                ChangedFileKind::File,
             )
                 .wrap_vec(),
         );
-        h.ingest((SourceEventKind::Remove(a), ChangedFileKind::SourceFile).wrap_vec());
+        h.ingest((SourceEventKind::Remove(a), ChangedFileKind::File).wrap_vec());
         assert!(contents(h.state.reference(), "src/a.in").is_none());
     }
 
@@ -866,14 +882,8 @@ mod tests {
         h.write("src/a.in", "a");
         let a = h.abs("src/a.in");
         let src = h.abs("src");
-        h.ingest(
-            (
-                SourceEventKind::CreateOrModify(a),
-                ChangedFileKind::SourceFile,
-            )
-                .wrap_vec(),
-        );
-        h.ingest((SourceEventKind::Remove(src), ChangedFileKind::SourceFolder).wrap_vec());
+        h.ingest((SourceEventKind::CreateOrModify(a), ChangedFileKind::File).wrap_vec());
+        h.ingest((SourceEventKind::Remove(src), ChangedFileKind::Folder).wrap_vec());
         assert!(contents(h.state.reference(), "src/a.in").is_none());
     }
 
@@ -887,17 +897,11 @@ mod tests {
         h.ingest(
             (
                 SourceEventKind::CreateOrModify(from.clone()),
-                ChangedFileKind::SourceFile,
+                ChangedFileKind::File,
             )
                 .wrap_vec(),
         );
-        h.ingest(
-            (
-                SourceEventKind::Rename((from, to)),
-                ChangedFileKind::SourceFile,
-            )
-                .wrap_vec(),
-        );
+        h.ingest((SourceEventKind::Rename((from, to)), ChangedFileKind::File).wrap_vec());
         assert!(contents(h.state.reference(), "src/a.in").is_none());
         assert_eq!(
             contents(h.state.reference(), "src/b.in").as_deref(),
@@ -915,17 +919,11 @@ mod tests {
         h.ingest(
             (
                 SourceEventKind::CreateOrModify(h.abs("src/a.in")),
-                ChangedFileKind::SourceFile,
+                ChangedFileKind::File,
             )
                 .wrap_vec(),
         );
-        h.ingest(
-            (
-                SourceEventKind::Rename((from, to)),
-                ChangedFileKind::SourceFolder,
-            )
-                .wrap_vec(),
-        );
+        h.ingest((SourceEventKind::Rename((from, to)), ChangedFileKind::Folder).wrap_vec());
         assert!(contents(h.state.reference(), "src/a.in").is_none());
         assert_eq!(
             contents(h.state.reference(), "dst/a.in").as_deref(),
@@ -938,12 +936,8 @@ mod tests {
         let h = Harness::new(&[]);
         h.write("src/a.in", "a");
         let (watch_tx, mut watch_rx) = unbounded_channel();
-        let _watcher = start::<InHostProfile>(
-            watch_tx,
-            h.config_path.reference(),
-            h.source_files.as_slice(),
-        )
-        .expect("the watcher starts");
+        let _watcher = start::<InHostProfile>(watch_tx, h.config_path.reference(), h.globs.clone())
+            .expect("the watcher starts");
         assert!(watch_rx.try_recv().is_err());
         assert!(contents(h.state.reference(), "src/a.in").is_none());
     }
@@ -956,14 +950,14 @@ mod tests {
         h.ingest(
             (
                 SourceEventKind::CreateOrModify(h.abs(&format!("{ISOGRAPH_FOLDER}/a.in"))),
-                ChangedFileKind::SourceFile,
+                ChangedFileKind::File,
             )
                 .wrap_vec(),
         );
         h.ingest(
             (
                 SourceEventKind::CreateOrModify(h.abs("src/__isograph/b.in")),
-                ChangedFileKind::SourceFile,
+                ChangedFileKind::File,
             )
                 .wrap_vec(),
         );
@@ -982,7 +976,7 @@ mod tests {
         h.ingest(
             (
                 SourceEventKind::CreateOrModify(a.clone()),
-                ChangedFileKind::SourceFile,
+                ChangedFileKind::File,
             )
                 .wrap_vec(),
         );
@@ -991,13 +985,7 @@ mod tests {
             "a".wrap_some()
         );
         std::fs::remove_file(a.reference()).expect("the test deletes the file");
-        h.ingest(
-            (
-                SourceEventKind::CreateOrModify(a),
-                ChangedFileKind::SourceFile,
-            )
-                .wrap_vec(),
-        );
+        h.ingest((SourceEventKind::CreateOrModify(a), ChangedFileKind::File).wrap_vec());
         assert!(contents(h.state.reference(), "src/a.in").is_none());
     }
 
@@ -1008,10 +996,9 @@ mod tests {
         let event =
             notify::Event::new(notify::EventKind::Other).set_flag(notify::event::Flag::Rescan);
         let debounced = notify_debouncer_full::DebouncedEvent::new(event, Instant::now());
-        let globs = SourceGlobs::parse(h.source_files.as_slice()).expect("valid glob");
         let events = categorize_and_filter_events(
             &[debounced],
-            globs.reference(),
+            h.globs.reference(),
             h.config_path.reference(),
         )
         .expect("rescan produces a walk");
@@ -1027,12 +1014,8 @@ mod tests {
         let mut h = Harness::new(&["src/**/*.in"]);
         h.write("src/a.in", "a");
         let (watch_tx, mut watch_rx) = unbounded_channel();
-        let _watcher = start::<InHostProfile>(
-            watch_tx,
-            h.config_path.reference(),
-            h.source_files.as_slice(),
-        )
-        .expect("the watcher starts");
+        let _watcher = start::<InHostProfile>(watch_tx, h.config_path.reference(), h.globs.clone())
+            .expect("the watcher starts");
         let events = watch_rx.try_recv().expect("boot posted matching files");
         h.ingest(events);
         assert_eq!(
@@ -1046,12 +1029,8 @@ mod tests {
         let mut h = Harness::new(&["src/**/*.in"]);
         std::fs::create_dir_all(h.abs("src")).expect("a test can create src");
         let (watch_tx, mut watch_rx) = unbounded_channel();
-        let _watcher = start::<InHostProfile>(
-            watch_tx,
-            h.config_path.reference(),
-            h.source_files.as_slice(),
-        )
-        .expect("the watcher starts");
+        let _watcher = start::<InHostProfile>(watch_tx, h.config_path.reference(), h.globs.clone())
+            .expect("the watcher starts");
         let _ = watch_rx.try_recv();
         h.write("src/a.in", "a");
         let deadline = Instant::now() + Duration::from_secs(10);
@@ -1067,5 +1046,138 @@ mod tests {
             contents(h.state.reference(), "src/a.in").as_deref(),
             "a".wrap_some()
         );
+    }
+
+    fn schema_paths(state: &IsographState<InHostProfile>) -> Vec<String> {
+        let mut paths: Vec<String> = state
+            .db
+            .get_schema_file_set()
+            .untracked()
+            .0
+            .iter()
+            .map(|path| path.lookup().to_owned())
+            .collect();
+        paths.sort();
+        paths
+    }
+
+    fn create(h: &mut Harness, relative: &str, contents: &str) {
+        h.write(relative, contents);
+        let path = h.abs(relative);
+        h.ingest((SourceEventKind::CreateOrModify(path), ChangedFileKind::File).wrap_vec());
+    }
+
+    #[test]
+    fn a_graphql_file_under_the_schema_globs_is_stored_and_listed() {
+        let mut h = Harness::with_schema(&["src/**/*.in"], &["schema/**"]);
+        create(&mut h, "schema/a.graphql", "type Query");
+        assert_eq!(
+            contents(h.state.reference(), "schema/a.graphql").as_deref(),
+            "type Query".wrap_some()
+        );
+        assert_eq!(schema_paths(h.state.reference()), ["schema/a.graphql"]);
+    }
+
+    #[test]
+    fn a_graphql_file_outside_the_schema_globs_is_not_stored() {
+        let mut h = Harness::with_schema(&["src/**/*.in"], &["schema/**"]);
+        create(&mut h, "other/a.graphql", "type Query");
+        assert!(contents(h.state.reference(), "other/a.graphql").is_none());
+        assert_eq!(schema_paths(h.state.reference()), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_file_the_protocol_skips_under_the_schema_globs_is_not_stored() {
+        let mut h = Harness::with_schema(&["src/**/*.in"], &["schema/**"]);
+        create(&mut h, "schema/a.ts", "export {}");
+        assert!(contents(h.state.reference(), "schema/a.ts").is_none());
+        assert_eq!(schema_paths(h.state.reference()), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_source_file_under_the_schema_globs_is_stored_and_not_listed() {
+        let mut h = Harness::with_schema(&["**/*.in"], &["schema/**"]);
+        create(&mut h, "schema/a.in", "a");
+        assert_eq!(
+            contents(h.state.reference(), "schema/a.in").as_deref(),
+            "a".wrap_some()
+        );
+        assert_eq!(schema_paths(h.state.reference()), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_source_file_is_not_listed_as_a_schema_file() {
+        let mut h = Harness::with_schema(&["src/**/*.in"], &["schema/**"]);
+        create(&mut h, "src/a.in", "a");
+        assert_eq!(
+            contents(h.state.reference(), "src/a.in").as_deref(),
+            "a".wrap_some()
+        );
+        assert_eq!(schema_paths(h.state.reference()), Vec::<String>::new());
+    }
+
+    #[test]
+    fn remove_of_a_schema_file_removes_its_text_and_listing() {
+        let mut h = Harness::with_schema(&["src/**/*.in"], &["schema/**"]);
+        create(&mut h, "schema/a.graphql", "type Query");
+        create(&mut h, "schema/b.graphql", "type Mutation");
+        h.ingest(
+            (
+                SourceEventKind::Remove(h.abs("schema/a.graphql")),
+                ChangedFileKind::File,
+            )
+                .wrap_vec(),
+        );
+        assert!(contents(h.state.reference(), "schema/a.graphql").is_none());
+        assert_eq!(schema_paths(h.state.reference()), ["schema/b.graphql"]);
+    }
+
+    #[test]
+    fn remove_of_the_schema_folder_removes_every_listing_under_it() {
+        let mut h = Harness::with_schema(&["src/**/*.in"], &["schema/**"]);
+        create(&mut h, "schema/a.graphql", "type Query");
+        create(&mut h, "src/a.in", "a");
+        h.ingest(
+            (
+                SourceEventKind::Remove(h.abs("schema")),
+                ChangedFileKind::Folder,
+            )
+                .wrap_vec(),
+        );
+        assert!(contents(h.state.reference(), "schema/a.graphql").is_none());
+        assert_eq!(schema_paths(h.state.reference()), Vec::<String>::new());
+        assert_eq!(
+            contents(h.state.reference(), "src/a.in").as_deref(),
+            "a".wrap_some()
+        );
+    }
+
+    #[test]
+    fn boot_interns_a_schema_file_written_before_start() {
+        let mut h = Harness::with_schema(&["src/**/*.in"], &["schema/**"]);
+        h.write("schema/a.graphql", "type Query");
+        h.write("other/b.graphql", "type Query");
+        let (watch_tx, mut watch_rx) = unbounded_channel();
+        let _watcher = start::<InHostProfile>(watch_tx, h.config_path.reference(), h.globs.clone())
+            .expect("the watcher starts");
+        let events = watch_rx.try_recv().expect("boot posted the schema file");
+        h.ingest(events);
+        assert_eq!(
+            contents(h.state.reference(), "schema/a.graphql").as_deref(),
+            "type Query".wrap_some()
+        );
+        assert!(contents(h.state.reference(), "other/b.graphql").is_none());
+        assert_eq!(schema_paths(h.state.reference()), ["schema/a.graphql"]);
+    }
+
+    #[test]
+    fn an_invalid_schema_glob_is_a_schema_glob_error() {
+        let error = ProjectGlobs::parse(&["src/**".to_owned()], &["schema/[".to_owned()])
+            .err()
+            .expect("schema/[ is not a glob");
+        let WatchError::SchemaGlob(invalid) = error else {
+            panic!("expected SchemaGlob, got {error}");
+        };
+        assert_eq!(invalid.glob, "schema/[");
     }
 }
