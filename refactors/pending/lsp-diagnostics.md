@@ -1,6 +1,8 @@
 # Debounced `publishDiagnostics` per client
 
-Each live LSP client that accepts diagnostics receives `textDocument/publishDiagnostics` for the files it reads, computed through `file_contents(db, client, path)`: that client's open buffer when it has one, otherwise the `DiskFile`. A change that can alter diagnostics arms one 100ms debounce timer. When the timer fires, `handle` computes each client's current diagnostics, compares them with what that client was last sent, and returns one `PublishDiagnosticsEffect` per client that has a difference. A path whose errors went away is sent an empty list.
+Each live LSP client that declares the `textDocument.publishDiagnostics` client capability receives `textDocument/publishDiagnostics` for the files that client has open, computed from that client's buffers through `file_contents(db, client, path)`. A `didOpen`, `didChange`, or `didClose` that changed a buffer arms one 100ms debounce timer. When the timer fires, `handle` computes each client's current diagnostics, compares them with what that client was last sent, and returns one `PublishDiagnosticsEffect` per client that has a difference. A path whose errors went away, or that the client closed, is sent an empty list.
+
+Diagnostics are per client and reflect what that client sees. Client A's diagnostics cover only A's open files and are computed from A's buffers via `file_contents(A, path)`. Client B's open files and unsaved edits never affect A's diagnostics. Disk-only files (a `DiskFile` that no buffer of that client overlays) are never reported.
 
 Builds on the current code: `file_contents` and the client-keyed iso literal memos (lsp-open-files.md change 7), `freddie_timer` timers (`IsographEffect::Timer`, `IsographEvent::Timer`), and `LiveSessions`.
 
@@ -8,19 +10,17 @@ Origin: isograph `crates/isograph_lsp/src/server.rs` (debounce, `SHORT_DEBOUNCE_
 
 ## What the user does
 
-The user opens `src/Home.ts` in VS Code and types `export const Home = iso(\`entrypoint\`)`. About 100ms after the last `didChange`, a red squiggle covers the error range inside the literal and the Problems panel lists the error with source `isograph` and the parse error's message. The user types `entrypoint Query.HomeRoute`; 100ms later the squiggle and the Problems entry disappear. Typing faster than the debounce publishes once, for the text the editor had at the last change.
+The user opens `src/Home.ts` in VS Code and types `export const Home = iso(\`entrypoint\`)`. About 100ms after the last `didChange`, a red squiggle covers the error range inside the literal and the Problems panel lists the error with severity Error, source `isograph`, and the parse error's message. The user types `entrypoint Query.HomeRoute`; 100ms later the squiggle and the Problems entry disappear. Typing faster than the debounce publishes once, for the text the editor had at the last change.
 
-`iso\`entrypoint Query.HomeRoute\`` (no parentheses) is a squiggle over the literal interior with the message `You must call the iso function with parentheses. "iso`...`" is not supported`.
+Only parse errors appear. A literal that parses but has a host-language problem (`iso\`entrypoint Query.HomeRoute\`` with no parentheses, an unexported field, a field with no associated function) has no entry.
 
-What else appears depends on open decision 1:
+The Problems panel lists errors in open files only. A broken file on disk that the window has not opened has no entry. Closing a tab clears that file's entries, including when the closed buffer had unsaved broken edits. An open file that the config's `source_files` globs exclude, or that `THostLanguage::should_skip_source_file` skips (for example `README.md` containing `` iso`...` ``), has no entries.
 
-- (a) open files only: only files open in that window have entries. Closing a tab clears its entries.
-- (b) disk plus open (the design below): when the window connects, the Problems panel lists errors in every file on disk, including files not open. Closing a tab with unsaved broken edits replaces the buffer's errors with the disk file's errors (or clears them if the disk file is clean). Deleting a file on disk clears its entries.
-- (c) upstream's disk with overlay: as (b), except a file open in the editor that has no `DiskFile` gets no entries.
+"Open" means the client sent `didOpen` and has not sent `didClose`. LSP has no visibility signal. VS Code also sends `didOpen` for documents it loads without a visible tab (for example the target of a peek view), so such a document can have entries until VS Code sends `didClose` for it.
 
-Two VS Code windows on one project are two clients. Window A's unsaved errors appear only in A. A file B has not opened shows its disk errors in B. When A saves, the watcher posts `DiskChanged` and B's entries for that path (if B does not have it open) update to the saved text.
+Two VS Code windows on one project are two clients. If both have `src/Home.ts` open with different unsaved text, each window shows errors for its own text only. Window A's unsaved errors never appear in B, and a file only A has open has entries only in A. Saving in A does not change B's entries: B's diagnostics come from B's buffer.
 
-`isograph send` connections initialize with `{ "capabilities": {} }` and receive nothing (open decision 4).
+`isograph send` connections initialize with `{ "capabilities": {} }`, declare no `textDocument.publishDiagnostics`, and receive no diagnostics.
 
 ## Types
 
@@ -49,37 +49,14 @@ pub struct PublishDiagnosticsEffect {
 
 ### Per-client published state
 
-`PublishedDiagnostics` and `PublishDiagnosticsSupport` are outbound I/O state: what the daemon has written to one connection. They are not pico sources. No memo reads them; only `handle` reads and writes them.
+`PublishedDiagnostics` is outbound I/O state: what the daemon has written to one connection. It is not a pico source. No memo reads it; only `handle` reads and writes it. It lives on `LiveSession`, so `Gone` drops it with the session and a replacing `Started` starts from an empty map. Upstream isograph keeps only a `BTreeSet<Uri>` of previously published URIs and resends every list on each publish; `PublishedDiagnostics` keeps the lists too, so a publish skips files whose diagnostics did not change.
 
 ```rust
 // from crates/isograph_cli/src/diagnostics.rs
 /// What one client was last sent: every path whose last notification had a non-empty list.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PublishedDiagnostics(pub HashMap<RelativePathToSourceFile, Vec<lsp_types::Diagnostic>>);
-
-/// Whether a client receives `publishDiagnostics`, and what it was last sent.
-#[derive(Clone, Debug, PartialEq)]
-pub enum PublishDiagnosticsSupport {
-    Supported(PublishedDiagnostics),
-    Unsupported,
-}
-
-impl PublishDiagnosticsSupport {
-    /// `Supported` when the client declared `textDocument.publishDiagnostics`.
-    pub fn from_client_capabilities(capabilities: &lsp_types::ClientCapabilities) -> Self {
-        match capabilities
-            .text_document
-            .as_ref()
-            .and_then(|text_document| text_document.publish_diagnostics.as_ref())
-        {
-            Some(_) => Self::Supported(PublishedDiagnostics::default()),
-            None => Self::Unsupported,
-        }
-    }
-}
 ```
-
-The published map rides inside the `Supported` variant, so an `Unsupported` client has no published map to keep empty.
 
 Before:
 
@@ -101,12 +78,76 @@ After:
 #[derive(Clone, Debug)]
 pub struct LiveSession {
     pub sender: crossbeam::channel::Sender<lsp_server::Message>,
-    pub publish_diagnostics: crate::diagnostics::PublishDiagnosticsSupport,
+    pub capabilities: lsp_types::ClientCapabilities,
+    pub published_diagnostics: crate::diagnostics::PublishedDiagnostics,
     pub outstanding: std::collections::HashSet<lsp_server::RequestId>,
 }
 ```
 
-`capabilities` is deleted. `run_session` reads `params.capabilities` once to build `PublishDiagnosticsSupport`; after that nothing in production reads the stored capabilities, and tests are not a reader. A later feature that needs another capability adds its own derived field the same way.
+`capabilities` stays the whole `lsp_types::ClientCapabilities`. `publish_to_client` reads it on every publish, so the `#[cfg_attr(not(test), expect(dead_code))]` is removed. A client gets diagnostics when `session.capabilities.text_document.as_ref().and_then(|text_document| text_document.publish_diagnostics.as_ref())` is `Some`; a client where it is `None` is skipped and its `published_diagnostics` stays empty.
+
+### Source globs on `IsographState`
+
+`SourceGlobs` (`crates/isograph_cli/src/watch.rs:210-259`) is private to the watcher today. It becomes `pub(crate)`, as do `SourceGlobs::parse` and `SourceGlobs::contains`. Bodies, `GlobPattern`, and `ExcludeGlob` are unchanged.
+
+Before:
+
+```rust
+// from crates/isograph_cli/src/watch.rs
+#[derive(Clone)]
+struct SourceGlobs {
+    patterns: Vec<GlobPattern>,
+}
+
+impl SourceGlobs {
+    fn parse(source_files: &[String]) -> Result<Self, WatchError> {
+        // unchanged
+    }
+
+    fn contains(&self, relative: &Path) -> bool {
+        // unchanged
+    }
+}
+```
+
+After:
+
+```rust
+// from crates/isograph_cli/src/watch.rs
+#[derive(Clone)]
+pub(crate) struct SourceGlobs {
+    patterns: Vec<GlobPattern>,
+}
+
+impl SourceGlobs {
+    pub(crate) fn parse(source_files: &[String]) -> Result<Self, WatchError> {
+        // unchanged
+    }
+
+    pub(crate) fn contains(&self, relative: &Path) -> bool {
+        // unchanged
+    }
+}
+```
+
+`serve` (`daemon.rs`) parses the config's `source_files` once into `IsographState.source_globs`, before starting the watcher. An invalid glob logs `tracing::error!(error = %e, "invalid source_files")` and returns, the same outcome as today's watcher start failure; with `Filesystem::Injected` (which never parsed globs before) an invalid glob now also stops `serve`. The watcher keeps parsing its own copy from `source_files`.
+
+```rust
+// from crates/isograph_cli/src/daemon.rs
+    let source_globs = match crate::watch::SourceGlobs::parse(config.source_files.as_slice()) {
+        Ok(source_globs) => source_globs,
+        Err(e) => {
+            tracing::error!(error = %e, "invalid source_files");
+            return;
+        }
+    };
+    let mut state = IsographState {
+        db: IsographDb::<THostLanguage>::default(),
+        live_sessions: LiveSessions::default(),
+        source_globs,
+        diagnostics_debounce: None,
+    };
+```
 
 ### Timer payload and state
 
@@ -148,11 +189,12 @@ After:
 pub struct IsographState<THostLanguage: HostLanguage> {
     pub db: IsographDb<THostLanguage>,
     pub live_sessions: LiveSessions,
+    pub(crate) source_globs: crate::watch::SourceGlobs,
     pub(crate) diagnostics_debounce: Option<freddie_timer::TimerGuard>,
 }
 ```
 
-Construction sites that write `hello_world_debounce: None` write `diagnostics_debounce: None`: `daemon.rs` `serve` and its `empty_state` test helper, `lsp_socket.rs` `listen_and_reply`, `watch.rs` test fixture, `state.rs` `empty`.
+Construction sites that write `hello_world_debounce: None` write `diagnostics_debounce: None` and a `source_globs`: `daemon.rs` `serve` (above) and its `empty_state` test helper, `lsp_socket.rs` `listen_and_reply`, `watch.rs` test fixture, `state.rs` `empty`. The `daemon.rs`, `lsp_socket.rs`, and `state.rs` test sites write `source_globs: crate::watch::SourceGlobs::parse(&["src/**".to_owned()]).expect("the test glob is valid")`; the `watch.rs` fixture parses its own `source_files` with the same `expect`.
 
 ### Errors
 
@@ -184,131 +226,58 @@ enum PublishDiagnosticsError {
 
 ## Computation
 
-Each function asks for one thing.
-
 ```text
-publish_diagnostics(state)                          handle side, plain fn
-  for each live client with Supported:
-    client_diagnostics(db, client)                  plain fn
-      db.paths_read_by(client)                      plain method
-      lsp_diagnostics_for_file(db, client, path)    memo, isograph_lsp
-        iso_literal_errors_in_file(client, path)    memo, isograph_compiler
+publish_diagnostics(state)                              handle side, plain fn
+  for each live client whose capabilities declare textDocument.publishDiagnostics:
+    client_diagnostics(db, source_globs, client)        plain fn
+      db.open_paths_of_client(client)                   plain method
+      filter: source_globs.contains, should_skip_source_file
+      lsp_diagnostics_for_file(db, client, path)        memo, isograph_lsp
+        iso_literal_parse_errors_in_file(client, path)  memo, isograph_compiler
           parsed_iso_literals_in_file(client, path)
-          HostLanguage::host_errors(extraction, parsed)
-        line_index(db, client, path)                memo, isograph_lsp
+        line_index(db, client, path)                    memo, isograph_lsp
           file_contents(client, path)
-    changed_diagnostics(published, current)         plain fn
-    uri_for_path(db, path)                          plain fn
+    changed_diagnostics(published, current)             plain fn
+    uri_for_path(db, path)                              plain fn
 ```
 
-### `iso_literal_errors_in_file`
+The memoized layer (`lsp_diagnostics_for_file` and below) works only with `ClientId` and `RelativePathToSourceFile`, plus the literal text for the parse. Absolute paths and URIs exist only at the outer layer: `relative_from_uri` converts the editor's URI to a `RelativePathToSourceFile` on the way in (`did_open`, `did_change`, `did_close`), and `uri_for_path` converts a `RelativePathToSourceFile` back to a URI on the way out, called only from `publish_diagnostics` when it builds notifications. No URI is stored on `LiveSession`, in a pico source, or in a memo key.
 
-`crates/isograph_compiler/src/iso_literals.rs`, exported from `lib.rs`. Body moved from `file_literals` (`crates/isograph_extract_typescript/src/lib.rs:136-162`). Delta: generic over the host, calls `THostLanguage::host_errors` instead of the free `host_errors_for_extraction`, reads `parsed_iso_literals_in_file` instead of `extract_iso_literals` plus `parsed_iso_literal` per extraction, flattens to one list per file instead of one `FileLiteral` per literal, and is a memo.
+`publish_diagnostics` and its helpers are plain functions called from `handle`; none is memoized. The one-step-per-function rule in pico.md (Structuring functions and memos) governs the memo layers below `lsp_diagnostics_for_file`, and `publish_diagnostics` is not split into memo layers.
+
+### `iso_literal_parse_errors_in_file`
+
+`crates/isograph_compiler/src/iso_literals.rs`, exported from `lib.rs` (`pub use iso_literals::{..., iso_literal_parse_errors_in_file}`). `iso_literals.rs` imports `isograph_parser::ParseError` and `span::{WithSpan, WithSpanPostfix}`.
 
 ```rust
 // from crates/isograph_compiler/src/iso_literals.rs
-/// Host and parse errors of every iso literal in `path` as `client` reads it, as file-absolute spans.
+/// Parse errors of every iso literal in `path` as `client` reads it, as file-absolute spans.
 #[memo]
-pub fn iso_literal_errors_in_file<THostLanguage: HostLanguage>(
+pub fn iso_literal_parse_errors_in_file<THostLanguage: HostLanguage>(
     db: &IsographDb<THostLanguage>,
     client: ClientId,
     path: RelativePathToSourceFile,
-) -> Option<Vec<WithSpan<IsoLiteralError<THostLanguage>>>> {
+) -> Option<Vec<WithSpan<ParseError>>> {
     let literals = parsed_iso_literals_in_file(db, client, path).as_ref()?;
     literals
         .iter()
         .flat_map(|(extraction, parsed)| {
-            THostLanguage::host_errors(extraction, parsed)
-                .into_iter()
-                .map(|error| error.map(IsoLiteralError::Host))
-                .chain(parsed.errors.iter().map(|error| {
-                    IsoLiteralError::Parse(error.item.clone())
-                        .with_span(error.location.with_offset(extraction.span().start))
-                }))
+            let offset = extraction.iso_literal_start_index.0 as u32;
+            parsed.errors.iter().map(move |error| {
+                error
+                    .item
+                    .clone()
+                    .with_span(error.location.with_offset(offset))
+            })
         })
         .collect::<Vec<_>>()
         .wrap_some()
 }
 ```
 
-`None` is no text for that client. `Some(vec![])` is text with no errors (including no literals). Parse error spans are relative to the literal text in `ParsedIsoLiteral` (pico.md: a prepend does not make the parse `!=`); this memo shifts them by the literal's start. Host error spans are already file-absolute (`extraction.span()`).
+`None` is no text for that client. `Some(vec![])` is text with no parse errors (including no literals). `ParsedIsoLiteral.errors` is `Vec<WithSpan<ParseError>>` with spans relative to `iso_literal_text` (pico.md: a prepend does not make the parse `!=`); this memo shifts each by the literal's `iso_literal_start_index`, the same offset `format_iso_literals` and `lsp_semantic_tokens_for_file` add. `Span::with_offset` (`crates/span/src/lib.rs:40`) adds the offset to both ends.
 
-### `HostLanguage::host_errors`
-
-Before:
-
-```rust
-// from crates/isograph_compiler/src/host_language.rs
-pub trait HostLanguage: Send + Sync + Sized + 'static {
-    type Error: std::fmt::Display + std::error::Error + Clone + PartialEq + Eq + 'static;
-    type LiteralContext: Clone + PartialEq + Eq + Debug + 'static;
-
-    fn extract_iso_literals_from_text(contents: &str) -> Vec<IsoLiteralExtraction<Self>>;
-
-    fn should_skip_source_file(relative_path: &Path) -> SkipSourceFile;
-}
-```
-
-After:
-
-```rust
-// from crates/isograph_compiler/src/host_language.rs
-pub trait HostLanguage: Send + Sync + Sized + 'static {
-    type Error: std::fmt::Display + std::error::Error + Clone + PartialEq + Eq + 'static;
-    type LiteralContext: Clone + PartialEq + Eq + Debug + 'static;
-
-    fn extract_iso_literals_from_text(contents: &str) -> Vec<IsoLiteralExtraction<Self>>;
-
-    /// Errors in the host-language code around one literal, as file-absolute spans.
-    fn host_errors(
-        extraction: &IsoLiteralExtraction<Self>,
-        parsed: &ParsedIsoLiteral,
-    ) -> Vec<WithSpan<Self::Error>>;
-
-    fn should_skip_source_file(relative_path: &Path) -> SkipSourceFile;
-}
-```
-
-A plain associated function, like `extract_iso_literals_from_text`. `host_language.rs` imports `isograph_parser::ParsedIsoLiteral` and `span::WithSpan`.
-
-The TypeScript impl is the body of `host_errors_for_extraction` (`crates/isograph_extract_typescript/src/lib.rs:100-124`), verbatim. Delta: it is a trait method, and the return type names `Self::Error` instead of `TypeScriptHostError`. `item_of` stays a private free function.
-
-```rust
-// from crates/isograph_extract_typescript/src/lib.rs
-impl HostLanguage for TypeScriptHostLanguage {
-    // type LiteralContext, type Error, extract_iso_literals_from_text, should_skip_source_file unchanged
-
-    fn host_errors(
-        extraction: &IsoLiteralExtraction<Self>,
-        parsed: &ParsedIsoLiteral,
-    ) -> Vec<span::WithSpan<Self::Error>> {
-        let span = extraction.span();
-        let mut errors = Vec::new();
-        if let IsoCall::TaggedTemplate = extraction.context.call {
-            errors.push(TypeScriptHostError::MissingParentheses.with_span(span));
-        }
-        let parsed_item = parsed.item.as_ref().and_then(item_of);
-        if let Some(IsoLiteralItem::Selectable(selectable)) = parsed_item {
-            if extraction.context.const_export_name.is_none() {
-                errors.push(
-                    TypeScriptHostError::MissingExport {
-                        suggested_name: selectable.name.item,
-                    }
-                    .with_span(span),
-                );
-            }
-            if let AssociatedJsFunction::Absent = extraction.context.associated_js_function {
-                errors.push(TypeScriptHostError::MissingAssociatedFunction.with_span(span));
-            }
-        }
-        errors
-    }
-}
-```
-
-The test hosts `TestHostLanguage` (`crates/isograph_compiler/src/database.rs` tests) and `InHost` (`crates/isograph_cli/src/watch.rs` tests) return `Vec::new()`.
-
-Deleted from `crates/isograph_extract_typescript/src/lib.rs`: the free `host_errors_for_extraction`, `FileLiteral`, and `file_literals`. The imports `ClientId`, `IsoLiteralError`, `IsographDb`, `extract_iso_literals`, `parsed_iso_literal`, and `RelativePathToSourceFile` leave the non-test part of that file.
+v0 reports parse errors only. Host errors (`TypeScriptHostError`: missing parentheses, missing export, missing associated function) are a later change. `host_errors_for_extraction`, `FileLiteral`, and `file_literals` in `crates/isograph_extract_typescript/src/lib.rs` stay as they are and remain test-only, tracked in `refactors/pending/tests-only-functionality.md`.
 
 ### `line_index`
 
@@ -428,7 +397,7 @@ pub fn lsp_diagnostics_for_file<THostLanguage: HostLanguage>(
     client: ClientId,
     path: RelativePathToSourceFile,
 ) -> Option<Vec<lsp_types::Diagnostic>> {
-    let errors = iso_literal_errors_in_file(db, client, path).as_ref()?;
+    let errors = iso_literal_parse_errors_in_file(db, client, path).as_ref()?;
     if errors.is_empty() {
         return Vec::new().wrap_some();
     }
@@ -447,40 +416,31 @@ pub fn lsp_diagnostics_for_file<THostLanguage: HostLanguage>(
 }
 ```
 
-The early return means a file with no errors does not compute or store a line index; with (b) that is most of the project, per client. The message is `IsoLiteralError`'s `Display` (`#[error("{0}")]` of the host or parse error). Severity and `code` are open decision 5.
+The early return means an open file with no errors does not compute or store a line index. The message is `ParseError`'s `Display` (`#[error("{0}")]` of the `AstError`, `BracketError`, or `CommaWithoutItem`). Every diagnostic has severity `ERROR` and no `code`.
 
-### `paths_read_by`
+### `open_paths_of_client`
 
 ```rust
 // from crates/isograph_compiler/src/database.rs
 impl<THostLanguage: HostLanguage> IsographDb<THostLanguage> {
-    /// Every path with a `DiskFile`, plus every path `client` has open.
-    pub fn paths_read_by(&self, client: ClientId) -> HashSet<RelativePathToSourceFile> {
-        let disk_file_map = self.get_disk_file_map();
-        let open_file_map = self.get_open_file_map();
-        disk_file_map
+    /// Every path `client` has open.
+    pub fn open_paths_of_client(&self, client: ClientId) -> Vec<RelativePathToSourceFile> {
+        self.get_open_file_map()
             .tracked()
             .0
             .keys()
-            .copied()
-            .chain(
-                open_file_map
-                    .tracked()
-                    .0
-                    .keys()
-                    .filter(|key| key.client == client)
-                    .map(|key| key.path),
-            )
+            .filter(|key| key.client == client)
+            .map(|key| key.path)
             .collect()
     }
 }
 ```
 
-A plain method. `handle` calls it with no memo on the stack, so the `tracked()` reads record nothing (`dependency_stack.push_if_not_empty`, `crates/pico/src/database.rs:109-121`); `tracked()` is used because AGENTS.md forbids iterating `untracked()`. As a memo it would hit the never-written counter gap (Known risks): before the first `set_open_file` it would record no dependency on `open_file_map` and never see a later open.
+A plain method. `handle` calls it with no memo on the stack, so the `tracked()` read records nothing (`dependency_stack.push_if_not_empty`, `crates/pico/src/database.rs:109-121`); `tracked()` is used because AGENTS.md forbids iterating `untracked()`. It does not read `disk_file_map`: a disk-only path is never reported. Each returned path has an `OpenFile` for `client`, so `file_contents(db, client, path)` for it returns that client's buffer, never disk text, and never misses the open map.
 
-It returns a `HashSet`, not `impl Iterator`. `View::tracked(&'a self) -> &'a T` (`crates/pico/src/view.rs:29-32`) borrows the `View`, and the `View` is a local, so an iterator over its keys cannot leave the function. The set is also the deduplication of a path both on disk and open.
+It returns a `Vec`, not `impl Iterator`. `View::tracked(&'a self) -> &'a T` (`crates/pico/src/view.rs:29-32`) borrows the `View`, and the `View` is a local, so an iterator over its keys cannot leave the function. `OpenFileKey` is `(client, path)`, so no path appears twice.
 
-This is (b). (a) is the `open_file_map` half only; (c) is the `disk_file_map` half only.
+The name does not collide: no item named `open_paths_of_client` exists in the workspace.
 
 ### Publish
 
@@ -493,24 +453,30 @@ pub(crate) fn publish_diagnostics<THostLanguage: HostLanguage>(
     state: &mut IsographState<THostLanguage>,
 ) -> Vec<IsographEffect> {
     let db = state.db.reference();
+    let source_globs = state.source_globs.reference();
     state
         .live_sessions
         .0
         .iter_mut()
-        .filter_map(|(client, session)| publish_to_client(db, client.dereference(), session))
+        .filter_map(|(client, session)| {
+            publish_to_client(db, source_globs, client.dereference(), session)
+        })
         .collect()
 }
 
 fn publish_to_client<THostLanguage: HostLanguage>(
     db: &IsographDb<THostLanguage>,
+    source_globs: &SourceGlobs,
     client: ClientId,
     session: &mut LiveSession,
 ) -> Option<IsographEffect> {
-    let PublishDiagnosticsSupport::Supported(published) = &mut session.publish_diagnostics else {
-        return None;
-    };
-    let previous = std::mem::take(published);
-    let mut current = client_diagnostics(db, client);
+    session
+        .capabilities
+        .text_document
+        .as_ref()
+        .and_then(|text_document| text_document.publish_diagnostics.as_ref())?;
+    let previous = std::mem::take(&mut session.published_diagnostics);
+    let mut current = client_diagnostics(db, source_globs, client);
     let outcomes: Vec<_> = changed_diagnostics(previous.reference(), current.reference())
         .map(|(path, diagnostics)| (path, publish_notification(db, path, diagnostics)))
         .collect();
@@ -528,7 +494,7 @@ fn publish_to_client<THostLanguage: HostLanguage>(
                 .ok()
         })
         .collect();
-    *published = PublishedDiagnostics(current);
+    session.published_diagnostics = PublishedDiagnostics(current);
     if notifications.is_empty() {
         return None;
     }
@@ -547,13 +513,22 @@ After a publish, the stored map is what the client has: `current`, except that a
 
 ```rust
 // from crates/isograph_cli/src/diagnostics.rs
-/// Non-empty diagnostics of every path `client` reads.
+/// Non-empty diagnostics of every source file `client` has open.
 fn client_diagnostics<THostLanguage: HostLanguage>(
     db: &IsographDb<THostLanguage>,
+    source_globs: &SourceGlobs,
     client: ClientId,
 ) -> HashMap<RelativePathToSourceFile, Vec<lsp_types::Diagnostic>> {
-    db.paths_read_by(client)
+    db.open_paths_of_client(client)
         .into_iter()
+        .filter(|path| {
+            let relative = Path::new(path.lookup());
+            source_globs.contains(relative)
+                && matches!(
+                    THostLanguage::should_skip_source_file(relative),
+                    SkipSourceFile::Keep
+                )
+        })
         .filter_map(|path| {
             let diagnostics = isograph_lsp::lsp_diagnostics_for_file(db, client, path).as_ref()?;
             (!diagnostics.is_empty()).then(|| (path, diagnostics.clone()))
@@ -597,9 +572,11 @@ fn publish_notification<THostLanguage: HostLanguage>(
 }
 ```
 
-A closed, deleted, or fixed path is absent from `current` (it is not read, or its list is empty), so `changed_diagnostics` yields `vec![]` for it when it was published before. That is how the client clears squiggles. Notifications within one effect are in `HashMap` order; the protocol does not order them and tests do not depend on it.
+The filter is the watcher's disk filter (`watch.rs` `process_create_or_modify`: `globs.contains(relative)` then `should_skip_source_file`) applied to open paths, so an open buffer is diagnosed exactly when the watcher would ingest the same path from disk. A parent-relative key (`../other/a.ts`, from a `didOpen` outside the config directory) is diagnosed only if a glob matches it, as the watcher would. `previous` is moved out of `session.published_diagnostics` with `std::mem::take` (`PublishedDiagnostics: Default`).
 
-`version` is `None` (open decision 7).
+A closed or fixed path is absent from `current` (it is no longer open, or its list is empty), so `changed_diagnostics` yields `vec![]` for it when it was published before. That is how the client clears squiggles, and how `didClose` clears a closed file's entries for that client only. Notifications within one effect are in `HashMap` order; the protocol does not order them and tests do not depend on it.
+
+`version` is `None` in v0; storing document versions is a later change. A publish computed before a newer `didChange` arrives can be shown on the newer text until the next publish, which that `didChange` has already armed.
 
 ### `uri_for_path`
 
@@ -641,7 +618,9 @@ fn normalize_lexically(path: &Path) -> PathBuf {
 }
 ```
 
-`relative_from_uri` produces parent-relative keys (`../other/a.ts`) through `pathdiff`. `Url::from_file_path` keeps `..` segments (`url-2.5.8/src/lib.rs:2948-2983` percent-encodes each component), and VS Code does not resolve them, so `file:///tmp/proj/../other/a.ts` would not match the editor's `file:///tmp/other/a.ts`. std's `Path::normalize_lexically` is unstable and the workspace builds on stable; no crate in `Cargo.lock` provides it. Lexical `..` is correct here because `CurrentWorkingDirectory` is the parent of the canonicalized config path (`discover.rs:63`) and `pathdiff` computes the relative part lexically from it. `Url::from_file_path` percent-encodes spaces and other reserved bytes.
+`relative_from_uri` produces parent-relative keys (`../other/a.ts`) through `pathdiff`. `Url::from_file_path` keeps `..` segments (`url-2.5.8/src/lib.rs:2948-2983` percent-encodes each component), and VS Code does not resolve them, so `file:///tmp/proj/../other/a.ts` would not match the editor's `file:///tmp/other/a.ts`. std's `Path::normalize_lexically` is unstable and the workspace builds on stable; no crate in `Cargo.lock` provides it. Lexical `..` is correct here because `CurrentWorkingDirectory` is the parent of the canonicalized config path (`config_path`, `discover.rs:51-69`, canonicalizes both a `--config` flag and the `nearest_config` result) and `pathdiff` computes the relative part lexically from it. `Url::from_file_path` percent-encodes spaces, non-ASCII bytes, and other reserved bytes; `relative_from_uri` decodes them (`Url::to_file_path`), so the round trip is exact.
+
+A symlinked config directory does not produce a URI that differs from the editor's. `CurrentWorkingDirectory` is canonical (`/private/tmp/proj` on macOS). A window opened at `/tmp/proj` sends `file:///tmp/proj/src/a.ts`; `relative_from_uri` does not fail on it and stores the open file under the parent-relative key `../../../tmp/proj/src/a.ts`. `uri_for_path` joins that key to `/private/tmp/proj` and normalizes lexically to `/tmp/proj/src/a.ts`, which is the URI the editor sent. Only open files are published, so no disk key `src/a.ts` publishes a second URI for the same file. Such a key is published only if a `source_files` glob matches it (see Known risks).
 
 On error the caller logs `warn!`, skips the path, and does not record it as published.
 
@@ -664,9 +643,11 @@ pub(crate) fn arm_diagnostics_debounce<THostLanguage: HostLanguage>(
 }
 ```
 
+There is one global timer. The interval is 100ms, upstream `SHORT_DEBOUNCE_TIME`; vscode-languageclient batches full-sync `didChange` for up to 250ms (lsp-open-files.md, What the user does), so 100ms normally fires between batches. Every arming event resets the timer (trailing debounce, as upstream). Typing in one window therefore delays another window's publish, and one publish computes every client. A timer per client would need `HashMap<ClientId, TimerGuard>` on `IsographState`, because `TimerGuard` is not `Clone` and `LiveSession` is `Clone` (`ClientStartedEvent` and `IsographEvent` derive `Clone`).
+
 Overwriting `diagnostics_debounce` drops the previous `TimerGuard`, which closes its oneshot and cancels its sleep in `schedule_timer` (`daemon.rs:216-233`). A firing that raced the drop fails `trigger_if_matching` because its `TimerId` differs.
 
-Callers: `on_did_open`, `on_did_change`, `on_did_close` when the write succeeded; `handle_disk_changed` when `apply_disk_changed` succeeded (`File` `Present`, `File` `Absent`, `FolderRemoved`); `handle_client_connection` on `Started`. Not on `Gone`: the gone client's published state goes with its `LiveSession`, and other clients do not read its buffers. Not on `HelloWorld`, `Quit`, requests, or responses.
+Callers: `on_did_open`, `on_did_change`, `on_did_close` when the write succeeded. Not on `DiskChanged`: every path a client is diagnosed for has that client's `OpenFile`, so `file_contents(client, path)` does not read the `DiskFile` and a disk change cannot alter any client's diagnostics. Not on `Started`: a new client has no open files, so a publish for it sends nothing. Not on `Gone`: the gone client's published state goes with its `LiveSession`, and other clients do not read its buffers. Not on `HelloWorld`, `Quit`, requests, or responses.
 
 ### `handle_timer_fired` and HelloWorld
 
@@ -721,7 +702,7 @@ fn handle_internal_event<THostLanguage: HostLanguage>(
     match internal {
         InternalEvent::HelloWorld => IsographEffect::LogHelloWorld.wrap_vec(),
         InternalEvent::Quit => IsographEffect::Kill.wrap_vec(),
-        InternalEvent::DiskChanged(change) => handle_disk_changed(state, change),
+        InternalEvent::DiskChanged(change) => handle_disk_changed(&mut state.db, change),
     }
 }
 
@@ -740,70 +721,6 @@ fn handle_timer_fired<THostLanguage: HostLanguage>(
 ```
 
 `use std::time::Duration;` leaves `state.rs`. A stale firing, a firing on a never-armed state, and a second delivery of the same firing return no effects.
-
-### `handle_disk_changed`
-
-Before:
-
-```rust
-// from crates/isograph_cli/src/state.rs
-fn handle_disk_changed<THostLanguage: HostLanguage>(
-    state: &mut IsographDb<THostLanguage>,
-    change: DiskChanged,
-) -> Vec<IsographEffect> {
-    apply_disk_changed(state, change)
-        .unwrap_or_else(|error| tracing::warn!(%error, "DiskChanged path"));
-    no_effects()
-}
-```
-
-After:
-
-```rust
-// from crates/isograph_cli/src/state.rs
-fn handle_disk_changed<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
-    change: DiskChanged,
-) -> Vec<IsographEffect> {
-    apply_disk_changed(&mut state.db, change).map_or_else(
-        |error| {
-            tracing::warn!(%error, "DiskChanged path");
-            no_effects()
-        },
-        |()| crate::diagnostics::arm_diagnostics_debounce(state),
-    )
-}
-```
-
-### `handle_client_connection`
-
-Before:
-
-```rust
-// from crates/isograph_cli/src/state.rs
-        ClientConnectionEvent::Started(started) => {
-            state
-                .live_sessions
-                .0
-                .insert(started.client, started.session);
-            no_effects()
-        }
-```
-
-After:
-
-```rust
-// from crates/isograph_cli/src/state.rs
-        ClientConnectionEvent::Started(started) => {
-            state
-                .live_sessions
-                .0
-                .insert(started.client, started.session);
-            crate::diagnostics::arm_diagnostics_debounce(state)
-        }
-```
-
-A `Started` for an id already live replaces the session, including its published map; the new session starts from an empty map and receives the full set.
 
 ### Document sync handlers
 
@@ -861,10 +778,8 @@ After:
 // from crates/isograph_cli/src/lsp_socket.rs
             session: crate::event::LiveSession {
                 sender: connection.sender.clone(),
-                publish_diagnostics:
-                    crate::diagnostics::PublishDiagnosticsSupport::from_client_capabilities(
-                        params.capabilities.reference(),
-                    ),
+                capabilities: params.capabilities,
+                published_diagnostics: crate::diagnostics::PublishedDiagnostics::default(),
                 outstanding: std::collections::HashSet::new(),
             },
 ```
@@ -905,48 +820,15 @@ This doc adds no panic and no `UnexpectedError`. `publish_diagnostics` is not a 
 
 ## Shared state
 
-None added. `PublishedDiagnostics` lives on `LiveSession` inside `IsographState`, written only by `handle`. The debounce guard is a field on `IsographState`. `freddie_timer::TimerId::mint` uses a `static AtomicU64` inside freddie; that is existing behavior of the dependency, reached already by `HelloWorld`.
-
-## Open decisions
-
-None of these is decided. The design above is written with the first-listed option where one is named in the sections above.
-
-1. Which files each client gets.
-   - (a) Open files only. `client_diagnostics` iterates this client's `open_file_map` keys. No per-client copy of disk text (see Known risks, memo growth). `didClose` always clears. Errors in files the user has not opened are invisible until opened.
-   - (b) Disk plus open (`paths_read_by` above). The Problems panel is project-wide. Each client computes `file_contents`, extract, parse, and errors for every disk path under its own `ClientId`, which stores one copy of every disk file's text per client. A variant reads disk-only paths under one shared reader `ClientId` so clients share those memo slots; `event-model.md` says how such a reader gets its `ClientId` is not designed.
-   - (c) Upstream: disk paths with overlay. A buffer with no `DiskFile` (a new file before its first save is still a `file:` URI only after save, so this is mainly files outside the watched set) gets no diagnostics.
-   - Filtering. `did_open` stores any `file:` URI, including `README.md` and paths outside the config directory (`../other/a.ts`). `handle` does not know globs (`event-model.md`). Options: no filtering (a markdown file containing `` iso`...` `` gets diagnostics); filter in `did_open` with `THostLanguage::should_skip_source_file` (no globs needed, extension only, also changes what semantic tokens and formatting see); filter `paths_read_by` the same way (diagnostics only); or carry `source_files` globs into `IsographState` (contradicts event-model.md's "handle does not know about globs" and needs that doc amended).
-
-2. Debounce interval and timer granularity.
-   - Interval: 100ms is upstream `SHORT_DEBOUNCE_TIME`. vscode-languageclient batches full-sync `didChange` for up to 250ms (lsp-open-files.md, What the user does), so 100ms normally fires between batches.
-   - One global timer (above): any client's change delays every client's publish, and one publish computes every client. Simple and one field.
-   - Per client: `TimerGuard` is not `Clone` (`freddie_timer/src/timer.rs`, no derive), and `LiveSession` is `Clone` because `ClientStartedEvent` and `IsographEvent` derive `Clone`, so the guard cannot sit on `LiveSession`; it would be `HashMap<ClientId, TimerGuard>` on `IsographState`, removed on `Gone`. `TimerFired`'s payload is private and readable only through `trigger_if_matching(guard)`, so `TimerPayload::DiagnosticsDebounce(ClientId)` cannot route the firing; `handle_timer_fired` tries each client's guard in turn. `DiskChanged` arms every client's timer.
-
-3. Where published state lives.
-   - (a) `LiveSession` (above). `Gone` drops it with the session; a replacing `Started` resets it.
-   - (b) `HashMap<ClientId, PublishedDiagnostics>` on `IsographState`. `Gone` and a replacing `Started` must also clear the entry, a second place to keep in sync with `LiveSessions`.
-   - (c) A set of published paths only, like upstream's `BTreeSet<Uri>`. Every publish resends every non-empty list and clears paths that left the set. No stored `Vec<Diagnostic>`; traffic on each fire proportional to the number of files with errors, not to the number that changed.
-
-4. Capability gating. The spec's `textDocument.publishDiagnostics` client capability lists optional features (`relatedInformation`, `tagSupport`, `versionSupport`, `codeDescriptionSupport`, `dataSupport`; `lsp-types-0.97.0/src/lib.rs:1270-1304`); the spec does not say a client without it rejects the notification.
-   - (a) Gate on presence (above). `isograph send` and the socket and CLI tests send `{ "capabilities": {} }` and receive nothing; their `read_message` sequences stay valid. `capabilities` leaves `LiveSession`.
-   - (b) Publish to every client. `PublishDiagnosticsSupport` is replaced by `PublishedDiagnostics` on every session. `isograph send` connections receive notifications until they close (sends then fail and are ignored). The `lsp_socket.rs` and `cli.rs` tests that read the next message as a response must skip notifications, because a `DiskChanged` they inject arms a real 100ms timer.
-
-5. Severity and code. (a) All `ERROR` (above). (b) Host errors `WARNING`, parse errors `ERROR`: `lsp_diagnostics_for_file` matches `IsoLiteralError` variants. A per-variant `code` (`NumberOrString::String("missing-export")`, through `strum` or a match) lets later code actions and filters key on the error; it adds one name per variant of `TypeScriptHostError` and `ParseError`.
-
-6. Host error ranges. Today every host error spans the literal interior (`extraction.span()`), so a missing-parentheses squiggle covers the whole literal. Alternative: `TypeScriptLiteralContext` records the byte ranges of `iso`, `(`, and `)(` from the regex captures, and `host_errors` uses them (`MissingParentheses` on `iso`, `MissingAssociatedFunction` after the closing paren, `MissingExport` on `iso(`). The context then carries spans; extract is already `!=` after a prepend because `iso_literal_start_index` moves, so no new invalidation.
-
-7. `version`. `None` (above), as upstream. Sending the buffer version requires storing the `didOpen` / `didChange` version: on `OpenFile` (a version-only change becomes a source change; `file_contents` re-invokes and backdates) or in a map on `IsographState`. Disk-only paths have no version either way. A client may use the version to drop diagnostics computed for an older buffer.
-
-8. URIs rebuilt from `CurrentWorkingDirectory` plus path (above) or remembered from the client. The config directory is canonical (`/private/tmp/proj` on macOS). A window opened at `/tmp/proj` sends `file:///tmp/proj/src/a.ts`, which `relative_from_uri` turns into `../../../tmp/proj/src/a.ts`, a different key from the disk key `src/a.ts`. With rebuilt URIs and lexical normalization the open key publishes to `file:///tmp/proj/src/a.ts`, which matches the editor, and the disk key publishes to `file:///private/tmp/proj/src/a.ts`, a second Problems entry for a file VS Code considers unopened. Remembering the client's URI per `(client, path)` reproduces the client's spelling for open paths but does not merge the two keys; the duplicate is a `relative_from_uri` canonicalization gap that this doc does not fix.
-
-9. Order relative to the never-written counter fix (Known risks). Change 2 makes the gap reachable on every daemon start. Options: land `refactors/pending/pico-missing-key-dependency.md` (or upstream pico PR https://github.com/isographlabs/isograph/pull/994) first; land lsp-open-files.md change 3 option (a) (`IsographDb::default` writes each counter once) first; or ship change 2 with the gap.
+None added. `PublishedDiagnostics` lives on `LiveSession` inside `IsographState`, written only by `handle`. The debounce guard and `source_globs` are fields on `IsographState`. `freddie_timer::TimerId::mint` uses a `static AtomicU64` inside freddie; that is existing behavior of the dependency, reached already by `HelloWorld`.
 
 ## Known risks
 
 - `perform` runs on the effect loop of a current-thread tokio runtime (`daemon.rs:24`). Each session's writer is `bounded(0)` (`lsp_socket.rs:48-56`), so `sender.send` blocks until the writer thread takes the message, and the writer thread blocks in `Message::write` when the socket buffer is full. A client that stops reading stalls its writer, then the next send blocks the runtime thread: the event loop, timers, the accept loop, and every other client stop. Responses already have this; diagnostics add traffic the client did not request, so a client that never sends a request can still stall the daemon.
-- Traffic. The first publish after `Started` sends one notification per path with errors (with (b), across the project). Later publishes send only changed paths.
-- Never-written counter. pico records no dependency when a memo reads a tracked map whose counter was never written (lsp-open-files.md Known gap, `refactors/pending/pico-missing-key-dependency.md`; pico PR https://github.com/isographlabs/isograph/pull/994 fixes it). The `open_file_map` counter is first written by the first `set_open_file` in the process. A window that connects with no file open gets a publish 100ms after `Started`; with (b) that runs `file_contents(client, p)` for every disk path, each missing the open map with no recorded dependency. The first `didOpen` of such a `p` sets a vacant counter and a vacant source and does not advance the epoch, so `file_contents(client, p)` keeps returning disk text. Later `didChange`s do not re-invoke it either, because its only recorded dependency is the `DiskFile`. Diagnostics, semantic tokens, and formatting for that `(client, p)` then use disk text until the disk file changes; formatting computes edits from disk ranges and applies them to the buffer. With (a) the publish never reads a path the client has not opened, so this path to the gap does not exist.
-- Memo growth. `accept_loop` mints a new `ClientId` per connection (`lsp_socket.rs:96-101`); a window reload is a new client. Memo slots keyed by `(client, path)` are never collected: i2 never calls `run_garbage_collection`, and `Gone` removes sources, not memo slots. With (b) each diagnostics client stores a `file_contents` copy of every disk file, plus extract, parse pairs, errors, and diagnostics.
+- Traffic. A publish sends one notification per open path whose diagnostics changed, per client.
+- Symlinked project directory. A window opened through a symlink (`/tmp/proj` when the config resolves to `/private/tmp/proj`) stores its open files under parent-relative keys (`../../../tmp/proj/src/a.ts`). A glob such as `src/**` does not match those keys, so that window gets no diagnostics. The watcher filters disk paths the same way, and semantic tokens and formatting already work on those keys. Fixing it is a `relative_from_uri` canonicalization change, not part of this doc.
+- Never-written counter. pico records no dependency when a memo reads a tracked map whose counter was never written (lsp-open-files.md Known gap, `refactors/pending/pico-missing-key-dependency.md`; pico PR https://github.com/isographlabs/isograph/pull/994). Diagnostics cannot hit this gap, so this change does not wait for that fix. Every diagnosed path was opened by a `didOpen`, which writes `open_file_map` (and its counter) before any diagnostics memo reads it, and `file_contents(client, path)` for that path hits the `OpenFile`.
+- Memo growth. `accept_loop` mints a new `ClientId` per connection (`lsp_socket.rs:96-101`); a window reload is a new client. Memo slots keyed by `(client, path)` are never collected: i2 never calls `run_garbage_collection`, and `Gone` removes sources, not memo slots. Each client adds `line_index`, `iso_literal_parse_errors_in_file`, and `lsp_diagnostics_for_file` slots for the files it opened, alongside the `file_contents`, extract, and parse slots semantic tokens already create for them.
 
 ## Upstream comparison
 
@@ -958,6 +840,7 @@ Copied:
 - Re-arm on each change, publish on quiet.
 - Clear a path by sending an empty list when it was published before and has nothing now (`diagnostic_notification.rs`: `map.entry(uri).or_default()` for each old URI).
 - `Display` messages (`diagnostic.printable(noop_print_location_fn())`).
+- `PublishDiagnosticsParams.version: None`.
 - URIs built from the working directory plus the relative path (`location_utils.rs:isograph_location_to_lsp_location`).
 
 Not copied:
@@ -966,13 +849,15 @@ Not copied:
 - `char_index_to_position` (`format.rs:73-91`) counts bytes as columns and breaks lines on `\n` only. Here columns are UTF-16 code units and `\n`, `\r\n`, `\r` are breaks.
 - Diagnostics with no embedded location, or whose path is not in the iso literal map, or whose URI fails, are dropped with `continue` and no log. Here a URI or serialize failure is a `warn!` and the path is retried.
 - `serde_json::to_value(...).expect(...)` and `lsp_server::Notification::new` (which unwraps). Here both are `?`.
-- Every publish resends every path with diagnostics. Here only changed paths are sent.
-- Every notification arms the timer, including ones that change nothing. Here only a successful `didOpen` / `didChange` / `didClose`, an applied `DiskChanged`, and `Started` arm it.
-- One connection, one set. Here each client has its own text and its own published state.
+- `BTreeSet<Uri>` of previously published URIs, and every publish resends every path with diagnostics. Here `PublishedDiagnostics` stores the lists and only changed paths are sent.
+- Every notification and every file-system batch arms the timer, including ones that change nothing. Here only an accepted `didOpen` / `didChange` / `didClose` arms it.
+- Diagnostics for every file in the project, read from disk with the open buffer as an overlay. Here only the client's open files, read from that client's buffers.
+- Host-language validation errors. Here only parse errors.
+- One connection, one set. Here each client has its own text and its own published state, and a client that does not declare `textDocument.publishDiagnostics` receives nothing.
 
 ## Changes
 
-AGENTS.md: an API only tests call should not exist. `iso_literal_errors_in_file`, `line_index`, `lsp_diagnostics_for_file`, `paths_read_by`, and `uri_for_path` have one production reader chain, which ends at `publish_diagnostics`. They therefore ship together with it. The `LineIndex` type has production readers today (formatting and semantic tokens) and ships first.
+AGENTS.md: an API only tests call should not exist. `iso_literal_parse_errors_in_file`, `line_index`, `lsp_diagnostics_for_file`, `open_paths_of_client`, `uri_for_path`, and the `pub(crate)` `SourceGlobs` on `IsographState` have one production reader chain, which ends at `publish_diagnostics`. They therefore ship together with it. The `LineIndex` type has production readers today (formatting and semantic tokens) and ships first.
 
 ### Change 1: owned `LineIndex` (prefactor)
 
@@ -1080,11 +965,11 @@ Tests (in `line_index.rs`): `line_breaks_records_crlf_as_one_break` moves from `
 
 One shippable change. It lands as commits in this order, each compiling with tests passing; `pub` items in library crates do not trip `dead_code` between commits, and every `pub(crate)` item lands in the commit with its caller.
 
-1. `HostLanguage::host_errors`, the TS impl, test-host impls, `iso_literal_errors_in_file`; delete `host_errors_for_extraction`, `FileLiteral`, `file_literals`; move their tests.
+1. `iso_literal_parse_errors_in_file` and its tests.
 2. `line_index` memo.
 3. `lsp_diagnostics_for_file` and its tests.
-4. `IsographDb::paths_read_by` and its tests.
-5. `PublishDiagnosticsSupport`, `PublishedDiagnostics`, `LiveSession.publish_diagnostics` (deleting `capabilities`), `uri_for_path`, `PathUriError`, `diagnostics.rs`, `PublishDiagnosticsEffect` and its `perform` arm, `TimerPayload::DiagnosticsDebounce` replacing `HelloWorldDebounced`, `diagnostics_debounce` replacing `hello_world_debounce`, the arming call sites, and the `handle` tests.
+4. `IsographDb::open_paths_of_client` and its tests.
+5. `PublishedDiagnostics`, `LiveSession.published_diagnostics`, removal of the `expect(dead_code)` on `LiveSession.capabilities`, `SourceGlobs` made `pub(crate)`, `IsographState.source_globs` and its parse in `serve`, `uri_for_path`, `PathUriError`, `diagnostics.rs`, `PublishDiagnosticsEffect` and its `perform` arm, `TimerPayload::DiagnosticsDebounce` replacing `HelloWorldDebounced`, `diagnostics_debounce` replacing `hello_world_debounce`, the three arming call sites, and the `handle` tests.
 
 ## Tests
 
@@ -1092,116 +977,78 @@ No sleeps, no polling. A timer fires by the test injecting `IsographEvent::Timer
 
 ### `handle` tests (`crates/isograph_cli/src/state.rs`)
 
-Helpers: `dummy_session(sender, publish_diagnostics: PublishDiagnosticsSupport)` replaces the `capabilities` parameter; `diagnostics_client(state, client) -> TestClient` starts a client with `Supported(PublishedDiagnostics::default())` and drains the `Started` timer by firing it; `only_timer(effects) -> TimerEffect<TimerPayload>` panics unless `effects` is exactly one `Timer`; `fire(state, effects) -> Vec<IsographEffect>` is `handle(state, IsographEvent::Timer(only_timer(effects).event))`; `published(client, effects) -> HashMap<String, Vec<Diagnostic>>` performs and drains. Fixture URIs are under `file:///tmp/proj` (`with_config`).
+Helpers: `dummy_session(sender, capabilities)` keeps its parameters and writes `published_diagnostics: PublishedDiagnostics::default()`; `diagnostics_capabilities() -> lsp_types::ClientCapabilities` is the default with `text_document: Some(TextDocumentClientCapabilities { publish_diagnostics: Some(Default::default()), ..Default::default() })`; `diagnostics_client(state, client) -> TestClient` starts a client with `diagnostics_capabilities()`; `only_timer(effects) -> TimerEffect<TimerPayload>` panics unless `effects` is exactly one `Timer`; `fire(state, effects) -> Vec<IsographEffect>` is `handle(state, IsographEvent::Timer(only_timer(effects).event))`; `published(client, effects) -> HashMap<String, Vec<Diagnostic>>` performs and drains. Fixture URIs are under `file:///tmp/proj` (`with_config`); `empty` sets `source_globs` to `src/**`.
 
-- `didOpen` of `iso(\`entrypoint\`)` returns one `Timer`; firing it returns one `PublishDiagnostics` whose one notification is `file:///tmp/proj/src/x.ts` with non-empty diagnostics, all `ERROR`, source `isograph`.
-- UTF-16 range: `didOpen` of `"const é = 1;\nconst 😀 = iso\`entrypoint Query.HomeRoute\`"`; the one diagnostic (`MissingParentheses`) starts at line 1, character `"const 😀 = iso\`".encode_utf16().count()` and ends at that plus `"entrypoint Query.HomeRoute".len()`.
+- `didOpen` of `src/x.ts` with `iso(\`entrypoint\`)` returns one `Timer`; firing it returns one `PublishDiagnostics` whose one notification is `file:///tmp/proj/src/x.ts` with non-empty diagnostics, all `ERROR`, source `isograph`, no `code`.
+- UTF-16 range: `didOpen` of `"const é = 1;\nconst 😀 = iso(\`entrypoint\`)"`; with `parsed = parse_iso_literal("entrypoint")`, the first diagnostic starts at line 1, character `"const 😀 = iso(\`".encode_utf16().count() as u32 + parsed.errors[0].location.start`.
 - CRLF: the same literal after `"const a = 1;\r\n"` starts on line 1.
 - A file with no literals: fire returns no effects.
-- Whitespace-only literal `iso(\` \`)`: one diagnostic whose message is `IsoLiteralError::<TypeScriptHostLanguage>::Parse(ParseError::Ast(AstError::EmptyLiteral)).to_string()`.
+- Whitespace-only literal `iso(\` \`)`: one diagnostic whose message is `ParseError::Ast(AstError::EmptyLiteral).to_string()`.
+- A literal with only a host-language problem (`iso\`entrypoint Query.HomeRoute\``, which parses): fire returns no effects.
 - Broken then fixed: second fire publishes that URI with `[]`; a third arm and fire returns no effects.
 - Fixed then broken: first fire returns no effects; second publishes the errors.
-- Two fires with no change: arm with `DiskChanged` of identical contents after a publish; the fire returns no effects.
+- Two fires with no change: after a publish, `didChange` with identical text arms; the fire returns no effects.
 - Two `didChange`s before a fire: firing the first timer returns no effects (its guard was dropped); firing the second publishes the second text's errors once.
 - The same firing delivered twice: the second returns no effects.
 - A firing on a never-armed state (timer taken from another state) returns no effects.
-- Close with (b): broken buffer over a clean `DiskFile`, `didClose`, fire: `[]`. Broken buffer with no `DiskFile`, `didClose`, fire: `[]`. Broken buffer over a disk file with different errors: the disk errors. With (a): every close publishes `[]` for a published path.
-- Two clients, one path, different buffers: client 1 broken, client 2 clean buffer: only client 1 receives a notification; client 2's `try_recv` is `Empty`.
+- Close clears: broken buffer published, `didClose`, fire: that URI with `[]`, with and without a `DiskFile` for that path, including a broken `DiskFile`.
+- Disk-only broken file produces nothing: `DiskChanged` `Present` of `src/y.ts` with `iso(\`entrypoint\`)` returns no effects; a client then `didOpen`s a clean `src/x.ts`, and the fire returns no effects.
+- `DiskChanged` returns no `Timer`: `Present`, `Absent`, and `FolderRemoved` each return no effects, including when a client has that path open.
+- `Started` returns no `Timer`: `handle` of `Started` for a client with diagnostics capabilities returns no effects.
+- Glob and host filtering: `didOpen` of `other/x.ts` (outside `src/**`) and of `src/README.md` (skipped by `should_skip_source_file`), each with `iso(\`entrypoint\`)`, arms; the fire returns no effects.
+- Two clients, one path, different buffers: client 1 and client 2 both `didOpen` `src/x.ts`, client 1 with `iso(\`entrypoint\`)`, client 2 with `iso(\` \`)`. One fire returns two effects. Client 1's diagnostics equal `lsp_diagnostics_for_file(db, client 1, path)` and contain no `EmptyLiteral` message; client 2's diagnostics are exactly the one `EmptyLiteral` diagnostic. Client 2 then `didChange`s to clean text: the fire publishes `[]` to client 2 only, and client 1's `try_recv` is `Empty`.
+- Another client's open file: client 1 opens broken `src/x.ts`, client 2 opens nothing: client 2 receives nothing.
 - `Gone` before the fire: fire returns no effects for the gone client; another live client is unaffected.
-- Capability absent: a client with `Unsupported` and a broken buffer receives nothing.
-- `DiskChanged` `Absent` of a published disk path, and `FolderRemoved` of its directory: `[]`.
-- `Started` with broken disk files while client 1 already received them: firing the `Started` timer publishes to client 2 only.
+- Capability absent: a client started with `ClientCapabilities::default()` and a broken buffer receives nothing; a client with `text_document: Some(Default::default())` (so `publish_diagnostics: None`) receives nothing.
 - `didOpen` of a non-file URI, `didChange` with a ranged change, and `didOpen` from a never-started client return no effects and leave `diagnostics_debounce` unchanged.
-- Tagged template host error range: covered by the UTF-16 test (`MissingParentheses` spans the literal interior).
 
 Existing tests that change:
 
-- Assert one `Timer` (via `only_timer`) instead of `effects.is_empty()`: `disk_changed_present_interns_a_path_relative_to_the_config`, `disk_changed_present_outside_the_config_dir_is_a_parent_relative_path`, `disk_changed_absent_removes_the_relative_path`, `folder_removed_of_src_removes_files_under_src_not_src2`, `folder_removed_of_the_config_directory_removes_every_interned_file`, `folder_removed_of_a_never_interned_path_is_a_noop` (renamed `folder_removed_of_a_never_interned_path_removes_nothing`), `file_absent_of_a_directory_path_does_not_remove_files_under_it`, `did_open_stores_the_buffer_for_that_client_only`, `did_change_with_one_full_change_replaces_the_buffer`, `did_close_falls_back_to_disk`, `lsp_isograph_event_disk_changed_interns`, `client_started_stores_the_session`, `client_started_twice_for_the_same_id_keeps_the_second_session`.
-- `client_started_stores_the_session` asserts `session.publish_diagnostics` instead of `session.capabilities`.
+- Assert one `Timer` (via `only_timer`) instead of `effects.is_empty()`: `did_open_stores_the_buffer_for_that_client_only`, `did_change_with_one_full_change_replaces_the_buffer`, `did_close_falls_back_to_disk`.
+- `client_started_stores_the_session` keeps `assert!(effects.is_empty())` and its `session.capabilities` assertion, and asserts `session.published_diagnostics == PublishedDiagnostics::default()`.
 - `hello_world_returns_a_timer` becomes `hello_world_returns_log_hello_world`; `lsp_isograph_event_hello_world_returns_a_timer` becomes `lsp_isograph_event_hello_world_returns_log_hello_world`.
 - Deleted (their behavior is covered by the diagnostics timer tests above): `matching_hello_world_debounced_returns_log_hello_world`, `stale_hello_world_debounced_returns_no_effects`, `a_second_hello_world_drops_the_first_guard`, `a_matching_hello_world_debounced_fed_twice_logs_once`, `lsp_isograph_event_hello_world_then_its_timer_returns_log_hello_world`.
 - `timer_fired_on_a_never_armed_state_returns_no_effects` arms with `didOpen` in a second state.
-- `lsp_notification_from_a_client_that_never_started_returns_no_effects` asserts `diagnostics_debounce.is_none()`; `lsp_notification_after_gone_returns_no_effects` drops its `hello_world_debounce` assertion (its `Started` armed the debounce).
+- `lsp_notification_from_a_client_that_never_started_returns_no_effects` and `lsp_notification_after_gone_returns_no_effects` assert `diagnostics_debounce.is_none()` in place of `hello_world_debounce.is_none()`.
 - `crates/isograph_cli/src/daemon.rs`: `sending_hello_world_emits_a_timer` becomes `sending_hello_world_emits_log_hello_world`; the three timer tests use `TimerPayload::DiagnosticsDebounce`.
 
 ### Plain-function tests (`crates/isograph_cli/src/diagnostics.rs`)
 
 - `changed_diagnostics`: empty and empty yields nothing; a new path yields it; an equal list yields nothing; a different list yields the new list; a published path absent from current yields `[]`.
-- `PublishDiagnosticsSupport::from_client_capabilities`: default capabilities are `Unsupported`; `text_document` without `publish_diagnostics` is `Unsupported`; `publish_diagnostics: Some(default)` is `Supported` with an empty map.
 
 ### `uri_for_path` (`crates/isograph_cli/src/adapter.rs` tests)
 
 - `src/a.ts` is `file:///tmp/proj/src/a.ts`, and `relative_from_uri` of it is `src/a.ts`.
-- `src/a b.ts` is `file:///tmp/proj/src/a%20b.ts` and round-trips.
+- `src/a b/é.ts` is `file:///tmp/proj/src/a%20b/%C3%A9.ts`, and `relative_from_uri` of it is `src/a b/é.ts`.
 - `../other/a.ts` is `file:///tmp/other/a.ts` and round-trips.
 - `src/./a.ts` is `file:///tmp/proj/src/a.ts`.
 - No `CurrentWorkingDirectory` is `MissingWorkingDirectory`.
 
-### `paths_read_by` (`crates/isograph_compiler/src/database.rs` tests)
+### `open_paths_of_client` (`crates/isograph_compiler/src/database.rs` tests)
 
-Empty database is empty; disk paths only; one client's open path only; a path both on disk and open appears once; another client's open path is excluded.
+Empty database is empty; disk paths only is empty; one client's open path is returned; a path both on disk and open appears once; another client's open path is excluded; after `remove_open_file` the path is gone.
 
 ### Memo tests
 
-`iso_literal_errors_in_file` (`crates/isograph_extract_typescript/src/lib.rs` `memo_tests`):
+`iso_literal_parse_errors_in_file` (`crates/isograph_extract_typescript/src/lib.rs` `memo_tests`, which already builds `IsographDb<TypeScriptHostLanguage>` fixtures):
 
 - Missing file is `None`. A file with no literals is `Some(vec![])`.
-- `iso(\`entrypoint\`)`: a `Parse` error whose span starts at or after the literal start (file-absolute).
-- Prepending `"const x = 1;\n"` shifts every error span by that length.
+- `iso(\`entrypoint\`)`: the errors equal `parse_iso_literal("entrypoint").errors` with each span shifted by the literal's `iso_literal_start_index`.
+- Prepending `"const x = 1;\n"` shifts every error span by that length and leaves every `item` equal.
+- Two literals in one file: the errors of both, each shifted by its own start.
 - Two clients: client 1's broken buffer has errors, client 2 reading clean disk has none.
-
-The `host_errors_for_extraction` tests call `TypeScriptHostLanguage::host_errors(&extraction, &parsed)`: `tagged_template_is_missing_parentheses`, `entrypoint_without_export_is_valid`, `field_without_export_is_missing_export`, `field_without_associated_function_is_missing_associated_function`, `exported_field_with_associated_function_is_valid`, `tagged_template_field_reports_parentheses_and_export_and_associated`, `host_error_span_is_the_extraction_span`, `valid_extraction_has_no_errors`, `failed_field_parse_is_not_missing_export`. The `file_literals` tests read `iso_literal_errors_in_file`: `incomplete_entrypoint_is_a_parse_error`, `missing_disk_file_has_no_file_literals` (renamed `missing_disk_file_has_no_iso_literal_errors`), `present_file_with_no_iso_has_empty_file_literals` (renamed `present_file_with_no_iso_has_no_iso_literal_errors`), `file_literals_parse_error_is_file_absolute` (renamed `iso_literal_errors_parse_error_is_file_absolute`), `tagged_template_incomplete_entrypoint_is_parentheses_only`.
-
-Before:
-
-```rust
-// from crates/isograph_extract_typescript/src/lib.rs
-    #[test]
-    fn incomplete_entrypoint_is_a_parse_error() {
-        let (db, path, extraction, parsed) = one_literal("iso(`entrypoint`)");
-        assert!(!parsed.errors.is_empty());
-        assert!(host_errors_for_extraction(&extraction, &parsed).is_empty());
-        let literals = file_literals(&db, client(), path).expect("the test interned this path");
-        assert!(
-            literals
-                .iter()
-                .flat_map(|literal| literal.errors.iter())
-                .any(|error| matches!(error.item, IsoLiteralError::Parse(_)))
-        );
-    }
-```
-
-After:
-
-```rust
-// from crates/isograph_extract_typescript/src/lib.rs
-    #[test]
-    fn incomplete_entrypoint_is_a_parse_error() {
-        let (db, path, extraction, parsed) = one_literal("iso(`entrypoint`)");
-        assert!(!parsed.errors.is_empty());
-        assert!(TypeScriptHostLanguage::host_errors(&extraction, &parsed).is_empty());
-        let errors = iso_literal_errors_in_file(&db, client(), path)
-            .as_ref()
-            .expect("the test interned this path");
-        assert!(
-            errors
-                .iter()
-                .any(|error| matches!(error.item, IsoLiteralError::Parse(_)))
-        );
-    }
-```
 
 `lsp_diagnostics_for_file` (`crates/isograph_lsp/src/file_diagnostics.rs`, with `isograph_extract_typescript` as the existing dev-dependency):
 
 - Missing file is `None`; no literals is `Some(vec![])`.
-- Each message equals the `to_string()` of the corresponding `iso_literal_errors_in_file` item; severity `ERROR`; source `isograph`.
+- Each message equals the `to_string()` of the corresponding `iso_literal_parse_errors_in_file` item; severity `ERROR`; source `isograph`; `code` `None`.
 - CRLF and lone `\r` before the literal put the range on line 1.
 - A surrogate pair (`😀`) before the literal on its line adds 2 to the start character.
 
 ## Docs this change amends
 
-- `docs-website/docs/design-docs/event-model.md`: `IsographEffect` gains `PublishDiagnostics(Box<PublishDiagnosticsEffect>)`; "HelloWorld arms a timer; `handle` of that `TimerFired` is `trigger_if_matching` and `LogHelloWorld`" becomes "HelloWorld returns `LogHelloWorld`; an applied `DiskChanged`, document sync notification, or `Started` arms the diagnostics debounce, and `handle` of that `TimerFired` returns `PublishDiagnosticsEffect`s"; "Effects from `handle` (`ReportDiagnostics`)" becomes `PublishDiagnosticsEffect`; the effect loop list adds `PublishDiagnostics`; `IsographState` names `diagnostics_debounce`.
-- `docs-website/docs/design-docs/pico.md`, Iso literals: add the chain `lsp_diagnostics_for_file(client, path) -> iso_literal_errors_in_file(client, path) -> parsed_iso_literals_in_file(client, path)`, plus `line_index(client, path) -> file_contents(client, path)`.
-- `refactors/pending/tests-only-functionality.md`: the Diagnostics block (`host_errors_for_extraction`, `FileLiteral`, `file_literals`) and the sentence "`IsoLiteralError` is the error type on `FileLiteral.errors`" are removed; "`parsed_iso_literal` is called from those and from `file_literals`" drops `file_literals`; the `WithErrors` section's "`file_literals` builds `FileLiteral` instead" becomes "`iso_literal_errors_in_file` returns the errors as a list".
+- `docs-website/docs/design-docs/event-model.md`: `IsographEffect` gains `PublishDiagnostics(Box<PublishDiagnosticsEffect>)`; "HelloWorld arms a timer; `handle` of that `TimerFired` is `trigger_if_matching` and `LogHelloWorld`" becomes "HelloWorld returns `LogHelloWorld`; an accepted `didOpen`, `didChange`, or `didClose` arms the diagnostics debounce, and `handle` of that `TimerFired` returns `PublishDiagnosticsEffect`s"; "Effects from `handle` (`ReportDiagnostics`)" becomes `PublishDiagnosticsEffect`; the effect loop list adds `PublishDiagnostics`; `IsographState` names `source_globs` and `diagnostics_debounce`; "`handle` does not know about globs, gitignore, or \"in scope\". Scope is the watcher's job." becomes "Scope of disk files is the watcher's job. `handle` reads `source_globs` only to choose which open files get diagnostics."
+- `docs-website/docs/design-docs/pico.md`, Iso literals: add the chain `lsp_diagnostics_for_file(client, path) -> iso_literal_parse_errors_in_file(client, path) -> parsed_iso_literals_in_file(client, path)`, plus `line_index(client, path) -> file_contents(client, path)`. Outbound I/O state: the `IsographState` snippet names `source_globs` and `diagnostics_debounce`, and "the planned last-published diagnostics per client" becomes `LiveSession.published_diagnostics`.
+- `refactors/pending/tests-only-functionality.md`: the Diagnostics block's "Production caller: lsp-diagnostics.md via `file_literals`" becomes "Production caller: a later host-errors change; lsp-diagnostics.md reports parse errors only".
 - `refactors/pending/format-file-from-segments.md`: its `lsp_range_for_byte_range` calls become `LineIndex::new(text).range(span)`.
 - `refactors/pending/lsp-open-files.md` change 7 "Docs this change amends" describes the previous shape of this doc (`report_diagnostics`, `file_literals`, `PublishDiagnosticsCap`); it is history of that change and is not edited.
