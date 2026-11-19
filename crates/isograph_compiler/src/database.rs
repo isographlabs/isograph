@@ -136,6 +136,17 @@ impl<THostLanguage: HostLanguage> IsographDb<THostLanguage> {
         }
     }
 
+    /// Every path `client` has open.
+    pub fn open_paths_of_client(&self, client: ClientId) -> Vec<RelativePathToSourceFile> {
+        self.get_open_file_map()
+            .tracked()
+            .0
+            .keys()
+            .filter(|key| key.client == client)
+            .map(|key| key.path)
+            .collect()
+    }
+
     pub fn insert_disk_file(&mut self, path: RelativePathToSourceFile, contents: String) {
         let source_id = self.set(DiskFile { path, contents });
         self.get_disk_file_map_mut()
@@ -658,6 +669,65 @@ mod tests {
         assert_eq!(
             read(db.reference(), ClientId(1), path),
             "disk".to_owned().wrap_some()
+        );
+    }
+
+    #[test]
+    fn open_paths_of_client_of_an_empty_database_is_empty() {
+        let db = IsographDb::<TestHostLanguage>::default();
+        assert_eq!(
+            db.open_paths_of_client(ClientId(1)),
+            Vec::<RelativePathToSourceFile>::new()
+        );
+    }
+
+    #[test]
+    fn open_paths_of_client_excludes_disk_only_paths() {
+        let mut db = IsographDb::<TestHostLanguage>::default();
+        db.insert_disk_file(intern_path("src/a.ts"), "disk".to_owned());
+        assert_eq!(
+            db.open_paths_of_client(ClientId(1)),
+            Vec::<RelativePathToSourceFile>::new()
+        );
+    }
+
+    #[test]
+    fn open_paths_of_client_returns_that_clients_open_path() {
+        let mut db = IsographDb::<TestHostLanguage>::default();
+        let a = intern_path("src/a.ts");
+        db.set_open_file(ClientId(1), a, "one".to_owned());
+        assert_eq!(db.open_paths_of_client(ClientId(1)), a.wrap_vec());
+    }
+
+    #[test]
+    fn open_paths_of_client_lists_a_path_on_disk_and_open_once() {
+        let mut db = IsographDb::<TestHostLanguage>::default();
+        let a = intern_path("src/a.ts");
+        db.insert_disk_file(a, "disk".to_owned());
+        db.set_open_file(ClientId(1), a, "one".to_owned());
+        assert_eq!(db.open_paths_of_client(ClientId(1)), a.wrap_vec());
+    }
+
+    #[test]
+    fn open_paths_of_client_excludes_another_clients_open_path() {
+        let mut db = IsographDb::<TestHostLanguage>::default();
+        let a = intern_path("src/a.ts");
+        let b = intern_path("src/b.ts");
+        db.set_open_file(ClientId(1), a, "one".to_owned());
+        db.set_open_file(ClientId(2), b, "two".to_owned());
+        assert_eq!(db.open_paths_of_client(ClientId(1)), a.wrap_vec());
+        assert_eq!(db.open_paths_of_client(ClientId(2)), b.wrap_vec());
+    }
+
+    #[test]
+    fn open_paths_of_client_drops_a_removed_open_file() {
+        let mut db = IsographDb::<TestHostLanguage>::default();
+        let a = intern_path("src/a.ts");
+        db.set_open_file(ClientId(1), a, "one".to_owned());
+        db.remove_open_file(ClientId(1), a);
+        assert_eq!(
+            db.open_paths_of_client(ClientId(1)),
+            Vec::<RelativePathToSourceFile>::new()
         );
     }
 }
