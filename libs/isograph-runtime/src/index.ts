@@ -4,6 +4,7 @@ export type {
   ArgumentValue,
   Condition,
   EntityName,
+  ExtractParameters,
   IsographEntrypoint,
   NormalizationAst,
   NormalizationCompositeTarget,
@@ -60,3 +61,14 @@ export {
   wrapPromise,
   wrapResolvedValue,
 } from './PromiseWrapper';
+export {
+  createIsographEnvironment,
+  garbageCollectEnvironment,
+  type IsographEnvironment,
+  type IsographNetworkFunction,
+  type IsographOperation,
+  retainQuery,
+  unretainQuery,
+} from './environment';
+export type { NetworkRequestKey } from './network';
+export type { ReadErr, Subscription, SubscriptionResult } from './subscribe';

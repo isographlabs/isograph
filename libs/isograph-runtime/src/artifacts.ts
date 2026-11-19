@@ -126,6 +126,13 @@ export type ReaderArtifact<
   resolver(param: TParam): TOutput;
 };
 
+/** The variables of a field whose resolver parameter is `T`. */
+export type ExtractParameters<T> = T extends {
+  readonly parameters: infer P extends Variables;
+}
+  ? P
+  : Variables;
+
 /** What `read` calls a resolver with. */
 export type ResolverParam<TEntityName extends EntityName = EntityName> = {
   readonly data: SelectionSetData;

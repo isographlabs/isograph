@@ -335,7 +335,7 @@ Upstream's semantics (`docs-website/docs/conditional-fetching.md`; `makeNetworkR
 
 ```ts
 // from libs/isograph-runtime/src/network.ts
-/** The entrypoint's query text, then `stableStringify(variables)`. */
+/** The entrypoint's query text, then `JSON.stringify(stableCopy(variables))`. */
 export type NetworkRequestKey = string;
 
 /**
@@ -856,12 +856,25 @@ export function deferredNetwork(): {
   readonly calls: ReadonlyArray<DeferredNetworkCall>;
 };
 
-/** `PetDetail`'s response for `Pet:1` with `Pet:2` as its best friend, with `overrides` on `Pet:1`. */
-export function petDetailResponse(overrides: { readonly name?: string; readonly nickname?: string | null }): JsonObject;
+/** Values of `Pet:1` that `petDetailPet` and `petDetailResponse` override. */
+export type PetDetailOverrides = {
+  readonly name?: string;
+  readonly nickname?: string | null;
+};
 
-/** `PetLists`'s response with one pet, `Pet:9`. */
-export function petListsResponse(): JsonObject;
+/** A `Pet` response object of `PetDetail`'s `pet` selection, `Pet:1` with best friend `Pet:2`
+ * whose best friend is `Pet:1`, with `overrides` on both objects of `Pet:1`. */
+export function petDetailPet(overrides: PetDetailOverrides = {}): JsonObject;
+
+/** `PetDetail`'s response for `Pet:1`, with `overrides` on `Pet:1`. */
+export function petDetailResponse(overrides: PetDetailOverrides = {}): JsonObject;
+
+/** `PetLists`' response whose only pet is `Pet:9`; it writes no record but `Pet:9` and the
+ * query root. */
+export function petListsPet9Response(): JsonObject;
 ```
+
+The landed `petDetailPet()` and `petDetailResponse()` take no argument and are called that way by store.md's and reader-ast.md's tests, so `overrides` defaults to `{}`. The overrides apply to both response objects of `Pet:1`: `normalize` writes the AST's selections in order, so the nested `Pet:1` under `bestFriend.bestFriend` would otherwise write its `name` after the top-level one. The landed `petListsResponse()` also writes `Pet:1`, `Pet:3`, `Pet:4`, and `Pet:5`, which a `PetDetail` subscription reads (`Pet:1`), so the unrelated write in these tests is the new `petListsPet9Response()`; every mention of "`PetLists` writing only `Pet:9`" below means it.
 
 ### `test/PromiseWrapper.test.ts` (`transpose`)
 
@@ -1432,7 +1445,7 @@ Each change is one commit, in order. Prerequisites: store.md changes 1 to 7 and 
 
 ### 4. The environment (libs/isograph-runtime)
 
-`src/environment.ts` with `IsographEnvironment`, `IsographNetworkFunction`, `IsographOperation`, `createIsographEnvironment`, `retainQuery`, `unretainQuery`, `garbageCollectEnvironment`; `NetworkRequestKey` as a type in `src/network.ts`; `Subscription` as a type in `src/subscribe.ts`; `ExtractParameters` in `src/artifacts.ts`; their exports; `test/environment.test.ts`; `deferredNetwork` in `test/fixtures.ts`. Depends on 2.
+`src/environment.ts` with `IsographEnvironment`, `IsographNetworkFunction`, `IsographOperation`, `createIsographEnvironment`, `retainQuery`, `unretainQuery`, `garbageCollectEnvironment`; `NetworkRequestKey` as a type in `src/network.ts`; `Subscription`, and the `SubscriptionResult` and `ReadErr` its `delivered` field names, as types in `src/subscribe.ts`; `ExtractParameters` in `src/artifacts.ts`; their exports; `test/environment.test.ts`; `deferredNetwork` in `test/fixtures.ts`. Depends on 2.
 
 ### 5. Subscriptions (libs/isograph-runtime)
 
