@@ -1,10 +1,12 @@
 # Components returned by fields
 
-Status: exploration. This is not a plan for v1 and not approved for implementation. It decides nothing; it lays out options and ends with open questions.
+Status: exploration. This is not a plan for v1 and not approved for implementation. It lays out the design space, a concrete shape for the option that keeps component identity, and open questions.
 
 The question: what happens when a client field's resolver returns a React component. React compares an element's `type` with `Object.is`; when the type at one position of the tree changes, React unmounts the old subtree (its state is lost and its effects are cleaned up) and mounts the new one. A field that returns a component must therefore return the same function on every read for as long as the component is meant to keep its state. Something has to hold that function. This doc asks where, and whether userland can do it in i2, where v1 has no directives (`refactors/pending/iso-directives-unexpected.md`) and `@isograph/runtime` has no React knowledge (`refactors/pending/runtime/store.md`, `refactors/pending/runtime/reader-ast.md`).
 
-Upstream references are the checkout at `/Users/rbalicki/code/isograph` (commit `79e2a3c0`). Paths without a directory are under `isograph/libs/isograph-react/src/core`; `react/` paths are under `isograph/libs/isograph-react/src/react`. "Change 1" to "change 4" are the changes of `refactors/pending/runtime/pico-runtime.md`.
+The answer turns on one distinction (Two kinds of resolver result): whether the field's result is a closure that reads the field's data when the closure is executed, or a value computed from data read when the resolver runs. Every option below produces one of the two, or is storage for one.
+
+Upstream references are the checkout at `/Users/rbalicki/code/isograph` (commit `79e2a3c0`). Paths without a directory are under `isograph/libs/isograph-react/src/core`; `react/` paths are under `isograph/libs/isograph-react/src/react`. "Change 1" to "change 4" and "Step A" are those of `refactors/pending/runtime/pico-runtime.md`. `readButDoNotEvaluate`, `readAndSubscribe`, `SubscriptionResult`, and `IsographEnvironment` are `refactors/pending/runtime/network-and-subscriptions.md`'s (Step A, amended). `useIsographEnvironment`, `onNextChangeToFragmentData`, and `useResult` are `refactors/pending/runtime/react.md`'s.
 
 ## What upstream does
 
@@ -100,7 +102,7 @@ Two consequences of the `??=`:
 
 The component's stable location is determined by the record id, the field, and the variables. That is a resolver store key on a record (pico-runtime.md, The resolver store key). Store the component there, on the record, as change 2 stores a resolver result, and it is deleted with the record: change 3's `garbageCollect` deletes the records no retention reaches, and with them every resolver entry they hold, and sweeps resolver entries on surviving records that no retained or observed location reaches.
 
-The rest of this doc asks how much of that userland can do without `@component` and without runtime code that knows about components.
+The rest of this doc asks how much of that userland can do without `@component` and without runtime code that knows about components. The closure field below needs runtime code that knows that a resolver can create a wrapper; it needs none that knows React.
 
 ## What a resolver has in i2
 
@@ -116,11 +118,424 @@ export type ResolverParam<TEntityName extends EntityName = EntityName> = {
 
 (reader-ast.md, The artifact's TypeScript types; A resolver's own link.) A resolver receives its selections, its variables, and its own record's link. It does not receive the store or the record. The link works for every record: a `PetStats` record's link carries its derived id `Pet:1.stats` (store.md, Record ids), which no selectable holds, and on a field of an abstract entity the link names the concrete entity, which the store does not otherwise keep (store.md, The store). `link` is typed `Pet____link__output_type`, `Link<"Pet">` (store.md change 6). A nested record's link comes from a one-line client field on that entity that returns `link`, selected in the nested selection set (reader-ast.md, A resolver's own link).
 
-The examples below select `id` and build the link by hand (`{ entityName: 'Pet', id: data.id }`). With `link` on `ResolverParam`, each of them reads `link` instead and drops the `id` selection; nothing else in them changes.
+## Two kinds of resolver result
 
-The fixture used below is store.md's `Pet` entity (`id`, `name`, `nickname`, `tagline`) and the field `Pet.PetName`.
+(a) A closure that reads its data when the closure is executed. The field's result is a function. When React calls it (a component, at render) or code calls it (a plain function), the function reads the field's selections from the store at that moment and computes from what it read.
 
-## Option 1: a resolver that selects only `id` and returns a component
+- The field's result is computed from the record's link, the field's reader artifact, and the field's variables. None of them changes for one record, field, and variables, so the result is the same function for that triple for as long as it is stored. Stability holds by construction, with no memo that compares data.
+- The data dependency moves from the field to the closure's execution. The parent that selects the field does not read the field's selections and does not depend on them. Whoever executes the closure reads them, and a component that must re-render on a change subscribes to them itself.
+- Upstream's `@component` is this kind. The parent's read returns the cached component and does not read the component's data (`read.ts:603-612`); the component reads at render through `useReadAndSubscribe` (`react/useReadAndSubscribe.ts:88-130`).
+
+(b) A value computed from data read eagerly, when the resolver runs. The runtime reads the field's selections, then calls the resolver with them. That happens at read time under v1 (reader-ast.md, The read function), during render under react.md's `useResult`, or at normalization time under changes 2 and 3, where settlement computes every resolver result a retained query reaches.
+
+- The field's result changes whenever its data changes: the resolver is called again with the new data, and under change 2 an entry whose dependency changed is recomputed.
+- A component built this way is a new function after each change of its data, and React remounts it. A component that keeps the first function forever shows the first data forever. Why closing over data breaks stability, below, works this through.
+- Its parent depends on the component's data, so a data change also reaches the parent. Under change 2, with `===` result equality, every component-returning ancestor recomputes and remounts too (Option 4).
+
+The options this doc considered before are placed under this split in The earlier options under the split. The design for (a) comes first.
+
+## A field whose result is a closure
+
+The user's function receives the field's data and the caller's arguments. The runtime does not call it at read. It creates, once per record, field, and variables, a wrapper that reads the field's data through the field's reader artifact and the record's link when the wrapper is executed, and calls the user's function with that data. The wrapper is the field's value, stored on the record, and freed with it.
+
+### End-user experience
+
+```tsx
+// from demos/pet-demo/src/PetCard.tsx
+import { component } from '@isograph/react';
+
+export const PetCard = iso(`
+  field Pet.PetCard {
+    PetName
+    tagline
+  }
+`)(component(function PetCard({ data }, props: { readonly selected: boolean }) {
+  return (
+    <div className={props.selected ? 'selected' : undefined}>
+      {data.PetName.name}: {data.tagline}
+    </div>
+  );
+}));
+```
+
+```tsx
+// from demos/pet-demo/src/HomeRoute.tsx
+import { component } from '@isograph/react';
+
+export const HomeRoute = iso(`
+  field Query.HomeRoute {
+    pets {
+      id
+      PetCard
+    }
+  }
+`)(component(function HomeRoute({ data }, props: { readonly selectedId: string | null }) {
+  return data.pets.map((pet) => (
+    <pet.PetCard key={pet.id} selected={pet.id === props.selectedId} />
+  ));
+}));
+```
+
+One iso literal per component, data in the first parameter, props in the second, as upstream's `@component` (A `@component` directive). `pet.PetCard` is typed `React.FC<{ readonly selected: boolean }>`. When `Pet:1.tagline` changes, `PetCard` on `Pet:1` re-renders and `HomeRoute` does not: `HomeRoute`'s data holds `PetCard`'s stored wrapper, which is the same function before and after the write.
+
+A plain function is the same mechanism without React:
+
+```ts
+// from demos/pet-demo/src/shareText.ts
+import { closure } from '@isograph/runtime';
+
+export const shareText = iso(`
+  field Pet.shareText {
+    PetName
+    tagline
+  }
+`)(closure(function shareText({ data }, prefix: string) {
+  return `${prefix} ${data.PetName.name}: ${data.tagline}`;
+}));
+```
+
+`data.shareText` is typed `(prefix: string) => ReadResult<string>`. Calling it reads `PetName` and `tagline` at the time of the call, so an event handler that calls it after a write sees the written values.
+
+### The resolver's two forms
+
+```ts
+// from libs/isograph-runtime/src/artifacts.ts
+export type ReaderArtifact<
+  TParam extends ResolverParam<TEntityName>,
+  TOutput,
+  TEntityName extends EntityName,
+> = {
+  /** The client field's selectable name: the prefix of its resolver store key. */
+  readonly selectableName: string;
+  readonly readerAst: ReaderSelectionSet;
+  readonly resolver: EagerResolver<TParam, TOutput> | ClosureResolver<TParam, TOutput>;
+};
+
+/**
+ * A resolver `read` calls with the data it read. Written as React's `bivarianceHack`
+ * (`@types/react`'s `EventHandler`) so that TypeScript compares `TParam` bivariantly, as it
+ * compared the method signature this replaces (reader-ast.md, Why `resolver` is a method
+ * signature).
+ */
+export type EagerResolver<TParam, TOutput> = {
+  bivarianceHack(param: TParam): TOutput;
+}['bivarianceHack'];
+
+/**
+ * A resolver whose value is a wrapper `read` creates once per record, field, and variables,
+ * without reading the field's selections.
+ */
+export type ClosureResolver<TParam extends ResolverParam, TWrapper> = {
+  readonly kind: 'Closure';
+  /** Called once per record, field, and variables. A method signature, so it is bivariant
+   * in `TParam`. */
+  createWrapper(reference: ClosureReference<TParam>, store: Store): TWrapper;
+};
+
+/** What a wrapper reads with when it is executed. */
+export type ClosureReference<TParam extends ResolverParam> = {
+  /** The closure field's own reader artifact. Its reader AST is the field's selections. */
+  readonly artifact: ReaderArtifact<TParam, unknown, EntityName>;
+  readonly link: TParam['link'];
+  /** The field's variables: `childVariables` of the selecting node's arguments. */
+  readonly parameters: TParam['parameters'];
+};
+```
+
+Deltas from reader-ast.md's `ReaderArtifact`: `selectableName` is change 2's field, brought forward because the wrapper's store key needs it; `resolver` is a property whose type is a union of the two forms, instead of a method signature. `EagerResolver` is the user's function as v1 has it. `ClosureResolver` is an object made by a helper (`closure` in `@isograph/runtime`, `component` in `@isograph/react`), which the generated `resolver_reader.ts` imports through `resolver: resolver` exactly as it imports a function today. The compiler does not know which form a field has.
+
+### Reading
+
+`read` (reader-ast.md, The read function) returns the stored wrapper for a closure resolver, and reads the selections only for an eager one. Before:
+
+```ts
+// from libs/isograph-runtime/src/read.ts
+  const data = readSelectionSet(store, artifact.readerAst, root, variables);
+  if (data.kind === "MissingData") {
+    return data;
+  }
+  return ok(artifact.resolver({ data: data.value, parameters: variables, link: root }));
+```
+
+After:
+
+```ts
+// from libs/isograph-runtime/src/read.ts
+  const resolver = artifact.resolver;
+  if (typeof resolver !== "function") {
+    return ok(closureWrapper(store, record, artifact, resolver, root, variables));
+  }
+  const data = readSelectionSet(store, artifact.readerAst, root, variables);
+  if (data.kind === "MissingData") {
+    return data;
+  }
+  return ok(resolver({ data: data.value, parameters: variables, link: root }));
+```
+
+`record` is the record `read` already looks up for its absent-record check, bound to a `const` instead of compared and dropped.
+
+```ts
+// from libs/isograph-runtime/src/closure.ts
+/**
+ * The wrapper stored on `record` under the field's resolver store key, created by
+ * `resolver.createWrapper` the first time the field is read there with `variables`.
+ */
+export function closureWrapper<TEntityName extends EntityName, TWrapper>(
+  store: Store,
+  record: StoreRecord,
+  artifact: ReaderArtifact<ResolverParam<TEntityName>, TWrapper, TEntityName>,
+  resolver: ClosureResolver<ResolverParam<TEntityName>, TWrapper>,
+  root: Link<TEntityName>,
+  variables: Variables,
+): TWrapper {
+  const key = resolverStoreKey(artifact.selectableName, variables);
+  const stored = record.get(key);
+  if (stored === undefined) {
+    const wrapper = resolver.createWrapper({ artifact, link: root, parameters: variables }, store);
+    record.set(key, { kind: "Closure", wrapper, timeUpdated: store.epoch });
+    return wrapper;
+  }
+  if (stored.kind !== "Closure") {
+    throw new Error(`${artifact.selectableName} on ${recordName(root)} holds a ${stored.kind} entry`);
+  }
+  // `key` on `record` is written only here, by `artifact`: one selectable of one entity has
+  // one reader artifact.
+  return stored.wrapper as TWrapper;
+}
+```
+
+The throw is store.md's kind of throw (Errors): a client field's store key is never a server store key (change 1, The store), and a field whose resolver is a closure never stores a `ResolverEntry`, so only a broken invariant reaches it.
+
+The `Resolver` case of `readSelection` is unchanged: it calls `read`, which now returns the wrapper. A parent that selects a closure field therefore never reads that field's selections, and a `MissingData` inside them does not end the parent's read.
+
+`readButDoNotEvaluate` (network-and-subscriptions.md, Reading without the root resolver) is unchanged. For a closure field's artifact it reads the field's selections and calls nothing, which is the read a wrapper makes when it is executed.
+
+### What is stored, and how it is freed
+
+```ts
+// from libs/isograph-runtime/src/store.ts
+export type StoreEntry = ServerEntry | ResolverEntry | ClosureEntry;
+
+/** A closure field's wrapper, created once by its resolver's `createWrapper`. */
+export type ClosureEntry = {
+  readonly kind: 'Closure';
+  readonly wrapper: unknown;
+  /** The epoch it was created in. */
+  readonly timeUpdated: Epoch;
+};
+```
+
+The entry lives on the record the field was read on, under `resolverStoreKey(artifact.selectableName, variables)` (change 2, The resolver store key): `PetCard` on `Pet:1` is `PetCard`; a closure field with `$limit: Int = 3` selected with no argument is `F____limit___3`. Two selections of the field with equal argument values on one record share one wrapper, whatever their aliases.
+
+This needs change 1's tagged entries and nothing else of changes 1 to 4. v1's `StoreRecord` holds untagged `StoreValue`s (store.md, The store), which are JSON, so a function cannot be stored in it without widening every walk's value type. Before change 2, `ResolverEntry` is not yet in the union, and `timeUpdated` has no reader; change 2's dependency check reads it.
+
+Freeing:
+
+- store.md's `garbageCollect` deletes a record no retained query reaches, with every entry on it, the wrapper's included. Nothing else holds the wrapper except a parent's data that held it and the React tree that renders it, and both are dropped when the parent re-reads and the component unmounts.
+- Under change 3, the sweep of resolver entries on surviving records also sweeps closure entries that no retained or observed location reaches. A parent that selects the closure field reaches it through its `Entry` dependency.
+- A record collected and later normalized again gets a new wrapper, so a component that was mounted across the collection remounts (open question 4). Upstream's leaked cache keeps the old one (What upstream does).
+
+Reading while writing: `closureWrapper` writes the store during a read. It advances no epoch, and no dependency observed the key before the write: the only reader of the key is a read of the closure field, which creates the entry before it records a dependency on it. Under change 2 that dependency is `Entry(record, key)` with `observed` the creation epoch, which changes only when the entry is deleted and created again; `garbageCollect` advances the epoch when it deletes, so the recreated entry's `timeUpdated` differs. pico-runtime.md open decision 8 concerns a resolver that reaches the store; this write is the runtime's, and does not break verification for the reason above.
+
+### The wrappers
+
+The plain function, in `@isograph/runtime`:
+
+```ts
+// from libs/isograph-runtime/src/closure.ts
+/** A field whose value is a function that reads the field's data each time it is called. */
+export function closure<
+  TParam extends ResolverParam,
+  TArgs extends ReadonlyArray<unknown>,
+  TResult,
+>(
+  body: (param: TParam, ...args: TArgs) => TResult,
+): ClosureResolver<TParam, (...args: TArgs) => ReadResult<TResult>> {
+  const bound: { call(param: ResolverParam, ...args: TArgs): TResult } = { call: body };
+  return {
+    kind: 'Closure',
+    createWrapper(reference, store) {
+      return (...args) => {
+        const data = readButDoNotEvaluate(store, reference.artifact, reference.link, reference.parameters);
+        if (data.kind === 'MissingData') {
+          return data;
+        }
+        return ok(bound.call({ data: data.value, parameters: reference.parameters, link: reference.link }, ...args));
+      };
+    },
+  };
+}
+```
+
+`ok` is `read.ts`'s, exported for this module. `bound` binds `body` through a method signature, so `TParam` is compared bivariantly and the runtime's untyped `SelectionSetData` reaches the generated param type with no cast, as react.md's `useResult` binds the reader artifact. The wrapper reads from the store it was created with. It does not subscribe: a function reads when it is called.
+
+The component, in `@isograph/react` (react.md):
+
+```tsx
+// from libs/isograph-react/src/react/component.ts
+import type { ClosureResolver, ResolverParam } from '@isograph/runtime';
+import type React from 'react';
+import { useClosureData } from './useClosureData';
+
+/** A field whose value is a component that reads the field's data when it renders. */
+export function component<TParam extends ResolverParam, TProps extends object>(
+  body: (param: TParam, props: TProps) => React.ReactNode,
+): ClosureResolver<TParam, React.FC<TProps>> {
+  const bound: { call(param: ResolverParam, props: TProps): React.ReactNode } = { call: body };
+  return {
+    kind: 'Closure',
+    createWrapper(reference) {
+      function Component(props: TProps): React.ReactNode {
+        const data = useClosureData(reference);
+        return bound.call({ data, parameters: reference.parameters, link: reference.link }, props);
+      }
+      Component.displayName = `${reference.artifact.selectableName} (${reference.link.entityName}:${reference.link.id})`;
+      return Component;
+    },
+  };
+}
+```
+
+```ts
+// from libs/isograph-react/src/react/useClosureData.ts
+import {
+  readAndSubscribe,
+  readButDoNotEvaluate,
+  type ClosureReference,
+  type ResolverParam,
+  type SelectionSetData,
+  type SubscriptionResult,
+} from '@isograph/runtime';
+import { useEffect, useState } from 'react';
+import { onNextChangeToFragmentData } from '../core/read';
+import { useIsographEnvironment } from './IsographEnvironmentProvider';
+
+/**
+ * The data `reference`'s reader AST reads now, re-rendering when it changes. Suspends on
+ * `MissingData` until a write fills it; throws a re-read's error.
+ */
+export function useClosureData<TParam extends ResolverParam>(
+  reference: ClosureReference<TParam>,
+): SelectionSetData {
+  const environment = useIsographEnvironment();
+  const [result, setResult] = useState<SubscriptionResult>(() =>
+    readButDoNotEvaluate(environment.store, reference.artifact, reference.link, reference.parameters),
+  );
+  useEffect(
+    () =>
+      readAndSubscribe(
+        environment,
+        reference.artifact,
+        reference.link,
+        reference.parameters,
+        result,
+        setResult,
+      ),
+    [environment],
+  );
+  switch (result.kind) {
+    case 'Ok':
+      return result.value;
+    case 'MissingData':
+      throw onNextChangeToFragmentData(environment, reference.artifact, reference.link, reference.parameters, result);
+    case 'Err':
+      throw result.error;
+  }
+}
+```
+
+- The read is react.md's `useReadAndSubscribe` (a read in the `useState` initializer, `readAndSubscribe` in an effect with the rendered result as `delivered`, so a write between render and effect is delivered), without the stable-id check. react.md adds that check because a component calling `useResult` can receive another fragment reference. A wrapper has exactly one `ClosureReference` for its life, so the effect's dependencies are `[environment]`, which is upstream's assumption (`react/useRerenderOnChange.ts:31-37`) made true by construction.
+- `onNextChangeToFragmentData` takes the artifact, the link, and the variables instead of a `FragmentReference`, because a closure has no network request. The component waits for the data and does not see a request's error; the error reaches the entrypoint's reader through `useResult`'s `maybeUnwrapNetworkRequest`. Upstream's component waits on the first request that created it (What upstream does, the first caller wins), which this removes.
+- The component reads through the environment in context, not through the `store` `createWrapper` receives. A component rendered under another provider than the one whose store created it reads the other store. Open question 5.
+- `displayName` is upstream's (`react/useReadAndSubscribe.ts:127-128`) without the `@component` suffix.
+
+### Typing
+
+The param type is unchanged: `Pet__PetCard__param` has `data`, `parameters`, and `link: Pet____link__output_type` (reader-ast.md, The param type's link). The output type and the iso overload change, in the generators, so that both resolver forms type-check without the compiler knowing the form.
+
+Before (`crates/typescript_artifacts/src/generate_types.rs`, `output_type.ts`):
+
+```ts
+// generated by crates/typescript_artifacts/src/generate_types.rs
+import type { PetCard as resolver } from "./../../../PetCard";
+export type Pet__PetCard__output_type = ReturnType<typeof resolver>;
+```
+
+After:
+
+```ts
+// generated by crates/typescript_artifacts/src/generate_types.rs
+import type { ResolverOutput } from "@isograph/runtime";
+import type { PetCard as resolver } from "./../../../PetCard";
+export type Pet__PetCard__output_type = ResolverOutput<typeof resolver>;
+```
+
+```ts
+// from libs/isograph-runtime/src/artifacts.ts
+/** The value `read` returns for a field with `TResolver`: a closure resolver's wrapper, or an
+ * eager resolver's return type. */
+export type ResolverOutput<TResolver> =
+  TResolver extends ClosureResolver<ResolverParam, infer TWrapper>
+    ? TWrapper
+    : TResolver extends EagerResolver<never, infer TOutput>
+      ? TOutput
+      : never;
+```
+
+Before (`crates/typescript_artifacts/src/iso_overloads.rs`, `iso.ts`):
+
+```ts
+// generated by crates/typescript_artifacts/src/iso_overloads.rs
+type IdentityWithParam<TParam extends object, TReturnConstraint = unknown> = <TClientFieldReturn extends TReturnConstraint>(clientField: (param: TParam) => TClientFieldReturn) => (param: TParam) => TClientFieldReturn;
+```
+
+After:
+
+```ts
+// generated by crates/typescript_artifacts/src/iso_overloads.rs
+import type { ClosureResolver, ResolverParam } from "@isograph/runtime";
+type IdentityWithParam<TParam extends ResolverParam, TReturnConstraint = unknown> = {
+  <TClientFieldReturn extends TReturnConstraint>(clientField: (param: TParam) => TClientFieldReturn): (param: TParam) => TClientFieldReturn;
+  <TWrapper extends TReturnConstraint>(clientField: ClosureResolver<TParam, TWrapper>): ClosureResolver<TParam, TWrapper>;
+};
+```
+
+- `TEntityName`: `ClosureReference<TParam>.link` is `TParam['link']`, the generated `E____link__output_type`, so a `PetCard` wrapper's link is `Link<"Pet">`, and on an abstract entity the union of its concrete entities' names (reader-ast.md, The parent entity's name). `reference.artifact` is held at `EntityName`; `readButDoNotEvaluate` and `readAndSubscribe` are called with the pair at `EntityName`, which network-and-subscriptions.md's `Subscription` already does.
+- Props: `component`'s `TProps` is inferred from the annotation on `body`'s second parameter, and the field's output type is `React.FC<TProps>`. `key` is admitted by TypeScript's JSX check through `JSX.IntrinsicAttributes`, so upstream's `CombineWithIntrinsicAttributes` (`generate_artifacts.rs:623-626`) is not needed.
+- `TParam` for `body`'s first parameter comes from the contextual type: `component(..)` is the argument of the second `IdentityWithParam` signature, whose parameter type is `ClosureResolver<Pet__PetCard__param, TWrapper>`, and TypeScript infers `component`'s `TParam` from that return type. This is not checked with `tsc`. If inference through the overload fails, `data` is `SelectionSetData`'s values typed `unknown`, and the implementer stops and raises it.
+- `TArgs` of `closure` is inferred from `body`'s parameters after the first, `TResult` from its return.
+
+### Fetching the closure's data
+
+The query includes the closure's selections with no compiler change. To the compiler, `PetCard` is an ordinary client field: its iso literal declares `PetName` and `tagline`, `HomeRoute`'s selection set reaches it, and query generation merges the selections of every client field the entrypoint reaches into the query (query-generation.md, Merging). Its reader AST and its `Resolver` node in `HomeRoute`'s reader AST are generated as for any field. Only the runtime treats the field differently, and only at read, from the resolver's value. Upstream does the same for `@component` (`merge_client_scalar_field`, `create_merged_selection_set.rs:932`, has no case on it).
+
+This is the split option 2 builds out of `PetCardFetched` and `PetCardData` (Option 2): the query includes the selections, and the parent's read does not depend on them. Here the field's own selections play `PetCardData`'s part, and `read` skipping them plays `PetCardFetched`'s. `check` (store.md) of the merged normalization AST reports the closure's data as missing when it is, so `fetchEntrypoint` with `IfNecessary` sends the request (network-and-subscriptions.md, Fetching).
+
+### Under changes 2 to 4
+
+- Change 2: a parent that selects a closure field records one dependency on the closure entry. Its observed `timeUpdated` changes only when the entry is deleted and created again, so the parent's entry never recomputes for the closure's data.
+- Change 3: settlement does not compute the closure's data, because no parent depends on it. A component's render then reads its data, which pico-runtime.md's goal ("Renders do no work") excludes. The alternative is a second entry per closure entry, holding the data read as a `ResolverEntry`, which settlement computes when a retained root reaches the closure entry and which the component observes. Open question 3.
+- Change 4: Step A's `readAndSubscribe` is replaced by `listen` and `snapshot`, which take an `EntryLocation`. `useClosureData` then needs that second entry's location, so change 4 decides open question 3.
+
+### Without runtime support
+
+A helper with no runtime change cannot stop `read` from reading the field's selections before it calls the resolver, so the field stays an eager result whose resolver ignores `data` and returns a stored wrapper. What that costs, each of which the runtime version removes:
+
+- The parent's read depends on the closure's selections. `MissingData` in them ends the parent's read, and the resolver runs again after every change to them. Under Step A the parent's data is still equal (`===` on the same wrapper), and under change 2 the recomputed entry backdates, so identity survives; the work does not.
+- The wrapper needs a key whose lifetime is the record's. The resolver receives the link, not the record, so the helper's map is option 1's string-keyed map, with its leak and its sharing across stores, or option 3's `RecordHandle` or `memo`, which are runtime API.
+- The wrapper needs the field's reader artifact to read at execution, which the resolver does not receive. The user's module imports its own `resolver_reader.ts`, the module cycle of option 2.
+
+## The earlier options under the split
+
+The fixture used below is store.md's `Pet` entity (`id`, `name`, `nickname`, `tagline`) and the field `Pet.PetName`. The examples select `id` and build the link by hand (`{ entityName: 'Pet', id: data.id }`). With `link` on `ResolverParam`, each of them reads `link` instead and drops the `id` selection; nothing else in them changes.
+
+- Option 1 is eager. Its result is stable only because its one input, `id`, never changes, and it cannot show data that does.
+- Option 2 is a closure built by hand. The field is eager over inputs that never change (`id` and a constant-returning field), and its result is a component that reads its data at render through a hook. The closure field above is option 2 with the runtime doing the three literals' work.
+- Option 2 with a module-level component is a closure whose identity is the module binding. The field returns no component.
+- Option 3 is storage. For an eager result it makes the result stable by ignoring later data; for a closure it is where the wrapper lives. The runtime's `ClosureEntry` is that storage.
+- Option 4 is eager.
+
+### Option 1: a resolver that selects only `id` and returns a component
 
 ```ts
 // from demos/pet-demo/src/PetCard.tsx
@@ -138,10 +553,10 @@ export const PetCard = iso(`
 The component closes over `data`, and `data` holds only `id`, which never changes for one record. Whether the function is the same across reads depends on what calls the resolver:
 
 - v1 `read` calls every resolver on every read (reader-ast.md, The read function: `ok(artifact.resolver(..))`). Each read returns a new function, and each render that reads again remounts the card.
-- Step A of pico-runtime.md re-reads every subscription after every write with v1's `read`. The nested resolver returns a new function, its parent's data compares unequal (`===` on nested resolver values), and every subscribed parent receives a new card on every write (pico-runtime.md, Step A, Costs). Every write remounts every card.
+- Step A re-reads every subscription after every write with v1's `read`. The nested resolver returns a new function, its parent's data compares unequal (`===` on nested resolver values), and every subscribed parent receives a new card on every write (pico-runtime.md, Step A, Costs). Every write remounts every card.
 - Change 2 stores the result in a `ResolverEntry` on `Pet:1` under `PetCard`. Its one dependency is `Entry(Pet:1, id)`. `normalize` keeps an equal value's entry (change 1), so `id`'s `timeUpdated` never moves, verification finds the dependency unchanged, and the stored function is returned on every read. Option 4 covers this.
 
-Without change 2, stability needs a memo the user writes. The only key a resolver has is the link it built by hand, so the memo is a module-level map keyed by a string:
+Without change 2, stability needs a memo the user writes. The only key a resolver has is the link, so the memo is a module-level map keyed by a string:
 
 ```ts
 // from demos/pet-demo/src/PetCard.tsx
@@ -189,9 +604,9 @@ there are two choices, and both are wrong:
 - Return a new function when `name` changes (change 2 does this, since the resolver re-runs when its input changes). The new identity remounts the card on every change of `name`. State inside the card (a `useState`, an input's focus and text, a running effect) is lost.
 - Return the first function forever (the memo above). The card shows the first `name` forever.
 
-A function's identity and the data it closes over change together. A component that must keep its identity across data changes cannot close over the data; it has to read the data at render time from somewhere that changes without changing the function. That is option 2.
+A function's identity and the data it closes over change together. This is the eager kind's limit: a component that must keep its identity across data changes cannot be computed from its data, and has to read the data when it is executed, from somewhere that changes without changing the function. That is the closure kind: option 2 by hand, or the closure field.
 
-## Option 2: a component that reads its own data through a hook, given its link
+### Option 2: a component that reads its own data through a hook, given its link
 
 The resolver's result depends only on the link. The component reads its data at render through a hook in the React package:
 
@@ -263,7 +678,7 @@ The parent renders `<data.PetCard selected={isSelected} />`. Under change 2, `Pe
 
 As written, this does not fetch the card's data. Query generation inlines the selections of client fields the entrypoint reaches (query-generation.md, Merging), and nothing reaches `PetCardData`: the hook call is runtime code the compiler does not read. The query fetches `Pet.id` and no `name` or `tagline`, and the hook suspends with no request that would fill it.
 
-### Fetching the component's data without the field depending on it
+#### Fetching the component's data without the field depending on it
 
 `PetCard` has to select something that brings `PetCardData`'s selections into the query. If it selects `PetCardData` directly, its resolver entry depends on `PetCardData`'s entry, re-runs when the card's data changes, and returns a new function: the closure problem again, though the function does not use the value. The selection has to reach `PetCardData` through a field whose own result does not change. In userland that is a field whose resolver returns a constant:
 
@@ -309,13 +724,13 @@ notify                      the observer of (Pet:1, PetCardData) is called; PetC
 
 The query fetches `name`, `nickname`, and `tagline` because `PetCardFetched` reaches `PetCardData` and `PetName`. Settlement computes `PetCardData` eagerly because the retained root reaches it through `PetCard` and `PetCardFetched` (change 3, Settlement), so the hook's first `snapshot` finds a stored result. This reproduces upstream's split (the query includes the component's selections, the parent's read does not depend on them, `read.ts:603-612`) out of three fields and the backdating of change 2.
 
-What is left that the runtime does not give userland:
+What is left that the runtime does not give userland, each of which the closure field removes:
 
 - `MissingData` still propagates. When `PetCardData` lacks `tagline`, `PetCardFetched`'s resolver is not called and its result is `MissingData`, and so is `PetCard`'s, and so is the parent's (reader-ast.md, Semantics: the first `MissingData` ends the read). The parent cannot render the card at all, where upstream renders it and the card suspends at its own boundary. The parent's result also changes from `MissingData` to `Ok` when the data arrives, which is a new function and a mount, the first one.
 - Arguments. When `PetCardData` declares a variable (`$limit: Int = 3`), the store key the hook computes must use the values `PetCardFetched`'s selection passed. The user writes them twice, once in the iso literal and once in the hook call, and nothing checks that they agree. A mismatch is a store key no query wrote and a hook that suspends forever.
 - A module cycle. `PetCard.tsx` imports `PetCardData/resolver_reader.ts`, which imports the `PetCardData` resolver from `PetCard.tsx`. ES modules allow it because the reader artifact is read only inside the component body, at render, after both modules finished evaluating. Moving `PetCardData` into its own file removes the cycle.
 
-### Option 2 without a function per record
+#### Option 2 without a function per record
 
 The function the resolver creates closes over nothing but the link. The link can be a prop instead, and the component a module-level constant:
 
@@ -336,11 +751,11 @@ export function PetCardView(props: {
 
 Its identity is the module binding, so nothing needs to be stored, there is nothing to free, and it works under v1's `read` and Step A as well as under change 2. The field no longer returns a component: the parent selects `id` and `PetCardFetched`, builds the link, imports `PetCardView`, and renders `<PetCardView link={link} selected={isSelected} />`. This is Relay's fragment reference with the masking done by hand. The parent's resolver depends on `PetCardFetched`, which backdates, so the parent's own result is stable for the same reason `PetCard`'s was.
 
-## Option 3: a userland memo per record
+### Option 3: a userland memo per record
 
-Under v1 and Step A, where no resolver result is stored, a memo is the only way a resolver returns the same function twice. The key must be an object whose lifetime is the record's, or the memo leaks (Option 1's string map). Links are not that object: a link value is stored under the store key of the field that points at the record, many links point at one record, and the resolver receives none of them. The record itself is that object: a `StoreRecord` map is created once by `normalize` and dropped when `garbageCollect` deletes it (store.md, `garbageCollect`). userland cannot reach it, so the runtime would expose an opaque handle to it.
+Under v1 and Step A, where no resolver result is stored, a memo is the only way an eager resolver returns the same function twice. The key must be an object whose lifetime is the record's, or the memo leaks (Option 1's string map). Links are not that object: a link value is stored under the store key of the field that points at the record, many links point at one record, and the resolver receives none of them. The record itself is that object: a `StoreRecord` map is created once by `normalize` and dropped when `garbageCollect` deletes it (store.md, `garbageCollect`). userland cannot reach it, so the runtime would expose an opaque handle to it.
 
-### In a `WeakMap`, through a record handle
+#### In a `WeakMap`, through a record handle
 
 ```ts
 // from libs/isograph-runtime/src/artifacts.ts
@@ -378,7 +793,7 @@ export function memoOnRecord<T>(record: RecordHandle, key: string, create: () =>
 
 The runtime passes the record's `StoreRecord` map, typed as `RecordHandle`, in `callResolver`; the brand stops user code from mutating it through the type. The `WeakMap` entry is collectable once the record is deleted. Two stores have distinct records, so nothing is shared across stores. The user chooses `key`, so two fields that pick the same key collide, and the cast is an invariant the user keeps by discipline.
 
-### In the store, through a memo function
+#### In the store, through a memo function
 
 ```ts
 // from libs/isograph-runtime/src/artifacts.ts
@@ -403,11 +818,11 @@ export type MemoEntry = {
 
 The runtime keys the memo by the reading field's resolver store key, so two fields never collide and the user writes no key. It is deleted with its record. Costs: a third entry kind that every walk narrows away; a store key namespace for memos that no selectable name can produce; a write to the store during a read, which pico-runtime.md open decision 8 lists as breaking verification unless it records nothing and advances no epoch; and a value nothing invalidates, so a `memo` whose `create` closes over `data` returns stale data forever, with no type to stop it.
 
-Under change 2, the store version is a `ResolverEntry` whose dependencies never change. An `id`-only resolver already is that entry. The memo adds nothing for components under change 2, except in one case: a resolver that must depend on changing data and still return the same function (it selects `PetCardData` directly and memoizes), where `memo` makes the recomputed result `===` the stored one, so it backdates. Option 2's constant-returning field reaches the same result with no new API.
+`ClosureEntry` is the store version keyed by the closure field's own resolver store key, with the stale-data problem removed: the wrapper's `createWrapper` receives no `data`, only the reference it reads with. The memo has no use for components once closure fields exist. Under change 2 without closure fields it has one: a resolver that must depend on changing data and still return the same function, where `memo` makes the recomputed result `===` the stored one, so it backdates. Option 2's constant-returning field reaches the same result with no new API.
 
-## Option 4: change 2 alone
+### Option 4: change 2 alone
 
-Change 2 makes every resolver result stable until one of its recorded inputs changes, stores it on the record it was read on, and change 3 deletes it with the record or when no retained or observed location reaches it. That is the user's idea for any resolver, and it needs nothing component-specific.
+Change 2 makes every resolver result stable until one of its recorded inputs changes, stores it on the record it was read on, and change 3 deletes it with the record or when no retained or observed location reaches it. That is the user's idea for any eager resolver, and it needs nothing component-specific.
 
 Whether that suffices depends on what the component's resolver depends on:
 
@@ -415,12 +830,22 @@ Whether that suffices depends on what the component's resolver depends on:
 - A resolver that closes over data re-runs when the data changes and returns a new function. `===` equality (pico-runtime.md, Results, equality) makes every entry that reads it re-run as well. When the parent is itself a component-returning resolver that reads `data.PetCard`, the parent gets a new function too and remounts, and so on up to the first resolver that does not return a component. A change of one pet's `tagline` remounts every component on the path from that card to the root.
 - A recomputation the user did not cause gives a new function: `garbageCollect` deletes `Pet:1` and a later `normalize` writes it again; or no retained or observed location reaches the entry, change 3 sweeps it, and a later read recomputes it. A mounted component's entry is reached through its parent's retention, so neither happens while the parent query is retained. Upstream's leaked cache keeps identity across both (What upstream does).
 
-Change 2 therefore solves storage and freeing. It does not solve where the component's data comes from; option 2 and the constant-returning field do.
+Change 2 therefore solves storage and freeing for eager results. It does not solve where a component's data comes from; a closure does.
 
 ## Comparison
 
+The closure field (a `ClosureResolver` made by `component` or `closure`, `ClosureEntry`, and `read`'s case):
+
+- Kind: closure.
+- Ergonomics: one iso literal, data in the first parameter, props or arguments after it, one helper call around the function.
+- Type safety: param type as any resolver; props from the annotation; output `React.FC<TProps>` or `(...args) => ReadResult<TResult>` through `ResolverOutput`. `TParam`'s inference through the overload is not checked with `tsc`.
+- Garbage collection: the wrapper is a `ClosureEntry` on the record, deleted with the record or by change 3's sweep.
+- React: stable for the record's lifetime; the component re-renders alone on its own data; the parent does not re-render; data missing under the closure suspends the component at its own boundary and does not block the parent.
+- Support needed: change 1's tagged entries, `selectableName` on the reader artifact, `ClosureResolver` and `read`'s case in `@isograph/runtime`, `component` and `useClosureData` in `@isograph/react`, and two generator changes (`ResolverOutput` in `output_type.ts`, a second `IdentityWithParam` signature). Works with Step A (network-and-subscriptions.md); under change 4 it needs open question 3 decided.
+
 Option 1, string-keyed memo, v1 or later:
 
+- Kind: eager.
 - Ergonomics: one field, plus a hand-written cache per field. The component cannot show changing data.
 - Type safety: the props type is the user's annotation; the output type is `ReturnType<typeof resolver>`, so `<data.PetCard selected />` is checked. The cache's key is a string the user builds.
 - Garbage collection: never freed; shared across stores.
@@ -429,6 +854,7 @@ Option 1, string-keyed memo, v1 or later:
 
 Option 2 under change 2 (`id`, a constant-returning field, a data field, and `useFragment`):
 
+- Kind: closure built by hand over an eager field whose inputs never change.
 - Ergonomics: three iso literals per component, a hand-built link, and arguments repeated in the hook call.
 - Type safety: `useFragment` checks the artifact's output type, and, typed as reader-ast.md's `read` is (`ReaderArtifact<ResolverParam<TEntityName>, TOutput, TEntityName>` and `NoInfer<Link<TEntityName>>`), that the link's entity is the artifact's parent entity. It does not check that the variables are the ones the selection passed (`Variables` is any JSON map).
 - Garbage collection: the component lives in `PetCard`'s resolver entry on `Pet:1` and is deleted with the record or by change 3's sweep.
@@ -437,6 +863,7 @@ Option 2 under change 2 (`id`, a constant-returning field, a data field, and `us
 
 Option 2 with a module-level component (`PetCardView`):
 
+- Kind: closure, not returned by a field.
 - Ergonomics: two iso literals, a hand-built link, an import in the parent. The field does not return the component.
 - Type safety: as option 2; the link is a typed prop.
 - Garbage collection: nothing stored.
@@ -445,14 +872,16 @@ Option 2 with a module-level component (`PetCardView`):
 
 Option 3, a memo per record:
 
+- Kind: storage for an eager result.
 - Ergonomics: one call per resolver. Easy to misuse by closing over `data`.
 - Type safety: the `WeakMap` version needs a user-maintained cast; the store version types `memo<T>` per call.
 - Garbage collection: freed with the record.
 - React: stable; data must still come from option 2's hook.
-- Support needed: a public runtime API (`RecordHandle` or `memo`) and, for the store version, a third entry kind. Redundant under change 2.
+- Support needed: a public runtime API (`RecordHandle` or `memo`) and, for the store version, a third entry kind. Redundant once closure fields exist.
 
 Option 4, change 2 alone with data in the closure:
 
+- Kind: eager.
 - Ergonomics: one field, data in `data`, as any resolver.
 - Type safety: as any resolver.
 - Garbage collection: freed with the record.
@@ -461,7 +890,7 @@ Option 4, change 2 alone with data in the closure:
 
 ## A `@component` directive
 
-The most ergonomic shape is upstream's: one iso literal, data in the first parameter, props in the second.
+Upstream's shape, with the directive in the iso literal instead of a helper call:
 
 ```ts
 // from demos/pet-demo/src/PetCard.tsx
@@ -479,28 +908,23 @@ export const PetCard = iso(`
 });
 ```
 
-In i2 terms the directive could compile to option 2 under change 2, and it would supply what userland writes by hand or cannot reach:
+The closure field already supplies what the directive supplied in upstream and what the hand-built option 2 lacks: the split between fetching and depending, the link, the variables, `MissingData` that does not block the parent, `displayName`, and storage freed with the record. What a directive would still add over `component(..)`:
 
-- The split between fetching and depending. The parent's `Resolver` node for a component reads only the component's entry, as upstream's read does (`read.ts:603-612`); the component's selections are still inlined into the query. The runtime computes the component's data in a second entry on the same record, which the mounted component observes. Userland needs `PetCardFetched` and `PetCardData` for this.
-- The link. The runtime holds `root` when it reads the component's entry and passes it as the resolver's `link`, as it does for every resolver, so this is no longer a difference from userland.
-- Arguments. The data entry's variables are the component field's own, computed once by the runtime (`childVariables`), so the hook cannot be called with other values.
-- `MissingData` that does not block the parent. The component's entry does not read the data, so it is `Ok` while the data is missing; the parent renders, and the component suspends at its own boundary. The userland chain propagates `MissingData` through `PetCardFetched`.
-- Typing. The output type is a component over the props (upstream's `React.FC<CombineWithIntrinsicAttributes<ExtractSecondParam<typeof resolver>>>` admits `key`), and the iso overload types the two parameters (`IdentityWithParamComponent`). Userland annotates the returned function's props by hand, and TypeScript's JSX check admits `key` through `JSX.IntrinsicAttributes`, so the typing gap is the second parameter's inference, not `key`.
-- `displayName`. The runtime names the component by field and record (`react/useReadAndSubscribe.ts:127-128`).
-- Storage. The component is the component entry's result, freed with the record, where upstream's cache leaks.
+- The compiler knows the field's form. It can print a distinct reader node or artifact kind, and the runtime dispatches on compiler-written data instead of on the shape of the resolver value. With the helper, the generated artifact holds whatever the user's module exports, and the runtime distinguishes the forms by `typeof`.
+- Typing without inference through an overload. The compiler can print a component overload for that field alone (upstream's `IdentityWithParamComponent`, `iso_overload_file.rs:97-102`, `:156-168`) and a component output type (`generate_artifacts.rs:623-626`), so `ResolverOutput` and the second `IdentityWithParam` signature are not needed, and `data` is typed by the overload's parameter directly.
+- Ergonomics: no helper import and no wrapping call. This is the difference a user sees.
 
 What it costs:
 
 - A supported directive: a variant in the parser's supported set (iso-directives-unexpected.md, Change 4, The supported set), and `ClientFieldKind` back in `crates/isograph_compiler/src/schema.rs` (removed by iso-directives-unexpected.md change 2).
-- A reader node or artifact kind the runtime dispatches on, and a component-creating function the React package supplies to `@isograph/runtime`, as upstream injects `componentFunction` into the environment (`IsographEnvironment.ts:76`, `react/createIsographEnvironment.ts:19`). That is component-specific runtime code, though `@isograph/runtime` still does not import React.
-- Two entries per component per record instead of one.
+- A component-creating function the React package supplies to `@isograph/runtime`, as upstream injects `componentFunction` into the environment (`IsographEnvironment.ts:76`, `react/createIsographEnvironment.ts:19`), because the artifact no longer carries `component`'s `createWrapper`. That is component-specific runtime code, though `@isograph/runtime` still does not import React. The helper keeps the runtime's knowledge to "this resolver creates a wrapper".
+- A directive names one executor. A plain-function closure (`closure`) needs a second directive or stays a helper.
 
 ## Open questions
 
-1. Is option 2's three-literal pattern acceptable as the userland answer, or is the cost to the user the reason to add `@component` after v1?
-2. Settled: the runtime gives every resolver its own record's link as `link` on `ResolverParam`, with no `__link` selectable (reader-ast.md, A resolver's own link).
-3. Settled: `ReaderArtifact<TParam, TOutput, TEntityName>` carries its parent entity's name, and a link is `Link<TEntityName>`, so a hook typed like `read` rejects a link of another entity (reader-ast.md, The parent entity's name).
-4. Should a field be able to select another field for the query without its own result depending on it? That is what `PetCardFetched` emulates. As syntax it is a directive or a new selection form, which v1 does not have.
-5. Under v1 and Step A, is a React demo with components in scope? If it is, only option 2's module-level variant or option 3 gives stable identity, since nothing stores resolver results.
-6. Identity across garbage collection: upstream keeps the component across a collection and refetch of its record; record-bound storage does not. Is a remount after the record was collected and fetched again acceptable?
-7. Should option 3's memo exist at all once change 2 lands, given that an `id`-only resolver is already a memo per record?
+1. Form selection: does the runtime distinguish the two resolver forms by the value the user's module exports (`typeof resolver`, the helper's object), or does the compiler learn the form from a directive after v1?
+2. `TParam` inference: does `component(function PetCard({ data }, props) {..})` as the argument of the two-signature `IdentityWithParam` type `data` from `Pet__PetCard__param` under `tsc` 5.6.3? If not, the helper form needs the user to annotate the param, which is the case for the directive.
+3. Under changes 3 and 4: does a closure entry get a second entry holding its data read, computed by settlement whenever a retained root reaches the closure entry and observed by `useClosureData` through `listen` and `snapshot`? Without it, a closure component's render reads, against pico-runtime.md's goal; with it, settlement computes data for components that may never render (pico-runtime.md open decision 3).
+4. Identity across garbage collection: upstream keeps the component across a collection and refetch of its record; record-bound storage does not. Is a remount after the record was collected and fetched again acceptable?
+5. The store a wrapper reads: `closure`'s wrapper reads the `store` `createWrapper` received, and `component`'s reads the environment in context. Should `read` take the environment, so that `createWrapper` receives it and the component closes over it instead of reading the context?
+6. Ordering: closure fields need change 1's tagged entries. Does change 1 land before Step A (network-and-subscriptions.md), so that a React demo with components runs on Step A?
