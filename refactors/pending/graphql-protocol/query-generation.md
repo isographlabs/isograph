@@ -1,10 +1,8 @@
 # GraphQL protocol: query generation
 
-This is the second of two files; `entrypoints.md` in this directory specifies the protocol data, `NetworkProtocol`'s methods, the fetch plan, and validation. This file specifies how the core turns an entrypoint into a merged selection map, how the GraphQL protocol builds an operation document from that map and prints it, where the text goes, and which functions are memos. The ordered change list for both files is at the end.
+This is the second of two files; `entrypoints.md` in this directory specifies the protocol data, `NetworkProtocol`'s lookup and fetch plan methods, and validation. This file specifies how the core turns an entrypoint into a merged selection map and then a completed selection map, what the protocol tells the core to do so, how the GraphQL protocol prints the completed map, where the text goes, and which functions are memos. The ordered change list for both files is at the end.
 
-Every entrypoint gets a query. The core walks the entrypoint field's selection set, inlines the selection sets of the `field` declarations it selects, and merges the result into one map keyed by selectable name and arguments. That walk is protocol-agnostic: a protocol selection is a node holding the protocol's data, which the core does not inspect. The protocol builds an `OperationDocument` that adds the fields normalization needs (`id`, `__typename`) and prints it with one printer. Entities declared by `entity` in source files contribute nothing to a query.
-
-`normalization-ast.md` in this directory specifies the normalization AST, built from the same `OperationDocument`.
+Every entrypoint gets a query. The core walks the entrypoint field's selection set, inlines the selection sets of the `field` declarations it selects, and merges the result into one map keyed by selectable name and arguments. The walk is protocol-agnostic: the core reads the protocol's data only through `NetworkProtocol::entity_shape` and `::selectable_shape`, which state as core values whether a target is a leaf or composite and whether a selectable is a refinement. The core then completes the map: it adds the discriminator and identity selections the protocol names, as protocol-neutral `Discriminator` and `Identity` selections, and turns refinements into conditionals. The protocol prints the completed map; the core builds the normalization AST from the same map (`normalization-ast.md` in this directory). Entities declared by `entity` in source files contribute nothing to a query, and neither do client pointers in v0.
 
 ## End-user experience
 
@@ -21,9 +19,12 @@ query_text.graphql
 ```graphql
 query PetDetailRoute($id: ID!) {
   pet____id___v_id: pet(id: $id) {
+    __typename: __typename
     id: id
     best_friend_relationship: best_friend_relationship {
+      __typename: __typename
       best_friend: best_friend {
+        __typename: __typename
         id: id
         firstName: firstName
         lastName: lastName
@@ -34,6 +35,7 @@ query PetDetailRoute($id: ID!) {
     lastName: lastName
     nickname: nickname
     stats: stats {
+      __typename: __typename
       cuteness: cuteness
       energy: energy
       hunger: hunger
@@ -49,21 +51,19 @@ followed by one newline. `query_text.ts` default-exports the same text as a stri
 
 What the text shows:
 
-- `PetDetailRoute`'s own selections are the `pet(id: $id)` field. `fullName`, `PetStatsCard`, `PetBestFriendCard`, `bestFriend`, and `owner` are `field` declarations; their selection sets are inlined (`firstName`, `lastName`, `nickname`, `stats { .. }`, `best_friend_relationship { .. }`, `id`).
+- `PetDetailRoute`'s own selections are the `pet(id: $id)` field. `fullName`, `PetStatsCard`, and `PetBestFriendCard` are `field` declarations without `to`; their selection sets are inlined (`firstName`, `lastName`, `nickname`, `stats { .. }`, `best_friend_relationship { .. }`, `id`).
 - `friendName: firstName` in `PetBestFriendCard` prints as `firstName: firstName`. A reader alias is the reader's name for a value; it does not reach the query.
 - Every field prints with its normalization alias: `pet(id: $id)` as `pet____id___v_id: pet(id: $id)`, and a field with no arguments under its own name (`firstName: firstName`).
 - `PetCheckinsCard(limit: 5) @loadable(lazyLoadArtifact: true)` contributes nothing. Its query is the loadable field's own, a later doc.
-- `bestFriend { fullName }` contributes `bestFriend`'s own selection set (`best_friend_relationship { best_friend { id } }`), not `fullName`. The selections under a `field ... to` pointer are fetched by refetching the target, a later doc. `owner { OwnerBadge }` likewise contributes `owner`'s `{ id }`; `OwnerBadge` is on the source entity `Owner`.
-- `id: id` comes first under every type with `id: ID!`, whether or not anything selected it. `Pet` is an object, so there is no `__typename`.
-- Entries are in alphabetical order after `id`.
+- `bestFriend { fullName }` and `owner { OwnerBadge }` contribute nothing. `bestFriend` and `owner` are client pointers (`field Pet.bestFriend to Pet`, `field Pet.owner to Owner!`), which v0 query generation omits with their nested selection sets (Client pointers, below). The `best_friend_relationship` block comes from `PetBestFriendCard`.
+- `__typename: __typename` comes first in every selection set under a selection, and `id: id` next under every type with `id: ID!`, whether or not anything selected them. The top level has neither.
+- Entries are in alphabetical order after those two.
 
 `entrypoint Pet.PetSummaryCard`, through `Node`:
 
 ```graphql
 query PetSummaryCard($id: ID!) {
   node____id___v_id: node(id: $id) {
-    __typename: __typename
-    id: id
     ... on Pet {
       __typename: __typename
       id: id
@@ -84,7 +84,9 @@ query PetSummaryCard($id: ID!) {
 ```graphql
 mutation SetTagline($id: ID!, $tagline: String!) {
   set_pet_tagline____input___o_id__v_id_tagline__v_tagline_c: set_pet_tagline(input: { id: $id, tagline: $tagline }) {
+    __typename: __typename
     pet: pet {
+      __typename: __typename
       id: id
       tagline: tagline
     }
@@ -94,41 +96,275 @@ mutation SetTagline($id: ID!, $tagline: String!) {
 
 A query that cannot be generated is an error of that entrypoint only. Selecting `nope` in `field Pet.PetStatsCard` fails `PetDetailRoute`'s query (it inlines `PetStatsCard`) and leaves `HomeRoute`'s, `SpeciesRoute`'s, and `SetTagline`'s queries unchanged. While any query fails, the daemon logs the entrypoint and the error and writes no artifacts, as it does for a literal with a parse error (artifact-generation.md); open decision 4.
 
+## What the protocol tells the core
+
+The core walks selections without matching on the protocol's data. Four facts about that data change the walk's result: whether a selection's target entity is a leaf or has selectables, whether a selectable is a refinement, the discriminator the protocol selects in every selection set on a composite entity, and the identity it selects on each entity. The protocol states them as core values, through `NetworkProtocol` methods (entrypoints.md, Protocol data on entities and selectables):
+
+```rust
+// from crates/isograph_compiler/src/host_language.rs
+pub trait NetworkProtocol: Sized + 'static {
+    // associated types and the lookup and fetch plan methods unchanged
+
+    /// What the core reads about an entity with `data`: whether a selection of it has
+    /// selections, and for one that does, the identity selection the protocol adds to every
+    /// selection set on it.
+    fn entity_shape(data: &Self::EntityData) -> EntityShape;
+
+    /// What a selection of a selectable with `data` is in a merged selection map.
+    fn selectable_shape(data: &Self::SelectableData) -> SelectableShape;
+
+    /// The selectable the protocol selects in every selection set on a composite entity,
+    /// whose value names the response object's concrete entity.
+    fn discriminator() -> SelectableName;
+}
+```
+
+```rust
+// from crates/isograph_compiler/src/protocol_shape.rs
+/// What the core reads about an entity the protocol defines.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum EntityShape {
+    /// A selection of it has no selections (GraphQL scalars and enums).
+    Leaf,
+    /// Never the target of a selection (GraphQL input objects).
+    Input,
+    /// A selection of it selects its selectables; the protocol adds the discriminator and
+    /// this identity selection to every selection set on it.
+    Composite(IdentitySelection),
+}
+
+/// Whether the protocol selects the identity, the selectable whose value identifies the
+/// response object's record.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IdentitySelection {
+    Select(SelectableName),
+    Omit,
+}
+
+/// What a selection of a protocol selectable is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SelectableShape {
+    /// A selection of the selectable's target entity.
+    Direct,
+    /// A conditional: its selections apply when the response object is the selectable's
+    /// target entity, and select on that entity.
+    Refinement,
+}
+```
+
+The core decides nothing about which identity an entity has; it inserts the selections the protocol names, as the neutral `Discriminator` and `Identity` variants below, and builds the normalization AST from the same map. The discriminator is one selectable per protocol, not one per entity, because the runtime reads one discriminator response key per artifact (normalization-ast.md open decision 2); `discriminator()`'s contract is the rule "every selection set on a composite entity selects it", which is GraphQL's rule below. A protocol whose rule names a discriminator per entity would move it into `EntityShape::Composite` and carry the key per composite target in the AST.
+
+`IdentitySelection` carries the name, so a later identity rule that names a different selectable per entity (`IdentityFieldSelection::KeyDirective`, Config below) changes only the protocol's `entity_shape`. `KeyDirective` with several key selectables changes `IdentitySelection::Select` to carry a non-empty list.
+
+### GraphQL's shapes
+
+```rust
+// from crates/graphql_network_protocol/src/protocol_data.rs
+const TYPENAME: &str = "__typename";
+const ID: &str = "id";
+
+/// An object, interface, or union is composite; `id` is its identity where `IdField` is
+/// `Present`.
+pub(crate) fn graphql_entity_shape(data: &GraphQLEntityData) -> EntityShape {
+    match data {
+        GraphQLEntityData::Leaf => EntityShape::Leaf,
+        GraphQLEntityData::InputObject => EntityShape::Input,
+        GraphQLEntityData::Object(composite) | GraphQLEntityData::Interface(composite) => {
+            EntityShape::Composite(identity_selection(composite.id_field))
+        }
+        GraphQLEntityData::Union => EntityShape::Composite(IdentitySelection::Omit),
+    }
+}
+
+fn identity_selection(id_field: IdField) -> IdentitySelection {
+    match id_field {
+        IdField::Present => IdentitySelection::Select(ID.intern().to()),
+        IdField::Absent => IdentitySelection::Omit,
+    }
+}
+
+pub(crate) fn graphql_selectable_shape(data: &GraphQLSelectableData) -> SelectableShape {
+    match data {
+        GraphQLSelectableData::Field => SelectableShape::Direct,
+        GraphQLSelectableData::Refinement => SelectableShape::Refinement,
+    }
+}
+```
+
+`GraphQLNetworkProtocol::entity_shape` and `::selectable_shape` call these; `::discriminator` is `TYPENAME.intern().to()`. `IdField` is decided by `IdentityFieldSelection::Auto` (Config, below). `GraphQLCompositeData` gains `id_field: IdField` (entrypoints.md) in this change, its first reader.
+
+GraphQL selects `__typename` in every selection set under a selection of an object, interface, or union, and inside every refinement. Consequences:
+
+- Every record is self-describing: its response object holds its concrete entity's name.
+- The normalizer always takes a record's entity from the response's discriminator selection. The normalization AST has no concrete entity on a selection's target, and no node for the discriminator: the normalizer reads it from every composite response object without being told (normalization-ast.md, the asymmetry its tests account for).
+- A composite selection always selects at least `__typename`, so no selection set under a selection is empty, and upstream's filler (`__typename` for an empty map, `query_text.rs:81-84`) has no counterpart.
+- Each response object carries one more key, which costs bytes per response.
+
+Delta from upstream: upstream adds `__typename` only under abstract types (`isograph/crates/isograph_schema/src/create_merged_selection_set.rs:1419-1427`) and inside inline fragments, and its AST names `concreteType` for object targets. Later: selecting `__typename` only where the compiler does not know the concrete entity, with the concrete entity back in the AST (normalization-ast.md, Later), is an efficiency change.
+
+The test protocol defines no entity, so the core never calls its shape methods with data: its `entity_shape` returns `EntityShape::Leaf`, its `selectable_shape` returns `SelectableShape::Direct`, and its `discriminator` returns `"__typename"`.
+
 ## The merged selection map
+
+The walk produces a `MergedSelectionMap`: the selections of one selection set after inlining `field` declarations, without the discriminator and identity. `complete` (The operation, below) turns the entrypoint's map into a `CompletedSelectionMap`, which adds them and is what the protocol prints and the core builds the normalization AST from. Completion runs after every merge, so each selection set receives the protocol's additions once.
 
 ```rust
 // from crates/isograph_compiler/src/merged_selection.rs
-/// The server selections of one selection set after inlining `field` declarations, keyed
-/// by selectable name and arguments.
+/// The server selections of one selection set after inlining `field` declarations, keyed by
+/// what identifies them.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct MergedSelectionMap<TSelectableData, TEntityData>(
-    pub BTreeMap<MergeKey, MergedSelection<TSelectableData, TEntityData>>,
-);
+pub struct MergedSelectionMap(BTreeMap<MergeKey, MergedSelection>);
 
-/// One protocol selectable selected with one set of argument values.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct MergedSelection<TSelectableData, TEntityData> {
-    pub selectable: TSelectableData,
-    pub target: MergedTarget<TEntityData>,
-    /// `None` when no merged selection of this key wrote a selection set.
-    pub selection_set: Option<MergedSelectionMap<TSelectableData, TEntityData>>,
-}
-
-/// The entity a selection's selectable points at.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct MergedTarget<TEntityData> {
-    pub name: EntityName,
-    pub data: TEntityData,
-}
-
-/// What identifies a merged selection within its map: two selections with the same key
-/// are one selection in the query.
+/// What identifies a merged selection within its map: two selections with the same key are
+/// one selection in the query.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct MergeKey {
+pub enum MergeKey {
+    Selectable(SelectionKey),
+    Conditional(Condition),
+}
+
+/// One selectable selected with one set of argument values.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SelectionKey {
     pub name: SelectableName,
     pub arguments: MergedArguments,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum MergedSelection {
+    /// A selection of a protocol selectable.
+    Selectable(MergedSelectableSelection),
+    /// The selections of a refinement.
+    Conditional(MergedConditional),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MergedSelectableSelection {
+    pub key: SelectionKey,
+    pub target: MergedSelectionTarget,
+}
+
+/// What a selectable selection's target entity is, which decides whether it has selections.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum MergedSelectionTarget {
+    Leaf,
+    Composite(MergedCompositeTarget),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MergedCompositeTarget {
+    /// The identity the protocol adds to a selection set on the target entity.
+    pub identity: IdentitySelection,
+    pub selections: MergedSelectionMap,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MergedConditional {
+    pub condition: Condition,
+    /// The identity the protocol adds to a selection set on the condition's entity, which
+    /// the selections select on.
+    pub identity: IdentitySelection,
+    pub selections: MergedSelectionMap,
+}
+
+/// When a conditional's selections apply to the response object.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Condition {
+    /// A refinement `asT`: the response object's discriminator selection equals `T`'s name.
+    SelectionEquals(EntityName),
+}
+```
+
+`MergedSelectionMap`'s field is private. Its only constructors are `empty`, `single`, `merge`, and `substitute`, and each stores a selection under `selection.key()`, so a key and its selection always agree:
+
+```rust
+// from crates/isograph_compiler/src/merged_selection.rs
+impl MergedSelection {
+    /// `Selectable(s)` is `MergeKey::Selectable(s.key)`; `Conditional(c)` is
+    /// `MergeKey::Conditional(c.condition)`.
+    pub fn key(&self) -> MergeKey;
+}
+
+impl MergedSelectionMap {
+    pub fn empty() -> Self;
+
+    /// The map holding only `selection`.
+    pub fn single(selection: MergedSelection) -> Self;
+
+    /// `self` with every selection of `other` merged in.
+    pub fn merge(self, other: Self) -> Result<Self, MergeError>;
+
+    /// The selections in key order.
+    pub fn iter(&self) -> impl Iterator<Item = &MergedSelection>;
+
+    /// Every variable name in the arguments of this map, at any depth.
+    pub fn used_variables(&self) -> BTreeSet<VariableName>;
+}
+```
+
+The completed map:
+
+```rust
+// from crates/isograph_compiler/src/merged_selection.rs
+/// A merged selection map with the discriminator and identity selections its protocol adds
+/// at every depth below the operation's top level. Never empty.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CompletedSelectionMap(BTreeMap<CompletedKey, CompletedSelection>);
+
+/// The derived order is query order: the discriminator, the identity, selectable selections
+/// by name and arguments, then conditionals.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum CompletedKey {
+    Discriminator,
+    Identity,
+    Selectable(SelectionKey),
+    Conditional(Condition),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CompletedSelection {
+    /// The selection of the protocol's `discriminator()`, with no arguments.
+    Discriminator,
+    /// The selection of the identity selectable this name names, with no arguments.
+    Identity(SelectableName),
+    Selectable(CompletedSelectableSelection),
+    Conditional(CompletedConditional),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CompletedSelectableSelection {
+    pub key: SelectionKey,
+    pub target: CompletedSelectionTarget,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CompletedSelectionTarget {
+    Leaf,
+    Composite(CompletedSelectionMap),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CompletedConditional {
+    pub condition: Condition,
+    pub selections: CompletedSelectionMap,
+}
+
+impl CompletedSelection {
+    pub fn key(&self) -> CompletedKey;
+}
+
+impl CompletedSelectionMap {
+    /// The selections in key order.
+    pub fn iter(&self) -> impl Iterator<Item = &CompletedSelection>;
+}
+```
+
+The field is private; `complete`, `top_level`, and `fetch_selection` (The operation) are the only constructors, which keeps a key and its selection in agreement and the map non-empty.
+
+`MergedArguments`, `MergedArgument`, `MergedValue`, `MergedObject`, and `MergedObjectEntry` are unchanged:
+
+```rust
+// from crates/isograph_compiler/src/merged_selection.rs
 /// Arguments sorted by name, no name twice.
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct MergedArguments(Vec<MergedArgument>);
@@ -160,11 +396,6 @@ pub struct MergedObjectEntry {
     pub name: ValueKeyName,
     pub value: MergedValue,
 }
-
-pub type ProfileSelectionMap<TProfile> = MergedSelectionMap<
-    <<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::SelectableData,
-    <<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::EntityData,
->;
 ```
 
 `MergedArguments` and `MergedObject` have private fields and one constructor each that sorts and rejects a repeated name, so a sorted, unique list is the only one that exists:
@@ -183,47 +414,85 @@ impl MergedObject {
 }
 ```
 
-`Err` is the repeated name. `MergedArguments::default()` is the empty list, which is sorted and unique; the printer's added `id` and `__typename` use it. `Boolean` is `isograph_parser::Boolean`, which gains `PartialOrd, Ord, Hash` derives. Ordering of interned names compares their text (`intern::string::StringId`'s `Ord`), so map order is alphabetical and independent of intern order.
+`Err` is the repeated name. `MergedArguments::default()` is the empty list, which is sorted and unique; the discriminator and identity selections use it. `Boolean` is `isograph_parser::Boolean`, which gains `PartialOrd, Ord, Hash` derives. Ordering of interned names compares their text (`intern::string::StringId`'s `Ord`), so map order is alphabetical and independent of intern order.
+
+Delta from the stash of change 6 (`git stash show -p stash@{0}` in the `i2` clone, "WIP change 6"): its `MergedSelectionMap<TSelectableData, TEntityData>` and `MergedSelection<TSelectableData, TEntityData> { selectable, target: MergedTarget<TEntityData>, selection_set: Option<..> }` become the non-generic types above; its struct `MergeKey { name, arguments }` is `SelectionKey`, and `MergeKey` is the enum; `ProfileSelectionMap` and `ProfileFieldSelectionMap` are deleted, because no type is generic over the protocol any more. The map stores no protocol data: the walk reads `entity_shape` and `selectable_shape` once per selection and keeps only their values. The landed `MergedTarget<TEntityData>` (`crates/isograph_compiler/src/merged_selection.rs`) is deleted in change 7, together with the fetch plan payloads that read it (The fetch plan).
+
+Before (landed, and the stash's head of the file):
+
+```rust
+// from crates/isograph_compiler/src/merged_selection.rs
+/// The entity a selection's selectable points at.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MergedTarget<TEntityData> {
+    pub name: EntityName,
+    pub data: TEntityData,
+}
+
+/// One protocol selectable selected with one set of argument values.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MergedSelection<TSelectableData, TEntityData> {
+    pub selectable: TSelectableData,
+    pub target: MergedTarget<TEntityData>,
+    /// `None` when no merged selection of this key wrote a selection set.
+    pub selection_set: Option<MergedSelectionMap<TSelectableData, TEntityData>>,
+}
+```
+
+After: the types above. `VariableType` and `NonNullVariableType` stay where they landed.
 
 Upstream's origin is `MergedSelectionMap`, `MergedServerSelection`, and `NormalizationKey` (`isograph/crates/isograph_schema/src/create_merged_selection_set.rs`). Deltas:
 
-- Upstream's map has variants per kind (`ScalarField`, `LinkedField`, `ClientObjectSelectable`, `InlineFragment`) and keys `Discriminator` and `Id`. The core here has one node kind; scalar versus linked versus refinement is the protocol's data, and `__typename` and `id` are added by the protocol's completion, not stored. Upstream panics when two kinds meet at one key; here one key is one selectable, so they cannot.
-- Upstream stores client pointers in the map for normalization. Client pointer refetch is a later doc; nothing here records them.
+- Upstream's `NormalizationKey` has `Discriminator`, `Id`, `ServerField`, `ClientPointer`, and `InlineFragment`; its merged selections are `ScalarField`, `LinkedField`, `ClientObjectSelectable`, and `InlineFragment`. i2's `CompletedKey` and `CompletedSelection` have the same roles under protocol-neutral names (`Discriminator`, `Identity`, `Selectable`, `Conditional`), and leaf versus composite is `CompletedSelectionTarget`. Upstream inserts `__typename` and `id` by name in the core (`select_typename_and_id_fields_in_merged_selection`, `:1414-1463`); i2's core inserts the protocol's `discriminator()` and the identity `entity_shape` names. Upstream panics when two kinds meet at one key; here a key and its selection agree by construction, and two selections at one key with different targets are `MergeError::SelectionMismatch`.
+- Upstream merges a client pointer's reader selections into the parent and records a `ClientObjectSelectable` entry. v0 omits client pointers (Client pointers, below).
 - Arguments are sorted by name, so `f(a: 1, b: 2)` and `f(b: 2, a: 1)` merge. Upstream keeps source order and does not merge them.
 - `MergedValue` has no `List`, `Float`, or `Enum`. The iso grammar has no float or enum literal; a list argument is an error (open decision 5).
 
 ### Merging
 
-Two maps merge by key. For a key in both, the selection sets merge: `None` and `None` is `None`, `Some` and `None` is the `Some`, `Some` and `Some` merge recursively. `selectable` and `target` are taken from the first: both came from `selectable_named` and `entity_named` of the same parent entity and name in the same database revision, so they are equal.
+Two maps merge by key. For a key in both:
+
+- `Selectable` with `Leaf` and `Leaf` is `Leaf`. `Composite` and `Composite` with equal `identity` merge their `selections` recursively. Any other pair is `SelectionMismatch`.
+- `Conditional` and `Conditional` with equal `identity` merge their `selections`; different `identity` is `SelectionMismatch`.
+
+Both selections of one key came from `selectable_named` and `entity_named` of the same parent entity and name in the same database revision, so their targets and `identity` are equal and `SelectionMismatch` is not reached; it is an error variant, as `DefinitionMoved` is, because a memo cannot return `LSPRuntimeError::UnexpectedError`.
 
 ```rust
 // from crates/isograph_compiler/src/merged_selection.rs
-impl<TSelectableData, TEntityData> MergedSelectionMap<TSelectableData, TEntityData> {
-    pub fn empty() -> Self;
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum MergeError {
+    #[error("{0}")]
+    AliasCollision(AliasCollision),
+    #[error("Two selections with one key have different targets.")]
+    SelectionMismatch,
+}
 
-    /// `self` with every selection of `other` merged in.
-    pub fn merge(self, other: Self) -> Result<Self, AliasCollision>;
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[error("`{}` and `{}` have the same normalization alias.", .first.name, .second.name)]
+pub struct AliasCollision {
+    pub first: SelectionKey,
+    pub second: SelectionKey,
 }
 ```
 
-The only conflict merging can find is two different keys in one map whose normalization aliases are equal: `f(s: "a b")` and `f(s: "a_b")` both alias to `f____s___s_a_b`, and a field named `f____s___s_a` selected with no arguments aliases to the same text as `f(s: "a")`. That is `AliasCollision`, an error of the query. Different arguments to one field are two keys, not a conflict; a reader alias does not take part. Open decision 1 is the alternative where they are.
+The only other conflict merging can find is two different selectable keys in one map whose normalization aliases are equal: `f(s: "a b")` and `f(s: "a_b")` both alias to `f____s___s_a_b`, and a field named `f____s___s_a` selected with no arguments aliases to the same text as `f(s: "a")`. That is `AliasCollision`, an error of the query. Different arguments to one field are two keys, not a conflict; a reader alias does not take part. Open decision 1 is the alternative where they are. Conditionals have no alias.
 
 ### Normalization aliases
 
 ```rust
 // from crates/isograph_compiler/src/merged_selection.rs
 /// The name a selection's value is stored under in the response and in the runtime store.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, derive_more::Display)]
 pub struct NormalizationAlias(pub String);
 
-impl MergeKey {
-    /// The field name, then one chunk per argument: the field name alone when the key has no
+impl SelectionKey {
+    /// The selectable name, then one chunk per argument: the name alone when the key has no
     /// arguments.
     pub fn normalization_alias(&self) -> NormalizationAlias;
 }
 ```
 
-Every field in a generated query prints with its normalization alias, including a field with no arguments and the `id` and `__typename` the document adds; a field with no arguments aliases to its own name (`firstName: firstName`).
+Every selection in a generated query prints with its normalization alias, including a selection with no arguments and the discriminator and identity selections, whose key is their name with `MergedArguments::default()`; a selection with no arguments aliases to its own name (`firstName: firstName`).
 
 Upstream aliases only fields with arguments. `MergedScalarFieldSelection::normalization_alias` and `MergedLinkedFieldSelection::normalization_alias` return `None` when `arguments` is empty (`isograph/crates/isograph_schema/src/create_merged_selection_set.rs:124-131` and `:159-166`), and `write_selections_for_query_text` writes `alias: ` only for `Some` (`isograph/crates/graphql_network_protocol/src/query_text.rs:90-92` and `:100-102`). The user's direction is to alias every field automatically, and this doc writes that: every field gets the deterministic alias above. Upstream shows no concrete problem with it. The runtime reads a field's value from the response under the field name followed by the same per-argument chunks (`getNetworkResponseKey`, `isograph/libs/isograph-react/src/core/cache.ts:538-552`, with `____`, `___`, `__` at `:594-596`), which for a field with no arguments is the field name, so `firstName: firstName` puts the value where the runtime reads it. GraphQL accepts an alias equal to the field name, `__typename` included (spec 2.7). The cost is query text length.
 
@@ -238,9 +507,9 @@ A `field` declaration's selection set becomes a map once, keyed by the field, wi
 /// The merged selection map of a `field` declaration's selection set, and the variables it
 /// declares.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct FieldSelectionMap<TSelectableData, TEntityData> {
+pub struct FieldSelectionMap {
     pub variables: Vec<FieldVariable>,
-    pub selections: MergedSelectionMap<TSelectableData, TEntityData>,
+    pub selections: MergedSelectionMap,
 }
 
 /// `$name: Type = default` on a `field` declaration.
@@ -264,11 +533,6 @@ pub enum NonNullVariableType {
     Named(EntityName),
     List(Box<VariableType>),
 }
-
-pub type ProfileFieldSelectionMap<TProfile> = FieldSelectionMap<
-    <<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::SelectableData,
-    <<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::EntityData,
->;
 ```
 
 The iso `TypeAnnotation` converts: `Named(n)` is `NonNull(Named(n))`, `List(l)` is `NonNull(List(l.inner))`, `Union([w, Null])` is `Nullable(..)` of `w`'s conversion. A list whose `inner` is `None` did not parse and is `UnparsedVariableType`.
@@ -284,15 +548,15 @@ enum VariableValue {
 }
 
 /// `field_map` with each variable replaced by its value in `context`.
-fn substitute<TSelectableData: Clone, TEntityData: Clone>(
-    field_map: &MergedSelectionMap<TSelectableData, TEntityData>,
+fn substitute(
+    field_map: &MergedSelectionMap,
     context: &BTreeMap<VariableName, VariableValue>,
-) -> Result<MergedSelectionMap<TSelectableData, TEntityData>, AliasCollision>;
+) -> Result<MergedSelectionMap, SelectionMapErrorKind>;
 ```
 
 The context of a selection `G(a: v)` of a field `G` with variables `$a`, `$b: Int = 3`, `$c: Int` is `{ a: Value(v), b: Value(3), c: Unset }`. `v` is already a `MergedValue` of the parent's map: a parent variable stays a `Variable` naming the parent's variable, and is substituted when the parent is inlined in turn. Upstream's origin is `VariableContext::child_variable_context` (`isograph/crates/isograph_schema/src/variable_context.rs`).
 
-An argument whose value is a top-level `Unset` variable is removed from the key. Inside an object, `Unset` is `Null`. Delta: upstream writes `null` for both, which overrides a server-side default (`checkins(skip: null)` where the schema says `skip: Int = 0`); omitting the argument keeps the default (open decision 2). Substitution re-keys the map; two keys that become equal merge, and the result is checked for alias collisions.
+An argument whose value is a top-level `Unset` variable is removed from the key. Inside an object, `Unset` is `Null`. Delta: upstream writes `null` for both, which overrides a server-side default (`checkins(skip: null)` where the schema says `skip: Int = 0`); omitting the argument keeps the default (open decision 2). Substitution re-keys `Selectable` entries at every depth, inside composite targets and conditionals; two keys that become equal merge, and the result is checked for alias collisions. `Err` is `UndefinedVariable` or `Merge`, as in the stash.
 
 A variable that is not declared by the field whose selection set uses it is `UndefinedVariable`, reported when that field's map is built, so every `Variable` in a field's map names one of its `variables`.
 
@@ -308,7 +572,7 @@ pub fn field_selection_map<TProfile: CompilationProfile>(
     client: ClientId,
     entity: EntityName,
     selectable: SelectableName,
-) -> Result<ProfileFieldSelectionMap<TProfile>, SelectionMapError>
+) -> Result<FieldSelectionMap, SelectionMapError>
 ```
 
 The body:
@@ -356,7 +620,7 @@ fn merge_selection_set<TProfile: CompilationProfile>(
     context: DeclarationContext<'_>,
     parent: EntityName,
     selection_set: &SelectionSet,
-) -> Result<ProfileSelectionMap<TProfile>, SelectionMapError>;
+) -> Result<MergedSelectionMap, SelectionMapError>;
 
 /// What one selection on `parent` adds to its selection set's map.
 fn selection_contribution<TProfile: CompilationProfile>(
@@ -365,16 +629,32 @@ fn selection_contribution<TProfile: CompilationProfile>(
     context: DeclarationContext<'_>,
     parent: EntityName,
     selection: &Selection,
-) -> Result<ProfileSelectionMap<TProfile>, SelectionMapError>;
+) -> Result<MergedSelectionMap, SelectionMapError>;
 ```
 
 `merge_selection_set` maps every slot to `selection_contribution` and folds with `merge`, stopping at the first error. A slot with no item is `UnparsedSelection`. `selection_contribution`:
 
 - Looks up `selectable_named(db, client, parent, selection.name)`; `Err` is `Lookup`.
 - Converts `selection.arguments` to `MergedArguments` against `context.variables`: a variable not declared is `UndefinedVariable`, a repeated argument `DuplicateArgument`, a repeated object key `DuplicateObjectKey`, a list `ListArgument`, a slot with no item `UnparsedArgument`.
-- `SelectableKind::Server`: looks up `entity_named(db, client, target_entity())`. `Err` is `Lookup`; `EntityOrigin::Source` is `TargetIsSourceEntity`. The nested selection set, when present, is `merge_selection_set` on the target. The result is a map of one entry.
-- `SelectableKind::ClientField` or `ClientPointer`, with a directive named `loadable` on the selection: the empty map.
-- `SelectableKind::ClientField` or `ClientPointer` otherwise: `field_selection_map(db, client, parent, selection.name)`, then `substitute` with the context built from the converted arguments and that map's `variables`. An argument the field does not declare is `UnknownFieldArgument`. The selection's own nested selection set is not read.
+- `SelectableKind::Server(server)`: the target entity is the first inner entity of `server.target` (none is `NoTargetEntity`); `entity_named(db, client, target)`'s `Err` is `Lookup`, and `EntityOrigin::Source` is `TargetIsSourceEntity`. The target's data gives `entity_shape`, and `server.data` gives `selectable_shape`:
+  - `Direct` on a `Leaf` target: a selection set on the selection is `SelectionSetOnLeaf`; otherwise one entry `Selectable(MergedSelectableSelection { key, target: Leaf })`.
+  - `Direct` on a `Composite(identity)` target: no selection set is `MissingSelectionSet`; otherwise one entry `Selectable { key, target: Composite(MergedCompositeTarget { identity, selections }) }`, with `selections` the nested selection set's `merge_selection_set` on the target.
+  - `Refinement` on a `Composite(identity)` target: arguments on the selection are `ArgumentsOnRefinement`, no selection set is `MissingSelectionSet`; otherwise one entry `Conditional(MergedConditional { condition: Condition::SelectionEquals(target), identity, selections })`.
+  - `Refinement` on a `Leaf` target is `RefinementToNonComposite(target)`; GraphQL's refinements target only object types (`refinement_to`), so GraphQL does not reach it.
+  - Either shape on an `Input` target is `InputTarget(target)`.
+- `SelectableKind::ClientField` with a directive named `loadable` on the selection: the empty map.
+- `SelectableKind::ClientField` otherwise: `field_selection_map(db, client, parent, selection.name)`, then `substitute` with the context built from the converted arguments and that map's `variables`. An argument the field does not declare is `UnknownFieldArgument`. The selection's own nested selection set is not read.
+- `SelectableKind::ClientPointer`: the empty map, with or without `@loadable`. Its own selection set and the selection's nested selection set are not read (Client pointers, below).
+
+`key` is `SelectionKey { name: selection.name, arguments }` with the converted arguments. Each shape error is located at the selection's name.
+
+### Client pointers
+
+v0 query generation omits client pointers (`field X.y to T`, `SelectableKind::ClientPointer`). The merge skips a client pointer selection and its nested selection set entirely, so neither the query text nor the normalization AST contains it or anything selected through it, and the two still match by construction. There is no error and no panic. `inlined_fields` does not list client pointers, so a pointer takes no part in cycle detection.
+
+The data a client pointer's selections need is not fetched, so reading through a pointer finds it missing until pointers are supported. In the pet demo, `PetDetailRoute` selects `bestFriend` and `owner`, both pointers; its generated query has neither, nor `bestFriend`'s own `best_friend_relationship { best_friend { id } }` or `owner`'s `{ id }`.
+
+Later: upstream merges the pointer's reader selections into the parent (`isograph/crates/isograph_schema/src/create_merged_selection_set.rs:1291-1349`, `:1241-1265`) and records a `ClientObjectSelectable` entry, which both printers skip. Supporting pointers is a later doc, with the refetch of the target.
 
 The recursion through `field_selection_map` is a memo call, so pico records the dependency on the inlined field.
 
@@ -385,8 +665,8 @@ The recursion through `field_selection_map` is a memo call, so pico records the 
 ```rust
 // from crates/isograph_compiler/src/merged_selection.rs
 /// The `field` declarations whose selection sets `entity.selectable`'s selection set
-/// inlines directly: source selections, not `@loadable`, at any depth under protocol
-/// selections. A selection whose lookup fails is not listed.
+/// inlines directly: client field selections, not `@loadable`, at any depth under protocol
+/// selections. A selection whose lookup fails is not listed, and neither is a client pointer.
 #[memo]
 pub fn inlined_fields<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
@@ -420,24 +700,29 @@ fn inline_cycle<TProfile: CompilationProfile>(
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 #[error("{kind}")]
 pub struct SelectionMapError {
-    pub location: DefinitionLocation,
+    /// `None` when the error is the lookup of the field itself, which has no one definition.
+    pub location: Option<DefinitionLocation>,
     pub kind: SelectionMapErrorKind,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum SelectionMapErrorKind {
-    #[error("{0}")]
+    #[error("{}", .0.0.message)]
     Lookup(Diagnostic),
-    #[error("`{}.{}` comes from the schema and has no selection set to inline.", .0.entity, .0.selectable)]
+    #[error("`{0}` comes from the schema and has no selection set to inline.")]
     NotASourceField(SelectableKey),
-    #[error("The declaration of `{}.{}` is not where its definition says.", .0.entity, .0.selectable)]
+    #[error("The declaration of `{0}` is not where its definition says.")]
     DefinitionMoved(SelectableKey),
     #[error("This selection did not parse.")]
     UnparsedSelection,
     #[error("This argument did not parse.")]
     UnparsedArgument,
+    #[error("This variable declaration did not parse.")]
+    UnparsedVariable,
     #[error("This variable's type did not parse.")]
     UnparsedVariableType,
+    #[error("A variable's type is a named type, a list, or one of those or `null`.")]
+    UnsupportedVariableType,
     #[error("Variable `${0}` is not declared by this field.")]
     UndefinedVariable(VariableName),
     #[error("A default value cannot use the variable `${0}`.")]
@@ -448,14 +733,26 @@ pub enum SelectionMapErrorKind {
     DuplicateObjectKey(ValueKeyName),
     #[error("List arguments are not supported in queries yet.")]
     ListArgument,
-    #[error("`{0}` declares no variable `${1}`.", .0.field, .0.argument)]
+    #[error("`{}` declares no variable `${}`.", .0.field, .0.argument)]
     UnknownFieldArgument(UnknownFieldArgument),
+    #[error("`{0}` has no entity to select into.")]
+    NoTargetEntity(SelectableKey),
     #[error("`{0}` is declared in source files and cannot be the type of a schema field.")]
     TargetIsSourceEntity(EntityName),
+    #[error("`{0}` returns a leaf and takes no selection set.")]
+    SelectionSetOnLeaf(SelectableKey),
+    #[error("`{0}` returns an entity with selectables and needs a selection set.")]
+    MissingSelectionSet(SelectableKey),
+    #[error("`{0}` is an input type, which cannot be selected.")]
+    InputTarget(EntityName),
+    #[error("The refinement `{0}` takes no arguments.")]
+    ArgumentsOnRefinement(SelectableKey),
+    #[error("A refinement cannot target the leaf `{0}`.")]
+    RefinementToNonComposite(EntityName),
     #[error("These fields inline each other: {}.", .0.display())]
     InlineCycle(InlineCycle),
     #[error("{0}")]
-    AliasCollision(AliasCollision),
+    Merge(MergeError),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -463,18 +760,242 @@ pub struct UnknownFieldArgument {
     pub field: SelectableKey,
     pub argument: ArgumentName,
 }
-
-#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
-#[error("`{}` and `{}` have the same normalization alias.", .first.name, .second.name)]
-pub struct AliasCollision {
-    pub first: MergeKey,
-    pub second: MergeKey,
-}
 ```
+
+The enum is the stash's (`git stash show -p stash@{0}`), whose deltas from the earlier text of this doc stay: `location` is optional, and `UnparsedVariable`, `UnsupportedVariableType`, and `NoTargetEntity` exist. Deltas from the stash: `SelectionSetOnLeaf`, `MissingSelectionSet`, `InputTarget`, `ArgumentsOnRefinement`, and `RefinementToNonComposite` are new; `AliasCollision(AliasCollision)` becomes `Merge(MergeError)`, which also carries `SelectionMismatch`.
 
 `SelectableKey` implements `Display` as `Entity.selectable` (`derive_more::Display`), and `InlineCycle::display` joins the keys with ` -> `. `location` is the offending node's span in its file: the selection name, the argument, the variable, or for `InlineCycle` the name of the field that starts the walk. A field that inlines a broken field returns the inlined field's error unchanged, so the location is where the mistake is.
 
-## The operation and the protocol's printer
+## The operation
+
+`query_for_entrypoint` builds one operation's completed selection map in the core, builds the normalization AST from it (normalization-ast.md), and hands the same map to the protocol, which prints the text. The text and the AST are produced from one value.
+
+### Where the entrypoint's selections sit
+
+```rust
+// from crates/isograph_compiler/src/entrypoint.rs
+/// Where a fetch plan puts an entrypoint's selections in its operation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FetchPosition<'a> {
+    /// At the operation's top level: the entrypoint's parent is the operation's root.
+    TopLevel,
+    /// Under one top-level selection, whose arguments are operation variables of the same
+    /// names.
+    Selection(&'a FetchSelection),
+}
+
+/// The top-level selection a fetch goes through: GraphQL's `node(id: $id)`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FetchSelection {
+    pub selectable: SelectableName,
+    /// In definition order.
+    pub arguments: Vec<FetchArgument>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FetchArgument {
+    pub name: InputValueName,
+    /// The argument's type, made nullable when the argument has a default, so the caller
+    /// may omit it (spec 5.8.5, All Variable Usages Are Allowed).
+    pub variable_type: VariableType,
+}
+```
+
+```rust
+// from crates/isograph_compiler/src/host_language.rs
+pub trait NetworkProtocol: Sized + 'static {
+    // as above
+    /// Where `plan` puts an entrypoint's selections.
+    fn fetch_position(plan: &Self::FetchPlan) -> FetchPosition<'_>;
+}
+```
+
+`FetchArgument` is the landed `GraphQLFetchArgument` (`crates/graphql_network_protocol/src/fetch_plan.rs`) moved to the core and renamed; its fields are unchanged. `InputValueName` converts to `ArgumentName` and `VariableName` with `.to()` (`string_key_one_way_conversion!` in `crates/common_lang_types/src/string_key_types.rs`). The test protocol's `fetch_position` returns `TopLevel`; its `fetch_plan` never returns `Ok`.
+
+`fetch_position` maps the protocol's plan to the one fact the core reads. The alternative, a core `FetchPlan<TFetchData> { position, data }`, would let a GraphQL `Root` plan carry a `Selection` position; the method derives the position from the plan, so that state does not exist.
+
+### The fetch plan
+
+Completion in the core changes the landed `GraphQLFetchPlan` (change 4). Its `MergedTarget<GraphQLEntityData>` payloads existed so the GraphQL operation builder could add `id` and `__typename` under the root type, under `node`, and inside `... on T`. The core now adds them from `discriminator()` and `entity_shape`, and the `node` selection's selections are the entity's own (below), so no payload carries entity data. The `node` selection and its arguments become the core `FetchSelection`, which `fetch_position` returns. The refinement stays GraphQL data: it prints `... on T` and has no normalization AST node.
+
+Before (landed):
+
+```rust
+// from crates/graphql_network_protocol/src/fetch_plan.rs
+pub enum GraphQLFetchPlan {
+    Root(GraphQLRootFetch),
+    Node(GraphQLNodeFetch),
+}
+
+pub struct GraphQLRootFetch {
+    pub operation_type: OperationType,
+    /// The root type, whose data decides the top-level `id` and `__typename`.
+    pub entity: MergedTarget<GraphQLEntityData>,
+}
+
+pub struct GraphQLNodeFetch {
+    /// `node`'s arguments, each passed as the operation variable of the same name.
+    pub arguments: Vec<GraphQLFetchArgument>,
+    /// The type `node` returns, which the operation builder completes like any selection
+    /// target.
+    pub field_target: MergedTarget<GraphQLEntityData>,
+    pub refinement: FetchRefinement,
+}
+
+pub struct GraphQLFetchArgument {
+    pub name: InputValueName,
+    pub variable_type: VariableType,
+}
+
+pub enum FetchRefinement {
+    Exact,
+    InlineFragment(MergedTarget<GraphQLEntityData>),
+}
+```
+
+After:
+
+```rust
+// from crates/graphql_network_protocol/src/fetch_plan.rs
+/// How the GraphQL protocol fetches an entity that parents an entrypoint.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum GraphQLFetchPlan {
+    /// The entity is the root type of this operation type: its selections are the
+    /// operation's.
+    Root(OperationType),
+    /// A `query` that selects the query root's `node` field, which returns the entity or an
+    /// interface or union containing it.
+    Node(GraphQLNodeFetch),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GraphQLNodeFetch {
+    /// `node` and its arguments.
+    pub selection: FetchSelection,
+    pub refinement: FetchRefinement,
+}
+
+/// How the query text puts the entity's selections under `node`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FetchRefinement {
+    /// `node` returns the entity itself.
+    Exact,
+    /// `node` returns an interface or union containing the entity, an object type: the text
+    /// prints `... on Entity { }` around the entity's selections.
+    InlineFragment(EntityName),
+}
+```
+
+`GraphQLRootFetch` has one field once `entity` is gone, so it is replaced by its `OperationType` (AGENTS.md, a one-field struct is a newtype, and the variant then holds the payload). `GraphQLFetchArgument` is replaced by the core `FetchArgument`. `graphql_fetch_plan` and `node_fetch` change only in what they store:
+
+```rust
+// from crates/graphql_network_protocol/src/fetch_plan.rs
+/// The fetch of the object type `entity`, which declares `object`, through the `node` field
+/// of the query root `query_root`.
+fn node_fetch<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    query_root: EntityName,
+    entity: EntityName,
+    object: &GraphQLCompositeData,
+) -> Result<GraphQLNodeFetch, NodeFieldError>;
+
+/// Whether the interface or union `returns`, whose data is `returns_data`, contains the
+/// object type `entity`, which declares `object`.
+fn contains<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    returns: EntityName,
+    returns_data: &GraphQLEntityData,
+    entity: EntityName,
+    object: &GraphQLCompositeData,
+) -> bool;
+```
+
+`graphql_fetch_plan` step 1 binds the `Object`'s `GraphQLCompositeData` (entrypoints.md, objects only) and passes it to `node_fetch`. `node_fetch` still reads `graphql_entity(T)` of `node`'s return type, for `contains` and for `Target` and `UnknownTarget`, and no longer stores it. `contains`'s `Interface` arm is `object.interfaces.contains(&returns)`, with no match on the entity's data, because the entity is an object. `GraphQLNetworkProtocol::fetch_position` is `TopLevel` for `Root(_)` and `Selection(fetch.selection.reference())` for `Node(fetch)`.
+
+### The `node` selection's selections
+
+`node(id:)` returns the entity whose id is `$id`, so the entity is known by construction. The `node` selection's selections are the entity's own completed selections, and nothing is selected beside them: no `__typename` and no `id` under `node` outside the fragment, and no condition in the normalization AST. The GraphQL text still prints `... on T` around them, because GraphQL requires it to select `Pet`'s fields on a `Node`-typed field (spec 5.3.1). The text has this line and the AST does not: normalization-ast.md, Tests, states the asymmetry. `FetchRefinement::InlineFragment` is text only; conditionals come only from refinements `asT`.
+
+For `entrypoint Pet.PetSummaryCard`:
+
+```graphql
+query PetSummaryCard($id: ID!) {
+  node____id___v_id: node(id: $id) {
+    ... on Pet {
+      __typename: __typename
+      id: id
+      age: age
+      firstName: firstName
+      lastName: lastName
+      nickname: nickname
+      picture: picture
+      species: species
+      tagline: tagline
+    }
+  }
+}
+```
+
+Inside the fragment, `__typename` is the discriminator every selection set under a selection gets, and `id` is `Pet`'s identity.
+
+### Completion
+
+```rust
+// from crates/isograph_compiler/src/merged_selection.rs
+/// `map`, a selection set under a selection of an entity whose identity is `identity`, with
+/// the discriminator, the identity, and every composite target and conditional below it
+/// completed.
+pub fn complete<TProtocol: NetworkProtocol>(
+    map: &MergedSelectionMap,
+    identity: IdentitySelection,
+) -> Result<CompletedSelectionMap, AddedSelectionCollision>;
+
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[error("`{}` has the normalization alias of a selection the protocol adds.", .0.name)]
+pub struct AddedSelectionCollision(pub SelectionKey);
+```
+
+`complete`, in order:
+
+1. Each `Selectable` entry: `Leaf` is `CompletedSelectionTarget::Leaf`; `Composite(target)` is `Composite(complete::<TProtocol>(target.selections, target.identity)?)`.
+2. Each `Conditional` entry: `CompletedConditional { condition, selections: complete::<TProtocol>(c.selections, c.identity)? }`.
+3. A `Leaf` selectable entry with no arguments named `TProtocol::discriminator()` becomes `Discriminator`; one named `identity`'s `Select` name becomes `Identity(name)`. The selection a user wrote and the one the protocol adds are one selection.
+4. `Discriminator` is added. `IdentitySelection::Select(i)` adds `Identity(i)`.
+5. A remaining `Selectable` key whose normalization alias equals the discriminator's or the identity's name is `AddedSelectionCollision(key)`. Step 3 has absorbed the leaf selection with no arguments; what remains is a composite selectable named like one of them, which GraphQL excludes (`__typename` is not a schema field, and `IdField::Present` requires `id: ID!`).
+
+Step 4 makes the map non-empty and puts the discriminator before every conditional in the same selection set, which the condition reads. Under `IdentitySelection::Omit` (a type whose `id` is not `ID!`), a selection of `id` stays a `Selectable` entry, in name order.
+
+Completion runs once, on the entrypoint's whole map, after all inlining and substitution, so a selection set merged from several selections receives the protocol's additions once. A `field` declaration's map is not completed: it is merged into its selection's parent and completed with it.
+
+```rust
+// from crates/isograph_compiler/src/merged_selection.rs
+impl CompletedSelectionMap {
+    /// The operation's top-level map under a `TopLevel` fetch: every selection completed, and
+    /// nothing added at the top level itself.
+    pub fn top_level<TProtocol: NetworkProtocol>(
+        map: &MergedSelectionMap,
+    ) -> Result<Self, TopLevelError>;
+
+    /// The operation's top-level map under a fetch selection: that one selection.
+    pub fn fetch_selection(key: SelectionKey, selections: CompletedSelectionMap) -> Self;
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum TopLevelError {
+    #[error("The entrypoint selects nothing the server returns.")]
+    Empty,
+    #[error("A refinement cannot be selected at the top level of an operation.")]
+    Conditional,
+    #[error("{0}")]
+    AddedSelectionCollision(AddedSelectionCollision),
+}
+```
+
+The operation's top level is not under a selection, so it gets no discriminator and no identity. GraphQL forbids an introspection field as a subscription's root field (spec 5.2.3.1), so `__typename` at the top level of `subscription` would be invalid, and the root record's entity is the root type, known without a discriminator. `top_level` completes each `Selectable` entry as `complete`'s step 1 does. A `Conditional` entry is `Conditional`, because its condition would read a discriminator the top level does not select; a GraphQL root type is an object type (spec 3.3.1) and has no refinements, so GraphQL does not reach it. An empty map is `Empty`: GraphQL rejects an empty selection set, and the top level has no discriminator to fill it. `entrypoint Query.X` whose only selection is `@loadable` is `Empty`.
+
+### The operation's selections and variables
 
 ```rust
 // from crates/isograph_compiler/src/query.rs
@@ -483,26 +1004,80 @@ pub struct EntrypointOperation<'a, TProtocol: NetworkProtocol> {
     /// The operation name: the entrypoint's selectable name.
     pub name: SelectableName,
     pub fetch_plan: &'a TProtocol::FetchPlan,
-    /// The entrypoint field's variables that the selections use, in declaration order.
-    pub variables: Vec<&'a FieldVariable>,
-    pub selections: &'a MergedSelectionMap<TProtocol::SelectableData, TProtocol::EntityData>,
+    /// The fetch selection's arguments, then the entrypoint field's variables that the
+    /// selections use, in declaration order.
+    pub variables: &'a [FieldVariable],
+    pub selections: &'a CompletedSelectionMap,
 }
 
-/// The text of one entrypoint's query, and the file name the protocol gives a file holding
-/// exactly that text.
+/// The text the protocol prints for one operation, and its name for a file holding exactly
+/// that text.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProtocolQueryText {
+    pub text: QueryText,
+    pub file_name: Option<ArtifactFileName>,
+}
+
+/// One entrypoint's query: its text, the protocol's file name for the text, and the
+/// normalization AST of its response.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct QueryArtifact {
     pub text: QueryText,
     pub file_name: Option<ArtifactFileName>,
+    pub normalization_ast: NormalizationAst,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum OperationError {
+    #[error("Variable `${0}` is declared by the entrypoint and is an argument of the fetch.")]
+    VariableCollision(VariableName),
+    #[error("The fetch passes argument `{0}` more than once.")]
+    DuplicateFetchArgument(ArgumentName),
+    #[error("{0}")]
+    TopLevel(TopLevelError),
+    #[error("{0}")]
+    Completion(AddedSelectionCollision),
 }
 ```
 
-`QueryText` and `ArtifactFileName` are the existing `common_lang_types` types. Only used variables are declared, because GraphQL rejects an operation that declares a variable it does not use (spec 5.8.4); upstream's `get_used_variable_definitions` does the same. A variable is used when a `MergedValue::Variable` of that name is in `selections`, at any depth or inside an object.
+```rust
+// from crates/isograph_compiler/src/host_language.rs
+pub trait NetworkProtocol: Sized + 'static {
+    // as above
+    /// The text of `operation`'s query, and the protocol's name for a file holding exactly
+    /// that text.
+    fn query_text(operation: &EntrypointOperation<'_, Self>) -> ProtocolQueryText;
+}
+```
+
+`query_text` is infallible: the core finds every error of an operation (`OperationError`, and `SelectionSetOnLeaf`, `MissingSelectionSet`, `InputTarget` in the walk, located at the selection). `NetworkProtocol` has no `QueryError` associated type, because it would be `Infallible`. The test protocol's `query_text` returns an empty `QueryText` and `file_name: None`; its `fetch_plan` never returns `Ok`, so it is not reached.
+
+```rust
+// from crates/isograph_compiler/src/query.rs
+/// The fetch selection's arguments as variables with no default, then the entrypoint
+/// field's variables that its selections use. A name in both is `VariableCollision`.
+fn operation_variables(
+    position: FetchPosition<'_>,
+    field: &FieldSelectionMap,
+) -> Result<Vec<FieldVariable>, OperationError>;
+
+/// The operation's top-level selections: the entrypoint field's map at the top level, or
+/// completed under the fetch selection when there is one.
+fn operation_selections<TProtocol: NetworkProtocol>(
+    identity: IdentitySelection,
+    position: FetchPosition<'_>,
+    selections: &MergedSelectionMap,
+) -> Result<CompletedSelectionMap, OperationError>;
+```
+
+`TopLevel` is `CompletedSelectionMap::top_level::<TProtocol>(selections)` (`Err` is `OperationError::TopLevel`). `Selection(fetch)` is `CompletedSelectionMap::fetch_selection(key, complete::<TProtocol>(selections, identity)?)` (`Err` is `Completion`), with `key` `SelectionKey { name: fetch.selectable, arguments }` and `arguments` `MergedArguments::new` of `<argument>: $<argument>` for each fetch argument (`Err` is `DuplicateFetchArgument`). The entity's selections are under a selection, so they get the discriminator and the entity's identity.
+
+The operation's top level under a fetch selection holds only the fetch selection.
 
 ```rust
 // from crates/isograph_compiler/src/query.rs
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
-pub enum EntrypointQueryError<TNotFetchable: std::fmt::Display, TQueryError: std::fmt::Display> {
+pub enum EntrypointQueryError<TNotFetchable: std::fmt::Display> {
     #[error("{0}")]
     Lookup(Diagnostic),
     #[error("{0}")]
@@ -510,12 +1085,13 @@ pub enum EntrypointQueryError<TNotFetchable: std::fmt::Display, TQueryError: std
     #[error("{0}")]
     SelectionMap(SelectionMapError),
     #[error("{0}")]
-    Protocol(TQueryError),
+    Operation(OperationError),
+    #[error("{0}")]
+    IntegerOutOfRange(IntegerOutOfRange),
 }
 
 pub type ProfileEntrypointQueryError<TProfile> = EntrypointQueryError<
     <<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::NotFetchable,
-    <<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::QueryError,
 >;
 
 /// The query of `entrypoint entity.selectable` as `client` reads the source and schema.
@@ -532,174 +1108,176 @@ pub fn query_for_entrypoint<TProfile: CompilationProfile>(
     let selectable_value = selectable_named(db, client, entity, selectable)
         .clone()
         .map_err(EntrypointQueryError::Lookup)?;
-    let fetch_plan = entrypoint_fetch_plan(db, client, &entity_value, &selectable_value)
+    let fetch = entrypoint_fetch_plan(db, client, &entity_value, &selectable_value)
         .map_err(EntrypointQueryError::NotFetchable)?;
     let field = field_selection_map(db, client, entity, selectable)
         .as_ref()
         .map_err(|error| EntrypointQueryError::SelectionMap(error.clone()))?;
-    let used = field.selections.used_variables();
-    TProfile::NetworkProtocol::query_artifact(&EntrypointOperation {
-        name: selectable,
-        fetch_plan: &fetch_plan,
-        variables: field
-            .variables
-            .iter()
-            .filter(|variable| used.contains(&variable.name))
-            .collect(),
-        selections: &field.selections,
-    })
-    .map_err(EntrypointQueryError::Protocol)
+    let position = TProfile::NetworkProtocol::fetch_position(fetch.plan.reference());
+    let variables =
+        operation_variables(position, field).map_err(EntrypointQueryError::Operation)?;
+    let selections = operation_selections::<TProfile::NetworkProtocol>(
+        fetch.identity,
+        position,
+        field.selections.reference(),
+    )
+    .map_err(EntrypointQueryError::Operation)?;
+    let normalization_ast = normalization_ast(
+        selections.reference(),
+        SelectionKey {
+            name: TProfile::NetworkProtocol::discriminator(),
+            arguments: MergedArguments::default(),
+        }
+        .normalization_alias(),
+    )
+    .map_err(EntrypointQueryError::IntegerOutOfRange)?;
+    let ProtocolQueryText { text, file_name } =
+        TProfile::NetworkProtocol::query_text(&EntrypointOperation {
+            name: selectable,
+            fetch_plan: fetch.plan.reference(),
+            variables: variables.as_slice(),
+            selections: selections.reference(),
+        });
+    QueryArtifact {
+        text,
+        file_name,
+        normalization_ast,
+    }
+    .wrap_ok()
 }
 ```
+
+`normalization_ast`, `NormalizationAst`, and `IntegerOutOfRange` are normalization-ast.md's, and land with its change 2: until then `QueryArtifact` is `{ text, file_name }` and `query_for_entrypoint` has no `normalization_ast` step. The AST carries the discriminator's response key, so the runtime names no GraphQL selectable. Only used variables are declared, because GraphQL rejects an operation that declares a variable it does not use (spec 5.8.4); upstream's `get_used_variable_definitions` does the same. A variable is used when a `MergedValue::Variable` of that name is in `selections`, at any depth or inside an object. The operation name is the selectable name, upstream's (`isograph/crates/artifact_content/src/entrypoint_artifact.rs`, `query_name = entrypoint.name`); open decision 3.
+
+### The entrypoint's parent shape
+
+Under a fetch selection, `query_for_entrypoint` completes the entity's map with the entity's `IdentitySelection`, which `entrypoint_fetch_plan` returns with the plan. A parent whose shape is not `Composite` has nothing to select and is reported where validation reports the other reasons.
+
+Before (landed change 5):
 
 ```rust
-// from crates/isograph_compiler/src/merged_selection.rs
-impl<TSelectableData, TEntityData> MergedSelectionMap<TSelectableData, TEntityData> {
-    /// Every variable name in the arguments of this map, at any depth.
-    pub fn used_variables(&self) -> BTreeSet<VariableName>;
+// from crates/isograph_compiler/src/entrypoint.rs
+pub fn entrypoint_fetch_plan<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    entity: &ProfileEntity<TProfile>,
+    selectable: &ProfileSelectable<TProfile>,
+) -> Result<ProfileFetchPlan<TProfile>, ProfileEntrypointNotFetchableError<TProfile>> {
+    if let EntityOrigin::Source = entity.origin {
+        return EntrypointNotFetchableError::SourceEntity(entity.name).wrap_err();
+    }
+    if let SelectableKind::Server(_) = selectable.kind {
+        return EntrypointNotFetchableError::ProtocolSelectable(SelectableKey {
+            entity: selectable.parent_entity,
+            selectable: selectable.name,
+        })
+        .wrap_err();
+    }
+    TProfile::NetworkProtocol::fetch_plan(db, client, entity.name)
+        .map_err(EntrypointNotFetchableError::Protocol)
 }
 ```
 
-The operation name is the selectable name, upstream's (`isograph/crates/artifact_content/src/entrypoint_artifact.rs`, `query_name = entrypoint.name`); open decision 3.
+After:
+
+```rust
+// from crates/isograph_compiler/src/entrypoint.rs
+/// The protocol's plan for fetching an entrypoint's parent, and the parent's identity
+/// selection.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EntrypointFetch<TFetchPlan> {
+    pub plan: TFetchPlan,
+    pub identity: IdentitySelection,
+}
+
+pub type ProfileEntrypointFetch<TProfile> = EntrypointFetch<ProfileFetchPlan<TProfile>>;
+
+/// The protocol's plan for fetching `entity` as the parent of the entrypoint `selectable`.
+pub fn entrypoint_fetch_plan<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    entity: &ProfileEntity<TProfile>,
+    selectable: &ProfileSelectable<TProfile>,
+) -> Result<ProfileEntrypointFetch<TProfile>, ProfileEntrypointNotFetchableError<TProfile>> {
+    let data = match entity.origin.reference() {
+        EntityOrigin::Source => {
+            return EntrypointNotFetchableError::SourceEntity(entity.name).wrap_err();
+        }
+        EntityOrigin::Protocol(data) => data,
+    };
+    if let SelectableKind::Server(_) = selectable.kind {
+        return EntrypointNotFetchableError::ProtocolSelectable(SelectableKey {
+            entity: selectable.parent_entity,
+            selectable: selectable.name,
+        })
+        .wrap_err();
+    }
+    let identity = match TProfile::NetworkProtocol::entity_shape(data) {
+        EntityShape::Composite(identity) => identity,
+        EntityShape::Leaf | EntityShape::Input => {
+            return EntrypointNotFetchableError::NotComposite(entity.name).wrap_err();
+        }
+    };
+    let plan = TProfile::NetworkProtocol::fetch_plan(db, client, entity.name)
+        .map_err(EntrypointNotFetchableError::Protocol)?;
+    EntrypointFetch { plan, identity }.wrap_ok()
+}
+```
+
+`EntrypointNotFetchableError` gains:
+
+```rust
+// from crates/isograph_compiler/src/validation.rs
+    #[error("`{0}` has no selectables, so it cannot parent an entrypoint.")]
+    NotComposite(EntityName),
+```
+
+`entrypoint_declaration_error` locates `NotComposite` at `parent_type`, with `SourceEntity` and `Protocol`. The origin `match` binds the data the `if let` used to discard, so the shape is read from the same value the origin check ruled on. For GraphQL, `entrypoint String.X` is now `NotComposite` where it was `Protocol(NotObjectOrInterface)`; `graphql_fetch_plan(String)` itself is still `NotObject` (entrypoints.md).
 
 ### GraphQL printing
 
-`GraphQLNetworkProtocol::query_artifact` is a pure function of the operation: every fact it needs (leaf or composite, abstract, has `id`) is in the `GraphQLEntityData` the core stored on each node and in the fetch plan. It reads no database.
+`GraphQLNetworkProtocol::query_text` is a pure function of the operation: every fact it prints is in the completed map and the fetch plan. It reads no database. It prints the map directly; there is no GraphQL document type between the map and the text, and the printer is the only function that writes GraphQL text.
 
-Query text is produced in two steps. `operation_document` builds an `OperationDocument` from the merged selection map and the fetch plan, adding `id`, `__typename`, the `node` field, and the refinement. `print_operation_document` prints that document; it is the only function that writes GraphQL text, and the generation logic concatenates no strings.
-
-Upstream has no structure between the merged map and the string. `generate_query_text` (`isograph/crates/graphql_network_protocol/src/query_text.rs:13`) pushes the header onto one `String` (`:23`), and `write_selections_for_query_text` (`:70`) recurses over the `MergedSelectionMap` (`isograph/crates/isograph_schema/src/create_merged_selection_set.rs:33`, a `BTreeMap<NormalizationKey, MergedServerSelection>`) with `push_str` and `format!`, writing aliases at `:89-92` and `:99-102`. Arguments are strings from `get_serialized_arguments_for_query_text` (`:135`), values from `serialize_non_constant_value_for_graphql` (`:158`), and variable definitions from `write_variables_to_string` (`:38`). `id` and `__typename` are inserted into the map during the merge (`select_typename_and_id_fields_in_merged_selection`, `create_merged_selection_set.rs:1414`), not by the printer.
-
-```rust
-// from crates/graphql_network_protocol/src/operation_document.rs
-/// A GraphQL executable document holding one operation (spec 2.3), with `id`, `__typename`,
-/// and the `node` field already added: what `print_operation_document` prints.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OperationDocument {
-    pub operation_type: OperationType,
-    /// The entrypoint's selectable name (open decision 3).
-    pub name: SelectableName,
-    /// The fetch plan's arguments, then the entrypoint field's used variables.
-    pub variable_definitions: Vec<FieldVariable>,
-    pub selection_set: OperationSelectionSet,
-}
-
-/// A selection set; GraphQL rejects an empty one.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OperationSelectionSet(pub NonEmpty<OperationSelection>);
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum OperationSelection {
-    Field(OperationField),
-    InlineFragment(OperationInlineFragment),
-}
-
-/// `alias: name(arguments) { selections }`.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OperationField {
-    pub alias: NormalizationAlias,
-    pub name: SelectableName,
-    pub arguments: MergedArguments,
-    /// `None` when the field's target is a scalar or enum.
-    pub selection_set: Option<OperationSelectionSet>,
-}
-
-/// `... on type_condition { selections }`.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OperationInlineFragment {
-    pub type_condition: EntityName,
-    pub selection_set: OperationSelectionSet,
-}
-```
-
-`OperationType` is the parser's; `FieldVariable`, `MergedArguments`, `NormalizationAlias`, and `MergedValue` are the core's. A fetch argument becomes a `FieldVariable` with the argument's name and `variable_type` and no default. `graphql_network_protocol` gains the `nonempty` workspace dependency.
+Upstream has no structure between the merged map and the string. `generate_query_text` (`isograph/crates/graphql_network_protocol/src/query_text.rs:13`) pushes the header onto one `String` (`:23`), and `write_selections_for_query_text` (`:70`) recurses over the `MergedSelectionMap` (`isograph/crates/isograph_schema/src/create_merged_selection_set.rs:33`, a `BTreeMap<NormalizationKey, MergedServerSelection>`) with `push_str` and `format!`, writing aliases at `:89-92` and `:99-102`. Arguments are strings from `get_serialized_arguments_for_query_text` (`:135`), values from `serialize_non_constant_value_for_graphql` (`:158`), and variable definitions from `write_variables_to_string` (`:38`). Like upstream, i2's printer walks the core's map; unlike upstream, the map is protocol-neutral and GraphQL's names arrive in it as values.
 
 ```rust
 // from crates/graphql_network_protocol/src/query_text.rs
 pub const QUERY_TEXT_FILE_NAME: &str = "query_text.graphql";
 
-pub(crate) fn query_artifact(
+pub(crate) fn query_text(
     operation: &EntrypointOperation<'_, GraphQLNetworkProtocol>,
-) -> Result<QueryArtifact, GraphQLQueryError> {
-    let document = operation_document(operation)?;
-    QueryArtifact {
-        text: print_operation_document(document.reference()),
+) -> ProtocolQueryText {
+    ProtocolQueryText {
+        text: print_operation(operation),
         file_name: QUERY_TEXT_FILE_NAME.intern().to::<ArtifactFileName>().wrap_some(),
     }
-    .wrap_ok()
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
-pub enum GraphQLQueryError {
-    #[error("Variable `${0}` is declared by the entrypoint and passed to `node`.")]
-    VariableCollision(VariableName),
-    #[error("`{0}` returns a scalar or enum and takes no selection set.")]
-    SelectionSetOnLeaf(SelectableName),
-    #[error("`{0}` returns an object, interface, or union and needs a selection set.")]
-    MissingSelectionSet(SelectableName),
-    #[error("`{0}` returns an input object, which cannot be selected.")]
-    InputObjectTarget(SelectableName),
 }
 ```
-
-```rust
-// from crates/graphql_network_protocol/src/operation_document.rs
-/// The document `operation` sends.
-pub(crate) fn operation_document(
-    operation: &EntrypointOperation<'_, GraphQLNetworkProtocol>,
-) -> Result<OperationDocument, GraphQLQueryError>;
-
-/// Where a selection set sits, which decides whether it selects `__typename`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum SelectionSetPosition {
-    /// Under a field, or the operation's top level.
-    Field,
-    /// Under `... on T`.
-    InlineFragment,
-}
-
-/// `selections`, on `target`, with `id` and `__typename` added.
-fn completed_selection_set(
-    target: &MergedTarget<GraphQLEntityData>,
-    position: SelectionSetPosition,
-    selections: &GraphQLSelectionMap,
-) -> Result<OperationSelectionSet, GraphQLQueryError>;
-
-/// One merged selection as a field or an inline fragment.
-fn operation_selection(
-    key: &MergeKey,
-    selection: &GraphQLMergedSelection,
-) -> Result<OperationSelection, GraphQLQueryError>;
-
-pub type GraphQLSelectionMap = MergedSelectionMap<GraphQLSelectableData, GraphQLEntityData>;
-pub type GraphQLMergedSelection = MergedSelection<GraphQLSelectableData, GraphQLEntityData>;
-```
-
-`operation_document`:
-
-- `Root(root)`: `operation_type` is `root.operation_type`, `variable_definitions` are the operation's variables, and `selection_set` is `completed_selection_set(root.entity, Field, selections)`.
-- `Node(fetch)`: `operation_type` is `Query`; `variable_definitions` are `fetch.arguments` then the operation's variables, and a name in both is `VariableCollision`. `selection_set` is one `OperationField` with name `node`, arguments `<argument>: $<argument>` for each fetch argument, alias the `normalization_alias` of that key, and selection set `completed_selection_set(fetch.field_target, Field, ..)` over the entity's selections (`Exact`), or over a map holding only an inline fragment on the entity whose selection set is `completed_selection_set(entity, InlineFragment, selections)` (`InlineFragment`).
-
-`completed_selection_set` produces, in order:
-
-1. `__typename` when the target is an `Interface` or `Union`, or when `position` is `InlineFragment`.
-2. `id` when the target is an `Object` or `Interface` with `IdField::Present`, or when the map selected `id` with no arguments. That entry is not produced again in step 3.
-3. Each `Field` entry of the map in key order, through `operation_selection`.
-4. Each `Refinement` entry in key order, through `operation_selection`.
-5. If steps 1 to 4 produced nothing, `__typename`, because GraphQL rejects an empty selection set (upstream prints `__typename` for an empty map, `query_text.rs:81-84`). `NonEmpty::from_vec` returning `None` is this case.
-
-Every `OperationField`'s alias is `MergeKey::normalization_alias` of its key; the added `id` and `__typename` use a key with `MergedArguments::default()`, so they alias to their own names. `operation_selection` of a `Field` entry: a `Leaf` target with a selection set is `SelectionSetOnLeaf`; an `Object`, `Interface`, or `Union` target with none is `MissingSelectionSet`; an `InputObject` target is `InputObjectTarget`; a composite target's selection set is `completed_selection_set` at position `Field`. A `Refinement` entry is an `OperationInlineFragment` on its target with `completed_selection_set` at position `InlineFragment`.
-
-`GraphQLRootFetch.entity` and `FetchRefinement::InlineFragment` carry the entity's `MergedTarget<GraphQLEntityData>` (entrypoints.md), so step 2 under the root type and under `... on Pet` reads that type's `IdField`.
 
 ```rust
 // from crates/graphql_network_protocol/src/print_operation.rs
-/// The text of `document`: one selection per line, two spaces of indentation per depth, one
+/// The text of `operation`: one selection per line, two spaces of indentation per depth, one
 /// newline between lines and none at the end.
-pub(crate) fn print_operation_document(document: &OperationDocument) -> QueryText;
+pub(crate) fn print_operation(
+    operation: &EntrypointOperation<'_, GraphQLNetworkProtocol>,
+) -> QueryText;
 
-/// The lines of `selection_set`'s selections at `depth`, without its braces.
-fn print_selection_set(selection_set: &OperationSelectionSet, depth: usize) -> Vec<String>;
+/// `query`, `mutation`, or `subscription`: the root's operation type, or `query` for `node`.
+fn operation_type(plan: &GraphQLFetchPlan) -> OperationType;
+
+/// The lines of the operation's top-level selections. Under `Node` with
+/// `InlineFragment(T)`, each composite selection's selections are printed inside
+/// `... on T { }`.
+fn print_top_level(plan: &GraphQLFetchPlan, selections: &CompletedSelectionMap) -> Vec<String>;
+
+/// The lines of `selections` at `depth`, without braces.
+fn print_selection_set(selections: &CompletedSelectionMap, depth: usize) -> Vec<String>;
+
+/// The lines of one selection at `depth`.
+fn print_selection(selection: &CompletedSelection, depth: usize) -> Vec<String>;
+
+/// `<alias>: <name><arguments>`.
+fn print_selection_head(key: &SelectionKey) -> String;
 
 /// `(name: value, ...)`, or the empty string when there are none.
 fn print_arguments(arguments: &MergedArguments) -> String;
@@ -711,19 +1289,25 @@ fn print_variable_definition(variable: &FieldVariable) -> String;
 fn print_variable_type(variable_type: &VariableType) -> String;
 ```
 
-`print_selection_set` returns a `Vec` because each nested selection set's lines are spliced between its opening and closing lines, and a recursive `impl Iterator` is not a nameable type.
+`print_selection_set` and `print_selection` return a `Vec` because each nested selection set's lines are spliced between its opening and closing lines, and a recursive `impl Iterator` is not a nameable type.
 
-The header is `<operation_type> <name>(<variable definitions>) {`, with the parentheses omitted when there are none, then the top-level selection set at depth 1, then `}`. A variable definition prints `$name: Type`, then ` = <default>` when it has one. `VariableType` prints `Nullable(t)` as `t`'s text without `!`, `NonNull(t)` with `!`, `List` in brackets. A field prints `<alias>: <name><arguments>`, then ` {`, its selection set at `depth + 1`, and `}` on its own line when it has one. An inline fragment prints `... on <type_condition> {`, its selection set at `depth + 1`, and `}`.
+The header is `<operation_type> <name>(<variable definitions>) {`, with the parentheses omitted when there are none, then `print_top_level` at depth 1, then `}`. `print_top_level` is `print_selection_set(selections, 1)` for `Root(_)` and `Node` with `Exact`. For `Node` with `InlineFragment(T)` it prints each top-level selection as `print_selection` does, except that a `Selectable` with a `Composite` target prints its head and ` {`, then `... on T {` at depth 2, its selections at depth 3, `}` at depth 2, and `}` at depth 1. The core gives that map one selection, the `node` selection. A variable definition prints `$name: Type`, then ` = <default>` when it has one. `VariableType` prints `Nullable(t)` as `t`'s text without `!`, `NonNull(t)` with `!`, `List` in brackets.
+
+`print_selection`:
+
+- `Discriminator` prints `__typename: __typename`; `Identity(name)` prints `<name>: <name>`.
+- `Selectable(selection)` prints `print_selection_head(selection.key)`; with a `Composite` target, then ` {`, its selections at `depth + 1`, and `}` on its own line. The alias is `selection.key.normalization_alias()`.
+- `Conditional(conditional)` with `SelectionEquals(entity)` prints `... on <entity> {`, its selections at `depth + 1`, and `}`.
 
 Values print as GraphQL: `$name`, integers in decimal, `true`, `false`, `null`, `{ key: value, key: value }`, and strings in double quotes with `"`, `\`, and the control characters U+0000 to U+001F escaped (`\"`, `\\`, `\n`, `\r`, `\t`, `\b`, `\f`, and `\u00XX` for the rest; spec 2.9.4). Upstream writes the string's text between quotes without escaping (`query_text.rs:164`, whose comment notes the bug).
 
-`query_artifact` returns `file_name: Some(QUERY_TEXT_FILE_NAME)`. Upstream writes no raw query file; its query text lives only in `query_text.ts` (`export default 'query HomeRoute {\...'`), so the name is new. Upstream separates selections with `,` and builds a TypeScript string with `\` line continuations; here the protocol returns plain text, and the host language encodes it as a string literal.
+`query_text` returns `file_name: Some(QUERY_TEXT_FILE_NAME)`. Upstream writes no raw query file; its query text lives only in `query_text.ts` (`export default 'query HomeRoute {\...'`), so the name is new. Upstream separates selections with `,` and builds a TypeScript string with `\` line continuations; here the protocol returns plain text, and the host language encodes it as a string literal.
 
-Upstream's origin for the completion rules is `select_typename_and_id_fields_in_merged_selection` and `selection_map_wrapped` (`isograph/crates/isograph_schema/src/create_merged_selection_set.rs:1414`, `:1477`) and `GraphQLNetworkProtocol::wrap_merged_selection_map` (`isograph/crates/graphql_network_protocol/src/graphql_network_protocol.rs:305`) for the `node` wrapping. Deltas: `id` and `__typename` are added when the document is built, from entity data, rather than inserted into the map during the merge; every field is aliased (Normalization aliases); the text comes from one printer over `OperationDocument`.
+Upstream's origin for the completion rules is `select_typename_and_id_fields_in_merged_selection` and `selection_map_wrapped` (`isograph/crates/isograph_schema/src/create_merged_selection_set.rs:1414`, `:1477`) and `GraphQLNetworkProtocol::wrap_merged_selection_map` (`isograph/crates/graphql_network_protocol/src/graphql_network_protocol.rs:305`) for the `node` wrapping. Deltas: the names are the protocol's `discriminator()` and `entity_shape`, applied by the core's `complete`, rather than names hardcoded in the core; the discriminator is selected in every selection set under a selection, and none at the operation's top level; the `node` selection holds the entity's selections with no `__typename`, `id`, or conditional beside them; every selection is aliased (Normalization aliases); the text comes from one printer over the completed map.
 
 ### Config: which types get an identity field
 
-No doc owns GraphQL config yet, and `crates/isograph_config` has no GraphQL section (`IsographProjectConfig` has `source_files`, `schema`, `output_directory`). This section documents the option that decides `completed_selection_set` step 2. v1 implements only the default, `auto`, which is the rule step 2 states (a type with a field `id: ID!`, `IdField::Present`, entrypoints.md). v1 does not add the field to `IsographProjectConfig`; the other two variants are documented and not implemented.
+No doc owns GraphQL config yet, and `crates/isograph_config` has no GraphQL section (`IsographProjectConfig` has `source_files`, `schema`, `output_directory`). This section documents the option that decides GraphQL's `IdField`, which `graphql_entity_shape` turns into `IdentitySelection`. v1 implements only the default, `auto` (a type with a field `id: ID!` is `IdField::Present`, entrypoints.md). v1 does not add the field to `IsographProjectConfig`; the other two variants are documented and not implemented.
 
 ```json
 {
@@ -778,10 +1362,10 @@ Naming follows `isograph_config`: snake_case serde field names (`source_files`, 
 
 What each variant changes when it is implemented:
 
-- `Auto` and `NodeOnly` decide only `IdField` in `graphql_entity` (entrypoints.md): `NodeOnly` is `Present` when the type has `id: ID!` and is `Node` or lists `Node` in `interfaces`. `completed_selection_set` step 2 is unchanged.
-- `KeyDirective` changes `IdField::Present` to carry the key fields, because the key may be several fields or a field not named `id`; step 2 selects each of them.
+- `Auto` and `NodeOnly` decide only `IdField` in `graphql_entity` (entrypoints.md): `NodeOnly` is `Present` when the type has `id: ID!` and is `Node` or lists `Node` in `interfaces`. `graphql_entity_shape` and the core's `complete` are unchanged.
+- `KeyDirective` changes `IdField::Present` to carry the key fields, because the key may be several fields or a field not named `id`; `IdentitySelection::Select` then carries each of them, and `complete` selects each.
 - `NodeOnly` and `KeyDirective` select no identity field on some types that have an `id`. Upstream's runtime keys a record by `dataToNormalize.id` whenever the response holds one (`getDataIdOfNetworkResponse`, `isograph/libs/isograph-react/src/core/cache.ts:623-626`), so a user selection of `id` on such a type would still key the record. Under these variants the normalization AST must say which fields are the identity, rather than the runtime reading `id`; normalization-ast.md does not have that yet.
-- An `id` that a selection asks for with no arguments is still selected, by step 2's second clause, under every variant.
+- An `id` that a selection asks for with no arguments is still selected under every variant: as `Identity` where the identity is `id`, otherwise as an ordinary selection.
 
 The option reaches `graphql_entity` as a database input read by the protocol's memos; how config values enter the database is not specified in i2 yet, and is the first thing a change implementing a non-default variant specifies.
 
@@ -887,7 +1471,7 @@ query_for_entrypoint(client, E, f)
        -> parsed_iso_literals_in_file(client, path of E.f)
        -> selectable_named / entity_named of every selection and target
        -> field_selection_map(client, P, g) of every inlined field g
-  -> NetworkProtocol::query_artifact (plain, no db)
+  -> complete, normalization_ast, NetworkProtocol::query_text (plain, no db)
 ```
 
 Each memo is keyed by the narrowest identity that determines it: `field_selection_map` by the field, `query_for_entrypoint` by the entrypoint, `graphql_fetch_plan` by the entity, `root_operation_types` by the client only. The client is a key because every one reads file text through `file_contents`.
@@ -906,34 +1490,41 @@ A query fails only on errors inside what it reads. A broken field fails every `f
 
 Facts about generated text, not snapshots. A helper in the test module returns the lines of a query text, and assertions name lines and their relative order (`assert!(lines contains "    tagline")`, "the `id` line precedes the `age` line", "no line contains `friendName`").
 
-`crates/graphql_network_protocol/src/query_text.rs`, building `EntrypointOperation` values by hand (no database):
+`crates/graphql_network_protocol/src/print_operation.rs`, building `EntrypointOperation` values by hand from `complete` of hand-built `MergedSelectionMap`s (no database):
 
-- `Root(Query)` with no variables and one `Field` entry `pets` targeting `Pet` (object, id present) whose map has `tagline` (leaf): text is `query HomeRoute {`, `  pets: pets {`, `    id: id`, `    tagline: tagline`, `  }`, `}`.
-- `Root(Mutation)` header starts `mutation`; `Root(Subscription)` starts `subscription`.
+- `Root(Query)` with no variables and one `Selectable` entry `pets` targeting an entity with identity `Select(id)` whose map has `tagline` (leaf): text is `query HomeRoute {`, `  pets: pets {`, `    __typename: __typename`, `    id: id`, `    tagline: tagline`, `  }`, `}`.
+- `Root(Mutation)` header starts `mutation`; `Root(Subscription)` starts `subscription`; no top-level line is `__typename: __typename`.
 - A variable `$limit: Int = 3` used in the map prints `query X($limit: Int = 3) {`; `[ID!]!` prints `[ID!]!`; a nullable list of nullable prints `[ID]`.
-- An entry targeting a `Union` prints `__typename: __typename` first in its block; an `Interface` with id prints `__typename: __typename` then `id: id`; a `Refinement` entry prints `... on BlogItem {` after every `Field` entry of its block, with `__typename: __typename` first inside it.
-- A composite entry with `Some(empty)` prints one `__typename: __typename` line in its block.
+- An entry whose identity is `Omit` prints `__typename: __typename` first in its block and no `id: id`; one with `Select(id)` prints `__typename: __typename` then `id: id`; a `Conditional` entry `SelectionEquals(BlogItem)` prints `... on BlogItem {` after every `Selectable` entry of its block, with `__typename: __typename` first inside it.
+- A composite entry whose map is empty and whose identity is `Omit` prints one `__typename: __typename` line in its block.
 - Every line that is not the header, `}`, or an `... on` line has the form `<alias>: <name>`, where the alias is the key's `normalization_alias`.
-- A leaf entry with a selection set is `SelectionSetOnLeaf`; an object entry with `None` is `MissingSelectionSet`; an input object target is `InputObjectTarget`.
-- `Node` with `InlineFragment(Pet)` and one entrypoint variable `$id` is `VariableCollision(id)`; without it, the header is `query X($id: ID!) {` and the second line is `  node____id___v_id: node(id: $id) {`.
+- `Node` with `InlineFragment(Pet)`: the header is `query X($id: ID!) {`, the second line is `  node____id___v_id: node(id: $id) {`, the third is `    ... on Pet {`, and the fourth is `      __typename: __typename`. With `Exact`, the third line is `    __typename: __typename`.
 - A string argument `a"b\c` followed by a newline prints `"a\"b\\c\n"`.
 - An object argument `{ id: $id, tagline: $tagline }` prints in key order with `{ ` and ` }`.
 - No line ends in whitespace; the text does not end in a newline.
-- `operation_document` of `Root` with an empty map has a selection set of exactly one `__typename` field aliased `__typename`; `print_operation_document` of a hand-built `OperationDocument` with one field `a` aliased `b` prints `  b: a`.
+
+`crates/isograph_compiler/src/query.rs` and `merged_selection.rs`, the core's operation rules (GraphQL profile in the next group where a case needs a schema):
+
+- `complete` of a map holding a leaf `id` with no arguments under `Select(id)` has one `Identity(id)` entry and no `Selectable` entry `id`; under `Omit`, the `Selectable` entry `id` remains, in name order.
+- `complete` of a map holding a composite selection named `id` with no arguments under `Select(id)` is `AddedSelectionCollision`.
+- `top_level` of an empty map is `Empty`; of a map with a `Conditional` entry is `Conditional`; of a map with `pets` has no `Discriminator` entry at its own level and one under `pets`.
+- `operation_variables` of `Selection` with fetch argument `id` and a used entrypoint variable `$id` is `VariableCollision(id)`.
+- `fetch_selection` under `Selection` with fetch arguments `id`, `id` is `DuplicateFetchArgument(id)`.
 
 `crates/isograph_compiler/src/merged_selection.rs` (test protocol with `()` data where a case needs no protocol fields; otherwise the GraphQL profile in the next group):
 
 - `MergedArguments::new` sorts `b, a` to `a, b`, and returns `Err(a)` for `a, a`.
 - `normalization_alias` of `pet(id: $id)` is `pet____id___v_id`; of `checkins(limit: 5, skip: 0)` is `checkins____limit___l_5____skip___l_0`; of `set_pet_tagline(input: { id: $id, tagline: $tagline })` is `set_pet_tagline____input___o_id__v_id_tagline__v_tagline_c`; of a key `firstName` with no arguments is `firstName`.
 - Merging `f(s: "a b")` and `f(s: "a_b")` into one map is `AliasCollision`; so is merging `f(s: "a")` with a no-argument selection of a field named `f____s___s_a`.
+- Merging a `Leaf` and a `Composite` entry at one key is `SelectionMismatch`.
 
 `crates/graphql_network_protocol/tests` or the crate's test module (GraphQL profile, TypeScript host, the pet demo's schema and source files inserted before the first lookup):
 
-- `HomeRoute`: the first line is `query HomeRoute {`; the `pets: pets {` block contains `id: id`, `age: age`, `firstName: firstName`, `lastName: lastName`, `nickname: nickname`, `picture: picture`, `species: species`, `tagline: tagline`, each once; no line contains `PetSummaryCard`, `fullName`, or `__typename`.
-- `PetDetailRoute`: the first line is `query PetDetailRoute($id: ID!) {`; a line is `  pet____id___v_id: pet(id: $id) {`; exactly one line is `    best_friend_relationship: best_friend_relationship {`, and its block contains `picture_together: picture_together` and a `best_friend: best_friend {` block with `id: id`, `firstName: firstName`, `lastName: lastName`; no line contains `checkins`, `friendName`, `OwnerBadge`, or `displayName`.
+- `HomeRoute`: the first line is `query HomeRoute {`; the `pets: pets {` block contains `id: id`, `age: age`, `firstName: firstName`, `lastName: lastName`, `nickname: nickname`, `picture: picture`, `species: species`, `tagline: tagline`, each once; the block's first line is `__typename: __typename`; no line contains `PetSummaryCard` or `fullName`; the top level has no `__typename` line.
+- `PetDetailRoute`: the first line is `query PetDetailRoute($id: ID!) {`; a line is `  pet____id___v_id: pet(id: $id) {`; exactly one line is `    best_friend_relationship: best_friend_relationship {`, and its block contains `picture_together: picture_together` and a `best_friend: best_friend {` block with `id: id`, `firstName: firstName`, `lastName: lastName`; no line contains `checkins`, `friendName`, `owner`, `OwnerBadge`, or `displayName` (`owner` and `bestFriend` are client pointers, omitted).
 - `SpeciesRoute`: the header is `query SpeciesRoute($species: PetSpecies!) {`; lines include `  petsBySpecies____species___v_species: petsBySpecies(species: $species) {`, `    favorite_phrase: favorite_phrase`, `  viewer: viewer {`, and `  node____id___s_1: node(id: "1") {`, whose block's first two lines are `__typename: __typename` and `id: id`.
 - `SetTagline`: the header is `mutation SetTagline($id: ID!, $tagline: String!) {`; the second line is the `set_pet_tagline____input___o_id__v_id_tagline__v_tagline_c: set_pet_tagline(input: { id: $id, tagline: $tagline }) {` line.
-- `entrypoint Pet.PetSummaryCard` with a `field`: the second line is `  node____id___v_id: node(id: $id) {`, a later line is `    ... on Pet {`.
+- `entrypoint Pet.PetSummaryCard` with a `field`: the second line is `  node____id___v_id: node(id: $id) {`, the third is `    ... on Pet {`; no line at depth 2 is `__typename` or `id`.
 - Removing `@loadable` from `PetCheckinsCard(limit: 5)` in `PetDetailRoute` adds the line `    checkins____limit___l_5____skip___l_0: checkins(limit: 5, skip: 0) {`. A second selection `PetCheckinsCard` with no arguments adds `checkins____limit___l_3____skip___l_0` (the default); both blocks are present.
 - `field Pet.Opt($x: Int) { checkins(limit: $x) { id } }` selected as `Opt` with no argument prints `checkins: checkins {` with no arguments.
 - An entrypoint field declaring `$unused: Int` that nothing reads has no `$unused` in its header.
@@ -944,6 +1535,9 @@ Facts about generated text, not snapshots. A helper in the test module returns t
 - `field Pet.x { checkins(limit: $nope) { id } }` is `UndefinedVariable(nope)`; `pet(id: 1, id: 2)` is `DuplicateArgument(id)`; `PetCheckinsCard(other: 1)` is `UnknownFieldArgument`.
 - `entrypoint Owner.OwnerBadge` is `NotFetchable(SourceEntity)`; `entrypoint PetStats.Card` is `NotFetchable(Protocol(NoFetchRoot))`.
 - A schema field `owner: Owner` where `Owner` is only an `entity` declaration: selecting `owner { .. }` is `TargetIsSourceEntity(Owner)`.
+- `age { x }` on the leaf `age` is `SelectionSetOnLeaf` located at `age`; `stats` with no selection set is `MissingSelectionSet` located at `stats`; `asBlogItem(x: 1) { title }` is `ArgumentsOnRefinement`.
+- A client pointer: `field Pet.p to Pet { stats { weight } }` selected as `p { nickname }` adds no line; `field Pet.loop to Pet { loop }` selected anywhere is not `InlineCycle`.
+- `field String.X` with `entrypoint String.X` is `NotFetchable(NotComposite(String))`.
 
 `crates/isograph_cli/src/compile.rs` (handle seam, artifact directory set, GraphQL profile):
 
@@ -961,7 +1555,7 @@ entrypoints.md, Prefactor. Independent of every other change.
 
 ### 2. Protocol data types and origins (isograph_compiler)
 
-Status: landed with integration.md change 2. `NetworkProtocol` gained `EntityData` and `SelectableData` here and `LookupError` in change 3; `FetchPlan`, `NotFetchable`, and `QueryError` land with changes 4, 5, and 7, which read them.
+Status: landed with integration.md change 2. `NetworkProtocol` gained `EntityData` and `SelectableData` here and `LookupError` in change 3; `FetchPlan` and `NotFetchable` landed with changes 4 and 5. `NetworkProtocol` has no `QueryError` (The operation).
 
 `NetworkProtocol`'s six associated types; `Entity<TEntityData>`, `EntityOrigin`, `Selectable<TSelectableData>`, `SelectableKind`, `ClientPointerTarget`, `ServerSelectable`, `Selectable::target_entity()`, artifact-set-and-types.md change 1's `Wrapper`, the `Profile*` aliases; `SourceSelectableDefinition`; readers of `target_entity` switched to the method; the test protocol's types. Lookups still read source files only; every entity is `EntityOrigin::Source`. Depends on source-backed-lookups.md. Tests: the existing lookup, hover, and validation tests pass unchanged in their facts.
 
@@ -973,19 +1567,35 @@ Status: landed as integration.md change 3, which owns it (open decision 7). Delt
 
 ### 4. Root operation types and fetch plans (graphql_network_protocol)
 
-`RootOperationTypes`, `root_operation_types`; `GraphQLFetchPlan`, `GraphQLRootFetch`, `GraphQLNodeFetch`, `GraphQLFetchArgument`, `FetchRefinement`, `GraphQLNotFetchable`, `NodeFieldError`, `NodeFieldTypeMismatch`, `graphql_fetch_plan`, `node_fetch`; `NetworkProtocol::fetch_plan`; `VariableType` and `NonNullVariableType` (in isograph_compiler, needed by `GraphQLFetchArgument`); `MergedTarget`. `OperationType` gains `strum::Display`. Depends on 1 and 3.
+Status: landed (`103a23b9`). `RootOperationTypes`, `root_operation_types`; `GraphQLFetchPlan`, `GraphQLRootFetch`, `GraphQLNodeFetch`, `GraphQLFetchArgument`, `FetchRefinement`, `GraphQLNotFetchable`, `NodeFieldError`, `NodeFieldTypeMismatch`, `graphql_fetch_plan`, `node_fetch`; `NetworkProtocol::fetch_plan`; `VariableType` and `NonNullVariableType`; `MergedTarget`. Change 7 revises the fetch plan types and accepts only object types.
 
 ### 5. Entrypoint validation (isograph_compiler)
 
-`EntrypointNotFetchableError`, `ValidationError<TNotFetchable>`, `entrypoint_fetch_plan`, `entrypoint_declaration_error`'s new check. Depends on 4 and validation-diagnostics.md.
+Status: landed (`7e38d5c4`). `EntrypointNotFetchableError`, `ValidationError<TNotFetchable>`, `entrypoint_fetch_plan`, `entrypoint_declaration_error`'s new check. Change 7 adds `NotComposite` and `EntrypointFetch`.
 
-### 6. Merged selection maps (isograph_compiler)
+### 6. Protocol shapes and merged selection maps (isograph_compiler, graphql_network_protocol)
 
-`MergedSelectionMap`, `MergedSelection`, `MergeKey`, `MergedArguments` (with `Default`), `MergedArgument`, `MergedValue`, `MergedObject`, `MergedObjectEntry`, `NormalizationAlias`, `merge`, `used_variables`; `FieldSelectionMap`, `FieldVariable`, `VariableValue`, `substitute`; `SourceFieldDeclaration`, `source_field_declaration`; `inlined_fields`, `InlineCycle`, `inline_cycle`; `field_selection_map`, `merge_selection_set`, `selection_contribution`; `SelectionMapError`, `SelectionMapErrorKind`, `UnknownFieldArgument`, `AliasCollision`. `isograph_parser::Boolean` and `SelectableKey` gain the `Ord` and `Hash` derives. Depends on 3.
+The stash `stash@{0}` ("WIP change 6") is the starting point; its deltas are stated in The merged selection map and Errors.
 
-### 7. Operations and GraphQL printing (isograph_compiler, graphql_network_protocol)
+- `crates/isograph_compiler/src/protocol_shape.rs`: `EntityShape`, `IdentitySelection`, `SelectableShape`.
+- `NetworkProtocol::entity_shape`, `::selectable_shape`, `::discriminator`; the GraphQL implementations `graphql_entity_shape`, `identity_selection`, `graphql_selectable_shape`, `TYPENAME`, `ID`; `GraphQLCompositeData.id_field` and `IdField` (entrypoints.md) with `graphql_entity` computing it; the test protocols' implementations (`crates/isograph_compiler`, `crates/isograph_cli`, `crates/isograph_lsp` test profiles).
+- `MergedSelectionMap`, `MergeKey`, `SelectionKey`, `MergedSelection`, `MergedSelectableSelection`, `MergedSelectionTarget`, `MergedCompositeTarget`, `MergedConditional`, `Condition`, `MergedSelection::key`, `MergedSelectionMap::{empty, single, merge, iter, used_variables}`, `MergeError`, `AliasCollision`; `MergedArguments` (with `Default`), `MergedArgument`, `MergedValue`, `MergedObject`, `MergedObjectEntry`, `NormalizationAlias`, `SelectionKey::normalization_alias`.
+- `FieldSelectionMap`, `FieldVariable`, `VariableValue`, `substitute`; `SourceFieldDeclaration`, `source_field_declaration`; `inlined_fields` (client fields only), `InlineCycle`, `inline_cycle`; `field_selection_map`, `merge_selection_set`, `selection_contribution` with the shape errors and the client pointer omission; `SelectionMapError`, `SelectionMapErrorKind`, `UnknownFieldArgument`.
+- `isograph_parser::Boolean` and `SelectableKey` gain the `Ord` and `Hash` derives.
+- The `crates/isograph_compiler/src/merged_selection.rs` tests and the walk tests of the GraphQL group above that do not read query text.
 
-`EntrypointOperation`, `QueryArtifact`, `EntrypointQueryError`, `query_for_entrypoint`; `NetworkProtocol::query_artifact`; `GraphQLQueryError`, `QUERY_TEXT_FILE_NAME`, the GraphQL `query_artifact`; `OperationDocument`, `OperationSelectionSet`, `OperationSelection`, `OperationField`, `OperationInlineFragment`, `SelectionSetPosition`, `operation_document`, `completed_selection_set`, `operation_selection`, `GraphQLSelectionMap`, `GraphQLMergedSelection`; `print_operation_document` and its helpers; the `nonempty` dependency of `graphql_network_protocol`. Depends on 4, 5, and 6.
+The landed `MergedTarget` stays until change 7. Depends on 3 and 5.
+
+### 7. Completion, operations, and GraphQL printing (isograph_compiler, graphql_network_protocol)
+
+- Core: `CompletedSelectionMap`, `CompletedKey`, `CompletedSelection`, `CompletedSelectableSelection`, `CompletedSelectionTarget`, `CompletedConditional`, `CompletedSelection::key`, `CompletedSelectionMap::{iter, top_level, fetch_selection}`, `complete`, `AddedSelectionCollision`, `TopLevelError`.
+- Core: `FetchPosition`, `FetchSelection`, `FetchArgument`, `NetworkProtocol::fetch_position`; `EntrypointFetch`, `ProfileEntrypointFetch`, `entrypoint_fetch_plan` returning it, `EntrypointNotFetchableError::NotComposite` and its location in `entrypoint_declaration_error`.
+- Core: `EntrypointOperation`, `ProtocolQueryText`, `QueryArtifact { text, file_name }`, `OperationError`, `EntrypointQueryError` without `IntegerOutOfRange`, `operation_variables`, `operation_selections`, `query_for_entrypoint` without the `normalization_ast` step; `NetworkProtocol::query_text`; the test protocols' `fetch_position` and `query_text`. `MergedTarget` is deleted.
+- GraphQL: `GraphQLFetchPlan::Root(OperationType)`, `GraphQLNodeFetch { selection, refinement }`, `FetchRefinement::InlineFragment(EntityName)`; `GraphQLRootFetch` and `GraphQLFetchArgument` deleted; `node_fetch` and `contains` taking the object's `GraphQLCompositeData`; objects only (`NotObject`), entrypoints.md, Delta from the landed fetch plan; `GraphQLNetworkProtocol::fetch_position`.
+- GraphQL: `QUERY_TEXT_FILE_NAME`, `query_text`, `print_operation`, `operation_type`, `print_top_level`, `print_selection_set`, `print_selection`, `print_selection_head`, `print_arguments`, `print_value`, `print_variable_definition`, `print_variable_type`; `GraphQLNetworkProtocol::query_text`.
+- Tests: the printer tests, the core operation-rule tests, the profile tests that read query text, and the fetch plan and validation test updates.
+
+Depends on 4, 5, and 6.
 
 ### 8. Query artifacts (isograph_compiler, isograph_extract_typescript, isograph_cli)
 

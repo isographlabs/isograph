@@ -66,8 +66,6 @@ pub trait NetworkProtocol: Sized + 'static {
     type FetchPlan: Clone + Debug + PartialEq + Eq + 'static;
     /// Why an entity defined by the protocol cannot parent an entrypoint.
     type NotFetchable: Clone + Debug + PartialEq + Eq + std::fmt::Display + 'static;
-    /// Why the protocol could not produce a query from a merged selection map.
-    type QueryError: Clone + Debug + PartialEq + Eq + std::fmt::Display + 'static;
     /// Why the protocol's lookup of an entity or selectable failed.
     type LookupError: Clone + Debug + PartialEq + Eq + std::fmt::Display + 'static;
 
@@ -96,15 +94,23 @@ pub trait NetworkProtocol: Sized + 'static {
         entity: EntityName,
     ) -> Result<Self::FetchPlan, Self::NotFetchable>;
 
-    /// The query one entrypoint sends, and the protocol's name for a file holding exactly
-    /// that text. (query-generation.md)
-    fn query_artifact(
-        operation: &EntrypointOperation<'_, Self>,
-    ) -> Result<QueryArtifact, Self::QueryError>;
+    /// Every selectable the protocol defines on `entity`, by name. (landed with integration.md)
+    fn selectables<TProfile: CompilationProfile<NetworkProtocol = Self>>(
+        db: &IsographDb<TProfile>,
+        client: ClientId,
+        entity: EntityName,
+    ) -> Vec<(SelectableName, ProtocolSelectable<Self::SelectableData>)>;
+
+    // query-generation.md, What the protocol tells the core and The operation:
+    fn entity_shape(data: &Self::EntityData) -> EntityShape;
+    fn selectable_shape(data: &Self::SelectableData) -> SelectableShape;
+    fn discriminator() -> SelectableName;
+    fn fetch_position(plan: &Self::FetchPlan) -> FetchPosition<'_>;
+    fn query_text(operation: &EntrypointOperation<'_, Self>) -> ProtocolQueryText;
 }
 ```
 
-Before, the trait had only `should_include_schema_file`. The core reads every method above: `entity` and `selectable` from `entity_named` and `selectable_named`, `fetch_plan` from validation and from `query_for_entrypoint`, `query_artifact` from `query_for_entrypoint`. `entity`, `selectable`, and `fetch_plan` return owned values: the GraphQL implementation clones them out of its own memos (below), whose results are small. pico cannot yet memoize a trait method (`refactors/pending/memo-on-trait-methods.md`), so each method is a plain function that calls a `#[memo]` free function in the implementing crate.
+Before, the trait had only `should_include_schema_file`. The core reads every method above: `entity` and `selectable` from `entity_named` and `selectable_named`, `fetch_plan` from validation and from `query_for_entrypoint`, `entity_shape` and `selectable_shape` from the merge walk and `entrypoint_fetch_plan`, `discriminator`, `fetch_position`, and `query_text` from `query_for_entrypoint`. `entity`, `selectable`, and `fetch_plan` return owned values: the GraphQL implementation clones them out of its own memos (below), whose results are small. pico cannot yet memoize a trait method (`refactors/pending/memo-on-trait-methods.md`), so each method is a plain function that calls a `#[memo]` free function in the implementing crate.
 
 ```rust
 // from crates/isograph_compiler/src/schema.rs
@@ -254,7 +260,7 @@ pub fn entity_named<TProfile: CompilationProfile>(
 
 `selectable_named` is the same shape over `source_selectable_definitions` and `TProfile::NetworkProtocol::selectable`, building `SelectableKind::ClientField` or `SelectableKind::ClientPointer(target)` from the source definition and `SelectableKind::Server(ServerSelectable { target, data })` from the protocol's. `source_selectable_definitions` keeps returning the source-only list; its element type becomes `SourceSelectableDefinition { name, parent_entity, description, kind: SourceSelectableKind, definition }`, where `SourceSelectableKind` is `ClientField` or `ClientPointer(ClientPointerTarget)`, the kinds a `field` declaration can define.
 
-The test protocol (`crates/isograph_compiler/src/test_profile.rs`) defines nothing: every data type is `()`; `LookupError` is `std::convert::Infallible`, because `entity` and `selectable` return `Ok(None)` and `selectables` returns no entries; `NotFetchable` and `QueryError` are a unit struct `TestProtocolError` with `#[error("test protocol")]`, which `fetch_plan` and `query_artifact` return. `Infallible` is acceptable only in these `#[cfg(test)]` profiles.
+The test protocol (`crates/isograph_compiler/src/test_profile.rs`) defines nothing: every data type is `()`; `LookupError` is `std::convert::Infallible`, because `entity` and `selectable` return `Ok(None)` and `selectables` returns no entries; `NotFetchable` is a unit struct `TestProtocolError` with `#[error("test protocol")]`, which `fetch_plan` returns; its shape, discriminator, fetch position, and query text methods are query-generation.md's. `Infallible` is acceptable only in these `#[cfg(test)]` profiles.
 
 ### GraphQL entity data
 
@@ -273,7 +279,7 @@ pub enum GraphQLEntityData {
     Union,
 }
 
-// id_field lands with query-generation.md change 7, the change whose code reads it.
+// id_field lands with query-generation.md change 6, the change whose code reads it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GraphQLCompositeData {
     /// The interfaces this type declares it implements, in definition then extension order.
@@ -281,7 +287,7 @@ pub struct GraphQLCompositeData {
     pub id_field: IdField,
 }
 
-/// Whether a type has a field `id: ID!`, which the printer selects for normalization.
+/// Whether a type has a field `id: ID!`, which `graphql_entity_shape` makes its identity.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum IdField {
     Present,
@@ -289,7 +295,7 @@ pub enum IdField {
 }
 ```
 
-Scalars and enums are one variant because nothing reads the difference: both print as a bare field name. Object versus interface versus union is read: `GraphQLNetworkProtocol::entity_shape` (query-generation.md) selects `__typename` under an interface or union, and the fetch plan accepts objects only. `IdField::Present` is upstream's `server_id_selectable` rule (`isograph/crates/isograph_schema/src/memoized/server_selectable_access.rs`): the type has a field named `id`. Delta: the type must be exactly `ID!`; upstream checks the inner type and has a config option for other types. A field `id: String` is `Absent`, so the printer does not add it.
+Scalars and enums are one variant because nothing reads the difference: both print as a bare field name. Object versus interface versus union is read: `GraphQLNetworkProtocol::entity_shape` (query-generation.md) selects `__typename` under an interface or union, and the fetch plan accepts objects only. `IdField::Present` is upstream's `server_id_selectable` rule (`isograph/crates/isograph_schema/src/memoized/server_selectable_access.rs`): the type has a field named `id`. Delta: the type must be exactly `ID!`; upstream checks the inner type and has a config option for other types. A field `id: String` is `Absent`, so the query does not add it.
 
 Root operation kind is not entity data, and neither is fetchability. Both depend on definitions other than the entity's own (the schema definition, the query root's fields). Putting them in `GraphQLEntityData` would make `entity_named(Pet)` fail when the schema definition or `type Query` has a syntax error, which breaks integration.md's isolation rule. They are the memos `root_operation_types` and `graphql_fetch_plan` below.
 
@@ -427,9 +433,10 @@ An entrypoint `entrypoint E.f` is allowed when:
 
 1. `E` is defined by the protocol (`EntityOrigin::Protocol`). An `entity` declaration in a source file has nothing to fetch from.
 2. `E.f` is a `field` declaration (`SelectableKind::ClientField` or `ClientPointer`). A schema field has no selection set to read.
-3. The protocol's `fetch_plan(E)` is `Ok`.
+3. `E`'s `NetworkProtocol::entity_shape` is `Composite`: a selection set on it selects its selectables (query-generation.md).
+4. The protocol's `fetch_plan(E)` is `Ok`.
 
-Rules 1 and 2 are the core's; rule 3 is the protocol's. For GraphQL, `fetch_plan(E)` is `Ok` when `E` is an object type and one of these holds, checked in this order, the first that applies deciding:
+Rules 1 to 3 are the core's; rule 4 is the protocol's. For GraphQL, `fetch_plan(E)` is `Ok` when `E` is an object type and one of these holds, checked in this order, the first that applies deciding:
 
 1. `E` is a root operation type: the operation is `query`, `mutation`, or `subscription` with the entrypoint's selections at the top level.
 2. `E` implements `Node`: the operation is a `query` whose top-level selection is the query root's field `node`.
@@ -443,50 +450,35 @@ Every field of the mutation and subscription root can thus parent an entrypoint,
 /// How the GraphQL protocol fetches an entity that parents an entrypoint.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum GraphQLFetchPlan {
-    /// The entity is a root operation type: its selections are the operation's.
-    Root(GraphQLRootFetch),
+    /// The entity is the root type of this operation type: its selections are the
+    /// operation's.
+    Root(OperationType),
     /// A `query` that selects the query root's `node` field, which returns the entity or an
-    /// interface containing it.
+    /// interface or union containing it.
     Node(GraphQLNodeFetch),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct GraphQLRootFetch {
-    pub operation_type: OperationType,
-    /// The root type, whose data decides the top-level `id` and `__typename`.
-    pub entity: MergedTarget<GraphQLEntityData>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GraphQLNodeFetch {
-    /// `node`'s arguments, each passed as the operation variable of the same name.
-    pub arguments: Vec<GraphQLFetchArgument>,
-    /// The type `node` returns, which the operation builder completes like any selection
-    /// target.
-    pub field_target: MergedTarget<GraphQLEntityData>,
+    /// `node` and its arguments.
+    pub selection: FetchSelection,
     pub refinement: FetchRefinement,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct GraphQLFetchArgument {
-    pub name: InputValueName,
-    /// The argument's type, made nullable when the argument has a default, so the caller
-    /// may omit it (spec 5.8.5, All Variable Usages Are Allowed).
-    pub variable_type: VariableType,
-}
-
-/// How the entity's selections sit under `node`.
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// How the query text puts the entity's selections under `node`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FetchRefinement {
     /// `node` returns the entity itself.
     Exact,
-    /// `node` returns an interface or union that contains the entity:
-    /// `... on Entity { }`. The entity's data decides the fragment's `id`.
-    InlineFragment(MergedTarget<GraphQLEntityData>),
+    /// `node` returns an interface or union containing the entity, an object type: the text
+    /// prints `... on Entity { }` around the entity's selections.
+    InlineFragment(EntityName),
 }
 ```
 
-`OperationType` is the parser's (`crates/graphql_schema_parser/src/ast.rs`); it gains `strum::Display` with `serialize_all = "lowercase"` so the printer writes `query`, `mutation`, `subscription`. `MergedTarget` and `VariableType` are core types (query-generation.md).
+These are the types after query-generation.md change 7 (The fetch plan, with the landed types as Before). `FetchSelection` and `FetchArgument` are core types there.
+
+`OperationType` is the parser's (`crates/graphql_schema_parser/src/ast.rs`); it gains `strum::Display` with `serialize_all = "lowercase"` so the printer writes `query`, `mutation`, `subscription`. `VariableType` is a core type (query-generation.md).
 
 ```rust
 // from crates/graphql_network_protocol/src/fetch_plan.rs
@@ -502,36 +494,37 @@ pub fn graphql_fetch_plan<TProfile: CompilationProfile>(
 The body:
 
 1. `graphql_entity(db, client, entity)`: `Err` is `GraphQLNotFetchable::Entity`, `Ok(None)` is `UnknownEntity`, a variant other than `Object` is `NotObject`.
-2. `root_operation_types(db, client)`, `Err` is `RootOperationTypes`. `entity` equal to `query`, `mutation`, or `subscription` is `Root` of that operation type, with `entity` and step 1's data as `entity`.
+2. `root_operation_types(db, client)`, `Err` is `RootOperationTypes`. `entity` equal to `query`, `mutation`, or `subscription` is `Root` of that operation type.
 3. `interfaces` containing `Node`: `node_fetch(db, client, roots.query, entity)`, `Err` is `NodeField`.
 4. Otherwise `NoFetchRoot`.
 
 ```rust
 // from crates/graphql_network_protocol/src/fetch_plan.rs
-/// The fetch of `entity` through the `node` field of the query root `query_root`.
+/// The fetch of the object type `entity`, which declares `object`, through the `node` field
+/// of the query root `query_root`.
 fn node_fetch<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
     query_root: EntityName,
-    entity: MergedTarget<GraphQLEntityData>,
+    entity: EntityName,
+    object: &GraphQLCompositeData,
 ) -> Result<GraphQLNodeFetch, NodeFieldError>;
-```
 
-```rust
-// from crates/graphql_network_protocol/src/fetch_plan.rs
-/// Whether the interface or union `returns`, whose data is `returns_data`, contains `entity`.
+/// Whether the interface or union `returns`, whose data is `returns_data`, contains the
+/// object type `entity`, which declares `object`.
 fn contains<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
     returns: EntityName,
     returns_data: &GraphQLEntityData,
-    entity: &MergedTarget<GraphQLEntityData>,
+    entity: EntityName,
+    object: &GraphQLCompositeData,
 ) -> bool;
 ```
 
-`graphql_fetch_plan`'s step 2 is `roots.operation_type_of(entity)`. `node_fetch` reads `graphql_network_protocol::selectable_named(db, client, query_root, "node")`. `Err` is `Selectable`, `Ok(None)` is `NotFound`. The field's type with `NonNull` removed must be `Named(T)`; a list is `ReturnsList`. `T == entity` is `Exact`. `T` an interface in `entity`'s `interfaces`, or a union whose member types contain `entity`, is `InlineFragment` of `entity` and its data; any other `T` is `TypeMismatch`; `contains` decides the interface and union cases, reading the union's members through `graphql_network_protocol::entity_named(T)`. `node_fetch` takes the entity's data from `graphql_fetch_plan`'s step 1 through its caller, as `entity: MergedTarget<GraphQLEntityData>` in place of `entity: EntityName`. `field_target` is `T` and `graphql_entity(T)`'s data (`Err` is `Target`, `Ok(None)` is `UnknownTarget`). Each argument definition becomes a `GraphQLFetchArgument` in definition order: its GraphQL type converted to `VariableType` (`TypeAnnotation::NonNull` to `VariableType::NonNull`, `Named` and `List` under it to `NonNullVariableType::Named` and `::List`), with the outer `NonNull` dropped when the argument has a default value.
+`graphql_fetch_plan`'s step 2 is `roots.operation_type_of(entity)`. `node_fetch` reads `graphql_network_protocol::selectable_named(db, client, query_root, "node")`. `Err` is `Selectable`, `Ok(None)` is `NotFound`. The field's type with `NonNull` removed must be `Named(T)`; a list is `ReturnsList`. `T == entity` is `Exact`. `T` an interface in `object.interfaces`, or a union whose member types contain `entity`, is `InlineFragment(entity)`; any other `T` is `TypeMismatch`; `contains` decides the interface and union cases, reading the union's members through `graphql_network_protocol::entity_named(T)`. `node_fetch` takes the object's `GraphQLCompositeData` from `graphql_fetch_plan`'s step 1. `graphql_entity(T)` gives `contains` its data (`Err` is `Target`, `Ok(None)` is `UnknownTarget`). `selection` is `FetchSelection { selectable: node, arguments }`, and each argument definition becomes a `FetchArgument` in definition order: its GraphQL type converted to `VariableType` (`TypeAnnotation::NonNull` to `VariableType::NonNull`, `Named` and `List` under it to `NonNullVariableType::Named` and `::List`), with the outer `NonNull` dropped when the argument has a default value.
 
-`node`'s arguments are read from its definition, not assumed to be `id: ID!`. With pet demo's `node(id: ID!): Node` and `type Pet implements Node`, `graphql_fetch_plan(Pet)` is `Node(GraphQLNodeFetch { arguments: [id: ID!], field_target: Node (interface, id present), refinement: InlineFragment(Pet (object, id present)) })`.
+`node`'s arguments are read from its definition, not assumed to be `id: ID!`. With pet demo's `node(id: ID!): Node` and `type Pet implements Node`, `graphql_fetch_plan(Pet)` is `Node(GraphQLNodeFetch { selection: FetchSelection { selectable: node, arguments: [id: ID!] }, refinement: InlineFragment(Pet) })`.
 
 ```rust
 // from crates/graphql_network_protocol/src/fetch_plan.rs
@@ -580,13 +573,13 @@ pub struct NodeFieldTypeMismatch {
 }
 ```
 
-`GraphQLNetworkProtocol::fetch_plan` is `graphql_fetch_plan(db, client, entity).clone()`; `type FetchPlan = GraphQLFetchPlan`, `type NotFetchable = GraphQLNotFetchable`.
+`GraphQLNetworkProtocol::fetch_plan` is `graphql_fetch_plan(db, client, entity).clone()`; `type FetchPlan = GraphQLFetchPlan`, `type NotFetchable = GraphQLNotFetchable`. `GraphQLNetworkProtocol::fetch_position` is `TopLevel` for `Root(_)` and `Selection(fetch.selection.reference())` for `Node(fetch)`.
 
 The memo reads `Pet`'s data, the root types, and for a `node` fetch the `node` field and its target type. Editing an unrelated type does not change any of those reads, so the memo backdates. Editing `type Query` re-runs every `node` fetch plan, because each reads `Query.node`.
 
 ## Validation
 
-validation-diagnostics.md's `entrypoint_declaration_error` checks that `E` and `E.f` are defined. After this change it then checks rules 1 to 3.
+validation-diagnostics.md's `entrypoint_declaration_error` checks that `E` and `E.f` are defined. After this change it then checks rules 1 to 4.
 
 ```rust
 // from crates/isograph_compiler/src/validation.rs
@@ -710,12 +703,12 @@ pub type ProfileEntrypointNotFetchableError<TProfile> = EntrypointNotFetchableEr
 
 - `root_operation_types`: pet demo's `schema { query: Query mutation: Mutation }` is `{ Query, Some(Mutation), None }`; no schema definition is `{ Query, Some(Mutation), Some(Subscription) }`; `schema { query: RootQuery }` plus `extend schema { subscription: S }` is `{ RootQuery, None, Some(S) }`; two `schema` definitions in two files is `DuplicateSchemaDefinition` with first from the earlier path; `extend schema { query: A }` with a definition naming `query` is `DuplicateOperation(Query)`; `schema { mutation: M }` is `MissingQuery`; `schema { query: }` is `Syntax`; a broken `type Broken { a: ! }` in the same file does not change the result.
 - `graphql_entity`: `Pet` is `Object` with `interfaces == [Node, Namable]` and `id_field == Present`; `PetStats` is `Object` with `Absent`; a type with `id: String!` is `Absent`; `NewsfeedItem` is `Union`; `ICheckin` is `Interface` with `interfaces == [Node]`; `PetSpecies` and `ID` are `Leaf`; `SetPetTaglineParams` is `InputObject`.
-- `graphql_fetch_plan` over the pet demo schema: `Query` is `Root` with operation type `Query` and `entity.name == Query`; `Mutation` is `Root` with `Mutation`; `Pet` is `Node` with one argument `id` of type `ID!`, refinement `InlineFragment(Pet)`, and `field_target.name == Node`; `ICheckin` (an interface implementing `Node`) is `NotObject`; `Node` itself is `NotObject`; `PetStats` is `NoFetchRoot`; `NewsfeedItem` is `NotObject`; `String` is `NotObject`; with `node(id: ID!): Pet` in place of the demo's `node`, `Pet` is `Node` with `Exact`; `Nobody` is `UnknownEntity`.
+- `graphql_fetch_plan` over the pet demo schema: `Query` is `Root(Query)`; `Mutation` is `Root(Mutation)`; `Pet` is `Node` with selection `node` and one argument `id` of type `ID!`, and refinement `InlineFragment(Pet)`; `ICheckin` (an interface implementing `Node`) is `NotObject`; `Node` itself is `NotObject`; `PetStats` is `NoFetchRoot`; `NewsfeedItem` is `NotObject`; `String` is `NotObject`; with `node(id: ID!): Pet` in place of the demo's `node`, `Pet` is `Node` with `Exact`; `Nobody` is `UnknownEntity`.
 - `petByName(name: String!): Pet` on `Query` changes no plan: `Pet` stays `Node`, `PetStats` stays `NoFetchRoot`.
 - With `node(id: ID!): [Node]`: `Pet` is `NodeField(ReturnsList(Query))`. With `node(id: ID!): Viewer`: `NodeField(TypeMismatch(..))` naming `Viewer` and `Pet`. With no `node` field: `NodeField(NotFound(Query))`. In each failing case, `graphql_fetch_plan(Query)` and `graphql_fetch_plan(Mutation)` are unchanged.
 - `node(id: ID!, hint: Int = 0): Node` gives arguments `id` of type `ID!` and `hint` of type `Int` (nullable, because it has a default).
-- With no `schema` definition and `type Subscription { petAdded: Pet }`, `Subscription` is `Root` with `Subscription`; with `schema { query: Query }`, a `type Mutation` is `NoFetchRoot`.
-- A syntax error in `type Query` makes `Pet`'s plan `NodeField(Selectable(..))` and leaves `Mutation`'s plan `Root` with `Mutation`.
+- With no `schema` definition and `type Subscription { petAdded: Pet }`, `Subscription` is `Root(Subscription)`; with `schema { query: Query }`, a `type Mutation` is `NoFetchRoot`.
+- A syntax error in `type Query` makes `Pet`'s plan `NodeField(Selectable(..))` and leaves `Mutation`'s plan `Root(Mutation)`.
 
 `crates/isograph_compiler` (test protocol):
 
@@ -736,7 +729,7 @@ Changes 4 and 5 landed with interfaces as entrypoint parents. This section's rev
 
 - `graphql_fetch_plan` step 1 accepts only `Object`; `Interface` joins `Leaf`, `InputObject`, and `Union` in `NotObject`, which replaces `NotObjectOrInterface` and its message.
 - Step 3 drops the `entity == Node` clause: `Node` is an interface and fails step 1.
-- `contains` reads the entity's interfaces only from `GraphQLEntityData::Object`, so its `Interface` arm on the entity's data goes away (query-generation.md, The fetch plan).
+- `node_fetch` and `contains` take the object's `GraphQLCompositeData`, so `contains` no longer matches on the entity's data. The payloads `GraphQLRootFetch`, `field_target`, `GraphQLFetchArgument`, and `FetchRefinement::InlineFragment(MergedTarget)` become the types above (query-generation.md, The fetch plan).
 - Tests: `ICheckin` and `Node` are `NotObject` where they were `Node` fetches; `NotObjectOrInterface` assertions become `NotObject`.
 
 `EntrypointNotFetchableError` and `entrypoint_declaration_error` report the new variant with no change of their own: `Protocol(GraphQLNotFetchable::NotObject(_))` is located at `parent_type`, as every `Protocol` reason is.
