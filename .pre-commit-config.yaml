@@ -83,17 +83,36 @@ repos:
         language: system
         files: '^libs/isograph-babel-plugin/'
         pass_filenames: false
+      - id: disposable-types-test
+        name: disposable-types test
+        entry: pnpm --filter @isograph/disposable-types test
+        language: system
+        files: '^libs/isograph-disposable-types/'
+        pass_filenames: false
+      - id: disposable-types-typecheck
+        name: disposable-types typecheck
+        entry: pnpm --filter @isograph/disposable-types tsc
+        language: system
+        files: '^(libs/isograph-disposable-types/|tsconfig\.build\.json$)'
+        pass_filenames: false
+      # The runtime's tests and typecheck import its workspace dependencies' dist.
+      - id: runtime-dependencies-build
+        name: runtime dependencies build
+        entry: pnpm exec turbo run compile-libs --filter=@isograph/runtime^...
+        language: system
+        files: '^(libs/isograph-runtime/|libs/isograph-disposable-types/|tsconfig\.build\.json$)'
+        pass_filenames: false
       - id: runtime-test
         name: runtime test
         entry: pnpm --filter @isograph/runtime test
         language: system
-        files: '^libs/isograph-runtime/'
+        files: '^libs/(isograph-runtime|isograph-disposable-types)/'
         pass_filenames: false
       - id: runtime-typecheck
         name: runtime typecheck
         entry: pnpm --filter @isograph/runtime tsc
         language: system
-        files: '^(libs/isograph-runtime/|tsconfig\.build\.json$)'
+        files: '^(libs/isograph-runtime/|libs/isograph-disposable-types/|tsconfig\.build\.json$)'
         pass_filenames: false
       - id: precommit-in-worktree-test
         name: precommit-in-worktree-test

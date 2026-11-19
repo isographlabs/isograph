@@ -34,6 +34,8 @@ jobs:
         run: pnpm --filter @isograph/babel-plugin typecheck
       - name: Build JS files
         run: pnpm compile-libs
+      - name: Test @isograph/disposable-types
+        run: pnpm --filter @isograph/disposable-types test
       - name: Test the runtime
         run: pnpm --filter @isograph/runtime test
       - name: Typecheck the pet demo

@@ -47,3 +47,15 @@ export {
   type ReadOk,
   type ReadResult,
 } from './read';
+export {
+  getPromiseState,
+  NOT_SET,
+  type NotSet,
+  type PromiseState,
+  type PromiseWrapper,
+  readPromise,
+  type Result,
+  transpose,
+  wrapPromise,
+  wrapResolvedValue,
+} from './PromiseWrapper';

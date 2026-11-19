@@ -236,9 +236,10 @@ type TransposeStatus =
   | { readonly kind: "Waiting" }
   /** The inner pair arrived, and the cleanup has not run. */
   | { readonly kind: "Arrived"; readonly cleanup: CleanupFn }
-  /** The cleanup ran before the inner pair arrived; the inner cleanup runs when it arrives. */
+  /** The cleanup ran before the inner pair arrived, or after `wrapper` rejected; the inner
+   * cleanup runs if the pair arrives. */
   | { readonly kind: "ClearedBeforeArrival" }
-  /** The cleanup ran after the inner pair arrived, or after `wrapper` rejected. */
+  /** The cleanup ran after the inner pair arrived. */
   | { readonly kind: "Cleared" };
 
 /**
@@ -247,7 +248,7 @@ type TransposeStatus =
  * cleanup runs the inner cleanup once the inner pair exists.
  */
 export function transpose<T>(
-  wrapper: PromiseWrapper<ItemCleanupPair<T>, unknown>,
+  wrapper: PromiseWrapper<ItemCleanupPair<Exclude<T, NotSet>>, unknown>,
 ): ItemCleanupPair<PromiseWrapper<T, unknown>> {
   let status: TransposeStatus =
     wrapper.result !== NOT_SET && wrapper.result.kind === "Ok"
@@ -297,6 +298,8 @@ export function transpose<T>(
   ];
 }
 ```
+
+The parameter's item type is `Exclude<T, NotSet>`, not `T`: `wrapPromise<T>` takes a `Promise<Exclude<T, NotSet>>`, and with `ItemCleanupPair<T>` the item is `T`, which `tsc` rejects (TS2345, TS2322). Callers' `T` is still inferred. The status comments state what the code does: a cleanup after a rejection moves the status to `ClearedBeforeArrival`, not `Cleared`.
 
 Semantics, stated as facts the tests assert:
 
@@ -1417,7 +1420,7 @@ Each change is one commit, in order. Prerequisites: store.md changes 1 to 7 and 
 
 ### 1. `PromiseWrapper` and `transpose` (libs/isograph-disposable-types, libs/isograph-runtime)
 
-`@isograph/disposable-types` ported unchanged from upstream at `9d72f6fc` (`src/index.ts`, `src/joinCleanups.test.ts`), with `private`, source `exports` (`types`, `import`), and the `typecheck` and `test` scripts; `@isograph/runtime` depends on it. `src/PromiseWrapper.ts` with `transpose`; their exports; `test/PromiseWrapper.test.ts`. Depends only on these two files and the port.
+`@isograph/disposable-types` ported unchanged from upstream at `072af275` (`src/index.ts`, `src/joinCleanups.test.ts`, `README.md`, `tsconfig.json`, unchanged since `9d72f6fc`). Its `package.json` is upstream's with `private` and a `vitest` dev dependency added: the package is built as upstream's libs packages are, as `@isograph/runtime` already is (`tsdown` into `dist`, `exports` of `require` and `import` into `dist`, the `compile-libs`, `tsc`, and `test` scripts), so the root `pnpm compile-libs` (turbo) builds it before the runtime's `tsc`. `@isograph/runtime` depends on it. The runtime's tests and `tsc` resolve it through its `dist`, so the pre-commit config gains `disposable-types-test` and `disposable-types-typecheck`, and a `runtime-dependencies-build` hook (`pnpm exec turbo run compile-libs --filter=@isograph/runtime^...`) before the runtime's two hooks, whose `files` also match `libs/isograph-disposable-types/`; CI gains "Test @isograph/disposable-types" after "Build JS files". `src/PromiseWrapper.ts` with `transpose`; their exports; `test/PromiseWrapper.test.ts`. Depends only on these two files and the port.
 
 ### 2. `CacheItem` and `ParentCache` in `@isograph/disposable-types`
 

@@ -132,7 +132,20 @@ importers:
         specifier: ^2.1.2
         version: 2.1.9(@types/node@22.17.2)(terser@5.43.1)
 
+  libs/isograph-disposable-types:
+    devDependencies:
+      typescript:
+        specifier: 5.6.3
+        version: 5.6.3
+      vitest:
+        specifier: ^2.1.2
+        version: 2.1.9(@types/node@22.17.2)(terser@5.43.1)
+
   libs/isograph-runtime:
+    dependencies:
+      '@isograph/disposable-types':
+        specifier: workspace:*
+        version: link:../isograph-disposable-types
     devDependencies:
       '@babel/core':
         specifier: ^7.28.3

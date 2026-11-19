@@ -15,6 +15,9 @@
     "tsc": "tsc -b",
     "tsc-force": "tsc --build --clean && tsc --build --force"
   },
+  "dependencies": {
+    "@isograph/disposable-types": "workspace:*"
+  },
   "devDependencies": {
     "@babel/core": "^7.28.3",
     "@isograph/babel-plugin": "workspace:*",
