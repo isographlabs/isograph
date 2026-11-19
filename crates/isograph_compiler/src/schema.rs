@@ -4,6 +4,7 @@ use common_lang_types::{
     DescriptionValue, Diagnostic, DiagnosticResult, EntityName, RelativePathToSourceFile,
     SelectableName,
 };
+use intern::Lookup;
 use isograph_parser::{IsoLiteralItem, SelectableDeclaration};
 use pico_macros::memo;
 use prelude::Postfix;
@@ -45,11 +46,18 @@ pub struct Selectable<TSelectableData> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SelectableKind<TSelectableData> {
     /// `field P.f` with no `to`: its value is what its resolver returns.
-    ClientField,
+    ClientField(ClientFieldKind),
     /// `field P.f to T`: its resolver returns a link to a `T`.
     ClientPointer(ClientPointerTarget),
     /// Defined by the network protocol.
     Server(ServerSelectable<TSelectableData>),
+}
+
+/// Whether a client field's declaration has `@component`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ClientFieldKind {
+    Component,
+    Plain,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -70,7 +78,7 @@ impl<TSelectableData> Selectable<TSelectableData> {
     /// inner entity of its target.
     pub fn target_entity(&self) -> Option<EntityName> {
         match self.kind.reference() {
-            SelectableKind::ClientField => None,
+            SelectableKind::ClientField(_) => None,
             SelectableKind::ClientPointer(target) => target.target_entity(),
             SelectableKind::Server(server) => server.target.inner_values().next().copied(),
         }
@@ -107,7 +115,7 @@ pub struct SourceSelectableDefinition {
 /// The kinds of selectable a `field` declaration defines.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SourceSelectableKind {
-    ClientField,
+    ClientField(ClientFieldKind),
     ClientPointer(ClientPointerTarget),
 }
 
@@ -115,7 +123,7 @@ impl SourceSelectableDefinition {
     /// The entity selections under a selection of this selectable select on.
     pub fn target_entity(&self) -> Option<EntityName> {
         match self.kind.reference() {
-            SourceSelectableKind::ClientField => None,
+            SourceSelectableKind::ClientField(_) => None,
             SourceSelectableKind::ClientPointer(target) => target.target_entity(),
         }
     }
@@ -127,7 +135,9 @@ impl SourceSelectableDefinition {
             description: self.description,
             definition: self.definition,
             kind: match self.kind.reference() {
-                SourceSelectableKind::ClientField => SelectableKind::ClientField,
+                SourceSelectableKind::ClientField(kind) => {
+                    SelectableKind::ClientField(kind.dereference())
+                }
                 SourceSelectableKind::ClientPointer(target) => {
                     SelectableKind::ClientPointer(target.clone())
                 }
@@ -437,7 +447,7 @@ fn selectable_of_declaration(
             .description
             .map(|description| description.item.0),
         kind: match declaration.target_type.as_ref() {
-            None => SourceSelectableKind::ClientField,
+            None => SourceSelectableKind::ClientField(client_field_kind(declaration)),
             Some(target_type) => SourceSelectableKind::ClientPointer(
                 wrapper_of_type_annotation(target_type.item.reference())
                     .map_or(ClientPointerTarget::Unparsed, ClientPointerTarget::Parsed),
@@ -447,5 +457,73 @@ fn selectable_of_declaration(
             path,
             span: declaration.name.location.with_offset(literal_start),
         },
+    }
+}
+
+const COMPONENT_DIRECTIVE: &str = "component";
+
+/// `Component` when `declaration` has `@component`.
+fn client_field_kind(declaration: &SelectableDeclaration) -> ClientFieldKind {
+    let has_component = declaration
+        .directive_set
+        .iter()
+        .flat_map(|directives| directives.item.0.iter())
+        .any(|directive| directive.item.name.item.0.lookup() == COMPONENT_DIRECTIVE);
+    if has_component {
+        ClientFieldKind::Component
+    } else {
+        ClientFieldKind::Plain
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use common_lang_types::RelativePathToSourceFile;
+    use intern::string_key::Intern;
+    use prelude::Postfix;
+
+    use super::{ClientFieldKind, SelectableKind, selectable_named};
+    use crate::test_profile::TestProfile;
+    use crate::{ClientId, FileMembership, IncludeFile, IsographDb};
+
+    const CLIENT: ClientId = ClientId(1);
+
+    /// The kind of `Pet.f` declared by `literal`.
+    fn kind_of(literal: &str) -> SelectableKind<()> {
+        let mut db = IsographDb::<TestProfile>::default();
+        let path: RelativePathToSourceFile = "src/a.ts".intern().to();
+        db.insert_disk_file(
+            path,
+            FileMembership {
+                source_file: IncludeFile::Include,
+                schema_file: IncludeFile::Skip,
+            },
+            format!("iso(`entity Pet`)\niso(`{literal}`)"),
+        );
+        selectable_named(
+            db.reference(),
+            CLIENT,
+            "Pet".intern().to(),
+            "f".intern().to(),
+        )
+        .clone()
+        .expect("the fixture declares Pet.f once")
+        .kind
+    }
+
+    #[test]
+    fn a_component_directive_makes_a_component_client_field() {
+        assert_eq!(
+            kind_of("field Pet.f @component { id }"),
+            SelectableKind::ClientField(ClientFieldKind::Component)
+        );
+        assert_eq!(
+            kind_of("field Pet.f { id }"),
+            SelectableKind::ClientField(ClientFieldKind::Plain)
+        );
+        assert_eq!(
+            kind_of("field Pet.f @loadable { id }"),
+            SelectableKind::ClientField(ClientFieldKind::Plain)
+        );
     }
 }

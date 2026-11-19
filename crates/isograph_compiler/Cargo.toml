@@ -6,6 +6,7 @@ license = { workspace = true }
 
 [dependencies]
 common_lang_types = { path = "../common_lang_types" }
+intern = { path = "../../relay-crates/intern" }
 isograph_parser = { path = "../isograph_parser" }
 pico = { path = "../pico" }
 pico_macros = { path = "../pico_macros" }
@@ -15,8 +16,6 @@ span = { path = "../span" }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
-[dev-dependencies]
-intern = { path = "../../relay-crates/intern" }
 
 [lints]
 workspace = true

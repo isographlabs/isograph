@@ -29,7 +29,7 @@ pub use iso_literals::{
 pub use merged_selection::{MergedTarget, NonNullVariableType, VariableType};
 pub use references::{ReferenceTarget, references_in_file};
 pub use schema::{
-    ClientPointerTarget, DefinitionLocation, Entity, EntityOrigin, ProfileEntity,
+    ClientFieldKind, ClientPointerTarget, DefinitionLocation, Entity, EntityOrigin, ProfileEntity,
     ProfileLookupError, ProfileSelectable, ProtocolEntity, ProtocolSelectable, Selectable,
     SelectableKind, ServerSelectable, SourceSelectableDefinition, SourceSelectableKind,
     entity_named, selectable_named, selectables_for_entity,
