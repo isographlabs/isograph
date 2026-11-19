@@ -107,12 +107,13 @@ Set `isograph.pathToIsograph` to the absolute path of `target/debug/isograph` in
 pnpm open-pet-demo
 ```
 
-This command runs `scripts/open-pet-demo.sh`. The script builds `target/debug/isograph`, builds `vscode-extension/out/extension.js` once with esbuild, and opens `demos/pet-demo` in VS Code with `--extensionDevelopmentPath=vscode-extension`. VS Code loads the extension from source without installing it. The binary is the one named by `isograph.pathToIsograph` in `demos/pet-demo/.vscode/settings.json` (`../../target/debug/isograph`). The F5 alternative is the `Isograph VS Code extension` configuration in `.vscode/launch.json`.
+This command runs `scripts/open-pet-demo.sh`. The script builds `target/debug/isograph`, builds `vscode-extension/out/extension.js` once with esbuild, restarts the pet-demo daemon if one is running, and opens `demos/pet-demo` in VS Code with `--extensionDevelopmentPath=vscode-extension`. VS Code loads the extension from source without installing it. The binary is the one named by `isograph.pathToIsograph` in `demos/pet-demo/.vscode/settings.json` (`../../target/debug/isograph`). The F5 alternative is the `Isograph VS Code extension` configuration in `.vscode/launch.json`.
 
 ### Restarting and seeing new changes
 
-- Run `pnpm watch-rs` to rebuild the `isograph` binary.
-- Reload the Extension Development Host to use the new binary or a new `out/extension.js`.
+- Run `pnpm watch-rs` to rebuild the `isograph` binary. After each successful build, the job (`scripts/watch-rs-build.sh`) restarts the daemon for `demos/pet-demo/isograph.config.json` if `isograph status` reports it running. A failed build does not restart it, and the job never starts a daemon. Daemons for other configs are not restarted; run `isograph restart --config <that config>` for those.
+- Run `pnpm watch-extension` to rebuild `vscode-extension/out/extension.js`.
+- Run "Developer: Reload Window" in the Extension Development Host. The reloaded window loads the new `out/extension.js` and starts a new `isograph lsp`, which connects to the restarted daemon running the new binary.
 
 ### Logs etc.
 

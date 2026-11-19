@@ -34,7 +34,7 @@ From the i2 repo root:
 pnpm open-pet-demo
 ```
 
-This command runs `scripts/open-pet-demo.sh`. The script builds `target/debug/isograph` with `cargo build -p ts_graphql_react_isograph_cli`, builds `out/extension.js` once with the same esbuild flags as `npm run esbuild`, and opens `demos/pet-demo` in VS Code with `--extensionDevelopmentPath` set to `vscode-extension`. VS Code loads the extension from source; nothing is installed. The script uses `code` from PATH if present, otherwise `/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code`. It requires `npm install` in `vscode-extension` to have run once.
+This command runs `scripts/open-pet-demo.sh`. The script builds `target/debug/isograph` with `cargo build -p ts_graphql_react_isograph_cli`, builds `out/extension.js` once with the same esbuild flags as `npm run esbuild`, restarts the pet-demo daemon if one is running, and opens `demos/pet-demo` in VS Code with `--extensionDevelopmentPath` set to `vscode-extension`. VS Code loads the extension from source; nothing is installed. The script uses `code` from PATH if present, otherwise `/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code`. It requires `npm install` in `vscode-extension` to have run once.
 
 The extension runs the binary named by `isograph.pathToIsograph` in `demos/pet-demo/.vscode/settings.json`, which is `../../target/debug/isograph`.
 
@@ -42,5 +42,8 @@ The alternative is F5 in the i2 repo: the `Isograph VS Code extension` configura
 
 ## Restarting
 
-- New Rust binary: `pnpm watch-rs` at the repo root. Reload the Extension Development Host.
-- New extension TypeScript: reload the Extension Development Host. F5 already ran `npm run esbuild`.
+Run `pnpm watch-rs` and `pnpm watch-extension` at the repo root. After each successful build, the `watch-rs` job (`scripts/watch-rs-build.sh`) runs `isograph restart --config demos/pet-demo/isograph.config.json` if `isograph status` reports that daemon running. A failed build does not restart it, and the job never starts a daemon that is not running. Only the pet-demo daemon is restarted; a daemon for another config keeps running the old binary until you run `isograph restart --config <that config>`.
+
+Then "Developer: Reload Window" in the Extension Development Host picks up both the new `out/extension.js` (rebuilt by `watch-extension`) and the new daemon. The old `isograph lsp` process exits when the old daemon closes its connection. The reloaded window starts a new `isograph lsp`, which connects to the restarted daemon.
+
+`pnpm open-pet-demo` also restarts a running pet-demo daemon after its cargo build.
