@@ -665,9 +665,7 @@ mod tests {
 
     use intern::Lookup;
     use intern::string_key::Intern;
-    use isograph_compiler::{
-        CompilationProfile, HostLanguage, IncludeFile, IsoLiteralExtraction, IsographDb,
-    };
+    use isograph_compiler::{CompilationProfile, HostLanguage, IncludeFile, IsoLiteralExtraction};
     use isograph_config::ISOGRAPH_FOLDER;
     use prelude::Postfix;
     use thiserror::Error;
@@ -677,7 +675,7 @@ mod tests {
         ChangedFileKind, Globs, ProjectGlobs, SourceEventKind, WatchError, apply,
         categorize_and_filter_events, categorize_folder, start,
     };
-    use crate::event::{IsographEvent, LiveSessions};
+    use crate::event::IsographEvent;
     use crate::state::{IsographState, handle, intern_config_directory};
     use crate::test_profile::TestNetworkProtocol;
 
@@ -750,8 +748,8 @@ mod tests {
             let config_path = dir.path().join("isograph.config.json");
             std::fs::write(config_path.reference(), "{}\n").expect("a test can write a config");
             let config_path = config_path.canonicalize().expect("the config exists");
-            let mut db = IsographDb::<InHostProfile>::default();
-            intern_config_directory(&mut db, config_path.reference());
+            let mut state = IsographState::<InHostProfile>::new(globs.clone());
+            intern_config_directory(&mut state.db, config_path.reference());
             let config_directory = config_path
                 .parent()
                 .expect("a config file path has a parent directory")
@@ -761,12 +759,7 @@ mod tests {
                 _dir: dir,
                 config_path,
                 config_directory,
-                state: IsographState {
-                    db,
-                    live_sessions: LiveSessions::default(),
-                    globs: globs.clone(),
-                    diagnostics_debounce: None,
-                },
+                state,
                 event_tx,
                 event_rx,
                 globs,

@@ -65,7 +65,7 @@ The request handler computes the errors in `handle` from the memos. It does not 
 Each change is one commit, prefactors first. Each lists its tests. Each amends the design docs named in Docs this doc amends, in the same commit.
 
 1. The watcher returns the boot scan, and `serve` posts it before the LSP port accepts. Landed.
-2. `handle` mints every `ClientId` from `IsographState`.
+2. `handle` mints every `ClientId` from `IsographState`. Landed.
 3. The daemon compiles after every applied `DiskChanged`.
 4. Shared LSP client handshake and `isograph start` spawning.
 5. The `isograph/errors` request.
@@ -223,7 +223,7 @@ After:
 
 - New `semantic_tokens_right_after_a_watch_start_see_the_boot_scan`: write `src/Home.ts` with `CONTENTS`, `Daemon::start_watch("{\"source_files\":[\"src/**\"]}")`, `LspClient::connect` with no `settle()`, request `semanticTokens/full` of its URI. The first token is the `entrypoint` keyword (`KEYWORD`, length 10). Before this change the request can race the boot scan and return null.
 
-## Change 2: `handle` mints every `ClientId`
+## Change 2: `handle` mints every `ClientId` (landed)
 
 ### `ClientIdSource`
 

@@ -109,8 +109,9 @@ impl LiveSessions {
 
 #[derive(Clone, Debug)]
 pub struct ClientStartedEvent {
-    pub client: ClientId,
     pub session: LiveSession,
+    /// The session's thread waits on the other end for the `ClientId` `handle` mints.
+    pub assign: crossbeam::channel::Sender<ClientId>,
 }
 
 #[derive(Clone, Debug)]

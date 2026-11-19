@@ -24,12 +24,20 @@ impl std::fmt::Debug for SendLspResponseEffect {
     }
 }
 
+/// The `ClientId` `handle` minted for one connection, and the channel its session waits on.
+#[derive(Debug)]
+pub struct AssignClientIdEffect {
+    pub assign: crossbeam::channel::Sender<isograph_compiler::ClientId>,
+    pub client: isograph_compiler::ClientId,
+}
+
 #[derive(Debug)]
 pub enum IsographEffect {
     LogHelloWorld,
     Kill,
     SendLspResponse(Box<SendLspResponseEffect>),
     PublishDiagnostics(Box<PublishDiagnosticsEffect>),
+    AssignClientId(AssignClientIdEffect),
     Timer(TimerEffect<TimerPayload>),
 }
 

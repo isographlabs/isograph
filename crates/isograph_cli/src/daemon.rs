@@ -10,8 +10,8 @@ use tokio::sync::oneshot::error::TryRecvError;
 
 use crate::Filesystem;
 use crate::effect::{IsographEffect, PublishDiagnosticsEffect};
-use crate::event::{IsographEvent, LiveSessions};
-use crate::state::{IsographDb, IsographState, handle, intern_config_directory};
+use crate::event::IsographEvent;
+use crate::state::{IsographState, handle, intern_config_directory};
 use crate::timer::TimerPayload;
 use crate::watch::{ProjectGlobs, SourceFileEvent};
 
@@ -85,12 +85,7 @@ async fn serve<TProfile: CompilationProfile>(
             return;
         }
     };
-    let mut state = IsographState {
-        db: IsographDb::<TProfile>::default(),
-        live_sessions: LiveSessions::default(),
-        globs: globs.clone(),
-        diagnostics_debounce: None,
-    };
+    let mut state = IsographState::<TProfile>::new(globs.clone());
     intern_config_directory(&mut state.db, config_path.reference());
     let config_directory = config_path
         .parent()
@@ -229,6 +224,10 @@ pub fn perform(
             send_notifications(*publish);
             ControlFlow::Continue(())
         }
+        IsographEffect::AssignClientId(assign) => {
+            let _ = assign.assign.send(assign.client);
+            ControlFlow::Continue(())
+        }
         IsographEffect::Timer(timer) => {
             schedule_timer(timer, event_tx);
             ControlFlow::Continue(())
@@ -274,21 +273,18 @@ mod tests {
 
     use super::{perform, run_effect_loop, run_event_loop};
     use crate::effect::IsographEffect;
-    use crate::event::{InternalEvent, IsographEvent, LiveSessions};
-    use crate::state::{IsographDb, IsographState};
+    use crate::event::{InternalEvent, IsographEvent};
+    use crate::state::IsographState;
     use crate::test_profile::TestProfile;
     use crate::timer::TimerPayload;
     use prelude::Postfix;
     use tokio::sync::mpsc::unbounded_channel;
 
     fn empty_state() -> IsographState<TestProfile> {
-        IsographState {
-            db: IsographDb::<TestProfile>::default(),
-            live_sessions: LiveSessions::default(),
-            globs: crate::watch::ProjectGlobs::parse(&["src/**".to_owned()], &[])
+        IsographState::new(
+            crate::watch::ProjectGlobs::parse(&["src/**".to_owned()], &[])
                 .expect("the test glob is valid"),
-            diagnostics_debounce: None,
-        }
+        )
     }
 
     #[tokio::test]

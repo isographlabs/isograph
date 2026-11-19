@@ -421,7 +421,7 @@ pub(crate) fn semantic_tokens_response<TProfile: CompilationProfile>(
 ) -> LSPRuntimeResult<...>
 ```
 
-The session loop in `lsp_socket.rs` tags each incoming message with its connection's `ClientId`. `LspRequest`, `LspNotification`, and `LspResponse` carry that `client` across the event channel only. `LSPRequestDispatch` and `LSPNotificationDispatch` take it off the payload and pass it to the handler.
+The session loop in `lsp_socket.rs` tags each incoming message with the `ClientId` `handle` assigned to its connection when it processed that connection's `Started`. `LspRequest`, `LspNotification`, and `LspResponse` carry that `client` across the event channel only. `LSPRequestDispatch` and `LSPNotificationDispatch` take it off the payload and pass it to the handler.
 
 A handler's output never contains a `ClientId`. `TRequest::Result` is the LSP result type. `dispatch_lsp_request` routes the reply by the client the request came in on: `live_sessions.reply(client, id)` returns `BeforeCompute`, `before_compute` returns `AfterCompute`, and `after_compute` sends on that client's `LiveSession.sender`.
 

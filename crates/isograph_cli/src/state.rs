@@ -20,11 +20,36 @@ use crate::watch::ProjectGlobs;
 
 pub use isograph_compiler::IsographDb;
 
+/// Hands out each `ClientId` once.
+#[derive(Debug, Default)]
+pub(crate) struct ClientIdSource(u64);
+
+impl ClientIdSource {
+    pub(crate) fn mint(&mut self) -> ClientId {
+        let client = ClientId(self.0);
+        self.0 += 1;
+        client
+    }
+}
+
 pub struct IsographState<TProfile: CompilationProfile> {
     pub db: IsographDb<TProfile>,
     pub live_sessions: LiveSessions,
     pub(crate) globs: ProjectGlobs,
     pub(crate) diagnostics_debounce: Option<freddie_timer::TimerGuard>,
+    client_ids: ClientIdSource,
+}
+
+impl<TProfile: CompilationProfile> IsographState<TProfile> {
+    pub(crate) fn new(globs: ProjectGlobs) -> Self {
+        Self {
+            db: IsographDb::default(),
+            live_sessions: LiveSessions::default(),
+            globs,
+            diagnostics_debounce: None,
+            client_ids: ClientIdSource::default(),
+        }
+    }
 }
 
 pub fn handle<TProfile: CompilationProfile>(
@@ -45,11 +70,13 @@ fn handle_client_connection<TProfile: CompilationProfile>(
 ) -> Vec<IsographEffect> {
     match event {
         ClientConnectionEvent::Started(started) => {
-            state
-                .live_sessions
-                .0
-                .insert(started.client, started.session);
-            no_effects()
+            let client = state.client_ids.mint();
+            state.live_sessions.0.insert(client, started.session);
+            IsographEffect::AssignClientId(crate::effect::AssignClientIdEffect {
+                assign: started.assign,
+                client,
+            })
+            .wrap_vec()
         }
         ClientConnectionEvent::Gone(client) => {
             state.live_sessions.0.remove(&client);
@@ -326,7 +353,7 @@ mod tests {
 
     use crate::test_profile::TestProfile;
 
-    use super::{IsographDb, IsographState, handle, intern_config_directory};
+    use super::{IsographState, handle, intern_config_directory};
     use crate::diagnostics::PublishedDiagnostics;
     use crate::effect::IsographEffect;
     use crate::event::{
@@ -348,13 +375,10 @@ mod tests {
     }
 
     fn empty() -> IsographState<TestProfile> {
-        IsographState {
-            db: IsographDb::<TestProfile>::default(),
-            live_sessions: LiveSessions::default(),
-            globs: crate::watch::ProjectGlobs::parse(&["src/**".to_owned()], &[])
+        IsographState::new(
+            crate::watch::ProjectGlobs::parse(&["src/**".to_owned()], &[])
                 .expect("the test glob is valid"),
-            diagnostics_debounce: None,
-        }
+        )
     }
 
     fn with_config() -> IsographState<TestProfile> {
@@ -383,8 +407,8 @@ mod tests {
     #[test]
     fn timer_fired_on_a_never_armed_state_returns_no_effects() {
         let mut armed = with_config();
-        started(&mut armed, ClientId(1));
-        let timer = only_timer(handle(&mut armed, did_open(ClientId(1), X_URI, "open")));
+        let client_1 = started(&mut armed);
+        let timer = only_timer(handle(&mut armed, did_open(client_1, X_URI, "open")));
         let mut state = empty();
         let effects = handle(&mut state, timer.event.to());
         assert!(effects.is_empty());
@@ -456,19 +480,35 @@ mod tests {
         assert!(contents(state.reference(), interned("src/a.ts")).is_none());
     }
 
+    fn assigned(effects: Vec<IsographEffect>) -> ClientId {
+        let [IsographEffect::AssignClientId(assign)] =
+            <[IsographEffect; 1]>::try_from(effects).expect("Started returns exactly one effect")
+        else {
+            panic!("Started returns AssignClientId");
+        };
+        assign.client
+    }
+
+    fn started_event(
+        sender: crossbeam::channel::Sender<lsp_server::Message>,
+        capabilities: lsp_types::ClientCapabilities,
+    ) -> IsographEvent {
+        let (assign, _assigned) = crossbeam::channel::bounded(1);
+        ClientConnectionEvent::Started(ClientStartedEvent {
+            session: dummy_session(sender, capabilities),
+            assign,
+        })
+        .to()
+    }
+
     fn start_client(
         state: &mut IsographState<TestProfile>,
-        client: ClientId,
         sender: crossbeam::channel::Sender<lsp_server::Message>,
-    ) {
-        handle(
+    ) -> ClientId {
+        assigned(handle(
             state,
-            ClientConnectionEvent::Started(ClientStartedEvent {
-                client,
-                session: dummy_session(sender, lsp_types::ClientCapabilities::default()),
-            })
-            .to(),
-        );
+            started_event(sender, lsp_types::ClientCapabilities::default()),
+        ))
     }
 
     fn lsp_request(
@@ -498,9 +538,8 @@ mod tests {
     #[test]
     fn lsp_request_returns_method_not_found() {
         let mut state = empty();
-        let client = ClientId(1);
         let (tx, rx) = crossbeam::channel::unbounded();
-        start_client(&mut state, client, tx);
+        let client = start_client(&mut state, tx);
         let id = lsp_server::RequestId::from(1);
         let effects = handle(
             &mut state,
@@ -552,9 +591,8 @@ mod tests {
     #[test]
     fn lsp_formatting_of_a_live_client_without_a_file_is_null() {
         let mut state = with_config();
-        let client = ClientId(1);
         let (tx, rx) = crossbeam::channel::unbounded();
-        start_client(&mut state, client, tx);
+        let client = start_client(&mut state, tx);
         let id = lsp_server::RequestId::from(1);
         let effects = handle(
             &mut state,
@@ -600,9 +638,8 @@ mod tests {
     #[test]
     fn lsp_formatting_of_a_live_client_with_empty_params_returns_an_error() {
         let mut state = empty();
-        let client = ClientId(1);
         let (tx, rx) = crossbeam::channel::unbounded();
-        start_client(&mut state, client, tx);
+        let client = start_client(&mut state, tx);
         let id = lsp_server::RequestId::from(1);
         let effects = handle(
             &mut state,
@@ -665,7 +702,7 @@ mod tests {
     fn lsp_request_from_a_sibling_client_returns_no_effects() {
         let mut state = empty();
         let (tx, rx) = crossbeam::channel::unbounded();
-        start_client(&mut state, ClientId(1), tx);
+        start_client(&mut state, tx);
         let effects = handle(
             &mut state,
             lsp_request(
@@ -682,9 +719,8 @@ mod tests {
     #[test]
     fn lsp_request_after_gone_returns_no_effects() {
         let mut state = empty();
-        let client = ClientId(1);
         let (tx, rx) = crossbeam::channel::unbounded();
-        start_client(&mut state, client, tx);
+        let client = start_client(&mut state, tx);
         handle(&mut state, ClientConnectionEvent::Gone(client).to());
         let effects = handle(
             &mut state,
@@ -880,9 +916,8 @@ mod tests {
     #[test]
     fn semantic_tokens_of_a_non_utf8_file_uri_is_an_error_response() {
         let mut state = with_config();
-        let client = ClientId(1);
         let (tx, rx) = crossbeam::channel::unbounded();
-        start_client(&mut state, client, tx);
+        let client = start_client(&mut state, tx);
         let effects = handle(
             &mut state,
             lsp_request(
@@ -901,9 +936,8 @@ mod tests {
     #[test]
     fn formatting_without_a_working_directory_is_an_error_response() {
         let mut state = empty();
-        let client = ClientId(1);
         let (tx, rx) = crossbeam::channel::unbounded();
-        start_client(&mut state, client, tx);
+        let client = start_client(&mut state, tx);
         let effects = handle(
             &mut state,
             lsp_request(
@@ -974,9 +1008,9 @@ mod tests {
         state
     }
 
-    fn started(state: &mut IsographState<TestProfile>, client: ClientId) {
+    fn started(state: &mut IsographState<TestProfile>) -> ClientId {
         let (tx, _rx) = crossbeam::channel::unbounded();
-        start_client(state, client, tx);
+        start_client(state, tx)
     }
 
     fn read(state: &IsographState<TestProfile>, client: ClientId, path: &str) -> Option<String> {
@@ -986,11 +1020,11 @@ mod tests {
     #[test]
     fn did_open_stores_the_buffer_for_that_client_only() {
         let mut state = with_disk_x();
-        started(&mut state, ClientId(1));
-        let effects = handle(&mut state, did_open(ClientId(1), X_URI, "open"));
+        let client_1 = started(&mut state);
+        let effects = handle(&mut state, did_open(client_1, X_URI, "open"));
         only_timer(effects);
         assert_eq!(
-            read(state.reference(), ClientId(1), "src/x.ts"),
+            read(state.reference(), client_1, "src/x.ts"),
             "open".to_owned().wrap_some()
         );
         assert_eq!(
@@ -1002,19 +1036,15 @@ mod tests {
     #[test]
     fn did_change_with_one_full_change_replaces_the_buffer() {
         let mut state = with_disk_x();
-        started(&mut state, ClientId(1));
-        handle(&mut state, did_open(ClientId(1), X_URI, "open"));
+        let client_1 = started(&mut state);
+        handle(&mut state, did_open(client_1, X_URI, "open"));
         let effects = handle(
             &mut state,
-            did_change(
-                ClientId(1),
-                X_URI,
-                serde_json::json!([{ "text": "changed" }]),
-            ),
+            did_change(client_1, X_URI, serde_json::json!([{ "text": "changed" }])),
         );
         only_timer(effects);
         assert_eq!(
-            read(state.reference(), ClientId(1), "src/x.ts"),
+            read(state.reference(), client_1, "src/x.ts"),
             "changed".to_owned().wrap_some()
         );
     }
@@ -1022,8 +1052,8 @@ mod tests {
     #[test]
     fn did_change_that_is_not_one_full_change_leaves_the_buffer() {
         let mut state = with_disk_x();
-        started(&mut state, ClientId(1));
-        handle(&mut state, did_open(ClientId(1), X_URI, "open"));
+        let client_1 = started(&mut state);
+        handle(&mut state, did_open(client_1, X_URI, "open"));
         let ranged = serde_json::json!([{
             "range": {
                 "start": { "line": 0, "character": 0 },
@@ -1036,10 +1066,10 @@ mod tests {
             serde_json::json!([{ "text": "first" }, { "text": "second" }]),
             ranged,
         ] {
-            let effects = handle(&mut state, did_change(ClientId(1), X_URI, changes.clone()));
+            let effects = handle(&mut state, did_change(client_1, X_URI, changes.clone()));
             assert!(effects.is_empty(), "{changes}");
             assert_eq!(
-                read(state.reference(), ClientId(1), "src/x.ts"),
+                read(state.reference(), client_1, "src/x.ts"),
                 "open".to_owned().wrap_some(),
                 "{changes}"
             );
@@ -1049,16 +1079,16 @@ mod tests {
     #[test]
     fn did_close_falls_back_to_disk() {
         let mut state = with_disk_x();
-        started(&mut state, ClientId(1));
-        handle(&mut state, did_open(ClientId(1), X_URI, "open"));
+        let client_1 = started(&mut state);
+        handle(&mut state, did_open(client_1, X_URI, "open"));
         assert_eq!(
-            read(state.reference(), ClientId(1), "src/x.ts"),
+            read(state.reference(), client_1, "src/x.ts"),
             "open".to_owned().wrap_some()
         );
-        let effects = handle(&mut state, did_close(ClientId(1), X_URI));
+        let effects = handle(&mut state, did_close(client_1, X_URI));
         only_timer(effects);
         assert_eq!(
-            read(state.reference(), ClientId(1), "src/x.ts"),
+            read(state.reference(), client_1, "src/x.ts"),
             "disk".to_owned().wrap_some()
         );
     }
@@ -1066,16 +1096,16 @@ mod tests {
     #[test]
     fn two_clients_that_open_one_uri_each_read_their_own() {
         let mut state = with_disk_x();
-        started(&mut state, ClientId(1));
-        started(&mut state, ClientId(2));
-        handle(&mut state, did_open(ClientId(1), X_URI, "one"));
-        handle(&mut state, did_open(ClientId(2), X_URI, "two"));
+        let client_1 = started(&mut state);
+        let client_2 = started(&mut state);
+        handle(&mut state, did_open(client_1, X_URI, "one"));
+        handle(&mut state, did_open(client_2, X_URI, "two"));
         assert_eq!(
-            read(state.reference(), ClientId(1), "src/x.ts"),
+            read(state.reference(), client_1, "src/x.ts"),
             "one".to_owned().wrap_some()
         );
         assert_eq!(
-            read(state.reference(), ClientId(2), "src/x.ts"),
+            read(state.reference(), client_2, "src/x.ts"),
             "two".to_owned().wrap_some()
         );
     }
@@ -1083,22 +1113,22 @@ mod tests {
     #[test]
     fn gone_removes_only_that_clients_buffers() {
         let mut state = with_disk_x();
-        started(&mut state, ClientId(1));
-        started(&mut state, ClientId(2));
-        handle(&mut state, did_open(ClientId(1), X_URI, "one"));
-        handle(&mut state, did_open(ClientId(2), X_URI, "two"));
+        let client_1 = started(&mut state);
+        let client_2 = started(&mut state);
+        handle(&mut state, did_open(client_1, X_URI, "one"));
+        handle(&mut state, did_open(client_2, X_URI, "two"));
         assert_eq!(
-            read(state.reference(), ClientId(1), "src/x.ts"),
+            read(state.reference(), client_1, "src/x.ts"),
             "one".to_owned().wrap_some()
         );
-        let effects = handle(&mut state, ClientConnectionEvent::Gone(ClientId(1)).to());
+        let effects = handle(&mut state, ClientConnectionEvent::Gone(client_1).to());
         assert!(effects.is_empty());
         assert_eq!(
-            read(state.reference(), ClientId(1), "src/x.ts"),
+            read(state.reference(), client_1, "src/x.ts"),
             "disk".to_owned().wrap_some()
         );
         assert_eq!(
-            read(state.reference(), ClientId(2), "src/x.ts"),
+            read(state.reference(), client_2, "src/x.ts"),
             "two".to_owned().wrap_some()
         );
     }
@@ -1106,12 +1136,12 @@ mod tests {
     #[test]
     fn gone_of_a_client_that_never_started_leaves_other_buffers() {
         let mut state = with_disk_x();
-        started(&mut state, ClientId(2));
-        handle(&mut state, did_open(ClientId(2), X_URI, "two"));
+        let client_2 = started(&mut state);
+        handle(&mut state, did_open(client_2, X_URI, "two"));
         let effects = handle(&mut state, ClientConnectionEvent::Gone(ClientId(7)).to());
         assert!(effects.is_empty());
         assert_eq!(
-            read(state.reference(), ClientId(2), "src/x.ts"),
+            read(state.reference(), client_2, "src/x.ts"),
             "two".to_owned().wrap_some()
         );
     }
@@ -1192,25 +1222,25 @@ mod tests {
     #[test]
     fn did_open_lists_only_a_source_file_and_did_close_and_gone_drop_it() {
         let mut state = with_config();
-        started(&mut state, ClientId(1));
-        handle(&mut state, did_open(ClientId(1), X_URI, "open"));
+        let client_1 = started(&mut state);
+        handle(&mut state, did_open(client_1, X_URI, "open"));
         handle(
             &mut state,
-            did_open(ClientId(1), "file:///tmp/proj/other/a.ts", "open"),
+            did_open(client_1, "file:///tmp/proj/other/a.ts", "open"),
         );
         assert_eq!(
-            state.db.open_source_paths_of_client(ClientId(1)),
+            state.db.open_source_paths_of_client(client_1),
             interned("src/x.ts").wrap_vec()
         );
-        handle(&mut state, did_close(ClientId(1), X_URI));
+        handle(&mut state, did_close(client_1, X_URI));
         assert_eq!(
-            state.db.open_source_paths_of_client(ClientId(1)),
+            state.db.open_source_paths_of_client(client_1),
             Vec::<common_lang_types::RelativePathToSourceFile>::new()
         );
-        handle(&mut state, did_open(ClientId(1), X_URI, "open"));
-        handle(&mut state, ClientConnectionEvent::Gone(ClientId(1)).to());
+        handle(&mut state, did_open(client_1, X_URI, "open"));
+        handle(&mut state, ClientConnectionEvent::Gone(client_1).to());
         assert_eq!(
-            state.db.open_source_paths_of_client(ClientId(1)),
+            state.db.open_source_paths_of_client(client_1),
             Vec::<common_lang_types::RelativePathToSourceFile>::new()
         );
     }
@@ -1229,10 +1259,10 @@ mod tests {
     #[test]
     fn did_open_of_a_non_file_uri_stores_nothing() {
         let mut state = with_config();
-        started(&mut state, ClientId(1));
+        let client_1 = started(&mut state);
         let effects = handle(
             &mut state,
-            did_open(ClientId(1), "https://example.net/a.ts", "open"),
+            did_open(client_1, "https://example.net/a.ts", "open"),
         );
         assert!(effects.is_empty());
         assert!(state.db.get_open_file_map().untracked().0.is_empty());
@@ -1242,10 +1272,10 @@ mod tests {
     #[test]
     fn did_open_of_a_non_utf8_file_uri_stores_nothing() {
         let mut state = with_config();
-        started(&mut state, ClientId(1));
+        let client_1 = started(&mut state);
         let effects = handle(
             &mut state,
-            did_open(ClientId(1), "file:///tmp/proj/%FF.ts", "open"),
+            did_open(client_1, "file:///tmp/proj/%FF.ts", "open"),
         );
         assert!(effects.is_empty());
         assert!(state.db.get_open_file_map().untracked().0.is_empty());
@@ -1254,8 +1284,8 @@ mod tests {
     #[test]
     fn did_open_without_a_working_directory_stores_nothing() {
         let mut state = empty();
-        started(&mut state, ClientId(1));
-        let effects = handle(&mut state, did_open(ClientId(1), X_URI, "open"));
+        let client_1 = started(&mut state);
+        let effects = handle(&mut state, did_open(client_1, X_URI, "open"));
         assert!(effects.is_empty());
         assert!(state.db.get_open_file_map().untracked().0.is_empty());
     }
@@ -1282,9 +1312,9 @@ mod tests {
         rx: crossbeam::channel::Receiver<lsp_server::Message>,
     }
 
-    fn live_client(state: &mut IsographState<TestProfile>, client: ClientId) -> TestClient {
+    fn live_client(state: &mut IsographState<TestProfile>) -> TestClient {
         let (tx, rx) = crossbeam::channel::unbounded();
-        start_client(state, client, tx);
+        let client = start_client(state, tx);
         TestClient { client, rx }
     }
 
@@ -1372,7 +1402,7 @@ mod tests {
     fn formatting_reads_the_clients_buffer_over_disk() {
         let mut state = with_config();
         disk_changed(&mut state, "/tmp/proj/src/x.ts", "const x = 1;\n");
-        let one = live_client(&mut state, ClientId(1));
+        let one = live_client(&mut state);
         handle(&mut state, did_open(one.client, X_URI, FIELD_X));
         let edits = formatting_edits(&mut state, &one, X_URI).expect("the buffer has text");
         let [edit] = edits.as_slice() else {
@@ -1385,7 +1415,7 @@ mod tests {
     fn will_save_wait_until_returns_the_formatting_edits_of_the_buffer() {
         let mut state = with_config();
         disk_changed(&mut state, "/tmp/proj/src/x.ts", "const x = 1;\n");
-        let one = live_client(&mut state, ClientId(1));
+        let one = live_client(&mut state);
         handle(&mut state, did_open(one.client, X_URI, FIELD_X));
         let formatting = formatting_edits(&mut state, &one, X_URI);
         let will_save = will_save_edits(&mut state, &one, X_URI);
@@ -1397,7 +1427,7 @@ mod tests {
     fn formatting_after_did_close_reads_disk() {
         let mut state = with_config();
         disk_changed(&mut state, "/tmp/proj/src/x.ts", "const x = 1;\n");
-        let one = live_client(&mut state, ClientId(1));
+        let one = live_client(&mut state);
         handle(&mut state, did_open(one.client, X_URI, FIELD_X));
         assert_eq!(
             formatting_edits(&mut state, &one, X_URI).map(|edits| edits.len()),
@@ -1421,7 +1451,7 @@ mod tests {
     ) -> String {
         let mut state = with_config();
         disk_changed(&mut state, "/tmp/proj/src/x.ts", "const x = 1;\n");
-        let one = live_client(&mut state, ClientId(1));
+        let one = live_client(&mut state);
         handle(&mut state, did_open(one.client, X_URI, buffer));
         let edits = request(&mut state, &one, X_URI).expect("the buffer has text");
         crate::adapter::tests::assert_edits_replace_disjoint_interiors(buffer, &edits);
@@ -1475,8 +1505,8 @@ mod tests {
     #[test]
     fn semantic_tokens_follow_did_open_did_change_and_did_close() {
         let mut state = with_disk_home();
-        let one = live_client(&mut state, ClientId(1));
-        let two = live_client(&mut state, ClientId(2));
+        let one = live_client(&mut state);
+        let two = live_client(&mut state);
         handle(&mut state, did_open(one.client, HOME_URI, FIELD_X));
         let opened = first_token(semantic_tokens(&mut state, &one, HOME_URI));
         assert_eq!(opened.token_type, KEYWORD);
@@ -1502,8 +1532,8 @@ mod tests {
     #[test]
     fn two_clients_with_one_uri_open_get_tokens_of_their_own_buffers() {
         let mut state = with_disk_home();
-        let one = live_client(&mut state, ClientId(1));
-        let two = live_client(&mut state, ClientId(2));
+        let one = live_client(&mut state);
+        let two = live_client(&mut state);
         handle(&mut state, did_open(one.client, HOME_URI, FIELD_X));
         handle(&mut state, did_open(two.client, HOME_URI, ENTRYPOINT_A));
         assert_eq!(
@@ -1519,11 +1549,11 @@ mod tests {
     #[test]
     fn a_client_that_never_opened_the_uri_gets_disk_tokens() {
         let mut disk_only = with_disk_home();
-        let reader = live_client(&mut disk_only, ClientId(2));
+        let reader = live_client(&mut disk_only);
         let disk_tokens = semantic_tokens(&mut disk_only, &reader, HOME_URI);
         let mut state = with_disk_home();
-        let one = live_client(&mut state, ClientId(1));
-        let two = live_client(&mut state, ClientId(2));
+        let one = live_client(&mut state);
+        let two = live_client(&mut state);
         handle(&mut state, did_open(one.client, HOME_URI, FIELD_X));
         assert_eq!(
             first_token(semantic_tokens(&mut state, &one, HOME_URI)).length,
@@ -1537,7 +1567,7 @@ mod tests {
     fn semantic_tokens_of_an_open_file_with_no_disk_file_are_null_after_did_close() {
         const NEW_URI: &str = "file:///tmp/proj/src/new.ts";
         let mut state = with_config();
-        let one = live_client(&mut state, ClientId(1));
+        let one = live_client(&mut state);
         handle(&mut state, did_open(one.client, NEW_URI, FIELD_X));
         assert!(semantic_tokens(&mut state, &one, NEW_URI).is_some());
         handle(&mut state, did_close(one.client, NEW_URI));
@@ -1547,7 +1577,7 @@ mod tests {
     #[test]
     fn an_empty_buffer_over_a_disk_literal_has_no_tokens() {
         let mut state = with_disk_home();
-        let one = live_client(&mut state, ClientId(1));
+        let one = live_client(&mut state);
         handle(&mut state, did_open(one.client, HOME_URI, ""));
         assert_eq!(
             semantic_tokens(&mut state, &one, HOME_URI),
@@ -1608,7 +1638,7 @@ mod tests {
     fn disk_hover(text: &str, line: u32, character: u32) -> Option<lsp_types::Hover> {
         let mut state = with_config();
         disk_changed(&mut state, "/tmp/proj/src/x.ts", text);
-        let one = live_client(&mut state, ClientId(1));
+        let one = live_client(&mut state);
         hover(&mut state, &one, X_URI, line, character)
     }
 
@@ -1648,7 +1678,7 @@ mod tests {
     #[test]
     fn hover_names_the_leaf_under_each_char_of_an_entrypoint() {
         let mut state = with_disk_home();
-        let one = live_client(&mut state, ClientId(1));
+        let one = live_client(&mut state);
         let mut hover =
             |needle: &str| hover_text(&mut state, &one, HOME_URI, 0, column(HOME_DISK, needle));
         assert_eq!(hover("Query"), None);
@@ -1660,7 +1690,7 @@ mod tests {
     #[test]
     fn hover_outside_the_interior_is_null() {
         let mut state = with_disk_home();
-        let one = live_client(&mut state, ClientId(1));
+        let one = live_client(&mut state);
         let opening = column(HOME_DISK, "`");
         let closing = HOME_DISK
             .rfind('`')
@@ -1678,7 +1708,7 @@ mod tests {
     #[test]
     fn hover_contents_are_markdown() {
         let mut state = with_disk_home();
-        let one = live_client(&mut state, ClientId(1));
+        let one = live_client(&mut state);
         let result = request_result(
             &mut state,
             &one,
@@ -1695,8 +1725,8 @@ mod tests {
     #[test]
     fn hover_reads_the_clients_buffer_and_disk_after_did_close() {
         let mut state = with_disk_home();
-        let one = live_client(&mut state, ClientId(1));
-        let two = live_client(&mut state, ClientId(2));
+        let one = live_client(&mut state);
+        let two = live_client(&mut state);
         handle(&mut state, did_open(one.client, HOME_URI, FIELD_X));
         let brace = column(FIELD_X, "{");
         assert_eq!(
@@ -1724,7 +1754,7 @@ mod tests {
     #[test]
     fn hover_after_did_change_reads_the_changed_buffer() {
         let mut state = with_disk_home();
-        let one = live_client(&mut state, ClientId(1));
+        let one = live_client(&mut state);
         handle(&mut state, did_open(one.client, HOME_URI, FIELD_X));
         let character = column(FIELD_X, "field");
         assert_eq!(
@@ -1821,7 +1851,7 @@ mod tests {
     fn definition_on_disk(text: &str, line: u32, character: u32) -> serde_json::Value {
         let mut state = with_config();
         disk_changed(&mut state, "/tmp/proj/src/x.ts", text);
-        let one = live_client(&mut state, ClientId(1));
+        let one = live_client(&mut state);
         request_result(
             &mut state,
             &one,
@@ -1868,7 +1898,7 @@ mod tests {
         disk_changed(&mut state, "/tmp/proj/src/Pet.ts", PET_FILE);
         disk_changed(&mut state, "/tmp/proj/src/fullName.ts", FULL_NAME_FILE);
         disk_changed(&mut state, "/tmp/proj/src/x.ts", SELECTING_FILE);
-        let one = live_client(&mut state, ClientId(1));
+        let one = live_client(&mut state);
         let at = |needle: &str| hover_params(X_URI, 0, column(SELECTING_FILE, needle));
         let definition = |state: &mut IsographState<TestProfile>, needle: &str| {
             request_result(
@@ -1916,7 +1946,7 @@ mod tests {
         disk_changed(&mut state, "/tmp/proj/src/Pet.ts", PET_FILE);
         disk_changed(&mut state, "/tmp/proj/src/fullName.ts", FULL_NAME_FILE);
         disk_changed(&mut state, "/tmp/proj/src/x.ts", SELECTING_FILE);
-        let one = live_client(&mut state, ClientId(1));
+        let one = live_client(&mut state);
         let in_owner = column(SELECTING_FILE, "fullName");
         let labels = |result: serde_json::Value| -> Vec<String> {
             result
@@ -2023,7 +2053,7 @@ mod tests {
     /// Client 1's hover at the `nth` `needle` after `after`, through a didOpen buffer of `text`.
     fn buffer_hover(text: &str, after: &str, needle: &str, nth: usize) -> Option<lsp_types::Hover> {
         let mut state = with_config();
-        let one = live_client(&mut state, ClientId(1));
+        let one = live_client(&mut state);
         handle(&mut state, did_open(one.client, X_URI, text));
         let (line, character) = position_of(text, after, needle, nth);
         hover(&mut state, &one, X_URI, line, character)
@@ -2163,7 +2193,7 @@ mod tests {
     #[test]
     fn hover_past_the_line_end_or_the_last_line_is_null() {
         let mut state = with_disk_home();
-        let one = live_client(&mut state, ClientId(1));
+        let one = live_client(&mut state);
         let end = HOME_DISK.len() as u32;
         assert_eq!(hover_text(&mut state, &one, HOME_URI, 0, end), None);
         assert_eq!(hover_text(&mut state, &one, HOME_URI, 0, end + 1), None);
@@ -2173,14 +2203,14 @@ mod tests {
     #[test]
     fn hover_of_a_path_without_text_is_null() {
         let mut state = with_config();
-        let one = live_client(&mut state, ClientId(1));
+        let one = live_client(&mut state);
         assert_eq!(hover_text(&mut state, &one, HOME_URI, 0, 0), None);
     }
 
     #[test]
     fn hover_of_a_non_file_uri_is_null() {
         let mut state = with_disk_home();
-        let one = live_client(&mut state, ClientId(1));
+        let one = live_client(&mut state);
         assert_eq!(
             hover_text(&mut state, &one, "untitled:Untitled-1", 0, 0),
             None
@@ -2245,14 +2275,14 @@ mod tests {
     ) -> Option<Vec<lsp_types::DocumentHighlight>> {
         let mut state = with_config();
         disk_changed(&mut state, "/tmp/proj/src/x.ts", text);
-        let one = live_client(&mut state, ClientId(1));
+        let one = live_client(&mut state);
         highlights(&mut state, &one, X_URI, line, character)
     }
 
     #[test]
     fn highlight_on_a_name_is_exactly_that_token() {
         let mut state = with_disk_home();
-        let one = live_client(&mut state, ClientId(1));
+        let one = live_client(&mut state);
         let expected = highlight_of(0, HOME_DISK, "HomeRoute");
         let first = column(HOME_DISK, "HomeRoute");
         let last = first + "HomeRoute".len() as u32 - 1;
@@ -2267,7 +2297,7 @@ mod tests {
     #[test]
     fn highlight_on_a_period_is_the_period() {
         let mut state = with_disk_home();
-        let one = live_client(&mut state, ClientId(1));
+        let one = live_client(&mut state);
         assert_eq!(
             highlights(&mut state, &one, HOME_URI, 0, column(HOME_DISK, ".")),
             highlight_of(0, HOME_DISK, ".")
@@ -2277,7 +2307,7 @@ mod tests {
     #[test]
     fn highlight_between_tokens_inside_a_literal_is_empty() {
         let mut state = with_disk_home();
-        let one = live_client(&mut state, ClientId(1));
+        let one = live_client(&mut state);
         assert_eq!(
             highlights(&mut state, &one, HOME_URI, 0, column(HOME_DISK, " Query")),
             Vec::new().wrap_some()
@@ -2297,7 +2327,7 @@ mod tests {
     #[test]
     fn highlight_outside_every_literal_is_null() {
         let mut state = with_disk_home();
-        let one = live_client(&mut state, ClientId(1));
+        let one = live_client(&mut state);
         let opening = column(HOME_DISK, "`");
         let closing = HOME_DISK
             .rfind('`')
@@ -2318,7 +2348,7 @@ mod tests {
     #[test]
     fn highlight_of_a_path_without_text_is_null() {
         let mut state = with_config();
-        let one = live_client(&mut state, ClientId(1));
+        let one = live_client(&mut state);
         assert_eq!(highlights(&mut state, &one, HOME_URI, 0, 0), None);
     }
 
@@ -2357,8 +2387,8 @@ mod tests {
     #[test]
     fn highlight_reads_the_clients_buffer_and_another_client_reads_disk() {
         let mut state = with_disk_home();
-        let one = live_client(&mut state, ClientId(1));
-        let two = live_client(&mut state, ClientId(2));
+        let one = live_client(&mut state);
+        let two = live_client(&mut state);
         handle(&mut state, did_open(one.client, HOME_URI, FIELD_X));
         let id = column(FIELD_X, "id");
         assert_eq!(
@@ -2375,7 +2405,7 @@ mod tests {
     #[test]
     fn highlight_of_a_non_file_uri_is_null() {
         let mut state = with_disk_home();
-        let one = live_client(&mut state, ClientId(1));
+        let one = live_client(&mut state);
         assert_eq!(
             highlights(&mut state, &one, "untitled:Untitled-1", 0, 0),
             None
@@ -2435,10 +2465,8 @@ mod tests {
     }
 
     fn start_a_client(state: &mut IsographState<TestProfile>) -> ClientId {
-        let client = ClientId(1);
         let (tx, _rx) = crossbeam::channel::unbounded();
-        start_client(state, client, tx);
-        client
+        start_client(state, tx)
     }
 
     #[test]
@@ -2617,18 +2645,9 @@ mod tests {
     #[test]
     fn client_started_stores_the_session() {
         let mut state = empty();
-        let client = ClientId(1);
         let (tx, rx) = crossbeam::channel::unbounded();
         let capabilities = lsp_types::ClientCapabilities::default();
-        let effects = handle(
-            &mut state,
-            ClientConnectionEvent::Started(ClientStartedEvent {
-                client,
-                session: dummy_session(tx, capabilities.clone()),
-            })
-            .to(),
-        );
-        assert!(effects.is_empty());
+        let client = assigned(handle(&mut state, started_event(tx, capabilities.clone())));
         let session = state
             .live_sessions
             .0
@@ -2660,16 +2679,8 @@ mod tests {
     #[test]
     fn client_gone_removes_the_session() {
         let mut state = empty();
-        let client = ClientId(1);
         let (tx, _rx) = crossbeam::channel::unbounded();
-        handle(
-            &mut state,
-            ClientConnectionEvent::Started(ClientStartedEvent {
-                client,
-                session: dummy_session(tx, lsp_types::ClientCapabilities::default()),
-            })
-            .to(),
-        );
+        let client = start_client(&mut state, tx);
         let effects = handle(&mut state, ClientConnectionEvent::Gone(client).to());
         assert!(effects.is_empty());
         assert!(!state.live_sessions.0.contains_key(&client));
@@ -2684,51 +2695,35 @@ mod tests {
     }
 
     #[test]
-    fn client_started_twice_for_the_same_id_keeps_the_second_session() {
+    fn two_started_clients_get_different_ids() {
         let mut state = empty();
-        let client = ClientId(1);
-        let (tx1, rx1) = crossbeam::channel::unbounded();
-        let (tx2, rx2) = crossbeam::channel::unbounded();
-        handle(
-            &mut state,
-            ClientConnectionEvent::Started(ClientStartedEvent {
-                client,
-                session: dummy_session(tx1, lsp_types::ClientCapabilities::default()),
-            })
-            .to(),
-        );
+        let one = started(&mut state);
+        let two = started(&mut state);
+        assert_ne!(one, two);
+        assert_eq!(state.live_sessions.0.len(), 2);
+    }
+
+    #[test]
+    fn performing_assign_client_id_sends_the_id_to_the_session() {
+        let mut state = empty();
+        let (tx, _rx) = crossbeam::channel::unbounded();
+        let (assign, assigned_rx) = crossbeam::channel::bounded(1);
         let effects = handle(
             &mut state,
             ClientConnectionEvent::Started(ClientStartedEvent {
-                client,
-                session: dummy_session(tx2, lsp_types::ClientCapabilities::default()),
+                session: dummy_session(tx, lsp_types::ClientCapabilities::default()),
+                assign,
             })
             .to(),
         );
-        assert!(effects.is_empty());
-        assert_eq!(state.live_sessions.0.len(), 1);
-        let session = state
-            .live_sessions
-            .0
-            .get(&client)
-            .expect("Started twice keeps one row");
-        let notification = lsp_server::Message::Notification(lsp_server::Notification {
-            method: "textDocument/publishDiagnostics".to_owned(),
-            params: serde_json::json!({}),
-        });
-        session
-            .sender
-            .send(notification)
-            .expect("the second sender is stored");
-        assert!(
-            matches!(
-                rx2.recv().expect("the second session receives"),
-                lsp_server::Message::Notification(_)
-            ),
-            "the second sender receives the notification"
-        );
-        assert!(rx1.try_recv().is_err(), "the first session was replaced");
-        assert!(session.outstanding.is_empty());
+        let [IsographEffect::AssignClientId(effect)] =
+            <[IsographEffect; 1]>::try_from(effects).expect("Started returns exactly one effect")
+        else {
+            panic!("Started returns AssignClientId");
+        };
+        let client = effect.client;
+        perform_send(IsographEffect::AssignClientId(effect));
+        assert_eq!(assigned_rx.try_recv(), client.wrap_ok());
     }
 
     fn insert_live_session(
@@ -2897,27 +2892,17 @@ mod tests {
 
     fn start_with_capabilities(
         state: &mut IsographState<TestProfile>,
-        client: ClientId,
         capabilities: lsp_types::ClientCapabilities,
-    ) -> crossbeam::channel::Receiver<lsp_server::Message> {
+    ) -> (ClientId, crossbeam::channel::Receiver<lsp_server::Message>) {
         let (tx, rx) = crossbeam::channel::unbounded();
-        let effects = handle(
-            state,
-            ClientConnectionEvent::Started(ClientStartedEvent {
-                client,
-                session: dummy_session(tx, capabilities),
-            })
-            .to(),
-        );
-        assert!(effects.is_empty());
-        rx
+        let client = assigned(handle(state, started_event(tx, capabilities)));
+        (client, rx)
     }
 
     fn diagnostics_client(
         state: &mut IsographState<TestProfile>,
-        client: ClientId,
-    ) -> crossbeam::channel::Receiver<lsp_server::Message> {
-        start_with_capabilities(state, client, diagnostics_capabilities())
+    ) -> (ClientId, crossbeam::channel::Receiver<lsp_server::Message>) {
+        start_with_capabilities(state, diagnostics_capabilities())
     }
 
     fn only_timer(effects: Vec<IsographEffect>) -> freddie_timer::TimerEffect<TimerPayload> {
@@ -2986,8 +2971,8 @@ mod tests {
     #[test]
     fn did_open_of_a_broken_literal_publishes_its_errors_when_the_timer_fires() {
         let mut state = with_config();
-        let rx = diagnostics_client(&mut state, ClientId(1));
-        let armed = handle(&mut state, did_open(ClientId(1), X_URI, BROKEN));
+        let (client_1, rx) = diagnostics_client(&mut state);
+        let armed = handle(&mut state, did_open(client_1, X_URI, BROKEN));
         let effects = fire(&mut state, armed);
         assert!(matches!(
             effects.as_slice(),
@@ -3007,11 +2992,11 @@ mod tests {
     #[test]
     fn diagnostic_columns_are_utf16_code_units() {
         let mut state = with_config();
-        let rx = diagnostics_client(&mut state, ClientId(1));
+        let (client_1, rx) = diagnostics_client(&mut state);
         let armed = handle(
             &mut state,
             did_open(
-                ClientId(1),
+                client_1,
                 X_URI,
                 "const é = 1;\nconst 😀 = iso(`entrypoint`)",
             ),
@@ -3032,10 +3017,10 @@ mod tests {
     #[test]
     fn crlf_before_the_literal_puts_its_diagnostics_on_line_one() {
         let mut state = with_config();
-        let rx = diagnostics_client(&mut state, ClientId(1));
+        let (client_1, rx) = diagnostics_client(&mut state);
         let armed = handle(
             &mut state,
-            did_open(ClientId(1), X_URI, "const a = 1;\r\niso(`entrypoint`)"),
+            did_open(client_1, X_URI, "const a = 1;\r\niso(`entrypoint`)"),
         );
         let effects = fire(&mut state, armed);
         let sent = published(effects, rx.reference());
@@ -3051,16 +3036,16 @@ mod tests {
     #[test]
     fn a_file_with_no_literals_publishes_nothing() {
         let mut state = with_config();
-        let _rx = diagnostics_client(&mut state, ClientId(1));
-        let armed = handle(&mut state, did_open(ClientId(1), X_URI, "const a = 1;"));
+        let (client_1, _rx) = diagnostics_client(&mut state);
+        let armed = handle(&mut state, did_open(client_1, X_URI, "const a = 1;"));
         assert!(fire(&mut state, armed).is_empty());
     }
 
     #[test]
     fn a_whitespace_only_literal_publishes_the_empty_literal_error() {
         let mut state = with_config();
-        let rx = diagnostics_client(&mut state, ClientId(1));
-        let armed = handle(&mut state, did_open(ClientId(1), X_URI, EMPTY_LITERAL));
+        let (client_1, rx) = diagnostics_client(&mut state);
+        let armed = handle(&mut state, did_open(client_1, X_URI, EMPTY_LITERAL));
         let effects = fire(&mut state, armed);
         let sent = published(effects, rx.reference());
         let diagnostics = sent.get(X_URI).expect("the open file is published");
@@ -3076,9 +3061,9 @@ mod tests {
     #[test]
     fn an_open_file_selecting_an_undefined_field_publishes_that_validation_error() {
         let mut state = with_config();
-        let rx = diagnostics_client(&mut state, ClientId(1));
+        let (client_1, rx) = diagnostics_client(&mut state);
         let text = "iso(`entity Query`) iso(`field Query.x { nope }`)";
-        let armed = handle(&mut state, did_open(ClientId(1), X_URI, text));
+        let armed = handle(&mut state, did_open(client_1, X_URI, text));
         let effects = fire(&mut state, armed);
         let start = text.find("nope").expect("the fixture selects nope") as u32;
         assert_eq!(
@@ -3103,38 +3088,35 @@ mod tests {
     #[test]
     fn a_literal_with_only_a_host_language_problem_publishes_nothing() {
         let mut state = with_config();
-        let _rx = diagnostics_client(&mut state, ClientId(1));
-        let armed = handle(
-            &mut state,
-            did_open(ClientId(1), X_URI, "iso`entity Query`"),
-        );
+        let (client_1, _rx) = diagnostics_client(&mut state);
+        let armed = handle(&mut state, did_open(client_1, X_URI, "iso`entity Query`"));
         assert!(fire(&mut state, armed).is_empty());
     }
 
     #[test]
     fn fixing_a_published_file_publishes_an_empty_list_once() {
         let mut state = with_config();
-        let rx = diagnostics_client(&mut state, ClientId(1));
-        let armed = handle(&mut state, did_open(ClientId(1), X_URI, BROKEN));
+        let (client_1, rx) = diagnostics_client(&mut state);
+        let armed = handle(&mut state, did_open(client_1, X_URI, BROKEN));
         let effects = fire(&mut state, armed);
         assert!(!published(effects, rx.reference())[X_URI].is_empty());
-        let armed = handle(&mut state, change(ClientId(1), X_URI, CLEAN));
+        let armed = handle(&mut state, change(client_1, X_URI, CLEAN));
         let effects = fire(&mut state, armed);
         assert_eq!(
             published(effects, rx.reference()),
             HashMap::from([(X_URI.to_owned(), Vec::new())])
         );
-        let armed = handle(&mut state, change(ClientId(1), X_URI, CLEAN));
+        let armed = handle(&mut state, change(client_1, X_URI, CLEAN));
         assert!(fire(&mut state, armed).is_empty());
     }
 
     #[test]
     fn breaking_a_clean_file_publishes_its_errors() {
         let mut state = with_config();
-        let rx = diagnostics_client(&mut state, ClientId(1));
-        let armed = handle(&mut state, did_open(ClientId(1), X_URI, CLEAN));
+        let (client_1, rx) = diagnostics_client(&mut state);
+        let armed = handle(&mut state, did_open(client_1, X_URI, CLEAN));
         assert!(fire(&mut state, armed).is_empty());
-        let armed = handle(&mut state, change(ClientId(1), X_URI, BROKEN));
+        let armed = handle(&mut state, change(client_1, X_URI, BROKEN));
         let effects = fire(&mut state, armed);
         assert!(!published(effects, rx.reference())[X_URI].is_empty());
     }
@@ -3142,20 +3124,20 @@ mod tests {
     #[test]
     fn an_identical_change_after_a_publish_publishes_nothing() {
         let mut state = with_config();
-        let rx = diagnostics_client(&mut state, ClientId(1));
-        let armed = handle(&mut state, did_open(ClientId(1), X_URI, BROKEN));
+        let (client_1, rx) = diagnostics_client(&mut state);
+        let armed = handle(&mut state, did_open(client_1, X_URI, BROKEN));
         let effects = fire(&mut state, armed);
         assert_eq!(published(effects, rx.reference()).len(), 1);
-        let armed = handle(&mut state, change(ClientId(1), X_URI, BROKEN));
+        let armed = handle(&mut state, change(client_1, X_URI, BROKEN));
         assert!(fire(&mut state, armed).is_empty());
     }
 
     #[test]
     fn two_changes_before_a_fire_publish_the_second_text_once() {
         let mut state = with_config();
-        let rx = diagnostics_client(&mut state, ClientId(1));
-        let first = only_timer(handle(&mut state, did_open(ClientId(1), X_URI, BROKEN)));
-        let second = handle(&mut state, change(ClientId(1), X_URI, EMPTY_LITERAL));
+        let (client_1, rx) = diagnostics_client(&mut state);
+        let first = only_timer(handle(&mut state, did_open(client_1, X_URI, BROKEN)));
+        let second = handle(&mut state, change(client_1, X_URI, EMPTY_LITERAL));
         assert!(handle(&mut state, IsographEvent::Timer(first.event)).is_empty());
         let effects = fire(&mut state, second);
         let sent = published(effects, rx.reference());
@@ -3171,8 +3153,8 @@ mod tests {
     #[test]
     fn the_same_firing_delivered_twice_publishes_once() {
         let mut state = with_config();
-        let _rx = diagnostics_client(&mut state, ClientId(1));
-        let timer = only_timer(handle(&mut state, did_open(ClientId(1), X_URI, BROKEN)));
+        let (client_1, _rx) = diagnostics_client(&mut state);
+        let timer = only_timer(handle(&mut state, did_open(client_1, X_URI, BROKEN)));
         assert_eq!(
             handle(&mut state, IsographEvent::Timer(timer.event)).len(),
             1
@@ -3189,11 +3171,11 @@ mod tests {
                     .db
                     .insert_disk_file(interned("src/x.ts"), SOURCE_FILE, disk.to_owned());
             }
-            let rx = diagnostics_client(&mut state, ClientId(1));
-            let armed = handle(&mut state, did_open(ClientId(1), X_URI, EMPTY_LITERAL));
+            let (client_1, rx) = diagnostics_client(&mut state);
+            let armed = handle(&mut state, did_open(client_1, X_URI, EMPTY_LITERAL));
             let effects = fire(&mut state, armed);
             assert_eq!(published(effects, rx.reference()).len(), 1, "{disk:?}");
-            let armed = handle(&mut state, did_close(ClientId(1), X_URI));
+            let armed = handle(&mut state, did_close(client_1, X_URI));
             let effects = fire(&mut state, armed);
             assert_eq!(
                 published(effects, rx.reference()),
@@ -3206,7 +3188,7 @@ mod tests {
     #[test]
     fn a_broken_disk_only_file_publishes_nothing() {
         let mut state = with_config();
-        let _rx = diagnostics_client(&mut state, ClientId(1));
+        let (client_1, _rx) = diagnostics_client(&mut state);
         let effects = handle(
             &mut state,
             InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
@@ -3216,14 +3198,14 @@ mod tests {
             .to(),
         );
         assert!(fire(&mut state, effects).is_empty());
-        let armed = handle(&mut state, did_open(ClientId(1), X_URI, CLEAN));
+        let armed = handle(&mut state, did_open(client_1, X_URI, CLEAN));
         assert!(fire(&mut state, armed).is_empty());
     }
 
     #[test]
     fn an_applied_disk_changed_arms_the_debounce() {
         let mut state = with_config();
-        let _rx = diagnostics_client(&mut state, ClientId(1));
+        let (_, _rx) = diagnostics_client(&mut state);
         let present = handle(
             &mut state,
             InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
@@ -3260,7 +3242,7 @@ mod tests {
     #[test]
     fn a_disk_changed_whose_path_is_rejected_does_not_arm_the_debounce() {
         let mut state = with_config();
-        let _rx = diagnostics_client(&mut state, ClientId(1));
+        let (_, _rx) = diagnostics_client(&mut state);
         let effects = handle(
             &mut state,
             InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
@@ -3276,21 +3258,21 @@ mod tests {
     #[test]
     fn started_does_not_arm_the_debounce() {
         let mut state = with_config();
-        let _rx = diagnostics_client(&mut state, ClientId(1));
+        let (_, _rx) = diagnostics_client(&mut state);
         assert!(state.diagnostics_debounce.is_none());
     }
 
     #[test]
     fn open_files_outside_the_globs_or_skipped_by_the_host_publish_nothing() {
         let mut state = with_config();
-        let _rx = diagnostics_client(&mut state, ClientId(1));
+        let (client_1, _rx) = diagnostics_client(&mut state);
         handle(
             &mut state,
-            did_open(ClientId(1), "file:///tmp/proj/other/x.ts", BROKEN),
+            did_open(client_1, "file:///tmp/proj/other/x.ts", BROKEN),
         );
         let armed = handle(
             &mut state,
-            did_open(ClientId(1), "file:///tmp/proj/src/README.md", BROKEN),
+            did_open(client_1, "file:///tmp/proj/src/README.md", BROKEN),
         );
         assert!(fire(&mut state, armed).is_empty());
     }
@@ -3298,15 +3280,15 @@ mod tests {
     #[test]
     fn two_clients_with_one_path_each_receive_diagnostics_of_their_own_buffer() {
         let mut state = with_config();
-        let rx_1 = diagnostics_client(&mut state, ClientId(1));
-        let rx_2 = diagnostics_client(&mut state, ClientId(2));
-        handle(&mut state, did_open(ClientId(1), X_URI, BROKEN));
-        let armed = handle(&mut state, did_open(ClientId(2), X_URI, EMPTY_LITERAL));
+        let (client_1, rx_1) = diagnostics_client(&mut state);
+        let (client_2, rx_2) = diagnostics_client(&mut state);
+        handle(&mut state, did_open(client_1, X_URI, BROKEN));
+        let armed = handle(&mut state, did_open(client_2, X_URI, EMPTY_LITERAL));
         let effects = fire(&mut state, armed);
         assert_eq!(effects.len(), 2);
         let expected_1 = isograph_lsp::lsp_diagnostics_for_file(
             state.db.reference(),
-            ClientId(1),
+            client_1,
             interned("src/x.ts"),
         )
         .clone()
@@ -3327,7 +3309,7 @@ mod tests {
                 .collect::<Vec<_>>(),
             empty_literal_message().wrap_vec()
         );
-        let armed = handle(&mut state, change(ClientId(2), X_URI, CLEAN));
+        let armed = handle(&mut state, change(client_2, X_URI, CLEAN));
         let effects = fire(&mut state, armed);
         assert_eq!(effects.len(), 1);
         perform_all(effects);
@@ -3344,9 +3326,9 @@ mod tests {
     #[test]
     fn another_clients_open_file_is_not_published_to_a_client() {
         let mut state = with_config();
-        let rx_1 = diagnostics_client(&mut state, ClientId(1));
-        let rx_2 = diagnostics_client(&mut state, ClientId(2));
-        let armed = handle(&mut state, did_open(ClientId(1), X_URI, BROKEN));
+        let (client_1, rx_1) = diagnostics_client(&mut state);
+        let (_, rx_2) = diagnostics_client(&mut state);
+        let armed = handle(&mut state, did_open(client_1, X_URI, BROKEN));
         let effects = fire(&mut state, armed);
         assert_eq!(effects.len(), 1);
         perform_all(effects);
@@ -3360,11 +3342,11 @@ mod tests {
     #[test]
     fn a_client_gone_before_the_fire_receives_nothing() {
         let mut state = with_config();
-        let _rx_1 = diagnostics_client(&mut state, ClientId(1));
-        let rx_2 = diagnostics_client(&mut state, ClientId(2));
-        handle(&mut state, did_open(ClientId(2), X_URI, BROKEN));
-        let armed = handle(&mut state, did_open(ClientId(1), X_URI, BROKEN));
-        handle(&mut state, ClientConnectionEvent::Gone(ClientId(1)).to());
+        let (client_1, _rx_1) = diagnostics_client(&mut state);
+        let (client_2, rx_2) = diagnostics_client(&mut state);
+        handle(&mut state, did_open(client_2, X_URI, BROKEN));
+        let armed = handle(&mut state, did_open(client_1, X_URI, BROKEN));
+        handle(&mut state, ClientConnectionEvent::Gone(client_1).to());
         let effects = fire(&mut state, armed);
         assert_eq!(effects.len(), 1);
         assert_eq!(published(effects, rx_2.reference()).len(), 1);
@@ -3379,8 +3361,8 @@ mod tests {
         };
         for capabilities in [without_text_document, without_publish_diagnostics] {
             let mut state = with_config();
-            let rx = start_with_capabilities(&mut state, ClientId(1), capabilities);
-            let armed = handle(&mut state, did_open(ClientId(1), X_URI, BROKEN));
+            let (client_1, rx) = start_with_capabilities(&mut state, capabilities);
+            let armed = handle(&mut state, did_open(client_1, X_URI, BROKEN));
             assert!(fire(&mut state, armed).is_empty());
             assert!(matches!(
                 rx.try_recv(),
@@ -3392,7 +3374,7 @@ mod tests {
     #[test]
     fn rejected_document_notifications_do_not_arm_the_debounce() {
         let mut state = with_config();
-        let _rx = diagnostics_client(&mut state, ClientId(1));
+        let (client_1, _rx) = diagnostics_client(&mut state);
         let ranged = serde_json::json!([{
             "range": {
                 "start": { "line": 0, "character": 0 },
@@ -3403,9 +3385,9 @@ mod tests {
         let effects = [
             handle(
                 &mut state,
-                did_open(ClientId(1), "https://example.net/a.ts", BROKEN),
+                did_open(client_1, "https://example.net/a.ts", BROKEN),
             ),
-            handle(&mut state, did_change(ClientId(1), X_URI, ranged)),
+            handle(&mut state, did_change(client_1, X_URI, ranged)),
             handle(&mut state, did_open(ClientId(9), X_URI, BROKEN)),
         ];
         assert!(effects.iter().all(Vec::is_empty));
@@ -3463,7 +3445,7 @@ type Owner {
     #[test]
     fn hover_and_definition_of_schema_fields_and_refinements_read_the_schema_file() {
         let mut state = with_schema(SCHEMA_SELECTING);
-        let one = live_client(&mut state, ClientId(1));
+        let one = live_client(&mut state);
         let at = |needle: &str| hover_params(X_URI, 0, column(SCHEMA_SELECTING, needle));
         let definition = |state: &mut IsographState<TestProfile>, needle: &str| {
             request_result(
@@ -3518,7 +3500,7 @@ type Owner {
     #[test]
     fn completion_on_a_schema_type_lists_its_fields_and_refinements() {
         let mut state = with_schema(SCHEMA_SELECTING);
-        let one = live_client(&mut state, ClientId(1));
+        let one = live_client(&mut state);
         let items =
             |state: &mut IsographState<TestProfile>, needle: &str| -> Vec<(String, String)> {
                 request_result(
@@ -3558,8 +3540,8 @@ type Owner {
     fn validation_reads_the_schema_and_follows_a_schema_edit_on_disk() {
         let text = "iso(`field Query.V { pet { nope, name } }`)";
         let mut state = with_schema(text);
-        let rx = diagnostics_client(&mut state, ClientId(1));
-        let armed = handle(&mut state, did_open(ClientId(1), X_URI, text));
+        let (client_1, rx) = diagnostics_client(&mut state);
+        let armed = handle(&mut state, did_open(client_1, X_URI, text));
         let start = column(text, "nope");
         assert_eq!(
             published(fire(&mut state, armed), rx.reference()),
@@ -3595,8 +3577,8 @@ type Owner {
     fn a_source_entity_beside_a_schema_type_is_a_duplicate() {
         let text = "iso(`entity Pet`)";
         let mut state = with_schema(text);
-        let rx = diagnostics_client(&mut state, ClientId(1));
-        let armed = handle(&mut state, did_open(ClientId(1), X_URI, text));
+        let (client_1, rx) = diagnostics_client(&mut state);
+        let armed = handle(&mut state, did_open(client_1, X_URI, text));
         let messages: Vec<String> = published(fire(&mut state, armed), rx.reference())
             .remove(X_URI)
             .expect("the file has diagnostics")
