@@ -1,0 +1,10 @@
+mutation SetTagline($id: ID!, $tagline: String!) {
+  set_pet_tagline____input___o_id__v_id_tagline__v_tagline_c: set_pet_tagline(input: { id: $id, tagline: $tagline }) {
+    __typename
+    pet {
+      __typename
+      id
+      tagline
+    }
+  }
+}

@@ -1,0 +1,13 @@
+query HomeRoute {
+  pets {
+    __typename
+    id
+    age
+    firstName
+    lastName
+    nickname
+    picture
+    species
+    tagline
+  }
+}

@@ -1,0 +1,1 @@
+export default 'query SpeciesRoute($species: PetSpecies!) {\n  node____id___s_1: node(id: "1") {\n    __typename\n    id\n  }\n  petsBySpecies____species___v_species: petsBySpecies(species: $species) {\n    __typename\n    id\n    favorite_phrase\n    firstName\n    lastName\n  }\n  viewer {\n    __typename\n    id\n  }\n}';

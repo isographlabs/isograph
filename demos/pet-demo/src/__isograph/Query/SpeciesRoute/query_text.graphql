@@ -1,0 +1,17 @@
+query SpeciesRoute($species: PetSpecies!) {
+  node____id___s_1: node(id: "1") {
+    __typename
+    id
+  }
+  petsBySpecies____species___v_species: petsBySpecies(species: $species) {
+    __typename
+    id
+    favorite_phrase
+    firstName
+    lastName
+  }
+  viewer {
+    __typename
+    id
+  }
+}

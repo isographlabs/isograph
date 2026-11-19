@@ -37,7 +37,7 @@ The script reads the committed artifacts. It does not run the daemon, so after c
 
 ## Config
 
-`isograph.config.json` sets `source_files` to `src/**/*.ts`, `schema` to `schema/**/*.graphql`, and `output_directory` to `src`, so the daemon writes artifacts into `src/__isograph/`. That folder is generated and committed: running the daemon in this directory rewrites it. It holds `iso.ts`, `tsconfig.json`, a param type per field, a parameters type per field with variables, output types and reader stubs per upstream's reachability rules, an entrypoint and normalization AST per entrypoint, and a link type per pointer target.
+`isograph.config.json` sets `source_files` to `src/**/*.ts`, `schema` to `schema/**/*.graphql`, and `output_directory` to `src`, so the daemon writes artifacts into `src/__isograph/`. That folder is generated and committed: running the daemon in this directory rewrites it. It holds `iso.ts`, `tsconfig.json`, a param type per field, a parameters type per field with variables, output types and reader stubs per upstream's reachability rules, an entrypoint, normalization AST, `query_text.ts`, and `query_text.graphql` per entrypoint, and a link type per pointer target.
 
 ## Schema
 

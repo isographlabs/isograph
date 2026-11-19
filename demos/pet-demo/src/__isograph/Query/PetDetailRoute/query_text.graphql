@@ -1,0 +1,34 @@
+query PetDetailRoute($id: ID!) {
+  pet____id___v_id: pet(id: $id) {
+    __typename
+    id
+    best_friend_relationship {
+      __typename
+      best_friend {
+        __typename
+        id
+        firstName
+        lastName
+      }
+      picture_together
+    }
+    checkins____limit___l_5____skip___l_0: checkins(limit: 5, skip: 0) {
+      __typename
+      id
+      location
+      time
+    }
+    firstName
+    lastName
+    nickname
+    stats {
+      __typename
+      cuteness
+      energy
+      hunger
+      intelligence
+      sociability
+      weight
+    }
+  }
+}
