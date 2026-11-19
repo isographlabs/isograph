@@ -1,4 +1,5 @@
-import type { Pet____link__output_type } from "./../__link/output_type";
+import type { Pet____link__output_type } from './../__link/output_type';
+
 export type Pet__owner__param = {
   readonly data: {
     /**

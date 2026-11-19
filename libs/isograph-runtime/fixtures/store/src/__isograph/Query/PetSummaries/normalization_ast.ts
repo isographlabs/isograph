@@ -1,50 +1,51 @@
-import type { NormalizationAst } from "@isograph/runtime";
-const normalizationAst: NormalizationAst<"Query"> = {
-  discriminatorResponseKey: "__typename",
+import type { NormalizationAst } from '@isograph/runtime';
+
+const normalizationAst: NormalizationAst<'Query'> = {
+  discriminatorResponseKey: '__typename',
   root: {
-    entityName: "Query",
-    id: "__ROOT"
+    entityName: 'Query',
+    id: '__ROOT',
   },
   selections: [
     {
-      kind: "Selection",
+      kind: 'Selection',
       responseKey: null,
-      selectableName: "pets",
+      selectableName: 'pets',
       arguments: null,
       target: {
         entity: {
-          kind: "Known",
-          entityName: "Pet"
+          kind: 'Known',
+          entityName: 'Pet',
         },
         identity: {
-          kind: "Select",
-          selectableName: "id"
+          kind: 'Select',
+          selectableName: 'id',
         },
         selections: [
           {
-            kind: "Selection",
+            kind: 'Selection',
             responseKey: null,
-            selectableName: "id",
+            selectableName: 'id',
             arguments: null,
-            target: null
+            target: null,
           },
           {
-            kind: "Selection",
+            kind: 'Selection',
             responseKey: null,
-            selectableName: "name",
+            selectableName: 'name',
             arguments: null,
-            target: null
+            target: null,
           },
           {
-            kind: "Selection",
+            kind: 'Selection',
             responseKey: null,
-            selectableName: "nickname",
+            selectableName: 'nickname',
             arguments: null,
-            target: null
-          }
-        ]
-      }
-    }
-  ]
+            target: null,
+          },
+        ],
+      },
+    },
+  ],
 };
 export default normalizationAst;

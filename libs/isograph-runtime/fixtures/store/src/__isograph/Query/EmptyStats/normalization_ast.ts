@@ -1,60 +1,61 @@
-import type { NormalizationAst } from "@isograph/runtime";
-const normalizationAst: NormalizationAst<"Query"> = {
-  discriminatorResponseKey: "__typename",
+import type { NormalizationAst } from '@isograph/runtime';
+
+const normalizationAst: NormalizationAst<'Query'> = {
+  discriminatorResponseKey: '__typename',
   root: {
-    entityName: "Query",
-    id: "__ROOT"
+    entityName: 'Query',
+    id: '__ROOT',
   },
   selections: [
     {
-      kind: "Selection",
-      responseKey: "pet____id___v_id",
-      selectableName: "pet",
+      kind: 'Selection',
+      responseKey: 'pet____id___v_id',
+      selectableName: 'pet',
       arguments: [
         [
-          "id",
+          'id',
           {
-            kind: "Variable",
-            name: "id"
-          }
-        ]
+            kind: 'Variable',
+            name: 'id',
+          },
+        ],
       ],
       target: {
         entity: {
-          kind: "Known",
-          entityName: "Pet"
+          kind: 'Known',
+          entityName: 'Pet',
         },
         identity: {
-          kind: "Select",
-          selectableName: "id"
+          kind: 'Select',
+          selectableName: 'id',
         },
         selections: [
           {
-            kind: "Selection",
+            kind: 'Selection',
             responseKey: null,
-            selectableName: "id",
+            selectableName: 'id',
             arguments: null,
-            target: null
+            target: null,
           },
           {
-            kind: "Selection",
+            kind: 'Selection',
             responseKey: null,
-            selectableName: "stats",
+            selectableName: 'stats',
             arguments: null,
             target: {
               entity: {
-                kind: "Known",
-                entityName: "PetStats"
+                kind: 'Known',
+                entityName: 'PetStats',
               },
               identity: {
-                kind: "Omit"
+                kind: 'Omit',
               },
-              selections: []
-            }
-          }
-        ]
-      }
-    }
-  ]
+              selections: [],
+            },
+          },
+        ],
+      },
+    },
+  ],
 };
 export default normalizationAst;

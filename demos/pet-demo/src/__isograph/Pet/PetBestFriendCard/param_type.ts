@@ -1,5 +1,6 @@
-import type { Pet____link__output_type } from "./../__link/output_type";
-import type { Pet__fullName__output_type } from "./../fullName/output_type";
+import type { Pet____link__output_type } from './../__link/output_type';
+import type { Pet__fullName__output_type } from './../fullName/output_type';
+
 export type Pet__PetBestFriendCard__param = {
   readonly data: {
     /**
@@ -9,8 +10,8 @@ export type Pet__PetBestFriendCard__param = {
     /**
      * Pets have a very complex social life. Find out more!
      */
-    readonly best_friend_relationship: ({
-      readonly picture_together: (unknown | null);
+    readonly best_friend_relationship: {
+      readonly picture_together: unknown | null;
       readonly best_friend: {
         /**
          * The pet's ID
@@ -25,7 +26,7 @@ export type Pet__PetBestFriendCard__param = {
          */
         readonly fullName: Pet__fullName__output_type;
       };
-    } | null);
+    } | null;
   };
   readonly parameters: Record<PropertyKey, never>;
   readonly link: Pet____link__output_type;

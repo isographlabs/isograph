@@ -1,46 +1,94 @@
-import type { Mutation__SetTagline__param } from "./Mutation/SetTagline/param_type";
-import type { Owner__OwnerBadge__param } from "./Owner/OwnerBadge/param_type";
-import type { Owner__displayName__param } from "./Owner/displayName/param_type";
-import type { Pet__PetBestFriendCard__param } from "./Pet/PetBestFriendCard/param_type";
-import type { Pet__PetCheckinsCard__param } from "./Pet/PetCheckinsCard/param_type";
-import type { Pet__PetStatsCard__param } from "./Pet/PetStatsCard/param_type";
-import type { Pet__PetSummaryCard__param } from "./Pet/PetSummaryCard/param_type";
-import type { Pet__bestFriend__param } from "./Pet/bestFriend/param_type";
-import type { Pet__fullName__param } from "./Pet/fullName/param_type";
-import type { Pet__owner__param } from "./Pet/owner/param_type";
-import type { Query__HomeRoute__param } from "./Query/HomeRoute/param_type";
-import type { Query__PetDetailRoute__param } from "./Query/PetDetailRoute/param_type";
-import type { Query__SpeciesRoute__param } from "./Query/SpeciesRoute/param_type";
-import type { Mutation____link__output_type } from "./Mutation/__link/output_type";
-import type { Owner____link__output_type } from "./Owner/__link/output_type";
-import type { Pet____link__output_type } from "./Pet/__link/output_type";
-import type { Query____link__output_type } from "./Query/__link/output_type";
-import type Mutation__SetTagline__entrypoint from "./Mutation/SetTagline/entrypoint";
-import type Query__HomeRoute__entrypoint from "./Query/HomeRoute/entrypoint";
-import type Query__PetDetailRoute__entrypoint from "./Query/PetDetailRoute/entrypoint";
-import type Query__SpeciesRoute__entrypoint from "./Query/SpeciesRoute/entrypoint";
-type IdentityWithParam<TParam extends object, TReturnConstraint = unknown> = <TClientFieldReturn extends TReturnConstraint>(clientField: (param: TParam) => TClientFieldReturn) => (param: TParam) => TClientFieldReturn;
-type WhitespaceCharacter = " " | "	" | "\n";
-type Whitespace<In> = In extends `${WhitespaceCharacter}${infer In}` ? Whitespace<In> : In;
-type MatchesWhitespaceAndString<TString extends string, T> = Whitespace<T> extends `${TString}${string}` ? T : never;
-export function iso<T>(param: T & MatchesWhitespaceAndString<"field Mutation.SetTagline", T>): IdentityWithParam<Mutation__SetTagline__param>;
-export function iso<T>(param: T & MatchesWhitespaceAndString<"field Owner.OwnerBadge", T>): IdentityWithParam<Owner__OwnerBadge__param>;
-export function iso<T>(param: T & MatchesWhitespaceAndString<"field Owner.displayName", T>): IdentityWithParam<Owner__displayName__param>;
-export function iso<T>(param: T & MatchesWhitespaceAndString<"field Pet.PetBestFriendCard", T>): IdentityWithParam<Pet__PetBestFriendCard__param>;
-export function iso<T>(param: T & MatchesWhitespaceAndString<"field Pet.PetCheckinsCard", T>): IdentityWithParam<Pet__PetCheckinsCard__param>;
-export function iso<T>(param: T & MatchesWhitespaceAndString<"field Pet.PetStatsCard", T>): IdentityWithParam<Pet__PetStatsCard__param>;
-export function iso<T>(param: T & MatchesWhitespaceAndString<"field Pet.PetSummaryCard", T>): IdentityWithParam<Pet__PetSummaryCard__param>;
-export function iso<T>(param: T & MatchesWhitespaceAndString<"field Pet.bestFriend", T>): IdentityWithParam<Pet__bestFriend__param, (Pet____link__output_type | null)>;
-export function iso<T>(param: T & MatchesWhitespaceAndString<"field Pet.fullName", T>): IdentityWithParam<Pet__fullName__param>;
-export function iso<T>(param: T & MatchesWhitespaceAndString<"field Pet.owner", T>): IdentityWithParam<Pet__owner__param, Owner____link__output_type>;
-export function iso<T>(param: T & MatchesWhitespaceAndString<"field Query.HomeRoute", T>): IdentityWithParam<Query__HomeRoute__param>;
-export function iso<T>(param: T & MatchesWhitespaceAndString<"field Query.PetDetailRoute", T>): IdentityWithParam<Query__PetDetailRoute__param>;
-export function iso<T>(param: T & MatchesWhitespaceAndString<"field Query.SpeciesRoute", T>): IdentityWithParam<Query__SpeciesRoute__param>;
-export function iso<T>(param: T & MatchesWhitespaceAndString<"entity Owner", T>): void;
-export function iso<T>(param: T & MatchesWhitespaceAndString<"entrypoint Mutation.SetTagline", T>): typeof Mutation__SetTagline__entrypoint;
-export function iso<T>(param: T & MatchesWhitespaceAndString<"entrypoint Query.HomeRoute", T>): typeof Query__HomeRoute__entrypoint;
-export function iso<T>(param: T & MatchesWhitespaceAndString<"entrypoint Query.PetDetailRoute", T>): typeof Query__PetDetailRoute__entrypoint;
-export function iso<T>(param: T & MatchesWhitespaceAndString<"entrypoint Query.SpeciesRoute", T>): typeof Query__SpeciesRoute__entrypoint;
-export function iso(_isographLiteralText: string): IdentityWithParam<any> | object | void {
-  throw new Error("iso: Unexpected invocation at runtime. Either the Babel transform was not set up, or it failed to identify this call site. Make sure it is being used verbatim as `iso`.");
+import type { Mutation__SetTagline__param } from './Mutation/SetTagline/param_type';
+import type { Owner__OwnerBadge__param } from './Owner/OwnerBadge/param_type';
+import type { Owner__displayName__param } from './Owner/displayName/param_type';
+import type { Pet__PetBestFriendCard__param } from './Pet/PetBestFriendCard/param_type';
+import type { Pet__PetCheckinsCard__param } from './Pet/PetCheckinsCard/param_type';
+import type { Pet__PetStatsCard__param } from './Pet/PetStatsCard/param_type';
+import type { Pet__PetSummaryCard__param } from './Pet/PetSummaryCard/param_type';
+import type { Pet__bestFriend__param } from './Pet/bestFriend/param_type';
+import type { Pet__fullName__param } from './Pet/fullName/param_type';
+import type { Pet__owner__param } from './Pet/owner/param_type';
+import type { Query__HomeRoute__param } from './Query/HomeRoute/param_type';
+import type { Query__PetDetailRoute__param } from './Query/PetDetailRoute/param_type';
+import type { Query__SpeciesRoute__param } from './Query/SpeciesRoute/param_type';
+import type { Mutation____link__output_type } from './Mutation/__link/output_type';
+import type { Owner____link__output_type } from './Owner/__link/output_type';
+import type { Pet____link__output_type } from './Pet/__link/output_type';
+import type { Query____link__output_type } from './Query/__link/output_type';
+import type Mutation__SetTagline__entrypoint from './Mutation/SetTagline/entrypoint';
+import type Query__HomeRoute__entrypoint from './Query/HomeRoute/entrypoint';
+import type Query__PetDetailRoute__entrypoint from './Query/PetDetailRoute/entrypoint';
+import type Query__SpeciesRoute__entrypoint from './Query/SpeciesRoute/entrypoint';
+
+type IdentityWithParam<TParam extends object, TReturnConstraint = unknown> = <
+  TClientFieldReturn extends TReturnConstraint,
+>(
+  clientField: (param: TParam) => TClientFieldReturn,
+) => (param: TParam) => TClientFieldReturn;
+type WhitespaceCharacter = ' ' | '	' | '\n';
+type Whitespace<In> = In extends `${WhitespaceCharacter}${infer In}`
+  ? Whitespace<In>
+  : In;
+type MatchesWhitespaceAndString<TString extends string, T> =
+  Whitespace<T> extends `${TString}${string}` ? T : never;
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Mutation.SetTagline', T>,
+): IdentityWithParam<Mutation__SetTagline__param>;
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Owner.OwnerBadge', T>,
+): IdentityWithParam<Owner__OwnerBadge__param>;
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Owner.displayName', T>,
+): IdentityWithParam<Owner__displayName__param>;
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Pet.PetBestFriendCard', T>,
+): IdentityWithParam<Pet__PetBestFriendCard__param>;
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Pet.PetCheckinsCard', T>,
+): IdentityWithParam<Pet__PetCheckinsCard__param>;
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Pet.PetStatsCard', T>,
+): IdentityWithParam<Pet__PetStatsCard__param>;
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Pet.PetSummaryCard', T>,
+): IdentityWithParam<Pet__PetSummaryCard__param>;
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Pet.bestFriend', T>,
+): IdentityWithParam<Pet__bestFriend__param, (Pet____link__output_type | null)>;
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Pet.fullName', T>,
+): IdentityWithParam<Pet__fullName__param>;
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Pet.owner', T>,
+): IdentityWithParam<Pet__owner__param, Owner____link__output_type>;
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Query.HomeRoute', T>,
+): IdentityWithParam<Query__HomeRoute__param>;
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Query.PetDetailRoute', T>,
+): IdentityWithParam<Query__PetDetailRoute__param>;
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Query.SpeciesRoute', T>,
+): IdentityWithParam<Query__SpeciesRoute__param>;
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entity Owner', T>,
+): void;
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Mutation.SetTagline', T>,
+): typeof Mutation__SetTagline__entrypoint;
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Query.HomeRoute', T>,
+): typeof Query__HomeRoute__entrypoint;
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Query.PetDetailRoute', T>,
+): typeof Query__PetDetailRoute__entrypoint;
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Query.SpeciesRoute', T>,
+): typeof Query__SpeciesRoute__entrypoint;
+export function iso(
+  _isographLiteralText: string,
+): IdentityWithParam<any> | object | void {
+  throw new Error(
+    'iso: Unexpected invocation at runtime. Either the Babel transform was not set up, or it failed to identify this call site. Make sure it is being used verbatim as `iso`.',
+  );
 }

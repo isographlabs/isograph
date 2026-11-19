@@ -1,83 +1,84 @@
-import type { NormalizationAst } from "@isograph/runtime";
-const normalizationAst: NormalizationAst<"Mutation"> = {
-  discriminatorResponseKey: "__typename",
+import type { NormalizationAst } from '@isograph/runtime';
+
+const normalizationAst: NormalizationAst<'Mutation'> = {
+  discriminatorResponseKey: '__typename',
   root: {
-    entityName: "Mutation",
-    id: "__ROOT"
+    entityName: 'Mutation',
+    id: '__ROOT',
   },
   selections: [
     {
-      kind: "Selection",
-      responseKey: "set_pet_tagline____input___o_id__v_id_tagline__v_tagline_c",
-      selectableName: "set_pet_tagline",
+      kind: 'Selection',
+      responseKey: 'set_pet_tagline____input___o_id__v_id_tagline__v_tagline_c',
+      selectableName: 'set_pet_tagline',
       arguments: [
         [
-          "input",
+          'input',
           {
-            kind: "Object",
+            kind: 'Object',
             value: [
               [
-                "id",
+                'id',
                 {
-                  kind: "Variable",
-                  name: "id"
-                }
+                  kind: 'Variable',
+                  name: 'id',
+                },
               ],
               [
-                "tagline",
+                'tagline',
                 {
-                  kind: "Variable",
-                  name: "tagline"
-                }
-              ]
-            ]
-          }
-        ]
+                  kind: 'Variable',
+                  name: 'tagline',
+                },
+              ],
+            ],
+          },
+        ],
       ],
       target: {
         entity: {
-          kind: "Known",
-          entityName: "SetPetTaglineResponse"
+          kind: 'Known',
+          entityName: 'SetPetTaglineResponse',
         },
         identity: {
-          kind: "Omit"
+          kind: 'Omit',
         },
         selections: [
           {
-            kind: "Selection",
+            kind: 'Selection',
             responseKey: null,
-            selectableName: "pet",
+            selectableName: 'pet',
             arguments: null,
             target: {
               entity: {
-                kind: "Known",
-                entityName: "Pet"
+                kind: 'Known',
+                entityName: 'Pet',
               },
               identity: {
-                kind: "Select",
-                selectableName: "id"
+                kind: 'Select',
+                selectableName: 'id',
               },
               selections: [
                 {
-                  kind: "Selection",
+                  kind: 'Selection',
                   responseKey: null,
-                  selectableName: "id",
+                  selectableName: 'id',
                   arguments: null,
-                  target: null
+                  target: null,
                 },
                 {
-                  kind: "Selection",
+                  kind: 'Selection',
                   responseKey: null,
-                  selectableName: "tagline",
+                  selectableName: 'tagline',
                   arguments: null,
-                  target: null
-                }
-              ]
-            }
-          }
-        ]
-      }
-    }
-  ]
+                  target: null,
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
 };
 export default normalizationAst;

@@ -1,91 +1,93 @@
-import type { NormalizationAst } from "@isograph/runtime";
-const normalizationAst: NormalizationAst<"Query"> = {
-  discriminatorResponseKey: "__typename",
+import type { NormalizationAst } from '@isograph/runtime';
+
+const normalizationAst: NormalizationAst<'Query'> = {
+  discriminatorResponseKey: '__typename',
   root: {
-    entityName: "Query",
-    id: "__ROOT"
+    entityName: 'Query',
+    id: '__ROOT',
   },
   selections: [
     {
-      kind: "Selection",
+      kind: 'Selection',
       responseKey: null,
-      selectableName: "greeting",
+      selectableName: 'greeting',
       arguments: null,
-      target: null
+      target: null,
     },
     {
-      kind: "Selection",
-      responseKey: "greeting____loud___l_true____name___s_Ada_Lovelace____times___l_3",
-      selectableName: "greeting",
+      kind: 'Selection',
+      responseKey:
+        'greeting____loud___l_true____name___s_Ada_Lovelace____times___l_3',
+      selectableName: 'greeting',
       arguments: [
         [
-          "loud",
+          'loud',
           {
-            kind: "Literal",
-            value: true
-          }
+            kind: 'Literal',
+            value: true,
+          },
         ],
         [
-          "name",
+          'name',
           {
-            kind: "String",
-            value: "Ada Lovelace"
-          }
+            kind: 'String',
+            value: 'Ada Lovelace',
+          },
         ],
         [
-          "times",
+          'times',
           {
-            kind: "Literal",
-            value: 3
-          }
-        ]
+            kind: 'Literal',
+            value: 3,
+          },
+        ],
       ],
-      target: null
+      target: null,
     },
     {
-      kind: "Selection",
-      responseKey: "greeting____name___v_name",
-      selectableName: "greeting",
+      kind: 'Selection',
+      responseKey: 'greeting____name___v_name',
+      selectableName: 'greeting',
       arguments: [
         [
-          "name",
+          'name',
           {
-            kind: "Variable",
-            name: "name"
-          }
-        ]
+            kind: 'Variable',
+            name: 'name',
+          },
+        ],
       ],
-      target: null
+      target: null,
     },
     {
-      kind: "Selection",
-      responseKey: "greeting____name___l_null",
-      selectableName: "greeting",
+      kind: 'Selection',
+      responseKey: 'greeting____name___l_null',
+      selectableName: 'greeting',
       arguments: [
         [
-          "name",
+          'name',
           {
-            kind: "Literal",
-            value: null
-          }
-        ]
+            kind: 'Literal',
+            value: null,
+          },
+        ],
       ],
-      target: null
+      target: null,
     },
     {
-      kind: "Selection",
+      kind: 'Selection',
       responseKey: null,
-      selectableName: "settings",
+      selectableName: 'settings',
       arguments: null,
-      target: null
+      target: null,
     },
     {
-      kind: "Selection",
+      kind: 'Selection',
       responseKey: null,
-      selectableName: "tags",
+      selectableName: 'tags',
       arguments: null,
-      target: null
-    }
-  ]
+      target: null,
+    },
+  ],
 };
 export default normalizationAst;

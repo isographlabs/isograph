@@ -1,5 +1,6 @@
-import type { Pet____link__output_type } from "./../__link/output_type";
-import type { Pet__fullName__output_type } from "./../fullName/output_type";
+import type { Pet____link__output_type } from './../__link/output_type';
+import type { Pet__fullName__output_type } from './../fullName/output_type';
+
 export type Pet__PetSummaryCard__param = {
   readonly data: {
     /**
@@ -13,7 +14,7 @@ export type Pet__PetSummaryCard__param = {
     /**
      * What you call the pet when you're very happy.
      */
-    readonly nickname: (string | null);
+    readonly nickname: string | null;
     /**
      * It's just a number.
      */

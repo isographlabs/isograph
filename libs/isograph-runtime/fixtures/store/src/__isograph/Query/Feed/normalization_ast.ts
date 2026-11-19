@@ -1,113 +1,114 @@
-import type { NormalizationAst } from "@isograph/runtime";
-const normalizationAst: NormalizationAst<"Query"> = {
-  discriminatorResponseKey: "__typename",
+import type { NormalizationAst } from '@isograph/runtime';
+
+const normalizationAst: NormalizationAst<'Query'> = {
+  discriminatorResponseKey: '__typename',
   root: {
-    entityName: "Query",
-    id: "__ROOT"
+    entityName: 'Query',
+    id: '__ROOT',
   },
   selections: [
     {
-      kind: "Selection",
-      responseKey: "feed____limit___v_limit",
-      selectableName: "feed",
+      kind: 'Selection',
+      responseKey: 'feed____limit___v_limit',
+      selectableName: 'feed',
       arguments: [
         [
-          "limit",
+          'limit',
           {
-            kind: "Variable",
-            name: "limit"
-          }
-        ]
+            kind: 'Variable',
+            name: 'limit',
+          },
+        ],
       ],
       target: {
         entity: {
-          kind: "Discriminator"
+          kind: 'Discriminator',
         },
         identity: {
-          kind: "Omit"
+          kind: 'Omit',
         },
         selections: [
           {
-            kind: "Conditional",
+            kind: 'Conditional',
             condition: {
-              kind: "SelectionEquals",
-              entityName: "AdItem"
+              kind: 'SelectionEquals',
+              entityName: 'AdItem',
             },
             identity: {
-              kind: "Omit"
+              kind: 'Omit',
             },
             selections: [
               {
-                kind: "Selection",
+                kind: 'Selection',
                 responseKey: null,
-                selectableName: "advertiser",
+                selectableName: 'advertiser',
                 arguments: null,
-                target: null
-              }
-            ]
+                target: null,
+              },
+            ],
           },
           {
-            kind: "Conditional",
+            kind: 'Conditional',
             condition: {
-              kind: "SelectionEquals",
-              entityName: "BlogItem"
+              kind: 'SelectionEquals',
+              entityName: 'BlogItem',
             },
             identity: {
-              kind: "Select",
-              selectableName: "id"
+              kind: 'Select',
+              selectableName: 'id',
             },
             selections: [
               {
-                kind: "Selection",
+                kind: 'Selection',
                 responseKey: null,
-                selectableName: "id",
+                selectableName: 'id',
                 arguments: null,
-                target: null
+                target: null,
               },
               {
-                kind: "Selection",
+                kind: 'Selection',
                 responseKey: null,
-                selectableName: "author",
+                selectableName: 'author',
                 arguments: null,
                 target: {
                   entity: {
-                    kind: "Known",
-                    entityName: "Pet"
+                    kind: 'Known',
+                    entityName: 'Pet',
                   },
                   identity: {
-                    kind: "Select",
-                    selectableName: "id"
+                    kind: 'Select',
+                    selectableName: 'id',
                   },
                   selections: [
                     {
-                      kind: "Selection",
+                      kind: 'Selection',
                       responseKey: null,
-                      selectableName: "id",
+                      selectableName: 'id',
                       arguments: null,
-                      target: null
+                      target: null,
                     },
                     {
-                      kind: "Selection",
+                      kind: 'Selection',
                       responseKey: null,
-                      selectableName: "name",
+                      selectableName: 'name',
                       arguments: null,
-                      target: null
-                    }
-                  ]
-                }
+                      target: null,
+                    },
+                  ],
+                },
               },
               {
-                kind: "Selection",
+                kind: 'Selection',
                 responseKey: null,
-                selectableName: "title",
+                selectableName: 'title',
                 arguments: null,
-                target: null
-              }
-            ]
-          }
-        ]
-      }
-    }
-  ]
+                target: null,
+              },
+            ],
+          },
+        ],
+      },
+    },
+  ],
 };
 export default normalizationAst;

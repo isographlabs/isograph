@@ -1,241 +1,242 @@
-import type { NormalizationAst } from "@isograph/runtime";
-const normalizationAst: NormalizationAst<"Query"> = {
-  discriminatorResponseKey: "__typename",
+import type { NormalizationAst } from '@isograph/runtime';
+
+const normalizationAst: NormalizationAst<'Query'> = {
+  discriminatorResponseKey: '__typename',
   root: {
-    entityName: "Query",
-    id: "__ROOT"
+    entityName: 'Query',
+    id: '__ROOT',
   },
   selections: [
     {
-      kind: "Selection",
-      responseKey: "pet____id___v_id",
-      selectableName: "pet",
+      kind: 'Selection',
+      responseKey: 'pet____id___v_id',
+      selectableName: 'pet',
       arguments: [
         [
-          "id",
+          'id',
           {
-            kind: "Variable",
-            name: "id"
-          }
-        ]
+            kind: 'Variable',
+            name: 'id',
+          },
+        ],
       ],
       target: {
         entity: {
-          kind: "Known",
-          entityName: "Pet"
+          kind: 'Known',
+          entityName: 'Pet',
         },
         identity: {
-          kind: "Select",
-          selectableName: "id"
+          kind: 'Select',
+          selectableName: 'id',
         },
         selections: [
           {
-            kind: "Selection",
+            kind: 'Selection',
             responseKey: null,
-            selectableName: "id",
+            selectableName: 'id',
             arguments: null,
-            target: null
+            target: null,
           },
           {
-            kind: "Selection",
+            kind: 'Selection',
             responseKey: null,
-            selectableName: "best_friend_relationship",
+            selectableName: 'best_friend_relationship',
             arguments: null,
             target: {
               entity: {
-                kind: "Known",
-                entityName: "BestFriendRelationship"
+                kind: 'Known',
+                entityName: 'BestFriendRelationship',
               },
               identity: {
-                kind: "Omit"
+                kind: 'Omit',
               },
               selections: [
                 {
-                  kind: "Selection",
+                  kind: 'Selection',
                   responseKey: null,
-                  selectableName: "best_friend",
+                  selectableName: 'best_friend',
                   arguments: null,
                   target: {
                     entity: {
-                      kind: "Known",
-                      entityName: "Pet"
+                      kind: 'Known',
+                      entityName: 'Pet',
                     },
                     identity: {
-                      kind: "Select",
-                      selectableName: "id"
+                      kind: 'Select',
+                      selectableName: 'id',
                     },
                     selections: [
                       {
-                        kind: "Selection",
+                        kind: 'Selection',
                         responseKey: null,
-                        selectableName: "id",
+                        selectableName: 'id',
                         arguments: null,
-                        target: null
+                        target: null,
                       },
                       {
-                        kind: "Selection",
+                        kind: 'Selection',
                         responseKey: null,
-                        selectableName: "firstName",
+                        selectableName: 'firstName',
                         arguments: null,
-                        target: null
+                        target: null,
                       },
                       {
-                        kind: "Selection",
+                        kind: 'Selection',
                         responseKey: null,
-                        selectableName: "lastName",
+                        selectableName: 'lastName',
                         arguments: null,
-                        target: null
-                      }
-                    ]
-                  }
+                        target: null,
+                      },
+                    ],
+                  },
                 },
                 {
-                  kind: "Selection",
+                  kind: 'Selection',
                   responseKey: null,
-                  selectableName: "picture_together",
+                  selectableName: 'picture_together',
                   arguments: null,
-                  target: null
-                }
-              ]
-            }
+                  target: null,
+                },
+              ],
+            },
           },
           {
-            kind: "Selection",
-            responseKey: "checkins____limit___l_5____skip___l_0",
-            selectableName: "checkins",
+            kind: 'Selection',
+            responseKey: 'checkins____limit___l_5____skip___l_0',
+            selectableName: 'checkins',
             arguments: [
               [
-                "limit",
+                'limit',
                 {
-                  kind: "Literal",
-                  value: 5
-                }
+                  kind: 'Literal',
+                  value: 5,
+                },
               ],
               [
-                "skip",
+                'skip',
                 {
-                  kind: "Literal",
-                  value: 0
-                }
-              ]
+                  kind: 'Literal',
+                  value: 0,
+                },
+              ],
             ],
             target: {
               entity: {
-                kind: "Known",
-                entityName: "Checkin"
+                kind: 'Known',
+                entityName: 'Checkin',
               },
               identity: {
-                kind: "Select",
-                selectableName: "id"
+                kind: 'Select',
+                selectableName: 'id',
               },
               selections: [
                 {
-                  kind: "Selection",
+                  kind: 'Selection',
                   responseKey: null,
-                  selectableName: "id",
+                  selectableName: 'id',
                   arguments: null,
-                  target: null
+                  target: null,
                 },
                 {
-                  kind: "Selection",
+                  kind: 'Selection',
                   responseKey: null,
-                  selectableName: "location",
+                  selectableName: 'location',
                   arguments: null,
-                  target: null
+                  target: null,
                 },
                 {
-                  kind: "Selection",
+                  kind: 'Selection',
                   responseKey: null,
-                  selectableName: "time",
+                  selectableName: 'time',
                   arguments: null,
-                  target: null
-                }
-              ]
-            }
+                  target: null,
+                },
+              ],
+            },
           },
           {
-            kind: "Selection",
+            kind: 'Selection',
             responseKey: null,
-            selectableName: "firstName",
+            selectableName: 'firstName',
             arguments: null,
-            target: null
+            target: null,
           },
           {
-            kind: "Selection",
+            kind: 'Selection',
             responseKey: null,
-            selectableName: "lastName",
+            selectableName: 'lastName',
             arguments: null,
-            target: null
+            target: null,
           },
           {
-            kind: "Selection",
+            kind: 'Selection',
             responseKey: null,
-            selectableName: "nickname",
+            selectableName: 'nickname',
             arguments: null,
-            target: null
+            target: null,
           },
           {
-            kind: "Selection",
+            kind: 'Selection',
             responseKey: null,
-            selectableName: "stats",
+            selectableName: 'stats',
             arguments: null,
             target: {
               entity: {
-                kind: "Known",
-                entityName: "PetStats"
+                kind: 'Known',
+                entityName: 'PetStats',
               },
               identity: {
-                kind: "Omit"
+                kind: 'Omit',
               },
               selections: [
                 {
-                  kind: "Selection",
+                  kind: 'Selection',
                   responseKey: null,
-                  selectableName: "cuteness",
+                  selectableName: 'cuteness',
                   arguments: null,
-                  target: null
+                  target: null,
                 },
                 {
-                  kind: "Selection",
+                  kind: 'Selection',
                   responseKey: null,
-                  selectableName: "energy",
+                  selectableName: 'energy',
                   arguments: null,
-                  target: null
+                  target: null,
                 },
                 {
-                  kind: "Selection",
+                  kind: 'Selection',
                   responseKey: null,
-                  selectableName: "hunger",
+                  selectableName: 'hunger',
                   arguments: null,
-                  target: null
+                  target: null,
                 },
                 {
-                  kind: "Selection",
+                  kind: 'Selection',
                   responseKey: null,
-                  selectableName: "intelligence",
+                  selectableName: 'intelligence',
                   arguments: null,
-                  target: null
+                  target: null,
                 },
                 {
-                  kind: "Selection",
+                  kind: 'Selection',
                   responseKey: null,
-                  selectableName: "sociability",
+                  selectableName: 'sociability',
                   arguments: null,
-                  target: null
+                  target: null,
                 },
                 {
-                  kind: "Selection",
+                  kind: 'Selection',
                   responseKey: null,
-                  selectableName: "weight",
+                  selectableName: 'weight',
                   arguments: null,
-                  target: null
-                }
-              ]
-            }
-          }
-        ]
-      }
-    }
-  ]
+                  target: null,
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
 };
 export default normalizationAst;

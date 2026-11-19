@@ -1,24 +1,25 @@
-import type { Query____link__output_type } from "./../__link/output_type";
-import type { Query__PetDetail__parameters } from "./parameters_type";
+import type { Query____link__output_type } from './../__link/output_type';
+import type { Query__PetDetail__parameters } from './parameters_type';
+
 export type Query__PetDetail__param = {
   readonly data: {
-    readonly pet: ({
+    readonly pet: {
       readonly id: string;
       readonly name: string;
-      readonly nickname: (string | null);
+      readonly nickname: string | null;
       readonly tagline: string;
-      readonly stats: ({
-        readonly weight: (number | null);
-        readonly energy: (number | null);
-      } | null);
-      readonly bestFriend: ({
+      readonly stats: {
+        readonly weight: number | null;
+        readonly energy: number | null;
+      } | null;
+      readonly bestFriend: {
         readonly id: string;
         readonly name: string;
-        readonly bestFriend: ({
+        readonly bestFriend: {
           readonly id: string;
           readonly name: string;
-        } | null);
-      } | null);
+        } | null;
+      } | null;
       readonly checkins: ReadonlyArray<{
         readonly id: string;
         readonly location: string;
@@ -27,7 +28,7 @@ export type Query__PetDetail__param = {
         readonly id: string;
         readonly location: string;
       }>;
-    } | null);
+    } | null;
   };
   readonly parameters: Query__PetDetail__parameters;
   readonly link: Query____link__output_type;

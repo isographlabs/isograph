@@ -1,5 +1,6 @@
-import type { Query____link__output_type } from "./../__link/output_type";
-import type { Query__Search__parameters } from "./parameters_type";
+import type { Query____link__output_type } from './../__link/output_type';
+import type { Query__Search__parameters } from './parameters_type';
+
 export type Query__Search__param = {
   readonly data: {
     readonly search: ReadonlyArray<{

@@ -1,17 +1,18 @@
-import type { Pet____link__output_type } from "./../__link/output_type";
+import type { Pet____link__output_type } from './../__link/output_type';
+
 export type Pet__bestFriend__param = {
   readonly data: {
     /**
      * Pets have a very complex social life. Find out more!
      */
-    readonly best_friend_relationship: ({
+    readonly best_friend_relationship: {
       readonly best_friend: {
         /**
          * The pet's ID
          */
         readonly id: string;
       };
-    } | null);
+    } | null;
   };
   readonly parameters: Record<PropertyKey, never>;
   readonly link: Pet____link__output_type;

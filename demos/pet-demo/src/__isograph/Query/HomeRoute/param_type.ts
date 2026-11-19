@@ -1,5 +1,6 @@
-import type { Pet__PetSummaryCard__output_type } from "./../../Pet/PetSummaryCard/output_type";
-import type { Query____link__output_type } from "./../__link/output_type";
+import type { Pet__PetSummaryCard__output_type } from './../../Pet/PetSummaryCard/output_type';
+import type { Query____link__output_type } from './../__link/output_type';
+
 export type Query__HomeRoute__param = {
   readonly data: {
     /**
