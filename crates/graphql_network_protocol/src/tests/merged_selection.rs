@@ -794,3 +794,21 @@ fn a_schema_field_has_no_map() {
         Err(FieldSelectionMapError::FieldLookup(_))
     ));
 }
+
+#[test]
+fn a_loadable_selection_merges_as_without_the_directive() {
+    let db = demo(
+        &[],
+        &[(
+            "src/Loadable.ts",
+            "iso(`field Pet.Loadable { PetCheckinsCard @loadable, bestFriend @loadable { id } }`)\n\
+             iso(`field Pet.Eager { PetCheckinsCard, bestFriend { id } }`)",
+        )],
+        &[],
+    );
+    assert_eq!(
+        field_map(&db, "Pet", "Loadable"),
+        field_map(&db, "Pet", "Eager")
+    );
+    assert!(field_map(&db, "Pet", "Loadable").is_ok());
+}

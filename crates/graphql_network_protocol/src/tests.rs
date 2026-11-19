@@ -1609,6 +1609,101 @@ fn an_entrypoint_whose_parent_cannot_be_fetched_is_an_error_on_the_parent() {
 }
 
 #[test]
+fn a_loadable_selection_is_an_error_on_the_directive_when_its_parent_cannot_be_fetched() {
+    let parent_not_fetchable = |selection: &str, reason: &str| {
+        (
+            format!(
+                "`@loadable` on `{selection}` needs its parent to be fetchable by itself. {reason}"
+            ),
+            "@loadable".to_owned(),
+        )
+    };
+    let cases = [
+        (
+            "iso(`field Query.A($id: ID!) { pet(id: $id) { PetCheckinsCard @loadable } }`)",
+            vec![],
+        ),
+        ("iso(`field Query.A { pet(id: 1) { tagline @loadable } }`)", vec![]),
+        ("iso(`field Query.A { HomeRoute @loadable }`)", vec![]),
+        ("iso(`field Query.A { pets @loadable { id } }`)", vec![]),
+        ("iso(`field Pet.A { bestFriend @loadable { id } }`)", vec![]),
+        (
+            "iso(`field PetStats.StatsBadge { weight }`) \
+             iso(`field Pet.A { stats { StatsBadge @loadable } }`)",
+            parent_not_fetchable(
+                "PetStats.StatsBadge",
+                "`PetStats` is not a root operation type and does not implement `Node`, so it \
+                cannot be fetched by itself.",
+            )
+            .wrap_vec(),
+        ),
+        (
+            "iso(`field Node.A { id @loadable }`)",
+            parent_not_fetchable(
+                "Node.id",
+                "`Node` is not an object type, so it cannot be fetched by itself.",
+            )
+            .wrap_vec(),
+        ),
+        (
+            "iso(`field Owner.A { OwnerBadge @loadable }`)",
+            parent_not_fetchable(
+                "Owner.OwnerBadge",
+                "`Owner` is declared in source files, so the network protocol cannot fetch it.",
+            )
+            .wrap_vec(),
+        ),
+        (
+            "iso(`field Pet.Required($n: Int!) { tagline }`) \
+             iso(`field Query.A { pet(id: 1) { Required @loadable } }`)",
+            (
+                "`Pet.Required` declares `$n` with no default, and this selection does not pass it."
+                    .to_owned(),
+                "Required".to_owned(),
+            )
+                .wrap_vec(),
+        ),
+    ];
+    for (contents, expected) in cases {
+        let db = project_db(
+            &PET_DEMO_SCHEMA,
+            &pet_demo_sources(&[], &[("src/a.ts", contents)]),
+        );
+        assert_eq!(
+            validation_errors(&db, "src/a.ts", contents),
+            expected,
+            "{contents}"
+        );
+    }
+}
+
+#[test]
+fn a_broken_node_field_is_an_error_on_loadable_selections_under_node_entities() {
+    const LOADABLE: &str = "iso(`field Query.A { pet(id: 1) { PetCheckinsCard @loadable } }`)";
+    let schema = PET_DEMO_SCHEMA[0]
+        .1
+        .replace("node(id: ID!): Node", "node(id: ID!): [Node]");
+    let db = project_db(
+        &[
+            (PET_DEMO_SCHEMA[0].0, schema.as_str()),
+            PET_DEMO_SCHEMA[1],
+            PET_DEMO_SCHEMA[2],
+        ],
+        &pet_demo_sources(&[], &[("src/a.ts", LOADABLE)]),
+    );
+    assert_eq!(
+        validation_errors(&db, "src/a.ts", LOADABLE),
+        (
+            "`@loadable` on `Pet.PetCheckinsCard` needs its parent to be fetchable by itself. \
+            `Query.node` returns a list; it returns one value."
+                .to_owned(),
+            "@loadable".to_owned()
+        )
+            .wrap_vec()
+    );
+}
+
+#[test]
 fn a_broken_node_field_is_an_error_on_entrypoints_on_node_entities_only() {
     const SUMMARY: &str = "iso(`entrypoint Pet.PetSummaryCard`)";
     let schema = PET_DEMO_SCHEMA[0]

@@ -28,9 +28,24 @@ pub struct IsographFieldDirective {
 #[resolve_position(parent_type = IsographFieldDirectivePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct IsographDirectiveNameWrapper(pub common_lang_types::IsographDirectiveName);
 
-/// A directive name the iso parser accepts. v1 accepts none.
+/// A directive name the iso parser accepts on a selection.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, strum::EnumString)]
-enum SupportedDirectiveName {}
+pub(crate) enum SelectionDirectiveName {
+    #[strum(serialize = "loadable")]
+    Loadable,
+}
+
+/// A directive name the iso parser accepts on an `entrypoint` or `field` declaration. v1
+/// accepts none.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, strum::EnumString)]
+enum DeclarationDirectiveName {}
+
+/// Where a directive list sits, which decides the names it accepts.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum DirectivePosition {
+    Declaration,
+    Selection,
+}
 
 #[derive(Debug)]
 pub enum IsographFieldDirectiveListParent<'a> {
@@ -59,6 +74,7 @@ fn next_is_at(cursor: &mut ItemCursor<'_>) -> bool {
 
 pub(crate) fn consume_directives(
     cursor: &mut ItemCursor<'_>,
+    position: DirectivePosition,
 ) -> Result<Option<WithSpan<IsographFieldDirectiveList>>, WithSpan<AstError>> {
     if !next_is_at(cursor) {
         return None.wrap_ok();
@@ -69,7 +85,7 @@ pub(crate) fn consume_directives(
             while let Some(at) =
                 cursor.consume_token_if(NonBracketTokenKind::At, IsographSemanticToken::At)
             {
-                directives.push(parse_directive_after_at(cursor, at.location)?);
+                directives.push(parse_directive_after_at(cursor, at.location, position)?);
             }
             IsographFieldDirectiveList(directives).wrap_ok()
         })
@@ -79,6 +95,7 @@ pub(crate) fn consume_directives(
 fn parse_directive_after_at(
     cursor: &mut ItemCursor<'_>,
     at: Span,
+    position: DirectivePosition,
 ) -> Result<WithSpan<IsographFieldDirective>, WithSpan<AstError>> {
     let name = cursor
         .require_token(
@@ -92,11 +109,23 @@ fn parse_directive_after_at(
         .map(|list| list.location.end)
         .unwrap_or(name.location.end);
     let location = Span::new(at.start, end);
-    match name.text().parse::<SupportedDirectiveName>() {
-        Ok(supported) => match supported {},
-        Err(strum::ParseError::VariantNotFound) => {
-            cursor.report_error(AstError::UnexpectedDirective.with_span(location));
-        }
+    match position {
+        DirectivePosition::Declaration => match name.text().parse::<DeclarationDirectiveName>() {
+            Ok(supported) => match supported {},
+            Err(strum::ParseError::VariantNotFound) => {
+                cursor.report_error(AstError::UnexpectedDirective.with_span(location));
+            }
+        },
+        DirectivePosition::Selection => match name.text().parse::<SelectionDirectiveName>() {
+            Ok(SelectionDirectiveName::Loadable) => {
+                if let Some(arguments) = arguments.as_ref() {
+                    cursor.report_error(AstError::LoadableArguments.with_span(arguments.location));
+                }
+            }
+            Err(strum::ParseError::VariantNotFound) => {
+                cursor.report_error(AstError::UnexpectedDirective.with_span(location));
+            }
+        },
     }
     IsographFieldDirective {
         name: name.interned().map(IsographDirectiveNameWrapper),

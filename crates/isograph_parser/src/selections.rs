@@ -1,13 +1,14 @@
+use intern::Lookup;
 use prelude::Postfix;
 use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
-use span::WithSpan;
+use span::{Span, WithSpan};
 
 use crate::chunk_stream::ItemCursor;
 use crate::{
-    ArgumentList, AstError, BracketKind, Expectation, IsographFieldDirectiveList,
-    IsographResolutionNode, IsographSemanticToken, NonBracketTokenKind, Slot, UnparsedChunkItems,
-    consume_argument_list, consume_directives,
+    ArgumentList, AstError, BracketKind, DirectivePosition, Expectation,
+    IsographFieldDirectiveList, IsographResolutionNode, IsographSemanticToken, NonBracketTokenKind,
+    SelectionDirectiveName, Slot, UnparsedChunkItems, consume_argument_list, consume_directives,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
@@ -30,6 +31,39 @@ pub struct Selection {
     #[resolve_field]
     #[parent_variant(Selection)]
     pub selection_set: Option<WithSpan<SelectionSet>>,
+}
+
+/// Whether a selection carries `@loadable`.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum Loadability {
+    /// Without `@loadable`.
+    Eager,
+    /// `@loadable`, at this literal-relative span.
+    Loadable(Span),
+}
+
+impl Selection {
+    /// `Loadable` at the first `@loadable` in this selection's directive list.
+    pub fn loadability(&self) -> Loadability {
+        self.directive_set
+            .iter()
+            .flat_map(|list| list.item.0.iter())
+            .find(|directive| {
+                matches!(
+                    directive
+                        .item
+                        .name
+                        .item
+                        .0
+                        .lookup()
+                        .parse::<SelectionDirectiveName>(),
+                    Ok(SelectionDirectiveName::Loadable)
+                )
+            })
+            .map_or(Loadability::Eager, |directive| {
+                Loadability::Loadable(directive.location)
+            })
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
@@ -92,7 +126,7 @@ fn parse_selection(cursor: &mut ItemCursor<'_>) -> Result<Selection, WithSpan<As
             None => (None, first.interned().map(SelectionNameWrapper)),
         };
     let arguments = consume_argument_list(cursor);
-    let directive_set = consume_directives(cursor)?;
+    let directive_set = consume_directives(cursor, DirectivePosition::Selection)?;
     let selection_set = consume_selection_set(cursor);
     Selection {
         reader_alias,

@@ -524,3 +524,14 @@ fn every_entity_a_field_is_declared_on_has_a_link_type() {
             .collect::<Vec<_>>()
     );
 }
+
+#[test]
+fn a_loadable_selection_has_the_types_and_reader_of_the_selection_without_it() {
+    let db = demo(&[(
+        "src/Loadable.ts",
+        "iso(`field Pet.Loadable { PetCheckinsCard @loadable, bestFriend @loadable { id } }`)\n\
+         iso(`field Pet.Eager { PetCheckinsCard, bestFriend { id } }`)",
+    )]);
+    assert_eq!(types(&db, "Pet", "Loadable"), types(&db, "Pet", "Eager"));
+    assert!(types(&db, "Pet", "Loadable").is_ok());
+}

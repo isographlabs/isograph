@@ -285,7 +285,7 @@ mod tests {
 
     #[test]
     fn at_has_a_space_before() {
-        let out = formatted_with_unexpected_directives("field Query.x { id @loadable }");
+        let out = formatted("field Query.x { id @loadable }");
         assert!(out.contains("id @loadable"), "{out}");
     }
 

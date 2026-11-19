@@ -16,6 +16,8 @@ pub enum AstError {
     IntegerDoesNotFitI64,
     #[error("unexpected directive")]
     UnexpectedDirective,
+    #[error("`@loadable` takes no arguments.")]
+    LoadableArguments,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
@@ -225,6 +227,10 @@ mod tests {
         assert_eq!(
             AstError::UnexpectedDirective.to_string(),
             "unexpected directive"
+        );
+        assert_eq!(
+            AstError::LoadableArguments.to_string(),
+            "`@loadable` takes no arguments."
         );
     }
 

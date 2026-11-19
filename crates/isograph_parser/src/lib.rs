@@ -55,8 +55,8 @@ pub use parse_iso_literal::{
     SelectableNameWrapperParent, SelectableNameWrapperPath, parse_iso_literal, resolve_offset,
 };
 pub use selections::{
-    Selection, SelectionNameWrapper, SelectionNameWrapperPath, SelectionPath, SelectionSet,
-    SelectionSetParent, SelectionSetPath, SelectionSlotPath,
+    Loadability, Selection, SelectionNameWrapper, SelectionNameWrapperPath, SelectionPath,
+    SelectionSet, SelectionSetParent, SelectionSetPath, SelectionSlotPath,
 };
 pub use semantic_token::IsographSemanticToken;
 pub(crate) use semantic_token::leftover_token;
@@ -74,7 +74,7 @@ pub(crate) use arguments::{
 #[cfg(test)]
 pub(crate) use chunk::chunk_level;
 pub(crate) use chunk::{chunk, parse_one_chunk, parse_stream, record_leftover_chunk};
-pub(crate) use directives::consume_directives;
+pub(crate) use directives::{DirectivePosition, SelectionDirectiveName, consume_directives};
 pub(crate) use matched_brackets::{BracketItem, Bracketed, MatchedBrackets, match_brackets};
 pub(crate) use non_bracket_token::{BracketToken, SplitToken};
 pub(crate) use parse_error::DECLARATION_KEYWORD;

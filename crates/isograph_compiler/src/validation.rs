@@ -6,7 +6,7 @@ use common_lang_types::{
 };
 use intern::Lookup;
 use isograph_parser::{
-    EntityNameWrapper, EntrypointDeclaration, IsoLiteralItem, ListTypeAnnotation,
+    EntityNameWrapper, EntrypointDeclaration, IsoLiteralItem, ListTypeAnnotation, Loadability,
     SelectableDeclaration, Selection, SelectionSet, TypeAnnotation, UnionVariant,
     VariableDeclarationList,
 };
@@ -18,8 +18,8 @@ use crate::merged_selection::UnknownFieldArgument;
 use crate::schema::{Definitions, entity_definitions, selectable_definitions};
 use crate::{
     ClientId, CompilationProfile, EntityOrigin, EntityShape, IsographDb, NetworkProtocol,
-    ProfileEntity, SelectableKind, entity_named, entrypoint_fetch_plan, field_declaration,
-    parsed_iso_literals_in_file, selectable_named,
+    ProfileEntity, SelectableKind, entity_fetch_plan, entity_named, entrypoint_fetch_plan,
+    field_declaration, parsed_iso_literals_in_file, selectable_named,
 };
 
 /// A reference in an iso literal that the source declarations do not satisfy.
@@ -52,7 +52,21 @@ pub enum ValidationError<TNotFetchable: std::fmt::Display, TArgumentError: std::
     /// The protocol's verdict on a selection's argument values.
     #[error("{0}")]
     Argument(TArgumentError),
+    #[error("{0}")]
+    LoadableParentNotFetchable(LoadableParentNotFetchable<TNotFetchable>),
 }
+
+/// A `@loadable` selection of `selection` whose parent entity cannot be fetched by itself.
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[error("`@loadable` on `{selection}` needs its parent to be fetchable by itself. {reason}")]
+pub struct LoadableParentNotFetchable<TNotFetchable: std::fmt::Display> {
+    pub selection: SelectableKey,
+    pub reason: EntityNotFetchableError<TNotFetchable>,
+}
+
+pub type ProfileLoadableParentNotFetchable<TProfile> = LoadableParentNotFetchable<
+    <<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::NotFetchable,
+>;
 
 /// An entity that cannot parent a `field` declaration or be the target of its `to` clause.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
@@ -454,6 +468,14 @@ fn validate_selection<'a, TProfile: CompilationProfile>(
         )
         .boxed(),
         Definitions::Unique(selectable) => {
+            let loadable = match selection.loadability() {
+                Loadability::Eager => None,
+                Loadability::Loadable(span) => {
+                    loadable_parent_error(db, client, key).map(|error| {
+                        ValidationError::LoadableParentNotFetchable(error).with_span(span)
+                    })
+                }
+            };
             let arguments = match selectable.kind {
                 SelectableKind::ClientField | SelectableKind::ClientPointer(_) => {
                     field_argument_errors(db, client, variables, key, selection)
@@ -484,12 +506,29 @@ fn validate_selection<'a, TProfile: CompilationProfile>(
                         target_errors(db, client, variables, key, selection, selection_set, target)
                     }
                 };
-            arguments.into_iter().chain(nested).boxed()
+            loadable.into_iter().chain(arguments).chain(nested).boxed()
         }
         Definitions::Duplicated | Definitions::ProtocolLookupFailed(_) => {
             std::iter::empty().boxed()
         }
     }
+}
+
+/// Why the `@loadable` selection of `key` is invalid: its parent cannot be fetched by itself.
+/// `None` when the parent can, or when the parent's lookup fails, which the declaration's own
+/// checks report.
+fn loadable_parent_error<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    key: SelectableKey,
+) -> Option<ProfileLoadableParentNotFetchable<TProfile>> {
+    let parent = entity_named(db, client, key.entity).as_ref().ok()?;
+    entity_fetch_plan(db, client, parent)
+        .err()
+        .map(|reason| LoadableParentNotFetchable {
+            selection: key,
+            reason,
+        })
 }
 
 /// What a selection of a selectable whose target entity has this shape needs.

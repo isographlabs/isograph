@@ -246,6 +246,8 @@ An empty enum with `strum::EnumString`. `"x".parse::<SupportedDirectiveName>()` 
 
 One set covers the three positions a directive list can sit in (`EntrypointDeclaration`, `SelectableDeclaration`, `Selection`). Upstream's sets differ by position; with an empty set the positions agree. The first directive that is valid in only some positions splits the set into one enum per position.
 
+Amended by `graphql-protocol/node-entrypoints-and-loadable.md` change 3: `@loadable` is that directive. The set is split by position into `SelectionDirectiveName` (`Loadable`) and `DeclarationDirectiveName` (empty), and `consume_directives` takes a `DirectivePosition`. `@loadable` on a selection parses without error, `@loadable` with an argument list is `AstError::LoadableArguments` at the list, and `@loadable` on a declaration is still `unexpected directive`. Validation reads it through `Selection::loadability`.
+
 ### The error
 
 ```rust

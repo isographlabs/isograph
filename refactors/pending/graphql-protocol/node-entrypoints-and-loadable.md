@@ -716,14 +716,15 @@ Memo invalidation: `graphql_fetch_plan(Pet)` now also reads `Query.node`'s defin
 - `a_loadable_selection_parses_without_errors`: `field Pet.X { PetCheckinsCard @loadable }` has no errors; `selection.loadability()` is `Loadable(span_of(text, "@loadable"))`.
 - `a_loadable_selection_with_arguments_is_an_error_on_the_arguments`: `PetCheckinsCard @loadable(lazyLoadArtifact: true)` has one error, `LoadableArguments` at `(lazyLoadArtifact: true)`; `@loadable()` has one at `()`.
 - `loadable_on_a_declaration_is_unexpected`: `field Pet.X @loadable { a }` and `entrypoint Pet.X @loadable` each have `unexpected_directives(text, &["@loadable"])`.
-- `a_selection_without_loadable_is_eager`: `a`, `a @updatable` (with its `unexpected directive`) are `Eager`.
-- The landed tests that fixture `@loadable` on a selection (`two_directives_on_one_selection_stay_in_one_list`, `a_directive_with_empty_arguments_parses`, `a_selection_with_alias_arguments_directives_and_a_nested_set_parses`) drop `@loadable` from their `unexpected_directives` lists; `a_directive_with_empty_arguments_parses` expects `LoadableArguments` at `()`.
+- `a_selection_without_loadable_is_eager`: `a`, `b @updatable` (with its `unexpected directive`) are `Eager`.
+- `loadable_twice_is_loadable_at_the_first`: `a @loadable @loadable` has no errors and is `Loadable` at the first `@loadable`.
+- The landed tests that fixture `@loadable` on a selection (`two_directives_on_one_selection_stay_in_one_list`, `a_directive_with_empty_arguments_parses`, `a_selection_with_alias_arguments_directives_and_a_nested_set_parses`) drop `@loadable` from their `unexpected_directives` lists; `a_directive_with_empty_arguments_parses` expects `LoadableArguments` at `()`. `a_selection_directive_with_arguments_is_unexpected_on_the_whole_directive` becomes `a_loadable_selection_with_arguments_is_an_error_on_the_arguments`, and `a_directive_with_an_argument_error_reports_both` expects `IntegerDoesNotFitI64` then `LoadableArguments` at `(x: 99999999999999999999)`. `format.rs`'s `at_has_a_space_before` formats `id @loadable` with `formatted`, which expects no errors.
 
 `crates/isograph_compiler`:
 
 - `entity_fetch_plan` of a source entity is `SourceEntity` (the landed `a_source_entity_cannot_parent_an_entrypoint`, asserting `EntrypointNotFetchableError::Entity(SourceEntity(owner))`).
-- Merge: the map of `field Pet.X { PetCheckinsCard @loadable }` equals the map of `field Pet.X { PetCheckinsCard }`.
-- `field_types`: the data type and reader AST of `field Pet.X { PetCheckinsCard @loadable }` equal those of `field Pet.X { PetCheckinsCard }`.
+- Merge (in `crates/graphql_network_protocol/src/tests/merged_selection.rs`, which has the pet demo schema the fixture needs): the field selection map of `field Pet.Loadable { PetCheckinsCard @loadable, bestFriend @loadable { id } }` equals that of `field Pet.Eager { PetCheckinsCard, bestFriend { id } }`.
+- `field_types` (in `crates/graphql_network_protocol/src/tests/reader_ast.rs`, for the same reason): the `FieldTypes` of the two fields are equal.
 
 `crates/graphql_network_protocol` (pet demo schema):
 

@@ -91,8 +91,9 @@ pub use selectable_for_path::{
 };
 pub use validation::{
     DuplicateDefinitionError, DuplicateResponseName, EntityNotFetchableError,
-    EntrypointNotFetchableError, InvalidEntityError, MissingFieldArgument, ProfileValidationError,
-    SelectableKey, SelectionSetOnFieldWithoutTargetError, UnknownEntityError,
-    UnknownSelectableError, ValidationError, iso_literal_validation_errors_in_file,
+    EntrypointNotFetchableError, InvalidEntityError, LoadableParentNotFetchable,
+    MissingFieldArgument, ProfileLoadableParentNotFetchable, ProfileValidationError, SelectableKey,
+    SelectionSetOnFieldWithoutTargetError, UnknownEntityError, UnknownSelectableError,
+    ValidationError, iso_literal_validation_errors_in_file,
 };
 pub use wrapper::{Nullability, UnionWrapper, Wrapper, WrapperVariant};
