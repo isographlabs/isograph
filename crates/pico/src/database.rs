@@ -122,8 +122,7 @@ impl<Db: Database> Storage<Db> {
 
     pub fn get<T: 'static>(&self, id: SourceId<T>) -> &T {
         self.get_impl(id.key).expect(
-            "Source node not found in database. SourceId should not be used \
-            after the corresponding source node is removed.",
+            "Source node not found in database. SourceId should not be used after the corresponding source node is removed.",
         )
     }
 
@@ -144,10 +143,7 @@ impl<Db: Database> Storage<Db> {
                 .as_ref()
                 .as_any()
                 .downcast_ref::<T>()
-                .expect(
-                    "unexpected struct type. \
-            This is indicative of a bug in Pico.",
-                ),
+                .expect("unexpected struct type. This is indicative of a bug in Pico."),
         )
     }
 
@@ -207,10 +203,11 @@ impl<Db: Database> Storage<Db> {
 impl<Db: Database> InternalStorage<Db> {
     pub(crate) fn get_param(&self, param_id: ParamId) -> Option<&Box<dyn Any>> {
         let index = self.param_id_to_index.get(&param_id)?;
-        Some(self.params.get(index.idx).expect(
-            "indexes should always be valid. \
-            This is indicative of a bug in Pico.",
-        ))
+        Some(
+            self.params
+                .get(index.idx)
+                .expect("indexes should always be valid. This is indicative of a bug in Pico."),
+        )
     }
 
     pub(crate) fn get_derived_node(
@@ -225,10 +222,9 @@ impl<Db: Database> InternalStorage<Db> {
         &self,
         revision: &DerivedNodeRevision,
     ) -> &DerivedNode<Db> {
-        self.derived_nodes.get(revision.node_index.idx).expect(
-            "Indexes should always be valid. \
-            This is indicative of a bug in Pico.",
-        )
+        self.derived_nodes
+            .get(revision.node_index.idx)
+            .expect("Indexes should always be valid. This is indicative of a bug in Pico.")
     }
 
     pub(crate) fn get_derived_node_and_revision(
@@ -309,10 +305,7 @@ impl<Db: Database> InternalStorage<Db> {
         let index = self.source_node_key_to_index.get(&key)?;
         self.source_nodes
             .get(index.idx)
-            .expect(
-                "indexes should always be valid. \
-                This is indicative of a bug in Pico.",
-            )
+            .expect("indexes should always be valid. This is indicative of a bug in Pico.")
             .as_ref()
     }
 
@@ -329,13 +322,11 @@ impl<Db: Database> InternalStorage<Db> {
                     .source_nodes
                     .get_mut(occupied_entry.get().idx)
                     .expect(
-                        "indexes should always be valid. \
-                        This is indicative of a bug in Pico.",
+                        "indexes should always be valid. This is indicative of a bug in Pico.",
                     )
                     .as_mut()
                     .expect(
-                        "indexes should always point to a non-empty source node. \
-                        This is indicative of a bug in Pico.",
+                        "indexes should always point to a non-empty source node. This is indicative of a bug in Pico.",
                     );
                 if !source_node.value.as_ref().dyn_eq(&source) {
                     // We cannot call self.increment_epoch() because that borrows
@@ -364,10 +355,7 @@ impl<Db: Database> InternalStorage<Db> {
             self.current_epoch.increment();
             self.source_nodes
                 .get_mut(index.idx)
-                .expect(
-                    "indexes should always be valid. \
-                    This is indicative of a bug in Pico.",
-                )
+                .expect("indexes should always be valid. This is indicative of a bug in Pico.")
                 .take();
         }
     }

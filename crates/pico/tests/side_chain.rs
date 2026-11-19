@@ -75,6 +75,5 @@ fn capitalized_first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> cha
 #[memo]
 fn unchanged_subtree(_db: &TestDatabase) -> &'static str {
     UNCHANGED_SUBTREE.fetch_add(1, Ordering::SeqCst);
-    "this function should not be re-executed, \
-    even if a parent has been re-executed"
+    "this function should not be re-executed, even if a parent has been re-executed"
 }

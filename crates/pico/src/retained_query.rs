@@ -35,8 +35,7 @@ impl std::ops::Drop for RetainedQuery {
     fn drop(&mut self) {
         if !self.cleared {
             panic!(
-                "RetainedQuery dropped while still retained. Either call Database::clear_retain \
-                or RetainedQuery::never_garbage_collect."
+                "RetainedQuery dropped while still retained. Either call Database::clear_retain or RetainedQuery::never_garbage_collect."
             )
         }
     }

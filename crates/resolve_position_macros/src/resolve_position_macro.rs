@@ -471,14 +471,12 @@ fn generate_enum_arm(
         return match parse_resolve_field_form(resolve_field) {
             Ok(ResolveFieldForm::Transparent) => Error::new_spanned(
                 resolve_field,
-                "`#[resolve_field(transparent)]` is a struct-field attribute; \
-                 an unmarked payload already forwards `parent`",
+                "`#[resolve_field(transparent)]` is a struct-field attribute; an unmarked payload already forwards `parent`",
             )
             .to_compile_error(),
             Ok(ResolveFieldForm::Bare) => Error::new_spanned(
                 resolve_field,
-                "an enum payload always resolves and passes the parent through; annotate \
-                 only to construct the parent: `#[parent_variant(SomeVariant)]` or `#[parent_from]`",
+                "an enum payload always resolves and passes the parent through; annotate only to construct the parent: `#[parent_variant(SomeVariant)]` or `#[parent_from]`",
             )
             .to_compile_error(),
             Err(e) => e,
@@ -703,18 +701,14 @@ fn parse_resolve_field_form(
             }
             Error::new_spanned(
                 attr.meta.reference(),
-                "expected bare `#[resolve_field]` or `#[resolve_field(transparent)]`; \
-                 parent wrapping is `#[parent_variant(SomeVariant)]`, \
-                 parent conversion is `#[parent_from]`",
+                "expected bare `#[resolve_field]` or `#[resolve_field(transparent)]`; parent wrapping is `#[parent_variant(SomeVariant)]`, parent conversion is `#[parent_from]`",
             )
             .to_compile_error()
             .wrap_err()
         }
         syn::Meta::NameValue(name_value) => Error::new_spanned(
             name_value,
-            "expected bare `#[resolve_field]` or `#[resolve_field(transparent)]`; \
-             parent wrapping is `#[parent_variant(SomeVariant)]`, \
-             parent conversion is `#[parent_from]`",
+            "expected bare `#[resolve_field]` or `#[resolve_field(transparent)]`; parent wrapping is `#[parent_variant(SomeVariant)]`, parent conversion is `#[parent_from]`",
         )
         .to_compile_error()
         .wrap_err(),
@@ -850,8 +844,7 @@ fn parse_resolve_field_type(
 
     Error::new_spanned(
         path,
-        "Expected WithSpan<T>, WithLocation<T>, WithGenericLocation<T>, WithOptionalSpan<T>, GraphQLTypeAnnotation, \
-        Vec<T>, Option<T>, or NonEmpty<T> where T is a valid resolve field type",
+        "Expected WithSpan<T>, WithLocation<T>, WithGenericLocation<T>, WithOptionalSpan<T>, GraphQLTypeAnnotation, Vec<T>, Option<T>, or NonEmpty<T> where T is a valid resolve field type",
     )
     .to_compile_error()
     .wrap_err()
@@ -938,8 +931,7 @@ fn get_resolve_field_info(
         if type_is_with_span(field.ty.reference()) {
             return Error::new_spanned(
                 field.ty.reference(),
-                "`#[resolve_field(transparent)]` on a `WithSpan<T>` field is a compile error: \
-                 span-checked descent is the unmarked `#[resolve_field]` form",
+                "`#[resolve_field(transparent)]` on a `WithSpan<T>` field is a compile error: span-checked descent is the unmarked `#[resolve_field]` form",
             )
             .to_compile_error()
             .wrap_err();
