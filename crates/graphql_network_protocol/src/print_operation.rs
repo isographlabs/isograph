@@ -1377,16 +1377,22 @@ mod tests {
     /// The plan of an operation of `operation_type`, with `Query` and `Mutation` as root
     /// entities.
     fn plan(operation_type: OperationType) -> GraphQLFetchPlan {
-        let operation = entity(root_type_name(operation_type));
         GraphQLFetchPlan {
             operation_type,
-            roots: RootEntities {
-                operation,
-                others: [entity("Query"), entity("Mutation")]
-                    .into_iter()
-                    .filter(|other| *other != operation)
-                    .collect(),
-            },
+            wrapper: EntrypointWrapper::Unwrapped(format_roots(operation_type)),
+        }
+    }
+
+    /// The root entities of an operation of `operation_type`, with `Query` and `Mutation` as
+    /// root entities.
+    fn format_roots(operation_type: OperationType) -> RootEntities {
+        let operation = entity(root_type_name(operation_type));
+        RootEntities {
+            operation,
+            others: [entity("Query"), entity("Mutation")]
+                .into_iter()
+                .filter(|other| *other != operation)
+                .collect(),
         }
     }
 
@@ -1416,7 +1422,7 @@ mod tests {
             let plan = plan(operation_type);
             let completed = CompletedSelectionMap::top_level::<GraphQLNetworkProtocol>(
                 map(selections).reference(),
-                plan.roots.reference(),
+                format_roots(operation_type).reference(),
             )
             .expect("the test's top level completes");
             (plan, completed)
