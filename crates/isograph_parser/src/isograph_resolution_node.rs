@@ -1,10 +1,10 @@
 use crate::{
     ArgumentListPath, ArgumentNameWrapperPath, ArgumentPath, ArgumentSlotPath, BooleanValuePath,
     ChunkPath, ChunkSeparatorPath, ChunkedGroupPath, ChunkedLevelPath, ChunkedRootPath,
-    CloseBracketPath, DescriptionPath, EntityNameWrapperPath, EntrypointDeclarationPath,
-    IntegerValuePath, IsoLiteralParsePath, IsographDirectiveNameWrapperPath,
-    IsographFieldDirectiveListPath, IsographFieldDirectivePath, ListLiteralPath,
-    ListLiteralValuePath, ListLiteralValueSlotPath, ListTypeAnnotationPath,
+    CloseBracketPath, DescriptionPath, EntityDeclarationPath, EntityNameWrapperPath,
+    EntrypointDeclarationPath, IntegerValuePath, IsoLiteralParsePath,
+    IsographDirectiveNameWrapperPath, IsographFieldDirectiveListPath, IsographFieldDirectivePath,
+    ListLiteralPath, ListLiteralValuePath, ListLiteralValueSlotPath, ListTypeAnnotationPath,
     NamedTypeAnnotationPath, NonBracketTokenPath, NullValuePath, ObjectEntryPath,
     ObjectEntrySlotPath, ObjectLiteralPath, OpenBracketPath, SelectableDeclarationPath,
     SelectableNameWrapperPath, SelectionNameWrapperPath, SelectionPath, SelectionSetPath,
@@ -23,6 +23,7 @@ pub enum IsographResolutionNode<'a> {
     IsoLiteralSlot(IsoLiteralParsePath<'a>),
     #[from]
     ChunkedRoot(ChunkedRootPath<'a>),
+    EntityDeclaration(EntityDeclarationPath<'a>),
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
     SelectableDeclaration(SelectableDeclarationPath<'a>),
     Description(DescriptionPath<'a>),

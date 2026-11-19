@@ -22,8 +22,18 @@ pub type IsoLiteralParsePath<'a> = PositionResolutionPath<&'a IsoLiteralParse, (
 #[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum IsoLiteralItem {
+    Entity(EntityDeclaration),
     Entrypoint(EntrypointDeclaration),
     Selectable(SelectableDeclaration),
+}
+
+/// `entity Pet`, the declaration of the named entity `Pet`.
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct EntityDeclaration {
+    #[resolve_field]
+    #[parent_variant(EntityDeclaration)]
+    pub name: WithSpan<EntityNameWrapper>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
@@ -64,7 +74,7 @@ pub struct SelectableDeclaration {
     pub selection_set: Option<WithSpan<SelectionSet>>,
 }
 
-/// The name of a schema type, `Query` in `entrypoint Query.foo`.
+/// The name of an entity, `Query` in `entrypoint Query.foo` and `Pet` in `entity Pet`.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = EntityNameWrapperParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct EntityNameWrapper(pub common_lang_types::EntityName);
@@ -84,6 +94,7 @@ pub struct Description(pub common_lang_types::DescriptionValue);
 
 #[derive(Debug)]
 pub enum EntityNameWrapperParent<'a> {
+    EntityDeclaration(EntityDeclarationPath<'a>),
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
     SelectableDeclaration(SelectableDeclarationPath<'a>),
     NamedTypeAnnotation(NamedTypeAnnotationPath<'a>),
@@ -94,6 +105,9 @@ pub enum SelectableNameWrapperParent<'a> {
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
     SelectableDeclaration(SelectableDeclarationPath<'a>),
 }
+
+pub type EntityDeclarationPath<'a> =
+    PositionResolutionPath<&'a EntityDeclaration, IsoLiteralParsePath<'a>>;
 
 pub type EntrypointDeclarationPath<'a> =
     PositionResolutionPath<&'a EntrypointDeclaration, IsoLiteralParsePath<'a>>;
@@ -197,6 +211,7 @@ fn parse_iso_literal_item(
         )
         .map_err(|()| cursor.expected(DECLARATION_KEYWORD))?;
     match keyword.text() {
+        "entity" => IsoLiteralItem::Entity(parse_entity(cursor)?).wrap_ok(),
         "entrypoint" => IsoLiteralItem::Entrypoint(parse_entrypoint(cursor)?).wrap_ok(),
         "field" => IsoLiteralItem::Selectable(parse_selectable_declaration(cursor)?).wrap_ok(),
         _ => AstError::expected(
@@ -228,6 +243,17 @@ fn parse_type_dot_name(
         name.interned(),
     )
         .wrap_ok()
+}
+
+fn parse_entity(cursor: &mut ItemCursor<'_>) -> Result<EntityDeclaration, WithSpan<AstError>> {
+    let name = cursor
+        .require_token(NonBracketTokenKind::Identifier, IsographSemanticToken::Type)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+    cursor.consume_line_breaks();
+    EntityDeclaration {
+        name: name.interned().map(EntityNameWrapper),
+    }
+    .wrap_ok()
 }
 
 fn parse_entrypoint(
@@ -4840,6 +4866,424 @@ mod tests {
         assert_eq!(
             resolved_name(text, span_of(text, "fieldd")),
             "IsoLiteralSlot".to_owned().wrap_some()
+        );
+    }
+
+    fn as_entity(parse: &WithSpan<IsoLiteralParse>) -> &EntityDeclaration {
+        match parsed_item(parse).expect("the fixture's literal parsed an item") {
+            IsoLiteralItem::Entity(declaration) => declaration,
+            item => panic!("expected an entity declaration, got {item:?}"),
+        }
+    }
+
+    const ENTITY_PET_TOKENS: &[(IsographSemanticToken, &str)] = &[
+        (IsographSemanticToken::Keyword, "entity"),
+        (IsographSemanticToken::Type, "Pet"),
+    ];
+
+    #[test]
+    fn an_entity_declaration_parses_with_tight_spans() {
+        let text = "entity Pet";
+        let (parse, errors) = parsed(text, ENTITY_PET_TOKENS);
+        let declaration = as_entity(parse.reference());
+        assert_eq!(
+            declaration.name.item,
+            EntityNameWrapper("Pet".intern().to())
+        );
+        assert_eq!(declaration.name.location, span_of(text, "Pet"));
+        assert_eq!(first_slot(parse.reference()).extra, None);
+        assert_eq!(errors, vec![]);
+        assert_eq!(parse.location, Span::from_usize(0, text.len()));
+    }
+
+    #[test]
+    fn entity_surrounding_line_breaks_and_interior_spaces_are_insignificant() {
+        for text in [
+            "\n  entity Pet\n",
+            "\n\nentity Pet",
+            "entity    Pet",
+            "entity Pet\n\n",
+        ] {
+            let (parse, errors) = parsed(text, ENTITY_PET_TOKENS);
+            assert_eq!(
+                as_entity(parse.reference()).name.location,
+                span_of(text, "Pet"),
+                "for literal {text:?}"
+            );
+            assert_eq!(
+                first_slot(parse.reference()).extra,
+                None,
+                "for literal {text:?}"
+            );
+            assert_eq!(errors, vec![], "for literal {text:?}");
+        }
+    }
+
+    #[test]
+    fn an_entity_may_be_named_entity() {
+        let text = "entity entity";
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (IsographSemanticToken::Keyword, "entity"),
+                (IsographSemanticToken::Type, "entity"),
+            ],
+        );
+        let declaration = as_entity(parse.reference());
+        assert_eq!(
+            declaration.name.item,
+            EntityNameWrapper("entity".intern().to())
+        );
+        assert_eq!(declaration.name.location, Span::new(7, 13));
+        assert_eq!(errors, vec![]);
+    }
+
+    #[test]
+    fn a_bare_entity_expects_an_identifier_at_the_end() {
+        let text = "entity";
+        let keyword_end = span_of(text, "entity").end;
+        assert_no_declaration(
+            text,
+            expected(token(Identifier), Found::EndOfChunk),
+            Span::new(keyword_end, keyword_end),
+            &[(IsographSemanticToken::Keyword, "entity")],
+        );
+        let (parse, _) = parsed(text, &[(IsographSemanticToken::Keyword, "entity")]);
+        assert_eq!(
+            first_slot(parse.reference())
+                .extra
+                .as_ref()
+                .expect("the keyword is extra")
+                .location,
+            span_of(text, "entity"),
+        );
+    }
+
+    #[test]
+    fn entity_name_on_the_next_line_fails_at_the_line_break() {
+        let text = "entity\nPet";
+        let keyword_end = span_of(text, "entity").end;
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (IsographSemanticToken::Keyword, "entity"),
+                (IsographSemanticToken::Content, "Pet"),
+            ],
+        );
+        assert!(parsed_item(parse.reference()).is_none());
+        assert_eq!(
+            errors,
+            expected(token(Identifier), Found::Token(LineBreak))
+                .with_span(Span::new(keyword_end, keyword_end + 1))
+                .wrap_vec(),
+        );
+        assert_eq!(
+            first_slot(parse.reference())
+                .extra
+                .as_ref()
+                .expect("the line break and Pet")
+                .location,
+            Span::new(keyword_end, text.len() as u32),
+        );
+    }
+
+    #[test]
+    fn a_non_identifier_entity_name_fails_at_that_token() {
+        let text = "entity $Pet";
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (IsographSemanticToken::Keyword, "entity"),
+                (IsographSemanticToken::Content, "$"),
+                (IsographSemanticToken::Content, "Pet"),
+            ],
+        );
+        assert!(parsed_item(parse.reference()).is_none());
+        assert_eq!(
+            errors,
+            expected(token(Identifier), Found::Token(Dollar))
+                .with_span(span_of(text, "$"))
+                .wrap_vec(),
+        );
+        assert_eq!(
+            first_slot(parse.reference())
+                .extra
+                .as_ref()
+                .expect("$Pet is extra")
+                .location,
+            span_of(text, "$Pet"),
+        );
+    }
+
+    #[test]
+    fn a_token_after_an_entity_is_leftover() {
+        let text = "entity Pet extra";
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (IsographSemanticToken::Keyword, "entity"),
+                (IsographSemanticToken::Type, "Pet"),
+                (IsographSemanticToken::Content, "extra"),
+            ],
+        );
+        assert_eq!(
+            as_entity(parse.reference()).name.location,
+            span_of(text, "Pet")
+        );
+        assert_eq!(
+            first_slot(parse.reference())
+                .extra
+                .as_ref()
+                .expect("extra is leftover")
+                .location,
+            span_of(text, "extra"),
+        );
+        assert_eq!(
+            errors,
+            expected(EndOfDeclaration, Found::Token(Identifier))
+                .with_span(span_of(text, "extra"))
+                .wrap_vec(),
+        );
+    }
+
+    #[test]
+    fn a_dot_after_an_entity_is_leftover_at_the_dot() {
+        let text = "entity Pet.foo";
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (IsographSemanticToken::Keyword, "entity"),
+                (IsographSemanticToken::Type, "Pet"),
+                (IsographSemanticToken::Content, "."),
+                (IsographSemanticToken::Content, "foo"),
+            ],
+        );
+        assert_eq!(
+            as_entity(parse.reference()).name.location,
+            span_of(text, "Pet")
+        );
+        assert_eq!(
+            first_slot(parse.reference())
+                .extra
+                .as_ref()
+                .expect(".foo is leftover")
+                .location,
+            span_of(text, ".foo"),
+        );
+        assert_eq!(
+            errors,
+            expected(EndOfDeclaration, Found::Token(Period))
+                .with_span(span_of(text, "."))
+                .wrap_vec(),
+        );
+    }
+
+    #[test]
+    fn a_selection_set_after_an_entity_is_leftover_at_the_group() {
+        let text = "entity Pet { id }";
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (IsographSemanticToken::Keyword, "entity"),
+                (IsographSemanticToken::Type, "Pet"),
+                (IsographSemanticToken::Bracket, "{"),
+                (IsographSemanticToken::Content, "id"),
+                (IsographSemanticToken::Bracket, "}"),
+            ],
+        );
+        as_entity(parse.reference());
+        assert_eq!(
+            first_slot(parse.reference())
+                .extra
+                .as_ref()
+                .expect("the group is leftover")
+                .location,
+            span_of(text, "{ id }"),
+        );
+        assert_eq!(
+            errors,
+            expected(
+                EndOfDeclaration,
+                Found::Group(OpenBracket(BracketKind::Brace))
+            )
+            .with_span(span_of(text, "{ id }"))
+            .wrap_vec(),
+        );
+    }
+
+    #[test]
+    fn a_trailing_comma_after_an_entity_is_extra() {
+        let text = "entity Pet,";
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (IsographSemanticToken::Keyword, "entity"),
+                (IsographSemanticToken::Type, "Pet"),
+                (IsographSemanticToken::Content, ","),
+            ],
+        );
+        as_entity(parse.reference());
+        assert_eq!(
+            errors,
+            expected(EndOfDeclaration, Found::Token(Comma))
+                .with_span(span_of(text, ","))
+                .wrap_vec(),
+        );
+    }
+
+    #[test]
+    fn uppercase_entity_is_not_the_keyword() {
+        let text = "ENTITY Pet";
+        assert_no_declaration(
+            text,
+            expected(DECLARATION_KEYWORD, Found::Token(Identifier)),
+            span_of(text, "ENTITY"),
+            &[
+                (IsographSemanticToken::Keyword, "ENTITY"),
+                (IsographSemanticToken::Content, "Pet"),
+            ],
+        );
+    }
+
+    #[test]
+    fn entrypoint_and_field_still_parse_alongside_entity() {
+        let entrypoint = "entrypoint Query.foo";
+        let (parse, errors) = parsed(
+            entrypoint,
+            &[
+                (IsographSemanticToken::Keyword, "entrypoint"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "foo"),
+            ],
+        );
+        assert_eq!(
+            as_entrypoint(parse.reference()).parent_type.item,
+            EntityNameWrapper("Query".intern().to())
+        );
+        assert_eq!(errors, vec![]);
+
+        let field = "field Pet.x { id }";
+        let (parse, errors) = parsed(
+            field,
+            &[
+                (IsographSemanticToken::Keyword, "field"),
+                (IsographSemanticToken::Type, "Pet"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "x"),
+                (IsographSemanticToken::Brace, "{"),
+                (IsographSemanticToken::FieldName, "id"),
+                (IsographSemanticToken::Brace, "}"),
+            ],
+        );
+        assert_eq!(
+            as_selectable(parse.reference()).parent_type.item,
+            EntityNameWrapper("Pet".intern().to())
+        );
+        assert_eq!(errors, vec![]);
+    }
+
+    #[test]
+    fn the_entity_name_resolves_to_its_leaf_and_the_rest_to_the_declaration() {
+        let text = "entity Pet";
+        let (parse, _) = parsed(text, ENTITY_PET_TOKENS);
+        match parse.resolve((), span_of(text, "Pet")) {
+            IsographResolutionNode::EntityNameWrapper(name) => {
+                assert_eq!(
+                    name.inner.dereference(),
+                    EntityNameWrapper("Pet".intern().to())
+                );
+                match name.parent {
+                    EntityNameWrapperParent::EntityDeclaration(declaration) => {
+                        assert_eq!(declaration.inner.name.location, span_of(text, "Pet"));
+                    }
+                    parent => panic!("expected an entity declaration parent, got {parent:?}"),
+                }
+            }
+            node => panic!("expected the entity name leaf, got {node:?}"),
+        }
+        for span in [
+            span_of(text, "entity"),
+            Span::new(span_of(text, "entity").end, span_of(text, "Pet").start),
+        ] {
+            match parse.resolve((), span) {
+                IsographResolutionNode::EntityDeclaration(declaration) => {
+                    assert_eq!(declaration.inner.name.location, span_of(text, "Pet"));
+                }
+                node => panic!("expected the declaration leaf at {span}, got {node:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn leading_whitespace_resolves_to_the_slot_and_a_trailing_line_break_to_the_entity() {
+        let text = "\n  entity Pet\n";
+        let (parse, _) = parsed(text, ENTITY_PET_TOKENS);
+        for span in [Span::new(0, 1), Span::new(1, 2)] {
+            match parse.resolve((), span) {
+                IsographResolutionNode::IsoLiteralSlot(path) => {
+                    assert!(path.inner.item.is_some());
+                }
+                node => panic!("expected IsoLiteralSlot at {span}, got {node:?}"),
+            }
+        }
+        let trailing = Span::from_usize(text.len() - 1, text.len());
+        match parse.resolve((), trailing) {
+            IsographResolutionNode::EntityDeclaration(_) => {}
+            node => panic!("expected the declaration at {trailing}, got {node:?}"),
+        }
+        let entrypoint = "\n  entrypoint Query.foo\n";
+        let (parse, _) = parsed(
+            entrypoint,
+            &[
+                (IsographSemanticToken::Keyword, "entrypoint"),
+                (IsographSemanticToken::Type, "Query"),
+                (IsographSemanticToken::Period, "."),
+                (IsographSemanticToken::FieldName, "foo"),
+            ],
+        );
+        let trailing = Span::from_usize(entrypoint.len() - 1, entrypoint.len());
+        match parse.resolve((), trailing) {
+            IsographResolutionNode::EntrypointDeclaration(_) => {}
+            node => panic!("expected the declaration at {trailing}, got {node:?}"),
+        }
+    }
+
+    #[test]
+    fn leftover_after_an_entity_resolves_to_the_leftover_token() {
+        let text = "entity Pet extra";
+        let (parse, _) = parsed(
+            text,
+            &[
+                (IsographSemanticToken::Keyword, "entity"),
+                (IsographSemanticToken::Type, "Pet"),
+                (IsographSemanticToken::Content, "extra"),
+            ],
+        );
+        match parse.resolve((), span_of(text, "extra")) {
+            IsographResolutionNode::NonBracketToken(_) => {}
+            node => panic!("expected the leftover token, got {node:?}"),
+        }
+        let gap = Span::new(span_of(text, "Pet").end, span_of(text, "extra").start);
+        match parse.resolve((), gap) {
+            IsographResolutionNode::IsoLiteralSlot(path) => {
+                assert!(path.inner.item.is_some());
+                assert!(path.inner.extra.is_some());
+            }
+            node => panic!("expected IsoLiteralSlot, got {node:?}"),
+        }
+    }
+
+    #[test]
+    fn resolve_offset_of_entity_keyword_and_name() {
+        let text = "entity Pet";
+        assert_eq!(
+            resolved_name(text, span_of(text, "entity")),
+            "EntityDeclaration".to_owned().wrap_some()
+        );
+        assert_eq!(
+            resolved_name(text, span_of(text, "Pet")),
+            "EntityNameWrapper".to_owned().wrap_some()
         );
     }
 }

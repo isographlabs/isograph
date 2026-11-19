@@ -101,6 +101,7 @@ fn write_one_of(f: &mut fmt::Formatter<'_>, items: &[Expectation]) -> fmt::Resul
 }
 
 pub const DECLARATION_KEYWORD: Expectation = Expectation::OneOf(&[
+    Expectation::Keyword("entity"),
     Expectation::Keyword("entrypoint"),
     Expectation::Keyword("field"),
 ]);
@@ -147,7 +148,7 @@ mod tests {
     fn expectation_unit_variants_use_their_messages() {
         assert_eq!(
             DECLARATION_KEYWORD.to_string(),
-            "the keyword `entrypoint` or the keyword `field`",
+            "the keyword `entity`, the keyword `entrypoint`, or the keyword `field`",
         );
         assert_eq!(Expectation::Keyword("to").to_string(), "the keyword `to`",);
         assert_eq!(

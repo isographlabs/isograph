@@ -210,6 +210,12 @@ mod tests {
     }
 
     #[test]
+    fn entity_is_on_its_own_indented_line() {
+        assert_eq!(formatted("entity Pet"), "\n  entity Pet\n");
+        assert_eq!(formatted("\n\n   entity    Pet\n"), "\n  entity Pet\n");
+    }
+
+    #[test]
     fn to_has_spaces() {
         assert_eq!(
             formatted("field Pet.x to Image { id }"),

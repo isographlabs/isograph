@@ -48,11 +48,11 @@ pub use matched_brackets::{BracketError, CloseBracket, NonBracketToken, OpenBrac
 pub use non_bracket_token::{BracketKind, NonBracketTokenKind};
 pub use parse_error::{AstError, Expectation, ExpectedFound, Found, ParseError};
 pub use parse_iso_literal::{
-    Description, DescriptionPath, EntityNameWrapper, EntityNameWrapperParent,
-    EntityNameWrapperPath, EntrypointDeclaration, EntrypointDeclarationPath, IsoLiteralItem,
-    IsoLiteralParse, IsoLiteralParsePath, ParsedIsoLiteral, SelectableDeclaration,
-    SelectableDeclarationPath, SelectableNameWrapper, SelectableNameWrapperParent,
-    SelectableNameWrapperPath, parse_iso_literal, resolve_offset,
+    Description, DescriptionPath, EntityDeclaration, EntityDeclarationPath, EntityNameWrapper,
+    EntityNameWrapperParent, EntityNameWrapperPath, EntrypointDeclaration,
+    EntrypointDeclarationPath, IsoLiteralItem, IsoLiteralParse, IsoLiteralParsePath,
+    ParsedIsoLiteral, SelectableDeclaration, SelectableDeclarationPath, SelectableNameWrapper,
+    SelectableNameWrapperParent, SelectableNameWrapperPath, parse_iso_literal, resolve_offset,
 };
 pub use selections::{
     Selection, SelectionNameWrapper, SelectionNameWrapperPath, SelectionPath, SelectionSet,
