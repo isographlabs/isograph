@@ -281,106 +281,7 @@ v0 reports parse errors only. Host errors (`TypeScriptHostError`: missing parent
 
 ### `line_index`
 
-`crates/isograph_lsp/src/line_index.rs`. Change 1 adds the `LineIndex` type; change 2 adds the memo.
-
-`LineIndex` in `semantic_tokens.rs` today borrows the text (`struct LineIndex<'a> { text: &'a str, breaks: Vec<LineBreak> }`, `crates/isograph_lsp/src/semantic_tokens.rs:168-171`). A memo result is owned (pico.md: Memo), so a borrowed index cannot be the memo's value. The owned `LineIndex` stores the line breaks and the non-ASCII chars, so it converts a byte offset to a UTF-16 position without the text. The shape is rust-analyzer's `line-index` crate (`newlines` plus `WideChar`s). That crate is not used because it breaks lines on `\n` only; iso tokenizes `\n`, `\r\n`, and `\r` as line breaks (`line_breaks` doc comment), and diagnostics, semantic tokens, and formatting must agree with it.
-
-```rust
-// from crates/isograph_lsp/src/line_index.rs
-/// Byte offsets of the line breaks and the non-ASCII chars of one text.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct LineIndex {
-    pub(crate) breaks: Vec<LineBreak>,
-    wide_chars: Vec<WideChar>,
-}
-
-/// One line terminator. `start` is the first byte of `\n`, `\r`, or `\r\n`.
-/// `after` is the first byte of the next line.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) struct LineBreak {
-    pub(crate) start: u32,
-    pub(crate) after: u32,
-}
-
-/// A non-ASCII char. Its UTF-8 length exceeds its UTF-16 length.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-struct WideChar {
-    start: u32,
-    utf8_len: u8,
-    utf16_len: u8,
-}
-
-impl LineIndex {
-    pub fn new(text: &str) -> Self {
-        Self {
-            breaks: line_breaks(text),
-            wide_chars: text
-                .char_indices()
-                .filter(|(_, character)| !character.is_ascii())
-                .map(|(start, character)| WideChar {
-                    start: start as u32,
-                    utf8_len: character.len_utf8() as u8,
-                    utf16_len: character.len_utf16() as u8,
-                })
-                .collect(),
-        }
-    }
-
-    /// 0-based line, and UTF-16 code units from the line start to `offset`.
-    pub fn position(&self, offset: u32) -> lsp_types::Position {
-        let line = self
-            .breaks
-            .partition_point(|line_break| line_break.after <= offset);
-        let line_start = match line {
-            0 => 0,
-            n => self.breaks[n - 1].after,
-        };
-        let first = self
-            .wide_chars
-            .partition_point(|wide| wide.start < line_start);
-        let last = self
-            .wide_chars
-            .partition_point(|wide| wide.start + u32::from(wide.utf8_len) <= offset);
-        let narrowed: u32 = self.wide_chars[first..last]
-            .iter()
-            .map(|wide| u32::from(wide.utf8_len - wide.utf16_len))
-            .sum();
-        lsp_types::Position {
-            line: line as u32,
-            character: offset - line_start - narrowed,
-        }
-    }
-
-    pub fn range(&self, span: Span) -> lsp_types::Range {
-        lsp_types::Range {
-            start: self.position(span.start),
-            end: self.position(span.end),
-        }
-    }
-}
-```
-
-`position` does not slice the text and does not panic. `n - 1` is in range because `n <= breaks.len()`. `first <= last` because `line_start <= offset`. Only chars that end at or before `offset` are counted, so the subtraction cannot underflow; an offset that is not a char boundary counts the partial char's bytes as code units.
-
-`line_breaks` moves from `semantic_tokens.rs:299-327` to `line_index.rs` verbatim (with its doc comment and `LineBreak`).
-
-```rust
-// from crates/isograph_lsp/src/line_index.rs
-/// The line index of `path` as `client` reads it.
-#[memo]
-pub fn line_index<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
-    client: ClientId,
-    path: RelativePathToSourceFile,
-) -> Option<LineIndex> {
-    let contents = file_contents(db, client, path).as_ref()?;
-    LineIndex::new(contents).wrap_some()
-}
-```
-
-`lib.rs` adds `mod line_index;` and `pub use line_index::{LineIndex, line_index};`.
-
-The memo is also the planned reader for hover's `LineChar` conversion. Semantic tokens and formatting keep building a `LineIndex` per call from `text_through_last_iso_literal`, not from this memo: the memo reads the whole file, so typing after the last literal would re-invoke them, where today `text_through_last_iso_literal` backdates and they do not.
+`LineIndex` and the `#[memo] line_index(db, client, path) -> Option<LineIndex>` exist in `crates/isograph_lsp/src/line_index.rs` (landed in `d48dd131`), exported as `isograph_lsp::{LineIndex, line_index}`. `LineIndex::range(span: Span) -> lsp_types::Range` counts columns in UTF-16 code units and treats `\n`, `\r\n`, and `\r` as line breaks. Diagnostics read the memo and `range`; this doc does not change either.
 
 ### `lsp_diagnostics_for_file`
 
@@ -857,119 +758,20 @@ Not copied:
 
 ## Changes
 
-AGENTS.md: an API only tests call should not exist. `iso_literal_parse_errors_in_file`, `line_index`, `lsp_diagnostics_for_file`, `open_paths_of_client`, `uri_for_path`, and the `pub(crate)` `SourceGlobs` on `IsographState` have one production reader chain, which ends at `publish_diagnostics`. They therefore ship together with it. The `LineIndex` type has production readers today (formatting and semantic tokens) and ships first.
+AGENTS.md: an API only tests call should not exist. `iso_literal_parse_errors_in_file`, `lsp_diagnostics_for_file`, `open_paths_of_client`, `uri_for_path`, and the `pub(crate)` `SourceGlobs` on `IsographState` have one production reader chain, which ends at `publish_diagnostics`. They therefore ship together with it.
 
-### Change 1: owned `LineIndex` (prefactor)
+### Change 1: owned `LineIndex` and the `line_index` memo (landed)
 
-`crates/isograph_lsp/src/line_index.rs` with `LineIndex`, `LineBreak`, `WideChar`, `line_breaks` (no memo yet). Production readers: `format_iso_literals` and `lsp_semantic_tokens`.
-
-`lsp_range_for_byte_range` is deleted. Its one caller builds the index once per request instead of once per literal.
-
-Before:
-
-```rust
-// from crates/isograph_cli/src/adapter.rs
-    let literals = isograph_compiler::parsed_iso_literals_in_file(db, client, path).as_ref()?;
-    let page_content =
-        isograph_compiler::text_through_last_iso_literal(db, client, path).as_ref()?;
-    literals
-        .iter()
-        .filter_map(|(extraction, parsed)| {
-            if !parsed.errors.is_empty() {
-                return None;
-            }
-            let start = extraction.iso_literal_start_index.0 as u32;
-            let end = start + extraction.iso_literal_text.len() as u32;
-            lsp_types::TextEdit {
-                range: isograph_lsp::lsp_range_for_byte_range(page_content, start, end),
-                new_text: isograph_parser::format_recorded(
-                    extraction.iso_literal_text.as_str(),
-                    parsed.tokens.as_slice(),
-                ),
-            }
-            .wrap_some()
-        })
-        .collect::<Vec<_>>()
-        .wrap_some()
-```
-
-After:
-
-```rust
-// from crates/isograph_cli/src/adapter.rs
-    let literals = isograph_compiler::parsed_iso_literals_in_file(db, client, path).as_ref()?;
-    let page_content =
-        isograph_compiler::text_through_last_iso_literal(db, client, path).as_ref()?;
-    let line_index = isograph_lsp::LineIndex::new(page_content);
-    literals
-        .iter()
-        .filter_map(|(extraction, parsed)| {
-            if !parsed.errors.is_empty() {
-                return None;
-            }
-            lsp_types::TextEdit {
-                range: line_index.range(extraction.span()),
-                new_text: isograph_parser::format_recorded(
-                    extraction.iso_literal_text.as_str(),
-                    parsed.tokens.as_slice(),
-                ),
-            }
-            .wrap_some()
-        })
-        .collect::<Vec<_>>()
-        .wrap_some()
-```
-
-Semantic tokens: the private borrowed `LineIndex<'a>` (`semantic_tokens.rs:168-201`) is deleted. `LineCursor` holds the text and the owned index.
-
-Before:
-
-```rust
-// from crates/isograph_lsp/src/semantic_tokens.rs
-/// `break_index` is the current line. Offsets must not go backward.
-struct LineCursor<'a> {
-    index: &'a LineIndex<'a>,
-    break_index: usize,
-}
-```
-
-After:
-
-```rust
-// from crates/isograph_lsp/src/semantic_tokens.rs
-/// `break_index` is the current line. Offsets must not go backward.
-struct LineCursor<'a> {
-    text: &'a str,
-    index: &'a LineIndex,
-    break_index: usize,
-}
-
-impl<'a> LineCursor<'a> {
-    fn new(text: &'a str, index: &'a LineIndex) -> Self {
-        Self {
-            text,
-            index,
-            break_index: 0,
-        }
-    }
-}
-```
-
-`lsp_semantic_tokens` builds `let index = LineIndex::new(page_content);` and passes `LineCursor::new(page_content, index.reference())` to `lsp_semantic_tokens_with`, which takes `mut cursor: LineCursor<'_>` in place of `index: &LineIndex` and drops `let mut cursor = index.cursor();`. In `LineCursor`'s methods, `self.index.text` becomes `self.text`; `self.index.breaks` is unchanged (`breaks` is `pub(crate)`). The semantic-tokens encoding is unchanged. `LineIndex::new` also collects wide chars, which semantic tokens do not read; that is one extra pass over the text through the last literal.
-
-`lib.rs`: `pub use semantic_tokens::{lsp_semantic_tokens, semantic_token_legend};` and `pub use line_index::LineIndex;`.
-
-Tests (in `line_index.rs`): `line_breaks_records_crlf_as_one_break` moves from `semantic_tokens.rs`. `position` of offset 0 in `""` is `0:0`; after `"a\n"`, `"a\r\n"`, `"a\r"` the next line's first byte is `1:0`; an offset between `\r` and `\n` is on line 0; `é` (2 bytes) before the offset counts 1; `😀` (4 bytes) counts 2; a wide char on an earlier line does not change the column; `range` of a span crossing a line break. The existing formatting tests (`adapter.rs`, `state.rs`) pin that formatting ranges are unchanged, including multi-byte text and CRLF.
+Landed in `d48dd131` (hover plan, `refactors/past/hover.md`).
 
 ### Change 2: diagnostics
 
 One shippable change. It lands as commits in this order, each compiling with tests passing; `pub` items in library crates do not trip `dead_code` between commits, and every `pub(crate)` item lands in the commit with its caller.
 
 1. `iso_literal_parse_errors_in_file` and its tests.
-2. `line_index` memo.
-3. `lsp_diagnostics_for_file` and its tests.
-4. `IsographDb::open_paths_of_client` and its tests.
-5. `PublishedDiagnostics`, `LiveSession.published_diagnostics`, removal of the `expect(dead_code)` on `LiveSession.capabilities`, `SourceGlobs` made `pub(crate)`, `IsographState.source_globs` and its parse in `serve`, `uri_for_path`, `PathUriError`, `diagnostics.rs`, `PublishDiagnosticsEffect` and its `perform` arm, `TimerPayload::DiagnosticsDebounce` replacing `HelloWorldDebounced`, `diagnostics_debounce` replacing `hello_world_debounce`, the three arming call sites, and the `handle` tests.
+2. `lsp_diagnostics_for_file` and its tests.
+3. `IsographDb::open_paths_of_client` and its tests.
+4. `PublishedDiagnostics`, `LiveSession.published_diagnostics`, removal of the `expect(dead_code)` on `LiveSession.capabilities`, `SourceGlobs` made `pub(crate)`, `IsographState.source_globs` and its parse in `serve`, `uri_for_path`, `PathUriError`, `diagnostics.rs`, `PublishDiagnosticsEffect` and its `perform` arm, `TimerPayload::DiagnosticsDebounce` replacing `HelloWorldDebounced`, `diagnostics_debounce` replacing `hello_world_debounce`, the three arming call sites, and the `handle` tests.
 
 ## Tests
 
@@ -1048,7 +850,6 @@ Empty database is empty; disk paths only is empty; one client's open path is ret
 ## Docs this change amends
 
 - `docs-website/docs/design-docs/event-model.md`: `IsographEffect` gains `PublishDiagnostics(Box<PublishDiagnosticsEffect>)`; "HelloWorld arms a timer; `handle` of that `TimerFired` is `trigger_if_matching` and `LogHelloWorld`" becomes "HelloWorld returns `LogHelloWorld`; an accepted `didOpen`, `didChange`, or `didClose` arms the diagnostics debounce, and `handle` of that `TimerFired` returns `PublishDiagnosticsEffect`s"; "Effects from `handle` (`ReportDiagnostics`)" becomes `PublishDiagnosticsEffect`; the effect loop list adds `PublishDiagnostics`; `IsographState` names `source_globs` and `diagnostics_debounce`; "`handle` does not know about globs, gitignore, or \"in scope\". Scope is the watcher's job." becomes "Scope of disk files is the watcher's job. `handle` reads `source_globs` only to choose which open files get diagnostics."
-- `docs-website/docs/design-docs/pico.md`, Iso literals: add the chain `lsp_diagnostics_for_file(client, path) -> iso_literal_parse_errors_in_file(client, path) -> parsed_iso_literals_in_file(client, path)`, plus `line_index(client, path) -> file_contents(client, path)`. Outbound I/O state: the `IsographState` snippet names `source_globs` and `diagnostics_debounce`, and "the planned last-published diagnostics per client" becomes `LiveSession.published_diagnostics`.
+- `docs-website/docs/design-docs/pico.md`, Iso literals: add the chain `lsp_diagnostics_for_file(client, path) -> iso_literal_parse_errors_in_file(client, path) -> parsed_iso_literals_in_file(client, path)`, plus `line_index(client, path)`. Outbound I/O state: the `IsographState` snippet names `source_globs` and `diagnostics_debounce`, and "the planned last-published diagnostics per client" becomes `LiveSession.published_diagnostics`.
 - `refactors/pending/tests-only-functionality.md`: the Diagnostics block's "Production caller: lsp-diagnostics.md via `file_literals`" becomes "Production caller: a later host-errors change; lsp-diagnostics.md reports parse errors only".
-- `refactors/pending/format-file-from-segments.md`: its `lsp_range_for_byte_range` calls become `LineIndex::new(text).range(span)`.
 - `refactors/pending/lsp-open-files.md` change 7 "Docs this change amends" describes the previous shape of this doc (`report_diagnostics`, `file_literals`, `PublishDiagnosticsCap`); it is history of that change and is not edited.
