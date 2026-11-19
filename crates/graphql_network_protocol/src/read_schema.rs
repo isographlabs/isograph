@@ -4,7 +4,7 @@ use common_lang_types::{DiagnosticResult, RelativePathToSourceFile};
 use graphql_lang_types::{GraphQLTypeSystemDocument, GraphQLTypeSystemExtensionDocument};
 use graphql_schema_parser::{parse_schema, parse_schema_extensions};
 use isograph_schema::{CompilationProfile, IsographDatabase, SchemaSource};
-use pico::{MemoRef, SourceId};
+use pico::{MemoRef, MemoRefPostfix, SourceId};
 use pico_macros::memo;
 use prelude::Postfix;
 

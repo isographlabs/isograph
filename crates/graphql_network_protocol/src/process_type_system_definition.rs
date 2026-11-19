@@ -23,6 +23,7 @@ use isograph_schema::{
     insert_selectable_or_multiple_definition_diagnostic,
 };
 use lazy_static::lazy_static;
+use pico::MemoRefPostfix;
 use prelude::Postfix;
 
 use crate::{GraphQLAndJavascriptProfile, GraphQLRootTypes};

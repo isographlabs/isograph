@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use common_lang_types::{EmbeddedLocation, EntityName, SelectableName};
 use isograph_lang_types::SelectionType;
-use pico::MemoRef;
+use pico::{MemoRef, MemoRefPostfix};
 use pico_macros::memo;
 use prelude::Postfix;
 

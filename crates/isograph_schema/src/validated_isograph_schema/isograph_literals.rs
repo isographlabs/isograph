@@ -9,7 +9,7 @@ use common_lang_types::{
 use isograph_lang_parser::{IsoLiteralExtractionResult, parse_iso_literal};
 use isograph_lang_types::{EntrypointDeclaration, SelectionTypePostfix};
 use lazy_static::lazy_static;
-use pico::SourceId;
+use pico::{MemoRefPostfix, SourceId};
 use pico_macros::memo;
 use prelude::Postfix;
 use regex::Regex;

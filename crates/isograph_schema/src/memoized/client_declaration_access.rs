@@ -12,7 +12,7 @@ use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{
     ClientFieldDeclaration, ClientPointerDeclaration, SelectionType, SelectionTypePostfix,
 };
-use pico::MemoRef;
+use pico::{MemoRef, MemoRefPostfix};
 use pico_macros::memo;
 use prelude::Postfix;
 

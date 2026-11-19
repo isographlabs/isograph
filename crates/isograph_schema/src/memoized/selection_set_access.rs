@@ -5,7 +5,7 @@ use common_lang_types::{
     WithLocationPostfix,
 };
 use isograph_lang_types::{SelectionSet, SelectionType, SelectionTypePostfix};
-use pico::MemoRef;
+use pico::{MemoRef, MemoRefPostfix};
 use pico_macros::memo;
 use prelude::Postfix;
 
