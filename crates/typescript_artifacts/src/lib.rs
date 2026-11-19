@@ -449,7 +449,8 @@ mod tests {
     }
 
     #[test]
-    fn variables_print_a_parameters_type_with_optional_nullable_parameters() {
+    fn variables_print_a_parameters_type_with_required_parameters_and_optional_nullable_input_fields()
+     {
         let mut with_parameters = field("Pet", "f", Vec::new());
         with_parameters.parameters = ParametersType {
             parameters: NonEmpty::from((
@@ -486,7 +487,7 @@ mod tests {
         let parameters = text_at(artifacts.as_slice(), "Pet/f/parameters_type.ts");
         assert!(parameters.contains("readonly id: string;"), "{parameters}");
         assert!(
-            parameters.contains("readonly limit?: number | null | void;"),
+            parameters.contains("readonly limit: number | null;"),
             "{parameters}"
         );
         assert!(

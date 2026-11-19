@@ -167,7 +167,7 @@ pub(crate) fn parameters_type_file(
                 fields
                     .iter()
                     .map(|input_field| {
-                        parameter_property(
+                        input_field_property(
                             input_field.name.lookup(),
                             input_field.type_.reference(),
                             options,
@@ -299,10 +299,40 @@ fn readonly_array(element: TypeScriptType) -> TypeScriptType {
     TypeScriptType::generic("ReadonlyArray", element.wrap_vec())
 }
 
-/// A parameter's property: like `wrapped_type`, except that a top-level nullable union prints
-/// its other variants then `null | void` with no parentheses (upstream's
-/// `format_parameter_type`), and the property is optional.
+/// A parameter's property: required; a top-level nullable union prints its other variants
+/// then `null`, with no parentheses.
 fn parameter_property(
+    key: &str,
+    wrapper: &Wrapper<ArtifactInputType>,
+    options: &Options,
+) -> PropertySignature {
+    let mut inner = |input: &ArtifactInputType| input_type(input, options);
+    let type_ = match (wrapper, wrapper.nullability()) {
+        (Wrapper::Union(union), Nullability::Nullable) => TypeScriptType::Union(
+            union
+                .0
+                .iter()
+                .filter(|variant| !matches!(variant, WrapperVariant::Null))
+                .map(|variant| variant_type(variant, &mut inner))
+                .chain([TypeScriptType::Keyword(TypeScriptKeyword::Null)])
+                .collect(),
+        ),
+        (Wrapper::Inner(_) | Wrapper::List(_) | Wrapper::Union(_), _) => {
+            wrapped_type(wrapper, &mut inner)
+        }
+    };
+    PropertySignature {
+        key: key.to_owned(),
+        optionality: Optionality::Required,
+        type_,
+        description: None,
+    }
+}
+
+/// An input object field's property: a top-level nullable union prints its other variants
+/// then `null | void`, with no parentheses, and the property is optional (upstream's
+/// `format_parameter_type`); otherwise as `parameter_property`.
+fn input_field_property(
     key: &str,
     wrapper: &Wrapper<ArtifactInputType>,
     options: &Options,

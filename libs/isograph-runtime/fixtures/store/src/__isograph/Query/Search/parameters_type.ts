@@ -1,3 +1,3 @@
 export type Query__Search__parameters = {
-  readonly q?: string | null | void;
+  readonly q: string | null;
 };
