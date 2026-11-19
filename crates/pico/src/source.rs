@@ -80,5 +80,5 @@ impl<T> From<ParamId> for SourceId<T> {
 #[derive(Debug)]
 pub struct SourceNode {
     pub time_updated: Epoch,
-    pub value: Box<dyn DynEq>,
+    pub value: Option<Box<dyn DynEq>>,
 }

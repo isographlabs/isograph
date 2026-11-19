@@ -577,8 +577,6 @@ mod memo_tests {
     #[test]
     fn missing_then_present_extracts() {
         let mut db = IsographDb::<TestProfile>::default();
-        let other = intern_path("src/b.ts");
-        intern_file(&mut db, other, "export const x = 1;");
         let path = intern_path("src/a.ts");
         assert!(extract_iso_literals(&db, client(), path).is_none());
         intern_file(&mut db, path, "iso(`entrypoint Query.HomeRoute`)");

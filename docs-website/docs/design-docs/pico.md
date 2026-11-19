@@ -467,7 +467,7 @@ Choose memo boundaries deliberately. Each distinct set of memo arguments creates
 
 A read of one key records a dependency on that key whether the key is present or absent, so a later insert or removal of that key re-invokes the reader. `tracked()` is for iterating the key set.
 
-Until the pico change lands (upstream PR https://github.com/isographlabs/isograph/pull/994, plan in `refactors/pending/pico-missing-key-dependency.md`), a keyed lookup in a tracked map does this: on a hit, `untracked()` then `db.get(source_id)`; on a miss, `tracked()`.
+A keyed lookup in a tracked map does this: on a hit, `untracked()` then `db.get(source_id)`; on a miss, `tracked()`.
 
 ```rust
 // from crates/isograph_compiler/src/database.rs
@@ -479,9 +479,9 @@ fn disk_file_source_id(&self, path: RelativePathToSourceFile) -> Option<SourceId
 }
 ```
 
-The miss branch depends on the map's counter singleton. A counter that was never written is itself a missing key, so pico records no dependency. On a fresh database, a `file_contents` miss before the first `set_open_file` does not see that open.
+The miss branch depends on the map's counter singleton. pico records a dependency on a missing key through an absent node (upstream isograph #994), so the miss depends on the counter even before the map's first write. On a fresh database, a `file_contents` miss before the first `set_open_file` sees that open. The miss re-invokes on any insert into the map, not only an insert of that path.
 
-After the pico change lands, pico records a dependency on an absent source node. A keyed lookup then depends on its key directly, present or absent, and `tracked()` is used only to iterate the map.
+A keyed lookup that depends on its key alone, present or absent, needs `T::source_id` and `get_if_present` (change 3 of `refactors/pending/pico-missing-key-dependency.md`). After that change, `tracked()` is used only to iterate the map.
 
 ### No `Default` for missing data
 
@@ -542,11 +542,11 @@ The map is which paths currently have a `DiskFile`. `db.set` of a `DiskFile` doe
 
 `untracked()` does not record the map. It is correct when the memo is already keyed by `path`, looks up that one `SourceId`, and then `db.get(source_id)` (which tracks the source). Adding an unrelated file must not re-invoke a per-file `file_contents`. Iterating `untracked()` is wrong: a newly inserted path is not seen. `file_contents` is the one per-path lookup of text; every other memo that needs text calls it.
 
-A lookup that misses did not `db.get`. If it also did not `tracked()` the map, a later `Present` of that path is not seen and the memo stays `None`. isograph hit this: an autofix created a file, `get_iso_literal` ran untracked, returned `None`, and the next request reused that `None` and panicked. Until the pico change in `refactors/pending/pico-missing-key-dependency.md` lands, a miss reads the map `tracked()` so a later insert of that key is seen; after it lands, the keyed lookup depends on the key itself (Keyed reads depend on their key, present or absent). The intended dependency of a per-file memo that hits is that file, not the set of all files.
+A lookup that misses did not `db.get`. If it also did not `tracked()` the map, a later `Present` of that path is not seen and the memo stays `None`. isograph hit this: an autofix created a file, `get_iso_literal` ran untracked, returned `None`, and the next request reused that `None` and panicked. A miss reads the map `tracked()` so a later insert of that key is seen. After change 3 of `refactors/pending/pico-missing-key-dependency.md`, the keyed lookup depends on the key itself (Keyed reads depend on their key, present or absent). The intended dependency of a per-file memo that hits is that file, not the set of all files.
 
 `open_file_map` is keyed by `OpenFileKey { client, path }`. `file_contents` looks up untracked and `db.get`s the hit; on a miss it reads the map tracked. A write of a key already present does not write the map, so a keystroke re-invokes only the derived node that read that `OpenFile`. Any open or close re-invokes every `file_contents` derived node of every client that missed in `open_file_map`; each backdates when its text is `==`.
 
-A tracked read of a map whose counter was never written records no dependency (`refactors/pending/pico-missing-key-dependency.md`). On a fresh database, a `file_contents` miss before the first `set_open_file` does not see that later open.
+A tracked read of a map whose counter was never written records a dependency on the absent counter. On a fresh database, a `file_contents` miss before the first `set_open_file` sees that later open.
 
 ## Intern
 

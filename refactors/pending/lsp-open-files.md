@@ -10,7 +10,7 @@ Origin of the open-file map and handlers: isograph `OpenFileMap` / `OpenFileSour
 
 These are not approved.
 
-1. A tracked map whose counter was never written (change 3). The problem and both options are in change 3. The user accepted the bug for now and changes 5 and 6 shipped without change 3; the fix is planned in `refactors/pending/pico-missing-key-dependency.md`. See Known gap.
+1. A tracked map whose counter was never written (change 3). Resolved without change 3 by change 1 of `refactors/pending/pico-missing-key-dependency.md` (upstream isograph #994). See Known gap.
 2. Order relative to format-file-from-segments.md. Decided: (a); change 7 landed first and format-file-from-segments.md reads `file_contents`. (a) This doc first: change 7's `format_iso_literals` uses `parsed_iso_literals_in_file` and `text_through_last_iso_literal` with the client, and format-file-from-segments.md then reads `file_contents(db, client, path)` instead of `state.disk_file(path)`. (b) format-file-from-segments.md first: change 7's `format_iso_literals` is that doc's version with `file_contents` replacing `disk_file` (second snippet in change 7). Either order ships; (b) makes change 7's format diff smaller, (a) makes format-file-from-segments.md read the buffer from the start.
 3. `SendLspResponseEffect` as data (optional change). The feature does not need it. Tests read a response by calling `perform` and `recv`ing on the crossbeam receiver behind the `LiveSession` (`lsp_formatting_of_a_live_client_without_a_file_is_null`, `crates/isograph_cli/src/state.rs`), and change 6's tests use that pattern. (a) Ship the optional change. (b) Do not ship it; `Box<dyn FnOnce(&SideEffectToken) + Send>` stays.
 
@@ -38,7 +38,7 @@ Prefactors first.
 
 1. Notifications carry the client; handlers receive it as a parameter. Dispatch drops a notification from a client not in `LiveSessions`. Landed in `9e0dcde0`.
 2. Requests and responses carry the client; request handlers receive it as a parameter. `LSPRequestDispatch` moves from `isograph_lsp` to `isograph_cli`, next to `LSPNotificationDispatch`. Dispatch drops a response from a client not in `LiveSessions`. Landed in `c74128a3` (move) and `862b68fc`.
-3. A tracked counter that was never written. Open decision; not decided. Skipped; see Known gap.
+3. A tracked counter that was never written. Not needed; change 1 of `refactors/pending/pico-missing-key-dependency.md` fixes it in pico. See Known gap.
 4. `ClientId` moves to `isograph_compiler`. Landed in `65d4cce4`.
 5. `open_file_map`, the `file_contents` memo, the writers, and unit tests. Landed in `a42d7cad`.
 6. `didOpen` / `didChange` / `didClose`, advertised capabilities, `Gone` cleanup, and `handle` tests. Landed in `0ecc7e2f` (typed path conversion) and `a7846d69` (handlers, capabilities, `Gone`); design docs in `220e64ac`.
@@ -46,7 +46,7 @@ Prefactors first.
 
 ## Known gap
 
-Change 3 did not ship. pico records no dependency when a memo reads a tracked map whose counter was never written, so on a database where `open_file_map` was never written, a `file_contents(client, path)` miss on the open-file map does not see a later `set_open_file` of that key. The same holds for `disk_file_map` before the first `insert_disk_file`. `read_before_first_open_file_write_misses_the_later_open` (`crates/isograph_compiler/src/database.rs`) asserts the current, wrong result (disk text after the open); when `refactors/pending/pico-missing-key-dependency.md` lands, its assertion flips to the buffer text. The other `file_contents` tests that read before an open write `open_file_map` or `disk_file_map` first, with a comment naming this.
+Closed. Change 3 did not ship. Upstream isograph #994 (change 1 of `refactors/pending/pico-missing-key-dependency.md`) makes a memo that reads a tracked map whose counter was never written depend on the absent counter, so a `file_contents(client, path)` miss before the first `set_open_file` or `insert_disk_file` sees that later write. `read_before_first_open_file_write_sees_the_later_open` (`crates/isograph_compiler/src/database.rs`) asserts the buffer text after the open. The `file_contents`, `sources`, `compiler_errors_in_file`, and `extract_iso_literals` tests no longer write an unrelated map entry before the first read.
 
 Deltas from the snippets below, as landed:
 

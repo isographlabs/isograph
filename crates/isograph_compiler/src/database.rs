@@ -731,8 +731,6 @@ mod tests {
     fn missing_then_present_on_disk_is_read() {
         let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
-        // pico records no dependency on a never-written tracked counter; see refactors/pending/pico-missing-key-dependency.md.
-        db.insert_disk_file(intern_path("src/other.ts"), SOURCE_FILE, "other".to_owned());
         assert_eq!(read(db.reference(), ClientId(1), path), None);
         db.insert_disk_file(path, SOURCE_FILE, "disk".to_owned());
         assert_eq!(
@@ -745,13 +743,6 @@ mod tests {
     fn read_disk_then_open_then_close_then_remove_disk() {
         let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
-        // pico records no dependency on a never-written tracked counter; see refactors/pending/pico-missing-key-dependency.md.
-        db.set_open_file(
-            ClientId(2),
-            intern_path("src/other.ts"),
-            SOURCE_FILE,
-            "other".to_owned(),
-        );
         db.insert_disk_file(path, SOURCE_FILE, "disk".to_owned());
         assert_eq!(
             read(db.reference(), ClientId(1), path),
@@ -793,7 +784,7 @@ mod tests {
     }
 
     #[test]
-    fn read_before_first_open_file_write_misses_the_later_open() {
+    fn read_before_first_open_file_write_sees_the_later_open() {
         let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         db.insert_disk_file(path, SOURCE_FILE, "disk".to_owned());
@@ -802,10 +793,9 @@ mod tests {
             "disk".to_owned().wrap_some()
         );
         db.set_open_file(ClientId(1), path, SOURCE_FILE, "open".to_owned());
-        // pico records no dependency on a never-written tracked counter; see refactors/pending/pico-missing-key-dependency.md; when that lands, flip this assertion to the buffer text.
         assert_eq!(
             read(db.reference(), ClientId(1), path),
-            "disk".to_owned().wrap_some()
+            "open".to_owned().wrap_some()
         );
     }
 

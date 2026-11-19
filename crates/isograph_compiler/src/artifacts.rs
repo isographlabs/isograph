@@ -175,9 +175,7 @@ mod tests {
 
     #[test]
     fn a_path_with_no_text_is_none() {
-        let mut db = IsographDb::<TestProfile>::default();
-        // pico records no dependency on a never-written tracked counter; see refactors/pending/pico-missing-key-dependency.md.
-        db.insert_disk_file("src/other.ts".intern().to(), SOURCE_FILE, String::new());
+        let db = IsographDb::<TestProfile>::default();
         assert_eq!(sources(db.reference()), None);
     }
 }

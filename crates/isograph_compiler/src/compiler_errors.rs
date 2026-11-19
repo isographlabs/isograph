@@ -77,9 +77,7 @@ mod tests {
 
     #[test]
     fn missing_file_has_no_errors() {
-        let mut db = IsographDb::<TestProfile>::default();
-        // pico records no dependency on a never-written tracked counter; see refactors/pending/pico-missing-key-dependency.md.
-        db.insert_disk_file("src/other.ts".intern().to(), SOURCE_FILE, String::new());
+        let db = IsographDb::<TestProfile>::default();
         assert_eq!(errors(db.reference()), None);
     }
 
