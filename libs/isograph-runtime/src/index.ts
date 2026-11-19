@@ -31,3 +31,4 @@ export type {
 } from './store';
 export { normalize } from './normalize';
 export { check, type CheckResult } from './check';
+export { garbageCollect, type RetainedQuery } from './garbageCollection';

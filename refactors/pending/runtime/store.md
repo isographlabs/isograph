@@ -439,7 +439,7 @@ Mark, then sweep (upstream `garbageCollectBaseStoreLayer`, `garbageCollection.ts
 - The sweep deletes every unmarked record, then every entity map left empty. Marked records stay whole, including fields no retained AST selects. `retained = []` empties the store.
 - Cyclic data terminates: the walk recurses on the AST, which is finite. A record reached by several paths is walked once per path.
 
-The mark is an iterator, `function* reachableRecords(store, retained): Generator<StoreLink>`, consumed into a `Map<EntityName, Set<RecordId>>` before the sweep starts, so the sweep's deletes never run during the walk. The sweep deletes from `store` with `Map.prototype.delete`, as upstream's sweep does with `delete` (`garbageCollection.ts:101-118`).
+The mark is an iterator, `function* reachableRecords(store, retained): Generator<StoreLink>`, consumed into a `Map<EntityName, Set<RecordId>>` before the sweep starts, so the sweep's deletes never run during the walk. The sweep deletes from `store` with `Map.prototype.delete` inside `Map.prototype.forEach`, which visits every entry not yet visited and skips deleted ones, as upstream's sweep deletes with `delete` inside `for .. in` (`garbageCollection.ts:101-118`). Composite values are read with `linksIn` (The store).
 
 It returns nothing. No v1 caller reads what was deleted or how many records were; tests inspect `store`.
 
