@@ -22,9 +22,9 @@ pub use fetch_plan::{
 };
 use protocol_data::union_members;
 pub use protocol_data::{
-    GraphQLCompositeData, GraphQLEntityData, GraphQLSelectableData, GraphQLSelectableLookupError,
-    RefinementCollision, RefinementTargetError, graphql_entity, graphql_selectable,
-    graphql_selectables, object_types_implementing,
+    DuplicateInputField, GraphQLCompositeData, GraphQLEntityData, GraphQLSelectableData,
+    GraphQLSelectableLookupError, RefinementCollision, RefinementTargetError, graphql_entity,
+    graphql_selectable, graphql_selectables, object_types_implementing,
 };
 pub use root_operation_types::{
     DuplicateOperation, DuplicateSchemaDefinition, RootOperationTypes, RootOperationTypesError,

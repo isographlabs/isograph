@@ -2,8 +2,8 @@ use std::collections::BTreeSet;
 
 use common_lang_types::{EntityName, SelectableName};
 use graphql_schema_parser::{
-    FieldDefinition, NullableTypeAnnotation, TypeAnnotation, TypeDefinition, TypeExtension,
-    TypeSystemDefinition, TypeSystemDefinitionOrExtension, TypeSystemExtension,
+    FieldDefinition, InputValueDefinition, NullableTypeAnnotation, TypeAnnotation, TypeDefinition,
+    TypeExtension, TypeSystemDefinition, TypeSystemDefinitionOrExtension, TypeSystemExtension,
 };
 use intern::Lookup;
 use intern::string_key::Intern;
@@ -47,6 +47,8 @@ pub enum GraphQLSelectableData {
     /// `asUser` on a union or interface: printed as `... on User`, where `User` is the
     /// selectable's target.
     Refinement,
+    /// A field of an input object: read in parameter types, never selected.
+    InputField,
 }
 
 /// The GraphQL type `name` as `client` reads the schema, with the data the protocol records.
@@ -116,6 +118,18 @@ pub enum GraphQLSelectableLookupError {
     #[error("{0}")]
     #[from(skip)]
     RefinementCollision(Box<RefinementCollision>),
+    #[error("{0}")]
+    #[from(skip)]
+    DuplicateInputField(Box<DuplicateInputField>),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[error("Input field `{entity}.{selectable}` is defined more than once in the schema.")]
+pub struct DuplicateInputField {
+    pub entity: EntityName,
+    pub selectable: SelectableName,
+    pub first: InSchemaFile<InputValueDefinition>,
+    pub second: InSchemaFile<InputValueDefinition>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
@@ -144,6 +158,9 @@ pub fn graphql_selectable<TProfile: CompilationProfile>(
     entity: EntityName,
     selectable: SelectableName,
 ) -> Result<Option<ProtocolSelectable<GraphQLSelectableData>>, GraphQLSelectableLookupError> {
+    if let Some(input_field) = input_field_named(db, client, entity, selectable)? {
+        return input_field.wrap_some().wrap_ok();
+    }
     let field = selectable_named(db, client, entity, selectable).clone()?;
     let refinement = refinement_named(db, client, entity, selectable)?;
     match (field, refinement) {
@@ -158,6 +175,95 @@ pub fn graphql_selectable<TProfile: CompilationProfile>(
         .wrap_err(),
         (Some(field), None) => field_selectable(field).wrap_some().wrap_ok(),
         (None, refinement) => refinement.wrap_ok(),
+    }
+}
+
+/// The input field `selectable` of the input object `entity`; `Ok(None)` when `entity` is not
+/// an input object or has no such field.
+fn input_field_named<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    entity: EntityName,
+    selectable: SelectableName,
+) -> Result<Option<ProtocolSelectable<GraphQLSelectableData>>, GraphQLSelectableLookupError> {
+    let Some(schema_entity) = entity_named(db, client, entity)
+        .clone()
+        .map_err(|error| GraphQLSelectableLookupError::Selectable(error.to()))?
+    else {
+        return None.wrap_ok();
+    };
+    let mut fields = input_fields(schema_entity.reference())
+        .filter(|field| field.item.item.name.item.0.to::<SelectableName>() == selectable);
+    let Some(first) = fields.next() else {
+        return None.wrap_ok();
+    };
+    match fields.next() {
+        None => input_field_selectable(first).wrap_some().wrap_ok(),
+        Some(second) => GraphQLSelectableLookupError::DuplicateInputField(
+            DuplicateInputField {
+                entity,
+                selectable,
+                first,
+                second,
+            }
+            .boxed(),
+        )
+        .wrap_err(),
+    }
+}
+
+/// Every field of an input object's definition and its input object extensions, with its
+/// file. Empty for every other kind of type.
+fn input_fields(
+    schema_entity: &SchemaEntity,
+) -> impl Iterator<Item = InSchemaFile<InputValueDefinition>> + '_ {
+    let definition_fields = match schema_entity.definition.item.item.reference() {
+        TypeDefinition::InputObject(input_object) => input_object.fields.as_slice(),
+        TypeDefinition::Scalar(_)
+        | TypeDefinition::Object(_)
+        | TypeDefinition::Interface(_)
+        | TypeDefinition::Union(_)
+        | TypeDefinition::Enum(_) => &[],
+    }
+    .iter()
+    .map(|field| InSchemaFile {
+        path: schema_entity.definition.path,
+        item: field.clone(),
+    });
+    let extension_fields = schema_entity.extensions.iter().flat_map(|extension| {
+        match extension.item.item.reference() {
+            TypeExtension::InputObject(input_object) => input_object.fields.as_slice(),
+            TypeExtension::Scalar(_)
+            | TypeExtension::Object(_)
+            | TypeExtension::Interface(_)
+            | TypeExtension::Union(_)
+            | TypeExtension::Enum(_) => &[],
+        }
+        .iter()
+        .map(|field| InSchemaFile {
+            path: extension.path,
+            item: field.clone(),
+        })
+    });
+    definition_fields.chain(extension_fields)
+}
+
+/// The protocol selectable an input object field defines.
+fn input_field_selectable(
+    field: InSchemaFile<InputValueDefinition>,
+) -> ProtocolSelectable<GraphQLSelectableData> {
+    ProtocolSelectable {
+        description: field
+            .item
+            .item
+            .description
+            .map(|description| description.item.0),
+        target: wrapper_of_graphql_type(field.item.item.type_.item.reference()),
+        definition: DefinitionLocation {
+            path: field.path,
+            span: field.item.item.name.location,
+        },
+        data: GraphQLSelectableData::InputField,
     }
 }
 
@@ -333,8 +439,15 @@ pub fn graphql_selectables<TProfile: CompilationProfile>(
             .flatten()
             .map(|refinement| (refinement_name(target), refinement))
     });
+    let input_fields = input_fields(schema_entity).map(|field| {
+        (
+            field.item.item.name.item.0.to::<SelectableName>(),
+            input_field_selectable(field),
+        )
+    });
     schema_entity_fields(schema_entity)
         .map(|field| (field.item.item.name.item.0, field_selectable(field)))
+        .chain(input_fields)
         .chain(refinements)
         .collect()
 }

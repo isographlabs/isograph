@@ -11,6 +11,7 @@ string_key_newtype!(InputValueName);
 string_key_one_way_conversion!(from: InputValueName, to: VariableName);
 string_key_one_way_conversion!(from: InputValueName, to: FieldArgumentName);
 string_key_one_way_conversion!(from: InputValueName, to: ArgumentName);
+string_key_one_way_conversion!(from: InputValueName, to: SelectableName);
 
 string_key_newtype!(EnumLiteralValue);
 string_key_newtype!(StringLiteralValue);

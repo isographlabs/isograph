@@ -1076,3 +1076,37 @@ fn an_enum_is_a_string_scalar_and_a_union_is_an_object_of_its_members() {
         vec![entity("A")]
     );
 }
+
+#[test]
+fn an_input_object_field_is_an_input_field_selectable() {
+    let schema = "input Filter { and: [Filter!] } extend input Filter { name: String! }";
+    let db = db_with(&[("a.graphql", schema)]);
+    let and = field(&db, "Filter", "and");
+    assert_eq!(
+        and.target,
+        nullable(WrapperVariant::List(
+            Wrapper::Inner(entity("Filter")).boxed()
+        ))
+    );
+    assert_eq!(and.data, GraphQLSelectableData::InputField);
+    assert_eq!(
+        field(&db, "Filter", "name").target,
+        Wrapper::Inner(entity("String"))
+    );
+    assert_eq!(
+        graphql_selectables(&db, CLIENT, entity("Filter"))
+            .iter()
+            .map(|(name, _)| name.dereference())
+            .collect::<Vec<_>>(),
+        vec![selectable("and"), selectable("name")]
+    );
+}
+
+#[test]
+fn an_input_field_defined_twice_is_an_error() {
+    let db = db_with(&[("a.graphql", "input F { a: Int a: Int }")]);
+    assert!(matches!(
+        graphql_selectable(&db, CLIENT, entity("F"), selectable("a")).clone(),
+        Err(GraphQLSelectableLookupError::DuplicateInputField(_))
+    ));
+}
