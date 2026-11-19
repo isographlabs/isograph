@@ -6,7 +6,7 @@ use intern::string_key::Intern;
 use isograph_compiler::{
     ClientId, CompilationProfile, DefinitionLocation, FileMembership, IncludeFile, IsographDb,
     NetworkProtocol, NonNullVariableType, ProtocolSelectable, UnionWrapper, VariableType, Wrapper,
-    WrapperVariant,
+    WrapperVariant, iso_literal_validation_errors_in_file,
 };
 use isograph_extract_typescript::TypeScriptHostLanguage;
 use prelude::Postfix;
@@ -856,5 +856,171 @@ fn a_syntax_error_in_the_query_root_fails_node_fetches_and_not_other_roots() {
     assert_eq!(
         root_plan(&db, "Mutation").operation_type,
         OperationType::Mutation
+    );
+}
+
+const SOURCE_FILE: FileMembership = FileMembership {
+    source_file: IncludeFile::Include,
+    schema_file: IncludeFile::Skip,
+};
+
+const PET_DEMO_SOURCES: [(&str, &str); 10] = [
+    (
+        "src/HomeRoute.ts",
+        include_str!("../../../demos/pet-demo/src/HomeRoute.ts"),
+    ),
+    (
+        "src/Owner.ts",
+        include_str!("../../../demos/pet-demo/src/Owner.ts"),
+    ),
+    (
+        "src/Pet.ts",
+        include_str!("../../../demos/pet-demo/src/Pet.ts"),
+    ),
+    (
+        "src/PetBestFriendCard.ts",
+        include_str!("../../../demos/pet-demo/src/PetBestFriendCard.ts"),
+    ),
+    (
+        "src/PetCheckinsCard.ts",
+        include_str!("../../../demos/pet-demo/src/PetCheckinsCard.ts"),
+    ),
+    (
+        "src/PetDetailRoute.ts",
+        include_str!("../../../demos/pet-demo/src/PetDetailRoute.ts"),
+    ),
+    (
+        "src/PetStatsCard.ts",
+        include_str!("../../../demos/pet-demo/src/PetStatsCard.ts"),
+    ),
+    (
+        "src/PetSummaryCard.ts",
+        include_str!("../../../demos/pet-demo/src/PetSummaryCard.ts"),
+    ),
+    (
+        "src/SetTagline.ts",
+        include_str!("../../../demos/pet-demo/src/SetTagline.ts"),
+    ),
+    (
+        "src/SpeciesRoute.ts",
+        include_str!("../../../demos/pet-demo/src/SpeciesRoute.ts"),
+    ),
+];
+
+/// A database with `schema` as schema files and `sources` as source files, every file
+/// inserted before the first lookup.
+fn project_db(schema: &[(&str, &str)], sources: &[(&str, &str)]) -> Db {
+    let mut db = db_with(schema);
+    for (file, contents) in sources {
+        db.insert_disk_file(path(file), SOURCE_FILE, contents.dereference().to_owned());
+    }
+    db
+}
+
+/// The pet demo's sources with `replaced` substituted for the source of the same path and
+/// `added` beside them.
+fn pet_demo_sources<'a>(
+    replaced: &[(&'a str, &'a str)],
+    added: &[(&'a str, &'a str)],
+) -> Vec<(&'a str, &'a str)> {
+    PET_DEMO_SOURCES
+        .iter()
+        .map(|(file, contents)| {
+            replaced
+                .iter()
+                .find(|(replaced_file, _)| replaced_file == file)
+                .copied()
+                .unwrap_or((file, contents))
+        })
+        .chain(added.iter().copied())
+        .collect()
+}
+
+/// Each validation error message of `file` and the text its span covers.
+fn validation_errors(db: &Db, file: &str, contents: &str) -> Vec<(String, String)> {
+    iso_literal_validation_errors_in_file(db, CLIENT, path(file))
+        .clone()
+        .expect("the test inserted the file")
+        .into_iter()
+        .map(|error| {
+            (
+                error.item.to_string(),
+                contents[error.location.as_usize_range()].to_owned(),
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn the_pet_demo_has_no_validation_errors() {
+    let db = project_db(&PET_DEMO_SCHEMA, &PET_DEMO_SOURCES);
+    for (file, contents) in PET_DEMO_SOURCES {
+        assert_eq!(validation_errors(&db, file, contents), vec![], "{file}");
+    }
+}
+
+#[test]
+fn an_entrypoint_whose_parent_cannot_be_fetched_is_an_error_on_the_parent() {
+    let cases = [
+        (
+            "iso(`field PetStats.Card { weight }`) iso(`entrypoint PetStats.Card`)",
+            "`PetStats` cannot be fetched: it is not a root operation type and does not implement `Node`.",
+            "PetStats",
+        ),
+        (
+            "iso(`entrypoint Owner.OwnerBadge`)",
+            "`Owner` is declared in source files; only entities from the schema can parent an entrypoint.",
+            "Owner",
+        ),
+        (
+            "iso(`entrypoint Query.pets`)",
+            "`Query.pets` comes from the schema; an entrypoint names a `field` declaration.",
+            "pets",
+        ),
+    ];
+    for (contents, message, covered) in cases {
+        let db = project_db(
+            &PET_DEMO_SCHEMA,
+            &pet_demo_sources(&[], &[("src/a.ts", contents)]),
+        );
+        assert_eq!(
+            validation_errors(&db, "src/a.ts", contents),
+            (message.to_owned(), covered.to_owned()).wrap_vec(),
+            "{contents}"
+        );
+    }
+}
+
+#[test]
+fn a_broken_node_field_is_an_error_on_node_fetched_entrypoints_only() {
+    const SUMMARY: &str = "iso(`entrypoint Pet.PetSummaryCard`)";
+    let db = project_db(
+        &PET_DEMO_SCHEMA,
+        &pet_demo_sources(&[], &[("src/a.ts", SUMMARY)]),
+    );
+    assert_eq!(validation_errors(&db, "src/a.ts", SUMMARY), vec![]);
+
+    let schema = PET_DEMO_SCHEMA[0]
+        .1
+        .replace("node(id: ID!): Node", "node(id: ID!): [Node]");
+    let db = project_db(
+        &[
+            (PET_DEMO_SCHEMA[0].0, schema.as_str()),
+            PET_DEMO_SCHEMA[1],
+            PET_DEMO_SCHEMA[2],
+        ],
+        &pet_demo_sources(&[], &[("src/a.ts", SUMMARY)]),
+    );
+    assert_eq!(
+        validation_errors(&db, "src/a.ts", SUMMARY),
+        (
+            "`Query.node` returns a list; it returns one value.".to_owned(),
+            "Pet".to_owned()
+        )
+            .wrap_vec()
+    );
+    assert_eq!(
+        validation_errors(&db, "src/HomeRoute.ts", PET_DEMO_SOURCES[0].1),
+        vec![]
     );
 }

@@ -175,14 +175,17 @@ mod validation_tests {
     use common_lang_types::{EntityName, RelativePathToSourceFile, SelectableName};
     use intern::string_key::Intern;
     use isograph_compiler::{
-        ClientId, DuplicateDefinitionError, FileMembership, IncludeFile, IsographDb, SelectableKey,
+        ClientId, DuplicateDefinitionError, EntrypointNotFetchableError, FileMembership,
+        IncludeFile, IsographDb, ProfileValidationError, SelectableKey,
         SelectionSetOnFieldWithoutTargetError, UnknownEntityError, UnknownSelectableError,
-        ValidationError, iso_literal_validation_errors_in_file,
+        iso_literal_validation_errors_in_file,
     };
     use prelude::Postfix;
 
     use super::lsp_diagnostics_for_file;
     use crate::test_profile::TestProfile;
+
+    type ValidationError = ProfileValidationError<TestProfile>;
 
     const SOURCE_FILE: FileMembership = FileMembership {
         source_file: IncludeFile::Include,
@@ -389,7 +392,13 @@ mod validation_tests {
         );
         assert_eq!(
             errors_in("iso(`entrypoint Owner.displayName`)", &[]),
-            vec![]
+            (
+                ValidationError::EntrypointNotFetchable(EntrypointNotFetchableError::SourceEntity(
+                    entity("Owner")
+                )),
+                "Owner".to_owned()
+            )
+                .wrap_vec()
         );
     }
 
@@ -426,7 +435,7 @@ mod validation_tests {
             ),
             (
                 "src/Card.ts",
-                "iso(`field Pet.card($id: ID!) @component { owner { displayName, OwnerBadge }, id }`)\niso(`entrypoint Pet.card`)",
+                "iso(`field Pet.card($id: ID!) @component { owner { displayName, OwnerBadge }, id }`)",
             ),
         ];
         let db = db_with(&files);

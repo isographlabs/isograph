@@ -216,8 +216,7 @@ mod tests {
     use crate::watch::ProjectGlobs;
 
     const BROKEN: &str = "iso(`entrypoint`)";
-    const CLEAN: &str =
-        "iso(`entity Query`) iso(`entrypoint Query.HomeRoute`) iso(`field Query.HomeRoute`)";
+    const CLEAN: &str = "iso(`entity Query`) iso(`field Query.HomeRoute`)";
     const UNDEFINED_FIELD: &str = "iso(`entity Query`) iso(`field Query.x { nope }`)";
 
     const PET_SCHEMA: &str = "type Query {\n  pets: [Pet!]!\n  pet(id: ID!): Pet\n}\n\ntype Pet {\n  id: ID!\n  firstName: String!\n  lastName: String!\n  best_friend: Pet\n}\n";

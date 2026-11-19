@@ -5,18 +5,22 @@ use prelude::Postfix;
 use span::WithSpan;
 
 use crate::{
-    ClientId, CompilationProfile, IsographDb, ValidationError, iso_literal_parse_errors_in_file,
-    iso_literal_validation_errors_in_file,
+    ClientId, CompilationProfile, IsographDb, NetworkProtocol, ValidationError,
+    iso_literal_parse_errors_in_file, iso_literal_validation_errors_in_file,
 };
 
 /// An error the compiler reports for a source file.
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
-pub enum CompilerError {
+pub enum CompilerError<TNotFetchable: std::fmt::Display> {
     #[error("{0}")]
     Parse(ParseError),
     #[error("{0}")]
-    Validation(ValidationError),
+    Validation(ValidationError<TNotFetchable>),
 }
+
+pub type ProfileCompilerError<TProfile> = CompilerError<
+    <<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::NotFetchable,
+>;
 
 /// Every compiler error of `path` as `client` reads it, as file-absolute spans.
 #[memo]
@@ -24,7 +28,7 @@ pub fn compiler_errors_in_file<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
     path: RelativePathToSourceFile,
-) -> Option<Vec<WithSpan<CompilerError>>> {
+) -> Option<Vec<WithSpan<ProfileCompilerError<TProfile>>>> {
     let parse_errors = iso_literal_parse_errors_in_file(db, client, path).as_ref()?;
     let validation_errors = iso_literal_validation_errors_in_file(db, client, path).as_ref()?;
     parse_errors
@@ -47,7 +51,7 @@ mod tests {
     use prelude::Postfix;
     use span::WithSpan;
 
-    use super::{CompilerError, compiler_errors_in_file};
+    use super::{CompilerError, ProfileCompilerError, compiler_errors_in_file};
     use crate::test_profile::TestProfile;
     use crate::{
         ClientId, FileMembership, IncludeFile, IsographDb, iso_literal_parse_errors_in_file,
@@ -65,7 +69,9 @@ mod tests {
         "src/a.ts".intern().to()
     }
 
-    fn errors(db: &IsographDb<TestProfile>) -> Option<Vec<WithSpan<CompilerError>>> {
+    fn errors(
+        db: &IsographDb<TestProfile>,
+    ) -> Option<Vec<WithSpan<ProfileCompilerError<TestProfile>>>> {
         compiler_errors_in_file(db, CLIENT, path()).clone()
     }
 
@@ -164,7 +170,7 @@ mod tests {
         db.insert_disk_file(
             path(),
             SOURCE_FILE,
-            "iso(`entity Query`) iso(`field Query.x`) iso(`entrypoint Query.x`)".to_owned(),
+            "iso(`entity Query`) iso(`field Query.x { y }`) iso(`field Query.y`)".to_owned(),
         );
         assert_eq!(errors(db.reference()), Vec::new().wrap_some());
     }

@@ -621,7 +621,24 @@ pub type ProfileValidationError<TProfile> = ValidationError<
 >;
 ```
 
-`iso_literal_validation_errors_in_file` returns `Option<Vec<WithSpan<ProfileValidationError<TProfile>>>>`; the diagnostics code reads `error.item.to_string()` and is otherwise unchanged.
+`iso_literal_validation_errors_in_file` returns `Option<Vec<WithSpan<ProfileValidationError<TProfile>>>>`; the diagnostics code reads `error.item.to_string()` and is otherwise unchanged. `CompilerError`, which wraps a validation error, takes the same parameter:
+
+```rust
+// from crates/isograph_compiler/src/compiler_errors.rs
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum CompilerError<TNotFetchable: std::fmt::Display> {
+    #[error("{0}")]
+    Parse(ParseError),
+    #[error("{0}")]
+    Validation(ValidationError<TNotFetchable>),
+}
+
+pub type ProfileCompilerError<TProfile> = CompilerError<
+    <<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::NotFetchable,
+>;
+```
+
+`compiler_errors_in_file` returns `Option<Vec<WithSpan<ProfileCompilerError<TProfile>>>>`.
 
 ```rust
 // from crates/isograph_compiler/src/validation.rs
@@ -702,7 +719,7 @@ pub type ProfileEntrypointNotFetchableError<TProfile> = EntrypointNotFetchableEr
 
 - `entrypoint_fetch_plan` of a source entity is `SourceEntity`; with a source field on a source entity, `SourceEntity` comes first.
 
-`crates/isograph_lsp/src/file_diagnostics.rs` (GraphQL profile, pet demo schema and source files):
+`crates/graphql_network_protocol` validation tests, which read `iso_literal_validation_errors_in_file` (GraphQL profile, pet demo schema and source files; `isograph_lsp` does not depend on `graphql_network_protocol`):
 
 - The pet demo's `entrypoint Query.HomeRoute`, `entrypoint Query.PetDetailRoute`, `entrypoint Query.SpeciesRoute`, and `entrypoint Mutation.SetTagline` have no diagnostics.
 - `entrypoint PetStats.Card` with `field PetStats.Card { weight }` has one diagnostic, on `PetStats`, whose message is the `NoFetchRoot` text.

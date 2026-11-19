@@ -1,6 +1,7 @@
 mod artifacts;
 mod compiler_errors;
 mod database;
+mod entrypoint;
 mod host_language;
 mod iso_literals;
 mod merged_selection;
@@ -13,11 +14,12 @@ mod validation;
 mod wrapper;
 
 pub use artifacts::{ArtifactPath, ArtifactSource, LiteralParseFailed, artifact_sources_in_file};
-pub use compiler_errors::{CompilerError, compiler_errors_in_file};
+pub use compiler_errors::{CompilerError, ProfileCompilerError, compiler_errors_in_file};
 pub use database::{
     ClientId, DiskFile, DiskFileMap, FileMembership, IsographDb, OpenFileKey, SchemaPathMap,
     SourcePathMap, file_contents, source_file_paths,
 };
+pub use entrypoint::{ProfileEntrypointNotFetchableError, ProfileFetchPlan, entrypoint_fetch_plan};
 pub use host_language::*;
 pub use iso_literals::{
     LiteralId, extract_iso_literals, iso_literal_extraction, iso_literal_parse_errors_in_file,
@@ -37,8 +39,8 @@ pub use selectable_for_path::{
     selectable_for_selection_parent, selectable_for_selection_path, selectable_target,
 };
 pub use validation::{
-    DuplicateDefinitionError, SelectableKey, SelectionSetOnFieldWithoutTargetError,
-    UnknownEntityError, UnknownSelectableError, ValidationError,
-    iso_literal_validation_errors_in_file,
+    DuplicateDefinitionError, EntrypointNotFetchableError, ProfileValidationError, SelectableKey,
+    SelectionSetOnFieldWithoutTargetError, UnknownEntityError, UnknownSelectableError,
+    ValidationError, iso_literal_validation_errors_in_file,
 };
 pub use wrapper::{UnionWrapper, Wrapper, WrapperVariant};

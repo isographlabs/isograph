@@ -8,11 +8,14 @@ use prelude::Postfix;
 use span::{WithSpan, WithSpanPostfix};
 
 use crate::schema::{Definitions, entity_definitions, selectable_definitions};
-use crate::{ClientId, CompilationProfile, IsographDb, parsed_iso_literals_in_file};
+use crate::{
+    ClientId, CompilationProfile, IsographDb, NetworkProtocol, entity_named, entrypoint_fetch_plan,
+    parsed_iso_literals_in_file, selectable_named,
+};
 
 /// A reference in an iso literal that the source declarations do not satisfy.
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
-pub enum ValidationError {
+pub enum ValidationError<TNotFetchable: std::fmt::Display> {
     #[error("{0}")]
     UnknownEntity(UnknownEntityError),
     #[error("{0}")]
@@ -21,7 +24,27 @@ pub enum ValidationError {
     DuplicateDefinition(DuplicateDefinitionError),
     #[error("{0}")]
     SelectionSetOnFieldWithoutTarget(SelectionSetOnFieldWithoutTargetError),
+    #[error("{0}")]
+    EntrypointNotFetchable(EntrypointNotFetchableError<TNotFetchable>),
 }
+
+/// Why `entrypoint E.f` cannot be fetched.
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum EntrypointNotFetchableError<TNotFetchable: std::fmt::Display> {
+    #[error(
+        "`{0}` is declared in source files; only entities from the schema can parent an \
+        entrypoint."
+    )]
+    SourceEntity(EntityName),
+    #[error("`{}.{}` comes from the schema; an entrypoint names a `field` declaration.", .0.entity, .0.selectable)]
+    ProtocolSelectable(SelectableKey),
+    #[error("{0}")]
+    Protocol(TNotFetchable),
+}
+
+pub type ProfileValidationError<TProfile> = ValidationError<
+    <<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::NotFetchable,
+>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
 #[error("Entity `{0}` is not defined.")]
@@ -56,7 +79,7 @@ pub fn iso_literal_validation_errors_in_file<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
     path: RelativePathToSourceFile,
-) -> Option<Vec<WithSpan<ValidationError>>> {
+) -> Option<Vec<WithSpan<ProfileValidationError<TProfile>>>> {
     let literals = parsed_iso_literals_in_file(db, client, path).as_ref()?;
     literals
         .iter()
@@ -73,14 +96,15 @@ pub fn iso_literal_validation_errors_in_file<TProfile: CompilationProfile>(
         .wrap_some()
 }
 
-type ValidationErrors<'a> = Box<dyn Iterator<Item = WithSpan<ValidationError>> + 'a>;
+type ValidationErrors<'a, TProfile> =
+    Box<dyn Iterator<Item = WithSpan<ProfileValidationError<TProfile>>> + 'a>;
 
 /// The validation errors of one iso literal item, in literal-relative spans.
 fn item_validation_errors<'a, TProfile: CompilationProfile>(
     db: &'a IsographDb<TProfile>,
     client: ClientId,
     item: &'a IsoLiteralItem,
-) -> ValidationErrors<'a> {
+) -> ValidationErrors<'a, TProfile> {
     match item {
         IsoLiteralItem::Entity(declaration) => duplicate_entity_error(db, client, declaration.name)
             .into_iter()
@@ -102,7 +126,7 @@ fn duplicate_entity_error<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
     name: WithSpan<EntityNameWrapper>,
-) -> Option<WithSpan<ValidationError>> {
+) -> Option<WithSpan<ProfileValidationError<TProfile>>> {
     match entity_definitions(db, client, name.item.0) {
         Definitions::Duplicated => {
             ValidationError::DuplicateDefinition(DuplicateDefinitionError::Entity(name.item.0))
@@ -142,7 +166,7 @@ fn selectable_declaration_errors<'a, TProfile: CompilationProfile>(
     db: &'a IsographDb<TProfile>,
     client: ClientId,
     declaration: &'a SelectableDeclaration,
-) -> ValidationErrors<'a> {
+) -> ValidationErrors<'a, TProfile> {
     let entity = declaration.parent_type.item.0;
     if let EntityDefinedness::Undefined = entity_definedness(db, client, entity) {
         return std::iter::once(
@@ -178,12 +202,13 @@ fn selectable_declaration_errors<'a, TProfile: CompilationProfile>(
         .boxed()
 }
 
-/// `entrypoint Q.X`: `Q` is defined, then `Q.X` is defined.
+/// `entrypoint E.f`: `E` and `E.f` are defined, `E` comes from the protocol, `E.f` is a
+/// `field` declaration, and the protocol can fetch `E`.
 fn entrypoint_declaration_error<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
     declaration: &EntrypointDeclaration,
-) -> Option<WithSpan<ValidationError>> {
+) -> Option<WithSpan<ProfileValidationError<TProfile>>> {
     let entity = declaration.parent_type.item.0;
     if let EntityDefinedness::Undefined = entity_definedness(db, client, entity) {
         return ValidationError::UnknownEntity(UnknownEntityError(entity))
@@ -195,13 +220,30 @@ fn entrypoint_declaration_error<TProfile: CompilationProfile>(
         selectable: declaration.name.item.0,
     };
     match selectable_definitions(db, client, key.entity, key.selectable) {
-        Definitions::Undefined => ValidationError::UnknownSelectable(UnknownSelectableError(key))
-            .with_span(declaration.name.location)
-            .wrap_some(),
+        Definitions::Undefined => {
+            return ValidationError::UnknownSelectable(UnknownSelectableError(key))
+                .with_span(declaration.name.location)
+                .wrap_some();
+        }
         Definitions::Unique(_) | Definitions::Duplicated | Definitions::ProtocolLookupFailed(_) => {
-            None
         }
     }
+    let entity = entity_named(db, client, key.entity).as_ref().ok()?;
+    let selectable = selectable_named(db, client, key.entity, key.selectable)
+        .as_ref()
+        .ok()?;
+    let location = |error: &EntrypointNotFetchableError<_>| match error {
+        EntrypointNotFetchableError::ProtocolSelectable(_) => declaration.name.location,
+        EntrypointNotFetchableError::SourceEntity(_) | EntrypointNotFetchableError::Protocol(_) => {
+            declaration.parent_type.location
+        }
+    };
+    entrypoint_fetch_plan(db, client, entity, selectable)
+        .err()
+        .map(|error| {
+            let span = location(error.reference());
+            ValidationError::EntrypointNotFetchable(error).with_span(span)
+        })
 }
 
 /// The validation errors of `selection_set`, a selection set on `parent`, in literal-relative
@@ -211,7 +253,7 @@ fn validate_selection_set<'a, TProfile: CompilationProfile>(
     client: ClientId,
     parent: EntityName,
     selection_set: &'a SelectionSet,
-) -> impl Iterator<Item = WithSpan<ValidationError>> + 'a {
+) -> impl Iterator<Item = WithSpan<ProfileValidationError<TProfile>>> + 'a {
     selection_set
         .0
         .iter()
@@ -226,7 +268,7 @@ fn validate_selection<'a, TProfile: CompilationProfile>(
     client: ClientId,
     parent: EntityName,
     selection: &'a Selection,
-) -> ValidationErrors<'a> {
+) -> ValidationErrors<'a, TProfile> {
     let key = SelectableKey {
         entity: parent,
         selectable: selection.name.item.0.unchecked_conversion(),
