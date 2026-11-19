@@ -1,7 +1,8 @@
 use common_lang_types::DiagnosticResult;
 use isograph_compiler::{
     ClientId, CompilationProfile, DefinitionLocation, Entity, IsographDb, NetworkProtocol,
-    Selectable, entity_named, selectable_for_selectable_name_path, selectable_for_selection_path,
+    ReferenceTarget, Selectable, SelectableKey, entity_named, selectable_for_selectable_name_path,
+    selectable_for_selection_path,
 };
 use isograph_parser::IsographResolutionNode;
 use prelude::Postfix;
@@ -24,6 +25,19 @@ impl<TEntityData, TSelectableData> EntityOrSelectable<TEntityData, TSelectableDa
         match self {
             EntityOrSelectable::Entity(entity) => entity.definition,
             EntityOrSelectable::Selectable(selectable) => selectable.definition,
+        }
+    }
+
+    /// The identity references to this item carry.
+    pub(crate) fn reference_target(&self) -> ReferenceTarget {
+        match self {
+            EntityOrSelectable::Entity(entity) => ReferenceTarget::Entity(entity.name),
+            EntityOrSelectable::Selectable(selectable) => {
+                ReferenceTarget::Selectable(SelectableKey {
+                    entity: selectable.parent_entity,
+                    selectable: selectable.name,
+                })
+            }
         }
     }
 }
