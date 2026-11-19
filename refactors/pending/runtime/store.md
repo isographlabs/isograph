@@ -306,7 +306,12 @@ Behavior, walking `ast.selections` against `response` onto the record `ast.root`
 - A selected response key absent from the response object, outside a conditional that does not hold: throws. A well-formed response holds every such key, and conditionals already skip the keys of a fragment that does not apply.
 - The discriminator is never written to a record.
 
-A throw part-way through leaves the writes made before it (open decision 9). The walk writes each value into `store` as it reaches it; there is no draft and no intermediate list.
+A throw part-way through leaves the writes made before it, as upstream does: `normalizeData` writes through `getMutableStoreRecordProxy` (`cache.ts:93`, `:423`) and throws mid-walk (`cache.ts:297-302`). The walk writes each value into `store` as it reaches it; there is no draft and no intermediate list. A malformed response means the server broke the contract of the query the compiler generated (schema skew between the compiler and the server, a broken server or proxy, a wrong test fixture). A correct server never produces one, and after the throw the environment is broken anyway, so a validation walk on every response buys nothing in practice.
+
+Considered:
+
+- Validate the response against the AST in a read-only pass, throwing before any write, then write. A malformed response leaves `store` untouched. Cost: two walks of every response.
+- Walk once, collecting writes into a list, and apply the list at the end; a throw leaves `store` untouched. Cost: an intermediate list holding every write of every response.
 
 Deltas from upstream (`cache.ts:77-437`):
 
@@ -702,7 +707,7 @@ Each case asserts the whole resulting store with `storeOf`.
 - Into a non-empty store: `PetLists` then `PetDetail` for `Pet:1`: `Pet:1` holds the union of both; a field `PetDetail` does not select is kept; a field both write holds `PetDetail`'s value.
 - Nested root entity: `NestedQuery` with `query: { __typename: "Query", tags: ["a"] }` writes `greeting` and `tags` onto `Query.__ROOT`, which links itself under `query` (`{ entityName: "Query", id: "__ROOT" }`), and creates no other `Query` record. The same with `query: { tags: ["a"] }` (no `__typename`) writes the same store: the `Known` entity reads no discriminator. `SetTagline` writes its nested `Query` object onto `Query.__ROOT` (`greeting`), and the `SetTaglinePayload` record links it under `query`.
 - Malformed responses throw, with the message of Errors: an empty response object `{}` for `Leaves` names `greeting`; `pet____id___v_id: "x"` at `["pet____id___v_id"]`; `petGrid: [[3]]` at `["petGrid",0,0]`; a pet without `__typename`; `id: 4`.
-- A throw part-way leaves the earlier writes: `pets: [{ ..valid Pet:1 }, "x"]` throws at `["pets",1]`, and `store` holds `Pet:1` (open decision 9).
+- A throw part-way leaves the earlier writes: `pets: [{ ..valid Pet:1 }, "x"]` throws at `["pets",1]`, and `store` holds `Pet:1`.
 
 ### `check` (`test/check.test.ts`)
 
@@ -778,16 +783,6 @@ Each change is one commit. Prerequisite: normalization-ast.md changes 1 to 3.
 - A one-shot `isograph compile --config <path>` verb that compiles once, writes, and exits, and a CI step that runs it on every committed artifact folder (the pet demo's `demos/pet-demo/src/__isograph/` and the runtime fixture's `libs/isograph-runtime/fixtures/store/src/__isograph/`) and fails when the working tree changes. It covers every committed artifact folder at once, so it is its own change, not part of the runtime's.
 
 ## Open decisions
-
-### 9. What a throw part-way through `normalize` leaves in the store
-
-`normalize` writes into `store` in place, so a throw after some writes has already changed the store.
-
-- (a) Validate the response against the AST in a read-only pass, throwing before any write, then write. A malformed response leaves `store` untouched. Cost: two walks of every response.
-- (b) Write while walking, throw at the first mismatch, and leave the writes made before it, upstream's behavior (`normalizeData` writes through `getMutableStoreRecordProxy`, `cache.ts:93`, `:423`, and throws mid-walk at `cache.ts:297-302`). Cost: the store holds part of a response the server sent against a broken contract.
-- (c) Walk once, collecting writes into a list, and apply the list at the end; a throw leaves `store` untouched. Cost: an intermediate list holding every write of every response.
-
-Held: (b). A malformed response happens only when the server broke the contract of the query the compiler generated (schema skew between the compiler and the server, a broken server or proxy, a wrong test fixture). A correct server never produces one, and after the throw the environment is broken anyway, so a second walk on every response, or a list of every write, buys nothing in practice.
 
 ### 11. The parameters type of a field another field selects
 
