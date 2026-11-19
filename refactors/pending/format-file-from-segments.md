@@ -1,12 +1,12 @@
 # Format a file from segments
 
-Requires iso-format.md (landed). Independent of one-save-format-apply.md. Independent of lsp-open-files.md. Does not add `OpenFile`.
+Requires iso-format.md (landed) and lsp-open-files.md change 7 (landed; open decision 2 (a), lsp-open-files.md first). Independent of one-save-format-apply.md. `format_iso_literals` takes `client: ClientId` and reads `isograph_compiler::file_contents(db, client, path)`.
 
 `format_iso_literals` emits one `TextEdit` per iso interior. Each range is a byte span converted through `text_through_last_iso_literal`. Those ranges are positions in the interned snapshot.
 
 Two interiors in one file are two ranges. Applying them depends on reverse order. A file is one string: the text before the first interior, then each interior plus the text that follows it until the next interior or EOF.
 
-`adapter::tests::pretty_disk_edits_applied_to_a_buffer_with_an_extra_blank_line_leave_an_extra_brace` is interned-snapshot ranges applied to a longer string. That mismatch is lsp-open-files.md (format the text being edited). This slice does not fix that. It stops using N interior ranges.
+`adapter::tests::edits_for_a_client_without_a_buffer_applied_to_a_longer_buffer_leave_an_extra_brace` is disk ranges applied to a longer string. lsp-open-files.md change 7 fixed the user-visible case: a client with the buffer open formats that buffer (`edits_for_a_client_with_that_buffer_open_are_pretty_when_applied_to_it`). This slice stops using N interior ranges.
 
 ## What the user does
 
@@ -105,14 +105,12 @@ After: full interned file, one edit of the whole file. No `text_through_last_iso
 ```rust
 // from crates/isograph_cli/src/adapter.rs
 fn format_iso_literals<THostLanguage: HostLanguage>(
-    state: &isograph_compiler::IsographDb<THostLanguage>,
-    uri: &lsp_types::Uri,
+    db: &IsographDb<THostLanguage>,
+    client: ClientId,
+    path: RelativePathToSourceFile,
 ) -> Option<Vec<lsp_types::TextEdit>> {
-    let absolute = file_path(uri)?;
-    let cwd = *state.get_singleton::<common_lang_types::CurrentWorkingDirectory>()?;
-    let path = common_lang_types::relative_path_from_absolute_and_working_directory(cwd, &absolute);
-    let literals = isograph_compiler::parsed_iso_literals_in_file(state, path).as_ref()?;
-    let contents = state.disk_file(path)?.contents.as_str();
+    let literals = isograph_compiler::parsed_iso_literals_in_file(db, client, path).as_ref()?;
+    let contents = isograph_compiler::file_contents(db, client, path).as_ref()?;
     let new_text = rewrite_iso_interiors(contents, literals);
     lsp_types::TextEdit {
         range: isograph_lsp::lsp_range_for_byte_range(contents, 0, contents.len() as u32),
@@ -161,6 +159,4 @@ A failed literal next to a good one: the failed interior is unchanged, the good 
 
 ## Who calls what
 
-`format_iso_literals` calls `rewrite_iso_interiors` and `lsp_range_for_byte_range` on the full interned contents. `parsed_iso_literals_in_file` still provides the list. `disk_file` provides `contents`. Callers of `format_iso_literals` are unchanged.
-
-lsp-open-files.md later passes the open buffer into this same rewrite. Do not add that here.
+`format_iso_literals` calls `rewrite_iso_interiors` and `lsp_range_for_byte_range` on the full interned contents. `parsed_iso_literals_in_file` still provides the list. `file_contents(db, client, path)` provides `contents`. Callers of `format_iso_literals` are unchanged.

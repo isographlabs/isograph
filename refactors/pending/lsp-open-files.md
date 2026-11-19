@@ -11,7 +11,7 @@ Origin of the open-file map and handlers: isograph `OpenFileMap` / `OpenFileSour
 These are not approved.
 
 1. A tracked map whose counter was never written (change 3). The problem and both options are in change 3. The user accepted the bug for now and changes 5 and 6 shipped without change 3; the fix is planned in `refactors/pending/pico-missing-key-dependency.md`. See Known gap.
-2. Order relative to format-file-from-segments.md. (a) This doc first: change 7's `format_iso_literals` uses `parsed_iso_literals_in_file` and `text_through_last_iso_literal` with the client, and format-file-from-segments.md then reads `file_contents(db, client, path)` instead of `state.disk_file(path)`. (b) format-file-from-segments.md first: change 7's `format_iso_literals` is that doc's version with `file_contents` replacing `disk_file` (second snippet in change 7). Either order ships; (b) makes change 7's format diff smaller, (a) makes format-file-from-segments.md read the buffer from the start.
+2. Order relative to format-file-from-segments.md. Decided: (a); change 7 landed first and format-file-from-segments.md reads `file_contents`. (a) This doc first: change 7's `format_iso_literals` uses `parsed_iso_literals_in_file` and `text_through_last_iso_literal` with the client, and format-file-from-segments.md then reads `file_contents(db, client, path)` instead of `state.disk_file(path)`. (b) format-file-from-segments.md first: change 7's `format_iso_literals` is that doc's version with `file_contents` replacing `disk_file` (second snippet in change 7). Either order ships; (b) makes change 7's format diff smaller, (a) makes format-file-from-segments.md read the buffer from the start.
 3. `SendLspResponseEffect` as data (optional change). The feature does not need it. Tests read a response by calling `perform` and `recv`ing on the crossbeam receiver behind the `LiveSession` (`lsp_formatting_of_a_live_client_without_a_file_is_null`, `crates/isograph_cli/src/state.rs`), and change 6's tests use that pattern. (a) Ship the optional change. (b) Do not ship it; `Box<dyn FnOnce(&SideEffectToken) + Send>` stays.
 
 ## What the user does
@@ -42,7 +42,7 @@ Prefactors first.
 4. `ClientId` moves to `isograph_compiler`. Landed in `65d4cce4`.
 5. `open_file_map`, the `file_contents` memo, the writers, and unit tests. Landed in `a42d7cad`.
 6. `didOpen` / `didChange` / `didClose`, advertised capabilities, `Gone` cleanup, and `handle` tests. Landed in `0ecc7e2f` (typed path conversion) and `a7846d69` (handlers, capabilities, `Gone`); design docs in `220e64ac`.
-7. Semantic tokens and formatting read through `file_contents`. Pending. Until it lands, `file_contents` and the open-file state have only test readers: semantic tokens and formatting still read `DiskFile`.
+7. Semantic tokens and formatting read through `file_contents`. Landed in `1bdffe19` (`extract_iso_literals_from_text`), `0a9cf53c` (client-keyed memos, semantic tokens, formatting, `willSaveWaitUntil`), `76d666c5` (multi-literal formatting tests), and `77c5a992` (`IsographDb::disk_file` deleted).
 
 ## Known gap
 
@@ -55,6 +55,12 @@ Deltas from the snippets below, as landed:
 - `DiskChangedPathError` is `#[error("{}: {error}", .path.display())]`; thiserror names a field in an extra format argument with a leading `.`.
 - The request handlers keep `_client: ClientId` from change 2; change 7 renames it to `client`.
 - The `handle` tests of a `didChange` that is not one full change assert the buffer is unchanged and no effects; they do not observe the `warn!`.
+- Change 7: `file_contents` is the only reader of `DiskFile.contents` and `OpenFile.contents`. `IsographDb::disk_file` is deleted; its remaining callers were tests (`database.rs`, `watch.rs`), and those tests and the `state.rs` `contents` helper read `file_contents(db, ClientId(1), path)`. Other uses of `disk_file_map` are writers and map-size assertions.
+- Change 7: `adapter::tests` is `pub(crate) mod tests`. `state.rs` `handle` tests reuse `apply_text_edits`, `assert_edits_replace_disjoint_interiors`, and the `TWO_LITERALS` / `THREE_LITERALS` fixtures. `apply_text_edits` resolves every range against the original text (treating `\n`, `\r\n`, and `\r` as line terminators, UTF-16 columns) and applies from the last start to the first.
+- Change 7 added formatting tests beyond the list below: two and three literals where the first grows, the second already pretty, the first shrinking, a failed literal between two good ones, multi-byte text before a literal on its line, CRLF outside the literals; each also formats its result again unchanged. `state.rs` runs the two- and three-literal cases through Formatting and `willSaveWaitUntil`. All passed against the change 7 code; no formatting bug was found.
+- The iso tokenizer rejects a string character above U+FFFF (`ErrorUnsupportedStringCharacter`), so the multi-byte fixture keeps the emoji in the JavaScript and BMP characters in the description.
+- The `isograph_extract_typescript` `tests` module calls `extract_iso_literals_from_text` directly; `two_literals_in_one_file` already covered two calls in source order.
+- `event-model.md` amended: artifact generation reads through `file_contents` as its own client.
 
 The optional change (`SendLspResponseEffect` is data) ships only if open decision 3 picks (a); no other change depends on it.
 
@@ -1507,7 +1513,7 @@ All at the `handle` seam in `crates/isograph_cli/src/state.rs`: one process, no 
 
 ## Change 7: semantic tokens and formatting read `file_contents`
 
-Pending. Not approved.
+Landed. Deltas are under Known gap.
 
 After this change the extract memo and every memo downstream of it are keyed by `(client, path)` and read text through `file_contents`. `semanticTokens/full`, `textDocument/formatting`, and `textDocument/willSaveWaitUntil` read with the asking client's `ClientId`.
 
