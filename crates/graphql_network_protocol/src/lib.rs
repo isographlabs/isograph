@@ -9,15 +9,18 @@ mod tests;
 use std::path::Path;
 
 use common_lang_types::{EntityName, SelectableName};
+use intern::Lookup;
 use isograph_compiler::{
-    ClientId, CompilationProfile, IncludeFile, IsographDb, NetworkProtocol, ProtocolEntity,
-    ProtocolSelectable,
+    ClientId, CompilationProfile, EntityKind, IncludeFile, IsographDb, NetworkProtocol,
+    ProtocolEntity, ProtocolSelectable, ScalarKind, ScalarValueKind,
 };
+use prelude::Postfix;
 
 pub use fetch_plan::{
     FetchRefinement, GraphQLFetchArgument, GraphQLFetchPlan, GraphQLNodeFetch, GraphQLNotFetchable,
     GraphQLRootFetch, NodeFieldError, NodeFieldTypeMismatch, graphql_fetch_plan,
 };
+use protocol_data::union_members;
 pub use protocol_data::{
     GraphQLCompositeData, GraphQLEntityData, GraphQLSelectableData, GraphQLSelectableLookupError,
     RefinementCollision, RefinementTargetError, graphql_entity, graphql_selectable,
@@ -35,6 +38,16 @@ pub use schema_lookup::{
 };
 
 pub struct GraphQLNetworkProtocol;
+
+/// GraphQL's built-in scalars (spec 3.5) by name; every other scalar is custom.
+pub fn scalar_kind(name: EntityName) -> ScalarKind {
+    match name.lookup() {
+        "String" | "ID" => ScalarKind::Known(ScalarValueKind::String),
+        "Int" | "Float" => ScalarKind::Known(ScalarValueKind::Number),
+        "Boolean" => ScalarKind::Known(ScalarValueKind::Boolean),
+        _ => ScalarKind::Custom(name),
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error, derive_more::From)]
 pub enum GraphQLLookupError {
@@ -55,6 +68,38 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         match relative_path.extension().and_then(|e| e.to_str()) {
             Some("graphql" | "graphqls") => IncludeFile::Include,
             _ => IncludeFile::Skip,
+        }
+    }
+
+    fn entity_kind(data: &GraphQLEntityData) -> EntityKind {
+        match data {
+            GraphQLEntityData::Scalar(name) => EntityKind::Scalar(scalar_kind(name.dereference())),
+            GraphQLEntityData::Enum => {
+                EntityKind::Scalar(ScalarKind::Known(ScalarValueKind::String))
+            }
+            GraphQLEntityData::InputObject
+            | GraphQLEntityData::Object(_)
+            | GraphQLEntityData::Interface(_)
+            | GraphQLEntityData::Union => EntityKind::Object,
+        }
+    }
+
+    fn concrete_types<TProfile: CompilationProfile<NetworkProtocol = Self>>(
+        db: &IsographDb<TProfile>,
+        client: ClientId,
+        entity: EntityName,
+        data: &GraphQLEntityData,
+    ) -> Vec<EntityName> {
+        match data {
+            GraphQLEntityData::Object(_) | GraphQLEntityData::InputObject => entity.wrap_vec(),
+            GraphQLEntityData::Interface(_) => {
+                object_types_implementing(db, client, entity).clone()
+            }
+            GraphQLEntityData::Union => match entity_named(db, client, entity) {
+                Ok(Some(schema_entity)) => union_members(schema_entity).into_iter().collect(),
+                Ok(None) | Err(_) => Vec::new(),
+            },
+            GraphQLEntityData::Scalar(_) | GraphQLEntityData::Enum => Vec::new(),
         }
     }
 

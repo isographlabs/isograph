@@ -23,8 +23,9 @@ use crate::schema_lookup::{
 /// What the GraphQL protocol records about a type.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum GraphQLEntityData {
-    /// A scalar or enum: selected with no selection set.
-    Leaf,
+    /// A scalar, by its name.
+    Scalar(EntityName),
+    Enum,
     /// An input object: an argument type, never a selection target.
     InputObject,
     Object(GraphQLCompositeData),
@@ -78,7 +79,8 @@ pub fn graphql_entity<TProfile: CompilationProfile>(
             }
         };
     let data = match schema_entity.definition.item.item.reference() {
-        TypeDefinition::Scalar(_) | TypeDefinition::Enum(_) => GraphQLEntityData::Leaf,
+        TypeDefinition::Scalar(_) => GraphQLEntityData::Scalar(name),
+        TypeDefinition::Enum(_) => GraphQLEntityData::Enum,
         TypeDefinition::InputObject(_) => GraphQLEntityData::InputObject,
         TypeDefinition::Object(object) => {
             GraphQLEntityData::Object(composite(object.interfaces.as_slice()))
@@ -229,7 +231,8 @@ fn refinement_to<TProfile: CompilationProfile>(
         .wrap_ok(),
         Some(ProtocolEntity {
             data:
-                GraphQLEntityData::Leaf
+                GraphQLEntityData::Scalar(_)
+                | GraphQLEntityData::Enum
                 | GraphQLEntityData::InputObject
                 | GraphQLEntityData::Interface(_)
                 | GraphQLEntityData::Union,

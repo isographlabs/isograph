@@ -472,6 +472,19 @@ mod memo_tests {
             IncludeFile::Skip
         }
 
+        fn entity_kind(_data: &()) -> isograph_compiler::EntityKind {
+            isograph_compiler::EntityKind::Object
+        }
+
+        fn concrete_types<TProfile: CompilationProfile<NetworkProtocol = Self>>(
+            _db: &IsographDb<TProfile>,
+            _client: ClientId,
+            entity: EntityName,
+            _data: &(),
+        ) -> Vec<EntityName> {
+            entity.wrap_vec()
+        }
+
         fn entity<TProfile: CompilationProfile<NetworkProtocol = Self>>(
             _db: &IsographDb<TProfile>,
             _client: ClientId,

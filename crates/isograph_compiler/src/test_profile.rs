@@ -11,7 +11,8 @@ use crate::host_language::{
     NetworkProtocol,
 };
 use crate::{
-    ArtifactPath, ArtifactSource, ClientId, IsographDb, ProtocolEntity, ProtocolSelectable,
+    ArtifactPath, ArtifactSource, ClientId, EntityKind, IsographDb, ProtocolEntity,
+    ProtocolSelectable,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
@@ -66,6 +67,19 @@ impl NetworkProtocol for TestNetworkProtocol {
 
     fn should_include_schema_file(_relative_path: &Path) -> IncludeFile {
         IncludeFile::Skip
+    }
+
+    fn entity_kind(_data: &()) -> EntityKind {
+        EntityKind::Object
+    }
+
+    fn concrete_types<TProfile: CompilationProfile<NetworkProtocol = Self>>(
+        _db: &IsographDb<TProfile>,
+        _client: ClientId,
+        entity: EntityName,
+        _data: &(),
+    ) -> Vec<EntityName> {
+        entity.wrap_vec()
     }
 
     fn entity<TProfile: CompilationProfile<NetworkProtocol = Self>>(

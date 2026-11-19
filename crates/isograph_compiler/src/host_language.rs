@@ -8,7 +8,8 @@ use thiserror::Error;
 use isograph_parser::ParseError;
 
 use crate::{
-    ArtifactPath, ArtifactSource, ClientId, IsographDb, ProtocolEntity, ProtocolSelectable,
+    ArtifactPath, ArtifactSource, ClientId, EntityKind, IsographDb, ProtocolEntity,
+    ProtocolSelectable,
 };
 
 /// Byte offset of the iso literal text in its file.
@@ -98,6 +99,18 @@ pub trait NetworkProtocol: Sized + 'static {
     type LookupError: Clone + Debug + PartialEq + Eq + std::fmt::Display + 'static;
 
     fn should_include_schema_file(relative_path: &Path) -> IncludeFile;
+
+    /// The compiler's kind of an entity the protocol defines.
+    fn entity_kind(data: &Self::EntityData) -> EntityKind;
+
+    /// The object types a value of the protocol entity `entity` can be: the entity itself
+    /// when it is concrete, its implementors or members when it is abstract.
+    fn concrete_types<TProfile: CompilationProfile<NetworkProtocol = Self>>(
+        db: &IsographDb<TProfile>,
+        client: ClientId,
+        entity: EntityName,
+        data: &Self::EntityData,
+    ) -> Vec<EntityName>;
 
     /// The entity `name` as the protocol defines it; `Ok(None)` when it defines none.
     fn entity<TProfile: CompilationProfile<NetworkProtocol = Self>>(

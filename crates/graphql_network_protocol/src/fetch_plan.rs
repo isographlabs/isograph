@@ -125,7 +125,10 @@ pub fn graphql_fetch_plan<TProfile: CompilationProfile>(
         GraphQLEntityData::Object(composite) | GraphQLEntityData::Interface(composite) => {
             composite.interfaces.clone()
         }
-        GraphQLEntityData::Leaf | GraphQLEntityData::InputObject | GraphQLEntityData::Union => {
+        GraphQLEntityData::Scalar(_)
+        | GraphQLEntityData::Enum
+        | GraphQLEntityData::InputObject
+        | GraphQLEntityData::Union => {
             return GraphQLNotFetchable::NotObjectOrInterface(entity).wrap_err();
         }
     };
@@ -228,17 +231,19 @@ fn contains<TProfile: CompilationProfile>(
             GraphQLEntityData::Object(composite) | GraphQLEntityData::Interface(composite) => {
                 composite.interfaces.contains(&returns)
             }
-            GraphQLEntityData::Leaf | GraphQLEntityData::InputObject | GraphQLEntityData::Union => {
-                false
-            }
+            GraphQLEntityData::Scalar(_)
+            | GraphQLEntityData::Enum
+            | GraphQLEntityData::InputObject
+            | GraphQLEntityData::Union => false,
         },
         GraphQLEntityData::Union => match entity_named(db, client, returns) {
             Ok(Some(schema_entity)) => union_members(schema_entity).contains(&entity.name),
             Ok(None) | Err(_) => false,
         },
-        GraphQLEntityData::Leaf | GraphQLEntityData::InputObject | GraphQLEntityData::Object(_) => {
-            false
-        }
+        GraphQLEntityData::Scalar(_)
+        | GraphQLEntityData::Enum
+        | GraphQLEntityData::InputObject
+        | GraphQLEntityData::Object(_) => false,
     }
 }
 

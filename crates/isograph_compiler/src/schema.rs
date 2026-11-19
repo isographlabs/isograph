@@ -32,6 +32,42 @@ pub enum EntityOrigin<TEntityData> {
     Protocol(TEntityData),
 }
 
+/// The compiler's kind of an entity.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EntityKind {
+    /// Selections under a selection of this entity select its selectables.
+    Object,
+    /// Read whole. A selection of a selectable whose target is a scalar has no selection set.
+    Scalar(ScalarKind),
+}
+
+/// What the compiler knows about the values of a scalar entity.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum ScalarKind {
+    /// The protocol defines how this scalar's values arrive.
+    Known(ScalarValueKind),
+    /// A scalar the protocol knows only by name. The profile's `custom_scalar_types` may give
+    /// its host-language type.
+    Custom(EntityName),
+}
+
+/// How the values of a scalar arrive in the data a network protocol returns.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum ScalarValueKind {
+    String,
+    Number,
+    Boolean,
+}
+
+impl<TEntityData> Entity<TEntityData> {
+    pub fn kind<TProtocol: NetworkProtocol<EntityData = TEntityData>>(&self) -> EntityKind {
+        match self.origin.reference() {
+            EntityOrigin::Source => EntityKind::Object,
+            EntityOrigin::Protocol(data) => TProtocol::entity_kind(data),
+        }
+    }
+}
+
 /// A named pointer from an entity to a wrapper of an entity.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Selectable<TSelectableData> {

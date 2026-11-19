@@ -3,8 +3,8 @@ use std::path::Path;
 
 use common_lang_types::{EntityName, SelectableName};
 use isograph_compiler::{
-    ClientId, CompilationProfile, IncludeFile, IsographDb, NetworkProtocol, ProtocolEntity,
-    ProtocolSelectable,
+    ClientId, CompilationProfile, EntityKind, IncludeFile, IsographDb, NetworkProtocol,
+    ProtocolEntity, ProtocolSelectable,
 };
 use isograph_extract_typescript::TypeScriptHostLanguage;
 use prelude::Postfix;
@@ -24,6 +24,19 @@ impl NetworkProtocol for TestNetworkProtocol {
 
     fn should_include_schema_file(_relative_path: &Path) -> IncludeFile {
         IncludeFile::Skip
+    }
+
+    fn entity_kind(_data: &()) -> EntityKind {
+        EntityKind::Object
+    }
+
+    fn concrete_types<TProfile: CompilationProfile<NetworkProtocol = Self>>(
+        _db: &IsographDb<TProfile>,
+        _client: ClientId,
+        entity: EntityName,
+        _data: &(),
+    ) -> Vec<EntityName> {
+        entity.wrap_vec()
     }
 
     fn entity<TProfile: CompilationProfile<NetworkProtocol = Self>>(

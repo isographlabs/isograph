@@ -29,10 +29,11 @@ pub use iso_literals::{
 pub use merged_selection::{MergedTarget, NonNullVariableType, VariableType};
 pub use references::{ReferenceTarget, references_in_file};
 pub use schema::{
-    ClientFieldKind, ClientPointerTarget, DefinitionLocation, Entity, EntityOrigin, ProfileEntity,
-    ProfileLookupError, ProfileSelectable, ProtocolEntity, ProtocolSelectable, Selectable,
-    SelectableKind, ServerSelectable, SourceSelectableDefinition, SourceSelectableKind,
-    entity_named, selectable_named, selectables_for_entity,
+    ClientFieldKind, ClientPointerTarget, DefinitionLocation, Entity, EntityKind, EntityOrigin,
+    ProfileEntity, ProfileLookupError, ProfileSelectable, ProtocolEntity, ProtocolSelectable,
+    ScalarKind, ScalarValueKind, Selectable, SelectableKind, ServerSelectable,
+    SourceSelectableDefinition, SourceSelectableKind, entity_named, selectable_named,
+    selectables_for_entity,
 };
 pub use selectable_for_path::{
     entity_for_selection_set_path, selectable_for_selectable_name_path,

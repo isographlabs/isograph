@@ -4,9 +4,10 @@ use common_lang_types::{EntityName, RelativePathToSourceFile, SelectableName};
 use graphql_schema_parser::OperationType;
 use intern::string_key::Intern;
 use isograph_compiler::{
-    ClientId, CompilationProfile, DefinitionLocation, FileMembership, IncludeFile, IsographDb,
-    NetworkProtocol, NonNullVariableType, ProtocolSelectable, UnionWrapper, VariableType, Wrapper,
-    WrapperVariant, iso_literal_validation_errors_in_file,
+    ClientId, CompilationProfile, DefinitionLocation, EntityKind, FileMembership, IncludeFile,
+    IsographDb, NetworkProtocol, NonNullVariableType, ProtocolSelectable, ScalarKind,
+    ScalarValueKind, UnionWrapper, VariableType, Wrapper, WrapperVariant,
+    iso_literal_validation_errors_in_file,
 };
 use isograph_extract_typescript::TypeScriptHostLanguage;
 use prelude::Postfix;
@@ -19,7 +20,7 @@ use crate::{
     GraphQLSelectableLookupError, NodeFieldError, NodeFieldTypeMismatch, RootOperationTypes,
     RootOperationTypesError, SelectableLookupError, entity_named, graphql_entity,
     graphql_fetch_plan, graphql_selectable, graphql_selectables, parsed_schema_file,
-    root_operation_types, schema_file_paths, selectable_named,
+    root_operation_types, scalar_kind, schema_file_paths, selectable_named,
 };
 
 struct GraphQLProfile;
@@ -360,8 +361,8 @@ fn graphql_entity_data_follows_the_kind_of_type() {
             .expect("the fixture defines the type")
             .data
     };
-    assert_eq!(data("ID"), GraphQLEntityData::Leaf);
-    assert_eq!(data("E"), GraphQLEntityData::Leaf);
+    assert_eq!(data("ID"), GraphQLEntityData::Scalar(entity("ID")));
+    assert_eq!(data("E"), GraphQLEntityData::Enum);
     assert_eq!(data("I"), GraphQLEntityData::InputObject);
     assert_eq!(data("U"), GraphQLEntityData::Union);
     assert_eq!(
@@ -1022,5 +1023,56 @@ fn a_broken_node_field_is_an_error_on_node_fetched_entrypoints_only() {
     assert_eq!(
         validation_errors(&db, "src/HomeRoute.ts", PET_DEMO_SOURCES[0].1),
         vec![]
+    );
+}
+
+#[test]
+fn the_built_in_scalars_are_known_and_every_other_scalar_is_custom() {
+    let known = |value_kind| ScalarKind::Known(value_kind);
+    assert_eq!(
+        scalar_kind(entity("String")),
+        known(ScalarValueKind::String)
+    );
+    assert_eq!(scalar_kind(entity("ID")), known(ScalarValueKind::String));
+    assert_eq!(scalar_kind(entity("Int")), known(ScalarValueKind::Number));
+    assert_eq!(scalar_kind(entity("Float")), known(ScalarValueKind::Number));
+    assert_eq!(
+        scalar_kind(entity("Boolean")),
+        known(ScalarValueKind::Boolean)
+    );
+    assert_eq!(
+        scalar_kind(entity("Url")),
+        ScalarKind::Custom(entity("Url"))
+    );
+}
+
+#[test]
+fn an_enum_is_a_string_scalar_and_a_union_is_an_object_of_its_members() {
+    let db = db_with(&[(
+        "a.graphql",
+        "enum E { A } type A { id: ID! } type B { id: ID! } union U = A | B",
+    )]);
+    let data = |name: &str| {
+        graphql_entity(&db, CLIENT, entity(name))
+            .clone()
+            .expect("the fixture parses")
+            .expect("the fixture defines the type")
+            .data
+    };
+    assert_eq!(
+        GraphQLNetworkProtocol::entity_kind(data("E").reference()),
+        EntityKind::Scalar(ScalarKind::Known(ScalarValueKind::String))
+    );
+    assert_eq!(
+        GraphQLNetworkProtocol::entity_kind(data("U").reference()),
+        EntityKind::Object
+    );
+    assert_eq!(
+        GraphQLNetworkProtocol::concrete_types(&db, CLIENT, entity("U"), data("U").reference()),
+        vec![entity("A"), entity("B")]
+    );
+    assert_eq!(
+        GraphQLNetworkProtocol::concrete_types(&db, CLIENT, entity("A"), data("A").reference()),
+        vec![entity("A")]
     );
 }
