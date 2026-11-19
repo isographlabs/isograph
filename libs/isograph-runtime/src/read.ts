@@ -48,6 +48,23 @@ export function read<TEntityName extends EntityName, TOutput>(
   root: NoInfer<Link<TEntityName>>,
   variables: Variables,
 ): ReadResult<TOutput> {
+  const data = readButDoNotEvaluate(store, artifact, root, variables);
+  if (data.kind === 'MissingData') {
+    return data;
+  }
+  return ok(
+    artifact.resolver({ data: data.value, parameters: variables, link: root }),
+  );
+}
+
+/** What `artifact`'s reader AST reads at `root` with `variables`, with every nested resolver
+ * called and `artifact`'s own resolver not called. */
+export function readButDoNotEvaluate<TEntityName extends EntityName>(
+  store: Store,
+  artifact: ReaderArtifact<ResolverParam<TEntityName>, unknown, TEntityName>,
+  root: NoInfer<Link<TEntityName>>,
+  variables: Variables,
+): ReadResult<SelectionSetData> {
   if (storeRecord(store, root) === undefined) {
     return {
       kind: 'MissingData',
@@ -55,13 +72,7 @@ export function read<TEntityName extends EntityName, TOutput>(
       recordLink: root,
     };
   }
-  const data = readSelectionSet(store, artifact.readerAst, root, variables);
-  if (data.kind === 'MissingData') {
-    return data;
-  }
-  return ok(
-    artifact.resolver({ data: data.value, parameters: variables, link: root }),
-  );
+  return readSelectionSet(store, artifact.readerAst, root, variables);
 }
 
 function ok<T>(value: T): ReadOk<T> {

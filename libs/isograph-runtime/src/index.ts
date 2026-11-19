@@ -43,6 +43,7 @@ export { check, type CheckResult } from './check';
 export { garbageCollect, type RetainedQuery } from './garbageCollection';
 export {
   read,
+  readButDoNotEvaluate,
   type ReadMissingData,
   type ReadOk,
   type ReadResult,

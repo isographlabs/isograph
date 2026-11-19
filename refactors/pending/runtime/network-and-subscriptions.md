@@ -554,7 +554,7 @@ export function readButDoNotEvaluate<TEntityName extends EntityName>(
   root: NoInfer<Link<TEntityName>>,
   variables: Variables,
 ): ReadResult<SelectionSetData> {
-  if (store.get(root.entityName)?.get(root.id) === undefined) {
+  if (storeRecord(store, root) === undefined) {
     return { kind: "MissingData", reason: `No record for ${recordName(root)}`, recordLink: root };
   }
   return readSelectionSet(store, artifact.readerAst, root, variables);

@@ -37,7 +37,12 @@ import petSummaryReaderArtifact from '../fixtures/store/src/__isograph/Query/Pet
 import searchNormalizationAst from '../fixtures/store/src/__isograph/Query/Search/normalization_ast';
 import searchReaderArtifact from '../fixtures/store/src/__isograph/Query/Search/resolver_reader';
 import { normalize } from '../src/normalize';
-import { read, type ReadMissingData, type ReadResult } from '../src/read';
+import {
+  read,
+  readButDoNotEvaluate,
+  type ReadMissingData,
+  type ReadResult,
+} from '../src/read';
 import type {
   JsonObject,
   JsonValue,
@@ -675,4 +680,32 @@ test('every resolver runs again on every read', () => {
   expect(petSummary).toHaveBeenCalledTimes(2);
   expect(vi.mocked(PetName)).toHaveBeenCalledTimes(2);
   expect(vi.mocked(RecentCheckins)).toHaveBeenCalledTimes(2);
+});
+
+describe('readButDoNotEvaluate', () => {
+  test('returns the data read passes to the root resolver, calling nested resolvers and not the root resolver', () => {
+    const store = normalized(petSummaryNormalizationAst, petSummaryResponse(), {
+      id: '1',
+    });
+    const artifact = petSummaryReaderArtifact();
+    const petSummary = vi.spyOn(artifact, 'resolver');
+    expect(
+      readButDoNotEvaluate(store, artifact, queryRoot, { id: '1' }),
+    ).toEqual({ kind: 'Ok', value: petSummaryValue });
+    expect(petSummary).not.toHaveBeenCalled();
+    expect(vi.mocked(PetName)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(RecentCheckins)).toHaveBeenCalledTimes(1);
+  });
+
+  test('an absent root is missing data on the root', () => {
+    expect(
+      readButDoNotEvaluate(new Map(), petSummaryReaderArtifact(), queryRoot, {
+        id: '1',
+      }),
+    ).toEqual({
+      kind: 'MissingData',
+      reason: 'No record for Query:__ROOT',
+      recordLink: queryRoot,
+    });
+  });
 });
