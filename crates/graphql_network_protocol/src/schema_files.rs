@@ -1,7 +1,11 @@
+use common_lang_types::EntityName;
 use common_lang_types::RelativePathToSourceFile;
 use graphql_schema_parser::{
-    DefinitionError, ParsedSchema, TypeSystemDefinitionOrExtension, parse_schema,
+    DefinitionError, NullableTypeAnnotation, ParsedSchema, TypeAnnotation, TypeDefinition,
+    TypeExtension, TypeSystemDefinition, TypeSystemDefinitionOrExtension, TypeSystemExtension,
+    parse_schema,
 };
+use intern::Lookup;
 use isograph_compiler::{
     ClientId, CompilationProfile, IsographDb, file_contents, schema_file_paths,
 };
@@ -46,6 +50,9 @@ pub(crate) fn schema_entries<TProfile: CompilationProfile>(
 pub enum GraphQLSchemaFileError {
     #[error("{0}")]
     Parse(graphql_schema_parser::ParseError),
+    /// Upstream's `on_invalid_id_type` check at its default, `error`.
+    #[error("The `id` field on `{0}` must have type `ID!`.")]
+    InvalidIdField(EntityName),
 }
 
 /// The errors of the schema file `path` as `client` reads it, file-absolute; `None` when the
@@ -60,11 +67,49 @@ pub fn graphql_schema_file_errors<TProfile: CompilationProfile>(
     parsed
         .definitions
         .iter()
-        .filter_map(|entry| entry.as_ref().err())
-        .map(|failed| {
-            GraphQLSchemaFileError::Parse(failed.item.error.item)
+        .flat_map(|entry| match entry {
+            Err(failed) => GraphQLSchemaFileError::Parse(failed.item.error.item)
                 .with_span(failed.item.error.location)
+                .wrap_vec(),
+            Ok(entry) => invalid_id_fields(entry.item.reference()),
         })
         .collect::<Vec<_>>()
         .wrap_some()
+}
+
+/// An `InvalidIdField` at the type of each field named `id` of an object or interface
+/// definition or extension whose type is not `ID!`.
+fn invalid_id_fields(
+    entry: &TypeSystemDefinitionOrExtension,
+) -> Vec<WithSpan<GraphQLSchemaFileError>> {
+    let (name, fields) = match entry {
+        TypeSystemDefinitionOrExtension::Definition(TypeSystemDefinition::Type(
+            TypeDefinition::Object(object),
+        )) => (object.name, object.fields.as_slice()),
+        TypeSystemDefinitionOrExtension::Definition(TypeSystemDefinition::Type(
+            TypeDefinition::Interface(interface),
+        )) => (interface.name, interface.fields.as_slice()),
+        TypeSystemDefinitionOrExtension::Extension(TypeSystemExtension::Type(
+            TypeExtension::Object(object),
+        )) => (object.name, object.fields.as_slice()),
+        TypeSystemDefinitionOrExtension::Extension(TypeSystemExtension::Type(
+            TypeExtension::Interface(interface),
+        )) => (interface.name, interface.fields.as_slice()),
+        TypeSystemDefinitionOrExtension::Definition(_)
+        | TypeSystemDefinitionOrExtension::Extension(_) => return Vec::new(),
+    };
+    fields
+        .iter()
+        .filter(|field| field.item.name.item.0.lookup() == "id")
+        .filter(|field| match field.item.type_.item.reference() {
+            TypeAnnotation::NonNull(non_null) => match non_null.0.item.reference() {
+                NullableTypeAnnotation::Named(named) => named.0.item.0.lookup() != "ID",
+                NullableTypeAnnotation::List(_) => true,
+            },
+            TypeAnnotation::Named(_) | TypeAnnotation::List(_) => true,
+        })
+        .map(|field| {
+            GraphQLSchemaFileError::InvalidIdField(name.item.0).with_span(field.item.type_.location)
+        })
+        .collect()
 }

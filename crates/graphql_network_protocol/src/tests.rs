@@ -212,6 +212,41 @@ fn a_failed_schema_definition_is_one_schema_file_error_on_its_span() {
 }
 
 #[test]
+fn an_id_field_whose_type_is_not_id_non_null_is_an_error_on_its_type() {
+    let text = "type A { id: String }\ntype B { id: ID }\ninterface C { id: [ID!] }\nextend type D { id: Int }\ntype E { id: ID! }\ninput F { id: Int }\ntype D { x: Int }";
+    let db = db_with(&[("a.graphql", text)]);
+    assert_eq!(
+        graphql_schema_file_errors(&db, CLIENT, path("a.graphql"))
+            .clone()
+            .expect("the test inserted the file")
+            .iter()
+            .map(|error| (
+                error.item.to_string(),
+                &text[error.location.as_usize_range()]
+            ))
+            .collect::<Vec<_>>(),
+        vec![
+            (
+                "The `id` field on `A` must have type `ID!`.".to_owned(),
+                "String"
+            ),
+            (
+                "The `id` field on `B` must have type `ID!`.".to_owned(),
+                "ID"
+            ),
+            (
+                "The `id` field on `C` must have type `ID!`.".to_owned(),
+                "[ID!]"
+            ),
+            (
+                "The `id` field on `D` must have type `ID!`.".to_owned(),
+                "Int"
+            ),
+        ]
+    );
+}
+
+#[test]
 fn a_definition_merges_with_extensions_in_any_order_and_file() {
     for files in [
         [
