@@ -20,6 +20,7 @@
     "format-prettier": "prettier --experimental-cli --cache --config-path ./.prettierrc.json --write .",
     "format-rust": "cargo fmt",
     "sanity-check": "./scripts/sanity-check.sh",
+    "open-pet-demo": "./scripts/open-pet-demo.sh",
     "fix-line-endings": "git diff $(git merge-base main HEAD) --name-only | xargs -I {} dos2unix {}"
   },
   "license": "MIT",
