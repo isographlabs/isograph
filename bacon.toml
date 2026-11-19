@@ -8,11 +8,9 @@
 default_job = "check"
 
 # Build is a custom job, the rest of the file is from the Bacon default configuration
+# Builds, then restarts a running pet-demo daemon (scripts/watch-rs-build.sh).
 [jobs.build]
-command = [
-	"cargo", "build",
-	"--color", "always",
-]
+command = ["./scripts/watch-rs-build.sh"]
 watch = ["crates"]
 need_stdout = false
 
