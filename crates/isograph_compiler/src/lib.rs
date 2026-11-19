@@ -5,6 +5,7 @@ mod schema;
 mod selectable_for_path;
 #[cfg(test)]
 mod test_profile;
+mod validation;
 
 pub use database::{
     ClientId, DiskFile, DiskFileMap, FileMembership, IsographDb, OpenFileKey, SchemaPathMap,
@@ -20,4 +21,9 @@ pub use schema::{DefinitionLocation, Entity, Selectable, entity_named, selectabl
 pub use selectable_for_path::{
     selectable_for_entity, selectable_for_selectable_name_path, selectable_for_selection_parent,
     selectable_for_selection_path, selectable_target,
+};
+pub use validation::{
+    DuplicateDefinitionError, SelectableKey, SelectionSetOnFieldWithoutTargetError,
+    UnknownEntityError, UnknownSelectableError, ValidationError,
+    iso_literal_validation_errors_in_file,
 };

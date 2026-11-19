@@ -2932,7 +2932,7 @@ mod tests {
 
     const BROKEN: &str = "iso(`entrypoint`)";
     const EMPTY_LITERAL: &str = "iso(` `)";
-    const CLEAN: &str = "iso(`entrypoint Query.HomeRoute`)";
+    const CLEAN: &str = "iso(`entity Query`)";
 
     fn empty_literal_message() -> String {
         isograph_parser::ParseError::Ast(isograph_parser::AstError::EmptyLiteral).to_string()
@@ -3029,12 +3029,39 @@ mod tests {
     }
 
     #[test]
+    fn an_open_file_selecting_an_undefined_field_publishes_that_validation_error() {
+        let mut state = with_config();
+        let rx = diagnostics_client(&mut state, ClientId(1));
+        let text = "iso(`entity Query`) iso(`field Query.x { nope }`)";
+        let armed = handle(&mut state, did_open(ClientId(1), X_URI, text));
+        let effects = fire(&mut state, armed);
+        let start = text.find("nope").expect("the fixture selects nope") as u32;
+        assert_eq!(
+            published(effects, rx.reference()),
+            HashMap::from([(
+                X_URI.to_owned(),
+                lsp_types::Diagnostic {
+                    range: lsp_types::Range::new(
+                        lsp_types::Position::new(0, start),
+                        lsp_types::Position::new(0, start + 4)
+                    ),
+                    severity: lsp_types::DiagnosticSeverity::ERROR.wrap_some(),
+                    source: "isograph".to_owned().wrap_some(),
+                    message: "Field `Query.nope` is not defined.".to_owned(),
+                    ..Default::default()
+                }
+                .wrap_vec()
+            )])
+        );
+    }
+
+    #[test]
     fn a_literal_with_only_a_host_language_problem_publishes_nothing() {
         let mut state = with_config();
         let _rx = diagnostics_client(&mut state, ClientId(1));
         let armed = handle(
             &mut state,
-            did_open(ClientId(1), X_URI, "iso`entrypoint Query.HomeRoute`"),
+            did_open(ClientId(1), X_URI, "iso`entity Query`"),
         );
         assert!(fire(&mut state, armed).is_empty());
     }
