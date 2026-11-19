@@ -1231,7 +1231,7 @@ export type NodeDefinition<TValue> = {
 };
 ```
 
-The context is a parameter, built per computation by `compute`, as the walk's `ReadHooks` is; there is no ambient "current computation" (MobX's `globalState.trackingDerivation`, Reactively's `CurrentReaction`). The engine knows nothing about what a node computes: the caller supplies the computation, the owner, and the id. Resolver entries are the one node kind changes 2 to 4 create; Other node kinds lists the planned ones, and the engine's API admits them unchanged.
+The context is a parameter, built per computation by `compute`, as the walk's `ReadHooks` is; there is no ambient "current computation" (MobX's `globalState.trackingDerivation`, Reactively's `CurrentReaction`). The engine knows nothing about what a node computes: the caller supplies the computation, the owner, and the id. Resolver entries are the one node kind changes 2 to 4 create; Other node kinds lists the kinds the follow-ups add and the parts of the API they need.
 
 A node is mutated in place (`value`, `state`, `dependencies`), because other nodes' `dependents` sets and `NodeDependency`s hold it by identity. An input dependency is an `InputId`, because a server value has no object to point at and a record may not exist yet. A node dependency is the node, because `dependents` holds nodes and change 4's needed counts walk from a node to the nodes it reads. `graph.ts` imports `getOrInsert` from `util.ts` and nothing else.
 
@@ -2411,45 +2411,15 @@ New cases in the compiler:
 
 ## Other node kinds
 
-The engine is general over node kinds: a caller supplies each node's id, owner, height, and computation, and the engine never inspects a value except through `valuesEqual`. Resolver entries are the only kind changes 1 to 4 create. Changes 1 to 4 keep the API in that shape, so that the kinds below are additions and not a redesign:
+`check` stays the plain function from store.md; caching it as a node of the graph was considered and rejected by the user (no need).
 
-- `graph.ts` imports nothing from the store, the reader, or the environment, and names no resolver, record, or artifact.
-- A node's computation, owner, and id come from its creator (`NodeDefinition`, `track`, `readNode`, `retainRoot`); no engine function builds one.
-- The graph's value type is a parameter, `TValue`. A second kind widens the environment's graph to a union of the kinds' values, and `valuesEqual` to a function that compares two values of one kind and answers unequal for two kinds.
-- Heights are the caller's: `NodeDefinition.height` is a `number` in change 4, because every kind changes 1 to 4 create has a height the compiler wrote, and the stored `check` below is height 0. A kind without a static height is Follow-ups 10.
+The engine is general over node kinds only as far as the follow-ups that add nodes need: a caller supplies each node's id, owner, height, and computation, and the engine never inspects a value except through `valuesEqual`. Resolver entries are the only kind changes 1 to 4 create. The parts of the API that serve the follow-ups:
 
-### A stored `check` (planned, after change 4)
-
-`check(store, ast, variables)` (store.md) as one node of the graph per (entrypoint, variables, root).
-
-Inputs. `check` reads presence, not values: whether a record is present, whether a key of a present record is present, and the value of a key only when it is a link, because a link decides which record is checked next. A scalar's value changing does not reach the node; a record appearing or disappearing, a key appearing, or a link changing does.
-
-```ts
-// from libs/isograph-runtime/src/inputs.ts
-/** The input a presence check of `storeKey` on a present `record` reports. It changes when the key
- * goes from absent to present; `normalize` never removes a key, and a deleted record reports `recordInput`. */
-export function keyInput(record: StoreLink, storeKey: StoreKey): InputId {
-  return JSON.stringify(['Key', record.entityName, record.id, storeKey]) as InputId;
-}
-```
-
-The node reports `recordInput` for each record it looks up, `keyInput` for each key it checks, and `valueInput` for each composite key whose links it follows. `check`'s walk takes the reporting half of `ReadHooks` (`readRecord`, and a `readKey` beside `readValue`); v1's `check` passes hooks that report nothing. The store reports presence changes separately from value changes: `normalize`'s `ValueChanged` splits into `KeyAdded` (the record did not hold the key) and `ValueChanged` (it held a value `isUnchanged` rejected), and `changeInput` maps `KeyAdded` to both `keyInput` and `valueInput` of the key and `ValueChanged` to `valueInput` alone. `garbageCollect` reports deleted records, whose `recordInput` covers every key on them. Changes 1 to 4 keep one `ValueChanged`, because no node they create reads a `keyInput`.
-
-- Value: `CheckResult`, `EnoughData` or `MissingData { record }`. `valuesEqual` compares `kind` and, for `MissingData`, the record's `entityName` and `id`, so a recomputation with the same answer keeps the old object, `===`.
-- Height 0: it reads only inputs, never another node.
-- Owner: `recordInput(ast.root)`. Id: the JSON of `['Check', queryText, stableCopy(variables), ast.root.entityName, ast.root.id]`.
-- No intermediate nodes: the node is the whole walk, and nothing records that a branch of the query is fully present.
-
-What a write costs: nothing when it changes only scalar values, which is the common case. When a key or record appears or disappears or a link changes among the inputs the last walk recorded, the node recomputes, which walks the query once, `O(records and keys the query reaches)`, as v1's `check` does on every call today.
-
-It makes `shouldFetch: 'IfNecessary'` (network-and-subscriptions.md, `fetchEntrypoint`, which calls `check` on every render with that option) a lookup when no presence or link input changed since the last check: one `track` of a `Clean` node, instead of a walk of the whole AST. Observing it gives a suspended render an exact signal: the observer is called when the value goes from `MissingData` to `EnoughData`, and not on a write that leaves the query missing elsewhere. Upstream suspends on `onNextChangeToRecord(environment, response.recordLink)` (`read.ts:117-122`, `cache.ts:135-149`), which resumes on any change to the one record the read stopped at, so a write that fills that record and leaves another missing resumes a render that suspends again, and a write that fills another missing record first does not resume it.
-
-Later, and only if presence changes become frequent for large retained queries (pagination appending items to a large retained list re-walks the whole query on every page): a node per (record, selection set position) that checks that record's keys and reads, through `readNode`, the child node of each link target it follows, with heights from the AST depth (a selection set's height is one more than its deepest target selection set's) and cutoff when a child's result is unchanged. A write then recomputes the changed record's node and its ancestors up to the first unchanged result. Cost: one intermediate node per (record, selection set position) a retained query reaches, each with its own dependency list, and one `Node` edge per followed link.
-
-### Other kinds that fit
-
-- Garbage collection reachability per retained query: a node per `RetainedQuery` whose value is the set of records its AST reaches (store.md's mark, from that query), with the inputs the stored `check` reports. `garbageCollectEnvironment` would take the union of the retained queries' node values instead of walking every retained AST on every collection, and a retained query whose inputs did not change costs a lookup. Its value is a new set on every recomputation, so it cuts off nothing (R4).
-- Closure-component entries (components-in-userland.md): the wrapper is a node at the closure field's resolver store key, whose computation reads only the record's presence (The engine, the store, and the environment, Lifetime still follows records), and a second node per closure entry for its data read is that doc's open question 3. Both are resolver-shaped nodes with compile-time heights.
+- `graph.ts` imports nothing from the store, the reader, or the environment, and names no resolver, record, or artifact. This is open decision 12's held design, which changes 2 to 4 need on their own.
+- A node's owner is a caller-supplied `InputId` (`NodeDefinition.owner`). Closure-component entries (components-in-userland.md) need it: the wrapper is a node at the closure field's resolver store key, owned by the record's `recordInput`, whose computation reads only the record's presence (The engine, the store, and the environment, Lifetime still follows records), and a second node per closure entry for its data read is that doc's open question 3. Both are resolver-shaped nodes with compile-time heights, so they need nothing else beyond change 2's resolver nodes.
+- A node's computation and id come from its creator (`NodeDefinition`, `track`, `readNode`, `retainRoot`); no engine function builds one. Follow-up 10 needs it: a runtime-defined computation is not a resolver and has no resolver store key.
+- The graph's value type is a parameter, `TValue`. Follow-up 10 needs it: a derived value or a selector's value is not a `ResolverResult`, so that follow-up widens the environment's graph to a union of the kinds' values, and `valuesEqual` to a function that compares two values of one kind and answers unequal for two kinds.
+- Heights are the caller's: `NodeDefinition.height` is a `number` in change 4, because every kind changes 1 to 4 create has a height the compiler wrote. Follow-up 10 widens it for a node without a static height.
 
 ## Later
 
