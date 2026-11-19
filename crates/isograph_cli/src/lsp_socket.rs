@@ -615,7 +615,7 @@ mod tests {
             &mut writer,
             Message::Request(Request {
                 id: RequestId::from(2),
-                method: "textDocument/definition".to_owned(),
+                method: "textDocument/references".to_owned(),
                 params: serde_json::json!({}),
             }),
         );
@@ -1197,7 +1197,7 @@ mod tests {
             &mut writer,
             Message::Request(Request {
                 id: RequestId::from(2),
-                method: "textDocument/definition".to_owned(),
+                method: "textDocument/references".to_owned(),
                 params: serde_json::json!({}),
             }),
         );
@@ -1401,7 +1401,7 @@ mod tests {
             &mut writer2,
             Message::Request(Request {
                 id: RequestId::from(2),
-                method: "textDocument/definition".to_owned(),
+                method: "textDocument/references".to_owned(),
                 params: serde_json::json!({}),
             }),
         );

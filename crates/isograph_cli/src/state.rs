@@ -495,7 +495,7 @@ mod tests {
             lsp_request(
                 client,
                 id.clone(),
-                "textDocument/definition",
+                "textDocument/references",
                 serde_json::json!({}),
             ),
         );
@@ -524,7 +524,7 @@ mod tests {
         assert_eq!(error.code, lsp_server::ErrorCode::MethodNotFound as i32);
         assert_eq!(
             error.message,
-            "No handler registered for method 'textDocument/definition'"
+            "No handler registered for method 'textDocument/references'"
         );
         assert!(
             state
