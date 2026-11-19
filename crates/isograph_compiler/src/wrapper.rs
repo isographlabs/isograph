@@ -22,6 +22,47 @@ pub enum WrapperVariant<T> {
 }
 
 impl<T> Wrapper<T> {
+    /// The same structure with every `Inner` replaced by `f` of it, or the first error `f`
+    /// returns.
+    pub fn try_map<U, E>(&self, f: &mut impl FnMut(&T) -> Result<U, E>) -> Result<Wrapper<U>, E> {
+        match self {
+            Wrapper::Inner(inner) => Wrapper::Inner(f(inner)?).wrap_ok(),
+            Wrapper::List(list) => Wrapper::List(list.try_map(f)?.boxed()).wrap_ok(),
+            Wrapper::Union(union) => Wrapper::Union(UnionWrapper(
+                union
+                    .0
+                    .iter()
+                    .map(|variant| {
+                        match variant {
+                            WrapperVariant::Inner(inner) => WrapperVariant::Inner(f(inner)?),
+                            WrapperVariant::List(list) => {
+                                WrapperVariant::List(list.try_map(f)?.boxed())
+                            }
+                            WrapperVariant::Null => WrapperVariant::Null,
+                        }
+                        .wrap_ok()
+                    })
+                    .collect::<Result<Vec<_>, E>>()?,
+            ))
+            .wrap_ok(),
+        }
+    }
+
+    /// `Nullable` when the top level is a `Union` with a `Null` variant.
+    pub fn nullability(&self) -> Nullability {
+        match self {
+            Wrapper::Union(union)
+                if union
+                    .0
+                    .iter()
+                    .any(|variant| matches!(variant, WrapperVariant::Null)) =>
+            {
+                Nullability::Nullable
+            }
+            Wrapper::Inner(_) | Wrapper::List(_) | Wrapper::Union(_) => Nullability::NonNull,
+        }
+    }
+
     /// Every `Inner`, in order.
     pub fn inner_values(&self) -> impl Iterator<Item = &T> {
         let values: Box<dyn Iterator<Item = &T> + '_> = match self {
@@ -41,6 +82,13 @@ impl<T> Wrapper<T> {
         };
         values
     }
+}
+
+/// Whether a wrapper admits `null` at its top level.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Nullability {
+    Nullable,
+    NonNull,
 }
 
 /// The wrapper `annotation` writes. `None` when a list's inner type did not parse.
@@ -78,7 +126,7 @@ mod tests {
     use isograph_parser::{IsoLiteralItem, parse_iso_literal};
     use prelude::Postfix;
 
-    use super::{UnionWrapper, Wrapper, WrapperVariant, wrapper_of_type_annotation};
+    use super::{Nullability, UnionWrapper, Wrapper, WrapperVariant, wrapper_of_type_annotation};
 
     fn entity(name: &str) -> EntityName {
         name.intern().to()
@@ -142,5 +190,43 @@ mod tests {
             wrapper.inner_values().copied().collect::<Vec<_>>(),
             vec![entity("A"), entity("B")]
         );
+    }
+
+    #[test]
+    fn a_top_level_null_variant_is_nullable() {
+        let nullability = |to: &str| {
+            wrapper_of_to(to)
+                .expect("the fixture's to clause parses")
+                .nullability()
+        };
+        assert_eq!(nullability("Pet"), Nullability::Nullable);
+        assert_eq!(nullability("[Pet]!"), Nullability::NonNull);
+        assert_eq!(nullability("Pet!"), Nullability::NonNull);
+    }
+
+    #[test]
+    fn try_map_keeps_the_structure_and_returns_the_first_error() {
+        let wrapper = wrapper_of_to("[Pet]").expect("the fixture's to clause parses");
+        assert_eq!(
+            wrapper.try_map(&mut |name| name.to_string().len().wrap_ok::<()>()),
+            nullable_usize(3).wrap_ok()
+        );
+        assert_eq!(
+            wrapper.try_map(&mut |name| name.to_string().wrap_err::<usize>()),
+            "Pet".to_owned().wrap_err()
+        );
+    }
+
+    fn nullable_usize(value: usize) -> Wrapper<usize> {
+        Wrapper::Union(UnionWrapper(vec![
+            WrapperVariant::List(
+                Wrapper::Union(UnionWrapper(vec![
+                    WrapperVariant::Inner(value),
+                    WrapperVariant::Null,
+                ]))
+                .boxed(),
+            ),
+            WrapperVariant::Null,
+        ]))
     }
 }

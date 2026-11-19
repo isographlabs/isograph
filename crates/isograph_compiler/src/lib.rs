@@ -43,4 +43,4 @@ pub use validation::{
     SelectionSetOnFieldWithoutTargetError, UnknownEntityError, UnknownSelectableError,
     ValidationError, iso_literal_validation_errors_in_file,
 };
-pub use wrapper::{UnionWrapper, Wrapper, WrapperVariant};
+pub use wrapper::{Nullability, UnionWrapper, Wrapper, WrapperVariant};
