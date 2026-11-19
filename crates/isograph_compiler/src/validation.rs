@@ -7,7 +7,7 @@ use pico_macros::memo;
 use prelude::Postfix;
 use span::{WithSpan, WithSpanPostfix};
 
-use crate::schema::{source_entity_definitions, source_selectable_definitions};
+use crate::schema::{Definitions, entity_definitions, selectable_definitions};
 use crate::{ClientId, CompilationProfile, IsographDb, parsed_iso_literals_in_file};
 
 /// A reference in an iso literal that the source declarations do not satisfy.
@@ -96,16 +96,44 @@ fn item_validation_errors<'a, TProfile: CompilationProfile>(
     }
 }
 
-/// `DuplicateDefinition` on `name` when more than one source file declaration defines it.
+/// `DuplicateDefinition` on `name` when more than one source file declaration or the
+/// protocol defines it.
 fn duplicate_entity_error<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
     name: WithSpan<EntityNameWrapper>,
 ) -> Option<WithSpan<ValidationError>> {
-    (source_entity_definitions(db, client, name.item.0).len() > 1).then(|| {
-        ValidationError::DuplicateDefinition(DuplicateDefinitionError::Entity(name.item.0))
-            .with_span(name.location)
-    })
+    match entity_definitions(db, client, name.item.0) {
+        Definitions::Duplicated => {
+            ValidationError::DuplicateDefinition(DuplicateDefinitionError::Entity(name.item.0))
+                .with_span(name.location)
+                .wrap_some()
+        }
+        Definitions::Undefined | Definitions::Unique(_) | Definitions::ProtocolLookupFailed(_) => {
+            None
+        }
+    }
+}
+
+/// Whether the source files or the protocol define the entity named `entity`.
+fn entity_definedness<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    entity: EntityName,
+) -> EntityDefinedness {
+    match entity_definitions(db, client, entity) {
+        Definitions::Undefined => EntityDefinedness::Undefined,
+        Definitions::Unique(_) | Definitions::Duplicated | Definitions::ProtocolLookupFailed(_) => {
+            EntityDefinedness::Defined
+        }
+    }
+}
+
+/// Whether an entity has at least one definition, however its lookup ends.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum EntityDefinedness {
+    Undefined,
+    Defined,
 }
 
 /// `field E.x { .. }`: `E` is defined, `E.x` is not duplicated, and the selection set
@@ -116,7 +144,7 @@ fn selectable_declaration_errors<'a, TProfile: CompilationProfile>(
     declaration: &'a SelectableDeclaration,
 ) -> ValidationErrors<'a> {
     let entity = declaration.parent_type.item.0;
-    if source_entity_definitions(db, client, entity).is_empty() {
+    if let EntityDefinedness::Undefined = entity_definedness(db, client, entity) {
         return std::iter::once(
             ValidationError::UnknownEntity(UnknownEntityError(entity))
                 .with_span(declaration.parent_type.location),
@@ -127,12 +155,16 @@ fn selectable_declaration_errors<'a, TProfile: CompilationProfile>(
         entity,
         selectable: declaration.name.item.0,
     };
-    let duplicate = (source_selectable_definitions(db, client, key.entity, key.selectable).len()
-        > 1)
-    .then(|| {
-        ValidationError::DuplicateDefinition(DuplicateDefinitionError::Selectable(key))
-            .with_span(declaration.name.location)
-    });
+    let duplicate = match selectable_definitions(db, client, key.entity, key.selectable) {
+        Definitions::Duplicated => {
+            ValidationError::DuplicateDefinition(DuplicateDefinitionError::Selectable(key))
+                .with_span(declaration.name.location)
+                .wrap_some()
+        }
+        Definitions::Undefined | Definitions::Unique(_) | Definitions::ProtocolLookupFailed(_) => {
+            None
+        }
+    };
     duplicate
         .into_iter()
         .chain(
@@ -153,7 +185,7 @@ fn entrypoint_declaration_error<TProfile: CompilationProfile>(
     declaration: &EntrypointDeclaration,
 ) -> Option<WithSpan<ValidationError>> {
     let entity = declaration.parent_type.item.0;
-    if source_entity_definitions(db, client, entity).is_empty() {
+    if let EntityDefinedness::Undefined = entity_definedness(db, client, entity) {
         return ValidationError::UnknownEntity(UnknownEntityError(entity))
             .with_span(declaration.parent_type.location)
             .wrap_some();
@@ -162,12 +194,14 @@ fn entrypoint_declaration_error<TProfile: CompilationProfile>(
         entity,
         selectable: declaration.name.item.0,
     };
-    source_selectable_definitions(db, client, key.entity, key.selectable)
-        .is_empty()
-        .then(|| {
-            ValidationError::UnknownSelectable(UnknownSelectableError(key))
-                .with_span(declaration.name.location)
-        })
+    match selectable_definitions(db, client, key.entity, key.selectable) {
+        Definitions::Undefined => ValidationError::UnknownSelectable(UnknownSelectableError(key))
+            .with_span(declaration.name.location)
+            .wrap_some(),
+        Definitions::Unique(_) | Definitions::Duplicated | Definitions::ProtocolLookupFailed(_) => {
+            None
+        }
+    }
 }
 
 /// The validation errors of `selection_set`, a selection set on `parent`, in literal-relative
@@ -197,29 +231,32 @@ fn validate_selection<'a, TProfile: CompilationProfile>(
         entity: parent,
         selectable: selection.name.item.0.unchecked_conversion(),
     };
-    match source_selectable_definitions(db, client, key.entity, key.selectable).as_slice() {
-        [] => std::iter::once(
+    match selectable_definitions(db, client, key.entity, key.selectable) {
+        Definitions::Undefined => std::iter::once(
             ValidationError::UnknownSelectable(UnknownSelectableError(key))
                 .with_span(selection.name.location),
         )
         .boxed(),
-        [selectable] => match (selection.selection_set.as_ref(), selectable.target_entity()) {
-            (None, _) => std::iter::empty().boxed(),
-            (Some(nested), None) => std::iter::once(
-                ValidationError::SelectionSetOnFieldWithoutTarget(
-                    SelectionSetOnFieldWithoutTargetError(key),
+        Definitions::Unique(selectable) => {
+            match (selection.selection_set.as_ref(), selectable.target_entity()) {
+                (None, _) => std::iter::empty().boxed(),
+                (Some(nested), None) => std::iter::once(
+                    ValidationError::SelectionSetOnFieldWithoutTarget(
+                        SelectionSetOnFieldWithoutTargetError(key),
+                    )
+                    .with_span(nested.location),
                 )
-                .with_span(nested.location),
-            )
-            .boxed(),
-            (Some(nested), Some(target)) => {
-                if source_entity_definitions(db, client, target).is_empty() {
-                    std::iter::empty().boxed()
-                } else {
-                    validate_selection_set(db, client, target, nested.item.reference()).boxed()
-                }
+                .boxed(),
+                (Some(nested), Some(target)) => match entity_definedness(db, client, target) {
+                    EntityDefinedness::Undefined => std::iter::empty().boxed(),
+                    EntityDefinedness::Defined => {
+                        validate_selection_set(db, client, target, nested.item.reference()).boxed()
+                    }
+                },
             }
-        },
-        [_, _, ..] => std::iter::empty().boxed(),
+        }
+        Definitions::Duplicated | Definitions::ProtocolLookupFailed(_) => {
+            std::iter::empty().boxed()
+        }
     }
 }

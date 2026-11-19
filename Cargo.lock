@@ -558,7 +558,18 @@ dependencies = [
 name = "graphql_network_protocol"
 version = "0.5.3"
 dependencies = [
+ "common_lang_types",
+ "derive_more",
+ "graphql_schema_parser",
+ "intern",
  "isograph_compiler",
+ "isograph_extract_typescript",
+ "pico",
+ "pico_macros",
+ "prelude",
+ "span",
+ "thiserror 1.0.69",
+ "tracing",
 ]
 
 [[package]]
@@ -810,6 +821,7 @@ dependencies = [
  "freddie_single_instance",
  "freddie_timer",
  "globset",
+ "graphql_network_protocol",
  "intern",
  "isograph_compiler",
  "isograph_config",

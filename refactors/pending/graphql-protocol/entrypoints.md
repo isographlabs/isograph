@@ -257,7 +257,7 @@ pub fn entity_named<TProfile: CompilationProfile>(
 
 `selectable_named` is the same shape over `source_selectable_definitions` and `TProfile::NetworkProtocol::selectable`, building `SelectableKind::ClientField` or `SelectableKind::ClientPointer(target)` from the source definition and `SelectableKind::Server(ServerSelectable { target, data })` from the protocol's. `source_selectable_definitions` keeps returning the source-only list; its element type becomes `SourceSelectableDefinition { name, parent_entity, description, kind: SourceSelectableKind, definition }`, where `SourceSelectableKind` is `ClientField` or `ClientPointer(ClientPointerTarget)`, the kinds a `field` declaration can define.
 
-The test protocol (`crates/isograph_compiler/src/test_profile.rs`) defines nothing: every associated type is `()` except `NotFetchable`, `QueryError`, and `LookupError`, which are a unit struct `TestProtocolError` with `#[error("test protocol")]`; `entity` and `selectable` return `Ok(None)`; `fetch_plan` and `query_artifact` return `Err(TestProtocolError)`.
+The test protocol (`crates/isograph_compiler/src/test_profile.rs`) defines nothing: every data type is `()`; `LookupError` is `std::convert::Infallible`, because `entity` and `selectable` return `Ok(None)` and `selectables` returns no entries; `NotFetchable` and `QueryError` are a unit struct `TestProtocolError` with `#[error("test protocol")]`, which `fetch_plan` and `query_artifact` return. `Infallible` is acceptable only in these `#[cfg(test)]` profiles.
 
 ### GraphQL entity data
 

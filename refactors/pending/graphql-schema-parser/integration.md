@@ -170,13 +170,13 @@ pub struct SchemaEntity {
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum EntityLookupError {
     #[error("{0}")]
-    Syntax(EntitySyntaxError),
+    Syntax(Box<EntitySyntaxError>),
     #[error("{0}")]
-    DuplicateDefinition(DuplicateDefinition),
+    DuplicateDefinition(Box<DuplicateDefinition>),
     #[error("{0}")]
-    ExtensionWithoutDefinition(ExtensionWithoutDefinition),
+    ExtensionWithoutDefinition(Box<ExtensionWithoutDefinition>),
     #[error("{0}")]
-    ExtensionKindMismatch(ExtensionKindMismatch),
+    ExtensionKindMismatch(Box<ExtensionKindMismatch>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
@@ -248,7 +248,7 @@ pub(crate) fn type_extension_name(extension: &TypeExtension) -> WithSpan<EntityN
 pub(crate) fn type_extension_kind(extension: &TypeExtension) -> TypeKind;
 ```
 
-Each is a match over the six variants. They are plain functions because `TypeDefinition` and `TypeExtension` live in `graphql_schema_parser`, which no other crate depends on for behavior.
+The error payloads that hold schema AST nodes are boxed so the `Result`s stay small (clippy `result_large_err`). Each function below is a match over the six variants. They are plain functions because `TypeDefinition` and `TypeExtension` live in `graphql_schema_parser`, which no other crate depends on for behavior.
 
 ## Fields in the schema
 
@@ -259,7 +259,7 @@ pub enum SelectableLookupError {
     #[error("{0}")]
     Entity(EntityLookupError),
     #[error("{0}")]
-    DuplicateField(DuplicateField),
+    DuplicateField(Box<DuplicateField>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
@@ -347,7 +347,7 @@ pub enum GraphQLSelectableLookupError {
     RefinementTarget(RefinementTargetError),
     #[error("{0}")]
     #[from(skip)]
-    RefinementCollision(RefinementCollision),
+    RefinementCollision(Box<RefinementCollision>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
@@ -472,7 +472,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
     ) -> Vec<(SelectableName, ProtocolSelectable<Self::SelectableData>)>;
 ```
 
-`FetchPlan`, `NotFetchable`, `QueryError`, `fetch_plan`, and `query_artifact` land with the query-generation changes that read them (4, 5, 7).
+`FetchPlan`, `NotFetchable`, `QueryError`, `fetch_plan`, and `query_artifact` land with the query-generation changes that read them (4, 5, 7). The `#[cfg(test)]` test protocols, which define nothing, set `LookupError = std::convert::Infallible`; a protocol outside tests names its real error.
 
 The core counts definitions in one place:
 
@@ -530,6 +530,8 @@ Status: landed.
 query-generation.md change 2 and artifact-set-and-types.md change 1: `Entity<TEntityData>`, `EntityOrigin`, `Selectable<TSelectableData>`, `SelectableKind`, `ClientPointerTarget`, `ServerSelectable`, `Selectable::target_entity()`, `ProfileEntity`, `ProfileSelectable`, `SourceSelectableDefinition`, `SourceSelectableKind`; `Wrapper`, `UnionWrapper`, `WrapperVariant`, `inner_values`, `wrapper_of_type_annotation`; `NetworkProtocol::EntityData`, `SelectableData`. Lookups still read source files only. Tests: the existing lookup, hover, completion, and validation tests pass unchanged in their facts.
 
 ### 3. Schema lookups and protocol lookups in the core
+
+Status: landed.
 
 `schema_file_paths`, `parsed_schema_file`, `schema_entries`, `entity_named`, `selectable_named` (protocol crate), `graphql_entity`, `graphql_selectable`, `graphql_selectables`, `object_types_implementing`, the error types, `GraphQLLookupError`; `NetworkProtocol::LookupError`, `entity`, `selectable`, `selectables`; `ProtocolEntity`, `ProtocolSelectable`; `Definitions`, `entity_definitions`, `selectable_definitions`; the core lookups and validation counting both. Merges query-generation.md change 3.
 

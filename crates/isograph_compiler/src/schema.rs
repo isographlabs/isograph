@@ -143,6 +143,114 @@ pub struct DefinitionLocation {
     pub span: Span,
 }
 
+/// An entity the protocol defines.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProtocolEntity<TEntityData> {
+    pub definition: DefinitionLocation,
+    pub data: TEntityData,
+}
+
+/// A selectable the protocol defines.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProtocolSelectable<TSelectableData> {
+    pub description: Option<DescriptionValue>,
+    pub target: Wrapper<EntityName>,
+    pub definition: DefinitionLocation,
+    pub data: TSelectableData,
+}
+
+impl<TSelectableData> ProtocolSelectable<TSelectableData> {
+    fn into_selectable(
+        self,
+        parent_entity: EntityName,
+        name: SelectableName,
+    ) -> Selectable<TSelectableData> {
+        Selectable {
+            name,
+            parent_entity,
+            description: self.description,
+            definition: self.definition,
+            kind: SelectableKind::Server(ServerSelectable {
+                target: self.target,
+                data: self.data,
+            }),
+        }
+    }
+}
+
+pub type ProfileLookupError<TProfile> =
+    <<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::LookupError;
+
+/// What the source files and the protocol define under one name.
+pub(crate) enum Definitions<T, TLookupError> {
+    Undefined,
+    Unique(T),
+    /// More than one definition among the source declarations and the protocol.
+    Duplicated,
+    /// The protocol's lookup failed and no source declaration has the name.
+    ProtocolLookupFailed(TLookupError),
+}
+
+impl<T, TLookupError> Definitions<T, TLookupError> {
+    /// `source` chained with the protocol's definition. A protocol `Err` counts as one
+    /// definition.
+    fn count(source: impl Iterator<Item = T>, protocol: Result<Option<T>, TLookupError>) -> Self {
+        let mut source = source.peekable();
+        match (source.next(), source.peek().is_some(), protocol) {
+            (None, _, Ok(None)) => Definitions::Undefined,
+            (None, _, Ok(Some(definition))) | (Some(definition), false, Ok(None)) => {
+                Definitions::Unique(definition)
+            }
+            (None, _, Err(error)) => Definitions::ProtocolLookupFailed(error),
+            (Some(_), true, _) | (Some(_), false, Ok(Some(_)) | Err(_)) => Definitions::Duplicated,
+        }
+    }
+}
+
+/// The definitions of the entity named `entity_name`.
+pub(crate) fn entity_definitions<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    entity_name: EntityName,
+) -> Definitions<ProfileEntity<TProfile>, ProfileLookupError<TProfile>> {
+    Definitions::count(
+        source_entity_definitions(db, client, entity_name)
+            .iter()
+            .map(|definition| Entity {
+                name: entity_name,
+                definition: definition.dereference(),
+                origin: EntityOrigin::Source,
+            }),
+        TProfile::NetworkProtocol::entity(db, client, entity_name).map(|protocol| {
+            protocol.map(|protocol| Entity {
+                name: entity_name,
+                definition: protocol.definition,
+                origin: EntityOrigin::Protocol(protocol.data),
+            })
+        }),
+    )
+}
+
+/// The definitions of the selectable named `selectable_name` on the entity named
+/// `entity_name`.
+pub(crate) fn selectable_definitions<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    entity_name: EntityName,
+    selectable_name: SelectableName,
+) -> Definitions<ProfileSelectable<TProfile>, ProfileLookupError<TProfile>> {
+    Definitions::count(
+        source_selectable_definitions(db, client, entity_name, selectable_name)
+            .iter()
+            .map(SourceSelectableDefinition::selectable),
+        TProfile::NetworkProtocol::selectable(db, client, entity_name, selectable_name).map(
+            |protocol| {
+                protocol.map(|protocol| protocol.into_selectable(entity_name, selectable_name))
+            },
+        ),
+    )
+}
+
 /// The entity named `entity_name` in the schema as `client` reads it.
 #[memo]
 pub fn entity_named<TProfile: CompilationProfile>(
@@ -150,19 +258,19 @@ pub fn entity_named<TProfile: CompilationProfile>(
     client: ClientId,
     entity_name: EntityName,
 ) -> DiagnosticResult<ProfileEntity<TProfile>> {
-    match source_entity_definitions(db, client, entity_name).as_slice() {
-        [definition] => Entity {
-            name: entity_name,
-            definition: definition.dereference(),
-            origin: EntityOrigin::Source,
+    match entity_definitions(db, client, entity_name) {
+        Definitions::Unique(entity) => entity.wrap_ok(),
+        Definitions::Undefined => {
+            Diagnostic::new(format!("Entity `{entity_name}` is not defined."), None).wrap_err()
         }
-        .wrap_ok(),
-        [] => Diagnostic::new(format!("Entity `{entity_name}` is not defined."), None).wrap_err(),
-        [_, _, ..] => Diagnostic::new(
+        Definitions::Duplicated => Diagnostic::new(
             format!("Entity `{entity_name}` is defined more than once."),
             None,
         )
         .wrap_err(),
+        Definitions::ProtocolLookupFailed(error) => {
+            Diagnostic::new(error.to_string(), None).wrap_err()
+        }
     }
 }
 
@@ -175,23 +283,26 @@ pub fn selectable_named<TProfile: CompilationProfile>(
     entity_name: EntityName,
     selectable_name: SelectableName,
 ) -> DiagnosticResult<ProfileSelectable<TProfile>> {
-    match source_selectable_definitions(db, client, entity_name, selectable_name).as_slice() {
-        [selectable] => selectable.selectable().wrap_ok(),
-        [] => Diagnostic::new(
+    match selectable_definitions(db, client, entity_name, selectable_name) {
+        Definitions::Unique(selectable) => selectable.wrap_ok(),
+        Definitions::Undefined => Diagnostic::new(
             format!("Field `{entity_name}.{selectable_name}` is not defined."),
             None,
         )
         .wrap_err(),
-        [_, _, ..] => Diagnostic::new(
+        Definitions::Duplicated => Diagnostic::new(
             format!("Field `{entity_name}.{selectable_name}` is defined more than once."),
             None,
         )
         .wrap_err(),
+        Definitions::ProtocolLookupFailed(error) => {
+            Diagnostic::new(error.to_string(), None).wrap_err()
+        }
     }
 }
 
 /// Every selectable on the entity named `entity_name` that exactly one source file
-/// declaration defines, by name.
+/// declaration or protocol definition defines, by name.
 #[memo]
 pub fn selectables_for_entity<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
@@ -199,8 +310,8 @@ pub fn selectables_for_entity<TProfile: CompilationProfile>(
     entity_name: EntityName,
 ) -> DiagnosticResult<Vec<ProfileSelectable<TProfile>>> {
     entity_named(db, client, entity_name).clone()?;
-    source_iso_literal_items(db, client)
-        .filter_map(|source_item| match source_item.item {
+    let source =
+        source_iso_literal_items(db, client).filter_map(|source_item| match source_item.item {
             IsoLiteralItem::Selectable(declaration) => {
                 (declaration.parent_type.item.0 == entity_name).then(|| {
                     selectable_of_declaration(
@@ -208,12 +319,18 @@ pub fn selectables_for_entity<TProfile: CompilationProfile>(
                         source_item.literal_start,
                         declaration,
                     )
+                    .selectable()
                 })
             }
             IsoLiteralItem::Entity(_) | IsoLiteralItem::Entrypoint(_) => None,
-        })
+        });
+    let protocol = TProfile::NetworkProtocol::selectables(db, client, entity_name)
+        .into_iter()
+        .map(|(name, protocol)| protocol.into_selectable(entity_name, name));
+    source
+        .chain(protocol)
         .fold(
-            BTreeMap::<SelectableName, Vec<SourceSelectableDefinition>>::new(),
+            BTreeMap::<SelectableName, Vec<ProfileSelectable<TProfile>>>::new(),
             |mut by_name, selectable| {
                 by_name.entry(selectable.name).or_default().push(selectable);
                 by_name
@@ -221,9 +338,9 @@ pub fn selectables_for_entity<TProfile: CompilationProfile>(
         )
         .into_values()
         .filter_map(|definitions| {
-            <[SourceSelectableDefinition; 1]>::try_from(definitions)
+            <[ProfileSelectable<TProfile>; 1]>::try_from(definitions)
                 .ok()
-                .map(|[selectable]| selectable.selectable())
+                .map(|[selectable]| selectable)
         })
         .collect::<Vec<_>>()
         .wrap_ok()

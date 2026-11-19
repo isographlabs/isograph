@@ -33,6 +33,7 @@ tracing = { workspace = true }
 url = { workspace = true }
 
 [dev-dependencies]
+graphql_network_protocol = { path = "../graphql_network_protocol" }
 isograph_extract_typescript = { path = "../isograph_extract_typescript" }
 span = { path = "../span" }
 tempfile = "3"

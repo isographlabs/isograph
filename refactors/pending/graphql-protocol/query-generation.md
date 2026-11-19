@@ -782,7 +782,7 @@ Status: landed with integration.md change 2. `NetworkProtocol` gained `EntityDat
 
 ### 3. Protocol lookups in the core (isograph_compiler, graphql_network_protocol)
 
-Lands as integration.md change 3, which owns it (open decision 10). Deltas from the text below: `NetworkProtocol::selectables` (completion) is a fifth method; `GraphQLCompositeData` has only `interfaces`, with `id_field` arriving in change 7 and `fetchable_directives` in change 4; a refinement's definition is the target type's definition name.
+Status: landed as integration.md change 3, which owns it (open decision 10). Deltas from the text below: `NetworkProtocol::selectables` (completion) is a fifth method; `GraphQLCompositeData` has only `interfaces`, with `id_field` arriving in change 7 and `fetchable_directives` in change 4; a refinement's definition is the target type's definition name.
 
 `NetworkProtocol::entity` and `::selectable`; `ProtocolEntity`, `ProtocolSelectable`; `GraphQLEntityData`, `GraphQLCompositeData`, `IdField`, `GraphQLSelectableData`; `graphql_entity`, `graphql_selectable` (refinements per the integration step); `entity_named` and `selectable_named` merging source and protocol definitions; validation's "defined" checks counting both. Depends on 2 and integration.md 1 to 3. This is the schema integration step that source-backed-lookups.md's Later section names; if a schema-integration doc specifies it first, that doc's version replaces this change and the data types above move into it (open decision 10).
 

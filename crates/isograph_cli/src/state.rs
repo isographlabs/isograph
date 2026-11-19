@@ -3411,4 +3411,203 @@ mod tests {
         assert!(effects.iter().all(Vec::is_empty));
         assert!(state.diagnostics_debounce.is_none());
     }
+
+    const SCHEMA_PATH: &str = "/tmp/proj/schema/schema.graphql";
+    const SCHEMA_URI: &str = "file:///tmp/proj/schema/schema.graphql";
+    const SCHEMA: &str = "type Query {
+  pet: Pet
+  feed: [FeedItem!]!
+}
+type Pet {
+  \"The pet's given name.\"
+  name: String!
+  nickname: String
+}
+union FeedItem = Pet | Owner
+type Owner {
+  id: ID!
+}
+";
+    const SCHEMA_SELECTING: &str =
+        "iso(`field Query.HomeRoute { pet { name }, feed { asPet { name } } }`)";
+
+    /// A state with `SCHEMA` on disk as a schema file and `text` on disk as `src/x.ts`.
+    fn with_schema(text: &str) -> IsographState<TestProfile> {
+        let mut state = with_schema_glob();
+        disk_changed(&mut state, SCHEMA_PATH, SCHEMA);
+        disk_changed(&mut state, "/tmp/proj/src/x.ts", text);
+        state
+    }
+
+    /// The range in a `textDocument/definition` result of the first `needle` in `SCHEMA`
+    /// that follows `context`.
+    fn schema_definition_json(context: &str, needle: &str) -> serde_json::Value {
+        let start = SCHEMA
+            .find(context)
+            .expect("the schema contains the context")
+            + context
+                .find(needle)
+                .expect("the context contains the needle");
+        let line = SCHEMA[..start].matches('\n').count() as u32;
+        let character =
+            (start - SCHEMA[..start].rfind('\n').map_or(0, |newline| newline + 1)) as u32;
+        serde_json::json!({
+            "uri": SCHEMA_URI,
+            "range": {
+                "start": { "line": line, "character": character },
+                "end": { "line": line, "character": character + needle.len() as u32 },
+            },
+        })
+    }
+
+    #[test]
+    fn hover_and_definition_of_schema_fields_and_refinements_read_the_schema_file() {
+        let mut state = with_schema(SCHEMA_SELECTING);
+        let one = live_client(&mut state, ClientId(1));
+        let at = |needle: &str| hover_params(X_URI, 0, column(SCHEMA_SELECTING, needle));
+        let definition = |state: &mut IsographState<TestProfile>, needle: &str| {
+            request_result(
+                state,
+                &one,
+                lsp_types::request::GotoDefinition::METHOD,
+                at(needle),
+            )
+        };
+        assert_eq!(
+            hover_text(&mut state, &one, X_URI, 0, column(SCHEMA_SELECTING, "pet")),
+            some("field **Query.pet**: **Pet**")
+        );
+        assert_eq!(
+            definition(&mut state, "pet"),
+            schema_definition_json("pet: Pet", "pet")
+        );
+        assert_eq!(
+            hover_text(&mut state, &one, X_URI, 0, column(SCHEMA_SELECTING, "name")),
+            some("field **Pet.name**: **String**\n\nThe pet's given name.")
+        );
+        assert_eq!(
+            hover_text(
+                &mut state,
+                &one,
+                X_URI,
+                0,
+                column(SCHEMA_SELECTING, "asPet")
+            ),
+            some("field **FeedItem.asPet**: **Pet**")
+        );
+        assert_eq!(
+            definition(&mut state, "asPet"),
+            schema_definition_json("type Pet", "Pet")
+        );
+        assert_eq!(
+            hover_text(
+                &mut state,
+                &one,
+                X_URI,
+                0,
+                column(SCHEMA_SELECTING, "Query")
+            ),
+            some("entity **Query**")
+        );
+        assert_eq!(
+            definition(&mut state, "Query"),
+            schema_definition_json("type Query", "Query")
+        );
+    }
+
+    #[test]
+    fn completion_on_a_schema_type_lists_its_fields_and_refinements() {
+        let mut state = with_schema(SCHEMA_SELECTING);
+        let one = live_client(&mut state, ClientId(1));
+        let items =
+            |state: &mut IsographState<TestProfile>, needle: &str| -> Vec<(String, String)> {
+                request_result(
+                    state,
+                    &one,
+                    lsp_types::request::Completion::METHOD,
+                    hover_params(X_URI, 0, column(SCHEMA_SELECTING, needle)),
+                )
+                .as_array()
+                .expect("completion returns an array")
+                .iter()
+                .map(|item| {
+                    (
+                        item["label"]
+                            .as_str()
+                            .expect("an item has a label")
+                            .to_owned(),
+                        item["detail"]
+                            .as_str()
+                            .expect("a schema item has a detail")
+                            .to_owned(),
+                    )
+                })
+                .collect()
+            };
+        assert_eq!(
+            items(&mut state, "name }, feed"),
+            ("nickname".to_owned(), "String".to_owned()).wrap_vec()
+        );
+        assert_eq!(
+            items(&mut state, "asPet"),
+            ("asOwner".to_owned(), "Owner".to_owned()).wrap_vec()
+        );
+    }
+
+    #[test]
+    fn validation_reads_the_schema_and_follows_a_schema_edit_on_disk() {
+        let text = "iso(`field Query.V { pet { nope, name } }`)";
+        let mut state = with_schema(text);
+        let rx = diagnostics_client(&mut state, ClientId(1));
+        let armed = handle(&mut state, did_open(ClientId(1), X_URI, text));
+        let start = column(text, "nope");
+        assert_eq!(
+            published(fire(&mut state, armed), rx.reference()),
+            HashMap::from([(
+                X_URI.to_owned(),
+                lsp_types::Diagnostic {
+                    range: lsp_types::Range::new(
+                        lsp_types::Position::new(0, start),
+                        lsp_types::Position::new(0, start + 4)
+                    ),
+                    severity: lsp_types::DiagnosticSeverity::ERROR.wrap_some(),
+                    source: "isograph".to_owned().wrap_some(),
+                    message: "Field `Pet.nope` is not defined.".to_owned(),
+                    ..Default::default()
+                }
+                .wrap_vec()
+            )])
+        );
+        let armed = handle(
+            &mut state,
+            disk_file_changed(
+                SCHEMA_PATH,
+                Presence::Present(SCHEMA.replace("nickname: String", "nope: Int")),
+            ),
+        );
+        assert_eq!(
+            published(fire(&mut state, armed), rx.reference()),
+            HashMap::from([(X_URI.to_owned(), vec![])])
+        );
+    }
+
+    #[test]
+    fn a_source_entity_beside_a_schema_type_is_a_duplicate() {
+        let text = "iso(`entity Pet`)";
+        let mut state = with_schema(text);
+        let rx = diagnostics_client(&mut state, ClientId(1));
+        let armed = handle(&mut state, did_open(ClientId(1), X_URI, text));
+        let messages: Vec<String> = published(fire(&mut state, armed), rx.reference())
+            .remove(X_URI)
+            .expect("the file has diagnostics")
+            .into_iter()
+            .map(|diagnostic| diagnostic.message)
+            .collect();
+        assert_eq!(
+            messages,
+            "Entity `Pet` is defined more than once."
+                .to_owned()
+                .wrap_vec()
+        );
+    }
 }

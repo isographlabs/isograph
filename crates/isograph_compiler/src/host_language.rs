@@ -1,9 +1,12 @@
 use std::fmt::{self, Debug};
 use std::path::Path;
 
+use common_lang_types::{EntityName, SelectableName};
 use thiserror::Error;
 
 use isograph_parser::ParseError;
+
+use crate::{ClientId, IsographDb, ProtocolEntity, ProtocolSelectable};
 
 /// Byte offset of the iso literal text in its file.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -81,8 +84,34 @@ pub trait NetworkProtocol: Sized + 'static {
     type EntityData: Clone + Debug + PartialEq + Eq + 'static;
     /// What the protocol records about a selectable it defines.
     type SelectableData: Clone + Debug + PartialEq + Eq + 'static;
+    /// Why the protocol's lookup of an entity or selectable failed.
+    type LookupError: Clone + Debug + PartialEq + Eq + std::fmt::Display + 'static;
 
     fn should_include_schema_file(relative_path: &Path) -> IncludeFile;
+
+    /// The entity `name` as the protocol defines it; `Ok(None)` when it defines none.
+    fn entity<TProfile: CompilationProfile<NetworkProtocol = Self>>(
+        db: &IsographDb<TProfile>,
+        client: ClientId,
+        name: EntityName,
+    ) -> Result<Option<ProtocolEntity<Self::EntityData>>, Self::LookupError>;
+
+    /// The selectable `selectable` of `entity` as the protocol defines it; `Ok(None)` when it
+    /// defines none.
+    fn selectable<TProfile: CompilationProfile<NetworkProtocol = Self>>(
+        db: &IsographDb<TProfile>,
+        client: ClientId,
+        entity: EntityName,
+        selectable: SelectableName,
+    ) -> Result<Option<ProtocolSelectable<Self::SelectableData>>, Self::LookupError>;
+
+    /// Every selectable the protocol defines on `entity`, by name. A name may repeat;
+    /// `selectables_for_entity` keeps names defined exactly once.
+    fn selectables<TProfile: CompilationProfile<NetworkProtocol = Self>>(
+        db: &IsographDb<TProfile>,
+        client: ClientId,
+        entity: EntityName,
+    ) -> Vec<(SelectableName, ProtocolSelectable<Self::SelectableData>)>;
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
