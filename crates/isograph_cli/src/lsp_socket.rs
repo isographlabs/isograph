@@ -155,7 +155,16 @@ fn start_session(
         hover_provider: lsp_types::HoverProviderCapability::Simple(true).wrap_some(),
         definition_provider: lsp_types::OneOf::Left(true).wrap_some(),
         document_highlight_provider: lsp_types::OneOf::Left(true).wrap_some(),
-        completion_provider: lsp_types::CompletionOptions::default().wrap_some(),
+        completion_provider: lsp_types::CompletionOptions {
+            trigger_characters: ('a'..='z')
+                .chain('A'..='Z')
+                .chain(std::iter::once('_'))
+                .map(String::from)
+                .collect::<Vec<_>>()
+                .wrap_some(),
+            ..Default::default()
+        }
+        .wrap_some(),
         references_provider: lsp_types::OneOf::Left(true).wrap_some(),
         text_document_sync: lsp_types::TextDocumentSyncCapability::Options(
             lsp_types::TextDocumentSyncOptions {
@@ -993,9 +1002,15 @@ mod tests {
             result["capabilities"]["textDocumentSync"]["change"],
             serde_json::json!(1)
         );
+        let trigger_characters: Vec<String> = ('a'..='z')
+            .chain('A'..='Z')
+            .chain(std::iter::once('_'))
+            .map(String::from)
+            .collect();
+        assert_eq!(trigger_characters.len(), 53);
         assert_eq!(
             result["capabilities"]["completionProvider"],
-            serde_json::json!({})
+            serde_json::json!({ "triggerCharacters": trigger_characters })
         );
         assert_eq!(
             result["capabilities"]["referencesProvider"],

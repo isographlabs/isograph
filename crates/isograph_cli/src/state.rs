@@ -2034,6 +2034,42 @@ mod tests {
     }
 
     #[test]
+    fn completion_from_a_trigger_character_returns_the_items_of_an_invoked_completion() {
+        let mut state = with_config();
+        disk_changed(&mut state, "/tmp/proj/src/Pet.ts", PET_FILE);
+        disk_changed(&mut state, "/tmp/proj/src/fullName.ts", FULL_NAME_FILE);
+        disk_changed(&mut state, "/tmp/proj/src/x.ts", SELECTING_FILE);
+        let one = live_client(&mut state);
+        let in_owner = column(SELECTING_FILE, "fullName");
+        let with_context = |context: lsp_types::CompletionContext| {
+            let mut params = hover_params(X_URI, 0, in_owner);
+            params["context"] =
+                serde_json::to_value(context).expect("a CompletionContext serializes to JSON");
+            params
+        };
+        let invoked = request_result(
+            &mut state,
+            &one,
+            lsp_types::request::Completion::METHOD,
+            with_context(lsp_types::CompletionContext {
+                trigger_kind: lsp_types::CompletionTriggerKind::INVOKED,
+                trigger_character: None,
+            }),
+        );
+        let triggered = request_result(
+            &mut state,
+            &one,
+            lsp_types::request::Completion::METHOD,
+            with_context(lsp_types::CompletionContext {
+                trigger_kind: lsp_types::CompletionTriggerKind::TRIGGER_CHARACTER,
+                trigger_character: "f".to_owned().wrap_some(),
+            }),
+        );
+        assert_ne!(invoked, serde_json::Value::Null);
+        assert_eq!(triggered, invoked);
+    }
+
+    #[test]
     fn a_declarations_own_name_resolves_to_that_declaration() {
         let character = column(DECLARED, "x(");
         assert_eq!(
