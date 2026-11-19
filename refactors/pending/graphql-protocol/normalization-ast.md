@@ -455,7 +455,7 @@ pub struct NormalizationObjectEntry {
 
 `isograph_compiler` gains the `nonempty` workspace dependency. `NormalizationArguments` keeps `MergedArguments`' order because the TypeScript `Arguments` is a list, and the store key upstream builds from it (`getParentRecordKey`) depends on its order; sorted arguments give one store key per merge key. An empty `NormalizationArguments` prints as `arguments: null` (upstream `get_serialized_field_arguments`, `isograph/crates/artifact_content/src/generate_artifacts.rs:483-485`).
 
-`Integer(i32)` is narrower than `MergedValue::Integer(i64)` because the TypeScript value is a `number` (`f64`), which represents every `i32` exactly (`f64::from(i32)`), and the workspace denies `cast_precision_loss`. GraphQL `Int` is 32-bit (spec 3.5.1), so a literal outside `i32` is a query the server rejects; the builder returns `IntegerOutOfRange` (open decision 4).
+`Integer(i32)` is narrower than `MergedValue::Integer(i64)` because the TypeScript value is a `number` (`f64`), which represents every `i32` exactly (`f64::from(i32)`), and the workspace denies `cast_precision_loss`. GraphQL `Int` is 32-bit (spec 3.5.1), so a literal outside `i32` is a query the server rejects; the builder returns `IntegerOutOfRange`, which fails the query. The alternative, an `ArtifactValue` integer variant printed from its decimal text that keeps `i64`, is not taken: the server rejects such a query anyway, and a value beyond 2^53 loses precision once the TypeScript source is parsed as a `number`.
 
 ### `QueryArtifact`
 
@@ -879,7 +879,3 @@ Nothing produces `VariableEquals`: the iso grammar parses directives on selectio
 ### 3. The `Node` fetch of an interface parent
 
 `entrypoint ICheckin.X` (query-generation.md open decision 10, held: interfaces allowed) prints `node(id: $id) { ... on ICheckin { .. } }`, and `FieldEquals { __typename, "ICheckin" }` never holds, so the normalizer writes none of the fragment's fields. Options: (a) objects only as `Node`-fetched entrypoint parents (flip query-generation.md decision 10); (b) bring the Later `FieldPresent` condition into v1 for this fragment (`... on ICheckin { __refinement__ICheckin: __typename .. }`). (a) removes a feature. (b) adds a condition variant, an added field in `completed_selection_set` at position `InlineFragment` when the type condition is abstract, and the reserved prefix. `entrypoint Node.X` is not affected: `node` returns `Node` itself, so its fetch is `FetchRefinement::Exact` with no fragment.
-
-### 4. Integer literals outside `i32`
-
-Held: `IntegerOutOfRange`, which fails the query. Option: `ArtifactValue` gains an integer variant printed from its decimal text, keeping `i64`. Consequences: the held option rejects a query the server would reject anyway (GraphQL `Int` is 32-bit); the other keeps the value exact in TypeScript source, where any value beyond 2^53 still loses precision once parsed as a `number`.
