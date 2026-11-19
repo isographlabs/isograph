@@ -1,1349 +1,945 @@
-# A pico-style memoized client runtime
+# Runtime: resolver results maintained by `normalize`
 
-Status: parked. Not part of v1. v1 generates artifacts and tests against them.
+Status: under discussion. Not approved for implementation. This is the planned runtime step after v1 (`refactors/pending/runtime/store.md` and `refactors/pending/runtime/reader-ast.md`). It describes only what changes from v1, and from upstream where v1 matches upstream.
 
-`@isograph/runtime` (`libs/isograph-runtime`) is upstream Isograph's runtime (`isograph/libs/isograph-react/src/core`) with the changes below and no React dependency. Everything this doc does not list keeps upstream's behavior: `getDataIdOfNetworkResponse` (`cache.ts:599-642`), `getNetworkResponseKey` (`cache.ts:538-591`), the normalization AST, `Arguments` and `Variables`, the network function's shape, `check` (`check.ts:43-215`), retained queries with the release buffer (`garbageCollection.ts:40-63`), and `generateChildVariableMap` (`read.ts:465-490`).
+Upstream references are the checkout at `/Users/rbalicki/code/isograph` (commit `79e2a3c0`). Paths without a directory are under `isograph/libs/isograph-react/src/core`; `react/` paths are under `isograph/libs/isograph-react/src/react`.
 
-## End-user experience
+## Goal
 
-```ts
-// from demos/pet-demo/src/main.ts
-import {
-  createStore,
-  fetchEntrypoint,
-  subscribeEntrypoint,
-} from '@isograph/runtime';
-import homeRoute from './__isograph/Query/HomeRoute/entrypoint';
+Renders do no work. Every resolver result a retained query's entrypoint reaches is computed when `normalize` writes the response, and recomputed after every later `normalize` that changes one of its inputs, in dependency order. A render reads a precomputed value and nothing else.
 
-const store = createStore({
-  networkFunction: (operation, variables) =>
-    fetch('/graphql', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: operation.text, variables }),
-    }).then((response) => response.json()),
-  log: null,
-  gcBufferSize: 10,
-});
+Upstream reads and evaluates during render. `useReadAndSubscribe` reads the fragment's data in a `useState` initializer (`react/useReadAndSubscribe.ts:33-35`), `useResult` calls the resolver in the render body (`react/useResult.ts:45-64`), every nested eager resolver is called again on every read (`read.ts:600`), and the component subscribes in an effect after the render (`react/useRerenderOnChange.ts:21-37`, `subscribe.ts:15-40`). After a write, `callSubscriptions` re-reads every subscription whose recorded records overlap the written ones (`subscribe.ts:63-109`, called at `makeNetworkRequest.ts:271`). The deviation is the user's: no read-and-subscribe during render, because a render that reads and evaluates does resolver work on the render path, repeats it for every component that reads the same resolver, and needs a second read in the effect to catch writes between render and subscribe (`subscribe.ts:32-36`).
 
-const request = fetchEntrypoint(
-  store,
-  homeRoute,
-  {},
-  {
-    shouldFetch: 'IfNecessary',
-    optimisticResponse: null,
-  },
-);
+## Two levels
 
-const subscription = subscribeEntrypoint(store, homeRoute, {}, (result) => {
-  switch (result.kind) {
-    case 'Ok':
-      render(result.value);
-      return;
-    case 'MissingData':
-      renderLoading();
-      return;
-    case 'ResolverThrew':
-      renderError(result.error);
-      return;
-  }
-});
-
-// subscription.initial is { kind: 'MissingData', ... } before the response lands.
-// When it lands, the callback receives { kind: 'Ok', value }.
-
-// later
-subscription.dispose();
-request.dispose();
+```text
+level 2: observers        listen(location, onChange)  snapshot(location)
+                                 ^ notified after level 1 settles
+level 1: resolver graph   ResolverEntry on records, computed and recomputed by normalize
+                                 ^ reads
+store:                    ServerEntry on records, written by normalize
 ```
 
-With `field Pet.fullName { firstName lastName }` and `field Query.HomeRoute { pets { id fullName tagline } }`:
+Level 1 is the resolver graph. Its nodes are stored resolver results (`ResolverEntry`), one per client field, record, and argument values, held on the record under the client field's store key. Its edges are each entry's dependencies: the server values and the other resolver results its reader AST read. `normalize` owns it: it computes the entries a newly retained query reaches, and after every write it brings every retained query's entries up to date. Level 1 owns ordering. No level 2 code runs while level 1 is computing.
 
-- A second response for the same query with identical data calls no callback and runs no resolver.
-- A response that changes only `Pet:7.tagline` re-runs the selection set of `pets` on `Pet:7`, the selection set of `Query.HomeRoute`, and the `HomeRoute` resolver. `fullName` on `Pet:7` and every node for the other pets are reused without running. The callback receives a new array whose elements for the other pets are the same objects as before (`===`).
-- A response that changes only `Pet:7.firstName` re-runs `fullName` on `Pet:7`. If `fullName` declares a comparator and the new string is equal, nothing above it re-runs and no callback fires.
-- A change to a field nobody read (`Pet:7.age`) calls nothing and verifies nothing.
+Level 2 is observers. An observer names one location of level 1 (a record and a resolver store key) and a no-argument callback. It holds no value. After level 1 settles, each observer whose location's stored result changed is called once. `snapshot` returns the stored result and computes nothing. This is the shape React's `useSyncExternalStore(subscribe, getSnapshot)` takes (Level 2), so a React package can render from level 2 while `@isograph/runtime` stays React-free.
 
-## 1. Field sources with epochs replace record-level `EncounteredIds`
+With React, components are resolver results too (`@component`, Later): a component's entry is a level 1 node like any other, and a mounted component is a level 2 observer of its own entry.
 
-Upstream marks a whole record as changed when any of its fields changed (`cache.ts:211-218`), and a read records every record it touches (`read.ts:155-159`).
+## Steps
 
-```ts
-// external isograph/libs/isograph-react/src/core/cache.ts
-  if (recordHasBeenUpdated) {
-    let encounteredRecordsIds = insertEmptySetIfMissing(
-      mutableEncounteredIds,
-      targetParentRecordLink.__typename,
-    );
+Each change is one commit, in order. Step A is optional and independent of 1 to 4.
 
-    encounteredRecordsIds.add(targetParentRecordLink.__link);
-  }
-```
+- Step A. Re-read every subscription after each write, upstream's mechanism, with v1's `read`. No memoization.
+- 1. Store entries and epochs (prefactor): every value on a record is a tagged entry, the store carries an epoch, and `normalize` keeps an equal value's entry.
+- 2. Stored resolver results: `read` stores each resolver's result on its record and reuses it while its inputs are unchanged, verifying dependencies before itself (pico's algorithm).
+- 3. Level 1: `normalize` retains its query, computes the entries its entrypoint reaches, and settles every retained query after each write. `garbageCollect` reads the retained queries from the store.
+- 4. Level 2: `listen` and `snapshot`, called after settlement.
 
-Here every field of every record is a source with a `timeUpdated` epoch, and a reader depends on the sources it read.
+## Step A: re-read every subscription after each write
 
-```ts
-// from libs/isograph-runtime/src/store.ts
-export type Brand<T, TBrand extends string> = T & { readonly __brand: TBrand };
-
-export type TypeName = Brand<string, 'TypeName'>;
-export type DataId = Brand<string, 'DataId'>;
-/** A field name plus its argument chunks, as `getStorageKey` writes it. */
-export type StorageKey = Brand<string, 'StorageKey'>;
-/** A store-wide counter. It advances once per committed transaction that changed a field. */
-export type Epoch = Brand<number, 'Epoch'>;
-
-export const ROOT_ID = '__ROOT' as DataId;
-
-export type StoreLink = {
-  readonly __typename: TypeName;
-  readonly __link: DataId;
-};
-
-export type Store = {
-  readonly records: Map<TypeName, Map<DataId, StoreRecord>>;
-  /** The epoch of the last committed transaction that changed a field. */
-  epoch: Epoch;
-  phase: StorePhase;
-  readonly derivedNodes: DerivedNodeIndex;
-  /** Oldest first. */
-  readonly optimisticLayers: OptimisticLayer[];
-  readonly retainedQueries: Set<RetainedQuery>;
-  readonly gcBuffer: RetainedQuery[];
-  readonly gcBufferSize: number;
-  /** The sequence the next subscription receives. */
-  nextSubscriptionSequence: number;
-  readonly networkFunction: NetworkFunction;
-  readonly log: LogFunction | null;
-};
-
-/** A record exists once any field of it was written or read. */
-export type StoreRecord = {
-  readonly link: StoreLink;
-  readonly fields: Map<StorageKey, FieldSource>;
-};
-
-/** One field of one record: the unit of change and of dependency. */
-export type FieldSource = {
-  readonly kind: 'FieldSource';
-  readonly record: StoreRecord;
-  readonly storageKey: StorageKey;
-  /** The value without optimistic overrides. `Absent` until a write. */
-  base: FieldValue;
-  /** Oldest layer first. Reads see the last entry, else `base`. */
-  overrides: OptimisticOverride[];
-  /** The epoch in which the value reads see last changed. */
-  timeUpdated: Epoch;
-  /** Derived nodes whose current dependencies include this source. */
-  readonly dependents: Set<DerivedNode>;
-};
-
-export type FieldValue = { readonly kind: 'Absent' } | PresentFieldValue;
-
-export type PresentFieldValue =
-  | { readonly kind: 'Scalar'; readonly value: ScalarValue }
-  | { readonly kind: 'Linked'; readonly value: LinkedValue }
-  | { readonly kind: 'Inline'; readonly value: InlineValue };
-
-/** A JSON value from the response, including custom scalars that are objects. */
-export type ScalarValue =
-  | null
-  | boolean
-  | number
-  | string
-  | readonly ScalarValue[]
-  | { readonly [key: string]: ScalarValue };
-
-export type LinkedValue = null | StoreLink | readonly LinkedValue[];
-
-/** An object of a type stored inline, with its selected fields. */
-export type InlineValue = null | InlineObject | readonly InlineValue[];
-/** A missing key is a field no query selected. */
-export type InlineObject = ReadonlyMap<StorageKey, PresentFieldValue>;
-
-export const ABSENT: FieldValue = { kind: 'Absent' };
-
-export type StoreOptions = {
-  readonly networkFunction: NetworkFunction;
-  readonly log: LogFunction | null;
-  /** Released retained queries kept before garbage collection runs. Upstream's default is 10. */
-  readonly gcBufferSize: number;
-};
-
-/** Receives errors thrown by subscription callbacks and comparators. */
-export type LogFunction = (error: unknown) => void;
-
-/** An empty store at epoch 0 in `Idle`. */
-export function createStore(options: StoreOptions): Store;
-
-/** Upstream `getParentRecordKey` (`cache.ts:454-521`), renamed. */
-export function getStorageKey(
-  field:
-    | ReaderScalarField
-    | ReaderLinkedField
-    | NormalizationScalarField
-    | NormalizationLinkedField,
-  variables: Variables,
-): StorageKey;
-
-/** Upstream `stableCopy` (`util.ts:44-59`), then `JSON.stringify`. */
-export function stableStringify(variables: Variables): string;
-
-/** The value reads see. */
-export function effectiveValue(source: FieldSource): FieldValue {
-  const newest = source.overrides.at(-1);
-  return newest === undefined ? source.base : newest.value;
-}
-```
-
-A read of a field that was never written creates the `StoreRecord` (if needed) and a `FieldSource` whose `base` is `Absent`, and records a dependency on it. A later write to that key advances its `timeUpdated`, and the reader re-runs. This is the semantics of `refactors/pending/pico-missing-key-dependency.md`. Garbage collection deletes an `Absent` source with no dependents.
-
-A derived node is identified by `(kind, the reader AST object or artifact object, Root, Variables)`. Reader ASTs and artifacts are module constants, so object identity is the key.
-
-```ts
-// from libs/isograph-runtime/src/store.ts
-/** Where a selection set or resolver reads its fields. */
-export type Root =
-  | { readonly kind: 'Record'; readonly link: StoreLink }
-  | {
-      readonly kind: 'Inline';
-      readonly owner: StoreLink;
-      readonly path: readonly InlinePathSegment[];
-    };
-
-export type InlinePathSegment =
-  | { readonly kind: 'Field'; readonly storageKey: StorageKey }
-  | { readonly kind: 'Index'; readonly index: number };
-
-/** `${typename}:${id}`, then `.${storageKey}` or `.${index}` per path segment. */
-export type RootKey = Brand<string, 'RootKey'>;
-export function rootKey(root: Root): RootKey;
-```
-
-## 2. Inline storage for id-less types
-
-Upstream stores every object without `id` as a separate record at a synthetic id built from the parent and field name (`cache.ts:628-641`).
-
-```ts
-// external isograph/libs/isograph-react/src/core/cache.ts
-  let storeKey = `${parentRecordLink.__typename}:${parentRecordLink.__link}.${astNode.fieldName}`;
-  if (index != null) {
-    storeKey += `.${index}`;
-  }
-```
-
-A linked field whose target type is listed in the config's `inline_types` is stored inline: the field's source holds the whole object (with only the selected subfields) as one `Inline` value. Any other linked field keeps upstream's normalization, including the synthetic id.
-
-```json
-{
-  "source_files": ["src/**/*.ts"],
-  "schema": ["schema/**/*.graphql"],
-  "artifact_directory": "src",
-  "inline_types": ["Date", "Money"]
-}
-```
-
-The compiler writes the decision into every reader and normalization AST node as `storage: 'Normalized' | 'Inline'`. The runtime does not decide.
-
-- `User:1.birthday` is one source holding `{ year, month, day }`. A reader of `birthday { year }` depends on that one source, so a change to `birthday.day` re-runs it.
-- Writes merge: a response selecting `birthday { month }` adds `month` to the stored object and keeps `year`. Lists merge element by element at equal indices, and the new length wins. This keeps upstream's result, where a later write to a synthetic-id record overwrites only the selected fields.
-- An inline value may contain links to normalized records. For a normalized object inside an inline value, the synthetic id's `parentKey` is that of the owning record followed by `.${storageKey}` or `.${index}` for each segment of the inline path.
-- A type stored inline cannot be selected with `__link` (there is no `StoreLink`), which the compiler rejects. `field` selectables on an inline type are allowed; their root is `Root.Inline`.
-
-## 3. Cached resolver results in derived nodes
-
-Upstream does not cache resolver outputs: every read of a fragment calls every nested eager resolver again (`read.ts:600`), and `useResult` calls the top resolver on every render (`react/useResult.ts:64`).
-
-```ts
-// external isograph/libs/isograph-react/src/core/read.ts
-      return {
-        kind: 'Success',
-        data: readerWithRefetchQueries.readerArtifact.resolver(firstParameter),
-      };
-```
-
-Here every read of a selection set on a root, and every evaluation of a resolver on a root, is a derived node with recorded dependencies, a cached result, a `timeUpdated`, and a `timeVerified`.
-
-```ts
-// from libs/isograph-runtime/src/derivedNode.ts
-export type DerivedNode = SelectionSetNode | ResolverNode;
-
-/** The read of a selection set on one root. */
-export type SelectionSetNode = DerivedNodeFields<SelectionSetData> & {
-  readonly kind: 'SelectionSet';
-  readonly selectionSet: ReaderSelectionSet;
-  readonly root: Root;
-  readonly variables: Variables;
-};
-
-/** A resolver applied to the read of its selection set on one root. */
-export type ResolverNode = DerivedNodeFields<unknown> & {
-  readonly kind: 'Resolver';
-  readonly artifact: EagerReaderArtifact<unknown>;
-  readonly root: Root;
-  readonly variables: Variables;
-};
-
-type DerivedNodeFields<T> = {
-  state: DerivedNodeState<T>;
-  /** The last epoch in which a write reached this node through `dependents`. */
-  markedDirtyAt: Epoch;
-  readonly dependents: Set<DerivedNode>;
-  readonly subscriptions: Set<Subscription>;
-};
-
-export type DerivedNodeState<T> =
-  | {
-      readonly kind: 'Executing';
-      readonly previous: ComputedState<T> | null;
-    }
-  | ComputedState<T>;
-
-export type ComputedState<T> = {
-  readonly kind: 'Computed';
-  readonly result: ReadResult<T>;
-  /** The newest `timeUpdated` among the dependencies when the result last changed. */
-  readonly timeUpdated: Epoch;
-  /** The last epoch in which the result was confirmed current. */
-  timeVerified: Epoch;
-  /** In read order. */
-  readonly dependencies: readonly Dependency[];
-};
-
-export type Dependency = FieldSource | DerivedNode;
-
-export type SelectionSetData = { readonly [alias: string]: unknown };
-
-export type ReadResult<T> =
-  | { readonly kind: 'Ok'; readonly value: T }
-  | MissingData
-  | ResolverThrew;
-
-export type MissingData = {
-  readonly kind: 'MissingData';
-  readonly root: Root;
-  readonly storageKey: StorageKey;
-};
-
-export type ResolverThrew = {
-  readonly kind: 'ResolverThrew';
-  /** `EagerReaderArtifact.fieldName` of the resolver that threw. */
-  readonly fieldName: string;
-  readonly root: Root;
-  readonly error: unknown;
-};
-
-export type DerivedNodeIndex = {
-  readonly selectionSets: Map<
-    ReaderSelectionSet,
-    Map<DerivedNodeKey, SelectionSetNode>
-  >;
-  readonly resolvers: Map<
-    EagerReaderArtifact<unknown>,
-    Map<DerivedNodeKey, ResolverNode>
-  >;
-};
-
-/** `rootKey(root)`, a NUL, then `stableStringify(variables)`. */
-export type DerivedNodeKey = Brand<string, 'DerivedNodeKey'>;
-```
-
-For `Query.HomeRoute`:
-
-- `Query.HomeRoute` on `Query:__ROOT` is a `ResolverNode`. Its one dependency is the `SelectionSetNode` of its reader AST on the same root.
-- That selection set node depends on the source `Query:__ROOT.pets`, and on one `SelectionSetNode` per pet for the nested `{ id fullName tagline }`.
-- Each pet's selection set node depends on the sources `id` and `tagline` and on the `ResolverNode` of `fullName` on that pet.
-- `fullName` on `Pet:7` depends on the `SelectionSetNode` of `{ firstName lastName }` on `Pet:7`, which depends on two sources.
-
-A resolver receives `data`, the result of its selection set node, and does not read the store, so its dependencies are exactly that node.
-
-A `MissingData` or `ResolverThrew` result is cached like `Ok`. A parent that reads a child whose result is not `Ok` returns the child's result object unchanged. A resolver that throws is caught; its node's result is `ResolverThrew` until a dependency changes.
-
-### Recording dependencies
-
-```ts
-// from libs/isograph-runtime/src/derivedNode.ts
-/** The dependencies of the node whose body is running. */
-type DependencyRecorder = {
-  readonly dependencies: Dependency[];
-  maxTimeUpdated: Epoch;
-};
-
-function recordDependency(
-  recorder: DependencyRecorder,
-  dependency: Dependency,
-  timeUpdated: Epoch,
-): void {
-  recorder.maxTimeUpdated = Math.max(
-    recorder.maxTimeUpdated,
-    timeUpdated,
-  ) as Epoch;
-  if (recorder.dependencies.at(-1) !== dependency) {
-    recorder.dependencies.push(dependency);
-  }
-}
-```
-
-The recorder is a parameter of every read function, created by `recompute` for the node whose body runs. Cycle detection uses the `Executing` state.
-
-### Verification
-
-Verification is pico's algorithm (`docs-website/docs/design-docs/pico.md`) plus one short-circuit: `markedDirtyAt <= timeVerified` means no write reached the node since it was verified, so the dependency walk is skipped (see change 5).
-
-```ts
-// from libs/isograph-runtime/src/derivedNode.ts
-/** Brings `node` up to date in the current epoch and returns its result. */
-export function verify<T>(store: Store, node: NodeOf<T>): ReadResult<T> {
-  const state = node.state;
-  switch (state.kind) {
-    case 'Executing':
-      throw new CycleError(node);
-    case 'Computed': {
-      if (state.timeVerified === store.epoch) {
-        return state.result;
-      }
-      if (
-        node.markedDirtyAt <= state.timeVerified ||
-        !anyDependencyChanged(store, state)
-      ) {
-        state.timeVerified = store.epoch;
-        return state.result;
-      }
-      return recompute(store, node, state);
-    }
-  }
-}
-
-function anyDependencyChanged(
-  store: Store,
-  state: ComputedState<unknown>,
-): boolean {
-  const since = state.timeVerified;
-  return state.dependencies.some((dependency) => {
-    switch (dependency.kind) {
-      case 'FieldSource':
-        return dependency.timeUpdated > since;
-      case 'SelectionSet':
-      case 'Resolver':
-        verify(store, dependency);
-        return computedState(dependency).timeUpdated > since;
-    }
-  });
-}
-
-/** Runs the body of `node`, then stores the result, backdating when equal. */
-function recompute<T>(
-  store: Store,
-  node: NodeOf<T>,
-  previous: ComputedState<T> | null,
-): ReadResult<T> {
-  node.state = { kind: 'Executing', previous };
-  const recorder: DependencyRecorder = {
-    dependencies: [],
-    maxTimeUpdated: 0 as Epoch,
-  };
-  const result = computeOrRestore(store, recorder, node, previous);
-  replaceReverseEdges(
-    node,
-    previous?.dependencies ?? [],
-    recorder.dependencies,
-  );
-  const equal =
-    previous !== null && resultsEqual(store, node, previous.result, result);
-  node.state = {
-    kind: 'Computed',
-    result: equal ? previous.result : result,
-    timeUpdated: equal ? previous.timeUpdated : recorder.maxTimeUpdated,
-    timeVerified: store.epoch,
-    dependencies: recorder.dependencies,
-  };
-  return node.state.result;
-}
-
-/** The body by kind. On a throw (only `CycleError`), restores `previous`, or removes a new node from the index, and rethrows. */
-function computeOrRestore<T>(
-  store: Store,
-  recorder: DependencyRecorder,
-  node: NodeOf<T>,
-  previous: ComputedState<T> | null,
-): ReadResult<T>;
-
-/** Removes `node` from each old dependency's `dependents` and adds it to each new one's. */
-function replaceReverseEdges(
-  node: DerivedNode,
-  previous: readonly Dependency[],
-  next: readonly Dependency[],
-): void;
-
-/** `node.state` after `verify` returned. */
-function computedState<T>(node: NodeOf<T>): ComputedState<T>;
-
-/** `SelectionSetNode` when `T` is `SelectionSetData`, else `ResolverNode`. */
-type NodeOf<T> = DerivedNode & { state: DerivedNodeState<T> };
-```
-
-The walk stops at the first changed dependency, so after a link changes from `Pet:7` to `Pet:8`, the node re-runs before it verifies the old `Pet:7` child. Writes cannot happen while a body runs (see `StorePhase`), so the node's `timeVerified` replaces pico's per-dependency epoch.
-
-## 4. Backdating and resolver comparators
-
-Upstream compares nested resolver values with `!==` when it decides whether a fragment changed (`areEqualWithDeepComparison.ts:84-95`), so a nested resolver that returns a new object makes the fragment differ.
-
-```ts
-// external isograph/libs/isograph-react/src/core/areEqualWithDeepComparison.ts
-      case 'Resolver': {
-        const key = field.alias;
-        // @ts-expect-error
-        const oldValue = oldItemObject[key];
-        // @ts-expect-error
-        const newValue = newItemObject[key];
-
-        if (oldValue !== newValue) {
-          canRecycle = false;
-        }
-        break;
-      }
-```
-
-Here equal results keep the previous result object and the previous `timeUpdated`, and a field may declare a comparator (`isEqual` on `EagerReaderArtifact`).
-
-```ts
-// from libs/isograph-runtime/src/equality.ts
-function resultsEqual<T>(
-  store: Store,
-  node: NodeOf<T>,
-  previous: ReadResult<T>,
-  next: ReadResult<T>,
-): boolean {
-  if (previous.kind === 'Ok' && next.kind === 'Ok') {
-    switch (node.kind) {
-      case 'SelectionSet':
-        return selectionSetDataEqual(
-          node.selectionSet,
-          previous.value,
-          next.value,
-        );
-      case 'Resolver': {
-        const isEqual = node.artifact.isEqual;
-        return (
-          isEqual !== null &&
-          runUserCode(store, () => isEqual(previous.value, next.value))
-        );
-      }
-    }
-  }
-  if (previous.kind === 'MissingData' && next.kind === 'MissingData') {
-    return (
-      rootKey(previous.root) === rootKey(next.root) &&
-      previous.storageKey === next.storageKey
-    );
-  }
-  return false;
-}
-
-/** Same aliases; each value `===`, comparing arrays (plural fields) element by element at every list depth. */
-function selectionSetDataEqual(
-  selectionSet: ReaderSelectionSet,
-  previous: SelectionSetData,
-  next: SelectionSetData,
-): boolean;
-```
-
-- A selection set's data is server values and child results, so one level of `===` is exact: a scalar is the stored reference when its source did not change, and a child result is the same object when the child backdated. It returns true when the node re-ran because of a dependency it reads but does not output, such as the `__typename` an inline fragment tests.
-- Two `MissingData` results at the same root and storage key are equal, so a node still waiting for the same field does not notify.
-- A resolver's output is never compared unless its artifact has `isEqual`. With a comparator, an equal output stops the parent selection set node, the parent resolver, and the subscriber.
-- A comparator that throws is logged and treated as unequal.
-
-Memoization replaces `mergeObjectsUsingReaderAst` (`areEqualWithDeepComparison.ts:55-121`), which upstream uses to recover old sub-objects after rebuilding the whole tree. A node that did not re-run returns its previous object, so a parent that re-runs builds a new object around unchanged children.
-
-## 5. Dirty marks along reverse edges replace the subscription scan
-
-Upstream loops over every subscription after a write (`subscribe.ts:63-109`); a fragment subscription whose last `EncounteredIds` overlaps the changed records (`subscribe.ts:164-189`) re-reads its whole fragment (`subscribe.ts:117`) and compares it with `mergeObjectsUsingReaderAst` (`subscribe.ts:138-161`).
-
-```ts
-// external isograph/libs/isograph-react/src/core/subscribe.ts
-  environment.subscriptions.forEach((subscription) =>
-    logAnyError(environment, { situation: 'calling subscriptions' }, () => {
-      switch (subscription.kind) {
-        case 'FragmentSubscription': {
-          // TODO if there are multiple components subscribed to the same
-          // fragment, we will call readButNotEvaluate multiple times. We
-          // should fix that.
-          if (
-            hasOverlappingIds(
-              recordsEncounteredWhenNormalizing,
-              subscription.encounteredDataAndRecords.encounteredRecords,
-            )
-          ) {
-            callSubscriptionIfDataChanged(environment, subscription);
-          }
-          return;
-        }
-```
-
-Here a write pushes a dirty mark up `dependents` and collects the subscriptions it reaches, then each collected subscription pulls its node's result through `verify` (open decision 1).
-
-Upstream's write sites call `callSubscriptions` directly after `normalizeData` (`makeNetworkRequest.ts:271`, `writeData.ts:55`, `optimisticProxy.ts:492`). Here writes happen inside a `transaction`, which notifies once at commit and guards reads during writes and during user code.
-
-```ts
-// from libs/isograph-runtime/src/transaction.ts
-export type StorePhase =
-  | IdlePhase
-  | NotifyingPhase
-  | {
-      readonly kind: 'Transaction';
-      readonly transaction: TransactionState;
-      readonly resume: IdlePhase | NotifyingPhase;
-    }
-  | {
-      /** A resolver or comparator is running. */
-      readonly kind: 'RunningUserCode';
-      readonly resume: IdlePhase | NotifyingPhase;
-    };
-
-export type IdlePhase = { readonly kind: 'Idle' };
-
-/** Subscription callbacks are running. Insertion order is delivery order. */
-export type NotifyingPhase = {
-  readonly kind: 'Notifying';
-  readonly queue: Set<Subscription>;
-};
-
-export type TransactionState = {
-  /** `store.epoch + 1`. Every field this transaction changes gets it. */
-  readonly epoch: Epoch;
-  readonly changed: Set<FieldSource>;
-};
-
-/** Runs `body` as one transaction and notifies once at the end. Joins an open transaction. */
-export function transaction<T>(
-  store: Store,
-  body: (transaction: TransactionState) => T,
-): T {
-  const phase = store.phase;
-  switch (phase.kind) {
-    case 'Transaction':
-      return body(phase.transaction);
-    case 'RunningUserCode':
-      throw new StoreAccessDuringUserCodeError('transaction');
-    case 'Idle':
-    case 'Notifying': {
-      const transaction: TransactionState = {
-        epoch: (store.epoch + 1) as Epoch,
-        changed: new Set(),
-      };
-      store.phase = { kind: 'Transaction', transaction, resume: phase };
-      try {
-        return body(transaction);
-      } finally {
-        commit(store, transaction, phase);
-      }
-    }
-  }
-}
-
-function commit(
-  store: Store,
-  transaction: TransactionState,
-  resume: IdlePhase | NotifyingPhase,
-): void {
-  if (transaction.changed.size > 0) {
-    store.epoch = transaction.epoch;
-  }
-  const affected = markDirty(transaction.changed, transaction.epoch);
-  switch (resume.kind) {
-    case 'Notifying':
-      affected.forEach((subscription) => resume.queue.add(subscription));
-      store.phase = resume;
-      return;
-    case 'Idle': {
-      const notifying: NotifyingPhase = {
-        kind: 'Notifying',
-        queue: new Set(affected),
-      };
-      store.phase = notifying;
-      deliver(store, notifying);
-      store.phase = resume;
-      return;
-    }
-  }
-}
-
-/** Marks every node reachable from `changed` through `dependents`. Returns their subscriptions by `sequence`. */
-function markDirty(
-  changed: ReadonlySet<FieldSource>,
-  epoch: Epoch,
-): Subscription[] {
-  const affected: Subscription[] = [];
-  const pending: DerivedNode[] = [...changed].flatMap((source) => [
-    ...source.dependents,
-  ]);
-  let node = pending.pop();
-  while (node !== undefined) {
-    if (node.markedDirtyAt !== epoch) {
-      node.markedDirtyAt = epoch;
-      affected.push(...node.subscriptions);
-      pending.push(...node.dependents);
-    }
-    node = pending.pop();
-  }
-  return affected.sort((a, b) => a.sequence - b.sequence);
-}
-
-function deliver(store: Store, notifying: NotifyingPhase): void {
-  let next = firstOf(notifying.queue);
-  while (next !== undefined) {
-    const subscription = next;
-    notifying.queue.delete(subscription);
-    if (subscription.node.subscriptions.has(subscription)) {
-      const result = verify(store, subscription.node);
-      if (result !== subscription.delivered) {
-        subscription.delivered = result;
-        callLogged(store, () => subscription.callback(result));
-      }
-    }
-    next = firstOf(notifying.queue);
-  }
-}
-
-/** The first element in insertion order. */
-function firstOf<T>(set: ReadonlySet<T>): T | undefined;
-
-/** Calls `body`; a throw goes to `store.log`. */
-function callLogged(store: Store, body: () => void): void;
-```
-
-```ts
-// from libs/isograph-runtime/src/errors.ts
-/** A public read or `transaction` while a resolver or comparator runs. */
-export class StoreAccessDuringUserCodeError extends Error {
-  constructor(readonly operation: 'read' | 'transaction');
-}
-
-/** A public read while a transaction is open. */
-export class StoreAccessDuringTransactionError extends Error {}
-
-/** A derived node read itself while executing. */
-export class CycleError extends Error {
-  constructor(readonly node: DerivedNode);
-}
-
-/** A stored value's kind disagrees with the reader AST: the compiler and the store disagree. */
-export class StoreShapeError extends Error {
-  constructor(
-    readonly root: Root,
-    readonly storageKey: StorageKey,
-    readonly found: FieldValue,
-  );
-}
-```
-
-Reads during a transaction throw `StoreAccessDuringTransactionError`, because a node verified mid-transaction would record a `timeVerified` equal to an epoch still receiving writes. Reads and transactions inside a resolver or comparator throw `StoreAccessDuringUserCodeError`. A subscription callback runs in `Notifying` and may read or open a transaction; that transaction commits at once and appends its affected subscriptions to the queue being delivered. A callback that throws is logged and does not stop delivery.
-
-A subscription is called when the `ReadResult` object it last received is not the object `verify` returns. A backdated node returns the previous object, so a backdated subscription is not called.
-
-## 6. Structural equality on writes
-
-Upstream compares an incoming scalar with `!==` (`cache.ts:248-249`), so a list scalar or an object custom scalar counts as changed on every response.
-
-```ts
-// external isograph/libs/isograph-react/src/core/cache.ts
-  targetStoreRecord[parentRecordKey] = networkResponseData;
-  return existingValue !== networkResponseData;
-```
-
-Here a write compares structurally, and a source's epoch advances only when the value reads see changed.
-
-```ts
-// from libs/isograph-runtime/src/transaction.ts
-export type WritePosition =
-  /** Server data newer than every override except those of `keepOverridesOf`. */
-  | {
-      readonly kind: 'Base';
-      readonly keepOverridesOf: ReadonlySet<OptimisticLayer>;
-    }
-  /** An optimistic response's data. */
-  | { readonly kind: 'Layer'; readonly layer: OptimisticLayer };
-
-export function writeField(
-  transaction: TransactionState,
-  source: FieldSource,
-  value: PresentFieldValue,
-  position: WritePosition,
-): void {
-  const before = effectiveValue(source);
-  switch (position.kind) {
-    case 'Base':
-      source.base = fieldValueEqual(source.base, value) ? source.base : value;
-      source.overrides = source.overrides.filter((override) =>
-        position.keepOverridesOf.has(override.layer),
-      );
-      break;
-    case 'Layer':
-      source.overrides = [
-        ...source.overrides.filter(
-          (override) => override.layer !== position.layer,
-        ),
-        { layer: position.layer, value },
-      ];
-      position.layer.fields.add(source);
-      break;
-  }
-  if (!fieldValueEqual(before, effectiveValue(source))) {
-    source.timeUpdated = transaction.epoch;
-    transaction.changed.add(source);
-  }
-}
-
-/** Structural equality of stored values. Links compare `__typename` and `__link`. Object key order is ignored. */
-export function fieldValueEqual(a: FieldValue, b: FieldValue): boolean;
-```
-
-When the incoming value equals the stored base, the stored reference is kept, so downstream `===` comparisons hold.
-
-`normalize` returns nothing; upstream's `EncounteredIds` (`cache.ts:77-107`) is replaced by `writeField` recording each changed source in the transaction.
-
-```ts
-// from libs/isograph-runtime/src/normalize.ts
-/** Writes `response` into the record `root` per `selections`. Called inside a transaction. */
-export function normalize(
-  store: Store,
-  transaction: TransactionState,
-  selections: NormalizationSelectionSet,
-  response: NetworkResponseObject,
-  variables: Variables,
-  root: StoreLink,
-  position: WritePosition,
-): void;
-
-/** Builds the `Inline` value for one inline linked field, merged with `existing` per `selections`. Nested normalized objects are written as records. */
-function inlineValue(
-  store: Store,
-  transaction: TransactionState,
-  existing: FieldValue,
-  response: NetworkResponseValue,
-  selections: NormalizationSelectionSet,
-  variables: Variables,
-  owner: StoreLink,
-  path: readonly InlinePathSegment[],
-  position: WritePosition,
-): InlineValue;
-
-/** Upstream `check` (`check.ts:43-215`) over `effectiveValue`, without recording dependencies. */
-export function check(
-  store: Store,
-  selections: NormalizationSelectionSet,
-  variables: Variables,
-  root: StoreLink,
-): CheckResult;
-
-export type CheckResult =
-  | { readonly kind: 'EnoughData' }
-  | {
-      readonly kind: 'MissingData';
-      readonly root: Root;
-      readonly storageKey: StorageKey;
-    };
-```
-
-A `Linked` selection with `storage: 'Inline'` `writeField`s `{ kind: 'Inline', value: inlineValue(...) }`, where `existing` is `base` for a `Base` write and `effectiveValue` for a `Layer` write. Other selections normalize as upstream does, through `writeField`.
-
-## 7. Optimistic overrides on each source replace the layer stack
-
-Upstream reads every field through a `Proxy` that walks the store layers (`optimisticProxy.ts:46-98`).
-
-```ts
-// external isograph/libs/isograph-react/src/core/optimisticProxy.ts
-  return new Proxy<StoreRecord>(
-    {},
-    {
-      get(_, propertyName) {
-        let currentStoreLayer: StoreLayer | null = childMostStoreLayer;
-        while (currentStoreLayer != null) {
-          const storeRecord =
-            currentStoreLayer.data[link.__typename]?.[link.__link];
-```
-
-Here each source holds its overrides, and reads take `effectiveValue`.
-
-```ts
-// from libs/isograph-runtime/src/optimistic.ts
-export type OptimisticLayer = {
-  /** Every source this layer overrides. */
-  readonly fields: Set<FieldSource>;
-};
-
-export type OptimisticOverride = {
-  readonly layer: OptimisticLayer;
-  readonly value: PresentFieldValue;
-};
-
-/** Appends a layer to `store.optimisticLayers`. */
-export function createOptimisticLayer(store: Store): OptimisticLayer;
-
-/** Removes the layer's overrides and the layer. Returns the layers newer than it, for a replacing write. */
-export function revertOptimisticLayer(
-  store: Store,
-  transaction: TransactionState,
-  layer: OptimisticLayer,
-): ReadonlySet<OptimisticLayer>;
-```
-
-`revertOptimisticLayer` removes the layer's override from each of its sources and runs the same changed-check as `writeField`. A server response writes `Base` with `keepOverridesOf` empty, which matches upstream's `addNetworkResponseStoreLayer` on top of the stack (`optimisticProxy.ts:161-183`). The response that replaces an optimistic layer reverts the layer and writes `Base` keeping the overrides of the layers newer than it, which matches upstream's replacement in place (`optimisticProxy.ts:393-492`). Effective values are the same as upstream's for data-only layers.
-
-## 8. Subscriptions on resolver nodes and `MissingData` results replace fragment subscriptions and Suspense throws
-
-Upstream subscriptions are per fragment reference, plus `AnyRecords` and `AnyChangesToRecord` (`IsographEnvironment.ts:42-69`), and a read with missing data throws a promise built on `onNextChangeToRecord` (`read.ts:92-122`).
-
-```ts
-// external isograph/libs/isograph-react/src/core/read.ts
-    throw onNextChangeToRecord(environment, response.recordLink);
-```
-
-`onNextChangeToRecord` (`cache.ts:135-149`) is built on `AnyChangesToRecord`, whose check is always true: `has` returns a boolean, and a boolean is never `null`, so the callback fires whenever any record of that type changed (`subscribe.ts:93-97`).
-
-```ts
-// external isograph/libs/isograph-react/src/core/subscribe.ts
-        case 'AnyChangesToRecord': {
-          if (
-            recordsEncounteredWhenNormalizing
-              .get(subscription.recordLink.__typename)
-              ?.has(subscription.recordLink.__link) != null
-          ) {
-```
-
-Here a subscription is attached to a `ResolverNode`, and missing data is a cached `MissingData` result that a later write updates through the normal dirty-mark path. `AnyRecords` and `AnyChangesToRecord` do not exist.
+A step close to upstream that lets a React demo exist before the memoized runtime. It is not the final design: it is read-plus-subscribe, with the read on every write.
 
 ```ts
 // from libs/isograph-runtime/src/subscribe.ts
 export type Subscription = {
-  readonly sequence: number;
-  readonly node: ResolverNode;
-  delivered: ReadResult<unknown>;
-  readonly callback: (result: ReadResult<unknown>) => void;
-};
-
-export type SubscriptionHandle<T> = {
-  readonly initial: ReadResult<T>;
-  readonly dispose: () => void;
-};
-
-/** The current result of `artifact` on `link`. */
-export function readField<T>(
-  store: Store,
-  artifact: EagerReaderArtifact<T>,
-  link: StoreLink,
-  variables: Variables,
-): ReadResult<T>;
-
-/** Reads, then calls `callback` after every committed transaction that changes the result. */
-export function subscribeField<T>(
-  store: Store,
-  artifact: EagerReaderArtifact<T>,
-  link: StoreLink,
-  variables: Variables,
-  callback: (result: ReadResult<T>) => void,
-): SubscriptionHandle<T>;
-
-/** `readField` of the entrypoint's reader artifact on `{ __typename: concreteType, __link: ROOT_ID }`. */
-export function readEntrypoint<T, TVariables extends Variables>(
-  store: Store,
-  entrypoint: Entrypoint<T, TVariables, NetworkResponseObject>,
-  variables: TVariables,
-): ReadResult<T>;
-
-export function subscribeEntrypoint<T, TVariables extends Variables>(
-  store: Store,
-  entrypoint: Entrypoint<T, TVariables, NetworkResponseObject>,
-  variables: TVariables,
-  callback: (result: ReadResult<T>) => void,
-): SubscriptionHandle<T>;
-```
-
-`readField` throws in `Transaction` and `RunningUserCode`, gets or creates the `ResolverNode` for `(artifact, Root.Record(link), variables)`, and returns `verify` (creating a node runs `recompute` with `previous` null). `subscribeField` does the same, mints `sequence` from `store.nextSubscriptionSequence`, adds the subscription to the node with `delivered` set to the result, and returns that result as `initial`. `dispose` removes the subscription from the node.
-
-Reads inside a node body:
-
-```ts
-// from libs/isograph-runtime/src/read.ts
-function computeSelectionSet(
-  store: Store,
-  recorder: DependencyRecorder,
-  node: SelectionSetNode,
-): ReadResult<SelectionSetData> {
-  const data: { [alias: string]: unknown } = {};
-  for (const selection of node.selectionSet) {
-    const value = readSelection(store, recorder, node, selection);
-    if (value.kind !== 'Ok') {
-      return value;
-    }
-    data[selectionAlias(selection)] = value.value;
-  }
-  return { kind: 'Ok', value: data };
-}
-
-function computeResolver(
-  store: Store,
-  recorder: DependencyRecorder,
-  node: ResolverNode,
-): ReadResult<unknown> {
-  const data = readChild(
-    store,
-    recorder,
-    selectionSetNode(
-      store,
-      node.artifact.readerAst,
-      node.root,
-      node.variables,
-    ),
-  );
-  if (data.kind !== 'Ok') {
-    return data;
-  }
-  return runUserCode(store, () => {
-    try {
-      return {
-        kind: 'Ok',
-        value: node.artifact.resolver({
-          data: data.value,
-          parameters: node.variables,
-        }),
-      };
-    } catch (error) {
-      return {
-        kind: 'ResolverThrew',
-        fieldName: node.artifact.fieldName,
-        root: node.root,
-        error,
-      };
-    }
-  });
-}
-
-/**
- * Scalar: the field's `Scalar` value. Link: `node.root.link`.
- * Linked, normalized: `readChild` of `selectionSetNode(selection.selections, Root.Record(link))` per link, mapped over list depth.
- * Linked, inline: `readChild` of `selectionSetNode(selection.selections, Root.Inline(owner, path))` per object, mapped over list depth, with `Index` segments.
- * Resolver: `readChild` of `resolverNode(selection.readerArtifact(), node.root, generateChildVariableMap(node.variables, selection.arguments))`.
- * The first non-`Ok` child result is returned unchanged. An `Absent` field is `MissingData` at (root, storageKey).
- * A stored kind that disagrees with the selection (a `Scalar` selection reading a `Linked` value) throws `StoreShapeError`.
- */
-function readSelection(
-  store: Store,
-  recorder: DependencyRecorder,
-  node: SelectionSetNode,
-  selection: ReaderSelection,
-): ReadResult<unknown>;
-
-/** Record root: the source at (root.link, storageKey); a missing one is created with `base` `Absent` and `timeUpdated` `store.epoch`. Inline root: the owner source, then the path, then `storageKey` in the object reached; a path that does not reach an object is `Absent`. Records the source. */
-function readFieldValue(
-  store: Store,
-  recorder: DependencyRecorder,
-  root: Root,
-  storageKey: StorageKey,
-): FieldValue;
-
-/** `verify`, then records `child` with its `timeUpdated`. */
-function readChild<T>(
-  store: Store,
-  recorder: DependencyRecorder,
-  child: NodeOf<T>,
-): ReadResult<T>;
-
-/** Gets or creates; a created node is computed before it is returned. */
-function selectionSetNode(
-  store: Store,
-  selectionSet: ReaderSelectionSet,
-  root: Root,
-  variables: Variables,
-): SelectionSetNode;
-
-function resolverNode(
-  store: Store,
-  artifact: EagerReaderArtifact<unknown>,
-  root: Root,
-  variables: Variables,
-): ResolverNode;
-
-/** `alias`, else `fieldName`. */
-function selectionAlias(selection: ReaderSelection): string;
-
-/** Sets `RunningUserCode` around `body` and restores the previous phase. */
-function runUserCode<T>(store: Store, body: () => T): T;
-```
-
-## 9. `fetchEntrypoint` returns a typed outcome
-
-Upstream `makeNetworkRequest` returns `ItemCleanupPair<PromiseWrapper<void, AnyError>>` (`makeNetworkRequest.ts:159-179`) and rejects when the response has `errors` (`makeNetworkRequest.ts:224-231`).
-
-```ts
-// external isograph/libs/isograph-react/src/core/makeNetworkRequest.ts
-      if (networkResponse.errors != null) {
-        try {
-          fetchOptions?.onError?.();
-        } catch {}
-        throw new Error('Network response had errors', {
-          cause: networkResponse,
-        });
-      }
-```
-
-Here the promise resolves a `FetchOutcome`, and only a rejection of `networkFunction` rejects it.
-
-```ts
-// from libs/isograph-runtime/src/network.ts
-export type NetworkFunction = (
-  operation: Operation,
-  variables: Variables,
-) => Promise<NetworkResponse>;
-
-export type NetworkResponse = {
-  readonly data?: NetworkResponseObject | null;
-  readonly errors?: readonly unknown[];
-};
-
-export type FetchOptions<TRawResponse extends NetworkResponseObject> = {
-  readonly shouldFetch: ShouldFetch;
-  readonly optimisticResponse: TRawResponse | null;
-};
-
-/** Upstream `ShouldFetch` (`check.ts:13-14`). */
-export type ShouldFetch = 'Yes' | 'No' | 'IfNecessary';
-
-export type FetchHandle = {
-  readonly response: Promise<FetchOutcome>;
-  /** Reverts an in-flight optimistic layer and releases the retained query. */
-  readonly dispose: () => void;
-};
-
-export type FetchOutcome =
-  | { readonly kind: 'Written' }
-  | { readonly kind: 'NotFetched' }
-  | { readonly kind: 'DisposedBeforeResponse' }
-  | { readonly kind: 'ResponseHadErrors'; readonly errors: readonly unknown[] };
-
-type RequestStatus =
-  | { readonly kind: 'InFlight'; readonly layer: OptimisticLayer | null }
-  | { readonly kind: 'Complete' }
-  | { readonly kind: 'Disposed' };
-
-export function fetchEntrypoint<
-  T,
-  TVariables extends Variables,
-  TRawResponse extends NetworkResponseObject,
->(
-  store: Store,
-  entrypoint: Entrypoint<T, TVariables, TRawResponse>,
-  variables: TVariables,
-  options: FetchOptions<TRawResponse>,
-): FetchHandle;
-```
-
-- `No`, or `IfNecessary` when `check` finds every field present: `response` resolves `NotFetched`.
-- A response after `dispose` is not written, as upstream (`makeNetworkRequest.ts:235`), and `response` resolves `DisposedBeforeResponse`.
-- A response with `errors` reverts the layer in a transaction and resolves `ResponseHadErrors`.
-- Otherwise one transaction reverts the layer (if any) and `normalize`s `data` at `{ kind: 'Base', keepOverridesOf }` (empty, or the set `revertOptimisticLayer` returned), then `response` resolves `Written`.
-- The optimistic response is written in one transaction with `createOptimisticLayer` and `normalize` at `{ kind: 'Layer', layer }`.
-
-## 10. Garbage collection of derived nodes, and records live nodes still read
-
-Upstream deletes every record a retained query does not reach (`garbageCollection.ts:98-118`), so a reader of such a record suspends.
-
-```ts
-// external isograph/libs/isograph-react/src/core/garbageCollection.ts
-    for (const dataId in dataById) {
-      if (!retainedTypeIds.has(dataId)) {
-        delete dataById[dataId];
-      }
-    }
-```
-
-```ts
-// from libs/isograph-runtime/src/garbageCollection.ts
-/** Upstream `RetainedQuery` (`garbageCollection.ts:20-24`) with a loaded normalization AST. */
-export type RetainedQuery = {
-  readonly normalizationAst: NormalizationSelectionSet;
-  readonly variables: Variables;
+  readonly artifact: ReaderArtifact<ResolverParam, unknown>;
   readonly root: StoreLink;
+  readonly variables: Variables;
+  /** The data the callback last received the result of. */
+  delivered: ReadResult<SelectionSetData>;
+  /** A method signature, so a `Subscription<T>` callback is assignable (reader-ast.md, Why `resolver` is a method signature). */
+  callback(result: ReadResult<unknown>): void;
 };
 
-/** Deletes derived nodes no subscription reaches, and sources no retained query or live node reaches. */
-export function garbageCollect(store: Store): void;
+/** Adds a subscription to `subscriptions`, with `delivered` read now. Returns the function that removes it. */
+export function subscribe<TOutput>(
+  store: Store,
+  subscriptions: Set<Subscription>,
+  artifact: ReaderArtifact<ResolverParam, TOutput>,
+  root: StoreLink,
+  variables: Variables,
+  callback: (result: ReadResult<TOutput>) => void,
+): () => void;
+
+/** Re-reads every subscription's data and calls its callback with the resolver's result when the data changed. */
+export function callSubscriptions(
+  store: Store,
+  subscriptions: ReadonlySet<Subscription>,
+): void;
 ```
 
-`garbageCollect` returns without work outside `Idle` or while any optimistic layer exists (upstream returns while the store has layers, `garbageCollection.ts:66-68`). Otherwise:
+- The caller holds the `Set`, as v1's caller holds the retained list (store.md, `garbageCollect`); upstream holds it on the environment (`IsographEnvironment.ts:80`). The write site calls `callSubscriptions` after `normalize`, as upstream's write sites do (`makeNetworkRequest.ts:271`, `:542`, `writeData.ts:55`).
+- `callSubscriptions` reads each subscription's data with v1's `readSelectionSet` (exported from `read.ts`), compares it with `delivered` by upstream's rule (`mergeObjectsUsingReaderAst`, `areEqualWithDeepComparison.ts:55-121`: server values structurally, nested `Resolver` values by `===`, `:84-95`), and when unequal stores it and calls the callback with `ok(artifact.resolver({ data, parameters: variables }))`, or with the `MissingData`.
+- No overlap filter: v1's `normalize` records no `EncounteredIds` (store.md, `normalize`), so every subscription is re-read, where upstream skips the ones whose records do not overlap (`subscribe.ts:74-79`).
+- Order does not matter for correctness: every re-read runs after the write finished and reads the whole store, so nothing reads a stale input. Nothing is shared: a resolver two subscriptions reach runs once per subscription per write.
 
-1. Live derived nodes: every node with a subscription, and every derived node reachable from one through `dependencies`.
-2. Every other node is removed from `store.derivedNodes` and from the `dependents` of each of its dependencies.
-3. Live records: upstream's mark (`recordReachableIds`, `garbageCollection.ts:125-226`) over effective values, including links inside inline values.
-4. A live record keeps every source except an `Absent` source with no dependents. Any other record keeps only sources that have dependents. A record with no sources is deleted; a type with no records is deleted.
+Costs: every write re-reads every subscription and re-runs every nested resolver under it; a nested resolver that returns a new object makes its parent's data unequal on every write (upstream has the same, `areEqualWithDeepComparison.ts:84-95`), so its callback fires on every write. With the callback being React's `setState`, a demo renders correctly and slowly. Changes 1 to 4 replace it; nothing in them builds on it.
 
-A node created by `readField` with no subscription survives until the next `garbageCollect` and is recomputed after it.
+## End-user experience
 
-## 11. Artifacts
+```ts
+// from libs/isograph-runtime/test/level2.test.ts
+const store = createStore();
+const retention = normalize(store, petSummaryEntrypoint, response, { id: '1' });
+// Every resolver PetSummary reaches ran once, inside normalize.
+const location = retention.location; // Query.__ROOT, 'PetSummary____id___"1"'
+const onChange = vi.fn();
+const stop = listen(store, location, onChange);
+expect(snapshot(store, location)).toEqual({ kind: 'Ok', value: /* .. */ });
 
-The runtime consumes the artifact types below.
+normalize(store, petSummaryEntrypoint, sameResponse, { id: '1' });
+// No resolver ran, onChange was not called.
+
+normalize(store, petSummaryEntrypoint, responseWithNewNickname, { id: '1' });
+// PetName on Pet:1 and PetSummary ran once each; RecentCheckins did not.
+// onChange was called once, after both ran; snapshot returns the new result.
+
+stop();
+dispose(store, retention);
+garbageCollect(store); // the store holds the second and third retentions' records
+```
+
+A React package, which this doc does not plan, would render with:
+
+```tsx
+// from libs/isograph-react/src/useResolverResult.ts
+const result = useSyncExternalStore(
+  (onStoreChange) => listen(store, location, onStoreChange),
+  () => snapshot(store, location),
+);
+```
+
+## 1. Store entries and epochs
+
+### The store
+
+Before (store.md, The store):
+
+```ts
+// from libs/isograph-runtime/src/store.ts
+export type Store = Map<EntityName, Map<RecordId, StoreRecord>>;
+export type StoreRecord = Map<StoreKey, StoreValue>;
+```
+
+After:
+
+```ts
+// from libs/isograph-runtime/src/store.ts
+export type Store = {
+  /** Every record: `EntityName`, then record id, then the record. */
+  readonly records: Map<EntityName, Map<RecordId, StoreRecord>>;
+  /** The epoch of the last `normalize` or `garbageCollect` that changed `records`. */
+  epoch: Epoch;
+};
+
+/** A store-wide counter. Starts at 0. */
+export type Epoch = number;
+
+/** One record's entries by store key. A server value and a stored resolver result share the
+ * record, because a server selectable and a client field of one entity have distinct names. */
+export type StoreRecord = Map<StoreKey, StoreEntry>;
+
+export type StoreEntry = ServerEntry | ResolverEntry;
+
+/** A value `normalize` wrote from a response. */
+export type ServerEntry = {
+  readonly kind: 'Server';
+  readonly value: StoreValue;
+  /** The epoch of the `normalize` that last changed `value`. */
+  readonly timeUpdated: Epoch;
+};
+
+/** An empty store at epoch 0. */
+export function createStore(): Store;
+```
+
+`ResolverEntry` is change 2's; change 1 adds the union with that one member only and change 2 adds the second. `StoreValue`, `StoreLink`, `StoreKey`, `JsonValue`, and `Variables` are store.md's, unchanged. `epoch` is mutable for the reason store.md's maps are: the store is written in place.
+
+The entries are tagged because the record now holds two kinds of value and every walk narrows by `kind`: v1's untagged values are told apart by the AST (store.md, The store), and that stays true for leaf against composite inside `value`, but a stored resolver result is not a `JsonValue`, so TypeScript cannot narrow `StoreValue | ResolverEntry` without a tag. `timeUpdated` is pico's `time_updated` of a source (`docs-website/docs/design-docs/pico.md`, Equality and backdating): the unit of change is one store key on one record, where upstream's unit is the record (`cache.ts:211-218`). Reason: a resolver that reads `Pet:1.name` must not re-run when only `Pet:1.tagline` changes.
+
+### `normalize` keeps an equal value
+
+Before (store.md, `normalize`): every selected value is written with `record.set(key, value)`, and there is no change detection.
+
+After, at the start of each call `writeEpoch = store.epoch + 1`, and every write goes through:
+
+```ts
+// from libs/isograph-runtime/src/normalize.ts
+/** Writes `value` under `key`, unless the stored value is equal. The first write that changes
+ * the store sets `store.epoch` to `writeEpoch`. */
+function writeValue(
+  store: Store,
+  record: StoreRecord,
+  owner: StoreLink,
+  key: StoreKey,
+  value: StoreValue,
+  writeEpoch: Epoch,
+): void;
+
+/** Structural equality of JSON values: object keys in any order, list items in order. */
+export function jsonEqual(a: JsonValue, b: JsonValue): boolean;
+```
+
+- Absent key, or a `ServerEntry` whose value is not `jsonEqual`: sets `{ kind: 'Server', value, timeUpdated: writeEpoch }` and sets `store.epoch = writeEpoch`.
+- A `ServerEntry` whose value is `jsonEqual`: nothing; the old entry, its `timeUpdated`, and its value's identity stay.
+- A `ResolverEntry`: throws (Errors).
+- Creating a record sets `store.epoch = writeEpoch` too; a stored resolver result can depend on a record's absence (change 2, Dependencies).
+
+A link is a `JsonValue` (`{ entityName, id }`) and a composite value is `null`, a link, or lists of these, so one equality covers leaves and composites. Setting `store.epoch` at the first change rather than at the end keeps a throw part-way (store.md open decision 9 (b)) from leaving entries newer than `store.epoch`.
+
+Deltas from upstream: upstream compares a scalar with `!==` (`cache.ts:248-249`), so a list leaf or a `JSON` object counts as changed on every response, and compares links by id (`dataIdsAreTheSame`, `cache.ts:372-393`). Here a list leaf with equal items is unchanged, because otherwise every response would re-run every resolver that reads one.
+
+### Readers of entries
+
+`check`, `garbageCollect`, and `read` read `entry.value` of a `ServerEntry` where v1 reads the value. A `ResolverEntry` under a store key a normalization or reader `Scalar`/`Linked` selection names throws (Errors). `garbageCollect` sets `store.epoch = store.epoch + 1` when it deletes anything, so that a stored resolver result verified before the deletion is verified again (change 2, Verification).
+
+### Errors
+
+Added to store.md's throw sites, both broken invariants of distinct selectable names (a server selectable and a client field of one entity never share a store key, `docs-website/docs/design-docs/mental-model.md`, Entity: `selectables: BTreeMap<SelectableName, Selectable>`):
+
+- `normalize`, `check`, `garbageCollect`, and `read`'s `Scalar`/`Linked` nodes, a `ResolverEntry` under a server store key: `Store record ${entityName}:${id} holds a resolver result under the server store key "${storeKey}".`
+- `read`'s resolver lookup, a `ServerEntry` under a resolver store key: `Store record ${entityName}:${id} holds a server value under the resolver store key "${storeKey}".`
+
+### Tests
+
+store.md's tests change mechanically:
+
+```ts
+// from libs/isograph-runtime/test/fixtures.ts
+/** A new store at epoch 0 whose every value is a `ServerEntry` with `timeUpdated: 0`. */
+export function storeOf(records: StoreValues): Store;
+
+/** Every `ServerEntry`'s value, by entity, id, and store key; resolver entries are left out. */
+export function serverValues(store: Store): StoreValues;
+
+export type StoreValues = {
+  readonly [entityName: string]: {
+    readonly [id: string]: { readonly [storeKey: string]: StoreValue };
+  };
+};
+```
+
+`expect(store).toEqual(storeOf({ .. }))` becomes `expect(serverValues(store)).toEqual({ .. })` with the same literal; `new Map()` becomes `createStore()`; `expect(store).toEqual(new Map())` becomes `expect(serverValues(store)).toEqual({})`. New cases in `test/normalize.test.ts`:
+
+- `store.epoch` is 0, then 1 after `PetDetail`; normalizing the same response again leaves it 1 and every entry `===` the one before.
+- `tags: ["a"]` then `tags: ["a"]` keeps the first list object; then `tags: ["b"]` stores a new entry with `timeUpdated: 3`.
+- `settings` objects with the same keys in another order are equal.
+- A store whose `Pet:1.name` holds a hand-built `ResolverEntry` makes `PetDetail` throw the resolver-under-server-key message.
+- `garbageCollect` that deletes a record advances `store.epoch`; one that deletes nothing does not.
+
+## 2. Stored resolver results
+
+A resolver's result is stored on the record it was read on, under the client field's resolver store key, in the same record as the server values. Reading a resolver whose inputs did not change returns the stored result without calling the resolver.
+
+### The resolver store key
+
+```ts
+// from libs/isograph-runtime/src/storeKey.ts
+/** `selectableName`, then one `____<name>___<stableStringify(value)>` chunk per entry of
+ * `variables`, names in code unit order: `argumentChunks`'s format. */
+export function resolverStoreKey(
+  selectableName: string,
+  variables: Variables,
+): StoreKey;
+```
+
+The variables are the field's own: for a `Resolver` node, `childVariables(variables, selection.arguments)` (reader-ast.md, The read function), which holds the arguments the selection passes and the compiler-written defaults, and omits an unpassed variable with no default; for a top-level `read`, the read's variables. `PetName` on `Pet:1` is `PetName`; `RecentCheckins` selected with no argument is `RecentCheckins____n___2`; `PetSummary` read with `{ id: "1" }` is `PetSummary____id___"1"` on `Query.__ROOT`. Two selections of one client field with equal argument values on one record are one key, whatever their aliases.
+
+The key needs the client field's selectable name, which v1's reader artifact does not carry (reader-ast.md drops upstream's `fieldName` because nothing read it, `reader.ts:26-37`). It does now:
+
+Before:
 
 ```ts
 // from libs/isograph-runtime/src/artifacts.ts
-export type ReaderSelectionSet = readonly ReaderSelection[];
-
-export type ReaderSelection =
-  | ReaderScalarField
-  | ReaderLinkedField
-  | ReaderResolverField
-  | ReaderLinkField;
-
-export type ReaderScalarField = {
-  readonly kind: 'Scalar';
-  readonly fieldName: string;
-  readonly alias: string | null;
-  readonly arguments: Arguments | null;
-};
-
-export type ReaderLinkedField = {
-  readonly kind: 'Linked';
-  readonly fieldName: string;
-  readonly alias: string | null;
-  readonly arguments: Arguments | null;
-  readonly storage: LinkedFieldStorage;
-  readonly selections: ReaderSelectionSet;
-};
-
-export type LinkedFieldStorage = 'Normalized' | 'Inline';
-
-export type ReaderResolverField = {
-  readonly kind: 'Resolver';
-  readonly alias: string;
-  readonly arguments: Arguments | null;
-  readonly readerArtifact: () => EagerReaderArtifact<unknown>;
-};
-
-export type ReaderLinkField = {
-  readonly kind: 'Link';
-  readonly alias: string;
-};
-
-export type EagerReaderArtifact<T> = {
-  readonly kind: 'EagerReaderArtifact';
-  /** `Pet.fullName`. */
-  readonly fieldName: string;
+export type ReaderArtifact<TParam, TOutput> = {
   readonly readerAst: ReaderSelectionSet;
-  readonly resolver: (parameters: ResolverParameters) => T;
-  readonly isEqual: ((previous: T, next: T) => boolean) | null;
-};
-
-export type ResolverParameters = {
-  readonly data: SelectionSetData;
-  readonly parameters: Variables;
-};
-
-export type NormalizationSelectionSet = readonly NormalizationSelection[];
-
-export type NormalizationSelection =
-  | NormalizationScalarField
-  | NormalizationLinkedField
-  | NormalizationInlineFragment;
-
-export type NormalizationScalarField = {
-  readonly kind: 'Scalar';
-  readonly fieldName: string;
-  readonly arguments: Arguments | null;
-};
-
-export type NormalizationLinkedField = {
-  readonly kind: 'Linked';
-  readonly fieldName: string;
-  readonly arguments: Arguments | null;
-  readonly storage: LinkedFieldStorage;
-  readonly concreteType: TypeName | null;
-  readonly selections: NormalizationSelectionSet;
-};
-
-export type NormalizationInlineFragment = {
-  readonly kind: 'InlineFragment';
-  readonly type: TypeName;
-  readonly selections: NormalizationSelectionSet;
-};
-
-export type Operation = { readonly kind: 'Operation'; readonly text: string };
-
-export type Entrypoint<
-  T,
-  TVariables extends Variables,
-  TRawResponse extends NetworkResponseObject,
-> = {
-  readonly kind: 'Entrypoint';
-  readonly concreteType: TypeName;
-  readonly operation: Operation;
-  readonly normalizationAst: NormalizationSelectionSet;
-  readonly readerArtifact: () => EagerReaderArtifact<T>;
-  /** Type-only. Not present at runtime. */
-  readonly '~variables'?: TVariables;
-  readonly '~rawResponse'?: TRawResponse;
+  resolver(param: TParam): TOutput;
 };
 ```
 
-Deltas from upstream (`core/reader.ts`, `core/entrypoint.ts`):
+After:
 
-- `ReaderScalarField` (`reader.ts:89-96`): no `isFallible`, no `isUpdatable`.
-- `ReaderLinkedField` (`reader.ts:103-121`): gains `storage`; no `isFallible`, `condition`, `isUpdatable`, or `refetchQueryIndex`.
-- `ReaderResolverField` is upstream `ReaderNonLoadableResolverField` (`reader.ts:127-134`) without `usedRefetchQueries`; `readerArtifact` returns `EagerReaderArtifact` only.
-- `ReaderImperativelyLoadedField` and `LoadablySelectedField` do not exist.
-- `EagerReaderArtifact` (`reader.ts:26-37`): gains `isEqual`; no `hasUpdatable`; `ResolverParameters` has no `startUpdate`.
-- `NormalizationLinkedField` (`entrypoint.ts:146-153`) gains `storage`; no `isFallible` on any normalization node.
-- `Entrypoint` replaces upstream `IsographEntrypoint` (`entrypoint.ts:77-93`): `operation` and `normalizationAst` move out of `networkRequestInfo`; no persisted operations, no `NormalizationAstLoader`, no `ReaderWithRefetchQueriesLoader`, no refetch queries.
+```ts
+// from libs/isograph-runtime/src/artifacts.ts
+export type ReaderArtifact<TParam, TOutput> = {
+  /** The client field's selectable name: the prefix of its resolver store key. */
+  readonly selectableName: string;
+  readonly readerAst: ReaderSelectionSet;
+  resolver(param: TParam): TOutput;
+};
+```
 
-### What the compiler emits
+`reader_artifact_file` (`crates/typescript_artifacts/src/reader_artifact.rs`, reader-ast.md) writes `selectableName: String(field.field.selectable_name)` as the object's first entry. `Pet/fullName/resolver_reader.ts` gains `selectableName: "fullName",`.
 
-`refactors/pending/artifact-generation.md` generates `iso.ts` and an entrypoint file whose default export is the string `"Query.HomeRoute"`; it lists readers, query text, and normalization ASTs as later docs. This runtime needs those later docs to emit:
+### The resolver entry
 
-- `__isograph/<Parent>/<name>/resolver_reader.ts` for each `field` with a selection set: `export default` an `EagerReaderArtifact`, importing the resolver from its source file by its export name.
-- `__isograph/<Parent>/<name>/entrypoint.ts`: `export default` an `Entrypoint` with the query text, the normalization AST, and `readerArtifact` importing the resolver reader. The `iso.ts` overload `typeof entrypoint_Query__HomeRoute` stays correct when the default export changes from a string to this object.
-- `storage` on every linked reader and normalization node, from the config's `inline_types`.
-- `isEqual` on each `EagerReaderArtifact`: `null`, or the comparator the field declares (open decision 3).
+```ts
+// from libs/isograph-runtime/src/store.ts
+/** A resolver's stored result on the record it was read on. */
+export type ResolverEntry = {
+  readonly kind: 'Resolver';
+  /** What recomputes it: the field's reader artifact and its variables. */
+  readonly artifact: ReaderArtifact<ResolverParam, unknown>;
+  readonly variables: Variables;
+  readonly result: ReadResult<unknown>;
+  /** The epoch in which `result` last changed. */
+  readonly timeUpdated: Epoch;
+  /** The last epoch in which `result` was confirmed current. */
+  readonly timeVerified: Epoch;
+  /** What the last computation read, in read order. */
+  readonly dependencies: ReadonlyArray<Dependency>;
+};
 
-The compiler rejects `__link` selected on a type in `inline_types`.
+/** Where a stored entry lives. */
+export type EntryLocation = {
+  readonly record: StoreLink;
+  readonly storeKey: StoreKey;
+};
+```
 
-## 12. Removed from upstream
+A `ServerEntry` holds a value `normalize` wrote and the epoch it changed in. A `ResolverEntry` holds a result `read` computed, what it read, and what recomputes it: pico's derived node (`DerivedNode` with `inner_fn` and value, `DerivedNodeRevision` with `time_updated` and `time_verified`, and its dependency list; `crates/pico/src/execute_memoized_function.rs`). An entry is replaced, never mutated: `record.set(key, next)`.
 
-React (components, hooks, Suspense), `startUpdate` and updatable data, client pointers, loadable and imperatively loaded fields, refetch queries, `missingFieldHandler`, persisted operations, lazy normalization ASTs and entrypoint loaders, `isFallible`, `writeData`, `AnyRecords` and `AnyChangesToRecord` subscriptions, and the logging event catalog (`log` receives callback and comparator errors only).
+What reads a stored resolver result: a top-level `read`; a parent's `Resolver` node while the parent computes; verification of a parent that depends on it; settlement (change 3); `snapshot` (change 4). `normalize`, `check`, and `garbageCollect`'s mark never read one; their walks name only server store keys.
+
+### Dependencies
+
+```ts
+// from libs/isograph-runtime/src/store.ts
+export type Dependency = RecordDependency | EntryDependency;
+
+/** The read found `record` absent. Changed once the record exists. */
+export type RecordDependency = {
+  readonly kind: 'Record';
+  readonly record: StoreLink;
+};
+
+/** The read looked up `storeKey` on `record`, which existed. */
+export type EntryDependency = {
+  readonly kind: 'Entry';
+  readonly record: StoreLink;
+  readonly storeKey: StoreKey;
+  /** The entry's `timeUpdated` when read; `null` when the key was absent. */
+  readonly observed: Epoch | null;
+};
+```
+
+A dependency is a location, as pico's is a key (`NodeKind::Source(Key)`, `NodeKind::Derived(DerivedNodeId)`, `crates/pico/src/dependency.rs:11-15`), not a reference to an entry: an entry is replaced on every verification and deleted with its record.
+
+A dependency changed when:
+
+- `Record`: the record exists.
+- `Entry`, record now absent: always.
+- `Entry`, key now absent: `observed !== null`.
+- `Entry` on a `ServerEntry`: `entry.timeUpdated !== observed`.
+- `Entry` on a `ResolverEntry`: after verifying that entry, `entry.timeUpdated !== observed`.
+
+Delta from pico: pico asks whether a dependency's `time_updated` is newer than the epoch it was recorded at (`execute_memoized_function.rs:192-206`). Here the observed epoch is compared for equality, because `garbageCollect` deletes entries and a deleted entry has no `time_updated` to compare; pico never deletes a source (pico.md, Source: `remove` keeps the node and stamps an epoch). Equality is exact: an entry written after the read has a later `timeUpdated`, an entry deleted and recreated was recreated in a later epoch (`garbageCollect` advances it), and an unchanged entry keeps its `timeUpdated`.
+
+### Verification
+
+```ts
+// from libs/isograph-runtime/src/read.ts
+/** The stored result of `artifact` on `root` with `variables`, and the dependency a parent records on it. */
+type ResolverRead = {
+  readonly result: ReadResult<unknown>;
+  readonly dependency: Dependency;
+};
+
+function readResolver(
+  store: Store,
+  artifact: ReaderArtifact<ResolverParam, unknown>,
+  root: StoreLink,
+  variables: Variables,
+): ResolverRead {
+  const record = store.records.get(root.entityName)?.get(root.id);
+  if (record === undefined) {
+    return {
+      result: {
+        kind: 'MissingData',
+        reason: `No record for ${recordName(root)}`,
+        recordLink: root,
+      },
+      dependency: { kind: 'Record', record: root },
+    };
+  }
+  const storeKey = resolverStoreKey(artifact.selectableName, variables);
+  const entry = verifiedEntry(
+    store,
+    record,
+    { record: root, storeKey },
+    artifact,
+    variables,
+  );
+  return {
+    result: entry.result,
+    dependency: {
+      kind: 'Entry',
+      record: root,
+      storeKey,
+      observed: entry.timeUpdated,
+    },
+  };
+}
+
+/** The entry at `location`, brought up to date in `store.epoch`. */
+function verifiedEntry(
+  store: Store,
+  record: StoreRecord,
+  location: EntryLocation,
+  artifact: ReaderArtifact<ResolverParam, unknown>,
+  variables: Variables,
+): ResolverEntry {
+  const existing = record.get(location.storeKey);
+  if (existing === undefined) {
+    return compute(store, record, location, artifact, variables, null);
+  }
+  if (existing.kind === 'Server') {
+    throw new Error(
+      `Store record ${recordName(location.record)} holds a server value under the resolver store key "${location.storeKey}".`,
+    );
+  }
+  if (existing.timeVerified === store.epoch) {
+    return existing;
+  }
+  if (
+    existing.dependencies.some((dependency) =>
+      dependencyChanged(store, dependency),
+    )
+  ) {
+    return compute(
+      store,
+      record,
+      location,
+      existing.artifact,
+      existing.variables,
+      existing,
+    );
+  }
+  const verified: ResolverEntry = { ...existing, timeVerified: store.epoch };
+  record.set(location.storeKey, verified);
+  return verified;
+}
+
+function dependencyChanged(store: Store, dependency: Dependency): boolean {
+  const record = store.records
+    .get(dependency.record.entityName)
+    ?.get(dependency.record.id);
+  switch (dependency.kind) {
+    case 'Record':
+      return record !== undefined;
+    case 'Entry': {
+      if (record === undefined) {
+        return true;
+      }
+      const entry = record.get(dependency.storeKey);
+      if (entry === undefined) {
+        return dependency.observed !== null;
+      }
+      switch (entry.kind) {
+        case 'Server':
+          return entry.timeUpdated !== dependency.observed;
+        case 'Resolver':
+          return (
+            verifiedEntry(
+              store,
+              record,
+              dependency,
+              entry.artifact,
+              entry.variables,
+            ).timeUpdated !== dependency.observed
+          );
+      }
+    }
+  }
+}
+
+/** Reads `artifact`'s reader AST, calls its resolver, and stores the result, keeping
+ * `previous`'s result and `timeUpdated` when the new result is equal. */
+function compute(
+  store: Store,
+  record: StoreRecord,
+  location: EntryLocation,
+  artifact: ReaderArtifact<ResolverParam, unknown>,
+  variables: Variables,
+  previous: ResolverEntry | null,
+): ResolverEntry {
+  const dependencies: Dependency[] = [];
+  const data = readSelectionSet(
+    store,
+    artifact.readerAst,
+    location.record,
+    variables,
+    (dependency) => dependencies.push(dependency),
+  );
+  const result = data.kind === 'Ok' ? callResolver(artifact, location.record, data.value, variables) : data;
+  const unchanged = previous !== null && resultsEqual(previous.result, result);
+  const entry: ResolverEntry = {
+    kind: 'Resolver',
+    artifact,
+    variables,
+    result: unchanged ? previous.result : result,
+    timeUpdated: unchanged ? previous.timeUpdated : store.epoch,
+    timeVerified: store.epoch,
+    dependencies,
+  };
+  record.set(location.storeKey, entry);
+  return entry;
+}
+```
+
+This is pico's `execute_memoized_function` (`crates/pico/src/execute_memoized_function.rs:59-105`): an entry verified in the current epoch is returned (`:77-83`); otherwise its dependencies are checked in recorded order, a resolver dependency is verified before it is compared (`derived_node_changed_since` calls `execute_memoized_function`, `:208-247`), the check stops at the first changed dependency (`.any`, `:190-200`), and a changed entry re-runs its body and is backdated when its value is equal (`update_derived_node`, `:137-181`). Deltas: the observed-epoch comparison above; a new entry's `timeUpdated` is `store.epoch` where pico takes the newest dependency's (`:131-134`), which is equivalent under equality comparison; dependencies are collected through the `track` parameter below where pico pushes onto an ambient `DependencyStack` (`dependency.rs:45-102`), because every read happens inside the runtime's own functions.
+
+`read` keeps its v1 signature and becomes:
+
+```ts
+// from libs/isograph-runtime/src/read.ts
+export function read<TOutput>(
+  store: Store,
+  artifact: ReaderArtifact<ResolverParam, TOutput>,
+  root: StoreLink,
+  variables: Variables,
+): ReadResult<TOutput> {
+  // The entry under `artifact.selectableName`'s resolver store key on `root` was computed by
+  // `artifact`: one selectable of one entity has one reader artifact.
+  return readResolver(store, artifact, root, variables).result as ReadResult<TOutput>;
+}
+```
+
+The cast is the one place a stored `ReadResult<unknown>` is returned at the caller's type; the invariant is in its comment.
+
+v1's walk gains a `track: (dependency: Dependency) => void` parameter on `readSelectionSet`, `readSelection`, `readStoreValue`, and `readLinkedValue`, passed down unchanged. `readStoreValue` calls `track({ kind: 'Record', record: root })` when the record is absent, and otherwise `track({ kind: 'Entry', record: root, storeKey: key, observed: entry?.timeUpdated ?? null })` before returning. The `Resolver` case:
+
+Before (reader-ast.md):
+
+```ts
+// from libs/isograph-runtime/src/read.ts
+    case "Resolver": {
+      const resolved = read(store, selection.readerArtifact, root, childVariables(variables, selection.arguments));
+      return resolved.kind === "MissingData" ? missingDataFor(selection.alias, root, resolved) : resolved;
+    }
+```
+
+After:
+
+```ts
+// from libs/isograph-runtime/src/read.ts
+    case 'Resolver': {
+      const resolved = readResolver(
+        store,
+        selection.readerArtifact,
+        root,
+        childVariables(variables, selection.arguments),
+      );
+      track(resolved.dependency);
+      return resolved.result.kind === 'MissingData'
+        ? missingDataFor(selection.alias, root, resolved.result)
+        : resolved.result;
+    }
+```
+
+A computation that stops at the first `MissingData` records the dependencies read up to it, which are exactly what its result depends on.
+
+### Results, equality, and a resolver that throws
+
+```ts
+// from libs/isograph-runtime/src/read.ts
+export type ReadResult<T> = ReadOk<T> | ReadMissingData | ReadResolverThrew;
+
+/** The resolver of `selectableName` on `recordLink` threw `error`. */
+export type ReadResolverThrew = {
+  readonly kind: 'ResolverThrew';
+  readonly selectableName: string;
+  readonly recordLink: StoreLink;
+  readonly error: unknown;
+};
+
+/** `artifact.resolver` called with `data`; a throw becomes `ResolverThrew`. */
+function callResolver(
+  artifact: ReaderArtifact<ResolverParam, unknown>,
+  root: StoreLink,
+  data: SelectionSetData,
+  variables: Variables,
+): ReadResult<unknown>;
+
+/** `Ok`: values `===`. `MissingData`: equal `reason`, `recordLink` entity and id, and
+ * `nestedReason`, recursively. `ResolverThrew`: errors `===`. Different kinds: unequal. */
+function resultsEqual(a: ReadResult<unknown>, b: ReadResult<unknown>): boolean;
+```
+
+`allOk` stops at the first result whose `kind` is not `Ok`; a `ResolverThrew` passes up unchanged, a `MissingData` is wrapped as v1 wraps it. v1 lets a throw propagate out of `read` (reader-ast.md, Semantics). Here it is a stored result, because change 3 computes every retained query's resolvers inside `normalize`: a throw that propagated would abort `normalize` for every query in the store, and leave the other retained queries unsettled. Open decision 5.
+
+Equality is upstream's for resolver values, `===` (`areEqualWithDeepComparison.ts:84-95`), as pico's is the value's `==`. A resolver that returns a string backdates when the string is equal; one that returns a new object never backdates, and every entry that reads it re-runs. Comparators are open decision 7.
+
+### Tests
+
+`test/read.test.ts` (reader-ast.md, Tests, Runtime) changes:
+
+- "The store is unchanged by every read" becomes: `serverValues(store)` is unchanged by every read, and after `PetSummary` with `{ id: "1" }` the store holds resolver entries at `Query.__ROOT` `PetSummary____id___"1"`, `Pet:1` `PetName`, and `Pet:1` `RecentCheckins____n___2`.
+- "A resolver that throws propagates out of `read`" becomes: `read` returns `ResolverThrew` with the error, the field's selectable name, and the record; its parent's result is the same `ResolverThrew` object.
+- reader-ast.md asserts no call count across two reads (its one call-count case is a child whose data is `MissingData`, count 0). v1 calls every resolver on every `read` by construction (its `read` body calls `artifact.resolver`). The first case below fails against v1: that is the flip.
+
+New, in `test/memo.test.ts`. Call counts come from `vi.spyOn(readerArtifact, 'resolver')`, which replaces the method on the one artifact object every `Resolver` node imports. Fixture sources added to store.md's fixture project:
+
+```text
+field Pet.Initial { name }
+field Pet.Monogram { Initial }
+field Pet.Signature { Initial nickname }
+field Pet.Badge { Monogram Signature }
+field Query.BadgePage($id: ID!) { pet(id: $id) { Badge } }
+
+field Pet.FriendLabel { bestFriend { PetName } }
+field Pet.FriendCard { FriendLabel tagline }
+field Query.FriendPage($id: ID!) { pet(id: $id) { FriendCard } }
+
+field Query.TwoNames {
+  a: pet(id: "1") { PetName }
+  b: pet(id: "1") { PetName }
+}
+```
+
+with `entrypoint Query.BadgePage`, `entrypoint Query.FriendPage`, and `entrypoint Query.TwoNames`. `Initial` returns `data.name.slice(0, 1)`, `Monogram` returns `` `${data.Initial}.` ``, `Signature` returns `` `${data.Initial} ${data.nickname ?? ""}` ``; every other fixture resolver returns `data` (store.md's convention).
+
+- A second read with no write between: every resolver's call count is unchanged, and the result is `===` the first read's. (v1: every count doubles.)
+- Diamond, `Pet:1.name` `Rex` to `Max`: `Initial`, `Monogram`, `Signature`, `Badge`, and `BadgePage` are each called once; `Badge` receives `{ Monogram: "M.", Signature: "M " }` on its one call; `Initial` is called once although `Monogram` and `Signature` both select it.
+- Diamond, `Rex` to `Ray`: `Initial` is called once and returns `"R"`; no other resolver is called, and `BadgePage`'s result is `===` the previous one.
+- Diamond, only `nickname` changes: `Signature`, `Badge`, `BadgePage` once each; `Initial` and `Monogram` zero.
+- Chain across fragments, `Pet:1.bestFriend` is `Pet:2`; `FriendPage` with `{ id: "1" }` and `PetSummary` with `{ id: "2" }` read, then `Pet:2.name` changes, then both read again in either order: `PetName` on `Pet:2` is called once; `FriendLabel`, `FriendCard`, `FriendPage`, and `PetSummary` once each; `RecentCheckins` zero.
+- Unrelated write: only `Pet:1.tagline` changes: `FriendCard` and `FriendPage` once; `FriendLabel` and `PetName` zero.
+- Same resolver selected twice: a first read of `TwoNames` calls `PetName` once, and `a.PetName` and `b.PetName` are `===`.
+- An identical response normalized again: no resolver is called on the next read, and `store.epoch` is unchanged.
+- Missing then present: a read of `FriendPage` with `Pet:2` lacking `nickname` is `MissingData`; after `nickname` is written, the next read is `Ok` and calls `PetName`.
+- Absent record: `FriendPage` read while `Pet:1.bestFriend` links a `Pet:9` deleted by hand is `MissingData` naming `Pet:9`; after `normalize` writes `Pet:9` with `name` and `nickname`, the next read is `Ok`.
+- A deleted record: after `garbageCollect` deletes `Pet:2`, the next read of a stored `FriendPage` result is `MissingData` with `recordLink` `Pet:2`, not the stored `Ok`.
+- `resolverStoreKey`: `RecentCheckins` with `{ n: 2 }` is `RecentCheckins____n___2`; `{}` is `RecentCheckins`; `{ b: 1, a: "x" }` is `X____a___"x"____b___1`.
+
+## Ordering
+
+A write can make several stored results stale at once. Recalculation must run in dependency order: no entry recomputes from a stale input, and no entry recomputes twice for one write. The design guarantees both with pico's pull-based verification, and settlement (change 3) and observers (change 4) add nothing that could break it.
+
+### Worked example: a diamond
+
+`Badge` (A) reads `Monogram` (B) and `Signature` (C); both read `Initial` (D); `Initial` reads `Pet:1.name`. After a first read at epoch 1, the entries on `Pet:1`:
+
+```text
+Initial    deps [Entry(Pet:1, name, observed 1)]
+Monogram   deps [Entry(Pet:1, Initial, observed 1)]
+Signature  deps [Entry(Pet:1, Initial, observed 1), Entry(Pet:1, nickname, observed 1)]
+Badge      deps [Entry(Pet:1, Monogram, observed 1), Entry(Pet:1, Signature, observed 1)]
+BadgePage  deps [Entry(Query:__ROOT, pet____id___"1", observed 1), Entry(Pet:1, Badge, observed 1)]
+```
+
+`normalize` writes `name: "Max"`: `Pet:1.name` gets `timeUpdated: 2`, `store.epoch` is 2. Verifying `BadgePage`:
+
+```text
+verify BadgePage         timeVerified 1 != 2: check deps in order
+  pet____id___"1"        server, timeUpdated 1 == observed: unchanged
+  Badge                  verify Badge
+    Monogram             verify Monogram
+      Initial            verify Initial
+        name             server, 2 != 1: changed
+        compute Initial  "M" != "R": timeUpdated 2              (Initial call 1)
+      2 != 1: changed
+      compute Monogram   reads Initial: timeVerified 2, returned  (Monogram call 1)
+    changed: stop checking, compute Badge
+      reads Monogram     timeVerified 2, returned
+      reads Signature    verify Signature
+        Initial          timeVerified 2, returned; 2 != 1: changed
+        compute Signature  reads Initial: returned               (Signature call 1)
+                                                                 (Badge call 1)
+  changed: compute BadgePage                                     (BadgePage call 1)
+```
+
+Every entry is computed after the entries it reads were verified in epoch 2, because the only way a computation reads a resolver result is `readResolver`, which verifies first. Every entry is computed at most once in epoch 2, because a computed entry has `timeVerified === store.epoch` and every later visit returns it. `Initial` is reached on two paths and computed once. With `Rex` to `Ray`, `Initial` computes `"R"`, is backdated (`timeUpdated` stays 1), and `Monogram`, `Signature`, and `Badge` see `observed 1` and do not compute.
+
+### Worked example: a chain across fragments
+
+`FriendPage` reads `FriendCard` on `Pet:1`, which reads `FriendLabel` on `Pet:1`, which reads `PetName` on `Pet:2` through `bestFriend`. A second query, `PetSummary` with `{ id: "2" }`, reads `PetName` on `Pet:2` directly. Both are stored at epoch 1. `normalize` writes `Pet:2.name` at epoch 2.
+
+Verifying `FriendPage` first: `FriendCard` verifies `FriendLabel`, which checks `Pet:1.bestFriend` (unchanged), then verifies `PetName` on `Pet:2`, which computes (call 1, a new object), so `FriendLabel` computes, so `FriendCard` computes (reading `tagline`, unchanged), so `FriendPage` computes. Verifying `PetSummary` next: its `PetName` dependency is verified in epoch 2 and its `timeUpdated` is 2, so `PetSummary` computes and reads the stored `PetName` without calling it. Verifying in the other order gives the same calls: `PetSummary` computes `PetName`, and `FriendLabel`'s check later finds it verified. A write in one fragment's input does not schedule anything in another fragment; verification discovers it, through the shared entry.
+
+### The options
+
+- Pull-based verification, pico's (held). An entry verifies its dependencies, in recorded order, before itself (`execute_memoized_function.rs:183-247`), and is verified at most once per epoch (`node_verified_in_current_epoch`, `crates/pico/src/database.rs:246-251`). Order is a depth-first post-order over the current dependencies, computed by recursion; nothing stores it. Dependencies the new computation no longer reads (a link moved from `Pet:2` to `Pet:3`) are never verified. Cost: verifying a stored result whose inputs did not change walks its whole dependency graph once per epoch, comparing epochs.
+- Push-based dirty marking, then pull. A write follows reverse edges (each entry's dependents) and marks every entry it reaches; verification then skips the dependency walk of an entry not marked since its last verification. The order is still the pull's: marks only say which entries might be stale and which observers to look at. Cost: a dependents set on every server and resolver entry that a stored result read, kept equal to the inverse of every dependency list on every computation, and entries for absent keys to hold the dependents of a read that found nothing (pico's missing-key dependency, `refactors/pending/pico-missing-key-dependency.md`). Benefit: a write's cost is proportional to what it reaches, not to the whole graph. Open decision 2.
+- Topological order by height. Each entry has a height, one more than its highest dependency; a write enqueues the entries that read what changed, and recomputation takes the lowest height first, enqueuing dependents of each entry whose result changed. It recomputes each entry once and after its inputs. Cost: heights must be maintained as dependencies change with the data (a link change can raise an entry's height and every height above it), the queue is store state, and it recomputes every reachable entry eagerly whether or not anything will read it. Pico does not do this.
+
+The failure mode all three avoid is push without order: `Initial` changes and notifies `Monogram` and `Signature`; `Monogram` recomputes and notifies `Badge`; `Badge` recomputes reading the old `Signature`; `Signature` recomputes and notifies `Badge` again. `Badge` runs twice, once from a stale input.
+
+Held: pull, as pico. Push marks are an optimization of which entries to verify, and they can be added later without changing the order (open decision 2). Height ordering adds state and work pico shows is unnecessary.
+
+### The same resolver selected twice
+
+Two selections of one client field on one record with equal argument values are one store key, so one entry: computed once, read by both parents, each parent recording a dependency on the same location. This holds across fragments and across queries. Unequal argument values are two keys and two entries. Aliases do not enter the key.
+
+### Reads during recalculation
+
+- A level 2 callback never runs during recalculation: change 4 calls callbacks only after settlement has verified every retained and observed entry. A callback that calls `read` or `snapshot` receives a result verified in the current epoch. A callback that calls `normalize` runs a nested write, settlement, and notification; when it returns, the outer notification loop compares each remaining observer's stored result with the one it last notified, so no observer is called twice for one result or receives an older result after a newer one.
+- A callback in a `read` caller during recalculation is the same case: `read` itself is a verification, so a `read` between two steps of settlement makes the entries it reaches current, and settlement later finds them verified.
+- A resolver that reads or writes the store (through a closure, since its parameter holds no store) during its own computation breaks the guarantee: its inner `read` records no dependency on the outer entry, and an inner `normalize` advances the epoch mid-verification. Open decision 8.
+- Cycles: none. A resolver entry reads only entries of client fields its reader AST selects, the reader import graph is acyclic (reader-ast.md, Reader artifact imports), and a client field that selects itself through data (`field Pet.X { bestFriend { X } }`) is an `InlineCycle` query error (query-generation.md, Cycles), so no entry is reached again while it computes.
+
+## 3. Level 1: `normalize` retains and settles
+
+### `normalize`
+
+Before (store.md):
+
+```ts
+// from libs/isograph-runtime/src/normalize.ts
+export function normalize(
+  store: Store,
+  ast: NormalizationAst,
+  response: JsonObject,
+  variables: Variables,
+): void;
+```
+
+After:
+
+```ts
+// from libs/isograph-runtime/src/normalize.ts
+/** What `normalize` needs from an `entrypoint.ts` artifact. */
+export type Entrypoint<TOutput> = {
+  readonly normalizationAst: NormalizationAst;
+  readonly readerArtifact: ReaderArtifact<ResolverParam, TOutput>;
+};
+
+/**
+ * Writes `response`, retains the query, and settles: every retained query's resolver results,
+ * this one's included, are current when it returns, and observers have been called.
+ * Throws on a response that does not match the AST (store.md, Errors).
+ */
+export function normalize<TOutput>(
+  store: Store,
+  entrypoint: Entrypoint<TOutput>,
+  response: JsonObject,
+  variables: Variables,
+): Retention<TOutput>;
+
+/** v1's `normalize`, renamed and not exported from the package: writes only. */
+export function writeResponse(
+  store: Store,
+  ast: NormalizationAst,
+  response: JsonObject,
+  variables: Variables,
+): void;
+```
+
+`Entrypoint` is structural: the generated `entrypoint.ts` object (`kind`, `name`, `normalizationAst`, `readerArtifact`, artifact-set-and-types.md, Per entrypoint) is assignable, and `TOutput` is inferred from its reader artifact's declared type. No compiler change.
+
+The package index exports `normalize` and no longer exports a write without settlement, so a write cannot leave level 1 stale.
+
+### Retention
+
+```ts
+// from libs/isograph-runtime/src/retention.ts
+/** One `normalize` call's hold on its query's records and its entrypoint's resolver result. */
+export type Retention<TOutput> = {
+  readonly ast: NormalizationAst;
+  readonly variables: Variables;
+  readonly artifact: ReaderArtifact<ResolverParam, TOutput>;
+  /** `ast.root` and `resolverStoreKey(artifact.selectableName, variables)`. */
+  readonly location: EntryLocation;
+};
+
+/** Ends `retention`: its records and resolver results are no longer kept by it. */
+export function dispose(
+  store: Store,
+  retention: Retention<unknown>,
+): void;
+```
+
+`Store` gains `readonly retained: Set<Retention<unknown>>`; `createStore` starts it empty. This is upstream's `retainQuery` and `unretainQuery` (`garbageCollection.ts:40-63`) and its `RetainedQuery` (`:20-24`) with the entrypoint's reader artifact added, without the release buffer (store.md, `garbageCollect`). Normalizing retains, so retaining and computing happen together; upstream retains at the request (`makeNetworkRequest.ts:464-493`) and reads in render.
+
+`normalize` does, in order:
+
+1. `writeResponse(store, entrypoint.normalizationAst, response, variables)`.
+2. Settles (below) with the new retention included.
+3. Adds the retention to `store.retained`, after settlement succeeds, so a throw leaves nothing retained that the caller holds no handle to.
+4. Notifies observers (change 4).
+
+A resolver entry is live while a retention's `location` or an observed location reaches it through `Entry` dependencies. Several retentions of one entrypoint with equal variables have one `location`, and verifying it twice in one epoch is free; a resolver shared by several queries is one entry reached from several roots. The reference count of the user's design is therefore implicit: an entry stays live while any retention or observed location reaches it, and `dispose` of one retention leaves it live while another does. Explicit counts are needed only with push marks (open decision 2).
+
+### Settlement
+
+```ts
+// from libs/isograph-runtime/src/settle.ts
+/** Verifies the resolver result at every retained location, then at every observed location. */
+function settle(store: Store): void;
+```
+
+Each retained location is verified with `readResolver(store, retention.artifact, retention.location.record, retention.variables)`; each observed location with its stored entry's `artifact` and `variables` when one is stored. Verification is change 2's, so the order is pull's (Ordering), and an entry reached from several roots is verified once. After `settle` returns, every live entry has `timeVerified === store.epoch`, which is what change 4 reads.
+
+The entries a new retention reaches are computed here, children before parents: the root's computation reads each `Resolver` node through `readResolver`, which computes the child first. This is the bottom-up order the user's design creates them in on the way back up the response (Resolver markers, below).
+
+A `normalize` that changed nothing leaves `store.epoch` unchanged, and settlement returns at the first check of each root.
+
+Cost: every `normalize` verifies every retained query's resolver graph, walking each graph's dependencies once when the epoch advanced. Upstream walks every subscription too (`subscribe.ts:67`) and re-reads the overlapping ones in full (`:117`).
+
+### Eager computation
+
+Settlement computes every resolver result a retained query reaches, whether or not any component renders it. That matters when retained queries outnumber rendered ones (a prefetched route, a screen kept retained after navigation) or when resolvers are expensive, and it costs nothing extra when every retained query is on screen. Open decision 3.
+
+### Garbage collection
+
+Before (store.md): `garbageCollect(store: Store, retained: ReadonlyArray<RetainedQuery>): void`.
+
+After: `garbageCollect(store: Store): void`, reading `store.retained`.
+
+- Records: store.md's mark and sweep, from each retention's `ast` and `variables`. An entry a retention reaches never loses a record: it reads only what its reader ASTs select along current links, and the retained query's normalization AST is the merge of those reader ASTs with the same variables (query-generation.md), so every record it reads is marked. An entry reached only from an observed location can lose its records (Level 2).
+- Resolver entries: entries reachable from retained and observed locations through `Entry` dependencies on resolver entries are marked; the sweep deletes every other resolver entry on a surviving record. Entries a plain `read` stored outside any retention are collected this way.
+- `store.epoch` advances when anything was deleted (change 1).
+
+`RetainedQuery` is removed; `Retention` replaces it.
+
+### Resolver markers
+
+The user's design has `normalize` walk the response to the leaves and, on the way back up, create the resolver subscriptions each record needs. That needs `normalize` to know which resolvers the query's readers select at each position. The normalization AST does not say: query generation inlines a client field's selections and keeps no trace of it (query-generation.md, Merging). Two ways:
+
+- (a) Root only (held). `normalize` knows the entrypoint's reader artifact (`Entrypoint.readerArtifact`), and settlement computes the root entry; computing it creates every entry the query reaches, children first, by the same recursion that orders recalculation. Nothing new in any artifact.
+- (b) A marker per position. Each `NormalizationSelectionSet` gains the client fields the readers select on that record, `{ kind: "Resolver", readerArtifact, arguments }`, with `readerArtifact` imported and `arguments` in the operation's variables with defaults applied (what query generation substituted when it inlined the field), listed children first; `normalize` creates each entry when it leaves the record. This is candidate 6 of `refactors/pending/runtime/normalization-ast-mount-markers.md` ("A marker is needed only if a subscription must be created for a record the response introduces").
+
+Reason for (a): every marker in (b) is already reachable from the root through reader ASTs, so (b) adds no entry (a) does not create, and creates them in the same order. (b) also goes stale: a later response that moves `Pet:1.bestFriend` from `Pet:2` to `Pet:3` makes `FriendLabel` read `PetName` on `Pet:3`, where no marker of `FriendPage`'s response ran, so the live set has to follow dependencies anyway. And `normalization_ast.ts` would import reader artifacts, and through them the user's source modules, so loading a query's normalization AST would load its resolvers. Open decision 1.
+
+### Tests
+
+`test/level1.test.ts`, over the fixture of change 2, through `normalize` with the fixture's entrypoint artifacts:
+
+- After `normalize` of `BadgePage`, every resolver it reaches was called once and no `read` was made; `read` of `BadgePage` then calls nothing and returns the stored result.
+- Two retentions of `BadgePage` with `{ id: "1" }`: a later change calls each affected resolver once; `dispose` of one keeps the entries current on the next `normalize`; `dispose` of both, then `garbageCollect`, deletes `Pet:1`'s resolver entries with `Pet:1`.
+- The diamond and chain cases of change 2, with the second read replaced by a `normalize` of the changed response: the same call counts, all inside `normalize`.
+- `FriendPage` retained, then a `PetDetail` response for `Pet:1` whose `bestFriend` is `Pet:3` (`PetDetail` selects no `nickname` under `bestFriend`): inside that `normalize`, `FriendLabel` re-reads on `Pet:3`, and `FriendPage`'s stored result is `MissingData` naming `Pet:3`; `garbageCollect` keeps `Pet:3`, which `FriendPage`'s AST reaches through the new link.
+- A throwing resolver in one retained query: `normalize` returns, that query's root holds `ResolverThrew`, and another retained query's results are current.
+- A resolver entry stored by a plain `read` outside any retention is deleted by `garbageCollect`; one under a retained root is kept.
+- store.md's GC tests retain through `normalize` and release through `dispose` instead of passing `retained`; store.md's other tests call `writeResponse` from `../src/normalize`.
+
+## 4. Level 2: observers
+
+```ts
+// from libs/isograph-runtime/src/observe.ts
+/** Calls `onChange` after each settlement that changed the result stored at `location`.
+ * Returns the function that stops it. */
+export function listen(
+  store: Store,
+  location: EntryLocation,
+  onChange: () => void,
+): () => void;
+
+/** The result stored at `location` as of the last settlement, or `undefined` when none is
+ * stored. Computes nothing. */
+export function snapshot(
+  store: Store,
+  location: EntryLocation,
+): ReadResult<unknown> | undefined;
+```
+
+```ts
+// from libs/isograph-runtime/src/store.ts
+/** The observers of one location. */
+export type Observed = {
+  readonly location: EntryLocation;
+  readonly callbacks: Set<() => void>;
+  /** The stored result the callbacks were last called for, or were registered at. */
+  notified: ReadResult<unknown> | undefined;
+};
+```
+
+`Store` gains `readonly observed: Map<string, Observed>`, keyed by `stableStringify([entityName, id, storeKey])`. `listen` adds to it with `notified` set to the current stored result; the returned function removes the callback, and the `Observed` when it has none left.
+
+Notification, after settlement in `normalize`: for each `Observed` in insertion order, the stored result is compared by identity with `notified`; when different, `notified` is set and each callback is called once. Identity suffices because a backdated entry keeps its result object. Callbacks that throw do not stop the loop; after it, one error is rethrown as is and several as an `AggregateError` (open decision 9).
+
+What each level owns:
+
+- Level 1 holds results, dependencies, and the epochs that order recalculation. It runs user code (resolvers).
+- Level 2 holds locations, callbacks, and the last-notified identity. It runs no resolver, and is notified only after level 1 settled, once per changed location per settlement.
+
+A parent component never re-renders with a stale child: every entry is verified before the first callback, so any `snapshot` during any re-render returns the settled value, whatever the order callbacks run in. React additionally batches the `setState`s that `useSyncExternalStore` calls in one notification loop into one render.
+
+What React needs, and gets without `@isograph/runtime` knowing React: `useSyncExternalStore(subscribe, getSnapshot)` where `subscribe(onStoreChange)` returns an unsubscribe function (`listen`), and `getSnapshot` returns the same value while nothing changed and is pure and cheap (`snapshot`, a lookup). How a component learns its location (the entry a parent's result names) is the React package's, with `@component` (Later).
+
+An observer keeps its entry verified (settlement verifies observed locations) but retains no record: data stays only while a retention keeps it. A location whose record `garbageCollect` deleted has no stored result, and `snapshot` returns `undefined`.
+
+### Tests
+
+`test/level2.test.ts`:
+
+- `listen` then an unchanged `normalize`: no call. A changed one: one call, after which `snapshot` returns the new result; inside the callback, `snapshot` already returns it and every resolver's call count is final.
+- Two observers of `PetName` on `Pet:2` through different locations' queries (`FriendPage`, `PetSummary`): one write, `PetName` called once, each observer called once.
+- An observer of `Initial` and one of `BadgePage`, `Rex` to `Ray`: neither is called.
+- A callback that calls `normalize` with another change: the nested call notifies; each observer receives each result once.
+- A callback that throws: the other observers are still called, then `normalize` throws it; two that throw give an `AggregateError` of both.
+- The stop function: no later call; `snapshot` still works.
+
+## Docs this doc amends
+
+- `refactors/pending/runtime/store.md`: "`pico-runtime.md` stays parked" is replaced by this doc as the step after v1. `Store`, `StoreRecord`, `ServerEntry`, `Epoch`, `createStore`, `jsonEqual`, and the two throw sites (change 1); `normalize` becomes `writeResponse` and the exported `normalize` retains and settles, `garbageCollect` reads `store.retained`, and `RetainedQuery` becomes `Retention` (change 3); its test helpers `storeOf` and `serverValues`.
+- `refactors/pending/runtime/reader-ast.md`: `ReaderArtifact.selectableName` and its printing; `ReadResult` gains `ReadResolverThrew`; `read` stores and reuses resolver results; "The store is unchanged by every read" and "A resolver that throws propagates out of `read`" change as change 2's Tests state. Its note that this doc's `computeResolver` and `readSelection` replace its `read` is superseded by change 2.
+- `refactors/pending/runtime/normalization-ast-mount-markers.md`: candidate 6 is answered by Resolver markers (held: no marker); its open question on how this doc models a mount is answered by `Retention` and settlement.
+
+## Later
+
+- `@component`: a component is a resolver result, stored and settled like any other; a mounted component observes its own entry.
+- Client pointers, `@loadable`, refetch queries (reader-ast.md, Later): each adds entries or retentions, and the markers of normalization-ast-mount-markers.md.
+- Optimistic writes: a layer of server entries that settlement reads through.
 
 ## Open decisions
 
-1. Propagation. Options: pull only (verify every subscription after each commit), push only (recompute dirty nodes at commit), push-pull. Pull only makes every write cost the size of every subscribed dependency graph, the same order of work as upstream's overlap scan. Push only recomputes results nobody reads and needs a topological order to backdate. Push-pull costs a `Set` of reverse edges per source and per node and keeps pico's verification. I hold push-pull.
+### 1. Resolver markers in the normalization AST
 
-2. How a type is marked for inline storage. Options: (a) a config list `inline_types` in `isograph.config.json`; (b) a directive on the type in an SDL extension file in `schema`; (c) every type without an `id` field is inline (Apollo's default for objects without key fields), with an opt-out list; (d) every type without `id` is normalized at a synthetic id (upstream's default), with an opt-in list. (c) makes an id-less singleton such as `viewer` one source, so any change under it re-runs every reader of it. (b) requires the user to own an extension file and a directive name the server never sees. (a) and (d) together keep upstream's behavior by default and make inline storage an explicit choice per type. I hold (a) with (d) as the default.
+- (a) Root only: `normalize` takes the entrypoint, and settlement creates the rest through reader ASTs (held, Resolver markers).
+- (b) A marker per selection set, as the user's design describes. Cost: artifacts import reader artifacts and source modules, the marker set goes stale as links change, and it duplicates what reader ASTs already say.
 
-3. How a field declares its comparator. Options: (a) a directive naming an export of the same module, `field Pet.fullName @equality(comparator: "fullNameEquality")`, and the reader artifact imports it; (b) a directive with built-in comparators only (`Identity`, `Shallow`, `Json`); (c) a second argument to the function `iso` returns, `iso(...)(fullName, { isEqual })`, which changes the exported value's type from exactly the resolver's (artifact-generation.md's `Identity`) and requires the transform to keep the options. (a) allows any function, and TypeScript checks the import and the comparator's type against the resolver's return type in the generated artifact. (b) covers fewer cases and adds runtime exports. I hold (a). The directive name is part of this decision.
+### 2. Which entries settlement visits
 
-4. Backdating selection set nodes. Options: compare with `selectionSetDataEqual`, or treat every re-run as changed. The comparison is one level of `===` per selected alias and stops a resolver from re-running when its selection set re-ran without a different output. I hold compare.
+- (a) Every retained and observed root, pull only (held). Cost: per `normalize`, a walk of every live dependency graph comparing epochs.
+- (b) Dirty marks along dependents, then pull from marked roots. Each live entry and each server entry a live entry read holds its dependents; reference counts (retentions plus live dependents) decide liveness and detach edges at zero. Cost: edge maintenance on every computation, entries for absent keys, and the counts; benefit: a write costs what it reaches. The order is (a)'s.
+- (c) Height-ordered queue. Cost: maintained heights and a queue in the store; no laziness.
 
-5. When callbacks run. Options: synchronously at the end of the transaction that changed the data, or on a microtask after it. Synchronous delivery is deterministic and one network response is already one transaction; a microtask would merge separate responses that land in one task, at the price of a window in which `readField` and the last delivered result disagree. I hold synchronous.
+### 3. Eager computation for retained queries nobody renders
 
-6. How dependencies are recorded. Options: an explicit `DependencyRecorder` parameter, or an ambient stack on the store like pico's `DependencyStack`. Resolvers do not read the store, so every read happens in the runtime's own functions, which can pass the recorder. An ambient stack would be needed only if user code read the store. I hold the explicit recorder.
+- (a) Every retained query is settled after every write (held; the user's goal: renders do no work).
+- (b) Only roots that have an observer are settled; a retained root without one is verified when `listen` attaches, in the subscribe call, not in render. Cost: the first render of a newly observed location can get a stale `snapshot` before `listen` runs.
+- (c) Per retention, a choice between (a) and (b). Cost: an option on `normalize`.
 
-7. Where a `ResolverThrew` stops. Options: propagate to every ancestor (the parent selection set's result is the child's `ResolverThrew`), or store the error as the field's value in the parent's data. Propagation matches upstream, where the exception unwinds the whole read. Storing the value lets the rest of a page read, and makes every resolver's `data` type include an error case. I hold propagate.
+### 4. Entry representation
 
-8. Cycles through resolvers over cyclic data (`field User.bestFriendName { bestFriend { bestFriendName } }` where two users are each other's best friend). Options: throw `CycleError` from the read, as pico panics (`crates/pico/src/dependency.rs:95-101`); or a `ReadResult` variant. A cached `Cycle` result would depend on a node that has no result yet. Upstream overflows the stack. I hold throw.
+- (a) Tagged entries with a `timeUpdated` per server value (held, pico's sources).
+- (b) Server values stay untagged and unchanged; `normalize` keeps an equal value's reference, a dependency records the value it read, and verification compares it with `===`; a resolver entry is told apart by `instanceof` of a class. Cost: dependencies hold references to old values, and `store.epoch` is still needed for the verified-this-epoch check, so `Store` changes anyway.
 
-9. When garbage collection runs. Options: upstream's trigger (a released retained query overflows the buffer, `makeNetworkRequest.ts:565-577`) plus the exported `garbageCollect`; or also on every subscription dispose. Collecting on dispose bounds derived nodes sooner and makes an unmount followed by a remount of the same view recompute everything. I hold upstream's trigger plus `garbageCollect`.
+### 5. A resolver that throws
 
-10. A response that lands after `dispose`. Options: drop it (upstream, `makeNetworkRequest.ts:235`), or write it. Writing keeps data the server sent, and GC may delete it at once since nothing retains it. I hold drop.
+- (a) Stored as `ResolverThrew`, propagated to parents like `MissingData` (held). Reason: settlement runs every retained query's resolvers inside `normalize`.
+- (b) Propagate the exception, v1's behavior. Cost: one broken resolver aborts `normalize` for every query and leaves level 1 unsettled.
 
-11. Package location and name. Options: `libs/isograph-runtime` published as `@isograph/runtime`, or a directory under `crates`. i2 keeps JavaScript packages in `libs` (`libs/isograph-babel-plugin`), and `pnpm-workspace.yaml` lists `libs/*`. No upstream package is named `@isograph/runtime`. I hold `libs/isograph-runtime` and `@isograph/runtime`.
+### 6. Garbage collection from live resolver dependencies
 
-12. Reads of a field on a record, beyond entrypoints. Options: export `readField` and `subscribeField` taking an `EagerReaderArtifact` and a `StoreLink`, or export only the entrypoint forms. A consumer that renders one pet subscribes to that pet's field without subscribing to the whole page. I hold exporting both.
+The user's idea, explicitly unsettled: records and fields linked to the resolver entries that read them, so collection knows what is live without walking ASTs.
 
-## Changes
+- (a) Walk retained normalization ASTs, as v1 (held).
+- (b) A record is live when a live entry depends on it. Needs option 2 (b)'s dependents. Cost: a record a retained query fetched but no live entry read is deleted (fields after a `MissingData`, records a reader stops before), so `check` of that retained query reports `MissingData` and a refetch follows; retention no longer means what store.md and upstream mean (`garbageCollection.ts:88-119`).
 
-Each change is one commit, in order.
+### 7. Result equality
 
-1. `libs/isograph-runtime`: `package.json` (`@isograph/runtime`, no dependencies), `tsconfig.json`, `src/index.ts`.
-2. `artifacts.ts`, `store.ts`, `equality.ts`: every type in changes 1, 2, and 11, `createStore`, `effectiveValue`, `rootKey`, `getStorageKey`, `fieldValueEqual`, `selectionSetDataEqual`.
-3. `derivedNode.ts`, `read.ts`, `subscribe.ts`: derived nodes, verification, backdating, `readField`, `subscribeField`, `readEntrypoint`, `subscribeEntrypoint`.
-4. `transaction.ts`: `StorePhase`, `transaction`, `writeField`, `markDirty`, delivery.
-5. `normalize.ts`, `network.ts`: `normalize`, `inlineValue`, `check`, `fetchEntrypoint` without optimistic responses.
-6. `optimistic.ts`: layers, `revertOptimisticLayer`, `optimisticResponse` in `fetchEntrypoint`.
-7. `garbageCollection.ts`: retained queries, the release buffer, `garbageCollect`.
-8. Compiler, after the reader and normalization artifact docs land: `inline_types` in the config, `storage` on emitted AST nodes, the `__link` check, and the comparator directive.
+- (a) `===`, upstream's (held).
+- (b) A comparator the field declares. Cost: a directive, and v1 parses none.
+- (c) Structural equality of resolver outputs. Cost: outputs can be functions, class instances, or React elements.
+
+### 8. A resolver that reads or writes the store
+
+- (a) No guard: the resolver's parameter holds no store, and one reached through a closure is undefined behavior.
+- (b) The store records that a resolver is running; `read`, `normalize`, and `garbageCollect` throw while it does. Cost: a phase field on `Store`.
+
+Not held.
+
+### 9. Callback errors
+
+- (a) Call every callback, then rethrow one error or an `AggregateError` (held). Reason: one failing observer must not leave others stale.
+- (b) Propagate the first throw. Cost: later observers miss the change until the next write.
+
+### 10. Step A
+
+- (a) Ship it before change 1, for a React demo.
+- (b) Skip it. Cost: no React demo until change 4.
+
+Not held: the user's choice.
