@@ -1,10 +1,41 @@
+use std::collections::BTreeSet;
+
+use common_lang_types::EntityName;
 use prelude::Postfix;
 
 use crate::validation::{EntrypointNotFetchableError, SelectableKey};
 use crate::{
-    ClientId, CompilationProfile, EntityOrigin, EntityShape, IsographDb, NetworkProtocol,
-    ProfileEntity, ProfileSelectable, SelectableKind,
+    ClientId, CompilationProfile, CompletedIdentity, EntityOrigin, EntityShape, FixedRecordId,
+    IdentitySelection, IsographDb, NetworkProtocol, ProfileEntity, ProfileSelectable,
+    SelectableKind,
 };
+
+/// The root entities of one operation. Each has one record, at `FixedRecordId::root()`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RootEntities {
+    /// The root entity whose record holds the operation's top-level selections.
+    pub operation: EntityName,
+    /// The other root entities.
+    pub others: BTreeSet<EntityName>,
+}
+
+impl RootEntities {
+    /// `Fixed(FixedRecordId::root())` when `entity` is `operation` or one of `others`;
+    /// otherwise `identity`'s `Select(name)` as `Select(name)` and `Omit` as `Omit`.
+    pub fn identity_of(
+        &self,
+        entity: EntityName,
+        identity: IdentitySelection,
+    ) -> CompletedIdentity {
+        if entity == self.operation || self.others.contains(entity.reference()) {
+            return CompletedIdentity::Fixed(FixedRecordId::root());
+        }
+        match identity {
+            IdentitySelection::Select(name) => CompletedIdentity::Select(name),
+            IdentitySelection::Omit => CompletedIdentity::Omit,
+        }
+    }
+}
 
 /// The protocol's plan for fetching `entity` as the parent of the entrypoint `selectable`.
 pub fn entrypoint_fetch_plan<TProfile: CompilationProfile>(

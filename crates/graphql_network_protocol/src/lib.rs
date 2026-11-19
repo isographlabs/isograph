@@ -15,8 +15,8 @@ use intern::Lookup;
 use intern::string_key::Intern;
 use isograph_compiler::{
     ClientId, CompilationProfile, EntityKind, EntityShape, EntrypointOperation, IncludeFile,
-    IsographDb, NetworkProtocol, ProtocolEntity, ProtocolQueryText, ProtocolSelectable, ScalarKind,
-    ScalarValueKind, SelectableShape,
+    IsographDb, NetworkProtocol, ProtocolEntity, ProtocolQueryText, ProtocolSelectable,
+    RootEntities, ScalarKind, ScalarValueKind, SelectableShape,
 };
 use prelude::Postfix;
 
@@ -152,6 +152,10 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
 
     fn discriminator() -> SelectableName {
         TYPENAME.intern().to()
+    }
+
+    fn root_entities(plan: &GraphQLFetchPlan) -> RootEntities {
+        plan.roots.clone()
     }
 
     fn query_text(operation: &EntrypointOperation<'_, Self>) -> ProtocolQueryText {

@@ -8,8 +8,9 @@ use graphql_schema_parser::{
 use intern::Lookup;
 use intern::string_key::Intern;
 use isograph_compiler::{
-    ClientId, CompilationProfile, DefinitionLocation, EntityShape, IdentitySelection, IsographDb,
-    ProtocolEntity, ProtocolSelectable, SelectableShape, UnionWrapper, Wrapper, WrapperVariant,
+    ClientId, CompilationProfile, CompositeShape, Concreteness, DefinitionLocation, EntityShape,
+    IdentitySelection, IsographDb, ProtocolEntity, ProtocolSelectable, SelectableShape,
+    UnionWrapper, Wrapper, WrapperVariant,
 };
 use pico_macros::memo;
 use prelude::Postfix;
@@ -51,16 +52,24 @@ pub enum IdField {
 pub(crate) const TYPENAME: &str = "__typename";
 const ID: &str = "id";
 
-/// An object, interface, or union is composite; `id` is its identity where `IdField` is
-/// `Present`.
+/// An object, interface, or union is composite; an object is concrete; `id` is the identity
+/// where `IdField` is `Present`.
 pub(crate) fn graphql_entity_shape(data: &GraphQLEntityData) -> EntityShape {
     match data {
         GraphQLEntityData::Scalar(_) | GraphQLEntityData::Enum => EntityShape::Leaf,
         GraphQLEntityData::InputObject => EntityShape::Input,
-        GraphQLEntityData::Object(composite) | GraphQLEntityData::Interface(composite) => {
-            EntityShape::Composite(identity_selection(composite.id_field))
-        }
-        GraphQLEntityData::Union => EntityShape::Composite(IdentitySelection::Omit),
+        GraphQLEntityData::Object(composite) => EntityShape::Composite(CompositeShape {
+            concreteness: Concreteness::Concrete,
+            identity: identity_selection(composite.id_field),
+        }),
+        GraphQLEntityData::Interface(composite) => EntityShape::Composite(CompositeShape {
+            concreteness: Concreteness::Abstract,
+            identity: identity_selection(composite.id_field),
+        }),
+        GraphQLEntityData::Union => EntityShape::Composite(CompositeShape {
+            concreteness: Concreteness::Abstract,
+            identity: IdentitySelection::Omit,
+        }),
     }
 }
 

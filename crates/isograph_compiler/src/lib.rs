@@ -30,7 +30,9 @@ pub use database::{
     ClientId, DiskFile, DiskFileMap, FileMembership, IsographDb, OpenFileKey, SchemaPathMap,
     SourcePathMap, file_contents, source_file_paths,
 };
-pub use entrypoint::{ProfileEntrypointNotFetchableError, ProfileFetchPlan, entrypoint_fetch_plan};
+pub use entrypoint::{
+    ProfileEntrypointNotFetchableError, ProfileFetchPlan, RootEntities, entrypoint_fetch_plan,
+};
 pub use host_language::*;
 pub use iso_literals::{
     LiteralId, extract_iso_literals, iso_literal_extraction, iso_literal_parse_errors_in_file,
@@ -38,17 +40,20 @@ pub use iso_literals::{
     text_through_last_iso_literal,
 };
 pub use merged_selection::{
-    AddedSelectionCollision, AliasCollision, CompletedConditional, CompletedKey,
-    CompletedSelectableSelection, CompletedSelection, CompletedSelectionMap,
-    CompletedSelectionTarget, Condition, FieldSelectionMap, FieldVariable, InlineCycle, MergeError,
-    MergeKey, MergedArgument, MergedArguments, MergedCompositeTarget, MergedConditional,
-    MergedObject, MergedObjectEntry, MergedSelectableSelection, MergedSelection,
-    MergedSelectionMap, MergedSelectionTarget, MergedValue, NonNullVariableType,
-    NormalizationAlias, SelectionKey, SelectionMapError, SelectionMapErrorKind,
-    SourceFieldDeclaration, TopLevelError, UnknownFieldArgument, VariableType, complete,
-    field_selection_map, inlined_fields, source_field_declaration,
+    AddedSelectionCollision, AliasCollision, CompletedCompositeTarget, CompletedConditional,
+    CompletedIdentity, CompletedKey, CompletedSelectableSelection, CompletedSelection,
+    CompletedSelectionMap, CompletedSelectionTarget, Condition, FieldSelectionMap, FieldVariable,
+    FixedRecordId, InlineCycle, MergeError, MergeKey, MergedArgument, MergedArguments,
+    MergedCompositeTarget, MergedConditional, MergedObject, MergedObjectEntry,
+    MergedSelectableSelection, MergedSelection, MergedSelectionMap, MergedSelectionTarget,
+    MergedValue, NonNullVariableType, NormalizationAlias, RecordEntity, ResponseKey, SelectionKey,
+    SelectionMapError, SelectionMapErrorKind, SourceFieldDeclaration, TopLevelError,
+    UnknownFieldArgument, VariableType, complete, field_selection_map, inlined_fields,
+    source_field_declaration,
 };
-pub use protocol_shape::{EntityShape, IdentitySelection, SelectableShape};
+pub use protocol_shape::{
+    CompositeShape, Concreteness, EntityShape, IdentitySelection, SelectableShape,
+};
 pub use query::{
     EntrypointOperation, EntrypointQueryError, ProfileEntrypointQueryError, ProtocolQueryText,
     QueryArtifact, query_for_entrypoint,

@@ -16,9 +16,9 @@ use span::{WithSpan, WithSpanPostfix};
 
 use crate::validation::SelectableKey;
 use crate::{
-    ClientId, CompilationProfile, DefinitionLocation, EntityOrigin, EntityShape, IdentitySelection,
-    IsographDb, NetworkProtocol, SelectableKind, SelectableShape, ServerSelectable, entity_named,
-    parsed_iso_literals_in_file, selectable_named,
+    ClientId, CompilationProfile, CompositeShape, Concreteness, DefinitionLocation, EntityOrigin,
+    EntityShape, IdentitySelection, IsographDb, NetworkProtocol, RootEntities, SelectableKind,
+    SelectableShape, ServerSelectable, entity_named, parsed_iso_literals_in_file, selectable_named,
 };
 
 /// The server selections of one selection set after inlining `field` declarations, keyed by
@@ -64,8 +64,12 @@ pub enum MergedSelectionTarget {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MergedCompositeTarget {
-    /// The identity the protocol adds to a selection set on the target entity.
-    pub identity: IdentitySelection,
+    /// The target entity, which completion compares with the root entities and names in
+    /// `RecordEntity::Known`.
+    pub entity: EntityName,
+    /// The target entity's concreteness and the identity the protocol adds to a selection
+    /// set on it.
+    pub shape: CompositeShape,
     pub selections: MergedSelectionMap,
 }
 
@@ -298,6 +302,28 @@ impl SelectionKey {
     }
 }
 
+/// The key of a selection's value in the response object.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ResponseKey {
+    /// The selection has no arguments: the query prints no alias, and the key is the
+    /// selectable name.
+    SelectableName,
+    /// The selection has arguments: the query prints this alias.
+    Alias(NormalizationAlias),
+}
+
+impl SelectionKey {
+    /// `SelectableName` when the key has no arguments, otherwise `Alias` of
+    /// `normalization_alias`.
+    pub fn response_key(&self) -> ResponseKey {
+        if self.arguments.is_empty() {
+            ResponseKey::SelectableName
+        } else {
+            ResponseKey::Alias(self.normalization_alias())
+        }
+    }
+}
+
 impl MergedValue {
     /// The part of a normalization alias that names this value.
     fn alias_chunk(&self) -> String {
@@ -411,11 +437,12 @@ impl MergedSelectionTarget {
                 MergedSelectionTarget::Leaf.wrap_ok()
             }
             (MergedSelectionTarget::Composite(first), MergedSelectionTarget::Composite(second)) => {
-                if first.identity != second.identity {
+                if first.entity != second.entity || first.shape != second.shape {
                     return MergeError::SelectionMismatch.wrap_err();
                 }
                 MergedSelectionTarget::Composite(MergedCompositeTarget {
-                    identity: first.identity,
+                    entity: first.entity,
+                    shape: first.shape,
                     selections: first.selections.merge(second.selections)?,
                 })
                 .wrap_ok()
@@ -538,7 +565,8 @@ fn substitute_selection(
                     MergedSelectionTarget::Leaf => MergedSelectionTarget::Leaf,
                     MergedSelectionTarget::Composite(target) => {
                         MergedSelectionTarget::Composite(MergedCompositeTarget {
-                            identity: target.identity,
+                            entity: target.entity,
+                            shape: target.shape,
                             selections: substitute(target.selections.reference(), context)?,
                         })
                     }
@@ -1046,11 +1074,12 @@ fn server_contribution<TProfile: CompilationProfile>(
                 .wrap_ok()
             }
         },
-        (SelectableShape::Direct, EntityShape::Composite(identity)) => {
+        (SelectableShape::Direct, EntityShape::Composite(shape)) => {
             MergedSelectionMap::single(MergedSelection::Selectable(MergedSelectableSelection {
                 key: selection_key,
                 target: MergedSelectionTarget::Composite(MergedCompositeTarget {
-                    identity,
+                    entity: target_name,
+                    shape,
                     selections: nested_map()?,
                 }),
             }))
@@ -1059,13 +1088,13 @@ fn server_contribution<TProfile: CompilationProfile>(
         (SelectableShape::Refinement, EntityShape::Leaf) => {
             at_name(SelectionMapErrorKind::RefinementToNonComposite(target_name)).wrap_err()
         }
-        (SelectableShape::Refinement, EntityShape::Composite(identity)) => {
+        (SelectableShape::Refinement, EntityShape::Composite(shape)) => {
             if !selection_key.arguments.is_empty() {
                 return at_name(SelectionMapErrorKind::ArgumentsOnRefinement(key)).wrap_err();
             }
             MergedSelectionMap::single(MergedSelection::Conditional(MergedConditional {
                 condition: Condition::SelectionEquals(target_name),
-                identity,
+                identity: shape.identity,
                 selections: nested_map()?,
             }))
             .wrap_ok()
@@ -1264,13 +1293,59 @@ pub struct CompletedSelectableSelection {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CompletedSelectionTarget {
     Leaf,
-    Composite(CompletedSelectionMap),
+    Composite(CompletedCompositeTarget),
 }
 
+/// A completed selection set on a composite target entity, and how its response objects'
+/// records are found.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CompletedCompositeTarget {
+    pub entity: RecordEntity,
+    pub identity: CompletedIdentity,
+    pub selections: CompletedSelectionMap,
+}
+
+/// The conditional's records are of the condition's entity, so it carries no `RecordEntity`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CompletedConditional {
     pub condition: Condition,
+    pub identity: CompletedIdentity,
     pub selections: CompletedSelectionMap,
+}
+
+/// Which entity a response object's record is of.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RecordEntity {
+    /// The target entity is `Concrete`: every response object is of this entity.
+    Known(EntityName),
+    /// The target entity is `Abstract`: the response object's discriminator names its entity.
+    Discriminator,
+}
+
+/// How a response object's record id is found.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CompletedIdentity {
+    /// The value of the identity selection, which the map holds as `Identity(name)`.
+    Select(SelectableName),
+    /// The entity has no identity selection; the normalizer derives the record id from the
+    /// parent record and the path.
+    Omit,
+    /// The entity is a root entity: every response object of it is the record with this id.
+    Fixed(FixedRecordId),
+}
+
+/// A record id the compiler assigns.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, derive_more::Display)]
+pub struct FixedRecordId(pub String);
+
+const ROOT_RECORD_ID: &str = "__ROOT";
+
+impl FixedRecordId {
+    /// `"__ROOT"`: the id of a root entity's one record, upstream's `ROOT_ID`
+    /// (`isograph/libs/isograph-react/src/core/IsographEnvironment.ts:163`).
+    pub fn root() -> Self {
+        FixedRecordId(ROOT_RECORD_ID.to_owned())
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
@@ -1308,10 +1383,11 @@ impl CompletedSelectionMap {
         self.0.values()
     }
 
-    /// The operation's top-level map: every selection completed, and nothing added at the top
-    /// level itself.
+    /// The operation's top-level map: every selection completed against `roots`, and nothing
+    /// added at the top level itself.
     pub fn top_level<TProtocol: NetworkProtocol>(
         map: &MergedSelectionMap,
+        roots: &RootEntities,
     ) -> Result<Self, TopLevelError> {
         let selections = map
             .iter()
@@ -1319,7 +1395,7 @@ impl CompletedSelectionMap {
                 MergedSelection::Selectable(selection) => {
                     CompletedSelection::Selectable(CompletedSelectableSelection {
                         key: selection.key.clone(),
-                        target: complete_target::<TProtocol>(selection.target.reference())
+                        target: complete_target::<TProtocol>(selection.target.reference(), roots)
                             .map_err(TopLevelError::AddedSelectionCollision)?,
                     })
                     .wrap_ok()
@@ -1344,30 +1420,36 @@ impl CompletedSelectionMap {
     }
 }
 
-/// `map`, a selection set under a selection of an entity whose identity is `identity`, with
-/// the discriminator, the identity, and every composite target and conditional below it
-/// completed.
+/// `map`, a selection set under a selection of an entity whose record id is found by
+/// `identity`, with the discriminator, the identity, and every composite target and
+/// conditional below it completed against `roots`.
 pub fn complete<TProtocol: NetworkProtocol>(
     map: &MergedSelectionMap,
-    identity: IdentitySelection,
+    identity: &CompletedIdentity,
+    roots: &RootEntities,
 ) -> Result<CompletedSelectionMap, AddedSelectionCollision> {
     let discriminator = TProtocol::discriminator();
-    let added = std::iter::once(CompletedSelection::Discriminator).chain(match identity {
-        IdentitySelection::Select(name) => CompletedSelection::Identity(name).wrap_some(),
-        IdentitySelection::Omit => None,
-    });
+    let identity_name = match identity {
+        CompletedIdentity::Select(name) => name.dereference().wrap_some(),
+        CompletedIdentity::Omit | CompletedIdentity::Fixed(_) => None,
+    };
+    let added = std::iter::once(CompletedSelection::Discriminator)
+        .chain(identity_name.map(CompletedSelection::Identity));
     map.iter()
-        .map(|selection| complete_selection::<TProtocol>(selection, discriminator, identity))
+        .map(|selection| {
+            complete_selection::<TProtocol>(selection, discriminator, identity_name, roots)
+        })
         .collect::<Result<Vec<_>, _>>()
         .map(|selections| CompletedSelectionMap::from_selections(added.chain(selections).collect()))
 }
 
 /// One selection of a selection set whose discriminator is `discriminator` and whose
-/// identity is `identity`, completed.
+/// identity selection is `identity_name`, completed against `roots`.
 fn complete_selection<TProtocol: NetworkProtocol>(
     selection: &MergedSelection,
     discriminator: SelectableName,
-    identity: IdentitySelection,
+    identity_name: Option<SelectableName>,
+    roots: &RootEntities,
 ) -> Result<CompletedSelection, AddedSelectionCollision> {
     match selection {
         MergedSelection::Selectable(selection) => {
@@ -1376,9 +1458,7 @@ fn complete_selection<TProtocol: NetworkProtocol>(
                 (MergedSelectionTarget::Leaf, true) if key.name == discriminator => {
                     CompletedSelection::Discriminator.wrap_some()
                 }
-                (MergedSelectionTarget::Leaf, true)
-                    if identity == IdentitySelection::Select(key.name) =>
-                {
+                (MergedSelectionTarget::Leaf, true) if identity_name == key.name.wrap_some() => {
                     CompletedSelection::Identity(key.name).wrap_some()
                 }
                 (MergedSelectionTarget::Leaf | MergedSelectionTarget::Composite(_), _) => None,
@@ -1387,11 +1467,8 @@ fn complete_selection<TProtocol: NetworkProtocol>(
                 return added.wrap_ok();
             }
             let alias = key.normalization_alias();
-            let added_names = std::iter::once(discriminator).chain(match identity {
-                IdentitySelection::Select(name) => name.wrap_some(),
-                IdentitySelection::Omit => None,
-            });
-            if added_names
+            if std::iter::once(discriminator)
+                .chain(identity_name)
                 .map(|name| name.to_string())
                 .any(|name| name == alias.0)
             {
@@ -1399,33 +1476,50 @@ fn complete_selection<TProtocol: NetworkProtocol>(
             }
             CompletedSelection::Selectable(CompletedSelectableSelection {
                 key: key.clone(),
-                target: complete_target::<TProtocol>(selection.target.reference())?,
+                target: complete_target::<TProtocol>(selection.target.reference(), roots)?,
             })
             .wrap_ok()
         }
         MergedSelection::Conditional(conditional) => {
+            let Condition::SelectionEquals(entity) = conditional.condition;
+            let identity = roots.identity_of(entity, conditional.identity);
             CompletedSelection::Conditional(CompletedConditional {
                 condition: conditional.condition.clone(),
                 selections: complete::<TProtocol>(
                     conditional.selections.reference(),
-                    conditional.identity,
+                    identity.reference(),
+                    roots,
                 )?,
+                identity,
             })
             .wrap_ok()
         }
     }
 }
 
-/// `target` with its selections completed under its own identity.
+/// `target` with its selections completed under its own record entity and identity.
 fn complete_target<TProtocol: NetworkProtocol>(
     target: &MergedSelectionTarget,
+    roots: &RootEntities,
 ) -> Result<CompletedSelectionTarget, AddedSelectionCollision> {
     match target {
         MergedSelectionTarget::Leaf => CompletedSelectionTarget::Leaf.wrap_ok(),
-        MergedSelectionTarget::Composite(target) => CompletedSelectionTarget::Composite(
-            complete::<TProtocol>(target.selections.reference(), target.identity)?,
-        )
-        .wrap_ok(),
+        MergedSelectionTarget::Composite(target) => {
+            let identity = roots.identity_of(target.entity, target.shape.identity);
+            CompletedSelectionTarget::Composite(CompletedCompositeTarget {
+                entity: match target.shape.concreteness {
+                    Concreteness::Concrete => RecordEntity::Known(target.entity),
+                    Concreteness::Abstract => RecordEntity::Discriminator,
+                },
+                selections: complete::<TProtocol>(
+                    target.selections.reference(),
+                    identity.reference(),
+                    roots,
+                )?,
+                identity,
+            })
+            .wrap_ok()
+        }
     }
 }
 
@@ -1442,9 +1536,10 @@ mod tests {
         AliasCollision, Condition, MergeError, MergeKey, MergedArgument, MergedArguments,
         MergedCompositeTarget, MergedConditional, MergedObject, MergedObjectEntry,
         MergedSelectableSelection, MergedSelection, MergedSelectionMap, MergedSelectionTarget,
-        MergedValue, SelectionKey, SelectionMapErrorKind, VariableValue, substitute,
+        MergedValue, NormalizationAlias, ResponseKey, SelectionKey, SelectionMapErrorKind,
+        VariableValue, substitute,
     };
-    use crate::IdentitySelection;
+    use crate::{CompositeShape, Concreteness, IdentitySelection};
 
     fn name(s: &str) -> SelectableName {
         s.intern().to()
@@ -1510,16 +1605,38 @@ mod tests {
         })
     }
 
+    /// A selection of `s` whose target is the concrete entity named `s` with `identity`.
     fn composite(
         s: &str,
         list: Vec<MergedArgument>,
         identity: IdentitySelection,
         selections: Vec<MergedSelection>,
     ) -> MergedSelection {
+        composite_of(
+            s,
+            list,
+            s,
+            CompositeShape {
+                concreteness: Concreteness::Concrete,
+                identity,
+            },
+            selections,
+        )
+    }
+
+    /// A selection of `s` whose target is `target` with `shape`.
+    fn composite_of(
+        s: &str,
+        list: Vec<MergedArgument>,
+        target: &str,
+        shape: CompositeShape,
+        selections: Vec<MergedSelection>,
+    ) -> MergedSelection {
         MergedSelection::Selectable(MergedSelectableSelection {
             key: key(s, list),
             target: MergedSelectionTarget::Composite(MergedCompositeTarget {
-                identity,
+                entity: entity(target),
+                shape,
                 selections: map(selections),
             }),
         })
@@ -2203,21 +2320,53 @@ mod tests {
     }
 
     mod completion {
-        use super::{argument, composite, conditional, entity, id, leaf, map, name};
-        use crate::IdentitySelection;
+        use std::collections::BTreeSet;
+
+        use super::{argument, composite, composite_of, conditional, entity, id, leaf, map, name};
         use crate::merged_selection::{
-            AddedSelectionCollision, CompletedKey, CompletedSelection, CompletedSelectionMap,
-            CompletedSelectionTarget, Condition, MergedSelectionMap, MergedValue, SelectionKey,
+            AddedSelectionCollision, CompletedCompositeTarget, CompletedIdentity, CompletedKey,
+            CompletedSelection, CompletedSelectionMap, CompletedSelectionTarget, Condition,
+            FixedRecordId, MergedSelectionMap, MergedValue, RecordEntity, SelectionKey,
             TopLevelError, complete,
         };
         use crate::test_profile::TestNetworkProtocol;
+        use crate::{CompositeShape, Concreteness, IdentitySelection, RootEntities};
+        use common_lang_types::EntityName;
         use prelude::Postfix;
+
+        /// `Query` with `Mutation` beside it.
+        fn roots() -> RootEntities {
+            RootEntities {
+                operation: entity("Query"),
+                others: [entity("Mutation")].into_iter().collect(),
+            }
+        }
+
+        /// `identity` of an entity that is not a root entity.
+        fn not_root(identity: IdentitySelection) -> CompletedIdentity {
+            roots().identity_of(entity("NotARoot"), identity)
+        }
+
+        fn complete_with(
+            map: &MergedSelectionMap,
+            identity: IdentitySelection,
+        ) -> Result<CompletedSelectionMap, AddedSelectionCollision> {
+            complete::<TestNetworkProtocol>(
+                map,
+                not_root(identity).reference(),
+                roots().reference(),
+            )
+        }
 
         fn completed(
             map: &MergedSelectionMap,
             identity: IdentitySelection,
         ) -> CompletedSelectionMap {
-            complete::<TestNetworkProtocol>(map, identity).expect("the test's map completes")
+            complete_with(map, identity).expect("the test's map completes")
+        }
+
+        fn top_level(map: &MergedSelectionMap) -> Result<CompletedSelectionMap, TopLevelError> {
+            CompletedSelectionMap::top_level::<TestNetworkProtocol>(map, roots().reference())
         }
 
         /// One line per completed selection, two spaces per depth.
@@ -2239,9 +2388,9 @@ mod tests {
                         let alias = selection.key.normalization_alias();
                         match selection.target.reference() {
                             CompletedSelectionTarget::Leaf => format!("{indent}{alias}").wrap_vec(),
-                            CompletedSelectionTarget::Composite(inner) => {
+                            CompletedSelectionTarget::Composite(target) => {
                                 std::iter::once(format!("{indent}{alias} {{"))
-                                    .chain(outline_at(inner, depth + 1))
+                                    .chain(outline_at(target.selections.reference(), depth + 1))
                                     .collect()
                             }
                         }
@@ -2337,17 +2486,14 @@ mod tests {
                 vec![],
             )]);
             assert_eq!(
-                complete::<TestNetworkProtocol>(named_id.reference(), id()),
+                complete_with(named_id.reference(), id()),
                 AddedSelectionCollision(SelectionKey {
                     name: name("id"),
                     arguments: Default::default(),
                 })
                 .wrap_err()
             );
-            assert!(
-                complete::<TestNetworkProtocol>(named_id.reference(), IdentitySelection::Omit)
-                    .is_ok()
-            );
+            assert!(complete_with(named_id.reference(), IdentitySelection::Omit).is_ok());
             let named_typename = map(vec![composite(
                 "__typename",
                 vec![],
@@ -2355,10 +2501,7 @@ mod tests {
                 vec![],
             )]);
             assert!(matches!(
-                complete::<TestNetworkProtocol>(
-                    named_typename.reference(),
-                    IdentitySelection::Omit
-                ),
+                complete_with(named_typename.reference(), IdentitySelection::Omit),
                 Err(AddedSelectionCollision(_))
             ));
         }
@@ -2376,7 +2519,7 @@ mod tests {
                 )],
             )]);
             assert!(matches!(
-                complete::<TestNetworkProtocol>(merged.reference(), IdentitySelection::Omit),
+                complete_with(merged.reference(), IdentitySelection::Omit),
                 Err(AddedSelectionCollision(_))
             ));
         }
@@ -2457,7 +2600,7 @@ mod tests {
             ]);
             assert_eq!(
                 outline(
-                    CompletedSelectionMap::top_level::<TestNetworkProtocol>(merged.reference())
+                    top_level(merged.reference())
                         .expect("the map has selections")
                         .reference()
                 ),
@@ -2474,19 +2617,15 @@ mod tests {
         #[test]
         fn the_top_level_rejects_an_empty_map_a_conditional_and_a_collision_below() {
             assert_eq!(
-                CompletedSelectionMap::top_level::<TestNetworkProtocol>(
-                    MergedSelectionMap::empty().reference()
-                ),
+                top_level(MergedSelectionMap::empty().reference()),
                 TopLevelError::Empty.wrap_err()
             );
             assert_eq!(
-                CompletedSelectionMap::top_level::<TestNetworkProtocol>(
-                    map(vec![leaf("a", vec![]), conditional("T", id(), vec![])]).reference()
-                ),
+                top_level(map(vec![leaf("a", vec![]), conditional("T", id(), vec![])]).reference()),
                 TopLevelError::Conditional.wrap_err()
             );
             assert!(matches!(
-                CompletedSelectionMap::top_level::<TestNetworkProtocol>(
+                top_level(
                     map(vec![composite(
                         "pets",
                         vec![],
@@ -2504,12 +2643,186 @@ mod tests {
             let merged = map(vec![leaf("__typename", vec![]), leaf("id", vec![])]);
             assert_eq!(
                 outline(
-                    CompletedSelectionMap::top_level::<TestNetworkProtocol>(merged.reference())
+                    top_level(merged.reference())
                         .expect("the map has selections")
                         .reference()
                 ),
                 lines(&["__typename", "id"])
             );
         }
+
+        fn concrete(identity: IdentitySelection) -> CompositeShape {
+            CompositeShape {
+                concreteness: Concreteness::Concrete,
+                identity,
+            }
+        }
+
+        /// The completed target of the composite selection named `s` in `map`.
+        fn target_of<'a>(map: &'a CompletedSelectionMap, s: &str) -> &'a CompletedCompositeTarget {
+            map.iter()
+                .find_map(|selection| match selection {
+                    CompletedSelection::Selectable(selection) if selection.key.name == name(s) => {
+                        match selection.target.reference() {
+                            CompletedSelectionTarget::Composite(target) => target.wrap_some(),
+                            CompletedSelectionTarget::Leaf => None,
+                        }
+                    }
+                    CompletedSelection::Discriminator
+                    | CompletedSelection::Identity(_)
+                    | CompletedSelection::Selectable(_)
+                    | CompletedSelection::Conditional(_) => None,
+                })
+                .expect("the map has this composite selection")
+        }
+
+        #[test]
+        fn a_root_entity_target_is_known_and_fixed_at_the_root_record_with_no_identity_entry() {
+            let merged = map(vec![
+                composite_of(
+                    "query",
+                    vec![],
+                    "Query",
+                    concrete(id()),
+                    vec![leaf("id", vec![]), leaf("tags", vec![])],
+                ),
+                composite_of("mutation", vec![], "Mutation", concrete(id()), vec![]),
+            ]);
+            let completed = top_level(merged.reference()).expect("the map has selections");
+            let query = target_of(completed.reference(), "query");
+            assert_eq!(query.entity, RecordEntity::Known(entity("Query")));
+            assert_eq!(
+                query.identity,
+                CompletedIdentity::Fixed(FixedRecordId::root())
+            );
+            assert_eq!(
+                outline(query.selections.reference()),
+                lines(&["<discriminator>", "id", "tags"])
+            );
+            let mutation = target_of(completed.reference(), "mutation");
+            assert_eq!(
+                mutation.identity,
+                CompletedIdentity::Fixed(FixedRecordId::root())
+            );
+            assert_eq!(FixedRecordId::root().0, "__ROOT");
+        }
+
+        #[test]
+        fn a_concrete_target_is_known_and_an_abstract_one_reads_the_discriminator() {
+            let merged = map(vec![
+                composite_of("pet", vec![], "Pet", concrete(id()), vec![]),
+                composite_of(
+                    "feed",
+                    vec![],
+                    "NewsfeedItem",
+                    CompositeShape {
+                        concreteness: Concreteness::Abstract,
+                        identity: IdentitySelection::Omit,
+                    },
+                    vec![
+                        conditional("BlogItem", id(), vec![leaf("title", vec![])]),
+                        conditional("Query", id(), vec![leaf("x", vec![])]),
+                    ],
+                ),
+            ]);
+            let completed = top_level(merged.reference()).expect("the map has selections");
+            let pet = target_of(completed.reference(), "pet");
+            assert_eq!(pet.entity, RecordEntity::Known(entity("Pet")));
+            assert_eq!(pet.identity, CompletedIdentity::Select(name("id")));
+            assert_eq!(
+                outline(pet.selections.reference()),
+                lines(&["<discriminator>", "<identity id>"])
+            );
+            let feed = target_of(completed.reference(), "feed");
+            assert_eq!(feed.entity, RecordEntity::Discriminator);
+            assert_eq!(feed.identity, CompletedIdentity::Omit);
+            let identities: Vec<(EntityName, CompletedIdentity)> = feed
+                .selections
+                .iter()
+                .filter_map(|selection| match selection {
+                    CompletedSelection::Conditional(conditional) => {
+                        let Condition::SelectionEquals(on) = conditional.condition;
+                        (on, conditional.identity.clone()).wrap_some()
+                    }
+                    CompletedSelection::Discriminator
+                    | CompletedSelection::Identity(_)
+                    | CompletedSelection::Selectable(_) => None,
+                })
+                .collect();
+            assert_eq!(
+                identities,
+                vec![
+                    (entity("BlogItem"), CompletedIdentity::Select(name("id"))),
+                    (
+                        entity("Query"),
+                        CompletedIdentity::Fixed(FixedRecordId::root())
+                    ),
+                ]
+            );
+        }
+
+        #[test]
+        fn identity_of_is_fixed_for_every_root_entity_and_the_protocol_identity_otherwise() {
+            let roots = roots();
+            for root in ["Query", "Mutation"] {
+                for identity in [id(), IdentitySelection::Omit] {
+                    assert_eq!(
+                        roots.identity_of(entity(root), identity),
+                        CompletedIdentity::Fixed(FixedRecordId::root()),
+                        "{root}"
+                    );
+                }
+            }
+            assert_eq!(
+                roots.identity_of(entity("Pet"), id()),
+                CompletedIdentity::Select(name("id"))
+            );
+            assert_eq!(
+                roots.identity_of(entity("Pet"), IdentitySelection::Omit),
+                CompletedIdentity::Omit
+            );
+            let only_query = RootEntities {
+                operation: entity("Query"),
+                others: BTreeSet::new(),
+            };
+            assert_eq!(
+                only_query.identity_of(entity("Mutation"), id()),
+                CompletedIdentity::Select(name("id"))
+            );
+        }
+    }
+
+    #[test]
+    fn the_response_key_is_the_selectable_name_without_arguments_and_the_alias_with_them() {
+        assert_eq!(
+            key("firstName", vec![]).response_key(),
+            ResponseKey::SelectableName
+        );
+        assert_eq!(
+            key("pet", vec![argument("id", var("id"))]).response_key(),
+            ResponseKey::Alias(NormalizationAlias("pet____id___v_id".to_owned()))
+        );
+    }
+
+    #[test]
+    fn composites_with_different_entities_or_concreteness_at_one_key_are_a_mismatch() {
+        let shape = |concreteness| CompositeShape {
+            concreteness,
+            identity: IdentitySelection::Omit,
+        };
+        assert_eq!(
+            try_map(vec![
+                composite_of("f", vec![], "A", shape(Concreteness::Concrete), vec![]),
+                composite_of("f", vec![], "B", shape(Concreteness::Concrete), vec![]),
+            ]),
+            MergeError::SelectionMismatch.wrap_err()
+        );
+        assert_eq!(
+            try_map(vec![
+                composite_of("f", vec![], "A", shape(Concreteness::Concrete), vec![]),
+                composite_of("f", vec![], "A", shape(Concreteness::Abstract), vec![]),
+            ]),
+            MergeError::SelectionMismatch.wrap_err()
+        );
     }
 }

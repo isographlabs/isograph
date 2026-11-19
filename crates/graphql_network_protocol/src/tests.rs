@@ -4,10 +4,10 @@ use common_lang_types::{EntityName, RelativePathToSourceFile, SelectableName};
 use graphql_schema_parser::OperationType;
 use intern::string_key::Intern;
 use isograph_compiler::{
-    ClientId, CompilationProfile, DefinitionLocation, EntityKind, EntityShape, FileMembership,
-    IdentitySelection, IncludeFile, IsographDb, NetworkProtocol, ProtocolSelectable, ScalarKind,
-    ScalarValueKind, SelectableShape, UnionWrapper, Wrapper, WrapperVariant,
-    iso_literal_validation_errors_in_file,
+    ClientId, CompilationProfile, CompositeShape, Concreteness, DefinitionLocation, EntityKind,
+    EntityShape, FileMembership, IdentitySelection, IncludeFile, IsographDb, NetworkProtocol,
+    ProtocolSelectable, RootEntities, ScalarKind, ScalarValueKind, SelectableShape, UnionWrapper,
+    Wrapper, WrapperVariant, iso_literal_validation_errors_in_file,
 };
 use isograph_extract_typescript::TypeScriptHostLanguage;
 use prelude::Postfix;
@@ -435,23 +435,35 @@ fn the_graphql_shapes_name_typename_and_id() {
         GraphQLNetworkProtocol::entity_shape(&GraphQLEntityData::Object(composite(
             IdField::Present
         ))),
-        EntityShape::Composite(IdentitySelection::Select(id))
+        EntityShape::Composite(CompositeShape {
+            concreteness: Concreteness::Concrete,
+            identity: IdentitySelection::Select(id)
+        })
     );
     assert_eq!(
         GraphQLNetworkProtocol::entity_shape(&GraphQLEntityData::Interface(composite(
             IdField::Present
         ))),
-        EntityShape::Composite(IdentitySelection::Select(id))
+        EntityShape::Composite(CompositeShape {
+            concreteness: Concreteness::Abstract,
+            identity: IdentitySelection::Select(id)
+        })
     );
     assert_eq!(
         GraphQLNetworkProtocol::entity_shape(&GraphQLEntityData::Object(composite(
             IdField::Absent
         ))),
-        EntityShape::Composite(IdentitySelection::Omit)
+        EntityShape::Composite(CompositeShape {
+            concreteness: Concreteness::Concrete,
+            identity: IdentitySelection::Omit
+        })
     );
     assert_eq!(
         GraphQLNetworkProtocol::entity_shape(&GraphQLEntityData::Union),
-        EntityShape::Composite(IdentitySelection::Omit)
+        EntityShape::Composite(CompositeShape {
+            concreteness: Concreteness::Abstract,
+            identity: IdentitySelection::Omit
+        })
     );
     assert_eq!(
         GraphQLNetworkProtocol::entity_shape(&GraphQLEntityData::Scalar(entity("ID"))),
@@ -763,7 +775,21 @@ fn fetch_plan(db: &Db, name: &str) -> Result<GraphQLFetchPlan, GraphQLNotFetchab
 fn root_plan(db: &Db, name: &str) -> OperationType {
     fetch_plan(db, name)
         .expect("the fixture makes this entity a root operation type")
-        .0
+        .operation_type
+}
+
+/// The root entities of `name`'s plan, which the fixture makes a root fetch.
+fn plan_roots(db: &Db, name: &str) -> RootEntities {
+    fetch_plan(db, name)
+        .expect("the fixture makes this entity a root operation type")
+        .roots
+}
+
+fn root_entities(operation: &str, others: &[&str]) -> RootEntities {
+    RootEntities {
+        operation: entity(operation),
+        others: others.iter().map(|other| entity(other)).collect(),
+    }
 }
 
 #[test]
@@ -771,9 +797,20 @@ fn only_the_root_operation_types_of_the_pet_demo_are_fetchable() {
     let db = db_with(&PET_DEMO_SCHEMA);
     assert_eq!(
         fetch_plan(&db, "Query"),
-        GraphQLFetchPlan(OperationType::Query).wrap_ok()
+        GraphQLFetchPlan {
+            operation_type: OperationType::Query,
+            roots: root_entities("Query", &["Mutation"]),
+        }
+        .wrap_ok()
     );
-    assert_eq!(root_plan(&db, "Mutation"), OperationType::Mutation);
+    assert_eq!(
+        fetch_plan(&db, "Mutation"),
+        GraphQLFetchPlan {
+            operation_type: OperationType::Mutation,
+            roots: root_entities("Mutation", &["Query"]),
+        }
+        .wrap_ok()
+    );
     for not_root in [
         "Pet",
         "PetStats",
@@ -804,6 +841,10 @@ fn the_default_root_types_are_fetchable_and_an_unnamed_mutation_is_not() {
         "type Query { a: Int } type Subscription { petAdded: Int }",
     )]);
     assert_eq!(root_plan(&db, "Subscription"), OperationType::Subscription);
+    assert_eq!(
+        plan_roots(&db, "Subscription"),
+        root_entities("Subscription", &["Query", "Mutation"])
+    );
     let db = db_with(&[(
         "a.graphql",
         "schema { query: Query } type Query { a: Int } type Mutation { a: Int }",

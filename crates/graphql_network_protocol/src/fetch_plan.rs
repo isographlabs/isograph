@@ -1,6 +1,6 @@
 use common_lang_types::EntityName;
 use graphql_schema_parser::OperationType;
-use isograph_compiler::{ClientId, CompilationProfile, IsographDb, ProtocolEntity};
+use isograph_compiler::{ClientId, CompilationProfile, IsographDb, ProtocolEntity, RootEntities};
 use pico_macros::memo;
 use prelude::Postfix;
 
@@ -9,9 +9,13 @@ use crate::schema_lookup::EntityLookupError;
 use crate::{GraphQLEntityData, graphql_entity};
 
 /// How the GraphQL protocol fetches an entity that parents an entrypoint: the entity is the
-/// root type of this operation type, and its selections are the operation's.
+/// root type of `operation_type`, and its selections are the operation's.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct GraphQLFetchPlan(pub OperationType);
+pub struct GraphQLFetchPlan {
+    pub operation_type: OperationType,
+    /// The schema's root operation types, with the entity as `operation`.
+    pub roots: RootEntities,
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum GraphQLNotFetchable {
@@ -47,7 +51,11 @@ pub fn graphql_fetch_plan<TProfile: CompilationProfile>(
         .operation_type_of(entity)
         .ok_or(GraphQLNotFetchable::NotRootOperationType(entity))?;
     match data {
-        GraphQLEntityData::Object(_) => GraphQLFetchPlan(operation_type).wrap_ok(),
+        GraphQLEntityData::Object(_) => GraphQLFetchPlan {
+            operation_type,
+            roots: roots.root_entities(entity),
+        }
+        .wrap_ok(),
         GraphQLEntityData::Scalar(_)
         | GraphQLEntityData::Enum
         | GraphQLEntityData::InputObject

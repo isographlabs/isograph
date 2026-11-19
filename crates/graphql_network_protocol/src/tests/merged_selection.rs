@@ -93,7 +93,7 @@ fn identity_at(map: &MergedSelectionMap, path: &[&str]) -> IdentitySelection {
         })
         .expect("the path names composite selections");
     match rest {
-        [] => target.identity,
+        [] => target.shape.identity,
         rest => identity_at(target.selections.reference(), rest),
     }
 }

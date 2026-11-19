@@ -10,7 +10,7 @@ use isograph_parser::ParseError;
 use crate::{
     ArtifactPath, ClientId, EntityKind, EntityShape, EntrypointOperation, GenerationOptions,
     IsographDb, ProjectArtifacts, ProtocolEntity, ProtocolQueryText, ProtocolSelectable,
-    SelectableShape,
+    RootEntities, SelectableShape,
 };
 
 /// Byte offset of the iso literal text in its file.
@@ -157,8 +157,8 @@ pub trait NetworkProtocol: Sized + 'static {
     ) -> Result<Self::FetchPlan, Self::NotFetchable>;
 
     /// What the core reads about an entity with `data`: whether a selection of it has
-    /// selections, and for one that does, the identity selection the protocol adds to every
-    /// selection set on it.
+    /// selections, and for one that does, whether the entity is concrete and the identity
+    /// selection the protocol adds to every selection set on it.
     fn entity_shape(data: &Self::EntityData) -> EntityShape;
 
     /// What a selection of a selectable with `data` is in a merged selection map.
@@ -167,6 +167,9 @@ pub trait NetworkProtocol: Sized + 'static {
     /// The selectable the protocol selects in every selection set on a composite entity,
     /// whose value names the response object's concrete entity.
     fn discriminator() -> SelectableName;
+
+    /// The root entities of the operation `plan` describes.
+    fn root_entities(plan: &Self::FetchPlan) -> RootEntities;
 
     /// The text of `operation`'s query, and the protocol's name for a file holding exactly
     /// that text.

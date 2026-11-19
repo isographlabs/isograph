@@ -1,7 +1,10 @@
 use intern::Lookup;
+use std::collections::BTreeSet;
+
 use isograph_compiler::{
-    EntrypointNotFetchableError, EntrypointQueryError, QueryArtifact, SelectionMapErrorKind,
-    TopLevelError, query_for_entrypoint,
+    CompletedIdentity, CompletedSelection, CompletedSelectionMap, CompletedSelectionTarget,
+    EntrypointNotFetchableError, EntrypointQueryError, FixedRecordId, QueryArtifact, RecordEntity,
+    RootEntities, SelectionMapErrorKind, TopLevelError, field_selection_map, query_for_entrypoint,
 };
 use prelude::Postfix;
 
@@ -9,7 +12,9 @@ use super::{
     CLIENT, Db, PET_DEMO_SCHEMA, PET_DEMO_SOURCES, entity, located, pet_demo_sources, project_db,
     selectable, validation_errors,
 };
-use crate::{GraphQLNotFetchable, QUERY_TEXT_FILE_NAME};
+use crate::{
+    GraphQLNetworkProtocol, GraphQLNotFetchable, QUERY_TEXT_FILE_NAME, graphql_fetch_plan,
+};
 
 type QueryError = EntrypointQueryError<GraphQLNotFetchable>;
 
@@ -437,4 +442,68 @@ fn an_entrypoint_on_a_leaf_is_a_validation_error_on_the_parent() {
             "String".to_owned()
         )]
     );
+}
+
+#[test]
+fn a_nested_selection_of_a_root_entity_selects_no_identity() {
+    let schema = "scalar ID\nscalar String\ntype Query { id: ID! greeting: String query: Query! tags: [String] }\n";
+    let db = project_db(
+        &[("schema/schema.graphql", schema)],
+        &[(
+            "src/Nested.ts",
+            "iso(`field Query.NestedQuery { greeting, query { tags } }`)",
+        )],
+    );
+    assert_eq!(
+        text(&db, "Query", "NestedQuery"),
+        "query NestedQuery {
+  greeting
+  query {
+    __typename
+    tags
+  }
+}"
+    );
+}
+
+#[test]
+fn a_renamed_query_root_is_the_root_entity() {
+    let schema = "scalar String\nschema { query: RootQuery }\ntype RootQuery { me: RootQuery! name: String }\n";
+    let db = project_db(
+        &[("schema/schema.graphql", schema)],
+        &[("src/Me.ts", "iso(`field RootQuery.Me { me { name } }`)")],
+    );
+    let roots = graphql_fetch_plan(&db, CLIENT, entity("RootQuery"))
+        .clone()
+        .expect("RootQuery is the query root")
+        .roots;
+    assert_eq!(
+        roots,
+        RootEntities {
+            operation: entity("RootQuery"),
+            others: BTreeSet::new(),
+        }
+    );
+    let field = field_selection_map(&db, CLIENT, entity("RootQuery"), selectable("Me"))
+        .clone()
+        .expect("Me merges");
+    let completed = CompletedSelectionMap::top_level::<GraphQLNetworkProtocol>(
+        field.selections.reference(),
+        roots.reference(),
+    )
+    .expect("Me selects me");
+    let me = completed
+        .iter()
+        .find_map(|selection| match selection {
+            CompletedSelection::Selectable(selection) => match selection.target.reference() {
+                CompletedSelectionTarget::Composite(target) => target.wrap_some(),
+                CompletedSelectionTarget::Leaf => None,
+            },
+            CompletedSelection::Discriminator
+            | CompletedSelection::Identity(_)
+            | CompletedSelection::Conditional(_) => None,
+        })
+        .expect("me is composite");
+    assert_eq!(me.entity, RecordEntity::Known(entity("RootQuery")));
+    assert_eq!(me.identity, CompletedIdentity::Fixed(FixedRecordId::root()));
 }

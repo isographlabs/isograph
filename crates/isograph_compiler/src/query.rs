@@ -78,9 +78,12 @@ pub fn query_for_entrypoint<TProfile: CompilationProfile>(
         .as_ref()
         .map_err(|error| EntrypointQueryError::SelectionMap(error.clone()))?;
     let variables = operation_variables(field);
-    let selections =
-        CompletedSelectionMap::top_level::<TProfile::NetworkProtocol>(field.selections.reference())
-            .map_err(EntrypointQueryError::TopLevel)?;
+    let roots = TProfile::NetworkProtocol::root_entities(fetch_plan.reference());
+    let selections = CompletedSelectionMap::top_level::<TProfile::NetworkProtocol>(
+        field.selections.reference(),
+        roots.reference(),
+    )
+    .map_err(EntrypointQueryError::TopLevel)?;
     let ProtocolQueryText { text, file_name } =
         TProfile::NetworkProtocol::query_text(&EntrypointOperation {
             name: selectable,

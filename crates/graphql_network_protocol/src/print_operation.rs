@@ -3,7 +3,7 @@ use intern::Lookup;
 use isograph_compiler::{
     CompletedSelection, CompletedSelectionMap, CompletedSelectionTarget, Condition,
     EntrypointOperation, FieldVariable, MergedArguments, MergedValue, NonNullVariableType,
-    SelectionKey, VariableType,
+    ResponseKey, SelectionKey, VariableType,
 };
 use isograph_parser::Boolean;
 use prelude::Postfix;
@@ -31,7 +31,7 @@ pub(crate) fn print_operation(
     };
     let header = format!(
         "{} {}{variables} {{",
-        operation.fetch_plan.0, operation.name
+        operation.fetch_plan.operation_type, operation.name
     );
     QueryText(
         std::iter::once(header)
@@ -60,9 +60,12 @@ fn print_selection(selection: &CompletedSelection, depth: usize) -> Vec<String> 
             let head = print_selection_head(selectable.key.reference());
             match selectable.target.reference() {
                 CompletedSelectionTarget::Leaf => format!("{indent}{head}").wrap_vec(),
-                CompletedSelectionTarget::Composite(inner) => {
+                CompletedSelectionTarget::Composite(target) => {
                     std::iter::once(format!("{indent}{head} {{"))
-                        .chain(print_selection_set(inner, depth + 1))
+                        .chain(print_selection_set(
+                            target.selections.reference(),
+                            depth + 1,
+                        ))
                         .chain(std::iter::once(format!("{indent}}}")))
                         .collect()
                 }
@@ -88,15 +91,14 @@ fn indent(depth: usize) -> String {
 
 /// `<alias>: <name>(<arguments>)`, or `<name>` when the key has no arguments.
 fn print_selection_head(key: &SelectionKey) -> String {
-    if key.arguments.is_empty() {
-        return key.name.to_string();
+    match key.response_key() {
+        ResponseKey::SelectableName => key.name.to_string(),
+        ResponseKey::Alias(alias) => format!(
+            "{alias}: {}{}",
+            key.name,
+            print_arguments(key.arguments.reference())
+        ),
     }
-    format!(
-        "{}: {}{}",
-        key.normalization_alias(),
-        key.name,
-        print_arguments(key.arguments.reference())
-    )
 }
 
 /// `(name: value, ...)`, or the empty string when there are none.
@@ -191,11 +193,14 @@ mod tests {
     use common_lang_types::{EntityName, QueryText, SelectableName, VariableName};
     use graphql_schema_parser::OperationType;
     use intern::string_key::Intern;
+    use std::collections::BTreeSet;
+
     use isograph_compiler::{
-        CompletedSelectionMap, Condition, EntrypointOperation, FieldVariable, IdentitySelection,
-        MergedArgument, MergedArguments, MergedCompositeTarget, MergedConditional, MergedObject,
-        MergedObjectEntry, MergedSelectableSelection, MergedSelection, MergedSelectionMap,
-        MergedSelectionTarget, MergedValue, NonNullVariableType, SelectionKey, VariableType,
+        CompletedSelectionMap, CompositeShape, Concreteness, Condition, EntrypointOperation,
+        FieldVariable, IdentitySelection, MergedArgument, MergedArguments, MergedCompositeTarget,
+        MergedConditional, MergedObject, MergedObjectEntry, MergedSelectableSelection,
+        MergedSelection, MergedSelectionMap, MergedSelectionTarget, MergedValue,
+        NonNullVariableType, RootEntities, SelectionKey, VariableType,
     };
     use isograph_parser::Boolean;
     use prelude::Postfix;
@@ -251,7 +256,11 @@ mod tests {
         MergedSelection::Selectable(MergedSelectableSelection {
             key: key(s, arguments),
             target: MergedSelectionTarget::Composite(MergedCompositeTarget {
-                identity,
+                entity: entity(s),
+                shape: CompositeShape {
+                    concreteness: Concreteness::Concrete,
+                    identity,
+                },
                 selections: map(selections),
             }),
         })
@@ -278,8 +287,11 @@ mod tests {
     }
 
     fn top_level(selections: Vec<MergedSelection>) -> CompletedSelectionMap {
-        CompletedSelectionMap::top_level::<GraphQLNetworkProtocol>(map(selections).reference())
-            .expect("the test's top level completes")
+        CompletedSelectionMap::top_level::<GraphQLNetworkProtocol>(
+            map(selections).reference(),
+            root(OperationType::Query).roots.reference(),
+        )
+        .expect("the test's top level completes")
     }
 
     fn print(
@@ -300,7 +312,13 @@ mod tests {
     }
 
     fn root(operation_type: OperationType) -> GraphQLFetchPlan {
-        GraphQLFetchPlan(operation_type)
+        GraphQLFetchPlan {
+            operation_type,
+            roots: RootEntities {
+                operation: entity(operation_type.to_string().as_str()),
+                others: BTreeSet::new(),
+            },
+        }
     }
 
     #[test]

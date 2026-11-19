@@ -4,7 +4,7 @@ use graphql_schema_parser::{
     SchemaExtension, TypeSystemDefinition, TypeSystemDefinitionOrExtension, TypeSystemExtension,
 };
 use intern::string_key::Intern;
-use isograph_compiler::{ClientId, CompilationProfile, IsographDb};
+use isograph_compiler::{ClientId, CompilationProfile, IsographDb, RootEntities};
 use pico_macros::memo;
 use prelude::Postfix;
 use span::WithSpanPostfix;
@@ -30,6 +30,19 @@ impl RootOperationTypes {
         ]
         .into_iter()
         .find_map(|(operation_type, root)| (root == entity.wrap_some()).then_some(operation_type))
+    }
+
+    /// `operation` as the operation's root, and every other root operation type the schema
+    /// names (`query`, then `mutation` and `subscription` when present) as `others`.
+    pub fn root_entities(&self, operation: EntityName) -> RootEntities {
+        RootEntities {
+            operation,
+            others: [self.query.wrap_some(), self.mutation, self.subscription]
+                .into_iter()
+                .flatten()
+                .filter(|root| *root != operation)
+                .collect(),
+        }
     }
 }
 

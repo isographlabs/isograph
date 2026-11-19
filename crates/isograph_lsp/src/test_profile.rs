@@ -84,6 +84,13 @@ impl NetworkProtocol for TestNetworkProtocol {
         intern::string_key::Intern::intern("__typename").to()
     }
 
+    fn root_entities(_plan: &()) -> isograph_compiler::RootEntities {
+        isograph_compiler::RootEntities {
+            operation: intern::string_key::Intern::intern("Query").to(),
+            others: std::collections::BTreeSet::new(),
+        }
+    }
+
     fn query_text(
         _operation: &isograph_compiler::EntrypointOperation<'_, Self>,
     ) -> isograph_compiler::ProtocolQueryText {
