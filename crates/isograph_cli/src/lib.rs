@@ -9,6 +9,7 @@ use prelude::Postfix;
 mod adapter;
 mod config_path;
 mod daemon;
+mod diagnostics;
 mod discover;
 mod effect;
 mod event;

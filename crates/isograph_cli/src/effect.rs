@@ -29,7 +29,15 @@ pub enum IsographEffect {
     LogHelloWorld,
     Kill,
     SendLspResponse(Box<SendLspResponseEffect>),
+    PublishDiagnostics(Box<PublishDiagnosticsEffect>),
     Timer(TimerEffect<TimerPayload>),
+}
+
+/// `textDocument/publishDiagnostics` notifications for one client.
+#[derive(Debug)]
+pub struct PublishDiagnosticsEffect {
+    pub sender: crossbeam::channel::Sender<lsp_server::Message>,
+    pub notifications: Vec<lsp_server::Notification>,
 }
 
 pub fn no_effects() -> Vec<IsographEffect> {

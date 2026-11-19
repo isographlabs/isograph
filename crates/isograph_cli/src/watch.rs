@@ -208,7 +208,7 @@ pub fn apply<THostLanguage: HostLanguage>(
 }
 
 #[derive(Clone)]
-struct SourceGlobs {
+pub(crate) struct SourceGlobs {
     patterns: Vec<GlobPattern>,
 }
 
@@ -225,7 +225,7 @@ enum ExcludeGlob {
 }
 
 impl SourceGlobs {
-    fn parse(source_files: &[String]) -> Result<Self, WatchError> {
+    pub(crate) fn parse(source_files: &[String]) -> Result<Self, WatchError> {
         let patterns = source_files
             .iter()
             .map(|raw| {
@@ -245,7 +245,7 @@ impl SourceGlobs {
         SourceGlobs { patterns }.wrap_ok()
     }
 
-    fn contains(&self, relative: &Path) -> bool {
+    pub(crate) fn contains(&self, relative: &Path) -> bool {
         self.patterns.iter().fold(false, |allowed, pattern| {
             if pattern.matcher.is_match(relative) {
                 match pattern.exclude {
@@ -700,7 +700,15 @@ mod tests {
                 state: IsographState {
                     db,
                     live_sessions: LiveSessions::default(),
-                    hello_world_debounce: None,
+                    source_globs: crate::watch::SourceGlobs::parse(
+                        source_files
+                            .iter()
+                            .map(|s| (*s).to_owned())
+                            .collect::<Vec<_>>()
+                            .as_slice(),
+                    )
+                    .expect("the test glob is valid"),
+                    diagnostics_debounce: None,
                 },
                 event_tx,
                 event_rx,

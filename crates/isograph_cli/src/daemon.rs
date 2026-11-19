@@ -9,7 +9,7 @@ use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 use tokio::sync::oneshot::error::TryRecvError;
 
 use crate::Filesystem;
-use crate::effect::IsographEffect;
+use crate::effect::{IsographEffect, PublishDiagnosticsEffect};
 use crate::event::{IsographEvent, LiveSessions};
 use crate::state::{IsographDb, IsographState, handle, intern_config_directory};
 use crate::timer::TimerPayload;
@@ -77,10 +77,18 @@ async fn serve<THostLanguage: HostLanguage>(
     }
     tracing::info!(config = %config_path.display(), port, "isograph daemon up");
 
+    let source_globs = match crate::watch::SourceGlobs::parse(config.source_files.as_slice()) {
+        Ok(source_globs) => source_globs,
+        Err(e) => {
+            tracing::error!(error = %e, "invalid source_files");
+            return;
+        }
+    };
     let mut state = IsographState {
         db: IsographDb::<THostLanguage>::default(),
         live_sessions: LiveSessions::default(),
-        hello_world_debounce: None,
+        source_globs,
+        diagnostics_debounce: None,
     };
     intern_config_directory(&mut state.db, config_path.reference());
     let config_directory = config_path
@@ -206,11 +214,28 @@ pub fn perform(
             (respond.send)(token);
             ControlFlow::Continue(())
         }
+        IsographEffect::PublishDiagnostics(publish) => {
+            send_notifications(*publish);
+            ControlFlow::Continue(())
+        }
         IsographEffect::Timer(timer) => {
             schedule_timer(timer, event_tx);
             ControlFlow::Continue(())
         }
     }
+}
+
+/// Sends each notification in order; a disconnected session drops the rest.
+fn send_notifications(publish: PublishDiagnosticsEffect) {
+    let PublishDiagnosticsEffect {
+        sender,
+        notifications,
+    } = publish;
+    notifications
+        .into_iter()
+        .map(lsp_server::Message::Notification)
+        .try_for_each(|message| sender.send(message).map_err(drop))
+        .unwrap_or_else(|()| tracing::debug!("publishDiagnostics to a closed session"));
 }
 
 /// Fire-and-forget on the runtime, so a pending sleep runs off the effect loop.
@@ -249,12 +274,14 @@ mod tests {
         IsographState {
             db: IsographDb::<TypeScriptHostLanguage>::default(),
             live_sessions: LiveSessions::default(),
-            hello_world_debounce: None,
+            source_globs: crate::watch::SourceGlobs::parse(&["src/**".to_owned()])
+                .expect("the test glob is valid"),
+            diagnostics_debounce: None,
         }
     }
 
     #[tokio::test]
-    async fn sending_hello_world_emits_a_timer() {
+    async fn sending_hello_world_emits_log_hello_world() {
         let (event_tx, event_rx) = unbounded_channel();
         let (effect_tx, mut effect_rx) = unbounded_channel();
         event_tx
@@ -263,7 +290,7 @@ mod tests {
         drop(event_tx);
         run_event_loop(empty_state(), event_rx, effect_tx).await;
         let effect = effect_rx.recv().await.expect("handle sent one effect");
-        assert!(matches!(effect, IsographEffect::Timer(_)));
+        assert!(matches!(effect, IsographEffect::LogHelloWorld));
     }
 
     #[tokio::test]
@@ -271,7 +298,7 @@ mod tests {
         let (event_tx, mut event_rx) = unbounded_channel();
         let (guard, timer) = freddie_timer::timer_effect_and_guard(
             Duration::ZERO,
-            TimerPayload::HelloWorldDebounced,
+            TimerPayload::DiagnosticsDebounce,
         );
         assert!(
             perform(
@@ -287,7 +314,7 @@ mod tests {
         };
         assert!(matches!(
             fired.trigger_if_matching(guard.reference().wrap_some()),
-            Some(&TimerPayload::HelloWorldDebounced)
+            Some(&TimerPayload::DiagnosticsDebounce)
         ));
     }
 
@@ -296,7 +323,7 @@ mod tests {
         let (event_tx, mut event_rx) = unbounded_channel();
         let (guard, timer) = freddie_timer::timer_effect_and_guard(
             Duration::ZERO,
-            TimerPayload::HelloWorldDebounced,
+            TimerPayload::DiagnosticsDebounce,
         );
         drop(guard);
         let _ = perform(
@@ -320,7 +347,7 @@ mod tests {
         let (event_tx, mut event_rx) = unbounded_channel();
         let (guard, timer) = freddie_timer::timer_effect_and_guard(
             Duration::from_secs(60),
-            TimerPayload::HelloWorldDebounced,
+            TimerPayload::DiagnosticsDebounce,
         );
         let _ = perform(
             &crate::effect::SideEffectToken::mint(),

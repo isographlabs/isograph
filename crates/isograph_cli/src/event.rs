@@ -41,8 +41,8 @@ pub enum InternalEvent {
 #[derive(Clone, Debug)]
 pub struct LiveSession {
     pub sender: crossbeam::channel::Sender<lsp_server::Message>,
-    #[cfg_attr(not(test), expect(dead_code))]
     pub capabilities: lsp_types::ClientCapabilities,
+    pub published_diagnostics: crate::diagnostics::PublishedDiagnostics,
     pub outstanding: std::collections::HashSet<lsp_server::RequestId>,
 }
 

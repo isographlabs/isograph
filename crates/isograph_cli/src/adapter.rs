@@ -1,7 +1,10 @@
+use std::path::{Component, Path, PathBuf};
+
 use common_lang_types::{
     CurrentWorkingDirectory, RelativePathError, RelativePathToSourceFile,
     relative_path_from_absolute_and_working_directory,
 };
+use intern::Lookup;
 use isograph_compiler::{ClientId, HostLanguage, IsographDb};
 use isograph_lsp::lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult};
 use pico::Database;
@@ -86,8 +89,13 @@ pub(crate) fn on_did_open<THostLanguage: HostLanguage>(
     client: ClientId,
     params: lsp_types::DidOpenTextDocumentParams,
 ) -> Vec<IsographEffect> {
-    did_open(&mut state.db, client, params).unwrap_or_else(|error| warn!(%error, "didOpen"));
-    no_effects()
+    did_open(&mut state.db, client, params).map_or_else(
+        |error| {
+            warn!(%error, "didOpen");
+            no_effects()
+        },
+        |()| crate::diagnostics::arm_diagnostics_debounce(state),
+    )
 }
 
 pub(crate) fn on_did_change<THostLanguage: HostLanguage>(
@@ -95,8 +103,13 @@ pub(crate) fn on_did_change<THostLanguage: HostLanguage>(
     client: ClientId,
     params: lsp_types::DidChangeTextDocumentParams,
 ) -> Vec<IsographEffect> {
-    did_change(&mut state.db, client, params).unwrap_or_else(|error| warn!(%error, "didChange"));
-    no_effects()
+    did_change(&mut state.db, client, params).map_or_else(
+        |error| {
+            warn!(%error, "didChange");
+            no_effects()
+        },
+        |()| crate::diagnostics::arm_diagnostics_debounce(state),
+    )
 }
 
 pub(crate) fn on_did_close<THostLanguage: HostLanguage>(
@@ -104,8 +117,13 @@ pub(crate) fn on_did_close<THostLanguage: HostLanguage>(
     client: ClientId,
     params: lsp_types::DidCloseTextDocumentParams,
 ) -> Vec<IsographEffect> {
-    did_close(&mut state.db, client, params).unwrap_or_else(|error| warn!(%error, "didClose"));
-    no_effects()
+    did_close(&mut state.db, client, params).map_or_else(
+        |error| {
+            warn!(%error, "didClose");
+            no_effects()
+        },
+        |()| crate::diagnostics::arm_diagnostics_debounce(state),
+    )
 }
 
 fn did_open<THostLanguage: HostLanguage>(
@@ -142,6 +160,50 @@ fn did_close<THostLanguage: HostLanguage>(
     let path = relative_from_uri(db, params.text_document.uri.reference())?;
     db.remove_open_file(client, path);
     ().wrap_ok()
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
+pub(crate) enum PathUriError {
+    #[error("CurrentWorkingDirectory is not interned")]
+    MissingWorkingDirectory,
+    #[error("the joined path is not absolute")]
+    NotAbsolute,
+    #[error("{0}")]
+    InvalidUri(<lsp_types::Uri as std::str::FromStr>::Err),
+}
+
+/// The `file:` URI of `path` under the config directory.
+pub(crate) fn uri_for_path<THostLanguage: HostLanguage>(
+    db: &IsographDb<THostLanguage>,
+    path: RelativePathToSourceFile,
+) -> Result<lsp_types::Uri, PathUriError> {
+    let cwd = db
+        .get_singleton::<CurrentWorkingDirectory>()
+        .ok_or(PathUriError::MissingWorkingDirectory)?
+        .dereference();
+    let absolute = normalize_lexically(Path::new(cwd.lookup()).join(path.lookup()).as_path());
+    let url =
+        url::Url::from_file_path(absolute.as_path()).map_err(|()| PathUriError::NotAbsolute)?;
+    url.as_str()
+        .parse::<lsp_types::Uri>()
+        .map_err(PathUriError::InvalidUri)
+}
+
+/// `path` with each `.` dropped and each `..` removing the component before it, without reading the filesystem.
+fn normalize_lexically(path: &Path) -> PathBuf {
+    path.components()
+        .fold(PathBuf::new(), |mut normalized, component| {
+            match component {
+                Component::CurDir => {}
+                Component::ParentDir => {
+                    normalized.pop();
+                }
+                Component::Prefix(_) | Component::RootDir | Component::Normal(_) => {
+                    normalized.push(component);
+                }
+            }
+            normalized
+        })
 }
 
 fn file_path(uri: &lsp_types::Uri) -> Option<std::path::PathBuf> {
@@ -225,7 +287,7 @@ pub(crate) mod tests {
     use isograph_extract_typescript::TypeScriptHostLanguage;
     use prelude::Postfix;
 
-    use super::format_iso_literals;
+    use super::{PathUriError, format_iso_literals, relative_from_uri, uri_for_path};
     use crate::state::intern_config_directory;
 
     const PRETTY: &str = "export const fullName = iso(`\n  field Pet.fullName @foo(\n    bar: 123,\n    baz: $qux,\n  ) {\n    id,\n  }\n`);\n";
@@ -502,5 +564,82 @@ pub(crate) mod tests {
                 );
             });
         });
+    }
+
+    fn config_db() -> IsographDb<TypeScriptHostLanguage> {
+        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        intern_config_directory(
+            &mut db,
+            std::path::Path::new("/tmp/proj/isograph.config.json"),
+        );
+        db
+    }
+
+    fn uri_of(db: &IsographDb<TypeScriptHostLanguage>, path: &str) -> String {
+        uri_for_path(db, path.intern().to())
+            .expect("the config directory is interned")
+            .as_str()
+            .to_owned()
+    }
+
+    fn relative_of(db: &IsographDb<TypeScriptHostLanguage>, uri: &str) -> RelativePathToSourceFile {
+        relative_from_uri(
+            db,
+            uri.parse::<lsp_types::Uri>()
+                .expect("uri_for_path returns a URI")
+                .reference(),
+        )
+        .expect("the URI is a file URI")
+    }
+
+    #[test]
+    fn uri_for_path_joins_the_config_directory_and_round_trips() {
+        let db = config_db();
+        let uri = uri_of(db.reference(), "src/a.ts");
+        assert_eq!(uri, "file:///tmp/proj/src/a.ts");
+        assert_eq!(
+            relative_of(db.reference(), uri.as_str()),
+            "src/a.ts".intern().to::<RelativePathToSourceFile>()
+        );
+    }
+
+    #[test]
+    fn uri_for_path_percent_encodes_a_space_and_a_non_ascii_char_and_round_trips() {
+        let db = config_db();
+        let uri = uri_of(db.reference(), "src/a b/é.ts");
+        assert_eq!(uri, "file:///tmp/proj/src/a%20b/%C3%A9.ts");
+        assert_eq!(
+            relative_of(db.reference(), uri.as_str()),
+            "src/a b/é.ts".intern().to::<RelativePathToSourceFile>()
+        );
+    }
+
+    #[test]
+    fn uri_for_path_resolves_a_parent_relative_path_and_round_trips() {
+        let db = config_db();
+        let uri = uri_of(db.reference(), "../other/a.ts");
+        assert_eq!(uri, "file:///tmp/other/a.ts");
+        assert_eq!(
+            relative_of(db.reference(), uri.as_str()),
+            "../other/a.ts".intern().to::<RelativePathToSourceFile>()
+        );
+    }
+
+    #[test]
+    fn uri_for_path_drops_a_current_directory_component() {
+        let db = config_db();
+        assert_eq!(
+            uri_of(db.reference(), "src/./a.ts"),
+            "file:///tmp/proj/src/a.ts"
+        );
+    }
+
+    #[test]
+    fn uri_for_path_without_a_working_directory_is_missing_working_directory() {
+        let db = IsographDb::<TypeScriptHostLanguage>::default();
+        assert_eq!(
+            uri_for_path(db.reference(), "src/a.ts".intern().to()),
+            PathUriError::MissingWorkingDirectory.wrap_err()
+        );
     }
 }

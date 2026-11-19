@@ -192,6 +192,7 @@ fn run_session(
             session: crate::event::LiveSession {
                 sender: connection.sender.clone(),
                 capabilities: params.capabilities,
+                published_diagnostics: crate::diagnostics::PublishedDiagnostics::default(),
                 outstanding: std::collections::HashSet::new(),
             },
         })
@@ -299,7 +300,9 @@ mod tests {
             let state = IsographState {
                 db,
                 live_sessions: LiveSessions::default(),
-                hello_world_debounce: None,
+                source_globs: crate::watch::SourceGlobs::parse(&["src/**".to_owned()])
+                    .expect("the test glob is valid"),
+                diagnostics_debounce: None,
             };
             runtime.block_on(async {
                 tokio::select! {

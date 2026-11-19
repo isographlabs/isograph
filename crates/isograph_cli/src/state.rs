@@ -1,6 +1,5 @@
 use std::ops::ControlFlow;
 use std::path::Path;
-use std::time::Duration;
 
 use common_lang_types::{
     CurrentWorkingDirectory, RelativePathError, RelativePathToSourceFile,
@@ -22,7 +21,8 @@ pub use isograph_compiler::IsographDb;
 pub struct IsographState<THostLanguage: HostLanguage> {
     pub db: IsographDb<THostLanguage>,
     pub live_sessions: LiveSessions,
-    pub(crate) hello_world_debounce: Option<freddie_timer::TimerGuard>,
+    pub(crate) source_globs: crate::watch::SourceGlobs,
+    pub(crate) diagnostics_debounce: Option<freddie_timer::TimerGuard>,
 }
 
 pub fn handle<THostLanguage: HostLanguage>(
@@ -177,29 +177,20 @@ fn handle_internal_event<THostLanguage: HostLanguage>(
     internal: InternalEvent,
 ) -> Vec<IsographEffect> {
     match internal {
-        InternalEvent::HelloWorld => handle_hello_world(state),
+        InternalEvent::HelloWorld => IsographEffect::LogHelloWorld.wrap_vec(),
         InternalEvent::Quit => IsographEffect::Kill.wrap_vec(),
         InternalEvent::DiskChanged(change) => handle_disk_changed(&mut state.db, change),
     }
-}
-
-fn handle_hello_world<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
-) -> Vec<IsographEffect> {
-    let (guard, effect) =
-        freddie_timer::timer_effect_and_guard(Duration::ZERO, TimerPayload::HelloWorldDebounced);
-    state.hello_world_debounce = guard.wrap_some();
-    IsographEffect::Timer(effect).wrap_vec()
 }
 
 fn handle_timer_fired<THostLanguage: HostLanguage>(
     state: &mut IsographState<THostLanguage>,
     fired: freddie_timer::TimerFired<TimerPayload>,
 ) -> Vec<IsographEffect> {
-    match fired.trigger_if_matching(state.hello_world_debounce.as_ref()) {
-        Some(&TimerPayload::HelloWorldDebounced) => {
-            state.hello_world_debounce = None;
-            IsographEffect::LogHelloWorld.wrap_vec()
+    match fired.trigger_if_matching(state.diagnostics_debounce.as_ref()) {
+        Some(&TimerPayload::DiagnosticsDebounce) => {
+            state.diagnostics_debounce = None;
+            crate::diagnostics::publish_diagnostics(state)
         }
         None => no_effects(),
     }
@@ -318,13 +309,16 @@ mod tests {
     use isograph_extract_typescript::TypeScriptHostLanguage;
 
     use super::{IsographDb, IsographState, handle, intern_config_directory};
+    use crate::diagnostics::PublishedDiagnostics;
     use crate::effect::IsographEffect;
     use crate::event::{
         ClientConnectionEvent, ClientStartedEvent, DiskChanged, DiskFileChanged, FolderRemoved,
         InternalEvent, IsographEvent, LiveSession, LiveSessions, LspEvent, LspNotification,
         LspResponse, Presence,
     };
+    use crate::timer::TimerPayload;
     use isograph_compiler::ClientId;
+    use std::collections::HashMap;
 
     fn interned(s: &str) -> common_lang_types::RelativePathToSourceFile {
         s.intern().to()
@@ -334,7 +328,9 @@ mod tests {
         IsographState {
             db: IsographDb::<TypeScriptHostLanguage>::default(),
             live_sessions: LiveSessions::default(),
-            hello_world_debounce: None,
+            source_globs: crate::watch::SourceGlobs::parse(&["src/**".to_owned()])
+                .expect("the test glob is valid"),
+            diagnostics_debounce: None,
         }
     }
 
@@ -352,108 +348,23 @@ mod tests {
     }
 
     #[test]
-    fn hello_world_returns_a_timer() {
+    fn hello_world_returns_log_hello_world() {
         let mut state = empty();
         let effects = handle(&mut state, InternalEvent::HelloWorld.to());
-        assert!(matches!(effects.as_slice(), [IsographEffect::Timer(_)]));
-        assert!(state.hello_world_debounce.is_some());
-    }
-
-    #[test]
-    fn matching_hello_world_debounced_returns_log_hello_world() {
-        let mut state = empty();
-        let effects = handle(&mut state, InternalEvent::HelloWorld.to());
-        let IsographEffect::Timer(timer) = effects
-            .into_iter()
-            .next()
-            .expect("HelloWorld returns one Timer")
-        else {
-            panic!("HelloWorld returns Timer");
-        };
-        let effects = handle(&mut state, IsographEvent::Timer(timer.event));
         assert!(matches!(
             effects.as_slice(),
             [IsographEffect::LogHelloWorld]
         ));
-        assert!(state.hello_world_debounce.is_none());
-    }
-
-    #[test]
-    fn stale_hello_world_debounced_returns_no_effects() {
-        let mut state = empty();
-        let effects = handle(&mut state, InternalEvent::HelloWorld.to());
-        let IsographEffect::Timer(timer) = effects
-            .into_iter()
-            .next()
-            .expect("HelloWorld returns one Timer")
-        else {
-            panic!("HelloWorld returns Timer");
-        };
-        state.hello_world_debounce = None;
-        let effects = handle(&mut state, IsographEvent::Timer(timer.event));
-        assert!(effects.is_empty());
-    }
-
-    #[test]
-    fn a_second_hello_world_drops_the_first_guard() {
-        let mut state = empty();
-        let first = handle(&mut state, InternalEvent::HelloWorld.to());
-        let second = handle(&mut state, InternalEvent::HelloWorld.to());
-        let IsographEffect::Timer(first_timer) = first
-            .into_iter()
-            .next()
-            .expect("HelloWorld returns one Timer")
-        else {
-            panic!("HelloWorld returns Timer");
-        };
-        let effects = handle(&mut state, IsographEvent::Timer(first_timer.event));
-        assert!(effects.is_empty());
-        let IsographEffect::Timer(second_timer) = second
-            .into_iter()
-            .next()
-            .expect("HelloWorld returns one Timer")
-        else {
-            panic!("HelloWorld returns Timer");
-        };
-        let effects = handle(&mut state, IsographEvent::Timer(second_timer.event));
-        assert!(matches!(
-            effects.as_slice(),
-            [IsographEffect::LogHelloWorld]
-        ));
-        assert!(state.hello_world_debounce.is_none());
     }
 
     #[test]
     fn timer_fired_on_a_never_armed_state_returns_no_effects() {
-        let mut armed = empty();
-        let effects = handle(&mut armed, InternalEvent::HelloWorld.to());
-        let IsographEffect::Timer(timer) = effects
-            .into_iter()
-            .next()
-            .expect("HelloWorld returns one Timer")
-        else {
-            panic!("HelloWorld returns Timer");
-        };
+        let mut armed = with_config();
+        started(&mut armed, ClientId(1));
+        let timer = only_timer(handle(&mut armed, did_open(ClientId(1), X_URI, "open")));
         let mut state = empty();
         let effects = handle(&mut state, timer.event.to());
         assert!(effects.is_empty());
-    }
-
-    #[test]
-    fn a_matching_hello_world_debounced_fed_twice_logs_once() {
-        let mut state = empty();
-        let effects = handle(&mut state, InternalEvent::HelloWorld.to());
-        let IsographEffect::Timer(timer) = effects
-            .into_iter()
-            .next()
-            .expect("HelloWorld returns one Timer")
-        else {
-            panic!("HelloWorld returns Timer");
-        };
-        let first = handle(&mut state, timer.event.to());
-        assert!(matches!(first.as_slice(), [IsographEffect::LogHelloWorld]));
-        let second = handle(&mut state, timer.event.to());
-        assert!(second.is_empty());
     }
 
     #[test]
@@ -1058,7 +969,7 @@ mod tests {
         let mut state = with_disk_x();
         started(&mut state, ClientId(1));
         let effects = handle(&mut state, did_open(ClientId(1), X_URI, "open"));
-        assert!(effects.is_empty());
+        only_timer(effects);
         assert_eq!(
             read(state.reference(), ClientId(1), "src/x.ts"),
             "open".to_owned().wrap_some()
@@ -1082,7 +993,7 @@ mod tests {
                 serde_json::json!([{ "text": "changed" }]),
             ),
         );
-        assert!(effects.is_empty());
+        only_timer(effects);
         assert_eq!(
             read(state.reference(), ClientId(1), "src/x.ts"),
             "changed".to_owned().wrap_some()
@@ -1126,7 +1037,7 @@ mod tests {
             "open".to_owned().wrap_some()
         );
         let effects = handle(&mut state, did_close(ClientId(1), X_URI));
-        assert!(effects.is_empty());
+        only_timer(effects);
         assert_eq!(
             read(state.reference(), ClientId(1), "src/x.ts"),
             "disk".to_owned().wrap_some()
@@ -2093,7 +2004,7 @@ mod tests {
     }
 
     #[test]
-    fn lsp_isograph_event_hello_world_returns_a_timer() {
+    fn lsp_isograph_event_hello_world_returns_log_hello_world() {
         let mut state = empty();
         let client = start_a_client(&mut state);
         let effects = handle(
@@ -2103,29 +2014,6 @@ mod tests {
                 serde_json::to_value(InternalEvent::HelloWorld).expect("serializes"),
             ),
         );
-        assert!(matches!(effects.as_slice(), [IsographEffect::Timer(_)]));
-        assert!(state.hello_world_debounce.is_some());
-    }
-
-    #[test]
-    fn lsp_isograph_event_hello_world_then_its_timer_returns_log_hello_world() {
-        let mut state = empty();
-        let client = start_a_client(&mut state);
-        let effects = handle(
-            &mut state,
-            event_notification(
-                client,
-                serde_json::to_value(InternalEvent::HelloWorld).expect("serializes"),
-            ),
-        );
-        let IsographEffect::Timer(timer) = effects
-            .into_iter()
-            .next()
-            .expect("LSP HelloWorld returns one Timer")
-        else {
-            panic!("LSP HelloWorld returns Timer");
-        };
-        let effects = handle(&mut state, IsographEvent::Timer(timer.event));
         assert!(matches!(
             effects.as_slice(),
             [IsographEffect::LogHelloWorld]
@@ -2237,7 +2125,7 @@ mod tests {
             ),
         );
         assert!(effects.is_empty());
-        assert!(state.hello_world_debounce.is_none());
+        assert!(state.diagnostics_debounce.is_none());
     }
 
     #[test]
@@ -2273,7 +2161,7 @@ mod tests {
             ),
         );
         assert!(effects.is_empty());
-        assert!(state.hello_world_debounce.is_none());
+        assert!(state.diagnostics_debounce.is_none());
     }
 
     fn dummy_session(
@@ -2283,6 +2171,7 @@ mod tests {
         LiveSession {
             sender,
             capabilities,
+            published_diagnostics: PublishedDiagnostics::default(),
             outstanding: std::collections::HashSet::new(),
         }
     }
@@ -2308,6 +2197,10 @@ mod tests {
             .get(&client)
             .expect("Started inserts a row");
         assert_eq!(session.capabilities, capabilities);
+        assert_eq!(
+            session.published_diagnostics,
+            PublishedDiagnostics::default()
+        );
         session
             .sender
             .send(lsp_server::Message::Notification(
@@ -2550,5 +2443,489 @@ mod tests {
                 .is_none()
         );
         assert!(rx.try_recv().is_err());
+    }
+
+    fn diagnostics_capabilities() -> lsp_types::ClientCapabilities {
+        lsp_types::ClientCapabilities {
+            text_document: lsp_types::TextDocumentClientCapabilities {
+                publish_diagnostics: lsp_types::PublishDiagnosticsClientCapabilities::default()
+                    .wrap_some(),
+                ..Default::default()
+            }
+            .wrap_some(),
+            ..Default::default()
+        }
+    }
+
+    fn start_with_capabilities(
+        state: &mut IsographState<TypeScriptHostLanguage>,
+        client: ClientId,
+        capabilities: lsp_types::ClientCapabilities,
+    ) -> crossbeam::channel::Receiver<lsp_server::Message> {
+        let (tx, rx) = crossbeam::channel::unbounded();
+        let effects = handle(
+            state,
+            ClientConnectionEvent::Started(ClientStartedEvent {
+                client,
+                session: dummy_session(tx, capabilities),
+            })
+            .to(),
+        );
+        assert!(effects.is_empty());
+        rx
+    }
+
+    fn diagnostics_client(
+        state: &mut IsographState<TypeScriptHostLanguage>,
+        client: ClientId,
+    ) -> crossbeam::channel::Receiver<lsp_server::Message> {
+        start_with_capabilities(state, client, diagnostics_capabilities())
+    }
+
+    fn only_timer(effects: Vec<IsographEffect>) -> freddie_timer::TimerEffect<TimerPayload> {
+        let [IsographEffect::Timer(timer)] = <[IsographEffect; 1]>::try_from(effects)
+            .expect("the arming event returns exactly one effect")
+        else {
+            panic!("the arming event returns a Timer");
+        };
+        timer
+    }
+
+    fn fire(
+        state: &mut IsographState<TypeScriptHostLanguage>,
+        effects: Vec<IsographEffect>,
+    ) -> Vec<IsographEffect> {
+        handle(state, IsographEvent::Timer(only_timer(effects).event))
+    }
+
+    /// Performs every effect, then every notification `rx` received, keyed by URI.
+    fn published(
+        effects: Vec<IsographEffect>,
+        rx: &crossbeam::channel::Receiver<lsp_server::Message>,
+    ) -> HashMap<String, Vec<lsp_types::Diagnostic>> {
+        perform_all(effects);
+        drained(rx)
+    }
+
+    fn perform_all(effects: Vec<IsographEffect>) {
+        effects.into_iter().for_each(perform_send);
+    }
+
+    /// Every notification `rx` received, keyed by URI.
+    fn drained(
+        rx: &crossbeam::channel::Receiver<lsp_server::Message>,
+    ) -> HashMap<String, Vec<lsp_types::Diagnostic>> {
+        rx.try_iter()
+            .map(|message| {
+                let lsp_server::Message::Notification(notification) = message else {
+                    panic!("diagnostics arrive as notifications");
+                };
+                assert_eq!(
+                    notification.method,
+                    <lsp_types::notification::PublishDiagnostics as Notification>::METHOD
+                );
+                let params: lsp_types::PublishDiagnosticsParams =
+                    serde_json::from_value(notification.params)
+                        .expect("the notification carries PublishDiagnosticsParams");
+                assert_eq!(params.version, None);
+                (params.uri.as_str().to_owned(), params.diagnostics)
+            })
+            .collect()
+    }
+
+    fn change(client: ClientId, uri: &str, text: &str) -> IsographEvent {
+        did_change(client, uri, serde_json::json!([{ "text": text }]))
+    }
+
+    const BROKEN: &str = "iso(`entrypoint`)";
+    const EMPTY_LITERAL: &str = "iso(` `)";
+    const CLEAN: &str = "iso(`entrypoint Query.HomeRoute`)";
+
+    fn empty_literal_message() -> String {
+        isograph_parser::ParseError::Ast(isograph_parser::AstError::EmptyLiteral).to_string()
+    }
+
+    #[test]
+    fn did_open_of_a_broken_literal_publishes_its_errors_when_the_timer_fires() {
+        let mut state = with_config();
+        let rx = diagnostics_client(&mut state, ClientId(1));
+        let armed = handle(&mut state, did_open(ClientId(1), X_URI, BROKEN));
+        let effects = fire(&mut state, armed);
+        assert!(matches!(
+            effects.as_slice(),
+            [IsographEffect::PublishDiagnostics(_)]
+        ));
+        let sent = published(effects, rx.reference());
+        assert_eq!(sent.len(), 1);
+        let diagnostics = sent.get(X_URI).expect("the open file is published");
+        assert!(!diagnostics.is_empty());
+        assert!(diagnostics.iter().all(|diagnostic| {
+            diagnostic.severity == lsp_types::DiagnosticSeverity::ERROR.wrap_some()
+                && diagnostic.source == "isograph".to_owned().wrap_some()
+                && diagnostic.code.is_none()
+        }));
+    }
+
+    #[test]
+    fn diagnostic_columns_are_utf16_code_units() {
+        let mut state = with_config();
+        let rx = diagnostics_client(&mut state, ClientId(1));
+        let armed = handle(
+            &mut state,
+            did_open(
+                ClientId(1),
+                X_URI,
+                "const é = 1;\nconst 😀 = iso(`entrypoint`)",
+            ),
+        );
+        let effects = fire(&mut state, armed);
+        let sent = published(effects, rx.reference());
+        let parsed = isograph_parser::parse_iso_literal("entrypoint");
+        let first = sent.get(X_URI).expect("the open file is published")[0]
+            .range
+            .start;
+        assert_eq!(first.line, 1);
+        assert_eq!(
+            first.character,
+            "const 😀 = iso(`".encode_utf16().count() as u32 + parsed.errors[0].location.start
+        );
+    }
+
+    #[test]
+    fn crlf_before_the_literal_puts_its_diagnostics_on_line_one() {
+        let mut state = with_config();
+        let rx = diagnostics_client(&mut state, ClientId(1));
+        let armed = handle(
+            &mut state,
+            did_open(ClientId(1), X_URI, "const a = 1;\r\niso(`entrypoint`)"),
+        );
+        let effects = fire(&mut state, armed);
+        let sent = published(effects, rx.reference());
+        let diagnostics = sent.get(X_URI).expect("the open file is published");
+        assert!(!diagnostics.is_empty());
+        assert!(
+            diagnostics
+                .iter()
+                .all(|diagnostic| diagnostic.range.start.line == 1)
+        );
+    }
+
+    #[test]
+    fn a_file_with_no_literals_publishes_nothing() {
+        let mut state = with_config();
+        let _rx = diagnostics_client(&mut state, ClientId(1));
+        let armed = handle(&mut state, did_open(ClientId(1), X_URI, "const a = 1;"));
+        assert!(fire(&mut state, armed).is_empty());
+    }
+
+    #[test]
+    fn a_whitespace_only_literal_publishes_the_empty_literal_error() {
+        let mut state = with_config();
+        let rx = diagnostics_client(&mut state, ClientId(1));
+        let armed = handle(&mut state, did_open(ClientId(1), X_URI, EMPTY_LITERAL));
+        let effects = fire(&mut state, armed);
+        let sent = published(effects, rx.reference());
+        let diagnostics = sent.get(X_URI).expect("the open file is published");
+        assert_eq!(
+            diagnostics
+                .iter()
+                .map(|diagnostic| diagnostic.message.clone())
+                .collect::<Vec<_>>(),
+            empty_literal_message().wrap_vec()
+        );
+    }
+
+    #[test]
+    fn a_literal_with_only_a_host_language_problem_publishes_nothing() {
+        let mut state = with_config();
+        let _rx = diagnostics_client(&mut state, ClientId(1));
+        let armed = handle(
+            &mut state,
+            did_open(ClientId(1), X_URI, "iso`entrypoint Query.HomeRoute`"),
+        );
+        assert!(fire(&mut state, armed).is_empty());
+    }
+
+    #[test]
+    fn fixing_a_published_file_publishes_an_empty_list_once() {
+        let mut state = with_config();
+        let rx = diagnostics_client(&mut state, ClientId(1));
+        let armed = handle(&mut state, did_open(ClientId(1), X_URI, BROKEN));
+        let effects = fire(&mut state, armed);
+        assert!(!published(effects, rx.reference())[X_URI].is_empty());
+        let armed = handle(&mut state, change(ClientId(1), X_URI, CLEAN));
+        let effects = fire(&mut state, armed);
+        assert_eq!(
+            published(effects, rx.reference()),
+            HashMap::from([(X_URI.to_owned(), Vec::new())])
+        );
+        let armed = handle(&mut state, change(ClientId(1), X_URI, CLEAN));
+        assert!(fire(&mut state, armed).is_empty());
+    }
+
+    #[test]
+    fn breaking_a_clean_file_publishes_its_errors() {
+        let mut state = with_config();
+        let rx = diagnostics_client(&mut state, ClientId(1));
+        let armed = handle(&mut state, did_open(ClientId(1), X_URI, CLEAN));
+        assert!(fire(&mut state, armed).is_empty());
+        let armed = handle(&mut state, change(ClientId(1), X_URI, BROKEN));
+        let effects = fire(&mut state, armed);
+        assert!(!published(effects, rx.reference())[X_URI].is_empty());
+    }
+
+    #[test]
+    fn an_identical_change_after_a_publish_publishes_nothing() {
+        let mut state = with_config();
+        let rx = diagnostics_client(&mut state, ClientId(1));
+        let armed = handle(&mut state, did_open(ClientId(1), X_URI, BROKEN));
+        let effects = fire(&mut state, armed);
+        assert_eq!(published(effects, rx.reference()).len(), 1);
+        let armed = handle(&mut state, change(ClientId(1), X_URI, BROKEN));
+        assert!(fire(&mut state, armed).is_empty());
+    }
+
+    #[test]
+    fn two_changes_before_a_fire_publish_the_second_text_once() {
+        let mut state = with_config();
+        let rx = diagnostics_client(&mut state, ClientId(1));
+        let first = only_timer(handle(&mut state, did_open(ClientId(1), X_URI, BROKEN)));
+        let second = handle(&mut state, change(ClientId(1), X_URI, EMPTY_LITERAL));
+        assert!(handle(&mut state, IsographEvent::Timer(first.event)).is_empty());
+        let effects = fire(&mut state, second);
+        let sent = published(effects, rx.reference());
+        assert_eq!(
+            sent[X_URI]
+                .iter()
+                .map(|diagnostic| diagnostic.message.clone())
+                .collect::<Vec<_>>(),
+            empty_literal_message().wrap_vec()
+        );
+    }
+
+    #[test]
+    fn the_same_firing_delivered_twice_publishes_once() {
+        let mut state = with_config();
+        let _rx = diagnostics_client(&mut state, ClientId(1));
+        let timer = only_timer(handle(&mut state, did_open(ClientId(1), X_URI, BROKEN)));
+        assert_eq!(
+            handle(&mut state, IsographEvent::Timer(timer.event)).len(),
+            1
+        );
+        assert!(handle(&mut state, IsographEvent::Timer(timer.event)).is_empty());
+    }
+
+    #[test]
+    fn closing_a_published_file_publishes_an_empty_list() {
+        for disk in [None, CLEAN.wrap_some(), BROKEN.wrap_some()] {
+            let mut state = with_config();
+            if let Some(disk) = disk {
+                state
+                    .db
+                    .insert_disk_file(interned("src/x.ts"), disk.to_owned());
+            }
+            let rx = diagnostics_client(&mut state, ClientId(1));
+            let armed = handle(&mut state, did_open(ClientId(1), X_URI, EMPTY_LITERAL));
+            let effects = fire(&mut state, armed);
+            assert_eq!(published(effects, rx.reference()).len(), 1, "{disk:?}");
+            let armed = handle(&mut state, did_close(ClientId(1), X_URI));
+            let effects = fire(&mut state, armed);
+            assert_eq!(
+                published(effects, rx.reference()),
+                HashMap::from([(X_URI.to_owned(), Vec::new())]),
+                "{disk:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_broken_disk_only_file_publishes_nothing() {
+        let mut state = with_config();
+        let _rx = diagnostics_client(&mut state, ClientId(1));
+        let effects = handle(
+            &mut state,
+            InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
+                path: PathBuf::from("/tmp/proj/src/y.ts"),
+                presence: Presence::Present(BROKEN.to_owned()),
+            }))
+            .to(),
+        );
+        assert!(effects.is_empty());
+        let armed = handle(&mut state, did_open(ClientId(1), X_URI, CLEAN));
+        assert!(fire(&mut state, armed).is_empty());
+    }
+
+    #[test]
+    fn disk_changed_does_not_arm_the_debounce() {
+        let mut state = with_config();
+        let _rx = diagnostics_client(&mut state, ClientId(1));
+        handle(&mut state, did_open(ClientId(1), X_URI, BROKEN));
+        state.diagnostics_debounce = None;
+        let present = handle(
+            &mut state,
+            InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
+                path: PathBuf::from("/tmp/proj/src/x.ts"),
+                presence: Presence::Present(CLEAN.to_owned()),
+            }))
+            .to(),
+        );
+        let absent = handle(
+            &mut state,
+            InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
+                path: PathBuf::from("/tmp/proj/src/x.ts"),
+                presence: Presence::Absent,
+            }))
+            .to(),
+        );
+        let folder_removed = handle(
+            &mut state,
+            InternalEvent::DiskChanged(DiskChanged::FolderRemoved(FolderRemoved {
+                path: PathBuf::from("/tmp/proj/src"),
+            }))
+            .to(),
+        );
+        assert!(present.is_empty());
+        assert!(absent.is_empty());
+        assert!(folder_removed.is_empty());
+        assert!(state.diagnostics_debounce.is_none());
+    }
+
+    #[test]
+    fn started_does_not_arm_the_debounce() {
+        let mut state = with_config();
+        let _rx = diagnostics_client(&mut state, ClientId(1));
+        assert!(state.diagnostics_debounce.is_none());
+    }
+
+    #[test]
+    fn open_files_outside_the_globs_or_skipped_by_the_host_publish_nothing() {
+        let mut state = with_config();
+        let _rx = diagnostics_client(&mut state, ClientId(1));
+        handle(
+            &mut state,
+            did_open(ClientId(1), "file:///tmp/proj/other/x.ts", BROKEN),
+        );
+        let armed = handle(
+            &mut state,
+            did_open(ClientId(1), "file:///tmp/proj/src/README.md", BROKEN),
+        );
+        assert!(fire(&mut state, armed).is_empty());
+    }
+
+    #[test]
+    fn two_clients_with_one_path_each_receive_diagnostics_of_their_own_buffer() {
+        let mut state = with_config();
+        let rx_1 = diagnostics_client(&mut state, ClientId(1));
+        let rx_2 = diagnostics_client(&mut state, ClientId(2));
+        handle(&mut state, did_open(ClientId(1), X_URI, BROKEN));
+        let armed = handle(&mut state, did_open(ClientId(2), X_URI, EMPTY_LITERAL));
+        let effects = fire(&mut state, armed);
+        assert_eq!(effects.len(), 2);
+        let expected_1 = isograph_lsp::lsp_diagnostics_for_file(
+            state.db.reference(),
+            ClientId(1),
+            interned("src/x.ts"),
+        )
+        .clone()
+        .expect("client 1 has a buffer");
+        perform_all(effects);
+        let sent_1 = drained(rx_1.reference());
+        let sent_2 = drained(rx_2.reference());
+        assert_eq!(sent_1, HashMap::from([(X_URI.to_owned(), expected_1)]));
+        assert!(
+            sent_1[X_URI]
+                .iter()
+                .all(|diagnostic| diagnostic.message != empty_literal_message())
+        );
+        assert_eq!(
+            sent_2[X_URI]
+                .iter()
+                .map(|diagnostic| diagnostic.message.clone())
+                .collect::<Vec<_>>(),
+            empty_literal_message().wrap_vec()
+        );
+        let armed = handle(&mut state, change(ClientId(2), X_URI, CLEAN));
+        let effects = fire(&mut state, armed);
+        assert_eq!(effects.len(), 1);
+        perform_all(effects);
+        assert_eq!(
+            drained(rx_2.reference()),
+            HashMap::from([(X_URI.to_owned(), Vec::new())])
+        );
+        assert!(matches!(
+            rx_1.try_recv(),
+            Err(crossbeam::channel::TryRecvError::Empty)
+        ));
+    }
+
+    #[test]
+    fn another_clients_open_file_is_not_published_to_a_client() {
+        let mut state = with_config();
+        let rx_1 = diagnostics_client(&mut state, ClientId(1));
+        let rx_2 = diagnostics_client(&mut state, ClientId(2));
+        let armed = handle(&mut state, did_open(ClientId(1), X_URI, BROKEN));
+        let effects = fire(&mut state, armed);
+        assert_eq!(effects.len(), 1);
+        perform_all(effects);
+        assert_eq!(drained(rx_1.reference()).len(), 1);
+        assert!(matches!(
+            rx_2.try_recv(),
+            Err(crossbeam::channel::TryRecvError::Empty)
+        ));
+    }
+
+    #[test]
+    fn a_client_gone_before_the_fire_receives_nothing() {
+        let mut state = with_config();
+        let _rx_1 = diagnostics_client(&mut state, ClientId(1));
+        let rx_2 = diagnostics_client(&mut state, ClientId(2));
+        handle(&mut state, did_open(ClientId(2), X_URI, BROKEN));
+        let armed = handle(&mut state, did_open(ClientId(1), X_URI, BROKEN));
+        handle(&mut state, ClientConnectionEvent::Gone(ClientId(1)).to());
+        let effects = fire(&mut state, armed);
+        assert_eq!(effects.len(), 1);
+        assert_eq!(published(effects, rx_2.reference()).len(), 1);
+    }
+
+    #[test]
+    fn a_client_without_the_publish_diagnostics_capability_receives_nothing() {
+        let without_text_document = lsp_types::ClientCapabilities::default();
+        let without_publish_diagnostics = lsp_types::ClientCapabilities {
+            text_document: lsp_types::TextDocumentClientCapabilities::default().wrap_some(),
+            ..Default::default()
+        };
+        for capabilities in [without_text_document, without_publish_diagnostics] {
+            let mut state = with_config();
+            let rx = start_with_capabilities(&mut state, ClientId(1), capabilities);
+            let armed = handle(&mut state, did_open(ClientId(1), X_URI, BROKEN));
+            assert!(fire(&mut state, armed).is_empty());
+            assert!(matches!(
+                rx.try_recv(),
+                Err(crossbeam::channel::TryRecvError::Empty)
+            ));
+        }
+    }
+
+    #[test]
+    fn rejected_document_notifications_do_not_arm_the_debounce() {
+        let mut state = with_config();
+        let _rx = diagnostics_client(&mut state, ClientId(1));
+        let ranged = serde_json::json!([{
+            "range": {
+                "start": { "line": 0, "character": 0 },
+                "end": { "line": 0, "character": 1 }
+            },
+            "text": "ranged"
+        }]);
+        let effects = [
+            handle(
+                &mut state,
+                did_open(ClientId(1), "https://example.net/a.ts", BROKEN),
+            ),
+            handle(&mut state, did_change(ClientId(1), X_URI, ranged)),
+            handle(&mut state, did_open(ClientId(9), X_URI, BROKEN)),
+        ];
+        assert!(effects.iter().all(Vec::is_empty));
+        assert!(state.diagnostics_debounce.is_none());
     }
 }
