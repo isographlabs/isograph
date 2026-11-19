@@ -5,10 +5,10 @@ use graphql_schema_parser::OperationType;
 use intern::string_key::Intern;
 use isograph_compiler::{
     ClientId, CompilationProfile, CompositeShape, Concreteness, DefinitionLocation, EntityKind,
-    EntityShape, FileMembership, IdentitySelection, IncludeFile, IsographDb, NetworkProtocol,
-    ProtocolSelectable, RootEntities, ScalarKind, ScalarValueKind, SelectableShape, UnionWrapper,
-    Wrapper, WrapperVariant, compiler_errors_in_file, iso_literal_validation_errors_in_file,
-    schema_file_paths,
+    EntityShape, EntrypointWrapper, FileMembership, IdentitySelection, IncludeFile, IsographDb,
+    NetworkProtocol, ProtocolSelectable, RootEntities, ScalarKind, ScalarValueKind,
+    SelectableShape, UnionWrapper, Wrapper, WrapperVariant, compiler_errors_in_file,
+    iso_literal_validation_errors_in_file, schema_file_paths,
 };
 use isograph_extract_typescript::TypeScriptHostLanguage;
 use prelude::Postfix;
@@ -17,10 +17,11 @@ use span::Span;
 use crate::{
     DuplicateOperation, EntityLookupError, GraphQLCompositeData, GraphQLEntityData,
     GraphQLFetchPlan, GraphQLNetworkProtocol, GraphQLNotFetchable, GraphQLSelectableData,
-    GraphQLSelectableLookupError, IdField, RootOperationTypes, RootOperationTypesError,
-    SelectableLookupError, entity_named, graphql_entity, graphql_fetch_plan,
-    graphql_schema_file_errors, graphql_selectable, graphql_selectables, parsed_schema_file,
-    root_operation_types, scalar_kind, selectable_named,
+    GraphQLSelectableLookupError, IdField, NodeFieldArgument, NodeFieldError,
+    NodeFieldTypeMismatch, RootOperationTypes, RootOperationTypesError, SelectableLookupError,
+    entity_named, graphql_entity, graphql_fetch_plan, graphql_schema_file_errors,
+    graphql_selectable, graphql_selectables, parsed_schema_file, root_operation_types, scalar_kind,
+    selectable_named,
 };
 
 struct GraphQLProfile;
@@ -847,9 +848,15 @@ fn root_plan(db: &Db, name: &str) -> OperationType {
 
 /// The root entities of `name`'s plan, which the fixture makes a root fetch.
 fn plan_roots(db: &Db, name: &str) -> RootEntities {
-    fetch_plan(db, name)
+    match fetch_plan(db, name)
         .expect("the fixture makes this entity a root operation type")
-        .roots
+        .wrapper
+    {
+        EntrypointWrapper::Unwrapped(roots) => roots,
+        EntrypointWrapper::Wrapped => {
+            panic!("the fixture makes {name} a root operation type, which is unwrapped")
+        }
+    }
 }
 
 fn root_entities(operation: &str, others: &[&str]) -> RootEntities {
@@ -859,14 +866,22 @@ fn root_entities(operation: &str, others: &[&str]) -> RootEntities {
     }
 }
 
+fn wrapped_plan() -> Result<GraphQLFetchPlan, GraphQLNotFetchable> {
+    GraphQLFetchPlan {
+        operation_type: OperationType::Query,
+        wrapper: EntrypointWrapper::Wrapped,
+    }
+    .wrap_ok()
+}
+
 #[test]
-fn only_the_root_operation_types_of_the_pet_demo_are_fetchable() {
+fn the_pet_demo_roots_are_fetched_unwrapped_and_its_node_objects_by_id() {
     let db = db_with(&PET_DEMO_SCHEMA);
     assert_eq!(
         fetch_plan(&db, "Query"),
         GraphQLFetchPlan {
             operation_type: OperationType::Query,
-            roots: root_entities("Query", &["Mutation"]),
+            wrapper: EntrypointWrapper::Unwrapped(root_entities("Query", &["Mutation"])),
         }
         .wrap_ok()
     );
@@ -874,25 +889,32 @@ fn only_the_root_operation_types_of_the_pet_demo_are_fetchable() {
         fetch_plan(&db, "Mutation"),
         GraphQLFetchPlan {
             operation_type: OperationType::Mutation,
-            roots: root_entities("Mutation", &["Query"]),
+            wrapper: EntrypointWrapper::Unwrapped(root_entities("Mutation", &["Query"])),
         }
         .wrap_ok()
     );
-    for not_root in [
-        "Pet",
-        "PetStats",
+    for node in ["Pet", "Checkin", "Viewer", "BlogItem", "AdItem", "Image"] {
+        assert_eq!(fetch_plan(&db, node), wrapped_plan(), "{node}");
+    }
+    for neither in ["PetStats", "BestFriendRelationship"] {
+        assert_eq!(
+            fetch_plan(&db, neither),
+            GraphQLNotFetchable::NeitherRootNorNode(entity(neither)).wrap_err(),
+            "{neither}"
+        );
+    }
+    for not_object in [
         "Node",
         "ICheckin",
-        "Viewer",
         "NewsfeedItem",
         "String",
         "PetSpecies",
         "SetPetTaglineParams",
     ] {
         assert_eq!(
-            fetch_plan(&db, not_root),
-            GraphQLNotFetchable::NotRootOperationType(entity(not_root)).wrap_err(),
-            "{not_root}"
+            fetch_plan(&db, not_object),
+            GraphQLNotFetchable::NotObject(entity(not_object)).wrap_err(),
+            "{not_object}"
         );
     }
     assert_eq!(
@@ -918,7 +940,7 @@ fn the_default_root_types_are_fetchable_and_an_unnamed_mutation_is_not() {
     )]);
     assert_eq!(
         fetch_plan(&db, "Mutation"),
-        GraphQLNotFetchable::NotRootOperationType(entity("Mutation")).wrap_err()
+        GraphQLNotFetchable::NeitherRootNorNode(entity("Mutation")).wrap_err()
     );
 }
 
@@ -935,16 +957,116 @@ fn a_root_that_is_not_an_object_is_not_fetchable() {
 }
 
 #[test]
-fn a_syntax_error_in_the_query_root_leaves_the_other_roots_fetchable() {
+fn a_syntax_error_in_the_query_root_fails_node_fetches_and_not_other_roots() {
     let db = db_with(&[
-        ("a.graphql", "type Mutation { a: Int }"),
+        ("a.graphql", NODE_SCHEMA),
         ("b.graphql", "type Query { node(id: ID!): ! }"),
     ]);
     assert!(matches!(
         fetch_plan(&db, "Query"),
         Err(GraphQLNotFetchable::Entity(_))
     ));
+    assert!(matches!(
+        fetch_plan(&db, "Pet"),
+        Err(GraphQLNotFetchable::NodeField(NodeFieldError::Selectable(
+            _
+        )))
+    ));
     assert_eq!(root_plan(&db, "Mutation"), OperationType::Mutation);
+}
+
+const NODE_SCHEMA: &str = "interface Node { id: ID! } type Pet implements Node { id: ID! } \
+    type PetStats { weight: Int } type Viewer { id: ID! } type Mutation { a: Int } \
+    union Searchable = Pet";
+
+#[test]
+fn a_broken_node_field_fails_node_fetches_only() {
+    let query_root = entity("Query");
+    for (node, expected) in [
+        (
+            "node(id: ID!): [Node]",
+            NodeFieldError::ReturnsList(query_root),
+        ),
+        (
+            "node(id: ID!): [Node]!",
+            NodeFieldError::ReturnsList(query_root),
+        ),
+        (
+            "node(id: ID!): Viewer",
+            NodeFieldError::TypeMismatch(NodeFieldTypeMismatch {
+                query_root,
+                returns: entity("Viewer"),
+                entity: entity("Pet"),
+            }),
+        ),
+        (
+            "node(id: ID!): Missing",
+            NodeFieldError::UnknownTarget(entity("Missing")),
+        ),
+        ("other: Int", NodeFieldError::NotFound(query_root)),
+        (
+            "node(key: ID!): Node",
+            NodeFieldError::IdArgument(query_root),
+        ),
+        ("node(id: ID): Node", NodeFieldError::IdArgument(query_root)),
+        (
+            "node(id: String!): Node",
+            NodeFieldError::IdArgument(query_root),
+        ),
+        ("node: Node", NodeFieldError::IdArgument(query_root)),
+        (
+            "node(id: ID!, tenant: String!): Node",
+            NodeFieldError::RequiredArgument(NodeFieldArgument {
+                query_root,
+                argument: "tenant".intern().to(),
+            }),
+        ),
+    ] {
+        let query = format!("type Query {{ {node} }}");
+        let db = db_with(&[("a.graphql", NODE_SCHEMA), ("b.graphql", query.as_str())]);
+        assert_eq!(
+            fetch_plan(&db, "Pet"),
+            GraphQLNotFetchable::NodeField(expected).wrap_err(),
+            "{node}"
+        );
+        assert_eq!(root_plan(&db, "Query"), OperationType::Query, "{node}");
+        assert_eq!(
+            root_plan(&db, "Mutation"),
+            OperationType::Mutation,
+            "{node}"
+        );
+        assert_eq!(
+            fetch_plan(&db, "Viewer"),
+            GraphQLNotFetchable::NeitherRootNorNode(entity("Viewer")).wrap_err(),
+            "{node}"
+        );
+    }
+}
+
+#[test]
+fn node_may_return_the_entity_or_an_interface_or_union_containing_it() {
+    for node in [
+        "node(id: ID!): Node",
+        "node(id: ID!): Node!",
+        "node(id: ID!): Searchable",
+        "node(id: ID!): Pet",
+    ] {
+        let query = format!("type Query {{ {node} }}");
+        let db = db_with(&[("a.graphql", NODE_SCHEMA), ("b.graphql", query.as_str())]);
+        assert_eq!(fetch_plan(&db, "Pet"), wrapped_plan(), "{node}");
+    }
+}
+
+#[test]
+fn node_arguments_other_than_id_with_a_default_or_nullable_type_give_a_plan() {
+    let db = db_with(&[
+        ("a.graphql", NODE_SCHEMA),
+        (
+            "b.graphql",
+            "type Query { node(id: ID!, hint: Int = 0, ids: [ID!], tenant: String! = \"a\"): Node }",
+        ),
+    ]);
+    assert_eq!(fetch_plan(&db, "Pet"), wrapped_plan());
 }
 
 const SOURCE_FILE: FileMembership = FileMembership {
@@ -1449,17 +1571,17 @@ fn an_entrypoint_whose_parent_cannot_be_fetched_is_an_error_on_the_parent() {
     let cases = [
         (
             "iso(`field PetStats.Card { weight }`) iso(`entrypoint PetStats.Card`)",
-            "`PetStats` is not a root operation type; entrypoints must be on a root operation type.",
+            "`PetStats` is not a root operation type and does not implement `Node`, so it cannot be fetched by itself.",
             "PetStats",
         ),
         (
             "iso(`entrypoint Pet.PetSummaryCard`)",
-            "`Pet` is not a root operation type; entrypoints must be on a root operation type.",
+            "`Pet` is fetched by its id; entrypoints on entities fetched by id are not supported yet.",
             "Pet",
         ),
         (
             "iso(`field Node.Card { id }`) iso(`entrypoint Node.Card`)",
-            "`Node` is not a root operation type; entrypoints must be on a root operation type.",
+            "`Node` is not an object type, so it cannot be fetched by itself.",
             "Node",
         ),
         (
@@ -1484,6 +1606,34 @@ fn an_entrypoint_whose_parent_cannot_be_fetched_is_an_error_on_the_parent() {
             "{contents}"
         );
     }
+}
+
+#[test]
+fn a_broken_node_field_is_an_error_on_entrypoints_on_node_entities_only() {
+    const SUMMARY: &str = "iso(`entrypoint Pet.PetSummaryCard`)";
+    let schema = PET_DEMO_SCHEMA[0]
+        .1
+        .replace("node(id: ID!): Node", "node(id: ID!): [Node]");
+    let db = project_db(
+        &[
+            (PET_DEMO_SCHEMA[0].0, schema.as_str()),
+            PET_DEMO_SCHEMA[1],
+            PET_DEMO_SCHEMA[2],
+        ],
+        &pet_demo_sources(&[], &[("src/a.ts", SUMMARY)]),
+    );
+    assert_eq!(
+        validation_errors(&db, "src/a.ts", SUMMARY),
+        (
+            "`Query.node` returns a list; it returns one value.".to_owned(),
+            "Pet".to_owned()
+        )
+            .wrap_vec()
+    );
+    assert_eq!(
+        validation_errors(&db, "src/HomeRoute.ts", PET_DEMO_SOURCES[0].1),
+        vec![]
+    );
 }
 
 #[test]

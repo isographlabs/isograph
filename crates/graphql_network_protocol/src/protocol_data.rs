@@ -99,15 +99,22 @@ fn id_field<TProfile: CompilationProfile>(
     let Ok(Some(field)) = selectable_named(db, client, name, ID.intern().to()) else {
         return IdField::Absent;
     };
-    match field.item.item.type_.item.reference() {
-        TypeAnnotation::NonNull(non_null) => match non_null.0.item.reference() {
-            NullableTypeAnnotation::Named(named) if named.0.item.0.lookup() == "ID" => {
-                IdField::Present
-            }
-            NullableTypeAnnotation::Named(_) | NullableTypeAnnotation::List(_) => IdField::Absent,
-        },
-        TypeAnnotation::Named(_) | TypeAnnotation::List(_) => IdField::Absent,
+    if is_non_null_id(field.item.item.type_.item.reference()) {
+        IdField::Present
+    } else {
+        IdField::Absent
     }
+}
+
+/// Whether `type_annotation` is `ID!`.
+pub(crate) fn is_non_null_id(type_annotation: &TypeAnnotation) -> bool {
+    matches!(
+        type_annotation,
+        TypeAnnotation::NonNull(non_null) if matches!(
+            non_null.0.item.reference(),
+            NullableTypeAnnotation::Named(named) if named.0.item.0.lookup() == "ID"
+        )
+    )
 }
 
 /// What the GraphQL protocol records about a selectable.

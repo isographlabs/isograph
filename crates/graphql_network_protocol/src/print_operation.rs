@@ -323,14 +323,14 @@ mod tests {
 
     use isograph_compiler::{
         CompletedIdentity, CompletedSelectionMap, CompositeShape, Concreteness, Condition,
-        EntrypointOperation, FieldVariable, FixedRecordId, IdentitySelection, IntegerOutOfRange,
-        MergedArgument, MergedArguments, MergedCompositeTarget, MergedConditional, MergedObject,
-        MergedObjectEntry, MergedSelectableSelection, MergedSelection, MergedSelectionMap,
-        MergedSelectionTarget, MergedValue, NonNullVariableType, NormalizationAst,
-        NormalizationCompositeTarget, NormalizationNode, NormalizationObjectEntry,
-        NormalizationRootRecord, NormalizationSelectionSet, NormalizationTarget,
-        NormalizationValue, RecordEntity, ResponseKey, RootEntities, SelectionKey, VariableType,
-        normalization_ast,
+        EntrypointOperation, EntrypointWrapper, FieldVariable, FixedRecordId, IdentitySelection,
+        IntegerOutOfRange, MergedArgument, MergedArguments, MergedCompositeTarget,
+        MergedConditional, MergedObject, MergedObjectEntry, MergedSelectableSelection,
+        MergedSelection, MergedSelectionMap, MergedSelectionTarget, MergedValue,
+        NonNullVariableType, NormalizationAst, NormalizationCompositeTarget, NormalizationNode,
+        NormalizationObjectEntry, NormalizationRootRecord, NormalizationSelectionSet,
+        NormalizationTarget, NormalizationValue, RecordEntity, ResponseKey, RootEntities,
+        SelectionKey, VariableType, normalization_ast,
     };
     use isograph_parser::Boolean;
     use prelude::Postfix;
@@ -419,7 +419,7 @@ mod tests {
     fn top_level(selections: Vec<MergedSelection>) -> CompletedSelectionMap {
         CompletedSelectionMap::top_level::<GraphQLNetworkProtocol>(
             map(selections).reference(),
-            root(OperationType::Query).roots.reference(),
+            root_entities_of(OperationType::Query).reference(),
         )
         .expect("the test's top level completes")
     }
@@ -441,13 +441,18 @@ mod tests {
         text.0.split('\n').collect()
     }
 
+    /// The root type of `operation_type` as the only root entity.
+    fn root_entities_of(operation_type: OperationType) -> RootEntities {
+        RootEntities {
+            operation: entity(root_type_name(operation_type)),
+            others: BTreeSet::new(),
+        }
+    }
+
     fn root(operation_type: OperationType) -> GraphQLFetchPlan {
         GraphQLFetchPlan {
             operation_type,
-            roots: RootEntities {
-                operation: entity(root_type_name(operation_type)),
-                others: BTreeSet::new(),
-            },
+            wrapper: EntrypointWrapper::Unwrapped(root_entities_of(operation_type)),
         }
     }
 
@@ -881,23 +886,24 @@ mod tests {
         selections: Vec<MergedSelection>,
     ) -> (QueryText, NormalizationAst) {
         let operation = entity(root_type_name(operation_type));
-        let plan = GraphQLFetchPlan {
-            operation_type,
-            roots: RootEntities {
-                operation,
-                others: [entity("Query"), entity("Mutation")]
-                    .into_iter()
-                    .filter(|other| *other != operation)
-                    .collect(),
-            },
+        let roots = RootEntities {
+            operation,
+            others: [entity("Query"), entity("Mutation")]
+                .into_iter()
+                .filter(|other| *other != operation)
+                .collect(),
         };
         let completed = CompletedSelectionMap::top_level::<GraphQLNetworkProtocol>(
             map(selections).reference(),
-            plan.roots.reference(),
+            roots.reference(),
         )
         .expect("the test's top level completes");
         let ast = normalization_ast(completed.reference(), name("__typename"), operation)
             .expect("the test's integers fit");
+        let plan = GraphQLFetchPlan {
+            operation_type,
+            wrapper: EntrypointWrapper::Unwrapped(roots),
+        };
         (print(plan.reference(), &[], completed.reference()), ast)
     }
 
@@ -1228,7 +1234,7 @@ mod tests {
                 vec![("n", MergedValue::Integer(4_294_967_296))],
             )])
             .reference(),
-            root(OperationType::Query).roots.reference(),
+            root_entities_of(OperationType::Query).reference(),
         )
         .expect("the map has a selection");
         assert_eq!(
@@ -1241,7 +1247,7 @@ mod tests {
                 vec![("n", MergedValue::Integer(i64::from(i32::MIN)))],
             )])
             .reference(),
-            root(OperationType::Query).roots.reference(),
+            root_entities_of(OperationType::Query).reference(),
         )
         .expect("the map has a selection");
         assert!(

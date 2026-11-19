@@ -59,13 +59,33 @@ pub fn entity_fetch_plan<TProfile: CompilationProfile>(
         .map_err(EntityNotFetchableError::Protocol)
 }
 
+/// How an operation reaches the record an entrypoint's selections are on.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum EntrypointWrapper {
+    /// The entity is `RootEntities::operation`: the response's top-level object is its one
+    /// record, and the entrypoint's selections are the operation's top level.
+    Unwrapped(RootEntities),
+    /// The entrypoint's selections are under a path the protocol selects, on the record the
+    /// caller names by its id.
+    Wrapped,
+}
+
+/// The protocol's plan for an entrypoint's operation, and the operation's root entities.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EntrypointFetch<TFetchPlan> {
+    pub plan: TFetchPlan,
+    pub roots: RootEntities,
+}
+
+pub type ProfileEntrypointFetch<TProfile> = EntrypointFetch<ProfileFetchPlan<TProfile>>;
+
 /// The protocol's plan for fetching `entity` as the parent of the entrypoint `selectable`.
 pub fn entrypoint_fetch_plan<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
     entity: &ProfileEntity<TProfile>,
     selectable: &ProfileSelectable<TProfile>,
-) -> Result<ProfileFetchPlan<TProfile>, ProfileEntrypointNotFetchableError<TProfile>> {
+) -> Result<ProfileEntrypointFetch<TProfile>, ProfileEntrypointNotFetchableError<TProfile>> {
     if let SelectableKind::Server(_) = selectable.kind {
         return EntrypointNotFetchableError::ProtocolSelectable(SelectableKey {
             entity: selectable.parent_entity,
@@ -73,7 +93,14 @@ pub fn entrypoint_fetch_plan<TProfile: CompilationProfile>(
         })
         .wrap_err();
     }
-    entity_fetch_plan(db, client, entity).map_err(EntrypointNotFetchableError::Entity)
+    let plan =
+        entity_fetch_plan(db, client, entity).map_err(EntrypointNotFetchableError::Entity)?;
+    match TProfile::NetworkProtocol::entrypoint_wrapper(plan.reference()) {
+        EntrypointWrapper::Unwrapped(roots) => EntrypointFetch { plan, roots }.wrap_ok(),
+        EntrypointWrapper::Wrapped => {
+            EntrypointNotFetchableError::WrappedNotSupported(entity.name).wrap_err()
+        }
+    }
 }
 
 pub type ProfileFetchPlan<TProfile> =

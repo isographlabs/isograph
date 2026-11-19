@@ -8,9 +8,9 @@ use isograph_parser::{ArgumentList, ParsedIsoLiteral, VariableDeclarationList};
 use span::{Span, WithSpan};
 
 use crate::{
-    ArtifactPath, ClientId, EntityKind, EntityShape, EntrypointOperation, GenerationOptions,
-    IsographDb, ProjectArtifacts, ProtocolEntity, ProtocolQueryText, ProtocolSelectable,
-    RootEntities, SelectableKey, SelectableShape,
+    ArtifactPath, ClientId, EntityKind, EntityShape, EntrypointOperation, EntrypointWrapper,
+    GenerationOptions, IsographDb, ProjectArtifacts, ProtocolEntity, ProtocolQueryText,
+    ProtocolSelectable, SelectableKey, SelectableShape,
 };
 
 /// Byte offset of the iso literal text in its file.
@@ -209,8 +209,9 @@ pub trait NetworkProtocol: Sized + 'static {
     /// whose value names the response object's concrete entity.
     fn discriminator() -> SelectableName;
 
-    /// The root entities of the operation `plan` describes.
-    fn root_entities(plan: &Self::FetchPlan) -> RootEntities;
+    /// How the operation `plan` describes reaches the record the fetched entity's selections
+    /// are on.
+    fn entrypoint_wrapper(plan: &Self::FetchPlan) -> EntrypointWrapper;
 
     /// The text of `operation`'s query, and the protocol's name for a file holding exactly
     /// that text.

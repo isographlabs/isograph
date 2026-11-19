@@ -15,9 +15,9 @@ use common_lang_types::{EntityName, RelativePathToSourceFile, SelectableName};
 use intern::Lookup;
 use intern::string_key::Intern;
 use isograph_compiler::{
-    ClientId, CompilationProfile, EntityKind, EntityShape, EntrypointOperation, IncludeFile,
-    IsographDb, NetworkProtocol, ProtocolEntity, ProtocolQueryText, ProtocolSelectable,
-    RootEntities, ScalarKind, ScalarValueKind, SelectableKey, SelectableShape,
+    ClientId, CompilationProfile, EntityKind, EntityShape, EntrypointOperation, EntrypointWrapper,
+    IncludeFile, IsographDb, NetworkProtocol, ProtocolEntity, ProtocolQueryText,
+    ProtocolSelectable, ScalarKind, ScalarValueKind, SelectableKey, SelectableShape,
 };
 use isograph_parser::{ArgumentList, VariableDeclarationList};
 use prelude::Postfix;
@@ -27,7 +27,10 @@ pub use argument_errors::{
     ArgumentOf, GraphQLArgumentError, InputFieldOf, LiteralKind, LiteralTypeMismatch,
     VariableTypeMismatch,
 };
-pub use fetch_plan::{GraphQLFetchPlan, GraphQLNotFetchable, graphql_fetch_plan};
+pub use fetch_plan::{
+    GraphQLFetchPlan, GraphQLNotFetchable, NodeFieldArgument, NodeFieldError,
+    NodeFieldTypeMismatch, graphql_fetch_plan,
+};
 pub use protocol_data::{
     DuplicateInputField, GraphQLCompositeData, GraphQLEntityData, GraphQLSelectableData,
     GraphQLSelectableLookupError, IdField, RefinementCollision, RefinementTargetError,
@@ -199,8 +202,8 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         TYPENAME.intern().to()
     }
 
-    fn root_entities(plan: &GraphQLFetchPlan) -> RootEntities {
-        plan.roots.clone()
+    fn entrypoint_wrapper(plan: &GraphQLFetchPlan) -> EntrypointWrapper {
+        plan.wrapper.clone()
     }
 
     fn query_text(operation: &EntrypointOperation<'_, Self>) -> ProtocolQueryText {

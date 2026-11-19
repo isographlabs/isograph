@@ -28,7 +28,7 @@ type Pet implements Node {
 ```ts
 iso(`entrypoint Query.HomeRoute`); // ok: Query is the query root
 iso(`entrypoint Mutation.SetTagline`); // ok: Mutation is the mutation root
-iso(`entrypoint Pet.PetSummaryCard`); // error on `Pet`
+iso(`entrypoint Pet.PetSummaryCard`); // error on `Pet`: not supported yet
 iso(`entrypoint Node.Card`); // error on `Node`
 iso(`entrypoint Owner.Badge`); // error on `Owner` (declared by `entity Owner`)
 iso(`entrypoint Query.pets`); // error on `pets` (a schema field, not a `field` declaration)
@@ -36,12 +36,12 @@ iso(`entrypoint Query.pets`); // error on `pets` (a schema field, not a `field` 
 
 The four errors are LSP diagnostics, published like every other validation error:
 
-- `Pet`: `` `Pet` is not a root operation type; entrypoints must be on a root operation type. ``
-- `Node`: `` `Node` is not a root operation type; entrypoints must be on a root operation type. ``
-- `Owner`: `` `Owner` is declared in source files; only entities from the schema can parent an entrypoint. ``
+- `Pet`: `` `Pet` is fetched by its id; entrypoints on entities fetched by id are not supported yet. ``
+- `Node`: `` `Node` is not an object type, so it cannot be fetched by itself. ``
+- `Owner`: `` `Owner` is declared in source files, so the network protocol cannot fetch it. ``
 - `pets`: `` `Query.pets` comes from the schema; an entrypoint names a `field` declaration. ``
 
-In v1 the only entrypoint parents are the root operation types. There are no Node-fetched entrypoints: `Pet` implements `Node` and `Query` has `node(id: ID!): Node`, and `entrypoint Pet.PetSummaryCard` is still an error. Upstream fetches such an entrypoint as `node(id: $id) { ... on Pet { .. } }` (`isograph/crates/graphql_network_protocol/src/graphql_network_protocol.rs:305`, `wrap_merged_selection_map`); v1 does not, by the user's decision, and a later doc may add it back with its normalization AST shape.
+The only entrypoint parents that generate are the root operation types. `Pet` implements `Node` and `Query` has `node(id: ID!): Node`, so `Pet` can be fetched by itself (`node-entrypoints-and-loadable.md`, The GraphQL fetch plan), but an entrypoint on it is `WrappedNotSupported` until that doc's Later lands. Upstream fetches such an entrypoint as `node(id: $id) { ... on Pet { .. } }` (`isograph/crates/graphql_network_protocol/src/graphql_network_protocol.rs:305`, `wrap_merged_selection_map`).
 
 ## Protocol data on entities and selectables
 
@@ -427,21 +427,20 @@ An entrypoint `entrypoint E.f` is allowed when:
 1. `E` is defined by the protocol (`EntityOrigin::Protocol`). An `entity` declaration in a source file has nothing to fetch from.
 2. `E.f` is a `field` declaration (`SelectableKind::ClientField` or `ClientPointer`). A schema field has no selection set to read.
 3. `E`'s `NetworkProtocol::entity_shape` is `Composite`: a selection set on it selects its selectables (query-generation.md).
-4. The protocol's `fetch_plan(E)` is `Ok`.
+4. The protocol's `fetch_plan(E)` is `Ok`, and its `entrypoint_wrapper` is `Unwrapped`.
 
-Rules 1 to 3 are the core's; rule 4 is the protocol's. For GraphQL, `fetch_plan(E)` is `Ok` exactly when `E` is a root operation type, which is an object type: the operation is `query`, `mutation`, or `subscription` with the entrypoint's selections at the top level. No other entity can parent an entrypoint.
+Rules 1 to 3 are the core's; rule 4 is the protocol's. Rules 1, 3, and the `fetch_plan` half of 4 are `entity_fetch_plan`, which `@loadable` validation also calls (`node-entrypoints-and-loadable.md`). For GraphQL, `fetch_plan(E)` is `Ok` when `E` is an object type that is a root operation type (`Unwrapped`: the operation is `query`, `mutation`, or `subscription` with the entrypoint's selections at the top level), or an object type implementing `Node` while the query root has `node(id: ID!)` returning one value of `E` or of an interface or union containing it (`Wrapped`). An entrypoint on a `Wrapped` entity is `EntrypointNotFetchableError::WrappedNotSupported`, at `parent_type`.
 
 Every field of the mutation and subscription root can thus parent an entrypoint, as every field of the query root can.
 
 ```rust
 // from crates/graphql_network_protocol/src/fetch_plan.rs
-/// How the GraphQL protocol fetches an entity that parents an entrypoint: the entity is the
-/// root type of `operation_type`, and its selections are the operation's.
+/// How the GraphQL protocol fetches an entity by itself: the operation type, and how the
+/// operation's response reaches the entity's record.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GraphQLFetchPlan {
     pub operation_type: OperationType,
-    /// The schema's root operation types, with the entity as `operation`.
-    pub roots: RootEntities,
+    pub wrapper: EntrypointWrapper,
 }
 ```
 
@@ -451,7 +450,7 @@ This is the type after query-generation.md change 10. Change 7 landed it as `Gra
 
 ```rust
 // from crates/graphql_network_protocol/src/fetch_plan.rs
-/// How `entity` is fetched when it parents an entrypoint, as `client` reads the schema.
+/// How `entity` is fetched by itself, as `client` reads the schema.
 #[memo]
 pub fn graphql_fetch_plan<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
@@ -463,9 +462,9 @@ pub fn graphql_fetch_plan<TProfile: CompilationProfile>(
 The body:
 
 1. `graphql_entity(db, client, entity)`: `Err` is `GraphQLNotFetchable::Entity`, `Ok(None)` is `UnknownEntity`.
-2. `root_operation_types(db, client)`, `Err` is `RootOperationTypes`. `roots.operation_type_of(entity)` of `None` is `NotRootOperationType`.
-3. A root whose data is not `Object` is `NotObject`: the spec requires root operation types to be object types (spec 3.3.1), so only a schema that breaks that rule reaches it.
-4. Otherwise `GraphQLFetchPlan { operation_type, roots: roots.root_entities(entity) }`.
+2. An entity whose data is not `Object` is `NotObject`.
+3. `root_operation_types(db, client)`, `Err` is `RootOperationTypes`. `roots.operation_type_of(entity)` of `Some(operation_type)` is `GraphQLFetchPlan { operation_type, wrapper: Unwrapped(roots.root_entities(entity)) }`.
+4. An object that does not implement `Node` is `NeitherRootNorNode`; one whose query root's `node` field cannot fetch it is `NodeField(NodeFieldError)`; otherwise `GraphQLFetchPlan { operation_type: Query, wrapper: Wrapped }` (`node-entrypoints-and-loadable.md`, The GraphQL fetch plan).
 
 ```rust
 // from crates/graphql_network_protocol/src/fetch_plan.rs
@@ -477,10 +476,15 @@ pub enum GraphQLNotFetchable {
     Entity(EntityLookupError),
     #[error("`{0}` is not defined in the schema.")]
     UnknownEntity(EntityName),
-    #[error("`{0}` is not a root operation type; entrypoints must be on a root operation type.")]
-    NotRootOperationType(EntityName),
-    #[error("`{0}` cannot be fetched: only object types can parent an entrypoint.")]
+    #[error("`{0}` is not an object type, so it cannot be fetched by itself.")]
     NotObject(EntityName),
+    #[error(
+        "`{0}` is not a root operation type and does not implement `Node`, so it cannot be \
+        fetched by itself."
+    )]
+    NeitherRootNorNode(EntityName),
+    #[error("{0}")]
+    NodeField(NodeFieldError),
 }
 ```
 
@@ -642,4 +646,4 @@ Changes 4 and 5 landed with `Node`-fetched entrypoints. The commit "Remove Node-
 
 ## Later
 
-- Entrypoints on entities other than root operation types: through `node(id:)` (upstream's `wrap_merged_selection_map`) or a query root field the schema names. Neither is in v1. `Node`-fetched entrypoints and refetch queries share the shape `node(id: $id) { ... on T { .. } }`. When they arrive, the `... on T` is a `Conditional` (`SelectionEquals(T)`) in the normalization AST, as upstream keeps an `InlineFragment` there (`isograph/demos/pet-demo/src/components/__isograph/BlogItem/BlogItemMoreDetail/normalization_ast.ts:16-41`): the id comes from the caller, and for another entity's id the server returns `{ __typename: "Other" }` without `T`'s fields, which the conditional skips instead of throwing. The fetch's arguments, read from the schema's `node` field (the removed `node_fetch`, `crates/graphql_network_protocol/src/fetch_plan.rs:156-215` at `103a23b9`), must reach the generated parameters type of the entrypoint, because the entrypoint field declares no `$id`.
+- Generating entrypoints on Node entities, whose fetch plan is `Wrapped`: specified in `node-entrypoints-and-loadable.md`, Later: entrypoints on Node entities. Entrypoints through a query root field the schema names are not planned. `Node`-fetched entrypoints and refetch queries share the shape `node(id: $id) { ... on T { .. } }`. When they arrive, the `... on T` is a `Conditional` (`SelectionEquals(T)`) in the normalization AST, as upstream keeps an `InlineFragment` there (`isograph/demos/pet-demo/src/components/__isograph/BlogItem/BlogItemMoreDetail/normalization_ast.ts:16-41`): the id comes from the caller, and for another entity's id the server returns `{ __typename: "Other" }` without `T`'s fields, which the conditional skips instead of throwing. The fetch's arguments, read from the schema's `node` field (the removed `node_fetch`, `crates/graphql_network_protocol/src/fetch_plan.rs:156-215` at `103a23b9`), must reach the generated parameters type of the entrypoint, because the entrypoint field declares no `$id`.

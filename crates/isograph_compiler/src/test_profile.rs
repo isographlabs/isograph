@@ -172,11 +172,11 @@ impl NetworkProtocol for TestNetworkProtocol {
         intern::string_key::Intern::intern("__typename").to()
     }
 
-    fn root_entities(_plan: &()) -> crate::RootEntities {
-        crate::RootEntities {
+    fn entrypoint_wrapper(_plan: &()) -> crate::EntrypointWrapper {
+        crate::EntrypointWrapper::Unwrapped(crate::RootEntities {
             operation: intern::string_key::Intern::intern("Query").to(),
             others: std::collections::BTreeSet::new(),
-        }
+        })
     }
 
     fn query_text(_operation: &crate::EntrypointOperation<'_, Self>) -> crate::ProtocolQueryText {

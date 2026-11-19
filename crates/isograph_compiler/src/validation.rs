@@ -100,6 +100,11 @@ pub enum EntrypointNotFetchableError<TNotFetchable: std::fmt::Display> {
     ProtocolSelectable(SelectableKey),
     #[error("{0}")]
     Entity(EntityNotFetchableError<TNotFetchable>),
+    #[error(
+        "`{0}` is fetched by its id; entrypoints on entities fetched by id are not supported \
+        yet."
+    )]
+    WrappedNotSupported(EntityName),
 }
 
 /// Why an entity cannot be fetched by itself.
@@ -385,7 +390,8 @@ fn entrypoint_declaration_error<TProfile: CompilationProfile>(
         .ok()?;
     let location = |error: &EntrypointNotFetchableError<_>| match error {
         EntrypointNotFetchableError::ProtocolSelectable(_) => declaration.name.location,
-        EntrypointNotFetchableError::Entity(_) => declaration.parent_type.location,
+        EntrypointNotFetchableError::Entity(_)
+        | EntrypointNotFetchableError::WrappedNotSupported(_) => declaration.parent_type.location,
     };
     entrypoint_fetch_plan(db, client, entity, selectable)
         .err()

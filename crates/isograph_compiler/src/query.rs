@@ -2,6 +2,7 @@ use common_lang_types::{ArtifactFileName, Diagnostic, EntityName, QueryText, Sel
 use pico_macros::memo;
 use prelude::Postfix;
 
+use crate::entrypoint::EntrypointFetch;
 use crate::merged_selection::{
     CompletedSelectionMap, FieldSelectionMap, FieldSelectionMapError, FieldVariable, TopLevelError,
     field_selection_map,
@@ -72,7 +73,7 @@ pub fn query_for_entrypoint<TProfile: CompilationProfile>(
     let selectable_value = selectable_named(db, client, entity, selectable)
         .clone()
         .map_err(EntrypointQueryError::Lookup)?;
-    let fetch_plan = entrypoint_fetch_plan(
+    let EntrypointFetch { plan, roots } = entrypoint_fetch_plan(
         db,
         client,
         entity_value.reference(),
@@ -83,7 +84,6 @@ pub fn query_for_entrypoint<TProfile: CompilationProfile>(
         .as_ref()
         .map_err(|error| EntrypointQueryError::SelectionMap(error.clone()))?;
     let variables = operation_variables(field);
-    let roots = TProfile::NetworkProtocol::root_entities(fetch_plan.reference());
     let selections = CompletedSelectionMap::top_level::<TProfile::NetworkProtocol>(
         field.selections.reference(),
         roots.reference(),
@@ -98,7 +98,7 @@ pub fn query_for_entrypoint<TProfile: CompilationProfile>(
     let ProtocolQueryText { text, file_name } =
         TProfile::NetworkProtocol::query_text(&EntrypointOperation {
             name: selectable,
-            fetch_plan: fetch_plan.reference(),
+            fetch_plan: plan.reference(),
             variables: variables.as_slice(),
             selections: selections.reference(),
         });

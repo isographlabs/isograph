@@ -37,8 +37,9 @@ pub use database::{
     SourcePathMap, file_contents, schema_file_paths, source_file_paths,
 };
 pub use entrypoint::{
-    ProfileEntityNotFetchableError, ProfileEntrypointNotFetchableError, ProfileFetchPlan,
-    RootEntities, entity_fetch_plan, entrypoint_fetch_plan,
+    EntrypointFetch, EntrypointWrapper, ProfileEntityNotFetchableError, ProfileEntrypointFetch,
+    ProfileEntrypointNotFetchableError, ProfileFetchPlan, RootEntities, entity_fetch_plan,
+    entrypoint_fetch_plan,
 };
 pub use generation_errors::{QueryGenerationError, iso_literal_generation_errors_in_file};
 pub use host_language::*;

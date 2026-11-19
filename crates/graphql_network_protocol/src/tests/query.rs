@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 
 use isograph_compiler::{
     CompletedIdentity, CompletedSelection, CompletedSelectionMap, CompletedSelectionTarget,
-    EntityNotFetchableError, EntrypointNotFetchableError, EntrypointQueryError,
+    EntityNotFetchableError, EntrypointNotFetchableError, EntrypointQueryError, EntrypointWrapper,
     FieldSelectionMapError, FixedRecordId, IntegerOutOfRange, NormalizationAlias, NormalizationAst,
     NormalizationCompositeTarget, NormalizationNode, NormalizationRootRecord,
     NormalizationSelection, NormalizationTarget, NormalizationValue, QueryArtifact, RecordEntity,
@@ -426,17 +426,28 @@ fn an_entrypoint_parent_that_cannot_be_fetched_is_not_fetchable() {
             EntityNotFetchableError::SourceEntity(entity("Owner"))
         ))
     );
-    for (parent, field) in [
-        ("PetStats", "Card"),
-        ("Pet", "PetSummaryCard"),
-        ("Node", "Card"),
+    assert_eq!(
+        error(&db, "Pet", "PetSummaryCard"),
+        EntrypointQueryError::NotFetchable(EntrypointNotFetchableError::WrappedNotSupported(
+            entity("Pet")
+        ))
+    );
+    for (parent, field, reason) in [
+        (
+            "PetStats",
+            "Card",
+            GraphQLNotFetchable::NeitherRootNorNode(entity("PetStats")),
+        ),
+        (
+            "Node",
+            "Card",
+            GraphQLNotFetchable::NotObject(entity("Node")),
+        ),
     ] {
         assert_eq!(
             error(&db, parent, field),
             EntrypointQueryError::NotFetchable(EntrypointNotFetchableError::Entity(
-                EntityNotFetchableError::Protocol(GraphQLNotFetchable::NotRootOperationType(
-                    entity(parent)
-                ))
+                EntityNotFetchableError::Protocol(reason)
             )),
             "{parent}"
         );
@@ -529,10 +540,13 @@ fn a_renamed_query_root_is_the_root_entity() {
         &[("schema/schema.graphql", schema)],
         &[("src/Me.ts", "iso(`field RootQuery.Me { me { name } }`)")],
     );
-    let roots = graphql_fetch_plan(&db, CLIENT, entity("RootQuery"))
+    let EntrypointWrapper::Unwrapped(roots) = graphql_fetch_plan(&db, CLIENT, entity("RootQuery"))
         .clone()
         .expect("RootQuery is the query root")
-        .roots;
+        .wrapper
+    else {
+        panic!("RootQuery is the query root, which is unwrapped");
+    };
     assert_eq!(
         roots,
         RootEntities {

@@ -4,11 +4,13 @@ use common_lang_types::{EntityNameAndSelectableName, SelectionName};
 use intern::string_key::Intern;
 use isograph_compiler::{
     ArtifactInnerType, ArtifactObjectField, ArtifactObjectType, ArtifactSource, Condition,
+    EntrypointNotFetchableError, EntrypointQueryError, EntrypointQueryFailed,
     FieldSelectionMapError, FieldTypes, GenerationError, LinkType, NormalizationArgument,
-    NormalizationArguments, NormalizationObjectEntry, NormalizationValue, ReaderLinkedSelection,
-    ReaderRefinementSelection, ReaderResolverSelection, ReaderScalarSelection, ReaderSelection,
-    ReaderSelectionSet, SelectionMapErrorKind, UnionWrapper, UnknownFieldArgument, Wrapper,
-    WrapperVariant, artifact_sources_in_file, field_types, project_artifacts,
+    NormalizationArguments, NormalizationObjectEntry, NormalizationValue, ProjectArtifactsError,
+    ReaderLinkedSelection, ReaderRefinementSelection, ReaderResolverSelection,
+    ReaderScalarSelection, ReaderSelection, ReaderSelectionSet, SelectionMapErrorKind,
+    UnionWrapper, UnknownFieldArgument, Wrapper, WrapperVariant, artifact_sources_in_file,
+    field_types, project_artifacts,
 };
 use prelude::Postfix;
 
@@ -479,6 +481,30 @@ fn project_artifacts_carry_the_readers_of_reachable_fields_and_the_concrete_enti
             .into_iter()
             .map(entity)
             .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn an_entrypoint_on_a_node_entity_fails_the_project_artifacts() {
+    let added = [(
+        "src/PetTagline.ts",
+        "iso(`field Pet.PetTagline { tagline }`) iso(`entrypoint Pet.PetTagline`)",
+    )];
+    let db = demo(&added);
+    let files: Vec<(&str, &str)> = PET_DEMO_SOURCES
+        .iter()
+        .copied()
+        .chain(added.iter().copied())
+        .collect();
+    assert_eq!(
+        project_artifacts(&db, CLIENT, sources(&db, files.as_slice()).reference()),
+        ProjectArtifactsError::EntrypointQuery(EntrypointQueryFailed {
+            entrypoint: named("Pet", "PetTagline"),
+            error: EntrypointQueryError::NotFetchable(
+                EntrypointNotFetchableError::WrappedNotSupported(entity("Pet"))
+            ),
+        })
+        .wrap_err()
     );
 }
 
