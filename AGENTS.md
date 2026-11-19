@@ -8,6 +8,8 @@ The parser does not use pico. Parser functions are plain functions over `&str`. 
 
 Before writing a type, function, error, or pass, check the isograph checkout (`../isograph`) for the existing pattern. If isograph has a good one, use it.
 
+For every design decision, first state what upstream isograph does (`path:line` in `../isograph`). The held option is upstream's behavior unless there is a stated reason to deviate. A deviation names that reason.
+
 ## Mental model
 
 Schema data model: `docs-website/docs/design-docs/mental-model.md`. Read it before working on entities, entity declarations, wrappers, selectables, selectable declarations, selections, selection sets, or entrypoints.
