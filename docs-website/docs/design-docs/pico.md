@@ -483,7 +483,7 @@ match db.try_get(EditorBuffer::id_for_key(&EditorBufferKey { client, path })) {
 
 ### No `Default` for missing data
 
-A missing key is an absent state, and readers depend on that absence. A read does not insert a default value for a key that is not there, and a type does not implement `Default` to stand in for "not written yet". `file_contents` returns `None` when there is no buffer and no `DiskFile`; it does not insert an empty `DiskFile`. Change 2 of `refactors/pending/pico-missing-key-dependency.md` removes `Default` from the `#[tracked]` counter for this reason.
+A missing key is an absent state, and readers depend on that absence. A read does not insert a default value for a key that is not there, and a type does not implement `Default` to stand in for "not written yet". `file_contents` returns `None` when there is no buffer and no `DiskFile`; it does not insert an empty `DiskFile`. The `#[tracked]` counter has no `Default` for this reason. `MutView::tracked` writes `Counter::next(None)` as its first value.
 
 ### Outbound I/O state lives on `IsographState`
 

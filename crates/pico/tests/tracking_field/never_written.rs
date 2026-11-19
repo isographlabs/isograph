@@ -85,3 +85,20 @@ fn untracked_miss_then_tracked_then_insert_reruns() {
     assert_eq!(*lookup_a(&db), "asdf".to_string().wrap_some());
     assert_eq!(LOOKUP.load(Ordering::SeqCst), 2);
 }
+
+/// The first tracked write of a never-written map writes its counter as 0.
+#[test]
+fn first_tracked_write_writes_counter_zero() {
+    let mut db = TestDatabase::default();
+    assert_eq!(
+        db.get_singleton::<MapCounter>().map(|counter| counter.0),
+        None
+    );
+
+    db.get_map_mut().tracked();
+
+    assert_eq!(
+        db.get_singleton::<MapCounter>().map(|counter| counter.0),
+        0.wrap_some()
+    );
+}

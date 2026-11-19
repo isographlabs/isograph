@@ -71,11 +71,13 @@ pub(crate) fn db_macro(item: TokenStream) -> TokenStream {
         let get_ident_mut = format_ident!("get_{field_ident}_mut");
 
         aux_struct_defs.push(quote! {
-            #[derive(Clone, Copy, Default, PartialEq, Eq, Hash, ::pico_macros::Singleton)]
+            #[derive(Clone, PartialEq, Eq, Hash, ::pico_macros::Singleton)]
             pub struct #counter_ident(u64);
             impl ::pico::Counter for #counter_ident {
                 #[inline]
-                fn increment(self) -> Self { Self(self.0.wrapping_add(1)) }
+                fn next(previous: ::core::option::Option<&Self>) -> Self {
+                    previous.map_or(Self(0), |previous| Self(previous.0.wrapping_add(1)))
+                }
             }
         });
 
