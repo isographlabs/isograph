@@ -55,6 +55,33 @@ query PetDetailRoute($id: ID!) {
 
 followed by one newline. `query_text.ts` default-exports the same text as a string. `entrypoint.ts`'s default export gains `queryText`, imported from `./query_text`.
 
+The text above is the `expanded` query text format, which the pet demo's `isograph.config.json` sets:
+
+```json
+{
+  "source_files": ["src/**/*.ts"],
+  "schema": ["schema/**/*.graphql"],
+  "output_directory": "src",
+  "graphql": {
+    "query_text_format": "expanded"
+  }
+}
+```
+
+A config without `graphql.query_text_format` gets `collapsed`, one line with a space only between two tokens that would otherwise lex as one. `HomeRoute` in `collapsed`:
+
+```graphql
+query HomeRoute{pets{__typename id age firstName lastName nickname picture species tagline}}
+```
+
+and `SetTagline`:
+
+```graphql
+mutation SetTagline($id:ID!$tagline:String!){set_pet_tagline____input___o_id__v_id_tagline__v_tagline_c:set_pet_tagline(input:{id:$id tagline:$tagline}){__typename pet{__typename id tagline}}}
+```
+
+Both `query_text.ts` and `query_text.graphql` hold the configured format (Config: query text format, below).
+
 What the text shows:
 
 - `PetDetailRoute`'s own selections are the `pet(id: $id)` field. `fullName`, `PetStatsCard`, `PetCheckinsCard`, and `PetBestFriendCard` are `field` declarations without `to`; their selection sets are inlined (`firstName`, `lastName`, `nickname`, `stats { .. }`, `checkins(..) { .. }`, `best_friend_relationship { .. }`, `id`).
@@ -1218,7 +1245,7 @@ The root's identity is not read: the top level has no identity selection. `Entry
 
 ### GraphQL printing
 
-`GraphQLNetworkProtocol::query_text` is a pure function of the operation: every fact it prints is in the completed map and the fetch plan. It reads no database. It prints the map directly; there is no GraphQL document type between the map and the text, and the printer is the only function that writes GraphQL text.
+`GraphQLNetworkProtocol::query_text` is a pure function of the protocol's options and the operation: every fact it prints is in the completed map and the fetch plan, and the layout is `options.query_text_format`. It reads no database; the core reads the options (Config: query text format, below) and passes them. It prints the map directly; there is no GraphQL document type between the map and the text, and the printer is the only function that writes GraphQL text.
 
 Upstream has no structure between the merged map and the string. `generate_query_text` (`isograph/crates/graphql_network_protocol/src/query_text.rs:13`) pushes the header onto one `String` (`:23`), and `write_selections_for_query_text` (`:70`) recurses over the `MergedSelectionMap` (`isograph/crates/isograph_schema/src/create_merged_selection_set.rs:33`, a `BTreeMap<NormalizationKey, MergedServerSelection>`) with `push_str` and `format!`, writing aliases at `:89-92` and `:99-102`. Arguments are strings from `get_serialized_arguments_for_query_text` (`:135`), values from `serialize_non_constant_value_for_graphql` (`:158`), and variable definitions from `write_variables_to_string` (`:38`). Like upstream, i2's printer walks the core's map; unlike upstream, the map is protocol-neutral and GraphQL's names arrive in it as values.
 
@@ -1227,47 +1254,87 @@ Upstream has no structure between the merged map and the string. `generate_query
 pub const QUERY_TEXT_FILE_NAME: &str = "query_text.graphql";
 
 pub(crate) fn query_text(
+    format: QueryTextFormat,
     operation: &EntrypointOperation<'_, GraphQLNetworkProtocol>,
 ) -> ProtocolQueryText {
     ProtocolQueryText {
-        text: print_operation(operation),
+        text: print_operation(format, operation),
         file_name: QUERY_TEXT_FILE_NAME.intern().to::<ArtifactFileName>().wrap_some(),
     }
 }
 ```
 
+The printer builds the operation as `PrintItem`s, then lays them out in the format. Each `print_*` function returns items; `lay_out` is the only function that reads the format, so the two formats cannot print different tokens.
+
 ```rust
 // from crates/graphql_network_protocol/src/print_operation.rs
-/// The text of `operation`: one selection per line, two spaces of indentation per depth, one
-/// newline between lines and none at the end.
+/// One piece of an operation's text before `lay_out` writes it in a `QueryTextFormat`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum PrintItem {
+    /// Text both formats write as is: one or more GraphQL tokens with no whitespace or comma
+    /// between them (`pets`, `$id`, `[ID!]!`, `"a b"`, `{`).
+    Text(String),
+    /// A space `Expanded` writes and `Collapsed` does not.
+    Space,
+    /// A comma between two arguments, object entries, list items, or variable definitions.
+    /// GraphQL ignores it (spec 2.1.8); `Expanded` writes it and `Collapsed` does not.
+    Comma,
+    /// The start of a line at this depth. `Expanded` writes a newline and two spaces per depth;
+    /// `Collapsed` writes nothing.
+    LineBreak(usize),
+}
+
+/// The text of `operation` in `format`.
 pub(crate) fn print_operation(
+    format: QueryTextFormat,
     operation: &EntrypointOperation<'_, GraphQLNetworkProtocol>,
-) -> QueryText;
+) -> QueryText {
+    QueryText(lay_out(format, operation_items(operation).as_slice()))
+}
 
-/// The lines of `selections` at `depth`, without braces.
-fn print_selection_set(selections: &CompletedSelectionMap, depth: usize) -> Vec<String>;
+/// The header, `print_selection_set(selections, 1)`, a `LineBreak(0)`, and `}`.
+fn operation_items(operation: &EntrypointOperation<'_, GraphQLNetworkProtocol>) -> Vec<PrintItem>;
 
-/// The lines of one selection at `depth`.
-fn print_selection(selection: &CompletedSelection, depth: usize) -> Vec<String>;
+/// `items` as text. `Expanded` writes every item as its doc comment says. `Collapsed` writes
+/// only the `Text` items, each preceded by `collapsed_separator` of the previous `Text`'s
+/// last character and its first.
+fn lay_out(format: QueryTextFormat, items: &[PrintItem]) -> String;
+
+/// `" "` when `previous` and `next` are both name characters (`_`, `0`-`9`, `A`-`Z`, `a`-`z`;
+/// spec 2.1.9), because the two tokens would otherwise lex as one; otherwise `""`.
+fn collapsed_separator(previous: char, next: char) -> &'static str;
+
+/// Every selection of `selections` at `depth`, without braces.
+fn print_selection_set(selections: &CompletedSelectionMap, depth: usize) -> Vec<PrintItem>;
+
+/// `LineBreak(depth)`, then the selection; a selection set's closing `}` follows its own
+/// `LineBreak(depth)`.
+fn print_selection(selection: &CompletedSelection, depth: usize) -> Vec<PrintItem>;
 
 /// `<alias>: <name>(<arguments>)`, or `<name>` when the key has no arguments.
-fn print_selection_head(key: &SelectionKey) -> String;
+fn print_selection_head(key: &SelectionKey) -> Vec<PrintItem>;
 
-/// `(name: value, ...)`, or the empty string when there are none.
-fn print_arguments(arguments: &MergedArguments) -> String;
+/// `(name: value, ...)`, or no items when there are none.
+fn print_arguments(arguments: &MergedArguments) -> Vec<PrintItem>;
 
-fn print_value(value: &MergedValue) -> String;
+fn print_value(value: &MergedValue) -> Vec<PrintItem>;
 
-fn print_variable_definition(variable: &FieldVariable) -> String;
+/// `items` with `Comma` and `Space` between consecutive groups.
+fn comma_separated(groups: impl Iterator<Item = Vec<PrintItem>>) -> Vec<PrintItem>;
 
-fn print_variable_type(variable_type: &VariableType) -> String;
+fn print_variable_definition(variable: &FieldVariable) -> Vec<PrintItem>;
+
+/// Unchanged: one `Text`, also read by `argument_errors.rs`.
+pub(crate) fn print_variable_type(variable_type: &VariableType) -> String;
 ```
 
-`print_operation.rs` reads `isograph_parser::Boolean` to print a boolean value, so `graphql_network_protocol` gains the `isograph_parser` dependency. `print_selection` prints the discriminator through `protocol_data.rs`'s `TYPENAME`.
+`print_operation.rs` reads `isograph_parser::Boolean` to print a boolean value, so `graphql_network_protocol` gains the `isograph_parser` dependency. `print_selection` prints the discriminator through `protocol_data.rs`'s `TYPENAME`. `QueryTextFormat` is `isograph_config`'s, so `graphql_network_protocol` gains the `isograph_config` dependency.
 
-`print_selection_set` and `print_selection` return a `Vec` because each nested selection set's lines are spliced between its opening and closing lines, and a recursive `impl Iterator` is not a nameable type.
+`print_selection_set` and `print_selection` return a `Vec` because each nested selection set's items are spliced between its opening and closing items, and a recursive `impl Iterator` is not a nameable type.
 
-The header is `<operation_type> <name>(<variable definitions>) {`, with the operation type the plan's `OperationType` and the parentheses omitted when there are none, then `print_selection_set(selections, 1)`, then `}`. A variable definition prints `$name: Type`, then ` = <default>` when it has one. `VariableType` prints `Nullable(t)` as `t`'s text without `!`, `NonNull(t)` with `!`, `List` in brackets.
+The header is `<operation_type> <name>(<variable definitions>) {`, with the operation type the plan's `OperationType` and the parentheses omitted when there are none, then `print_selection_set(selections, 1)`, then `}` after `LineBreak(0)`. A variable definition prints `$name: Type`, then ` = <default>` when it has one. `VariableType` prints `Nullable(t)` as `t`'s text without `!`, `NonNull(t)` with `!`, `List` in brackets. Every space in these descriptions is a `Space` item and every `, ` a `Comma` then a `Space`.
+
+`Expanded` writes exactly today's text: one selection per line, two spaces of indentation per depth, one newline between lines and none at the end. `Collapsed` writes no newline, no comma, and no space except one between two `Text` items whose boundary characters are both name characters. The spaces it keeps are, exhaustively: between the operation type and the name (`query HomeRoute`), between two selections that are names (`__typename id`), between `on` and the entity (`...on BlogItem`), between a value that ends in a name character and the next argument's or object entry's name (`id:$id tagline:$tagline`, `limit:5 skip:0`, `b:true i:-5`), and between a name and a following name in a list (`[A B]`, which v1 does not print because enum values are not `MergedValue`s). It writes no space around `:`, `=`, `(`, `)`, `{`, `}`, `[`, `]`, `...`, `!`, `$`, or a string value, and none before `-` (`i:-5`, `[1-5]`: spec 2.9.1's lookahead after an `IntValue` excludes only a digit, `.`, and a name start). A string value is one `Text` and keeps its own characters, so `"a  b"` keeps its two spaces. Both formats lex to the same token sequence.
 
 `print_selection`:
 
@@ -1281,19 +1348,45 @@ Values print as GraphQL: `$name`, integers in decimal, `true`, `false`, `null`, 
 
 Upstream's origin for the completion rules is `select_typename_and_id_fields_in_merged_selection` (`isograph/crates/isograph_schema/src/create_merged_selection_set.rs:1414`). Deltas: the names are the protocol's `discriminator()` and `entity_shape`, applied by the core's `complete`, rather than names hardcoded in the core; the discriminator is selected in every selection set under a selection, and none at the operation's top level; upstream's `node` wrapping (`selection_map_wrapped`, `:1477`, and `GraphQLNetworkProtocol::wrap_merged_selection_map`, `isograph/crates/graphql_network_protocol/src/graphql_network_protocol.rs:305`) has no counterpart, because v1 has no Node-fetched entrypoints; the text comes from one printer over the completed map.
 
-### Config: which types get an identity field
+### Config: query text format
 
-No doc owns GraphQL config yet, and `crates/isograph_config` has no GraphQL section (`IsographProjectConfig` has `source_files`, `schema`, `output_directory`). This section documents the option that decides GraphQL's `IdField`, which `graphql_entity_shape` turns into `IdentitySelection`. v1 implements only the default, `auto` (a type with a field `id: ID!` is `IdField::Present`, entrypoints.md). v1 does not add the field to `IsographProjectConfig`; the other two variants are documented and not implemented.
+`graphql.query_text_format` decides how the GraphQL protocol lays out each entrypoint's query text. It is GraphQL protocol output, so it sits under the `graphql` key. This change creates `GraphQLConfig` with this one field; `identity_field_selection` (next section) joins it when a non-default variant is implemented.
 
 ```json
 {
   "source_files": ["src/**"],
   "schema": ["schema/**"],
   "graphql": {
-    "identity_field_selection": "auto"
+    "query_text_format": "expanded"
   }
 }
 ```
+
+Before:
+
+```rust
+// from crates/isograph_config/src/compilation_options.rs
+/// This struct is deserialized from an isograph.config.json file.
+#[derive(Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct IsographProjectConfig {
+    /// The user may hard-code the JSON Schema for their version of the config.
+    #[serde(rename = "$schema")]
+    pub json_schema: Option<String>,
+    /// Glob patterns relative to the config file's directory.
+    pub source_files: Vec<String>,
+    /// Glob patterns relative to the config file's directory.
+    #[serde(default)]
+    pub schema: Vec<String>,
+    /// The directory, relative to the config file's directory, whose `__isograph` folder holds
+    /// the generated artifacts. Absent: the compiler writes no artifacts, and the transforms
+    /// look in the config file's directory.
+    #[serde(default)]
+    pub output_directory: Option<PathBuf>,
+}
+```
+
+After:
 
 ```rust
 // from crates/isograph_config/src/compilation_options.rs
@@ -1308,9 +1401,188 @@ pub struct IsographProjectConfig {
 }
 
 /// The `graphql` section of the config.
-#[derive(Deserialize, Debug, Default)]
+#[derive(Deserialize, Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[serde(default, deny_unknown_fields)]
 pub struct GraphQLConfig {
+    /// How each entrypoint's query text is laid out.
+    pub query_text_format: QueryTextFormat,
+}
+
+/// How an entrypoint's query text is laid out. Both formats lex to the same tokens.
+#[derive(Deserialize, Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum QueryTextFormat {
+    /// One selection per line, two spaces of indentation per depth.
+    Expanded,
+    /// One line, with a space only between two tokens that would otherwise lex as one.
+    #[default]
+    Collapsed,
+}
+```
+
+The JSON values are `"expanded"` and `"collapsed"`; a missing `graphql` key and a `graphql` object without `query_text_format` are both `Collapsed`. `"compact"`, or any other string, is a config load error naming the two variants, and an unknown key inside `graphql` is a config load error naming the key (`deny_unknown_fields`).
+
+The default is `Collapsed` because the text is the `query` of every request, and `Collapsed` is the smaller request. Upstream has no such option. It has `Format { Pretty, Compact }` (`isograph/crates/isograph_schema/src/network_protocol.rs:69`), chosen per call site: `query_text.ts` is printed `Pretty` (`isograph/crates/artifact_content/src/entrypoint_artifact.rs:153`, `imperatively_loaded_fields.rs:100`), with each line ending in a `\` line continuation, so the string it exports has no newline but keeps the indentation and a `,` after every selection; `Compact` (`operation_text.rs:35`) is used only for persisted documents and prints `query HomeRoute { pets { id, age, }, }`. i2's `Collapsed` drops the commas and every space a lexer does not need.
+
+The pet demo sets `expanded`, so its committed artifacts stay one selection per line and their diffs name the selection that changed.
+
+`query_text.graphql` holds the configured format, the same text as `query_text.ts`, because a tool that registers or hashes operations from the `.graphql` file (a persisted-document allowlist) must see the bytes the client sends. A project that wants readable `.graphql` files sets `expanded`.
+
+#### How the options reach the protocol
+
+The project config is read once, when the daemon starts (`discover::load_config`); `watch.rs` ignores edits of the config file (`ChangedFileKind::Config => {}`), so a config edit takes effect at the next daemon start. Inside the process the protocol's options are a pico singleton source, as pico.md specifies for the config, so every memo that reads them depends on them and setting a different value re-runs those memos.
+
+The core does not name `graphql`. `NetworkProtocol` gains the protocol's options as an associated type and picks them out of the project config:
+
+```rust
+// from crates/isograph_compiler/src/host_language.rs
+pub trait NetworkProtocol: Sized + 'static {
+    // `EntityData`, `SelectableData`, `FetchPlan`, `NotFetchable`, `LookupError`,
+    // `ArgumentError`, `SchemaFileError` unchanged
+    /// The protocol's options, which it reads from the project config.
+    type Options: Clone + Debug + Default + PartialEq + Eq + 'static;
+
+    // every method but `query_text` unchanged
+
+    /// The protocol's options in `config`.
+    fn options(config: &IsographProjectConfig) -> Self::Options;
+
+    /// The text of `operation`'s query under `options`, and the protocol's name for a file
+    /// holding exactly that text.
+    fn query_text(
+        options: &Self::Options,
+        operation: &EntrypointOperation<'_, Self>,
+    ) -> ProtocolQueryText;
+}
+```
+
+Before, `query_text` took only `operation`. `isograph_compiler` gains the `isograph_config` dependency for `IsographProjectConfig`; `isograph_config` depends only on `serde`.
+
+```rust
+// from crates/isograph_compiler/src/database.rs
+/// The network protocol's options, a singleton source.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProtocolOptions<TOptions>(pub TOptions);
+
+impl<TOptions: 'static> Singleton for ProtocolOptions<TOptions> {
+    fn get_singleton_key() -> Key {
+        let mut hasher = DefaultHasher::new();
+        TypeId::of::<Self>().hash(&mut hasher);
+        hasher.finish().to()
+    }
+}
+
+impl<TOptions: 'static> Source for ProtocolOptions<TOptions> {
+    fn get_key(&self) -> Key {
+        Self::get_singleton_key()
+    }
+}
+
+pub type ProfileProtocolOptions<TProfile> =
+    <<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::Options;
+
+/// The protocol's options as set, or its default options when none are set.
+pub fn protocol_options<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+) -> ProfileProtocolOptions<TProfile> {
+    db.get_singleton::<ProtocolOptions<ProfileProtocolOptions<TProfile>>>()
+        .map(|options| options.0.clone())
+        .unwrap_or_default()
+}
+
+impl<TProfile: CompilationProfile> IsographDb<TProfile> {
+    // `set_editor_buffer`, `remove_editor_buffer`, and the rest unchanged
+    pub fn set_protocol_options(&mut self, options: ProfileProtocolOptions<TProfile>) {
+        self.set(ProtocolOptions(options));
+    }
+}
+```
+
+The two impls are what `#[derive(Singleton)]` (`crates/pico_macros/src/singleton_macro.rs`) writes, with the type parameter the derive does not accept; `CurrentWorkingDirectory` (`crates/common_lang_types/src/string_key_types.rs`) writes the same impls by hand. `TypeId::of::<Self>()` keys each options type separately. Unset options read as the default: the daemon sets them before the first event, a database a test builds with `IsographDb::default()` has none, and the default is what a config without the protocol's section deserializes to. `get_singleton` records a dependency whether or not the singleton is set (`Storage::try_get`), so a first `set` re-runs a memo that read the default.
+
+`query_for_entrypoint` reads the options and passes them:
+
+```rust
+// from crates/isograph_compiler/src/query.rs
+    let ProtocolQueryText { text, file_name } = TProfile::NetworkProtocol::query_text(
+        protocol_options(db).reference(),
+        &EntrypointOperation {
+            name: selectable,
+            fetch_plan: fetch_plan.reference(),
+            variables: variables.as_slice(),
+            selections: selections.reference(),
+        },
+    );
+```
+
+The daemon sets them after interning the config directory:
+
+```rust
+// from crates/isograph_cli/src/daemon.rs
+    let mut state = IsographState::<TProfile>::new(globs.clone(), artifact_output.clone());
+    intern_config_directory(&mut state.db, config_path.reference());
+    state
+        .db
+        .set_protocol_options(TProfile::NetworkProtocol::options(config.reference()));
+```
+
+The GraphQL protocol:
+
+```rust
+// from crates/graphql_network_protocol/src/lib.rs
+impl NetworkProtocol for GraphQLNetworkProtocol {
+    // the other associated types unchanged
+    type Options = GraphQLConfig;
+
+    fn options(config: &IsographProjectConfig) -> GraphQLConfig {
+        config.graphql
+    }
+
+    fn query_text(
+        options: &GraphQLConfig,
+        operation: &EntrypointOperation<'_, Self>,
+    ) -> ProtocolQueryText {
+        query_text::query_text(options.query_text_format, operation)
+    }
+}
+```
+
+The test protocols (`crates/isograph_compiler/src/test_profile.rs`, `crates/isograph_cli/src/test_profile.rs`, `crates/isograph_lsp/src/test_profile.rs`, and the one in `crates/isograph_extract_typescript/src/lib.rs`'s tests) have no options:
+
+```rust
+// from crates/isograph_compiler/src/test_profile.rs
+    type Options = ();
+
+    fn options(_config: &IsographProjectConfig) {}
+
+    fn query_text(_options: &(), _operation: &crate::EntrypointOperation<'_, Self>) -> crate::ProtocolQueryText {
+        // body unchanged
+    }
+```
+
+Each of those crates gains the `isograph_config` dependency where it lacks it.
+
+### Config: which types get an identity field
+
+This section documents the option that decides GraphQL's `IdField`, which `graphql_entity_shape` turns into `IdentitySelection`. v1 implements only the default, `auto` (a type with a field `id: ID!` is `IdField::Present`, entrypoints.md). v1 does not add the field to `GraphQLConfig` (Config: query text format, above); the other two variants are documented and not implemented.
+
+```json
+{
+  "source_files": ["src/**"],
+  "schema": ["schema/**"],
+  "graphql": {
+    "identity_field_selection": "auto"
+  }
+}
+```
+
+```rust
+// from crates/isograph_config/src/compilation_options.rs
+/// The `graphql` section of the config.
+#[derive(Deserialize, Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[serde(default, deny_unknown_fields)]
+pub struct GraphQLConfig {
+    // `query_text_format` unchanged
     /// Which types the query selects an identity field on, whether or not a selection asked
     /// for it.
     pub identity_field_selection: IdentityFieldSelection,
@@ -1343,7 +1615,7 @@ What each variant changes when it is implemented:
 - `NodeOnly` and `KeyDirective` select no identity field on some types that have an `id`. Upstream's runtime keys a record by `dataToNormalize.id` whenever the response holds one (`getDataIdOfNetworkResponse`, `isograph/libs/isograph-react/src/core/cache.ts:623-626`), so a user selection of `id` on such a type would still key the record. Under these variants the normalization AST must say which fields are the identity, rather than the runtime reading `id`; normalization-ast.md does not have that yet.
 - An `id` that a selection asks for with no arguments is still selected under every variant: as `Identity` where the identity is `id`, otherwise as an ordinary selection.
 
-The option reaches `graphql_entity` as a database input read by the protocol's memos; how config values enter the database is not specified in i2 yet, and is the first thing a change implementing a non-default variant specifies.
+The option reaches `graphql_entity` through `protocol_options(db)` (How the options reach the protocol, above), which records the memo's dependency on the options.
 
 ## Where the query text goes
 
@@ -1461,6 +1733,7 @@ query_for_entrypoint(client, E, f)
        -> parsed_iso_literals_in_file(client, path of E.f)
        -> selectable_named / entity_named of every selection and target
        -> field_selection_map(client, P, g) of every inlined field g
+  -> protocol_options (the ProtocolOptions singleton)
   -> complete, normalization_ast, NetworkProtocol::query_text (plain, no db)
 ```
 
@@ -1470,6 +1743,7 @@ Each memo is keyed by the narrowest identity that determines it: `field_selectio
 - An edit that does not change a field's map backdates there: renaming a reader alias, reordering selections, editing the resolver function body, or adding a selection already present.
 - A `field_selection_map` does not depend on how its field was selected. Two selections of `PetCheckinsCard` with different arguments share one map and substitute separately.
 - Editing an unrelated schema type re-runs the protocol's per-name lookups (integration.md), which backdate; no query re-runs.
+- Setting different protocol options (`set_protocol_options` with another `query_text_format`) re-runs every `query_for_entrypoint`, which returns new text; no `field_selection_map` re-runs. Setting equal options does not advance the epoch, and nothing re-runs.
 - Every derived node is retained for the process lifetime (pico.md, Garbage collection). There is one `field_selection_map` per field reached and one `query_for_entrypoint` per entrypoint, per client; the compile reads as `compiler_client`, so the LSP clients add nodes only if an LSP feature reads queries.
 
 ### Error isolation
@@ -1491,6 +1765,8 @@ Facts about generated text, not snapshots. A helper in the test module returns t
 - A string argument `a"b\c` followed by a newline prints `"a\"b\\c\n"`.
 - An object argument `{ id: $id, tagline: $tagline }` prints in key order with `{ ` and ` }`.
 - No line ends in whitespace; the text does not end in a newline.
+- The tests above print `Expanded`. For every operation the printer tests build (the `cases()` fixtures, which cover a union refinement, an abstract target, nested composites, a mutation, and every value kind, and the variable definitions fixture with defaults and list types), `Collapsed` text contains no `\n` and no two consecutive spaces; relay's `graphql_syntax::parse_executable` (`relay-crates/graphql-syntax`, a dev-dependency) accepts both texts with no diagnostics; and relay's lexer (`graphql_syntax::TokenKind`, through `logos`) yields the same `(kind, text)` sequence for both. Relay's AST carries source locations in its `PartialEq`, so equal tokens, not equal ASTs, is the assertion that both texts are one operation.
+- `Collapsed` of `pets { __typename id tagline }` under `query HomeRoute` is `query HomeRoute{pets{__typename id tagline}}`; of `f(b: true, i: -5, n: null, o: { s: "a b", v: $x }, s: "\"q\"", v: $x)` the arguments are `(b:true i:-5 n:null o:{s:"a b" v:$x}s:"\"q\""v:$x)`; a header with `$a: Int = 3` and `$b: [ID!]!` is `query X($a:Int=3$b:[ID!]!){`.
 
 `crates/isograph_compiler/src/query.rs` and `merged_selection.rs`, the core's operation rules (GraphQL profile in the next group where a case needs a schema):
 
@@ -1508,7 +1784,9 @@ Facts about generated text, not snapshots. A helper in the test module returns t
 - Merging `f(s: "a b")` and `f(s: "a_b")` into one map is `AliasCollision`; so is merging `f(s: "a")` with a no-argument selection of a field named `f____s___s_a`.
 - Merging a `Leaf` and a `Composite` entry at one key is `SelectionMismatch`.
 
-`crates/graphql_network_protocol/tests` or the crate's test module (GraphQL profile, TypeScript host, the pet demo's schema and source files inserted before the first lookup):
+`crates/graphql_network_protocol/tests` or the crate's test module (GraphQL profile, TypeScript host, the pet demo's schema and source files inserted before the first lookup, and `query_text_format: Expanded` set, as the pet demo's config sets it):
+
+- Options: with no options set, `HomeRoute`'s text is `query HomeRoute{pets{__typename id age firstName lastName nickname picture species tagline}}`. Setting `Expanded` on that database makes the next `query_for_entrypoint(Query, HomeRoute)` the expanded text; setting `Collapsed` again makes it the collapsed text again.
 
 - `HomeRoute`: the first line is `query HomeRoute {`; the `pets {` block contains `id`, `age`, `firstName`, `lastName`, `nickname`, `picture`, `species`, `tagline`, each once; the block's first line is `__typename`; no line contains `PetSummaryCard` or `fullName`; the top level has no `__typename` line.
 - `PetDetailRoute`: the first line is `query PetDetailRoute($id: ID!) {`; a line is `  pet____id___v_id: pet(id: $id) {`; exactly one line is `    best_friend_relationship {`, and its block contains `picture_together` and a `best_friend {` block with `id`, `firstName`, `lastName`; a line is `    checkins____limit___l_5____skip___l_0: checkins(limit: 5, skip: 0) {`; no line contains `friendName`, `owner`, `OwnerBadge`, or `displayName` (`owner` and `bestFriend` are client pointers, omitted).
@@ -1530,9 +1808,13 @@ Facts about generated text, not snapshots. A helper in the test module returns t
 - A client pointer: `field Pet.p to Pet { stats { weight } }` selected as `p { nickname }` adds no line; `field Pet.loop to Pet { loop }` selected anywhere is not `InlineCycle`.
 - `field String.X` with `entrypoint String.X` is `NotFetchable(NotComposite(String))`.
 
+`crates/isograph_config/src/compilation_options.rs`:
+
+- A config without `graphql` and one with `"graphql": {}` have `query_text_format == Collapsed`; `"expanded"` is `Expanded` and `"collapsed"` is `Collapsed`; `"compact"` is an error naming `expanded` and `collapsed`; `"graphql": {"query_text_formats": "expanded"}` is an error naming `query_text_formats`.
+
 `crates/isograph_cli/src/compile.rs` (handle seam, artifact directory set, GraphQL profile, a schema `type Query { id: ID! name: String }`):
 
-- The compile fire after `field Query.HomeRoute { id }` and `entrypoint Query.HomeRoute` returns a write containing `Query/HomeRoute/query_text.ts`, `Query/HomeRoute/query_text.graphql`, and `Query/HomeRoute/entrypoint.ts`; the `.graphql` artifact's contents are `query HomeRoute {\n  id\n}\n`; `query_text.ts` contains the text's first line; `entrypoint.ts` contains `queryText` and an import from `./query_text`.
+- The compile fire after `field Query.HomeRoute { id }` and `entrypoint Query.HomeRoute` returns a write containing `Query/HomeRoute/query_text.ts`, `Query/HomeRoute/query_text.graphql`, and `Query/HomeRoute/entrypoint.ts`; the `.graphql` artifact's contents are `query HomeRoute{id}\n` (the state sets no options, so the format is the default `Collapsed`); `query_text.ts` contains `query HomeRoute{id}`; `entrypoint.ts` contains `queryText` and an import from `./query_text`.
 - Editing the selection set of a field the entrypoint inlines returns writes of that field's `param_type.ts` and the entrypoint's `query_text.graphql` and `query_text.ts`, and nothing else (`entrypoint.ts` imports the text and does not change).
 - A failing query returns no effects; fixing it returns the write. `project_artifacts` of an entrypoint whose field has no selection set is `EntrypointQuery` naming the entrypoint, with `TopLevel(Empty)`.
 
@@ -1606,6 +1888,17 @@ The delta from landed change 7 that normalization-ast.md change 2 builds on:
 - Tests: the completion tests above with `roots`, the `NestedQuery` and `RootQuery` profile tests, and the fetch plan tests asserting `roots` (entrypoints.md).
 
 Depends on 7.
+
+### 11. Query text format (isograph_config, isograph_compiler, graphql_network_protocol, isograph_cli, pet demo)
+
+- `isograph_config`: `GraphQLConfig { query_text_format }`, `QueryTextFormat`, `IsographProjectConfig.graphql`.
+- Core: `NetworkProtocol::Options`, `::options`, `query_text` taking `options`; `ProtocolOptions`, `ProfileProtocolOptions`, `protocol_options`, `IsographDb::set_protocol_options`; `query_for_entrypoint` passing `protocol_options(db)`; the test protocols' `Options = ()`.
+- GraphQL: `Options = GraphQLConfig`, `options`, `query_text` taking the format; `PrintItem`, `operation_items`, `lay_out`, `collapsed_separator`, `comma_separated`, and the `print_*` functions returning items.
+- CLI: the daemon calling `set_protocol_options` at start.
+- Pet demo: `isograph.config.json` sets `"graphql": { "query_text_format": "expanded" }`; its regenerated `src/__isograph/` is unchanged byte for byte, because `Expanded` is the text change 9 committed.
+- Tests: the printer format tests, the options tests in the GraphQL profile group, the config tests, and the compile test's collapsed text. `graphql_network_protocol` gains the dev-dependencies `graphql-syntax` (`relay-crates/graphql-syntax`), `common` (`relay-crates/common`, for `SourceLocationKey`), and `logos`.
+
+Depends on 10.
 
 ## Open decisions
 
