@@ -1,2 +1,2 @@
 [target.wasm32-wasip1]
-rustflags = ["-C", "link-arg=--allow-undefined"]
+rustflags = ["-C", "link-arg=--allow-undefined", "--cfg=swc_ast_unknown"]

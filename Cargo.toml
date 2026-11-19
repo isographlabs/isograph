@@ -1,5 +1,6 @@
 [workspace]
 members = ["./crates/*"]
+exclude = ["crates/swc_isograph_plugin"]
 resolver = "2"
 
 [workspace.package]

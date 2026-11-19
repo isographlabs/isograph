@@ -1,0 +1,56 @@
+[package]
+authors = [
+  "Robert Balicki <robert.balicki@gmail.com>",
+  "Edmondo Porcu <edmondo.porcu@gmail.com>",
+  "Pablo Crovetto <jpcc077@gmail.com>",
+]
+description = "SWC plugin for Isograph"
+name = "swc_isograph_plugin"
+version = "0.5.3"
+edition = "2024"
+license = "MIT"
+
+# Its own workspace: swc_core locks ~200 packages that the root workspace does not use.
+[workspace]
+
+[workspace.lints.clippy]
+allow_attributes = "deny"
+print_stderr = "deny"
+print_stdout = "deny"
+explicit_deref_methods = "deny"
+explicit_into_iter_loop = "deny"
+match_wild_err_arm = "deny"
+unnecessary_join = "deny"
+unused_self = "deny"
+needless_for_each = "deny"
+struct_field_names = "deny"
+cast_precision_loss = "deny"
+match_bool = "deny"
+items_after_statements = "deny"
+single_char_pattern = "deny"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+isograph_config = { path = "../isograph_config" }
+pathdiff = "0.2.1"
+prelude = { path = "../prelude" }
+regex = "1.6.0"
+serde = { version = "1.0.197", features = ["derive"] }
+serde_json = "1.0.108"
+swc_core = { version = "84.2.0", features = ["ecma_plugin_transform", "ecma_utils"] }
+thiserror = "1.0.40"
+
+[dev-dependencies]
+swc_core = { version = "84.2.0", features = ["ecma_parser", "testing", "testing_transform"] }
+
+[profile.release]
+codegen-units = 1
+# Optimize for size
+opt-level = "s"
+# Strip debug symbols
+strip = "symbols"
+
+[lints]
+workspace = true

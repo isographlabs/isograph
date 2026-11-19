@@ -8,7 +8,7 @@ Both are restored from i2 history (`180ec76f^` for Babel, `435f7352^` for SWC). 
 
 - `libs/isograph-babel-plugin` (`@isograph/babel-plugin`), a pnpm workspace package. `pnpm-workspace.yaml` gains `libs/*`.
 - `crates/swc_isograph_plugin`, its own Cargo workspace. The root `Cargo.toml` gains `exclude = ["crates/swc_isograph_plugin"]`.
-- `libs/isograph-swc-plugin` (`@isograph/plugin-swc`), the npm package that ships `swc_isograph_plugin.wasm`, with a vitest test that runs the built wasm under `@swc/core`.
+- `libs/isograph-swc-plugin` (`@isograph/plugin-swc`), the npm package that ships `swc_isograph_plugin.wasm`, with a vitest test that runs the built wasm under `@swc/core`. It drops upstream's `@swc/counter` dependency, which nothing reads.
 
 The SWC crate is its own workspace because `swc_core` with `ecma_plugin_transform` and `testing_transform` locks 217 packages, close to the root lock's 248. A root member would nearly double the root `Cargo.lock`, which every other branch edits. A clean host build of the crate with its tests takes 18 s, so build time is not the reason.
 
@@ -45,7 +45,7 @@ Babel (`libs/isograph-babel-plugin`):
 - `package.json`: drops `babel-plugin-macros`, `graphql`, `prettier`, and `prettier-plugin-hermes-parser`, which nothing reads. Adds `vitest`, `typescript`, and `@types/node`. Scripts are `test` (`vitest run`) and `typecheck` (`tsc --noEmit`).
 - `tsconfig.json`: standalone (`checkJs`, `strict`, `noEmit`); upstream extended a `tsconfig.build.json` that i2 does not have.
 - `BabelPluginIsograph.test.js`: inline snapshots become `toBe` assertions. The `Module._load` cosmiconfig mock becomes a real `isograph.config.json` the test writes into a temp directory and finds through `searchFrom`.
-- `README.md`: the SWC paragraph and the stale version pin go.
+- `README.md`: the SWC paragraph and the stale version pin go. It states the import-or-require rule and where `output_directory` puts the artifact.
 
 SWC (`crates/swc_isograph_plugin`):
 
@@ -153,8 +153,9 @@ enum IsographTransformError {
 Deltas from `435f7352^`:
 
 - `isograph_config::IsographProjectConfig` becomes `ProjectConfig` (above); `ISOGRAPH_FOLDER` still comes from `isograph_config`.
-- `path_for_artifact` returns `Result<PathBuf, IsographTransformError>`. `real_filepath.parent()` returning `None` and `pathdiff::diff_paths` returning `None` are `ArtifactPathUnavailable` instead of `unwrap`/`expect`. The `./` prefix applies to every path that does not start with `.`, as in Babel.
+- `path_for_artifact` returns `Result<PathBuf, IsographTransformError>`. `real_filepath.parent()` returning `None` and `pathdiff::diff_paths` returning `None` or an absolute path (it returns the artifact directory unchanged when the file's folder is relative) are `ArtifactPathUnavailable` instead of `unwrap`/`expect`. The `./` prefix applies to every path that does not start with `.`, as in Babel.
 - `handle_valid_isograph_entrypoint_literal` returns `Result<Expr, IsographTransformError>` and matches `self.artifact_reference` instead of `config.options.module`. `Import` pushes an `IsographImport` only when no import of that path is already there, so two literals of one entrypoint produce one import (upstream produced a duplicate binding).
+- `parse_iso_template_literal` becomes a free function; it never read `self` (clippy `unused_self`).
 - `fold_module_items` prepends the imports of `ArtifactReference::Import`.
 - The plugin entry does not panic. A missing or unparseable plugin config, or a missing file name, emits an error through `HANDLER` and returns the program unchanged.
 
@@ -199,19 +200,18 @@ fn plugin_setup(metadata: &TransformPluginProgramMetadata) -> Result<PluginSetup
     .wrap_ok()
 }
 
-#[derive(Error, Debug, derive_more::From)]
+#[derive(Error, Debug)]
 enum PluginSetupError {
     #[error("The Isograph SWC plugin received no options. Pass {{ root_dir, config }}.")]
     MissingPluginConfig,
     #[error("The Isograph SWC plugin options are invalid: {0}")]
-    #[from]
-    InvalidPluginConfig(serde_json::Error),
+    InvalidPluginConfig(#[from] serde_json::Error),
     #[error("The Isograph SWC plugin requires the name of the file being transformed.")]
     MissingFileName,
 }
 ```
 
-Dependencies add `derive_more` (`From` for `PluginSetupError`). They drop `once_cell` (std `LazyLock`, as `isograph_extract_typescript` does for its regex), `swc_atoms`, `swc_ecma_utils`, and `swc_plugin_macro` (all through `swc_core` features `ecma_plugin_transform` and `ecma_utils`), and `swc_trace_macro` and `tracing` (the `debug!` calls and `#[swc_trace]` go; nothing reads them). Tests use `swc_core` features `ecma_parser`, `testing_transform`, and `testing`.
+Dependencies drop `once_cell` (std `LazyLock`, as `isograph_extract_typescript` does for its regex), `swc_atoms`, `swc_ecma_utils`, and `swc_plugin_macro` (all through `swc_core` features `ecma_plugin_transform` and `ecma_utils`), and `swc_trace_macro` and `tracing` (the `debug!` calls and `#[swc_trace]` go; nothing reads them). Tests use `swc_core` features `ecma_parser`, `testing_transform`, and `testing`.
 
 The tests drop the fixture directories (`output.js` and `output.stderr` are checked-in expected output). `tests/transform.rs` uses `swc_core::ecma::transforms::testing::test_transform` with input and expected code inline, and `swc_core::testing::Tester::errors` for the error cases, asserting the diagnostic message and that the program is unchanged. Cases: bare field to identity, field call to its argument, entrypoint in a module to a hoisted import, entrypoint in a script to `require(...).default`, nested entrypoint inside a field function, two literals of one entrypoint to one import, absent and present `output_directory`, a file above the output directory (`./` prefix), the two upstream error fixtures, and a template literal with a substitution.
 

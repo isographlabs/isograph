@@ -51,6 +51,24 @@ repos:
         language: system
         types: [rust]
         pass_filenames: false
+      - id: swc-plugin-fmt
+        name: swc plugin cargo fmt
+        entry: cargo fmt --manifest-path crates/swc_isograph_plugin/Cargo.toml -- --check
+        language: system
+        files: '^crates/swc_isograph_plugin/'
+        pass_filenames: false
+      - id: swc-plugin-clippy
+        name: swc plugin cargo clippy
+        entry: cargo clippy --manifest-path crates/swc_isograph_plugin/Cargo.toml --all-targets -- -D warnings
+        language: system
+        files: '^crates/swc_isograph_plugin/'
+        pass_filenames: false
+      - id: swc-plugin-test
+        name: swc plugin cargo test
+        entry: cargo test --manifest-path crates/swc_isograph_plugin/Cargo.toml
+        language: system
+        files: '^crates/swc_isograph_plugin/'
+        pass_filenames: false
       - id: babel-plugin-test
         name: babel plugin test
         entry: pnpm --filter @isograph/babel-plugin test
