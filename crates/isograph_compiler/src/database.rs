@@ -95,13 +95,11 @@ pub fn file_contents<TProfile: CompilationProfile>(
     client: ClientId,
     path: RelativePathToSourceFile,
 ) -> Option<String> {
-    match db.open_file_source_id(OpenFileKey { client, path }) {
-        Some(open_file_id) => db.get(open_file_id).contents.clone().wrap_some(),
+    match db.try_get(OpenFile::id_for_key(&OpenFileKey { client, path })) {
+        Some(open_file) => open_file.contents.clone().wrap_some(),
         None => db
-            .get(db.disk_file_source_id(path)?)
-            .contents
-            .clone()
-            .wrap_some(),
+            .try_get(DiskFile::id_for_key(&path))
+            .map(|disk_file| disk_file.contents.clone()),
     }
 }
 
@@ -128,20 +126,6 @@ pub fn source_file_paths<TProfile: CompilationProfile>(
 }
 
 impl<TProfile: CompilationProfile> IsographDb<TProfile> {
-    fn open_file_source_id(&self, key: OpenFileKey) -> Option<SourceId<OpenFile>> {
-        match self.get_open_file_map().untracked().0.get(&key).copied() {
-            Some(open_file_id) => open_file_id.wrap_some(),
-            None => self.get_open_file_map().tracked().0.get(&key).copied(),
-        }
-    }
-
-    fn disk_file_source_id(&self, path: RelativePathToSourceFile) -> Option<SourceId<DiskFile>> {
-        match self.get_disk_file_map().untracked().0.get(&path).copied() {
-            Some(disk_file_id) => disk_file_id.wrap_some(),
-            None => self.get_disk_file_map().tracked().0.get(&path).copied(),
-        }
-    }
-
     pub fn set_open_file(
         &mut self,
         client: ClientId,
@@ -796,6 +780,118 @@ mod tests {
         assert_eq!(
             read(db.reference(), ClientId(1), path),
             "open".to_owned().wrap_some()
+        );
+    }
+
+    #[test]
+    fn a_read_of_a_missing_open_file_without_a_disk_file_sees_the_later_open() {
+        let mut db = IsographDb::<TestProfile>::default();
+        let path = intern_path("src/a.ts");
+        assert_eq!(read(db.reference(), ClientId(1), path), None);
+        db.set_open_file(ClientId(1), path, SOURCE_FILE, "open".to_owned());
+        assert_eq!(
+            read(db.reference(), ClientId(1), path),
+            "open".to_owned().wrap_some()
+        );
+    }
+
+    #[test]
+    fn an_unrelated_open_edit_and_close_leaves_reads_of_missing_and_present_files_unchanged() {
+        let mut db = IsographDb::<TestProfile>::default();
+        let missing = intern_path("src/missing.ts");
+        let on_disk = intern_path("src/on_disk.ts");
+        let opened = intern_path("src/opened.ts");
+        let other = intern_path("src/other.ts");
+        db.insert_disk_file(on_disk, SOURCE_FILE, "disk".to_owned());
+        db.set_open_file(ClientId(1), opened, SOURCE_FILE, "open".to_owned());
+        let assert_reads = |db: &IsographDb<TestProfile>| {
+            assert_eq!(read(db, ClientId(1), missing), None);
+            assert_eq!(
+                read(db, ClientId(1), on_disk),
+                "disk".to_owned().wrap_some()
+            );
+            assert_eq!(read(db, ClientId(1), opened), "open".to_owned().wrap_some());
+        };
+        assert_reads(db.reference());
+        db.set_open_file(ClientId(1), other, SOURCE_FILE, "other".to_owned());
+        assert_reads(db.reference());
+        db.set_open_file(ClientId(2), missing, SOURCE_FILE, "two".to_owned());
+        db.set_open_file(ClientId(2), on_disk, SOURCE_FILE, "two".to_owned());
+        assert_reads(db.reference());
+        db.set_open_file(ClientId(1), other, SOURCE_FILE, "other edited".to_owned());
+        assert_reads(db.reference());
+        db.remove_open_file(ClientId(1), other);
+        db.remove_open_file(ClientId(2), missing);
+        db.remove_open_file(ClientId(2), on_disk);
+        assert_reads(db.reference());
+    }
+
+    #[test]
+    fn closing_a_read_open_file_without_a_disk_file_reads_none() {
+        let mut db = IsographDb::<TestProfile>::default();
+        let path = intern_path("src/a.ts");
+        db.set_open_file(ClientId(1), path, SOURCE_FILE, "open".to_owned());
+        assert_eq!(
+            read(db.reference(), ClientId(1), path),
+            "open".to_owned().wrap_some()
+        );
+        db.remove_open_file(ClientId(1), path);
+        assert_eq!(read(db.reference(), ClientId(1), path), None);
+    }
+
+    #[test]
+    fn reopening_a_closed_file_reads_the_new_buffer() {
+        let mut db = IsographDb::<TestProfile>::default();
+        let path = intern_path("src/a.ts");
+        db.set_open_file(ClientId(1), path, SOURCE_FILE, "first".to_owned());
+        db.remove_open_file(ClientId(1), path);
+        assert_eq!(read(db.reference(), ClientId(1), path), None);
+        db.set_open_file(ClientId(1), path, SOURCE_FILE, "second".to_owned());
+        assert_eq!(
+            read(db.reference(), ClientId(1), path),
+            "second".to_owned().wrap_some()
+        );
+    }
+
+    #[test]
+    fn an_unrelated_disk_insert_change_and_removal_leaves_reads_of_missing_and_present_files_unchanged()
+     {
+        let mut db = IsographDb::<TestProfile>::default();
+        let missing = intern_path("src/missing.ts");
+        let present = intern_path("src/present.ts");
+        let other = intern_path("src/other.ts");
+        db.insert_disk_file(present, SOURCE_FILE, "present".to_owned());
+        let assert_reads = |db: &IsographDb<TestProfile>| {
+            assert_eq!(read(db, ClientId(1), missing), None);
+            assert_eq!(
+                read(db, ClientId(1), present),
+                "present".to_owned().wrap_some()
+            );
+        };
+        assert_reads(db.reference());
+        db.insert_disk_file(other, SOURCE_FILE, "other".to_owned());
+        assert_reads(db.reference());
+        db.insert_disk_file(other, SOURCE_FILE, "other changed".to_owned());
+        assert_reads(db.reference());
+        db.remove_disk_file(other);
+        assert_reads(db.reference());
+    }
+
+    #[test]
+    fn removing_a_read_disk_file_reads_none() {
+        let mut db = IsographDb::<TestProfile>::default();
+        let path = intern_path("src/a.ts");
+        db.insert_disk_file(path, SOURCE_FILE, "disk".to_owned());
+        assert_eq!(
+            read(db.reference(), ClientId(1), path),
+            "disk".to_owned().wrap_some()
+        );
+        db.remove_disk_file(path);
+        assert_eq!(read(db.reference(), ClientId(1), path), None);
+        db.insert_disk_file(path, SOURCE_FILE, "disk again".to_owned());
+        assert_eq!(
+            read(db.reference(), ClientId(1), path),
+            "disk again".to_owned().wrap_some()
         );
     }
 
