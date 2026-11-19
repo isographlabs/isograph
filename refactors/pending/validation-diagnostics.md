@@ -10,7 +10,7 @@ Origin: isograph `crates/isograph_schema/src/validate_use_of_arguments.rs` walks
 // src/Owner.ts, open in the editor
 iso(`entity Owner`)
 iso(`field Owner.displayName`)
-iso(`field Owner.badge { displayName nickname }`)      // `nickname`: Field `Owner.nickname` is not defined.
+iso(`field Owner.badge { displayName, nickname }`)      // `nickname`: Field `Owner.nickname` is not defined.
 iso(`field Ownr.badge2 { anything { goes } }`)         // `Ownr`: Entity `Ownr` is not defined. Nothing else.
 iso(`field Owner.plain { displayName { id } }`)        // `{ id }`: Field `Owner.displayName` has no target to select into.
 iso(`entrypoint Owner.missing`)                        // `missing`: Field `Owner.missing` is not defined.
@@ -320,10 +320,10 @@ Scope and debounce are unchanged: open source files, published when the debounce
 `crates/isograph_lsp/src/file_diagnostics.rs` (memo level, source membership):
 
 - each kind with its message and range: `field Ownr.x { a }` (UnknownEntity on `Ownr`), `field Owner.x { nickname }` (UnknownSelectable on `nickname`), `entity Owner` twice in one file and once in another file (DuplicateDefinition on each `Owner` name in this file), `field Owner.d` twice (DuplicateDefinition on each `d`), `field Owner.plain { plain { id } }` (SelectionSetOnFieldWithoutTarget on `{ id }`), `entrypoint Owner.missing` (UnknownSelectable on `missing`), `entrypoint Ownr.x` (UnknownEntity on `Ownr` only).
-- cascade: `field Ownr.x { a { b } }` is exactly one error; `field Owner.x { nope { deeper } displayName nickname }` is errors on `nope` and `nickname` only; a selection through `to Ownr` (undefined) produces nothing under it.
+- cascade: `field Ownr.x { a { b } }` is exactly one error; `field Owner.x { nope { deeper }, displayName, nickname }` is errors on `nope` and `nickname` only; a selection through `to Ownr` (undefined) produces nothing under it.
 - an aliased selection is checked by field name: `field Owner.x { alias: displayName }` has no error; `alias: nope` errors on `nope`.
 - arguments are not checked: `field Owner.x { displayName(id: 1) }` has no error.
-- a pet-demo-like set of literals with source-only entities (`entity Owner`, `entity Pet`, `field Owner.displayName`, `field Pet.owner to Owner! { id }` with `field Pet.id`, `field Owner.OwnerBadge { displayName }`, `field Pet.card { owner { displayName OwnerBadge } }`, `entrypoint Pet.card`) has no diagnostics.
+- a pet-demo-like set of literals with source-only entities (`entity Owner`, `entity Pet`, `field Owner.displayName`, `field Pet.owner to Owner! { id }` with `field Pet.id`, `field Owner.OwnerBadge { displayName }`, `field Pet.card { owner { displayName, OwnerBadge } }`, `entrypoint Pet.card`) has no diagnostics.
 - parse and validation errors are both published, parse errors first.
 
 `crates/isograph_cli/src/state.rs` (handle seam): `didOpen` of a literal selecting an undefined field, then the debounce fires, publishes that one diagnostic with its range.
