@@ -1,4 +1,6 @@
+mod fetch_plan;
 mod protocol_data;
+mod root_operation_types;
 mod schema_files;
 mod schema_lookup;
 #[cfg(test)]
@@ -12,10 +14,18 @@ use isograph_compiler::{
     ProtocolSelectable,
 };
 
+pub use fetch_plan::{
+    FetchRefinement, GraphQLFetchArgument, GraphQLFetchPlan, GraphQLNodeFetch, GraphQLNotFetchable,
+    GraphQLRootFetch, NodeFieldError, NodeFieldTypeMismatch, graphql_fetch_plan,
+};
 pub use protocol_data::{
     GraphQLCompositeData, GraphQLEntityData, GraphQLSelectableData, GraphQLSelectableLookupError,
     RefinementCollision, RefinementTargetError, graphql_entity, graphql_selectable,
     graphql_selectables, object_types_implementing,
+};
+pub use root_operation_types::{
+    DuplicateOperation, DuplicateSchemaDefinition, RootOperationTypes, RootOperationTypesError,
+    root_operation_types,
 };
 pub use schema_files::{parsed_schema_file, schema_file_paths};
 pub use schema_lookup::{
@@ -37,6 +47,8 @@ pub enum GraphQLLookupError {
 impl NetworkProtocol for GraphQLNetworkProtocol {
     type EntityData = GraphQLEntityData;
     type SelectableData = GraphQLSelectableData;
+    type FetchPlan = GraphQLFetchPlan;
+    type NotFetchable = GraphQLNotFetchable;
     type LookupError = GraphQLLookupError;
 
     fn should_include_schema_file(relative_path: &Path) -> IncludeFile {
@@ -73,5 +85,13 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         entity: EntityName,
     ) -> Vec<(SelectableName, ProtocolSelectable<GraphQLSelectableData>)> {
         graphql_selectables(db, client, entity).clone()
+    }
+
+    fn fetch_plan<TProfile: CompilationProfile<NetworkProtocol = Self>>(
+        db: &IsographDb<TProfile>,
+        client: ClientId,
+        entity: EntityName,
+    ) -> Result<GraphQLFetchPlan, GraphQLNotFetchable> {
+        graphql_fetch_plan(db, client, entity).clone()
     }
 }

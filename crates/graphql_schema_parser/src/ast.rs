@@ -107,7 +107,7 @@ pub struct RootOperationTypeDefinition {
 }
 
 /// Spec 2.4 `OperationType`.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, strum::EnumString)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, strum::EnumString, strum::Display)]
 #[strum(serialize_all = "lowercase")]
 pub enum OperationType {
     Query,

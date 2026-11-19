@@ -1,20 +1,25 @@
 use std::path::Path;
 
 use common_lang_types::{EntityName, RelativePathToSourceFile, SelectableName};
+use graphql_schema_parser::OperationType;
 use intern::string_key::Intern;
 use isograph_compiler::{
     ClientId, CompilationProfile, DefinitionLocation, FileMembership, IncludeFile, IsographDb,
-    NetworkProtocol, ProtocolSelectable, UnionWrapper, Wrapper, WrapperVariant,
+    NetworkProtocol, NonNullVariableType, ProtocolSelectable, UnionWrapper, VariableType, Wrapper,
+    WrapperVariant,
 };
 use isograph_extract_typescript::TypeScriptHostLanguage;
 use prelude::Postfix;
 use span::Span;
 
 use crate::{
-    EntityLookupError, GraphQLCompositeData, GraphQLEntityData, GraphQLNetworkProtocol,
-    GraphQLSelectableData, GraphQLSelectableLookupError, SelectableLookupError, entity_named,
-    graphql_entity, graphql_selectable, graphql_selectables, parsed_schema_file, schema_file_paths,
-    selectable_named,
+    DuplicateOperation, EntityLookupError, FetchRefinement, GraphQLCompositeData,
+    GraphQLEntityData, GraphQLFetchArgument, GraphQLFetchPlan, GraphQLNetworkProtocol,
+    GraphQLNodeFetch, GraphQLNotFetchable, GraphQLRootFetch, GraphQLSelectableData,
+    GraphQLSelectableLookupError, NodeFieldError, NodeFieldTypeMismatch, RootOperationTypes,
+    RootOperationTypesError, SelectableLookupError, entity_named, graphql_entity,
+    graphql_fetch_plan, graphql_selectable, graphql_selectables, parsed_schema_file,
+    root_operation_types, schema_file_paths, selectable_named,
 };
 
 struct GraphQLProfile;
@@ -553,5 +558,303 @@ fn a_deleted_schema_file_contributes_nothing() {
     assert_eq!(
         entity_named(&db, CLIENT, entity("Gone")).clone(),
         None.wrap_ok()
+    );
+}
+
+const PET_DEMO_SCHEMA: [(&str, &str); 3] = [
+    (
+        "schema/schema.graphql",
+        include_str!("../../../demos/pet-demo/schema/schema.graphql"),
+    ),
+    (
+        "schema/extensions.graphql",
+        include_str!("../../../demos/pet-demo/schema/extensions.graphql"),
+    ),
+    (
+        "schema/scalars.graphql",
+        include_str!("../../../demos/pet-demo/schema/scalars.graphql"),
+    ),
+];
+
+fn roots(files: &[(&str, &str)]) -> Result<RootOperationTypes, RootOperationTypesError> {
+    root_operation_types(&db_with(files), CLIENT).clone()
+}
+
+#[test]
+fn root_operation_types_follow_the_schema_definition_and_extensions() {
+    assert_eq!(
+        roots(&PET_DEMO_SCHEMA),
+        RootOperationTypes {
+            query: entity("Query"),
+            mutation: entity("Mutation").wrap_some(),
+            subscription: None,
+        }
+        .wrap_ok()
+    );
+    assert_eq!(
+        roots(&[("a.graphql", "type Query { a: Int }")]),
+        RootOperationTypes {
+            query: entity("Query"),
+            mutation: entity("Mutation").wrap_some(),
+            subscription: entity("Subscription").wrap_some(),
+        }
+        .wrap_ok()
+    );
+    assert_eq!(
+        roots(&[
+            ("a.graphql", "schema { query: RootQuery }"),
+            ("b.graphql", "extend schema { subscription: S }"),
+        ]),
+        RootOperationTypes {
+            query: entity("RootQuery"),
+            mutation: None,
+            subscription: entity("S").wrap_some(),
+        }
+        .wrap_ok()
+    );
+    assert_eq!(
+        roots(&[("a.graphql", "type Broken { a: ! } schema { query: Query }")]),
+        RootOperationTypes {
+            query: entity("Query"),
+            mutation: None,
+            subscription: None,
+        }
+        .wrap_ok()
+    );
+}
+
+#[test]
+fn a_broken_schema_definition_is_an_error_of_the_root_types() {
+    let Err(RootOperationTypesError::DuplicateSchemaDefinition(duplicate)) = roots(&[
+        ("b.graphql", "schema { query: B }"),
+        ("a.graphql", "schema { query: A }"),
+    ]) else {
+        panic!("expected a duplicate schema definition");
+    };
+    assert_eq!(duplicate.first.path, path("a.graphql"));
+    assert_eq!(duplicate.second.path, path("b.graphql"));
+    assert!(matches!(
+        roots(&[(
+            "a.graphql",
+            "schema { query: Q } extend schema { query: A }"
+        )]),
+        Err(RootOperationTypesError::DuplicateOperation(
+            DuplicateOperation {
+                operation: OperationType::Query,
+                ..
+            }
+        ))
+    ));
+    assert!(matches!(
+        roots(&[("a.graphql", "schema { mutation: M }")]),
+        Err(RootOperationTypesError::MissingQuery(_))
+    ));
+    assert!(matches!(
+        roots(&[("a.graphql", "schema { query: }")]),
+        Err(RootOperationTypesError::Syntax(_))
+    ));
+    assert!(matches!(
+        roots(&[("a.graphql", "extend schema { query: Q }")]),
+        Err(RootOperationTypesError::ExtensionWithoutDefinition(_))
+    ));
+}
+
+fn fetch_plan(db: &Db, name: &str) -> Result<GraphQLFetchPlan, GraphQLNotFetchable> {
+    graphql_fetch_plan(db, CLIENT, entity(name)).clone()
+}
+
+/// The fetch plan of `name`, which the fixture makes a `node` fetch.
+fn node_plan(db: &Db, name: &str) -> GraphQLNodeFetch {
+    let Ok(GraphQLFetchPlan::Node(node)) = fetch_plan(db, name) else {
+        panic!("the fixture fetches {name} through node");
+    };
+    node
+}
+
+/// The operation type of `name`'s plan, which the fixture makes a root fetch.
+fn root_plan(db: &Db, name: &str) -> GraphQLRootFetch {
+    let Ok(GraphQLFetchPlan::Root(root)) = fetch_plan(db, name) else {
+        panic!("the fixture makes {name} a root operation type");
+    };
+    root
+}
+
+fn refinement_name(refinement: &FetchRefinement) -> Option<EntityName> {
+    match refinement {
+        FetchRefinement::Exact => None,
+        FetchRefinement::InlineFragment(target) => target.name.wrap_some(),
+    }
+}
+
+fn id_argument() -> GraphQLFetchArgument {
+    GraphQLFetchArgument {
+        name: "id".intern().to(),
+        variable_type: VariableType::NonNull(NonNullVariableType::Named(entity("ID"))),
+    }
+}
+
+#[test]
+fn the_pet_demo_entities_are_fetched_as_roots_or_through_node() {
+    let db = db_with(&PET_DEMO_SCHEMA);
+    let query = root_plan(&db, "Query");
+    assert_eq!(query.operation_type, OperationType::Query);
+    assert_eq!(query.entity.name, entity("Query"));
+    assert_eq!(
+        root_plan(&db, "Mutation").operation_type,
+        OperationType::Mutation
+    );
+    let pet = node_plan(&db, "Pet");
+    assert_eq!(pet.arguments, vec![id_argument()]);
+    assert_eq!(pet.field_target.name, entity("Node"));
+    assert_eq!(refinement_name(&pet.refinement), entity("Pet").wrap_some());
+    assert_eq!(
+        refinement_name(&node_plan(&db, "ICheckin").refinement),
+        entity("ICheckin").wrap_some()
+    );
+    assert_eq!(node_plan(&db, "Node").refinement, FetchRefinement::Exact);
+    assert_eq!(
+        fetch_plan(&db, "PetStats"),
+        GraphQLNotFetchable::NoFetchRoot(entity("PetStats")).wrap_err()
+    );
+    assert_eq!(
+        fetch_plan(&db, "NewsfeedItem"),
+        GraphQLNotFetchable::NotObjectOrInterface(entity("NewsfeedItem")).wrap_err()
+    );
+    assert_eq!(
+        fetch_plan(&db, "String"),
+        GraphQLNotFetchable::NotObjectOrInterface(entity("String")).wrap_err()
+    );
+    assert_eq!(
+        fetch_plan(&db, "Nobody"),
+        GraphQLNotFetchable::UnknownEntity(entity("Nobody")).wrap_err()
+    );
+}
+
+const NODE_SCHEMA: &str = "interface Node { id: ID! } type Pet implements Node { id: ID! } \
+    type PetStats { weight: Int } type Viewer { id: ID! } type Mutation { a: Int } \
+    union Searchable = Pet";
+
+#[test]
+fn a_broken_node_field_fails_node_fetches_only() {
+    for (node, expected) in [
+        (
+            "node(id: ID!): [Node]",
+            GraphQLNotFetchable::NodeField(NodeFieldError::ReturnsList(entity("Query"))),
+        ),
+        (
+            "node(id: ID!): Viewer",
+            GraphQLNotFetchable::NodeField(NodeFieldError::TypeMismatch(NodeFieldTypeMismatch {
+                query_root: entity("Query"),
+                returns: entity("Viewer"),
+                entity: entity("Pet"),
+            })),
+        ),
+        (
+            "other: Int",
+            GraphQLNotFetchable::NodeField(NodeFieldError::NotFound(entity("Query"))),
+        ),
+    ] {
+        let query = format!("type Query {{ {node} }}");
+        let db = db_with(&[("a.graphql", NODE_SCHEMA), ("b.graphql", query.as_str())]);
+        assert_eq!(fetch_plan(&db, "Pet"), expected.wrap_err(), "{node}");
+        assert_eq!(
+            root_plan(&db, "Query").operation_type,
+            OperationType::Query,
+            "{node}"
+        );
+        assert_eq!(
+            root_plan(&db, "Mutation").operation_type,
+            OperationType::Mutation,
+            "{node}"
+        );
+    }
+}
+
+#[test]
+fn node_may_return_a_union_containing_the_entity() {
+    let db = db_with(&[
+        ("a.graphql", NODE_SCHEMA),
+        ("b.graphql", "type Query { node(id: ID!): Searchable }"),
+    ]);
+    let pet = node_plan(&db, "Pet");
+    assert_eq!(pet.field_target.name, entity("Searchable"));
+    assert_eq!(refinement_name(&pet.refinement), entity("Pet").wrap_some());
+}
+
+#[test]
+fn a_node_argument_with_a_default_is_nullable() {
+    let db = db_with(&[
+        ("a.graphql", NODE_SCHEMA),
+        (
+            "b.graphql",
+            "type Query { node(id: ID!, hint: Int = 0, ids: [ID!]): Node }",
+        ),
+    ]);
+    assert_eq!(
+        node_plan(&db, "Pet").arguments,
+        vec![
+            id_argument(),
+            GraphQLFetchArgument {
+                name: "hint".intern().to(),
+                variable_type: VariableType::Nullable(NonNullVariableType::Named(entity("Int"))),
+            },
+            GraphQLFetchArgument {
+                name: "ids".intern().to(),
+                variable_type: VariableType::Nullable(NonNullVariableType::List(
+                    VariableType::NonNull(NonNullVariableType::Named(entity("ID"))).boxed()
+                )),
+            },
+        ]
+    );
+}
+
+#[test]
+fn a_query_root_field_returning_the_entity_changes_no_plan() {
+    let db = db_with(&PET_DEMO_SCHEMA);
+    assert!(matches!(
+        fetch_plan(&db, "Pet"),
+        Ok(GraphQLFetchPlan::Node(_))
+    ));
+    assert_eq!(
+        fetch_plan(&db, "PetStats"),
+        GraphQLNotFetchable::NoFetchRoot(entity("PetStats")).wrap_err()
+    );
+}
+
+#[test]
+fn the_default_root_types_are_fetchable_and_an_unnamed_mutation_is_not() {
+    let db = db_with(&[(
+        "a.graphql",
+        "type Query { a: Int } type Subscription { petAdded: Int }",
+    )]);
+    assert_eq!(
+        root_plan(&db, "Subscription").operation_type,
+        OperationType::Subscription
+    );
+    let db = db_with(&[(
+        "a.graphql",
+        "schema { query: Query } type Query { a: Int } type Mutation { a: Int }",
+    )]);
+    assert_eq!(
+        fetch_plan(&db, "Mutation"),
+        GraphQLNotFetchable::NoFetchRoot(entity("Mutation")).wrap_err()
+    );
+}
+
+#[test]
+fn a_syntax_error_in_the_query_root_fails_node_fetches_and_not_other_roots() {
+    let db = db_with(&[
+        ("a.graphql", NODE_SCHEMA),
+        ("b.graphql", "type Query { node(id: ID!): ! }"),
+    ]);
+    assert!(matches!(
+        fetch_plan(&db, "Pet"),
+        Err(GraphQLNotFetchable::NodeField(NodeFieldError::Selectable(
+            _
+        )))
+    ));
+    assert_eq!(
+        root_plan(&db, "Mutation").operation_type,
+        OperationType::Mutation
     );
 }

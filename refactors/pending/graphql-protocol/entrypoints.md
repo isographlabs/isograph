@@ -355,13 +355,13 @@ pub enum RootOperationTypesError {
     #[error("The schema definition has a syntax error.")]
     Syntax(InSchemaFile<DefinitionError>),
     #[error("The schema is defined more than once.")]
-    DuplicateSchemaDefinition(DuplicateSchemaDefinition),
+    DuplicateSchemaDefinition(Box<DuplicateSchemaDefinition>),
     #[error("The schema is extended but never defined.")]
-    ExtensionWithoutDefinition(InSchemaFile<SchemaExtension>),
+    ExtensionWithoutDefinition(Box<InSchemaFile<SchemaExtension>>),
     #[error("The root operation type `{}` is defined more than once.", .0.operation)]
     DuplicateOperation(DuplicateOperation),
     #[error("The schema definition has no `query` root operation type.")]
-    MissingQuery(InSchemaFile<SchemaDefinition>),
+    MissingQuery(Box<InSchemaFile<SchemaDefinition>>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -374,6 +374,11 @@ pub struct DuplicateSchemaDefinition {
 pub struct DuplicateOperation {
     pub operation: OperationType,
     pub second: InSchemaFile<RootOperationTypeDefinition>,
+}
+
+impl RootOperationTypes {
+    /// The operation whose root type is `entity`.
+    pub fn operation_type_of(&self, entity: EntityName) -> Option<OperationType>;
 }
 
 #[memo]
@@ -510,7 +515,19 @@ fn node_fetch<TProfile: CompilationProfile>(
 ) -> Result<GraphQLNodeFetch, NodeFieldError>;
 ```
 
-`node_fetch` reads `graphql_network_protocol::selectable_named(db, client, query_root, "node")`. `Err` is `Selectable`, `Ok(None)` is `NotFound`. The field's type with `NonNull` removed must be `Named(T)`; a list is `ReturnsList`. `T == entity` is `Exact`. `T` an interface in `entity`'s `interfaces`, or a union whose member types contain `entity`, is `InlineFragment` of `entity` and its data; any other `T` is `TypeMismatch`. `node_fetch` takes the entity's data from `graphql_fetch_plan`'s step 1 through its caller, as `entity: MergedTarget<GraphQLEntityData>` in place of `entity: EntityName`. `field_target` is `T` and `graphql_entity(T)`'s data (`Err` is `Target`, `Ok(None)` is `UnknownTarget`). Each argument definition becomes a `GraphQLFetchArgument` in definition order: its GraphQL type converted to `VariableType` (`TypeAnnotation::NonNull` to `VariableType::NonNull`, `Named` and `List` under it to `NonNullVariableType::Named` and `::List`), with the outer `NonNull` dropped when the argument has a default value.
+```rust
+// from crates/graphql_network_protocol/src/fetch_plan.rs
+/// Whether the interface or union `returns`, whose data is `returns_data`, contains `entity`.
+fn contains<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    returns: EntityName,
+    returns_data: &GraphQLEntityData,
+    entity: &MergedTarget<GraphQLEntityData>,
+) -> bool;
+```
+
+`graphql_fetch_plan`'s step 2 is `roots.operation_type_of(entity)`. `node_fetch` reads `graphql_network_protocol::selectable_named(db, client, query_root, "node")`. `Err` is `Selectable`, `Ok(None)` is `NotFound`. The field's type with `NonNull` removed must be `Named(T)`; a list is `ReturnsList`. `T == entity` is `Exact`. `T` an interface in `entity`'s `interfaces`, or a union whose member types contain `entity`, is `InlineFragment` of `entity` and its data; any other `T` is `TypeMismatch`; `contains` decides the interface and union cases, reading the union's members through `graphql_network_protocol::entity_named(T)`. `node_fetch` takes the entity's data from `graphql_fetch_plan`'s step 1 through its caller, as `entity: MergedTarget<GraphQLEntityData>` in place of `entity: EntityName`. `field_target` is `T` and `graphql_entity(T)`'s data (`Err` is `Target`, `Ok(None)` is `UnknownTarget`). Each argument definition becomes a `GraphQLFetchArgument` in definition order: its GraphQL type converted to `VariableType` (`TypeAnnotation::NonNull` to `VariableType::NonNull`, `Named` and `List` under it to `NonNullVariableType::Named` and `::List`), with the outer `NonNull` dropped when the argument has a default value.
 
 `node`'s arguments are read from its definition, not assumed to be `id: ID!`. With pet demo's `node(id: ID!): Node` and `type Pet implements Node`, `graphql_fetch_plan(Pet)` is `Node(GraphQLNodeFetch { arguments: [id: ID!], field_target: Node (interface, id present), refinement: InlineFragment(Pet (object, id present)) })`.
 

@@ -3,6 +3,7 @@ mod compiler_errors;
 mod database;
 mod host_language;
 mod iso_literals;
+mod merged_selection;
 mod references;
 mod schema;
 mod selectable_for_path;
@@ -23,6 +24,7 @@ pub use iso_literals::{
     parsed_iso_literal, parsed_iso_literal_by_id, parsed_iso_literals_in_file,
     text_through_last_iso_literal,
 };
+pub use merged_selection::{MergedTarget, NonNullVariableType, VariableType};
 pub use references::{ReferenceTarget, references_in_file};
 pub use schema::{
     ClientPointerTarget, DefinitionLocation, Entity, EntityOrigin, ProfileEntity,

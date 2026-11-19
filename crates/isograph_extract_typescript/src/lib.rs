@@ -455,11 +455,17 @@ mod memo_tests {
     use common_lang_types::{EntityName, SelectableName};
     use isograph_compiler::{ProtocolEntity, ProtocolSelectable};
 
+    #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+    #[error("test protocol")]
+    struct TestProtocolError;
+
     struct TestNetworkProtocol;
 
     impl NetworkProtocol for TestNetworkProtocol {
         type EntityData = ();
         type SelectableData = ();
+        type FetchPlan = ();
+        type NotFetchable = TestProtocolError;
         type LookupError = Infallible;
 
         fn should_include_schema_file(_relative_path: &Path) -> IncludeFile {
@@ -489,6 +495,14 @@ mod memo_tests {
             _entity: EntityName,
         ) -> Vec<(SelectableName, ProtocolSelectable<()>)> {
             Vec::new()
+        }
+
+        fn fetch_plan<TProfile: CompilationProfile<NetworkProtocol = Self>>(
+            _db: &IsographDb<TProfile>,
+            _client: ClientId,
+            _entity: EntityName,
+        ) -> Result<(), TestProtocolError> {
+            TestProtocolError.wrap_err()
         }
     }
 

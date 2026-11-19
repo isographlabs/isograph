@@ -9,11 +9,17 @@ use isograph_compiler::{
 use isograph_extract_typescript::TypeScriptHostLanguage;
 use prelude::Postfix;
 
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[error("test protocol")]
+pub(crate) struct TestProtocolError;
+
 pub(crate) struct TestNetworkProtocol;
 
 impl NetworkProtocol for TestNetworkProtocol {
     type EntityData = ();
     type SelectableData = ();
+    type FetchPlan = ();
+    type NotFetchable = TestProtocolError;
     type LookupError = Infallible;
 
     fn should_include_schema_file(relative_path: &Path) -> IncludeFile {
@@ -46,6 +52,14 @@ impl NetworkProtocol for TestNetworkProtocol {
         _entity: EntityName,
     ) -> Vec<(SelectableName, ProtocolSelectable<()>)> {
         Vec::new()
+    }
+
+    fn fetch_plan<TProfile: CompilationProfile<NetworkProtocol = Self>>(
+        _db: &IsographDb<TProfile>,
+        _client: ClientId,
+        _entity: EntityName,
+    ) -> Result<(), TestProtocolError> {
+        TestProtocolError.wrap_err()
     }
 }
 

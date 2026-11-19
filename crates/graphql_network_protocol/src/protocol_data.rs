@@ -240,7 +240,7 @@ fn refinement_to<TProfile: CompilationProfile>(
 }
 
 /// The member types of a union's definition and its union extensions, sorted, each once.
-fn union_members(schema_entity: &SchemaEntity) -> BTreeSet<EntityName> {
+pub(crate) fn union_members(schema_entity: &SchemaEntity) -> BTreeSet<EntityName> {
     let definition_members = match schema_entity.definition.item.item.reference() {
         TypeDefinition::Union(union) => union.member_types.as_slice(),
         TypeDefinition::Scalar(_)
