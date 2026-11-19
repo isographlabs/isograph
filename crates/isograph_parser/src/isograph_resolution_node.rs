@@ -18,7 +18,6 @@ use crate::{
 /// modifies these variants in place; today they are the grammar tree's, with the chunk
 /// tree's still surfacing inside unparsed regions.
 #[derive(Debug, derive_more::From, strum::Display)]
-#[non_exhaustive]
 pub enum IsographResolutionNode<'a> {
     #[from]
     IsoLiteralSlot(IsoLiteralParsePath<'a>),
