@@ -94,7 +94,7 @@ pub fn read_iso_literals_source<TCompilationProfile: CompilationProfile>(
     let open_file = db.get_open_file(*relative_path);
 
     // Use the open file's content, if it exists, otherwise use the content of the file from the file system
-    let content = open_file.map(|x| &db.get(x).content).unwrap_or(content);
+    let content = open_file.map_or(content, |file| &file.content);
 
     IsoLiteralsSource {
         relative_path: *relative_path,
