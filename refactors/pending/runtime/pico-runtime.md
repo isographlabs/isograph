@@ -1,8 +1,8 @@
 # A pico-style memoized client runtime
 
-`@isograph/runtime` is a TypeScript library in `libs/isograph-runtime`. It fetches an entrypoint's GraphQL query, normalizes the response into a store, runs the resolvers of `field` selectables, and lets a consumer read and subscribe to results. It has no React dependency.
+Status: parked. Not part of v1. v1 generates artifacts and tests against them.
 
-The store follows pico (`docs-website/docs/design-docs/pico.md`). Every field of every record is a source with a `timeUpdated` epoch. Every read of a selection set on a record, and every evaluation of a resolver on a record, is a derived node with recorded dependencies, a cached result, a `timeUpdated`, and a `timeVerified`. Verification follows pico's algorithm. Writes compare incoming server data with stored data, so a source's epoch advances only when its value changed. Resolver outputs are not compared unless the field declares a comparator; with one, an equal output is backdated.
+`@isograph/runtime` (`libs/isograph-runtime`) is upstream Isograph's runtime (`isograph/libs/isograph-react/src/core`) with the changes below and no React dependency. Everything this doc does not list keeps upstream's behavior: `getDataIdOfNetworkResponse` (`cache.ts:599-642`), `getNetworkResponseKey` (`cache.ts:538-591`), the normalization AST, `Arguments` and `Variables`, the network function's shape, `check` (`check.ts:43-215`), retained queries with the release buffer (`garbageCollection.ts:40-63`), and `generateChildVariableMap` (`read.ts:465-490`).
 
 ## End-user experience
 
@@ -58,41 +58,30 @@ subscription.dispose();
 request.dispose();
 ```
 
-The resolvers are the user's `field` declarations:
+With `field Pet.fullName { firstName lastName }` and `field Query.HomeRoute { pets { id fullName tagline } }`:
 
-```ts
-// from demos/pet-demo/src/Pet.ts
-export const fullName = iso(`
-  field Pet.fullName {
-    firstName
-    lastName
-  }
-`)(function fullName({ data }) {
-  return `${data.firstName} ${data.lastName}`;
-});
-
-// from demos/pet-demo/src/HomeRoute.ts
-export const HomeRoute = iso(`
-  field Query.HomeRoute {
-    pets {
-      id
-      fullName
-      tagline
-    }
-  }
-`)(function HomeRoute({ data }) {
-  return data.pets;
-});
-```
-
-What the user sees, by scenario:
-
-- A second response for the same query with identical data calls no callback and runs no resolver. Every incoming field compares equal to its stored value, so no source changes and the epoch does not advance.
-- A response that changes only `Pet:7.tagline` re-runs the selection set of `pets` on `Pet:7`, the selection set of `Query.HomeRoute`, and the `HomeRoute` resolver. `fullName` on `Pet:7` and every node for the other pets are verified and reused without running. The callback receives a new array whose elements for the other pets are the same objects as before (`===`).
+- A second response for the same query with identical data calls no callback and runs no resolver.
+- A response that changes only `Pet:7.tagline` re-runs the selection set of `pets` on `Pet:7`, the selection set of `Query.HomeRoute`, and the `HomeRoute` resolver. `fullName` on `Pet:7` and every node for the other pets are reused without running. The callback receives a new array whose elements for the other pets are the same objects as before (`===`).
 - A response that changes only `Pet:7.firstName` re-runs `fullName` on `Pet:7`. If `fullName` declares a comparator and the new string is equal, nothing above it re-runs and no callback fires.
 - A change to a field nobody read (`Pet:7.age`) calls nothing and verifies nothing.
 
-## Store
+## 1. Field sources with epochs replace record-level `EncounteredIds`
+
+Upstream marks a whole record as changed when any of its fields changed (`cache.ts:211-218`), and a read records every record it touches (`read.ts:155-159`).
+
+```ts
+// external isograph/libs/isograph-react/src/core/cache.ts
+  if (recordHasBeenUpdated) {
+    let encounteredRecordsIds = insertEmptySetIfMissing(
+      mutableEncounteredIds,
+      targetParentRecordLink.__typename,
+    );
+
+    encounteredRecordsIds.add(targetParentRecordLink.__link);
+  }
+```
+
+Here every field of every record is a source with a `timeUpdated` epoch, and a reader depends on the sources it read.
 
 ```ts
 // from libs/isograph-runtime/src/store.ts
@@ -188,7 +177,7 @@ export type LogFunction = (error: unknown) => void;
 /** An empty store at epoch 0 in `Idle`. */
 export function createStore(options: StoreOptions): Store;
 
-/** Upstream `getParentRecordKey` (`cache.ts:454-479`). */
+/** Upstream `getParentRecordKey` (`cache.ts:454-521`), renamed. */
 export function getStorageKey(
   field:
     | ReaderScalarField
@@ -208,14 +197,9 @@ export function effectiveValue(source: FieldSource): FieldValue {
 }
 ```
 
-A read of a field that was never written creates the `StoreRecord` (if needed) and a `FieldSource` whose `base` is `Absent`, and records a dependency on it. The source represents absence; it is not a default value. A later write to that key advances its `timeUpdated`, and the reader re-runs. This is the semantics of `refactors/pending/pico-missing-key-dependency.md` (a keyed read depends on its key, present or absent). Garbage collection deletes an `Absent` source with no dependents.
+A read of a field that was never written creates the `StoreRecord` (if needed) and a `FieldSource` whose `base` is `Absent`, and records a dependency on it. A later write to that key advances its `timeUpdated`, and the reader re-runs. This is the semantics of `refactors/pending/pico-missing-key-dependency.md`. Garbage collection deletes an `Absent` source with no dependents.
 
-### Identity rules
-
-- A record is `(__typename, DataId)`. `__typename` is the normalization AST's `concreteType`, else the response's `__typename`. Upstream `getDataIdOfNetworkResponse` (`isograph/libs/isograph-react/src/core/cache.ts:599-642`) decides the `DataId`, unchanged: `Query` is `ROOT_ID`; an object with `id` uses it; any other object of a normalized type gets the synthetic id `${parentKey}.${fieldName}` plus `.${index}` in a list plus the argument chunks. `parentKey` is `${__typename}:${__link}` of the record being normalized. For a normalized object inside an inline value, `parentKey` is that of the owning record followed by `.${storageKey}` or `.${index}` for each segment of the inline path.
-- A field is `(record, StorageKey)`. `getStorageKey` is upstream `getParentRecordKey` (`cache.ts:454-479`) and its helpers (`cache.ts:481-521`, `FIRST_SPLIT_KEY` and `SECOND_SPLIT_KEY` at `cache.ts:594-596`), renamed, behavior unchanged. The response key is upstream `getNetworkResponseKey` (`cache.ts:538-591`), unchanged.
-- A value of an inline type has no identity of its own. It lives in the field of the record that owns it, at a path.
-- A derived node is `(kind, the reader AST object or artifact object, Root, Variables)`. Reader ASTs and artifacts are module constants, so object identity is the key; no AST is hashed.
+A derived node is identified by `(kind, the reader AST object or artifact object, Root, Variables)`. Reader ASTs and artifacts are module constants, so object identity is the key.
 
 ```ts
 // from libs/isograph-runtime/src/store.ts
@@ -237,9 +221,19 @@ export type RootKey = Brand<string, 'RootKey'>;
 export function rootKey(root: Root): RootKey;
 ```
 
-### Inline storage
+## 2. Inline storage for id-less types
 
-A linked field whose target type is listed in the config's `inline_types` is stored inline: the field's source holds the whole object (with only the selected subfields) as one `Inline` value. A linked field whose target is any other type is normalized: the field holds a `StoreLink`, and the object's fields are sources of their own record.
+Upstream stores every object without `id` as a separate record at a synthetic id built from the parent and field name (`cache.ts:628-641`).
+
+```ts
+// external isograph/libs/isograph-react/src/core/cache.ts
+  let storeKey = `${parentRecordLink.__typename}:${parentRecordLink.__link}.${astNode.fieldName}`;
+  if (index != null) {
+    storeKey += `.${index}`;
+  }
+```
+
+A linked field whose target type is listed in the config's `inline_types` is stored inline: the field's source holds the whole object (with only the selected subfields) as one `Inline` value. Any other linked field keeps upstream's normalization, including the synthetic id.
 
 ```json
 {
@@ -252,15 +246,24 @@ A linked field whose target type is listed in the config's `inline_types` is sto
 
 The compiler writes the decision into every reader and normalization AST node as `storage: 'Normalized' | 'Inline'`. The runtime does not decide.
 
-What inline storage changes:
-
-- One source per owning field instead of one record and one source per subfield. `User:1.birthday` is one source holding `{ year, month, day }`.
-- A reader of `birthday { year }` depends on that one source. A change to `birthday.day` re-runs it.
-- Writes merge: a response selecting `birthday { month }` adds `month` to the stored object and keeps `year`. Lists merge element by element at equal indices, and the new length wins. This matches upstream, where an id-less object is a record at a path-derived id and a later write overwrites only the selected fields.
-- An inline value may contain links to normalized records.
+- `User:1.birthday` is one source holding `{ year, month, day }`. A reader of `birthday { year }` depends on that one source, so a change to `birthday.day` re-runs it.
+- Writes merge: a response selecting `birthday { month }` adds `month` to the stored object and keeps `year`. Lists merge element by element at equal indices, and the new length wins. This keeps upstream's result, where a later write to a synthetic-id record overwrites only the selected fields.
+- An inline value may contain links to normalized records. For a normalized object inside an inline value, the synthetic id's `parentKey` is that of the owning record followed by `.${storageKey}` or `.${index}` for each segment of the inline path.
 - A type stored inline cannot be selected with `__link` (there is no `StoreLink`), which the compiler rejects. `field` selectables on an inline type are allowed; their root is `Root.Inline`.
 
-## Derived nodes
+## 3. Cached resolver results in derived nodes
+
+Upstream does not cache resolver outputs: every read of a fragment calls every nested eager resolver again (`read.ts:600`), and `useResult` calls the top resolver on every render (`react/useResult.ts:64`).
+
+```ts
+// external isograph/libs/isograph-react/src/core/read.ts
+      return {
+        kind: 'Success',
+        data: readerWithRefetchQueries.readerArtifact.resolver(firstParameter),
+      };
+```
+
+Here every read of a selection set on a root, and every evaluation of a resolver on a root, is a derived node with recorded dependencies, a cached result, a `timeUpdated`, and a `timeVerified`.
 
 ```ts
 // from libs/isograph-runtime/src/derivedNode.ts
@@ -346,16 +349,16 @@ export type DerivedNodeIndex = {
 export type DerivedNodeKey = Brand<string, 'DerivedNodeKey'>;
 ```
 
-There are two kinds of derived node, and every level of a read is one of them:
+For `Query.HomeRoute`:
 
 - `Query.HomeRoute` on `Query:__ROOT` is a `ResolverNode`. Its one dependency is the `SelectionSetNode` of its reader AST on the same root.
 - That selection set node depends on the source `Query:__ROOT.pets`, and on one `SelectionSetNode` per pet for the nested `{ id fullName tagline }`.
 - Each pet's selection set node depends on the sources `id` and `tagline` and on the `ResolverNode` of `fullName` on that pet.
 - `fullName` on `Pet:7` depends on the `SelectionSetNode` of `{ firstName lastName }` on `Pet:7`, which depends on two sources.
 
-A scalar field is not a node; it is a source read by the node that selects it. A resolver does not read the store. It receives `data`, the result of its selection set node, so its dependencies are exactly that node. The user's function cannot make an untracked read.
+A resolver receives `data`, the result of its selection set node, and does not read the store, so its dependencies are exactly that node.
 
-A `MissingData` or `ResolverThrew` result is cached like `Ok`. A node whose selection set reached an `Absent` source depends on that source and re-runs when the response writes it. A parent that reads a child whose result is not `Ok` returns the child's result object unchanged. A resolver that throws is caught; its node's result is `ResolverThrew` until a dependency changes.
+A `MissingData` or `ResolverThrew` result is cached like `Ok`. A parent that reads a child whose result is not `Ok` returns the child's result object unchanged. A resolver that throws is caught; its node's result is `ResolverThrew` until a dependency changes.
 
 ### Recording dependencies
 
@@ -382,9 +385,11 @@ function recordDependency(
 }
 ```
 
-The recorder is a parameter of every read function, created by `recompute` for the node whose body runs. This is pico's `TrackedDependencies` (`crates/pico/src/dependency.rs:17-43`) including its consecutive-duplicate collapse (`dependency.rs:35-40`). pico needs a stack (`dependency.rs:45-102`) because a memo body calls other memos through `&Database`. Here the only bodies are the runtime's own read functions, which pass the recorder explicitly, and resolvers, which read nothing. Cycle detection uses the `Executing` state instead of pico's stack scan (`dependency.rs:95-101`).
+The recorder is a parameter of every read function, created by `recompute` for the node whose body runs. Cycle detection uses the `Executing` state.
 
 ### Verification
+
+Verification is pico's algorithm (`docs-website/docs/design-docs/pico.md`) plus one short-circuit: `markedDirtyAt <= timeVerified` means no write reached the node since it was verified, so the dependency walk is skipped (see change 5).
 
 ```ts
 // from libs/isograph-runtime/src/derivedNode.ts
@@ -478,17 +483,29 @@ function computedState<T>(node: NodeOf<T>): ComputedState<T>;
 type NodeOf<T> = DerivedNode & { state: DerivedNodeState<T> };
 ```
 
-This is pico's `execute_memoized_function` (`crates/pico/src/execute_memoized_function.rs:58-104`) with one addition:
+The walk stops at the first changed dependency, so after a link changes from `Pet:7` to `Pet:8`, the node re-runs before it verifies the old `Pet:7` child. Writes cannot happen while a body runs (see `StorePhase`), so the node's `timeVerified` replaces pico's per-dependency epoch.
 
-- Verified in this epoch: return the cached result (pico `node_verified_in_current_epoch`, `crates/pico/src/database.rs:254-259`).
-- Otherwise, walk dependencies in read order. A source changed if its `timeUpdated` is newer than the node's last verification (pico `source_node_changed_since`, `execute_memoized_function.rs:202-207`). A derived dependency is verified first, then compared the same way (pico `derived_node_changed_since`, `execute_memoized_function.rs:209-248`). The walk stops at the first change, so after a link changes from `Pet:7` to `Pet:8`, the node re-runs before it verifies the old `Pet:7` child.
-- No dependency changed: set `timeVerified` and reuse.
-- A dependency changed: re-run. The new `timeUpdated` is the newest `timeUpdated` among the new dependencies (pico `execute_memoized_function.rs:125` and `:168`).
-- The addition: `markedDirtyAt <= timeVerified` means no write reached this node since it was verified, so no dependency can have changed and the walk is skipped (see Change propagation).
+## 4. Backdating and resolver comparators
 
-pico compares each dependency against the epoch stored on the `Dependency` (`dependency.rs:5-9`, filtered at `execute_memoized_function.rs:191`). Writes cannot happen while a body runs here (see `StorePhase`), so every dependency of one execution was read in the same epoch and that epoch is the node's `timeVerified`. The node's `timeVerified` replaces the per-dependency epoch.
+Upstream compares nested resolver values with `!==` when it decides whether a fragment changed (`areEqualWithDeepComparison.ts:84-95`), so a nested resolver that returns a new object makes the fragment differ.
 
-### Backdating
+```ts
+// external isograph/libs/isograph-react/src/core/areEqualWithDeepComparison.ts
+      case 'Resolver': {
+        const key = field.alias;
+        // @ts-expect-error
+        const oldValue = oldItemObject[key];
+        // @ts-expect-error
+        const newValue = newItemObject[key];
+
+        if (oldValue !== newValue) {
+          canRecycle = false;
+        }
+        break;
+      }
+```
+
+Here equal results keep the previous result object and the previous `timeUpdated`, and a field may declare a comparator (`isEqual` on `EagerReaderArtifact`).
 
 ```ts
 // from libs/isograph-runtime/src/equality.ts
@@ -532,16 +549,41 @@ function selectionSetDataEqual(
 ): boolean;
 ```
 
-Equal results keep the previous result object and the previous `timeUpdated`. That is pico's backdating (`execute_memoized_function.rs:162-174`, which keeps the old value and leaves `time_updated` unchanged).
-
-- A selection set's data is server values and child results, so a one-level `===` comparison is cheap and exact: a scalar is the stored reference when its source did not change, and a child result is the same object when the child backdated. It returns true when the node re-ran because of a dependency it reads but does not output, such as the `__typename` an inline fragment tests.
-- Two `MissingData` results at the same root and storage key are equal, so a node that is still waiting for the same field does not notify.
-- A resolver's output is arbitrary JavaScript and is never compared, unless its artifact has `isEqual`. A field with a comparator buys three things downstream: the parent selection set node does not re-run, the parent resolver does not re-run, and a subscriber whose result did not change is not called. The previous output object is kept, so consumers comparing by reference see no change.
+- A selection set's data is server values and child results, so one level of `===` is exact: a scalar is the stored reference when its source did not change, and a child result is the same object when the child backdated. It returns true when the node re-ran because of a dependency it reads but does not output, such as the `__typename` an inline fragment tests.
+- Two `MissingData` results at the same root and storage key are equal, so a node still waiting for the same field does not notify.
+- A resolver's output is never compared unless its artifact has `isEqual`. With a comparator, an equal output stops the parent selection set node, the parent resolver, and the subscriber.
 - A comparator that throws is logged and treated as unequal.
 
-## Change propagation
+Memoization replaces `mergeObjectsUsingReaderAst` (`areEqualWithDeepComparison.ts:55-121`), which upstream uses to recover old sub-objects after rebuilding the whole tree. A node that did not re-run returns its previous object, so a parent that re-runs builds a new object around unchanged children.
 
-The runtime uses push-pull: a write pushes a dirty mark up the reverse edges (`dependents`) and collects the subscriptions it reaches, then each collected subscription pulls its node's result through `verify`.
+## 5. Dirty marks along reverse edges replace the subscription scan
+
+Upstream loops over every subscription after a write (`subscribe.ts:63-109`); a fragment subscription whose last `EncounteredIds` overlaps the changed records (`subscribe.ts:164-189`) re-reads its whole fragment (`subscribe.ts:117`) and compares it with `mergeObjectsUsingReaderAst` (`subscribe.ts:138-161`).
+
+```ts
+// external isograph/libs/isograph-react/src/core/subscribe.ts
+  environment.subscriptions.forEach((subscription) =>
+    logAnyError(environment, { situation: 'calling subscriptions' }, () => {
+      switch (subscription.kind) {
+        case 'FragmentSubscription': {
+          // TODO if there are multiple components subscribed to the same
+          // fragment, we will call readButNotEvaluate multiple times. We
+          // should fix that.
+          if (
+            hasOverlappingIds(
+              recordsEncounteredWhenNormalizing,
+              subscription.encounteredDataAndRecords.encounteredRecords,
+            )
+          ) {
+            callSubscriptionIfDataChanged(environment, subscription);
+          }
+          return;
+        }
+```
+
+Here a write pushes a dirty mark up `dependents` and collects the subscriptions it reaches, then each collected subscription pulls its node's result through `verify` (open decision 1).
+
+Upstream's write sites call `callSubscriptions` directly after `normalizeData` (`makeNetworkRequest.ts:271`, `writeData.ts:55`, `optimisticProxy.ts:492`). Here writes happen inside a `transaction`, which notifies once at commit and guards reads during writes and during user code.
 
 ```ts
 // from libs/isograph-runtime/src/transaction.ts
@@ -696,19 +738,21 @@ export class StoreShapeError extends Error {
 }
 ```
 
-Reads during a transaction throw `StoreAccessDuringTransactionError`. A node verified mid-transaction would record `timeVerified` equal to an epoch still receiving writes and would later be considered current. Reads and transactions inside a resolver or comparator throw `StoreAccessDuringUserCodeError`. A subscription callback runs in `Notifying` and may read or open a transaction; that transaction commits at once and appends its affected subscriptions to the queue being delivered, so the outer loop delivers them. A callback that throws is logged and does not stop delivery.
+Reads during a transaction throw `StoreAccessDuringTransactionError`, because a node verified mid-transaction would record a `timeVerified` equal to an epoch still receiving writes. Reads and transactions inside a resolver or comparator throw `StoreAccessDuringUserCodeError`. A subscription callback runs in `Notifying` and may read or open a transaction; that transaction commits at once and appends its affected subscriptions to the queue being delivered. A callback that throws is logged and does not stop delivery.
 
 A subscription is called when the `ReadResult` object it last received is not the object `verify` returns. A backdated node returns the previous object, so a backdated subscription is not called.
 
-Why push-pull and not either alone:
+## 6. Structural equality on writes
 
-- Pull only (pico): after every write, verify every subscribed node. pico can do this because a compile verifies one top-level call. A UI has many subscriptions, and a write that touches nothing they read would still walk every dependency list of every subscription, the same order of work upstream's overlap check does today.
-- Push only (recompute on write, eagerly): recomputes nodes whose result nobody will read before the next write, and cannot backdate in dependency order without a topological sort of the dirty region.
-- Push-pull: the dirty mark bounds verification to nodes a write can reach (`markedDirtyAt`), and pulling keeps pico's semantics: recomputation in dependency order, backdating, and no work for unsubscribed nodes until something reads them.
+Upstream compares an incoming scalar with `!==` (`cache.ts:248-249`), so a list scalar or an object custom scalar counts as changed on every response.
 
-The cost of push-pull is the reverse edges: one `Set` per source and per node, maintained on every recompute by `replaceReverseEdges`.
+```ts
+// external isograph/libs/isograph-react/src/core/cache.ts
+  targetStoreRecord[parentRecordKey] = networkResponseData;
+  return existingValue !== networkResponseData;
+```
 
-### Writes
+Here a write compares structurally, and a source's epoch advances only when the value reads see changed.
 
 ```ts
 // from libs/isograph-runtime/src/transaction.ts
@@ -755,9 +799,72 @@ export function writeField(
 export function fieldValueEqual(a: FieldValue, b: FieldValue): boolean;
 ```
 
-Server data is JSON, so `fieldValueEqual` is defined for every stored value and costs at most the size of the value. Upstream compares scalars with `!==` (`cache.ts:248-249`), so a list scalar or an object custom scalar counts as changed on every response; here it does not. When the incoming value equals the stored base, the stored reference is kept, so downstream `===` comparisons hold.
+When the incoming value equals the stored base, the stored reference is kept, so downstream `===` comparisons hold.
 
-### Optimistic responses
+`normalize` returns nothing; upstream's `EncounteredIds` (`cache.ts:77-107`) is replaced by `writeField` recording each changed source in the transaction.
+
+```ts
+// from libs/isograph-runtime/src/normalize.ts
+/** Writes `response` into the record `root` per `selections`. Called inside a transaction. */
+export function normalize(
+  store: Store,
+  transaction: TransactionState,
+  selections: NormalizationSelectionSet,
+  response: NetworkResponseObject,
+  variables: Variables,
+  root: StoreLink,
+  position: WritePosition,
+): void;
+
+/** Builds the `Inline` value for one inline linked field, merged with `existing` per `selections`. Nested normalized objects are written as records. */
+function inlineValue(
+  store: Store,
+  transaction: TransactionState,
+  existing: FieldValue,
+  response: NetworkResponseValue,
+  selections: NormalizationSelectionSet,
+  variables: Variables,
+  owner: StoreLink,
+  path: readonly InlinePathSegment[],
+  position: WritePosition,
+): InlineValue;
+
+/** Upstream `check` (`check.ts:43-215`) over `effectiveValue`, without recording dependencies. */
+export function check(
+  store: Store,
+  selections: NormalizationSelectionSet,
+  variables: Variables,
+  root: StoreLink,
+): CheckResult;
+
+export type CheckResult =
+  | { readonly kind: 'EnoughData' }
+  | {
+      readonly kind: 'MissingData';
+      readonly root: Root;
+      readonly storageKey: StorageKey;
+    };
+```
+
+A `Linked` selection with `storage: 'Inline'` `writeField`s `{ kind: 'Inline', value: inlineValue(...) }`, where `existing` is `base` for a `Base` write and `effectiveValue` for a `Layer` write. Other selections normalize as upstream does, through `writeField`.
+
+## 7. Optimistic overrides on each source replace the layer stack
+
+Upstream reads every field through a `Proxy` that walks the store layers (`optimisticProxy.ts:46-98`).
+
+```ts
+// external isograph/libs/isograph-react/src/core/optimisticProxy.ts
+  return new Proxy<StoreRecord>(
+    {},
+    {
+      get(_, propertyName) {
+        let currentStoreLayer: StoreLayer | null = childMostStoreLayer;
+        while (currentStoreLayer != null) {
+          const storeRecord =
+            currentStoreLayer.data[link.__typename]?.[link.__link];
+```
+
+Here each source holds its overrides, and reads take `effectiveValue`.
 
 ```ts
 // from libs/isograph-runtime/src/optimistic.ts
@@ -782,9 +889,30 @@ export function revertOptimisticLayer(
 ): ReadonlySet<OptimisticLayer>;
 ```
 
-`revertOptimisticLayer` removes the layer's override from each of its sources and calls the same changed-check as `writeField`. A server response writes `Base` with `keepOverridesOf` empty: it is newer than every optimistic layer, which is upstream's `addNetworkResponseStoreLayer` on top of the stack (`isograph/libs/isograph-react/src/core/optimisticProxy.ts:161-183`). The response that replaces an optimistic layer reverts the layer and writes `Base` keeping the overrides of the layers newer than it, which is upstream's replacement in place (`optimisticProxy.ts:393-492`). Effective values are the same as upstream's layer stack for data-only layers; reads do not walk layers.
+`revertOptimisticLayer` removes the layer's override from each of its sources and runs the same changed-check as `writeField`. A server response writes `Base` with `keepOverridesOf` empty, which matches upstream's `addNetworkResponseStoreLayer` on top of the stack (`optimisticProxy.ts:161-183`). The response that replaces an optimistic layer reverts the layer and writes `Base` keeping the overrides of the layers newer than it, which matches upstream's replacement in place (`optimisticProxy.ts:393-492`). Effective values are the same as upstream's for data-only layers.
 
-## Subscriptions and reads
+## 8. Subscriptions on resolver nodes and `MissingData` results replace fragment subscriptions and Suspense throws
+
+Upstream subscriptions are per fragment reference, plus `AnyRecords` and `AnyChangesToRecord` (`IsographEnvironment.ts:42-69`), and a read with missing data throws a promise built on `onNextChangeToRecord` (`read.ts:92-122`).
+
+```ts
+// external isograph/libs/isograph-react/src/core/read.ts
+    throw onNextChangeToRecord(environment, response.recordLink);
+```
+
+`onNextChangeToRecord` (`cache.ts:135-149`) is built on `AnyChangesToRecord`, whose check is always true: `has` returns a boolean, and a boolean is never `null`, so the callback fires whenever any record of that type changed (`subscribe.ts:93-97`).
+
+```ts
+// external isograph/libs/isograph-react/src/core/subscribe.ts
+        case 'AnyChangesToRecord': {
+          if (
+            recordsEncounteredWhenNormalizing
+              .get(subscription.recordLink.__typename)
+              ?.has(subscription.recordLink.__link) != null
+          ) {
+```
+
+Here a subscription is attached to a `ResolverNode`, and missing data is a cached `MissingData` result that a later write updates through the normal dirty-mark path. `AnyRecords` and `AnyChangesToRecord` do not exist.
 
 ```ts
 // from libs/isograph-runtime/src/subscribe.ts
@@ -832,7 +960,7 @@ export function subscribeEntrypoint<T, TVariables extends Variables>(
 ): SubscriptionHandle<T>;
 ```
 
-`readField` throws in `Transaction` and `RunningUserCode`, gets or creates the `ResolverNode` for `(artifact, Root.Record(link), variables)`, and returns `verify` (creating a node runs `recompute` with `previous` null). `subscribeField` does the same, mints `sequence` from `store.nextSubscriptionSequence`, adds the subscription to the node with `delivered` set to the result, and returns that result as `initial`. `dispose` removes the subscription from the node. A subscription retains its node and everything the node depends on (see Garbage collection).
+`readField` throws in `Transaction` and `RunningUserCode`, gets or creates the `ResolverNode` for `(artifact, Root.Record(link), variables)`, and returns `verify` (creating a node runs `recompute` with `previous` null). `subscribeField` does the same, mints `sequence` from `store.nextSubscriptionSequence`, adds the subscription to the node with `delivered` set to the result, and returns that result as `initial`. `dispose` removes the subscription from the node.
 
 Reads inside a node body:
 
@@ -944,11 +1072,23 @@ function selectionAlias(selection: ReaderSelection): string;
 function runUserCode<T>(store: Store, body: () => T): T;
 ```
 
-`generateChildVariableMap` is upstream's (`isograph/libs/isograph-react/src/core/read.ts:465-490`), unchanged.
+## 9. `fetchEntrypoint` returns a typed outcome
 
-Memoization gives structural sharing. Upstream rebuilds the whole tree on a re-read and then recovers old sub-objects with `mergeObjectsUsingReaderAst` (`areEqualWithDeepComparison.ts:55-121`). Here a node that did not re-run returns its previous object, so a parent that re-runs builds a new object around unchanged children.
+Upstream `makeNetworkRequest` returns `ItemCleanupPair<PromiseWrapper<void, AnyError>>` (`makeNetworkRequest.ts:159-179`) and rejects when the response has `errors` (`makeNetworkRequest.ts:224-231`).
 
-## Network
+```ts
+// external isograph/libs/isograph-react/src/core/makeNetworkRequest.ts
+      if (networkResponse.errors != null) {
+        try {
+          fetchOptions?.onError?.();
+        } catch {}
+        throw new Error('Network response had errors', {
+          cause: networkResponse,
+        });
+      }
+```
+
+Here the promise resolves a `FetchOutcome`, and only a rejection of `networkFunction` rejects it.
 
 ```ts
 // from libs/isograph-runtime/src/network.ts
@@ -999,69 +1139,24 @@ export function fetchEntrypoint<
 ): FetchHandle;
 ```
 
-`fetchEntrypoint`:
+- `No`, or `IfNecessary` when `check` finds every field present: `response` resolves `NotFetched`.
+- A response after `dispose` is not written, as upstream (`makeNetworkRequest.ts:235`), and `response` resolves `DisposedBeforeResponse`.
+- A response with `errors` reverts the layer in a transaction and resolves `ResponseHadErrors`.
+- Otherwise one transaction reverts the layer (if any) and `normalize`s `data` at `{ kind: 'Base', keepOverridesOf }` (empty, or the set `revertOptimisticLayer` returned), then `response` resolves `Written`.
+- The optimistic response is written in one transaction with `createOptimisticLayer` and `normalize` at `{ kind: 'Layer', layer }`.
 
-1. Retains `{ normalizationAst, variables, root }` in `store.retainedQueries` (upstream `fetchNormalizationAstAndRetainArtifact`, `makeNetworkRequest.ts:464-493`).
-2. `No`, or `IfNecessary` when `check` finds every field of the normalization AST present: `response` resolves `NotFetched`.
-3. With `optimisticResponse`: in one transaction, `createOptimisticLayer` and `normalize` the response at `{ kind: 'Layer', layer }`.
-4. Calls `networkFunction(entrypoint.operation, variables)`.
-5. On a response: if the status is `Disposed`, resolves `DisposedBeforeResponse` without writing (upstream skips the write for a disposed request, `makeNetworkRequest.ts:235`). If `errors` is present, reverts the layer in a transaction and resolves `ResponseHadErrors`. Otherwise, in one transaction, reverts the layer (if any) and `normalize`s `data` at `{ kind: 'Base', keepOverridesOf }` (empty, or the set `revertOptimisticLayer` returned), then resolves `Written`.
-6. On a rejection of `networkFunction`: reverts the layer in a transaction and rejects with that error.
-7. `dispose`: if `InFlight` with a layer, reverts it in a transaction; sets `Disposed`; moves the retained query to `gcBuffer` and runs `garbageCollect` when the buffer exceeds `gcBufferSize` (upstream `unretainQuery` and `unretainAndGarbageCollect`, `garbageCollection.ts:40-53`, `makeNetworkRequest.ts:565-577`).
+## 10. Garbage collection of derived nodes, and records live nodes still read
+
+Upstream deletes every record a retained query does not reach (`garbageCollection.ts:98-118`), so a reader of such a record suspends.
 
 ```ts
-// from libs/isograph-runtime/src/normalize.ts
-/** Writes `response` into the record `root` per `selections`. Called inside a transaction. */
-export function normalize(
-  store: Store,
-  transaction: TransactionState,
-  selections: NormalizationSelectionSet,
-  response: NetworkResponseObject,
-  variables: Variables,
-  root: StoreLink,
-  position: WritePosition,
-): void;
-
-/** Builds the `Inline` value for one inline linked field, merged with `existing` per `selections`. Nested normalized objects are written as records. */
-function inlineValue(
-  store: Store,
-  transaction: TransactionState,
-  existing: FieldValue,
-  response: NetworkResponseValue,
-  selections: NormalizationSelectionSet,
-  variables: Variables,
-  owner: StoreLink,
-  path: readonly InlinePathSegment[],
-  position: WritePosition,
-): InlineValue;
-
-/** Upstream `check` (`check.ts:43-215`) over `effectiveValue`, without recording dependencies. */
-export function check(
-  store: Store,
-  selections: NormalizationSelectionSet,
-  variables: Variables,
-  root: StoreLink,
-): CheckResult;
-
-export type CheckResult =
-  | { readonly kind: 'EnoughData' }
-  | {
-      readonly kind: 'MissingData';
-      readonly root: Root;
-      readonly storageKey: StorageKey;
-    };
+// external isograph/libs/isograph-react/src/core/garbageCollection.ts
+    for (const dataId in dataById) {
+      if (!retainedTypeIds.has(dataId)) {
+        delete dataById[dataId];
+      }
+    }
 ```
-
-`normalize` per selection:
-
-- `Scalar`: `writeField` of `{ kind: 'Scalar', value }`, where `undefined` and `null` are `null` (upstream `cache.ts:243-246`).
-- `Linked` with `storage: 'Normalized'`: computes each child link by the identity rules, `normalize`s each child object into its record, and `writeField`s `{ kind: 'Linked', value }` with the link, `null`, or the list.
-- `Linked` with `storage: 'Inline'`: `writeField`s `{ kind: 'Inline', value: inlineValue(...) }`. `existing` is `base` for a `Base` write and `effectiveValue` for a `Layer` write.
-- `InlineFragment`: when the response's `__typename` is `type`, `normalize`s the same record with the fragment's selections (upstream `cache.ts:345-370`).
-
-`normalize` returns nothing. Upstream collects `EncounteredIds` (`cache.ts:211-218`); here `writeField` records each changed source in the transaction.
-
-## Garbage collection
 
 ```ts
 // from libs/isograph-runtime/src/garbageCollection.ts
@@ -1080,16 +1175,14 @@ export function garbageCollect(store: Store): void;
 
 1. Live derived nodes: every node with a subscription, and every derived node reachable from one through `dependencies`.
 2. Every other node is removed from `store.derivedNodes` and from the `dependents` of each of its dependencies.
-3. Live records: every record reachable from `retainedQueries` and `gcBuffer` through their normalization ASTs over effective values, including links inside inline values (upstream `recordReachableIds`, `garbageCollection.ts:125-226`).
+3. Live records: upstream's mark (`recordReachableIds`, `garbageCollection.ts:125-226`) over effective values, including links inside inline values.
 4. A live record keeps every source except an `Absent` source with no dependents. Any other record keeps only sources that have dependents. A record with no sources is deleted; a type with no records is deleted.
 
-A subscription is the retain of a derived node, so "retained" and "subscribed" are the same set. A node created by `readField` with no subscription survives until the next `garbageCollect` and is recomputed after it. pico keeps an LRU of recent top-level calls (`top_level_call_lru_cache`, `crates/pico/src/database.rs:102-103`) and retains everything reachable from it (`crates/pico/src/garbage_collection.rs:14-25`); this runtime does not, because a consumer that reads repeatedly can subscribe.
+A node created by `readField` with no subscription survives until the next `garbageCollect` and is recomputed after it.
 
-A record that a retained query no longer reaches but a live node still reads keeps the sources that node reads. Upstream deletes such a record, and the reader suspends.
+## 11. Artifacts
 
-## Artifacts
-
-The runtime consumes the artifact types below. Each is upstream's (`isograph/libs/isograph-react/src/core/reader.ts`, `entrypoint.ts`, `util.ts`, `FragmentReference.ts`) with the stated deltas.
+The runtime consumes the artifact types below.
 
 ```ts
 // from libs/isograph-runtime/src/artifacts.ts
@@ -1191,18 +1284,15 @@ export type Entrypoint<
 };
 ```
 
-Deltas from upstream:
+Deltas from upstream (`core/reader.ts`, `core/entrypoint.ts`):
 
-- `ReaderScalarField`: no `isFallible`, no `isUpdatable`.
-- `ReaderLinkedField`: gains `storage`; no `isFallible`, `condition`, `isUpdatable`, or `refetchQueryIndex` (no client pointers or `asFoo` conditions in this version).
-- `ReaderResolverField` is upstream `ReaderNonLoadableResolverField` without `usedRefetchQueries`; `readerArtifact` returns `EagerReaderArtifact` only (no `ComponentReaderArtifact`, no React).
+- `ReaderScalarField` (`reader.ts:89-96`): no `isFallible`, no `isUpdatable`.
+- `ReaderLinkedField` (`reader.ts:103-121`): gains `storage`; no `isFallible`, `condition`, `isUpdatable`, or `refetchQueryIndex`.
+- `ReaderResolverField` is upstream `ReaderNonLoadableResolverField` (`reader.ts:127-134`) without `usedRefetchQueries`; `readerArtifact` returns `EagerReaderArtifact` only.
 - `ReaderImperativelyLoadedField` and `LoadablySelectedField` do not exist.
-- `EagerReaderArtifact`: gains `isEqual`; no `hasUpdatable`; `ResolverParameters` has no `startUpdate`.
-- `NormalizationLinkedField` gains `storage`; no `isFallible` on any normalization node.
-- `Entrypoint` replaces upstream `IsographEntrypoint`: `operation` and `normalizationAst` move out of `networkRequestInfo`; no persisted operations, no `NormalizationAstLoader`, no `ReaderWithRefetchQueriesLoader`, no refetch queries.
-- `Arguments`, `Argument`, `ArgumentValue` (`util.ts:10-33`) and `Variables`, `VariableValue` (`FragmentReference.ts:11-21`) are unchanged. `NetworkResponseObject` and `NetworkResponseValue` are upstream `cache.ts:49-75`, unchanged.
-
-The reader AST carries no dependency information. Dependencies are recorded when a node body runs, because which sources a selection set reads depends on data: the link a linked field holds, the length of a list, and whether a field is `Absent`.
+- `EagerReaderArtifact` (`reader.ts:26-37`): gains `isEqual`; no `hasUpdatable`; `ResolverParameters` has no `startUpdate`.
+- `NormalizationLinkedField` (`entrypoint.ts:146-153`) gains `storage`; no `isFallible` on any normalization node.
+- `Entrypoint` replaces upstream `IsographEntrypoint` (`entrypoint.ts:77-93`): `operation` and `normalizationAst` move out of `networkRequestInfo`; no persisted operations, no `NormalizationAstLoader`, no `ReaderWithRefetchQueriesLoader`, no refetch queries.
 
 ### What the compiler emits
 
@@ -1213,39 +1303,15 @@ The reader AST carries no dependency information. Dependencies are recorded when
 - `storage` on every linked reader and normalization node, from the config's `inline_types`.
 - `isEqual` on each `EagerReaderArtifact`: `null`, or the comparator the field declares (open decision 3).
 
-The compiler rejects `__link` selected on a type in `inline_types`. Nothing else changes in generation for this runtime.
+The compiler rejects `__link` selected on a type in `inline_types`.
 
-## Comparison with upstream
+## 12. Removed from upstream
 
-Upstream's runtime is `isograph/libs/isograph-react/src/core`:
-
-- The store is a stack of layers (`optimisticProxy.ts:100-159`), each `{ [TypeName]: { [DataId]: StoreRecord } }` (`IsographEnvironment.ts:150-169`), with links as `{ __link, __typename }` (`IsographEnvironment.ts:122-125`). Every field read goes through a `Proxy` that walks the layers (`optimisticProxy.ts:46-98`).
-- `normalizeData` writes a response and collects `EncounteredIds`: the records with at least one changed field (`cache.ts:77-107`, `:211-218`). Scalars compare with `!==` (`cache.ts:248-249`); links compare `__link` and `__typename` (`cache.ts:309`, `:337-338`). An object without `id` is a separate record at a synthetic id (`cache.ts:623-641`).
-- A read (`readButDoNotEvaluate` and `readData`, `read.ts:60-277`) walks the reader AST and records every record it touches into one `EncounteredIds`, including records read by nested resolvers (`read.ts:569-578`). Missing data throws a promise for Suspense (`read.ts:92-122`).
-- Resolver outputs are not cached. Every read of a fragment calls every nested eager resolver again (`read.ts:600`), and `useResult` calls the top resolver on every render (`useResult.ts:64`). Component fields are cached per fragment reference (`componentCache.ts:19-26`).
-- Subscriptions are per fragment reference, plus `AnyRecords` and `AnyChangesToRecord` (`IsographEnvironment.ts:42-69`). After a write, `callSubscriptions` loops over every subscription (`subscribe.ts:63-109`). A fragment subscription whose last `EncounteredIds` overlaps the changed records (`subscribe.ts:164-189`) re-reads its whole fragment (`subscribe.ts:117`), then `mergeObjectsUsingReaderAst` compares old and new by the reader AST (`subscribe.ts:138-161`; `areEqualWithDeepComparison.ts:55-121`) and calls back if anything differs. That comparison treats resolver values with `!==` (`areEqualWithDeepComparison.ts:84-95`), so a nested resolver that returns a new object makes the fragment differ.
-- GC: queries are retained while their request handle lives; released ones go into a 10-entry buffer (`IsographEnvironment.ts:177`, `garbageCollection.ts:40-53`); overflow runs a mark from retained normalization ASTs and deletes unreached records (`garbageCollection.ts:65-119`).
-
-`AnyChangesToRecord` checks `recordsEncounteredWhenNormalizing.get(typename)?.has(link) != null` (`subscribe.ts:93-97`). `has` returns a boolean, and a boolean is never `null`, so the callback fires whenever any record of that type changed. `onNextChangeToRecord` (`cache.ts:135-149`) is built on it.
-
-Kept: identity rules (`getDataIdOfNetworkResponse`), storage and response keys, the normalization AST, `Arguments` and `Variables`, the network function's shape, retained queries with the release buffer and the mark from normalization ASTs, `MissingData` as a read result, `optimisticNetworkResponse` semantics, and `generateChildVariableMap`.
-
-Replaced: record-level `EncounteredIds` by field sources with epochs; whole-fragment re-reads by derived nodes per (selection set, root) and per (resolver, root); uncached resolvers by resolver nodes; `mergeObjectsUsingReaderAst` by memoized results (unchanged children keep their objects); the overlap scan over all subscriptions by dirty marks along reverse edges; `Proxy` layer walks by effective values on each source; Suspense throws by `MissingData` results that a later write updates.
-
-Dropped from this version: React (components, hooks, Suspense), `startUpdate` and updatable data, client pointers, loadable and imperatively loaded fields, refetch queries, `missingFieldHandler`, persisted operations, lazy normalization ASTs and entrypoint loaders, `isFallible`, `writeData`, and the logging event catalog (`log` receives callback and comparator errors only).
-
-Performance, for `Query.HomeRoute` above with 500 pets, after a response changes only `Pet:7.tagline`:
-
-- Upstream: `Pet:7` is in `EncounteredIds`. Every subscription is scanned. Each overlapping subscription re-reads its whole fragment. For a subscription to `HomeRoute`, that is 500 pet records, 2,000 scalar reads through layer proxies (`id`, `tagline`, `firstName`, `lastName` per pet), and 500 calls of `fullName`, then a reader-AST comparison of 500 objects. Then the `HomeRoute` resolver runs again in the consumer.
-- This runtime: one source changes. The dirty mark reaches the selection set node of `Pet:7`, the `HomeRoute` selection set node, the `HomeRoute` resolver node, and their subscriptions. Verification re-runs those three nodes. The `HomeRoute` selection set node rebuilds its 500-element `pets` array; for each of the other 499 pets it looks up the child node, sees `markedDirtyAt <= timeVerified`, and reuses the child's result. `fullName` runs zero times. The node on `Pet:7` reads 2 sources and verifies `fullName` on `Pet:7` without running it.
-- A change to a field no node read (`Pet:7.age`): upstream still re-reads every subscription whose fragment touched `Pet:7`; here the source has no dependents and nothing runs.
-- A response identical to the stored data: upstream reports records whose list or object scalars are new arrays or objects as changed (`cache.ts:248-249`) and re-reads; here no source changes and the epoch does not advance.
-
-The costs this runtime adds: one object per field source and per derived node, a dependency array per node, and a `Set` of reverse edges per source and node. A list selection set node is still linear in its list length when anything under it changes, because it rebuilds its array. `garbageCollect` walks every derived node.
+React (components, hooks, Suspense), `startUpdate` and updatable data, client pointers, loadable and imperatively loaded fields, refetch queries, `missingFieldHandler`, persisted operations, lazy normalization ASTs and entrypoint loaders, `isFallible`, `writeData`, `AnyRecords` and `AnyChangesToRecord` subscriptions, and the logging event catalog (`log` receives callback and comparator errors only).
 
 ## Open decisions
 
-1. Propagation. Options: pull only (verify every subscription after each commit), push only (recompute dirty nodes at commit), push-pull. Pull only makes every write cost the size of every subscribed dependency graph. Push only recomputes results nobody reads and needs a topological order to backdate. Push-pull costs reverse edges and keeps pico's verification. I hold push-pull.
+1. Propagation. Options: pull only (verify every subscription after each commit), push only (recompute dirty nodes at commit), push-pull. Pull only makes every write cost the size of every subscribed dependency graph, the same order of work as upstream's overlap scan. Push only recomputes results nobody reads and needs a topological order to backdate. Push-pull costs a `Set` of reverse edges per source and per node and keeps pico's verification. I hold push-pull.
 
 2. How a type is marked for inline storage. Options: (a) a config list `inline_types` in `isograph.config.json`; (b) a directive on the type in an SDL extension file in `schema`; (c) every type without an `id` field is inline (Apollo's default for objects without key fields), with an opt-out list; (d) every type without `id` is normalized at a synthetic id (upstream's default), with an opt-in list. (c) makes an id-less singleton such as `viewer` one source, so any change under it re-runs every reader of it. (b) requires the user to own an extension file and a directive name the server never sees. (a) and (d) together keep upstream's behavior by default and make inline storage an explicit choice per type. I hold (a) with (d) as the default.
 
@@ -1261,11 +1327,11 @@ The costs this runtime adds: one object per field source and per derived node, a
 
 8. Cycles through resolvers over cyclic data (`field User.bestFriendName { bestFriend { bestFriendName } }` where two users are each other's best friend). Options: throw `CycleError` from the read, as pico panics (`crates/pico/src/dependency.rs:95-101`); or a `ReadResult` variant. A cached `Cycle` result would depend on a node that has no result yet. Upstream overflows the stack. I hold throw.
 
-9. When garbage collection runs. Options: upstream's trigger (a released retained query overflows the buffer) plus the exported `garbageCollect`; or also on every subscription dispose. Collecting on dispose bounds derived nodes sooner and makes an unmount followed by a remount of the same view recompute everything. I hold upstream's trigger plus `garbageCollect`.
+9. When garbage collection runs. Options: upstream's trigger (a released retained query overflows the buffer, `makeNetworkRequest.ts:565-577`) plus the exported `garbageCollect`; or also on every subscription dispose. Collecting on dispose bounds derived nodes sooner and makes an unmount followed by a remount of the same view recompute everything. I hold upstream's trigger plus `garbageCollect`.
 
 10. A response that lands after `dispose`. Options: drop it (upstream, `makeNetworkRequest.ts:235`), or write it. Writing keeps data the server sent, and GC may delete it at once since nothing retains it. I hold drop.
 
-11. Package location and name. Options: `libs/isograph-runtime` published as `@isograph/runtime`, or a directory under `crates`. i2 has no `libs` directory and `pnpm-workspace.yaml` lists only `docs-website`; upstream keeps JavaScript packages in `libs`. No upstream package is named `@isograph/runtime`. I hold `libs/isograph-runtime` and `@isograph/runtime`.
+11. Package location and name. Options: `libs/isograph-runtime` published as `@isograph/runtime`, or a directory under `crates`. i2 keeps JavaScript packages in `libs` (`libs/isograph-babel-plugin`), and `pnpm-workspace.yaml` lists `libs/*`. No upstream package is named `@isograph/runtime`. I hold `libs/isograph-runtime` and `@isograph/runtime`.
 
 12. Reads of a field on a record, beyond entrypoints. Options: export `readField` and `subscribeField` taking an `EagerReaderArtifact` and a `StoreLink`, or export only the entrypoint forms. A consumer that renders one pet subscribes to that pet's field without subscribing to the whole page. I hold exporting both.
 
@@ -1273,8 +1339,8 @@ The costs this runtime adds: one object per field source and per derived node, a
 
 Each change is one commit, in order.
 
-1. `libs/isograph-runtime`: `package.json` (`@isograph/runtime`, no dependencies), `tsconfig.json`, `src/index.ts`; `pnpm-workspace.yaml` gains `libs/*`.
-2. `artifacts.ts`, `store.ts`, `equality.ts`: every type in Artifacts and Store, `createStore`, `effectiveValue`, `rootKey`, `getStorageKey`, `fieldValueEqual`, `selectionSetDataEqual`.
+1. `libs/isograph-runtime`: `package.json` (`@isograph/runtime`, no dependencies), `tsconfig.json`, `src/index.ts`.
+2. `artifacts.ts`, `store.ts`, `equality.ts`: every type in changes 1, 2, and 11, `createStore`, `effectiveValue`, `rootKey`, `getStorageKey`, `fieldValueEqual`, `selectionSetDataEqual`.
 3. `derivedNode.ts`, `read.ts`, `subscribe.ts`: derived nodes, verification, backdating, `readField`, `subscribeField`, `readEntrypoint`, `subscribeEntrypoint`.
 4. `transaction.ts`: `StorePhase`, `transaction`, `writeField`, `markDirty`, delivery.
 5. `normalize.ts`, `network.ts`: `normalize`, `inlineValue`, `check`, `fetchEntrypoint` without optimistic responses.
