@@ -11,6 +11,8 @@ mod type_annotation;
 mod value;
 
 #[cfg(test)]
+mod demo_schemas;
+#[cfg(test)]
 mod span_of;
 #[cfg(test)]
 mod test_cursor;
