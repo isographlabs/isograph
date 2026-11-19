@@ -11,7 +11,7 @@ Prerequisites, in their own docs:
 - `refactors/pending/graphql-protocol/normalization-ast.md` changes 1 to 4.
 - `refactors/pending/runtime/store.md` changes 1 to 7: `Store`, `StoreLink` (`{ entityName, id }`), `Link`, `Variables`, `normalize`, `check`, `garbageCollect`, `RetainedQuery`, `stableStringify`, required parameters and input object fields.
 - `refactors/pending/runtime/reader-ast.md` changes 1 to 6: `ReaderArtifact`, `ResolverParam`, `SelectionSetData`, `read`, `ReadResult`, `ReadMissingData`, real `resolver_reader.ts` artifacts, the typed `IsographEntrypoint.readerArtifact`, `NamedImport`, `DeclaredConst`, `ExportDefaultBinding`.
-- `refactors/pending/runtime/network-and-subscriptions.md` changes 1 to 4: `IsographEnvironment`, `createIsographEnvironment`, `IsographNetworkFunction`, `ExtractParameters`, `PromiseWrapper` and its functions, `FetchOptions`, `ShouldFetch`, `fetchEntrypoint`, `NetworkRequestHandle`, `garbageCollectEnvironment`, `readButDoNotEvaluate`, `readAndSubscribe`, `SubscriptionResult`.
+- `refactors/pending/runtime/network-and-subscriptions.md` changes 1 to 6: `IsographEnvironment`, `createIsographEnvironment`, `IsographNetworkFunction`, `ExtractParameters`, `PromiseWrapper` and its functions, `FetchOptions`, `ShouldFetch`, `fetchEntrypoint`, `getOrCreateCacheForArtifact`, `garbageCollectEnvironment`, `readButDoNotEvaluate`, `readAndSubscribe`, `subscriptionSnapshot`, `SubscriptionResult`; `@isograph/disposable-types` with `CacheItem` and `ParentCache`.
 
 The demo's components below are plain React components that read resolver results with `FragmentReader`; `refactors/pending/runtime/components-in-userland.md` explores components returned by fields, and if it lands with another shape, the demo follows it.
 
@@ -147,7 +147,7 @@ What the user sees:
 
 - The home page shows "Loading pets..." for one render, then one button per pet, "Makayla Balicki: I AM HUNGRY" and "Mr Biggles: Pet me now, human". The mock network function was called once, with `HomeRoute`'s query text and `{}`.
 - Clicking a pet shows "Loading pet...", then the pet's full name, intelligence, best friend's first name ("Nobody" without one), and check-in locations, from the nested resolvers `fullName`, `PetStatsCard`, `PetBestFriendCard`, and `PetCheckinsCard`.
-- Clicking "Home" fetches `HomeRoute` again when the React package collects at disposal (open decision 1): unmounting `HomeRouteLoader` released its query, and `garbageCollectEnvironment` collected the pets it fetched before `PetDetailRoute`'s response arrived. Disposing a handle alone collects nothing (network-and-subscriptions.md).
+- Clicking "Home" fetches `HomeRoute` again when the React package collects at disposal (open decision 1): unmounting `HomeRouteLoader` released its query, and `garbageCollectEnvironment` collected the pets it fetched before `PetDetailRoute`'s response arrived. Releasing a request alone collects nothing (network-and-subscriptions.md).
 - Rendering the same entrypoint with the same variables twice sends one request.
 
 The demo's two resolvers return data the components read:
@@ -271,7 +271,7 @@ From `index.ts:1-183`. Keep means the name, signature, and behavior are upstream
 - No `@component`, `@loadable`, or directives: `useResult` has one case (`useResult.ts:28-36` removed); `FragmentReference.readerArtifactKind` is dropped; `useReadAndSubscribe` re-reads when its fragment reference changes, because upstream relied on a component per fragment reference to remount (`useRerenderOnChange.ts:31-36`).
 - No refetch queries and no lazily loaded readers: `FragmentReference.readerWithRefetchQueries` (a `PromiseWrapper`, `FragmentReference.ts:55-57`) is `readerArtifact`, the artifact itself; `getOrLoadReaderWithRefetchQueries` (`IsographEnvironment.ts:255-294`) is gone.
 - No store layers: `optimisticNetworkResponse` and every optimistic branch of `makeNetworkRequest` (`:190-198`, `:236-251`, `:495-563`) are dropped.
-- No release buffer: disposing a handle unretains and does not collect (network-and-subscriptions.md); when the React package calls `garbageCollectEnvironment` is open decision 1.
+- No release buffer: releasing a request unretains its query and does not collect (network-and-subscriptions.md); when the React package calls `garbageCollectEnvironment` is open decision 1.
 - No log events: every `logMessage` call is dropped (`useLazyReference.ts:42-48`).
 - Store shape: the environment holds store.md's `Store` (a `Map`), and the root record is `entrypoint.normalizationAst.root` (`{ entityName, id }`), not `{ __link: ROOT_ID, __typename: entrypoint.concreteType }` (`getOrCreateCacheForArtifact.ts:77`).
 - Links `{ entityName, id }`, typed `Link<TEntityName>`: `FragmentReference.root` and the stable id read `entityName` and `id` (`FragmentReference.ts:78`), and every hook over a reference carries the reference's `TEntityName`.
@@ -292,7 +292,6 @@ libs/isograph-react/                  @isograph/react
   src/index.ts
   src/core/entrypoint.ts
   src/core/FragmentReference.ts
-  src/core/getOrCreateCacheForArtifact.ts
   src/core/read.ts
   src/react/FragmentReader.tsx
   src/react/IsographEnvironmentProvider.tsx
@@ -455,9 +454,9 @@ Every generated parameters type is assignable to `Variables`, because every para
 
 ## The environment and the network path
 
-The environment, the network function, `PromiseWrapper`, the fetch options, retention, and `fetchEntrypoint` are `@isograph/runtime`'s (network-and-subscriptions.md). The React package imports them, re-exports none of them, and adds no field to the environment. The user creates one environment per app with the runtime's `createIsographEnvironment`, in a component's `useState` initializer (upstream's FAQ, `docs-website/docs/faq.md`, uses `useMemo`; the initializer runs once by contract).
+The environment, the network function, `PromiseWrapper`, the fetch options, retention, the request cache (`networkRequestCache`, `getOrCreateCacheForArtifact`), `fetchEntrypoint`, and the two-phase subscriptions are `@isograph/runtime`'s (network-and-subscriptions.md); `CacheItem` and `ParentCache` are `@isograph/disposable-types`'s. The React package imports them, re-exports none of them, and adds no field to the environment. The app creates one environment with the runtime's `createIsographEnvironment`, once, at module level or in a component's `useState` initializer (upstream's demos use `useMemo`, `isograph/demos/pet-demo/pages/_app.tsx:68-70`; the initializer runs once by contract), and `IsographEnvironmentProvider` only passes it through context.
 
-The runtime deduplicates requests in flight only (network-and-subscriptions.md, Deduplication). React needs more: a render that does not commit holds a request for a later render to reuse, after the request settled, through `@isograph/react-disposable-state`'s `ParentCache` per query text and variables (upstream's `fragmentCache`, `core/IsographEnvironment.ts:81-83`). That cache is React state, and the runtime's environment has no field for it. Where it lives is open decision 4; the snippets below read it as `environment.networkRequestCache` and are stale until that decision is made.
+The React package calls the runtime's pieces only at render and commit: at render, `getOrCreateCacheForArtifact(..).getOrPopulateAndTemporaryRetain()` and a temporarily retained `readAndSubscribe`; at commit, `permanentRetainIfNotDisposed`, as `useCachedResponsivePrecommitValue` and `useLazyDisposableState` do (network-and-subscriptions.md, The request cache, The two-phase lifetime). The hook snippets below are upstream's shape, which subscribes in an effect and reads the request cache through a React-side `getOrCreateCacheForArtifact`; they are stale against the runtime's two-phase subscriptions and its `getOrCreateCacheForArtifact` until this doc is next worked, when the subscribe moves to render under a temporary retain and the cache lookup is the runtime's.
 
 ```tsx
 // from libs/isograph-react/src/react/IsographEnvironmentProvider.tsx
@@ -593,7 +592,7 @@ import type {
 } from '@isograph/runtime';
 import { useMemo } from 'react';
 import type { FragmentReference } from '../core/FragmentReference';
-import { getOrCreateCacheForArtifact } from '../core/getOrCreateCacheForArtifact';
+import { getOrCreateCacheForArtifact } from '@isograph/runtime';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
 
 export function useLazyReference<
@@ -629,70 +628,16 @@ export function useLazyReference<
 }
 ```
 
-```ts
-// from libs/isograph-react/src/core/getOrCreateCacheForArtifact.ts
-import type { Factory, ItemCleanupPair } from '@isograph/disposable-types';
-import { ParentCache } from '@isograph/react-disposable-state';
-import {
-  type EntityName,
-  type ExtractParameters,
-  type FetchOptions,
-  fetchEntrypoint,
-  type IsographEntrypoint,
-  type IsographEnvironment,
-  type PromiseWrapper,
-  type ResolverParam,
-  stableStringify,
-} from '@isograph/runtime';
+`getOrCreateCacheForArtifact` is the runtime's (network-and-subscriptions.md, The request cache): the environment's `networkRequestCache`, keyed by `queryText + stableStringify(variables)`, upstream's key, with `fetchEntrypoint` as each `ParentCache`'s factory. `useLazyReference` imports it from `@isograph/runtime`, and `src/core/getOrCreateCacheForArtifact.ts` is not in this package.
 
-export function getOrCreateCacheForArtifact<
-  TReadFromStore extends ResolverParam<TEntityName>,
-  TClientFieldValue,
-  TEntityName extends EntityName,
->(
-  environment: IsographEnvironment,
-  entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue, TEntityName>,
-  variables: ExtractParameters<TReadFromStore>,
-  fetchOptions?: FetchOptions<TClientFieldValue>,
-): ParentCache<PromiseWrapper<void, unknown>> {
-  const cacheKey = stableStringify([entrypoint.queryText, variables]);
-  const factory = (): ItemCleanupPair<PromiseWrapper<void, unknown>> => {
-    const handle = fetchEntrypoint(
-      environment,
-      entrypoint,
-      variables,
-      fetchOptions ?? null,
-    );
-    return [handle.networkRequest, handle.dispose];
-  };
-  return getOrCreateItemInSuspenseCache(environment, cacheKey, factory);
-}
-
-export function getOrCreateItemInSuspenseCache(
-  environment: IsographEnvironment,
-  index: string,
-  factory: Factory<PromiseWrapper<void, unknown>>,
-): ParentCache<PromiseWrapper<void, unknown>> {
-  const existing = environment.networkRequestCache.get(index);
-  if (existing !== undefined) {
-    return existing;
-  }
-  const created = new ParentCache(factory);
-  environment.networkRequestCache.set(index, created);
-  return created;
-}
-```
-
-How it fetches: the first render with a cache key calls the factory through `useLazyDisposableState`, which temporarily retains the item (5000 ms, `disposable-state/CacheItem.ts:7`) and permanently retains it at commit. The factory is the runtime's `fetchEntrypoint`: `IfNecessary` calls store.md's `check` on the entrypoint's AST and variables, sends the request on `MissingData`, and retains the query either way. Normalizing writes the response, then `callSubscriptions` re-reads every subscription (network-and-subscriptions.md). A second render or a second component with the same query text and variables gets the same cached request. Unmount disposes the permanent retain; when no retain is left the cache item calls the handle's `dispose`, which unretains the query. Whether the package then calls `garbageCollectEnvironment` is open decision 1.
+How it fetches: the first render with a cache key calls the factory through `useLazyDisposableState`, which temporarily retains the item (5000 ms, `disposable-state/CacheItem.ts:7`) and permanently retains it at commit. The factory is the runtime's `fetchEntrypoint`: `IfNecessary` calls store.md's `check` on the entrypoint's AST and variables, sends the request on `MissingData`, and retains the query either way. Normalizing writes the response, then `callSubscriptions` re-reads every subscription (network-and-subscriptions.md). A second render or a second component with the same query text and variables gets the same cached request. Unmount disposes the permanent retain; when no retain is left the cache item calls `fetchEntrypoint`'s cleanup, which unretains the query. Whether the package then calls `garbageCollectEnvironment` is open decision 1.
 
 Deltas from `react/useLazyReference.ts:19-60` and `core/getOrCreateCacheForArtifact.ts:26-86`:
 
 - The signature drops `TNormalizationAst` and `TRawResponseType` and the conditional `...[fetchOptions]` tuple, which existed for `NormalizationAstLoader` (`RequiredFetchOptions` when the AST is loaded lazily). The return type is `{ fragmentReference }` without the `unknown` branch for the same reason.
 - No `kind !== 'Entrypoint'` log (`:42-48`): no log events, and the argument is a declared `IsographEntrypoint`.
-- The cache key is network-and-subscriptions.md's `NetworkRequestKey`, `stableStringify([queryText, variables])`, upstream's `operation.text + JSON.stringify(stableCopy(variables))` (`:42-54`) as the stable JSON of the pair.
-- The factory adapts the runtime's `NetworkRequestHandle` to the `ItemCleanupPair` that `ParentCache` takes.
-- The cache holds the network request, not the `FragmentReference` (`:55-84`), and the hook builds the reference from its own typed `entrypoint` and `variables`. Upstream's `fragmentCache` is `CacheMap<FragmentReference<any, any>>` (`IsographEnvironment.ts:81-83`), whose `any` lets one map hold every entrypoint's references; with `any` banned, a map of references needs a cast to the caller's type parameters. The request is untyped (`PromiseWrapper<void, unknown>`), so the map needs none. `useMemo` keeps the reference's identity per request: one cache key gives one request item, and one query text and variables give one entrypoint and equal variables (open decision 4).
-- `getOrCreateItemInSuspenseCache` (`core/cache.ts:34-47`) reads and writes a `Map`.
+- The cache and its key are the runtime's, upstream's `operation.text + JSON.stringify(stableCopy(variables))` (`:42-54`).
+- The cache holds the network request, not the `FragmentReference` (`:55-84`), and the hook builds the reference from its own typed `entrypoint` and `variables`. Upstream's `fragmentCache` is `CacheMap<FragmentReference<any, any>>` (`IsographEnvironment.ts:81-83`), whose `any` lets one map hold every entrypoint's references; with `any` banned, a map of references needs a cast to the caller's type parameters. The request is untyped (`PromiseWrapper<void, unknown>`), so the map needs none. `useMemo` keeps the reference's identity per request: one cache key gives one request item, and one query text and variables give one entrypoint and equal variables.
 
 ## `useImperativeReference`
 
@@ -743,7 +688,7 @@ export function useImperativeReference<
       variables: ExtractParameters<TReadFromStore>,
       fetchOptions?: FetchOptions<TClientFieldValue>,
     ) => {
-      const handle = fetchEntrypoint(
+      const [networkRequest, disposeNetworkRequest] = fetchEntrypoint(
         environment,
         entrypoint,
         variables,
@@ -755,9 +700,9 @@ export function useImperativeReference<
           fieldName: entrypoint.name,
           root: entrypoint.normalizationAst.root,
           variables,
-          networkRequest: handle.networkRequest,
+          networkRequest,
         },
-        handle.dispose,
+        disposeNetworkRequest,
       ]);
     },
   };
@@ -1086,15 +1031,15 @@ Delta from `react/FragmentReader.tsx:10-29`: the reference's type is given by `T
 
 ## Disposal, StrictMode, and upstream's disposable-state behavior
 
-StrictMode is supported, as upstream supports it. Upstream's `1ba744d7` ("useLazyDisposableState and friends survive effect re-runs under StrictMode and Fast Refresh") added `useEffectsRerunWithoutRenderRef` (`disposable-state/useEffectsRerunWithoutRender.ts:15-23`): `useCachedResponsivePrecommitValue`'s effect re-acquires the item from the parent cache, or the factory, when its effect re-runs without a render (`useCachedResponsivePrecommitValue.ts:74-98`), and `useLazyDisposableState`'s cleanup forgets its pair (`useLazyDisposableState.ts:31-43`). The same commit enabled `reactStrictMode` in upstream's demos (`demos/pet-demo/next.config.js:5`) and removed the FAQ and quickstart sections that told users to disable StrictMode, so upstream's `docs-website/docs/faq.md` and `quickstart.md` at `9d72f6fc` no longer say otherwise. The demo's `main.tsx` renders under `StrictMode`, and the hook tests render under it (Tests). In development a StrictMode mount sends the request, releases it on the simulated unmount, and re-acquires it on the remount: from the parent cache when another holder retains it, else through the factory, which joins the request in flight (network-and-subscriptions.md, Deduplication), so the network sees one call.
+StrictMode is supported, as upstream supports it. Upstream's `1ba744d7` ("useLazyDisposableState and friends survive effect re-runs under StrictMode and Fast Refresh") added `useEffectsRerunWithoutRenderRef` (`disposable-state/useEffectsRerunWithoutRender.ts:15-23`): `useCachedResponsivePrecommitValue`'s effect re-acquires the item from the parent cache, or the factory, when its effect re-runs without a render (`useCachedResponsivePrecommitValue.ts:74-98`), and `useLazyDisposableState`'s cleanup forgets its pair (`useLazyDisposableState.ts:31-43`). The same commit enabled `reactStrictMode` in upstream's demos (`demos/pet-demo/next.config.js:5`) and removed the FAQ and quickstart sections that told users to disable StrictMode, so upstream's `docs-website/docs/faq.md` and `quickstart.md` at `9d72f6fc` no longer say otherwise. The demo's `main.tsx` renders under `StrictMode`, and the hook tests render under it (Tests). In development a StrictMode mount sends the request, releases it on the simulated unmount, and re-acquires it on the remount: from the parent cache when another holder still temporarily retains it, else through the factory, which with `IfNecessary` sees `MissingData` while the first request is in flight and sends a second one, as upstream does (network-and-subscriptions.md, decision 4). The first response is dropped, because its item was disposed, and the second is normalized.
 
 Traces of upstream bugs that the current checkout fixes are gone from this doc: the StrictMode "A permanent retain should only be cleared once." throw (fixed by `1ba744d7`), `useDisposableState`'s throw on its second `setState` (`useDisposableState.ts:31-41`, the throw removed by `1ba744d7`), and a temporary retain cleared twice by its callback (fixed by `a8e129cf`).
 
 The following hold at `9d72f6fc`, traced from source, not reproduced:
 
-- A render not committed within 5000 ms disposes its item (`CacheItem.ts:7`, `:248-251`). When the component that calls `useLazyReference` is itself suspended (a `Suspense` boundary above it, and its reader in the same component), the handle is disposed before a slower response arrives; when no other handle joined the request, the response is dropped (network-and-subscriptions.md, Deduplication) and the read's subscription never fires. The demo places `Suspense` below the loader, as upstream's demo does (`isograph/demos/pet-demo/src/components/HomeRoute.tsx:32-47`).
-- When the commit finds its item disposed and the parent cache empty, it creates one with `parentCache.factory()` outside the parent cache (`useCachedResponsivePrecommitValue.ts:89-98`), so another component with the same cache key creates another item. With the runtime's deduplication, that item joins the request while it is in flight; after it settled, `IfNecessary` finds the data with `check` and sends nothing.
-- The first caller's `fetchOptions` win for a cache key: the factory closes over them (`getOrCreateCacheForArtifact.ts:55-84`), so a second component's `onComplete` with the same query and variables is not called. The runtime calls each joined handle's own options (network-and-subscriptions.md, open decision 4); the React cache in front of it keeps upstream's outcome.
+- A render not committed within 5000 ms disposes its item (`CacheItem.ts:7`, `:248-251`). When the component that calls `useLazyReference` is itself suspended (a `Suspense` boundary above it, and its reader in the same component), the item is disposed before a slower response arrives, the response is dropped (network-and-subscriptions.md, `fetchEntrypoint`), and the read's subscription never fires. The demo places `Suspense` below the loader, as upstream's demo does (`isograph/demos/pet-demo/src/components/HomeRoute.tsx:32-47`).
+- When the commit finds its item disposed and the parent cache empty, it creates one with `parentCache.factory()` outside the parent cache (`useCachedResponsivePrecommitValue.ts:89-98`), so another component with the same cache key creates another item. That item's `fetchEntrypoint` sends a second request while the first is in flight (`IfNecessary` sees `MissingData`); after the first settled, `IfNecessary` finds the data with `check` and sends nothing.
+- The first caller's `fetchOptions` win for a cache key: the factory closes over them (`getOrCreateCacheForArtifact.ts:55-84`), so a second component's `onComplete` with the same query and variables is not called. The runtime's cache keeps this outcome (network-and-subscriptions.md, The request cache).
 - Cache entries are never removed: one empty `ParentCache` per distinct query text and variables stays in the map for the environment's life (`ParentCache.ts:32`, "TODO pass an onEmpty function").
 - `useReadAndSubscribe` keeps stale data when its fragment reference changes: fixed here, because v1 forces it (Reading).
 
@@ -1102,18 +1047,18 @@ Held for the rest: upstream's behavior. Each is listed so that a fix is a decisi
 
 ## The disposable-state packages
 
-`@isograph/disposable-types` (`libs/isograph-disposable-types`) and `@isograph/react-disposable-state` (`libs/isograph-react-disposable-state`) are upstream's two packages, ported unchanged from the checkout at `9d72f6fc`: every source file, test, `index.ts`, `package.json` dependency, and `vitest.config.ts`, as upstream has them. `@isograph/disposable-types` is `src/index.ts` (`CleanupFn`, `ItemCleanupPair`, `Factory`, `joinCleanups`) and `src/joinCleanups.test.ts`. `@isograph/react-disposable-state` is `CacheItem.ts`, `ParentCache.ts`, `useCachedResponsivePrecommitValue.ts`, `useDisposableArray.ts`, `useDisposableState.ts`, `useEffectsRerunWithoutRender.ts`, `useHasCommittedRef.ts`, `useLazyDisposableState.ts`, `useUpdatableDisposableClearableState.ts`, `useUpdatableDisposableState.ts`, and their tests, under `src/`, with upstream's `index.ts` (`export *` of each module and of `@isograph/disposable-types`).
+`@isograph/disposable-types` (`libs/isograph-disposable-types`) and `@isograph/react-disposable-state` (`libs/isograph-react-disposable-state`) are upstream's two packages, ported unchanged from the checkout at `9d72f6fc`: every source file, test, `index.ts`, `package.json` dependency, and `vitest.config.ts`, as upstream has them. `@isograph/disposable-types` is ported by network-and-subscriptions.md (change 1), which also moves `CacheItem.ts` and `ParentCache.ts` with their tests into it, unchanged but for their import of that package's own types (its change 2). `@isograph/react-disposable-state` is `useCachedResponsivePrecommitValue.ts`, `useDisposableArray.ts`, `useDisposableState.ts`, `useEffectsRerunWithoutRender.ts`, `useHasCommittedRef.ts`, `useLazyDisposableState.ts`, `useUpdatableDisposableClearableState.ts`, `useUpdatableDisposableState.ts`, and their tests, under `src/`, with upstream's `index.ts` (`export *` of each module and of `@isograph/disposable-types`, which now includes `CacheItem` and `ParentCache`, so the package's exports are upstream's). The only change from upstream is the import of `./CacheItem` and `./ParentCache`, which is `@isograph/disposable-types` in `useCachedResponsivePrecommitValue.ts`, `useLazyDisposableState.ts`, `useDisposableState.ts`, and their tests, and the two `export *` lines leaving `index.ts`.
 
 The port keeps upstream's code as it is, including TypeScript's `private __x` fields, the tests' `(x as any).__state` reads, the `@ts-ignore`d `tsTests` functions, and the internal booleans (`cleared`, `hasCommittedRef`). These differ from AGENTS.md's TypeScript rules (ES private fields, no `any`) and its Booleans rule; the user's decision is that the two packages are upstream's code, ported as is, so that a later upstream fix ports by copying. Their `package.json` and `tsconfig.json` are upstream's, with `private` and the workspace's source `exports` (`types` and `import`) in place of upstream's `dist` builds, as `@isograph/react`'s. If the workspace's oxlint or typecheck hooks reject the ported code, the implementer stops and raises it.
 
 ## The network request lifecycle, end to end
 
-1. `useLazyReference` renders: `getOrCreateCacheForArtifact` returns the cache for `stableStringify([queryText, variables])`; `useLazyDisposableState` calls its factory on the first render.
-2. The factory: the runtime's `fetchEntrypoint`, which checks, sends or joins the request or retains without sending, and retains `{ ast, variables }` in `environment.retainedQueries`.
+1. `useLazyReference` renders: the runtime's `getOrCreateCacheForArtifact` returns the cache for `queryText + stableStringify(variables)`; `useLazyDisposableState` calls its factory on the first render.
+2. The factory: the runtime's `fetchEntrypoint`, which checks, sends the request or retains without sending, and retains `{ ast, variables }` in `environment.retainedQueries`.
 3. `FragmentReader` renders `useResult`: `maybeUnwrapNetworkRequest`, then `useReadAndSubscribe` reads with `readButDoNotEvaluate`; `MissingData` throws `onNextChangeToFragmentData`'s promise.
 4. The response arrives: `normalize`, then `callSubscriptions`: the suspended read's subscription sees `Ok`, removes itself, and resolves; React retries and the read is `Ok`. The component commits; `useRerenderOnChange` subscribes with the rendered data.
 5. A later write that changes the data calls the subscription's callback, which sets state; the component re-renders and calls the resolver on the new data.
-6. Unmount: `useRerenderOnChange` unsubscribes; `useLazyReference`'s permanent retain is cleared, and the cache item calls the handle's `dispose`, which unretains the query. Collection follows open decision 1.
+6. Unmount: `useRerenderOnChange` unsubscribes; `useLazyReference`'s permanent retain is cleared, and the cache item calls `fetchEntrypoint`'s cleanup, which unretains the query. Collection follows open decision 1.
 
 ## Errors
 
@@ -1122,7 +1067,7 @@ Every throw this package adds or keeps, and its invariant:
 - `useIsographEnvironment` outside a provider: upstream's message (`IsographEnvironmentProvider.tsx:25-34`). The invariant is the user's: hooks render under a provider.
 - `readOrSuspend` and `maybeUnwrapNetworkRequest` throw promises and the network error. These are React's Suspense and error boundary protocol, upstream's behavior, not broken invariants.
 - The ported disposable-state throws ("This indicates a bug in react-disposable-state.", "Calling setState before the component has committed is unsafe and disallowed."): upstream's, unchanged.
-- The runtime's network path rejects a handle on a network error or a malformed response (network-and-subscriptions.md, Errors); a reader sees it through `onNetworkError`.
+- The runtime's network path rejects a request's wrapper on a network error or a malformed response (network-and-subscriptions.md, Errors); a reader sees it through `onNetworkError`.
 
 ## The React demo
 
@@ -1444,7 +1389,7 @@ with `entrypoint Query.PetNames`, `Query.PetName`, `Mutation.SetName`, one sourc
 - `IfNecessary` with the data already normalized: no call, and the first commit renders the names with no fallback.
 - `shouldFetch: 'No'` on an empty store: no call, the fallback stays; then a second loader with `PetNames` and `'Yes'` mounts and its response arrives: both render the names.
 - Unmount: `retainedQueries.size` and `subscriptions.size` are 0; the store equals `new Map()` after the collection open decision 1 chooses.
-- Under `StrictMode`: the first render shows the fallback; one network call; after the response, the names; `retainedQueries.size` is 1. Unmount: `retainedQueries.size` is 0.
+- Under `StrictMode`: the first render shows the fallback; two network calls (the remount's factory sends again while the first is in flight); after the second response, the names; `retainedQueries.size` is 1. Unmount: `retainedQueries.size` is 0.
 - Unmount before the response, then the response: the store stays empty.
 - A rejected request with an error boundary: the boundary renders the error; `onError` has one call.
 - `onComplete` has one call with `["Rex", "Ash"]`.
@@ -1479,25 +1424,21 @@ Rendering `<App networkFunction={deferred} />`:
 
 Each change is one commit, in order. Each package change adds its CI steps to `.github/workflows/js.yml` (`typecheck`, and `test` where the package has tests) and its pre-commit hooks (the runtime's two, with the package name and `files: '^libs/<directory>/'`), and runs `pnpm install` to update `pnpm-lock.yaml`.
 
-### 1. `@isograph/disposable-types` (libs/isograph-disposable-types)
+### 1. `@isograph/react-disposable-state` (libs/isograph-react-disposable-state)
 
-The port of upstream's package at `9d72f6fc`, its tests, the `typecheck` and `test` CI steps and hooks.
+The port of upstream's package at `9d72f6fc` and its tests, with the import change above. Depends on network-and-subscriptions.md change 2.
 
-### 2. `@isograph/react-disposable-state` (libs/isograph-react-disposable-state)
+### 2. `@isograph/react` core (libs/isograph-react)
 
-The port of upstream's package at `9d72f6fc` and its tests, unchanged. Depends on 1.
+The package files; `src/core/*`; `src/index.ts` exporting the core names; the fixture project and its generated artifacts; `vitest.config.ts`, `test/setup.ts`, `test/fixtures.tsx`. Depends on network-and-subscriptions.md change 6, reader-ast.md change 3, and 1.
 
-### 3. `@isograph/react` core (libs/isograph-react)
+### 3. `@isograph/react` hooks and components (libs/isograph-react)
 
-The package files; `src/core/*`; `src/index.ts` exporting the core names; the fixture project and its generated artifacts; `vitest.config.ts`, `test/setup.ts`, `test/fixtures.tsx`. Depends on network-and-subscriptions.md change 4, reader-ast.md change 3, and 2.
+`src/react/*`; the rest of `src/index.ts`; `test/useLazyReference.test.tsx`, `test/useImperativeReference.test.tsx`, `test/useResult.test.tsx`. Depends on 2.
 
-### 4. `@isograph/react` hooks and components (libs/isograph-react)
+### 4. The React pet demo (demos/pet-demo)
 
-`src/react/*`; the rest of `src/index.ts`; `test/useLazyReference.test.tsx`, `test/useImperativeReference.test.tsx`, `test/useResult.test.tsx`. Depends on 3.
-
-### 5. The React pet demo (demos/pet-demo)
-
-`isograph.config.json`, `package.json`, `tsconfig.json`, `vite.config.ts`, `index.html`, `src/main.tsx`, `src/App.tsx`, `src/routes.ts`, `src/HomeRouteLoader.tsx`, `src/PetDetailRouteLoader.tsx`, `src/mockNetwork.ts`, the two resolver bodies, `test/setup.ts`, `test/App.test.tsx`; the `test` CI step and hook for the pet demo. Depends on 4.
+`isograph.config.json`, `package.json`, `tsconfig.json`, `vite.config.ts`, `index.html`, `src/main.tsx`, `src/App.tsx`, `src/routes.ts`, `src/HomeRouteLoader.tsx`, `src/PetDetailRouteLoader.tsx`, `src/mockNetwork.ts`, the two resolver bodies, `test/setup.ts`, `test/App.test.tsx`; the `test` CI step and hook for the pet demo. Depends on 3.
 
 ## Docs this doc amends
 
@@ -1516,7 +1457,7 @@ The package files; `src/core/*`; `src/index.ts` exporting the core names; the fi
 
 ### 1. When the React package collects
 
-Disposing a runtime handle unretains and does not collect (network-and-subscriptions.md); collection runs when a caller calls `garbageCollectEnvironment`.
+Releasing a runtime request unretains its query and does not collect (network-and-subscriptions.md); collection runs when a caller calls `garbageCollectEnvironment`.
 
 - (a) After every disposal the React package makes. Cost: navigating back refetches what the previous screen released, as the demo shows, and every unmount walks every retained query.
 - (b) Never automatically; the user calls `garbageCollectEnvironment`. Cost: the store grows until the user collects.
@@ -1538,18 +1479,3 @@ Not held.
 
 - (a) Vite (`vite.config.ts`, `index.html`, `main.tsx`) and the vitest test (held). Upstream's `demos/vite-demo` is the shape.
 - (b) The test only. Cost: no demo a person can open.
-
-### 4. The request cache: what it holds and where it lives
-
-What it holds:
-
-- (a) The network request; the hook builds the `FragmentReference` (the snippets above). No cast.
-- (b) The `FragmentReference`, as upstream (`getOrCreateCacheForArtifact.ts:69-82`). Cost: the map holds references of every entrypoint, so reading one back needs a cast to the caller's type parameters.
-
-Where it lives, now that the environment is the runtime's:
-
-- (c) A React environment the provider holds, `{ environment: IsographEnvironment; networkRequestCache: Map<NetworkRequestKey, ParentCache<PromiseWrapper<void, unknown>>> }`. Cost: every hook reads the runtime environment through it, and `useIsographEnvironment` returns the React type.
-- (d) A field of the runtime's `IsographEnvironment`. Cost: the runtime holds a field only React reads, typed by `@isograph/react-disposable-state`.
-- (e) A `WeakMap` from environment to cache in a module of `@isograph/react`. Cost: ambient state the program mints, which AGENTS.md (Shared state) rules out by default.
-
-Not held.
