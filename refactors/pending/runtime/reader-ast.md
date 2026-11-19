@@ -1040,7 +1040,7 @@ export function read<TEntityName extends EntityName, TOutput>(
 }
 ```
 
-A caller passes a generated artifact directly: `read(store, petSummaryReaderArtifact, queryRoot, { id: "1" })` infers `TEntityName` (`"Query"`) and `TOutput` from the artifact's declared type, by the bivariance above, and checks `queryRoot` against `Link<"Query">`. `index.ts` also exports `Link` (store.md). Upstream's `read` passes no link to the resolver (`read.ts:189-191` puts the root link in `data` only under a `__link` selection). `index.ts` exports `read`, `ReadResult`, `ReadOk`, and `ReadMissingData`.
+A caller passes the artifact the generated default export returns: `read(store, petSummaryReaderArtifact(), queryRoot, { id: "1" })` infers `TEntityName` (`"Query"`) and `TOutput` from the artifact's declared type, by the bivariance above, and checks `queryRoot` against `Link<"Query">`. `index.ts` also exports `Link` (store.md). Upstream's `read` passes no link to the resolver (`read.ts:189-191` puts the root link in `data` only under a `__link` selection). `index.ts` exports `read`, `ReadResult`, `ReadOk`, and `ReadMissingData`.
 
 `ReadMissingData` is upstream's `ReadDataResult`'s `MissingData` case (`isograph/libs/isograph-react/src/core/read.ts:135-143`: `reason: string`, `nestedReason?: ReadDataResult<unknown>`, `recordLink: StoreLink`), with `recordLink` of store.md's `StoreLink` and `nestedReason` narrowed to the `MissingData` case, the only one upstream ever puts there (`read.ts:302-305`, `:579-584`, `:656-662`, `:737-747`). Upstream has no store key field: the absent store key appears only inside `reason` (`'No value for ' + storeRecordName + ' on root ' + root.__link`, `read.ts:626-631`), and this doc does the same. Upstream's caller waits on `recordLink` for that record to change (`onNextChangeToRecord`, `read.ts:118`, `:122`); in i2 a later fetch policy can refetch that record (`refactors/pending/runtime/fetch-policies.md`).
 
@@ -1108,7 +1108,7 @@ function readSelection(
       return refined.kind === "MissingData" ? missingDataFor(selection.alias, root, refined) : refined;
     }
     case "Resolver": {
-      const resolved = read(store, selection.readerArtifact, root, childVariables(variables, selection.arguments));
+      const resolved = read(store, selection.readerArtifact(), root, childVariables(variables, selection.arguments));
       return resolved.kind === "MissingData" ? missingDataFor(selection.alias, root, resolved) : resolved;
     }
   }
@@ -1139,7 +1139,7 @@ function readLinkedValue(
   key: StoreKey,
   variables: Variables,
 ): ReadResult<unknown> {
-  if (value === null) {
+  if (value == null) {
     return ok(null);
   }
   if (Array.isArray(value)) {
@@ -1269,6 +1269,8 @@ No new memo besides the prefactor's `field_variables`. The reader AST is part of
 
 ## Tests
 
+Delta (landed), spies: a reader artifact's default export returns a new object on every call, so a `vi.spyOn` on one returned object does not see the call a `Resolver` node makes through the next. A nested resolver is spied on at its source module: `vi.mock("../fixtures/store/src/PetName", ..)` returns the module with its resolver wrapped in `vi.fn`, and the generated reader artifact imports it from that module. A top-level resolver is spied on with `vi.spyOn(artifact, "resolver")` on the object the test passes to `read`. A source module that also holds an `entrypoint` literal (`PetSummary.ts`, `Links.ts`) cannot be mocked this way: the mock's factory loads the original, which loads its entrypoint artifact and its reader artifact while the mock is unfinished, and that reader binds the original resolver; so `PetSummary` and `Links` are spied on at the top level only. The `Variables` fact for `{ name: null }` asserts that `variableGreeting` and `nullGreeting` read the same value, the one stored under `greeting____name___null`, because `Leaves` writes that store key twice (`nullGreeting` and `variableGreeting` with `name: null`).
+
 No snapshots. Facts about the reader AST, the printed artifact, and the read result.
 
 ### Compiler: reader AST against the iso literal
@@ -1377,7 +1379,7 @@ with `entrypoint Query.PetSummary`, `entrypoint Query.PetSummaries`, `entrypoint
 - Own links: `Links` with `{ id: "1" }`, after normalizing a response whose `pet` is `Pet:1` with a `stats` object and a `bestFriend` `Pet:2`, and whose `node` has `__typename: "Pet"` and `id: "1"`, reads `{ pet: { PetLink: { entityName: "Pet", id: "1" }, stats: { StatsLink: { entityName: "PetStats", id: "Pet:1.stats" } }, bestFriend: { PetLink: { entityName: "Pet", id: "2" } } }, node: { NodeLink: { entityName: "Pet", id: "1" } } }`. These are, in order, the own link on a nested record, on a record with a derived id, a nested record's link through the one-line `PetLink` selected in the nested selection set, and the own link on a record of an abstract entity, which names the concrete entity. With `stats: null` the value is `stats: null` and `StatsLink`'s resolver is not called. A `vi.spyOn` on `Links`'s reader artifact's `resolver` sees one call whose `link` equals `queryRoot`. `PetLink`'s reader artifact read rooted at `{ entityName: "Pet", id: "4" }` (after `PetDetail` normalized `Pet:4`) is `Ok` with that link.
 - Degenerate cases: a `Linked` node over `[]` reads `[]`; an empty reader AST passes `{}` as `data` to its resolver, with `link` the root.
 - The store is unchanged by every read.
-- No caching: `PetSummary` with `{ id: "1" }` is normalized and read once, with `vi.spyOn(artifact, "resolver")` on the imported reader artifacts of `Query.PetSummary`, `Pet.PetName`, and `Pet.RecentCheckins` (the objects the `Resolver` nodes' `readerArtifact` imports reach, so the spies see the nested calls; `PetSummary` resolves `PetName` and `RecentCheckins`, a chain of two levels). Each spy has one call. Then `normalize` writes data no read selects (`PetLists` writing `Pet:9`) and data the read selects (`PetDetail` changing `Pet:1`'s `name`), and the test reads again with the same variables: every spy has two calls, `PetName`'s whose input changed and `RecentCheckins`'s whose input did not. v1 has no memoization, so every resolver runs on every read. This test is expected to change when the pico-style runtime lands (`refactors/pending/runtime/pico-runtime.md`): then only resolvers whose inputs changed run again, and `RecentCheckins`'s spy stays at one call.
+- No caching: `PetSummary` with `{ id: "1" }` is normalized and read once, with a spy on each of `Query.PetSummary`'s, `Pet.PetName`'s, and `Pet.RecentCheckins`'s resolvers (`PetSummary` resolves `PetName` and `RecentCheckins`, a chain of two levels). Each spy has one call. Then `normalize` writes data no read selects (`PetLists` writing `Pet:9`) and data the read selects (`PetDetail` changing `Pet:1`'s `name`), and the test reads again with the same variables: every spy has two calls, `PetName`'s whose input changed and `RecentCheckins`'s whose input did not. v1 has no memoization, so every resolver runs on every read. This test is expected to change when the pico-style runtime lands (`refactors/pending/runtime/pico-runtime.md`): then only resolvers whose inputs changed run again, and `RecentCheckins`'s spy stays at one call.
 
 ### Types
 
@@ -1397,21 +1399,23 @@ const petLink: Link<"Pet"> = { entityName: "Pet", id: "1" };
 const storeLink: StoreLink = petLink;
 
 test("read takes a link to a record of the reader artifact's parent entity", () => {
-  read(store, linksReaderArtifact, queryRoot, { id: "1" });
-  read(store, nodeLinkReaderArtifact, petLink, {});
-  expectTypeOf(read(store, petLinkReaderArtifact, petLink, {})).toEqualTypeOf<ReadResult<Link<"Pet">>>();
+  read(store, linksReaderArtifact(), queryRoot, { id: "1" });
+  read(store, nodeLinkReaderArtifact(), petLink, {});
+  expectTypeOf(read(store, petLinkReaderArtifact(), petLink, {})).toEqualTypeOf<ReadResult<Link<"Pet">>>();
   // @ts-expect-error a Pet link to a Query reader artifact
-  read(store, linksReaderArtifact, petLink, { id: "1" });
+  read(store, linksReaderArtifact(), petLink, { id: "1" });
   // @ts-expect-error a Query link to a Pet reader artifact
-  read(store, petLinkReaderArtifact, queryRoot, {});
+  read(store, petLinkReaderArtifact(), queryRoot, {});
   // @ts-expect-error a Query link to a reader artifact of Node, which Query does not implement
-  read(store, nodeLinkReaderArtifact, queryRoot, {});
+  read(store, nodeLinkReaderArtifact(), queryRoot, {});
   // @ts-expect-error a link whose entity name is any string
-  read(store, petLinkReaderArtifact, storeLink, {});
+  read(store, petLinkReaderArtifact(), storeLink, {});
 });
 ```
 
 ### Loading reader artifacts
+
+Delta (landed): `typecheck.tsconfig` is `./tsconfig.test.json`. The package's `tsconfig.json` is store.md's solution file (`files: []` with references), and vitest's type check over it checks no file, so an unused `@ts-expect-error` passed; with `tsconfig.test.json`, removing one fails `vitest run`.
 
 A generated `resolver_reader.ts` imports its resolver as a value from the fixture's source file (`import { PetSummary as resolver } from "./../../../PetSummary"`). That module calls `iso(..)`, and the generated `iso.ts` throws when called (`iso: Unexpected invocation at runtime. Either the Babel transform was not set up, ..`, `demos/pet-demo/src/__isograph/iso.ts`). vitest therefore runs `@isograph/babel-plugin` (`libs/isograph-babel-plugin`) over the fixture's source files, which turns `` iso(`field ..`)(fn) `` into `fn` and `` iso(`entrypoint ..`) `` into an import of the entrypoint artifact (`compileTag.js`), and tests import the generated reader artifacts the compiler wrote.
 
@@ -1427,7 +1431,7 @@ const fixtureSources = path.join(fixtureDirectory, "src") + path.sep;
 const generatedArtifacts = path.join(fixtureSources, "__isograph") + path.sep;
 
 export default defineConfig({
-  test: { typecheck: { enabled: true } },
+  test: { typecheck: { enabled: true, tsconfig: "./tsconfig.test.json" } },
   plugins: [
     {
       name: "isograph-babel-plugin",

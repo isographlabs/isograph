@@ -1,0 +1,1 @@
+export default "query PetSummary($id: ID!) {\n  pet____id___v_id: pet(id: $id) {\n    __typename\n    id\n    checkins____limit___l_2: checkins(limit: 2) {\n      __typename\n      id\n      location\n    }\n    name\n    nickname\n  }\n}";

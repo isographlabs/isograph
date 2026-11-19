@@ -131,6 +131,12 @@ importers:
 
   libs/isograph-runtime:
     devDependencies:
+      '@babel/core':
+        specifier: ^7.28.3
+        version: 7.28.3
+      '@isograph/babel-plugin':
+        specifier: workspace:*
+        version: link:../isograph-babel-plugin
       typescript:
         specifier: 5.6.3
         version: 5.6.3

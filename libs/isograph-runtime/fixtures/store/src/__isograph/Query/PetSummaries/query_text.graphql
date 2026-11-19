@@ -1,0 +1,8 @@
+query PetSummaries {
+  pets {
+    __typename
+    id
+    name
+    nickname
+  }
+}

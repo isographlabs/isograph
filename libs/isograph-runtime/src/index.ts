@@ -41,3 +41,9 @@ export type {
 export { normalize } from './normalize';
 export { check, type CheckResult } from './check';
 export { garbageCollect, type RetainedQuery } from './garbageCollection';
+export {
+  read,
+  type ReadMissingData,
+  type ReadOk,
+  type ReadResult,
+} from './read';

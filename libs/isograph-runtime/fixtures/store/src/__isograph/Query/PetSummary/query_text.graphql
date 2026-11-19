@@ -1,0 +1,13 @@
+query PetSummary($id: ID!) {
+  pet____id___v_id: pet(id: $id) {
+    __typename
+    id
+    checkins____limit___l_2: checkins(limit: 2) {
+      __typename
+      id
+      location
+    }
+    name
+    nickname
+  }
+}

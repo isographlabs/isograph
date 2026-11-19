@@ -1,0 +1,1 @@
+export default "query Links($id: ID!) {\n  node____id___v_id: node(id: $id) {\n    __typename\n    id\n  }\n  pet____id___v_id: pet(id: $id) {\n    __typename\n    id\n    bestFriend {\n      __typename\n      id\n    }\n    stats {\n      __typename\n    }\n  }\n}";

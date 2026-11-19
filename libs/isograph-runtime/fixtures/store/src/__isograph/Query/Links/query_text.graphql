@@ -1,0 +1,17 @@
+query Links($id: ID!) {
+  node____id___v_id: node(id: $id) {
+    __typename
+    id
+  }
+  pet____id___v_id: pet(id: $id) {
+    __typename
+    id
+    bestFriend {
+      __typename
+      id
+    }
+    stats {
+      __typename
+    }
+  }
+}
