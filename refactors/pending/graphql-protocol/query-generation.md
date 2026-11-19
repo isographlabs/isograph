@@ -152,7 +152,7 @@ pub enum SelectableShape {
 }
 ```
 
-The core decides nothing about which identity an entity has; it inserts the selections the protocol names, as the neutral `Discriminator` and `Identity` variants below, and builds the normalization AST from the same map. The discriminator is one selectable per protocol, not one per entity, because the runtime reads one discriminator response key per artifact (normalization-ast.md open decision 2); `discriminator()`'s contract is the rule "every selection set on a composite entity selects it", which is GraphQL's rule below. A protocol whose rule names a discriminator per entity would move it into `EntityShape::Composite` and carry the key per composite target in the AST.
+The core decides nothing about which identity an entity has; it inserts the selections the protocol names, as the neutral `Discriminator` and `Identity` variants below, and builds the normalization AST from the same map. The discriminator is one selectable per protocol, not one per entity, because the runtime reads one discriminator response key per artifact (normalization-ast.md, The discriminator); `discriminator()`'s contract is the rule "every selection set on a composite entity selects it", which is GraphQL's rule below. A protocol whose rule names a discriminator per entity would move it into `EntityShape::Composite` and carry the key per composite target in the AST.
 
 `IdentitySelection` carries the name, so a later identity rule that names a different selectable per entity (`IdentityFieldSelection::KeyDirective`, Config below) changes only the protocol's `entity_shape`. `KeyDirective` with several key selectables changes `IdentitySelection::Select` to carry a non-empty list.
 
@@ -916,7 +916,7 @@ fn contains<TProfile: CompilationProfile>(
 
 ### The `node` selection's selections
 
-`node(id:)` returns the entity whose id is `$id`, so the entity is known by construction. The `node` selection's selections are the entity's own completed selections, and nothing is selected beside them: no `__typename` and no `id` under `node` outside the fragment, and no condition in the normalization AST. The GraphQL text still prints `... on T` around them, because GraphQL requires it to select `Pet`'s fields on a `Node`-typed field (spec 5.3.1). The text has this line and the AST does not: normalization-ast.md, Tests, states the asymmetry. `FetchRefinement::InlineFragment` is text only; conditionals come only from refinements `asT`.
+`node(id:)` returns the entity whose id is `$id`, so the entity is known by construction. The `node` selection's selections are the entity's own completed selections, and nothing is selected beside them: no `__typename` and no `id` under `node` outside the fragment, and no condition in the normalization AST. The GraphQL text still prints `... on T` around them, because GraphQL requires it to select `Pet`'s fields on a `Node`-typed field (spec 5.3.1). The text has this line and the AST does not: normalization-ast.md, The asymmetries, states it, and its Tests account for it. `FetchRefinement::InlineFragment` is text only; conditionals come only from refinements `asT`.
 
 For `entrypoint Pet.PetSummaryCard`:
 
