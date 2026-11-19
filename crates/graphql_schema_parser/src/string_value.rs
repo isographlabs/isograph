@@ -6,12 +6,32 @@ use nonempty::NonEmpty;
 use prelude::Postfix;
 use span::{Span, WithSpan, WithSpanPostfix};
 
-use crate::ParseError;
-use crate::token_cursor::TokenText;
+use crate::token_cursor::{TokenCursor, TokenText};
 use crate::token_kind::{StringToken, VariableWidthEscape};
+use crate::{GraphQLTokenKind, ParseError};
 
 #[cfg_attr(not(test), expect(dead_code))]
-pub(crate) fn decode_string_value(interior: TokenText<'_>) -> Result<String, WithSpan<ParseError>> {
+pub(crate) fn consume_string_value_if<T: From<intern::string_key::StringKey>>(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<Option<WithSpan<T>>, WithSpan<ParseError>> {
+    if let Some(string) = cursor.consume_token_if(GraphQLTokenKind::StringLiteral) {
+        let value = decode_string_value(string.exclude_ends(1))?;
+        return value
+            .intern()
+            .to::<T>()
+            .with_span(string.location)
+            .wrap_some()
+            .wrap_ok();
+    }
+    cursor
+        .consume_token_if(GraphQLTokenKind::BlockStringLiteral)
+        .map(|block| {
+            intern_block_string_value::<T>(block.exclude_ends(3).text()).with_span(block.location)
+        })
+        .wrap_ok()
+}
+
+fn decode_string_value(interior: TokenText<'_>) -> Result<String, WithSpan<ParseError>> {
     let mut pieces = StringToken::lexer(interior.text()).spanned().peekable();
     let mut value = String::new();
     while let Some((piece, range)) = pieces.next() {
@@ -58,10 +78,7 @@ fn decode_code_units(units: &NonEmpty<WithSpan<u16>>) -> Result<String, WithSpan
         .map_err(|_| ParseError::InvalidUnicodeEscape.with_span(location))
 }
 
-#[cfg_attr(not(test), expect(dead_code))]
-pub(crate) fn intern_block_string_value<T: From<intern::string_key::StringKey>>(
-    interior: &str,
-) -> T {
+fn intern_block_string_value<T: From<intern::string_key::StringKey>>(interior: &str) -> T {
     clean_block_string(&interior.replace("\\\"\"\"", "\"\"\""))
         .intern()
         .to()
@@ -132,20 +149,18 @@ mod tests {
     use span::{Span, WithSpan};
 
     use super::{clean_block_string, decode_string_value, intern_block_string_value};
-    use crate::GraphQLTokenKind;
-    use crate::ParseError;
-    use crate::token_cursor::TokenText;
-    use crate::tokenize::tokenize;
+    use crate::span_of::span_of;
+    use crate::test_cursor::with_cursor;
+    use crate::{GraphQLTokenKind, ParseError};
 
     fn decoded(text: &str) -> Result<String, WithSpan<ParseError>> {
-        let tokens = tokenize(text);
-        assert_eq!(tokens.len(), 1, "for text {text:?}");
-        assert_eq!(
-            tokens[0].item,
-            GraphQLTokenKind::StringLiteral,
-            "for text {text:?}"
-        );
-        decode_string_value(TokenText::new(tokens[0].location, text).exclude_ends(1))
+        with_cursor(text, |cursor| {
+            let string = cursor
+                .require_token(GraphQLTokenKind::StringLiteral)
+                .expect("the fixture is a string literal");
+            assert!(cursor.at_end(), "for text {text:?}");
+            decode_string_value(string.exclude_ends(1))
+        })
     }
 
     fn invalid_unicode_escape_at(text: &str) -> Span {
@@ -206,7 +221,8 @@ mod tests {
 
     #[test]
     fn an_unpaired_surrogate_error_spans_its_escape() {
-        assert_eq!(invalid_unicode_escape_at(r#""x\uDEADy""#), Span::new(2, 8));
+        let text = r#""x\uDEADy""#;
+        assert_eq!(invalid_unicode_escape_at(text), span_of(text, r"\uDEAD"));
     }
 
     #[test]
