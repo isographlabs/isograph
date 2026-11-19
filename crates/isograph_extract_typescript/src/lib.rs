@@ -444,6 +444,7 @@ mod memo_tests {
         type NotFetchable = TestProtocolError;
         type LookupError = Infallible;
         type SchemaFileError = Infallible;
+        type Options = ();
         type ArgumentError = Infallible;
 
         fn should_include_schema_file(_relative_path: &Path) -> IncludeFile {
@@ -546,7 +547,10 @@ mod memo_tests {
             })
         }
 
+        fn options(_config: &isograph_config::IsographProjectConfig) {}
+
         fn query_text(
+            _options: &(),
             _operation: &isograph_compiler::EntrypointOperation<'_, Self>,
         ) -> isograph_compiler::ProtocolQueryText {
             isograph_compiler::ProtocolQueryText {

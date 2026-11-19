@@ -7,10 +7,12 @@ use isograph_compiler::{
     EntityNotFetchableError, EntrypointNotFetchableError, EntrypointQueryError, EntrypointWrapper,
     FieldSelectionMapError, FixedRecordId, IntegerOutOfRange, NormalizationAlias, NormalizationAst,
     NormalizationCompositeTarget, NormalizationNode, NormalizationRootRecord,
-    NormalizationSelection, NormalizationTarget, NormalizationValue, QueryArtifact, RecordEntity,
-    ResponseKey, RootEntities, SelectionMapErrorKind, TopLevelError, field_selection_map,
-    query_for_entrypoint,
+    NormalizationSelection, NormalizationTarget, NormalizationValue, ProtocolOptions,
+    QueryArtifact, RecordEntity, ResponseKey, RootEntities, SelectionMapErrorKind, TopLevelError,
+    field_selection_map, query_for_entrypoint,
 };
+use isograph_config::{GraphQLConfig, QueryTextFormat};
+use pico::Database;
 use prelude::Postfix;
 
 use super::{
@@ -77,6 +79,28 @@ fn home_route_selects_the_inlined_fields_under_pets() {
             .file_name
             .map(|name| name.lookup()),
         QUERY_TEXT_FILE_NAME.wrap_some()
+    );
+}
+
+#[test]
+fn the_query_text_follows_the_protocol_options() {
+    const COLLAPSED: &str = "query HomeRoute{pets{__typename id age firstName lastName nickname picture species tagline}}";
+    let options = |format: QueryTextFormat| GraphQLConfig {
+        query_text_format: format,
+    };
+    let mut db = demo(&[], &[], &[]);
+    assert_eq!(
+        lines(text(&db, "Query", "HomeRoute").as_str())[0],
+        "query HomeRoute {"
+    );
+    db.set_protocol_options(options(QueryTextFormat::Collapsed));
+    assert_eq!(text(&db, "Query", "HomeRoute"), COLLAPSED);
+    db.remove_singleton::<ProtocolOptions<GraphQLConfig>>();
+    assert_eq!(text(&db, "Query", "HomeRoute"), COLLAPSED);
+    db.set_protocol_options(options(QueryTextFormat::Expanded));
+    assert_eq!(
+        lines(text(&db, "Query", "HomeRoute").as_str())[0],
+        "query HomeRoute {"
     );
 }
 

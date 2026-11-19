@@ -1269,7 +1269,6 @@ The printer builds the operation as `PrintItem`s, then lays them out in the form
 ```rust
 // from crates/graphql_network_protocol/src/print_operation.rs
 /// One piece of an operation's text before `lay_out` writes it in a `QueryTextFormat`.
-#[derive(Clone, Debug, PartialEq, Eq)]
 enum PrintItem {
     /// Text both formats write as is: one or more GraphQL tokens with no whitespace or comma
     /// between them (`pets`, `$id`, `[ID!]!`, `"a b"`, `{`).
@@ -1292,7 +1291,7 @@ pub(crate) fn print_operation(
     QueryText(lay_out(format, operation_items(operation).as_slice()))
 }
 
-/// The header, `print_selection_set(selections, 1)`, a `LineBreak(0)`, and `}`.
+/// The header, then `print_selection_block(selections, 0)`.
 fn operation_items(operation: &EntrypointOperation<'_, GraphQLNetworkProtocol>) -> Vec<PrintItem>;
 
 /// `items` as text. `Expanded` writes every item as its doc comment says. `Collapsed` writes
@@ -1304,11 +1303,17 @@ fn lay_out(format: QueryTextFormat, items: &[PrintItem]) -> String;
 /// spec 2.1.9), because the two tokens would otherwise lex as one; otherwise `""`.
 fn collapsed_separator(previous: char, next: char) -> &'static str;
 
+/// `PrintItem::Text(text.to_owned())`.
+fn text(text: &str) -> PrintItem;
+
 /// Every selection of `selections` at `depth`, without braces.
 fn print_selection_set(selections: &CompletedSelectionMap, depth: usize) -> Vec<PrintItem>;
 
-/// `LineBreak(depth)`, then the selection; a selection set's closing `}` follows its own
-/// `LineBreak(depth)`.
+/// ` {`, `selections` at `depth + 1`, and `}` on its own line at `depth`. The operation's
+/// selections are the block at depth 0.
+fn print_selection_block(selections: &CompletedSelectionMap, depth: usize) -> Vec<PrintItem>;
+
+/// `LineBreak(depth)`, then the selection.
 fn print_selection(selection: &CompletedSelection, depth: usize) -> Vec<PrintItem>;
 
 /// `<alias>: <name>(<arguments>)`, or `<name>` when the key has no arguments.
@@ -1316,6 +1321,9 @@ fn print_selection_head(key: &SelectionKey) -> Vec<PrintItem>;
 
 /// `(name: value, ...)`, or no items when there are none.
 fn print_arguments(arguments: &MergedArguments) -> Vec<PrintItem>;
+
+/// `name: value`, an argument or an object entry.
+fn print_entry(name: String, value: &MergedValue) -> Vec<PrintItem>;
 
 fn print_value(value: &MergedValue) -> Vec<PrintItem>;
 
@@ -1461,7 +1469,7 @@ Before, `query_text` took only `operation`. `isograph_compiler` gains the `isogr
 ```rust
 // from crates/isograph_compiler/src/database.rs
 /// The network protocol's options, a singleton source.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct ProtocolOptions<TOptions>(pub TOptions);
 
 impl<TOptions: 'static> Singleton for ProtocolOptions<TOptions> {
@@ -1765,8 +1773,8 @@ Facts about generated text, not snapshots. A helper in the test module returns t
 - A string argument `a"b\c` followed by a newline prints `"a\"b\\c\n"`.
 - An object argument `{ id: $id, tagline: $tagline }` prints in key order with `{ ` and ` }`.
 - No line ends in whitespace; the text does not end in a newline.
-- The tests above print `Expanded`. For every operation the printer tests build (the `cases()` fixtures, which cover a union refinement, an abstract target, nested composites, a mutation, and every value kind, and the variable definitions fixture with defaults and list types), `Collapsed` text contains no `\n` and no two consecutive spaces; relay's `graphql_syntax::parse_executable` (`relay-crates/graphql-syntax`, a dev-dependency) accepts both texts with no diagnostics; and relay's lexer (`graphql_syntax::TokenKind`, through `logos`) yields the same `(kind, text)` sequence for both. Relay's AST carries source locations in its `PartialEq`, so equal tokens, not equal ASTs, is the assertion that both texts are one operation.
-- `Collapsed` of `pets { __typename id tagline }` under `query HomeRoute` is `query HomeRoute{pets{__typename id tagline}}`; of `f(b: true, i: -5, n: null, o: { s: "a b", v: $x }, s: "\"q\"", v: $x)` the arguments are `(b:true i:-5 n:null o:{s:"a b" v:$x}s:"\"q\""v:$x)`; a header with `$a: Int = 3` and `$b: [ID!]!` is `query X($a:Int=3$b:[ID!]!){`.
+- The tests above print `Expanded`. For every operation the printer tests build (the `cases()` fixtures, which cover a union refinement, an abstract target, nested composites, a mutation, and every value kind; the variable definitions fixture with defaults and list types; and a list and an empty object argument), `Collapsed` text contains no `\n` and no two consecutive spaces, and graphql-parser (`graphql-parser = "0.4.1"`, a dev-dependency) parses both texts and prints the two parses identically. graphql-parser's `Document` carries source positions in its `PartialEq`; its printer writes none, so equal printed parses is the assertion that both texts are one operation. The round-trip fixtures use `i: 5` where `cases()` has `i: -5`, because the normalization alias of a negative integer argument (`i___l_-5`) contains `-` and is not a GraphQL name, in either format.
+- `Collapsed` of `pets { __typename id tagline }` under `query X` is `query X{pets{__typename id tagline}}`; of `f(b: true, i: -5, n: null, o: { s: "a b", v: $x }, s: "\"q\"", v: $x)` the arguments are `(b:true i:-5 n:null o:{s:"a b"v:$x}s:"\"q\""v:$x)`; the variable definitions fixture's header is `query X($limit:Int=3$ids:[ID!]!$maybe:[ID]$nested:[[Int!]]!$flag:Boolean!=false){a}`; the union fixture prints `__typename cursor...on BlogItem{__typename id title}`.
 
 `crates/isograph_compiler/src/query.rs` and `merged_selection.rs`, the core's operation rules (GraphQL profile in the next group where a case needs a schema):
 
@@ -1786,7 +1794,7 @@ Facts about generated text, not snapshots. A helper in the test module returns t
 
 `crates/graphql_network_protocol/tests` or the crate's test module (GraphQL profile, TypeScript host, the pet demo's schema and source files inserted before the first lookup, and `query_text_format: Expanded` set, as the pet demo's config sets it):
 
-- Options: with no options set, `HomeRoute`'s text is `query HomeRoute{pets{__typename id age firstName lastName nickname picture species tagline}}`. Setting `Expanded` on that database makes the next `query_for_entrypoint(Query, HomeRoute)` the expanded text; setting `Collapsed` again makes it the collapsed text again.
+- Options: `HomeRoute`'s first line is `query HomeRoute {` under `Expanded`. Setting `Collapsed` on that database makes the next `query_for_entrypoint(Query, HomeRoute)` `query HomeRoute{pets{__typename id age firstName lastName nickname picture species tagline}}`; removing the singleton (`remove_singleton::<ProtocolOptions<GraphQLConfig>>`) leaves that text, the default; setting `Expanded` makes the first line `query HomeRoute {` again.
 
 - `HomeRoute`: the first line is `query HomeRoute {`; the `pets {` block contains `id`, `age`, `firstName`, `lastName`, `nickname`, `picture`, `species`, `tagline`, each once; the block's first line is `__typename`; no line contains `PetSummaryCard` or `fullName`; the top level has no `__typename` line.
 - `PetDetailRoute`: the first line is `query PetDetailRoute($id: ID!) {`; a line is `  pet____id___v_id: pet(id: $id) {`; exactly one line is `    best_friend_relationship {`, and its block contains `picture_together` and a `best_friend {` block with `id`, `firstName`, `lastName`; a line is `    checkins____limit___l_5____skip___l_0: checkins(limit: 5, skip: 0) {`; no line contains `friendName`, `owner`, `OwnerBadge`, or `displayName` (`owner` and `bestFriend` are client pointers, omitted).
@@ -1896,7 +1904,7 @@ Depends on 7.
 - GraphQL: `Options = GraphQLConfig`, `options`, `query_text` taking the format; `PrintItem`, `operation_items`, `lay_out`, `collapsed_separator`, `comma_separated`, and the `print_*` functions returning items.
 - CLI: the daemon calling `set_protocol_options` at start.
 - Pet demo: `isograph.config.json` sets `"graphql": { "query_text_format": "expanded" }`; its regenerated `src/__isograph/` is unchanged byte for byte, because `Expanded` is the text change 9 committed.
-- Tests: the printer format tests, the options tests in the GraphQL profile group, the config tests, and the compile test's collapsed text. `graphql_network_protocol` gains the dev-dependencies `graphql-syntax` (`relay-crates/graphql-syntax`), `common` (`relay-crates/common`, for `SourceLocationKey`), and `logos`.
+- Tests: the printer format tests, the options test in the GraphQL profile group (whose `project_db` sets `Expanded`), the config tests, and the compile tests' collapsed text. `graphql_network_protocol` gains the dev-dependency `graphql-parser`. Relay's `graphql-syntax` (`relay-crates/graphql-syntax`) parses executable documents too, but a path dependency on it puts `relay-crates/common`, `graphql-syntax`, and `fixture-tests` under `cargo fmt -- --check`, which reorders their imports under style edition 2024.
 
 Depends on 10.
 

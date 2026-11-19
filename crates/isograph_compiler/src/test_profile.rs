@@ -77,6 +77,7 @@ impl NetworkProtocol for TestNetworkProtocol {
     type NotFetchable = TestProtocolError;
     type LookupError = Infallible;
     type SchemaFileError = Infallible;
+    type Options = ();
     type ArgumentError = Infallible;
 
     fn should_include_schema_file(_relative_path: &Path) -> IncludeFile {
@@ -179,7 +180,12 @@ impl NetworkProtocol for TestNetworkProtocol {
         })
     }
 
-    fn query_text(_operation: &crate::EntrypointOperation<'_, Self>) -> crate::ProtocolQueryText {
+    fn options(_config: &isograph_config::IsographProjectConfig) {}
+
+    fn query_text(
+        _options: &(),
+        _operation: &crate::EntrypointOperation<'_, Self>,
+    ) -> crate::ProtocolQueryText {
         crate::ProtocolQueryText {
             text: common_lang_types::QueryText(String::new()),
             file_name: None,

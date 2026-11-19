@@ -2,7 +2,7 @@ use std::ops::ControlFlow;
 use std::path::PathBuf;
 
 use freddie_timer::TimerEffect;
-use isograph_compiler::CompilationProfile;
+use isograph_compiler::{CompilationProfile, NetworkProtocol};
 use isograph_config::IsographProjectConfig;
 use prelude::Postfix;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
@@ -106,6 +106,9 @@ async fn serve<TProfile: CompilationProfile>(
     });
     let mut state = IsographState::<TProfile>::new(globs.clone(), artifact_output.clone());
     intern_config_directory(&mut state.db, config_path.reference());
+    state
+        .db
+        .set_protocol_options(TProfile::NetworkProtocol::options(config.reference()));
     let _hold_watch = watch_tx.clone();
     let started = match crate::watch::start_if_watching::<TProfile>(
         filesystem,

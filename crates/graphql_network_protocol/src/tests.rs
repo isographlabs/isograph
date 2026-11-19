@@ -1118,9 +1118,13 @@ const PET_DEMO_SOURCES: [(&str, &str); 10] = [
 ];
 
 /// A database with `schema` as schema files and `sources` as source files, every file
-/// inserted before the first lookup.
+/// inserted before the first lookup, and `query_text_format: Expanded`, which the pet demo's
+/// config sets.
 fn project_db(schema: &[(&str, &str)], sources: &[(&str, &str)]) -> Db {
     let mut db = db_with(schema);
+    db.set_protocol_options(isograph_config::GraphQLConfig {
+        query_text_format: isograph_config::QueryTextFormat::Expanded,
+    });
     for (file, contents) in sources {
         db.insert_disk_file(path(file), SOURCE_FILE, contents.dereference().to_owned());
     }

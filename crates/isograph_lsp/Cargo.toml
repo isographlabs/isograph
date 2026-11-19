@@ -17,6 +17,7 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 intern = { path = "../../relay-crates/intern" }
+isograph_config = { path = "../isograph_config" }
 isograph_extract_typescript = { path = "../isograph_extract_typescript" }
 thiserror = { workspace = true }
 

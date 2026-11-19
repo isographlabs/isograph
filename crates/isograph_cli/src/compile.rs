@@ -949,10 +949,10 @@ mod generation_tests {
         let changes = changes(&mut state);
         assert_eq!(
             written_text(changes.reference(), "Query/HomeRoute/query_text.graphql"),
-            "query HomeRoute {\n  id\n}\n"
+            "query HomeRoute{id}\n"
         );
         let module = written_text(changes.reference(), "Query/HomeRoute/query_text.ts");
-        assert!(module.contains("query HomeRoute {"), "{module}");
+        assert!(module.contains("query HomeRoute{id}"), "{module}");
         let entrypoint = written_text(changes.reference(), "Query/HomeRoute/entrypoint.ts");
         assert!(entrypoint.contains("queryText: "), "{entrypoint}");
         assert!(entrypoint.contains("from './query_text'"), "{entrypoint}");
@@ -986,7 +986,7 @@ mod generation_tests {
         );
         assert_eq!(
             written_text(changes.reference(), "Query/Outer/query_text.graphql"),
-            "query Outer {\n  id\n  name\n}\n"
+            "query Outer{id name}\n"
         );
     }
 

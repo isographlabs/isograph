@@ -33,8 +33,9 @@ pub use compiler_errors::{
     schema_errors_in_file,
 };
 pub use database::{
-    ClientId, DiskFile, DiskFileMap, EditorBufferKey, FileMembership, IsographDb, SchemaPathMap,
-    SourcePathMap, file_contents, schema_file_paths, source_file_paths,
+    ClientId, DiskFile, DiskFileMap, EditorBufferKey, FileMembership, IsographDb,
+    ProfileProtocolOptions, ProtocolOptions, SchemaPathMap, SourcePathMap, file_contents,
+    protocol_options, schema_file_paths, source_file_paths,
 };
 pub use entrypoint::{
     EntrypointFetch, EntrypointWrapper, ProfileEntityNotFetchableError, ProfileEntrypointFetch,

@@ -18,5 +18,8 @@ thiserror = { workspace = true }
 typescript_artifacts = { path = "../typescript_artifacts" }
 tracing = { workspace = true }
 
+[dev-dependencies]
+isograph_config = { path = "../isograph_config" }
+
 [lints]
 workspace = true

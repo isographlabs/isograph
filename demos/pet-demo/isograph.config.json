@@ -1,5 +1,8 @@
 {
   "source_files": ["src/**/*.ts"],
   "schema": ["schema/**/*.graphql"],
-  "output_directory": "src"
+  "output_directory": "src",
+  "graphql": {
+    "query_text_format": "expanded"
+  }
 }

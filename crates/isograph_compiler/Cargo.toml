@@ -8,6 +8,7 @@ license = { workspace = true }
 common_lang_types = { path = "../common_lang_types" }
 derive_more = { workspace = true }
 intern = { path = "../../relay-crates/intern" }
+isograph_config = { path = "../isograph_config" }
 isograph_parser = { path = "../isograph_parser" }
 nonempty = { workspace = true }
 pico = { path = "../pico" }

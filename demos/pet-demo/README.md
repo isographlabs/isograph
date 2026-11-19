@@ -63,7 +63,7 @@ Nothing renders; the resolvers return plain data. The fixture responses use the 
 
 ## Config
 
-`isograph.config.json` sets `source_files` to `src/**/*.ts`, `schema` to `schema/**/*.graphql`, and `output_directory` to `src`, so the daemon writes artifacts into `src/__isograph/`. That folder is generated and committed: running the daemon in this directory rewrites it. It holds `iso.ts`, `tsconfig.json`, a param type per field, a parameters type per field with variables, output types and reader artifacts per upstream's reachability rules, an entrypoint, normalization AST, `query_text.ts`, and `query_text.graphql` per entrypoint, and a link type per entity a field is declared on or a pointer points to.
+`isograph.config.json` sets `source_files` to `src/**/*.ts`, `schema` to `schema/**/*.graphql`, and `output_directory` to `src`, so the daemon writes artifacts into `src/__isograph/`. It sets `graphql.query_text_format` to `expanded`, so each query text is one selection per line; the default, `collapsed`, is one line. That folder is generated and committed: running the daemon in this directory rewrites it. It holds `iso.ts`, `tsconfig.json`, a param type per field, a parameters type per field with variables, output types and reader artifacts per upstream's reachability rules, an entrypoint, normalization AST, `query_text.ts`, and `query_text.graphql` per entrypoint, and a link type per entity a field is declared on or a pointer points to.
 
 ## Schema
 

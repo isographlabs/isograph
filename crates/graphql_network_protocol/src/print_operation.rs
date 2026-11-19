@@ -5,83 +5,101 @@ use isograph_compiler::{
     EntrypointOperation, FieldVariable, MergedArguments, MergedValue, NonNullVariableType,
     ResponseKey, SelectionKey, VariableType,
 };
+use isograph_config::QueryTextFormat;
 use isograph_parser::Boolean;
 use prelude::Postfix;
 
 use crate::GraphQLNetworkProtocol;
 use crate::protocol_data::TYPENAME;
 
-/// The text of `operation`: one selection per line, two spaces of indentation per depth, one
-/// newline between lines and none at the end.
+/// One piece of an operation's text before `lay_out` writes it in a `QueryTextFormat`.
+enum PrintItem {
+    /// Text both formats write as is: one or more GraphQL tokens with no whitespace or comma
+    /// between them (`pets`, `$id`, `[ID!]!`, `"a b"`, `{`).
+    Text(String),
+    /// A space `Expanded` writes and `Collapsed` does not.
+    Space,
+    /// A comma between two arguments, object entries, list items, or variable definitions.
+    /// GraphQL ignores it (spec 2.1.8); `Expanded` writes it and `Collapsed` does not.
+    Comma,
+    /// The start of a line at this depth. `Expanded` writes a newline and two spaces per depth;
+    /// `Collapsed` writes nothing.
+    LineBreak(usize),
+}
+
+fn text(text: &str) -> PrintItem {
+    PrintItem::Text(text.to_owned())
+}
+
+/// The text of `operation` in `format`.
 pub(crate) fn print_operation(
+    format: QueryTextFormat,
     operation: &EntrypointOperation<'_, GraphQLNetworkProtocol>,
 ) -> QueryText {
+    QueryText(lay_out(format, operation_items(operation).as_slice()))
+}
+
+/// The header, `print_selection_set(selections, 1)`, a `LineBreak(0)`, and `}`.
+fn operation_items(operation: &EntrypointOperation<'_, GraphQLNetworkProtocol>) -> Vec<PrintItem> {
     let variables = if operation.variables.is_empty() {
-        String::new()
+        Vec::new()
     } else {
-        format!(
-            "({})",
-            operation
-                .variables
-                .iter()
-                .map(print_variable_definition)
-                .collect::<Vec<_>>()
-                .join(", ")
-        )
+        std::iter::once(text("("))
+            .chain(comma_separated(
+                operation.variables.iter().map(print_variable_definition),
+            ))
+            .chain(std::iter::once(text(")")))
+            .collect()
     };
-    let header = format!(
-        "{} {}{variables} {{",
-        operation.fetch_plan.operation_type, operation.name
-    );
-    QueryText(
-        std::iter::once(header)
-            .chain(print_selection_set(operation.selections, 1))
-            .chain(std::iter::once("}".to_owned()))
-            .collect::<Vec<_>>()
-            .join("\n"),
-    )
+    [
+        PrintItem::Text(operation.fetch_plan.operation_type.to_string()),
+        PrintItem::Space,
+        PrintItem::Text(operation.name.to_string()),
+    ]
+    .into_iter()
+    .chain(variables)
+    .chain(print_selection_block(operation.selections, 0))
+    .collect()
 }
 
-/// The lines of `selections` at `depth`, without braces.
-fn print_selection_set(selections: &CompletedSelectionMap, depth: usize) -> Vec<String> {
-    selections
-        .iter()
-        .flat_map(|selection| print_selection(selection, depth))
-        .collect()
-}
-
-/// The lines of one selection at `depth`.
-fn print_selection(selection: &CompletedSelection, depth: usize) -> Vec<String> {
-    let indent = indent(depth);
-    match selection {
-        CompletedSelection::Discriminator => format!("{indent}{TYPENAME}").wrap_vec(),
-        CompletedSelection::Identity(name) => format!("{indent}{name}").wrap_vec(),
-        CompletedSelection::Selectable(selectable) => {
-            let head = print_selection_head(selectable.key.reference());
-            match selectable.target.reference() {
-                CompletedSelectionTarget::Leaf => format!("{indent}{head}").wrap_vec(),
-                CompletedSelectionTarget::Composite(target) => {
-                    std::iter::once(format!("{indent}{head} {{"))
-                        .chain(print_selection_set(
-                            target.selections.reference(),
-                            depth + 1,
-                        ))
-                        .chain(std::iter::once(format!("{indent}}}")))
-                        .collect()
+/// `items` as text. `Expanded` writes every item as its doc comment says. `Collapsed` writes
+/// only the `Text` items, each preceded by `collapsed_separator` of the previous `Text`'s
+/// last character and its first.
+fn lay_out(format: QueryTextFormat, items: &[PrintItem]) -> String {
+    match format {
+        QueryTextFormat::Expanded => items
+            .iter()
+            .map(|item| match item {
+                PrintItem::Text(text) => text.clone(),
+                PrintItem::Space => " ".to_owned(),
+                PrintItem::Comma => ",".to_owned(),
+                PrintItem::LineBreak(depth) => format!("\n{}", indent(depth.dereference())),
+            })
+            .collect(),
+        QueryTextFormat::Collapsed => items
+            .iter()
+            .filter_map(|item| match item {
+                PrintItem::Text(text) => text.as_str().wrap_some(),
+                PrintItem::Space | PrintItem::Comma | PrintItem::LineBreak(_) => None,
+            })
+            .fold(String::new(), |mut laid_out, text| {
+                if let (Some(previous), Some(next)) =
+                    (laid_out.chars().next_back(), text.chars().next())
+                {
+                    laid_out.push_str(collapsed_separator(previous, next));
                 }
-            }
-        }
-        CompletedSelection::Conditional(conditional) => match conditional.condition {
-            Condition::SelectionEquals(entity) => {
-                std::iter::once(format!("{indent}... on {entity} {{"))
-                    .chain(print_selection_set(
-                        conditional.selections.reference(),
-                        depth + 1,
-                    ))
-                    .chain(std::iter::once(format!("{indent}}}")))
-                    .collect()
-            }
-        },
+                laid_out.push_str(text);
+                laid_out
+            }),
+    }
+}
+
+/// `" "` when `previous` and `next` are both name characters (`_`, `0`-`9`, `A`-`Z`, `a`-`z`;
+/// spec 2.1.9), because the two tokens would otherwise lex as one; otherwise `""`.
+fn collapsed_separator(previous: char, next: char) -> &'static str {
+    match (previous, next) {
+        ('_' | '0'..='9' | 'A'..='Z' | 'a'..='z', '_' | '0'..='9' | 'A'..='Z' | 'a'..='z') => " ",
+        _ => "",
     }
 }
 
@@ -89,61 +107,135 @@ fn indent(depth: usize) -> String {
     "  ".repeat(depth)
 }
 
-/// `<alias>: <name>(<arguments>)`, or `<name>` when the key has no arguments.
-fn print_selection_head(key: &SelectionKey) -> String {
-    match key.response_key() {
-        ResponseKey::SelectableName => key.name.to_string(),
-        ResponseKey::Alias(alias) => format!(
-            "{alias}: {}{}",
-            key.name,
-            print_arguments(key.arguments.reference())
-        ),
-    }
+/// Every selection of `selections` at `depth`, without braces.
+fn print_selection_set(selections: &CompletedSelectionMap, depth: usize) -> Vec<PrintItem> {
+    selections
+        .iter()
+        .flat_map(|selection| print_selection(selection, depth))
+        .collect()
 }
 
-/// `(name: value, ...)`, or the empty string when there are none.
-fn print_arguments(arguments: &MergedArguments) -> String {
-    if arguments.is_empty() {
-        return String::new();
-    }
-    format!(
-        "({})",
-        arguments
-            .iter()
-            .map(|argument| format!(
-                "{}: {}",
-                argument.name,
-                print_value(argument.value.reference())
-            ))
-            .collect::<Vec<_>>()
-            .join(", ")
-    )
+/// ` {`, `selections` at `depth + 1`, and `}` on its own line at `depth`.
+fn print_selection_block(selections: &CompletedSelectionMap, depth: usize) -> Vec<PrintItem> {
+    [PrintItem::Space, text("{")]
+        .into_iter()
+        .chain(print_selection_set(selections, depth + 1))
+        .chain([PrintItem::LineBreak(depth), text("}")])
+        .collect()
 }
 
-fn print_value(value: &MergedValue) -> String {
-    match value {
-        MergedValue::Variable(name) => format!("${name}"),
-        MergedValue::String(string) => print_string(string.lookup()),
-        MergedValue::Integer(integer) => integer.to_string(),
-        MergedValue::Boolean(Boolean::True) => "true".to_owned(),
-        MergedValue::Boolean(Boolean::False) => "false".to_owned(),
-        MergedValue::Null => "null".to_owned(),
-        MergedValue::Object(object) => {
-            let entries = object
-                .iter()
-                .map(|entry| format!("{}: {}", entry.name, print_value(entry.value.reference())))
-                .collect::<Vec<_>>();
-            if entries.is_empty() {
-                "{}".to_owned()
-            } else {
-                format!("{{ {} }}", entries.join(", "))
+/// `LineBreak(depth)`, then the selection.
+fn print_selection(selection: &CompletedSelection, depth: usize) -> Vec<PrintItem> {
+    let line = PrintItem::LineBreak(depth);
+    match selection {
+        CompletedSelection::Discriminator => vec![line, text(TYPENAME)],
+        CompletedSelection::Identity(name) => vec![line, PrintItem::Text(name.to_string())],
+        CompletedSelection::Selectable(selectable) => {
+            let head = print_selection_head(selectable.key.reference());
+            match selectable.target.reference() {
+                CompletedSelectionTarget::Leaf => std::iter::once(line).chain(head).collect(),
+                CompletedSelectionTarget::Composite(target) => std::iter::once(line)
+                    .chain(head)
+                    .chain(print_selection_block(target.selections.reference(), depth))
+                    .collect(),
             }
         }
-        MergedValue::List(items) => format!(
-            "[{}]",
-            items.iter().map(print_value).collect::<Vec<_>>().join(", ")
-        ),
+        CompletedSelection::Conditional(conditional) => match conditional.condition {
+            Condition::SelectionEquals(entity) => [
+                line,
+                text("..."),
+                PrintItem::Space,
+                text("on"),
+                PrintItem::Space,
+                PrintItem::Text(entity.to_string()),
+            ]
+            .into_iter()
+            .chain(print_selection_block(
+                conditional.selections.reference(),
+                depth,
+            ))
+            .collect(),
+        },
     }
+}
+
+/// `<alias>: <name>(<arguments>)`, or `<name>` when the key has no arguments.
+fn print_selection_head(key: &SelectionKey) -> Vec<PrintItem> {
+    match key.response_key() {
+        ResponseKey::SelectableName => PrintItem::Text(key.name.to_string()).wrap_vec(),
+        ResponseKey::Alias(alias) => [
+            PrintItem::Text(alias.to_string()),
+            text(":"),
+            PrintItem::Space,
+            PrintItem::Text(key.name.to_string()),
+        ]
+        .into_iter()
+        .chain(print_arguments(key.arguments.reference()))
+        .collect(),
+    }
+}
+
+/// `(name: value, ...)`, or no items when there are none.
+fn print_arguments(arguments: &MergedArguments) -> Vec<PrintItem> {
+    if arguments.is_empty() {
+        return Vec::new();
+    }
+    std::iter::once(text("("))
+        .chain(comma_separated(arguments.iter().map(|argument| {
+            print_entry(argument.name.to_string(), argument.value.reference())
+        })))
+        .chain(std::iter::once(text(")")))
+        .collect()
+}
+
+/// `name: value`, an argument or an object entry.
+fn print_entry(name: String, value: &MergedValue) -> Vec<PrintItem> {
+    [PrintItem::Text(name), text(":"), PrintItem::Space]
+        .into_iter()
+        .chain(print_value(value))
+        .collect()
+}
+
+fn print_value(value: &MergedValue) -> Vec<PrintItem> {
+    match value {
+        MergedValue::Variable(name) => PrintItem::Text(format!("${name}")).wrap_vec(),
+        MergedValue::String(string) => PrintItem::Text(print_string(string.lookup())).wrap_vec(),
+        MergedValue::Integer(integer) => PrintItem::Text(integer.to_string()).wrap_vec(),
+        MergedValue::Boolean(Boolean::True) => text("true").wrap_vec(),
+        MergedValue::Boolean(Boolean::False) => text("false").wrap_vec(),
+        MergedValue::Null => text("null").wrap_vec(),
+        MergedValue::Object(object) => {
+            if object.iter().next().is_none() {
+                return text("{}").wrap_vec();
+            }
+            [text("{"), PrintItem::Space]
+                .into_iter()
+                .chain(comma_separated(object.iter().map(|entry| {
+                    print_entry(entry.name.to_string(), entry.value.reference())
+                })))
+                .chain([PrintItem::Space, text("}")])
+                .collect()
+        }
+        MergedValue::List(items) => std::iter::once(text("["))
+            .chain(comma_separated(items.iter().map(print_value)))
+            .chain(std::iter::once(text("]")))
+            .collect(),
+    }
+}
+
+/// `groups` with `Comma` and `Space` between consecutive groups.
+fn comma_separated(groups: impl Iterator<Item = Vec<PrintItem>>) -> Vec<PrintItem> {
+    groups
+        .enumerate()
+        .flat_map(|(index, group)| {
+            match index {
+                0 => Vec::new(),
+                _ => vec![PrintItem::Comma, PrintItem::Space],
+            }
+            .into_iter()
+            .chain(group)
+        })
+        .collect()
 }
 
 /// `text` as a GraphQL string value, with `"`, `\`, and U+0000 to U+001F escaped (spec 2.9.4).
@@ -165,17 +257,26 @@ fn print_string(text: &str) -> String {
     format!("\"{escaped}\"")
 }
 
-fn print_variable_definition(variable: &FieldVariable) -> String {
-    let default = variable
+fn print_variable_definition(variable: &FieldVariable) -> Vec<PrintItem> {
+    let default: Vec<PrintItem> = variable
         .default_value
         .as_ref()
-        .map(|value| format!(" = {}", print_value(value)))
+        .map(|value| {
+            [PrintItem::Space, text("="), PrintItem::Space]
+                .into_iter()
+                .chain(print_value(value))
+                .collect()
+        })
         .unwrap_or_default();
-    format!(
-        "${}: {}{default}",
-        variable.name,
-        print_variable_type(variable.variable_type.reference())
-    )
+    [
+        PrintItem::Text(format!("${}", variable.name)),
+        text(":"),
+        PrintItem::Space,
+        PrintItem::Text(print_variable_type(variable.variable_type.reference())),
+    ]
+    .into_iter()
+    .chain(default)
+    .collect()
 }
 
 pub(crate) fn print_variable_type(variable_type: &VariableType) -> String {
@@ -335,6 +436,8 @@ mod tests {
     use isograph_parser::Boolean;
     use prelude::Postfix;
 
+    use isograph_config::QueryTextFormat;
+
     use super::{SelectionLine, ast_lines, print_operation, text_lines, without_discriminator};
     use crate::{GraphQLFetchPlan, GraphQLNetworkProtocol};
 
@@ -429,12 +532,15 @@ mod tests {
         variables: &[FieldVariable],
         selections: &CompletedSelectionMap,
     ) -> QueryText {
-        print_operation(&EntrypointOperation {
-            name: name("X"),
-            fetch_plan: plan,
-            variables,
-            selections,
-        })
+        print_operation(
+            QueryTextFormat::Expanded,
+            &EntrypointOperation {
+                name: name("X"),
+                fetch_plan: plan,
+                variables,
+                selections,
+            },
+        )
     }
 
     fn lines(text: &QueryText) -> Vec<&str> {
@@ -458,13 +564,16 @@ mod tests {
 
     #[test]
     fn a_root_query_prints_its_selections_with_the_discriminator_and_identity_below_the_top() {
-        let text = print_operation(&EntrypointOperation {
-            name: name("HomeRoute"),
-            fetch_plan: root(OperationType::Query).reference(),
-            variables: &[],
-            selections: top_level(vec![composite("pets", vec![], id(), vec![leaf("tagline")])])
-                .reference(),
-        });
+        let text = print_operation(
+            QueryTextFormat::Expanded,
+            &EntrypointOperation {
+                name: name("HomeRoute"),
+                fetch_plan: root(OperationType::Query).reference(),
+                variables: &[],
+                selections: top_level(vec![composite("pets", vec![], id(), vec![leaf("tagline")])])
+                    .reference(),
+            },
+        );
         assert_eq!(
             lines(text.reference()),
             vec![
@@ -499,8 +608,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn variable_definitions_print_their_types_and_defaults() {
+    /// Variables of every type shape, two with defaults.
+    fn every_kind_of_variable() -> Vec<FieldVariable> {
         let variable =
             |name: &str, variable_type: VariableType, default_value: Option<MergedValue>| {
                 FieldVariable {
@@ -510,7 +619,7 @@ mod tests {
                 }
             };
         let named = |name: &str| NonNullVariableType::Named(entity(name));
-        let variables = vec![
+        vec![
             variable(
                 "limit",
                 VariableType::Nullable(named("Int")),
@@ -545,7 +654,12 @@ mod tests {
                 VariableType::NonNull(named("Boolean")),
                 MergedValue::Boolean(Boolean::False).wrap_some(),
             ),
-        ];
+        ]
+    }
+
+    #[test]
+    fn variable_definitions_print_their_types_and_defaults() {
+        let variables = every_kind_of_variable();
         let text = print(
             root(OperationType::Query).reference(),
             variables.as_slice(),
@@ -931,6 +1045,11 @@ mod tests {
     }
 
     fn every_kind_of_argument() -> MergedSelection {
+        every_kind_of_argument_with(-5)
+    }
+
+    /// A selection of `f` with an argument of every value kind, `i` being `integer`.
+    fn every_kind_of_argument_with(integer: i64) -> MergedSelection {
         let entry = |name: &str, value: MergedValue| MergedObjectEntry {
             name: name.intern().to(),
             value,
@@ -939,7 +1058,7 @@ mod tests {
             "f",
             vec![
                 ("b", MergedValue::Boolean(Boolean::True)),
-                ("i", MergedValue::Integer(-5)),
+                ("i", MergedValue::Integer(integer)),
                 ("n", MergedValue::Null),
                 (
                     "o",
@@ -1252,6 +1371,177 @@ mod tests {
         .expect("the map has a selection");
         assert!(
             normalization_ast(in_range.reference(), name("__typename"), entity("Query")).is_ok()
+        );
+    }
+
+    /// The plan of an operation of `operation_type`, with `Query` and `Mutation` as root
+    /// entities.
+    fn plan(operation_type: OperationType) -> GraphQLFetchPlan {
+        let operation = entity(root_type_name(operation_type));
+        GraphQLFetchPlan {
+            operation_type,
+            roots: RootEntities {
+                operation,
+                others: [entity("Query"), entity("Mutation")]
+                    .into_iter()
+                    .filter(|other| *other != operation)
+                    .collect(),
+            },
+        }
+    }
+
+    /// The operations the printer tests build, with a non-negative integer where `cases()` has
+    /// `-5` (its normalization alias `i___l_-5` is not a GraphQL name), the variable
+    /// definitions, and a list and an empty object argument.
+    fn format_fixtures() -> Vec<(GraphQLFetchPlan, Vec<FieldVariable>, CompletedSelectionMap)> {
+        let lists = leaf_with(
+            "g",
+            vec![
+                (
+                    "e",
+                    MergedValue::Object(MergedObject::new(vec![]).expect("no keys")),
+                ),
+                (
+                    "l",
+                    MergedValue::List(vec![
+                        MergedValue::Integer(1),
+                        MergedValue::Integer(5),
+                        MergedValue::Variable("x".intern().to()),
+                        MergedValue::Boolean(Boolean::True),
+                    ]),
+                ),
+            ],
+        );
+        let complete = |operation_type: OperationType, selections: Vec<MergedSelection>| {
+            let plan = plan(operation_type);
+            let completed = CompletedSelectionMap::top_level::<GraphQLNetworkProtocol>(
+                map(selections).reference(),
+                plan.roots.reference(),
+            )
+            .expect("the test's top level completes");
+            (plan, completed)
+        };
+        cases()
+            .into_iter()
+            .filter(|(_, selections)| *selections != every_kind_of_argument().wrap_vec())
+            .chain([
+                (
+                    OperationType::Mutation,
+                    every_kind_of_argument_with(5).wrap_vec(),
+                ),
+                (OperationType::Query, lists.wrap_vec()),
+            ])
+            .map(|(operation_type, selections)| {
+                let (plan, completed) = complete(operation_type, selections);
+                (plan, Vec::new(), completed)
+            })
+            .chain(std::iter::once({
+                let (plan, completed) = complete(OperationType::Query, leaf("a").wrap_vec());
+                (plan, every_kind_of_variable(), completed)
+            }))
+            .collect()
+    }
+
+    fn print_in(
+        format: QueryTextFormat,
+        plan: &GraphQLFetchPlan,
+        variables: &[FieldVariable],
+        selections: &CompletedSelectionMap,
+    ) -> String {
+        print_operation(
+            format,
+            &EntrypointOperation {
+                name: name("X"),
+                fetch_plan: plan,
+                variables,
+                selections,
+            },
+        )
+        .0
+    }
+
+    /// `text` parsed by graphql-parser and printed back in its own format, which writes no
+    /// source position: two texts of the same operation print the same.
+    fn parsed_and_printed(text: &str) -> String {
+        graphql_parser::parse_query::<String>(text)
+            .unwrap_or_else(|error| panic!("graphql-parser rejects {text}: {error}"))
+            .to_string()
+    }
+
+    #[test]
+    fn collapsed_text_has_no_newline_and_no_two_consecutive_spaces() {
+        for (plan, variables, selections) in format_fixtures() {
+            let text = print_in(
+                QueryTextFormat::Collapsed,
+                plan.reference(),
+                variables.as_slice(),
+                selections.reference(),
+            );
+            assert!(!text.contains('\n'), "{text}");
+            assert!(!text.contains("  "), "{text}");
+        }
+    }
+
+    #[test]
+    fn both_formats_parse_to_the_same_operation() {
+        for (plan, variables, selections) in format_fixtures() {
+            let [expanded, collapsed] = [QueryTextFormat::Expanded, QueryTextFormat::Collapsed]
+                .map(|format| {
+                    print_in(
+                        format,
+                        plan.reference(),
+                        variables.as_slice(),
+                        selections.reference(),
+                    )
+                });
+            assert_eq!(
+                parsed_and_printed(expanded.as_str()),
+                parsed_and_printed(collapsed.as_str()),
+                "{expanded}\n{collapsed}"
+            );
+        }
+    }
+
+    #[test]
+    fn collapsed_text_writes_a_space_only_between_two_name_characters() {
+        assert_eq!(
+            print_in(
+                QueryTextFormat::Collapsed,
+                root(OperationType::Query).reference(),
+                &[],
+                top_level(vec![
+                    composite("pets", vec![], id(), vec![leaf("tagline")],)
+                ])
+                .reference(),
+            ),
+            "query X{pets{__typename id tagline}}"
+        );
+        assert_eq!(
+            print_in(
+                QueryTextFormat::Collapsed,
+                root(OperationType::Mutation).reference(),
+                &[],
+                top_level(vec![every_kind_of_argument()]).reference(),
+            ),
+            "mutation X{f____b___l_true____i___l_-5____n___l_null____o___o_s__s_a_b_v__v_x_c____s___s__q_____v___v_x:f(b:true i:-5 n:null o:{s:\"a b\"v:$x}s:\"\\\"q\\\"\"v:$x)}"
+        );
+        assert_eq!(
+            print_in(
+                QueryTextFormat::Collapsed,
+                root(OperationType::Query).reference(),
+                every_kind_of_variable().as_slice(),
+                top_level(vec![leaf("a")]).reference(),
+            ),
+            "query X($limit:Int=3$ids:[ID!]!$maybe:[ID]$nested:[[Int!]]!$flag:Boolean!=false){a}"
+        );
+        assert_eq!(
+            print_in(
+                QueryTextFormat::Collapsed,
+                root(OperationType::Query).reference(),
+                &[],
+                top_level(vec![union_feed()]).reference(),
+            ),
+            "query X{newsfeed____limit___l_2:newsfeed(limit:2){__typename cursor...on BlogItem{__typename id title}}}"
         );
     }
 }

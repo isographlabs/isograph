@@ -4,6 +4,7 @@ use std::path::Path;
 
 use common_lang_types::{EntityName, RelativePathToSourceFile, SelectableName};
 
+use isograph_config::IsographProjectConfig;
 use isograph_parser::{ArgumentList, ParsedIsoLiteral, VariableDeclarationList};
 use span::{Span, WithSpan};
 
@@ -120,6 +121,8 @@ pub trait NetworkProtocol: Sized + 'static {
     type ArgumentError: Clone + Debug + PartialEq + Eq + std::fmt::Display + 'static;
     /// An error the protocol reports for a schema file.
     type SchemaFileError: Clone + Debug + PartialEq + Eq + std::fmt::Display + 'static;
+    /// The protocol's options, which it reads from the project config.
+    type Options: Clone + Debug + Default + PartialEq + Eq + 'static;
 
     fn should_include_schema_file(relative_path: &Path) -> IncludeFile;
 
@@ -213,9 +216,15 @@ pub trait NetworkProtocol: Sized + 'static {
     /// are on.
     fn entrypoint_wrapper(plan: &Self::FetchPlan) -> EntrypointWrapper;
 
-    /// The text of `operation`'s query, and the protocol's name for a file holding exactly
-    /// that text.
-    fn query_text(operation: &EntrypointOperation<'_, Self>) -> ProtocolQueryText;
+    /// The protocol's options in `config`.
+    fn options(config: &IsographProjectConfig) -> Self::Options;
+
+    /// The text of `operation`'s query under `options`, and the protocol's name for a file
+    /// holding exactly that text.
+    fn query_text(
+        options: &Self::Options,
+        operation: &EntrypointOperation<'_, Self>,
+    ) -> ProtocolQueryText;
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

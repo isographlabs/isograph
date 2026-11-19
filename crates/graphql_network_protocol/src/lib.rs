@@ -19,6 +19,7 @@ use isograph_compiler::{
     IncludeFile, IsographDb, NetworkProtocol, ProtocolEntity, ProtocolQueryText,
     ProtocolSelectable, ScalarKind, ScalarValueKind, SelectableKey, SelectableShape,
 };
+use isograph_config::{GraphQLConfig, IsographProjectConfig};
 use isograph_parser::{ArgumentList, VariableDeclarationList};
 use prelude::Postfix;
 use span::WithSpan;
@@ -77,6 +78,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
     type LookupError = GraphQLLookupError;
     type SchemaFileError = GraphQLSchemaFileError;
     type ArgumentError = GraphQLArgumentError;
+    type Options = GraphQLConfig;
 
     fn should_include_schema_file(relative_path: &Path) -> IncludeFile {
         match relative_path.extension().and_then(|e| e.to_str()) {
@@ -206,7 +208,14 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         plan.wrapper.clone()
     }
 
-    fn query_text(operation: &EntrypointOperation<'_, Self>) -> ProtocolQueryText {
-        query_text::query_text(operation)
+    fn options(config: &IsographProjectConfig) -> GraphQLConfig {
+        config.graphql
+    }
+
+    fn query_text(
+        options: &GraphQLConfig,
+        operation: &EntrypointOperation<'_, Self>,
+    ) -> ProtocolQueryText {
+        query_text::query_text(options.query_text_format, operation)
     }
 }

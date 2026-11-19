@@ -348,6 +348,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "combine"
+version = "4.6.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4356eba6976435498d05a311ee9fc486da3bc81c200d3f0d7dd9703b41913f92"
+dependencies = [
+ "bytes",
+ "memchr",
+]
+
+[[package]]
 name = "common_lang_types"
 version = "0.5.3"
 dependencies = [
@@ -789,14 +799,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "graphql-parser"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a818c0d883d7c0801df27be910917750932be279c7bc82dc541b8769425f409"
+dependencies = [
+ "combine",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "graphql_network_protocol"
 version = "0.5.3"
 dependencies = [
  "common_lang_types",
  "derive_more",
+ "graphql-parser",
  "graphql_schema_parser",
  "intern",
  "isograph_compiler",
+ "isograph_config",
  "isograph_extract_typescript",
  "isograph_parser",
  "pico",
@@ -1124,6 +1146,7 @@ dependencies = [
  "common_lang_types",
  "derive_more",
  "intern",
+ "isograph_config",
  "isograph_parser",
  "nonempty",
  "pico",
@@ -1151,6 +1174,7 @@ dependencies = [
  "common_lang_types",
  "intern",
  "isograph_compiler",
+ "isograph_config",
  "isograph_parser",
  "pico",
  "pico_macros",
@@ -1169,6 +1193,7 @@ dependencies = [
  "common_lang_types",
  "intern",
  "isograph_compiler",
+ "isograph_config",
  "isograph_extract_typescript",
  "isograph_parser",
  "lsp-types",

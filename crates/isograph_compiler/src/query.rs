@@ -11,7 +11,7 @@ use crate::normalization_ast::{IntegerOutOfRange, NormalizationAst, normalizatio
 use crate::validation::EntrypointNotFetchableError;
 use crate::{
     ClientId, CompilationProfile, IsographDb, NetworkProtocol, entity_named, entrypoint_fetch_plan,
-    selectable_named,
+    protocol_options, selectable_named,
 };
 
 /// What the core hands the protocol to print one entrypoint's query.
@@ -95,13 +95,15 @@ pub fn query_for_entrypoint<TProfile: CompilationProfile>(
         roots.operation,
     )
     .map_err(EntrypointQueryError::IntegerOutOfRange)?;
-    let ProtocolQueryText { text, file_name } =
-        TProfile::NetworkProtocol::query_text(&EntrypointOperation {
+    let ProtocolQueryText { text, file_name } = TProfile::NetworkProtocol::query_text(
+        protocol_options(db).reference(),
+        &EntrypointOperation {
             name: selectable,
             fetch_plan: plan.reference(),
             variables: variables.as_slice(),
             selections: selections.reference(),
-        });
+        },
+    );
     QueryArtifact {
         text,
         file_name,

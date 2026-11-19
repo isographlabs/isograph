@@ -1,12 +1,14 @@
+use std::any::TypeId;
 use std::collections::{BTreeSet, HashMap};
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::marker::PhantomData;
 
 use common_lang_types::RelativePathToSourceFile;
-use pico::{Database, SourceId, Storage};
+use pico::{Database, Key, Singleton, SourceId, Storage};
 use pico_macros::{Db, Source, memo};
 use prelude::Postfix;
 
-use crate::{CompilationProfile, IncludeFile};
+use crate::{CompilationProfile, IncludeFile, NetworkProtocol};
 
 /// A reader of file text.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -88,6 +90,36 @@ pub struct EditorBuffer {
     pub contents: String,
 }
 
+/// The network protocol's options, a singleton source.
+#[derive(Debug, PartialEq, Eq)]
+pub struct ProtocolOptions<TOptions>(pub TOptions);
+
+impl<TOptions: 'static> Singleton for ProtocolOptions<TOptions> {
+    fn get_singleton_key() -> Key {
+        let mut hasher = DefaultHasher::new();
+        TypeId::of::<Self>().hash(&mut hasher);
+        hasher.finish().to()
+    }
+}
+
+impl<TOptions: 'static> pico::Source for ProtocolOptions<TOptions> {
+    fn get_key(&self) -> Key {
+        Self::get_singleton_key()
+    }
+}
+
+pub type ProfileProtocolOptions<TProfile> =
+    <<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::Options;
+
+/// The protocol's options as set, or its default options when none are set.
+pub fn protocol_options<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+) -> ProfileProtocolOptions<TProfile> {
+    db.get_singleton::<ProtocolOptions<ProfileProtocolOptions<TProfile>>>()
+        .map(|options| options.0.clone())
+        .unwrap_or_default()
+}
+
 /// The text of `path` as `client` reads it: that client's editor buffer, otherwise disk.
 #[memo]
 pub fn file_contents<TProfile: CompilationProfile>(
@@ -148,6 +180,10 @@ pub fn schema_file_paths<TProfile: CompilationProfile>(
 }
 
 impl<TProfile: CompilationProfile> IsographDb<TProfile> {
+    pub fn set_protocol_options(&mut self, options: ProfileProtocolOptions<TProfile>) {
+        self.set(ProtocolOptions(options));
+    }
+
     pub fn set_editor_buffer(
         &mut self,
         client: ClientId,
