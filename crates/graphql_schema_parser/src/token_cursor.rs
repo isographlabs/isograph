@@ -26,7 +26,7 @@ impl<'a> TokenText<'a> {
         }
     }
 
-    #[expect(dead_code)]
+    #[cfg_attr(not(test), expect(dead_code))]
     pub(crate) fn interned<T: From<intern::string_key::StringKey>>(self) -> WithSpan<T> {
         self.text().intern().to::<T>().with_span(self.location)
     }
