@@ -1,7 +1,5 @@
 # The full artifact set: stub runtime ASTs, generated types, and scalar type mapping
 
-Status: not actively worked; it records decisions and will be brought current when work on it starts.
-
 This doc extends `refactors/pending/artifact-generation.md` (v0: `output_directory`, `iso.ts`, `{ kind: "Entrypoint", name }` entrypoint artifacts, `ArtifactValue` printed through SWC, all-or-nothing write with a diff) to every file upstream isograph generates. Files the runtime reads (reader ASTs, normalization ASTs, refetch readers) are generated at upstream's paths as modules whose default export is an empty object. Files TypeScript reads (param types, parameters types, output types, link types, the typed `iso.ts` overloads) are generated in full, by upstream's algorithm. The knowledge that GraphQL `String` is TypeScript `string` is split: the network protocol reports how a built-in scalar's values are represented as data, and the host language maps that data to its own types. A custom scalar's type comes from the compilation profile.
 
 Upstream references are the checkout at `/Users/rbalicki/code/isograph` (commit `79e2a3c0`): `crates/artifact_content/src/` and the generated tree `demos/pet-demo/src/components/__isograph/`.
@@ -1296,7 +1294,7 @@ I hold (b), for the three reasons in (a)'s consequences: the package is gone fro
 - (a) Upstream's rules: `resolver_reader.ts` only for fields reachable from an entrypoint, `output_type.ts` only for entrypoints and selected fields, `refetch_reader.ts` and a field's own entrypoint only for loadably selected reachable fields. Adding an entrypoint adds reader files of every field it reaches; generation needs the reachability worklist, which query generation also walks.
 - (b) Every file for every field. Each file depends on one literal, so an edit changes only that literal's files; the generated tree is larger than upstream's and has readers no runtime loads.
 
-Open. The decision is moot until this doc is actively worked; the sections above are written against (a).
+Decided: (a), upstream's rules.
 
 ### 4. The entrypoint artifact's content
 
@@ -1304,7 +1302,7 @@ Open. The decision is moot until this doc is actively worked; the sections above
 - (b) v0's object plus `normalizationAst` and `readerArtifact` importing the stubs, named as pico-runtime.md's `Entrypoint`. The module graph from an entrypoint reaches its stubs, as upstream's does; when readers become real, `readerArtifact` is already the default export the runtime calls.
 - (c) Upstream's shape: `networkRequestInfo: { kind: "NetworkRequestInfo", operation: { kind: "Operation", text }, normalizationAst }`, `concreteType`, `readerWithRefetchQueries: { kind: "ReaderWithRefetchQueries", nestedRefetchQueries, readerArtifact }`. It needs query text and `concreteType` from query generation, and it is the shape of the runtime i2 is not building.
 
-I hold (b).
+Decided: (b).
 
 ### 5. Enum types
 
