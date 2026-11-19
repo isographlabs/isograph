@@ -200,11 +200,8 @@ fn any_dependency_changed<Db: Database>(db: &Db, derived_node_id: DerivedNodeId)
 }
 
 fn source_node_changed_since<Db: Database>(db: &Db, key: Key, since: Epoch) -> bool {
-    // Every read inserts a node and `remove_source` keeps it, so `None` is not reached.
-    match db.get_storage().internal.get_source_node(key) {
-        Some(source) => source.time_updated > since,
-        None => true,
-    }
+    let (_, time_updated) = db.get_storage().internal.source_value_and_epoch(key);
+    time_updated > since
 }
 
 fn derived_node_changed_since<Db: Database>(
