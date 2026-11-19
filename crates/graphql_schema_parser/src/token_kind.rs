@@ -114,10 +114,10 @@ pub enum StringToken {
         r#"\\u[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]"#,
         fixed_width_code_unit
     )]
-    EscapedUnicode(#[expect(dead_code)] u16),
+    EscapedUnicode(u16),
 
     #[regex(r#"\\u\{[0-9A-Fa-f]+\}"#, variable_width_escape)]
-    EscapedVariableWidthUnicode(#[expect(dead_code)] VariableWidthEscape),
+    EscapedVariableWidthUnicode(VariableWidthEscape),
 
     #[token("\"")]
     Quote,
