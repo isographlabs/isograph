@@ -11,7 +11,7 @@ struct TestDatabase {
 }
 
 #[test]
-fn equal_reset_after_unrelated_epoch_reruns_bug() {
+fn equal_reset_after_unrelated_epoch_does_not_rerun() {
     let mut db = TestDatabase::default();
 
     let input_id = db.set(Input {
@@ -37,8 +37,7 @@ fn equal_reset_after_unrelated_epoch_reruns_bug() {
     });
 
     assert_eq!(*first_letter(&db, input_id), 'a');
-    // set_source's equal branch sets time_updated = current_epoch (database.rs); the fix flips this assertion.
-    assert_eq!(FIRST_LETTER_COUNTER.load(Ordering::SeqCst), 2);
+    assert_eq!(FIRST_LETTER_COUNTER.load(Ordering::SeqCst), 1);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Source)]
