@@ -421,11 +421,11 @@ mod tests {
         );
         let text = text_at(artifacts.as_slice(), "Pet/f/param_type.ts");
         assert!(
-            text.contains("/**\nThe pet's ID\n*/ readonly id: string;"),
+            text.contains("    /**\n     * The pet's ID\n     */\n    readonly id: string;"),
             "{text}"
         );
         assert!(
-            text.contains("/**\nends *\\/ here\n*/ readonly x: string;"),
+            text.contains("    /**\n     * ends *\\/ here\n     */\n    readonly x: string;"),
             "{text}"
         );
         let y_line = text

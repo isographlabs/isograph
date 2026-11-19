@@ -17,7 +17,7 @@ use swc_ecma_ast::{
     TsTypeParamDecl, TsTypeParamInstantiation, TsTypeQuery, TsTypeQueryExpr, TsTypeRef,
     TsUnionOrIntersectionType, TsUnionType,
 };
-use swc_ecma_codegen::text_writer::JsWriter;
+use swc_ecma_codegen::text_writer::{BindingStorage, JsWriter, ScopeKind, WriteJs};
 use swc_ecma_codegen::{Config, Emitter};
 
 use crate::imports::{artifact_import_identifier, artifact_import_specifier};
@@ -42,7 +42,7 @@ pub(crate) fn print(module: &TypeScriptModule) -> String {
                 Comment {
                     kind: CommentKind::Block,
                     span: DUMMY_SP,
-                    text: format!("*\n{}\n", description.replace("*/", "*\\/")).into(),
+                    text: jsdoc_text(description).into(),
                 },
             );
             Span::new(position, position)
@@ -68,13 +68,123 @@ pub(crate) fn print(module: &TypeScriptModule) -> String {
             cfg: Config::default().with_target(EsVersion::latest()),
             cm: source_map,
             comments: (&comments as &dyn Comments).wrap_some(),
-            wr: writer,
+            wr: OwnLineBlockComments {
+                inner: writer,
+                last_write: LastWrite::Other,
+            },
         };
         emitter
             .emit_module(swc_module.reference())
             .expect("writing to a Vec does not fail");
     }
     String::from_utf8(buffer).expect("swc_ecma_codegen writes UTF-8")
+}
+
+/// The text between `/*` and `*/` of the JSDoc comment for `description`: one ` * ` line per
+/// description line, then the space that aligns `*/` under the `*`s. `*/` in the description is
+/// escaped.
+fn jsdoc_text(description: &str) -> String {
+    let escaped = description.replace("*/", "*\\/");
+    let lines: String = escaped
+        .split('\n')
+        .map(|line| match line {
+            "" => "\n *".to_owned(),
+            line => format!("\n * {line}"),
+        })
+        .collect();
+    format!("*{lines}\n ")
+}
+
+/// The last thing an `OwnLineBlockComments` wrote.
+enum LastWrite {
+    BlockCommentEnd,
+    Other,
+}
+
+/// A writer that prints each block comment on its own lines: every newline in the comment text
+/// is a line break at the current indent, and the space swc_ecma_codegen writes after `*/` is a
+/// line break.
+struct OwnLineBlockComments<W: WriteJs> {
+    inner: W,
+    last_write: LastWrite,
+}
+
+macro_rules! delegate_write {
+    ($name:ident($($arg:ident: $ty:ty),*)) => {
+        fn $name(&mut self, $($arg: $ty),*) -> swc_ecma_codegen::Result {
+            self.last_write = LastWrite::Other;
+            self.inner.$name($($arg),*)
+        }
+    };
+}
+
+impl<W: WriteJs> WriteJs for OwnLineBlockComments<W> {
+    delegate_write!(increase_indent());
+    delegate_write!(decrease_indent());
+    delegate_write!(write_semi(span: Option<Span>));
+    delegate_write!(write_keyword(span: Option<Span>, s: &'static str));
+    delegate_write!(write_operator(span: Option<Span>, s: &str));
+    delegate_write!(write_param(s: &str));
+    delegate_write!(write_property(s: &str));
+    delegate_write!(write_line());
+    delegate_write!(write_lit(span: Span, s: &str));
+    delegate_write!(write_str_lit(span: Span, s: &str));
+    delegate_write!(write_str(s: &str));
+    delegate_write!(write_symbol(span: Span, s: &str));
+    delegate_write!(write_punct(span: Option<Span>, s: &'static str, commit_pending_semi: bool));
+    delegate_write!(commit_pending_semi());
+    delegate_write!(end_scope());
+    delegate_write!(start_scope(
+        name: Option<&str>,
+        kind: ScopeKind,
+        is_stack_frame: bool,
+        is_hidden: bool,
+        original_span: Option<Span>
+    ));
+    delegate_write!(add_scope_variable(
+        name: &str,
+        expression: Option<&str>,
+        storage: BindingStorage
+    ));
+
+    fn write_space(&mut self) -> swc_ecma_codegen::Result {
+        match std::mem::replace(&mut self.last_write, LastWrite::Other) {
+            LastWrite::BlockCommentEnd => self.inner.write_line(),
+            LastWrite::Other => self.inner.write_space(),
+        }
+    }
+
+    fn write_comment(&mut self, s: &str) -> swc_ecma_codegen::Result {
+        let mut lines = s.split('\n');
+        lines
+            .next()
+            .map_or(().wrap_ok(), |first| self.inner.write_comment(first))?;
+        lines.try_for_each(|line| {
+            self.inner.write_line()?;
+            self.inner.write_comment(line)
+        })?;
+        self.last_write = match s {
+            "*/" => LastWrite::BlockCommentEnd,
+            _ => LastWrite::Other,
+        };
+        ().wrap_ok()
+    }
+
+    fn care_about_srcmap(&self) -> bool {
+        self.inner.care_about_srcmap()
+    }
+
+    fn add_srcmap(&mut self, pos: BytePos) -> swc_ecma_codegen::Result {
+        self.inner.add_srcmap(pos)
+    }
+
+    fn can_ignore_invalid_unicodes(&mut self) -> bool {
+        self.inner.can_ignore_invalid_unicodes()
+    }
+
+    fn has_scope_tracking(&self) -> bool {
+        self.inner.has_scope_tracking()
+    }
 }
 
 fn module_item(from: &ArtifactPath, item: &TypeScriptItem, comment_at: CommentAt) -> ModuleItem {
@@ -527,9 +637,9 @@ mod tests {
 
     use super::print;
     use crate::module::{
-        ArtifactImport, ArtifactModule, ArtifactObjectEntry, ArtifactValue, TemplateLiteralSpan,
-        TemplateLiteralType, TypeAlias, TypeScriptItem, TypeScriptModule, TypeScriptType,
-        module_of_artifact,
+        ArtifactImport, ArtifactModule, ArtifactObjectEntry, ArtifactValue, Optionality,
+        PropertySignature, TemplateLiteralSpan, TemplateLiteralType, TypeAlias, TypeScriptItem,
+        TypeScriptKeyword, TypeScriptModule, TypeScriptType, module_of_artifact,
     };
 
     fn path(text: &str) -> ArtifactPath {
@@ -666,5 +776,83 @@ mod tests {
             .wrap_vec(),
         }));
         assert_eq!(text, "type X = `\\`\\\\\\${${T}end`;\n");
+    }
+
+    fn property(key: &str, type_: TypeScriptType, description: Option<&str>) -> PropertySignature {
+        PropertySignature {
+            key: key.to_owned(),
+            optionality: Optionality::Required,
+            type_,
+            description: description.map(str::to_owned),
+        }
+    }
+
+    fn described_string(description: &str) -> TypeScriptType {
+        TypeScriptType::Object(
+            property(
+                "a",
+                TypeScriptType::Keyword(TypeScriptKeyword::String),
+                description.wrap_some(),
+            )
+            .wrap_vec(),
+        )
+    }
+
+    #[test]
+    fn a_description_at_depth_one_is_a_jsdoc_comment_on_its_own_lines() {
+        let text = printed_alias(described_string("Replace a pet's tagline."));
+        assert_eq!(
+            text,
+            "type X = {\n  /**\n   * Replace a pet's tagline.\n   */\n  readonly a: string;\n};\n"
+        );
+    }
+
+    #[test]
+    fn a_description_at_depth_three_is_indented_to_its_property() {
+        let nest =
+            |inner: TypeScriptType| TypeScriptType::Object(property("o", inner, None).wrap_vec());
+        let text = printed_alias(nest(nest(described_string("Deep."))));
+        assert_eq!(
+            text,
+            concat!(
+                "type X = {\n",
+                "  readonly o: {\n",
+                "    readonly o: {\n",
+                "      /**\n",
+                "       * Deep.\n",
+                "       */\n",
+                "      readonly a: string;\n",
+                "    };\n",
+                "  };\n",
+                "};\n",
+            )
+        );
+    }
+
+    #[test]
+    fn each_line_of_a_multi_line_description_is_prefixed() {
+        let text = printed_alias(described_string("First.\n\nThird."));
+        assert_eq!(
+            text,
+            "type X = {\n  /**\n   * First.\n   *\n   * Third.\n   */\n  readonly a: string;\n};\n"
+        );
+    }
+
+    #[test]
+    fn an_empty_description_is_one_empty_comment_line() {
+        let text = printed_alias(described_string(""));
+        assert_eq!(
+            text,
+            "type X = {\n  /**\n   *\n   */\n  readonly a: string;\n};\n"
+        );
+    }
+
+    #[test]
+    fn a_comment_terminator_in_a_description_is_escaped() {
+        let text = printed_alias(described_string("a */ b"));
+        assert_eq!(
+            text,
+            "type X = {\n  /**\n   * a *\\/ b\n   */\n  readonly a: string;\n};\n"
+        );
     }
 }

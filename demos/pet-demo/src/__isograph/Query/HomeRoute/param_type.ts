@@ -2,14 +2,17 @@ import type { Pet__PetSummaryCard__output_type } from "./../../Pet/PetSummaryCar
 export type Query__HomeRoute__param = {
   readonly data: {
     /**
-All the pets! What more could you ask for?
-*/ readonly pets: ReadonlyArray<{
+     * All the pets! What more could you ask for?
+     */
+    readonly pets: ReadonlyArray<{
       /**
-The pet's ID
-*/ readonly id: string;
+       * The pet's ID
+       */
+      readonly id: string;
       /**
-A card with the pet's name, picture, and tagline.
-*/ readonly PetSummaryCard: Pet__PetSummaryCard__output_type;
+       * A card with the pet's name, picture, and tagline.
+       */
+      readonly PetSummaryCard: Pet__PetSummaryCard__output_type;
     }>;
   };
   readonly parameters: Record<PropertyKey, never>;
