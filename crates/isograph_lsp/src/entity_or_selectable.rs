@@ -95,7 +95,7 @@ pub(crate) fn entity_or_selectable_of_node<TProfile: CompilationProfile>(
 
 #[cfg(test)]
 mod tests {
-    use common_lang_types::RelativePathToSourceFile;
+    use common_lang_types::{EntityName, RelativePathToSourceFile};
     use intern::string_key::Intern;
     use isograph_compiler::{DefinitionLocation, Entity, Selectable};
     use prelude::Postfix;
@@ -122,7 +122,7 @@ mod tests {
             name: "owner".intern().to(),
             parent_entity: "Pet".intern().to(),
             description: None,
-            target_entity: "User".intern().to(),
+            target_entity: "User".intern().to::<EntityName>().wrap_some(),
             definition: selectable_definition,
         });
         assert_eq!(entity.definition(), entity_definition);

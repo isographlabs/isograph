@@ -105,6 +105,28 @@ pub fn file_contents<TProfile: CompilationProfile>(
     }
 }
 
+/// Every source file path `client` reads: disk paths and `client`'s open paths, sorted.
+#[memo]
+pub fn source_file_paths<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+) -> Vec<RelativePathToSourceFile> {
+    let view = db.get_source_path_map();
+    let map = view.tracked();
+    map.disk
+        .iter()
+        .copied()
+        .chain(
+            map.open
+                .iter()
+                .filter(|key| key.client == client)
+                .map(|key| key.path),
+        )
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
+}
+
 impl<TProfile: CompilationProfile> IsographDb<TProfile> {
     fn open_file_source_id(&self, key: OpenFileKey) -> Option<SourceId<OpenFile>> {
         match self.get_open_file_map().untracked().0.get(&key).copied() {

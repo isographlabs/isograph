@@ -1,4 +1,4 @@
-use common_lang_types::{DiagnosticResult, EntityName, SelectableName};
+use common_lang_types::{Diagnostic, DiagnosticResult, EntityName, SelectableName};
 use isograph_parser::{
     SelectableNameWrapperParent, SelectableNameWrapperPath, SelectionPath, SelectionSetParent,
     SelectionSetPath,
@@ -40,9 +40,27 @@ pub fn selectable_for_selection_parent<TProfile: CompilationProfile>(
         }
         SelectionSetParent::Selection(selection_path) => {
             let parent_selectable = selectable_for_selection_path(db, client, selection_path)?;
-            selectable_for_entity(db, client, parent_selectable.target_entity, selectable_name)
+            selectable_for_entity(
+                db,
+                client,
+                selectable_target(parent_selectable.reference())?,
+                selectable_name,
+            )
         }
     }
+}
+
+/// The entity selections under a selection of `selectable` select on.
+pub fn selectable_target(selectable: &Selectable) -> DiagnosticResult<EntityName> {
+    selectable.target_entity.ok_or_else(|| {
+        Diagnostic::new(
+            format!(
+                "Field `{}.{}` has no target to select into.",
+                selectable.parent_entity, selectable.name
+            ),
+            None,
+        )
+    })
 }
 
 /// The selectable named `selectable_name` on the entity named `entity_name`.

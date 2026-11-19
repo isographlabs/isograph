@@ -65,9 +65,13 @@ fn selectable_hover_markdown(selectable: &Selectable) -> String {
         .description
         .map(|description| format!("\n\n{description}"))
         .unwrap_or_default();
+    let target = selectable
+        .target_entity
+        .map(|target| format!(": **{target}**"))
+        .unwrap_or_default();
     format!(
-        "field **{}.{}**: **{}**{description}",
-        selectable.parent_entity, selectable.name, selectable.target_entity
+        "field **{}.{}**{target}{description}",
+        selectable.parent_entity, selectable.name
     )
 }
 
@@ -465,12 +469,12 @@ mod tests {
         }
     }
 
-    fn pet_owner(description: Option<&str>) -> isograph_compiler::Selectable {
+    fn pet_owner(target: Option<&str>, description: Option<&str>) -> isograph_compiler::Selectable {
         isograph_compiler::Selectable {
             name: "owner".intern().to(),
             parent_entity: "Pet".intern().to(),
             description: description.map(|description| description.intern().to()),
-            target_entity: "User".intern().to(),
+            target_entity: target.map(|target| target.intern().to()),
             definition: definition(),
         }
     }
@@ -487,12 +491,26 @@ mod tests {
     #[test]
     fn selectable_hover_names_parent_name_and_target_then_the_description() {
         assert_eq!(
-            selectable_hover_markdown(pet_owner("The owner".wrap_some()).reference()),
+            selectable_hover_markdown(
+                pet_owner("User".wrap_some(), "The owner".wrap_some()).reference()
+            ),
             "field **Pet.owner**: **User**\n\nThe owner"
         );
         assert_eq!(
-            selectable_hover_markdown(pet_owner(None).reference()),
+            selectable_hover_markdown(pet_owner("User".wrap_some(), None).reference()),
             "field **Pet.owner**: **User**"
+        );
+    }
+
+    #[test]
+    fn selectable_hover_of_a_field_without_a_target_names_no_target() {
+        assert_eq!(
+            selectable_hover_markdown(pet_owner(None, "The owner".wrap_some()).reference()),
+            "field **Pet.owner**\n\nThe owner"
+        );
+        assert_eq!(
+            selectable_hover_markdown(pet_owner(None, None).reference()),
+            "field **Pet.owner**"
         );
     }
 }

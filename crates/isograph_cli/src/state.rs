@@ -1774,11 +1774,10 @@ mod tests {
     const ALIASED: &str = "iso(`field Pet.fullName { b: bar }`)";
 
     /// Each one-line fixture with the UTF-16 column of every entity, selectable, and selection
-    /// name in it.
-    fn schema_name_positions() -> Vec<(&'static str, u32)> {
+    /// name in it that no declaration in the fixture defines.
+    fn undeclared_schema_name_positions() -> Vec<(&'static str, u32)> {
         vec![
             (DECLARED, column(DECLARED, "Pet")),
-            (DECLARED, column(DECLARED, "x(")),
             (DECLARED, column(DECLARED, "ID")),
             (DECLARED, column(DECLARED, "{ id") + 2),
             (ENTRYPOINT_QUERY_X, column(ENTRYPOINT_QUERY_X, "Query")),
@@ -1791,8 +1790,8 @@ mod tests {
     }
 
     #[test]
-    fn hover_on_a_schema_name_is_null_until_the_schema_exists() {
-        for (text, character) in schema_name_positions() {
+    fn hover_on_an_undeclared_schema_name_is_null() {
+        for (text, character) in undeclared_schema_name_positions() {
             assert_eq!(
                 hover_on_disk(text, 0, character),
                 None,
@@ -1828,19 +1827,102 @@ mod tests {
     }
 
     #[test]
-    fn definition_is_null_until_the_schema_exists() {
+    fn definition_of_an_undeclared_schema_name_is_null() {
         let others = [
             (DECLARED, column(DECLARED, "field")),
             (DECLARED, column(DECLARED, "{")),
             (ENTRYPOINT_QUERY_X, column(ENTRYPOINT_QUERY_X, "entrypoint")),
         ];
-        for (text, character) in schema_name_positions().into_iter().chain(others) {
+        for (text, character) in undeclared_schema_name_positions().into_iter().chain(others) {
             assert_eq!(
                 definition_on_disk(text, 0, character),
                 serde_json::Value::Null,
                 "{text:?} at {character}"
             );
         }
+    }
+
+    const PET_FILE: &str = "iso(`entity Pet`) iso(`field Pet.owner to Pet { id }`)";
+    const FULL_NAME_FILE: &str = "iso(`field Pet.fullName { id }`)";
+    const SELECTING_FILE: &str = "iso(`field Pet.x { owner { fullName } }`)";
+
+    /// A one-line range of `src/<file>` in a `textDocument/definition` result.
+    fn definition_json(file: &str, text: &str, needle: &str) -> serde_json::Value {
+        let start = column(text, needle);
+        serde_json::json!({
+            "uri": format!("file:///tmp/proj/src/{file}"),
+            "range": {
+                "start": { "line": 0, "character": start },
+                "end": { "line": 0, "character": start + needle.encode_utf16().count() as u32 },
+            },
+        })
+    }
+
+    #[test]
+    fn hover_and_definition_read_declarations_across_source_files() {
+        let mut state = with_config();
+        disk_changed(&mut state, "/tmp/proj/src/Pet.ts", PET_FILE);
+        disk_changed(&mut state, "/tmp/proj/src/fullName.ts", FULL_NAME_FILE);
+        disk_changed(&mut state, "/tmp/proj/src/x.ts", SELECTING_FILE);
+        let one = live_client(&mut state, ClientId(1));
+        let at = |needle: &str| hover_params(X_URI, 0, column(SELECTING_FILE, needle));
+        let definition = |state: &mut IsographState<TestProfile>, needle: &str| {
+            request_result(
+                state,
+                &one,
+                lsp_types::request::GotoDefinition::METHOD,
+                at(needle),
+            )
+        };
+        assert_eq!(
+            hover_text(
+                &mut state,
+                &one,
+                X_URI,
+                0,
+                column(SELECTING_FILE, "fullName")
+            ),
+            some("field **Pet.fullName**")
+        );
+        assert_eq!(
+            definition(&mut state, "fullName"),
+            definition_json("fullName.ts", FULL_NAME_FILE, "fullName")
+        );
+        assert_eq!(
+            hover_text(&mut state, &one, X_URI, 0, column(SELECTING_FILE, "owner")),
+            some("field **Pet.owner**: **Pet**")
+        );
+        assert_eq!(
+            definition(&mut state, "owner"),
+            definition_json("Pet.ts", PET_FILE, "owner")
+        );
+        assert_eq!(
+            hover_text(&mut state, &one, X_URI, 0, column(SELECTING_FILE, "Pet")),
+            some("entity **Pet**")
+        );
+        assert_eq!(
+            definition(&mut state, "Pet"),
+            definition_json("Pet.ts", PET_FILE, "Pet")
+        );
+    }
+
+    #[test]
+    fn a_declarations_own_name_resolves_to_that_declaration() {
+        let character = column(DECLARED, "x(");
+        assert_eq!(
+            hover_on_disk(DECLARED, 0, character),
+            some("field **Pet.x**")
+        );
+        assert_eq!(
+            definition_on_disk(DECLARED, 0, character),
+            serde_json::json!({
+                "uri": X_URI,
+                "range": {
+                    "start": { "line": 0, "character": character },
+                    "end": { "line": 0, "character": character + 1 },
+                },
+            })
+        );
     }
 
     #[test]
