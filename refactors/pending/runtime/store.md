@@ -407,6 +407,8 @@ Upstream's semantics (`check.ts:43-215`): `null` is known data, only an absent k
 - Composite selection: absent key is `MissingData { record: current }`; `null` is enough; a link whose record is absent is `MissingData { record: link }`; a present record recurses with `selection.target.selections`, even when they are `[]`; a list recurses into every item and nested list, `null` items being enough. A value that is not `null`, a link, or a list of these throws (Errors).
 - `Conditional`: when `condition.entityName === current.entityName`, recurses on the same record; otherwise enough.
 
+The walk is a generator, `function* missingRecords(store, ast, variables): Generator<StoreLink, void, undefined>`, of every missing position in that order; `check` takes its first item, so the walk stops there. Composite values are read with `linksIn` (The store).
+
 v1 has no `shouldFetch` decision function. The later network layer decides upstream's `'Yes' | 'No' | 'IfNecessary'` (default `IfNecessary`, `check.ts:13-16`; `makeNetworkRequest.ts:67-118`) by calling `check`.
 
 Deltas from upstream:
