@@ -81,7 +81,7 @@ If the new value `==` the old value, the epoch does not advance and dependents d
 
 The type system does not stop you from holding a `SourceId` after `remove`. `remove` keeps the key's `SourceNode`, `take`s its value, and stamps it with an incremented epoch. Dependents that read that source see it as changed (`source_node_changed_since` compares the node's newer `time_updated`). The next `get` of the stale id panics. A memo that returns a `SourceId` after the source was removed is handing out a false proof.
 
-A path is not a proof. Looking up by path can miss and return `None`. The tracked map is `HashMap<RelativePathToSourceFile, SourceId<DiskFile>>`: `Option<SourceId<_>>` from the map, then `get` of the id. Call sites that have a path and not a `SourceId` intern a `RelativePathToSourceFile` and go through the map.
+A path is not a proof. Looking up by path can miss and return `None`. `#[derive(Source)]` gives `DiskFile::id_for_key(&path)`, the `SourceId<DiskFile>` that `db.set` returns for a `DiskFile` with that path, computed whether or not one is set. `db.try_get(id)` returns `Option<&DiskFile>`. Call sites that have a path and not a `SourceId` intern a `RelativePathToSourceFile` and call `try_get(DiskFile::id_for_key(&path))`.
 
 `get_singleton<T>()` returns `Option<&T>`. A singleton has no `SourceId` you hold as a proof of presence. You ask by type. The config may not have been set.
 
@@ -400,7 +400,7 @@ pub fn file_contents<TProfile: CompilationProfile>(
 ) -> Option<String>
 ```
 
-Nothing else reads `DiskFile.contents` or `OpenFile.contents`. The other readers of `disk_file_map`, `open_file_map`, `source_path_map`, and `schema_path_map` are the private lookups of `file_contents` (`open_file_source_id`, `disk_file_source_id`), the writers (`insert_disk_file`, `remove_disk_file`, `remove_disk_files_from_path`, `set_open_file`, `remove_open_file`, `remove_open_files_of_client`), and uses that do not read text, such as listing the paths that exist (`open_source_paths_of_client`). `source_path_map` and `schema_path_map` hold paths and `OpenFileKey`s, not `SourceId`s: a reader of a listed file's text calls `file_contents` for each listed path. `insert_disk_file` and `set_open_file` take the path's `FileMembership` (source file, schema file, both, or neither), which `handle` computes from the config's globs. The writers touch the two path maps only when membership changes, because `MutView::tracked` bumps the counter on every call. A function that lists paths and needs each file's text calls `file_contents` for each path.
+Nothing else reads `DiskFile.contents` or `OpenFile.contents`. `file_contents` does not read `disk_file_map` or `open_file_map`; it calls `try_get` of `DiskFile::id_for_key` and `OpenFile::id_for_key`. The readers of `disk_file_map`, `open_file_map`, `source_path_map`, and `schema_path_map` are the writers (`insert_disk_file`, `remove_disk_file`, `remove_disk_files_from_path`, `set_open_file`, `remove_open_file`, `remove_open_files_of_client`), and uses that do not read text, such as listing the paths that exist (`open_source_paths_of_client`). `source_path_map` and `schema_path_map` hold paths and `OpenFileKey`s, not `SourceId`s: a reader of a listed file's text calls `file_contents` for each listed path. `insert_disk_file` and `set_open_file` take the path's `FileMembership` (source file, schema file, both, or neither), which `handle` computes from the config's globs. The writers touch the two path maps only when membership changes, because `MutView::tracked` bumps the counter on every call. A function that lists paths and needs each file's text calls `file_contents` for each path.
 
 ### The client is an input
 
@@ -467,21 +467,19 @@ Choose memo boundaries deliberately. Each distinct set of memo arguments creates
 
 A read of one key records a dependency on that key whether the key is present or absent, so a later insert or removal of that key re-invokes the reader. `tracked()` is for iterating the key set.
 
-A keyed lookup in a tracked map does this: on a hit, `untracked()` then `db.get(source_id)`; on a miss, `tracked()`.
+A keyed lookup is `db.try_get(T::id_for_key(&key))`. It does not read a tracked map.
 
 ```rust
 // from crates/isograph_compiler/src/database.rs
-fn disk_file_source_id(&self, path: RelativePathToSourceFile) -> Option<SourceId<DiskFile>> {
-    match self.get_disk_file_map().untracked().0.get(&path).copied() {
-        Some(disk_file_id) => disk_file_id.wrap_some(),
-        None => self.get_disk_file_map().tracked().0.get(&path).copied(),
-    }
+match db.try_get(OpenFile::id_for_key(&OpenFileKey { client, path })) {
+    Some(open_file) => open_file.contents.clone().wrap_some(),
+    None => db
+        .try_get(DiskFile::id_for_key(&path))
+        .map(|disk_file| disk_file.contents.clone()),
 }
 ```
 
-The miss branch depends on the map's counter singleton. A read of a missing key inside a memo records a dependency on that key at the initial epoch and does not write storage, and inserting a new key advances the epoch (upstream isograph #1000). The miss therefore depends on the counter even before the map's first write. On a fresh database, a `file_contents` miss before the first `set_open_file` sees that open. The miss re-invokes on any insert into the map, not only an insert of that path.
-
-A keyed lookup that depends on its key alone, present or absent, needs `T::source_id` and `get_if_present` (change 3 of `refactors/pending/pico-missing-key-dependency.md`). After that change, `tracked()` is used only to iterate the map.
+`try_get` records a dependency on the key's `SourceNode` at that node's `time_updated`. A key that was never set records the initial epoch. `set` of that key inserts the node with an incremented epoch, and `remove` keeps the node, `take`s its value, and increments the epoch, so either one re-invokes the reader. A set or remove of another key does not.
 
 ### No `Default` for missing data
 
@@ -540,13 +538,11 @@ The map is which paths currently have a `DiskFile`. `db.set` of a `DiskFile` doe
 
 `tracked()` records a dependency on the whole map. Inserting or removing any path invalidates every memo that used `tracked()`. A memo that iterates every file (compile, "all client declarations") uses `tracked()`.
 
-`untracked()` does not record the map. It is correct when the memo is already keyed by `path`, looks up that one `SourceId`, and then `db.get(source_id)` (which tracks the source). Adding an unrelated file must not re-invoke a per-file `file_contents`. Iterating `untracked()` is wrong: a newly inserted path is not seen. `file_contents` is the one per-path lookup of text; every other memo that needs text calls it.
+A memo that reads one key does not use the map. It calls `db.try_get(T::id_for_key(&key))` (Keyed reads depend on their key, present or absent). Adding an unrelated file does not re-invoke a per-file `file_contents`. Iterating `untracked()` is wrong: a newly inserted path is not seen. `file_contents` is the one per-path lookup of text; every other memo that needs text calls it.
 
-A lookup that misses did not `db.get`. If it also did not `tracked()` the map, a later `Present` of that path is not seen and the memo stays `None`. isograph hit this: an autofix created a file, `get_iso_literal` ran untracked, returned `None`, and the next request reused that `None` and panicked. A miss reads the map `tracked()` so a later insert of that key is seen. After change 3 of `refactors/pending/pico-missing-key-dependency.md`, the keyed lookup depends on the key itself (Keyed reads depend on their key, present or absent). The intended dependency of a per-file memo that hits is that file, not the set of all files.
+`open_file_map` is keyed by `OpenFileKey { client, path }`, the `#[key]` of `OpenFile`. `file_contents` reads `OpenFile::id_for_key` of that key, then `DiskFile::id_for_key` of the path on a miss. A keystroke re-invokes only the derived node that read that `OpenFile`. An open or close re-invokes only the `file_contents` derived nodes of that client and path. The maps exist for the writers and memos that iterate them (`remove_open_files_of_client`, `remove_disk_files_from_path`, `source_file_paths`), so `handle` still inserts into and removes from them.
 
-`open_file_map` is keyed by `OpenFileKey { client, path }`. `file_contents` looks up untracked and `db.get`s the hit; on a miss it reads the map tracked. A write of a key already present does not write the map, so a keystroke re-invokes only the derived node that read that `OpenFile`. Any open or close re-invokes every `file_contents` derived node of every client that missed in `open_file_map`; each backdates when its text is `==`.
-
-A tracked read of a map whose counter was never written records a dependency on the counter's key at the initial epoch. The first counter write inserts that key and advances the epoch. On a fresh database, a `file_contents` miss before the first `set_open_file` sees that later open.
+A tracked read of a map whose counter was never written records a dependency on the counter's key at the initial epoch. The first counter write inserts that key and advances the epoch. On a fresh database, a `source_file_paths` call before the first insert sees that later insert.
 
 ## Intern
 

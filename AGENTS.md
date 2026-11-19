@@ -22,11 +22,9 @@ pico: `docs-website/docs/design-docs/pico.md`. Read it before working on sources
 
 A memo that iterates the map (compile, every file) uses `tracked()`. That records a dependency on the whole map. Inserting or removing any key re-invokes it.
 
-A memo already keyed by the map key (a `path`) looks up that one `SourceId` with `untracked()`, then `db.get(source_id)`. `db.get` tracks the source. An unrelated insert or remove must not re-invoke. pico `tracking_field::efficiency` pins this.
+A one-key lookup does not read the map. It is `db.try_get(T::id_for_key(&key))`, which returns `Option<&T>` and records a dependency on that key whether or not it is set. A later set or remove of that key re-invokes the reader. A set or remove of another key does not. `file_contents` reads `OpenFile::id_for_key(&OpenFileKey { client, path })`, then `DiskFile::id_for_key(&path)`.
 
 Do not iterate `untracked()`. A newly inserted key is not seen. pico `tracking_field::correctness` pins this.
-
-A lookup that misses did not `db.get`. If it also did not `tracked()` the map, a later insert of that key is not seen. isograph hit this: `get_iso_literal` ran untracked, returned `None`, and the next request reused that `None`. On miss, `tracked()` the map so a later `Present` of that path is seen.
 
 ## Commits
 
