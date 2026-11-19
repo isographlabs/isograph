@@ -5,6 +5,10 @@ use prelude::Postfix;
 
 use crate::{ClientId, CompilationProfile, IsographDb, parsed_iso_literals_in_file};
 
+/// A path inside the `__isograph` folder, `/`-separated, with no `.` or `..` component.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ArtifactPath(pub String);
+
 /// What one iso literal contributes to generation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum ArtifactSource {

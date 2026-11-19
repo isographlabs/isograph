@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::fmt::{self, Debug};
 use std::path::Path;
 
@@ -6,7 +7,9 @@ use thiserror::Error;
 
 use isograph_parser::ParseError;
 
-use crate::{ClientId, IsographDb, ProtocolEntity, ProtocolSelectable};
+use crate::{
+    ArtifactPath, ArtifactSource, ClientId, IsographDb, ProtocolEntity, ProtocolSelectable,
+};
 
 /// Byte offset of the iso literal text in its file.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -70,6 +73,9 @@ pub trait HostLanguage: Send + Sync + Sized + 'static {
     fn extract_iso_literals_from_text(contents: &str) -> Vec<IsoLiteralExtraction<Self>>;
 
     fn should_include_source_file(relative_path: &Path) -> IncludeFile;
+
+    /// The path and text of every artifact of a project whose iso literals are `sources`.
+    fn generate_artifacts(sources: &BTreeSet<ArtifactSource>) -> Vec<(ArtifactPath, String)>;
 }
 
 /// One choice of host language and network protocol. A binary names one.

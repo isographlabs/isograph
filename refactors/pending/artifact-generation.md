@@ -2,9 +2,9 @@
 
 The daemon generates artifacts into the `__isograph` folder of an optional output directory. The config field is `output_directory`, relative to the config file's directory. Generated files live under `<config dir>/<output_directory>/__isograph/`: `iso.ts` at the top of that folder, and `<Entity>/<selectable>/entrypoint.ts` for each entrypoint, upstream's layout. The Babel transform (`libs/isograph-babel-plugin/compileTag.js`) and the SWC transform (`crates/swc_isograph_plugin/src/lib.rs`, `path_for_artifact`) read the same field and import `<output_directory>/__isograph/<Entity>/<selectable>/entrypoint.ts`. The transforms treat a missing `output_directory` as the config file's directory. Generation writes nothing when the field is missing.
 
-The artifacts in this doc are the top-level `iso.ts` and one entrypoint artifact per entrypoint literal. Generation is host-language work: `HostLanguage::generate_artifacts` and `HostLanguage::print_module`. `NetworkProtocol` gains nothing in this doc.
+The artifacts in this doc are the top-level `iso.ts` and one entrypoint artifact per entrypoint literal. Generation is host-language work: `HostLanguage::generate_artifacts`, which the TypeScript host language implements with the new crate `typescript_artifacts`. `NetworkProtocol` gains nothing in this doc.
 
-Artifacts are built as values, not strings. A module artifact is an `ArtifactValue` (its default export) at a path. The TypeScript host language converts it into an SWC module (`swc_ecma_ast`) and prints it with `swc_ecma_codegen`. `iso.ts` has overloads and type aliases, which a value does not describe, so the TypeScript generator builds it directly as an SWC module.
+Artifacts are built as values, not strings. A module artifact is an `ArtifactValue` (its default export) at a path. `iso.ts` has overloads and type aliases, which a value does not describe, so it is built from a small TypeScript declaration and type layer. One module converts both into swc nodes (`swc_ecma_ast`) and prints them with `swc_ecma_codegen`.
 
 All artifacts are generated and printed in memory. Only when every literal produced its sources are they written, together, and only the files whose text changed.
 
@@ -26,12 +26,12 @@ src/__isograph/Query/HomeRoute/entrypoint.ts
 src/__isograph/Mutation/SetTagline/entrypoint.ts
 ```
 
-`src/__isograph/Query/HomeRoute/entrypoint.ts` is a module whose default export is an object with `kind` `"Entrypoint"` and `name` `"Query.HomeRoute"`, in `swc_ecma_codegen`'s layout:
+`src/__isograph/Query/HomeRoute/entrypoint.ts`:
 
 ```ts
 export default {
-    kind: "Entrypoint",
-    name: "Query.HomeRoute"
+  kind: "Entrypoint",
+  name: "Query.HomeRoute"
 };
 ```
 
@@ -235,20 +235,69 @@ After:
 
 `ListedPathWithoutText` is the broken invariant compiler-errors.md names for `project_errors`: a path `disk_paths` listed has a `DiskFile`, and `compiler_client` has no `OpenFile`. `compile` logs it and writes nothing.
 
-## Generated values
+## Host language
 
 ```rust
 // from crates/isograph_compiler/src/artifacts.rs
 /// A path inside the `__isograph` folder, `/`-separated, with no `.` or `..` component.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ArtifactPath(pub String);
+```
 
-/// A generated file.
-#[derive(Clone, Debug, PartialEq)]
-pub enum ArtifactFile {
-    Module(ArtifactModule),
+```rust
+// from crates/isograph_compiler/src/host_language.rs
+pub trait HostLanguage: Send + Sync + Sized + 'static {
+    type Error: std::fmt::Display + std::error::Error + Clone + PartialEq + Eq + 'static;
+    type LiteralContext: Clone + PartialEq + Eq + Debug + 'static;
+
+    fn extract_iso_literals_from_text(contents: &str) -> Vec<IsoLiteralExtraction<Self>>;
+
+    fn should_include_source_file(relative_path: &Path) -> IncludeFile;
+
+    /// The path and text of every artifact of a project whose iso literals are `sources`.
+    fn generate_artifacts(sources: &BTreeSet<ArtifactSource>) -> Vec<(ArtifactPath, String)>;
 }
+```
 
+`ArtifactPath` is a `String` with `/` separators, not a `PathBuf`, because it is also the source of import specifiers, which are `/`-separated on every platform. `write_artifacts` joins its segments onto the folder.
+
+The `BTreeSet` drops duplicate literals: two `field Pet.fullName` literals produce one overload, and two `entrypoint Query.HomeRoute` literals one artifact. Rejecting duplicates is validation, which this doc does not do.
+
+The test hosts (`TestHostLanguage` in isograph_compiler, `InHost` in isograph_cli's watch tests) return `Vec::new()`. `TypeScriptHostLanguage` (`crates/isograph_extract_typescript`) delegates:
+
+```rust
+// from crates/isograph_extract_typescript/src/lib.rs
+    fn generate_artifacts(
+        sources: &std::collections::BTreeSet<isograph_compiler::ArtifactSource>,
+    ) -> Vec<(isograph_compiler::ArtifactPath, String)> {
+        typescript_artifacts::generate_artifacts(sources)
+    }
+```
+
+## typescript_artifacts
+
+`crates/typescript_artifacts` is TypeScript generation: the value layer, a small TypeScript declaration and type layer, the generators, and the one module that converts to swc nodes and prints. It depends on `common_lang_types`, `isograph_compiler`, `prelude`, and swc:
+
+```toml
+# from crates/typescript_artifacts/Cargo.toml
+swc_common = { version = "=27.0.0", default-features = false }
+swc_ecma_ast = { version = "=30.0.2", default-features = false }
+swc_ecma_codegen = { version = "=33.0.2", default-features = false }
+```
+
+These are the AST crates `swc_core` 84.2.0 uses, the version `crates/swc_isograph_plugin` pins. They are named directly, not through `swc_core`. No serde, encoding, or concurrent feature is enabled. `isograph_extract_typescript` is the only crate that depends on `typescript_artifacts`, because it implements `HostLanguage` for TypeScript; the `isograph` binary depends on it through that crate, and `isograph_cli`'s tests through their TypeScript test profile. `isograph_compiler`, `isograph_lsp`, the parsers, and the `isograph_cli` library do not depend on swc. `src/swc.rs` is the only module that names swc, so an swc bump touches one module.
+
+```rust
+// from crates/typescript_artifacts/src/lib.rs
+/// The path and text of every artifact of a project whose iso literals are `sources`: one
+/// entrypoint artifact per entrypoint, then `iso.ts`.
+pub fn generate_artifacts(sources: &BTreeSet<ArtifactSource>) -> Vec<(ArtifactPath, String)>;
+```
+
+### Values
+
+```rust
+// from crates/typescript_artifacts/src/module.rs
 /// A module whose only export is its default export.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ArtifactModule {
@@ -274,76 +323,180 @@ pub struct ArtifactObjectEntry {
     pub value: ArtifactValue,
 }
 
-/// The default export of the module at `path`.
+/// The default export of the module at this path.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ArtifactImport(pub ArtifactPath);
 ```
 
-`ArtifactValue` is the value layer reader ASTs and query text will also use. Named exports are not in it: nothing imports one. `ArtifactImport` is a newtype over the path because a default import has no other part.
+`ArtifactValue` is the value layer reader ASTs and query text will also use; its variants are the user's specification, and the printer tests exercise each. Named exports are not in it: nothing imports one. Every artifact in this doc is a module. When the network protocol produces a raw query file (`query_text.graphql` for GraphQL), a raw-file kind (`path`, exact `contents`) joins it, written and diffed like every other file.
 
-`ArtifactFile` has one variant now. When the network protocol produces a raw query file (`query_text.graphql` for GraphQL), it gains `Raw(RawArtifactFile)` with `RawArtifactFile { path: ArtifactPath, contents: String }`, written and diffed like every other file. Until that producer lands, the variant does not exist. `iso.ts` is not a raw file: the TypeScript host language builds it as an SWC module and prints it with the same emitter.
-
-`ArtifactPath` is a `String` with `/` separators, not a `PathBuf`, because it is also the source of import specifiers, which are `/`-separated on every platform. `write_artifacts` joins its segments onto the folder.
-
-## Host language
+### TypeScript declarations and types
 
 ```rust
-// from crates/isograph_compiler/src/host_language.rs
-pub trait HostLanguage: Send + Sync + Sized + 'static {
-    type Error: std::fmt::Display + std::error::Error + Clone + PartialEq + Eq + 'static;
-    type LiteralContext: Clone + PartialEq + Eq + Debug + 'static;
-
-    fn extract_iso_literals_from_text(contents: &str) -> Vec<IsoLiteralExtraction<Self>>;
-
-    fn should_include_source_file(relative_path: &Path) -> IncludeFile;
-
-    /// The path and text of every artifact of a project whose iso literals are `sources`.
-    fn generate_artifacts(sources: &BTreeSet<ArtifactSource>) -> Vec<(ArtifactPath, String)>;
+// from crates/typescript_artifacts/src/module.rs
+/// A TypeScript module: its path and its items, in order.
+pub(crate) struct TypeScriptModule {
+    pub path: ArtifactPath,
+    pub items: Vec<TypeScriptItem>,
 }
+
+pub(crate) enum TypeScriptItem {
+    /// `import <identifier> from "<specifier>";`
+    DefaultImport(ArtifactImport),
+    /// `import type <identifier> from "<specifier>";`
+    TypeImport(ArtifactImport),
+    /// `type <name><params> = <type>;`
+    TypeAlias(TypeAlias),
+    /// `export function <name><params>(<params>): <type>;`
+    ExportedOverload(FunctionSignature),
+    /// `export function <name><params>(<params>): <type> { throw new Error("<message>"); }`
+    ExportedThrowingFunction(ThrowingFunction),
+    /// `export default <value>;`
+    ExportDefault(ArtifactValue),
+}
+
+pub(crate) struct TypeAlias {
+    pub name: String,
+    pub type_params: Vec<TypeParam>,
+    pub aliased: TypeScriptType,
+}
+
+pub(crate) struct TypeParam {
+    pub name: String,
+    pub constraint: Option<TypeScriptType>,
+}
+
+pub(crate) struct FunctionSignature {
+    pub name: String,
+    pub type_params: Vec<TypeParam>,
+    pub params: Vec<FunctionParam>,
+    pub return_type: TypeScriptType,
+}
+
+pub(crate) struct FunctionParam {
+    pub name: String,
+    pub type_: TypeScriptType,
+}
+
+pub(crate) struct ThrowingFunction {
+    pub signature: FunctionSignature,
+    pub message: String,
+}
+
+pub(crate) enum TypeScriptType {
+    Keyword(TypeScriptKeyword),
+    /// `Name<Args>`, or `Name` with no arguments.
+    Reference(TypeReference),
+    StringLiteral(String),
+    TemplateLiteral(TemplateLiteralType),
+    Union(Vec<TypeScriptType>),
+    Intersection(Vec<TypeScriptType>),
+    Array(Box<TypeScriptType>),
+    Conditional(Box<ConditionalType>),
+    /// `infer Name`
+    Infer(String),
+    /// `typeof <the import's identifier>`
+    TypeOf(ArtifactImport),
+    Function(Box<FunctionType>),
+}
+
+pub(crate) enum TypeScriptKeyword {
+    String,
+    Unknown,
+    Never,
+    Void,
+    Object,
+}
+
+pub(crate) struct TypeReference {
+    pub name: String,
+    pub args: Vec<TypeScriptType>,
+}
+
+/// `` `<head>${<type>}<text>${<type>}<text>` ``
+pub(crate) struct TemplateLiteralType {
+    pub head: String,
+    pub spans: Vec<TemplateLiteralSpan>,
+}
+
+/// A substituted type and the text after it.
+pub(crate) struct TemplateLiteralSpan {
+    pub type_: TypeScriptType,
+    pub text: String,
+}
+
+/// `<check> extends <extends> ? <true> : <false>`
+pub(crate) struct ConditionalType {
+    pub check: TypeScriptType,
+    pub extends: TypeScriptType,
+    pub true_type: TypeScriptType,
+    pub false_type: TypeScriptType,
+}
+
+/// `<params>(<params>) => <return>`
+pub(crate) struct FunctionType {
+    pub type_params: Vec<TypeParam>,
+    pub params: Vec<FunctionTypeParam>,
+    pub return_type: TypeScriptType,
+}
+
+pub(crate) enum FunctionTypeParam {
+    /// `name: type`
+    Named(FunctionParam),
+    /// `...name: type`
+    Rest(FunctionParam),
+}
+
+/// `artifact` as a TypeScript module: a default import for each distinct import in its value,
+/// in path order, then the default export.
+pub(crate) fn module_of_artifact(artifact: &ArtifactModule) -> TypeScriptModule;
 ```
 
-`generate_artifacts` returns printed text because `iso.ts` is built as host-language AST, not as an `ArtifactValue`, so only the host language can print the whole set. The `ArtifactFile` values are the TypeScript generator's intermediate layer, printed by `print_module`.
+All derive `Clone, Debug, PartialEq`. Each item and type kind is one `iso.ts` or entrypoint artifact needs: object-literal types, `keyof`, indexed access, arrow thunks, and annotated consts join when an artifact needs them.
 
-The `BTreeSet` drops duplicate literals: two `field Pet.fullName` literals produce one overload, and two `entrypoint Query.HomeRoute` literals one artifact. Rejecting duplicates is validation, which this doc does not do.
-
-The test hosts (`TestHostLanguage` in isograph_compiler, `InHost` in isograph_cli's watch tests) return `Vec::new()`.
-
-### The TypeScript generator
-
-`crates/isograph_extract_typescript` is the TypeScript host language, so it holds generation and the only SWC dependency of the root workspace:
-
-```toml
-# from crates/isograph_extract_typescript/Cargo.toml
-swc_core = { version = "84.2.0", features = ["ecma_ast", "ecma_codegen", "common"] }
-```
-
-`84.2.0` is the version `crates/swc_isograph_plugin` pins. `ecma_ast` is `swc_ecma_ast` and `swc_atoms`; `ecma_codegen` is `swc_ecma_codegen`; `common` is `swc_common` for `SourceMap` and `DUMMY_SP`, which the emitter requires. No other crate names swc.
+### Imports
 
 ```rust
-// from crates/isograph_extract_typescript/src/generate_artifacts.rs
-impl HostLanguage for TypeScriptHostLanguage {
-    // ...
-    fn generate_artifacts(sources: &BTreeSet<ArtifactSource>) -> Vec<(ArtifactPath, String)> {
-        let entrypoints: Vec<EntityNameAndSelectableName> = sorted_entrypoints(sources);
-        entrypoints
-            .iter()
-            .map(|entrypoint| {
-                let module = entrypoint_artifact(entrypoint.dereference());
-                (module.path.clone(), print_module(module.reference()))
-            })
-            .chain(std::iter::once(iso_overload_file(sources)))
-            .collect()
-    }
-}
+// from crates/typescript_artifacts/src/imports.rs
+/// Every `Import` inside `value`, at any depth.
+pub(crate) fn imports_of(value: &ArtifactValue) -> BTreeSet<&ArtifactImport>;
+
+/// The local name of `import`: its path's segments joined by `__`, `.ts` dropped
+/// (`Query/HomeRoute/entrypoint.ts` is `Query__HomeRoute__entrypoint`).
+pub(crate) fn artifact_import_identifier(import: &ArtifactImport) -> String;
+
+/// The specifier that imports `import` from the module at `from`: the import's path relative
+/// to `from`'s folder, `./`-prefixed, `.ts` dropped.
+pub(crate) fn artifact_import_specifier(from: &ArtifactPath, import: &ArtifactImport) -> String;
 ```
+
+Identifiers are a function of the import's path alone, and imports print in path order, so a module whose value did not change prints byte-identically.
+
+### Printing
+
+```rust
+// from crates/typescript_artifacts/src/swc.rs
+/// The text of `module`, two-space indented.
+pub(crate) fn print(module: &TypeScriptModule) -> String;
+```
+
+`print` converts each item to an swc `ModuleItem` and emits the module with `swc_ecma_codegen::Emitter` over a `JsWriter` into a `Vec<u8>`, `Config::default().with_target(EsVersion::latest())`, `set_indent_str("  ")`, and a local `Lrc<SourceMap>`. `emit_module(..).expect("writing to a Vec does not fail")`: the emitter's only error is the writer's `io::Error`, and writing into a `Vec` does not fail. The `Lrc` (an `Rc`) is the `SourceMap` handle the emitter's API takes; it is local to `print` and shares nothing. Both were raised with the user.
+
+The conversion:
+
+- Strings and numbers have `raw: None`, so the emitter writes their escapes.
+- An object key that is an identifier prints bare; any other key is a string literal.
+- A union, intersection, function, or conditional type in an operand position (array element, union or intersection member, conditional check or extends type) is wrapped in `TsParenthesizedType`. swc's emitter adds no parentheses in types: without this, `("a" | "b")[]` prints as `"a" | "b"[]`.
+- Template literal type text escapes `\`, `` ` ``, and `${` in `raw`; `cooked` is the text.
 
 ### Entrypoint artifact
 
 Path `<Entity>/<selectable>/entrypoint.ts`, the path the transforms import:
 
 ```rust
-// from crates/isograph_extract_typescript/src/generate_artifacts.rs
-fn entrypoint_artifact(entrypoint: EntityNameAndSelectableName) -> ArtifactModule {
+// from crates/typescript_artifacts/src/entrypoint.rs
+/// The entrypoint artifact of `entrypoint`, at the path the iso transforms import.
+pub(crate) fn entrypoint_artifact(entrypoint: EntityNameAndSelectableName) -> ArtifactModule {
     ArtifactModule {
         path: entrypoint_path(entrypoint),
         default_export: ArtifactValue::Object(vec![
@@ -362,7 +515,7 @@ fn entrypoint_artifact(entrypoint: EntityNameAndSelectableName) -> ArtifactModul
     }
 }
 
-fn entrypoint_path(entrypoint: EntityNameAndSelectableName) -> ArtifactPath {
+pub(crate) fn entrypoint_path(entrypoint: EntityNameAndSelectableName) -> ArtifactPath {
     ArtifactPath(format!(
         "{}/{}/entrypoint.ts",
         entrypoint.parent_entity_name, entrypoint.selectable_name
@@ -370,98 +523,57 @@ fn entrypoint_path(entrypoint: EntityNameAndSelectableName) -> ArtifactPath {
 }
 ```
 
-### Printing a module
+Its text:
 
-```rust
-// from crates/isograph_extract_typescript/src/generate_artifacts.rs
-/// `module` as TypeScript: one default import per distinct `ArtifactImport` in its value, in
-/// path order, then `export default <value>;`.
-fn print_module(module: &ArtifactModule) -> String {
-    let imports: BTreeSet<&ArtifactImport> = imports_of(module.default_export.reference());
-    let items = imports
-        .into_iter()
-        .map(|import| default_import(module.path.reference(), import))
-        .chain(std::iter::once(export_default(expression(
-            module.default_export.reference(),
-        ))))
-        .collect();
-    emit(Module { span: DUMMY_SP, body: items, shebang: None })
-}
-
-/// Every `Import` inside `value`, at any depth.
-fn imports_of(value: &ArtifactValue) -> BTreeSet<&ArtifactImport>;
-
-/// `value` as an SWC expression; an `Import` is the identifier `artifact_import_identifier` gives.
-fn expression(value: &ArtifactValue) -> Expr;
-
-/// `import <identifier> from "<specifier>";`
-fn default_import(from: &ArtifactPath, import: &ArtifactImport) -> ModuleItem;
-
-/// `export default <expression>;`
-fn export_default(expression: Expr) -> ModuleItem;
-
-/// The text `swc_ecma_codegen` emits for `module`, with a `SourceMap` that holds no files.
-fn emit(module: Module) -> String;
-
-/// The local name of `import`: its path's segments joined by `__`, `.ts` dropped
-/// (`Query/HomeRoute/entrypoint.ts` is `Query__HomeRoute__entrypoint`).
-fn artifact_import_identifier(import: &ArtifactImport) -> String;
-
-/// The specifier that imports `import` from the module at `from`: the import's path relative
-/// to `from`'s folder, `./`-prefixed, `.ts` dropped.
-fn artifact_import_specifier(from: &ArtifactPath, import: &ArtifactImport) -> String;
+```ts
+export default {
+  kind: "Entrypoint",
+  name: "Query.HomeRoute"
+};
 ```
-
-Identifiers are a function of the import's path alone, and imports print in path order, so a module whose value did not change prints byte-identically. `emit` is `swc_ecma_codegen::Emitter` over a `JsWriter` into a `Vec<u8>`, with `Config::default().with_target(EsVersion::latest())` and `ascii_only: false`. String literals are built with `raw: None`, so the emitter writes their escapes: quotes, backslashes, newlines, and non-ASCII characters print as valid JavaScript string literals. An `emit` failure is an `io::Error` from writing into a `Vec`, which cannot happen; `emit` panics with that invariant named, the one panic this doc adds.
 
 ### iso.ts
 
-Path `iso.ts`, built as an SWC module and printed by `emit`. Upstream's `build_iso_overload_artifact` (`isograph/crates/artifact_content/src/iso_overload_file.rs`) prints the same declarations from strings; the deltas:
+```rust
+// from crates/typescript_artifacts/src/iso_overloads.rs
+/// `iso.ts`: an `iso` overload per field, entity, and entrypoint literal, and the
+/// implementation.
+pub(crate) fn iso_overload_module(sources: &BTreeSet<ArtifactSource>) -> TypeScriptModule;
+
+/// Upstream's `sort_field_name` rule over the whole match text: a string sorts before every
+/// string it is a prefix of, so a shorter match text cannot shadow a longer one.
+pub(crate) fn overload_order(a: &str, b: &str) -> Ordering;
+```
+
+Upstream's `build_iso_overload_artifact` (`isograph/crates/artifact_content/src/iso_overload_file.rs`) prints the same declarations from strings. The deltas:
 
 - No `import type { IsographEntrypoint } from '@isograph/react';`. Nothing refers to it: entrypoint overloads return the artifact's type, and the implementation signature does not name it. A project without `@isograph/react` installed type-checks.
 - No param-type imports and no `__link` output-type imports: those files are not generated yet.
 - `IdentityWithParam<TParam>` and `IdentityWithParamComponent<TParam>` are replaced by one `Identity` type with no param type. `@component` fields, fields with a `to` clause (upstream's `pointer`, whose overload names the target's `__link` output type), and other fields get the same overload.
 - `entity` literals get an overload returning `void`. Upstream has no `entity` keyword.
 - There is no `no_babel_transform` switch form, because i2 has no such option. The implementation throws, as upstream's default does, without the sentence naming `options.no_babel_transform`.
-- Entrypoint imports are `import type`, with `artifact_import_identifier`'s name and `artifact_import_specifier(iso.ts, ..)`'s specifier (`./Query/HomeRoute/entrypoint`). Upstream writes `'../__isograph/...'`, which names the same file.
+- Entrypoint imports are `import type`, with `artifact_import_identifier`'s name and the specifier from `iso.ts` (`./Query/HomeRoute/entrypoint`). Upstream writes `'../__isograph/...'`, which names the same file.
 - Upstream's comments are not printed: the emitter prints the AST, and the AST carries no comments.
-- Overloads are ordered by comparing the matched strings byte by byte with end-of-string after every byte. That is upstream's `sort_field_name` rule (a string sorts before every string it is a prefix of) applied to the whole `field Parent.name` text, so `field Pet.Avatar` cannot shadow `field Pet.AvatarCard`.
+- The type aliases are not exported, as upstream's are not.
+- Overloads are ordered by `overload_order`, upstream's `sort_field_name` rule applied to the whole match text, so `field Pet.Avatar` cannot shadow `field Pet.AvatarCard`. Sections are field overloads, then entity overloads, then entrypoint overloads; imports are the entrypoint imports in entrypoint-overload order.
 
-```rust
-// from crates/isograph_extract_typescript/src/generate_artifacts.rs
-/// `iso.ts` for `sources`.
-fn iso_overload_file(sources: &BTreeSet<ArtifactSource>) -> (ArtifactPath, String);
-
-/// The text an overload's `MatchesWhitespaceAndString` matches: `field Pet.fullName`,
-/// `entity Owner`, `entrypoint Query.HomeRoute`.
-fn overload_match_text(source: &ArtifactSource) -> String;
-
-/// Upstream's `sort_field_name` rule over the whole match text.
-fn overload_order(a: &str, b: &str) -> std::cmp::Ordering {
-    let key = |text: &str| text.bytes().map(u16::from).chain(std::iter::once(256));
-    key(a).cmp(key(b))
-}
-```
-
-For sources `Field(Pet.fullName)`, `Entity(Owner)`, `Entrypoint(Query.HomeRoute)`, the declarations are, in this order (shown as TypeScript; the exact spacing is the emitter's):
+For sources `Field(Pet.fullName)`, `Entity(Owner)`, `Entrypoint(Query.HomeRoute)`, the text is:
 
 ```ts
 import type Query__HomeRoute__entrypoint from "./Query/HomeRoute/entrypoint";
 type Identity = <TClientField extends (...args: never[]) => unknown>(clientField: TClientField) => TClientField;
-type WhitespaceCharacter = " " | "\t" | "\n";
+type WhitespaceCharacter = " " | "	" | "\n";
 type Whitespace<In> = In extends `${WhitespaceCharacter}${infer In}` ? Whitespace<In> : In;
 type MatchesWhitespaceAndString<TString extends string, T> = Whitespace<T> extends `${TString}${string}` ? T : never;
 export function iso<T>(param: T & MatchesWhitespaceAndString<"field Pet.fullName", T>): Identity;
 export function iso<T>(param: T & MatchesWhitespaceAndString<"entity Owner", T>): void;
 export function iso<T>(param: T & MatchesWhitespaceAndString<"entrypoint Query.HomeRoute", T>): typeof Query__HomeRoute__entrypoint;
 export function iso(_isographLiteralText: string): Identity | object | void {
-    throw new Error("iso: Unexpected invocation at runtime. Either the Babel transform was not set up, or it failed to identify this call site. Make sure it is being used verbatim as `iso`.");
+  throw new Error("iso: Unexpected invocation at runtime. Either the Babel transform was not set up, or it failed to identify this call site. Make sure it is being used verbatim as `iso`.");
 }
 ```
 
-`import type X from` a module whose default export is a value lets `typeof X` name that value's type with no runtime import. The implementation's return union has `object` because every entrypoint artifact's default export is an object. Sections are field overloads, then entity overloads, then entrypoint overloads, each sorted by `overload_order`. Imports are the entrypoint imports in entrypoint-overload order.
-
-The emitted `iso.ts` has no comment containing `` iso(` ``; the watcher skip keeps generated files out of the source files regardless.
+The `"	"` literal holds a tab character: the emitter writes tabs in strings as-is. `import type X from` a module whose default export is a value lets `typeof X` name that value's type with no runtime import. The implementation's return union has `object` because every entrypoint artifact's default export is an object.
 
 ## Compiling and writing
 
@@ -713,21 +825,26 @@ Tests (`crates/isograph_compiler`, whose test host extracts `` iso(`...`) ``): a
 
 ### 3. TypeScript generation
 
-`ArtifactPath`, `ArtifactFile`, `ArtifactModule`, `ArtifactValue`, `ArtifactObjectEntry`, `ArtifactImport`, the trait method and the test hosts' implementations, the swc_core dependency, `TypeScriptHostLanguage::generate_artifacts`, `entrypoint_artifact`, `print_module` and its helpers, `iso_overload_file`.
+`ArtifactPath`, the trait method and the test hosts' implementations, `crates/typescript_artifacts` (values, declarations and types, imports, the entrypoint artifact, `iso.ts`, `swc.rs`), and `TypeScriptHostLanguage::generate_artifacts`.
 
-Tests (`crates/isograph_extract_typescript/src/generate_artifacts.rs`), facts about values and text:
+Tests (`crates/typescript_artifacts`), facts about values and text:
 
-- `Entrypoint(Query.HomeRoute)` yields `Query/HomeRoute/entrypoint.ts` whose text has `export default`, `kind: "Entrypoint"`, and `name: "Query.HomeRoute"`.
-- `print_module` of an object holding the same `Import` twice and a second `Import` has exactly two import declarations, in path order, and the value names each by its identifier.
-- `print_module` of the same module twice is the same text.
-- `artifact_import_specifier` from `Query/A/reader.ts` to `Query/A/entrypoint.ts` is `./entrypoint`; from `iso.ts` to `Query/A/entrypoint.ts` is `./Query/A/entrypoint`; from `Query/A/x.ts` to `Pet/B/y.ts` is `./../../Pet/B/y`.
-- A string with `"`, `'`, `\`, a newline, and `é` prints as a literal that a JSON string parse of the printed literal returns unchanged; nested arrays and objects print with their nesting; `Null`, `Boolean`, and `Number` print as `null`, `true`/`false`, and the number.
-- `iso.ts` contains an import type of `./Query/HomeRoute/entrypoint` named `Query__HomeRoute__entrypoint`, and the overload matching `"entrypoint Query.HomeRoute"` returns `typeof Query__HomeRoute__entrypoint`.
+- `Entrypoint(Query.HomeRoute)` yields `Query/HomeRoute/entrypoint.ts` whose text starts with `export default {` and has `kind: "Entrypoint"` and `name: "Query.HomeRoute"`.
+- A module whose value holds one `Import` twice and another once has exactly two import declarations, in path order, and the value names each by its identifier.
+- Printing the same module twice is the same text.
+- `artifact_import_specifier` from `Query/A/reader.ts` to `Query/A/entrypoint.ts` is `./entrypoint`; from `iso.ts` to `Query/A/entrypoint.ts` is `./Query/A/entrypoint`; from `Query/A/x.ts` to `Pet/B/y.ts` is `./../../Pet/B/y`; from `Query/A/x.ts` to `Query/B/y.ts` is `./../B/y`. The identifier of `Query/HomeRoute/entrypoint.ts` is `Query__HomeRoute__entrypoint`.
+- A string with `"`, `'`, `\`, a newline, and `é` prints as one double-quoted literal on one line with `\"`, `\\`, and `\n` escapes and `é` as-is.
+- `[null, true, 2, [false], { "not-an-identifier": null }]` prints with that nesting and the key quoted.
+- `("a" | "b")[]` and `A & (B | C)` print with their parentheses.
+- Template literal text `` `\${ `` prints escaped.
+- `iso.ts` imports `Query__HomeRoute__entrypoint` from `./Query/HomeRoute/entrypoint` with `import type`, and the overload matching `"entrypoint Query.HomeRoute"` returns `typeof Query__HomeRoute__entrypoint`.
 - `Field(Pet.fullName)` yields the overload matching `"field Pet.fullName"` returning `Identity`, and no import.
 - `Entity(Owner)` yields the overload matching `"entity Owner"` returning `void`.
 - `Field(Pet.Avatar)` and `Field(Pet.AvatarCard)`: the `AvatarCard` overload comes first.
 - Field overloads precede entity overloads, which precede entrypoint overloads.
-- No sources: `iso.ts` is the only artifact and it has no import.
+- No sources: `iso.ts` is the only artifact, it has no import, and it ends with `}\n`.
+- Every import in `iso.ts` names an artifact the same call generated.
+- No line of `iso.ts` ends in whitespace.
 
 ### 4. Generate on the compile fire and write
 
@@ -753,7 +870,7 @@ The demo config, `src/iso.ts`, the imports, the logged entrypoints, and the comm
 
 ## Later
 
-- Query generation adds `queryText: Import(query_text.ts)` to the entrypoint artifact, where `query_text.ts` is a `Module` whose default export is the protocol-produced query string. When the network protocol also produces a raw query file (`query_text.graphql` for GraphQL), `ArtifactFile` gains `Raw(RawArtifactFile)` for it, written and diffed like every other file.
+- Query generation adds `queryText: Import(query_text.ts)` to the entrypoint artifact, where `query_text.ts` is an `ArtifactModule` whose default export is the protocol-produced query string. When the network protocol also produces a raw query file (`query_text.graphql` for GraphQL), a raw-file artifact kind (path plus exact contents) joins modules, written and diffed like every other file.
 - Param types per field (upstream's `param_type.ts`): field overloads return `IdentityWithParam<Parent__field__param>` and type the resolver's parameter. Then `ResolverParameters` and every use of it are deleted from the pet demo.
 - The SWC transform's literal regex accepts `entrypoint`, `field`, and `pointer`; an `entity` literal is a transform error there. Teaching the transform `entity` is separate work.
 

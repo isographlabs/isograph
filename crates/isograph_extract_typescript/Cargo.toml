@@ -15,6 +15,7 @@ prelude = { path = "../prelude" }
 regex = { workspace = true }
 span = { path = "../span" }
 thiserror = { workspace = true }
+typescript_artifacts = { path = "../typescript_artifacts" }
 tracing = { workspace = true }
 
 [lints]

@@ -711,6 +711,12 @@ mod tests {
             Vec::new()
         }
 
+        fn generate_artifacts(
+            _sources: &std::collections::BTreeSet<isograph_compiler::ArtifactSource>,
+        ) -> Vec<(isograph_compiler::ArtifactPath, String)> {
+            Vec::new()
+        }
+
         fn should_include_source_file(relative_path: &Path) -> IncludeFile {
             match relative_path.extension().and_then(|e| e.to_str()) {
                 Some("in") => IncludeFile::Include,

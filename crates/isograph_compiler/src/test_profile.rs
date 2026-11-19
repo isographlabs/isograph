@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::convert::Infallible;
 use std::path::Path;
 
@@ -9,7 +10,9 @@ use crate::host_language::{
     CompilationProfile, HostLanguage, IncludeFile, IsoLiteralExtraction, IsoLiteralStartIndex,
     NetworkProtocol,
 };
-use crate::{ClientId, IsographDb, ProtocolEntity, ProtocolSelectable};
+use crate::{
+    ArtifactPath, ArtifactSource, ClientId, IsographDb, ProtocolEntity, ProtocolSelectable,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
 #[error("test host")]
@@ -41,6 +44,10 @@ impl HostLanguage for TestHostLanguage {
 
     fn should_include_source_file(_relative_path: &Path) -> IncludeFile {
         IncludeFile::Include
+    }
+
+    fn generate_artifacts(_sources: &BTreeSet<ArtifactSource>) -> Vec<(ArtifactPath, String)> {
+        Vec::new()
     }
 }
 

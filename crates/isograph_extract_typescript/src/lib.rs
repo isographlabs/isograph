@@ -89,6 +89,12 @@ impl HostLanguage for TypeScriptHostLanguage {
             .collect()
     }
 
+    fn generate_artifacts(
+        sources: &std::collections::BTreeSet<isograph_compiler::ArtifactSource>,
+    ) -> Vec<(isograph_compiler::ArtifactPath, String)> {
+        typescript_artifacts::generate_artifacts(sources)
+    }
+
     fn should_include_source_file(relative_path: &Path) -> IncludeFile {
         match relative_path.extension().and_then(|e| e.to_str()) {
             Some("ts" | "tsx" | "js" | "jsx") => IncludeFile::Include,
