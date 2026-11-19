@@ -1,3 +1,4 @@
+import type { Pet____link__output_type } from "./../__link/output_type";
 import type { Pet__fullName__output_type } from "./../fullName/output_type";
 export type Pet__PetBestFriendCard__param = {
   readonly data: {
@@ -27,4 +28,5 @@ export type Pet__PetBestFriendCard__param = {
     } | null);
   };
   readonly parameters: Record<PropertyKey, never>;
+  readonly link: Pet____link__output_type;
 };

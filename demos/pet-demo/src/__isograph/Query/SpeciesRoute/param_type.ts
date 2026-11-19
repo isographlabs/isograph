@@ -1,4 +1,5 @@
 import type { Pet__fullName__output_type } from "./../../Pet/fullName/output_type";
+import type { Query____link__output_type } from "./../__link/output_type";
 import type { Query__SpeciesRoute__parameters } from "./parameters_type";
 export type Query__SpeciesRoute__param = {
   readonly data: {
@@ -33,4 +34,5 @@ export type Query__SpeciesRoute__param = {
     } | null);
   };
   readonly parameters: Query__SpeciesRoute__parameters;
+  readonly link: Query____link__output_type;
 };

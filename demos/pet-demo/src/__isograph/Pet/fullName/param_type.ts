@@ -1,3 +1,4 @@
+import type { Pet____link__output_type } from "./../__link/output_type";
 export type Pet__fullName__param = {
   readonly data: {
     /**
@@ -10,4 +11,5 @@ export type Pet__fullName__param = {
     readonly lastName: string;
   };
   readonly parameters: Record<PropertyKey, never>;
+  readonly link: Pet____link__output_type;
 };

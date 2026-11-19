@@ -1,3 +1,4 @@
+import type { Pet____link__output_type } from "./../__link/output_type";
 import type { Pet__PetCheckinsCard__parameters } from "./parameters_type";
 export type Pet__PetCheckinsCard__param = {
   readonly data: {
@@ -15,4 +16,5 @@ export type Pet__PetCheckinsCard__param = {
     }>;
   };
   readonly parameters: Pet__PetCheckinsCard__parameters;
+  readonly link: Pet____link__output_type;
 };

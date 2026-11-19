@@ -1,4 +1,2 @@
-export type Query____link__output_type = {
-  readonly __link: string;
-  readonly __typename: "Query";
-};
+import type { Link } from "@isograph/runtime";
+export type Query____link__output_type = Link<"Query">;
