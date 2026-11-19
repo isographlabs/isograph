@@ -333,7 +333,8 @@ impl<Db: Database> InternalStorage<Db> {
     }
 
     /// Sets a source in the database. If the key has an absent node, or a source that
-    /// does not equal the new source, increment the current epoch.
+    /// does not equal the new source, increment the current epoch. If the key has a source
+    /// that equals the new source, leave the node unchanged.
     ///
     /// A key with no node has never been read, so no memoized function depends on it,
     /// and inserting it does not increment the epoch.
@@ -356,8 +357,6 @@ impl<Db: Database> InternalStorage<Db> {
                         time_updated: next_epoch,
                         value: Some(Box::new(source)),
                     };
-                } else {
-                    source_node.time_updated = self.current_epoch;
                 }
             }
             Entry::Vacant(vacant_entry) => {
