@@ -455,7 +455,7 @@ impl NetworkProtocol for TestNetworkProtocol {
 }
 ```
 
-The test `HostLanguage` impls (`TestHostLanguage` in `database.rs`, `InHost` in `watch.rs`) rename the method and return `IncludeFile`. Test fixtures that built `source_globs: SourceGlobs::parse(&["src/**".to_owned()])` (`state.rs`, `daemon.rs`, `lsp_socket.rs`) build `globs: ProjectGlobs::parse(&["src/**".to_owned()], &[])`. The watch `Harness::new(source_files: &[&str], schema: &[&str])` holds `globs: ProjectGlobs` in place of `source_files: Vec<String>`.
+The test `HostLanguage` impls (`TestHostLanguage` in `database.rs`, `InHost` in `watch.rs`) rename the method and return `IncludeFile`. Test fixtures that built `source_globs: SourceGlobs::parse(&["src/**".to_owned()])` (`state.rs`, `daemon.rs`, `lsp_socket.rs`) build `globs: ProjectGlobs::parse(&["src/**".to_owned()], &[])`. The watch `Harness` holds `globs: ProjectGlobs` in place of `source_files: Vec<String>`. `Harness::with_schema(source_files: &[&str], schema: &[&str])` builds it; `Harness::new(source_files)` is `with_schema(source_files, &[])`.
 
 ## Tests
 
