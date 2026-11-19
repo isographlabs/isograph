@@ -49,11 +49,11 @@ enum Filesystem {
 fn handle(state: &mut IsographState, event: IsographEvent) -> Vec<IsographEffect>
 ```
 
-`IsographState` is the process wrapper (`db: IsographDb`, live sessions, `source_globs`, `diagnostics_debounce`). The guard is not a pico source. `IsographDb` is the pico database. The test harness calls `handle`. It does not start a daemon, open a socket, or write a file. A test constructs a `DiskChanged` or an `LspNotification`, runs `handle`, and asserts the effects and the `DiskFile` sources. The binary's event loop calls the same `handle` with the same types.
+`IsographState` is the process wrapper (`db: IsographDb`, live sessions, `globs` (the config's `source_files` and `schema` globs), `diagnostics_debounce`). The guard is not a pico source. `IsographDb` is the pico database. The test harness calls `handle`. It does not start a daemon, open a socket, or write a file. A test constructs a `DiskChanged` or an `LspNotification`, runs `handle`, and asserts the effects and the `DiskFile` sources. The binary's event loop calls the same `handle` with the same types.
 
 `IsographEvent` is `Lsp(LspEvent)` | `Internal(InternalEvent)` | `ClientConnection(ClientConnectionEvent)` | `Timer(TimerFired<TimerPayload>)`. `LspEvent` is `Request` / `Notification` / `Response`. `handle` of `Lsp` matches those and runs isograph request/notification dispatch. A request leftover is `method_not_found`: one immediate `SendLspResponseEffect`. HelloWorld returns `LogHelloWorld`. An accepted `didOpen`, `didChange`, or `didClose` arms the diagnostics debounce, and `handle` of that `TimerFired` returns `PublishDiagnosticsEffect`s. That is the plumbing the previous sentence named: a handler returns a timer plus an event. A notification leftover is no effects. A notification that matches returns `Vec<IsographEffect>` and not `SendLspResponseEffect`. Bad `isograph/event` params are leftover (empty effects). An LSP request and an LSP response carry the `ClientId` of their connection. `handle` drops a response from a client not in `LiveSessions`; a response from a live client is no effects. `handle` of `Internal` is `HelloWorld` / `Quit` / `DiskChanged`. `handle` of `Timer` uses `trigger_if_matching`. `handle` does not sleep. `handle` does not touch the socket. The effect loop writes the `Response`.
 
-Scope of disk files is the watcher's job. `handle` reads `source_globs` only to choose which open files get diagnostics. `handle` does not know about gitignore. `isograph send` may inject any path.
+Scope of disk files is the watcher's job. The watcher posts a path that is a source file (it matches `source_files` and `TProfile::HostLanguage::should_include_source_file` includes it) or a schema file (it matches `schema` and `TProfile::NetworkProtocol::should_include_schema_file` includes it). `handle` stores every `File` `Present` as a `DiskFile`. `handle` reads the schema globs to also list a `Present` path in `schema_file_set`, and the source globs to choose which open files get diagnostics. A path that is both a source file and a schema file is both. `handle` does not know about gitignore. `isograph send` may inject any path, and `handle` classifies it the same way.
 
 ## Outer
 
@@ -176,10 +176,15 @@ struct IsographDb<TProfile: CompilationProfile> {
     disk_file_map: DiskFileMap,
     #[tracked]
     open_file_map: OpenFileMap,
+    #[tracked]
+    schema_file_set: SchemaFileSet,
     phantom_data: PhantomData<TProfile>,
 }
 
 struct DiskFileMap(pub HashMap<PathBuf, SourceId<DiskFile>>);
+
+/// The disk paths that are schema files. Each is a key of `disk_file_map`.
+struct SchemaFileSet(pub HashSet<RelativePathToSourceFile>);
 
 #[derive(Debug, Clone, PartialEq, Eq, Source)]
 struct DiskFile {
@@ -203,7 +208,7 @@ struct OpenFile {
 }
 ```
 
-A path may have a `DiskFile`, one `OpenFile` per client that has it open, both, or neither. The tracked maps are which paths currently have a `DiskFile` and which `(client, path)` pairs have an `OpenFile`. `handle` is the only writer of `DiskFile` and `OpenFile`.
+A path may have a `DiskFile`, one `OpenFile` per client that has it open, both, or neither. The tracked maps are which paths currently have a `DiskFile` and which `(client, path)` pairs have an `OpenFile`. `schema_file_set` is which of the `DiskFile` paths are schema files; its text is read through `file_contents` like any other path. `handle` is the only writer of `DiskFile` and `OpenFile`.
 
 Artifact generation will read through `file_contents` as its own client with no `OpenFile`; how it gets its `ClientId` is not designed yet.
 

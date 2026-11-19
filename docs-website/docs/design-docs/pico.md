@@ -27,6 +27,8 @@ struct IsographDb<TProfile: CompilationProfile> {
     disk_file_map: DiskFileMap,
     #[tracked]
     open_file_map: OpenFileMap,
+    #[tracked]
+    schema_file_set: SchemaFileSet,
     phantom_data: PhantomData<TProfile>,
 }
 ```
@@ -396,7 +398,7 @@ pub fn file_contents<TProfile: CompilationProfile>(
 ) -> Option<String>
 ```
 
-Nothing else reads `DiskFile.contents` or `OpenFile.contents`. The other readers of `disk_file_map` and `open_file_map` are the private lookups of `file_contents` (`open_file_source_id`, `disk_file_source_id`), the writers (`insert_disk_file`, `remove_disk_file`, `remove_disk_files_from_path`, `set_open_file`, `remove_open_file`, `remove_open_files_of_client`), and uses that do not read text, such as listing the paths that exist. A function that lists paths and needs each file's text calls `file_contents` for each path.
+Nothing else reads `DiskFile.contents` or `OpenFile.contents`. The other readers of `disk_file_map`, `open_file_map`, and `schema_file_set` are the private lookups of `file_contents` (`open_file_source_id`, `disk_file_source_id`), the writers (`insert_disk_file`, `insert_schema_file`, `remove_disk_file`, `remove_disk_files_from_path`, `set_open_file`, `remove_open_file`, `remove_open_files_of_client`), and uses that do not read text, such as listing the paths that exist. `schema_file_set` holds paths, not `SourceId`s: a reader of schema text calls `file_contents` for each listed path. The writers touch `schema_file_set` only when its membership changes, because `MutView::tracked` bumps the counter on every call. A function that lists paths and needs each file's text calls `file_contents` for each path.
 
 ### The client is an input
 
