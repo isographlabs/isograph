@@ -1,5 +1,7 @@
 use common_lang_types::RelativePathToSourceFile;
-use isograph_compiler::{ClientId, HostLanguage, IsographDb, iso_literal_parse_errors_in_file};
+use isograph_compiler::{
+    ClientId, CompilationProfile, IsographDb, iso_literal_parse_errors_in_file,
+};
 use pico_macros::memo;
 use prelude::Postfix;
 
@@ -9,8 +11,8 @@ const DIAGNOSTIC_SOURCE: &str = "isograph";
 
 /// `lsp_types::Diagnostic`s of `path` as `client` reads it.
 #[memo]
-pub fn lsp_diagnostics_for_file<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub fn lsp_diagnostics_for_file<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     client: ClientId,
     path: RelativePathToSourceFile,
 ) -> Option<Vec<lsp_types::Diagnostic>> {
@@ -34,10 +36,10 @@ pub fn lsp_diagnostics_for_file<THostLanguage: HostLanguage>(
 
 #[cfg(test)]
 mod tests {
+    use crate::test_profile::TestProfile;
     use common_lang_types::RelativePathToSourceFile;
     use intern::string_key::Intern;
     use isograph_compiler::{ClientId, IsographDb, iso_literal_parse_errors_in_file};
-    use isograph_extract_typescript::TypeScriptHostLanguage;
     use prelude::Postfix;
 
     use super::lsp_diagnostics_for_file;
@@ -51,7 +53,7 @@ mod tests {
     }
 
     fn diagnostics_of(contents: &str) -> Vec<lsp_types::Diagnostic> {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         db.insert_disk_file(path, contents.to_owned());
         lsp_diagnostics_for_file(&db, client(), path)
@@ -61,7 +63,7 @@ mod tests {
 
     #[test]
     fn missing_file_has_no_diagnostics() {
-        let db = IsographDb::<TypeScriptHostLanguage>::default();
+        let db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         assert_eq!(lsp_diagnostics_for_file(&db, client(), path).as_ref(), None);
     }
@@ -73,7 +75,7 @@ mod tests {
 
     #[test]
     fn each_diagnostic_is_an_error_from_isograph_with_the_parse_error_message() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         db.insert_disk_file(path, "iso(`entrypoint`)".to_owned());
         let errors = iso_literal_parse_errors_in_file(&db, client(), path)

@@ -12,7 +12,7 @@ This is figaro's shape. Figaro's events are keys and OS reports. Isograph's even
 
 The building blocks are `Config`, `IsographEvent`, `IsographEffect`, `ClientId`, `DiskFile`, and `OpenFile`. The state is a pico database.
 
-A binary is compiled with one `HostLanguage`, one `NetworkProtocol`, and one `RuntimeFramework`. Those are the type parameters in the mental model. They are static for the process. The config file's fields depend on them.
+A binary is compiled with one `HostLanguage`, one `NetworkProtocol`, and one `RuntimeFramework`. Those are the type parameters in the mental model. They are static for the process. The config file's fields depend on them. A `CompilationProfile` names the `HostLanguage` and the `NetworkProtocol` as associated types. `IsographDb<TProfile>` and `IsographState<TProfile>` take the profile.
 
 Landing order for the implementation slices is `refactors/pending/event-model.md`.
 
@@ -170,13 +170,13 @@ event-loop.md ships `HelloWorld` / `LogHelloWorld`, `Quit` / `Kill`, tokio `run_
 
 ```rust
 #[derive(Debug, Db)]
-struct IsographDb<THostLanguage: HostLanguage> {
+struct IsographDb<TProfile: CompilationProfile> {
     storage: Storage<Self>,
     #[tracked]
     disk_file_map: DiskFileMap,
     #[tracked]
     open_file_map: OpenFileMap,
-    phantom_data: PhantomData<THostLanguage>,
+    phantom_data: PhantomData<TProfile>,
 }
 
 struct DiskFileMap(pub HashMap<PathBuf, SourceId<DiskFile>>);

@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use common_lang_types::RelativePathToSourceFile;
 use intern::Lookup;
-use isograph_compiler::{ClientId, HostLanguage, IsographDb, SkipSourceFile};
+use isograph_compiler::{ClientId, CompilationProfile, HostLanguage, IsographDb, SkipSourceFile};
 use prelude::Postfix;
 
 use crate::effect::{IsographEffect, PublishDiagnosticsEffect};
@@ -28,8 +28,8 @@ enum PublishDiagnosticsError {
 }
 
 /// Replaces the pending diagnostics timer with one that fires after `DIAGNOSTICS_DEBOUNCE`.
-pub(crate) fn arm_diagnostics_debounce<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
+pub(crate) fn arm_diagnostics_debounce<TProfile: CompilationProfile>(
+    state: &mut IsographState<TProfile>,
 ) -> Vec<IsographEffect> {
     let (guard, effect) = freddie_timer::timer_effect_and_guard(
         DIAGNOSTICS_DEBOUNCE,
@@ -40,8 +40,8 @@ pub(crate) fn arm_diagnostics_debounce<THostLanguage: HostLanguage>(
 }
 
 /// Changed diagnostics for every live client that accepts them, one effect per client.
-pub(crate) fn publish_diagnostics<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
+pub(crate) fn publish_diagnostics<TProfile: CompilationProfile>(
+    state: &mut IsographState<TProfile>,
 ) -> Vec<IsographEffect> {
     let db = state.db.reference();
     let source_globs = state.source_globs.reference();
@@ -55,8 +55,8 @@ pub(crate) fn publish_diagnostics<THostLanguage: HostLanguage>(
         .collect()
 }
 
-fn publish_to_client<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+fn publish_to_client<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     source_globs: &SourceGlobs,
     client: ClientId,
     session: &mut LiveSession,
@@ -100,8 +100,8 @@ fn publish_to_client<THostLanguage: HostLanguage>(
 }
 
 /// Non-empty diagnostics of every source file `client` has open.
-fn client_diagnostics<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+fn client_diagnostics<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     source_globs: &SourceGlobs,
     client: ClientId,
 ) -> HashMap<RelativePathToSourceFile, Vec<lsp_types::Diagnostic>> {
@@ -111,7 +111,7 @@ fn client_diagnostics<THostLanguage: HostLanguage>(
             let relative = Path::new(path.lookup());
             source_globs.contains(relative)
                 && matches!(
-                    THostLanguage::should_skip_source_file(relative),
+                    TProfile::HostLanguage::should_skip_source_file(relative),
                     SkipSourceFile::Keep
                 )
         })
@@ -141,8 +141,8 @@ fn changed_diagnostics<'a>(
     changed.chain(cleared)
 }
 
-fn publish_notification<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+fn publish_notification<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     path: RelativePathToSourceFile,
     diagnostics: Vec<lsp_types::Diagnostic>,
 ) -> Result<lsp_server::Notification, PublishDiagnosticsError> {

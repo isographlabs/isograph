@@ -555,6 +555,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "graphql_network_protocol"
+version = "0.5.3"
+dependencies = [
+ "isograph_compiler",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1900,7 +1907,9 @@ dependencies = [
 name = "ts_graphql_react_isograph_cli"
 version = "0.5.3"
 dependencies = [
+ "graphql_network_protocol",
  "isograph_cli",
+ "isograph_compiler",
  "isograph_extract_typescript",
  "lsp-server",
  "lsp-types",

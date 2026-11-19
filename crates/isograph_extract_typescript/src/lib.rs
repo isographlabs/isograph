@@ -4,8 +4,8 @@ use std::sync::LazyLock;
 use common_lang_types::{ConstExportName, RelativePathToSourceFile};
 use intern::string_key::Intern;
 use isograph_compiler::{
-    ClientId, HostLanguage, IsoLiteralError, IsoLiteralExtraction, IsoLiteralStartIndex,
-    IsographDb, SkipSourceFile, extract_iso_literals, parsed_iso_literal,
+    ClientId, CompilationProfile, HostLanguage, IsoLiteralError, IsoLiteralExtraction,
+    IsoLiteralStartIndex, IsographDb, SkipSourceFile, extract_iso_literals, parsed_iso_literal,
 };
 use isograph_parser::{IsoLiteralItem, IsoLiteralParse, ParsedIsoLiteral, SelectableNameWrapper};
 use prelude::Postfix;
@@ -133,8 +133,8 @@ pub struct FileLiteral<'a> {
     pub errors: Vec<span::WithSpan<IsoLiteralError<TypeScriptHostLanguage>>>,
 }
 
-pub fn file_literals<'a>(
-    db: &'a IsographDb<TypeScriptHostLanguage>,
+pub fn file_literals<'a, TProfile: CompilationProfile<HostLanguage = TypeScriptHostLanguage>>(
+    db: &'a IsographDb<TProfile>,
     client: ClientId,
     path: RelativePathToSourceFile,
 ) -> Option<Vec<FileLiteral<'a>>> {
@@ -420,10 +420,10 @@ mod memo_tests {
     use common_lang_types::RelativePathToSourceFile;
     use intern::string_key::Intern;
     use isograph_compiler::{
-        ClientId, HostLanguage, IsoLiteralError, IsoLiteralExtraction, IsoLiteralStartIndex,
-        IsographDb, LiteralId, extract_iso_literals, iso_literal_extraction,
-        iso_literal_parse_errors_in_file, parsed_iso_literal, parsed_iso_literals_in_file,
-        text_through_last_iso_literal,
+        ClientId, CompilationProfile, HostLanguage, IsoLiteralError, IsoLiteralExtraction,
+        IsoLiteralStartIndex, IsographDb, LiteralId, NetworkProtocol, extract_iso_literals,
+        iso_literal_extraction, iso_literal_parse_errors_in_file, parsed_iso_literal,
+        parsed_iso_literals_in_file, text_through_last_iso_literal,
     };
     use isograph_parser::{
         AstError, IsoLiteralItem, IsographSemanticToken, ParseError, ParsedIsoLiteral,
@@ -436,6 +436,17 @@ mod memo_tests {
         AssociatedJsFunction, IsoCall, TypeScriptHostError, TypeScriptHostLanguage,
         TypeScriptLiteralContext, file_literals, host_errors_for_extraction,
     };
+
+    struct TestNetworkProtocol;
+
+    impl NetworkProtocol for TestNetworkProtocol {}
+
+    struct TestProfile;
+
+    impl CompilationProfile for TestProfile {
+        type HostLanguage = TypeScriptHostLanguage;
+        type NetworkProtocol = TestNetworkProtocol;
+    }
 
     fn iso_literal_item(parsed: &ParsedIsoLiteral) -> Option<&IsoLiteralItem> {
         parsed
@@ -456,7 +467,7 @@ mod memo_tests {
     }
 
     fn intern_file(
-        db: &mut IsographDb<TypeScriptHostLanguage>,
+        db: &mut IsographDb<TestProfile>,
         path: RelativePathToSourceFile,
         contents: &str,
     ) {
@@ -470,12 +481,12 @@ mod memo_tests {
     fn one_literal(
         contents: &str,
     ) -> (
-        IsographDb<TypeScriptHostLanguage>,
+        IsographDb<TestProfile>,
         RelativePathToSourceFile,
         IsoLiteralExtraction<TypeScriptHostLanguage>,
         ParsedIsoLiteral,
     ) {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         intern_file(&mut db, path, contents);
         let literal_id = LiteralId {
@@ -493,14 +504,14 @@ mod memo_tests {
 
     #[test]
     fn missing_disk_file_is_none() {
-        let db = IsographDb::<TypeScriptHostLanguage>::default();
+        let db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         assert!(extract_iso_literals(&db, client(), path).is_none());
     }
 
     #[test]
     fn missing_then_present_extracts() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let other = intern_path("src/b.ts");
         intern_file(&mut db, other, "export const x = 1;");
         let path = intern_path("src/a.ts");
@@ -515,7 +526,7 @@ mod memo_tests {
 
     #[test]
     fn present_file_with_no_iso_is_empty() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         intern_file(&mut db, path, "export const Foo = 1;");
         let extracted = extract_iso_literals(&db, client(), path)
@@ -526,7 +537,7 @@ mod memo_tests {
 
     #[test]
     fn one_exported_field() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         let source = "export const fullName = iso(`field Pet.fullName { id }`)(";
         let text = "field Pet.fullName { id }";
@@ -555,7 +566,7 @@ mod memo_tests {
 
     #[test]
     fn two_literals() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         let source = "\
 export const fullName = iso(`field Pet.fullName { id }`)(
@@ -588,7 +599,7 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn a_second_present_replaces_literals() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         intern_file(
             &mut db,
@@ -606,7 +617,7 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn absent_then_extract_is_none() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         intern_file(&mut db, path, "iso(`entrypoint Query.HomeRoute`)");
         db.remove_disk_file(path);
@@ -615,7 +626,7 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn parsed_entrypoint_has_no_errors() {
-        let db = IsographDb::<TypeScriptHostLanguage>::default();
+        let db = IsographDb::<TestProfile>::default();
         let parsed = parsed_iso_literal(&db, "entrypoint Query.HomeRoute".to_owned());
         assert!(parsed.errors.is_empty());
         assert!(matches!(
@@ -626,7 +637,7 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn incomplete_entrypoint_has_a_parse_error() {
-        let db = IsographDb::<TypeScriptHostLanguage>::default();
+        let db = IsographDb::<TestProfile>::default();
         let parsed = parsed_iso_literal(&db, "entrypoint".to_owned());
         assert!(parsed.item.is_some());
         assert!(iso_literal_item(parsed).is_none());
@@ -635,7 +646,7 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn empty_literal_is_empty_literal_error() {
-        let db = IsographDb::<TypeScriptHostLanguage>::default();
+        let db = IsographDb::<TestProfile>::default();
         let parsed = parsed_iso_literal(&db, String::new());
         assert!(parsed.item.is_none());
         assert!(
@@ -648,7 +659,7 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn parsed_iso_literal_of_the_same_text_matches_after_unrelated_file() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let text = "entrypoint Query.HomeRoute".to_owned();
         let first = parsed_iso_literal(&db, text.clone()).clone();
         let second = parsed_iso_literal(&db, text.clone()).clone();
@@ -660,7 +671,7 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn missing_disk_file_has_no_extraction() {
-        let db = IsographDb::<TypeScriptHostLanguage>::default();
+        let db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         assert!(
             iso_literal_extraction(
@@ -677,7 +688,7 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn out_of_range_literal_id_is_none() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         intern_file(&mut db, path, "iso(`entrypoint Query.HomeRoute`)");
         assert!(
@@ -788,14 +799,14 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn missing_disk_file_has_no_file_literals() {
-        let db = IsographDb::<TypeScriptHostLanguage>::default();
+        let db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         assert!(file_literals(&db, client(), path).is_none());
     }
 
     #[test]
     fn present_file_with_no_iso_has_empty_file_literals() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         intern_file(&mut db, path, "export const Foo = 1;");
         let literals = file_literals(&db, client(), path).expect("the test interned this path");
@@ -853,14 +864,14 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn missing_disk_file_has_no_parsed_iso_literals_in_file() {
-        let db = IsographDb::<TypeScriptHostLanguage>::default();
+        let db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         assert!(parsed_iso_literals_in_file(&db, client(), path).is_none());
     }
 
     #[test]
     fn present_file_with_no_iso_has_empty_parsed_iso_literals_in_file() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         intern_file(&mut db, path, "export const Foo = 1;");
         let literals = parsed_iso_literals_in_file(&db, client(), path)
@@ -871,7 +882,7 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn one_entrypoint_is_one_pair() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         intern_file(&mut db, path, "iso(`entrypoint Query.HomeRoute`)");
         let extract = extract_iso_literals(&db, client(), path)
@@ -902,7 +913,7 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn incomplete_entrypoint_keeps_the_keyword_token() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         intern_file(&mut db, path, "iso(`entrypoint`)");
         let literals = parsed_iso_literals_in_file(&db, client(), path)
@@ -914,7 +925,7 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn empty_backticks_are_empty_parsed_iso_literals_in_file() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         intern_file(&mut db, path, "iso(``)");
         let literals = parsed_iso_literals_in_file(&db, client(), path)
@@ -925,7 +936,7 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn newline_only_literal_is_empty_literal() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         intern_file(&mut db, path, "iso(`\n`)");
         let extract = extract_iso_literals(&db, client(), path)
@@ -948,7 +959,7 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn space_only_literal_is_empty_literal() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         intern_file(&mut db, path, "iso(` `)");
         let extract = extract_iso_literals(&db, client(), path)
@@ -971,7 +982,7 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn two_literals_are_two_pairs() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         intern_file(
             &mut db,
@@ -991,7 +1002,7 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn multiline_field_has_keyword_then_name() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         intern_file(&mut db, path, "iso(`\nfield User.Avatar {\n  name\n}\n`)");
         let literals = parsed_iso_literals_in_file(&db, client(), path)
@@ -1030,7 +1041,7 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn prefix_with_newline_moves_start_index_and_keeps_tree() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         let contents = "iso(`entrypoint Query.HomeRoute`)";
         intern_file(&mut db, path, contents);
@@ -1058,7 +1069,7 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn prefix_with_emoji_is_a_byte_offset() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         let contents = "iso(`entrypoint Query.HomeRoute`)";
         intern_file(&mut db, path, contents);
@@ -1080,7 +1091,7 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn append_after_the_literal_is_eq() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         let contents = "iso(`entrypoint Query.HomeRoute`)";
         intern_file(&mut db, path, contents);
@@ -1101,7 +1112,7 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn context_only_rename_is_neq_with_same_tree() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         intern_file(
             &mut db,
@@ -1144,7 +1155,7 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn remove_disk_file_clears_parsed_iso_literals_in_file() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         intern_file(&mut db, path, "iso(`entrypoint Query.HomeRoute`)");
         assert!(parsed_iso_literals_in_file(&db, client(), path).is_some());
@@ -1162,14 +1173,14 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn missing_disk_file_has_no_text_through_last_iso_literal() {
-        let db = IsographDb::<TypeScriptHostLanguage>::default();
+        let db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         assert!(text_through_last_iso_literal(&db, client(), path).is_none());
     }
 
     #[test]
     fn present_file_with_no_iso_has_empty_text_through_last_iso_literal() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         intern_file(&mut db, path, "export const Foo = 1;");
         let text = text_through_last_iso_literal(&db, client(), path)
@@ -1180,7 +1191,7 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn text_through_last_iso_literal_stops_at_the_interior_end() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         let contents = "export const Home = iso(`entrypoint Query.HomeRoute`);\nconst y = 1;\n";
         intern_file(&mut db, path, contents);
@@ -1193,7 +1204,7 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn two_literals_stop_at_the_second_interior_end() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         let contents = "iso(`entrypoint Query.A`)\niso(`entrypoint Query.B`)\nconst y = 1;\n";
         intern_file(&mut db, path, contents);
@@ -1205,7 +1216,7 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn append_after_the_last_literal_keeps_text_through_last_iso_literal() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         let contents = "export const Home = iso(`entrypoint Query.HomeRoute`)";
         intern_file(&mut db, path, contents);
@@ -1222,7 +1233,7 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn remove_disk_file_clears_text_through_last_iso_literal() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         intern_file(&mut db, path, "iso(`entrypoint Query.HomeRoute`)");
         assert!(text_through_last_iso_literal(&db, client(), path).is_some());
@@ -1241,7 +1252,7 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn missing_file_has_no_iso_literal_parse_errors() {
-        let db = IsographDb::<TypeScriptHostLanguage>::default();
+        let db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         assert_eq!(
             iso_literal_parse_errors_in_file(&db, client(), path).as_ref(),
@@ -1251,7 +1262,7 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn file_with_no_literals_has_empty_iso_literal_parse_errors() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         intern_file(&mut db, path, "const a = 1;");
         assert_eq!(
@@ -1262,7 +1273,7 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn iso_literal_parse_errors_are_the_parse_errors_shifted_to_the_file() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         intern_file(&mut db, path, "iso(`entrypoint`)");
         let expected = shifted_parse_errors("entrypoint", "iso(`".len() as u32);
@@ -1275,7 +1286,7 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn prepending_text_shifts_iso_literal_parse_errors() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         intern_file(&mut db, path, "iso(`entrypoint`)");
         let before = iso_literal_parse_errors_in_file(&db, client(), path)
@@ -1300,7 +1311,7 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn iso_literal_parse_errors_cover_every_literal_in_the_file() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         let first = "iso(`entrypoint`)";
         let separator = ";\n";
@@ -1327,7 +1338,7 @@ iso(`entrypoint Query.HomeRoute`)";
 
     #[test]
     fn iso_literal_parse_errors_follow_each_clients_text() {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         intern_file(&mut db, path, "iso(`entrypoint Query.HomeRoute`)");
         db.set_open_file(ClientId(1), path, "iso(`entrypoint`)".to_owned());

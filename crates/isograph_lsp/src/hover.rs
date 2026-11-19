@@ -1,6 +1,7 @@
 use common_lang_types::RelativePathToSourceFile;
 use isograph_compiler::{
-    ClientId, HostLanguage, IsographDb, LiteralId, extract_iso_literals, parsed_iso_literal_by_id,
+    ClientId, CompilationProfile, IsographDb, LiteralId, extract_iso_literals,
+    parsed_iso_literal_by_id,
 };
 use isograph_parser::{IsographResolutionNode, ParsedIsoLiteral, resolve_offset};
 use prelude::Postfix;
@@ -9,8 +10,8 @@ use span::Span;
 use crate::line_index::byte_offset_at_lsp_position;
 
 /// The hover at `position` in `path` as `client` reads it.
-pub fn hover_for_position<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub fn hover_for_position<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     client: ClientId,
     path: RelativePathToSourceFile,
     position: lsp_types::Position,
@@ -26,8 +27,8 @@ pub fn hover_for_position<THostLanguage: HostLanguage>(
     .wrap_some()
 }
 
-fn resolved_position_at_lsp_position<'db, THostLanguage: HostLanguage>(
-    db: &'db IsographDb<THostLanguage>,
+fn resolved_position_at_lsp_position<'db, TProfile: CompilationProfile>(
+    db: &'db IsographDb<TProfile>,
     client: ClientId,
     path: RelativePathToSourceFile,
     position: lsp_types::Position,
@@ -36,8 +37,8 @@ fn resolved_position_at_lsp_position<'db, THostLanguage: HostLanguage>(
     resolve_offset(parsed, cursor)
 }
 
-fn ast_at_lsp_position<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+fn ast_at_lsp_position<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     client: ClientId,
     path: RelativePathToSourceFile,
     position: lsp_types::Position,
@@ -48,8 +49,8 @@ fn ast_at_lsp_position<THostLanguage: HostLanguage>(
 
 /// The literal whose interior contains `position`, and the span of the char under
 /// `position` relative to that interior.
-pub(crate) fn iso_literal_at_lsp_position<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub(crate) fn iso_literal_at_lsp_position<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     client: ClientId,
     path: RelativePathToSourceFile,
     position: lsp_types::Position,
@@ -80,10 +81,10 @@ pub(crate) fn iso_literal_at_lsp_position<THostLanguage: HostLanguage>(
 
 #[cfg(test)]
 mod tests {
+    use crate::test_profile::TestProfile;
     use common_lang_types::RelativePathToSourceFile;
     use intern::string_key::Intern;
     use isograph_compiler::{ClientId, IsographDb, LiteralId, parsed_iso_literal};
-    use isograph_extract_typescript::TypeScriptHostLanguage;
     use lsp_types::Position;
     use prelude::Postfix;
     use span::Span;
@@ -98,8 +99,8 @@ mod tests {
         s.intern().to()
     }
 
-    fn db_with(contents: &str) -> (IsographDb<TypeScriptHostLanguage>, RelativePathToSourceFile) {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+    fn db_with(contents: &str) -> (IsographDb<TestProfile>, RelativePathToSourceFile) {
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         db.insert_disk_file(path, contents.to_owned());
         (db, path)
@@ -110,7 +111,7 @@ mod tests {
     }
 
     fn literal_at(
-        db: &IsographDb<TypeScriptHostLanguage>,
+        db: &IsographDb<TestProfile>,
         path: RelativePathToSourceFile,
         position: Position,
     ) -> Option<(LiteralId, Span)> {
@@ -133,7 +134,7 @@ mod tests {
 
     #[test]
     fn no_file_is_none() {
-        let db = IsographDb::<TypeScriptHostLanguage>::default();
+        let db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         assert_eq!(literal_at(&db, path, at(0, 0)), None);
         assert_eq!(ast_at_lsp_position(&db, client(), path, at(0, 0)), None);
@@ -225,7 +226,7 @@ mod tests {
     #[test]
     fn the_same_text_in_two_files_is_the_same_parse() {
         let contents = "iso(`entrypoint Query.HomeRoute`)";
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let a = intern_path("src/a.ts");
         let b = intern_path("src/b.ts");
         db.insert_disk_file(a, contents.to_owned());

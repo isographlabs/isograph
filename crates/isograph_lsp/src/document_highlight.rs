@@ -1,6 +1,7 @@
 use common_lang_types::RelativePathToSourceFile;
 use isograph_compiler::{
-    ClientId, HostLanguage, IsographDb, LiteralId, iso_literal_extraction, parsed_iso_literal_by_id,
+    ClientId, CompilationProfile, IsographDb, LiteralId, iso_literal_extraction,
+    parsed_iso_literal_by_id,
 };
 use isograph_parser::IsographSemanticToken;
 use prelude::Postfix;
@@ -18,8 +19,8 @@ pub enum TokenUnderCursor<TLocation> {
 
 /// The file range of the semantic token under `position` in `path` as `client` reads it.
 /// `None` when `position` is not inside an iso literal.
-pub fn token_range_at_lsp_position<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub fn token_range_at_lsp_position<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     client: ClientId,
     path: RelativePathToSourceFile,
     position: lsp_types::Position,
@@ -34,8 +35,8 @@ pub fn token_range_at_lsp_position<THostLanguage: HostLanguage>(
 }
 
 /// The file span of the semantic token under `position`.
-fn token_span_at_lsp_position<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+fn token_span_at_lsp_position<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     client: ClientId,
     path: RelativePathToSourceFile,
     position: lsp_types::Position,
@@ -52,8 +53,8 @@ fn token_span_at_lsp_position<THostLanguage: HostLanguage>(
 }
 
 /// The literal under `position`, and what lies under it within that literal.
-fn literal_token_at_lsp_position<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+fn literal_token_at_lsp_position<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     client: ClientId,
     path: RelativePathToSourceFile,
     position: lsp_types::Position,

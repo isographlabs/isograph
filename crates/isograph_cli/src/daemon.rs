@@ -2,7 +2,7 @@ use std::ops::ControlFlow;
 use std::path::PathBuf;
 
 use freddie_timer::TimerEffect;
-use isograph_compiler::HostLanguage;
+use isograph_compiler::CompilationProfile;
 use isograph_config::IsographProjectConfig;
 use prelude::Postfix;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
@@ -15,7 +15,7 @@ use crate::state::{IsographDb, IsographState, handle, intern_config_directory};
 use crate::timer::TimerPayload;
 use crate::watch::SourceFileEvent;
 
-pub fn run<THostLanguage: HostLanguage>(
+pub fn run<TProfile: CompilationProfile>(
     config_path: PathBuf,
     port_path: PathBuf,
     filesystem: Filesystem,
@@ -31,7 +31,7 @@ pub fn run<THostLanguage: HostLanguage>(
             return;
         }
     };
-    runtime.block_on(serve::<THostLanguage>(
+    runtime.block_on(serve::<TProfile>(
         config_path,
         port_path,
         filesystem,
@@ -39,7 +39,7 @@ pub fn run<THostLanguage: HostLanguage>(
     ));
 }
 
-async fn serve<THostLanguage: HostLanguage>(
+async fn serve<TProfile: CompilationProfile>(
     config_path: PathBuf,
     port_path: PathBuf,
     filesystem: Filesystem,
@@ -85,7 +85,7 @@ async fn serve<THostLanguage: HostLanguage>(
         }
     };
     let mut state = IsographState {
-        db: IsographDb::<THostLanguage>::default(),
+        db: IsographDb::<TProfile>::default(),
         live_sessions: LiveSessions::default(),
         source_globs,
         diagnostics_debounce: None,
@@ -97,7 +97,7 @@ async fn serve<THostLanguage: HostLanguage>(
         .to_owned();
     let source_files = config.source_files.clone();
     let _hold_watch = watch_tx.clone();
-    let _watcher = match crate::watch::start_if_watching::<THostLanguage>(
+    let _watcher = match crate::watch::start_if_watching::<TProfile>(
         filesystem,
         watch_tx,
         config_path.reference(),
@@ -142,7 +142,7 @@ async fn serve<THostLanguage: HostLanguage>(
         () = run_event_loop(state, event_rx, effect_tx) => {}
         () = run_effect_loop(effect_rx, event_tx.clone()) => {}
         () = crate::lsp_socket::accept_loop(listener, event_tx.clone()) => {}
-        () = run_filesystem_watcher::<THostLanguage>(
+        () = run_filesystem_watcher::<TProfile>(
             watch_rx,
             event_tx,
             config_directory,
@@ -153,14 +153,14 @@ async fn serve<THostLanguage: HostLanguage>(
     std::process::exit(0);
 }
 
-async fn run_filesystem_watcher<THostLanguage: HostLanguage>(
+async fn run_filesystem_watcher<TProfile: CompilationProfile>(
     mut watch_rx: UnboundedReceiver<Vec<SourceFileEvent>>,
     event_tx: UnboundedSender<IsographEvent>,
     config_directory: PathBuf,
     source_files: Vec<String>,
 ) {
     while let Some(events) = watch_rx.recv().await {
-        crate::watch::apply::<THostLanguage>(
+        crate::watch::apply::<TProfile>(
             event_tx.reference(),
             config_directory.reference(),
             events,
@@ -169,8 +169,8 @@ async fn run_filesystem_watcher<THostLanguage: HostLanguage>(
     }
 }
 
-pub(crate) async fn run_event_loop<THostLanguage: HostLanguage>(
-    mut state: crate::state::IsographState<THostLanguage>,
+pub(crate) async fn run_event_loop<TProfile: CompilationProfile>(
+    mut state: crate::state::IsographState<TProfile>,
     mut event_rx: UnboundedReceiver<IsographEvent>,
     effect_tx: UnboundedSender<IsographEffect>,
 ) {
@@ -265,14 +265,14 @@ mod tests {
     use crate::effect::IsographEffect;
     use crate::event::{InternalEvent, IsographEvent, LiveSessions};
     use crate::state::{IsographDb, IsographState};
+    use crate::test_profile::TestProfile;
     use crate::timer::TimerPayload;
-    use isograph_extract_typescript::TypeScriptHostLanguage;
     use prelude::Postfix;
     use tokio::sync::mpsc::unbounded_channel;
 
-    fn empty_state() -> IsographState<TypeScriptHostLanguage> {
+    fn empty_state() -> IsographState<TestProfile> {
         IsographState {
-            db: IsographDb::<TypeScriptHostLanguage>::default(),
+            db: IsographDb::<TestProfile>::default(),
             live_sessions: LiveSessions::default(),
             source_globs: crate::watch::SourceGlobs::parse(&["src/**".to_owned()])
                 .expect("the test glob is valid"),

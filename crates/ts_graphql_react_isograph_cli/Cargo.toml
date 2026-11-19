@@ -9,7 +9,9 @@ name = "isograph"
 path = "src/main.rs"
 
 [dependencies]
+graphql_network_protocol = { path = "../graphql_network_protocol" }
 isograph_cli = { path = "../isograph_cli" }
+isograph_compiler = { path = "../isograph_compiler" }
 isograph_extract_typescript = { path = "../isograph_extract_typescript" }
 
 [dev-dependencies]

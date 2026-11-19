@@ -5,7 +5,7 @@ use common_lang_types::{
     relative_path_from_absolute_and_working_directory,
 };
 use intern::Lookup;
-use isograph_compiler::{ClientId, HostLanguage, IsographDb};
+use isograph_compiler::{ClientId, CompilationProfile, IsographDb};
 use isograph_lsp::lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult};
 use pico::Database;
 use prelude::Postfix;
@@ -24,15 +24,15 @@ pub(crate) enum UriPathError {
     Relative(RelativePathError),
 }
 
-pub(crate) fn semantic_tokens_response<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub(crate) fn semantic_tokens_response<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     client: ClientId,
     params: lsp_types::SemanticTokensParams,
 ) -> LSPRuntimeResult<
     <lsp_types::request::SemanticTokensFullRequest as lsp_types::request::Request>::Result,
 > {
     let path = relative_from_uri(db, params.text_document.uri.reference()).map_err(lsp_error)?;
-    isograph_lsp::lsp_semantic_tokens_for_file::<THostLanguage>(db, client, path)
+    isograph_lsp::lsp_semantic_tokens_for_file::<TProfile>(db, client, path)
         .clone()
         .map(|data| {
             lsp_types::SemanticTokensResult::Tokens(lsp_types::SemanticTokens {
@@ -43,8 +43,8 @@ pub(crate) fn semantic_tokens_response<THostLanguage: HostLanguage>(
         .wrap_ok()
 }
 
-pub(crate) fn hover_response<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub(crate) fn hover_response<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     client: ClientId,
     params: lsp_types::HoverParams,
 ) -> LSPRuntimeResult<<lsp_types::request::HoverRequest as lsp_types::request::Request>::Result> {
@@ -53,8 +53,8 @@ pub(crate) fn hover_response<THostLanguage: HostLanguage>(
     isograph_lsp::hover_for_position(db, client, path, position.position).wrap_ok()
 }
 
-pub(crate) fn document_highlight_response<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub(crate) fn document_highlight_response<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     client: ClientId,
     params: lsp_types::DocumentHighlightParams,
 ) -> LSPRuntimeResult<
@@ -84,8 +84,8 @@ pub(crate) enum DidChangeError {
     Uri(#[from] UriPathError),
 }
 
-pub(crate) fn on_did_open<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
+pub(crate) fn on_did_open<TProfile: CompilationProfile>(
+    state: &mut IsographState<TProfile>,
     client: ClientId,
     params: lsp_types::DidOpenTextDocumentParams,
 ) -> Vec<IsographEffect> {
@@ -98,8 +98,8 @@ pub(crate) fn on_did_open<THostLanguage: HostLanguage>(
     )
 }
 
-pub(crate) fn on_did_change<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
+pub(crate) fn on_did_change<TProfile: CompilationProfile>(
+    state: &mut IsographState<TProfile>,
     client: ClientId,
     params: lsp_types::DidChangeTextDocumentParams,
 ) -> Vec<IsographEffect> {
@@ -112,8 +112,8 @@ pub(crate) fn on_did_change<THostLanguage: HostLanguage>(
     )
 }
 
-pub(crate) fn on_did_close<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
+pub(crate) fn on_did_close<TProfile: CompilationProfile>(
+    state: &mut IsographState<TProfile>,
     client: ClientId,
     params: lsp_types::DidCloseTextDocumentParams,
 ) -> Vec<IsographEffect> {
@@ -126,8 +126,8 @@ pub(crate) fn on_did_close<THostLanguage: HostLanguage>(
     )
 }
 
-fn did_open<THostLanguage: HostLanguage>(
-    db: &mut IsographDb<THostLanguage>,
+fn did_open<TProfile: CompilationProfile>(
+    db: &mut IsographDb<TProfile>,
     client: ClientId,
     params: lsp_types::DidOpenTextDocumentParams,
 ) -> Result<(), UriPathError> {
@@ -136,8 +136,8 @@ fn did_open<THostLanguage: HostLanguage>(
     ().wrap_ok()
 }
 
-fn did_change<THostLanguage: HostLanguage>(
-    db: &mut IsographDb<THostLanguage>,
+fn did_change<TProfile: CompilationProfile>(
+    db: &mut IsographDb<TProfile>,
     client: ClientId,
     params: lsp_types::DidChangeTextDocumentParams,
 ) -> Result<(), DidChangeError> {
@@ -152,8 +152,8 @@ fn did_change<THostLanguage: HostLanguage>(
     ().wrap_ok()
 }
 
-fn did_close<THostLanguage: HostLanguage>(
-    db: &mut IsographDb<THostLanguage>,
+fn did_close<TProfile: CompilationProfile>(
+    db: &mut IsographDb<TProfile>,
     client: ClientId,
     params: lsp_types::DidCloseTextDocumentParams,
 ) -> Result<(), UriPathError> {
@@ -173,8 +173,8 @@ pub(crate) enum PathUriError {
 }
 
 /// The `file:` URI of `path` under the config directory.
-pub(crate) fn uri_for_path<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub(crate) fn uri_for_path<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     path: RelativePathToSourceFile,
 ) -> Result<lsp_types::Uri, PathUriError> {
     let cwd = db
@@ -210,8 +210,8 @@ fn file_path(uri: &lsp_types::Uri) -> Option<std::path::PathBuf> {
     url::Url::parse(uri.as_str()).ok()?.to_file_path().ok()
 }
 
-pub(crate) fn relative_from_uri<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub(crate) fn relative_from_uri<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     uri: &lsp_types::Uri,
 ) -> Result<RelativePathToSourceFile, UriPathError> {
     let absolute = file_path(uri).ok_or(UriPathError::NotAFileUri)?;
@@ -232,8 +232,8 @@ fn lsp_error(error: UriPathError) -> LSPRuntimeError {
     }
 }
 
-pub(crate) fn formatting_response<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub(crate) fn formatting_response<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     client: ClientId,
     params: lsp_types::DocumentFormattingParams,
 ) -> LSPRuntimeResult<<lsp_types::request::Formatting as lsp_types::request::Request>::Result> {
@@ -241,8 +241,8 @@ pub(crate) fn formatting_response<THostLanguage: HostLanguage>(
     format_iso_literals(db, client, path).wrap_ok()
 }
 
-pub(crate) fn will_save_wait_until_response<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub(crate) fn will_save_wait_until_response<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     client: ClientId,
     params: lsp_types::WillSaveTextDocumentParams,
 ) -> LSPRuntimeResult<<lsp_types::request::WillSaveWaitUntil as lsp_types::request::Request>::Result>
@@ -251,8 +251,8 @@ pub(crate) fn will_save_wait_until_response<THostLanguage: HostLanguage>(
     format_iso_literals(db, client, path).wrap_ok()
 }
 
-fn format_iso_literals<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+fn format_iso_literals<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     client: ClientId,
     path: RelativePathToSourceFile,
 ) -> Option<Vec<lsp_types::TextEdit>> {
@@ -281,10 +281,10 @@ fn format_iso_literals<THostLanguage: HostLanguage>(
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use crate::test_profile::TestProfile;
     use common_lang_types::RelativePathToSourceFile;
     use intern::string_key::Intern;
     use isograph_compiler::{ClientId, IsographDb};
-    use isograph_extract_typescript::TypeScriptHostLanguage;
     use prelude::Postfix;
 
     use super::{PathUriError, format_iso_literals, relative_from_uri, uri_for_path};
@@ -292,8 +292,8 @@ pub(crate) mod tests {
 
     const PRETTY: &str = "export const fullName = iso(`\n  field Pet.fullName @foo(\n    bar: 123,\n    baz: $qux,\n  ) {\n    id,\n  }\n`);\n";
 
-    fn db_with(contents: String) -> IsographDb<TypeScriptHostLanguage> {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+    fn db_with(contents: String) -> IsographDb<TestProfile> {
+        let mut db = IsographDb::<TestProfile>::default();
         intern_config_directory(
             &mut db,
             std::path::Path::new("/tmp/proj/isograph.config.json"),
@@ -482,7 +482,7 @@ pub(crate) mod tests {
     pub(crate) const THREE_LITERALS_PRETTY: &str = "const a = iso(`\n  field Query.x {\n    id,\n    name,\n  }\n`);\nconst b = 1;\nconst c = iso(`\n  field Query.y {\n    id,\n  }\n`);\nfoo(c);\nconst d = iso(`\n  field Query.z {\n    a,\n    b,\n    c,\n  }\n`);\nexport default d;\n";
 
     /// Formats `buffer` as client 1's open buffer, checks the edits, and returns the edited text.
-    fn formatted_buffer(db: &mut IsographDb<TypeScriptHostLanguage>, buffer: &str) -> String {
+    fn formatted_buffer(db: &mut IsographDb<TestProfile>, buffer: &str) -> String {
         db.set_open_file(client(), path(), buffer.to_owned());
         let edits = format_iso_literals(db, client(), path()).expect("edits");
         assert_edits_replace_disjoint_interiors(buffer, &edits);
@@ -566,8 +566,8 @@ pub(crate) mod tests {
         });
     }
 
-    fn config_db() -> IsographDb<TypeScriptHostLanguage> {
-        let mut db = IsographDb::<TypeScriptHostLanguage>::default();
+    fn config_db() -> IsographDb<TestProfile> {
+        let mut db = IsographDb::<TestProfile>::default();
         intern_config_directory(
             &mut db,
             std::path::Path::new("/tmp/proj/isograph.config.json"),
@@ -575,14 +575,14 @@ pub(crate) mod tests {
         db
     }
 
-    fn uri_of(db: &IsographDb<TypeScriptHostLanguage>, path: &str) -> String {
+    fn uri_of(db: &IsographDb<TestProfile>, path: &str) -> String {
         uri_for_path(db, path.intern().to())
             .expect("the config directory is interned")
             .as_str()
             .to_owned()
     }
 
-    fn relative_of(db: &IsographDb<TypeScriptHostLanguage>, uri: &str) -> RelativePathToSourceFile {
+    fn relative_of(db: &IsographDb<TestProfile>, uri: &str) -> RelativePathToSourceFile {
         relative_from_uri(
             db,
             uri.parse::<lsp_types::Uri>()
@@ -636,7 +636,7 @@ pub(crate) mod tests {
 
     #[test]
     fn uri_for_path_without_a_working_directory_is_missing_working_directory() {
-        let db = IsographDb::<TypeScriptHostLanguage>::default();
+        let db = IsographDb::<TestProfile>::default();
         assert_eq!(
             uri_for_path(db.reference(), "src/a.ts".intern().to()),
             PathUriError::MissingWorkingDirectory.wrap_err()

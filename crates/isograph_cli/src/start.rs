@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 use clap::ArgMatches;
 use clap::error::ErrorKind;
 use freddie_cli::{App, Verb};
-use isograph_compiler::HostLanguage;
+use isograph_compiler::CompilationProfile;
 use prelude::Postfix;
 
 use crate::Isograph;
@@ -18,23 +18,23 @@ const DEADLINE: Duration = Duration::from_secs(5);
 const SLEEP: Duration = Duration::from_millis(10);
 
 #[expect(clippy::print_stderr)]
-pub fn run<THostLanguage: HostLanguage>(
-    verb: Verb<Isograph<THostLanguage>>,
+pub fn run<TProfile: CompilationProfile>(
+    verb: Verb<Isograph<TProfile>>,
     matches: &ArgMatches,
 ) -> ExitCode {
     let id = match &verb {
         Verb::Start(args) => &args.id,
         Verb::Restart(args) => &args.id,
         _ => {
-            return freddie_cli::run_lifecycle_verb::<Isograph<THostLanguage>>(verb, matches);
+            return freddie_cli::run_lifecycle_verb::<Isograph<TProfile>>(verb, matches);
         }
     };
-    let instance = match Isograph::<THostLanguage>::instance(id) {
+    let instance = match Isograph::<TProfile>::instance(id) {
         Ok(instance) => instance,
         Err(e) => clap::Error::raw(ErrorKind::ValueValidation, format!("{e}\n")).exit(),
     };
     let port_path = discover::port_file(instance.lock_file());
-    let code = freddie_cli::run_lifecycle_verb::<Isograph<THostLanguage>>(verb, matches);
+    let code = freddie_cli::run_lifecycle_verb::<Isograph<TProfile>>(verb, matches);
     match freddie_single_instance::holder_at(instance.lock_file()) {
         Ok(freddie_single_instance::Held::By(_)) | Ok(freddie_single_instance::Held::Unnamed) => {}
         Ok(freddie_single_instance::Held::Free) | Err(_) => return ExitCode::FAILURE,

@@ -3,7 +3,7 @@ use std::process::ExitCode;
 
 use clap::{CommandFactory, FromArgMatches, Parser};
 use freddie_cli::{App, Instance};
-use isograph_compiler::HostLanguage;
+use isograph_compiler::CompilationProfile;
 use prelude::Postfix;
 
 mod adapter;
@@ -20,32 +20,33 @@ mod lsp_stdio;
 mod send;
 mod start;
 mod state;
+#[cfg(test)]
+mod test_profile;
 mod timer;
 mod watch;
 
-pub fn run<THostLanguage: HostLanguage>() -> ExitCode {
+pub fn run<TProfile: CompilationProfile>() -> ExitCode {
     // First, so `--help` prints and a bad flag exits before the lock is taken.
     // The matches are kept beside the parse because `run_lifecycle_verb` reads what was written
     // from them, to forward to the daemon it spawns.
-    let matches = Cli::<THostLanguage>::command().get_matches();
-    let cli = Cli::<THostLanguage>::from_arg_matches(matches.reference())
+    let matches = Cli::<TProfile>::command().get_matches();
+    let cli = Cli::<TProfile>::from_arg_matches(matches.reference())
         .expect("the derived type matches the command it derived");
 
     match cli.verb {
         Some(CliVerb::Lifecycle(verb)) => match verb {
             freddie_cli::Verb::Start(_) | freddie_cli::Verb::Restart(_) => {
-                crate::start::run::<THostLanguage>(verb, matches.reference())
+                crate::start::run::<TProfile>(verb, matches.reference())
             }
-            verb => freddie_cli::run_lifecycle_verb::<Isograph<THostLanguage>>(
-                verb,
-                matches.reference(),
-            ),
+            verb => {
+                freddie_cli::run_lifecycle_verb::<Isograph<TProfile>>(verb, matches.reference())
+            }
         },
         Some(CliVerb::Send(args)) => send::run(args.reference()),
         Some(CliVerb::ConfigPath(id)) => config_path::run(id.reference()),
         Some(CliVerb::Lsp(args)) => lsp_stdio::run(args.reference()),
-        None => crate::start::run::<THostLanguage>(
-            freddie_cli::verb_for_bare_invocation::<Isograph<THostLanguage>>(),
+        None => crate::start::run::<TProfile>(
+            freddie_cli::verb_for_bare_invocation::<Isograph<TProfile>>(),
             matches.reference(),
         ),
     }
@@ -53,16 +54,16 @@ pub fn run<THostLanguage: HostLanguage>() -> ExitCode {
 
 #[derive(Parser)]
 #[command(name = "isograph", version, about = "The isograph compiler.", long_about = None)]
-struct Cli<THostLanguage: HostLanguage> {
+struct Cli<TProfile: CompilationProfile> {
     #[command(subcommand)]
-    verb: Option<CliVerb<THostLanguage>>,
+    verb: Option<CliVerb<TProfile>>,
 }
 
 #[derive(clap::Subcommand)]
-enum CliVerb<THostLanguage: HostLanguage> {
+enum CliVerb<TProfile: CompilationProfile> {
     /// start, restart, status, logs, stop, and the hidden daemon.
     #[command(flatten)]
-    Lifecycle(freddie_cli::Verb<Isograph<THostLanguage>>),
+    Lifecycle(freddie_cli::Verb<Isograph<TProfile>>),
 
     /// Encode one IsographEvent as an LSP notification to the running daemon. Not for typing: tests and CI.
     #[command(hide = true)]
@@ -116,9 +117,9 @@ struct IsographArgs {
     pub filesystem: Filesystem,
 }
 
-struct Isograph<THostLanguage>(PhantomData<THostLanguage>);
+struct Isograph<TProfile>(PhantomData<TProfile>);
 
-impl<THostLanguage: HostLanguage> App for Isograph<THostLanguage> {
+impl<TProfile: CompilationProfile> App for Isograph<TProfile> {
     type Id = ConfigFlag;
     type DaemonArgs = IsographArgs;
 
@@ -149,7 +150,7 @@ impl<THostLanguage: HostLanguage> App for Isograph<THostLanguage> {
                 return;
             }
         };
-        crate::daemon::run::<THostLanguage>(path, port_path, args.filesystem, config);
+        crate::daemon::run::<TProfile>(path, port_path, args.filesystem, config);
     }
 
     #[cfg(windows)]

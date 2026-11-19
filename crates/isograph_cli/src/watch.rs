@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use globset::Glob;
-use isograph_compiler::{HostLanguage, SkipSourceFile};
+use isograph_compiler::{CompilationProfile, HostLanguage, SkipSourceFile};
 use isograph_config::ISOGRAPH_FOLDER;
 use notify::event::{CreateKind, ModifyKind, RemoveKind, RenameMode};
 use notify::{EventKind, RecommendedWatcher, RecursiveMode};
@@ -57,7 +57,7 @@ pub struct Watcher {
     _debouncer: Debouncer<RecommendedWatcher, RecommendedCache>,
 }
 
-pub fn start_if_watching<THostLanguage: HostLanguage>(
+pub fn start_if_watching<TProfile: CompilationProfile>(
     filesystem: Filesystem,
     watch_tx: UnboundedSender<Vec<SourceFileEvent>>,
     config_path: &Path,
@@ -65,13 +65,13 @@ pub fn start_if_watching<THostLanguage: HostLanguage>(
 ) -> Result<Option<Watcher>, WatchError> {
     match filesystem {
         Filesystem::Injected => None.wrap_ok(),
-        Filesystem::Watch => start::<THostLanguage>(watch_tx, config_path, source_files)
+        Filesystem::Watch => start::<TProfile>(watch_tx, config_path, source_files)
             .map(|watcher| watcher.wrap_some()),
     }
 }
 
 #[expect(clippy::extra_unused_type_parameters)]
-pub fn start<THostLanguage: HostLanguage>(
+pub fn start<TProfile: CompilationProfile>(
     watch_tx: UnboundedSender<Vec<SourceFileEvent>>,
     config_path: &Path,
     source_files: &[String],
@@ -143,7 +143,7 @@ pub fn start<THostLanguage: HostLanguage>(
     .wrap_ok()
 }
 
-pub fn apply<THostLanguage: HostLanguage>(
+pub fn apply<TProfile: CompilationProfile>(
     event_tx: &UnboundedSender<IsographEvent>,
     config_directory: &Path,
     events: Vec<SourceFileEvent>,
@@ -161,7 +161,7 @@ pub fn apply<THostLanguage: HostLanguage>(
             ChangedFileKind::Config => {}
             ChangedFileKind::SourceFile => match kind {
                 SourceEventKind::CreateOrModify(path) => {
-                    post_file::<THostLanguage>(
+                    post_file::<TProfile>(
                         event_tx,
                         config_directory,
                         globs.reference(),
@@ -170,7 +170,7 @@ pub fn apply<THostLanguage: HostLanguage>(
                 }
                 SourceEventKind::Rename((from, to)) => {
                     post_file_absent(event_tx, from.reference());
-                    post_file::<THostLanguage>(
+                    post_file::<TProfile>(
                         event_tx,
                         config_directory,
                         globs.reference(),
@@ -183,7 +183,7 @@ pub fn apply<THostLanguage: HostLanguage>(
             },
             ChangedFileKind::SourceFolder => match kind {
                 SourceEventKind::CreateOrModify(folder) => {
-                    scan_folder::<THostLanguage>(
+                    scan_folder::<TProfile>(
                         event_tx,
                         config_directory,
                         globs.reference(),
@@ -192,7 +192,7 @@ pub fn apply<THostLanguage: HostLanguage>(
                 }
                 SourceEventKind::Rename((from, to)) => {
                     post_folder_removed(event_tx, from.reference());
-                    scan_folder::<THostLanguage>(
+                    scan_folder::<TProfile>(
                         event_tx,
                         config_directory,
                         globs.reference(),
@@ -495,7 +495,7 @@ fn visit_dirs_skipping_isograph_from(
     }
 }
 
-fn scan_folder<THostLanguage: HostLanguage>(
+fn scan_folder<TProfile: CompilationProfile>(
     event_tx: &UnboundedSender<IsographEvent>,
     config_directory: &Path,
     globs: &SourceGlobs,
@@ -506,11 +506,11 @@ fn scan_folder<THostLanguage: HostLanguage>(
         paths.push(entry.path());
     });
     for path in paths {
-        post_file::<THostLanguage>(event_tx, config_directory, globs, path.reference());
+        post_file::<TProfile>(event_tx, config_directory, globs, path.reference());
     }
 }
 
-fn post_file<THostLanguage: HostLanguage>(
+fn post_file<TProfile: CompilationProfile>(
     event_tx: &UnboundedSender<IsographEvent>,
     config_directory: &Path,
     globs: &SourceGlobs,
@@ -549,7 +549,7 @@ fn post_file<THostLanguage: HostLanguage>(
     if !globs.contains(relative.reference()) {
         return;
     }
-    match THostLanguage::should_skip_source_file(relative.reference()) {
+    match TProfile::HostLanguage::should_skip_source_file(relative.reference()) {
         SkipSourceFile::Skip => return,
         SkipSourceFile::Keep => {}
     }
@@ -622,7 +622,9 @@ mod tests {
     use std::time::{Duration, Instant};
 
     use intern::string_key::Intern;
-    use isograph_compiler::{HostLanguage, IsoLiteralExtraction, IsographDb, SkipSourceFile};
+    use isograph_compiler::{
+        CompilationProfile, HostLanguage, IsoLiteralExtraction, IsographDb, SkipSourceFile,
+    };
     use isograph_config::ISOGRAPH_FOLDER;
     use prelude::Postfix;
     use thiserror::Error;
@@ -634,6 +636,7 @@ mod tests {
     };
     use crate::event::{IsographEvent, LiveSessions};
     use crate::state::{IsographState, handle, intern_config_directory};
+    use crate::test_profile::TestNetworkProtocol;
 
     #[derive(Clone, Debug, PartialEq, Eq, Error)]
     #[error("in host")]
@@ -657,11 +660,18 @@ mod tests {
         }
     }
 
+    struct InHostProfile;
+
+    impl CompilationProfile for InHostProfile {
+        type HostLanguage = InHost;
+        type NetworkProtocol = TestNetworkProtocol;
+    }
+
     fn interned(s: &str) -> common_lang_types::RelativePathToSourceFile {
         s.intern().to()
     }
 
-    fn contents(state: &IsographState<InHost>, path: &str) -> Option<String> {
+    fn contents(state: &IsographState<InHostProfile>, path: &str) -> Option<String> {
         isograph_compiler::file_contents(
             state.db.reference(),
             isograph_compiler::ClientId(1),
@@ -674,7 +684,7 @@ mod tests {
         _dir: tempfile::TempDir,
         config_path: PathBuf,
         config_directory: PathBuf,
-        state: IsographState<InHost>,
+        state: IsographState<InHostProfile>,
         event_tx: tokio::sync::mpsc::UnboundedSender<IsographEvent>,
         event_rx: tokio::sync::mpsc::UnboundedReceiver<IsographEvent>,
         source_files: Vec<String>,
@@ -686,7 +696,7 @@ mod tests {
             let config_path = dir.path().join("isograph.config.json");
             std::fs::write(config_path.reference(), "{}\n").expect("a test can write a config");
             let config_path = config_path.canonicalize().expect("the config exists");
-            let mut db = IsographDb::<InHost>::default();
+            let mut db = IsographDb::<InHostProfile>::default();
             intern_config_directory(&mut db, config_path.reference());
             let config_directory = config_path
                 .parent()
@@ -729,7 +739,7 @@ mod tests {
         }
 
         fn ingest(&mut self, events: Vec<super::SourceFileEvent>) {
-            apply::<InHost>(
+            apply::<InHostProfile>(
                 self.event_tx.reference(),
                 self.config_directory.reference(),
                 events,
@@ -928,7 +938,7 @@ mod tests {
         let h = Harness::new(&[]);
         h.write("src/a.in", "a");
         let (watch_tx, mut watch_rx) = unbounded_channel();
-        let _watcher = start::<InHost>(
+        let _watcher = start::<InHostProfile>(
             watch_tx,
             h.config_path.reference(),
             h.source_files.as_slice(),
@@ -1017,7 +1027,7 @@ mod tests {
         let mut h = Harness::new(&["src/**/*.in"]);
         h.write("src/a.in", "a");
         let (watch_tx, mut watch_rx) = unbounded_channel();
-        let _watcher = start::<InHost>(
+        let _watcher = start::<InHostProfile>(
             watch_tx,
             h.config_path.reference(),
             h.source_files.as_slice(),
@@ -1036,7 +1046,7 @@ mod tests {
         let mut h = Harness::new(&["src/**/*.in"]);
         std::fs::create_dir_all(h.abs("src")).expect("a test can create src");
         let (watch_tx, mut watch_rx) = unbounded_channel();
-        let _watcher = start::<InHost>(
+        let _watcher = start::<InHostProfile>(
             watch_tx,
             h.config_path.reference(),
             h.source_files.as_slice(),

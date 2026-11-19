@@ -6,23 +6,23 @@ use pico::{Database, SourceId, Storage};
 use pico_macros::{Db, Source, memo};
 use prelude::Postfix;
 
-use crate::HostLanguage;
+use crate::CompilationProfile;
 
 /// A reader of file text.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct ClientId(pub u64);
 
 #[derive(Debug, Db)]
-pub struct IsographDb<THostLanguage: HostLanguage> {
+pub struct IsographDb<TProfile: CompilationProfile> {
     storage: Storage<Self>,
     #[tracked]
     disk_file_map: DiskFileMap,
     #[tracked]
     open_file_map: OpenFileMap,
-    phantom_data: PhantomData<THostLanguage>,
+    phantom_data: PhantomData<TProfile>,
 }
 
-impl<THostLanguage: HostLanguage> Default for IsographDb<THostLanguage> {
+impl<TProfile: CompilationProfile> Default for IsographDb<TProfile> {
     fn default() -> Self {
         Self {
             storage: Storage::default(),
@@ -63,8 +63,8 @@ pub struct OpenFile {
 
 /// The text of `path` as `client` reads it: that client's open buffer, otherwise disk.
 #[memo]
-pub fn file_contents<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub fn file_contents<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     client: ClientId,
     path: RelativePathToSourceFile,
 ) -> Option<String> {
@@ -78,7 +78,7 @@ pub fn file_contents<THostLanguage: HostLanguage>(
     }
 }
 
-impl<THostLanguage: HostLanguage> IsographDb<THostLanguage> {
+impl<TProfile: CompilationProfile> IsographDb<TProfile> {
     fn open_file_source_id(&self, key: OpenFileKey) -> Option<SourceId<OpenFile>> {
         match self.get_open_file_map().untracked().0.get(&key).copied() {
             Some(open_file_id) => open_file_id.wrap_some(),
@@ -185,7 +185,9 @@ mod tests {
     use std::path::Path;
 
     use super::{ClientId, IsographDb, file_contents};
-    use crate::host_language::{HostLanguage, IsoLiteralExtraction, SkipSourceFile};
+    use crate::host_language::{
+        CompilationProfile, HostLanguage, IsoLiteralExtraction, NetworkProtocol, SkipSourceFile,
+    };
 
     #[derive(Clone, Debug, PartialEq, Eq, Error)]
     #[error("test host")]
@@ -206,13 +208,24 @@ mod tests {
         }
     }
 
+    struct TestNetworkProtocol;
+
+    impl NetworkProtocol for TestNetworkProtocol {}
+
+    struct TestProfile;
+
+    impl CompilationProfile for TestProfile {
+        type HostLanguage = TestHostLanguage;
+        type NetworkProtocol = TestNetworkProtocol;
+    }
+
     fn intern_path(s: &str) -> RelativePathToSourceFile {
         s.intern().to()
     }
 
     #[test]
     fn present_inserts_a_disk_file() {
-        let mut state = IsographDb::<TestHostLanguage>::default();
+        let mut state = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         state.insert_disk_file(path, "export const a = 1;\n".to_owned());
         assert_eq!(
@@ -223,7 +236,7 @@ mod tests {
 
     #[test]
     fn a_second_present_replaces_contents() {
-        let mut state = IsographDb::<TestHostLanguage>::default();
+        let mut state = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         state.insert_disk_file(path, "first".to_owned());
         state.insert_disk_file(path, "second".to_owned());
@@ -236,7 +249,7 @@ mod tests {
 
     #[test]
     fn an_empty_string_is_stored() {
-        let mut state = IsographDb::<TestHostLanguage>::default();
+        let mut state = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         state.insert_disk_file(path, String::new());
         assert_eq!(
@@ -247,7 +260,7 @@ mod tests {
 
     #[test]
     fn two_paths_are_two_entries() {
-        let mut state = IsographDb::<TestHostLanguage>::default();
+        let mut state = IsographDb::<TestProfile>::default();
         let a = intern_path("src/a.ts");
         let b = intern_path("src/b.ts");
         state.insert_disk_file(a, "a".to_owned());
@@ -265,7 +278,7 @@ mod tests {
 
     #[test]
     fn absent_removes_a_disk_file() {
-        let mut state = IsographDb::<TestHostLanguage>::default();
+        let mut state = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         state.insert_disk_file(path, "export const a = 1;\n".to_owned());
         state.remove_disk_file(path);
@@ -274,7 +287,7 @@ mod tests {
 
     #[test]
     fn absent_of_a_never_present_path_is_a_noop() {
-        let mut state = IsographDb::<TestHostLanguage>::default();
+        let mut state = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         state.remove_disk_file(path);
         assert!(read(state.reference(), ClientId(1), path).is_none());
@@ -283,7 +296,7 @@ mod tests {
 
     #[test]
     fn absent_then_present_on_different_paths_is_a_move() {
-        let mut state = IsographDb::<TestHostLanguage>::default();
+        let mut state = IsographDb::<TestProfile>::default();
         let from = intern_path("src/a.ts");
         let to = intern_path("src/b.ts");
         state.insert_disk_file(from, "export const a = 1;\n".to_owned());
@@ -298,7 +311,7 @@ mod tests {
 
     #[test]
     fn an_empty_relative_path_is_a_map_key() {
-        let mut state = IsographDb::<TestHostLanguage>::default();
+        let mut state = IsographDb::<TestProfile>::default();
         let path = intern_path("");
         state.insert_disk_file(path, "empty".to_owned());
         assert_eq!(
@@ -311,7 +324,7 @@ mod tests {
 
     #[test]
     fn unnormalized_relative_paths_are_two_entries() {
-        let mut state = IsographDb::<TestHostLanguage>::default();
+        let mut state = IsographDb::<TestProfile>::default();
         let a = intern_path("src/a.ts");
         let b = intern_path("src/./a.ts");
         state.insert_disk_file(a, "a".to_owned());
@@ -329,7 +342,7 @@ mod tests {
 
     #[test]
     fn remove_disk_files_from_path_removes_descendants_not_a_sibling_prefix() {
-        let mut state = IsographDb::<TestHostLanguage>::default();
+        let mut state = IsographDb::<TestProfile>::default();
         let a = intern_path("src/a.ts");
         let b = intern_path("src/b.ts");
         let c = intern_path("src2/c.ts");
@@ -347,7 +360,7 @@ mod tests {
 
     #[test]
     fn remove_disk_files_from_path_does_not_treat_a_filename_prefix_as_a_directory() {
-        let mut state = IsographDb::<TestHostLanguage>::default();
+        let mut state = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         state.insert_disk_file(path, "a".to_owned());
         state.remove_disk_files_from_path(intern_path("src/a.ts.bak"));
@@ -359,7 +372,7 @@ mod tests {
 
     #[test]
     fn remove_disk_files_from_path_of_the_empty_relative_path_removes_every_file() {
-        let mut state = IsographDb::<TestHostLanguage>::default();
+        let mut state = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         state.insert_disk_file(path, "a".to_owned());
         state.remove_disk_files_from_path(intern_path(""));
@@ -367,7 +380,7 @@ mod tests {
     }
 
     fn read(
-        db: &IsographDb<TestHostLanguage>,
+        db: &IsographDb<TestProfile>,
         client: ClientId,
         path: RelativePathToSourceFile,
     ) -> Option<String> {
@@ -376,7 +389,7 @@ mod tests {
 
     #[test]
     fn file_contents_with_no_disk_file_and_no_buffer_is_none() {
-        let db = IsographDb::<TestHostLanguage>::default();
+        let db = IsographDb::<TestProfile>::default();
         assert_eq!(
             read(db.reference(), ClientId(1), intern_path("src/a.ts")),
             None
@@ -385,7 +398,7 @@ mod tests {
 
     #[test]
     fn file_contents_falls_back_to_disk() {
-        let mut db = IsographDb::<TestHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         db.insert_disk_file(path, "disk".to_owned());
         assert_eq!(
@@ -396,7 +409,7 @@ mod tests {
 
     #[test]
     fn an_open_buffer_wins_over_disk_for_its_client_only() {
-        let mut db = IsographDb::<TestHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         db.insert_disk_file(path, "disk".to_owned());
         db.set_open_file(ClientId(1), path, "open".to_owned());
@@ -412,7 +425,7 @@ mod tests {
 
     #[test]
     fn an_open_buffer_without_a_disk_file_is_read_by_its_client_only() {
-        let mut db = IsographDb::<TestHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         db.set_open_file(ClientId(1), path, "open".to_owned());
         assert_eq!(
@@ -424,7 +437,7 @@ mod tests {
 
     #[test]
     fn a_second_set_open_file_of_the_same_key_replaces_the_text() {
-        let mut db = IsographDb::<TestHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         db.set_open_file(ClientId(1), path, "first".to_owned());
         assert_eq!(
@@ -440,7 +453,7 @@ mod tests {
 
     #[test]
     fn two_clients_with_one_path_open_each_read_their_own() {
-        let mut db = IsographDb::<TestHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         db.insert_disk_file(path, "disk".to_owned());
         db.set_open_file(ClientId(1), path, "one".to_owned());
@@ -457,7 +470,7 @@ mod tests {
 
     #[test]
     fn an_empty_buffer_is_read_and_not_disk() {
-        let mut db = IsographDb::<TestHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         db.insert_disk_file(path, "disk".to_owned());
         db.set_open_file(ClientId(1), path, String::new());
@@ -469,7 +482,7 @@ mod tests {
 
     #[test]
     fn a_disk_change_while_open_does_not_change_the_buffer_read() {
-        let mut db = IsographDb::<TestHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         db.insert_disk_file(path, "disk".to_owned());
         db.set_open_file(ClientId(1), path, "open".to_owned());
@@ -490,7 +503,7 @@ mod tests {
 
     #[test]
     fn remove_open_file_falls_back_to_the_current_disk_text() {
-        let mut db = IsographDb::<TestHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         db.insert_disk_file(path, "disk".to_owned());
         db.set_open_file(ClientId(1), path, "open".to_owned());
@@ -508,7 +521,7 @@ mod tests {
 
     #[test]
     fn remove_open_file_of_a_key_never_opened_leaves_every_read_unchanged() {
-        let mut db = IsographDb::<TestHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         let other = intern_path("src/b.ts");
         db.insert_disk_file(path, "disk".to_owned());
@@ -528,7 +541,7 @@ mod tests {
 
     #[test]
     fn remove_open_files_of_client_leaves_another_clients_buffers() {
-        let mut db = IsographDb::<TestHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let a = intern_path("src/a.ts");
         let b = intern_path("src/b.ts");
         db.insert_disk_file(a, "disk a".to_owned());
@@ -561,7 +574,7 @@ mod tests {
 
     #[test]
     fn remove_open_files_of_a_client_with_nothing_open_leaves_every_read_unchanged() {
-        let mut db = IsographDb::<TestHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         db.insert_disk_file(path, "disk".to_owned());
         db.set_open_file(ClientId(2), path, "two".to_owned());
@@ -579,7 +592,7 @@ mod tests {
 
     #[test]
     fn remove_disk_file_of_a_path_open_in_one_client() {
-        let mut db = IsographDb::<TestHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         db.insert_disk_file(path, "disk".to_owned());
         db.set_open_file(ClientId(1), path, "open".to_owned());
@@ -597,7 +610,7 @@ mod tests {
 
     #[test]
     fn missing_then_present_on_disk_is_read() {
-        let mut db = IsographDb::<TestHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         // pico records no dependency on a never-written tracked counter; see refactors/pending/pico-missing-key-dependency.md.
         db.insert_disk_file(intern_path("src/other.ts"), "other".to_owned());
@@ -611,7 +624,7 @@ mod tests {
 
     #[test]
     fn read_disk_then_open_then_close_then_remove_disk() {
-        let mut db = IsographDb::<TestHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         // pico records no dependency on a never-written tracked counter; see refactors/pending/pico-missing-key-dependency.md.
         db.set_open_file(ClientId(2), intern_path("src/other.ts"), "other".to_owned());
@@ -641,7 +654,7 @@ mod tests {
 
     #[test]
     fn another_clients_open_does_not_change_a_disk_read() {
-        let mut db = IsographDb::<TestHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         db.insert_disk_file(path, "disk".to_owned());
         assert_eq!(
@@ -657,7 +670,7 @@ mod tests {
 
     #[test]
     fn read_before_first_open_file_write_misses_the_later_open() {
-        let mut db = IsographDb::<TestHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let path = intern_path("src/a.ts");
         db.insert_disk_file(path, "disk".to_owned());
         assert_eq!(
@@ -674,7 +687,7 @@ mod tests {
 
     #[test]
     fn open_paths_of_client_of_an_empty_database_is_empty() {
-        let db = IsographDb::<TestHostLanguage>::default();
+        let db = IsographDb::<TestProfile>::default();
         assert_eq!(
             db.open_paths_of_client(ClientId(1)),
             Vec::<RelativePathToSourceFile>::new()
@@ -683,7 +696,7 @@ mod tests {
 
     #[test]
     fn open_paths_of_client_excludes_disk_only_paths() {
-        let mut db = IsographDb::<TestHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         db.insert_disk_file(intern_path("src/a.ts"), "disk".to_owned());
         assert_eq!(
             db.open_paths_of_client(ClientId(1)),
@@ -693,7 +706,7 @@ mod tests {
 
     #[test]
     fn open_paths_of_client_returns_that_clients_open_path() {
-        let mut db = IsographDb::<TestHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let a = intern_path("src/a.ts");
         db.set_open_file(ClientId(1), a, "one".to_owned());
         assert_eq!(db.open_paths_of_client(ClientId(1)), a.wrap_vec());
@@ -701,7 +714,7 @@ mod tests {
 
     #[test]
     fn open_paths_of_client_lists_a_path_on_disk_and_open_once() {
-        let mut db = IsographDb::<TestHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let a = intern_path("src/a.ts");
         db.insert_disk_file(a, "disk".to_owned());
         db.set_open_file(ClientId(1), a, "one".to_owned());
@@ -710,7 +723,7 @@ mod tests {
 
     #[test]
     fn open_paths_of_client_excludes_another_clients_open_path() {
-        let mut db = IsographDb::<TestHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let a = intern_path("src/a.ts");
         let b = intern_path("src/b.ts");
         db.set_open_file(ClientId(1), a, "one".to_owned());
@@ -721,7 +734,7 @@ mod tests {
 
     #[test]
     fn open_paths_of_client_drops_a_removed_open_file() {
-        let mut db = IsographDb::<TestHostLanguage>::default();
+        let mut db = IsographDb::<TestProfile>::default();
         let a = intern_path("src/a.ts");
         db.set_open_file(ClientId(1), a, "one".to_owned());
         db.remove_open_file(ClientId(1), a);

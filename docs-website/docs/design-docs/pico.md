@@ -21,19 +21,19 @@ The building blocks are `Database`, `Source`, `Memo`, and `Key`.
 
 ```rust
 #[derive(Debug, Db)]
-struct IsographDb<THostLanguage: HostLanguage> {
+struct IsographDb<TProfile: CompilationProfile> {
     storage: Storage<Self>,
     #[tracked]
     disk_file_map: DiskFileMap,
     #[tracked]
     open_file_map: OpenFileMap,
-    phantom_data: PhantomData<THostLanguage>,
+    phantom_data: PhantomData<TProfile>,
 }
 ```
 
 `IsographDb` is the database. `handle` writes sources into it. Memos read from it. Tests construct the same type, intern a `RelativePathToSourceFile`, `insert_disk_file`, and call memos. `handle` converts an event `PathBuf` first, then the same insert.
 
-Memos take `&IsographDb<THostLanguage>`. `set` and `remove` take `&mut` and panic if a memo is on the stack. Derived data is a return value. A `&mut Entity` that you write selectables into cannot sit behind a memo. isograph had to delete `server_object_entity_mut` before those reads could be memos.
+Memos take `&IsographDb<TProfile>`. `set` and `remove` take `&mut` and panic if a memo is on the stack. Derived data is a return value. A `&mut Entity` that you write selectables into cannot sit behind a memo. isograph had to delete `server_object_entity_mut` before those reads could be memos.
 
 ## Source
 
@@ -89,19 +89,19 @@ A singleton has no key field. There is at most one. `CompilerConfig` and `Curren
 
 ```rust
 #[memo]
-pub fn extract_iso_literals<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub fn extract_iso_literals<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     client: ClientId,
     path: RelativePathToSourceFile,
-) -> Option<Vec<IsoLiteralExtraction<THostLanguage>>> {
+) -> Option<Vec<IsoLiteralExtraction<TProfile::HostLanguage>>> {
     let contents = file_contents(db, client, path).as_ref()?;
-    THostLanguage::extract_iso_literals_from_text(contents).wrap_some()
+    TProfile::HostLanguage::extract_iso_literals_from_text(contents).wrap_some()
 }
 ```
 
-pico rewrites the return to `&T`. First argument is `&Database`. There is no `&self`. `HostLanguage::extract_iso_literals_from_text(contents: &str)` is a plain associated function, not a memo; the memo is generic over the host.
+pico rewrites the return to `&T`. First argument is `&Database`. There is no `&self`. `HostLanguage::extract_iso_literals_from_text(contents: &str)` is a plain associated function, not a memo; the memo is generic over the profile and calls the profile's host language.
 
-The first argument is `&Database`. The rest are the key, at most eight of them. pico hashes the function identity (the signature text at expansion) plus those arguments. That tuple (`DerivedNodeDescriptor`) identifies the memo's derived node. A type parameter is not an argument. `IsographDb<THostLanguage>` is a different database type per host, same as isograph `IsographDatabase<TCompilationProfile>`.
+The first argument is `&Database`. The rest are the key, at most eight of them. pico hashes the function identity (the signature text at expansion) plus those arguments. That tuple (`DerivedNodeDescriptor`) identifies the memo's derived node. A type parameter is not an argument. `IsographDb<TProfile>` is a different database type per profile, same as isograph `IsographDatabase<TCompilationProfile>`.
 
 The body must be a pure function of `db` reads and the arguments. No filesystem, no clock, no LSP. Reading the world is `handle` interning a source.
 
@@ -157,7 +157,7 @@ File text is a source. Extracting the literals in a file is a memo. The `Literal
 ```text
 extract_iso_literals(client, path)
   -> file_contents(client, path)
-  + THostLanguage::extract_iso_literals_from_text(&str)
+  + TProfile::HostLanguage::extract_iso_literals_from_text(&str)
 
 iso_literal_at_lsp_position(client, path, Position)
   -> byte_offset_at_lsp_position(client, path, Position)
@@ -231,8 +231,8 @@ impl HostLanguage for TypeScriptHostLanguage {
     }
 }
 
-fn iso_literal_at_lsp_position<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+fn iso_literal_at_lsp_position<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     client: ClientId,
     path: RelativePathToSourceFile,
     position: lsp_types::Position,
@@ -262,10 +262,10 @@ fn iso_literal_at_lsp_position<THostLanguage: HostLanguage>(
 }
 
 #[memo]
-fn iso_literal_extraction<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+fn iso_literal_extraction<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     literal_id: LiteralId,
-) -> Option<IsoLiteralExtraction<THostLanguage>> {
+) -> Option<IsoLiteralExtraction<TProfile::HostLanguage>> {
     let extractions = extract_iso_literals(db, literal_id.client, literal_id.path).as_ref()?;
     extractions.get(literal_id.index).cloned()
 }
@@ -364,8 +364,8 @@ hover_for_position(db, client, path, position)
 
 ```rust
 // from crates/isograph_lsp/src/hover.rs
-pub fn hover_for_position<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub fn hover_for_position<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     client: ClientId,
     path: RelativePathToSourceFile,
     position: lsp_types::Position,
@@ -382,15 +382,15 @@ pub fn hover_for_position<THostLanguage: HostLanguage>(
 }
 ```
 
-A body that calls `file_contents`, then `THostLanguage::extract_iso_literals_from_text`, then `parse_iso_literal`, then resolves, makes four steps in one function. Split it along the chain above.
+A body that calls `file_contents`, then `TProfile::HostLanguage::extract_iso_literals_from_text`, then `parse_iso_literal`, then resolves, makes four steps in one function. Split it along the chain above.
 
 ### File text is read only through `file_contents`
 
 ```rust
 // from crates/isograph_compiler/src/database.rs
 #[memo]
-pub fn file_contents<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub fn file_contents<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     client: ClientId,
     path: RelativePathToSourceFile,
 ) -> Option<String>
@@ -410,8 +410,8 @@ handler: fn(&TState, ClientId, TRequest::Params) -> LSPRuntimeResult<TRequest::R
 handler: fn(&mut TState, ClientId, TNotification::Params) -> Vec<IsographEffect>
 
 // from crates/isograph_cli/src/adapter.rs
-pub(crate) fn semantic_tokens_response<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub(crate) fn semantic_tokens_response<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     client: ClientId,
     params: lsp_types::SemanticTokensParams,
 ) -> LSPRuntimeResult<...>
@@ -426,8 +426,8 @@ A handler's output never contains a `ClientId`. `TRequest::Result` is the LSP re
 ```rust
 // from crates/isograph_compiler/src/iso_literals.rs
 #[memo]
-pub fn parsed_iso_literal<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub fn parsed_iso_literal<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     iso_literal_text: String,
 ) -> ParsedIsoLiteral {
     parse_iso_literal(iso_literal_text.as_str())
@@ -487,8 +487,8 @@ A missing key is an absent state, and readers depend on that absence. A read doe
 
 ```rust
 // from crates/isograph_cli/src/state.rs
-pub struct IsographState<THostLanguage: HostLanguage> {
-    pub db: IsographDb<THostLanguage>,
+pub struct IsographState<TProfile: CompilationProfile> {
+    pub db: IsographDb<TProfile>,
     pub live_sessions: LiveSessions,
     pub(crate) hello_world_debounce: Option<freddie_timer::TimerGuard>,
 }

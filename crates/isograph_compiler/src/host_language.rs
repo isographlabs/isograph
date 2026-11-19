@@ -69,6 +69,15 @@ pub trait HostLanguage: Send + Sync + Sized + 'static {
     fn should_skip_source_file(relative_path: &Path) -> SkipSourceFile;
 }
 
+/// One choice of host language and network protocol. A binary names one.
+pub trait CompilationProfile: 'static {
+    type HostLanguage: HostLanguage;
+    type NetworkProtocol: NetworkProtocol;
+}
+
+/// The way the compiler communicates with the upstream.
+pub trait NetworkProtocol: 'static {}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WithErrors<T, E> {
     pub item: T,

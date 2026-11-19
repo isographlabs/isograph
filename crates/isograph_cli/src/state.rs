@@ -6,7 +6,7 @@ use common_lang_types::{
     relative_path_from_absolute_and_working_directory,
 };
 use intern::string_key::Intern;
-use isograph_compiler::{ClientId, HostLanguage};
+use isograph_compiler::{ClientId, CompilationProfile};
 use pico::Database;
 use prelude::Postfix;
 
@@ -18,15 +18,15 @@ use crate::timer::TimerPayload;
 
 pub use isograph_compiler::IsographDb;
 
-pub struct IsographState<THostLanguage: HostLanguage> {
-    pub db: IsographDb<THostLanguage>,
+pub struct IsographState<TProfile: CompilationProfile> {
+    pub db: IsographDb<TProfile>,
     pub live_sessions: LiveSessions,
     pub(crate) source_globs: crate::watch::SourceGlobs,
     pub(crate) diagnostics_debounce: Option<freddie_timer::TimerGuard>,
 }
 
-pub fn handle<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
+pub fn handle<TProfile: CompilationProfile>(
+    state: &mut IsographState<TProfile>,
     event: IsographEvent,
 ) -> Vec<IsographEffect> {
     match event {
@@ -37,8 +37,8 @@ pub fn handle<THostLanguage: HostLanguage>(
     }
 }
 
-fn handle_client_connection<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
+fn handle_client_connection<TProfile: CompilationProfile>(
+    state: &mut IsographState<TProfile>,
     event: ClientConnectionEvent,
 ) -> Vec<IsographEffect> {
     match event {
@@ -57,8 +57,8 @@ fn handle_client_connection<THostLanguage: HostLanguage>(
     }
 }
 
-fn dispatch_lsp<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
+fn dispatch_lsp<TProfile: CompilationProfile>(
+    state: &mut IsographState<TProfile>,
     lsp: crate::event::LspEvent,
 ) -> Vec<IsographEffect> {
     match lsp {
@@ -88,8 +88,8 @@ fn dispatch_lsp<THostLanguage: HostLanguage>(
     }
 }
 
-fn dispatch_lsp_request<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
+fn dispatch_lsp_request<TProfile: CompilationProfile>(
+    state: &mut IsographState<TProfile>,
     incoming: crate::event::LspRequest,
     before: crate::event::BeforeCompute,
 ) -> Vec<IsographEffect> {
@@ -99,19 +99,19 @@ fn dispatch_lsp_request<THostLanguage: HostLanguage>(
     let get_response = || {
         let request = crate::lsp_request_dispatch::LSPRequestDispatch::new(incoming, &state.db)
             .on_request_sync::<lsp_types::request::SemanticTokensFullRequest>(
-                crate::adapter::semantic_tokens_response::<THostLanguage>,
+                crate::adapter::semantic_tokens_response::<TProfile>,
             )?
             .on_request_sync::<lsp_types::request::Formatting>(
-                crate::adapter::formatting_response::<THostLanguage>,
+                crate::adapter::formatting_response::<TProfile>,
             )?
             .on_request_sync::<lsp_types::request::WillSaveWaitUntil>(
-                crate::adapter::will_save_wait_until_response::<THostLanguage>,
+                crate::adapter::will_save_wait_until_response::<TProfile>,
             )?
             .on_request_sync::<lsp_types::request::HoverRequest>(
-                crate::adapter::hover_response::<THostLanguage>,
+                crate::adapter::hover_response::<TProfile>,
             )?
             .on_request_sync::<lsp_types::request::DocumentHighlightRequest>(
-                crate::adapter::document_highlight_response::<THostLanguage>,
+                crate::adapter::document_highlight_response::<TProfile>,
             )?
             .request();
         ControlFlow::Continue(request)
@@ -172,8 +172,8 @@ fn response_body(
     }
 }
 
-fn handle_internal_event<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
+fn handle_internal_event<TProfile: CompilationProfile>(
+    state: &mut IsographState<TProfile>,
     internal: InternalEvent,
 ) -> Vec<IsographEffect> {
     match internal {
@@ -183,8 +183,8 @@ fn handle_internal_event<THostLanguage: HostLanguage>(
     }
 }
 
-fn handle_timer_fired<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
+fn handle_timer_fired<TProfile: CompilationProfile>(
+    state: &mut IsographState<TProfile>,
     fired: freddie_timer::TimerFired<TimerPayload>,
 ) -> Vec<IsographEffect> {
     match fired.trigger_if_matching(state.diagnostics_debounce.as_ref()) {
@@ -196,23 +196,23 @@ fn handle_timer_fired<THostLanguage: HostLanguage>(
     }
 }
 
-fn dispatch_lsp_notification<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
+fn dispatch_lsp_notification<TProfile: CompilationProfile>(
+    state: &mut IsographState<TProfile>,
     notification: crate::event::LspNotification,
 ) -> Vec<IsographEffect> {
     let dispatch = || {
         crate::lsp_notification_dispatch::LSPNotificationDispatch::new(notification, state)
             .on_notification_sync::<crate::lsp_socket::IsographEventNotification>(
-                on_isograph_event_notification::<THostLanguage>,
+                on_isograph_event_notification::<TProfile>,
             )?
             .on_notification_sync::<lsp_types::notification::DidOpenTextDocument>(
-                crate::adapter::on_did_open::<THostLanguage>,
+                crate::adapter::on_did_open::<TProfile>,
             )?
             .on_notification_sync::<lsp_types::notification::DidChangeTextDocument>(
-                crate::adapter::on_did_change::<THostLanguage>,
+                crate::adapter::on_did_change::<TProfile>,
             )?
             .on_notification_sync::<lsp_types::notification::DidCloseTextDocument>(
-                crate::adapter::on_did_close::<THostLanguage>,
+                crate::adapter::on_did_close::<TProfile>,
             )?
             .notification();
         ControlFlow::Continue(())
@@ -223,8 +223,8 @@ fn dispatch_lsp_notification<THostLanguage: HostLanguage>(
     }
 }
 
-fn on_isograph_event_notification<THostLanguage: HostLanguage>(
-    state: &mut IsographState<THostLanguage>,
+fn on_isograph_event_notification<TProfile: CompilationProfile>(
+    state: &mut IsographState<TProfile>,
     _client: ClientId,
     internal: InternalEvent,
 ) -> Vec<IsographEffect> {
@@ -232,7 +232,7 @@ fn on_isograph_event_notification<THostLanguage: HostLanguage>(
 }
 
 pub(crate) fn intern_config_directory(
-    state: &mut IsographDb<impl HostLanguage>,
+    state: &mut IsographDb<impl CompilationProfile>,
     config_path: &Path,
 ) {
     let directory = config_path
@@ -254,7 +254,7 @@ struct DiskChangedPathError {
 }
 
 fn relative_path_to_source_file(
-    state: &IsographDb<impl HostLanguage>,
+    state: &IsographDb<impl CompilationProfile>,
     absolute: &Path,
 ) -> Result<RelativePathToSourceFile, DiskChangedPathError> {
     let cwd = *state
@@ -268,8 +268,8 @@ fn relative_path_to_source_file(
     })
 }
 
-fn handle_disk_changed<THostLanguage: HostLanguage>(
-    state: &mut IsographDb<THostLanguage>,
+fn handle_disk_changed<TProfile: CompilationProfile>(
+    state: &mut IsographDb<TProfile>,
     change: DiskChanged,
 ) -> Vec<IsographEffect> {
     apply_disk_changed(state, change)
@@ -277,8 +277,8 @@ fn handle_disk_changed<THostLanguage: HostLanguage>(
     no_effects()
 }
 
-fn apply_disk_changed<THostLanguage: HostLanguage>(
-    state: &mut IsographDb<THostLanguage>,
+fn apply_disk_changed<TProfile: CompilationProfile>(
+    state: &mut IsographDb<TProfile>,
     change: DiskChanged,
 ) -> Result<(), DiskChangedPathError> {
     match change {
@@ -306,7 +306,7 @@ mod tests {
     use lsp_types::request::Request;
     use prelude::Postfix;
 
-    use isograph_extract_typescript::TypeScriptHostLanguage;
+    use crate::test_profile::TestProfile;
 
     use super::{IsographDb, IsographState, handle, intern_config_directory};
     use crate::diagnostics::PublishedDiagnostics;
@@ -324,9 +324,9 @@ mod tests {
         s.intern().to()
     }
 
-    fn empty() -> IsographState<TypeScriptHostLanguage> {
+    fn empty() -> IsographState<TestProfile> {
         IsographState {
-            db: IsographDb::<TypeScriptHostLanguage>::default(),
+            db: IsographDb::<TestProfile>::default(),
             live_sessions: LiveSessions::default(),
             source_globs: crate::watch::SourceGlobs::parse(&["src/**".to_owned()])
                 .expect("the test glob is valid"),
@@ -334,14 +334,14 @@ mod tests {
         }
     }
 
-    fn with_config() -> IsographState<TypeScriptHostLanguage> {
+    fn with_config() -> IsographState<TestProfile> {
         let mut state = empty();
         intern_config_directory(&mut state.db, Path::new("/tmp/proj/isograph.config.json"));
         state
     }
 
     fn contents(
-        state: &IsographState<TypeScriptHostLanguage>,
+        state: &IsographState<TestProfile>,
         path: common_lang_types::RelativePathToSourceFile,
     ) -> Option<&str> {
         isograph_compiler::file_contents(state.db.reference(), ClientId(1), path).as_deref()
@@ -434,7 +434,7 @@ mod tests {
     }
 
     fn start_client(
-        state: &mut IsographState<TypeScriptHostLanguage>,
+        state: &mut IsographState<TestProfile>,
         client: ClientId,
         sender: crossbeam::channel::Sender<lsp_server::Message>,
     ) {
@@ -943,7 +943,7 @@ mod tests {
         )
     }
 
-    fn with_disk_x() -> IsographState<TypeScriptHostLanguage> {
+    fn with_disk_x() -> IsographState<TestProfile> {
         let mut state = with_config();
         state
             .db
@@ -951,16 +951,12 @@ mod tests {
         state
     }
 
-    fn started(state: &mut IsographState<TypeScriptHostLanguage>, client: ClientId) {
+    fn started(state: &mut IsographState<TestProfile>, client: ClientId) {
         let (tx, _rx) = crossbeam::channel::unbounded();
         start_client(state, client, tx);
     }
 
-    fn read(
-        state: &IsographState<TypeScriptHostLanguage>,
-        client: ClientId,
-        path: &str,
-    ) -> Option<String> {
+    fn read(state: &IsographState<TestProfile>, client: ClientId, path: &str) -> Option<String> {
         isograph_compiler::file_contents(state.db.reference(), client, interned(path)).clone()
     }
 
@@ -1148,7 +1144,7 @@ mod tests {
     const ENTRYPOINT_A: &str = "iso(`entrypoint Query.A`)";
     const KEYWORD: u32 = 15;
 
-    fn disk_changed(state: &mut IsographState<TypeScriptHostLanguage>, path: &str, text: &str) {
+    fn disk_changed(state: &mut IsographState<TestProfile>, path: &str, text: &str) {
         handle(
             state,
             InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
@@ -1164,17 +1160,14 @@ mod tests {
         rx: crossbeam::channel::Receiver<lsp_server::Message>,
     }
 
-    fn live_client(
-        state: &mut IsographState<TypeScriptHostLanguage>,
-        client: ClientId,
-    ) -> TestClient {
+    fn live_client(state: &mut IsographState<TestProfile>, client: ClientId) -> TestClient {
         let (tx, rx) = crossbeam::channel::unbounded();
         start_client(state, client, tx);
         TestClient { client, rx }
     }
 
     fn request_result(
-        state: &mut IsographState<TypeScriptHostLanguage>,
+        state: &mut IsographState<TestProfile>,
         client: &TestClient,
         method: &str,
         params: serde_json::Value,
@@ -1194,7 +1187,7 @@ mod tests {
     }
 
     fn formatting_edits(
-        state: &mut IsographState<TypeScriptHostLanguage>,
+        state: &mut IsographState<TestProfile>,
         client: &TestClient,
         uri: &str,
     ) -> Option<Vec<lsp_types::TextEdit>> {
@@ -1211,7 +1204,7 @@ mod tests {
     }
 
     fn will_save_edits(
-        state: &mut IsographState<TypeScriptHostLanguage>,
+        state: &mut IsographState<TestProfile>,
         client: &TestClient,
         uri: &str,
     ) -> Option<Vec<lsp_types::TextEdit>> {
@@ -1225,7 +1218,7 @@ mod tests {
     }
 
     fn semantic_tokens(
-        state: &mut IsographState<TypeScriptHostLanguage>,
+        state: &mut IsographState<TestProfile>,
         client: &TestClient,
         uri: &str,
     ) -> Option<Vec<lsp_types::SemanticToken>> {
@@ -1240,7 +1233,7 @@ mod tests {
             .map(|tokens| tokens.data)
     }
 
-    fn with_disk_home() -> IsographState<TypeScriptHostLanguage> {
+    fn with_disk_home() -> IsographState<TestProfile> {
         let mut state = with_config();
         disk_changed(&mut state, "/tmp/proj/src/Home.ts", HOME_DISK);
         state
@@ -1299,7 +1292,7 @@ mod tests {
     fn buffer_after_edits(
         buffer: &str,
         request: fn(
-            &mut IsographState<TypeScriptHostLanguage>,
+            &mut IsographState<TestProfile>,
             &TestClient,
             &str,
         ) -> Option<Vec<lsp_types::TextEdit>>,
@@ -1449,7 +1442,7 @@ mod tests {
 
     /// The Markdown text of the hover at `line:character`, or `None` for a `null` result.
     fn hover_text(
-        state: &mut IsographState<TypeScriptHostLanguage>,
+        state: &mut IsographState<TestProfile>,
         client: &TestClient,
         uri: &str,
         line: u32,
@@ -1750,7 +1743,7 @@ mod tests {
     }
 
     fn highlights(
-        state: &mut IsographState<TypeScriptHostLanguage>,
+        state: &mut IsographState<TestProfile>,
         client: &TestClient,
         uri: &str,
         line: u32,
@@ -1996,7 +1989,7 @@ mod tests {
         .to()
     }
 
-    fn start_a_client(state: &mut IsographState<TypeScriptHostLanguage>) -> ClientId {
+    fn start_a_client(state: &mut IsographState<TestProfile>) -> ClientId {
         let client = ClientId(1);
         let (tx, _rx) = crossbeam::channel::unbounded();
         start_client(state, client, tx);
@@ -2458,7 +2451,7 @@ mod tests {
     }
 
     fn start_with_capabilities(
-        state: &mut IsographState<TypeScriptHostLanguage>,
+        state: &mut IsographState<TestProfile>,
         client: ClientId,
         capabilities: lsp_types::ClientCapabilities,
     ) -> crossbeam::channel::Receiver<lsp_server::Message> {
@@ -2476,7 +2469,7 @@ mod tests {
     }
 
     fn diagnostics_client(
-        state: &mut IsographState<TypeScriptHostLanguage>,
+        state: &mut IsographState<TestProfile>,
         client: ClientId,
     ) -> crossbeam::channel::Receiver<lsp_server::Message> {
         start_with_capabilities(state, client, diagnostics_capabilities())
@@ -2492,7 +2485,7 @@ mod tests {
     }
 
     fn fire(
-        state: &mut IsographState<TypeScriptHostLanguage>,
+        state: &mut IsographState<TestProfile>,
         effects: Vec<IsographEffect>,
     ) -> Vec<IsographEffect> {
         handle(state, IsographEvent::Timer(only_timer(effects).event))

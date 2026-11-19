@@ -4,7 +4,7 @@ use pico_macros::memo;
 use prelude::Postfix;
 use span::{WithSpan, WithSpanPostfix};
 
-use crate::host_language::{HostLanguage, IsoLiteralExtraction};
+use crate::host_language::{CompilationProfile, HostLanguage, IsoLiteralExtraction};
 use crate::{ClientId, IsographDb, file_contents};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -15,29 +15,34 @@ pub struct LiteralId {
 }
 
 #[memo]
-pub fn parsed_iso_literal<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub fn parsed_iso_literal<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     iso_literal_text: String,
 ) -> ParsedIsoLiteral {
     parse_iso_literal(iso_literal_text.as_str())
 }
 
 #[memo]
-pub fn extract_iso_literals<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub fn extract_iso_literals<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     client: ClientId,
     path: RelativePathToSourceFile,
-) -> Option<Vec<IsoLiteralExtraction<THostLanguage>>> {
+) -> Option<Vec<IsoLiteralExtraction<TProfile::HostLanguage>>> {
     let contents = file_contents(db, client, path).as_ref()?;
-    THostLanguage::extract_iso_literals_from_text(contents).wrap_some()
+    TProfile::HostLanguage::extract_iso_literals_from_text(contents).wrap_some()
 }
 
 #[memo]
-pub fn parsed_iso_literals_in_file<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub fn parsed_iso_literals_in_file<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     client: ClientId,
     path: RelativePathToSourceFile,
-) -> Option<Vec<(IsoLiteralExtraction<THostLanguage>, ParsedIsoLiteral)>> {
+) -> Option<
+    Vec<(
+        IsoLiteralExtraction<TProfile::HostLanguage>,
+        ParsedIsoLiteral,
+    )>,
+> {
     let extractions = extract_iso_literals(db, client, path).as_ref()?;
     extractions
         .iter()
@@ -53,8 +58,8 @@ pub fn parsed_iso_literals_in_file<THostLanguage: HostLanguage>(
 
 /// Parse errors of every iso literal in `path` as `client` reads it, as file-absolute spans.
 #[memo]
-pub fn iso_literal_parse_errors_in_file<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub fn iso_literal_parse_errors_in_file<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     client: ClientId,
     path: RelativePathToSourceFile,
 ) -> Option<Vec<WithSpan<ParseError>>> {
@@ -75,8 +80,8 @@ pub fn iso_literal_parse_errors_in_file<THostLanguage: HostLanguage>(
 }
 
 #[memo]
-pub fn text_through_last_iso_literal<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub fn text_through_last_iso_literal<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     client: ClientId,
     path: RelativePathToSourceFile,
 ) -> Option<String> {
@@ -90,16 +95,16 @@ pub fn text_through_last_iso_literal<THostLanguage: HostLanguage>(
 }
 
 #[memo]
-pub fn iso_literal_extraction<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub fn iso_literal_extraction<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     literal_id: LiteralId,
-) -> Option<IsoLiteralExtraction<THostLanguage>> {
+) -> Option<IsoLiteralExtraction<TProfile::HostLanguage>> {
     let extractions = extract_iso_literals(db, literal_id.client, literal_id.path).as_ref()?;
     extractions.get(literal_id.index).cloned()
 }
 
-pub fn parsed_iso_literal_by_id<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub fn parsed_iso_literal_by_id<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     literal_id: LiteralId,
 ) -> Option<&ParsedIsoLiteral> {
     let extraction = iso_literal_extraction(db, literal_id).as_ref()?;

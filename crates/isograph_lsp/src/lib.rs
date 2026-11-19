@@ -5,6 +5,8 @@ mod hover;
 mod line_index;
 pub mod lsp_runtime_error;
 mod semantic_tokens;
+#[cfg(test)]
+mod test_profile;
 
 pub use document_highlight::{TokenUnderCursor, token_range_at_lsp_position};
 pub use file_diagnostics::lsp_diagnostics_for_file;

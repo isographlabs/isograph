@@ -1,7 +1,7 @@
 use std::ops::ControlFlow;
 
 use common_lang_types::RelativePathToSourceFile;
-use isograph_compiler::{ClientId, HostLanguage, IsographDb, file_contents};
+use isograph_compiler::{ClientId, CompilationProfile, IsographDb, file_contents};
 use pico_macros::memo;
 use prelude::Postfix;
 use span::Span;
@@ -124,8 +124,8 @@ impl LineIndex {
 
 /// The line index of `path` as `client` reads it.
 #[memo]
-pub fn line_index<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub fn line_index<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     client: ClientId,
     path: RelativePathToSourceFile,
 ) -> Option<LineIndex> {
@@ -133,8 +133,8 @@ pub fn line_index<THostLanguage: HostLanguage>(
     LineIndex::new(contents).wrap_some()
 }
 
-pub(crate) fn byte_offset_at_lsp_position<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub(crate) fn byte_offset_at_lsp_position<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     client: ClientId,
     path: RelativePathToSourceFile,
     position: lsp_types::Position,
