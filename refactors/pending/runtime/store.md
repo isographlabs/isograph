@@ -36,17 +36,17 @@ test("a pet with an identity-less stats object", () => {
         // ...
       },
     },
-    { id: "1" },
+    { id: "1", skip: null },
   );
   expect(store).toEqual(
     storeOf({
-      Query: { __ROOT: { pet____id___1: { entityName: "Pet", id: "1" } } },
+      Query: { __ROOT: { 'pet____id___"1"': { entityName: "Pet", id: "1" } } },
       Pet: { "1": { id: "1", name: "Rex", nickname: null, stats: { entityName: "PetStats", id: "Pet:1.stats" } /* ... */ } },
       PetStats: { "Pet:1.stats": { weight: 7, energy: null } },
     }),
   );
-  expect(check(store, petDetail, { id: "1" })).toEqual({ kind: "EnoughData" });
-  expect(check(store, petDetail, { id: "2" })).toEqual({ kind: "MissingData", record: queryRoot });
+  expect(check(store, petDetail, { id: "1", skip: null })).toEqual({ kind: "EnoughData" });
+  expect(check(store, petDetail, { id: "2", skip: null })).toEqual({ kind: "MissingData", record: queryRoot });
   garbageCollect(store, []);
   expect(store).toEqual(new Map());
 });
@@ -54,11 +54,11 @@ test("a pet with an identity-less stats object", () => {
 
 What this shows:
 
-- The response is read by each node's response key, `responseKey ?? selectableName` (`pet____id___v_id` for `pet(id: $id)`, `name` for `name`, which the query prints with no alias); the store is written by the store key, with variable values substituted (`pet____id___1`).
+- The response is read by each node's response key, `responseKey ?? selectableName` (`pet____id___v_id` for `pet(id: $id)`, `name` for `name`, which the query prints with no alias); the store is written by the store key, with variable values substituted (`pet____id___"1"`).
 - The top level is written onto `petDetail.root`, `{ entityName: "Query", id: "__ROOT" }`; the caller passes no root.
 - `Pet:1`'s entity is its target's `entity` (`Known`, `Pet`), and its id the value under its target's `identity` (`Select`, `id`); `PetStats`'s target has `identity: { kind: "Omit" }` and gets upstream's derived id `Pet:1.stats`.
 - `null` is stored as `null` and is known data. `__typename` is not stored: the record's entity is its first-layer key.
-- `check` with other variables reports the root record, which lacks `pet____id___2`.
+- `check` with other variables reports the root record, which lacks `pet____id___"2"`.
 - `normalize` and `garbageCollect` return nothing; the test inspects the same `store` object afterwards. Collecting with nothing retained empties it.
 
 ## The store
@@ -95,7 +95,7 @@ export type StoreLink = {
 export type JsonValue = null | boolean | number | string | ReadonlyArray<JsonValue> | JsonObject;
 export type JsonObject = { readonly [key: string]: JsonValue };
 
-/** Operation variables by name. An absent name is an unset variable. */
+/** Operation variables by name. Every variable of the operation is present (Variables). */
 export type Variables = { readonly [name: string]: JsonValue };
 ```
 
@@ -145,22 +145,61 @@ Deltas from upstream (`IsographEnvironment.ts:122-169`, `:211-217`):
 /** `selection.selectableName`, then `argumentChunks(selection.arguments, variables)`. */
 export function storeKey(selection: NormalizationSelection, variables: Variables): StoreKey;
 
-/** One `____<name>___<value>` chunk per argument, in the AST's order (sorted by name). */
+/** One `____<name>___<value>` chunk per argument, in the AST's order (sorted by name), with
+ * `<value>` the argument's value as `stableStringify` writes it. */
 export function argumentChunks(args: Arguments | null, variables: Variables): string;
+
+/** `JSON.stringify(value)` with every object's keys in code unit order, at every depth. */
+export function stableStringify(value: JsonValue): string;
 ```
 
-The value of a chunk, upstream's `getStoreKeyChunkForArgument` and `getStoreKeyChunkForArgumentValue` (`cache.ts:481-521`):
+The value of an argument, before `stableStringify`:
 
-- `Literal` (number, boolean, `null`): `${value}` (`5`, `true`, `null`).
-- `String`: the string verbatim (`Ada Lovelace`, spaces kept; the response key replaces non-word characters, the store key does not).
-- `Variable`: the variable's value when set, `"null"` when unset; a set value that is an object or array is `JSON.stringify(stableCopy(value))`, other values `${value}`.
-- `Object`: the entries as an object, each value substituted by these rules, then `JSON.stringify(stableCopy(object))`.
+- `Literal`: its value (`5`, `true`, `null`).
+- `String`: the string.
+- `Variable`: `variables[name]`. A top-level argument whose variable is absent from `variables` is omitted from the key, chunk and all.
+- `Object`: an object with one key per entry, each value by these rules; an entry whose variable is absent is `null`.
 
-`stableCopy` is upstream's (`util.ts:44-59`): object keys sorted, arrays element by element. It lives in `storeKey.ts`, typed `(value: JsonValue) => JsonValue`.
+So `limit: 5` is `____limit___5`, `name: "Ada Lovelace"` is `____name___"Ada Lovelace"`, `name: null` is `____name___null`, `name: "null"` is `____name___"null"`, `id: 1` is `____id___1` and `id: "1"` is `____id___"1"`, and `filter: { nameContains: $q, minAge: 2 }` with `q: "Rex"` is `____filter___{"minAge":2,"nameContains":"Rex"}`.
 
-`noPropertyAccessFromIndexSignature` and the `Object.hasOwn` read apply to `variables`. The collisions this format has are open decision 6.
+`stableStringify` is `JSON.stringify(value, (_key, v) => isJsonObject(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) : v)`: the replacer returns each object with its keys sorted, and `JSON.stringify` recurses into what the replacer returns, so nested objects are sorted at every depth; arrays keep their order; a key whose value is `undefined` is omitted, as `JSON.stringify` omits it; `isJsonObject` is `typeof v === "object" && v !== null && !Array.isArray(v)`. The sort is code unit order, not `localeCompare`, so the key does not depend on the locale. The sort runs at runtime because a variable whose value is an object comes from the caller in any key order; literal object arguments are already sorted by the compiler (`MergedObject`), and one function covers both.
 
-Delta from upstream: none in the format. Upstream's overloads for `LinkedParentRecordKey` and `ScalarParentRecordKey` (`cache.ts:449-469`) are one `StoreKey`, because a link and a leaf are told apart by the AST. `Enum` has no case (normalization-ast.md: `ArgumentValue` has no `Enum`).
+Every operation variable is present in `variables`: the generated parameters type of an entrypoint requires each one (Variables, below), and a missing one is undefined behavior, as any input outside its type is. The absent-variable rules above apply only to `read` of a client field whose parent did not pass a variable that has no default: query generation omits that top-level argument from the query and the normalization AST and writes `null` inside an object (query-generation.md, Source fields and variables), and the reader's key must match (`checkins`, not `checkins____limit___null`; reader-ast.md, Arguments and variable defaults).
+
+`noPropertyAccessFromIndexSignature` and the `Object.hasOwn` read apply to `variables`.
+
+Deltas from upstream (`getStoreKeyChunkForArgument` and `getStoreKeyChunkForArgumentValue`, `cache.ts:481-520`; `stableCopy`, `util.ts:44-59`):
+
+- Each value is JSON, so `null` and `"null"`, and `1` and `"1"`, are distinct keys; upstream writes `${value}` for strings, numbers, and booleans, which makes each pair one chunk. A cost: `node(id: 1)` and `node(id: "1")`, one value after `ID` coercion, are two keys, which is a cache miss, not wrong data.
+- The value is written by the standard serializer (`JSON.stringify`), with no hand-written escaping; upstream hand-rolls the chunk per kind and stringifies only objects and arrays.
+- A top-level argument whose variable is unset is omitted; upstream writes `null` for it (`cache.ts:481-520`). An unset variable applies the schema default for the argument (GraphQL spec, CoerceArgumentValues), and `null` overrides it, so the two are different requests; query generation already omits the argument (query-generation.md, open decision 2, held), and the reader's key must match the normalizer's.
+- Upstream's overloads for `LinkedParentRecordKey` and `ScalarParentRecordKey` (`cache.ts:449-469`) are one `StoreKey`, because a link and a leaf are told apart by the AST. `Enum` has no case (normalization-ast.md: `ArgumentValue` has no `Enum`).
+
+### Variables
+
+Every variable of an entrypoint is required in its generated `parameters_type.ts`: no `?` and no `void`. A nullable variable is `readonly limit: number | null`, and the caller passes it, `null` included. A variable with a declared default is required too: the caller passes the value it wants; the default matters only inside the compiler, for the arguments a parent field's selection leaves unpassed. Reason: an unprovided variable makes its argument behave as omitted, which applies the schema default, and is distinct from `null` (GraphQL spec, CoerceVariableValues and CoerceArgumentValues); requiring every variable removes the choice between `{}` and `{ limit: null }` from the API, and the runtime never sees an unset operation variable.
+
+Before (`demos/pet-demo/src/__isograph/Pet/PetCheckinsCard/parameters_type.ts`, from `parameter_property` in `crates/typescript_artifacts/src/generate_types.rs`):
+
+```ts
+// generated by crates/typescript_artifacts/src/generate_types.rs
+export type Pet__PetCheckinsCard__parameters = {
+  readonly limit?: number | null | void;
+};
+```
+
+After:
+
+```ts
+// generated by crates/typescript_artifacts/src/generate_types.rs
+export type Pet__PetCheckinsCard__parameters = {
+  readonly limit: number | null;
+};
+```
+
+`parameter_property`'s nullable arm becomes `(Optionality::Required, wrapped_type(wrapper, &mut inner))`, the same as the other arm, so `Optionality::Optional` and the `void` keyword have no other reader in that function and the match collapses to the one arm. Delta from upstream: upstream's parameters types make a nullable variable optional (`readonly skip?: number | null | void`, `isograph/demos/pet-demo/src/components/__isograph/Pet/PetCheckinsCard/parameters_type.ts`). The type artifacts change lands with the store (change 7). artifact-set-and-types.md's `readonly w?: T | null | void` is amended (Docs this doc amends).
+
+`parameters_type.ts` is one file per field, and a field's parameters type is also the type of its resolver's `parameters` when another field selects it (reader-ast.md, `childVariables`). There, a variable with no default that the parent does not pass is absent at runtime, so `readonly n: number | null` does not describe it. Open decision 11.
 
 ## Record ids
 
@@ -334,7 +373,7 @@ The runtime throws when something we generate is malformed, and when input break
 - Artifacts (the normalization AST, later the reader AST): the compiler generated them, and the `NormalizationAst` annotation type-checks each one. A switch on `kind` is exhaustive over the union, with no `default` and no throw.
 - Store states only our normalizer produces: one store key on one entity is one selectable, whose target is leaf or composite in every AST of one schema, so `normalize` never writes a non-link under a composite store key. A store that holds one was written with an AST that disagrees.
 - The network response: the server answered the query text the compiler generated with this AST. A response that does not match the AST means the server broke that query's contract (schema skew between the compiler and the server, a broken server or proxy, or a wrong test fixture). A correct server never produces one.
-- Caller-supplied variables: a missing required variable is a caller programming error, and throws by the same rule (open decision 10).
+- Caller-supplied variables: no check. Variables arrive typed by the generated parameters type, which requires each one, so a missing variable is undefined behavior, as any input outside its type is.
 
 This replaces, for the runtime, AGENTS.md's rule that socket reads return a typed error: the user's decision is that a response the generated query's contract excludes is a broken invariant, like a malformed artifact.
 
@@ -345,7 +384,6 @@ Every throw site:
 - `recordLink`, a composite response object whose target's `entity` is `Discriminator`, with no string under `ast.discriminatorResponseKey`: `Malformed response at ${path}: expected a string under "${discriminatorResponseKey}".` Invariant: the compiler selects the discriminator in every selection set under a composite selection (query-generation.md, Completion, step 4). Under a `Known` entity the discriminator is not read, so its absence does not throw.
 - `recordLink`, a `Select` identity value that is not a string: `Malformed response at ${path}: expected a string record id under "${selectableName}", got ${JSON.stringify(value)}.` Invariant: GraphQL serializes `ID` as a string (spec 3.5.5), and the protocol names only an `ID!` selectable as the identity (`IdField::Present`, query-generation.md).
 - `check` and `garbageCollect`, a value under a composite store key that is not `null`, a link, or a list of these at any depth: `Store record ${entityName}:${id} holds a non-link under the composite store key "${storeKey}"; the store was written with an AST that disagrees with this one.` Invariant: Store states only our normalizer produces, above. A link is an object whose own keys are exactly `entityName` and `id`, both strings.
-- `storeKey` and `recordLink` (through `argumentChunks`), a required variable absent from `variables`: open decision 10.
 
 `${path}` is `JSON.stringify(path)`, the response keys and list indexes from the top of the response (`["pet____id___v_id","checkins____limit___2",1]`).
 
@@ -416,7 +454,7 @@ export { garbageCollect, type RetainedQuery } from "./garbageCollection";
 export { normalize } from "./normalize";
 ```
 
-`storeKey`, `argumentChunks`, `recordLink`, and `stableCopy` are module exports that `normalize`, `check`, and `garbageCollect` import; the package index does not export them. Their tests import the modules directly.
+`storeKey`, `argumentChunks`, `stableStringify`, and `recordLink` are module exports that `normalize`, `check`, and `garbageCollect` import; the package index does not export them. Their tests import the modules directly.
 
 ```json
 // from libs/isograph-runtime/package.json
@@ -623,12 +661,14 @@ with `entrypoint Query.Leaves`, `Query.NestedQuery`, `Query.PetDetail`, `Query.E
 Selections are taken from the fixture ASTs by response key.
 
 - `greeting` with no arguments is `greeting`.
-- `literalGreeting` is `greeting____loud___true____name___Ada Lovelace____times___3`: chunks in the AST's (sorted) order, `String` verbatim with its space, `Literal` boolean and number.
+- `literalGreeting` is `greeting____loud___true____name___"Ada Lovelace"____times___3`: chunks in the AST's (sorted) order, the string JSON-quoted with its space, the boolean and number as JSON.
 - `nullGreeting` is `greeting____name___null`.
-- `variableGreeting` with `{ name: "Bo" }` is `greeting____name___Bo`; with `{}` it is `greeting____name___null`, equal to `nullGreeting`'s (open decision 6).
-- `search` with `{ q: "Rex" }` is `search____filter___{"minAge":2,"nameContains":"Rex"}`, keys sorted; with `{}` the entry is `"nameContains":"null"`.
-- `pet` with `{ id: "1" }` is `pet____id___1`; the response key is `pet____id___v_id`.
-- A variable whose value is an object (`{ q: { b: 1, a: 2 } }`, a test input of the wrong GraphQL type) stringifies with sorted keys.
+- `variableGreeting` with `{ name: "Bo" }` is `greeting____name___"Bo"`; with `{ name: null }` it is `greeting____name___null`, equal to `nullGreeting`'s; with `{ name: "null" }` it is `greeting____name___"null"`, a different key.
+- `search` with `{ q: "Rex" }` is `search____filter___{"minAge":2,"nameContains":"Rex"}`, keys sorted.
+- `pet` with `{ id: "1" }` is `pet____id___"1"`; with `{ id: 1 }` (a test input of the wrong GraphQL type) it is `pet____id___1`, a different key; the response key is `pet____id___v_id`.
+- `stableStringify` of `{ b: 1, a: { d: [3, { f: 1, e: 2 }], c: 2 } }` and of `{ a: { c: 2, d: [3, { e: 2, f: 1 }] }, b: 1 }` are both `{"a":{"c":2,"d":[3,{"e":2,"f":1}]},"b":1}`: key order is independent at every depth, and array order is kept (`[2, 1]` stays `[2,1]`).
+- `stableStringify` of `{ a: undefined, b: 1 }`, a value outside `JsonValue` built by a cast, is `{"b":1}`, as `JSON.stringify` writes it.
+- A top-level `Variable` argument whose variable is absent is omitted: `checkins(limit: $n)` with `{}` is `checkins`; inside an object it is `null`: `search(filter: { nameContains: $q, minAge: 2 })` with `{}` is `search____filter___{"minAge":2,"nameContains":null}`.
 
 ### `normalize` (`test/normalize.test.ts`)
 
@@ -636,7 +676,7 @@ Each case asserts the whole resulting store with `storeOf`.
 
 - Leaves into the empty store: one record `Query.__ROOT` with the four `greeting` keys, `tags` and `settings`; `tags: []` is stored `[]`; `tags: ["a", null]` is stored as received; `settings: { entityName: "Pet", id: "1" }` is stored as a leaf, and no `Pet` entity appears.
 - A `null` leaf is stored `null`, and the key is present.
-- `PetDetail`: `Query.__ROOT` holds `pet____id___1` linking `Pet:1`; `Pet:1` holds `id`, `name`, `nickname: null`, `tagline`, `stats`, `bestFriend`, `checkins____limit___2`, and `checkins____limit___2____skip___null` (variables `{ id: "1" }`); no record holds `__typename`.
+- `PetDetail`: `Query.__ROOT` holds `pet____id___"1"` linking `Pet:1`; `Pet:1` holds `id`, `name`, `nickname: null`, `tagline`, `stats`, `bestFriend`, `checkins____limit___2`, and `checkins____limit___2____skip___null` (variables `{ id: "1", skip: null }`); no record holds `__typename`.
 - The same with `{ id: "1", skip: 4 }` writes `checkins____limit___2____skip___4`, a second key beside `checkins____limit___2`.
 - Identity-less: `stats` links `PetStats` `Pet:1.stats`. `stats: null` writes `null` and creates no `PetStats` record.
 - Cyclic data: `Pet:1.bestFriend` is `Pet:2`, whose `bestFriend` is `Pet:1`; `Pet:1` holds the fields of both depths, and both links.
@@ -656,7 +696,7 @@ Stores come from `normalize` of fixture responses, then are edited by hand where
 
 - Empty store: `MissingData { record: queryRoot }`.
 - For each fixture entrypoint, after `normalize` with the same variables: `EnoughData`.
-- `PetDetail` with `{ id: "2" }` after `{ id: "1" }`: `MissingData { record: queryRoot }`.
+- `PetDetail` with `{ id: "2", skip: null }` after `{ id: "1", skip: null }`: `MissingData { record: queryRoot }`.
 - Leaf `null` (`nickname: null`): `EnoughData`. The `nickname` key deleted: `MissingData { record: Pet:1 }`.
 - `Pet:2` deleted while `Pet:1.bestFriend` links it: `MissingData { record: Pet:2 }`.
 - `stats: null`: `EnoughData`. `PetStats` `Pet:1.stats` deleted: `MissingData` for it.
@@ -673,7 +713,7 @@ Stores come from `normalize` of fixture responses, then are edited by hand where
 - One `PetDetail`: exactly `Query.__ROOT`, `Pet:1`, `Pet:2`, `PetStats` `Pet:1.stats`, and the checkins remain; a `Pet:9` written by `PetLists` is deleted, and so is the `PetLists`-only entity whose records were all unreached.
 - `PetDetail` and `PetLists` both normalized, only `PetLists` retained: `Pet:1` stays whole, including fields only `PetDetail` selected; `Checkin` records go.
 - Two roots: `PetDetail` and `SetTagline` both retained: `Query.__ROOT`, `Mutation.__ROOT`, and their records remain.
-- Variables: `PetDetail` retained with `{ id: "2" }` when the store has only `pet____id___1`: everything but `Query.__ROOT` is deleted.
+- Variables: `PetDetail` retained with `{ id: "2", skip: null }` when the store has only `pet____id___"1"`: everything but `Query.__ROOT` is deleted.
 - Conditionals: `Feed` retained keeps `BlogItem:b1` and its `author`; an `AdItem` is kept (reached by the list), and the `asBlogItem` walk does not run on it.
 - A link to an absent record and a retained root whose record is absent end the walk without error.
 - Cyclic `bestFriend` data terminates.
@@ -689,7 +729,7 @@ Each change is one commit. Prerequisite: normalization-ast.md changes 1 to 3.
 
 ### 2. Store, store keys, record ids
 
-`src/store.ts`, `src/storeKey.ts`, `src/recordId.ts`; `test/storeKey.test.ts`. Depends on 1.
+`src/store.ts`, `src/storeKey.ts` with `stableStringify`, `src/recordId.ts`; `test/storeKey.test.ts`. Depends on 1.
 
 ### 3. `normalize`
 
@@ -707,23 +747,21 @@ Each change is one commit. Prerequisite: normalization-ast.md changes 1 to 3.
 
 `link_type_file` writes `{ entityName, id }` (The store); the type artifact tests that assert `__link` and `__typename` assert `entityName` and `id`; the regenerated `demos/pet-demo/src/__isograph/*/__link/output_type.ts` and the fixture's. Independent of 2 to 5; lands with them.
 
+### 7. Required parameters (typescript_artifacts)
+
+`parameter_property` writes every parameter as required, a nullable one as `T | null` (Variables); the type artifact tests that assert `readonly limit?: number | null | void` assert `readonly limit: number | null`; the regenerated `parameters_type.ts` artifacts of the pet demo and the fixture. Independent of 2 to 6; lands with them.
+
 ## Docs this doc amends
 
-- `refactors/pending/graphql-protocol/normalization-ast.md`: `conditionHolds` is removed and the condition loses `responseKey` (Conditions; normalization-ast.md's own text says so); `tsconfig.json` `target` is `ES2022`. Open decision 10 (a) would add the operation's required variables to the AST.
+- `refactors/pending/graphql-protocol/normalization-ast.md`: `conditionHolds` is removed and the condition loses `responseKey` (Conditions; normalization-ast.md's own text says so); `tsconfig.json` `target` is `ES2022`.
+- `refactors/pending/artifact-set-and-types.md`, Per field: `P/f/parameters_type.ts` is `{ readonly v: T; readonly w: T | null; }`, every parameter required (Variables); its test "`readonly limit?: number | null | void`" is `readonly limit: number | null`.
 - `refactors/pending/runtime/pico-runtime.md`: the store is `Store` above, not upstream's layered store; `normalize`, `check`, and `garbageCollect` land here; its retained queries with a release buffer (intro, section 10, change 7) and its `log` option are dropped.
 
 ## Later
 
-- `Node`-fetched entrypoints (normalization-ast.md, Later; entrypoints.md, Later). With them, `check` of a `Node` fetch for `Pet:4` is `MissingData { record: queryRoot }` whenever `node____id___4` was never written, even when another query wrote all of `Pet:4`, unless the walk starts below `node`. Upstream answers this with `missingFieldHandler` (`read.ts:781-783`), which v1 does not have.
+- `Node`-fetched entrypoints (normalization-ast.md, Later; entrypoints.md, Later). With them, `check` of a `Node` fetch for `Pet:4` is `MissingData { record: queryRoot }` whenever `node____id___"4"` was never written, even when another query wrote all of `Pet:4`, unless the walk starts below `node`. Upstream answers this with `missingFieldHandler` (`read.ts:781-783`), which v1 does not have.
 
 ## Open decisions
-
-### 6. Store key encoding
-
-Upstream's format (held above) makes distinct arguments share a key: `name: "null"`, `name: null`, and an unset `$name` are all `____name___null`, and a string value `1` and the number `1` are one chunk. An unset variable in GraphQL means "not provided", which applies the argument's default, not `null`.
-
-- (a) Upstream verbatim. Cost: the collisions above; a store key written for `skip: null` is read for unset `$skip` where the server applied `skip = 0`.
-- (b) Each chunk is `JSON.stringify(stableCopy(value))` (`____name___"null"` against `____name___null`), and an unset variable's argument is omitted from the key. Cost: a delta from upstream; `node(id: 1)` and `node(id: "1")` (one value after `ID` coercion) become two keys, which is a cache miss, not wrong data.
 
 ### 8. How the fixture artifacts are generated
 
@@ -743,11 +781,12 @@ The compiler writes artifacts only from the daemon today (`crates/isograph_cli/s
 
 Held: (b). A malformed response happens only when the server broke the contract of the query the compiler generated (schema skew between the compiler and the server, a broken server or proxy, a wrong test fixture). A correct server never produces one, and after the throw the environment is broken anyway, so a second walk on every response, or a list of every write, buys nothing in practice.
 
-### 10. How the runtime knows a variable is required
+### 11. The parameters type of a field another field selects
 
-The rule (Errors) is that a missing required variable throws, as a caller programming error. The normalization AST carries no variable definitions: it has `{ kind: "Variable", name }` in arguments and nothing saying whether `$id` is `ID!` or `$skip` is an optional `Int`. `PetDetail` with `{ id: "1" }` and `$skip` unset is a correct call (`checkins____limit___2____skip___null`), so "absent" alone cannot throw.
+`parameters_type.ts` is one type per field, used as the entrypoint's variables type and as the resolver's `parameters` type when another field selects the field. With every parameter required, `field Pet.X($n: Int)` selected as `X` with no argument gets `parameters` `{}` at runtime (reader-ast.md, `childVariables`), which its type `{ readonly n: number | null }` does not describe.
 
-- (a) The AST gains the operation's required variables, `requiredVariables: ReadonlyArray<string>` on `NormalizationAst`, written by the core from the entrypoint's variables whose type is non-null and that have no default; `normalize`, `check`, and `garbageCollect` throw `Missing required variable "$${name}".` before walking when one is absent. Cost: an amendment to normalization-ast.md, approved and being implemented, and a field the compiler fills from `FieldVariable`.
-- (b) No check in the runtime: an absent variable is `null` in the store key, as upstream (`cache.ts:481-521`). Cost: the rule above is not enforced; a call missing `$id` writes and reads `pet____id___null`.
+- (a) Required for every field; a selection that leaves a variable with no default unpassed is a generation error (reader-ast.md's former open decision 2 (c)). Cost: rejects a selection GraphQL allows.
+- (b) Two generated types: the entrypoint's variables type, every variable required, and the field's parameters type, a nullable variable without a default optional. Cost: a second type artifact per entrypoint and an `entrypoint.ts` type change.
+- (c) Required for every field, and `childVariables` writes `null` for an unpassed variable with no default. Cost: the resolver's `parameters` then says `null` where the store key was computed for an omitted argument.
 
-Held: (a), matching the rule. normalization-ast.md is not amended until this is settled.
+Not held: raised with this change.
