@@ -14,11 +14,7 @@ mod span_of;
 #[cfg(test)]
 mod test_cursor;
 
-pub use ast::{
-    Argument, ArgumentNameWrapper, Description, Directive, DirectiveNameWrapper, EntityNameWrapper,
-    FieldDefinition, InputValueDefinition, InputValueNameWrapper, InterfaceTypeDefinition,
-    ObjectTypeDefinition, ScalarTypeDefinition, SelectableNameWrapper, ValueKeyNameWrapper,
-};
+pub use ast::*;
 pub use parse_error::{Expectation, ExpectedFound, Found, ParseError};
 pub use parse_schema::{DefinitionError, DefinitionName};
 pub use token_kind::GraphQLTokenKind;

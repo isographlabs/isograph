@@ -1,16 +1,18 @@
 use common_lang_types::{DescriptionValue, DirectiveName, EntityName};
 use prelude::Postfix;
-use span::WithSpan;
+use span::{WithSpan, WithSpanPostfix};
 
+use crate::keyword::BooleanOrNullKeyword;
 use crate::string_value::consume_string_value_if;
 use crate::token_cursor::TokenCursor;
 use crate::type_annotation::parse_type_annotation;
 use crate::value::parse_constant_value;
 use crate::{
     Argument, ArgumentNameWrapper, Description, Directive, DirectiveNameWrapper, EntityNameWrapper,
-    Expectation, FieldDefinition, GraphQLTokenKind, InputValueDefinition, InputValueNameWrapper,
+    EnumLiteralValueWrapper, EnumTypeDefinition, EnumValueDefinition, Expectation, FieldDefinition,
+    GraphQLTokenKind, InputObjectTypeDefinition, InputValueDefinition, InputValueNameWrapper,
     InterfaceTypeDefinition, ObjectTypeDefinition, ParseError, ScalarTypeDefinition,
-    SelectableNameWrapper,
+    SelectableNameWrapper, UnionTypeDefinition,
 };
 
 /// A top-level definition or extension whose parse failed. The wrapping span is the text the
@@ -215,6 +217,105 @@ fn parse_separated_nonempty<T>(
     items.wrap_ok()
 }
 
+#[cfg_attr(not(test), expect(dead_code))]
+fn parse_union_type_definition(
+    cursor: &mut TokenCursor<'_>,
+    description: Option<WithSpan<Description>>,
+) -> Result<UnionTypeDefinition, DefinitionError> {
+    parse_after_entity_name(cursor, |cursor, name| {
+        UnionTypeDefinition {
+            description,
+            name,
+            directives: parse_directives(cursor)?,
+            member_types: parse_union_member_types(cursor)?,
+        }
+        .wrap_ok()
+    })
+}
+
+fn parse_union_member_types(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<Vec<WithSpan<EntityNameWrapper>>, WithSpan<ParseError>> {
+    match cursor.consume_token_if(GraphQLTokenKind::Equals) {
+        None => Vec::new().wrap_ok(),
+        Some(_) => parse_separated_nonempty(cursor, GraphQLTokenKind::Pipe, parse_entity_name),
+    }
+}
+
+#[cfg_attr(not(test), expect(dead_code))]
+fn parse_enum_type_definition(
+    cursor: &mut TokenCursor<'_>,
+    description: Option<WithSpan<Description>>,
+) -> Result<EnumTypeDefinition, DefinitionError> {
+    parse_after_entity_name(cursor, |cursor, name| {
+        EnumTypeDefinition {
+            description,
+            name,
+            directives: parse_directives(cursor)?,
+            values: parse_enum_values_definition(cursor)?,
+        }
+        .wrap_ok()
+    })
+}
+
+fn parse_enum_values_definition(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<Vec<WithSpan<EnumValueDefinition>>, WithSpan<ParseError>> {
+    parse_optional_nonempty_group(
+        cursor,
+        GraphQLTokenKind::OpenBrace,
+        GraphQLTokenKind::CloseBrace,
+        |cursor| cursor.spanning(parse_enum_value_definition),
+    )
+}
+
+fn parse_enum_value_definition(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<EnumValueDefinition, WithSpan<ParseError>> {
+    let description = consume_description(cursor)?;
+    if let Some(word) = cursor.peek_identifier_of::<BooleanOrNullKeyword>() {
+        return ParseError::EnumValueCannotBeTrueFalseOrNull
+            .with_span(word.location)
+            .wrap_err();
+    }
+    let value = cursor
+        .require_token(GraphQLTokenKind::Identifier)
+        .map_err(|()| cursor.expected(Expectation::Token(GraphQLTokenKind::Identifier)))?;
+    EnumValueDefinition {
+        description,
+        value: value.interned().map(EnumLiteralValueWrapper),
+        directives: parse_directives(cursor)?,
+    }
+    .wrap_ok()
+}
+
+#[cfg_attr(not(test), expect(dead_code))]
+fn parse_input_object_type_definition(
+    cursor: &mut TokenCursor<'_>,
+    description: Option<WithSpan<Description>>,
+) -> Result<InputObjectTypeDefinition, DefinitionError> {
+    parse_after_entity_name(cursor, |cursor, name| {
+        InputObjectTypeDefinition {
+            description,
+            name,
+            directives: parse_directives(cursor)?,
+            fields: parse_input_fields_definition(cursor)?,
+        }
+        .wrap_ok()
+    })
+}
+
+fn parse_input_fields_definition(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<Vec<WithSpan<InputValueDefinition>>, WithSpan<ParseError>> {
+    parse_optional_nonempty_group(
+        cursor,
+        GraphQLTokenKind::OpenBrace,
+        GraphQLTokenKind::CloseBrace,
+        |cursor| cursor.spanning(parse_input_value_definition),
+    )
+}
+
 fn parse_directives(
     cursor: &mut TokenCursor<'_>,
 ) -> Result<Vec<WithSpan<Directive>>, WithSpan<ParseError>> {
@@ -318,16 +419,18 @@ mod tests {
 
     use super::{
         DefinitionError, DefinitionName, consume_description, parse_directives,
+        parse_enum_type_definition, parse_input_object_type_definition,
         parse_interface_type_definition, parse_object_type_definition,
-        parse_scalar_type_definition,
+        parse_scalar_type_definition, parse_union_type_definition,
     };
     use crate::span_of::span_of;
     use crate::test_cursor::with_cursor;
     use crate::token_cursor::TokenCursor;
     use crate::{
-        ConstantValue, Description, Directive, EntityNameWrapper, Expectation, FieldDefinition,
-        Found, GraphQLTokenKind, IntegerValue, NullableTypeAnnotation, ObjectTypeDefinition,
-        ParseError, TypeAnnotation,
+        ConstantValue, Description, Directive, EntityNameWrapper, EnumValueDefinition, Expectation,
+        FieldDefinition, Found, GraphQLTokenKind, InputObjectTypeDefinition, IntegerValue,
+        NullableTypeAnnotation, ObjectTypeDefinition, ParseError, TypeAnnotation,
+        UnionTypeDefinition,
     };
 
     /// Runs `parse` on `text` after its description, when it has one, and its keyword.
@@ -715,5 +818,156 @@ mod tests {
         .expect("the fixture is an interface")
         .item;
         assert_eq!(names(named.interfaces.as_slice()), "Node".wrap_vec());
+    }
+
+    fn union(text: &str) -> UnionTypeDefinition {
+        after_keyword(text, parse_union_type_definition)
+            .expect("the fixture is a union")
+            .item
+    }
+
+    #[test]
+    fn a_union_has_its_members() {
+        for text in ["union Search = Pet | User", "union Search = | Pet | User"] {
+            assert_eq!(
+                names(union(text).member_types.as_slice()),
+                vec!["Pet", "User"],
+                "for text {text:?}"
+            );
+        }
+        assert_eq!(
+            names(union("union Search = Pet").member_types.as_slice()),
+            "Pet".wrap_vec()
+        );
+        assert!(union("union Search").member_types.is_empty());
+        let directed = union("union Search @a");
+        assert_eq!(directed.directives.len(), 1);
+        assert!(directed.member_types.is_empty());
+    }
+
+    #[test]
+    fn a_union_missing_a_member_is_an_error() {
+        for text in ["union Search =", "union Search = |", "union Search = Pet |"] {
+            let error = after_keyword(text, parse_union_type_definition)
+                .expect_err("the fixture is missing a member");
+            assert_eq!(error.name, entity("Search"), "for text {text:?}");
+            assert_eq!(
+                error.error.item,
+                ParseError::expected(
+                    Expectation::Token(GraphQLTokenKind::Identifier),
+                    Found::EndOfFile
+                ),
+                "for text {text:?}"
+            );
+        }
+    }
+
+    fn enum_values(text: &str) -> Vec<WithSpan<EnumValueDefinition>> {
+        after_keyword(text, parse_enum_type_definition)
+            .expect("the fixture is an enum")
+            .item
+            .values
+    }
+
+    #[test]
+    fn an_enum_has_its_values() {
+        let values = enum_values("enum Status { AVAILABLE SOLD }");
+        let names: Vec<_> = values
+            .iter()
+            .map(|value| intern::Lookup::lookup(value.item.value.item.0))
+            .collect();
+        assert_eq!(names, vec!["AVAILABLE", "SOLD"]);
+        let described = enum_values("enum Status { \"on sale\" AVAILABLE @deprecated }");
+        assert_eq!(described.len(), 1);
+        assert_eq!(
+            described[0]
+                .item
+                .description
+                .map(|description| description.item.0),
+            DescriptionValue::from("on sale".intern()).wrap_some()
+        );
+        assert_eq!(described[0].item.directives.len(), 1);
+        assert!(enum_values("enum Status").is_empty());
+        assert_eq!(
+            after_keyword("enum Status {}", parse_enum_type_definition)
+                .expect_err("the fixture has an empty value group")
+                .error
+                .item,
+            ParseError::expected(
+                Expectation::Token(GraphQLTokenKind::Identifier),
+                Found::Token(GraphQLTokenKind::CloseBrace)
+            )
+        );
+    }
+
+    #[test]
+    fn an_enum_value_cannot_be_true_false_or_null() {
+        for word in ["true", "false", "null"] {
+            let text = format!("enum Status {{ {word} }}");
+            let error = after_keyword(text.as_str(), parse_enum_type_definition)
+                .expect_err("the fixture's value is a reserved word");
+            assert_eq!(error.name, entity("Status"), "for word {word:?}");
+            assert_eq!(
+                error.error,
+                ParseError::EnumValueCannotBeTrueFalseOrNull
+                    .with_span(span_of(text.as_str(), word)),
+                "for word {word:?}"
+            );
+        }
+        assert_eq!(enum_values("enum Status { nullable }").len(), 1);
+    }
+
+    fn input_object(text: &str) -> InputObjectTypeDefinition {
+        after_keyword(text, parse_input_object_type_definition)
+            .expect("the fixture is an input object")
+            .item
+    }
+
+    #[test]
+    fn an_input_object_has_its_fields() {
+        let pet = input_object("input PetInput { name: String = \"x\" tags: [String!] @a }");
+        assert_eq!(pet.fields.len(), 2);
+        let name = pet.fields[0].item.reference();
+        assert_eq!(name.name.item.0, "name");
+        let Some(ConstantValue::String(default)) =
+            name.default_value.as_ref().map(|value| value.item.clone())
+        else {
+            panic!("name has a string default");
+        };
+        assert_eq!(default.0, "x");
+        let tags = pet.fields[1].item.reference();
+        assert_eq!(tags.name.item.0, "tags");
+        assert_eq!(tags.directives.len(), 1);
+        assert!(input_object("input PetInput").fields.is_empty());
+        assert_eq!(
+            after_keyword("input PetInput {}", parse_input_object_type_definition)
+                .expect_err("the fixture has an empty field group")
+                .name,
+            entity("PetInput")
+        );
+    }
+
+    #[test]
+    fn an_input_field_default_is_any_constant_value() {
+        let input = input_object("input I { a: I = { b: [1, 2], c: ENUM } }");
+        let Some(ConstantValue::Object(object)) = input.fields[0]
+            .item
+            .default_value
+            .as_ref()
+            .map(|value| value.item.clone())
+        else {
+            panic!("a has an object default");
+        };
+        assert_eq!(object.0.len(), 2);
+        assert_eq!(object.0[0].item.name.item.0, "b");
+        assert!(matches!(
+            object.0[0].item.value.item,
+            ConstantValue::List(_)
+        ));
+        assert_eq!(object.0[1].item.name.item.0, "c");
+        assert!(matches!(
+            object.0[1].item.value.item,
+            ConstantValue::Enum(_)
+        ));
     }
 }

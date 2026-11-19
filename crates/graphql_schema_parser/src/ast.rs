@@ -4,7 +4,7 @@ use common_lang_types::{
 };
 use span::WithSpan;
 
-use crate::{ConstantValue, TypeAnnotation};
+use crate::{ConstantValue, EnumLiteralValueWrapper, TypeAnnotation};
 
 /// Spec 3.6 `ObjectTypeDefinition`.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -53,6 +53,41 @@ pub struct ScalarTypeDefinition {
     pub description: Option<WithSpan<Description>>,
     pub name: WithSpan<EntityNameWrapper>,
     pub directives: Vec<WithSpan<Directive>>,
+}
+
+/// Spec 3.8 `UnionTypeDefinition`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct UnionTypeDefinition {
+    pub description: Option<WithSpan<Description>>,
+    pub name: WithSpan<EntityNameWrapper>,
+    pub directives: Vec<WithSpan<Directive>>,
+    pub member_types: Vec<WithSpan<EntityNameWrapper>>,
+}
+
+/// Spec 3.9 `EnumTypeDefinition`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EnumTypeDefinition {
+    pub description: Option<WithSpan<Description>>,
+    pub name: WithSpan<EntityNameWrapper>,
+    pub directives: Vec<WithSpan<Directive>>,
+    pub values: Vec<WithSpan<EnumValueDefinition>>,
+}
+
+/// Spec 3.9 `EnumValueDefinition`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EnumValueDefinition {
+    pub description: Option<WithSpan<Description>>,
+    pub value: WithSpan<EnumLiteralValueWrapper>,
+    pub directives: Vec<WithSpan<Directive>>,
+}
+
+/// Spec 3.10 `InputObjectTypeDefinition`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct InputObjectTypeDefinition {
+    pub description: Option<WithSpan<Description>>,
+    pub name: WithSpan<EntityNameWrapper>,
+    pub directives: Vec<WithSpan<Directive>>,
+    pub fields: Vec<WithSpan<InputValueDefinition>>,
 }
 
 /// Spec 2.13 `Directive[Const] : @ Name Arguments[Const]?`. The span runs from `@` through
