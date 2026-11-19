@@ -2,6 +2,7 @@ use common_lang_types::{
     ArgumentName, DescriptionValue, DirectiveName, EntityName, InputValueName, SelectableName,
     ValueKeyName,
 };
+use nonempty::NonEmpty;
 use span::WithSpan;
 
 use crate::{ConstantValue, EnumLiteralValueWrapper, TypeAnnotation};
@@ -162,6 +163,85 @@ pub enum DirectiveLocation {
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct DirectiveLocationWrapper(pub DirectiveLocation);
+
+/// Spec 3.1 `TypeSystemExtension`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TypeSystemExtension {
+    Schema(SchemaExtension),
+    Type(TypeExtension),
+}
+
+/// Spec 3.4.3 `TypeExtension`: an extension of a named entity.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TypeExtension {
+    Scalar(ScalarTypeExtension),
+    Object(ObjectTypeExtension),
+    Interface(InterfaceTypeExtension),
+    Union(UnionTypeExtension),
+    Enum(EnumTypeExtension),
+    InputObject(InputObjectTypeExtension),
+}
+
+/// Spec 3.6.3 `ObjectTypeExtension`. At least one of `interfaces`, `directives`, `fields`
+/// is non-empty.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ObjectTypeExtension {
+    pub name: WithSpan<EntityNameWrapper>,
+    pub interfaces: Vec<WithSpan<EntityNameWrapper>>,
+    pub directives: Vec<WithSpan<Directive>>,
+    pub fields: Vec<WithSpan<FieldDefinition>>,
+}
+
+/// Spec 3.7.1 `InterfaceTypeExtension`. At least one of `interfaces`, `directives`,
+/// `fields` is non-empty.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct InterfaceTypeExtension {
+    pub name: WithSpan<EntityNameWrapper>,
+    pub interfaces: Vec<WithSpan<EntityNameWrapper>>,
+    pub directives: Vec<WithSpan<Directive>>,
+    pub fields: Vec<WithSpan<FieldDefinition>>,
+}
+
+/// Spec 3.5.6 `ScalarTypeExtension : extend scalar Name Directives[Const]`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ScalarTypeExtension {
+    pub name: WithSpan<EntityNameWrapper>,
+    pub directives: NonEmpty<WithSpan<Directive>>,
+}
+
+/// Spec 3.8.1 `UnionTypeExtension`. At least one of `directives`, `member_types` is
+/// non-empty.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct UnionTypeExtension {
+    pub name: WithSpan<EntityNameWrapper>,
+    pub directives: Vec<WithSpan<Directive>>,
+    pub member_types: Vec<WithSpan<EntityNameWrapper>>,
+}
+
+/// Spec 3.9.1 `EnumTypeExtension`. At least one of `directives`, `values` is non-empty.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EnumTypeExtension {
+    pub name: WithSpan<EntityNameWrapper>,
+    pub directives: Vec<WithSpan<Directive>>,
+    pub values: Vec<WithSpan<EnumValueDefinition>>,
+}
+
+/// Spec 3.10.2 `InputObjectTypeExtension`. At least one of `directives`, `fields` is
+/// non-empty.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct InputObjectTypeExtension {
+    pub name: WithSpan<EntityNameWrapper>,
+    pub directives: Vec<WithSpan<Directive>>,
+    pub fields: Vec<WithSpan<InputValueDefinition>>,
+}
+
+/// Spec 3.3.2 `SchemaExtension`. At least one of `directives`, `root_operation_types` is
+/// non-empty.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SchemaExtension {
+    pub directives: Vec<WithSpan<Directive>>,
+    pub root_operation_types: Vec<WithSpan<RootOperationTypeDefinition>>,
+}
 
 /// Spec 2.13 `Directive[Const] : @ Name Arguments[Const]?`. The span runs from `@` through
 /// the arguments.

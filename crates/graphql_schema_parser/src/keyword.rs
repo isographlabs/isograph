@@ -12,7 +12,7 @@ pub(crate) enum DefinitionKeyword {
     Directive,
 }
 
-#[expect(dead_code)]
+#[cfg_attr(not(test), expect(dead_code))]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, strum::EnumString)]
 #[strum(serialize_all = "lowercase")]
 pub(crate) enum ExtensionKeyword {

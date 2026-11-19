@@ -1,8 +1,9 @@
 use common_lang_types::{DescriptionValue, DirectiveName, EntityName};
+use nonempty::NonEmpty;
 use prelude::Postfix;
 use span::{WithSpan, WithSpanPostfix};
 
-use crate::keyword::BooleanOrNullKeyword;
+use crate::keyword::{BooleanOrNullKeyword, ExtensionKeyword};
 use crate::string_value::consume_string_value_if;
 use crate::token_cursor::TokenCursor;
 use crate::type_annotation::parse_type_annotation;
@@ -10,11 +11,13 @@ use crate::value::parse_constant_value;
 use crate::{
     Argument, ArgumentNameWrapper, Description, Directive, DirectiveDefinition, DirectiveLocation,
     DirectiveLocationWrapper, DirectiveNameWrapper, DirectiveRepeatability, EntityNameWrapper,
-    EnumLiteralValueWrapper, EnumTypeDefinition, EnumValueDefinition, Expectation, FieldDefinition,
-    GraphQLTokenKind, InputObjectTypeDefinition, InputValueDefinition, InputValueNameWrapper,
-    InterfaceTypeDefinition, ObjectTypeDefinition, OperationType, OperationTypeWrapper, ParseError,
-    RootOperationTypeDefinition, ScalarTypeDefinition, SchemaDefinition, SelectableNameWrapper,
-    UnionTypeDefinition,
+    EnumLiteralValueWrapper, EnumTypeDefinition, EnumTypeExtension, EnumValueDefinition,
+    Expectation, FieldDefinition, GraphQLTokenKind, InputObjectTypeDefinition,
+    InputObjectTypeExtension, InputValueDefinition, InputValueNameWrapper, InterfaceTypeDefinition,
+    InterfaceTypeExtension, ObjectTypeDefinition, ObjectTypeExtension, OperationType,
+    OperationTypeWrapper, ParseError, RootOperationTypeDefinition, ScalarTypeDefinition,
+    ScalarTypeExtension, SchemaDefinition, SchemaExtension, SelectableNameWrapper, TypeExtension,
+    TypeSystemExtension, UnionTypeDefinition, UnionTypeExtension,
 };
 
 /// A top-level definition or extension whose parse failed. The wrapping span is the text the
@@ -429,6 +432,170 @@ fn parse_directive_location(
         .ok_or_else(|| cursor.expected(Expectation::DirectiveLocation))
 }
 
+#[cfg_attr(not(test), expect(dead_code))]
+fn parse_type_system_extension(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<TypeSystemExtension, DefinitionError> {
+    let keyword = cursor
+        .consume_identifier_of::<ExtensionKeyword>()
+        .ok_or_else(|| DefinitionError::unnamed(cursor.expected(Expectation::ExtensionKeyword)))?;
+    match keyword.item {
+        ExtensionKeyword::Schema => TypeSystemExtension::Schema(parse_schema_extension(cursor)?),
+        ExtensionKeyword::Scalar => {
+            TypeSystemExtension::Type(TypeExtension::Scalar(parse_scalar_type_extension(cursor)?))
+        }
+        ExtensionKeyword::Type => {
+            TypeSystemExtension::Type(TypeExtension::Object(parse_object_type_extension(cursor)?))
+        }
+        ExtensionKeyword::Interface => TypeSystemExtension::Type(TypeExtension::Interface(
+            parse_interface_type_extension(cursor)?,
+        )),
+        ExtensionKeyword::Union => {
+            TypeSystemExtension::Type(TypeExtension::Union(parse_union_type_extension(cursor)?))
+        }
+        ExtensionKeyword::Enum => {
+            TypeSystemExtension::Type(TypeExtension::Enum(parse_enum_type_extension(cursor)?))
+        }
+        ExtensionKeyword::Input => TypeSystemExtension::Type(TypeExtension::InputObject(
+            parse_input_object_type_extension(cursor)?,
+        )),
+    }
+    .wrap_ok()
+}
+
+fn parse_schema_extension(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<SchemaExtension, DefinitionError> {
+    let directives = parse_directives(cursor).map_err(DefinitionError::unnamed)?;
+    let root_operation_types = match cursor.consume_token_if(GraphQLTokenKind::OpenBrace) {
+        Some(_) => {
+            parse_root_operation_types_after_open(cursor).map_err(DefinitionError::unnamed)?
+        }
+        None => Vec::new(),
+    };
+    if directives.is_empty() && root_operation_types.is_empty() {
+        return DefinitionError::unnamed(cursor.expected(Expectation::DirectiveOrOpenBrace))
+            .wrap_err();
+    }
+    SchemaExtension {
+        directives,
+        root_operation_types,
+    }
+    .wrap_ok()
+}
+
+fn parse_scalar_type_extension(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<ScalarTypeExtension, DefinitionError> {
+    parse_after_entity_name(cursor, |cursor, name| {
+        let directives = NonEmpty::from_vec(parse_directives(cursor)?)
+            .ok_or_else(|| cursor.expected(Expectation::Directive))?;
+        ScalarTypeExtension { name, directives }.wrap_ok()
+    })
+}
+
+fn parse_object_type_extension(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<ObjectTypeExtension, DefinitionError> {
+    parse_after_entity_name(cursor, |cursor, name| {
+        let interfaces = parse_implements_interfaces(cursor)?;
+        let directives = parse_directives(cursor)?;
+        let fields = parse_fields_definition(cursor)?;
+        if interfaces.is_empty() && directives.is_empty() && fields.is_empty() {
+            return cursor
+                .expected(Expectation::ImplementsDirectiveOrOpenBrace)
+                .wrap_err();
+        }
+        ObjectTypeExtension {
+            name,
+            interfaces,
+            directives,
+            fields,
+        }
+        .wrap_ok()
+    })
+}
+
+fn parse_interface_type_extension(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<InterfaceTypeExtension, DefinitionError> {
+    parse_after_entity_name(cursor, |cursor, name| {
+        let interfaces = parse_implements_interfaces(cursor)?;
+        let directives = parse_directives(cursor)?;
+        let fields = parse_fields_definition(cursor)?;
+        if interfaces.is_empty() && directives.is_empty() && fields.is_empty() {
+            return cursor
+                .expected(Expectation::ImplementsDirectiveOrOpenBrace)
+                .wrap_err();
+        }
+        InterfaceTypeExtension {
+            name,
+            interfaces,
+            directives,
+            fields,
+        }
+        .wrap_ok()
+    })
+}
+
+fn parse_union_type_extension(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<UnionTypeExtension, DefinitionError> {
+    parse_after_entity_name(cursor, |cursor, name| {
+        let directives = parse_directives(cursor)?;
+        let member_types = parse_union_member_types(cursor)?;
+        if directives.is_empty() && member_types.is_empty() {
+            return cursor.expected(Expectation::DirectiveOrEquals).wrap_err();
+        }
+        UnionTypeExtension {
+            name,
+            directives,
+            member_types,
+        }
+        .wrap_ok()
+    })
+}
+
+fn parse_enum_type_extension(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<EnumTypeExtension, DefinitionError> {
+    parse_after_entity_name(cursor, |cursor, name| {
+        let directives = parse_directives(cursor)?;
+        let values = parse_enum_values_definition(cursor)?;
+        if directives.is_empty() && values.is_empty() {
+            return cursor
+                .expected(Expectation::DirectiveOrOpenBrace)
+                .wrap_err();
+        }
+        EnumTypeExtension {
+            name,
+            directives,
+            values,
+        }
+        .wrap_ok()
+    })
+}
+
+fn parse_input_object_type_extension(
+    cursor: &mut TokenCursor<'_>,
+) -> Result<InputObjectTypeExtension, DefinitionError> {
+    parse_after_entity_name(cursor, |cursor, name| {
+        let directives = parse_directives(cursor)?;
+        let fields = parse_input_fields_definition(cursor)?;
+        if directives.is_empty() && fields.is_empty() {
+            return cursor
+                .expected(Expectation::DirectiveOrOpenBrace)
+                .wrap_err();
+        }
+        InputObjectTypeExtension {
+            name,
+            directives,
+            fields,
+        }
+        .wrap_ok()
+    })
+}
+
 fn parse_directives(
     cursor: &mut TokenCursor<'_>,
 ) -> Result<Vec<WithSpan<Directive>>, WithSpan<ParseError>> {
@@ -534,7 +701,8 @@ mod tests {
         DefinitionError, DefinitionName, consume_description, parse_directive_definition,
         parse_directives, parse_enum_type_definition, parse_input_object_type_definition,
         parse_interface_type_definition, parse_object_type_definition,
-        parse_scalar_type_definition, parse_schema_definition, parse_union_type_definition,
+        parse_scalar_type_definition, parse_schema_definition, parse_type_system_extension,
+        parse_union_type_definition,
     };
     use crate::span_of::span_of;
     use crate::test_cursor::with_cursor;
@@ -544,7 +712,7 @@ mod tests {
         DirectiveRepeatability, EntityNameWrapper, EnumValueDefinition, Expectation,
         FieldDefinition, Found, GraphQLTokenKind, InputObjectTypeDefinition, IntegerValue,
         NullableTypeAnnotation, ObjectTypeDefinition, OperationType, ParseError, SchemaDefinition,
-        TypeAnnotation, UnionTypeDefinition,
+        TypeAnnotation, TypeExtension, TypeSystemExtension, UnionTypeDefinition,
     };
 
     /// Runs `parse` on `text` after its description, when it has one, and its keyword.
@@ -1307,5 +1475,190 @@ mod tests {
         let definition = directive_definition(text);
         assert_eq!(definition.name.item.0, "type");
         assert_eq!(definition.name.location, span_of(text, "type"));
+    }
+
+    /// Runs `parse_type_system_extension` on `text` after its `extend`.
+    fn after_extend(text: &str) -> Result<TypeSystemExtension, DefinitionError> {
+        with_cursor(text, |cursor| {
+            cursor.advance();
+            parse_type_system_extension(cursor)
+        })
+    }
+
+    fn extension(text: &str) -> TypeSystemExtension {
+        after_extend(text).expect("the fixture is an extension")
+    }
+
+    fn extension_error(text: &str) -> DefinitionError {
+        after_extend(text).expect_err("the fixture is an invalid extension")
+    }
+
+    #[test]
+    fn an_object_extension_needs_one_of_its_parts() {
+        let TypeSystemExtension::Type(TypeExtension::Object(pet)) =
+            extension("extend type Pet { nickname: String }")
+        else {
+            panic!("the fixture extends an object");
+        };
+        assert_eq!(pet.name.item.0, "Pet");
+        assert_eq!(field_names(pet.fields.as_slice()), "nickname".wrap_vec());
+        for text in ["extend type Pet implements Node", "extend type Pet @a"] {
+            assert!(
+                matches!(
+                    extension(text),
+                    TypeSystemExtension::Type(TypeExtension::Object(_))
+                ),
+                "for text {text:?}"
+            );
+        }
+        assert_eq!(
+            extension_error("extend type Pet"),
+            DefinitionError {
+                name: entity("Pet"),
+                error: ParseError::expected(
+                    Expectation::ImplementsDirectiveOrOpenBrace,
+                    Found::EndOfFile
+                )
+                .with_span(Span::new(15, 15)),
+            }
+        );
+    }
+
+    #[test]
+    fn an_interface_extension_needs_one_of_its_parts() {
+        assert!(matches!(
+            extension("extend interface Node { id: ID! }"),
+            TypeSystemExtension::Type(TypeExtension::Interface(_))
+        ));
+        let error = extension_error("extend interface Node");
+        assert_eq!(error.name, entity("Node"));
+        assert_eq!(
+            error.error.item,
+            ParseError::expected(
+                Expectation::ImplementsDirectiveOrOpenBrace,
+                Found::EndOfFile
+            )
+        );
+    }
+
+    #[test]
+    fn a_scalar_extension_needs_a_directive() {
+        let TypeSystemExtension::Type(TypeExtension::Scalar(date)) =
+            extension("extend scalar Date @a")
+        else {
+            panic!("the fixture extends a scalar");
+        };
+        assert_eq!(date.directives.len(), 1);
+        assert_eq!(date.directives.first().item.name.item.0, "a");
+        let error = extension_error("extend scalar Date");
+        assert_eq!(error.name, entity("Date"));
+        assert_eq!(
+            error.error.item,
+            ParseError::expected(Expectation::Directive, Found::EndOfFile)
+        );
+    }
+
+    #[test]
+    fn a_union_extension_needs_one_of_its_parts() {
+        for text in ["extend union Search = Photo", "extend union Search @a"] {
+            assert!(
+                matches!(
+                    extension(text),
+                    TypeSystemExtension::Type(TypeExtension::Union(_))
+                ),
+                "for text {text:?}"
+            );
+        }
+        let error = extension_error("extend union Search");
+        assert_eq!(error.name, entity("Search"));
+        assert_eq!(
+            error.error.item,
+            ParseError::expected(Expectation::DirectiveOrEquals, Found::EndOfFile)
+        );
+    }
+
+    #[test]
+    fn an_enum_extension_needs_one_of_its_parts() {
+        for text in ["extend enum Status { LOST }", "extend enum Status @a"] {
+            assert!(
+                matches!(
+                    extension(text),
+                    TypeSystemExtension::Type(TypeExtension::Enum(_))
+                ),
+                "for text {text:?}"
+            );
+        }
+        let error = extension_error("extend enum Status");
+        assert_eq!(error.name, entity("Status"));
+        assert_eq!(
+            error.error.item,
+            ParseError::expected(Expectation::DirectiveOrOpenBrace, Found::EndOfFile)
+        );
+    }
+
+    #[test]
+    fn an_input_object_extension_needs_one_of_its_parts() {
+        for text in [
+            "extend input PetInput { age: Int }",
+            "extend input PetInput @a",
+        ] {
+            assert!(
+                matches!(
+                    extension(text),
+                    TypeSystemExtension::Type(TypeExtension::InputObject(_))
+                ),
+                "for text {text:?}"
+            );
+        }
+        let error = extension_error("extend input PetInput");
+        assert_eq!(error.name, entity("PetInput"));
+        assert_eq!(
+            error.error.item,
+            ParseError::expected(Expectation::DirectiveOrOpenBrace, Found::EndOfFile)
+        );
+    }
+
+    #[test]
+    fn a_schema_extension_needs_one_of_its_parts() {
+        let TypeSystemExtension::Schema(mutation) =
+            extension("extend schema { mutation: Mutation }")
+        else {
+            panic!("the fixture extends the schema");
+        };
+        assert_eq!(mutation.root_operation_types.len(), 1);
+        assert_eq!(
+            mutation.root_operation_types[0].item.operation_type.item.0,
+            OperationType::Mutation
+        );
+        let TypeSystemExtension::Schema(directed) = extension("extend schema @a") else {
+            panic!("the fixture extends the schema");
+        };
+        assert_eq!(directed.directives.len(), 1);
+        let error = extension_error("extend schema");
+        assert_eq!(error.name, None);
+        assert_eq!(
+            error.error.item,
+            ParseError::expected(Expectation::DirectiveOrOpenBrace, Found::EndOfFile)
+        );
+    }
+
+    #[test]
+    fn a_directive_cannot_be_extended() {
+        let text = "extend directive @a on FIELD";
+        assert_eq!(
+            extension_error(text),
+            DefinitionError {
+                name: None,
+                error: ParseError::expected(
+                    Expectation::ExtensionKeyword,
+                    Found::Token(GraphQLTokenKind::Identifier)
+                )
+                .with_span(span_of(text, "directive")),
+            }
+        );
+        assert_eq!(
+            extension_error("extend").error.item,
+            ParseError::expected(Expectation::ExtensionKeyword, Found::EndOfFile)
+        );
     }
 }
