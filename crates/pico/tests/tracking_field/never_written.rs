@@ -48,16 +48,16 @@ fn values_tracked(db: &TestDatabase) -> Vec<String> {
 }
 
 /// Before the first write, the map's counter singleton does not exist.
+/// Reading it inside a memo still records a dependency.
 #[test]
-fn iteration_before_first_write_then_insert_does_not_rerun_bug() {
+fn iteration_before_first_write_then_insert_reruns() {
     let mut db = TestDatabase::default();
     assert_eq!(*values_tracked(&db), Vec::<String>::new());
 
     insert(&mut db, "a", "asdf");
 
-    // pico records no dependency on a missing key; the fix flips this assertion.
-    assert_eq!(*values_tracked(&db), Vec::<String>::new());
-    assert_eq!(ITERATION.load(Ordering::SeqCst), 1);
+    assert_eq!(*values_tracked(&db), vec!["asdf".to_string()]);
+    assert_eq!(ITERATION.load(Ordering::SeqCst), 2);
 }
 
 static LOOKUP: AtomicUsize = AtomicUsize::new(0);
@@ -75,13 +75,12 @@ fn lookup_a(db: &TestDatabase) -> Option<String> {
 }
 
 #[test]
-fn untracked_miss_then_tracked_then_insert_does_not_rerun_bug() {
+fn untracked_miss_then_tracked_then_insert_reruns() {
     let mut db = TestDatabase::default();
     assert_eq!(*lookup_a(&db), None);
 
     insert(&mut db, "a", "asdf");
 
-    // pico records no dependency on a missing key; the fix flips this assertion.
-    assert_eq!(*lookup_a(&db), None);
-    assert_eq!(LOOKUP.load(Ordering::SeqCst), 1);
+    assert_eq!(*lookup_a(&db), Some("asdf".to_string()));
+    assert_eq!(LOOKUP.load(Ordering::SeqCst), 2);
 }
