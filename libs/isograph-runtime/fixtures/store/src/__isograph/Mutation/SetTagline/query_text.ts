@@ -1,0 +1,1 @@
+export default "mutation SetTagline($id: ID!, $tagline: String!) {\n  setTagline____input___o_id__v_id_tagline__v_tagline_c: setTagline(input: { id: $id, tagline: $tagline }) {\n    __typename\n    pet {\n      __typename\n      id\n      tagline\n    }\n    query {\n      __typename\n      greeting\n    }\n  }\n}";

@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.build.json",
+  "compilerOptions": {
+    "noUnusedLocals": false,
+    "paths": {
+      "@isograph/runtime": ["./src/index.ts"]
+    }
+  },
+  "include": ["test/**/*.ts", "fixtures/**/*.ts"],
+  "exclude": ["**/node_modules", "**/dist"]
+}

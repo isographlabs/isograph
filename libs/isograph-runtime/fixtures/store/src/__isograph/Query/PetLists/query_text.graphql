@@ -1,0 +1,21 @@
+query PetLists {
+  maybePets {
+    __typename
+    id
+    name
+  }
+  petGrid {
+    __typename
+    id
+    name
+  }
+  pets {
+    __typename
+    id
+    name
+  }
+  statGrid {
+    __typename
+    weight
+  }
+}

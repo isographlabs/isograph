@@ -1,0 +1,19 @@
+query Feed($limit: Int!) {
+  feed____limit___v_limit: feed(limit: $limit) {
+    __typename
+    ... on AdItem {
+      __typename
+      advertiser
+    }
+    ... on BlogItem {
+      __typename
+      id
+      author {
+        __typename
+        id
+        name
+      }
+      title
+    }
+  }
+}

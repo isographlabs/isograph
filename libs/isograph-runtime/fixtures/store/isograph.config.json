@@ -1,0 +1,5 @@
+{
+  "source_files": ["src/**/*.ts"],
+  "schema": ["schema/**/*.graphql"],
+  "output_directory": "src"
+}

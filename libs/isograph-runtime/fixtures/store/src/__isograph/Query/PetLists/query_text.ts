@@ -1,0 +1,1 @@
+export default "query PetLists {\n  maybePets {\n    __typename\n    id\n    name\n  }\n  petGrid {\n    __typename\n    id\n    name\n  }\n  pets {\n    __typename\n    id\n    name\n  }\n  statGrid {\n    __typename\n    weight\n  }\n}";

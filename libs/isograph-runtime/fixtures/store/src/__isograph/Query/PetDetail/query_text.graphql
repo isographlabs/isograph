@@ -1,0 +1,34 @@
+query PetDetail($id: ID!, $skip: Int) {
+  pet____id___v_id: pet(id: $id) {
+    __typename
+    id
+    bestFriend {
+      __typename
+      id
+      bestFriend {
+        __typename
+        id
+        name
+      }
+      name
+    }
+    checkins____limit___l_2: checkins(limit: 2) {
+      __typename
+      id
+      location
+    }
+    checkins____limit___l_2____skip___v_skip: checkins(limit: 2, skip: $skip) {
+      __typename
+      id
+      location
+    }
+    name
+    nickname
+    stats {
+      __typename
+      energy
+      weight
+    }
+    tagline
+  }
+}

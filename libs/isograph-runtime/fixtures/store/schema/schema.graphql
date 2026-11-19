@@ -1,0 +1,80 @@
+schema {
+  query: Query
+  mutation: Mutation
+}
+
+scalar ID
+scalar String
+scalar Int
+scalar Boolean
+scalar JSON
+
+type Query {
+  node(id: ID!): Node
+  pet(id: ID!): Pet
+  pets: [Pet!]!
+  maybePets: [Pet]
+  petGrid: [[Pet]]
+  statGrid: [[PetStats]]
+  feed(limit: Int!): [FeedItem!]!
+  search(filter: PetFilter!): [Pet!]!
+  greeting(name: String, loud: Boolean, times: Int): String
+  tags: [String]
+  settings: JSON
+  query: Query!
+}
+
+type Mutation {
+  setTagline(input: SetTaglineInput!): SetTaglinePayload!
+}
+
+interface Node {
+  id: ID!
+}
+
+type Pet implements Node {
+  id: ID!
+  name: String!
+  nickname: String
+  tagline: String!
+  stats: PetStats
+  bestFriend: Pet
+  checkins(limit: Int, skip: Int): [Checkin!]!
+}
+
+type PetStats {
+  weight: Int
+  energy: Int
+}
+
+type Checkin implements Node {
+  id: ID!
+  location: String!
+}
+
+union FeedItem = BlogItem | AdItem
+
+type BlogItem implements Node {
+  id: ID!
+  title: String!
+  author: Pet
+}
+
+type AdItem {
+  advertiser: String!
+}
+
+input PetFilter {
+  nameContains: String
+  minAge: Int
+}
+
+input SetTaglineInput {
+  id: ID!
+  tagline: String!
+}
+
+type SetTaglinePayload {
+  pet: Pet!
+  query: Query!
+}

@@ -83,6 +83,12 @@ repos:
         language: system
         files: '^libs/isograph-babel-plugin/'
         pass_filenames: false
+      - id: runtime-typecheck
+        name: runtime typecheck
+        entry: pnpm --filter @isograph/runtime tsc
+        language: system
+        files: '^(libs/isograph-runtime/|tsconfig\.build\.json$)'
+        pass_filenames: false
       - id: precommit-in-worktree-test
         name: precommit-in-worktree-test
         entry: ./scripts/precommit-in-worktree-test.sh

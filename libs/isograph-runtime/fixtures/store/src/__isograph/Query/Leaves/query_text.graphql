@@ -1,0 +1,8 @@
+query Leaves($name: String) {
+  greeting
+  greeting____loud___l_true____name___s_Ada_Lovelace____times___l_3: greeting(loud: true, name: "Ada Lovelace", times: 3)
+  greeting____name___v_name: greeting(name: $name)
+  greeting____name___l_null: greeting(name: null)
+  settings
+  tags
+}

@@ -483,35 +483,92 @@ export { normalize } from "./normalize";
 
 `storeKey`, `argumentChunks`, `stableStringify`, and `recordLink` are module exports that `normalize`, `check`, and `garbageCollect` import; the package index does not export them. Their tests import the modules directly.
 
+The package builds as upstream's `libs` packages do (`isograph/libs/isograph-react/package.json`, `tsconfig.json`, `tsconfig.package.json`, `tsconfig.test.json`, `tsdown.config.ts`; `isograph/tsconfig.build.json`; `isograph/tsdown.config.ts`): the same scripts, `exports`, and `dist` layout, emitted by `tsdown`, with `tsconfig.build.json` and `tsdown.config.ts` at the repository root and `tsdown` `0.20.1` in the root `devDependencies`, as upstream has them. The package has no React dependency, imports nothing from React, and defines no hook (`use*`).
+
 ```json
 // from libs/isograph-runtime/package.json
 {
+  "name": "@isograph/runtime",
+  "description": "The Isograph runtime and the types of the artifacts the compiler generates.",
+  "private": true,
+  "main": "./dist/index.cjs",
+  "types": "./dist/index.d.cts",
+  "license": "MIT",
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "compile-libs": "tsdown",
+    "watch-libs": "tsdown --watch",
+    "test": "vitest run",
+    "test-watch": "vitest watch",
+    "coverage": "vitest run --coverage",
+    "prepack": "pnpm run test && pnpm run compile-libs",
+    "tsc": "tsc -b",
+    "tsc-force": "tsc --build --clean && tsc --build --force"
   },
   "devDependencies": {
     "typescript": "5.6.3",
     "vitest": "^2.1.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/isographlabs/isograph.git",
+    "directory": "libs/isograph-runtime"
+  },
+  "sideEffects": false,
+  "module": "./dist/index.mjs",
+  "exports": {
+    ".": {
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.mjs"
+    },
+    "./package.json": "./package.json"
   }
 }
 ```
 
-Delta from normalization-ast.md's `package.json`: the `test` script and `vitest` at the babel plugin's version (`libs/isograph-babel-plugin/package.json`). Every other key is unchanged. `exports` keeps only its `types` condition: in v1 no module outside the package imports its runtime values, and tests import `../src/index`.
-
 ```json
 // from libs/isograph-runtime/tsconfig.json
 {
-  "compilerOptions": {
-    "target": "ES2022"
-  },
-  "include": ["./src/**/*.ts", "./test/**/*.ts"]
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.package.json" },
+    { "path": "./tsconfig.test.json" }
+  ]
 }
 ```
 
-Delta from normalization-ast.md's `tsconfig.json`: `target` `ES2022` (AGENTS.md, TypeScript; `Object.hasOwn` is ES2022), and `test` in `include`. Every other option is unchanged. The fixture artifacts are checked because the tests import them; they `import type { NormalizationAst } from "@isograph/runtime"`, which resolves to the package itself through its `exports` (TypeScript's package self-reference under `moduleResolution: "bundler"`). If `tsc` does not resolve the self-reference, the implementer stops and raises it.
+```json
+// from libs/isograph-runtime/tsconfig.package.json
+{
+  "extends": "../../tsconfig.build.json",
+  "include": ["src/**/*.ts"]
+}
+```
 
-`.github/workflows/js.yml` gains `pnpm --filter @isograph/runtime test` beside the runtime's `Typecheck` step (normalization-ast.md). `.pre-commit-config.yaml` gains `runtime-test` and `runtime-typecheck`, the babel plugin's two hooks with `@isograph/runtime` and `files: '^libs/isograph-runtime/'`. `.prettierignore` and `.oxlintrc.json` already ignore `__isograph`.
+```json
+// from libs/isograph-runtime/tsconfig.test.json
+{
+  "extends": "../../tsconfig.build.json",
+  "compilerOptions": {
+    "noUnusedLocals": false,
+    "paths": {
+      "@isograph/runtime": ["./src/index.ts"]
+    }
+  },
+  "include": ["test/**/*.ts", "fixtures/**/*.ts"],
+  "exclude": ["**/node_modules", "**/dist"]
+}
+```
+
+`libs/isograph-runtime/tsdown.config.ts` is `isograph/libs/isograph-react/tsdown.config.ts` verbatim (the root config merged with `dts: { build: true }`), and the root `tsdown.config.ts` is `isograph/tsdown.config.ts` verbatim. The root `tsconfig.build.json` is `isograph/tsconfig.build.json` with `target` `ES2022` in place of `ES2015` (AGENTS.md, TypeScript; `Object.hasOwn` is ES2022).
+
+Deltas from upstream's packages:
+
+- `private: true`, and no `version`, `homepage`, `author`, or `dependencies`: the package is not published.
+- `vitest` is a dev dependency of the package, as `libs/isograph-babel-plugin` has it, not only of the repository root.
+- `tsconfig.package.json` includes `src/**/*.ts` (upstream `**/*.ts` minus `src/tests`), and `tsconfig.test.json` includes `test/**/*.ts` and `fixtures/**/*.ts` and replaces the base `exclude` so `*.test.ts` files are checked (upstream's test config inherits the base `exclude`, which drops `**/*.test.ts`). The test config's `paths` maps `@isograph/runtime` to `./src/index.ts`, as upstream's maps `@isograph/react`, so the fixture artifacts' `import type { NormalizationAst } from "@isograph/runtime"` resolves to the sources without a build. Upstream's `jsx` option in the test config is dropped (no React).
+- No `turbo`: CI builds the package with `pnpm --filter @isograph/runtime compile-libs` before type-checking the pet demo, whose `@isograph/runtime` import resolves to `dist` through `exports`, as upstream's demos resolve the built libs.
+
+`.github/workflows/js.yml`'s runtime steps are `pnpm --filter @isograph/runtime tsc`, `pnpm --filter @isograph/runtime compile-libs` (before the pet demo's `Typecheck`), and `pnpm --filter @isograph/runtime test`. `.pre-commit-config.yaml` gains `runtime-typecheck` (`pnpm --filter @isograph/runtime tsc`, `files: '^(libs/isograph-runtime/|tsconfig\.build\.json$)'`) and `runtime-test` (`pnpm --filter @isograph/runtime test`, `files: '^libs/isograph-runtime/'`), the babel plugin's two hooks. `.prettierignore` and `.oxlintrc.json` already ignore `__isograph`, and `.gitignore` already ignores `dist` and `*.tsbuildinfo`.
 
 ## Test infrastructure
 
@@ -648,7 +705,7 @@ field Query.PetDetail($id: ID!, $skip: Int) {
 
 field PetStats.StatsCard { weight }
 field Query.EmptyStats($id: ID!) {
-  pet(id: $id) { stats { StatsCard @loadable } }
+  pet(id: $id) { stats { } }
 }
 
 field Query.PetLists {
@@ -679,7 +736,7 @@ field Query.NestedQuery {
 }
 ```
 
-with `entrypoint Query.Leaves`, `Query.NestedQuery`, `Query.PetDetail`, `Query.EmptyStats`, `Query.PetLists`, `Query.Feed`, `Query.Search`, and `Mutation.SetTagline`. If the compiler rejects one (for instance `@loadable` on an identity-less `PetStats` field), the implementer stops and raises it.
+with `entrypoint Query.Leaves`, `Query.NestedQuery`, `Query.PetDetail`, `Query.EmptyStats`, `Query.PetLists`, `Query.Feed`, `Query.Search`, and `Mutation.SetTagline`. `EmptyStats` selects `stats { }`, an empty selection set, because the iso parser rejects every directive (`AstError::UnexpectedDirective`), `@loadable` included; the compiler generates the same AST node `stats { StatsCard @loadable }` would, a composite selection with `selections: []`, and the query text `stats { __typename }`. `StatsCard` stays in the fixture for when `@loadable` parses.
 
 ## Tests
 
@@ -750,13 +807,13 @@ Stores come from `normalize` of fixture responses, then are edited by hand where
 
 Each change is one commit. Prerequisite: normalization-ast.md changes 1 to 3.
 
-### 1. Test runner and fixture project
+### 1. Build setup, test runner, and fixture project
 
-`vitest` and the `test` script; `target` and `include` in `tsconfig.json`; the CI step and the two pre-commit hooks; `fixtures/store` with its config, schema, sources, and generated artifacts; `test/fixtures.ts`.
+The package's upstream build (The package): `package.json`, the three `tsconfig` files, `tsdown.config.ts`, the root `tsconfig.build.json` and `tsdown.config.ts`, `tsdown` in the root `devDependencies`, `vitest`; the CI `tsc` and `compile-libs` steps; the `runtime-typecheck` hook; `fixtures/store` with its config, schema, sources, and generated artifacts.
 
 ### 2. Store, store keys, record ids
 
-`src/store.ts`, `src/storeKey.ts` with `stableStringify`, `src/recordId.ts`; `test/storeKey.test.ts`. Depends on 1.
+`src/store.ts`, `src/storeKey.ts` with `stableCopy`, `src/recordId.ts`; `test/fixtures.ts`, `test/storeKey.test.ts`; the CI `test` step and the `runtime-test` hook, which land with the first test file because `vitest run` fails when no test file exists. Depends on 1.
 
 ### 3. `normalize`
 

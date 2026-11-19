@@ -33,7 +33,9 @@ jobs:
       - name: Typecheck
         run: pnpm --filter @isograph/babel-plugin typecheck
       - name: Typecheck the runtime
-        run: pnpm --filter @isograph/runtime typecheck
+        run: pnpm --filter @isograph/runtime tsc
+      - name: Build the runtime
+        run: pnpm --filter @isograph/runtime compile-libs
       - name: Typecheck the pet demo
         run: pnpm --filter pet-demo typecheck
       - name: Test
