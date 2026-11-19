@@ -1,13 +1,12 @@
 use common_lang_types::RelativePathToSourceFile;
 use isograph_compiler::{
-    ClientId, CompilationProfile, IsographDb, LiteralId, iso_literal_extraction,
-    parsed_iso_literal_by_id,
+    ClientId, CompilationProfile, IsographDb, LiteralId, parsed_iso_literal_by_id,
 };
 use isograph_parser::IsographSemanticToken;
 use prelude::Postfix;
 use span::{Span, WithOptionalSpan};
 
-use crate::hover::iso_literal_at_lsp_position;
+use crate::hover::{file_span_of_literal_span, iso_literal_at_lsp_position};
 use crate::line_index::line_index;
 
 /// What lies under a position inside an iso literal.
@@ -44,8 +43,7 @@ fn token_span_at_lsp_position<TProfile: CompilationProfile>(
     let (literal_id, token) = literal_token_at_lsp_position(db, client, path, position)?;
     match token {
         TokenUnderCursor::Token(span) => {
-            let extraction = iso_literal_extraction(db, literal_id).as_ref()?;
-            TokenUnderCursor::Token(span.with_offset(extraction.iso_literal_start_index.0 as u32))
+            TokenUnderCursor::Token(file_span_of_literal_span(db, literal_id, span)?)
         }
         TokenUnderCursor::BetweenTokens => TokenUnderCursor::BetweenTokens,
     }

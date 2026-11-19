@@ -1440,14 +1440,14 @@ mod tests {
         })
     }
 
-    /// The Markdown text of the hover at `line:character`, or `None` for a `null` result.
-    fn hover_text(
+    /// The hover at `line:character`, or `None` for a `null` result.
+    fn hover(
         state: &mut IsographState<TestProfile>,
         client: &TestClient,
         uri: &str,
         line: u32,
         character: u32,
-    ) -> Option<String> {
+    ) -> Option<lsp_types::Hover> {
         let result = request_result(
             state,
             client,
@@ -1456,10 +1456,24 @@ mod tests {
         );
         serde_json::from_value::<Option<lsp_types::Hover>>(result)
             .expect("hover returns Hover | null")
-            .map(|hover| match hover.contents {
-                lsp_types::HoverContents::Markup(markup) => markup.value,
-                contents => panic!("expected markup contents, got {contents:?}"),
-            })
+    }
+
+    fn markup_value(hover: lsp_types::Hover) -> String {
+        match hover.contents {
+            lsp_types::HoverContents::Markup(markup) => markup.value,
+            contents => panic!("expected markup contents, got {contents:?}"),
+        }
+    }
+
+    /// The Markdown text of the hover at `line:character`, or `None` for a `null` result.
+    fn hover_text(
+        state: &mut IsographState<TestProfile>,
+        client: &TestClient,
+        uri: &str,
+        line: u32,
+        character: u32,
+    ) -> Option<String> {
+        hover(state, client, uri, line, character).map(markup_value)
     }
 
     /// The UTF-16 column of the first `needle` in the one-line `line`.
@@ -1469,11 +1483,40 @@ mod tests {
     }
 
     /// Client 1's hover at `line:character` of `src/x.ts` on disk as `text`.
-    fn hover_on_disk(text: &str, line: u32, character: u32) -> Option<String> {
+    fn disk_hover(text: &str, line: u32, character: u32) -> Option<lsp_types::Hover> {
         let mut state = with_config();
         disk_changed(&mut state, "/tmp/proj/src/x.ts", text);
         let one = live_client(&mut state, ClientId(1));
-        hover_text(&mut state, &one, X_URI, line, character)
+        hover(&mut state, &one, X_URI, line, character)
+    }
+
+    fn hover_on_disk(text: &str, line: u32, character: u32) -> Option<String> {
+        disk_hover(text, line, character).map(markup_value)
+    }
+
+    /// The range of client 1's hover at `line:character` of `src/x.ts` on disk as `text`.
+    fn hover_range_on_disk(
+        text: &str,
+        line: u32,
+        character: u32,
+    ) -> Option<Option<lsp_types::Range>> {
+        disk_hover(text, line, character).map(|hover| hover.range)
+    }
+
+    /// The range on `line` from UTF-16 column `start` to `end`, as a hover range.
+    fn hover_char_range(line: u32, start: u32, end: u32) -> Option<Option<lsp_types::Range>> {
+        lsp_types::Range {
+            start: lsp_types::Position {
+                line,
+                character: start,
+            },
+            end: lsp_types::Position {
+                line,
+                character: end,
+            },
+        }
+        .wrap_some()
+        .wrap_some()
     }
 
     fn some(text: &str) -> Option<String> {
@@ -1655,12 +1698,16 @@ mod tests {
     }
 
     /// Client 1's hover at the `nth` `needle` after `after`, through a didOpen buffer of `text`.
-    fn hover_in_buffer(text: &str, after: &str, needle: &str, nth: usize) -> Option<String> {
+    fn buffer_hover(text: &str, after: &str, needle: &str, nth: usize) -> Option<lsp_types::Hover> {
         let mut state = with_config();
         let one = live_client(&mut state, ClientId(1));
         handle(&mut state, did_open(one.client, X_URI, text));
         let (line, character) = position_of(text, after, needle, nth);
-        hover_text(&mut state, &one, X_URI, line, character)
+        hover(&mut state, &one, X_URI, line, character)
+    }
+
+    fn hover_in_buffer(text: &str, after: &str, needle: &str, nth: usize) -> Option<String> {
+        buffer_hover(text, after, needle, nth).map(markup_value)
     }
 
     #[test]
@@ -1689,6 +1736,81 @@ mod tests {
                 hover_in_buffer(text, "iso(`", ",", 0),
                 some("ArgumentList"),
                 "argument comma of the buffer {text:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn hover_range_on_argument_colons_and_commas_is_that_char() {
+        for text in [PET_MULTILINE, PET_ONE_LINE] {
+            for (needle, nth) in [(":", 0), (":", 1), (",", 0)] {
+                let (line, character) = position_of(text, "iso(`", needle, nth);
+                let expected = hover_char_range(line, character, character + 1);
+                assert_eq!(
+                    hover_range_on_disk(text, line, character),
+                    expected,
+                    "{needle:?} {nth} of {text:?}"
+                );
+                assert_eq!(
+                    buffer_hover(text, "iso(`", needle, nth).map(|hover| hover.range),
+                    expected,
+                    "{needle:?} {nth} of the buffer {text:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn hover_range_is_the_first_and_the_last_interior_char() {
+        let first = column(HOME_DISK, "entrypoint");
+        let last = column(HOME_DISK, "`)") - 1;
+        assert_eq!(
+            hover_range_on_disk(HOME_DISK, 0, first),
+            hover_char_range(0, first, first + 1)
+        );
+        assert_eq!(
+            hover_range_on_disk(HOME_DISK, 0, last),
+            hover_char_range(0, last, last + 1)
+        );
+    }
+
+    #[test]
+    fn hover_range_after_wide_chars_is_in_utf16_columns() {
+        for prefix in ["const s = \"😀\"; ", "const s = \"é\"; "] {
+            let text = format!("{prefix}{ENTRYPOINT_A}");
+            let query = column(&text, "Query");
+            assert_eq!(
+                hover_range_on_disk(&text, 0, query),
+                hover_char_range(0, query, query + 1),
+                "after {prefix:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn hover_range_on_a_multi_byte_char_in_a_string_literal_spans_its_utf16_units() {
+        let text = "iso(`field Pet.fullName @foo(bar: \"é😀\") { id }`)";
+        let e_acute = column(text, "é");
+        let emoji = column(text, "😀");
+        assert_eq!(
+            hover_range_on_disk(text, 0, e_acute),
+            hover_char_range(0, e_acute, e_acute + 1)
+        );
+        assert_eq!(
+            hover_range_on_disk(text, 0, emoji),
+            hover_char_range(0, emoji, emoji + 2)
+        );
+    }
+
+    #[test]
+    fn hover_range_after_crlf_and_cr_is_on_the_next_line() {
+        for line_break in ["\r\n", "\r"] {
+            let text = format!("const x = 1;{line_break}{ENTRYPOINT_A}");
+            let query = column(ENTRYPOINT_A, "Query");
+            assert_eq!(
+                hover_range_on_disk(&text, 1, query),
+                hover_char_range(1, query, query + 1),
+                "after {line_break:?}"
             );
         }
     }

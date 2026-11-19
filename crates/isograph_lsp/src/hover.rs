@@ -1,28 +1,33 @@
 use common_lang_types::RelativePathToSourceFile;
 use isograph_compiler::{
     ClientId, CompilationProfile, IsographDb, LiteralId, extract_iso_literals,
-    parsed_iso_literal_by_id,
+    iso_literal_extraction, parsed_iso_literal_by_id,
 };
 use isograph_parser::{IsographResolutionNode, ParsedIsoLiteral, resolve_offset};
 use prelude::Postfix;
 use span::Span;
 
-use crate::line_index::byte_offset_at_lsp_position;
+use crate::line_index::{byte_offset_at_lsp_position, line_index};
 
-/// The hover at `position` in `path` as `client` reads it.
+/// The hover at `position` in `path` as `client` reads it. Its range is the char under
+/// `position`.
 pub fn hover_for_position<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
     path: RelativePathToSourceFile,
     position: lsp_types::Position,
 ) -> Option<lsp_types::Hover> {
-    let node = resolved_position_at_lsp_position(db, client, path, position)?;
+    let (literal_id, node, cursor) = resolved_position_at_lsp_position(db, client, path, position)?;
+    let span = file_span_of_literal_span(db, literal_id, cursor)?;
     lsp_types::Hover {
         contents: lsp_types::HoverContents::Markup(lsp_types::MarkupContent {
             kind: lsp_types::MarkupKind::Markdown,
             value: node.to_string(),
         }),
-        range: None,
+        range: line_index(db, client, path)
+            .as_ref()?
+            .range(span)
+            .wrap_some(),
     }
     .wrap_some()
 }
@@ -32,9 +37,9 @@ fn resolved_position_at_lsp_position<'db, TProfile: CompilationProfile>(
     client: ClientId,
     path: RelativePathToSourceFile,
     position: lsp_types::Position,
-) -> Option<IsographResolutionNode<'db>> {
-    let (parsed, cursor) = ast_at_lsp_position(db, client, path, position)?;
-    resolve_offset(parsed, cursor)
+) -> Option<(LiteralId, IsographResolutionNode<'db>, Span)> {
+    let (literal_id, parsed, cursor) = ast_at_lsp_position(db, client, path, position)?;
+    (literal_id, resolve_offset(parsed, cursor)?, cursor).wrap_some()
 }
 
 fn ast_at_lsp_position<TProfile: CompilationProfile>(
@@ -42,9 +47,25 @@ fn ast_at_lsp_position<TProfile: CompilationProfile>(
     client: ClientId,
     path: RelativePathToSourceFile,
     position: lsp_types::Position,
-) -> Option<(&ParsedIsoLiteral, Span)> {
+) -> Option<(LiteralId, &ParsedIsoLiteral, Span)> {
     let (literal_id, cursor) = iso_literal_at_lsp_position(db, client, path, position)?;
-    (parsed_iso_literal_by_id(db, literal_id)?, cursor).wrap_some()
+    (
+        literal_id,
+        parsed_iso_literal_by_id(db, literal_id)?,
+        cursor,
+    )
+        .wrap_some()
+}
+
+/// The file span of `span`, a span relative to the interior of `literal_id`.
+pub(crate) fn file_span_of_literal_span<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    literal_id: LiteralId,
+    span: Span,
+) -> Option<Span> {
+    let extraction = iso_literal_extraction(db, literal_id).as_ref()?;
+    span.with_offset(extraction.iso_literal_start_index.0 as u32)
+        .wrap_some()
 }
 
 /// The literal whose interior contains `position`, and the span of the char under
@@ -89,7 +110,7 @@ mod tests {
     use prelude::Postfix;
     use span::Span;
 
-    use super::{ast_at_lsp_position, iso_literal_at_lsp_position};
+    use super::{ast_at_lsp_position, hover_for_position, iso_literal_at_lsp_position};
 
     fn client() -> ClientId {
         ClientId(1)
@@ -132,6 +153,33 @@ mod tests {
             .expect("the fixture contains the needle") as u32
     }
 
+    fn hover_range(
+        db: &IsographDb<TestProfile>,
+        path: RelativePathToSourceFile,
+        position: Position,
+    ) -> Option<Option<lsp_types::Range>> {
+        hover_for_position(db, client(), path, position).map(|hover| hover.range)
+    }
+
+    /// The range on `line` from UTF-16 column `start` to `end`, as a hover range.
+    fn char_range(line: u32, start: u32, end: u32) -> Option<Option<lsp_types::Range>> {
+        lsp_types::Range {
+            start: at(line, start),
+            end: at(line, end),
+        }
+        .wrap_some()
+        .wrap_some()
+    }
+
+    /// The UTF-16 column of the `nth` (0-based) `needle` in the one-line `contents`.
+    fn utf16_column_of(contents: &str, needle: &str, nth: usize) -> u32 {
+        let (byte, _) = contents
+            .match_indices(needle)
+            .nth(nth)
+            .expect("the fixture contains the needle");
+        contents[..byte].encode_utf16().count() as u32
+    }
+
     #[test]
     fn no_file_is_none() {
         let db = IsographDb::<TestProfile>::default();
@@ -155,7 +203,7 @@ mod tests {
             literal_at(&db, path, at(0, start + last)),
             (index(path, 0), Span::new(last, last + 1)).wrap_some()
         );
-        let (parsed, _) = ast_at_lsp_position(&db, client(), path, at(0, start))
+        let (_, parsed, _) = ast_at_lsp_position(&db, client(), path, at(0, start))
             .expect("the interior is inside the literal");
         assert_eq!(parsed, parsed_iso_literal(&db, interior.to_owned()));
         assert!(parsed.errors.is_empty());
@@ -182,7 +230,7 @@ mod tests {
     fn incomplete_entrypoint_has_parse_errors() {
         let contents = "iso(`entrypoint`)";
         let (db, path) = db_with(contents);
-        let (parsed, _) = ast_at_lsp_position(
+        let (_, parsed, _) = ast_at_lsp_position(
             &db,
             client(),
             path,
@@ -232,9 +280,9 @@ mod tests {
         db.insert_disk_file(a, contents.to_owned());
         db.insert_disk_file(b, contents.to_owned());
         let position = at(0, column_of(contents, "entrypoint"));
-        let (in_a, _) =
+        let (_, in_a, _) =
             ast_at_lsp_position(&db, client(), a, position).expect("file a has the literal");
-        let (in_b, _) =
+        let (_, in_b, _) =
             ast_at_lsp_position(&db, client(), b, position).expect("file b has the literal");
         assert_eq!(in_a, in_b);
     }
@@ -278,5 +326,82 @@ mod tests {
         };
         assert_eq!(text_for(client()), "entrypoint Query.Buffer");
         assert_eq!(text_for(ClientId(2)), "entrypoint Query.Disk");
+    }
+
+    #[test]
+    fn hover_range_is_the_first_and_the_last_interior_char() {
+        let contents = "iso(`entrypoint Query.HomeRoute`)";
+        let (db, path) = db_with(contents);
+        let start = column_of(contents, "entrypoint");
+        let last = column_of(contents, "`)") - 1;
+        assert_eq!(
+            hover_range(&db, path, at(0, start)),
+            char_range(0, start, start + 1)
+        );
+        assert_eq!(
+            hover_range(&db, path, at(0, last)),
+            char_range(0, last, last + 1)
+        );
+    }
+
+    #[test]
+    fn hover_range_after_a_wide_char_on_the_line_is_in_utf16_columns() {
+        for prefix in ["const s = \"😀\"; ", "const s = \"é\"; "] {
+            let contents = format!("{prefix}iso(`entrypoint Query.A`)");
+            let (db, path) = db_with(&contents);
+            let query = utf16_column_of(&contents, "Query", 0);
+            assert_eq!(
+                hover_range(&db, path, at(0, query)),
+                char_range(0, query, query + 1),
+                "after {prefix:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn hover_range_on_argument_colons_and_commas_is_that_char() {
+        let contents = "iso(`field Pet.fullName @foo(bar: 123, baz: $qux) { id }`)";
+        let (db, path) = db_with(contents);
+        for (needle, nth) in [(":", 0), (":", 1), (",", 0)] {
+            let character = utf16_column_of(contents, needle, nth);
+            assert_eq!(
+                hover_range(&db, path, at(0, character)),
+                char_range(0, character, character + 1),
+                "{needle:?} {nth}"
+            );
+        }
+    }
+
+    #[test]
+    fn hover_range_on_a_multi_byte_char_in_a_string_literal_spans_its_utf16_units() {
+        let contents = "iso(`field Pet.fullName @foo(bar: \"é😀\") { id }`)";
+        let (db, path) = db_with(contents);
+        let e_acute = utf16_column_of(contents, "é", 0);
+        let emoji = utf16_column_of(contents, "😀", 0);
+        assert_eq!(
+            hover_range(&db, path, at(0, e_acute)),
+            char_range(0, e_acute, e_acute + 1)
+        );
+        assert_eq!(
+            hover_range(&db, path, at(0, emoji)),
+            char_range(0, emoji, emoji + 2)
+        );
+    }
+
+    #[test]
+    fn hover_range_in_a_multiline_literal_is_on_the_cursor_line() {
+        let (db, path) = db_with("iso(`\nentrypoint Query.HomeRoute\n`)");
+        assert_eq!(hover_range(&db, path, at(1, 11)), char_range(1, 11, 12));
+    }
+
+    #[test]
+    fn hover_outside_the_literal_is_none() {
+        let contents = "iso(`entrypoint Query.HomeRoute`)";
+        let (db, path) = db_with(contents);
+        let closing = contents
+            .rfind('`')
+            .expect("the fixture has a closing backtick") as u32;
+        assert_eq!(hover_range(&db, path, at(0, 0)), None);
+        assert_eq!(hover_range(&db, path, at(0, closing)), None);
     }
 }
