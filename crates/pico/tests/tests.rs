@@ -1,3 +1,9 @@
+mod absent_source {
+    mod garbage_collection;
+    mod missing_key;
+    mod remove;
+}
+
 mod garbage_collection {
     mod basic_gc;
     mod inner_retained;
@@ -18,4 +24,5 @@ mod params {
 mod tracking_field {
     mod correctness;
     mod efficiency;
+    mod never_written;
 }
