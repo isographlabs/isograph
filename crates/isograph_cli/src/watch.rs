@@ -662,10 +662,12 @@ mod tests {
     }
 
     fn contents(state: &IsographState<InHost>, path: &str) -> Option<String> {
-        state
-            .db
-            .disk_file(interned(path))
-            .map(|file| file.contents.clone())
+        isograph_compiler::file_contents(
+            state.db.reference(),
+            isograph_compiler::ClientId(1),
+            interned(path),
+        )
+        .clone()
     }
 
     struct Harness {

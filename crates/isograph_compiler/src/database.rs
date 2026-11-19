@@ -162,11 +162,6 @@ impl<THostLanguage: HostLanguage> IsographDb<THostLanguage> {
             self.remove(source_id);
         }
     }
-
-    pub fn disk_file(&self, path: RelativePathToSourceFile) -> Option<&DiskFile> {
-        let source_id = self.get_disk_file_map().untracked().0.get(&path).copied()?;
-        self.get(source_id).wrap_some()
-    }
 }
 
 #[cfg(test)]
@@ -210,11 +205,8 @@ mod tests {
         let path = intern_path("src/a.ts");
         state.insert_disk_file(path, "export const a = 1;\n".to_owned());
         assert_eq!(
-            state
-                .disk_file(path)
-                .expect("the test inserted this path")
-                .contents,
-            "export const a = 1;\n"
+            read(state.reference(), ClientId(1), path),
+            "export const a = 1;\n".to_owned().wrap_some()
         );
     }
 
@@ -225,11 +217,8 @@ mod tests {
         state.insert_disk_file(path, "first".to_owned());
         state.insert_disk_file(path, "second".to_owned());
         assert_eq!(
-            state
-                .disk_file(path)
-                .expect("the test inserted this path")
-                .contents,
-            "second"
+            read(state.reference(), ClientId(1), path),
+            "second".to_owned().wrap_some()
         );
         assert_eq!(state.get_disk_file_map().untracked().0.len(), 1);
     }
@@ -240,11 +229,8 @@ mod tests {
         let path = intern_path("src/a.ts");
         state.insert_disk_file(path, String::new());
         assert_eq!(
-            state
-                .disk_file(path)
-                .expect("the test inserted this path")
-                .contents,
-            ""
+            read(state.reference(), ClientId(1), path),
+            "".to_owned().wrap_some()
         );
     }
 
@@ -256,18 +242,12 @@ mod tests {
         state.insert_disk_file(a, "a".to_owned());
         state.insert_disk_file(b, "b".to_owned());
         assert_eq!(
-            state
-                .disk_file(a)
-                .expect("the test inserted this path")
-                .contents,
-            "a"
+            read(state.reference(), ClientId(1), a),
+            "a".to_owned().wrap_some()
         );
         assert_eq!(
-            state
-                .disk_file(b)
-                .expect("the test inserted this path")
-                .contents,
-            "b"
+            read(state.reference(), ClientId(1), b),
+            "b".to_owned().wrap_some()
         );
         assert_eq!(state.get_disk_file_map().untracked().0.len(), 2);
     }
@@ -278,7 +258,7 @@ mod tests {
         let path = intern_path("src/a.ts");
         state.insert_disk_file(path, "export const a = 1;\n".to_owned());
         state.remove_disk_file(path);
-        assert!(state.disk_file(path).is_none());
+        assert!(read(state.reference(), ClientId(1), path).is_none());
     }
 
     #[test]
@@ -286,7 +266,7 @@ mod tests {
         let mut state = IsographDb::<TestHostLanguage>::default();
         let path = intern_path("src/a.ts");
         state.remove_disk_file(path);
-        assert!(state.disk_file(path).is_none());
+        assert!(read(state.reference(), ClientId(1), path).is_none());
         assert!(state.get_disk_file_map().untracked().0.is_empty());
     }
 
@@ -298,13 +278,10 @@ mod tests {
         state.insert_disk_file(from, "export const a = 1;\n".to_owned());
         state.remove_disk_file(from);
         state.insert_disk_file(to, "export const a = 1;\n".to_owned());
-        assert!(state.disk_file(from).is_none());
+        assert!(read(state.reference(), ClientId(1), from).is_none());
         assert_eq!(
-            state
-                .disk_file(to)
-                .expect("the test inserted this path")
-                .contents,
-            "export const a = 1;\n"
+            read(state.reference(), ClientId(1), to),
+            "export const a = 1;\n".to_owned().wrap_some()
         );
     }
 
@@ -314,14 +291,11 @@ mod tests {
         let path = intern_path("");
         state.insert_disk_file(path, "empty".to_owned());
         assert_eq!(
-            state
-                .disk_file(path)
-                .expect("the test inserted this path")
-                .contents,
-            "empty"
+            read(state.reference(), ClientId(1), path),
+            "empty".to_owned().wrap_some()
         );
         state.remove_disk_file(path);
-        assert!(state.disk_file(path).is_none());
+        assert!(read(state.reference(), ClientId(1), path).is_none());
     }
 
     #[test]
@@ -332,18 +306,12 @@ mod tests {
         state.insert_disk_file(a, "a".to_owned());
         state.insert_disk_file(b, "b".to_owned());
         assert_eq!(
-            state
-                .disk_file(a)
-                .expect("the test inserted this path")
-                .contents,
-            "a"
+            read(state.reference(), ClientId(1), a),
+            "a".to_owned().wrap_some()
         );
         assert_eq!(
-            state
-                .disk_file(b)
-                .expect("the test inserted this path")
-                .contents,
-            "b"
+            read(state.reference(), ClientId(1), b),
+            "b".to_owned().wrap_some()
         );
         assert_eq!(state.get_disk_file_map().untracked().0.len(), 2);
     }
@@ -358,14 +326,11 @@ mod tests {
         state.insert_disk_file(b, "b".to_owned());
         state.insert_disk_file(c, "c".to_owned());
         state.remove_disk_files_from_path(intern_path("src"));
-        assert!(state.disk_file(a).is_none());
-        assert!(state.disk_file(b).is_none());
+        assert!(read(state.reference(), ClientId(1), a).is_none());
+        assert!(read(state.reference(), ClientId(1), b).is_none());
         assert_eq!(
-            state
-                .disk_file(c)
-                .expect("src2 is not a path prefix of src")
-                .contents,
-            "c"
+            read(state.reference(), ClientId(1), c),
+            "c".to_owned().wrap_some()
         );
     }
 
@@ -376,11 +341,8 @@ mod tests {
         state.insert_disk_file(path, "a".to_owned());
         state.remove_disk_files_from_path(intern_path("src/a.ts.bak"));
         assert_eq!(
-            state
-                .disk_file(path)
-                .expect("src/a.ts.bak is not a path prefix of src/a.ts")
-                .contents,
-            "a"
+            read(state.reference(), ClientId(1), path),
+            "a".to_owned().wrap_some()
         );
     }
 
@@ -390,7 +352,7 @@ mod tests {
         let path = intern_path("src/a.ts");
         state.insert_disk_file(path, "a".to_owned());
         state.remove_disk_files_from_path(intern_path(""));
-        assert!(state.disk_file(path).is_none());
+        assert!(read(state.reference(), ClientId(1), path).is_none());
     }
 
     fn read(

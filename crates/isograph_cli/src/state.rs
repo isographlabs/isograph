@@ -307,7 +307,6 @@ mod tests {
     use intern::string_key::Intern;
     use lsp_types::notification::Notification;
     use lsp_types::request::Request;
-    use pico::Database;
     use prelude::Postfix;
 
     use isograph_extract_typescript::TypeScriptHostLanguage;
@@ -343,13 +342,7 @@ mod tests {
         state: &IsographState<TypeScriptHostLanguage>,
         path: common_lang_types::RelativePathToSourceFile,
     ) -> Option<&str> {
-        state
-            .db
-            .get_disk_file_map()
-            .untracked()
-            .0
-            .get(&path)
-            .map(|id| state.db.get(*id).contents.as_str())
+        isograph_compiler::file_contents(state.db.reference(), ClientId(1), path).as_deref()
     }
 
     #[test]
