@@ -4,13 +4,18 @@ use pico_macros::memo;
 use prelude::Postfix;
 use span::WithSpan;
 
-use crate::{ClientId, CompilationProfile, IsographDb, iso_literal_parse_errors_in_file};
+use crate::{
+    ClientId, CompilationProfile, IsographDb, ValidationError, iso_literal_parse_errors_in_file,
+    iso_literal_validation_errors_in_file,
+};
 
 /// An error the compiler reports for a source file.
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum CompilerError {
     #[error("{0}")]
     Parse(ParseError),
+    #[error("{0}")]
+    Validation(ValidationError),
 }
 
 /// Every compiler error of `path` as `client` reads it, as file-absolute spans.
@@ -21,9 +26,15 @@ pub fn compiler_errors_in_file<TProfile: CompilationProfile>(
     path: RelativePathToSourceFile,
 ) -> Option<Vec<WithSpan<CompilerError>>> {
     let parse_errors = iso_literal_parse_errors_in_file(db, client, path).as_ref()?;
+    let validation_errors = iso_literal_validation_errors_in_file(db, client, path).as_ref()?;
     parse_errors
         .iter()
         .map(|error| error.clone().map(CompilerError::Parse))
+        .chain(
+            validation_errors
+                .iter()
+                .map(|error| error.clone().map(CompilerError::Validation)),
+        )
         .collect::<Vec<_>>()
         .wrap_some()
 }
@@ -40,6 +51,7 @@ mod tests {
     use crate::test_profile::TestProfile;
     use crate::{
         ClientId, FileMembership, IncludeFile, IsographDb, iso_literal_parse_errors_in_file,
+        iso_literal_validation_errors_in_file,
     };
 
     const CLIENT: ClientId = ClientId(1);
@@ -102,5 +114,58 @@ mod tests {
                 .collect::<Vec<_>>(),
             CompilerError::Parse(ParseError::Ast(AstError::EmptyLiteral)).wrap_vec()
         );
+    }
+
+    #[test]
+    fn validation_errors_are_compiler_errors_with_the_same_spans() {
+        let mut db = IsographDb::<TestProfile>::default();
+        db.insert_disk_file(
+            path(),
+            SOURCE_FILE,
+            "iso(`entity Query`) iso(`field Query.x { nope }`)".to_owned(),
+        );
+        let validation_errors =
+            iso_literal_validation_errors_in_file(db.reference(), CLIENT, path())
+                .clone()
+                .expect("the file has text");
+        assert!(!validation_errors.is_empty());
+        assert_eq!(
+            errors(db.reference()),
+            validation_errors
+                .into_iter()
+                .map(|error| error.map(CompilerError::Validation))
+                .collect::<Vec<_>>()
+                .wrap_some()
+        );
+    }
+
+    #[test]
+    fn parse_errors_precede_validation_errors() {
+        let mut db = IsographDb::<TestProfile>::default();
+        db.insert_disk_file(
+            path(),
+            SOURCE_FILE,
+            "iso(`entrypoint Query.Missing`) iso(` `)".to_owned(),
+        );
+        let errors = errors(db.reference()).expect("the file has text");
+        assert!(matches!(
+            errors
+                .iter()
+                .map(|error| error.item.reference())
+                .collect::<Vec<_>>()
+                .as_slice(),
+            [CompilerError::Parse(_), CompilerError::Validation(_)]
+        ));
+    }
+
+    #[test]
+    fn a_file_whose_declarations_resolve_has_no_errors() {
+        let mut db = IsographDb::<TestProfile>::default();
+        db.insert_disk_file(
+            path(),
+            SOURCE_FILE,
+            "iso(`entity Query`) iso(`field Query.x`) iso(`entrypoint Query.x`)".to_owned(),
+        );
+        assert_eq!(errors(db.reference()), Vec::new().wrap_some());
     }
 }

@@ -216,7 +216,13 @@ mod tests {
     use crate::watch::ProjectGlobs;
 
     const BROKEN: &str = "iso(`entrypoint`)";
-    const CLEAN: &str = "iso(`entrypoint Query.HomeRoute`)";
+    const CLEAN: &str =
+        "iso(`entity Query`) iso(`entrypoint Query.HomeRoute`) iso(`field Query.HomeRoute`)";
+    const UNDEFINED_FIELD: &str = "iso(`entity Query`) iso(`field Query.x { nope }`)";
+
+    const PET_SCHEMA: &str = "type Query {\n  pets: [Pet!]!\n  pet(id: ID!): Pet\n}\n\ntype Pet {\n  id: ID!\n  firstName: String!\n  lastName: String!\n  best_friend: Pet\n}\n";
+    const PET: &str = "export const fullName = iso(`\n  field Pet.fullName {\n    firstName\n    lastName\n  }\n`);\n\nexport const bestFriend = iso(`\n  field Pet.bestFriend to Pet {\n    best_friend {\n      id\n    }\n  }\n`);\n";
+    const HOME_ROUTE: &str = "export const HomeRoute = iso(`\n  field Query.HomeRoute @component {\n    pets {\n      id\n      fullName\n      bestFriend {\n        firstName\n      }\n    }\n  }\n`);\n\nconsole.log(iso(`entrypoint Query.HomeRoute`));\n";
 
     const SOURCE_FILE: isograph_compiler::FileMembership = isograph_compiler::FileMembership {
         source_file: isograph_compiler::IncludeFile::Include,
@@ -367,6 +373,36 @@ mod tests {
                 (PathBuf::from("/tmp/proj/src/b.ts"), 0),
             ]
         );
+    }
+
+    #[test]
+    fn project_errors_include_a_validation_error_with_its_absolute_path_range_and_message() {
+        let mut state = state();
+        present(&mut state, "/tmp/proj/src/a.ts", UNDEFINED_FIELD);
+        let start = UNDEFINED_FIELD
+            .find("nope")
+            .expect("the fixture selects nope") as u32;
+        assert_eq!(
+            errors(state.reference()),
+            CompilerErrorReport {
+                path: PathBuf::from("/tmp/proj/src/a.ts"),
+                range: lsp_types::Range::new(
+                    lsp_types::Position::new(0, start),
+                    lsp_types::Position::new(0, start + 4)
+                ),
+                message: "Field `Query.nope` is not defined.".to_owned(),
+            }
+            .wrap_vec()
+        );
+    }
+
+    #[test]
+    fn project_errors_of_a_clean_pet_demo_like_project_is_empty() {
+        let mut state = state();
+        present(&mut state, "/tmp/proj/schema/schema.graphql", PET_SCHEMA);
+        present(&mut state, "/tmp/proj/src/Pet.ts", PET);
+        present(&mut state, "/tmp/proj/src/HomeRoute.ts", HOME_ROUTE);
+        assert_eq!(errors(state.reference()), vec![]);
     }
 
     #[test]
