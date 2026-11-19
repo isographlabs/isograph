@@ -101,7 +101,7 @@ Do not test another crate. pico, intern, serde, std. Re-invoke counts, intern id
 
 A test of our own dependency tracking (which writes invalidate which memos) counts re-invocations; that is our behavior, not pico's. pico's own tests count re-invocations too.
 
-Tests may mutate shared state: atomics, `static`s, `Cell`/`RefCell`. "Shared state and interior mutability" governs production code.
+Tests may use atomics and `static`s (for example, a re-invocation counter). "Shared state and interior mutability" governs production code.
 
 ## Wake on events
 
