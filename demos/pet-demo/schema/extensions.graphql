@@ -1,0 +1,26 @@
+"""
+Marks a field whose value the backend derives from another field.
+"""
+directive @derivedFrom(field: String!) on FIELD_DEFINITION
+
+extend type Pet {
+  """
+  What kind of animal the pet is.
+  """
+  species: PetSpecies!
+  """
+  It's probably something from David Foster Wallace or Dostoevsky, keep up.
+  """
+  favorite_phrase: String @derivedFrom(field: "tagline")
+}
+
+extend type Query {
+  """
+  Every pet of one species.
+  """
+  petsBySpecies(species: PetSpecies!): [Pet!]!
+}
+
+extend enum PetSpecies {
+  HAMSTER
+}

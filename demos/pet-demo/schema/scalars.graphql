@@ -1,0 +1,29 @@
+"""
+A signed 32-bit integer.
+"""
+scalar Int
+
+"""
+A signed double-precision floating-point value.
+"""
+scalar Float
+
+"""
+A UTF-8 character sequence.
+"""
+scalar String
+
+"""
+`true` or `false`.
+"""
+scalar Boolean
+
+"""
+A unique identifier, serialized as a string.
+"""
+scalar ID
+
+"""
+An absolute URL.
+"""
+scalar Url

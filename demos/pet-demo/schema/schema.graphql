@@ -1,0 +1,186 @@
+schema {
+  query: Query
+  mutation: Mutation
+}
+
+type Query {
+  """
+  All the pets! What more could you ask for?
+  """
+  pets: [Pet!]!
+  """
+  Fetch a pet by id
+  """
+  pet(id: ID!): Pet
+  """
+  Fetch a pet by name
+  """
+  petByName(name: String!): Pet
+  """
+  Fetch any object that has an id
+  """
+  node(id: ID!): Node
+  """
+  Who are you? Find out here!
+  """
+  viewer: Viewer!
+}
+
+type Mutation {
+  """
+  Make `new_best_friend_id` the best friend of the pet `id`.
+  """
+  set_pet_best_friend(id: ID!, new_best_friend_id: ID!): SetBestFriendResponse!
+  """
+  Replace a pet's tagline.
+  """
+  set_pet_tagline(input: SetPetTaglineParams!): SetPetTaglineResponse!
+}
+
+"""
+An object that can be refetched by its id.
+"""
+interface Node {
+  id: ID!
+}
+
+"""
+Anything with a first and last name.
+"""
+interface Namable {
+  firstName: String!
+  lastName: String!
+}
+
+"""
+A pet is the joy in life
+"""
+type Pet implements Node & Namable {
+  """
+  The pet's ID
+  """
+  id: ID!
+  """
+  What do you call the pet when you're happy?
+  """
+  firstName: String!
+  """
+  What do you call the pet when you're angry?
+  """
+  lastName: String!
+  """
+  What you call the pet when you're very happy.
+  """
+  nickname: String
+  """
+  It's just a number.
+  """
+  age: Int!
+  picture: Url!
+  """
+  If your pet was a superhero.
+  """
+  tagline: String!
+  """
+  Charisma? 100%
+  """
+  stats: PetStats
+  """
+  Pets have a very complex social life. Find out more!
+  """
+  best_friend_relationship: BestFriendRelationship
+  """
+  Hold your enemies close...
+  """
+  potential_new_best_friends: [Pet!]!
+  """
+  Even pets use social media, mmkay.
+  """
+  checkins(limit: Int, skip: Int = 0): [Checkin!]!
+}
+
+type BestFriendRelationship {
+  best_friend: Pet!
+  picture_together: Url
+}
+
+"""
+Scores out of 100.
+"""
+type PetStats {
+  weight: Int
+  intelligence: Int
+  cuteness: Int
+  hunger: Int
+  sociability: Int
+  energy: Int
+}
+
+"""
+A place a pet has been, and when.
+"""
+interface ICheckin implements Node {
+  id: ID!
+  location: String!
+  time: String!
+}
+
+type Checkin implements ICheckin & Node {
+  id: ID!
+  location: String!
+  time: String!
+}
+
+type Viewer implements Node {
+  id: ID!
+  newsfeed(limit: Int!, skip: Int!): [NewsfeedItem!]!
+}
+
+"""
+An item in the viewer's newsfeed.
+"""
+union NewsfeedItem = BlogItem | AdItem
+
+type BlogItem implements Node {
+  id: ID!
+  author: String!
+  title: String!
+  content: String!
+  image: Image
+}
+
+type AdItem implements Node {
+  id: ID!
+  advertiser: String!
+  message: String!
+}
+
+type Image implements Node {
+  id: ID!
+  url: Url!
+}
+
+"""
+What kind of animal a pet is.
+"""
+enum PetSpecies {
+  CAT
+  DOG
+  """
+  Includes ferrets.
+  """
+  OTHER
+}
+
+input SetPetTaglineParams {
+  id: ID!
+  tagline: String!
+}
+
+type SetBestFriendResponse {
+  pet: Pet!
+}
+
+type SetPetTaglineResponse {
+  pet: Pet!
+}
