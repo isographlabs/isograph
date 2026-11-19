@@ -1340,93 +1340,107 @@ The option reaches `graphql_entity` as a database input read by the protocol's m
 
 ## Where the query text goes
 
-The protocol produces the text and the file name; the host language writes the files. The artifact work replaces artifact-generation.md's string contents with structured values printed by a generic TypeScript printer: an `ArtifactFile` holds an `ArtifactValue`, which has `String`, object, and `Import(ArtifactImport { path, export })` variants, and the entrypoint artifact's value today is `{ kind: "Entrypoint", name }`. This section is written against those names; when the landed code differs, stop and fix this section first.
+The protocol produces the text and the file name; the host language writes the files. `project_artifacts` (`crates/isograph_compiler/src/artifact_types.rs`) builds the `ProjectArtifacts` the host language prints, and it pairs each entrypoint with its query there.
 
-Generation reads queries only through its input. artifact-generation.md's input is `BTreeSet<ArtifactSource>`, from the per-file memo, with `ArtifactSource::Entrypoint(EntityNameAndSelectableName)`. The compile step pairs each entrypoint with its query before calling the host language:
+Before:
 
 ```rust
-// from crates/isograph_compiler/src/artifacts.rs
-/// What one iso literal contributes to generation, with an entrypoint's query.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ArtifactInput {
-    Entity(EntityName),
-    Field(EntityNameAndSelectableName),
-    Entrypoint(EntrypointArtifactInput),
+// from crates/isograph_compiler/src/artifact_types.rs
+pub struct ProjectArtifacts<TLiteralContext> {
+    /// Sorted by field.
+    pub fields: Vec<FieldArtifacts<TLiteralContext>>,
+    /// The `entity` literals, sorted.
+    pub entities: Vec<EntityName>,
+    /// The `entrypoint` literals, sorted.
+    pub entrypoints: Vec<EntityNameAndSelectableName>,
+    /// One per entity some pointer points to, sorted by entity.
+    pub link_types: Vec<LinkType>,
 }
 
+pub fn project_artifacts<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    sources: &BTreeSet<ArtifactSource>,
+) -> Result<ProjectArtifacts<LiteralContextOf<TProfile>>, GenerationError>
+```
+
+After:
+
+```rust
+// from crates/isograph_compiler/src/artifact_types.rs
+pub struct ProjectArtifacts<TLiteralContext> {
+    // `fields`, `entities`, `link_types` unchanged
+    /// The `entrypoint` literals with their queries, sorted by entrypoint.
+    pub entrypoints: Vec<EntrypointArtifacts>,
+}
+
+/// An `entrypoint` literal and its query.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct EntrypointArtifactInput {
+pub struct EntrypointArtifacts {
     pub entrypoint: EntityNameAndSelectableName,
     pub query: QueryArtifact,
 }
-```
 
-```rust
-// from crates/isograph_compiler/src/host_language.rs
-    /// Every artifact of a project whose iso literals are `inputs`, in `ArtifactSource` order.
-    fn generate_artifacts(inputs: &[ArtifactInput]) -> Vec<Artifact>;
-```
+/// Why the artifacts of a project could not be built.
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error, derive_more::From)]
+pub enum ProjectArtifactsError<TNotFetchable: std::fmt::Display> {
+    #[error("{0}")]
+    Generation(GenerationError),
+    #[error("{0}")]
+    #[from(skip)]
+    EntrypointQuery(EntrypointQueryFailed<TNotFetchable>),
+}
 
-Before: `fn generate_artifacts(sources: &BTreeSet<ArtifactSource>) -> Vec<Artifact>;`.
-
-```rust
-// from crates/isograph_cli/src/compile.rs
-#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
-#[error("The query of `entrypoint {entrypoint}` could not be generated: {error}")]
-pub(crate) struct EntrypointQueryFailed<TError: std::fmt::Display> {
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[error(
+    "The query of `entrypoint {}.{}` could not be generated: {error}",
+    .entrypoint.parent_entity_name,
+    .entrypoint.selectable_name
+)]
+pub struct EntrypointQueryFailed<TNotFetchable: std::fmt::Display> {
     pub entrypoint: EntityNameAndSelectableName,
-    pub error: TError,
+    pub error: EntrypointQueryError<TNotFetchable>,
 }
 
-/// Each source with its entrypoint's query as `input.client` reads the project. `Err` is
-/// the first entrypoint, in source order, whose query failed.
-fn artifact_inputs<TProfile: CompilationProfile>(
-    input: &CompileInput<'_, TProfile>,
-    sources: BTreeSet<ArtifactSource>,
-) -> Result<Vec<ArtifactInput>, EntrypointQueryFailed<ProfileEntrypointQueryError<TProfile>>> {
-    sources
-        .into_iter()
-        .map(|source| match source {
-            ArtifactSource::Entity(name) => ArtifactInput::Entity(name).wrap_ok(),
-            ArtifactSource::Field(field) => ArtifactInput::Field(field).wrap_ok(),
-            ArtifactSource::Entrypoint(entrypoint) => query_for_entrypoint(
-                input.db,
-                input.client,
-                entrypoint.parent_entity_name,
-                entrypoint.selectable_name,
-            )
-            .clone()
-            .map(|query| {
-                ArtifactInput::Entrypoint(EntrypointArtifactInput { entrypoint, query })
-            })
-            .map_err(|error| EntrypointQueryFailed { entrypoint, error }),
-        })
-        .collect()
-}
+pub type ProfileProjectArtifactsError<TProfile> = ProjectArtifactsError<
+    <<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::NotFetchable,
+>;
+
+pub fn project_artifacts<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    sources: &BTreeSet<ArtifactSource>,
+) -> Result<ProjectArtifacts<LiteralContextOf<TProfile>>, ProfileProjectArtifactsError<TProfile>>
 ```
 
-`generate_artifacts` in `compile.rs` (artifact-generation.md) gains one step between `project_artifact_sources` and the host call:
+`project_artifacts` builds `fields` and `link_types` as before, then calls `query_for_entrypoint(db, client, entrypoint.parent_entity_name, entrypoint.selectable_name)` for each entrypoint in order. `Err` is the first entrypoint, in source order, whose query failed, as `EntrypointQueryFailed`. The error type follows `ProfileValidationError` and `ProfileCompilerError`: generic over the protocol's `NotFetchable`, named through `TProfile`. `field_types`' `GenerationError` stays non-generic, and `derive_more::From` converts it at every `?`. `compile.rs`'s `generate_artifacts` is unchanged: it logs `ProjectArtifactsError` with `tracing::warn!(%error, "artifacts not written")` and returns no effects, so a failing query writes no artifacts (open decision 4). `HostLanguage::generate_artifacts(project, options)` is unchanged.
+
+`typescript_artifacts::generate_artifacts`, per `EntrypointArtifacts { entrypoint, query }`, writes into `<Parent>/<name>/`:
+
+- `entrypoint.ts`: the entrypoint value gains `queryText: ArtifactValue::Import(ArtifactImport(<Parent>/<name>/query_text.ts))`, after `name`. Before: `{ kind, name, normalizationAst, readerArtifact }`; after: `{ kind, name, queryText, normalizationAst, readerArtifact }`.
+- `query_text.ts`: `query_text_artifact(entrypoint, text)`, an `ArtifactModule` whose default export is `ArtifactValue::String(query.text)`.
+- When `query.file_name` is `Some(file_name)`: `raw_query_text_file(entrypoint, file_name, text)`, the pair `(<Parent>/<name>/<file_name>, text + "\n")`, with no printer.
+- `normalization_ast.ts`: the stub, unchanged until normalization-ast.md change 3.
 
 ```rust
-// from crates/isograph_cli/src/compile.rs
-    let Some(inputs) = artifact_inputs(state.compile_input().reference(), sources)
-        .map_err(|error| tracing::warn!(%error, "artifacts not written"))
-        .ok()
-    else {
-        return no_effects();
-    };
-    let artifacts = TProfile::HostLanguage::generate_artifacts(inputs.as_slice());
+// from crates/typescript_artifacts/src/entrypoint.rs
+pub(crate) const QUERY_TEXT: &str = "query_text.ts";
+
+/// The module whose default export is the text of `entrypoint`'s query.
+pub(crate) fn query_text_artifact(
+    entrypoint: EntityNameAndSelectableName,
+    text: &QueryText,
+) -> ArtifactModule;
+
+/// The protocol's file holding exactly the text of `entrypoint`'s query, and one newline.
+pub(crate) fn raw_query_text_file(
+    entrypoint: EntityNameAndSelectableName,
+    file_name: ArtifactFileName,
+    text: &QueryText,
+) -> (ArtifactPath, String);
 ```
 
-`TypeScriptHostLanguage::generate_artifacts`, per `ArtifactInput::Entrypoint`, writes into `<Parent>/<name>/`:
-
-- `query_text.ts`: an `ArtifactFile` whose value is a default export of `ArtifactValue::String(query.text)`.
-- `entrypoint.ts`: the entrypoint value gains the property `queryText` whose value is `ArtifactValue::Import(ArtifactImport { path: "./query_text", export: default })`. Before: `{ kind: "Entrypoint", name }`; after: `{ kind: "Entrypoint", name, queryText }`.
-- When `query.file_name` is `Some(file_name)`: an `Artifact` at `<Parent>/<name>/<file_name>` whose contents are `query.text` and one newline, with no printer.
-
-`iso.ts` is unchanged: it imports `entrypoint.ts`, whose default export's type now includes `queryText: string`.
-
-The TypeScript host never inspects the text or the file name beyond writing them; another protocol's text (SQL, a persisted id) goes through the same path.
+`iso.ts` is unchanged: it imports `entrypoint.ts`, whose default export's type now includes `queryText: string`. The TypeScript host never inspects the text or the file name beyond writing them; another protocol's text (SQL, a persisted id) goes through the same path.
 
 ## Memos and invalidation
 
@@ -1509,11 +1523,11 @@ Facts about generated text, not snapshots. A helper in the test module returns t
 - A client pointer: `field Pet.p to Pet { stats { weight } }` selected as `p { nickname }` adds no line; `field Pet.loop to Pet { loop }` selected anywhere is not `InlineCycle`.
 - `field String.X` with `entrypoint String.X` is `NotFetchable(NotComposite(String))`.
 
-`crates/isograph_cli/src/compile.rs` (handle seam, artifact directory set, GraphQL profile):
+`crates/isograph_cli/src/compile.rs` (handle seam, artifact directory set, GraphQL profile, a schema `type Query { id: ID! name: String }`):
 
-- The compile fire after the pet demo's files returns a `Replace` containing `Query/HomeRoute/query_text.ts`, `Query/HomeRoute/query_text.graphql`, and `Query/HomeRoute/entrypoint.ts`; the `.graphql` artifact's contents are the query text and one newline; `query_text.ts` contains the text's first line; `entrypoint.ts` contains `queryText` and an import from `./query_text`.
-- Editing `PetStatsCard`'s selection set returns an `Update` whose writes are `Query/PetDetailRoute/query_text.ts` and `Query/PetDetailRoute/query_text.graphql`, and nothing else (`entrypoint.ts` imports the text and does not change).
-- A failing query returns no effects; fixing it returns the write.
+- The compile fire after `field Query.HomeRoute { id }` and `entrypoint Query.HomeRoute` returns a write containing `Query/HomeRoute/query_text.ts`, `Query/HomeRoute/query_text.graphql`, and `Query/HomeRoute/entrypoint.ts`; the `.graphql` artifact's contents are `query HomeRoute {\n  id\n}\n`; `query_text.ts` contains the text's first line; `entrypoint.ts` contains `queryText` and an import from `./query_text`.
+- Editing the selection set of a field the entrypoint inlines returns writes of that field's `param_type.ts` and the entrypoint's `query_text.graphql` and `query_text.ts`, and nothing else (`entrypoint.ts` imports the text and does not change).
+- A failing query returns no effects; fixing it returns the write. `project_artifacts` of an entrypoint whose field has no selection set is `EntrypointQuery` naming the entrypoint, with `TopLevel(Empty)`.
 
 ## Changes
 
@@ -1567,9 +1581,9 @@ The landed `MergedTarget` stays until change 7. Depends on 3 and 5.
 
 Depends on 4, 5, and 6.
 
-### 8. Query artifacts (isograph_compiler, isograph_extract_typescript, isograph_cli)
+### 8. Query artifacts (isograph_compiler, typescript_artifacts, isograph_cli)
 
-`ArtifactInput`, `EntrypointArtifactInput`, `generate_artifacts` taking `&[ArtifactInput]`, `artifact_inputs`, `EntrypointQueryFailed`, the TypeScript host writing `query_text.ts`, the raw file, and `queryText` on the entrypoint value. The test hosts ignore the new input. Depends on 7 and the artifact-generation work.
+`EntrypointArtifacts`, `ProjectArtifacts.entrypoints` carrying them, `ProjectArtifactsError`, `EntrypointQueryFailed`, `ProfileProjectArtifactsError`, `project_artifacts` calling `query_for_entrypoint`; `QUERY_TEXT`, `query_text_artifact`, `raw_query_text_file`, `queryText` on the entrypoint value, and `generate_artifacts` writing both files. Tests: `crates/typescript_artifacts` (the query text module, the raw file, no raw file without a file name), `crates/isograph_cli/src/compile.rs` (the handle seam below; its fixtures parent entrypoints on a schema `Query`, because a source `entity` cannot parent an entrypoint). Depends on 7.
 
 ### 9. Pet demo output
 

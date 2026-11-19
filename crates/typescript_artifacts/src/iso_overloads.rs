@@ -49,8 +49,8 @@ pub(crate) fn iso_overload_module<TLiteralContext>(
         .iter()
         .map(|entrypoint| {
             (
-                entrypoint_overload_text(entrypoint.dereference()),
-                ArtifactImport(entrypoint_path(entrypoint.dereference())),
+                entrypoint_overload_text(entrypoint.entrypoint),
+                ArtifactImport(entrypoint_path(entrypoint.entrypoint)),
             )
         })
         .collect();

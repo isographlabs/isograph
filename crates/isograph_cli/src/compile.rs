@@ -518,9 +518,10 @@ mod generation_tests {
     use common_lang_types::{EntityName, EntityNameAndSelectableName};
     use intern::string_key::Intern;
     use isograph_compiler::{
-        ArtifactPath, CompilationProfile, FieldArtifactKind, Generation, GenerationError,
-        GenerationOptions, LinkType, ProjectArtifacts, UnionWrapper, Wrapper, WrapperVariant,
-        project_artifacts,
+        ArtifactPath, CompilationProfile, EntrypointQueryError, FieldArtifactKind, Generation,
+        GenerationError, GenerationOptions, LinkType, ProfileProjectArtifactsError,
+        ProjectArtifacts, ProjectArtifactsError, TopLevelError, UnionWrapper, Wrapper,
+        WrapperVariant, project_artifacts,
     };
     use isograph_extract_typescript::{
         TypeScriptCustomScalarType, TypeScriptHostLanguage, TypeScriptLiteralContext,
@@ -537,15 +538,18 @@ mod generation_tests {
     use crate::test_profile::TestProfile;
     use crate::watch::ProjectGlobs;
 
-    const HOME_ROUTE: &str = "iso(`entity Query`)\nexport const HomeRoute = iso(`field Query.HomeRoute`)(() => null);\niso(`entrypoint Query.HomeRoute`)\n";
+    const QUERY_SCHEMA: &str = "scalar ID\nscalar String\ntype Query { id: ID! name: String }\n";
+    const HOME_ROUTE: &str = "export const HomeRoute = iso(`field Query.HomeRoute { id }`)(() => null);\niso(`entrypoint Query.HomeRoute`)\n";
     const PET: &str = "iso(`entity Pet`)\nexport const firstName = iso(`field Pet.firstName`)(() => 'a');\nexport const lastName = iso(`field Pet.lastName`)(() => 'b');\nexport const fullName = iso(`field Pet.fullName { firstName }`)(() => 'c');\n";
     const BROKEN: &str = "iso(`entrypoint`)";
 
-    const HOME_ROUTE_FILES: [&str; 7] = [
+    const HOME_ROUTE_FILES: [&str; 9] = [
         "Query/HomeRoute/entrypoint.ts",
         "Query/HomeRoute/normalization_ast.ts",
         "Query/HomeRoute/output_type.ts",
         "Query/HomeRoute/param_type.ts",
+        "Query/HomeRoute/query_text.graphql",
+        "Query/HomeRoute/query_text.ts",
         "Query/HomeRoute/resolver_reader.ts",
         "iso.ts",
         "tsconfig.json",
@@ -581,8 +585,11 @@ mod generation_tests {
         state
     }
 
+    /// A state with an artifact folder and `QUERY_SCHEMA` on disk.
     fn state() -> IsographState<TestProfile> {
-        state_of(output::<TestProfile>().wrap_some())
+        let mut state = state_of(output::<TestProfile>().wrap_some());
+        present(&mut state, "/tmp/proj/schema/schema.graphql", QUERY_SCHEMA);
+        state
     }
 
     fn disk_changed<TProfile: CompilationProfile>(
@@ -649,7 +656,8 @@ mod generation_tests {
 
     fn project(
         state: &IsographState<TestProfile>,
-    ) -> Result<ProjectArtifacts<TypeScriptLiteralContext>, GenerationError> {
+    ) -> Result<ProjectArtifacts<TypeScriptLiteralContext>, ProfileProjectArtifactsError<TestProfile>>
+    {
         let input = state.compile_input();
         let sources =
             project_artifact_sources(input.reference()).expect("every fixture literal parses");
@@ -692,6 +700,7 @@ mod generation_tests {
     #[test]
     fn without_an_artifact_folder_the_fire_writes_nothing() {
         let mut state = state_of::<TestProfile>(None);
+        present(&mut state, "/tmp/proj/schema/schema.graphql", QUERY_SCHEMA);
         present(&mut state, "/tmp/proj/src/Home.ts", HOME_ROUTE);
         assert!(fire(&mut state).is_empty());
     }
@@ -752,7 +761,7 @@ mod generation_tests {
         assert_eq!(written_paths(changes.reference()), ["iso.ts"]);
         assert_eq!(
             deleted_paths(changes.reference()),
-            HOME_ROUTE_FILES[..5].to_vec()
+            HOME_ROUTE_FILES[..7].to_vec()
         );
     }
 
@@ -806,7 +815,93 @@ mod generation_tests {
         assert_eq!(deleted_paths(changes.reference()), ["Old/x.ts"]);
     }
 
-    const REACHABILITY: &str = "iso(`entity Pet`)\nexport const a = iso(`field Pet.a { b }`)(() => 1);\nexport const b = iso(`field Pet.b`)(() => 1);\nexport const c = iso(`field Pet.c`)(() => 1);\niso(`entrypoint Pet.a`)\n";
+    fn written_text<'a>(changes: &'a ArtifactChanges, path: &str) -> &'a str {
+        changes
+            .writes
+            .iter()
+            .find(|(written, _)| written.0 == path)
+            .map(|(_, text)| text.as_str())
+            .expect("the fire writes this path")
+    }
+
+    #[test]
+    fn an_entrypoint_writes_its_query_text_and_the_raw_query_file() {
+        let mut state = state();
+        present(&mut state, "/tmp/proj/src/Home.ts", HOME_ROUTE);
+        let changes = changes(&mut state);
+        assert_eq!(
+            written_text(changes.reference(), "Query/HomeRoute/query_text.graphql"),
+            "query HomeRoute {\n  id\n}\n"
+        );
+        let module = written_text(changes.reference(), "Query/HomeRoute/query_text.ts");
+        assert!(module.contains("query HomeRoute {"), "{module}");
+        let entrypoint = written_text(changes.reference(), "Query/HomeRoute/entrypoint.ts");
+        assert!(entrypoint.contains("queryText: "), "{entrypoint}");
+        assert!(entrypoint.contains("from \"./query_text\""), "{entrypoint}");
+    }
+
+    const INLINED: &str = "export const Inner = iso(`field Query.Inner { id }`)(() => null);\nexport const Outer = iso(`field Query.Outer { Inner }`)(() => null);\niso(`entrypoint Query.Outer`)\n";
+
+    #[test]
+    fn editing_an_inlined_field_rewrites_its_param_type_and_the_query_files() {
+        let mut state = state();
+        present(&mut state, "/tmp/proj/src/Query.ts", INLINED);
+        changes(&mut state);
+        present(
+            &mut state,
+            "/tmp/proj/src/Query.ts",
+            INLINED
+                .replace("Query.Inner { id }", "Query.Inner { id, name }")
+                .as_str(),
+        );
+        let changes = changes(&mut state);
+        assert_eq!(
+            written_paths(changes.reference()),
+            [
+                "Query/Inner/param_type.ts",
+                "Query/Outer/query_text.graphql",
+                "Query/Outer/query_text.ts",
+            ]
+        );
+        assert_eq!(
+            written_text(changes.reference(), "Query/Outer/query_text.graphql"),
+            "query Outer {\n  id\n  name\n}\n"
+        );
+    }
+
+    #[test]
+    fn a_failing_query_writes_nothing_until_it_is_fixed() {
+        let mut state = state();
+        present(
+            &mut state,
+            "/tmp/proj/src/Home.ts",
+            HOME_ROUTE.replace("{ id }", "{ nope }").as_str(),
+        );
+        assert!(fire(&mut state).is_empty());
+        present(&mut state, "/tmp/proj/src/Home.ts", HOME_ROUTE);
+        assert_eq!(
+            written_paths(changes(&mut state).reference()),
+            HOME_ROUTE_FILES
+        );
+    }
+
+    #[test]
+    fn an_entrypoint_query_error_is_an_error_of_the_project() {
+        let mut state = state();
+        present(
+            &mut state,
+            "/tmp/proj/src/Home.ts",
+            "export const HomeRoute = iso(`field Query.HomeRoute`)(() => null);\niso(`entrypoint Query.HomeRoute`)\n",
+        );
+        assert!(matches!(
+            project(state.reference()),
+            Err(ProjectArtifactsError::EntrypointQuery(failed))
+                if failed.entrypoint == named("Query", "HomeRoute")
+                    && failed.error == EntrypointQueryError::TopLevel(TopLevelError::Empty)
+        ));
+    }
+
+    const REACHABILITY: &str = "export const a = iso(`field Query.a { id, b }`)(() => 1);\nexport const b = iso(`field Query.b`)(() => 1);\nexport const c = iso(`field Query.c`)(() => 1);\niso(`entrypoint Query.a`)\n";
 
     fn generation_of(
         project: &ProjectArtifacts<TypeScriptLiteralContext>,
@@ -815,7 +910,7 @@ mod generation_tests {
         let field = project
             .fields
             .iter()
-            .find(|artifacts| artifacts.field == named("Pet", field))
+            .find(|artifacts| artifacts.field == named("Query", field))
             .expect("the fixture declares the field");
         (field.output_type, field.resolver_reader)
     }
@@ -823,7 +918,7 @@ mod generation_tests {
     #[test]
     fn readers_are_generated_for_reachable_fields_and_output_types_for_selected_ones() {
         let mut state = state();
-        present(&mut state, "/tmp/proj/src/Pet.ts", REACHABILITY);
+        present(&mut state, "/tmp/proj/src/Query.ts", REACHABILITY);
         let project = project(state.reference()).expect("the fixture is valid");
         assert_eq!(
             generation_of(project.reference(), "a"),
@@ -881,7 +976,9 @@ mod generation_tests {
         );
         assert!(matches!(
             project(state.reference()),
-            Err(GenerationError::Lookup(_))
+            Err(ProjectArtifactsError::Generation(GenerationError::Lookup(
+                _
+            )))
         ));
     }
 

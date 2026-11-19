@@ -1,9 +1,11 @@
-use common_lang_types::EntityNameAndSelectableName;
+use common_lang_types::{ArtifactFileName, EntityNameAndSelectableName, QueryText};
+use intern::Lookup;
 use isograph_compiler::ArtifactPath;
 
 use crate::module::{ArtifactImport, ArtifactModule, ArtifactObjectEntry, ArtifactValue};
 
 pub(crate) const NORMALIZATION_AST: &str = "normalization_ast.ts";
+pub(crate) const QUERY_TEXT: &str = "query_text.ts";
 pub(crate) const RESOLVER_READER: &str = "resolver_reader.ts";
 
 /// The entrypoint artifact of `entrypoint`, at the path the iso transforms import.
@@ -23,6 +25,12 @@ pub(crate) fn entrypoint_artifact(entrypoint: EntityNameAndSelectableName) -> Ar
                 )),
             },
             ArtifactObjectEntry {
+                key: "queryText".to_owned(),
+                value: ArtifactValue::Import(ArtifactImport(field_artifact_path(
+                    entrypoint, QUERY_TEXT,
+                ))),
+            },
+            ArtifactObjectEntry {
                 key: "normalizationAst".to_owned(),
                 value: ArtifactValue::Import(ArtifactImport(field_artifact_path(
                     entrypoint,
@@ -38,6 +46,29 @@ pub(crate) fn entrypoint_artifact(entrypoint: EntityNameAndSelectableName) -> Ar
             },
         ]),
     }
+}
+
+/// The module whose default export is the text of `entrypoint`'s query.
+pub(crate) fn query_text_artifact(
+    entrypoint: EntityNameAndSelectableName,
+    text: &QueryText,
+) -> ArtifactModule {
+    ArtifactModule {
+        path: field_artifact_path(entrypoint, QUERY_TEXT),
+        default_export: ArtifactValue::String(text.0.clone()),
+    }
+}
+
+/// The protocol's file holding exactly the text of `entrypoint`'s query, and one newline.
+pub(crate) fn raw_query_text_file(
+    entrypoint: EntityNameAndSelectableName,
+    file_name: ArtifactFileName,
+    text: &QueryText,
+) -> (ArtifactPath, String) {
+    (
+        field_artifact_path(entrypoint, file_name.lookup()),
+        format!("{}\n", text.0),
+    )
 }
 
 /// A module whose default export is an empty object, at `P/f/<file>`.

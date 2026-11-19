@@ -13,6 +13,7 @@ use nonempty::NonEmpty;
 use pico_macros::memo;
 use prelude::Postfix;
 
+use crate::query::{EntrypointQueryError, QueryArtifact, query_for_entrypoint};
 use crate::schema::{LiteralContextOf, source_iso_literal_items};
 use crate::wrapper::wrapper_of_type_annotation;
 use crate::{
@@ -427,11 +428,43 @@ pub struct ProjectArtifacts<TLiteralContext> {
     pub fields: Vec<FieldArtifacts<TLiteralContext>>,
     /// The `entity` literals, sorted.
     pub entities: Vec<EntityName>,
-    /// The `entrypoint` literals, sorted.
-    pub entrypoints: Vec<EntityNameAndSelectableName>,
+    /// The `entrypoint` literals with their queries, sorted by entrypoint.
+    pub entrypoints: Vec<EntrypointArtifacts>,
     /// One per entity some pointer points to, sorted by entity.
     pub link_types: Vec<LinkType>,
 }
+
+/// An `entrypoint` literal and its query.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EntrypointArtifacts {
+    pub entrypoint: EntityNameAndSelectableName,
+    pub query: QueryArtifact,
+}
+
+/// Why the artifacts of a project could not be built.
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error, derive_more::From)]
+pub enum ProjectArtifactsError<TNotFetchable: std::fmt::Display> {
+    #[error("{0}")]
+    Generation(GenerationError),
+    #[error("{0}")]
+    #[from(skip)]
+    EntrypointQuery(EntrypointQueryFailed<TNotFetchable>),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[error(
+    "The query of `entrypoint {}.{}` could not be generated: {error}",
+    .entrypoint.parent_entity_name,
+    .entrypoint.selectable_name
+)]
+pub struct EntrypointQueryFailed<TNotFetchable: std::fmt::Display> {
+    pub entrypoint: EntityNameAndSelectableName,
+    pub error: EntrypointQueryError<TNotFetchable>,
+}
+
+pub type ProfileProjectArtifactsError<TProfile> = ProjectArtifactsError<
+    <<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::NotFetchable,
+>;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FieldArtifacts<TLiteralContext> {
@@ -488,7 +521,7 @@ pub fn project_artifacts<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
     sources: &BTreeSet<ArtifactSource>,
-) -> Result<ProjectArtifacts<LiteralContextOf<TProfile>>, GenerationError> {
+) -> Result<ProjectArtifacts<LiteralContextOf<TProfile>>, ProfileProjectArtifactsError<TProfile>> {
     let entrypoints: Vec<EntityNameAndSelectableName> = sources
         .iter()
         .filter_map(|source| match source {
@@ -599,6 +632,23 @@ pub fn project_artifacts<TProfile: CompilationProfile>(
             .wrap_ok()
         })
         .collect::<Result<Vec<_>, GenerationError>>()?;
+
+    let entrypoints = entrypoints
+        .into_iter()
+        .map(|entrypoint| {
+            query_for_entrypoint(
+                db,
+                client,
+                entrypoint.parent_entity_name,
+                entrypoint.selectable_name,
+            )
+            .clone()
+            .map(|query| EntrypointArtifacts { entrypoint, query })
+            .map_err(|error| {
+                ProjectArtifactsError::EntrypointQuery(EntrypointQueryFailed { entrypoint, error })
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
 
     ProjectArtifacts {
         fields,

@@ -9,7 +9,9 @@ mod module;
 mod swc;
 
 use common_lang_types::{ConstExportName, EntityNameAndSelectableName};
-use isograph_compiler::{ArtifactPath, Generation, GenerationOptions, ProjectArtifacts};
+use isograph_compiler::{
+    ArtifactPath, EntrypointArtifacts, Generation, GenerationOptions, ProjectArtifacts,
+};
 use prelude::Postfix;
 
 pub use custom_scalar::{ModuleSpecifier, TypeScriptCustomScalarType};
@@ -37,8 +39,9 @@ pub enum TypeScriptGenerationError {
 const TSCONFIG_JSON: &str = "{\n    \"compilerOptions\": {\n        \"noUnusedLocals\": false,\n        \"noUnusedParameters\": false,\n        \"jsx\": \"preserve\",\n        \"esModuleInterop\": true\n    }\n}\n";
 
 /// The path and text of every artifact of `project`, in this order: per field its param type,
-/// parameters type, output type, and resolver reader; per entrypoint its entrypoint and
-/// normalization AST; per link type its output type;
+/// parameters type, output type, and resolver reader; per entrypoint its entrypoint, query
+/// text, normalization AST, and the protocol's raw query text file when it names one; per link
+/// type its output type;
 /// `iso.ts`; `tsconfig.json`. `export_name` reads a literal's `export const` name.
 pub fn generate_artifacts<TLiteralContext>(
     project: &ProjectArtifacts<TLiteralContext>,
@@ -75,11 +78,24 @@ pub fn generate_artifacts<TLiteralContext>(
             modules.wrap_ok()
         })
         .collect::<Result<Vec<_>, TypeScriptGenerationError>>()?;
-    let per_entrypoint = project.entrypoints.iter().copied().flat_map(|entrypoint| {
+    let per_entrypoint = project.entrypoints.iter().flat_map(|artifacts| {
+        let EntrypointArtifacts { entrypoint, query } = artifacts;
         [
-            printed_artifact(entrypoint::entrypoint_artifact(entrypoint)),
-            printed_artifact(stub_artifact(entrypoint, NORMALIZATION_AST)),
+            printed_artifact(entrypoint::entrypoint_artifact(entrypoint.dereference())),
+            printed_artifact(entrypoint::query_text_artifact(
+                entrypoint.dereference(),
+                query.text.reference(),
+            )),
+            printed_artifact(stub_artifact(entrypoint.dereference(), NORMALIZATION_AST)),
         ]
+        .into_iter()
+        .chain(query.file_name.map(|file_name| {
+            entrypoint::raw_query_text_file(
+                entrypoint.dereference(),
+                file_name,
+                query.text.reference(),
+            )
+        }))
     });
     let link_types = project
         .link_types
@@ -115,14 +131,16 @@ mod tests {
     use std::path::PathBuf;
 
     use common_lang_types::{
-        ConstExportName, DescriptionValue, EntityName, EntityNameAndSelectableName, SelectionName,
+        ArtifactFileName, ConstExportName, DescriptionValue, EntityName,
+        EntityNameAndSelectableName, QueryText, SelectionName,
     };
     use intern::string_key::Intern;
     use isograph_compiler::{
         ArtifactInnerType, ArtifactInputField, ArtifactInputType, ArtifactObjectField,
-        ArtifactObjectType, ArtifactParameter, ArtifactPath, FieldArtifactKind, FieldArtifacts,
-        FieldDeclarationSource, Generation, GenerationOptions, LinkType, ParametersType,
-        ProjectArtifacts, ScalarKind, ScalarValueKind, UnionWrapper, Wrapper, WrapperVariant,
+        ArtifactObjectType, ArtifactParameter, ArtifactPath, EntrypointArtifacts,
+        FieldArtifactKind, FieldArtifacts, FieldDeclarationSource, Generation, GenerationOptions,
+        LinkType, ParametersType, ProjectArtifacts, QueryArtifact, ScalarKind, ScalarValueKind,
+        UnionWrapper, Wrapper, WrapperVariant,
     };
     use nonempty::NonEmpty;
     use prelude::Postfix;
@@ -497,13 +515,72 @@ mod tests {
         );
     }
 
+    const QUERY_TEXT: &str = "query HomeRoute {\n  pets {\n    \"quoted\"\n  }\n}";
+    const QUERY_FILE: &str = "query_text.graphql";
+
+    /// `parent.selectable` with the query `QUERY_TEXT`, whose raw file is `file_name`.
+    fn entrypoint(parent: &str, selectable: &str, file_name: Option<&str>) -> EntrypointArtifacts {
+        EntrypointArtifacts {
+            entrypoint: named(parent, selectable),
+            query: QueryArtifact {
+                text: QueryText(QUERY_TEXT.to_owned()),
+                file_name: file_name.map(|name| name.intern().to::<ArtifactFileName>()),
+            },
+        }
+    }
+
+    #[test]
+    fn an_entrypoint_writes_its_query_text_module_and_the_raw_file_the_protocol_names() {
+        let artifacts = generated(
+            ProjectArtifacts {
+                entrypoints: entrypoint("Query", "HomeRoute", QUERY_FILE.wrap_some()).wrap_vec(),
+                ..project(Vec::new())
+            }
+            .reference(),
+        );
+        assert_eq!(
+            text_at(artifacts.as_slice(), "Query/HomeRoute/query_text.graphql"),
+            format!("{QUERY_TEXT}\n")
+        );
+        let module = text_at(artifacts.as_slice(), "Query/HomeRoute/query_text.ts");
+        assert!(
+            module.starts_with("export default 'query HomeRoute {"),
+            "{module}"
+        );
+        assert!(module.contains("\\n  pets {"), "{module}");
+        assert!(module.contains("\"quoted\""), "{module}");
+        let entrypoint = text_at(artifacts.as_slice(), "Query/HomeRoute/entrypoint.ts");
+        assert!(entrypoint.contains("from \"./query_text\""), "{entrypoint}");
+        assert!(entrypoint.contains("queryText: "), "{entrypoint}");
+    }
+
+    #[test]
+    fn without_a_protocol_file_name_no_raw_file_is_written() {
+        let artifacts = generated(
+            ProjectArtifacts {
+                entrypoints: entrypoint("Query", "HomeRoute", None).wrap_vec(),
+                ..project(Vec::new())
+            }
+            .reference(),
+        );
+        assert!(has_path(
+            artifacts.as_slice(),
+            "Query/HomeRoute/query_text.ts"
+        ));
+        assert!(
+            !artifacts
+                .iter()
+                .any(|(path, _)| path.0.ends_with(".graphql"))
+        );
+    }
+
     #[test]
     fn readers_and_normalization_asts_are_empty_objects() {
         let mut checkins = field("Pet", "Checkins", Vec::new());
         checkins.resolver_reader = Generation::Generated;
         let artifacts = generated(
             ProjectArtifacts {
-                entrypoints: named("Pet", "Checkins").wrap_vec(),
+                entrypoints: entrypoint("Pet", "Checkins", QUERY_FILE.wrap_some()).wrap_vec(),
                 ..project(checkins.wrap_vec())
             }
             .reference(),
@@ -531,7 +608,7 @@ mod tests {
         home.resolver_reader = Generation::Generated;
         let artifacts = generated(
             ProjectArtifacts {
-                entrypoints: named("Query", "HomeRoute").wrap_vec(),
+                entrypoints: entrypoint("Query", "HomeRoute", QUERY_FILE.wrap_some()).wrap_vec(),
                 ..project(home.wrap_vec())
             }
             .reference(),
@@ -610,7 +687,7 @@ mod tests {
                     home,
                 ],
                 entities: entity("Owner").wrap_vec(),
-                entrypoints: named("Query", "HomeRoute").wrap_vec(),
+                entrypoints: entrypoint("Query", "HomeRoute", QUERY_FILE.wrap_some()).wrap_vec(),
                 link_types: vec![
                     LinkType {
                         entity: entity("Owner"),
@@ -707,7 +784,7 @@ mod tests {
         checkins.output_type = Generation::Generated;
         let artifacts = generated(
             ProjectArtifacts {
-                entrypoints: named("Pet", "Checkins").wrap_vec(),
+                entrypoints: entrypoint("Pet", "Checkins", QUERY_FILE.wrap_some()).wrap_vec(),
                 ..project(checkins.wrap_vec())
             }
             .reference(),
