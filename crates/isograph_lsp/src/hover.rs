@@ -49,24 +49,26 @@ fn hover_markdown<TProfile: CompilationProfile>(
     }
 }
 
-fn entity_or_selectable_hover_markdown(item: &EntityOrSelectable) -> String {
+fn entity_or_selectable_hover_markdown<TEntityData, TSelectableData>(
+    item: &EntityOrSelectable<TEntityData, TSelectableData>,
+) -> String {
     match item {
         EntityOrSelectable::Entity(entity) => entity_hover_markdown(entity),
         EntityOrSelectable::Selectable(selectable) => selectable_hover_markdown(selectable),
     }
 }
 
-fn entity_hover_markdown(entity: &Entity) -> String {
+fn entity_hover_markdown<TEntityData>(entity: &Entity<TEntityData>) -> String {
     format!("entity **{}**", entity.name)
 }
 
-fn selectable_hover_markdown(selectable: &Selectable) -> String {
+fn selectable_hover_markdown<TSelectableData>(selectable: &Selectable<TSelectableData>) -> String {
     let description = selectable
         .description
         .map(|description| format!("\n\n{description}"))
         .unwrap_or_default();
     let target = selectable
-        .target_entity
+        .target_entity()
         .map(|target| format!(": **{target}**"))
         .unwrap_or_default();
     format!(
@@ -469,21 +471,29 @@ mod tests {
         }
     }
 
-    fn pet_owner(target: Option<&str>, description: Option<&str>) -> isograph_compiler::Selectable {
+    fn pet_owner(
+        target: Option<&str>,
+        description: Option<&str>,
+    ) -> isograph_compiler::Selectable<()> {
         isograph_compiler::Selectable {
             name: "owner".intern().to(),
             parent_entity: "Pet".intern().to(),
             description: description.map(|description| description.intern().to()),
-            target_entity: target.map(|target| target.intern().to()),
             definition: definition(),
+            origin: isograph_compiler::SelectableOrigin::Source(
+                isograph_compiler::SourceSelectableOrigin {
+                    target_entity: target.map(|target| target.intern().to()),
+                },
+            ),
         }
     }
 
     #[test]
     fn entity_hover_names_the_entity() {
-        let entity = isograph_compiler::Entity {
+        let entity = isograph_compiler::Entity::<()> {
             name: "Pet".intern().to(),
             definition: definition(),
+            origin: isograph_compiler::EntityOrigin::Source,
         };
         assert_eq!(entity_hover_markdown(entity.reference()), "entity **Pet**");
     }

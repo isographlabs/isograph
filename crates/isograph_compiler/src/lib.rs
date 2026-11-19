@@ -18,7 +18,9 @@ pub use iso_literals::{
     text_through_last_iso_literal,
 };
 pub use schema::{
-    DefinitionLocation, Entity, Selectable, entity_named, selectable_named, selectables_for_entity,
+    DefinitionLocation, Entity, EntityOrigin, ProfileEntity, ProfileSelectable,
+    ProtocolSelectableOrigin, Selectable, SelectableOrigin, SourceSelectableDefinition,
+    SourceSelectableOrigin, entity_named, selectable_named, selectables_for_entity,
 };
 pub use selectable_for_path::{
     entity_for_selection_set_path, selectable_for_selectable_name_path,

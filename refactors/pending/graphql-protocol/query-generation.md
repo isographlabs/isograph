@@ -776,7 +776,7 @@ entrypoints.md, Prefactor. Independent of every other change.
 
 ### 2. Protocol data types and origins (isograph_compiler)
 
-Lands as integration.md change 2. `NetworkProtocol` gained `EntityData` and `SelectableData` here and `LookupError` in change 3; `FetchPlan`, `NotFetchable`, and `QueryError` land with changes 4, 5, and 7, which read them.
+Status: landed with integration.md change 2. `NetworkProtocol` gained `EntityData` and `SelectableData` here and `LookupError` in change 3; `FetchPlan`, `NotFetchable`, and `QueryError` land with changes 4, 5, and 7, which read them.
 
 `NetworkProtocol`'s six associated types; `Entity<TEntityData>`, `EntityOrigin`, `Selectable<TSelectableData>`, `SelectableOrigin`, `SourceSelectableOrigin`, `ProtocolSelectableOrigin`, `Selectable::target_entity()`, the `Profile*` aliases; `SourceSelectableDefinition`; readers of `target_entity` switched to the method; the test protocol's types. Lookups still read source files only; every entity is `EntityOrigin::Source`. Depends on source-backed-lookups.md. Tests: the existing lookup, hover, and validation tests pass unchanged in their facts.
 

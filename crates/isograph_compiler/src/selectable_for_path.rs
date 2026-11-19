@@ -5,14 +5,17 @@ use isograph_parser::{
 };
 use prelude::Postfix;
 
-use crate::{ClientId, CompilationProfile, IsographDb, Selectable, entity_named, selectable_named};
+use crate::{
+    ClientId, CompilationProfile, IsographDb, ProfileSelectable, Selectable, entity_named,
+    selectable_named,
+};
 
 /// The selectable `selection_path` selects, as `client` reads the schema.
 pub fn selectable_for_selection_path<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
     selection_path: &SelectionPath<'_>,
-) -> DiagnosticResult<Selectable> {
+) -> DiagnosticResult<ProfileSelectable<TProfile>> {
     selectable_for_selection_parent(
         db,
         client,
@@ -28,7 +31,7 @@ pub fn selectable_for_selection_parent<TProfile: CompilationProfile>(
     client: ClientId,
     selection_set_path: &SelectionSetPath<'_>,
     selectable_name: SelectableName,
-) -> DiagnosticResult<Selectable> {
+) -> DiagnosticResult<ProfileSelectable<TProfile>> {
     let entity_name = entity_for_selection_set_path(db, client, selection_set_path)?;
     selectable_named(db, client, entity_name, selectable_name).clone()
 }
@@ -53,8 +56,10 @@ pub fn entity_for_selection_set_path<TProfile: CompilationProfile>(
 }
 
 /// The entity selections under a selection of `selectable` select on.
-pub fn selectable_target(selectable: &Selectable) -> DiagnosticResult<EntityName> {
-    selectable.target_entity.ok_or_else(|| {
+pub fn selectable_target<TSelectableData>(
+    selectable: &Selectable<TSelectableData>,
+) -> DiagnosticResult<EntityName> {
+    selectable.target_entity().ok_or_else(|| {
         Diagnostic::new(
             format!(
                 "Field `{}.{}` has no target to select into.",
@@ -71,7 +76,7 @@ pub fn selectable_for_selectable_name_path<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
     selectable_name_path: &SelectableNameWrapperPath<'_>,
-) -> DiagnosticResult<Selectable> {
+) -> DiagnosticResult<ProfileSelectable<TProfile>> {
     let parent_type = match selectable_name_path.parent.reference() {
         SelectableNameWrapperParent::EntrypointDeclaration(entrypoint_declaration_path) => {
             entrypoint_declaration_path.inner.parent_type.item
@@ -93,7 +98,7 @@ mod tests {
 
     use super::{selectable_for_selectable_name_path, selectable_for_selection_path};
     use crate::test_profile::TestProfile;
-    use crate::{ClientId, IsographDb, Selectable, entity_named, selectable_named};
+    use crate::{ClientId, IsographDb, ProfileSelectable, entity_named, selectable_named};
 
     const CLIENT: ClientId = ClientId(1);
 
@@ -104,7 +109,7 @@ mod tests {
         text: &str,
         needle: &str,
         nth: usize,
-    ) -> DiagnosticResult<Selectable> {
+    ) -> DiagnosticResult<ProfileSelectable<TestProfile>> {
         let (start, _) = text
             .match_indices(needle)
             .nth(nth)
@@ -125,7 +130,7 @@ mod tests {
         db: &IsographDb<TestProfile>,
         text: &str,
         needle: &str,
-    ) -> DiagnosticResult<Selectable> {
+    ) -> DiagnosticResult<ProfileSelectable<TestProfile>> {
         let start = text.find(needle).expect("the fixture contains the needle") as u32;
         let parsed = parse_iso_literal(text);
         assert_eq!(parsed.errors, vec![], "for literal {text:?}");

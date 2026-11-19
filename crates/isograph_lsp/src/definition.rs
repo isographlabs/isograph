@@ -173,7 +173,7 @@ mod tests {
         selectable_named(&db, client(), entity("Pet"), selectable("owner"))
             .clone()
             .expect("the fixture declares Pet.owner once")
-            .target_entity
+            .target_entity()
     }
 
     #[test]

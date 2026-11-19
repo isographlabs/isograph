@@ -447,6 +447,9 @@ mod memo_tests {
     struct TestNetworkProtocol;
 
     impl NetworkProtocol for TestNetworkProtocol {
+        type EntityData = ();
+        type SelectableData = ();
+
         fn should_include_schema_file(_relative_path: &Path) -> IncludeFile {
             IncludeFile::Skip
         }

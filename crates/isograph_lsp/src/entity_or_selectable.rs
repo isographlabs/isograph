@@ -1,19 +1,25 @@
 use common_lang_types::DiagnosticResult;
 use isograph_compiler::{
-    ClientId, CompilationProfile, DefinitionLocation, Entity, IsographDb, Selectable, entity_named,
-    selectable_for_selectable_name_path, selectable_for_selection_path,
+    ClientId, CompilationProfile, DefinitionLocation, Entity, IsographDb, NetworkProtocol,
+    Selectable, entity_named, selectable_for_selectable_name_path, selectable_for_selection_path,
 };
 use isograph_parser::IsographResolutionNode;
 use prelude::Postfix;
 
 /// The schema item a resolved position names.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum EntityOrSelectable {
-    Entity(Entity),
-    Selectable(Selectable),
+pub(crate) enum EntityOrSelectable<TEntityData, TSelectableData> {
+    Entity(Entity<TEntityData>),
+    Selectable(Selectable<TSelectableData>),
 }
 
-impl EntityOrSelectable {
+/// The schema item types of a profile.
+pub(crate) type ProfileEntityOrSelectable<TProfile> = EntityOrSelectable<
+    <<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::EntityData,
+    <<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::SelectableData,
+>;
+
+impl<TEntityData, TSelectableData> EntityOrSelectable<TEntityData, TSelectableData> {
     pub(crate) fn definition(&self) -> DefinitionLocation {
         match self {
             EntityOrSelectable::Entity(entity) => entity.definition,
@@ -28,7 +34,7 @@ pub(crate) fn entity_or_selectable_of_node<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
     node: &IsographResolutionNode<'_>,
-) -> Option<DiagnosticResult<EntityOrSelectable>> {
+) -> Option<DiagnosticResult<ProfileEntityOrSelectable<TProfile>>> {
     match node {
         IsographResolutionNode::EntityNameWrapper(entity_name_path) => {
             entity_named(db, client, entity_name_path.inner.0)
@@ -97,7 +103,10 @@ pub(crate) fn entity_or_selectable_of_node<TProfile: CompilationProfile>(
 mod tests {
     use common_lang_types::{EntityName, RelativePathToSourceFile};
     use intern::string_key::Intern;
-    use isograph_compiler::{DefinitionLocation, Entity, Selectable};
+    use isograph_compiler::{
+        DefinitionLocation, Entity, EntityOrigin, Selectable, SelectableOrigin,
+        SourceSelectableOrigin,
+    };
     use prelude::Postfix;
     use span::Span;
 
@@ -114,16 +123,19 @@ mod tests {
     fn the_definition_is_the_items_own() {
         let entity_definition = location("src/schema.graphql", 5, 8);
         let selectable_definition = location("src/Pet.ts", 20, 25);
-        let entity = EntityOrSelectable::Entity(Entity {
+        let entity = EntityOrSelectable::<(), ()>::Entity(Entity {
             name: "Pet".intern().to(),
             definition: entity_definition,
+            origin: EntityOrigin::Source,
         });
-        let selectable = EntityOrSelectable::Selectable(Selectable {
+        let selectable = EntityOrSelectable::<(), ()>::Selectable(Selectable {
             name: "owner".intern().to(),
             parent_entity: "Pet".intern().to(),
             description: None,
-            target_entity: "User".intern().to::<EntityName>().wrap_some(),
             definition: selectable_definition,
+            origin: SelectableOrigin::Source(SourceSelectableOrigin {
+                target_entity: "User".intern().to::<EntityName>().wrap_some(),
+            }),
         });
         assert_eq!(entity.definition(), entity_definition);
         assert_eq!(selectable.definition(), selectable_definition);

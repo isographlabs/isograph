@@ -525,6 +525,8 @@ Status: landed.
 
 ### 2. Protocol data types and origins
 
+Status: landed.
+
 query-generation.md change 2: `Entity<TEntityData>`, `EntityOrigin`, `Selectable<TSelectableData>`, `SelectableOrigin`, `SourceSelectableOrigin`, `ProtocolSelectableOrigin`, `Selectable::target_entity()`, `ProfileEntity`, `ProfileSelectable`, `SourceSelectableDefinition`; `NetworkProtocol::EntityData`, `SelectableData`. Lookups still read source files only. Tests: the existing lookup, hover, completion, and validation tests pass unchanged in their facts.
 
 ### 3. Schema lookups and protocol lookups in the core

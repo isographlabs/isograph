@@ -12,25 +12,96 @@ use prelude::Postfix;
 use span::Span;
 
 use crate::{
-    ClientId, CompilationProfile, IsographDb, parsed_iso_literals_in_file, source_file_paths,
+    ClientId, CompilationProfile, IsographDb, NetworkProtocol, parsed_iso_literals_in_file,
+    source_file_paths,
 };
 
 /// A node of the schema graph.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Entity {
+pub struct Entity<TEntityData> {
     pub name: EntityName,
     pub definition: DefinitionLocation,
+    pub origin: EntityOrigin<TEntityData>,
+}
+
+/// Who defines an entity.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum EntityOrigin<TEntityData> {
+    /// `entity Owner` in a source file.
+    Source,
+    Protocol(TEntityData),
 }
 
 /// A named pointer from an entity to an entity.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Selectable {
+pub struct Selectable<TSelectableData> {
+    pub name: SelectableName,
+    pub parent_entity: EntityName,
+    pub description: Option<DescriptionValue>,
+    pub definition: DefinitionLocation,
+    pub origin: SelectableOrigin<TSelectableData>,
+}
+
+/// Who defines a selectable, and what it points at.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SelectableOrigin<TSelectableData> {
+    /// A `field` declaration in a source file.
+    Source(SourceSelectableOrigin),
+    Protocol(ProtocolSelectableOrigin<TSelectableData>),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SourceSelectableOrigin {
+    /// `None` for a field declared without `to`.
+    pub target_entity: Option<EntityName>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProtocolSelectableOrigin<TSelectableData> {
+    pub target_entity: EntityName,
+    pub data: TSelectableData,
+}
+
+impl<TSelectableData> Selectable<TSelectableData> {
+    /// The entity selections under a selection of this selectable select on.
+    pub fn target_entity(&self) -> Option<EntityName> {
+        match self.origin.reference() {
+            SelectableOrigin::Source(source) => source.target_entity,
+            SelectableOrigin::Protocol(protocol) => protocol.target_entity.wrap_some(),
+        }
+    }
+}
+
+/// The entity and selectable types of a profile.
+pub type ProfileEntity<TProfile> =
+    Entity<<<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::EntityData>;
+pub type ProfileSelectable<TProfile> = Selectable<
+    <<TProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::SelectableData,
+>;
+
+/// What a `field <entity>.<selectable>` declaration in a source file defines.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SourceSelectableDefinition {
     pub name: SelectableName,
     pub parent_entity: EntityName,
     pub description: Option<DescriptionValue>,
     /// `None` for a field declared without `to`.
     pub target_entity: Option<EntityName>,
     pub definition: DefinitionLocation,
+}
+
+impl SourceSelectableDefinition {
+    fn selectable<TSelectableData>(&self) -> Selectable<TSelectableData> {
+        Selectable {
+            name: self.name,
+            parent_entity: self.parent_entity,
+            description: self.description,
+            definition: self.definition,
+            origin: SelectableOrigin::Source(SourceSelectableOrigin {
+                target_entity: self.target_entity,
+            }),
+        }
+    }
 }
 
 /// Where an entity or selectable is defined: a span of a file, in that file's byte offsets.
@@ -46,11 +117,12 @@ pub fn entity_named<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
     entity_name: EntityName,
-) -> DiagnosticResult<Entity> {
+) -> DiagnosticResult<ProfileEntity<TProfile>> {
     match source_entity_definitions(db, client, entity_name).as_slice() {
         [definition] => Entity {
             name: entity_name,
             definition: definition.dereference(),
+            origin: EntityOrigin::Source,
         }
         .wrap_ok(),
         [] => Diagnostic::new(format!("Entity `{entity_name}` is not defined."), None).wrap_err(),
@@ -70,9 +142,9 @@ pub fn selectable_named<TProfile: CompilationProfile>(
     client: ClientId,
     entity_name: EntityName,
     selectable_name: SelectableName,
-) -> DiagnosticResult<Selectable> {
+) -> DiagnosticResult<ProfileSelectable<TProfile>> {
     match source_selectable_definitions(db, client, entity_name, selectable_name).as_slice() {
-        [selectable] => selectable.clone().wrap_ok(),
+        [selectable] => selectable.selectable().wrap_ok(),
         [] => Diagnostic::new(
             format!("Field `{entity_name}.{selectable_name}` is not defined."),
             None,
@@ -93,7 +165,7 @@ pub fn selectables_for_entity<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
     entity_name: EntityName,
-) -> DiagnosticResult<Vec<Selectable>> {
+) -> DiagnosticResult<Vec<ProfileSelectable<TProfile>>> {
     entity_named(db, client, entity_name).clone()?;
     source_iso_literal_items(db, client)
         .filter_map(|source_item| match source_item.item {
@@ -109,7 +181,7 @@ pub fn selectables_for_entity<TProfile: CompilationProfile>(
             IsoLiteralItem::Entity(_) | IsoLiteralItem::Entrypoint(_) => None,
         })
         .fold(
-            BTreeMap::<SelectableName, Vec<Selectable>>::new(),
+            BTreeMap::<SelectableName, Vec<SourceSelectableDefinition>>::new(),
             |mut by_name, selectable| {
                 by_name.entry(selectable.name).or_default().push(selectable);
                 by_name
@@ -117,9 +189,9 @@ pub fn selectables_for_entity<TProfile: CompilationProfile>(
         )
         .into_values()
         .filter_map(|definitions| {
-            <[Selectable; 1]>::try_from(definitions)
+            <[SourceSelectableDefinition; 1]>::try_from(definitions)
                 .ok()
-                .map(|[selectable]| selectable)
+                .map(|[selectable]| selectable.selectable())
         })
         .collect::<Vec<_>>()
         .wrap_ok()
@@ -156,7 +228,7 @@ pub(crate) fn source_selectable_definitions<TProfile: CompilationProfile>(
     client: ClientId,
     entity_name: EntityName,
     selectable_name: SelectableName,
-) -> Vec<Selectable> {
+) -> Vec<SourceSelectableDefinition> {
     source_iso_literal_items(db, client)
         .filter_map(|source_item| match source_item.item {
             IsoLiteralItem::Selectable(declaration) => (declaration.parent_type.item.0
@@ -208,8 +280,8 @@ fn selectable_of_declaration(
     path: RelativePathToSourceFile,
     literal_start: u32,
     declaration: &SelectableDeclaration,
-) -> Selectable {
-    Selectable {
+) -> SourceSelectableDefinition {
+    SourceSelectableDefinition {
         name: declaration.name.item.0,
         parent_entity: declaration.parent_type.item.0,
         description: declaration

@@ -76,7 +76,12 @@ pub trait CompilationProfile: 'static {
 }
 
 /// The way the compiler communicates with the upstream.
-pub trait NetworkProtocol: 'static {
+pub trait NetworkProtocol: Sized + 'static {
+    /// What the protocol records about an entity it defines.
+    type EntityData: Clone + Debug + PartialEq + Eq + 'static;
+    /// What the protocol records about a selectable it defines.
+    type SelectableData: Clone + Debug + PartialEq + Eq + 'static;
+
     fn should_include_schema_file(relative_path: &Path) -> IncludeFile;
 }
 

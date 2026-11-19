@@ -5,6 +5,9 @@ use isograph_compiler::{IncludeFile, NetworkProtocol};
 pub struct GraphQLNetworkProtocol;
 
 impl NetworkProtocol for GraphQLNetworkProtocol {
+    type EntityData = ();
+    type SelectableData = ();
+
     fn should_include_schema_file(relative_path: &Path) -> IncludeFile {
         match relative_path.extension().and_then(|e| e.to_str()) {
             Some("graphql" | "graphqls") => IncludeFile::Include,

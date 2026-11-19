@@ -142,11 +142,13 @@ fn completion_items<TProfile: CompilationProfile>(
         .wrap_some()
 }
 
-fn completion_item(selectable: &Selectable) -> lsp_types::CompletionItem {
+fn completion_item<TSelectableData>(
+    selectable: &Selectable<TSelectableData>,
+) -> lsp_types::CompletionItem {
     lsp_types::CompletionItem {
         label: selectable.name.to_string(),
         kind: lsp_types::CompletionItemKind::FIELD.wrap_some(),
-        detail: selectable.target_entity.map(|target| target.to_string()),
+        detail: selectable.target_entity().map(|target| target.to_string()),
         documentation: selectable
             .description
             .map(|description| lsp_types::Documentation::String(description.to_string())),
