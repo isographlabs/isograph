@@ -7,7 +7,7 @@ use common_lang_types::{
 };
 use intern::Lookup;
 use intern::string_key::Intern;
-use isograph_compiler::{ClientId, CompilationProfile};
+use isograph_compiler::{ArtifactPath, ClientId, CompilationProfile};
 use pico::Database;
 use prelude::Postfix;
 
@@ -32,6 +32,15 @@ impl ClientIdSource {
     }
 }
 
+/// The absolute path of `<output_directory>/__isograph`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ArtifactFolder(pub std::path::PathBuf);
+
+/// Every file under the artifact folder and its text: what the daemon read there at boot,
+/// then what it last wrote.
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ArtifactFiles(pub std::collections::BTreeMap<ArtifactPath, String>);
+
 pub struct IsographState<TProfile: CompilationProfile> {
     pub db: IsographDb<TProfile>,
     pub live_sessions: LiveSessions,
@@ -41,10 +50,13 @@ pub struct IsographState<TProfile: CompilationProfile> {
     client_ids: ClientIdSource,
     /// The compiler's reader of file text. No `LiveSession` and no `OpenFile` has it.
     compiler_client: ClientId,
+    /// `None` when the config has no `output_directory`.
+    pub(crate) artifact_folder: Option<ArtifactFolder>,
+    pub(crate) artifact_files: ArtifactFiles,
 }
 
 impl<TProfile: CompilationProfile> IsographState<TProfile> {
-    pub(crate) fn new(globs: ProjectGlobs) -> Self {
+    pub(crate) fn new(globs: ProjectGlobs, artifact_folder: Option<ArtifactFolder>) -> Self {
         let mut client_ids = ClientIdSource::default();
         let compiler_client = client_ids.mint();
         Self {
@@ -55,6 +67,8 @@ impl<TProfile: CompilationProfile> IsographState<TProfile> {
             compile_debounce: None,
             client_ids,
             compiler_client,
+            artifact_folder,
+            artifact_files: ArtifactFiles::default(),
         }
     }
 
@@ -230,6 +244,10 @@ fn handle_internal_event<TProfile: CompilationProfile>(
         InternalEvent::HelloWorld => IsographEffect::LogHelloWorld.wrap_vec(),
         InternalEvent::Quit => IsographEffect::Kill.wrap_vec(),
         InternalEvent::DiskChanged(change) => handle_disk_changed(state, change),
+        InternalEvent::ArtifactFilesRead(files) => {
+            state.artifact_files = files;
+            no_effects()
+        }
     }
 }
 
@@ -405,6 +423,7 @@ mod tests {
         IsographState::new(
             crate::watch::ProjectGlobs::parse(&["src/**".to_owned()], &[], None)
                 .expect("the test glob is valid"),
+            None,
         )
     }
 

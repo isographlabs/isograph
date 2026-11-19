@@ -10,6 +10,7 @@ isograph_parser = { path = "../isograph_parser" }
 pico = { path = "../pico" }
 pico_macros = { path = "../pico_macros" }
 prelude = { path = "../prelude" }
+serde = { workspace = true, features = ["derive"] }
 span = { path = "../span" }
 thiserror = { workspace = true }
 tracing = { workspace = true }

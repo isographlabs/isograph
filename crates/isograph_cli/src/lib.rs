@@ -25,6 +25,7 @@ mod state;
 mod test_profile;
 mod timer;
 mod watch;
+mod write_artifacts;
 
 pub fn run<TProfile: CompilationProfile>() -> ExitCode {
     // First, so `--help` prints and a bad flag exits before the lock is taken.

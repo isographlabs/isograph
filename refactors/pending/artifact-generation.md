@@ -199,7 +199,11 @@ pub(crate) fn project_artifact_sources<TProfile: CompilationProfile>(
         .collect::<Result<Vec<_>, _>>()?
         .into_iter()
         .flatten()
-        .map(|source| source.clone().map_err(ArtifactSourcesError::LiteralParseFailed))
+        .map(|source| {
+            source
+                .dereference()
+                .map_err(ArtifactSourcesError::LiteralParseFailed)
+        })
         .collect()
 }
 ```

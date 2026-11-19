@@ -307,6 +307,7 @@ mod tests {
             let mut state = IsographState::<TestProfile>::new(
                 crate::watch::ProjectGlobs::parse(&["src/**".to_owned()], &[], None)
                     .expect("the test glob is valid"),
+                None,
             );
             crate::state::intern_config_directory(
                 &mut state.db,

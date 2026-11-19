@@ -36,6 +36,7 @@ pub enum InternalEvent {
     HelloWorld,
     Quit,
     DiskChanged(DiskChanged),
+    ArtifactFilesRead(crate::state::ArtifactFiles),
 }
 
 #[derive(Clone, Debug)]

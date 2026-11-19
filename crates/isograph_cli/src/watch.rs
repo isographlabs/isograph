@@ -783,7 +783,7 @@ mod tests {
             let config_path = dir.path().join("isograph.config.json");
             std::fs::write(config_path.reference(), "{}\n").expect("a test can write a config");
             let config_path = config_path.canonicalize().expect("the config exists");
-            let mut state = IsographState::<InHostProfile>::new(globs.clone());
+            let mut state = IsographState::<InHostProfile>::new(globs.clone(), None);
             intern_config_directory(&mut state.db, config_path.reference());
             let config_directory = config_path
                 .parent()

@@ -88,12 +88,19 @@ async fn serve<TProfile: CompilationProfile>(
             return;
         }
     };
-    let mut state = IsographState::<TProfile>::new(globs.clone());
-    intern_config_directory(&mut state.db, config_path.reference());
     let config_directory = config_path
         .parent()
         .expect("a config file path has a parent directory")
         .to_owned();
+    let artifact_folder = config.output_directory.as_ref().map(|output_directory| {
+        crate::state::ArtifactFolder(
+            config_directory
+                .join(output_directory)
+                .join(isograph_config::ISOGRAPH_FOLDER),
+        )
+    });
+    let mut state = IsographState::<TProfile>::new(globs.clone(), artifact_folder.clone());
+    intern_config_directory(&mut state.db, config_path.reference());
     let _hold_watch = watch_tx.clone();
     let started = match crate::watch::start_if_watching::<TProfile>(
         filesystem,
@@ -118,6 +125,14 @@ async fn serve<TProfile: CompilationProfile>(
         boot,
         globs.reference(),
     );
+    if let Some(folder) = artifact_folder.as_ref() {
+        let _ = event_tx.send(
+            crate::event::InternalEvent::ArtifactFilesRead(
+                crate::write_artifacts::read_artifact_files(folder),
+            )
+            .to(),
+        );
+    }
 
     // `isograph stop` without `--force` is SIGTERM on unix, App::ask_to_quit on Windows
     // (InternalEvent::Quit on the socket). Route SIGTERM into the event channel as Quit,
@@ -231,6 +246,19 @@ pub fn perform(
             let _ = assign.assign.send(assign.client);
             ControlFlow::Continue(())
         }
+        IsographEffect::WriteArtifacts(write) => {
+            let folder = write.folder.clone();
+            crate::write_artifacts::write_artifacts(*write).unwrap_or_else(|error| {
+                tracing::error!(%error, "could not write the artifacts");
+                let _ = event_tx.send(
+                    crate::event::InternalEvent::ArtifactFilesRead(
+                        crate::write_artifacts::read_artifact_files(folder.reference()),
+                    )
+                    .to(),
+                );
+            });
+            ControlFlow::Continue(())
+        }
         IsographEffect::Timer(timer) => {
             schedule_timer(timer, event_tx);
             ControlFlow::Continue(())
@@ -287,6 +315,7 @@ mod tests {
         IsographState::new(
             crate::watch::ProjectGlobs::parse(&["src/**".to_owned()], &[], None)
                 .expect("the test glob is valid"),
+            None,
         )
     }
 

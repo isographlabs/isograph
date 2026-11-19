@@ -998,6 +998,7 @@ dependencies = [
  "pico",
  "pico_macros",
  "prelude",
+ "serde",
  "span",
  "thiserror 1.0.69",
  "tracing",

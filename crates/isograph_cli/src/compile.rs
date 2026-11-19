@@ -1,16 +1,18 @@
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use common_lang_types::RelativePathToSourceFile;
 use intern::Lookup;
 use isograph_compiler::{
-    ClientId, CompilationProfile, IncludeFile, IsographDb, compiler_errors_in_file,
+    ArtifactPath, ArtifactSource, ClientId, CompilationProfile, HostLanguage, IncludeFile,
+    IsographDb, LiteralParseFailed, artifact_sources_in_file, compiler_errors_in_file,
 };
 use prelude::Postfix;
 
 use crate::adapter::MissingWorkingDirectory;
-use crate::effect::{IsographEffect, no_effects};
-use crate::state::IsographState;
+use crate::effect::{ArtifactChanges, IsographEffect, WriteArtifactsEffect, no_effects};
+use crate::state::{ArtifactFiles, IsographState};
 use crate::timer::TimerPayload;
 use crate::watch::ProjectGlobs;
 
@@ -51,15 +53,116 @@ pub(crate) fn arm_compile_debounce<TProfile: CompilationProfile>(
     IsographEffect::Timer(effect).wrap_vec()
 }
 
-/// Computes every source file's errors, so later reads are memo hits, and logs the count.
+/// Computes every source file's errors and logs the count, then generates the artifacts.
 pub(crate) fn compile<TProfile: CompilationProfile>(
-    state: &IsographState<TProfile>,
+    state: &mut IsographState<TProfile>,
 ) -> Vec<IsographEffect> {
     project_errors(state.compile_input().reference()).map_or_else(
         |error| tracing::error!(%error, "compile"),
         |reports| tracing::info!(errors = reports.len(), "compiled"),
     );
-    no_effects()
+    generate_artifacts(state)
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
+pub(crate) enum ArtifactSourcesError {
+    #[error("{0}")]
+    LiteralParseFailed(LiteralParseFailed),
+    #[error("{} is in disk_file_map but has no text", .0.lookup())]
+    ListedPathWithoutText(RelativePathToSourceFile),
+}
+
+/// The write of every artifact whose text differs from the artifact folder's. No effects when
+/// the config has no `output_directory`, when any literal failed, or when nothing changed.
+fn generate_artifacts<TProfile: CompilationProfile>(
+    state: &mut IsographState<TProfile>,
+) -> Vec<IsographEffect> {
+    let Some(folder) = state.artifact_folder.clone() else {
+        return no_effects();
+    };
+    let Some(sources) = project_artifact_sources(state.compile_input().reference())
+        .map_err(|error| tracing::warn!(%error, "artifacts not written"))
+        .ok()
+    else {
+        return no_effects();
+    };
+    let next = ArtifactFiles(
+        TProfile::HostLanguage::generate_artifacts(sources.reference())
+            .into_iter()
+            .collect(),
+    );
+    state
+        .artifact_files
+        .replace(next)
+        .map(|changes| {
+            IsographEffect::WriteArtifacts(WriteArtifactsEffect { folder, changes }.boxed())
+        })
+        .into_iter()
+        .collect()
+}
+
+/// Every source file on disk, by the config's `source_files` globs and the host language.
+fn source_paths<'a, TProfile: CompilationProfile>(
+    input: &'a CompileInput<'_, TProfile>,
+) -> impl Iterator<Item = RelativePathToSourceFile> + 'a {
+    input.db.disk_paths().into_iter().filter(|path| {
+        matches!(
+            input
+                .globs
+                .should_include_source_file::<TProfile>(Path::new(path.lookup())),
+            IncludeFile::Include
+        )
+    })
+}
+
+/// The artifact sources of every source file on disk as `input.client` reads them. `Err` names
+/// the first literal, in path order, that failed.
+pub(crate) fn project_artifact_sources<TProfile: CompilationProfile>(
+    input: &CompileInput<'_, TProfile>,
+) -> Result<BTreeSet<ArtifactSource>, ArtifactSourcesError> {
+    let mut paths: Vec<RelativePathToSourceFile> = source_paths(input).collect();
+    paths.sort_by(|a, b| a.lookup().cmp(b.lookup()));
+    paths
+        .into_iter()
+        .map(|path| {
+            artifact_sources_in_file(input.db, input.client, path)
+                .as_ref()
+                .ok_or(ArtifactSourcesError::ListedPathWithoutText(path))
+        })
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .flatten()
+        .map(|source| {
+            source
+                .dereference()
+                .map_err(ArtifactSourcesError::LiteralParseFailed)
+        })
+        .collect()
+}
+
+impl ArtifactFiles {
+    /// Records `next` as the artifact folder's files and returns how the folder must change.
+    /// `None` when nothing changes.
+    pub(crate) fn replace(&mut self, next: ArtifactFiles) -> Option<ArtifactChanges> {
+        let previous = std::mem::replace(self, next);
+        let writes: Vec<(ArtifactPath, String)> = self
+            .0
+            .iter()
+            .filter(|(path, text)| {
+                previous.0.get(path.dereference()) != text.dereference().wrap_some()
+            })
+            .map(|(path, text)| (path.clone(), text.clone()))
+            .collect();
+        let deletes: Vec<ArtifactPath> = previous
+            .0
+            .into_keys()
+            .filter(|path| !self.0.contains_key(path))
+            .collect();
+        if writes.is_empty() && deletes.is_empty() {
+            return None;
+        }
+        ArtifactChanges { writes, deletes }.wrap_some()
+    }
 }
 
 /// Every error of every source file on disk as `input.client` reads it, sorted by path,
@@ -67,18 +170,7 @@ pub(crate) fn compile<TProfile: CompilationProfile>(
 pub(crate) fn project_errors<TProfile: CompilationProfile>(
     input: &CompileInput<'_, TProfile>,
 ) -> Result<Vec<CompilerErrorReport>, ProjectErrorsError> {
-    let per_file = input
-        .db
-        .disk_paths()
-        .into_iter()
-        .filter(|path| {
-            matches!(
-                input
-                    .globs
-                    .should_include_source_file::<TProfile>(Path::new(path.lookup())),
-                IncludeFile::Include
-            )
-        })
+    let per_file = source_paths(input)
         .map(|path| file_reports(input.db, input.client, path))
         .collect::<Result<Vec<_>, _>>()?;
     let mut reports: Vec<CompilerErrorReport> = per_file.into_iter().flatten().collect();
@@ -149,6 +241,7 @@ mod tests {
         let mut state = IsographState::new(
             ProjectGlobs::parse(&owned(source_files), &owned(&["schema/**"]), None)
                 .expect("the test globs are valid"),
+            None,
         );
         intern_config_directory(&mut state.db, Path::new("/tmp/proj/isograph.config.json"));
         state
@@ -327,6 +420,7 @@ mod tests {
     fn project_errors_without_a_working_directory_is_missing_working_directory() {
         let mut state = IsographState::<TestProfile>::new(
             ProjectGlobs::parse(&["src/**".to_owned()], &[], None).expect("the test glob is valid"),
+            None,
         );
         state
             .db
@@ -346,5 +440,230 @@ mod tests {
         let compiler = state.compile_input().client;
         assert_ne!(one, compiler);
         assert_ne!(two, compiler);
+    }
+}
+
+#[cfg(test)]
+mod generation_tests {
+    use std::collections::BTreeMap;
+    use std::path::{Path, PathBuf};
+
+    use isograph_compiler::ArtifactPath;
+    use prelude::Postfix;
+
+    use crate::effect::{ArtifactChanges, IsographEffect};
+    use crate::event::{DiskChanged, DiskFileChanged, InternalEvent, Presence};
+    use crate::state::{
+        ArtifactFiles, ArtifactFolder, IsographState, handle, intern_config_directory,
+    };
+    use crate::test_profile::TestProfile;
+    use crate::watch::ProjectGlobs;
+
+    const HOME_ROUTE: &str = "export const A = iso(`entrypoint Query.HomeRoute`);\n";
+    const FULL_NAME: &str = "export const fullName = iso(`field Pet.fullName { firstName }`);\n";
+    const BROKEN: &str = "iso(`entrypoint`)";
+
+    fn folder() -> ArtifactFolder {
+        ArtifactFolder(PathBuf::from("/tmp/proj/src/__isograph"))
+    }
+
+    fn state_with_folder(artifact_folder: Option<ArtifactFolder>) -> IsographState<TestProfile> {
+        let mut state = IsographState::new(
+            ProjectGlobs::parse(&["src/**".to_owned()], &[], Path::new("src").wrap_some())
+                .expect("the test glob is valid"),
+            artifact_folder,
+        );
+        intern_config_directory(&mut state.db, Path::new("/tmp/proj/isograph.config.json"));
+        state
+    }
+
+    fn state() -> IsographState<TestProfile> {
+        state_with_folder(folder().wrap_some())
+    }
+
+    fn disk_changed(state: &mut IsographState<TestProfile>, path: &str, presence: Presence) {
+        handle(
+            state,
+            InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
+                path: PathBuf::from(path),
+                presence,
+            }))
+            .to(),
+        );
+    }
+
+    fn present(state: &mut IsographState<TestProfile>, path: &str, contents: &str) {
+        disk_changed(state, path, Presence::Present(contents.to_owned()));
+    }
+
+    /// The effects of the compile fire.
+    fn fire(state: &mut IsographState<TestProfile>) -> Vec<IsographEffect> {
+        crate::compile::compile(state)
+    }
+
+    /// The changes of the one `WriteArtifacts` the compile fire returns.
+    fn changes(state: &mut IsographState<TestProfile>) -> ArtifactChanges {
+        let [IsographEffect::WriteArtifacts(write)] =
+            <[IsographEffect; 1]>::try_from(fire(state)).expect("the fire returns one effect")
+        else {
+            panic!("the fire returns WriteArtifacts");
+        };
+        assert_eq!(write.folder, folder());
+        write.changes
+    }
+
+    fn written_paths(changes: &ArtifactChanges) -> Vec<&str> {
+        changes
+            .writes
+            .iter()
+            .map(|(path, _)| path.0.as_str())
+            .collect()
+    }
+
+    fn deleted_paths(changes: &ArtifactChanges) -> Vec<&str> {
+        changes.deletes.iter().map(|path| path.0.as_str()).collect()
+    }
+
+    #[test]
+    fn the_first_fire_writes_iso_ts_and_the_entrypoint_artifact() {
+        let mut state = state();
+        present(&mut state, "/tmp/proj/src/Home.ts", HOME_ROUTE);
+        let changes = changes(&mut state);
+        assert_eq!(
+            written_paths(changes.reference()),
+            ["Query/HomeRoute/entrypoint.ts", "iso.ts"]
+        );
+        assert!(changes.deletes.is_empty());
+    }
+
+    #[test]
+    fn handle_of_the_compile_timer_returns_the_write() {
+        let mut state = state();
+        let effects = handle(
+            &mut state,
+            InternalEvent::DiskChanged(DiskChanged::File(DiskFileChanged {
+                path: PathBuf::from("/tmp/proj/src/Home.ts"),
+                presence: Presence::Present(HOME_ROUTE.to_owned()),
+            }))
+            .to(),
+        );
+        let [
+            IsographEffect::Timer(_diagnostics),
+            IsographEffect::Timer(compile),
+        ] = <[IsographEffect; 2]>::try_from(effects).expect("DiskChanged returns two effects")
+        else {
+            panic!("DiskChanged returns the diagnostics timer and the compile timer");
+        };
+        assert!(matches!(
+            handle(&mut state, compile.event.to()).as_slice(),
+            [IsographEffect::WriteArtifacts(_)]
+        ));
+    }
+
+    #[test]
+    fn without_an_artifact_folder_the_fire_writes_nothing() {
+        let mut state = state_with_folder(None);
+        present(&mut state, "/tmp/proj/src/Home.ts", HOME_ROUTE);
+        assert!(fire(&mut state).is_empty());
+    }
+
+    #[test]
+    fn a_second_fire_with_no_change_writes_nothing() {
+        let mut state = state();
+        present(&mut state, "/tmp/proj/src/Home.ts", HOME_ROUTE);
+        changes(&mut state);
+        assert!(fire(&mut state).is_empty());
+    }
+
+    #[test]
+    fn editing_a_selection_set_does_not_change_iso_ts() {
+        let mut state = state();
+        present(&mut state, "/tmp/proj/src/Pet.ts", FULL_NAME);
+        changes(&mut state);
+        present(
+            &mut state,
+            "/tmp/proj/src/Pet.ts",
+            "export const fullName = iso(`field Pet.fullName { firstName lastName }`);\n",
+        );
+        assert!(fire(&mut state).is_empty());
+    }
+
+    #[test]
+    fn adding_a_field_rewrites_only_iso_ts() {
+        let mut state = state();
+        present(&mut state, "/tmp/proj/src/Home.ts", HOME_ROUTE);
+        changes(&mut state);
+        present(&mut state, "/tmp/proj/src/Pet.ts", FULL_NAME);
+        let changes = changes(&mut state);
+        assert_eq!(written_paths(changes.reference()), ["iso.ts"]);
+        assert!(changes.deletes.is_empty());
+    }
+
+    #[test]
+    fn removing_an_entrypoint_deletes_its_artifact() {
+        let mut state = state();
+        present(&mut state, "/tmp/proj/src/Home.ts", HOME_ROUTE);
+        present(&mut state, "/tmp/proj/src/Pet.ts", FULL_NAME);
+        changes(&mut state);
+        disk_changed(&mut state, "/tmp/proj/src/Home.ts", Presence::Absent);
+        let changes = changes(&mut state);
+        assert_eq!(written_paths(changes.reference()), ["iso.ts"]);
+        assert_eq!(
+            deleted_paths(changes.reference()),
+            ["Query/HomeRoute/entrypoint.ts"]
+        );
+    }
+
+    #[test]
+    fn a_parse_error_writes_nothing_until_it_is_fixed() {
+        let mut state = state();
+        present(&mut state, "/tmp/proj/src/Home.ts", HOME_ROUTE);
+        present(&mut state, "/tmp/proj/src/Broken.ts", BROKEN);
+        assert!(fire(&mut state).is_empty());
+        present(&mut state, "/tmp/proj/src/Broken.ts", FULL_NAME);
+        assert_eq!(
+            written_paths(changes(&mut state).reference()),
+            ["Query/HomeRoute/entrypoint.ts", "iso.ts"]
+        );
+    }
+
+    #[test]
+    fn a_broken_literal_outside_the_source_globs_does_not_block_the_write() {
+        let mut state = state();
+        present(&mut state, "/tmp/proj/src/Home.ts", HOME_ROUTE);
+        present(&mut state, "/tmp/proj/lib/Broken.ts", BROKEN);
+        assert_eq!(
+            written_paths(changes(&mut state).reference()),
+            ["Query/HomeRoute/entrypoint.ts", "iso.ts"]
+        );
+    }
+
+    #[test]
+    fn the_first_fire_diffs_against_the_files_read_from_the_folder() {
+        let mut generated = state();
+        present(&mut generated, "/tmp/proj/src/Home.ts", HOME_ROUTE);
+        let iso = changes(&mut generated)
+            .writes
+            .into_iter()
+            .find(|(path, _)| path.0 == "iso.ts")
+            .expect("the fire writes iso.ts");
+
+        let mut state = state();
+        present(&mut state, "/tmp/proj/src/Home.ts", HOME_ROUTE);
+        let effects = handle(
+            &mut state,
+            InternalEvent::ArtifactFilesRead(ArtifactFiles(BTreeMap::from([
+                iso,
+                (ArtifactPath("Old/x.ts".to_owned()), "stale".to_owned()),
+            ])))
+            .to(),
+        );
+        assert!(effects.is_empty());
+        let changes = changes(&mut state);
+        assert_eq!(
+            written_paths(changes.reference()),
+            ["Query/HomeRoute/entrypoint.ts"]
+        );
+        assert_eq!(deleted_paths(changes.reference()), ["Old/x.ts"]);
     }
 }

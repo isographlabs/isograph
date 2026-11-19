@@ -39,6 +39,20 @@ pub enum IsographEffect {
     PublishDiagnostics(Box<PublishDiagnosticsEffect>),
     AssignClientId(AssignClientIdEffect),
     Timer(TimerEffect<TimerPayload>),
+    WriteArtifacts(Box<WriteArtifactsEffect>),
+}
+
+/// The files of the artifact folder to write and to delete.
+#[derive(Debug)]
+pub struct WriteArtifactsEffect {
+    pub folder: crate::state::ArtifactFolder,
+    pub changes: ArtifactChanges,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct ArtifactChanges {
+    pub writes: Vec<(isograph_compiler::ArtifactPath, String)>,
+    pub deletes: Vec<isograph_compiler::ArtifactPath>,
 }
 
 /// `textDocument/publishDiagnostics` notifications for one client.
