@@ -18,7 +18,6 @@ import type Query__HomeRoute__entrypoint from "./Query/HomeRoute/entrypoint";
 import type Query__PetDetailRoute__entrypoint from "./Query/PetDetailRoute/entrypoint";
 import type Query__SpeciesRoute__entrypoint from "./Query/SpeciesRoute/entrypoint";
 type IdentityWithParam<TParam extends object, TReturnConstraint = unknown> = <TClientFieldReturn extends TReturnConstraint>(clientField: (param: TParam) => TClientFieldReturn) => (param: TParam) => TClientFieldReturn;
-type IdentityWithParamComponent<TParam extends object> = <TClientFieldReturn, TComponentProps = Record<PropertyKey, never>>(clientComponentField: (data: TParam, componentProps: TComponentProps) => TClientFieldReturn) => (data: TParam, componentProps: TComponentProps) => TClientFieldReturn;
 type WhitespaceCharacter = " " | "	" | "\n";
 type Whitespace<In> = In extends `${WhitespaceCharacter}${infer In}` ? Whitespace<In> : In;
 type MatchesWhitespaceAndString<TString extends string, T> = Whitespace<T> extends `${TString}${string}` ? T : never;
@@ -40,6 +39,6 @@ export function iso<T>(param: T & MatchesWhitespaceAndString<"entrypoint Mutatio
 export function iso<T>(param: T & MatchesWhitespaceAndString<"entrypoint Query.HomeRoute", T>): typeof Query__HomeRoute__entrypoint;
 export function iso<T>(param: T & MatchesWhitespaceAndString<"entrypoint Query.PetDetailRoute", T>): typeof Query__PetDetailRoute__entrypoint;
 export function iso<T>(param: T & MatchesWhitespaceAndString<"entrypoint Query.SpeciesRoute", T>): typeof Query__SpeciesRoute__entrypoint;
-export function iso(_isographLiteralText: string): IdentityWithParam<any> | IdentityWithParamComponent<any> | object | void {
+export function iso(_isographLiteralText: string): IdentityWithParam<any> | object | void {
   throw new Error("iso: Unexpected invocation at runtime. Either the Babel transform was not set up, or it failed to identify this call site. Make sure it is being used verbatim as `iso`.");
 }

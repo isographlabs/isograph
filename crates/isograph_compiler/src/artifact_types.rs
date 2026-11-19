@@ -17,9 +17,9 @@ use prelude::Postfix;
 use crate::schema::{LiteralContextOf, source_iso_literal_items};
 use crate::wrapper::wrapper_of_type_annotation;
 use crate::{
-    ArtifactSource, ClientFieldKind, ClientId, ClientPointerTarget, CompilationProfile, EntityKind,
-    EntityOrigin, HostLanguage, IsographDb, NetworkProtocol, ScalarKind, SelectableKey,
-    SelectableKind, Wrapper, entity_named, selectable_named, selectables_for_entity,
+    ArtifactSource, ClientId, ClientPointerTarget, CompilationProfile, EntityKind, EntityOrigin,
+    HostLanguage, IsographDb, NetworkProtocol, ScalarKind, SelectableKey, SelectableKind, Wrapper,
+    entity_named, selectable_named, selectables_for_entity,
 };
 
 /// The type of a param type's `data`: one field per selection, in selection order.
@@ -246,7 +246,7 @@ fn selection_field<TProfile: CompilationProfile>(
         .as_ref()
         .map(|selection_set| selection_set.item.reference());
     let (type_, selected) = match selectable.kind.reference() {
-        SelectableKind::ClientField(_) => {
+        SelectableKind::ClientField => {
             if nested_selection_set.is_some() {
                 return GenerationError::SelectionSetOnClientField(key).wrap_err();
             }
@@ -431,7 +431,7 @@ fn input_objects<TProfile: CompilationProfile>(
                         .try_map(&mut |entity| input_type(db, client, entity.dereference()))?,
                 }
                 .wrap_ok(),
-                SelectableKind::ClientField(_) | SelectableKind::ClientPointer(_) => {
+                SelectableKind::ClientField | SelectableKind::ClientPointer(_) => {
                     GenerationError::Lookup(Diagnostic::new(
                         format!(
                             "`{input_object}.{}` is a client field on an input object.",
@@ -488,7 +488,7 @@ pub struct FieldDeclarationSource<TLiteralContext> {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FieldArtifactKind {
-    ClientField(ClientFieldKind),
+    ClientField,
     Pointer(Wrapper<EntityName>),
 }
 
@@ -599,7 +599,7 @@ pub fn project_artifacts<TProfile: CompilationProfile>(
                     .clone()
                     .map_err(GenerationError::Lookup)?;
             let kind = match selectable.kind {
-                SelectableKind::ClientField(kind) => FieldArtifactKind::ClientField(kind),
+                SelectableKind::ClientField => FieldArtifactKind::ClientField,
                 SelectableKind::ClientPointer(ClientPointerTarget::Parsed(target)) => {
                     FieldArtifactKind::Pointer(target)
                 }
@@ -638,7 +638,7 @@ pub fn project_artifacts<TProfile: CompilationProfile>(
         .iter()
         .flat_map(|field| match field.kind.reference() {
             FieldArtifactKind::Pointer(target) => target.inner_values().copied().collect(),
-            FieldArtifactKind::ClientField(_) => Vec::new(),
+            FieldArtifactKind::ClientField => Vec::new(),
         })
         .collect::<BTreeSet<EntityName>>()
         .into_iter()

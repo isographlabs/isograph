@@ -138,10 +138,9 @@ mod tests {
     use intern::string_key::Intern;
     use isograph_compiler::{
         ArtifactInnerType, ArtifactInputField, ArtifactInputType, ArtifactObjectField,
-        ArtifactObjectType, ArtifactParameter, ArtifactPath, ClientFieldKind, FieldArtifactKind,
-        FieldArtifacts, FieldDeclarationSource, Generation, GenerationOptions, LinkType,
-        ParametersType, ProjectArtifacts, ScalarKind, ScalarValueKind, UnionWrapper, Wrapper,
-        WrapperVariant,
+        ArtifactObjectType, ArtifactParameter, ArtifactPath, FieldArtifactKind, FieldArtifacts,
+        FieldDeclarationSource, Generation, GenerationOptions, LinkType, ParametersType,
+        ProjectArtifacts, ScalarKind, ScalarValueKind, UnionWrapper, Wrapper, WrapperVariant,
     };
     use nonempty::NonEmpty;
     use prelude::Postfix;
@@ -192,7 +191,7 @@ mod tests {
     fn field(parent: &str, name: &str, data: Vec<ArtifactObjectField>) -> FieldArtifacts<Context> {
         FieldArtifacts {
             field: named(parent, name),
-            kind: FieldArtifactKind::ClientField(ClientFieldKind::Plain),
+            kind: FieldArtifactKind::ClientField,
             resolver: FieldDeclarationSource {
                 path: format!("src/{parent}.ts").intern().to(),
                 context: name.intern().to::<ConstExportName>().wrap_some(),
@@ -610,8 +609,7 @@ mod tests {
 
     #[test]
     fn iso_overloads_are_typed_by_field_kind() {
-        let mut home = field("Query", "HomeRoute", Vec::new());
-        home.kind = FieldArtifactKind::ClientField(ClientFieldKind::Component);
+        let home = field("Query", "HomeRoute", Vec::new());
         let mut best_friend = field("Pet", "bestFriend", Vec::new());
         best_friend.kind =
             FieldArtifactKind::Pointer(nullable(WrapperVariant::Inner(entity("Pet"))));
@@ -648,9 +646,10 @@ mod tests {
         );
         assert!(
             overload_line(iso, "field Query.HomeRoute")
-                .ends_with("): IdentityWithParamComponent<Query__HomeRoute__param>;"),
+                .ends_with("): IdentityWithParam<Query__HomeRoute__param>;"),
             "{iso}"
         );
+        assert!(!iso.contains("IdentityWithParamComponent"), "{iso}");
         assert!(
             overload_line(iso, "field Pet.bestFriend").ends_with(
                 "): IdentityWithParam<Pet__bestFriend__param, (Pet____link__output_type | null)>;"

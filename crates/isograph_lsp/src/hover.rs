@@ -486,9 +486,7 @@ mod tests {
                         isograph_compiler::Wrapper::Inner(target.intern().to()),
                     ),
                 ),
-                None => isograph_compiler::SelectableKind::ClientField(
-                    isograph_compiler::ClientFieldKind::Plain,
-                ),
+                None => isograph_compiler::SelectableKind::ClientField,
             },
         }
     }
