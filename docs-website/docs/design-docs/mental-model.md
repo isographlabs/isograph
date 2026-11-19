@@ -4,7 +4,7 @@ The schema is a graph. An entity is a node. A selectable is a named pointer from
 
 There is one kind of entity and one kind of selectable. `User`, `String`, `Query`, and the result of `field User.Avatar` are all entities.
 
-Isograph takes upstream entities and selectables, for example from a GraphQL schema, and adds ones defined in the project. A `SelectableDeclaration` (iso keyword `field`) adds a selectable. An `EntityDeclaration` (iso keyword `type`, future) adds a named entity.
+Isograph takes upstream entities and selectables, for example from a GraphQL schema, and adds ones defined in the project. A `SelectableDeclaration` (iso keyword `field`) adds a selectable. An `EntityDeclaration` (iso keyword `entity`) adds a named entity.
 
 The building blocks are `Wrapper`, `Entity`, `EntityDeclaration`, `Selectable`, `SelectableDeclaration`, `Selection`, `SelectionSet`, and `Entrypoint`.
 
@@ -100,7 +100,7 @@ A selectable declaration's parent is a named entity. That entity may be upstream
 
 ## EntityDeclaration
 
-Future. An `EntityDeclaration` adds a named entity. The iso keyword is `type`. Upstream named entities are not entity declarations. GraphQL `type User` and `scalar ID` are upstream; they are not this form.
+An `EntityDeclaration` adds a named entity. The iso keyword is `entity`. The parser accepts `entity` followed by the entity name and nothing else; a description, directives, or a body are not part of the grammar yet. Upstream named entities are not entity declarations. GraphQL `type User` and `scalar ID` are upstream; they are not this form.
 
 ```rust
 struct EntityDeclaration {
@@ -109,7 +109,7 @@ struct EntityDeclaration {
 ```
 
 ```text
-type Friend
+entity Friend
 ```
 
 This defines the named entity `Friend`. A selectable declaration can point at it with `to Friend`. Anonymous entities are not produced by an entity declaration; they are produced by a selectable declaration with no `to`.
