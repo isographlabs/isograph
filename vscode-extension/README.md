@@ -26,6 +26,20 @@ These paths are relative to the workspace you open in the Extension Development 
 - `isograph.pathToConfig`: config path relative to `rootDirectory`, passed as `--config`. If unset, `isograph lsp` walks up from cwd.
 - `isograph.rootDirectory`: path relative to the VS Code workspace. Default is the workspace root. cwd of `isograph lsp`, and the start of the node_modules walk.
 
+## Open pet-demo with the extension from source
+
+From the i2 repo root:
+
+```sh
+pnpm open-pet-demo
+```
+
+This command runs `scripts/open-pet-demo.sh`. The script builds `target/debug/isograph` with `cargo build -p ts_graphql_react_isograph_cli`, builds `out/extension.js` once with the same esbuild flags as `npm run esbuild`, and opens `demos/pet-demo` in VS Code with `--extensionDevelopmentPath` set to `vscode-extension`. VS Code loads the extension from source; nothing is installed. The script uses `code` from PATH if present, otherwise `/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code`. It requires `npm install` in `vscode-extension` to have run once.
+
+The extension runs the binary named by `isograph.pathToIsograph` in `demos/pet-demo/.vscode/settings.json`, which is `../../target/debug/isograph`.
+
+The alternative is F5 in the i2 repo: the `Isograph VS Code extension` configuration in `.vscode/launch.json` runs `npm run esbuild` and opens an Extension Development Host, in which you open `demos/pet-demo`. F5 does not build the Rust binary.
+
 ## Restarting
 
 - New Rust binary: `pnpm watch-rs` at the repo root. Reload the Extension Development Host.

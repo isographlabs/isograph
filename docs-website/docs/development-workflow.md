@@ -101,6 +101,14 @@ npm run esbuild
 
 Set `isograph.pathToIsograph` to the absolute path of `target/debug/isograph` in the workspace that contains the Isograph config. Run and Debug: `Isograph VS Code extension`. In the Extension Development Host, open that project. The extension starts when you open a JS, JSX, TS, or TSX file.
 
+### Opening pet-demo with the extension from source
+
+```sh
+pnpm open-pet-demo
+```
+
+This command runs `scripts/open-pet-demo.sh`. The script builds `target/debug/isograph`, builds `vscode-extension/out/extension.js` once with esbuild, and opens `demos/pet-demo` in VS Code with `--extensionDevelopmentPath=vscode-extension`. VS Code loads the extension from source without installing it. The binary is the one named by `isograph.pathToIsograph` in `demos/pet-demo/.vscode/settings.json` (`../../target/debug/isograph`). The F5 alternative is the `Isograph VS Code extension` configuration in `.vscode/launch.json`.
+
 ### Restarting and seeing new changes
 
 - Run `pnpm watch-rs` to rebuild the `isograph` binary.
