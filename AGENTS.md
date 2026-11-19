@@ -229,6 +229,16 @@ An audit fixes the whole class, not the quoted instance. Sweep every file the st
 - Try not to mix match levels in one function. If each variant calls a function, do not inline other arms. If each arm matches one level, do not match two levels on some arms. `Result<Option<T>, E>` and `Option<Result<T, E>>` break this regularly and correctly. Guidance, not a hard rule.
 - Never `#[allow(lint)]`. Use `#[expect(lint)]`. An item whose only callers are tests is `#[cfg_attr(not(test), expect(dead_code))]`. Clippy `allow_attributes` is deny in workspace lints and covers outer `#[allow]` only; do not use inner `#![allow]` in our crates either. Relay crates keep crate-level `#![allow(clippy::all)]`.
 
+## TypeScript
+
+These rules cover hand-written TypeScript: the runtime, the Babel plugin, and the VS Code extension. Generated artifacts are plain object literals and types.
+
+- Private state is an ES private field (`#field`), not TypeScript's `private`.
+- A method that reads `this.#x` throws a `TypeError` when called through a `Proxy` wrapping the instance, because the `Proxy` does not have the private field. Do not wrap an object that has private fields in a `Proxy`.
+- Properties are `readonly` and arrays are `ReadonlyArray<T>` by default.
+- No `any`. Use `unknown` and narrow.
+- Target ES2022 or later. ES2022 compiles private fields and class fields natively. An older target turns each private field into a `WeakMap` lookup.
+
 ## Invariants - do not work around these
 
 - Never throw information away. A remainder after matching some variants is a narrower type that does not include those variants, not the original type.
