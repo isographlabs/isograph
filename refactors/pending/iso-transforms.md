@@ -42,7 +42,7 @@ Babel (`libs/isograph-babel-plugin`):
 
 - `compileTag.js`: the artifact directory is `config.config['output_directory'] ?? '.'` joined to the config directory. Import vs require reads `path.scope.getProgramParent().path.node.sourceType === 'module'` instead of `options.module`. A relative path that does not start with `.` gets a `./` prefix (upstream only fixed a leading `/`, so a file above the output directory imported `src/__isograph/...` as a bare specifier).
 - `BabelPluginIsograph.js`: unchanged.
-- `package.json`: drops `babel-plugin-macros`, `graphql`, `prettier`, and `prettier-plugin-hermes-parser`, which nothing reads. Adds `vitest`. Scripts are `test` (`vitest run`) and `typecheck` (`tsc --noEmit`).
+- `package.json`: drops `babel-plugin-macros`, `graphql`, `prettier`, and `prettier-plugin-hermes-parser`, which nothing reads. Adds `vitest`, `typescript`, and `@types/node`. Scripts are `test` (`vitest run`) and `typecheck` (`tsc --noEmit`).
 - `tsconfig.json`: standalone (`checkJs`, `strict`, `noEmit`); upstream extended a `tsconfig.build.json` that i2 does not have.
 - `BabelPluginIsograph.test.js`: inline snapshots become `toBe` assertions. The `Module._load` cosmiconfig mock becomes a real `isograph.config.json` the test writes into a temp directory and finds through `searchFrom`.
 - `README.md`: the SWC paragraph and the stale version pin go.
@@ -238,5 +238,5 @@ The crate's `Cargo.toml` holds `[profile.release]` (`codegen-units = 1`, `opt-le
 - `.github/workflows/js.yml` gains a `babel-plugin` job: `pnpm --filter @isograph/babel-plugin typecheck` and `test`.
 - `.github/workflows/rust.yml` gains a `swc-plugin` job: `cargo fmt --check`, `clippy`, and `test` with `--manifest-path crates/swc_isograph_plugin/Cargo.toml`, then installs `wasm32-wasip1`, runs `pnpm --filter @isograph/plugin-swc build` and `test`.
 - `ci.yml` needs no change; `rust` and `js` are already in `all-checks-passed`.
-- `.pre-commit-config.yaml` gains `swc-plugin-fmt`, `swc-plugin-clippy`, and `swc-plugin-test` (files `^crates/swc_isograph_plugin/`), and `babel-plugin-test` (files `^libs/isograph-babel-plugin/`).
+- `.pre-commit-config.yaml` gains `swc-plugin-fmt`, `swc-plugin-clippy`, and `swc-plugin-test` (files `^crates/swc_isograph_plugin/`), and `babel-plugin-test` and `babel-plugin-typecheck` (files `^libs/isograph-babel-plugin/`).
 - `crates/prelude/src/postfix_constructors.rs` adds `crates/swc_isograph_plugin` to the walked crates.

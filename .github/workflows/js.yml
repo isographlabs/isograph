@@ -23,3 +23,14 @@ jobs:
       - uses: ./.github/actions/setup-js
       - name: Run lint
         run: pnpm run lint --deny-warnings
+
+  babel-plugin:
+    name: Babel plugin
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-js
+      - name: Typecheck
+        run: pnpm --filter @isograph/babel-plugin typecheck
+      - name: Test
+        run: pnpm --filter @isograph/babel-plugin test

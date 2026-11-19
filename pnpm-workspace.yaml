@@ -1,5 +1,6 @@
 packages:
   - docs-website
+  - libs/*
 
 enablePrePostScripts: true
 saveWorkspaceProtocol: false

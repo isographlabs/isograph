@@ -51,6 +51,18 @@ repos:
         language: system
         types: [rust]
         pass_filenames: false
+      - id: babel-plugin-test
+        name: babel plugin test
+        entry: pnpm --filter @isograph/babel-plugin test
+        language: system
+        files: '^libs/isograph-babel-plugin/'
+        pass_filenames: false
+      - id: babel-plugin-typecheck
+        name: babel plugin typecheck
+        entry: pnpm --filter @isograph/babel-plugin typecheck
+        language: system
+        files: '^libs/isograph-babel-plugin/'
+        pass_filenames: false
       - id: precommit-in-worktree-test
         name: precommit-in-worktree-test
         entry: ./scripts/precommit-in-worktree-test.sh
