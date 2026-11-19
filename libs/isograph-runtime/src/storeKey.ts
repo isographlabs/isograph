@@ -11,7 +11,7 @@ const SECOND_SPLIT_KEY = '___';
 
 /** `selection.selectableName`, then `argumentChunks(selection.arguments, variables)`. */
 export function storeKey(
-  selection: NormalizationSelection,
+  selection: Pick<NormalizationSelection, 'selectableName' | 'arguments'>,
   variables: Variables,
 ): StoreKey {
   return (

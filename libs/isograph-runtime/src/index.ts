@@ -14,6 +14,15 @@ export type {
   NormalizationRootRecord,
   NormalizationSelection,
   NormalizationSelectionSet,
+  ReaderArtifact,
+  ReaderLinkedSelection,
+  ReaderRefinementSelection,
+  ReaderResolverSelection,
+  ReaderScalarSelection,
+  ReaderSelection,
+  ReaderSelectionSet,
+  ResolverParam,
+  SelectionSetData,
 } from './artifacts';
 export type {
   CompositeValue,

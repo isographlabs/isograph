@@ -1,3 +1,5 @@
+import type { Link, Variables } from './store';
+
 /** The default export of a `normalization_ast.ts` artifact, whose operation's root entity is
  * `TEntityName`. */
 export type NormalizationAst<TEntityName extends EntityName = EntityName> = {
@@ -104,4 +106,76 @@ export type IsographEntrypoint<
   readonly '~param'?: TParam;
   /** Type-only, absent at runtime. */
   readonly '~output'?: TOutput;
+};
+
+/**
+ * The default export of a `resolver_reader.ts` artifact. `TEntityName` is the name of the
+ * field's parent entity, or the union of its concrete entities' names when it is abstract.
+ */
+export type ReaderArtifact<
+  TParam extends ResolverParam<TEntityName>,
+  TOutput,
+  TEntityName extends EntityName,
+> = {
+  readonly readerAst: ReaderSelectionSet;
+  /**
+   * A method signature, so TypeScript compares its parameter bivariantly: an artifact
+   * declared with one field's param type is also a
+   * `ReaderArtifact<ResolverParam, TOutput, EntityName>`.
+   */
+  resolver(param: TParam): TOutput;
+};
+
+/** What `read` calls a resolver with. */
+export type ResolverParam<TEntityName extends EntityName = EntityName> = {
+  readonly data: SelectionSetData;
+  readonly parameters: Variables;
+  /** The record the resolver's reader AST was read at. */
+  readonly link: Link<TEntityName>;
+};
+
+/** The resolver's `data`: one value per reader node, under the node's `alias`. */
+export type SelectionSetData = { readonly [alias: string]: unknown };
+
+export type ReaderSelectionSet = ReadonlyArray<ReaderSelection>;
+
+export type ReaderSelection =
+  | ReaderScalarSelection
+  | ReaderLinkedSelection
+  | ReaderRefinementSelection
+  | ReaderResolverSelection;
+
+/** A selection of a server selectable whose target is a scalar: the stored value, whole. */
+export type ReaderScalarSelection = {
+  readonly kind: 'Scalar';
+  readonly alias: string;
+  readonly selectableName: string;
+  readonly arguments: Arguments | null;
+};
+
+/** A selection of a server selectable whose target has selectables. */
+export type ReaderLinkedSelection = {
+  readonly kind: 'Linked';
+  readonly alias: string;
+  readonly selectableName: string;
+  readonly arguments: Arguments | null;
+  /** Read at every record the stored value links to. */
+  readonly selections: ReaderSelectionSet;
+};
+
+/** A refinement `asT`: `selections` read on the same record when `condition` holds, else `null`. */
+export type ReaderRefinementSelection = {
+  readonly kind: 'Refinement';
+  readonly alias: string;
+  readonly condition: Condition;
+  readonly selections: ReaderSelectionSet;
+};
+
+/** A client field selection: the value its resolver returns. */
+export type ReaderResolverSelection = {
+  readonly kind: 'Resolver';
+  readonly alias: string;
+  /** The values the selection passes to the field's variables, in terms of the reader's own. */
+  readonly arguments: Arguments | null;
+  readonly readerArtifact: ReaderArtifact<ResolverParam, unknown, EntityName>;
 };

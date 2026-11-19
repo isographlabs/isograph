@@ -1218,6 +1218,21 @@ export function isStoreLink(value: StoreValue): value is StoreLink;
 
 store.md states this test in its Errors section ("A link is an object whose own keys are exactly `entityName` and `id`, both strings") for `check` and `garbageCollect`; this doc names it as a module export of `src/store.ts` so that `check.ts`, `garbageCollection.ts`, and `read.ts` import one function. The package index does not export it.
 
+Delta (landed): store.md landed `linksIn(value, owner, storeKey)`, a generator of every link in a composite value that `check` and `garbageCollect` share, and a private `linkOf`. `read` keeps the list structure, so it cannot use `linksIn`. Instead of `isStoreLink`, `src/store.ts` exports the test and the non-link error as one function, which `linksIn` and `read.ts` both call, so the message is written once:
+
+```ts
+// from libs/isograph-runtime/src/store.ts
+/** `value`, a value under the composite store key `storeKey` of the record `owner` that is
+ * neither `null` nor a list, as a link. Throws when it is not a link. */
+export function linkAt(
+  value: Exclude<StoreValue, null | ReadonlyArray<StoreValue>>,
+  owner: StoreLink,
+  storeKey: StoreKey,
+): StoreLink;
+```
+
+`readLinkedValue`'s last case is `readSelectionSet(store, selections, linkAt(value, owner, key), variables)`, and the record lookups in `read` and `readStoreValue` are store.md's `storeRecord(store, link)`. The link `linkAt` returns is a new `{ entityName, id }` object equal to the stored one.
+
 The reader's store keys come from `storeKey`, so they follow store.md's encoding (Store keys).
 
 ## Memos and invalidation
@@ -1434,6 +1449,8 @@ Each change is one commit. Prerequisites: query-generation.md changes 6 to 8, no
 `crates/isograph_compiler/src/reader_ast.rs` with `ReaderSelectionSet`, `ReaderSelection`, `ReaderScalarSelection`, `ReaderLinkedSelection`, `ReaderRefinementSelection`, `ReaderResolverSelection`; `FieldTypes.reader_ast`; `ObjectSelections`, `SelectionOutput`, `SelectionRead`, `ReadSelection`, `ReaderTarget`, `ObjectTarget`, `ReaderContext`; `object_type`, `selection_field`, `reader_arguments`, `resolver_arguments`; `NotRead` for pointer selections in the data type; the five `GenerationError` variants; `FieldArtifacts.resolver_reader: Option<ReaderSelectionSet>`; `FieldArtifacts.concrete_entities`; `link_types` for every field's parent entity, and `concrete_types`'s message; the compiler reader AST tests. The TypeScript host prints the stub for `Some(_)` until change 4. Depends on 1.
 
 ### 3. The reader types (libs/isograph-runtime)
+
+Delta (landed): this commit adds the reader types without changing `IsographEntrypoint`. Typing `readerArtifact` as `ReaderArtifact<TParam, ..>` fails `tsc` on every committed `entrypoint.ts` until the reader artifacts and the param types' `link` are regenerated, and the runtime's typecheck hook checks the fixture's artifacts. The `IsographEntrypoint` change lands with the fixture's regenerated artifacts (change 5).
 
 The reader types in `src/artifacts.ts` and their exports in `src/index.ts`: `ReaderArtifact` with `TEntityName`, `ResolverParam<TEntityName extends EntityName = EntityName>` with `link`. The landed `IsographEntrypoint<TParam, TOutput, TEntityName>` (normalization-ast.md, The artifact's TypeScript type) gets its reader artifact typed in this change (The entrypoint's reader artifact). `storeKey`'s `Pick<NormalizationSelection, "selectableName" | "arguments">` parameter; `isStoreLink` in `src/store.ts`, imported by `check.ts` and `garbageCollection.ts` in place of their own test. store.md's tests pass unchanged. Independent of 1 and 2.
 

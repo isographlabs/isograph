@@ -66,13 +66,23 @@ export function* linksIn(
     }
     return;
   }
+  yield linkAt(value, owner, storeKey);
+}
+
+/** `value`, a value under the composite store key `storeKey` of the record `owner` that is
+ * neither `null` nor a list, as a link. Throws when it is not a link. */
+export function linkAt(
+  value: Exclude<StoreValue, null | ReadonlyArray<StoreValue>>,
+  owner: StoreLink,
+  storeKey: StoreKey,
+): StoreLink {
   const link = typeof value === 'object' ? linkOf(value) : undefined;
   if (link === undefined) {
     throw new Error(
       `Store record ${owner.entityName}:${owner.id} holds a non-link under the composite store key "${storeKey}"; the store was written with an AST that disagrees with this one.`,
     );
   }
-  yield link;
+  return link;
 }
 
 /** `value` as a link: an object whose own keys are exactly `entityName` and `id`, both strings. */
