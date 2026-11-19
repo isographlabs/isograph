@@ -630,9 +630,8 @@ Deltas from upstream's packages:
 - `private: true`, and no `version`, `homepage`, `author`, or `dependencies`: the package is not published.
 - `vitest` is a dev dependency of the package, as `libs/isograph-babel-plugin` has it, not only of the repository root.
 - `tsconfig.package.json` includes `src/**/*.ts` (upstream `**/*.ts` minus `src/tests`), and `tsconfig.test.json` includes `test/**/*.ts` and `fixtures/**/*.ts` and replaces the base `exclude` so `*.test.ts` files are checked (upstream's test config inherits the base `exclude`, which drops `**/*.test.ts`). The test config's `paths` maps `@isograph/runtime` to `./src/index.ts`, as upstream's maps `@isograph/react`, so the fixture artifacts' `import type { NormalizationAst } from "@isograph/runtime"` resolves to the sources without a build. Upstream's `jsx` option in the test config is dropped (no React).
-- No `turbo`: CI builds the package with `pnpm --filter @isograph/runtime compile-libs` before type-checking the pet demo, whose `@isograph/runtime` import resolves to `dist` through `exports`, as upstream's demos resolve the built libs.
 
-`.github/workflows/js.yml`'s runtime steps are `pnpm --filter @isograph/runtime tsc`, `pnpm --filter @isograph/runtime compile-libs` (before the pet demo's `Typecheck`), and `pnpm --filter @isograph/runtime test`. `.pre-commit-config.yaml` gains `runtime-typecheck` (`pnpm --filter @isograph/runtime tsc`, `files: '^(libs/isograph-runtime/|tsconfig\.build\.json$)'`) and `runtime-test` (`pnpm --filter @isograph/runtime test`, `files: '^libs/isograph-runtime/'`), the babel plugin's two hooks. `.prettierignore` and `.oxlintrc.json` already ignore `__isograph`, and `.gitignore` already ignores `dist` and `*.tsbuildinfo`.
+The libs build with upstream's turbo setup (commit `c11feea1b`): the root `package.json` scripts `compile-libs` (`turbo compile-libs --log-order=grouped`) and `watch-libs` (`turbo watch compile-libs`) and `turbo.json` are `isograph/package.json:25-26` and `isograph/turbo.json`, and turbo runs each lib's `tsc` before its `compile-libs`. `.github/workflows/js.yml`'s runtime steps are `pnpm compile-libs` (before the pet demo's `Typecheck`, whose `@isograph/runtime` import resolves to `dist` through `exports`, as upstream's demos resolve the built libs) and `pnpm --filter @isograph/runtime test`. `.pre-commit-config.yaml` gains `runtime-typecheck` (`pnpm --filter @isograph/runtime tsc`, `files: '^(libs/isograph-runtime/|tsconfig\.build\.json$)'`) and `runtime-test` (`pnpm --filter @isograph/runtime test`, `files: '^libs/isograph-runtime/'`), the babel plugin's two hooks. `.prettierignore` and `.oxlintrc.json` already ignore `__isograph`, and `.gitignore` already ignores `dist` and `*.tsbuildinfo`.
 
 ## Test infrastructure
 
@@ -893,7 +892,7 @@ Each change is one commit. Prerequisite: normalization-ast.md changes 1 to 3.
 
 ### 1. Build setup, test runner, and fixture project
 
-The package's upstream build (The package): `package.json`, the three `tsconfig` files, `tsdown.config.ts`, the root `tsconfig.build.json` and `tsdown.config.ts`, `tsdown` in the root `devDependencies`, `vitest`; the CI `tsc` and `compile-libs` steps; the `runtime-typecheck` hook; `fixtures/store` with its config, schema, sources, and generated artifacts.
+The package's upstream build (The package): `package.json`, the three `tsconfig` files, `tsdown.config.ts`, the root `tsconfig.build.json` and `tsdown.config.ts`, `tsdown` in the root `devDependencies`, `vitest`; the CI `compile-libs` step; the `runtime-typecheck` hook; `fixtures/store` with its config, schema, sources, and generated artifacts.
 
 ### 2. Store, store keys, record ids
 

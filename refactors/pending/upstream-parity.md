@@ -306,7 +306,7 @@ No React package exists in i2 (`libs/` holds only `isograph-babel-plugin`, `isog
 - `partial`: demo typecheck plus eslint for three demos (`isograph/.github/workflows/ci.yml:88-119`); i2 typechecks the pet demo only, no eslint (`.github/workflows/js.yml:37-38`).
 - `different`: `cargo fmt` runs fmt then checks git status, edition 2021 (`isograph/.github/workflows/ci.yml:218-231`, `isograph/rustfmt.toml:1`); i2 runs `--check` with edition 2024 (`scripts/check-rustfmt.sh`, `rustfmt.toml`).
 - `missing`: npm OIDC trusted publishing (`isograph/.github/workflows/ci.yml:374,442`).
-- `missing`: root scripts `test`, `tsc`, `coverage`, `watch-libs`, `compile-libs`, demo `dev-*`/`build-*` (`isograph/package.json:20-53`); i2 `package.json:11-24`.
+- `missing`: root scripts `test`, `tsc`, `coverage`, demo `dev-*`/`build-*` (`isograph/package.json:20-53`); i2 `package.json:14-29`. `watch-libs` and `compile-libs` landed in commit `c11feea1b`.
 - `partial`: `sanity-check` runs format, clippy, build-demos, git status, compile-libs, test (`isograph/scripts/sanity-check.sh:1-6`); i2 runs format, clippy, git status (`scripts/sanity-check.sh:1-3`).
 - `different`: website deploy gate is identical (`.github/workflows/ci.yml:105-109`), so a push to i2 `main` would deploy i2's docs, mostly stale upstream copies, to isograph.dev.
 - `partial`: pet demo: upstream is a Next.js app with a graphql-yoga backend, swc plugin, 10 entrypoints, `@component`, `@loadable`, `@updatable`, pagination, `__refetch`, `asT`, pointers (`isograph/demos/pet-demo/`); i2's is 10 `.ts` files with no React, server or bundler that logs entrypoint artifacts (`demos/pet-demo/scripts/log-entrypoints.cjs`); rendering is planned in `refactors/pending/runtime/react.md:20`.
@@ -323,7 +323,7 @@ No React package exists in i2 (`libs/` holds only `isograph-babel-plugin`, `isog
 - `dropped`: fixture up-to-date check (`isograph/.github/workflows/ci.yml:259-264`); AGENTS.md "No snapshot tests".
 - `dropped`: tsdown CJS/ESM/dts build of JS packages and root vitest (`isograph/.github/workflows/ci.yml:121-153`, `tsdown.config.ts`, `vitest.workspace.ts`); commits `25604bd5e`, `552db565b`.
 - `dropped`: npm canary on `main`, `deploy/*` dist-tag, and `latest` on `v*` tags (`isograph/.github/workflows/ci.yml:352-525`, `gulpfile.js:4-57`); commit `25604bd5e`; no replacement plan.
-- `dropped`: turbo task graph and `.turbo` CI cache (`isograph/turbo.json`); commit `552db565b`.
+- `dropped`: `.turbo` CI cache (`isograph/.github/workflows/ci.yml:99-105`); commit `552db565b`. The turbo task graph (`isograph/turbo.json`) landed in commit `c11feea1b`.
 - `dropped`: `patches/@docusaurus__tsconfig.patch` (`isograph/pnpm-workspace.yaml:21-22`); replaced by an inlined tsconfig (`docs-website/tsconfig.json:3`), commit `2e575a7f4`.
 - `dropped`: `cross`, musl and the `cross` script (`isograph/package.json:20-27`), `refactors/past/cli-ci-build.md:17,101`.
 - `dropped`: `github-demo` (Next.js, live GitHub API, `useConnectionSpecPagination`, S3/CloudFront deploy; `isograph/demos/github-demo/`), commit `180ec76fc`.
