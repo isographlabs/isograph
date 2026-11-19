@@ -10,10 +10,100 @@ Origin of the open-file map and handlers: isograph `OpenFileMap` / `OpenFileSour
 
 These are not approved. The body is written against the first option of each; each other option states its delta.
 
-1. Per-client storage shape in pico. The pico standard describes one pattern for "which keys currently have a source": a `#[tracked]` database field mapping key to `SourceId<T>` (`pico.md` Tracked maps, "The map is which paths currently have a `DiskFile`. `db.set` of a `DiskFile` does not update the map. `handle` does both"; AGENTS.md "pico tracked maps"). Option (b) is that pattern. Neither document describes a source whose value is a map of `SourceId`s, so option (a) is neither prescribed nor forbidden. Option (c) contradicts `pico.md` "It is a type-level proof that a `T` exists in the database". In every option `file_source` reads the source it returns, so a removed source re-invokes it. (a) A tracked `client_map: HashMap<ClientId, SourceId<ClientOpenFiles>>` written only on `Started` and `Gone`; one `ClientOpenFiles` source per client holding `HashMap<RelativePathToSourceFile, SourceId<OpenFile>>`; one `OpenFile` source per `(client, path)`. A keystroke writes one `OpenFile`. Open or close by client A writes A's `ClientOpenFiles`, which re-invokes every `file_source(A, _)` slot, hit or miss, because each read that source; each backdates unless its answer changed. No other client's memos re-invoke. (b) One tracked `OpenFileMap(pub HashMap<OpenFileKey, SourceId<OpenFile>>)`, the `disk_file_map` pattern: `file_source` looks up `OpenFileKey { client: ClientId, path }` untracked and `db.get`s the hit; on a miss it reads the map tracked and falls back to disk. Writes follow change 2: `set_open_file` `set`s the `OpenFile` and calls `tracked()` only when the key is absent. The `SourceId` of an `OpenFile` is the hash of `TypeId<OpenFile>` and its `#[key]` (`crates/pico_macros/src/source_macro.rs:51-55`), so a second `set` of the same key returns the same id and needs no map write. A `didChange` of an open path is one `set`; the counter does not move, and no memo that missed the map re-invokes. `didOpen` of a new path, `didClose`, and `Gone` (one `extract_if` over keys whose `client` matches, like `remove_disk_files_from_path`) bump the counter, which re-invokes every `file_source` slot of every client that missed the map, that is every disk-fallback read; each backdates unless its answer changed. Hits do not re-invoke. Without change 2's write rule, `MutView::tracked()` (`crates/pico/src/view.rs:67-74`) bumps on every call, keystrokes included. Delta from the body: `ClientMap`, `ClientOpenFiles`, `insert_client`, and `UnknownClientError` are deleted; `set_open_file` and `remove_open_file` return `()`; the database does not record which clients exist, only `LiveSessions` does. (c) Per-client `ClientOpenFiles` without `client_map`: compute `SourceId<ClientOpenFiles>` from a placeholder value (`SourceId::new(&ClientOpenFiles { client, open_files: HashMap::new() })`). Removes one map, but constructs a value only to hash it, and `db.get` of that id panics for a client with no state (a `Gone` without `Started`).
+1. Per-client storage shape in pico. The pico standard describes one pattern for "which keys currently have a source": a `#[tracked]` database field mapping key to `SourceId<T>` (`pico.md` Tracked maps, "The map is which paths currently have a `DiskFile`. `db.set` of a `DiskFile` does not update the map. `handle` does both"; AGENTS.md "pico tracked maps"). Option (b) is that pattern. Neither document describes a source whose value is a map of `SourceId`s, so option (a) is neither prescribed nor forbidden. Option (c) contradicts `pico.md` "It is a type-level proof that a `T` exists in the database". In options (a) to (c) `file_source` reads the source it returns, so a removed source re-invokes it. Option (d) changes the public memo keys that `pico.md` Key lists. (a) A tracked `client_map: HashMap<ClientId, SourceId<ClientOpenFiles>>` written only on `Started` and `Gone`; one `ClientOpenFiles` source per client holding `HashMap<RelativePathToSourceFile, SourceId<OpenFile>>`; one `OpenFile` source per `(client, path)`. A keystroke writes one `OpenFile`. Open or close by client A writes A's `ClientOpenFiles`, which re-invokes every `file_source(A, _)` slot, hit or miss, because each read that source; each backdates unless its answer changed. No other client's memos re-invoke. (b) One tracked `OpenFileMap(pub HashMap<OpenFileKey, SourceId<OpenFile>>)`, the `disk_file_map` pattern: `file_source` looks up `OpenFileKey { client: ClientId, path }` untracked and `db.get`s the hit; on a miss it reads the map tracked and falls back to disk. Writes follow change 2: `set_open_file` `set`s the `OpenFile` and calls `tracked()` only when the key is absent. The `SourceId` of an `OpenFile` is the hash of `TypeId<OpenFile>` and its `#[key]` (`crates/pico_macros/src/source_macro.rs:51-55`), so a second `set` of the same key returns the same id and needs no map write. A `didChange` of an open path is one `set`; the counter does not move, and no memo that missed the map re-invokes. `didOpen` of a new path, `didClose`, and `Gone` (one `extract_if` over keys whose `client` matches, like `remove_disk_files_from_path`) bump the counter, which re-invokes every `file_source` slot of every client that missed the map, that is every disk-fallback read; each backdates unless its answer changed. Hits do not re-invoke. Without change 2's write rule, `MutView::tracked()` (`crates/pico/src/view.rs:67-74`) bumps on every call, keystrokes included. Delta from the body: `ClientMap`, `ClientOpenFiles`, `insert_client`, and `UnknownClientError` are deleted; `set_open_file` and `remove_open_file` return `()`; the database does not record which clients exist, only `Clients` does. (c) Per-client `ClientOpenFiles` without `client_map`: compute `SourceId<ClientOpenFiles>` from a placeholder value (`SourceId::new(&ClientOpenFiles { client, open_files: HashMap::new() })`). Removes one map, but constructs a value only to hash it, and `db.get` of that id panics for a client with no state (a `Gone` without `Started`).
+
+   (d) Open files indexed on `ClientState` (change 4), outside pico's tracked state. `OpenFile` stays a pico source, keyed by `OpenFileKey { client, path }` as in the body. Each client's index of its open files is a field of its `ClientState`, which a memo cannot read. A request handler resolves a `FileSourceId` from the asking client's current `ClientState`, outside any memo, and passes it to memos keyed by it. On `Gone`, `handle` removes the `ClientState` and `db.remove`s each `OpenFile` it indexed.
+
+   ```rust
+   // from crates/isograph_cli/src/event.rs
+   /// The daemon's state for one client.
+   #[derive(Debug)]
+   pub struct ClientState {
+       pub live_session: LiveSession,
+       pub open_files: HashMap<RelativePathToSourceFile, SourceId<OpenFile>>,
+   }
+
+   impl ClientState {
+       pub fn file_source_id(&self, path: RelativePathToSourceFile) -> FileSourceId {
+           match self.open_files.get(&path).copied() {
+               Some(open_file_id) => FileSourceId::Open(open_file_id),
+               None => FileSourceId::Disk(path),
+           }
+       }
+   }
+   ```
+
+   ```rust
+   // from crates/isograph_compiler/src/database.rs
+   /// The source one read of file text uses.
+   #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+   pub enum FileSourceId {
+       Disk(RelativePathToSourceFile),
+       Open(SourceId<OpenFile>),
+   }
+
+   /// The text of `file`.
+   pub fn file_contents<THostLanguage: HostLanguage>(
+       db: &IsographDb<THostLanguage>,
+       file: FileSourceId,
+   ) -> Option<&str> {
+       match file {
+           FileSourceId::Disk(path) => db.disk_file(path).map(|disk_file| disk_file.contents.as_str()),
+           FileSourceId::Open(open_file_id) => db.get(open_file_id).contents.as_str().wrap_some(),
+       }
+   }
+   ```
+
+   ```rust
+   // from crates/isograph_compiler/src/iso_literals.rs
+   #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+   pub struct LiteralId {
+       pub file: FileSourceId,
+       pub index: usize,
+   }
+
+   #[memo]
+   pub fn extract_iso_literals<THostLanguage: HostLanguage>(
+       db: &IsographDb<THostLanguage>,
+       file: FileSourceId,
+   ) -> Option<Vec<IsoLiteralExtraction<THostLanguage>>>;
+
+   #[memo]
+   pub fn parsed_iso_literals_in_file<THostLanguage: HostLanguage>(
+       db: &IsographDb<THostLanguage>,
+       file: FileSourceId,
+   ) -> Option<Vec<(IsoLiteralExtraction<THostLanguage>, ParsedIsoLiteral)>>;
+
+   #[memo]
+   pub fn text_through_last_iso_literal<THostLanguage: HostLanguage>(
+       db: &IsographDb<THostLanguage>,
+       file: FileSourceId,
+   ) -> Option<String>;
+
+   #[memo]
+   pub fn literal_id_at_location<THostLanguage: HostLanguage>(
+       db: &IsographDb<THostLanguage>,
+       file: FileSourceId,
+       line_char: LineChar,
+   ) -> Option<LiteralId>;
+   ```
+
+   `FileSourceId` here replaces the body's `FileSourceId { Disk(SourceId<DiskFile>), Open(SourceId<OpenFile>) }`; the `Disk` variant holds the path, and the memo resolves it through `disk_file` (change 2: untracked hit, tracked miss). `lsp_semantic_tokens_for_file(db, file)`, `file_literals(db, file)`, and `format_iso_literals(db, file)` take `FileSourceId` in place of `(client, path)`. `semantic_tokens_response`, `formatting_response`, and `will_save_wait_until_response` take the asking client's `&ClientState`, compute `path` with `relative_from_uri`, and call `client_state.file_source_id(path)`. `did_open` / `did_change` `set` an `OpenFile` and insert its id into `ClientState.open_files`; `did_close` removes the path from `open_files` and `db.remove`s the id it held. Delta from the body: `ClientMap`, the `client_map` tracked field and its `tracked()` in `IsographDb::default`, `ClientOpenFiles`, `insert_client`, `remove_client`, `set_open_file`'s and `remove_open_file`'s `client_map` lookup, `UnknownClientError`, `file_source`, `open_file_source_id`, and `disk_file_source_id` are deleted; `IsographDb::disk_file` (change 2) stays. The request and notification paths reach `ClientState` through `state.clients.0.get(&client)` after `Clients::reply` or `dispatch_lsp`'s liveness check already established presence, so how a handler receives `&ClientState` without a second lookup that can miss is not yet specified.
+
+   Consequences:
+
+   - No tracked open-file map exists. `didOpen` of a new path `set`s a vacant `OpenFile`, which does not advance the epoch (`crates/pico/src/database.rs:352-357`), and writes only `ClientState`. `didClose` and `Gone` `remove` sources, which advances the epoch (`database.rs:362-373`); the next request from that client passes a different `FileSourceId`, so no memo it calls reads the removed node. No open or close bumps a tracked counter, so no memo re-invokes because another path was opened or closed.
+   - A memo depends only on the source it is handed: `Open(id)` memos read `db.get(id)`; `Disk(path)` memos read `disk_file_map` and that `DiskFile`. Passing a `SourceId` or a `FileSourceId` as a memo argument records no dependency; the body's `db.get` does (`database.rs:134-140`).
+   - No stale-`SourceId` panic on the request path. The panic needs a memo re-verified with a removed id: re-verification sees the removed source as changed (`crates/pico/src/execute_memoized_function.rs:202-207`), re-runs the body, and the body's `db.get` panics (`database.rs:123-128`; pico `tests/removing_params.rs:24-41` pins this). Handlers only pass ids from the current `ClientState`, and a memo passes its callees the id it received. Reopening a path yields the same `SourceId<OpenFile>` (the hash of `TypeId<OpenFile>` and `OpenFileKey`, `crates/pico_macros/src/source_macro.rs:51-55`); its old slot re-verifies against the re-`set` source, which exists.
+   - Memo slots for removed ids are retained until garbage collection, which is out of scope (nothing in i2 calls `run_garbage_collection`). Garbage collection does not execute memos (`crates/pico/src/garbage_collection.rs:22-128`), so a retained slot for a removed id does not panic there.
+   - Disk-backed memo slots are shared across clients. `Disk(path)` carries no `ClientId`, so two clients without a buffer at an unchanged path read one `extract_iso_literals` / `parsed_iso_literals_in_file` / `lsp_semantic_tokens_for_file` slot. In (a) to (c) each client has its own `(client, path)` slots, and each client's disk-fallback read runs once per client.
+   - Work over all of a client's open files (lsp-diagnostics.md's per-client publish) iterates `ClientState.open_files` in `handle` or the effect that publishes, outside memos. A memo cannot enumerate a client's open files, because they are not in the database.
+   - Every public memo of the family changes key from `(client, path)` to `FileSourceId`, and `LiteralId` carries `file: FileSourceId` in place of `client` and `path`. pico.md Key lists the public keys ("Public APIs take one of: `path`, `path` and `LineChar`, ..."), and pico.md says "A function that needs the file takes `path` and calls `db.disk_file(path)`"; (d) amends both.
+
+   Against (a): a keystroke is the same (one `OpenFile` `set`); open and close re-invoke nothing in (d), where in (a) they re-invoke every `file_source(A, _)` slot of that client. Against (b): (d) has no tracked counter, so open and close do not re-invoke every disk-fallback slot of every client. Against (c): (d) never `db.get`s per-client state, so `Gone` without `Started` reaches no false proof; `Gone` of a client with no `ClientState` removes nothing. (a) and (b) keep the open-file index in pico, so a memo can enumerate a client's open files; (d) cannot.
 2. A tracked map whose counter was never written. `Storage::get_impl` (`crates/pico/src/database.rs:134-140`) returns `None` before registering a dependency, so a miss-then-`tracked()` read before the first write to that map records nothing, and a later insert is not seen. `missing_then_present_extracts` in `isograph_extract_typescript` inserts an unrelated file first to work around this. (a) `IsographDb::default` calls `tracked()` once on each tracked field, which writes each counter; no pico change. A future tracked field that is not listed there has the bug again, silently. (b) pico prefactor: record a dependency on an absent source. `Dependency` gains the presence observed at read time, `get_impl` registers on a miss, and `source_node_changed_since` reports "changed" only when presence differs or the present node is newer. Fixes every absent read (singletons included) for every tracked field. pico is kept unchanged from upstream isograph per AGENTS.md, so this is an upstream divergence; it would be its own change before change 2, with pico tests.
-3. Order relative to format-file-from-segments.md. (a) This doc first. Change 5's `format_iso_literals` uses `parsed_iso_literals_in_file` and `text_through_last_iso_literal` with the client. format-file-from-segments.md then reads `file_contents(db, client, path)` instead of `state.disk_file(path)` (which change 5 deletes). (b) format-file-from-segments.md first. Change 5's `format_iso_literals` after-snippet is the second one in that section, with `file_contents` replacing `disk_file`. Either order ships; (b) makes change 5's format diff smaller, (a) makes format-file-from-segments.md read the buffer from the start.
-4. `SendLspResponseEffect` as data (change 4). The feature does not need it. `SendLspResponseEffect` is how `handle` returns a reply for `perform` to send. Tests already read the response by calling `perform` and `recv`ing on the crossbeam receiver behind the `LiveSession` (`lsp_formatting_of_a_live_client_without_a_file_is_null`, `crates/isograph_cli/src/state.rs:574`), and change 5's tests use that pattern. (a) Ship change 4: `{ sender, response }` with private fields, `pub(crate) fn response(&self) -> &lsp_server::Response`, and `pub(crate) fn send(self, token: &SideEffectToken)` called by `perform`. `LiveSessions::after_compute` returns it. Tests can match the response on the effect without `perform` and a channel; `#[expect(clippy::type_complexity)]` and the hand-written `Debug` go away; `run_event_loop` is unchanged; `send` still takes the token. (b) Do not ship change 4; `Box<dyn FnOnce(&SideEffectToken) + Send>` stays.
+3. Order relative to format-file-from-segments.md. (a) This doc first. Change 6's `format_iso_literals` uses `parsed_iso_literals_in_file` and `text_through_last_iso_literal` with the client. format-file-from-segments.md then reads `file_contents(db, client, path)` instead of `state.disk_file(path)` (which change 6 deletes). (b) format-file-from-segments.md first. Change 6's `format_iso_literals` after-snippet is the second one in that section, with `file_contents` replacing `disk_file`. Either order ships; (b) makes change 6's format diff smaller, (a) makes format-file-from-segments.md read the buffer from the start.
+4. `SendLspResponseEffect` as data (change 5). The feature does not need it. `SendLspResponseEffect` is how `handle` returns a reply for `perform` to send. Tests already read the response by calling `perform` and `recv`ing on the crossbeam receiver behind the `LiveSession` (`lsp_formatting_of_a_live_client_without_a_file_is_null`, `crates/isograph_cli/src/state.rs:574`), and change 6's tests use that pattern. (a) Ship change 5: `{ sender, response }` with private fields, `pub(crate) fn response(&self) -> &lsp_server::Response`, and `pub(crate) fn send(self, token: &SideEffectToken)` called by `perform`. `Clients::after_compute` returns it. Tests can match the response on the effect without `perform` and a channel; `#[expect(clippy::type_complexity)]` and the hand-written `Debug` go away; `run_event_loop` is unchanged; `send` still takes the token. (b) Do not ship change 5; `Box<dyn FnOnce(&SideEffectToken) + Send>` stays.
 
 ## What the user does
 
@@ -31,13 +121,14 @@ A URI with neither a buffer for the asking window nor a `DiskFile` is JSON `null
 
 ## Changes
 
-Five changes, prefactors first. Change 4 ships only if open decision 4 picks (a). Change 5 does not depend on change 4.
+Six changes, prefactors first. Change 5 ships only if open decision 4 picks (a). Change 6 does not depend on change 5.
 
 1. Typed path conversion.
 2. Tracked counters exist from construction; tracked-map writes only bump on a key change; `disk_file` tracks its miss.
 3. `HostLanguage::extract_iso_literals_from_text`.
-4. `SendLspResponseEffect` is data.
-5. Clients and their open files.
+4. One `clients` map replacing `LiveSessions`.
+5. `SendLspResponseEffect` is data.
+6. Clients and their open files.
 
 ## Change 1: typed path conversion
 
@@ -246,7 +337,7 @@ fn lsp_error(error: UriPathError) -> LSPRuntimeError {
 }
 ```
 
-`file_path` is unchanged and stays private. `relative_from_uri` is `pub(crate)` because change 5's document-sync handlers call it.
+`file_path` is unchanged and stays private. `relative_from_uri` is `pub(crate)` because change 6's document-sync handlers call it.
 
 A non-file URI stays JSON `null` (`ExpectedError`). A missing working directory is a broken startup invariant; it is now an error response. A path with no relative form is a real file the daemon cannot key; it is an error response naming the cause.
 
@@ -575,7 +666,7 @@ After:
 
 ## Change 3: `extract_iso_literals_from_text`
 
-The TypeScript extract memo looks up a `DiskFile` and runs the regex. Change 5 runs that regex on whatever text the client reads. This change splits lookup from extract-from-text. Disk extract still looks up `DiskFile`. Highlighting is unchanged.
+The TypeScript extract memo looks up a `DiskFile` and runs the regex. Change 6 runs that regex on whatever text the client reads. This change splits lookup from extract-from-text. Disk extract still looks up `DiskFile`. Highlighting is unchanged.
 
 Origin: the regex body of `TypeScriptHostLanguage::extract_iso_literals`. Delta: the body after the lookup is an associated function on `HostLanguage` that takes `&str`.
 
@@ -644,9 +735,365 @@ Existing extract, `parsed_iso_literals_in_file`, and tokens tests keep their fac
 
 `docs-website/docs/design-docs/pico.md` Parser and extract: "Extract is a memo over a `DiskFile`" becomes "Extract is a memo that looks up file text and calls `HostLanguage::extract_iso_literals_from_text`."
 
-## Change 4: `SendLspResponseEffect` is data
+## Change 4: one `clients` map replacing `LiveSessions`
 
-Ships only if open decision 4 picks (a). Change 5 does not depend on it.
+`IsographState` holds one map from `ClientId` to that client's state. Today the only per-client state is the LSP session, so `ClientState` has one field, `live_session`. Every client today is an LSP connection, so `live_session` is not an `Option`. Change 6 adds per-client state to this map's value. `ClientState` stays a named-field struct, not a newtype, because a second field is planned.
+
+`reply`, `before_compute`, and `after_compute` move from `LiveSessions` to `Clients` with the same signatures. Each body reads `client_state.live_session` where it read `session`. They stay in `event.rs` because `BeforeCompute` and `AfterCompute` have private fields that only `event.rs` constructs.
+
+The production readers are the ones `LiveSessions` has today: `handle_client_connection` (`Started`, `Gone`), `dispatch_lsp` (`reply`), `dispatch_lsp_request` (`before_compute`), and `send_lsp_response` (`after_compute`). This change ships alone.
+
+### Types
+
+Before:
+
+```rust
+// from crates/isograph_cli/src/event.rs
+#[derive(Clone, Debug)]
+pub struct LiveSession {
+    pub sender: crossbeam::channel::Sender<lsp_server::Message>,
+    #[cfg_attr(not(test), expect(dead_code))]
+    pub capabilities: lsp_types::ClientCapabilities,
+    pub outstanding: std::collections::HashSet<lsp_server::RequestId>,
+}
+
+#[derive(Debug, Default)]
+pub struct LiveSessions(pub std::collections::HashMap<ClientId, LiveSession>);
+```
+
+After:
+
+```rust
+// from crates/isograph_cli/src/event.rs
+#[derive(Clone, Debug)]
+pub struct LiveSession {
+    pub sender: crossbeam::channel::Sender<lsp_server::Message>,
+    #[cfg_attr(not(test), expect(dead_code))]
+    pub capabilities: lsp_types::ClientCapabilities,
+    pub outstanding: std::collections::HashSet<lsp_server::RequestId>,
+}
+
+/// The daemon's state for one client.
+#[derive(Debug)]
+pub struct ClientState {
+    pub live_session: LiveSession,
+}
+
+/// Every client that has `Started` and is not yet `Gone`.
+#[derive(Debug, Default)]
+pub struct Clients(pub std::collections::HashMap<ClientId, ClientState>);
+```
+
+`LiveSession` is unchanged; `ClientStartedEvent.session` and `run_session`'s construction of it (`lsp_socket.rs:185-195`) are unchanged. `ClientState` derives `Debug` because `Clients` does. Nothing clones a `ClientState`.
+
+Before:
+
+```rust
+// from crates/isograph_cli/src/state.rs
+pub struct IsographState<THostLanguage: HostLanguage> {
+    pub db: IsographDb<THostLanguage>,
+    pub live_sessions: LiveSessions,
+    pub(crate) hello_world_debounce: Option<freddie_timer::TimerGuard>,
+}
+```
+
+After:
+
+```rust
+// from crates/isograph_cli/src/state.rs
+pub struct IsographState<THostLanguage: HostLanguage> {
+    pub db: IsographDb<THostLanguage>,
+    pub clients: Clients,
+    pub(crate) hello_world_debounce: Option<freddie_timer::TimerGuard>,
+}
+```
+
+### `Clients` methods
+
+Before:
+
+```rust
+// from crates/isograph_cli/src/event.rs
+impl LiveSessions {
+    pub fn reply(&mut self, client: ClientId, id: lsp_server::RequestId) -> Option<BeforeCompute> {
+        let session = self.0.get_mut(&client)?;
+        session.outstanding.insert(id.clone());
+        BeforeCompute { client, id }.wrap_some()
+    }
+
+    pub fn before_compute(&mut self, before: BeforeCompute) -> Option<AfterCompute> {
+        let session = self.0.get_mut(&before.client)?;
+        if !session.outstanding.contains(&before.id) {
+            return None;
+        }
+        AfterCompute {
+            client: before.client,
+            id: before.id,
+        }
+        .wrap_some()
+    }
+
+    #[expect(clippy::type_complexity)]
+    pub fn after_compute(
+        &mut self,
+        after: AfterCompute,
+        body: Result<serde_json::Value, lsp_server::ResponseError>,
+    ) -> Option<Box<dyn FnOnce(&crate::effect::SideEffectToken) + Send>> {
+        let session = self.0.get_mut(&after.client)?;
+        if !session.outstanding.remove(&after.id) {
+            return None;
+        }
+        let sender = session.sender.clone();
+        // ... unchanged
+    }
+}
+```
+
+After:
+
+```rust
+// from crates/isograph_cli/src/event.rs
+impl Clients {
+    pub fn reply(&mut self, client: ClientId, id: lsp_server::RequestId) -> Option<BeforeCompute> {
+        let client_state = self.0.get_mut(&client)?;
+        client_state.live_session.outstanding.insert(id.clone());
+        BeforeCompute { client, id }.wrap_some()
+    }
+
+    pub fn before_compute(&mut self, before: BeforeCompute) -> Option<AfterCompute> {
+        let client_state = self.0.get_mut(&before.client)?;
+        if !client_state.live_session.outstanding.contains(&before.id) {
+            return None;
+        }
+        AfterCompute {
+            client: before.client,
+            id: before.id,
+        }
+        .wrap_some()
+    }
+
+    #[expect(clippy::type_complexity)]
+    pub fn after_compute(
+        &mut self,
+        after: AfterCompute,
+        body: Result<serde_json::Value, lsp_server::ResponseError>,
+    ) -> Option<Box<dyn FnOnce(&crate::effect::SideEffectToken) + Send>> {
+        let client_state = self.0.get_mut(&after.client)?;
+        if !client_state.live_session.outstanding.remove(&after.id) {
+            return None;
+        }
+        let sender = client_state.live_session.sender.clone();
+        // ... unchanged
+    }
+}
+```
+
+### `handle_client_connection`
+
+Before:
+
+```rust
+// from crates/isograph_cli/src/state.rs
+    match event {
+        ClientConnectionEvent::Started(started) => {
+            state
+                .live_sessions
+                .0
+                .insert(started.client, started.session);
+            no_effects()
+        }
+        ClientConnectionEvent::Gone(client) => {
+            state.live_sessions.0.remove(&client);
+            no_effects()
+        }
+    }
+```
+
+After:
+
+```rust
+// from crates/isograph_cli/src/state.rs
+    match event {
+        ClientConnectionEvent::Started(started) => {
+            state.clients.0.insert(
+                started.client,
+                ClientState {
+                    live_session: started.session,
+                },
+            );
+            no_effects()
+        }
+        ClientConnectionEvent::Gone(client) => {
+            state.clients.0.remove(&client);
+            no_effects()
+        }
+    }
+```
+
+A second `Started` for one id replaces that client's whole `ClientState`, as it replaces the `LiveSession` today (`client_started_twice_for_the_same_id_keeps_the_second_session`). A `Gone` of an id not in the map is a no-op, as today.
+
+### Request path
+
+Before:
+
+```rust
+// from crates/isograph_cli/src/state.rs
+        crate::event::LspEvent::Request(incoming) => {
+            let client = incoming.client;
+            let id = incoming.request.id.clone();
+            let Some(before_compute) = state.live_sessions.reply(client, id) else {
+                return no_effects();
+            };
+            dispatch_lsp_request(state, incoming, before_compute)
+        }
+// ...
+    let request = incoming.request;
+    let Some(after) = state.live_sessions.before_compute(before) else {
+        return no_effects();
+    };
+// ...
+    match get_response() {
+        ControlFlow::Break(response) => {
+            send_lsp_response(&mut state.live_sessions, after, response_body(response))
+        }
+        ControlFlow::Continue(request) => {
+            method_not_found(&mut state.live_sessions, after, request)
+        }
+    }
+}
+
+fn send_lsp_response(
+    sessions: &mut crate::event::LiveSessions,
+    after: crate::event::AfterCompute,
+    body: Result<serde_json::Value, lsp_server::ResponseError>,
+) -> Vec<IsographEffect> {
+    let Some(send) = sessions.after_compute(after, body) else {
+        return no_effects();
+    };
+    // ... unchanged
+}
+
+fn method_not_found(
+    sessions: &mut crate::event::LiveSessions,
+    after: crate::event::AfterCompute,
+    request: lsp_server::Request,
+) -> Vec<IsographEffect> {
+    send_lsp_response(
+        sessions,
+        after,
+        // ... unchanged
+    )
+}
+```
+
+After:
+
+```rust
+// from crates/isograph_cli/src/state.rs
+        crate::event::LspEvent::Request(incoming) => {
+            let client = incoming.client;
+            let id = incoming.request.id.clone();
+            let Some(before_compute) = state.clients.reply(client, id) else {
+                return no_effects();
+            };
+            dispatch_lsp_request(state, incoming, before_compute)
+        }
+// ...
+    let request = incoming.request;
+    let Some(after) = state.clients.before_compute(before) else {
+        return no_effects();
+    };
+// ...
+    match get_response() {
+        ControlFlow::Break(response) => {
+            send_lsp_response(&mut state.clients, after, response_body(response))
+        }
+        ControlFlow::Continue(request) => method_not_found(&mut state.clients, after, request),
+    }
+}
+
+fn send_lsp_response(
+    clients: &mut crate::event::Clients,
+    after: crate::event::AfterCompute,
+    body: Result<serde_json::Value, lsp_server::ResponseError>,
+) -> Vec<IsographEffect> {
+    let Some(send) = clients.after_compute(after, body) else {
+        return no_effects();
+    };
+    // ... unchanged
+}
+
+fn method_not_found(
+    clients: &mut crate::event::Clients,
+    after: crate::event::AfterCompute,
+    request: lsp_server::Request,
+) -> Vec<IsographEffect> {
+    send_lsp_response(
+        clients,
+        after,
+        // ... unchanged
+    )
+}
+```
+
+`dispatch_lsp_notification` does not read the map in this change; change 6 adds its liveness check against `state.clients`.
+
+### Construction and imports
+
+Every `IsographState` literal writes `clients: Clients::default()` where it wrote `live_sessions: LiveSessions::default()`, and imports `Clients` from `crate::event` instead of `LiveSessions`:
+
+- `daemon::run` (`daemon.rs:80-84`, import `daemon.rs:13`)
+- `daemon.rs` tests `empty_state` (`daemon.rs:249-253`, import `daemon.rs:241`)
+- `lsp_socket.rs` tests (`lsp_socket.rs:289-293`, import `lsp_socket.rs:228-231`)
+- `watch.rs` tests (`watch.rs:702-706`, import `watch.rs:635`)
+- `state.rs` tests `empty` (`state.rs:282-288`, import `state.rs:273-276`, which also imports `ClientState` and drops `LiveSessions`)
+- `state.rs` imports `Clients` and `ClientState` instead of `LiveSessions` (`state.rs:15-17`)
+
+### Tests
+
+Facts unchanged. Only the path to the session changes.
+
+`state.rs`:
+
+- `start_client` and `dummy_session` are unchanged.
+- `insert_live_session` becomes `insert_client_state`:
+
+```rust
+// from crates/isograph_cli/src/state.rs
+    fn insert_client_state(
+        clients: &mut Clients,
+        client: ClientId,
+    ) -> crossbeam::channel::Receiver<lsp_server::Message> {
+        let (tx, rx) = crossbeam::channel::unbounded();
+        clients.0.insert(
+            client,
+            ClientState {
+                live_session: dummy_session(tx, lsp_types::ClientCapabilities::default()),
+            },
+        );
+        rx
+    }
+```
+
+- `reply_of_a_client_that_is_not_in_the_map_is_none`, `reply_then_after_compute_of_a_live_client_sends_the_closed_over_id`, `before_compute_after_removing_the_client_is_none`, `after_compute_after_removing_the_client_is_none`, `before_compute_after_removing_the_id_is_none`, `after_compute_after_removing_the_id_is_none`: `let mut sessions = LiveSessions::default();` becomes `let mut clients = Clients::default();`; `insert_live_session(&mut sessions, client)` becomes `insert_client_state(&mut clients, client)`; `sessions.0.get(&client).expect("the client is live").outstanding` and the `get_mut` form become `clients.0.get(&client).expect("the client is live").live_session.outstanding`; `sessions.0.remove(&client)` becomes `clients.0.remove(&client)`; method calls go through `clients`.
+- `client_started_stores_the_session` and `client_started_twice_for_the_same_id_keeps_the_second_session`: `let session = state.live_sessions.0.get(&client).expect(..);` becomes `let session = &state.clients.0.get(&client).expect(..).live_session;`; the `len()` assertion reads `state.clients.0.len()`.
+- `client_gone_removes_the_session`: `!state.clients.0.contains_key(&client)`. `client_gone_of_an_unknown_id_is_a_noop`: `state.clients.0.is_empty()`.
+- The three `outstanding.is_empty()` assertions after a response (`state.rs:562-570`, `state.rs:610-618`, `state.rs:659-667`) read `state.clients.0.get(&client).expect("the client is live").live_session.outstanding`.
+
+### Call sites
+
+- `handle_client_connection` `Started` -> `clients.0.insert(client, ClientState { live_session })`
+- `handle_client_connection` `Gone` -> `clients.0.remove`
+- `dispatch_lsp` -> `Clients::reply`
+- `dispatch_lsp_request` -> `Clients::before_compute`, `send_lsp_response` / `method_not_found` -> `Clients::after_compute`
+
+### Docs this change amends
+
+`refactors/pending/lsp-diagnostics.md` names `LiveSessions` (`IsographState.live_sessions`, `publish(live: &LiveSessions, ..)`, "on `LiveSessions`"). Those become `Clients` / `clients`, and a per-session field it adds is a field of `LiveSession` reached through `ClientState.live_session`.
+
+## Change 5: `SendLspResponseEffect` is data
+
+Ships only if open decision 4 picks (a). Change 6 does not depend on it.
 
 Before:
 
@@ -701,11 +1148,11 @@ Before:
         after: AfterCompute,
         body: Result<serde_json::Value, lsp_server::ResponseError>,
     ) -> Option<Box<dyn FnOnce(&crate::effect::SideEffectToken) + Send>> {
-        let session = self.0.get_mut(&after.client)?;
-        if !session.outstanding.remove(&after.id) {
+        let client_state = self.0.get_mut(&after.client)?;
+        if !client_state.live_session.outstanding.remove(&after.id) {
             return None;
         }
-        let sender = session.sender.clone();
+        let sender = client_state.live_session.sender.clone();
         let (result, error) = match body {
             Ok(value) => (value.wrap_some(), None),
             Err(error) => (None, error.wrap_some()),
@@ -733,8 +1180,8 @@ After:
         after: AfterCompute,
         body: Result<serde_json::Value, lsp_server::ResponseError>,
     ) -> Option<crate::effect::SendLspResponseEffect> {
-        let session = self.0.get_mut(&after.client)?;
-        if !session.outstanding.remove(&after.id) {
+        let client_state = self.0.get_mut(&after.client)?;
+        if !client_state.live_session.outstanding.remove(&after.id) {
             return None;
         }
         let (result, error) = match body {
@@ -742,7 +1189,7 @@ After:
             Err(error) => (None, error.wrap_some()),
         };
         crate::effect::SendLspResponseEffect::new(
-            session.sender.clone(),
+            client_state.live_session.sender.clone(),
             lsp_server::Response {
                 id: after.id,
                 result,
@@ -756,11 +1203,11 @@ After:
 ```rust
 // from crates/isograph_cli/src/state.rs
 fn send_lsp_response(
-    sessions: &mut crate::event::LiveSessions,
+    clients: &mut crate::event::Clients,
     after: crate::event::AfterCompute,
     body: Result<serde_json::Value, lsp_server::ResponseError>,
 ) -> Vec<IsographEffect> {
-    let Some(effect) = sessions.after_compute(after, body) else {
+    let Some(effect) = clients.after_compute(after, body) else {
         return no_effects();
     };
     IsographEffect::SendLspResponse(effect.boxed()).wrap_vec()
@@ -781,11 +1228,11 @@ fn send_lsp_response(
 
 ### Call sites
 
-- `send_lsp_response` -> `LiveSessions::after_compute` -> `SendLspResponseEffect::new`
+- `send_lsp_response` -> `Clients::after_compute` -> `SendLspResponseEffect::new`
 - `perform` -> `SendLspResponseEffect::send`
 - tests -> `SendLspResponseEffect::response`
 
-## Change 5: clients and their open files
+## Change 6: clients and their open files
 
 After this change:
 
@@ -798,7 +1245,7 @@ After this change:
 
 ### Where the client lives
 
-Connectedness and the reply channel stay in `LiveSessions` on `IsographState`. Open-file state is pico state on `IsographDb`, because memos read it. `handle` of `Started` and `Gone` writes both in one arm. `client_map`, the writers, and the reads are all keyed by `ClientId`.
+Connectedness and the reply channel stay in `ClientState.live_session`, in `IsographState.clients` (change 4). Open-file state is pico state on `IsographDb`, because memos read it. `handle` of `Started` and `Gone` writes both in one arm. `client_map`, the writers, and the reads are all keyed by `ClientId`.
 
 ### Types
 
@@ -821,7 +1268,7 @@ Before:
 pub(crate) struct ClientId(pub u64);
 ```
 
-After: `event.rs` has no `ClientId` definition and starts with `use isograph_compiler::ClientId;`. `LspRequest.client`, `LspNotification.client`, the `LiveSessions` key, `BeforeCompute.client`, `AfterCompute.client`, `LiveSessions::reply`, `ClientStartedEvent.client`, and `ClientConnectionEvent::Gone` keep the type name `ClientId` and now name `isograph_compiler::ClientId`.
+After: `event.rs` has no `ClientId` definition and starts with `use isograph_compiler::ClientId;`. `LspRequest.client`, `LspNotification.client`, the `Clients` key, `BeforeCompute.client`, `AfterCompute.client`, `Clients::reply`, `ClientStartedEvent.client`, and `ClientConnectionEvent::Gone` keep the type name `ClientId` and now name `isograph_compiler::ClientId`.
 
 An LSP connection's `ClientId` is minted by `accept_loop` from its local counter. The file-based compiler will be another client with its own `ClientId`, reading through `file_contents` like any client and holding open files like any client (empty unless something sets them). How the compiler gets its `ClientId` is out of scope for this doc.
 
@@ -1004,7 +1451,7 @@ impl<THostLanguage: HostLanguage> IsographDb<THostLanguage> {
 
 `insert_client` of an id already present replaces its state with an empty one. `accept_loop` mints each id once at TCP accept from a local counter (`crates/isograph_cli/src/lsp_socket.rs:96-101`), and `run_session` posts `Started` once, only after a successful `initialize` / `initialized` handshake (`lsp_socket.rs:185`), so that does not occur. Within one connection the order is `Started`, then that connection's messages, then `Gone`: `run_session` forwards messages only after it posts `Started`, and `session` posts `Gone` after `run_session` returns.
 
-`remove_client` of an id with no state is a no-op: the keyed untracked lookup misses and the function returns before any write, `get`, or `remove`. There is no `expect`, panic, or `UnexpectedError` on that path. That case occurs on every `isograph start`: `session` posts `Gone` after every connection that got a transport, including one that never initialized (`lsp_socket.rs:134`), and the readiness probe in `start.rs:68-70` connects and drops without initializing (pinned by `drop_before_initialize_is_gone_without_started`, `lsp_socket.rs:1192`). `handle` already treats an unknown `Gone` as a no-op for `live_sessions` (`state.rs:52-55`, `client_gone_of_an_unknown_id_is_a_noop`). The untracked lookup first also keeps that no-op from bumping the `client_map` counter.
+`remove_client` of an id with no state is a no-op: the keyed untracked lookup misses and the function returns before any write, `get`, or `remove`. There is no `expect`, panic, or `UnexpectedError` on that path. That case occurs on every `isograph start`: `session` posts `Gone` after every connection that got a transport, including one that never initialized (`lsp_socket.rs:134`), and the readiness probe in `start.rs:68-70` connects and drops without initializing (pinned by `drop_before_initialize_is_gone_without_started`, `lsp_socket.rs:1192`). `handle` already treats an unknown `Gone` as a no-op for `clients` (change 4's `Gone` arm, `client_gone_of_an_unknown_id_is_a_noop`). The untracked lookup first also keeps that no-op from bumping the `client_map` counter.
 
 `set_open_file` `set`s `ClientOpenFiles` only when the path is new. pico `set_source` of an equal value moves `time_updated` to the current epoch (`crates/pico/src/database.rs` `set_source`, `Entry::Occupied` equal branch), which can report a change to a memo verified at an earlier epoch; writing only on a new path avoids that.
 
@@ -1381,7 +1828,7 @@ fn dispatch_lsp_request<THostLanguage: HostLanguage>(
     before: crate::event::BeforeCompute,
 ) -> Vec<IsographEffect> {
     let request = incoming.request;
-    let Some(after) = state.live_sessions.before_compute(before) else {
+    let Some(after) = state.clients.before_compute(before) else {
         return no_effects();
     };
     let get_response = || {
@@ -1411,7 +1858,7 @@ fn dispatch_lsp_request<THostLanguage: HostLanguage>(
     before: crate::event::BeforeCompute,
 ) -> Vec<IsographEffect> {
     let crate::event::LspRequest { client, request } = incoming;
-    let Some(after) = state.live_sessions.before_compute(before) else {
+    let Some(after) = state.clients.before_compute(before) else {
         return no_effects();
     };
     let get_response = || {
@@ -1592,7 +2039,7 @@ fn dispatch_lsp_notification<THostLanguage: HostLanguage>(
 }
 ```
 
-`dispatch_lsp` drops a notification whose client is not in `live_sessions`, the same as it drops a request (`state.rs:67-69`, through `LiveSessions::reply`). Given the per-connection order above, no notification arrives from such a client today; the check makes `handle` total over that input instead of relying on the socket's ordering.
+`dispatch_lsp` drops a notification whose client is not in `clients`, the same as it drops a request (through `Clients::reply`, change 4). Given the per-connection order above, no notification arrives from such a client today; the check makes `handle` total over that input instead of relying on the socket's ordering.
 
 Before:
 
@@ -1608,7 +2055,7 @@ After:
 ```rust
 // from crates/isograph_cli/src/state.rs
         crate::event::LspEvent::Notification(notification) => {
-            if !state.live_sessions.0.contains_key(&notification.client) {
+            if !state.clients.0.contains_key(&notification.client) {
                 return no_effects();
             }
             dispatch_lsp_notification(state, notification)
@@ -1711,7 +2158,7 @@ fn did_close<THostLanguage: HostLanguage>(
 
 `warn!` is `tracing::warn!`, the same as `on_notification_sync`'s params error. `change.text` is moved out of the one-element array, not cloned. `language_id` and `version` are not stored; nothing reads them.
 
-`didChange` of a path the client never opened stores it as open. `dispatch_lsp` has already dropped notifications from a client not in `live_sessions`, and `handle` of `Started` / `Gone` writes `live_sessions` and `client_map` in the same arm, so `UnknownClientError` fires only if those two disagree. It is logged, and reads for that client fall back to disk.
+`didChange` of a path the client never opened stores it as open. `dispatch_lsp` has already dropped notifications from a client not in `clients`, and `handle` of `Started` / `Gone` writes `clients` and `client_map` in the same arm, so `UnknownClientError` fires only if those two disagree. It is logged, and reads for that client fall back to disk.
 
 ### `initialize` advertises full sync
 
@@ -1745,20 +2192,22 @@ After:
 
 ### `Started` and `Gone`
 
-Before:
+Before (change 4's after):
 
 ```rust
 // from crates/isograph_cli/src/state.rs
     match event {
         ClientConnectionEvent::Started(started) => {
-            state
-                .live_sessions
-                .0
-                .insert(started.client, started.session);
+            state.clients.0.insert(
+                started.client,
+                ClientState {
+                    live_session: started.session,
+                },
+            );
             no_effects()
         }
         ClientConnectionEvent::Gone(client) => {
-            state.live_sessions.0.remove(&client);
+            state.clients.0.remove(&client);
             no_effects()
         }
     }
@@ -1771,14 +2220,16 @@ After:
     match event {
         ClientConnectionEvent::Started(started) => {
             state.db.insert_client(started.client);
-            state
-                .live_sessions
-                .0
-                .insert(started.client, started.session);
+            state.clients.0.insert(
+                started.client,
+                ClientState {
+                    live_session: started.session,
+                },
+            );
             no_effects()
         }
         ClientConnectionEvent::Gone(client) => {
-            state.live_sessions.0.remove(&client);
+            state.clients.0.remove(&client);
             state.db.remove_client(client);
             no_effects()
         }
@@ -1800,13 +2251,13 @@ All feature behavior is asserted at the `handle` seam in `crates/isograph_cli/sr
 - then client 1 `didClose`: tokens are disk's (first token length 10, from `entrypoint Query.HomeRoute`; assert the encoded data equals a client with no buffer)
 - clients 1 and 2 `didOpen` the same URI with `iso(\`field Query.x{id}\`)` and `iso(\`entrypoint Query.A\`)`: client 1's first token length 5, client 2's length 10
 - client 1 has a buffer; client 2 never opened the URI: client 2's tokens equal disk's
-- client 1 `didOpen` then `Gone(1)`: `live_sessions` lacks 1; `file_contents(&state.db, ClientId(1), path)` is disk's text; client 2 started afterwards reads disk
+- client 1 `didOpen` then `Gone(1)`: `clients` lacks 1; `file_contents(&state.db, ClientId(1), path)` is disk's text; client 2 started afterwards reads disk
 - open-only file: no `DiskFile` at `src/new.ts`; client 1 `didOpen` with an iso literal: tokens non-null; `didClose`: JSON `null`
 - `didChange` with `contentChanges: []`, with two full changes, and with one ranged change: `file_contents` for client 1 is the `didOpen` text after each
 - `didOpen` of `https://example.net/a.ts`: no effects, no open file
 - `#[cfg(unix)]` `didOpen` of `file:///tmp/proj/%FF.ts`: no effects, no panic
 - `didOpen` from a client that never `Started`: no effects (`dispatch_lsp` drops it); `file_contents` for that client is disk's text
-- `Gone` of a client that never `Started` leaves state unchanged: disk `src/x.ts` is `const x = 1;\n`; client 2 `Started` and `didOpen` with `iso(\`field Query.x{id}\`)`; `Gone(ClientId(7))`: no effects, no panic; `live_sessions` holds only client 2; `client_map` holds only client 2; `file_contents` for client 2 is its buffer; `file_contents` for client 7 is disk's text
+- `Gone` of a client that never `Started` leaves state unchanged: disk `src/x.ts` is `const x = 1;\n`; client 2 `Started` and `didOpen` with `iso(\`field Query.x{id}\`)`; `Gone(ClientId(7))`: no effects, no panic; `clients` holds only client 2; `client_map` holds only client 2; `file_contents` for client 2 is its buffer; `file_contents` for client 7 is disk's text
 - `isograph/event` HelloWorld as an `LspNotification` from a started client still returns `Timer`; an unknown notification from a started client still returns no effects. `event_notification` takes `client: ClientId`; `lsp_isograph_event_hello_world_returns_a_timer`, `lsp_isograph_event_hello_world_then_its_timer_returns_log_hello_world`, and `lsp_unknown_notification_returns_no_effects` call `start_client` first
 - `isograph/event` HelloWorld from a client that never `Started`: no effects, `hello_world_debounce` is `None`
 - an empty buffer: disk has an iso literal; client 1 `didOpen` with `""`: `file_contents` is `Some("")`; tokens are `Some(vec![])`, not disk's
@@ -1850,9 +2301,9 @@ No test asserts re-invoke counts; which memo re-runs is pico's behavior.
 ### Call sites
 
 - `accept_loop` -> `isograph_compiler::ClientId(next)` -> `session` / `run_session` -> `LspRequest.client`, `LspNotification.client`, `ClientStartedEvent.client`, `ClientConnectionEvent::Gone`
-- `handle_client_connection` `Started` -> `insert_client`, `live_sessions.0.insert`
-- `handle_client_connection` `Gone` -> `live_sessions.0.remove`, `remove_client`
-- `dispatch_lsp` -> `live_sessions.0.contains_key`, then `dispatch_lsp_notification`
+- `handle_client_connection` `Started` -> `insert_client`, `clients.0.insert`
+- `handle_client_connection` `Gone` -> `clients.0.remove`, `remove_client`
+- `dispatch_lsp` -> `clients.0.contains_key`, then `dispatch_lsp_notification`
 - `dispatch_lsp_notification` -> `handle_internal_event` (function item), `on_did_open` / `on_did_change` / `on_did_close` (closures over `client`)
 - `on_did_open` / `on_did_change` -> `relative_from_uri`, `set_open_file`
 - `on_did_close` -> `relative_from_uri`, `remove_open_file`
@@ -1874,6 +2325,6 @@ No test asserts re-invoke counts; which memo re-runs is pico's behavior.
 - Dispatch: "`EditorChanged` with `Open` sets `OpenFile`. `EditorChanged` with `Closed` removes it." becomes "`DidOpenTextDocument` and `DidChangeTextDocument` (one change, no range) call `set_open_file` for the notification's client. `DidCloseTextDocument` calls `remove_open_file`. `ClientConnectionEvent::Started` calls `insert_client`; `Gone` calls `remove_client`."
 - The test-harness sentence "A test constructs a `DiskChanged` or `EditorChanged`" becomes "A test constructs a `DiskChanged` or an `LspNotification`".
 
-`refactors/pending/format-file-from-segments.md`: "Independent of lsp-open-files.md. Does not add `OpenFile`." becomes the ordering from open decision 3. Its `format_iso_literals` takes `client: ClientId` and reads `isograph_compiler::file_contents(db, client, path)`; `state.disk_file(path)` no longer exists after change 5. Its adapter-test section names the renamed extra-`}` test.
+`refactors/pending/format-file-from-segments.md`: "Independent of lsp-open-files.md. Does not add `OpenFile`." becomes the ordering from open decision 3. Its `format_iso_literals` takes `client: ClientId` and reads `isograph_compiler::file_contents(db, client, path)`; `state.disk_file(path)` no longer exists after change 6. Its adapter-test section names the renamed extra-`}` test.
 
-`refactors/pending/lsp-diagnostics.md`: `report_diagnostics`, for each `ClientId` in `live_sessions` whose `PublishDiagnosticsCap` is `Yes`, reads `file_literals(db, client, path)` over the disk paths and that client's open paths, and publishes that client's set to that client only. `didOpen` / `didChange` arm the debounce like `DiskChanged`.
+`refactors/pending/lsp-diagnostics.md`: `report_diagnostics`, for each `ClientId` in `clients` whose `PublishDiagnosticsCap` is `Yes`, reads `file_literals(db, client, path)` over the disk paths and that client's open paths, and publishes that client's set to that client only. `didOpen` / `didChange` arm the debounce like `DiskChanged`.
