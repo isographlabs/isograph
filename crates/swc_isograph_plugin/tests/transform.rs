@@ -297,6 +297,45 @@ const a = _Query__HomeRoute;
 }
 
 #[test]
+fn an_entity_literal_becomes_undefined() {
+    assert_transform(
+        no_output_directory().reference(),
+        FILE,
+        SourceType::Module,
+        r#"
+iso(`entity Owner`);
+const a = iso(`
+  entity Owner
+`);
+"#,
+        r#"
+void 0;
+const a = void 0;
+"#,
+    );
+}
+
+#[test]
+fn an_entity_literal_in_a_script_becomes_undefined() {
+    assert_transform(
+        no_output_directory().reference(),
+        FILE,
+        SourceType::Script,
+        "iso(`entity Owner`);",
+        "void 0;",
+    );
+}
+
+#[test]
+fn a_called_entity_literal_is_an_error() {
+    let errors = transform_errors("const a = iso(`entity Owner`)(f);");
+    assert_eq!(
+        errors,
+        ["Invalid iso tag usage. An entity literal cannot be called."]
+    );
+}
+
+#[test]
 fn an_unknown_keyword_is_an_error() {
     let errors = transform_errors(
         r#"
@@ -313,7 +352,7 @@ export const HomeRoute = iso(`
     );
     assert_eq!(
         errors,
-        ["Invalid iso tag usage. Expected 'entrypoint', 'field' or 'pointer'."]
+        ["Invalid iso tag usage. Expected 'entity', 'entrypoint', 'field' or 'pointer'."]
     );
 }
 

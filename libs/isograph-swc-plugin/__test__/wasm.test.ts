@@ -52,6 +52,15 @@ describe('the swc_isograph_plugin wasm under @swc/core', () => {
     expect(code).toBe('export const HomeRoute = f;\n');
   });
 
+  test('an entity literal becomes undefined', async () => {
+    const { code } = await transformWithPlugin(
+      'iso(`entity Owner`);\nexport const a = iso(`entity Owner`);',
+      { root_dir: rootDir, config: {} },
+    );
+
+    expect(code).toBe('void 0;\nexport const a = void 0;\n');
+  });
+
   test('invalid plugin options are an error', async () => {
     await expect(
       transformWithPlugin('const a = 1;', { config: {} }),
@@ -65,7 +74,7 @@ describe('the swc_isograph_plugin wasm under @swc/core', () => {
         config: {},
       }),
     ).rejects.toThrow(
-      "Invalid iso tag usage. Expected 'entrypoint', 'field' or 'pointer'.",
+      "Invalid iso tag usage. Expected 'entity', 'entrypoint', 'field' or 'pointer'.",
     );
   });
 });

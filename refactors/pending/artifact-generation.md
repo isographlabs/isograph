@@ -876,7 +876,6 @@ The demo config, `src/iso.ts`, the imports, the logged entrypoints, and the comm
 
 - Query generation adds `queryText: Import(query_text.ts)` to the entrypoint artifact, where `query_text.ts` is an `ArtifactModule` whose default export is the protocol-produced query string. When the network protocol also produces a raw query file (`query_text.graphql` for GraphQL), a raw-file artifact kind (path plus exact contents) joins modules, written and diffed like every other file.
 - Param types per field (upstream's `param_type.ts`): field overloads return `IdentityWithParam<Parent__field__param>` and type the resolver's parameter. Then `ResolverParameters` and every use of it are deleted from the pet demo.
-- The Babel and SWC transforms accept `entrypoint`, `field`, and `pointer` literals; an `entity` literal (the pet demo's `Owner.ts` has one) is a transform error in both. Teaching the transforms `entity` is separate work.
 
 ## Docs this doc amends
 

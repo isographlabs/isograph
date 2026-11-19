@@ -3,7 +3,6 @@ use prelude::Postfix;
 use regex::Regex;
 use serde::Deserialize;
 use std::{
-    fmt,
     path::{Path, PathBuf},
     sync::LazyLock,
 };
@@ -26,6 +25,9 @@ static OPERATION_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"\s*(entrypoint|field|pointer)\s*([^\.\s]+)\.([^\s\(]+)")
         .expect("OPERATION_REGEX is a valid regex")
 });
+
+static ENTITY_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^entity\s+\S").expect("ENTITY_REGEX is a valid regex"));
 
 /// The subset of `isograph.config.json` the transform reads.
 #[derive(Deserialize, Debug)]
@@ -160,8 +162,11 @@ enum ArtifactReference {
 
 #[derive(Error, Clone, Debug, Eq, PartialEq)]
 enum IsographTransformError {
-    #[error("Invalid iso tag usage. Expected 'entrypoint', 'field' or 'pointer'.")]
+    #[error("Invalid iso tag usage. Expected 'entity', 'entrypoint', 'field' or 'pointer'.")]
     InvalidIsoKeyword,
+
+    #[error("Invalid iso tag usage. An entity literal cannot be called.")]
+    EntityLiteralCalled,
 
     #[error("Invalid iso tag usage. The iso function should be passed exactly one argument.")]
     IsoFnCallRequiresOneArg,
@@ -218,26 +223,30 @@ impl IsographImport {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum ArtifactType {
-    Entrypoint,
+/// An `iso` literal, by keyword.
+#[derive(Debug, Clone)]
+enum IsoLiteral {
+    /// `entity Owner`: replaced with `undefined`.
+    Entity,
+    /// `field Type.name` or `pointer Type.name`: replaced with its resolver.
     Field,
+    /// `entrypoint Type.name`: replaced with a reference to its artifact.
+    Entrypoint(EntrypointLiteral),
 }
 
-impl fmt::Display for ArtifactType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ArtifactType::Entrypoint => f.write_str("entrypoint"),
-            ArtifactType::Field => f.write_str("field"),
+impl IsoLiteral {
+    fn parse(text: &str) -> Option<IsoLiteral> {
+        if ENTITY_REGEX.is_match(text) {
+            return IsoLiteral::Entity.wrap_some();
         }
-    }
-}
-
-impl ArtifactType {
-    fn from_keyword(keyword: &str) -> Option<ArtifactType> {
-        match keyword {
-            "entrypoint" => ArtifactType::Entrypoint.wrap_some(),
-            "field" | "pointer" => ArtifactType::Field.wrap_some(),
+        let capture_group = OPERATION_REGEX.captures(text)?;
+        match &capture_group[1] {
+            "entrypoint" => IsoLiteral::Entrypoint(EntrypointLiteral {
+                field_type: capture_group[2].to_string(),
+                field_name: capture_group[3].to_string(),
+            })
+            .wrap_some(),
+            "field" | "pointer" => IsoLiteral::Field.wrap_some(),
             _ => None,
         }
     }
@@ -253,13 +262,12 @@ fn build_ident_expr_for_hoisted_import(ident_name: &str, unresolved_ctxt: Syntax
 }
 
 #[derive(Debug, Clone)]
-struct ValidIsographTemplateLiteral {
+struct EntrypointLiteral {
     pub field_type: String,
     pub field_name: String,
-    pub artifact_type: ArtifactType,
 }
 
-impl ValidIsographTemplateLiteral {
+impl EntrypointLiteral {
     fn build_require_expr_from_path(path: &str, unresolved_ctxt: SyntaxContext) -> Expr {
         Expr::Member(MemberExpr {
             span: DUMMY_SP,
@@ -306,11 +314,10 @@ impl ValidIsographTemplateLiteral {
             .ok_or(IsographTransformError::ArtifactPathUnavailable)?;
 
         let mut file_to_artifact = PathBuf::from(format!(
-            "{}/{}/{}/{}.ts",
+            "{}/{}/{}/entrypoint.ts",
             file_to_artifact_dir.display(),
             self.field_type,
             self.field_name,
-            self.artifact_type
         ));
 
         if cfg!(target_os = "windows") {
@@ -338,18 +345,16 @@ struct IsoLiteralCompilerVisitor<'a> {
 impl IsoLiteralCompilerVisitor<'_> {
     fn handle_valid_isograph_entrypoint_literal(
         &mut self,
-        iso_template_literal: ValidIsographTemplateLiteral,
+        iso_template_literal: EntrypointLiteral,
     ) -> Result<Expr, IsographTransformError> {
         let file_to_artifact =
             iso_template_literal.path_for_artifact(self.filepath, self.config, self.root_dir)?;
 
         match &mut self.artifact_reference {
-            ArtifactReference::Require => {
-                ValidIsographTemplateLiteral::build_require_expr_from_path(
-                    file_to_artifact.display().to_string().reference(),
-                    self.unresolved_ctxt,
-                )
-            }
+            ArtifactReference::Require => EntrypointLiteral::build_require_expr_from_path(
+                file_to_artifact.display().to_string().reference(),
+                self.unresolved_ctxt,
+            ),
             ArtifactReference::Import(imports) => {
                 let path: Atom = file_to_artifact.display().to_string().to();
                 let ident_name = format!(
@@ -383,13 +388,17 @@ impl IsoLiteralCompilerVisitor<'_> {
             return IsographTransformError::IsoRequiresOneArg.wrap_err();
         };
 
-        let iso_template_literal = parse_iso_template_literal(first)?;
-
-        match iso_template_literal.artifact_type {
-            ArtifactType::Entrypoint => {
+        match parse_iso_template_literal(first)? {
+            IsoLiteral::Entity => match fn_args {
+                // iso(...)(fn_args)
+                Some(_) => IsographTransformError::EntityLiteralCalled.wrap_err(),
+                // iso(...)>empty<
+                None => (*Expr::undefined(DUMMY_SP)).wrap_ok(),
+            },
+            IsoLiteral::Entrypoint(iso_template_literal) => {
                 self.handle_valid_isograph_entrypoint_literal(iso_template_literal)
             }
-            ArtifactType::Field => {
+            IsoLiteral::Field => {
                 match fn_args {
                     Some(fn_args) => {
                         if let Some((first, [])) = fn_args.split_first() {
@@ -408,7 +417,7 @@ impl IsoLiteralCompilerVisitor<'_> {
 
 fn parse_iso_template_literal(
     expr_or_spread: &ExprOrSpread,
-) -> Result<ValidIsographTemplateLiteral, IsographTransformError> {
+) -> Result<IsoLiteral, IsographTransformError> {
     if let Expr::Tpl(Tpl { quasis, .. }) = (*expr_or_spread.expr).reference() {
         let first = if let Some((first, [])) = quasis.split_first() {
             first
@@ -416,18 +425,7 @@ fn parse_iso_template_literal(
             return IsographTransformError::SubstitutionsNotAllowedInIsoFragments.wrap_err();
         };
 
-        return OPERATION_REGEX
-            .captures_iter(first.raw.trim())
-            .next()
-            .and_then(|capture_group| {
-                let artifact_type = ArtifactType::from_keyword(&capture_group[1])?;
-                ValidIsographTemplateLiteral {
-                    artifact_type,
-                    field_type: capture_group[2].to_string(),
-                    field_name: capture_group[3].to_string(),
-                }
-                .wrap_some()
-            })
+        return IsoLiteral::parse(first.raw.trim())
             .ok_or(IsographTransformError::InvalidIsoKeyword);
     }
     IsographTransformError::OnlyAllowedTemplateLiteral.wrap_err()
