@@ -1,8 +1,8 @@
 # Runtime: the network path and `readAndSubscribe`
 
-Status: changes 1 to 6 are approved for implementation; implementation starts after store.md's store and reader-ast.md's `read` land on i2. Request entries in the store (its own section, change 7) is a follow-up design under discussion, not approved.
+Status: changes 1 to 6 are approved for implementation; implementation starts after store.md's store and reader-ast.md's `read` land on i2. Request entries in the store (its own section, change 7) is a follow-up design under discussion, not approved. Change 8, the pet demo script (The pet demo script), is the final change; it depends on change 6 and not on change 7, and is not yet approved.
 
-`@isograph/runtime` (`libs/isograph-runtime`) gains the network path and subscriptions, as plain functions with no React. After this doc the package exposes `normalize`, `check`, `garbageCollect` (store.md), `read` (reader-ast.md), `readButDoNotEvaluate`, `readAndSubscribe`, `subscriptionSnapshot`, `callSubscriptions`, `fetchEntrypoint`, `getOrCreateCacheForArtifact`, `transpose`, and the environment functions `createIsographEnvironment`, `retainQuery`, `unretainQuery`, and `garbageCollectEnvironment`. The package has no React dependency and no React knowledge. A React package (`refactors/pending/runtime/react.md`) is a later plan built on these functions; it is not part of this work.
+`@isograph/runtime` (`libs/isograph-runtime`) gains the network path and subscriptions, as plain functions with no React. After this doc the package exposes `normalize`, `check`, `garbageCollect` (store.md), `read` (reader-ast.md), `readButDoNotEvaluate`, `readAndSubscribe`, `subscriptionSnapshot`, `listenToSubscription`, `callSubscriptions`, `fetchEntrypoint`, `getOrCreateCacheForArtifact`, `transpose`, and the environment functions `createIsographEnvironment`, `retainQuery`, `unretainQuery`, and `garbageCollectEnvironment`. The package has no React dependency and no React knowledge. A React package (`refactors/pending/runtime/react.md`) is a later plan built on these functions; it is not part of this work.
 
 The lifetime model is upstream's disposable-state pattern: at render, a caller gets or creates a disposable item and temporarily retains it; at commit, it permanently retains it; a render that never commits has its temporary retain released by a timeout. The runtime provides exactly what that pattern needs, with no React in it: a request cache of upstream's `ParentCache`s, whose items are fetched requests, and subscriptions that are disposable items too, so a subscription made at render delivers every write until commit and is released if no commit comes. The cache and item classes are upstream's, unchanged; the runtime adds the factories (`fetchEntrypoint`, `readAndSubscribe`) and the cache lookup (`getOrCreateCacheForArtifact`).
 
@@ -17,7 +17,7 @@ Prerequisites, in their own docs:
 
 ## End-user experience
 
-The only callers are the package's tests. A test plays a render and a commit with the cache and item methods, through a network function it resolves by hand:
+The callers are the package's tests and the pet demo script (The pet demo script), which fetches and reads with no React. A test plays a render and a commit with the cache and item methods, through a network function it resolves by hand:
 
 ```ts
 // from libs/isograph-runtime/test/network.test.ts
@@ -587,6 +587,8 @@ export type Subscription = {
   /** The result last read: at subscribe, or the last one the callback received. */
   delivered: SubscriptionResult;
   readonly callback: (result: SubscriptionResult) => void;
+  /** Called after each change to `delivered`, after `callback`. */
+  readonly listeners: Set<() => void>;
 };
 
 /**
@@ -607,6 +609,7 @@ export function readAndSubscribe<TEntityName extends EntityName>(
     variables,
     delivered: readSubscription(environment, readerArtifact, link, variables),
     callback,
+    listeners: new Set(),
   };
   environment.subscriptions.add(subscription);
   return [
@@ -622,6 +625,18 @@ export function subscriptionSnapshot(subscription: Subscription): SubscriptionRe
   return subscription.delivered;
 }
 
+/** Calls `listener` after each change to `subscriptionSnapshot(subscription)`, until the
+ * returned function is called. */
+export function listenToSubscription(
+  subscription: Subscription,
+  listener: () => void,
+): () => void {
+  subscription.listeners.add(listener);
+  return () => {
+    subscription.listeners.delete(listener);
+  };
+}
+
 /**
  * Re-reads every subscription in `environment.subscriptions`, in insertion order, and calls
  * each one's callback when its result changed. Never throws.
@@ -632,6 +647,7 @@ export function callSubscriptions(environment: IsographEnvironment): void {
     if (!subscriptionResultsAreEqual(subscription.artifact, subscription.delivered, result)) {
       subscription.delivered = result;
       reportCallbackError(() => subscription.callback(result));
+      subscription.listeners.forEach((listener) => reportCallbackError(listener));
     }
   });
 }
@@ -681,6 +697,8 @@ export function reportCallbackError(f: () => void): void {
 
 `reportCallbackError` is a module export that `network.ts` imports; the package index does not export it.
 
+`listenToSubscription` exists because a subscription's `callback` is fixed when `readAndSubscribe` creates it, at render, while React's `useSyncExternalStore` hands over its listener only at commit, through `subscribe` (react.md, `useReadAndSubscribe`). A listener receives no argument; it reads `subscriptionSnapshot(subscription)`. The returned function is a `CleanupFn` (`() => void`); calling it twice removes nothing the second time. Listeners are the subscription's own: `readAndSubscribe`'s cleanup removes the subscription from `environment.subscriptions`, after which no listener of it is called, whether or not its cleanup ran.
+
 Typing: `readAndSubscribe` ties `readerArtifact` and `link` to one `TEntityName` with reader-ast.md's `read` signature (The parent entity's name): `TEntityName` is inferred from the artifact's declared third type argument, and `NoInfer` keeps the link out of the inference, so a `Link<"Pet">` passed with a `Query` reader fails `tsc`, and so does a `StoreLink`. The stored `Subscription` holds the pair at `EntityName`, because one `Set` holds subscriptions of every entity: `ReaderArtifact<ResolverParam<TEntityName>, unknown, TEntityName>` is assignable to `ReaderArtifact<ResolverParam, unknown, EntityName>` (`TEntityName` does not occur in the body, and `resolver` is compared bivariantly) and `Link<TEntityName>` to `StoreLink`, with no cast. `readSubscription` calls `readButDoNotEvaluate` with the pair at `EntityName`, which reader-ast.md's `Resolver` case does too. If `tsc` rejects either assignment, the implementer stops and raises it.
 
 ### The two-phase lifetime
@@ -699,7 +717,7 @@ A caller with no render and commit (a test, a non-React app) uses the pair direc
 
 A React layer must not call `setState` before its component commits (`disposable-state/useUpdatableDisposableState.ts:73-79` throws "Calling setState before the component has committed is unsafe and disallowed."), yet the subscription made at render delivers writes before commit. `subscriptionSnapshot` lets that layer read instead of being told: it returns `subscription.delivered`, which `callSubscriptions` replaces only when a re-read is unequal to it (Semantics), so between changes it returns the same object (`===`), and after a change it returns the object the callback received. This is what both later React shapes need, with nothing React in the runtime:
 
-- `useSyncExternalStore(subscribe, getSnapshot)`: `getSnapshot` is `() => subscriptionSnapshot(subscription)`, stable while nothing changed, as React requires; `subscribe` registers React's listener, which the subscription's `callback` calls (the React layer's callback forwards to the listener it holds once committed).
+- `useSyncExternalStore(subscribe, getSnapshot)`: `getSnapshot` is `() => subscriptionSnapshot(subscription)`, stable while nothing changed, as React requires; `subscribe` is `(onStoreChange) => listenToSubscription(subscription, onStoreChange)`, which `callSubscriptions` calls after each change, and the subscription's `callback` does nothing.
 - Upstream's compare-at-commit (`useCachedResponsivePrecommitValue.ts:55-104`, re-render when the committed value differs from the rendered one): the commit compares `subscriptionSnapshot(subscription)` with the snapshot the render used, by `!==`, and re-renders when they differ; the callback before commit only needs to do nothing.
 
 ### Semantics
@@ -783,7 +801,7 @@ A `Linked` item that is not an object is a read result that reader-ast.md's `rea
 
 ### Ordering
 
-`callSubscriptions` visits `environment.subscriptions` in insertion order with `Set.prototype.forEach`, as upstream's `forEach` does (`subscribe.ts:67`), and for each subscription re-reads, compares, and calls its callback before re-reading the next. A callback that removes a subscription not yet visited (its own or another's) removes it from this pass; one that adds a subscription adds it to this pass, where its first comparison is with the read `readAndSubscribe` just made, so it is not called unless a write happened in between. Every re-read runs after `normalize` finished and reads the whole store, so no re-read sees a partial write (pico-runtime.md, Step A). A callback that writes the store synchronously (store.md's `normalize` on `environment.store`) changes what later subscriptions in the same pass read; it does not re-run earlier ones, until its own `callSubscriptions`.
+`callSubscriptions` visits `environment.subscriptions` in insertion order with `Set.prototype.forEach`, as upstream's `forEach` does (`subscribe.ts:67`), and for each subscription re-reads, compares, and calls its callback, then its listeners in insertion order, before re-reading the next. A callback that removes a subscription not yet visited (its own or another's) removes it from this pass; one that adds a subscription adds it to this pass, where its first comparison is with the read `readAndSubscribe` just made, so it is not called unless a write happened in between. Every re-read runs after `normalize` finished and reads the whole store, so no re-read sees a partial write (pico-runtime.md, Step A). A callback that writes the store synchronously (store.md's `normalize` on `environment.store`) changes what later subscriptions in the same pass read; it does not re-run earlier ones, until its own `callSubscriptions`.
 
 No overlap filter: store.md's `normalize` records no `EncounteredIds`, so every subscription is re-read after every write, where upstream skips the subscriptions whose recorded records do not overlap the written ones (`subscribe.ts:74-79`). A subscription whose reader reads only server values is still not called after an unrelated write, because its comparison is equal.
 
@@ -796,7 +814,7 @@ Upstream wraps every subscription in `logAnyError` (`subscribe.ts:47-61`, `:67-1
 - A read that throws (a nested resolver threw; a store invariant broke, store.md's non-link message), at subscribe or at a re-read, becomes `{ kind: "Err", error }`, compared with `delivered` and delivered to that subscription's callback like any other result. The loop continues; nothing escapes `readAndSubscribe`, `callSubscriptions`, `normalize`'s caller, or the request, whose wrapper stays `Ok`.
 - A callback that throws: `reportCallbackError` rethrows its error in its own microtask (`queueMicrotask`), so it reaches the host's uncaught-error handler (`window.onerror`, Node's `uncaughtException`) without stopping the loop or rejecting the request. The same function reports a throwing `onComplete` or `onError`. Upstream logs and discards these (`logAnyError`; `try { .. } catch {}` at `makeNetworkRequest.ts:290-296`, `:305-307`); with no log, discarding would hide the error (decision 3).
 
-`delivered` is updated before the callback is called, so a callback that throws has still received the result.
+`delivered` is updated before the callback is called, so a callback that throws has still received the result. Each listener is called through `reportCallbackError` too, so a throwing callback or listener does not stop the subscription's other listeners.
 
 Deltas from Step A (pico-runtime.md) and from react.md's former amended Step A:
 
@@ -891,6 +909,7 @@ Each test builds an environment over `deferredNetwork` and writes through `fetch
 - Equality by node: `Leaves` re-normalized with equal `tags: ["a", null]` (a new list): no call; with `settings` an equal `JSON` object (a new object): one call; a refinement in `Feed` that stays `null`: no call.
 - Data then `MissingData`: `Pet:1`'s `nickname` deleted by hand, then `callSubscriptions`: one call with `MissingData` whose `recordLink` is `Pet:1`; `callSubscriptions` again: no call; a write that restores it: one call with `Ok`.
 - Unsubscribe: after the cleanup, `subscriptions.size` is 0 and a changing write calls nothing.
+- Listeners: `listenToSubscription` after `readAndSubscribe`: an unrelated write calls neither the callback nor the listener, and `subscriptionSnapshot` returns the same object (`toBe`); the next changing write calls the listener once, after the callback (both spies record their order), with no argument, and `subscriptionSnapshot` then returns the callback's argument (`toBe`). After the listener's cleanup, a changing write calls the callback and not the listener; a second call of the cleanup throws nothing. Two listeners are called in the order they were added; a listener that throws does not stop the second, and its error is reported through `queueMicrotask` (stubbed as above).
 - Two-phase lifetime: `createTemporarilyRetainedCacheItem(() => readAndSubscribe(..), () => {})`; a write before the commit calls the callback; `permanentRetainIfNotDisposed` returns the pair; releasing it leaves `subscriptions.size` 0. Without a commit, `vi.advanceTimersToNextTimer()` leaves `subscriptions.size` 0 and a later write calls nothing.
 - Read errors: a nested resolver that throws (a fixture field whose resolver throws when `data.name` is `"Throw"`): at subscribe, the snapshot is `Err`; at a re-read, the callback is called once with `{ kind: "Err", error }`; a second subscription that reads healthy data is still called; the request's wrapper is `Ok`. The same throw again (a new `Error` object): one more call. `Pet:1.stats` set by hand to `"x"`: `Err` with store.md's non-link message.
 - A callback that throws: the other subscriptions are still called, `callSubscriptions` returns, and the error is reported through `queueMicrotask` (stubbed as above).
@@ -907,6 +926,426 @@ field Query.ThrowingPet($id: ID!) {
 ```
 
 with `entrypoint Query.ThrowingPet`.
+
+## The pet demo script
+
+`demos/pet-demo` gains a script that fetches and reads with the runtime, with no React: `pnpm --filter pet-demo fetch-and-read`. It creates an environment over a mock network function, fetches `Query.HomeRoute` and `Query.PetDetailRoute` with `fetchEntrypoint`, waits for each request, reads each root with `read`, subscribes to `Query.HomeRoute` with `readAndSubscribe`, runs `Mutation.SetTagline`, and prints each root resolver's result.
+
+The script makes no attempt at subcomponents. It reads the root entrypoint's result and prints it. The resolvers return plain data (strings and objects of strings), as the pet demo's resolvers do today, not components or elements. One subscription exists, at the `Query.HomeRoute` root; nothing renders, reads, or subscribes per child field.
+
+What the user runs and sees, from the i2 repo root after `pnpm install`:
+
+```sh
+pnpm --filter pet-demo fetch-and-read
+```
+
+```text
+Query.HomeRoute [
+  { id: '0', summary: 'Makayla Balicki: I AM HUNGRY' },
+  { id: '1', summary: 'Mr Biggles: Pet me now, human' }
+]
+Query.PetDetailRoute { id: '0' } Makayla Balicki
+Query.HomeRoute after Mutation.SetTagline [
+  { id: '0', summary: 'Makayla Balicki: I AM FULL' },
+  { id: '1', summary: 'Mr Biggles: Pet me now, human' }
+]
+Mutation.SetTagline I AM FULL
+```
+
+- Line 1 is `HomeRoute`'s resolver value after `HomeRoute`'s response was normalized; each `summary` is the nested resolver `PetSummaryCard`'s value.
+- Line 2 is `PetDetailRoute`'s resolver value for `{ id: '0' }`, `data.pet?.fullName`, from the nested resolver `fullName`.
+- Line 3 is printed by the `Query.HomeRoute` subscription's callback, which `callSubscriptions` calls once, after `SetTagline`'s response wrote `Pet:0.tagline`. The callback reads with `read`, because the `SubscriptionResult` it receives is the reader's data with the root resolver not called (decision 1), and that data's type is `SelectionSetData`, not `HomeRoute`'s param type, so passing it to `homeRoute.readerArtifact.resolver` does not type-check.
+- Line 4 is `SetTagline`'s `onComplete`, which `makeNetworkRequest` calls after `callSubscriptions`, so it prints after line 3.
+- The process exits with code 0. A rejected request, a `MissingData` read after a response, or a throwing subscription callback (rethrown by `reportCallbackError` in its own microtask) ends it with a non-zero code and the error on stderr.
+
+### How it runs
+
+The script is Node with `@babel/register`, as `log-entrypoints` is. `tsx` does not work: it compiles with esbuild, which runs no Babel plugins, so each `iso(..)` call would reach the generated `iso`, which throws when called (`demos/pet-demo/src/__isograph/iso.ts`). Babel's CommonJS transform turns each `import` into a `require`, which Node resolves through the packages' `exports` with the `require` and `default` conditions, and `@babel/register` compiles each required `.ts` file in the directories its `only` lists.
+
+The Babel registration both scripts use moves into one file:
+
+```js
+// from demos/pet-demo/scripts/registerBabel.cjs
+'use strict';
+
+// Compiles the demo's sources, and the TypeScript sources of the workspace packages they
+// import, with the Isograph Babel plugin as Node requires them.
+
+const path = require('node:path');
+
+const demoDirectory = path.join(__dirname, '..');
+const librariesDirectory = path.join(demoDirectory, '..', '..', 'libs');
+
+require('@babel/register')({
+  babelrc: false,
+  configFile: false,
+  cache: false,
+  extensions: ['.ts'],
+  only: [
+    path.join(demoDirectory, 'src'),
+    path.join(librariesDirectory, 'isograph-runtime', 'src'),
+    path.join(librariesDirectory, 'isograph-disposable-types', 'src'),
+  ],
+  presets: [require.resolve('@babel/preset-typescript')],
+  plugins: [
+    [require.resolve('@isograph/babel-plugin'), { searchFrom: demoDirectory }],
+    require.resolve('@babel/plugin-transform-modules-commonjs'),
+  ],
+});
+```
+
+Delta from `scripts/log-entrypoints.cjs`'s registration: `only` adds the runtime's and `@isograph/disposable-types`' `src` directories, because the script imports their runtime values and both packages export TypeScript source. Node resolves the workspace symlinks to `libs/..` before `@babel/register` matches `only`.
+
+```js
+// from demos/pet-demo/scripts/fetch-and-read.cjs
+'use strict';
+
+// Fetches and reads the demo's entrypoints from the mock network, and prints each root
+// resolver's result.
+
+const path = require('node:path');
+
+require('./registerBabel.cjs');
+
+require(path.join(__dirname, '..', 'src', 'fetchAndRead'))
+  .fetchAndRead()
+  .catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+```
+
+```js
+// from demos/pet-demo/scripts/log-entrypoints.cjs
+'use strict';
+
+// Requires `src/logEntrypoints.ts`, which logs the artifact each entrypoint literal is
+// replaced with.
+
+const path = require('node:path');
+
+require('./registerBabel.cjs');
+
+require(path.join(__dirname, '..', 'src', 'logEntrypoints'));
+```
+
+The entrypoint logs move out of the resolver sources. A generated `resolver_reader.ts` imports its resolver from the source file (reader-ast.md), so with the logs in `HomeRoute.ts`, `PetDetailRoute.ts`, and `SetTagline.ts`, importing their entrypoints in `fetchAndRead.ts` would print three artifacts before the script's output. `HomeRoute.ts`, `PetDetailRoute.ts`, `SpeciesRoute.ts`, and `SetTagline.ts` each lose their last line, `console.log(iso(\`entrypoint ..\`));`, and one file holds the four:
+
+```ts
+// from demos/pet-demo/src/logEntrypoints.ts
+import { iso } from './__isograph/iso';
+
+console.log(iso(`entrypoint Query.HomeRoute`));
+console.log(iso(`entrypoint Query.PetDetailRoute`));
+console.log(iso(`entrypoint Query.SpeciesRoute`));
+console.log(iso(`entrypoint Mutation.SetTagline`));
+```
+
+`log-entrypoints`' output is unchanged: the same four artifacts, in the same order.
+
+```json
+// from demos/pet-demo/package.json
+{
+  "name": "pet-demo",
+  "private": true,
+  "scripts": {
+    "fetch-and-read": "node scripts/fetch-and-read.cjs",
+    "log-entrypoints": "node scripts/log-entrypoints.cjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@isograph/runtime": "workspace:*"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.28.3",
+    "@babel/plugin-transform-modules-commonjs": "^7.27.1",
+    "@babel/preset-typescript": "^7.27.1",
+    "@babel/register": "^7.28.3",
+    "@isograph/babel-plugin": "workspace:*",
+    "typescript": "5.6.3"
+  }
+}
+```
+
+`demos/pet-demo/tsconfig.json` gains `"resolveJsonModule": true`, for the fixture imports. `libs/isograph-runtime/package.json`'s `exports["."]` and `libs/isograph-disposable-types/package.json`'s `exports["."]` each gain `"default": "./src/index.ts"` after their existing conditions, because the demo is the first module outside the packages that imports their runtime values, and it does so with `require`. `.github/workflows/js.yml` gains a step after "Typecheck the pet demo":
+
+```yaml
+# from .github/workflows/js.yml
+      - name: Fetch and read in the pet demo
+        run: pnpm --filter pet-demo fetch-and-read
+```
+
+### The script
+
+```ts
+// from demos/pet-demo/src/fetchAndRead.ts
+import {
+  createIsographEnvironment,
+  fetchEntrypoint,
+  read,
+  readAndSubscribe,
+  type ReadResult,
+} from '@isograph/runtime';
+import { iso } from './__isograph/iso';
+import { mockNetworkFunction } from './mockNetwork';
+
+const homeRoute = iso(`entrypoint Query.HomeRoute`);
+const petDetailRoute = iso(`entrypoint Query.PetDetailRoute`);
+const setTagline = iso(`entrypoint Mutation.SetTagline`);
+
+/**
+ * Fetches and reads `Query.HomeRoute` and `Query.PetDetailRoute`, then changes a pet's
+ * tagline with `Mutation.SetTagline`, after which the `Query.HomeRoute` subscription prints
+ * the root again.
+ */
+export async function fetchAndRead(): Promise<void> {
+  const environment = createIsographEnvironment(new Map(), mockNetworkFunction);
+  const readHomeRoute = () =>
+    valueOrThrow(
+      homeRoute.name,
+      read(environment.store, homeRoute.readerArtifact, homeRoute.normalizationAst.root, {}),
+    );
+
+  const [homeRouteRequest, releaseHomeRoute] = fetchEntrypoint(environment, homeRoute, {}, null);
+  await homeRouteRequest.promise;
+  console.log(homeRoute.name, readHomeRoute());
+
+  const petDetailVariables = { id: '0' };
+  const [petDetailRouteRequest, releasePetDetailRoute] = fetchEntrypoint(
+    environment,
+    petDetailRoute,
+    petDetailVariables,
+    null,
+  );
+  await petDetailRouteRequest.promise;
+  console.log(
+    petDetailRoute.name,
+    petDetailVariables,
+    valueOrThrow(
+      petDetailRoute.name,
+      read(
+        environment.store,
+        petDetailRoute.readerArtifact,
+        petDetailRoute.normalizationAst.root,
+        petDetailVariables,
+      ),
+    ),
+  );
+
+  const [, unsubscribe] = readAndSubscribe(
+    environment,
+    homeRoute.readerArtifact,
+    homeRoute.normalizationAst.root,
+    {},
+    () => console.log(`${homeRoute.name} after ${setTagline.name}`, readHomeRoute()),
+  );
+
+  const [setTaglineRequest, releaseSetTagline] = fetchEntrypoint(
+    environment,
+    setTagline,
+    { id: '0', tagline: 'I AM FULL' },
+    {
+      shouldFetch: 'Yes',
+      onComplete: (tagline) => console.log(setTagline.name, tagline),
+    },
+  );
+  await setTaglineRequest.promise;
+
+  unsubscribe();
+  releaseSetTagline();
+  releasePetDetailRoute();
+  releaseHomeRoute();
+}
+
+/** The read's value. A read right after its response was normalized that is `MissingData`
+ * means the fixture and the query disagree. */
+function valueOrThrow<T>(name: string, result: ReadResult<T>): T {
+  if (result.kind === 'MissingData') {
+    throw new Error(`${name} is missing data after its response was normalized: ${result.reason}`);
+  }
+  return result.value;
+}
+```
+
+- The subscription is made after both reads, so `PetDetailRoute`'s response, which rewrites the two pets' names with equal values, is not a write it sees; its one callback call is `SetTagline`'s.
+- `SetTagline` passes `shouldFetch: 'Yes'`: a mutation is sent every time, and `IfNecessary` would send it only because the store has no `Mutation` root yet.
+- The releases at the end unretain the three queries; nothing collects, and the process exits with the store in memory.
+- `HomeRoute`'s resolver returns each pet's id beside its summary, so the React demo (react.md) can name the pet a button changes:
+
+```ts
+// from demos/pet-demo/src/HomeRoute.ts
+import { iso } from './__isograph/iso';
+
+export const HomeRoute = iso(`
+  field Query.HomeRoute {
+    pets {
+      id
+      PetSummaryCard
+    }
+  }
+`)(function HomeRoute({ data }) {
+  return data.pets.map((pet) => ({ id: pet.id, summary: pet.PetSummaryCard }));
+});
+```
+
+Before, it returned `data.pets.map((pet) => pet.PetSummaryCard)` and ended with the `console.log` line. The literal is unchanged, so no artifact changes: `output_type.ts` is `ReturnType<typeof resolver>`.
+
+### The mock network function
+
+```ts
+// from demos/pet-demo/src/mockNetwork.ts
+import type { IsographNetworkFunction, JsonObject, Variables } from '@isograph/runtime';
+import homeRouteResponse from '../fixtures/Query.HomeRoute.json';
+import petDetailRouteResponses from '../fixtures/Query.PetDetailRoute.json';
+import { iso } from './__isograph/iso';
+
+const homeRoute = iso(`entrypoint Query.HomeRoute`);
+const petDetailRoute = iso(`entrypoint Query.PetDetailRoute`);
+const setTagline = iso(`entrypoint Mutation.SetTagline`);
+
+/** `Query.PetDetailRoute`'s response for each pet id the fixture has. */
+const petDetailRouteResponseById: ReadonlyMap<string, JsonObject> = new Map(
+  Object.entries(petDetailRouteResponses),
+);
+
+/**
+ * Answers `Query.HomeRoute` and `Query.PetDetailRoute` from the fixture responses, and
+ * `Mutation.SetTagline` with the pet and tagline it was sent. Rejects anything else.
+ */
+export const mockNetworkFunction: IsographNetworkFunction = (operation, variables) => {
+  const id = variables['id'];
+  const tagline = variables['tagline'];
+  if (operation.text === homeRoute.queryText) {
+    return Promise.resolve(homeRouteResponse);
+  }
+  if (operation.text === petDetailRoute.queryText && typeof id === 'string') {
+    const response = petDetailRouteResponseById.get(id);
+    return response === undefined ? noResponse(operation.text, variables) : Promise.resolve(response);
+  }
+  if (operation.text === setTagline.queryText && typeof id === 'string' && typeof tagline === 'string') {
+    return Promise.resolve({
+      set_pet_tagline____input___o_id__v_id_tagline__v_tagline_c: {
+        __typename: 'SetPetTaglineResponse',
+        pet: { __typename: 'Pet', id, tagline },
+      },
+    });
+  }
+  return noResponse(operation.text, variables);
+};
+
+function noResponse(queryText: string, variables: Variables): Promise<JsonObject> {
+  return Promise.reject(
+    new Error(`The mock network has no response for ${queryText} with ${JSON.stringify(variables)}`),
+  );
+}
+```
+
+The two queries' responses are fixture JSON in `demos/pet-demo/fixtures/`, outside `src/` so the daemon does not read them: `Query.HomeRoute.json` is `HomeRoute`'s data object, and `Query.PetDetailRoute.json` maps each pet id to `PetDetailRoute`'s data object for that id. `SetTagline`'s response is built from its variables, because a mutation's response echoes what it was sent. The response keys are those of `Query/HomeRoute/query_text.graphql`, `Query/PetDetailRoute/query_text.graphql`, and `Mutation/SetTagline/query_text.graphql` at this commit; a compiler change that renames a response key makes `normalize` throw in the script, with the key in the message. The React demo (react.md) uses the same function and fixtures.
+
+```json
+// from demos/pet-demo/fixtures/Query.HomeRoute.json
+{
+  "pets": [
+    {
+      "__typename": "Pet",
+      "id": "0",
+      "age": 4,
+      "firstName": "Makayla",
+      "lastName": "Balicki",
+      "nickname": "Mak",
+      "picture": "https://example.com/pets/0.png",
+      "species": "DOG",
+      "tagline": "I AM HUNGRY"
+    },
+    {
+      "__typename": "Pet",
+      "id": "1",
+      "age": 7,
+      "firstName": "Mr",
+      "lastName": "Biggles",
+      "nickname": null,
+      "picture": "https://example.com/pets/1.png",
+      "species": "CAT",
+      "tagline": "Pet me now, human"
+    }
+  ]
+}
+```
+
+```json
+// from demos/pet-demo/fixtures/Query.PetDetailRoute.json
+{
+  "0": {
+    "pet____id___v_id": {
+      "__typename": "Pet",
+      "id": "0",
+      "best_friend_relationship": {
+        "__typename": "BestFriendRelationship",
+        "best_friend": {
+          "__typename": "Pet",
+          "id": "1",
+          "firstName": "Mr",
+          "lastName": "Biggles"
+        },
+        "picture_together": null
+      },
+      "checkins____limit___l_5____skip___l_0": [
+        { "__typename": "Checkin", "id": "0-0", "location": "The park", "time": "2026-11-19T12:00:00Z" },
+        { "__typename": "Checkin", "id": "0-1", "location": "The vet", "time": "2026-11-19T15:00:00Z" }
+      ],
+      "firstName": "Makayla",
+      "lastName": "Balicki",
+      "nickname": "Mak",
+      "stats": {
+        "__typename": "PetStats",
+        "cuteness": 90,
+        "energy": 70,
+        "hunger": 100,
+        "intelligence": 80,
+        "sociability": 60,
+        "weight": 20
+      }
+    }
+  },
+  "1": {
+    "pet____id___v_id": {
+      "__typename": "Pet",
+      "id": "1",
+      "best_friend_relationship": null,
+      "checkins____limit___l_5____skip___l_0": [],
+      "firstName": "Mr",
+      "lastName": "Biggles",
+      "nickname": null,
+      "stats": {
+        "__typename": "PetStats",
+        "cuteness": 95,
+        "energy": 40,
+        "hunger": 30,
+        "intelligence": 95,
+        "sociability": 20,
+        "weight": 6
+      }
+    }
+  }
+}
+```
+
+Typing: `resolveJsonModule` types each fixture import as the object type of its literal, whose properties are `string`, `number`, `null`, arrays, and nested object types; an object literal type has an implicit index signature, so each is assignable to `JsonObject`, and the `Object.entries` values to the `Map`'s `JsonObject`. If `tsc` rejects either, the implementer stops and raises it.
+
+### README
+
+`demos/pet-demo/README.md`: "Logging the entrypoint artifacts" says the script requires `src/logEntrypoints.ts`, which holds the four entrypoint literals, in place of requiring the four route modules; the Sources list says `src/HomeRoute.ts`, `src/PetDetailRoute.ts`, `src/SpeciesRoute.ts`, and `src/SetTagline.ts` hold the fields and `src/logEntrypoints.ts` the entrypoints, and lists `src/fetchAndRead.ts` and `src/mockNetwork.ts`. A new section after it:
+
+```md
+<!-- from demos/pet-demo/README.md -->
+## Fetching and reading
+
+From the i2 repo root, after `pnpm install`:
+
+    pnpm --filter pet-demo fetch-and-read
+
+`scripts/fetch-and-read.cjs` registers Babel as `log-entrypoints` does, also over the TypeScript sources of `@isograph/runtime` and `@isograph/disposable-types`, and calls `fetchAndRead` in `src/fetchAndRead.ts`. That function creates an environment over `src/mockNetwork.ts`, which answers `Query.HomeRoute` and `Query.PetDetailRoute` from the JSON in `fixtures/` and `Mutation.SetTagline` from its variables. It fetches and reads `Query.HomeRoute` and `Query.PetDetailRoute` for pet `0`, subscribes to `Query.HomeRoute`, sets pet `0`'s tagline to `I AM FULL`, and prints each root resolver's result, the `Query.HomeRoute` result a second time from the subscription. Nothing renders; the resolvers return plain data.
+```
 
 ## Request entries in the store
 
@@ -994,7 +1433,7 @@ Each change is one commit, in order. Prerequisites: store.md changes 1 to 7 and 
 
 ### 5. Subscriptions (libs/isograph-runtime)
 
-`src/areEqualWithDeepComparison.ts`; `src/subscribe.ts` with `SubscriptionResult`, `ReadErr`, `readAndSubscribe`, `subscriptionSnapshot`, `callSubscriptions`, `reportCallbackError`; their exports; the `ThrowingName` fixture source and its regenerated artifacts; `test/subscribe.test.ts`, writing with `normalize` on `environment.store` then `callSubscriptions`. Depends on 3 and 4.
+`src/areEqualWithDeepComparison.ts`; `src/subscribe.ts` with `SubscriptionResult`, `ReadErr`, `readAndSubscribe`, `subscriptionSnapshot`, `listenToSubscription`, `callSubscriptions`, `reportCallbackError`; their exports; the `ThrowingName` fixture source and its regenerated artifacts; `test/subscribe.test.ts`, writing with `normalize` on `environment.store` then `callSubscriptions`. Depends on 3 and 4.
 
 ### 6. The network path (libs/isograph-runtime)
 
@@ -1036,6 +1475,7 @@ export {
 export { readButDoNotEvaluate } from "./read";
 export {
   callSubscriptions,
+  listenToSubscription,
   readAndSubscribe,
   type ReadErr,
   type Subscription,
@@ -1044,7 +1484,11 @@ export {
 } from "./subscribe";
 ```
 
-The index re-exports nothing of `@isograph/disposable-types`; callers import `ParentCache`, `CacheItem`, and `ItemCleanupPair` from it. `package.json`'s `exports` keeps only its `types` condition: no module outside the package imports its runtime values in this work, and tests import `../src/index`. The React plan adds the `import` condition with its first importer.
+The index re-exports nothing of `@isograph/disposable-types`; callers import `ParentCache`, `CacheItem`, and `ItemCleanupPair` from it. `package.json`'s `exports` keeps only its `types` condition through change 6: no module outside the package imports its runtime values until change 8, and tests import `../src/index`. Change 8 adds the `default` condition for the pet demo script, which requires the package through Babel's CommonJS transform.
+
+### 8. The pet demo script (demos/pet-demo, libs/isograph-runtime, libs/isograph-disposable-types)
+
+`scripts/registerBabel.cjs`, `scripts/fetch-and-read.cjs`, and `scripts/log-entrypoints.cjs` requiring `src/logEntrypoints.ts`; `src/logEntrypoints.ts`, `src/fetchAndRead.ts`, `src/mockNetwork.ts`; `fixtures/Query.HomeRoute.json`, `fixtures/Query.PetDetailRoute.json`; the `console.log` lines removed from `src/HomeRoute.ts`, `src/PetDetailRoute.ts`, `src/SpeciesRoute.ts`, and `src/SetTagline.ts`, and `HomeRoute`'s resolver returning `{ id, summary }`; the `fetch-and-read` script in `package.json`; `resolveJsonModule` in `tsconfig.json`; the README section; the `default` export condition of `@isograph/runtime` and `@isograph/disposable-types`; the CI step. The daemon run in `demos/pet-demo` leaves `src/__isograph/` unchanged, because no literal changes and the moved entrypoint literals produce the same artifacts. Depends on 6 and on reader-ast.md's real `resolver_reader.ts` artifacts in the pet demo.
 
 ## Docs this doc amends
 
@@ -1060,6 +1504,41 @@ The index re-exports nothing of `@isograph/disposable-types`; callers import `Pa
 - Replacing `readAndSubscribe` with pico-runtime.md's level 2 (`listen`, `snapshot`).
 - `writeData` (upstream `writeData.ts:23-79`), a second write site that calls `callSubscriptions`.
 - A caller of `transpose`.
+
+### Deduplicating identical requests in flight
+
+For development. Under React's StrictMode, a mount sends a request, the simulated unmount releases it, and the remount sends an identical second request while the first is still in flight (react.md, Disposal, StrictMode, and upstream's disposable-state behavior); a render after every holder committed does the same (decision 4). `ParentCache` cannot share either request, because the first item left the cache, and the fix belongs in neither `ParentCache` nor `CacheItem`, which stay upstream's. The network function is the user's, so the user can wrap it:
+
+```ts
+// from libs/isograph-runtime/src/dedupeInFlight.ts
+import type { IsographNetworkFunction } from "./environment";
+import type { NetworkRequestKey } from "./network";
+import type { JsonObject } from "./store";
+import { stableStringify } from "./storeKey";
+
+/** A network function that, for a request identical to one `networkFunction` is still
+ * answering (equal query text and `stableStringify(variables)`), returns that request's
+ * promise instead of calling `networkFunction` again. */
+export function dedupeInFlight(networkFunction: IsographNetworkFunction): IsographNetworkFunction {
+  const inFlight = new Map<NetworkRequestKey, Promise<JsonObject>>();
+  return (operation, variables) => {
+    const key: NetworkRequestKey = operation.text + stableStringify(variables);
+    const existing = inFlight.get(key);
+    if (existing !== undefined) {
+      return existing;
+    }
+    const promise = networkFunction(operation, variables).finally(() => inFlight.delete(key));
+    inFlight.set(key, promise);
+    return promise;
+  };
+}
+```
+
+The app installs it when it creates the environment, `createIsographEnvironment(new Map(), dedupeInFlight(networkFunction))`, for example only when `process.env.NODE_ENV !== 'production'`. It is harmless in production for queries: both callers normalize the same response, the second `normalize` writes equal values, and `callSubscriptions` calls nothing for it. It is not harmless where a caller relies on two separate responses: the same mutation with the same variables sent twice on purpose while the first is in flight runs once on the server.
+
+It dedupes only requests in flight at the same moment. Two identical requests whose lifetimes do not overlap both go to the network, by `shouldFetch` as today; answering the second from a cached response is fetch-policies.md's (`refactors/pending/runtime/fetch-policies.md`, Staleness and time-to-live), not this helper's.
+
+Relay has the same two pieces, from memory and not checked against a Relay checkout: `fetchQuery` (through `fetchQueryInternal`) shares one network observable between identical requests in flight, keyed by the request identifier and the variables, and `RelayQueryResponseCache` is a separate opt-in response cache with a time-to-live that an app uses inside its network layer.
 
 ## Decisions
 

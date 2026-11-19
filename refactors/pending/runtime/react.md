@@ -1,6 +1,6 @@
 # Runtime: the React package
 
-Status: not part of the current work, and not approved for implementation. The current work is `@isograph/runtime` with no React (`refactors/pending/runtime/network-and-subscriptions.md`): `normalize`, `check`, `garbageCollect`, `read`, `readButDoNotEvaluate`, `readAndSubscribe`, `callSubscriptions`, `fetchEntrypoint`, and the environment, all plain functions. This doc is a later plan built on those functions. The environment, the network function, `PromiseWrapper`, the fetch options, retention, the network path, `readButDoNotEvaluate`, and the subscriptions moved out of this doc into network-and-subscriptions.md; this doc keeps the React hooks, components, the React request cache, the disposable-state packages, and the demo. The sections below that call the runtime are written against network-and-subscriptions.md's signatures; where they still need a decision, it is an open decision below.
+Status: not part of the current work, and not approved for implementation. The React step is a single-component demo now (The React demo): one component, no routes, reading at the root only. Components (closure components in `refactors/pending/runtime/components-in-userland.md`, or a directive) come later. The current work is `@isograph/runtime` with no React (`refactors/pending/runtime/network-and-subscriptions.md`): `normalize`, `check`, `garbageCollect`, `read`, `readButDoNotEvaluate`, `readAndSubscribe`, `callSubscriptions`, `fetchEntrypoint`, and the environment, all plain functions. This doc is a later plan built on those functions. The environment, the network function, `PromiseWrapper`, the fetch options, retention, the network path, `readButDoNotEvaluate`, and the subscriptions moved out of this doc into network-and-subscriptions.md; this doc keeps the React hooks, components, the React request cache, the disposable-state packages, and the demo. The sections below that call the runtime are written against network-and-subscriptions.md's signatures; where they still need a decision, it is an open decision below.
 
 `@isograph/react` (`libs/isograph-react`) is the React package over `@isograph/runtime`. It holds upstream's hooks and components for fetching an entrypoint and reading its result: `IsographEnvironmentProvider`, `useIsographEnvironment`, `useLazyReference`, `useImperativeReference`, `useResult`, and `FragmentReader`. `@isograph/runtime` stays React-free (normalization-ast.md, The `@isograph/runtime` package). The package name is upstream's (`isograph/libs/isograph-react/package.json`); it is React-specific, so the name fits here.
 
@@ -13,11 +13,11 @@ Prerequisites, in their own docs:
 - `refactors/pending/runtime/reader-ast.md` changes 1 to 6: `ReaderArtifact`, `ResolverParam`, `SelectionSetData`, `read`, `ReadResult`, `ReadMissingData`, real `resolver_reader.ts` artifacts, the typed `IsographEntrypoint.readerArtifact`, `NamedImport`, `DeclaredConst`, `ExportDefaultBinding`.
 - `refactors/pending/runtime/network-and-subscriptions.md` changes 1 to 6: `IsographEnvironment`, `createIsographEnvironment`, `IsographNetworkFunction`, `ExtractParameters`, `PromiseWrapper` and its functions, `FetchOptions`, `ShouldFetch`, `fetchEntrypoint`, `getOrCreateCacheForArtifact`, `garbageCollectEnvironment`, `readButDoNotEvaluate`, `readAndSubscribe`, `subscriptionSnapshot`, `SubscriptionResult`; `@isograph/disposable-types` with `CacheItem` and `ParentCache`.
 
-The demo's components below are plain React components that read resolver results with `FragmentReader`; `refactors/pending/runtime/components-in-userland.md` explores components returned by fields, and if it lands with another shape, the demo follows it.
+The demo is one plain React component that reads the root entrypoint's result with `useResult`. It has no subcomponents and no per-child subscriptions; resolvers return plain data. When components exist, the demo is rewritten in Isograph's style (The React demo).
 
 ## End-user experience
 
-The pet demo renders `HomeRoute` and `PetDetailRoute` in a browser (`pnpm --filter pet-demo dev`) with a mock network function and no server:
+The React pet demo is one component, with no routes. It fetches the `Query.HomeRoute` entrypoint, reads and subscribes at the root only, renders the root resolver's result, and re-renders at the root when the store changes. A button per pet runs `Mutation.SetTagline` through the runtime's `fetchEntrypoint`, after which the root re-renders with the new tagline. There are no subcomponents, no per-child subscriptions, and no second route. It runs in a browser (`pnpm --filter pet-demo dev`) under Vite and `StrictMode`, with the mock network function and fixture responses of network-and-subscriptions.md's pet demo script (`src/mockNetwork.ts`, `fixtures/`) and no server.
 
 ```tsx
 // from demos/pet-demo/src/App.tsx
@@ -26,10 +26,8 @@ import {
   createIsographEnvironment,
   type IsographNetworkFunction,
 } from '@isograph/runtime';
-import { useState } from 'react';
-import { HomeRouteLoader } from './HomeRouteLoader';
-import { PetDetailRouteLoader } from './PetDetailRouteLoader';
-import type { Route } from './routes';
+import { Suspense, useState } from 'react';
+import { PetList } from './PetList';
 
 export function App({
   networkFunction,
@@ -39,173 +37,75 @@ export function App({
   const [environment] = useState(() =>
     createIsographEnvironment(new Map(), networkFunction),
   );
-  const [route, setRoute] = useState<Route>({ kind: 'Home' });
   return (
     <IsographEnvironmentProvider environment={environment}>
-      {route.kind === 'Home' ? (
-        <HomeRouteLoader navigateTo={setRoute} />
-      ) : (
-        <PetDetailRouteLoader id={route.id} navigateTo={setRoute} />
-      )}
+      <Suspense fallback={<p>Loading pets...</p>}>
+        <PetList />
+      </Suspense>
     </IsographEnvironmentProvider>
   );
 }
 ```
 
 ```tsx
-// from demos/pet-demo/src/HomeRouteLoader.tsx
-import { FragmentReader, useLazyReference } from '@isograph/react';
-import { Suspense } from 'react';
+// from demos/pet-demo/src/PetList.tsx
+import {
+  useIsographEnvironment,
+  useLazyReference,
+  useResult,
+} from '@isograph/react';
+import { fetchEntrypoint, type IsographEnvironment } from '@isograph/runtime';
 import { iso } from './__isograph/iso';
-import type { Route } from './routes';
 
-export function HomeRouteLoader({
-  navigateTo,
-}: {
-  readonly navigateTo: (route: Route) => void;
-}) {
+const setTagline = iso(`entrypoint Mutation.SetTagline`);
+
+export function PetList() {
+  const environment = useIsographEnvironment();
   const { fragmentReference } = useLazyReference(
     iso(`entrypoint Query.HomeRoute`),
     {},
   );
+  const pets = useResult(fragmentReference);
   return (
-    <Suspense fallback={<p>Loading pets...</p>}>
-      <FragmentReader fragmentReference={fragmentReference}>
-        {(pets) => (
-          <ul>
-            {pets.map((pet) => (
-              <li key={pet.id}>
-                <button
-                  onClick={() => navigateTo({ kind: 'PetDetail', id: pet.id })}
-                >
-                  {pet.summary}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </FragmentReader>
-    </Suspense>
+    <ul>
+      {pets.map((pet) => (
+        <li key={pet.id}>
+          <span>{pet.summary}</span>
+          <button onClick={() => feedPet(environment, pet.id)}>
+            Feed pet {pet.id}
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Sets pet `id`'s tagline to `I AM FULL`, and unretains the mutation when it settles. */
+function feedPet(environment: IsographEnvironment, id: string): void {
+  const [, release] = fetchEntrypoint(
+    environment,
+    setTagline,
+    { id, tagline: 'I AM FULL' },
+    {
+      shouldFetch: 'Yes',
+      onComplete: () => release(),
+      onError: () => release(),
+    },
   );
 }
 ```
 
-```tsx
-// from demos/pet-demo/src/PetDetailRouteLoader.tsx
-import { FragmentReader, useLazyReference } from '@isograph/react';
-import { Suspense } from 'react';
-import { iso } from './__isograph/iso';
-import type { Route } from './routes';
-
-export function PetDetailRouteLoader({
-  id,
-  navigateTo,
-}: {
-  readonly id: string;
-  readonly navigateTo: (route: Route) => void;
-}) {
-  const { fragmentReference } = useLazyReference(
-    iso(`entrypoint Query.PetDetailRoute`),
-    { id },
-  );
-  return (
-    <>
-      <button onClick={() => navigateTo({ kind: 'Home' })}>Home</button>
-      <Suspense fallback={<p>Loading pet...</p>}>
-        <FragmentReader fragmentReference={fragmentReference}>
-          {(pet) =>
-            pet == null ? (
-              <p>No pet with that id</p>
-            ) : (
-              <section>
-                <h1>{pet.fullName}</h1>
-                <p>Intelligence: {pet.intelligence}</p>
-                <p>Best friend: {pet.bestFriend}</p>
-                <ul>
-                  {pet.checkins.map((location, index) => (
-                    <li key={index}>{location}</li>
-                  ))}
-                </ul>
-              </section>
-            )
-          }
-        </FragmentReader>
-      </Suspense>
-    </>
-  );
-}
-```
-
-```ts
-// from demos/pet-demo/src/routes.ts
-export type Route =
-  | { readonly kind: 'Home' }
-  | { readonly kind: 'PetDetail'; readonly id: string };
-```
+`HomeRoute`'s resolver is network-and-subscriptions.md change 8's, which returns `{ id, summary }` per pet; `feedPet` reads `release` only in the callbacks, which `makeNetworkRequest` calls in a later microtask, after the binding is initialized.
 
 What the user sees:
 
-- The home page shows "Loading pets..." for one render, then one button per pet, "Makayla Balicki: I AM HUNGRY" and "Mr Biggles: Pet me now, human". The mock network function was called once, with `HomeRoute`'s query text and `{}`.
-- Clicking a pet shows "Loading pet...", then the pet's full name, intelligence, best friend's first name ("Nobody" without one), and check-in locations, from the nested resolvers `fullName`, `PetStatsCard`, `PetBestFriendCard`, and `PetCheckinsCard`.
-- Clicking "Home" fetches `HomeRoute` again when the React package collects at disposal (open decision 1): unmounting `HomeRouteLoader` released its query, and `garbageCollectEnvironment` collected the pets it fetched before `PetDetailRoute`'s response arrived. Releasing a request alone collects nothing (network-and-subscriptions.md).
-- Rendering the same entrypoint with the same variables twice sends one request.
+- "Loading pets..." for one render, then one row per pet: "Makayla Balicki: I AM HUNGRY" with a "Feed pet 0" button, and "Mr Biggles: Pet me now, human" with a "Feed pet 1" button.
+- Clicking "Feed pet 0" sends `SetTagline` with `{ id: "0", tagline: "I AM FULL" }`. Its response writes `Pet:0.tagline`, `callSubscriptions` re-reads the root's subscription, `useSyncExternalStore`'s listener fires (`listenToSubscription`), and `PetList` re-renders with "Makayla Balicki: I AM FULL". Nothing else re-renders, because nothing else subscribes.
+- Under `StrictMode` in development, the mount sends `HomeRoute` twice (Disposal, StrictMode, and upstream's disposable-state behavior); the first response is dropped and the second is normalized.
 
-The demo's two resolvers return data the components read:
+`PetList` calls `useLazyReference` and `useResult` in one component under a `Suspense` boundary above it, so the first render suspends with its request under a temporary retain. That is the case Disposal names: a response slower than 5000 ms is dropped and the read never resumes. The mock network answers in a microtask, so the demo is not affected; a network that can be slower needs the fetch and the read in two components, with `Suspense` between them (open decision 3).
 
-```ts
-// from demos/pet-demo/src/HomeRoute.ts
-import { iso } from './__isograph/iso';
-
-export const HomeRoute = iso(`
-  field Query.HomeRoute {
-    pets {
-      id
-      PetSummaryCard
-    }
-  }
-`)(function HomeRoute({ data }) {
-  return data.pets.map((pet) => ({ id: pet.id, summary: pet.PetSummaryCard }));
-});
-
-console.log(iso(`entrypoint Query.HomeRoute`));
-```
-
-```ts
-// from demos/pet-demo/src/PetDetailRoute.ts
-import { iso } from './__isograph/iso';
-
-export const PetDetailRoute = iso(`
-  field Query.PetDetailRoute($id: ID!) {
-    pet(id: $id) {
-      id
-      fullName
-      PetStatsCard
-      PetCheckinsCard(limit: 5)
-      PetBestFriendCard
-      bestFriend {
-        fullName
-      }
-      owner {
-        OwnerBadge
-      }
-    }
-  }
-`)(function PetDetailRoute({ data }) {
-  const pet = data.pet;
-  return pet == null
-    ? null
-    : {
-        fullName: pet.fullName,
-        intelligence: pet.PetStatsCard,
-        bestFriend: pet.PetBestFriendCard,
-        checkins: pet.PetCheckinsCard,
-      };
-});
-
-console.log(iso(`entrypoint Query.PetDetailRoute`));
-```
-
-Before, `HomeRoute` returned `data.pets.map((pet) => pet.PetSummaryCard)` and `PetDetailRoute` returned `data.pet?.fullName ?? 'No pet with that id'`. The iso literals are unchanged, so no artifact changes: each `output_type.ts` is `ReturnType<typeof resolver>`.
+A second query that writes overlapping records is not in the demo: the fixture's `PetDetailRoute` response writes the same names `HomeRoute` read, so it changes nothing the root shows and does not re-render it.
 
 ## Upstream's exports and what v1 does with each
 
@@ -362,7 +262,7 @@ libs/isograph-react/                  @isograph/react
 
 Delta from upstream's `package.json`: `private`, source exports with `types` and `import` conditions instead of `dist` builds (the runtime's form, normalization-ast.md), no `@isograph/reference-counted-pointer` (its only callers are the pagination hooks), the test-only Babel and vitest dependencies, and `@types/react-test-renderer` for typechecking tests. `react` and `@types/react` are upstream's versions; the peer range is upstream's.
 
-`@isograph/runtime`'s `exports` gains `"import": "./src/index.ts"` (change 1): `@isograph/react` imports runtime values. normalization-ast.md anticipated this ("The runtime change in pico-runtime.md adds the `import` condition with its code").
+`@isograph/runtime`'s `exports` already has `"default": "./src/index.ts"` from network-and-subscriptions.md change 8, which Vite and vitest resolve for `@isograph/react`'s imports of runtime values; this doc adds no condition.
 
 ```json
 // from libs/isograph-react/tsconfig.json
@@ -1057,7 +957,7 @@ Traces of upstream bugs that the current checkout fixes are gone from this doc: 
 
 The following hold at `9d72f6fc`, traced from source, not reproduced:
 
-- A render not committed within 5000 ms disposes its item (`CacheItem.ts:7`, `:248-251`). When the component that calls `useLazyReference` is itself suspended (a `Suspense` boundary above it, and its reader in the same component), the item is disposed before a slower response arrives, the response is dropped (network-and-subscriptions.md, `fetchEntrypoint`), and the read's subscription never fires. The demo places `Suspense` below the loader, as upstream's demo does (`isograph/demos/pet-demo/src/components/HomeRoute.tsx:32-47`).
+- A render not committed within 5000 ms disposes its item (`CacheItem.ts:7`, `:248-251`). When the component that calls `useLazyReference` is itself suspended (a `Suspense` boundary above it, and its reader in the same component), the item is disposed before a slower response arrives, the response is dropped (network-and-subscriptions.md, `fetchEntrypoint`), and the read's subscription never fires. Upstream's demo places `Suspense` below the loader (`isograph/demos/pet-demo/src/components/HomeRoute.tsx:32-47`); this doc's single-component demo places it above (open decision 3).
 - When the commit finds its item disposed and the parent cache empty, it creates one with `parentCache.factory()` outside the parent cache (`useCachedResponsivePrecommitValue.ts:89-98`), so another component with the same cache key creates another item. That item's `fetchEntrypoint` sends a second request while the first is in flight (`IfNecessary` sees `MissingData`); after the first settled, `IfNecessary` finds the data with `check` and sends nothing.
 - The first caller's `fetchOptions` win for a cache key: the factory closes over them (`getOrCreateCacheForArtifact.ts:55-84`), so a second component's `onComplete` with the same query and variables is not called. The runtime's cache keeps this outcome (network-and-subscriptions.md, The request cache).
 - Cache entries are never removed: one empty `ParentCache` per distinct query text and variables stays in the map for the environment's life (`ParentCache.ts:32`, "TODO pass an onEmpty function").
@@ -1091,7 +991,9 @@ Every throw this package adds or keeps, and its invariant:
 
 ## The React demo
 
-`demos/pet-demo` gains React and a browser entry. The `.ts` sources keep their `console.log(iso(\`entrypoint ..\`))` lines for `scripts/log-entrypoints.cjs`; the loaders reference the same entrypoints. Two literals naming one entrypoint are not a validation error (`crates/isograph_compiler/src/validation.rs` reports duplicate entities and selectables only) and produce one artifact (`project_artifacts` collects `ArtifactSource`s into a `BTreeSet`, `crates/isograph_compiler/src/artifact_types.rs:519-531`).
+`demos/pet-demo` gains React, a browser entry (Vite), and a test. The demo is written against `useLazyReference`, `useResult`, `IsographEnvironmentProvider`, and `useIsographEnvironment` only (Changes, change 3). Components (closure components in `refactors/pending/runtime/components-in-userland.md`, or a directive) come later, and the React demo then follows Isograph's style: each resolver renders its own fields, parents render children by selecting their fields, and the loader only fetches the entrypoint and renders its result.
+
+Two literals naming one entrypoint are not a validation error (`crates/isograph_compiler/src/validation.rs` reports duplicate entities and selectables only) and produce one artifact (`project_artifacts` collects `ArtifactSource`s into a `BTreeSet`, `crates/isograph_compiler/src/artifact_types.rs:519-531`), so `PetList.tsx`, `mockNetwork.ts`, `fetchAndRead.ts`, and `logEntrypoints.ts` each name the entrypoints they use.
 
 ```json
 // from demos/pet-demo/isograph.config.json
@@ -1109,6 +1011,7 @@ Every throw this package adds or keeps, and its invariant:
   "private": true,
   "scripts": {
     "dev": "vite",
+    "fetch-and-read": "node scripts/fetch-and-read.cjs",
     "log-entrypoints": "node scripts/log-entrypoints.cjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
@@ -1125,17 +1028,20 @@ Every throw this package adds or keeps, and its invariant:
     "@babel/preset-typescript": "^7.27.1",
     "@babel/register": "^7.28.3",
     "@isograph/babel-plugin": "workspace:*",
+    "@testing-library/dom": "10.4.1",
+    "@testing-library/react": "16.3.2",
     "@types/react": "18.3.1",
     "@types/react-dom": "18.3.1",
-    "@types/react-test-renderer": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.2",
-    "react-test-renderer": "^18.2.0",
+    "happy-dom": "20.4.0",
     "typescript": "5.6.3",
     "vite": "^5.4.8",
     "vitest": "^2.1.2"
   }
 }
 ```
+
+`@testing-library/react` and `happy-dom` are the versions upstream's `@isograph/react-disposable-state` tests use (`isograph/libs/isograph-react-disposable-state/package.json`). `@testing-library/react` 16 takes `@testing-library/dom` as a peer dependency; upstream's lockfile resolves it to `10.4.1` without declaring it, and the demo declares it.
 
 ```json
 // from demos/pet-demo/tsconfig.json
@@ -1148,6 +1054,7 @@ Every throw this package adds or keeps, and its invariant:
     "skipLibCheck": true,
     "noEmit": true,
     "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
     "jsx": "react-jsx",
     "types": []
   },
@@ -1155,7 +1062,7 @@ Every throw this package adds or keeps, and its invariant:
 }
 ```
 
-Delta: `target` `ES2022` (`Object.hasOwn` in the mock, `Error` `cause`), `jsx`, and the `.tsx` and test globs.
+Delta from network-and-subscriptions.md change 8's: `target` `ES2022` (`Error` `cause` in `@isograph/react`'s source, which the demo's `tsc` reads through the workspace), `jsx`, and the `.tsx` and test globs.
 
 ```ts
 // from demos/pet-demo/vite.config.ts
@@ -1174,12 +1081,13 @@ export default defineConfig({
     }),
   ],
   test: {
-    setupFiles: ['./test/setup.ts'],
+    globals: true,
+    environment: 'happy-dom',
   },
 });
 ```
 
-Delta from `isograph/demos/vite-demo/vite.config.ts`: the Babel plugin is configured here instead of in `.babelrc.json`, so the config is one file; no `@iso` alias (i2's sources import `./__isograph/iso`); the `test` block, because vitest reads this file.
+Delta from `isograph/demos/vite-demo/vite.config.ts`: the Babel plugin is configured here instead of in `.babelrc.json`, so the config is one file; no `@iso` alias (i2's sources import `./__isograph/iso`); the `test` block, because vitest reads this file. The `test` block is upstream's `isograph/libs/isograph-react-disposable-state/vitest.config.ts`: `globals: true` lets `@testing-library/react` register its `afterEach` cleanup, and `happy-dom` is the DOM it renders into.
 
 ```html
 <!-- from demos/pet-demo/index.html -->
@@ -1217,139 +1125,7 @@ createRoot(root).render(
 
 `main.tsx` is upstream's `vite-demo/src/main.tsx` with a null check in place of `!`, the network function passed in, and `StrictMode` (Disposal).
 
-```ts
-// from demos/pet-demo/src/mockNetwork.ts
-import type { IsographNetworkFunction, JsonObject } from '@isograph/runtime';
-import { iso } from './__isograph/iso';
-
-const homeRoute = iso(`entrypoint Query.HomeRoute`);
-const petDetailRoute = iso(`entrypoint Query.PetDetailRoute`);
-
-type MockPet = {
-  readonly id: string;
-  readonly firstName: string;
-  readonly lastName: string;
-  readonly nickname: string | null;
-  readonly age: number;
-  readonly picture: string;
-  readonly species: 'CAT' | 'DOG' | 'OTHER';
-  readonly tagline: string;
-  readonly bestFriendId: string | null;
-  readonly intelligence: number;
-  readonly checkins: ReadonlyArray<string>;
-};
-
-const PETS: ReadonlyArray<MockPet> = [
-  {
-    id: '0',
-    firstName: 'Makayla',
-    lastName: 'Balicki',
-    nickname: 'Mak',
-    age: 4,
-    picture: 'https://example.com/pets/0.png',
-    species: 'DOG',
-    tagline: 'I AM HUNGRY',
-    bestFriendId: '1',
-    intelligence: 80,
-    checkins: ['The park', 'The vet'],
-  },
-  {
-    id: '1',
-    firstName: 'Mr',
-    lastName: 'Biggles',
-    nickname: null,
-    age: 7,
-    picture: 'https://example.com/pets/1.png',
-    species: 'CAT',
-    tagline: 'Pet me now, human',
-    bestFriendId: null,
-    intelligence: 95,
-    checkins: [],
-  },
-];
-
-/** Answers `HomeRoute` and `PetDetailRoute` from `PETS`, with each query's response keys. */
-export const mockNetworkFunction: IsographNetworkFunction = (
-  operation,
-  variables,
-) => {
-  if (operation.text === homeRoute.queryText) {
-    return Promise.resolve({ pets: PETS.map(petSummary) });
-  }
-  const id = Object.hasOwn(variables, 'id') ? variables['id'] : undefined;
-  if (operation.text === petDetailRoute.queryText && typeof id === 'string') {
-    return Promise.resolve({ pet____id___v_id: petDetail(id) });
-  }
-  return Promise.reject(
-    new Error(`The mock network has no response for ${operation.text}`),
-  );
-};
-
-function petSummary(pet: MockPet): JsonObject {
-  return {
-    __typename: 'Pet',
-    id: pet.id,
-    age: pet.age,
-    firstName: pet.firstName,
-    lastName: pet.lastName,
-    nickname: pet.nickname,
-    picture: pet.picture,
-    species: pet.species,
-    tagline: pet.tagline,
-  };
-}
-
-function petDetail(id: string): JsonObject | null {
-  const pet = PETS.find((candidate) => candidate.id === id);
-  if (pet === undefined) {
-    return null;
-  }
-  const bestFriend = PETS.find(
-    (candidate) => candidate.id === pet.bestFriendId,
-  );
-  return {
-    __typename: 'Pet',
-    id: pet.id,
-    best_friend_relationship:
-      bestFriend === undefined
-        ? null
-        : {
-            __typename: 'BestFriendRelationship',
-            best_friend: {
-              __typename: 'Pet',
-              id: bestFriend.id,
-              firstName: bestFriend.firstName,
-              lastName: bestFriend.lastName,
-            },
-            picture_together: null,
-          },
-    checkins____limit___l_5____skip___l_0: pet.checkins.map(
-      (location, index) => ({
-        __typename: 'Checkin',
-        id: `${pet.id}-${index}`,
-        location,
-        time: '2026-11-19T12:00:00Z',
-      }),
-    ),
-    firstName: pet.firstName,
-    lastName: pet.lastName,
-    nickname: pet.nickname,
-    stats: {
-      __typename: 'PetStats',
-      cuteness: 90,
-      energy: 70,
-      hunger: 100,
-      intelligence: pet.intelligence,
-      sociability: 60,
-      weight: 20,
-    },
-  };
-}
-```
-
-The response keys are those of `Query/HomeRoute/query_text.graphql` and `Query/PetDetailRoute/query_text.graphql` at this commit. A compiler change that renames a response key makes `normalize` throw in the demo's test, which names the key. The mock resolves at once; the loading text shows for the render before the microtask that resolves it.
-
-`test/setup.ts` sets `globalThis.IS_REACT_ACT_ENVIRONMENT = true` (with its `declare global` for the type), so `act` from `react-test-renderer` runs without warnings; `@isograph/react`'s `test/setup.ts` is the same file.
+The mock network function and its fixture responses are network-and-subscriptions.md change 8's (`src/mockNetwork.ts`, `fixtures/Query.HomeRoute.json`, `fixtures/Query.PetDetailRoute.json`), unchanged. The mock resolves in a microtask; the loading text shows for the render before it.
 
 ## Tests
 
@@ -1433,12 +1209,50 @@ with `entrypoint Query.PetNames`, `Query.PetName`, `Mutation.SetName`, one sourc
 
 ### Pet demo (`demos/pet-demo/test/App.test.tsx`)
 
-Rendering `<App networkFunction={deferred} />`:
+`@testing-library/react` on `happy-dom`, as upstream's `@isograph/react-disposable-state` tests render (`isograph/libs/isograph-react-disposable-state/src/useLazyDisposableState.test.tsx`). The test waits on the network function's promises, not on a timer or a polling query (no `findBy*`, no `waitFor`):
 
-- One `HomeRoute` call with `{}`; after its response, the two button texts.
-- Clicking `Mr Biggles: Pet me now, human`: one `PetDetailRoute` call with `{ id: "1" }`; after its response, `Mr Biggles`, `Intelligence: 95`, `Best friend: Nobody`, and no check-ins.
-- Clicking `Home`: a second `HomeRoute` call when the package collects at disposal (open decision 1), then the two buttons.
-- Clicking `Makayla Balicki: I AM HUNGRY`: `Best friend: Mr` and the check-ins `The park` and `The vet`.
+```tsx
+// from demos/pet-demo/test/App.test.tsx
+import type { IsographNetworkFunction, JsonObject } from '@isograph/runtime';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { StrictMode } from 'react';
+import { expect, test } from 'vitest';
+import { App } from '../src/App';
+import { mockNetworkFunction } from '../src/mockNetwork';
+
+test('the root re-renders with the new tagline after Mutation.SetTagline', async () => {
+  const responses: Array<Promise<JsonObject>> = [];
+  const operationTexts: Array<string> = [];
+  const networkFunction: IsographNetworkFunction = (operation, variables) => {
+    const response = mockNetworkFunction(operation, variables);
+    responses.push(response);
+    operationTexts.push(operation.text);
+    return response;
+  };
+
+  await act(async () => {
+    render(
+      <StrictMode>
+        <App networkFunction={networkFunction} />
+      </StrictMode>,
+    );
+    await Promise.all(responses);
+  });
+  expect(screen.getByText('Makayla Balicki: I AM HUNGRY')).toBeDefined();
+  expect(screen.getByText('Mr Biggles: Pet me now, human')).toBeDefined();
+
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Feed pet 0' }));
+    await Promise.all(responses);
+  });
+  expect(screen.getByText('Makayla Balicki: I AM FULL')).toBeDefined();
+  expect(screen.queryByText('Makayla Balicki: I AM HUNGRY')).toBeNull();
+  expect(screen.getByText('Mr Biggles: Pet me now, human')).toBeDefined();
+  expect(operationTexts.filter((text) => text.startsWith('mutation SetTagline'))).toHaveLength(1);
+});
+```
+
+`fetchEntrypoint` chains its `normalize` and `callSubscriptions` on the network function's promise before the test's `Promise.all` does, so when `Promise.all` resolves the write and the notification have run, and `act` flushes the re-render. The test does not count `HomeRoute` calls: under `StrictMode` the mount sends two (Disposal).
 
 ## Changes
 
@@ -1452,17 +1266,21 @@ The port of upstream's package at `9d72f6fc` and its tests, with the import chan
 
 The package files; `src/core/*`; `src/index.ts` exporting the core names; the fixture project and its generated artifacts; `vitest.config.ts`, `test/setup.ts`, `test/fixtures.tsx`. Depends on network-and-subscriptions.md change 6, reader-ast.md change 3, and 1.
 
-### 3. `@isograph/react` hooks and components (libs/isograph-react)
+### 3. `@isograph/react` hooks the demo needs (libs/isograph-react)
 
-`src/react/*`; the rest of `src/index.ts`; `test/useLazyReference.test.tsx`, `test/useImperativeReference.test.tsx`, `test/useResult.test.tsx`. Depends on 2.
+`src/react/IsographEnvironmentProvider.tsx` (`IsographEnvironmentProvider`, `useIsographEnvironment`), `src/react/useLazyReference.ts`, `src/react/useResult.ts` (the root read hook) and what it calls: `src/react/maybeUnwrapNetworkRequest.ts`, `src/react/useReadAndSubscribe.ts`, `src/react/useSubscription.ts`, `src/react/useSubscriptionSnapshot.ts`; `src/index.ts` exporting these, without `FragmentReader` and `useImperativeReference`; `test/useLazyReference.test.tsx`, `test/useResult.test.tsx`. Where those tests' lists say `FragmentReader`, the tests read with a component that calls `useResult` and renders its result. Depends on 2 and on network-and-subscriptions.md's `listenToSubscription`.
 
 ### 4. The React pet demo (demos/pet-demo)
 
-`isograph.config.json`, `package.json`, `tsconfig.json`, `vite.config.ts`, `index.html`, `src/main.tsx`, `src/App.tsx`, `src/routes.ts`, `src/HomeRouteLoader.tsx`, `src/PetDetailRouteLoader.tsx`, `src/mockNetwork.ts`, the two resolver bodies, `test/setup.ts`, `test/App.test.tsx`; the `test` CI step and hook for the pet demo. Depends on 3.
+`isograph.config.json`, `package.json`, `tsconfig.json`, `vite.config.ts`, `index.html`, `src/main.tsx`, `src/App.tsx`, `src/PetList.tsx`, `test/App.test.tsx`; the `test` CI step and hook for the pet demo. The daemon run in `demos/pet-demo` adds no artifact: `PetList.tsx` names entrypoints that `logEntrypoints.ts` already names. Depends on 3 and on network-and-subscriptions.md change 8 (the mock network function, the fixtures, and `HomeRoute`'s `{ id, summary }` resolver).
+
+### 5. `FragmentReader` and `useImperativeReference` (libs/isograph-react)
+
+`src/react/FragmentReader.tsx`, `src/react/useImperativeReference.ts`, their exports, `test/useImperativeReference.test.tsx`, and the `FragmentReader` cases of the other hook tests. The demo uses neither. Depends on 3.
 
 ## Docs this doc amends
 
-- `refactors/pending/runtime/store.md`: `stableStringify` is exported from the package index, and `exports` gains the `import` condition, with this doc's first import of runtime values.
+- `refactors/pending/runtime/store.md`: `stableStringify` is exported from the package index.
 - `refactors/pending/runtime/network-and-subscriptions.md`, Subscriptions: `Subscription` gains `listeners`, `listenToSubscription` is added and exported, and `callSubscriptions` calls the listeners after the callback (Reading, `useReadAndSubscribe`).
 
 ## Later
@@ -1496,7 +1314,9 @@ Not held.
 
 Not held. The snippets are written as (b), which is what `subscriptionSnapshot` gives; (a) and (c) change only the function `useSubscriptionSnapshot` passes as `getSnapshot`.
 
-### 3. The demo's browser entry
+### 3. Where the demo suspends
 
-- (a) Vite (`vite.config.ts`, `index.html`, `main.tsx`) and the vitest test (held). Upstream's `demos/vite-demo` is the shape.
-- (b) The test only. Cost: no demo a person can open.
+`PetList` fetches and reads in one component under a `Suspense` boundary above it (End-user experience).
+
+- (a) One component, the user's scope for the demo (held). Cost: a response slower than 5000 ms after the first render is dropped and the read never resumes (Disposal); the mock network answers in a microtask, so the demo does not hit it.
+- (b) A loader component that calls `useLazyReference` and renders `Suspense` around a reader component that calls `useResult`, upstream's demo shape (`isograph/demos/pet-demo/src/components/HomeRoute.tsx:32-47`). Cost: two components, which the demo's scope excludes.
