@@ -1,4 +1,4 @@
-import { iso } from './iso';
+import { iso } from './__isograph/iso';
 import type { ResolverParameters } from './iso';
 
 export const PetDetailRoute = iso(`
@@ -23,4 +23,4 @@ export const PetDetailRoute = iso(`
   return data.pet?.fullName ?? 'No pet with that id';
 });
 
-iso(`entrypoint Query.PetDetailRoute`);
+console.log(iso(`entrypoint Query.PetDetailRoute`).name);

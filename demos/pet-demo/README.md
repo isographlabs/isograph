@@ -14,7 +14,7 @@ The command builds `target/debug/isograph`, builds the extension, restarts a run
 
 ## Config
 
-`isograph.config.json` sets `source_files` to `src/**/*.ts` and `schema` to `schema/**/*.graphql`.
+`isograph.config.json` sets `source_files` to `src/**/*.ts`, `schema` to `schema/**/*.graphql`, and `output_directory` to `src`, so the daemon writes artifacts into `src/__isograph/`. That folder is generated and committed: running the daemon in this directory rewrites it.
 
 ## Schema
 
@@ -24,7 +24,7 @@ The command builds `target/debug/isograph`, builds the extension, restarts a run
 
 ## Sources
 
-`src/iso.ts` defines `iso`, which returns the resolver it is passed. Every other file calls `iso(...)`. Each `field` literal is exported under its field name and immediately called with a resolver function.
+`src/__isograph/iso.ts` is the generated `iso`: a field literal returns the resolver it is passed, with that resolver's type, and an entrypoint literal has the type of its generated entrypoint artifact. `src/iso.ts` defines `ResolverParameters`, which the resolvers use to type their parameter until param types are generated. Every other file calls `iso(...)`. Each `field` literal is exported under its field name and immediately called with a resolver function. Each entrypoint literal's artifact is logged.
 
 - `src/Pet.ts`: `field Pet.fullName` with a string description, and `field Pet.bestFriend to Pet` with a nested selection set.
 - `src/Owner.ts`: `entity Owner`, which exists only in the sources; `field Owner.displayName` with no selection set; `field Owner.OwnerBadge`, which selects `displayName`; and `field Pet.owner to Owner!`.

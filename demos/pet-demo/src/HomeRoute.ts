@@ -1,4 +1,4 @@
-import { iso } from './iso';
+import { iso } from './__isograph/iso';
 import type { ResolverParameters } from './iso';
 
 export const HomeRoute = iso(`
@@ -14,4 +14,4 @@ export const HomeRoute = iso(`
   return data.pets.map((pet) => pet.PetSummaryCard);
 });
 
-iso(`entrypoint Query.HomeRoute`);
+console.log(iso(`entrypoint Query.HomeRoute`).name);

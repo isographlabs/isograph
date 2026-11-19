@@ -1,4 +1,4 @@
-import { iso } from './iso';
+import { iso } from './__isograph/iso';
 import type { ResolverParameters } from './iso';
 
 export const SpeciesRoute = iso(`
@@ -21,4 +21,4 @@ export const SpeciesRoute = iso(`
   return data.petsBySpecies.map((pet) => pet.fullName);
 });
 
-iso(`entrypoint Query.SpeciesRoute`);
+console.log(iso(`entrypoint Query.SpeciesRoute`).name);

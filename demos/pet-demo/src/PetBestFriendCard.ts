@@ -1,4 +1,4 @@
-import { iso } from './iso';
+import { iso } from './__isograph/iso';
 import type { ResolverParameters } from './iso';
 
 export const PetBestFriendCard = iso(`

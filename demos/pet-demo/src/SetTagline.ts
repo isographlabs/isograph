@@ -1,4 +1,4 @@
-import { iso } from './iso';
+import { iso } from './__isograph/iso';
 import type { ResolverParameters } from './iso';
 
 export const SetTagline = iso(`
@@ -16,4 +16,4 @@ export const SetTagline = iso(`
   return data.set_pet_tagline.pet.tagline;
 });
 
-iso(`entrypoint Mutation.SetTagline`);
+console.log(iso(`entrypoint Mutation.SetTagline`).name);
