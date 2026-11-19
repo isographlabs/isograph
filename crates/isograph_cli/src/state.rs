@@ -76,7 +76,15 @@ fn dispatch_lsp<THostLanguage: HostLanguage>(
             }
             dispatch_lsp_notification(state, notification)
         }
-        crate::event::LspEvent::Response(_response) => no_effects(),
+        crate::event::LspEvent::Response(crate::event::LspResponse {
+            client,
+            response: _response,
+        }) => {
+            if !state.live_sessions.0.contains_key(&client) {
+                return no_effects();
+            }
+            no_effects()
+        }
     }
 }
 
@@ -85,12 +93,11 @@ fn dispatch_lsp_request<THostLanguage: HostLanguage>(
     incoming: crate::event::LspRequest,
     before: crate::event::BeforeCompute,
 ) -> Vec<IsographEffect> {
-    let request = incoming.request;
     let Some(after) = state.live_sessions.before_compute(before) else {
         return no_effects();
     };
     let get_response = || {
-        let request = crate::lsp_request_dispatch::LSPRequestDispatch::new(request, &state.db)
+        let request = crate::lsp_request_dispatch::LSPRequestDispatch::new(incoming, &state.db)
             .on_request_sync::<lsp_types::request::SemanticTokensFullRequest>(
                 crate::adapter::semantic_tokens_response::<THostLanguage>,
             )?
@@ -284,7 +291,7 @@ mod tests {
     use crate::event::{
         ClientConnectionEvent, ClientId, ClientStartedEvent, DiskChanged, DiskFileChanged,
         FolderRemoved, InternalEvent, IsographEvent, LiveSession, LiveSessions, LspEvent,
-        LspNotification, Presence,
+        LspNotification, LspResponse, Presence,
     };
 
     fn interned(s: &str) -> common_lang_types::RelativePathToSourceFile {
@@ -1002,18 +1009,30 @@ mod tests {
         assert!(effects.is_empty());
     }
 
-    #[test]
-    fn lsp_response_returns_no_effects() {
-        let mut state = empty();
-        let effects = handle(
-            &mut state,
-            LspEvent::Response(lsp_server::Response {
+    fn lsp_response(client: ClientId) -> IsographEvent {
+        LspEvent::Response(LspResponse {
+            client,
+            response: lsp_server::Response {
                 id: lsp_server::RequestId::from(1),
                 result: None,
                 error: None,
-            })
-            .to(),
-        );
+            },
+        })
+        .to()
+    }
+
+    #[test]
+    fn lsp_response_from_a_live_client_returns_no_effects() {
+        let mut state = empty();
+        let client = start_a_client(&mut state);
+        let effects = handle(&mut state, lsp_response(client));
+        assert!(effects.is_empty());
+    }
+
+    #[test]
+    fn lsp_response_from_a_client_that_never_started_returns_no_effects() {
+        let mut state = empty();
+        let effects = handle(&mut state, lsp_response(ClientId(1)));
         assert!(effects.is_empty());
     }
 

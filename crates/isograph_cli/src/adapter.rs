@@ -2,8 +2,11 @@ use isograph_compiler::HostLanguage;
 use pico::Database;
 use prelude::Postfix;
 
+use crate::event::ClientId;
+
 pub(crate) fn semantic_tokens_response<THostLanguage: HostLanguage>(
     state: &isograph_compiler::IsographDb<THostLanguage>,
+    _client: ClientId,
     params: lsp_types::SemanticTokensParams,
 ) -> isograph_lsp::lsp_runtime_error::LSPRuntimeResult<
     <lsp_types::request::SemanticTokensFullRequest as lsp_types::request::Request>::Result,
@@ -37,6 +40,7 @@ fn semantic_tokens<THostLanguage: HostLanguage>(
 
 pub(crate) fn formatting_response<THostLanguage: HostLanguage>(
     state: &isograph_compiler::IsographDb<THostLanguage>,
+    _client: ClientId,
     params: lsp_types::DocumentFormattingParams,
 ) -> isograph_lsp::lsp_runtime_error::LSPRuntimeResult<
     <lsp_types::request::Formatting as lsp_types::request::Request>::Result,
@@ -46,6 +50,7 @@ pub(crate) fn formatting_response<THostLanguage: HostLanguage>(
 
 pub(crate) fn will_save_wait_until_response<THostLanguage: HostLanguage>(
     state: &isograph_compiler::IsographDb<THostLanguage>,
+    _client: ClientId,
     params: lsp_types::WillSaveTextDocumentParams,
 ) -> isograph_lsp::lsp_runtime_error::LSPRuntimeResult<
     <lsp_types::request::WillSaveWaitUntil as lsp_types::request::Request>::Result,

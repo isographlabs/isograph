@@ -204,7 +204,9 @@ fn run_session(
                     notification,
                 })
             }
-            lsp_server::Message::Response(response) => crate::event::LspEvent::Response(response),
+            lsp_server::Message::Response(response) => {
+                crate::event::LspEvent::Response(crate::event::LspResponse { client, response })
+            }
         };
         let _ = event_tx.send(event.to());
     }

@@ -17,10 +17,16 @@ pub struct LspNotification {
 }
 
 #[derive(Clone, Debug)]
+pub struct LspResponse {
+    pub client: ClientId,
+    pub response: lsp_server::Response,
+}
+
+#[derive(Clone, Debug)]
 pub enum LspEvent {
     Request(LspRequest),
     Notification(LspNotification),
-    Response(lsp_server::Response),
+    Response(LspResponse),
 }
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize, derive_more::From)]

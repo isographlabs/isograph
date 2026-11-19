@@ -6,16 +6,23 @@ use lsp_server::{
 use lsp_types::request::Request;
 use serde_json::Value;
 
+use crate::event::{ClientId, LspRequest};
+
 use isograph_lsp::lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult};
 
 pub struct LSPRequestDispatch<'state, TState> {
+    client: ClientId,
     request: lsp_server::Request,
     state: &'state TState,
 }
 
 impl<'state, TState> LSPRequestDispatch<'state, TState> {
-    pub fn new(request: lsp_server::Request, state: &'state TState) -> Self {
-        LSPRequestDispatch { request, state }
+    pub fn new(incoming: LspRequest, state: &'state TState) -> Self {
+        LSPRequestDispatch {
+            client: incoming.client,
+            request: incoming.request,
+            state,
+        }
     }
 
     /// Calls handler if the LSPRequestDispatch's request's method matches the method
@@ -25,19 +32,20 @@ impl<'state, TState> LSPRequestDispatch<'state, TState> {
     /// cause LSPRequestDispatch to execute the first matching handler, if any.
     pub fn on_request_sync<TRequest: Request>(
         self,
-        handler: fn(&TState, TRequest::Params) -> LSPRuntimeResult<TRequest::Result>,
+        handler: fn(&TState, ClientId, TRequest::Params) -> LSPRuntimeResult<TRequest::Result>,
     ) -> ControlFlow<Response, Self> {
         if self.request.method == TRequest::METHOD {
             let id = self.request.id.clone();
             match extract_request_params::<TRequest>(self.request) {
                 Ok((request_id, params)) => {
-                    let response = handler(self.state, params).and_then(|handler_result| {
-                        serde_json::to_value(handler_result).map_err(|_err| {
-                            LSPRuntimeError::UnexpectedError(
-                                "Unable to serialize request response".to_string(),
-                            )
-                        })
-                    });
+                    let response =
+                        handler(self.state, self.client, params).and_then(|handler_result| {
+                            serde_json::to_value(handler_result).map_err(|_err| {
+                                LSPRuntimeError::UnexpectedError(
+                                    "Unable to serialize request response".to_string(),
+                                )
+                            })
+                        });
                     let server_response = convert_to_lsp_response(request_id, response);
 
                     return ControlFlow::Break(server_response);
@@ -114,25 +122,29 @@ mod test {
     };
 
     use super::LSPRequestDispatch;
+    use crate::event::{ClientId, LspRequest};
     use isograph_lsp::lsp_runtime_error::LSPRuntimeResult;
 
     #[test]
     fn calls_first_matching_request_handler() {
         let state: AtomicI32 = AtomicI32::new(0);
         let dispatch = LSPRequestDispatch::new(
-            lsp_server::Request {
-                id: "id".to_string().into(),
-                method: "textDocument/definition".to_string(),
-                params: serde_json::to_value(TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier {
-                        uri: Uri::from_str("https://example.net").unwrap(),
-                    },
-                    position: Position {
-                        line: 0,
-                        character: 0,
-                    },
-                })
-                .unwrap(),
+            LspRequest {
+                client: ClientId(1),
+                request: lsp_server::Request {
+                    id: "id".to_string().into(),
+                    method: "textDocument/definition".to_string(),
+                    params: serde_json::to_value(TextDocumentPositionParams {
+                        text_document: TextDocumentIdentifier {
+                            uri: Uri::from_str("https://example.net").unwrap(),
+                        },
+                        position: Position {
+                            line: 0,
+                            character: 0,
+                        },
+                    })
+                    .unwrap(),
+                },
             },
             &state,
         );
@@ -149,6 +161,7 @@ mod test {
 
     fn hover_handler(
         state: &AtomicI32,
+        _client: ClientId,
         _params: <HoverRequest as Request>::Params,
     ) -> LSPRuntimeResult<<HoverRequest as Request>::Result> {
         state.store(1, Ordering::Relaxed);
@@ -158,6 +171,7 @@ mod test {
 
     fn goto_definition_handler(
         state: &AtomicI32,
+        _client: ClientId,
         _params: <GotoDefinition as Request>::Params,
     ) -> LSPRuntimeResult<<GotoDefinition as Request>::Result> {
         state.store(2, Ordering::Relaxed);
