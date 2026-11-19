@@ -669,3 +669,40 @@ fn an_integer_outside_i32_fails_the_query() {
         EntrypointQueryError::IntegerOutOfRange(IntegerOutOfRange(4_294_967_296))
     );
 }
+
+#[test]
+fn a_users_typename_merges_with_the_discriminator() {
+    let contents = "export const T = iso(`field Query.T { pets { __typename, t: __typename, id } }`)(() => 1)\niso(`entrypoint Query.T`)";
+    let db = demo(&[], &[("src/T.ts", contents)], &[]);
+    assert_eq!(validation_errors(&db, "src/T.ts", contents), vec![]);
+    assert_eq!(
+        lines(text(&db, "Query", "T").as_str()),
+        vec![
+            "query T {",
+            "  pets {",
+            "    __typename",
+            "    id",
+            "  }",
+            "}"
+        ]
+    );
+}
+
+#[test]
+fn typename_is_a_leaf_without_arguments() {
+    let contents = "export const T = iso(`field Query.T { pets { __typename { x } }, viewer { __typename(a: 1) } }`)(() => 1)";
+    let db = demo(&[], &[("src/T.ts", contents)], &[]);
+    assert_eq!(
+        validation_errors(&db, "src/T.ts", contents),
+        vec![
+            (
+                "`Pet.__typename` returns a leaf and takes no selection set.".to_owned(),
+                "{ x }".to_owned()
+            ),
+            (
+                "`Viewer.__typename` takes no argument `a`.".to_owned(),
+                "a".to_owned()
+            ),
+        ]
+    );
+}

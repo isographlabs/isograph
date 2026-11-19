@@ -3855,11 +3855,17 @@ scalar ID
             };
         assert_eq!(
             items(&mut state, "name }, feed"),
-            ("nickname".to_owned(), "String".to_owned()).wrap_vec()
+            vec![
+                ("__typename".to_owned(), "String".to_owned()),
+                ("nickname".to_owned(), "String".to_owned())
+            ]
         );
         assert_eq!(
             items(&mut state, "asPet"),
-            ("asOwner".to_owned(), "Owner".to_owned()).wrap_vec()
+            vec![
+                ("__typename".to_owned(), "String".to_owned()),
+                ("asOwner".to_owned(), "Owner".to_owned())
+            ]
         );
     }
 

@@ -51,6 +51,7 @@ pub enum IdField {
 /// The selectable GraphQL selects in every selection set on a composite type.
 pub(crate) const TYPENAME: &str = "__typename";
 const ID: &str = "id";
+const STRING: &str = "String";
 
 /// An object, interface, or union is composite; an object is concrete; `id` is the identity
 /// where `IdField` is `Present`.
@@ -229,6 +230,12 @@ pub fn graphql_selectable<TProfile: CompilationProfile>(
     entity: EntityName,
     selectable: SelectableName,
 ) -> Result<Option<ProtocolSelectable<GraphQLSelectableData>>, GraphQLSelectableLookupError> {
+    if selectable.lookup() == TYPENAME
+        && let Ok(Some(schema_entity)) = entity_named(db, client, entity)
+        && let TypenameSelectable::Present = typename_selectable(schema_entity)
+    {
+        return typename().wrap_some().wrap_ok();
+    }
     if let Some(input_field) = input_field_named(db, client, entity, selectable)? {
         return input_field.wrap_some().wrap_ok();
     }
@@ -518,11 +525,46 @@ pub fn graphql_selectables<TProfile: CompilationProfile>(
             input_field_selectable(field),
         )
     });
+    let typename = match typename_selectable(schema_entity) {
+        TypenameSelectable::Present => (TYPENAME.intern().to(), typename()).wrap_some(),
+        TypenameSelectable::Absent => None,
+    };
     schema_entity_fields(schema_entity)
         .map(|field| (field.item.item.name.item.0, field_selectable(field)))
         .chain(input_fields)
         .chain(refinements)
+        .chain(typename)
         .collect()
+}
+
+/// Whether a type has the `__typename` selectable.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TypenameSelectable {
+    Present,
+    Absent,
+}
+
+/// Every object, interface, and union has `__typename` (upstream's
+/// `parse_nested_server_schema.rs`, which adds it to each).
+fn typename_selectable(schema_entity: &SchemaEntity) -> TypenameSelectable {
+    match schema_entity.definition.item.item.reference() {
+        TypeDefinition::Object(_) | TypeDefinition::Interface(_) | TypeDefinition::Union(_) => {
+            TypenameSelectable::Present
+        }
+        TypeDefinition::Scalar(_) | TypeDefinition::Enum(_) | TypeDefinition::InputObject(_) => {
+            TypenameSelectable::Absent
+        }
+    }
+}
+
+/// `__typename`: a field of type `String!` that the schema text does not define.
+fn typename() -> ProtocolSelectable<GraphQLSelectableData> {
+    ProtocolSelectable {
+        description: None,
+        target: Wrapper::Inner(STRING.intern().to()),
+        definition: None,
+        data: GraphQLSelectableData::Field,
+    }
 }
 
 /// `as<target>`.

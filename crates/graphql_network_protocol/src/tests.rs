@@ -574,7 +574,7 @@ fn a_union_refines_to_each_object_member_of_its_definition_and_extensions() {
             .iter()
             .map(|(name, _)| name.to_string())
             .collect::<Vec<_>>(),
-        ["asA", "asB", "asC"]
+        ["asA", "asB", "asC", "__typename"]
     );
 }
 
@@ -605,7 +605,7 @@ fn an_interface_refines_to_each_object_implementing_it_and_not_to_interfaces() {
             .iter()
             .map(|(name, _)| name.to_string())
             .collect::<Vec<_>>(),
-        ["id", "asOwner", "asPet"]
+        ["id", "asOwner", "asPet", "__typename"]
     );
 }
 
@@ -629,7 +629,7 @@ fn a_broken_refinement_target_fails_that_refinement_only() {
             .iter()
             .map(|(name, _)| name.to_string())
             .collect::<Vec<_>>(),
-        ["asB"]
+        ["asB", "__typename"]
     );
 }
 
