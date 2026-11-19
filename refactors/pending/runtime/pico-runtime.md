@@ -931,6 +931,25 @@ The user's direction: do not do all the work at construct and destruct time.
 - Construction: `normalize` computes the result when the constructor runs, and defers setting up subscriptions to a scheduler. The runtime stays free of browser globals because the caller supplies the scheduler: `createStore` takes a function that receives a task and runs it later. The React package passes one that calls `requestIdleCallback` (or an equivalent where that global is absent); tests pass one that queues tasks and runs them when the test says.
 - Destruction: garbage collecting on every release is wasteful. A release adds the handle to a buffer, and collection runs later as one batch, through the same scheduler or when the buffer exceeds its size. A handle that is retained again before the batch runs is not destroyed. Upstream's release buffer is the related mechanism: `unretainQuery` pushes the released query onto `gcBuffer` and reports overflow past `gcBufferSize` (`garbageCollection.ts:40-53`), whose default is 10 (`IsographEnvironment.ts:177`, `:205-206`), and overflow triggers collection (`makeNetworkRequest.ts:565-577`). v1 removed the buffer as not needed yet (`refactors/pending/runtime/store.md`, `garbageCollect`).
 
+### 8. Pre-memoized selection sets
+
+To explore. This may not work out, and the user expects it probably does not matter.
+
+A reader's selection set read against a record (`{ firstName lastName }` on `Pet:4`) is itself a stored result, keyed by the record and the selection set. The selection set's part of the key is a stable key the compiler emits, such as a hash of the selection set or an interned id. Two resolvers whose reader ASTs contain the same selection set on the same record read it once. A resolver whose inputs are one stored selection-set result records one `EntryDependency` on that entry instead of one per field.
+
+Savings:
+
+- Repeated field reads: the second resolver that reads `{ firstName lastName }` on `Pet:4` reads the stored result instead of each field.
+- Finer-grained dependencies collapse into one: verification of a resolver compares one entry's `timeUpdated` instead of one per field.
+
+Costs:
+
+- More stored entries: one per selection set per record read, alongside the `ResolverEntry`s.
+- A key per selection set: the compiler emits it into the reader artifact, and two selection sets must get equal keys exactly when they read the same fields with the same arguments.
+- Equality of selection-set results: the stored result is a fresh object on each computation, so it needs `normalize`'s keep-an-equal-value rule (change 1) applied to the read result, or every recomputation changes its `timeUpdated` and invalidates every resolver that depends on it.
+
+Relation to changes 2 and 3: the stored selection-set result is an extra level between server entries and resolver entries. A resolver entry depends on a selection-set entry, the selection-set entry depends on server entries and on the resolver entries of the `Resolver` nodes it contains, and verification and settlement walk that level as they walk a resolver entry.
+
 ## Open decisions
 
 ### 1. Resolver markers in the normalization AST
