@@ -434,8 +434,7 @@ impl HostLanguage for TypeScriptHostLanguage {
         db: &IsographDb,
         path: PathBuf,
     ) -> Option<Vec<IsoLiteralExtraction<Self>>> {
-        let source_id = db.get_disk_file_map().tracked().0.get(&path).copied()?;
-        let contents = db.get(source_id).contents.as_str();
+        let contents = db.try_get(DiskFile::id_for_key(&path))?.contents.as_str();
         EXTRACT_ISO_LITERAL
             .captures_iter(contents)
             .filter_map(|captures| { /* IsoLiteralExtraction; skip comments and empty backticks */ })

@@ -4,7 +4,7 @@ Requires lsp-sessions.md and lsp-outstanding.md (landed). Diagnostics (lsp-diagn
 
 A client is a reader of file text. Each LSP connection (one VS Code window) is a client with its own open buffers: the text it sent with `didOpen` / `didChange` and has not closed. `IsographDb` holds every client's buffers in one tracked map keyed by `OpenFileKey { client, path }`. Every read of file text is the memo `file_contents(db, client, path)`: that client's open buffer for that path if it has one, otherwise the `DiskFile`. Highlighting, Format Document, and `willSaveWaitUntil` read through `file_contents` with the asking client. The file-based compiler will be another client with its own `ClientId`, reading through `file_contents` like any client; how it gets its `ClientId` is out of scope for this doc.
 
-Origin of the open-file map and handlers: isograph `OpenFileMap` / `OpenFileSource` / `insert_open_file` / `remove_open_file` (`crates/isograph_schema/src/isograph_database.rs`) and `crates/isograph_lsp/src/text_document.rs`. Origin of overlay-then-disk: isograph `read_iso_literals_source` (`crates/isograph_schema/src/validated_isograph_schema/isograph_literals.rs`). Delta from isograph: the map key is `OpenFileKey { client, path }`, not the path alone, because two clients can hold different text for one path; the source is `OpenFile { #[key] key: OpenFileKey, contents }`; a lookup is untracked on a hit and tracked on a miss (isograph's `get_open_file` reads the map tracked, with a TODO naming this); a write of an already-present key does not write the map; `didChange` accepts one full-text change and logs any other shape with `warn!`; no `expect` on a URI.
+Origin of the open-file map and handlers: isograph `OpenFileMap` / `OpenFileSource` / `insert_open_file` / `remove_open_file` (`crates/isograph_schema/src/isograph_database.rs`) and `crates/isograph_lsp/src/text_document.rs`. Origin of overlay-then-disk: isograph `read_iso_literals_source` (`crates/isograph_schema/src/validated_isograph_schema/isograph_literals.rs`). Delta from isograph: the map key is `OpenFileKey { client, path }`, not the path alone, because two clients can hold different text for one path; the source is `OpenFile { #[key] key: OpenFileKey, contents }`; a lookup is `db.try_get(OpenFile::id_for_key(&key))`, as upstream isograph #1003 reads `OpenFileSource::id_for_key`; i2 keeps `open_file_map` for the writers, where #1003 deletes upstream's map; a write of an already-present key does not write the map; `didChange` accepts one full-text change and logs any other shape with `warn!`; no `expect` on a URI.
 
 ## Open decisions
 
@@ -40,7 +40,7 @@ Prefactors first.
 2. Requests and responses carry the client; request handlers receive it as a parameter. `LSPRequestDispatch` moves from `isograph_lsp` to `isograph_cli`, next to `LSPNotificationDispatch`. Dispatch drops a response from a client not in `LiveSessions`. Landed in `c74128a3` (move) and `862b68fc`.
 3. A tracked counter that was never written. Not needed; change 1 of `refactors/pending/pico-missing-key-dependency.md` fixes it in pico. See Known gap.
 4. `ClientId` moves to `isograph_compiler`. Landed in `65d4cce4`.
-5. `open_file_map`, the `file_contents` memo, the writers, and unit tests. Landed in `a42d7cad`.
+5. `open_file_map`, the `file_contents` memo, the writers, and unit tests. Landed in `a42d7cad`; `file_contents` reads both keys with `try_get(id_for_key)` since `27b023a1`.
 6. `didOpen` / `didChange` / `didClose`, advertised capabilities, `Gone` cleanup, and `handle` tests. Landed in `0ecc7e2f` (typed path conversion) and `a7846d69` (handlers, capabilities, `Gone`); design docs in `220e64ac`.
 7. Semantic tokens and formatting read through `file_contents`. Landed in `1bdffe19` (`extract_iso_literals_from_text`), `0a9cf53c` (client-keyed memos, semantic tokens, formatting, `willSaveWaitUntil`), `76d666c5` (multi-literal formatting tests), and `77c5a992` (`IsographDb::disk_file` deleted).
 
@@ -723,48 +723,6 @@ The request liveness check is unchanged: `LiveSessions::reply` returns `None` fo
 
 `docs-website/docs/design-docs/event-model.md` Dispatch: "A response is no effects." becomes "An LSP request and an LSP response carry the `ClientId` of their connection. `handle` drops a response from a client not in `LiveSessions`; a response from a live client is no effects."
 
-## Change 3: a tracked counter that was never written
-
-Open decision. Not decided.
-
-Three facts about pico, each verified in source:
-
-- `View::tracked()` reads the counter singleton with `get_singleton` (`crates/pico/src/view.rs:29-32`). `Storage::get_impl` (`crates/pico/src/database.rs:134-140`) returns `None` from `get_source_node(key)?` before it calls `register_dependency_in_parent_memoized_fn`. A memo that reads a map `tracked()` before the first write to that map's counter records no dependency.
-- `MutView::tracked()` (`crates/pico/src/view.rs:67-74`) is `get_singleton::<C>().map_or(C::default(), |c| c.increment())` then `db.set(next)`. The first write sets the counter to `C::default()`.
-- `set_source` of a vacant key (`crates/pico/src/database.rs:352-358`) inserts the node at `current_epoch` without incrementing the epoch. The first counter write and the first `set` of a new `OpenFile` or `DiskFile` key both advance nothing.
-
-Together: a memo that misses a key and reads the map tracked on a fresh database records nothing. The first insert of that key sets a vacant source and a vacant counter, the epoch does not move, and the next call returns the stale `None` without re-verifying.
-
-Where it is reached:
-
-- `disk_file_map`. `TypeScriptHostLanguage::extract_iso_literals` reads the map tracked on a miss. Before the first `insert_disk_file`, a later `DiskChanged` that creates the file is not seen. `missing_then_present_extracts` in `isograph_extract_typescript` inserts an unrelated file first to work around this.
-- `open_file_map` (change 5). `file_contents` reads the map tracked on an open-file miss. Every client reads through `file_contents`, and until some client's first `didOpen` no counter exists; the first `didOpen` of a path whose `file_contents` already ran for that client would not be seen. Change 5 cannot ship correctly without one of the options below.
-
-Options:
-
-(a) `IsographDb::default` writes each counter once. No pico change. A future `#[tracked]` field that is not listed there has the bug again, silently.
-
-```rust
-// from crates/isograph_compiler/src/database.rs
-impl<THostLanguage: HostLanguage> Default for IsographDb<THostLanguage> {
-    fn default() -> Self {
-        let mut db = Self {
-            storage: Storage::default(),
-            disk_file_map: DiskFileMap::default(),
-            open_file_map: OpenFileMap::default(),
-            phantom_data: PhantomData,
-        };
-        db.get_disk_file_map_mut().tracked();
-        db.get_open_file_map_mut().tracked();
-        db
-    }
-}
-```
-
-(b) pico prefactor. The `#[derive(Db)]` macro (`crates/pico_macros/src/db_macro.rs`) generates the constructor, which builds every field with `Default::default()` and sets every tracked field's counter singleton; `IsographDb` derives its `Default` through it instead of writing one. `MutView::tracked` increments an existing counter with no default branch, because every counter now exists from construction. A new tracked field cannot be forgotten. pico and pico_macros are kept unchanged from upstream isograph per AGENTS.md, so this is an upstream divergence and needs user approval; it ships with pico tests before change 5.
-
-With either option, `missing_then_present_extracts` drops the `other` insert: it is a fresh-database miss then insert and asserts the same extraction.
-
 ## Change 4: `ClientId` moves to `isograph_compiler`
 
 The database keys open buffers by `ClientId` (change 5), so the type moves to the crate that owns `IsographDb` and becomes `pub`. One `ClientId` names every client.
@@ -799,7 +757,7 @@ Tests: the test modules of `lsp_socket.rs` and `state.rs` drop `ClientId` from t
 
 ## Change 5: `open_file_map`, `file_contents`, writers
 
-Requires change 3 (whichever option) and change 4.
+Requires change 4.
 
 ### Types
 
@@ -851,51 +809,33 @@ pub use database::{ClientId, DiskFile, DiskFileMap, IsographDb, file_contents};
 // from crates/isograph_compiler/src/database.rs
 /// The text of `path` as `client` reads it: that client's open buffer, otherwise disk.
 #[memo]
-pub fn file_contents<THostLanguage: HostLanguage>(
-    db: &IsographDb<THostLanguage>,
+pub fn file_contents<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
     client: ClientId,
     path: RelativePathToSourceFile,
 ) -> Option<String> {
-    match db.open_file_source_id(OpenFileKey { client, path }) {
-        Some(open_file_id) => db.get(open_file_id).contents.clone().wrap_some(),
+    match db.try_get(OpenFile::id_for_key(&OpenFileKey { client, path })) {
+        Some(open_file) => open_file.contents.clone().wrap_some(),
         None => db
-            .get(db.disk_file_source_id(path)?)
-            .contents
-            .clone()
-            .wrap_some(),
-    }
-}
-
-impl<THostLanguage: HostLanguage> IsographDb<THostLanguage> {
-    fn open_file_source_id(&self, key: OpenFileKey) -> Option<SourceId<OpenFile>> {
-        match self.get_open_file_map().untracked().0.get(&key).copied() {
-            Some(open_file_id) => open_file_id.wrap_some(),
-            None => self.get_open_file_map().tracked().0.get(&key).copied(),
-        }
-    }
-
-    fn disk_file_source_id(&self, path: RelativePathToSourceFile) -> Option<SourceId<DiskFile>> {
-        match self.get_disk_file_map().untracked().0.get(&path).copied() {
-            Some(disk_file_id) => disk_file_id.wrap_some(),
-            None => self.get_disk_file_map().tracked().0.get(&path).copied(),
-        }
+            .try_get(DiskFile::id_for_key(&path))
+            .map(|disk_file| disk_file.contents.clone()),
     }
 }
 ```
 
 `file_contents` is a memo and returns an owned `Option<String>`, which pico hands out as `&Option<String>`. A memo cannot return a `&str` into a source (`pico.md` Memo). Its callers are memos (change 7) and tests; `handle` does not call it.
 
-The lookups follow `pico.md` Tracked maps: a hit is untracked, then `db.get` records that one source; a miss reads the map tracked, so a later insert of that key re-invokes. `disk_file_source_id` is the lookup `TypeScriptHostLanguage::extract_iso_literals` writes inline today. `IsographDb::disk_file` (untracked only) is unchanged.
+The lookups follow AGENTS.md "pico tracked maps": a one-key lookup does not read the map. `try_get` records a dependency on that key whether or not a source is set there.
 
 Dependencies of one `file_contents(client, path)` slot:
 
-- Open buffer hit: that `OpenFile`. A disk change does not re-invoke it. The buffer wins until `didClose` or `Gone`.
-- Open miss, disk hit: the `open_file_map` counter and that `DiskFile`.
-- Open miss, disk miss: both counters.
+- Open buffer hit: that `OpenFile` key. A disk change does not re-invoke it. The buffer wins until `didClose` or `Gone`.
+- Open miss, disk hit: that `OpenFile` key and that `DiskFile` key.
+- Open miss, disk miss: the same two keys.
 
-`didClose` of a path removes the `OpenFile` and writes the map. A slot that hit re-verifies, sees the removed node as changed (`source_node_changed_since` is true for a removed node, `crates/pico/src/execute_memoized_function.rs:202-206`), re-runs, misses, and reads disk. It does not `db.get` the removed id, because the map no longer lists it. No memo receives a `SourceId<OpenFile>` as an argument.
+`didClose` of a path removes the `OpenFile`. A slot that hit re-verifies, sees the key changed, re-runs, misses, and reads disk. No memo receives a `SourceId<OpenFile>` as an argument.
 
-Every open-miss slot depends on the one `open_file_map` counter. Any client's `didOpen` of a new path, `didClose`, or `Gone` with open buffers re-invokes every open-miss `file_contents` slot of every client. Each re-run clones its disk text and compares it with `==`; an unchanged result keeps its old `time_updated` (`crates/pico/src/execute_memoized_function.rs:162-173`), and nothing downstream re-runs. A keystroke (`didChange` of an already-open path) does not write the map and re-invokes only the slot that read that `OpenFile`.
+An open or close re-invokes only the `file_contents` slot of that client and path. A keystroke (`didChange` of an already-open path) re-invokes only the slot that read that `OpenFile`. Each re-run clones its text and compares it with `==`; an unchanged result keeps its old `time_updated`, and nothing downstream re-runs.
 
 ### Writers
 
@@ -949,7 +889,7 @@ impl<THostLanguage: HostLanguage> IsographDb<THostLanguage> {
 }
 ```
 
-`set_open_file` writes the map only when the key is absent. `MutView::tracked()` increments the counter on every call (change 3), so writing a present key would re-invoke every open-miss slot on each keystroke. The `SourceId` of a key is a function of the key, so re-inserting a present key would write the same id. Reading the key untracked before writing it is the shape AGENTS.md steers away from in favor of `entry`; it is required here because `MutView` has only `tracked()`, and calling it is the bump.
+`set_open_file` writes the map only when the key is absent. `MutView::tracked()` increments the counter on every call, so writing a present key would re-invoke every memo that iterates `open_file_map` on each keystroke. The `SourceId` of a key is a function of the key, so re-inserting a present key would write the same id. Reading the key untracked before writing it is the shape AGENTS.md steers away from in favor of `entry`; it is required here because `MutView` has only `tracked()`, and calling it is the bump.
 
 `remove_open_file` of an absent key returns before any write. `remove_open_files_of_client` of a client with no buffers returns before any write; that occurs on every `isograph send` connection and on the readiness probe in `start.rs`, which connect and never `didOpen`. Its scan is over every client's keys; a per-client index is backlog (`future-improvements.md`). `open_file_ids` is collected because `self.remove` needs `&mut self` after the map borrow ends. pico does not collect sources (`crates/pico/src/garbage_collection.rs:21`), so `Gone` must remove each `OpenFile` explicitly.
 
@@ -969,7 +909,7 @@ impl<THostLanguage: HostLanguage> IsographDb<THostLanguage> {
 - `remove_open_files_of_client` of a client with no buffers leaves every read unchanged and `get_open_file_map().untracked().0.len()` unchanged
 - `remove_disk_file` of a path client 1 has open: client 1 still reads the buffer; client 2 reads `None`
 - miss then hit: client 1 reads disk; `set_open_file`; reads the buffer; `set_open_file` again; reads the new text; `remove_open_file`; reads disk; `remove_disk_file`; `None`, no panic
-- fresh-database miss then insert: client 1 reads `None` before any write; `set_open_file(ClientId(1), path, "open")`; reads `"open"`. A second: client 1 reads `None`; `insert_disk_file`; reads disk's text. These fail without change 3.
+- fresh-database miss then insert: client 1 reads `None` before any write; `set_open_file(ClientId(1), path, "open")`; reads `"open"`. A second: client 1 reads `None`; `insert_disk_file`; reads disk's text. pico's missing-key dependency (upstream isograph #994, #1000) makes these pass.
 - client 1 reads `path`; client 2 `set_open_file` of `path`: client 1 still reads disk's text
 
 ## Change 6: document sync handlers
@@ -1509,7 +1449,7 @@ All at the `handle` seam in `crates/isograph_cli/src/state.rs`: one process, no 
 
 `docs-website/docs/design-docs/pico.md` Source: the path-keyed `OpenFile` snippet becomes `OpenFileKey` and `OpenFile` as in change 5, and the Database snippet gains `#[tracked] open_file_map: OpenFileMap`. "A path may have a `DiskFile`, an `OpenFile`, both, or neither. Artifact generation reads `DiskFile`. The LSP reads `OpenFile` when that path has one, otherwise `DiskFile`. Those are different memos. One overlay used by both, as isograph's `read_iso_literals_source` does, makes artifact generation depend on editor buffers." becomes "A path may have a `DiskFile`, one `OpenFile` per client that has it open, both, or neither. Every read of file text is `file_contents(db, client, path)`: client `c` reads `c`'s `OpenFile` if present, otherwise `DiskFile`. The file-based compiler will be another client with its own `ClientId`."
 
-`pico.md` Tracked maps: add "`open_file_map` is keyed by `OpenFileKey { client, path }`. `file_contents` looks up untracked and `db.get`s the hit; on a miss it reads the map tracked. A write of a key already present does not write the map, so a keystroke re-invokes only the slot that read that `OpenFile`. Any open or close re-invokes every open-miss slot of every client; each backdates when its text is `==`."
+`pico.md` Tracked maps: add "`open_file_map` is keyed by `OpenFileKey { client, path }`. `file_contents` reads `OpenFile::id_for_key` of that key, then `DiskFile::id_for_key` of the path on a miss. A keystroke re-invokes only the slot that read that `OpenFile`. An open or close re-invokes only the `file_contents` slots of that client and path."
 
 ## Change 7: semantic tokens and formatting read `file_contents`
 
