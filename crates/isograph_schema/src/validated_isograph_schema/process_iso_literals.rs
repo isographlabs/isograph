@@ -16,19 +16,17 @@ use crate::parse_iso_literal_in_source;
 pub fn parse_iso_literals<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
 ) -> DiagnosticVecResult<ParsedIsoLiteralsMap> {
-    // TODO we are not checking the editor buffers here. This will probably be fixed when we
-    // fully rewrite everything to be incremental.
     let mut contains_iso = ParsedIsoLiteralsMap::default();
     let mut iso_literal_parse_errors = vec![];
-    for (relative_path, iso_literals_source_id) in db.get_iso_literal_map().tracked().0.iter() {
-        for literal in parse_iso_literal_in_source(db, *iso_literals_source_id)
+    for &relative_path in db.get_iso_literals().tracked() {
+        for literal in parse_iso_literal_in_source(db, relative_path)
             .to_owned()
             .note_todo("Do not clone. Use a MemoRef.")
         {
             match literal {
                 Ok(iso_literal) => {
                     contains_iso
-                        .entry(*relative_path)
+                        .entry(relative_path)
                         .or_default()
                         .push(iso_literal);
                 }

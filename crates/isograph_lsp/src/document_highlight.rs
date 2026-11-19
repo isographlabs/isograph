@@ -6,7 +6,9 @@ use isograph_lang_types::{
     DescriptionParent, EntityNameWrapperParent, IsographResolvedNode,
 };
 use isograph_schema::{CompilationProfile, IsographDatabase};
-use isograph_schema::{process_iso_literal_extraction, read_iso_literals_source};
+use isograph_schema::{
+    process_iso_literal_extraction, read_iso_literals_source_from_relative_path,
+};
 use lsp_types::DocumentHighlight;
 use lsp_types::request::DocumentHighlightRequest;
 use lsp_types::{Position, Uri, request::Request};
@@ -127,13 +129,11 @@ fn location_to_document_highlight<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     location: EmbeddedLocation,
 ) -> Option<DocumentHighlight> {
-    let iso_literal_map = db.get_iso_literal_map();
-    let source_id = iso_literal_map
-        .tracked()
-        .0
-        .get(&location.text_source.relative_path_to_source_file)?;
-
-    let source = read_iso_literals_source(db, *source_id);
+    let source = read_iso_literals_source_from_relative_path(
+        db,
+        location.text_source.relative_path_to_source_file,
+    )
+    .as_ref()?;
     DocumentHighlight {
         range: isograph_location_to_lsp_location(db, location, &source.content)?.range,
         kind: None,

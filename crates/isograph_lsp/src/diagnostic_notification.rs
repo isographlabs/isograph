@@ -3,7 +3,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use common_lang_types::{Diagnostic, noop_print_location_fn};
-use isograph_schema::{CompilationProfile, IsographDatabase, read_iso_literals_source};
+use isograph_schema::{
+    CompilationProfile, IsographDatabase, read_iso_literals_source_from_relative_path,
+};
 use lsp_types::{
     PublishDiagnosticsParams, Uri,
     notification::{Notification, PublishDiagnostics},
@@ -52,13 +54,11 @@ fn iso_diagnostics_to_params<TCompilationProfile: CompilationProfile>(
         let path = location.text_source.relative_path_to_source_file;
 
         // TODO diagnostics with GraphQL locations get dropped here
-        let iso_literal_map = db.get_iso_literal_map();
-        let source_id = match iso_literal_map.tracked().0.get(&path) {
-            Some(source_id) => source_id,
+        let source = match read_iso_literals_source_from_relative_path(db, path) {
+            Some(source) => source,
             // TODO don't do this
             None => continue,
         };
-        let source = read_iso_literals_source(db, *source_id);
 
         let location = match isograph_location_to_lsp_location(db, location, &source.content) {
             Some(l) => l,
