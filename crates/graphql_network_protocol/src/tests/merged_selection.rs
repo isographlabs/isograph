@@ -3,10 +3,10 @@ use std::collections::BTreeSet;
 use common_lang_types::VariableName;
 use intern::string_key::Intern;
 use isograph_compiler::{
-    Condition, FieldSelectionMap, IdentitySelection, InlineCycle, MergeError, MergedSelection,
-    MergedSelectionMap, MergedSelectionTarget, MergedValue, MissingFieldArgument, SelectableKey,
-    SelectionMapError, SelectionMapErrorKind, UnknownFieldArgument, field_selection_map,
-    inlined_fields,
+    Condition, FieldSelectionMap, FieldSelectionMapError, IdentitySelection, InlineCycle,
+    MergeError, MergedSelection, MergedSelectionMap, MergedSelectionTarget, MergedValue,
+    MissingFieldArgument, SelectableKey, SelectionMapError, SelectionMapErrorKind,
+    UnknownFieldArgument, field_selection_map, inlined_fields,
 };
 use prelude::Postfix;
 
@@ -25,7 +25,11 @@ fn demo(replaced: &[(&str, &str)], added: &[(&str, &str)], schema: &[(&str, &str
     project_db(&schema_files, &pet_demo_sources(replaced, added))
 }
 
-fn field_map(db: &Db, parent: &str, field: &str) -> Result<FieldSelectionMap, SelectionMapError> {
+fn field_map(
+    db: &Db,
+    parent: &str,
+    field: &str,
+) -> Result<FieldSelectionMap, FieldSelectionMapError> {
     field_selection_map(db, CLIENT, entity(parent), selectable(field)).clone()
 }
 
@@ -36,7 +40,12 @@ fn selections(db: &Db, parent: &str, field: &str) -> MergedSelectionMap {
 }
 
 fn error(db: &Db, parent: &str, field: &str) -> SelectionMapError {
-    field_map(db, parent, field).expect_err("the fixture's field fails")
+    match field_map(db, parent, field).expect_err("the fixture's field fails") {
+        FieldSelectionMapError::Located(error) => error,
+        FieldSelectionMapError::FieldLookup(diagnostic) => {
+            panic!("the fixture's field is found: {}", diagnostic.0.message)
+        }
+    }
 }
 
 /// One line per selection: two spaces per depth, then the alias of a selectable selection
@@ -317,15 +326,11 @@ fn a_variable_without_a_default_that_a_selection_does_not_pass_is_an_error_at_th
             variable: "y".intern().to(),
         })
     );
-    assert_eq!(
-        missing.location,
-        located("src/Chain.ts", CHAIN, "Middle }")
-            .wrap_some()
-            .map(|mut location| {
-                location.span.end = location.span.start + "Middle".len() as u32;
-                location
-            })
-    );
+    assert_eq!(missing.location, {
+        let mut location = located("src/Chain.ts", CHAIN, "Middle }");
+        location.span.end = location.span.start + "Middle".len() as u32;
+        location
+    });
     assert_eq!(
         error(&db, "Pet", "Broken").kind,
         SelectionMapErrorKind::MissingFieldArgument(MissingFieldArgument {
@@ -585,15 +590,11 @@ fn mutual_self_and_longer_cycles_are_errors_and_do_not_panic() {
         error(&db, "Pet", "reachesCycle").kind,
         SelectionMapErrorKind::InlineCycle(InlineCycle(vec![key("Pet", "a"), key("Pet", "b")]))
     );
-    assert_eq!(
-        error(&db, "Pet", "s").location,
-        located("src/Cycles.ts", CYCLES, "s {")
-            .wrap_some()
-            .map(|mut location| {
-                location.span.end = location.span.start + 1;
-                location
-            })
-    );
+    assert_eq!(error(&db, "Pet", "s").location, {
+        let mut location = located("src/Cycles.ts", CYCLES, "s {");
+        location.span.end = location.span.start + 1;
+        location
+    });
     assert!(field_map(&db, "Query", "HomeRoute").is_ok());
     assert!(field_map(&db, "Query", "PetDetailRoute").is_ok());
 }
@@ -608,7 +609,7 @@ fn a_broken_field_fails_the_fields_that_inline_it_at_its_own_location_and_no_oth
         .replace("    nickname\n", "    nickname\n    nope\n");
     let before = demo(&[], &[], &[]);
     let after = demo(&[("src/PetStatsCard.ts", broken.as_str())], &[], &[]);
-    let expected = located("src/PetStatsCard.ts", broken.as_str(), "nope").wrap_some();
+    let expected = located("src/PetStatsCard.ts", broken.as_str(), "nope");
     assert_eq!(error(&after, "Pet", "PetStatsCard").location, expected);
     assert!(matches!(
         error(&after, "Pet", "PetStatsCard").kind,
@@ -657,7 +658,6 @@ fn query_error(body: &str, schema: &[(&str, &str)]) -> (SelectionMapErrorKind, S
     let contents = format!("iso(`field Query.X($id: ID!) {{ {body} }}`)");
     let db = demo(&[], &[("src/X.ts", contents.as_str())], schema);
     let SelectionMapError { location, kind } = error(&db, "Query", "X");
-    let location = location.expect("a selection error has a location");
     (kind, contents[location.span.as_usize_range()].to_owned())
 }
 
@@ -793,8 +793,7 @@ fn a_schema_field_has_no_map() {
         SelectionMapErrorKind::NotASourceField(key("Pet", "age"))
     );
     assert!(matches!(
-        error(&db, "Pet", "nope").kind,
-        SelectionMapErrorKind::Lookup(_)
+        field_map(&db, "Pet", "nope"),
+        Err(FieldSelectionMapError::FieldLookup(_))
     ));
-    assert_eq!(error(&db, "Pet", "nope").location, None);
 }

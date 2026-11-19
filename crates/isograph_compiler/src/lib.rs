@@ -44,14 +44,14 @@ pub use iso_literals::{
 pub use merged_selection::{
     AddedSelectionCollision, AliasCollision, CompletedCompositeTarget, CompletedConditional,
     CompletedIdentity, CompletedKey, CompletedSelectableSelection, CompletedSelection,
-    CompletedSelectionMap, CompletedSelectionTarget, Condition, FieldSelectionMap, FieldVariable,
-    FixedRecordId, InlineCycle, MergeError, MergeKey, MergedArgument, MergedArguments,
-    MergedCompositeTarget, MergedConditional, MergedObject, MergedObjectEntry,
-    MergedSelectableSelection, MergedSelection, MergedSelectionMap, MergedSelectionTarget,
-    MergedValue, NonNullVariableType, NormalizationAlias, RecordEntity, ResponseKey, SelectionKey,
-    SelectionMapError, SelectionMapErrorKind, SourceFieldDeclaration, TopLevelError,
-    UnknownFieldArgument, VariableType, complete, field_selection_map, field_variables,
-    inlined_fields, source_field_declaration,
+    CompletedSelectionMap, CompletedSelectionTarget, Condition, FieldSelectionMap,
+    FieldSelectionMapError, FieldVariable, FixedRecordId, InlineCycle, MergeError, MergeKey,
+    MergedArgument, MergedArguments, MergedCompositeTarget, MergedConditional, MergedObject,
+    MergedObjectEntry, MergedSelectableSelection, MergedSelection, MergedSelectionMap,
+    MergedSelectionTarget, MergedValue, NonNullVariableType, NormalizationAlias, RecordEntity,
+    ResponseKey, SelectionKey, SelectionMapError, SelectionMapErrorKind, SourceFieldDeclaration,
+    TopLevelError, UnknownFieldArgument, VariableType, complete, field_selection_map,
+    field_variables, inlined_fields, source_field_declaration,
 };
 pub use normalization_ast::{
     IntegerOutOfRange, NormalizationArgument, NormalizationArguments, NormalizationAst,

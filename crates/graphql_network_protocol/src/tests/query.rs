@@ -3,10 +3,10 @@ use std::collections::BTreeSet;
 
 use isograph_compiler::{
     CompletedIdentity, CompletedSelection, CompletedSelectionMap, CompletedSelectionTarget,
-    EntrypointNotFetchableError, EntrypointQueryError, FixedRecordId, IntegerOutOfRange,
-    NormalizationAlias, NormalizationAst, NormalizationCompositeTarget, NormalizationNode,
-    NormalizationRootRecord, NormalizationSelection, NormalizationTarget, QueryArtifact,
-    RecordEntity, ResponseKey, RootEntities, SelectionMapErrorKind, TopLevelError,
+    EntrypointNotFetchableError, EntrypointQueryError, FieldSelectionMapError, FixedRecordId,
+    IntegerOutOfRange, NormalizationAlias, NormalizationAst, NormalizationCompositeTarget,
+    NormalizationNode, NormalizationRootRecord, NormalizationSelection, NormalizationTarget,
+    QueryArtifact, RecordEntity, ResponseKey, RootEntities, SelectionMapErrorKind, TopLevelError,
     field_selection_map, query_for_entrypoint,
 };
 use prelude::Postfix;
@@ -212,7 +212,7 @@ fn an_unpassed_variable_fails_the_query_and_an_unused_one_is_not_declared() {
     );
     assert!(matches!(
         error(&db, "Query", "UsesOpt"),
-        EntrypointQueryError::SelectionMap(error)
+        EntrypointQueryError::SelectionMap(FieldSelectionMapError::Located(error))
             if matches!(error.kind, SelectionMapErrorKind::MissingFieldArgument(_))
     ));
     let text = text(&db, "Query", "PassesNull");
@@ -287,14 +287,14 @@ fn a_broken_field_fails_only_the_queries_that_reach_it() {
         .replace("    nickname\n", "    nickname\n    nope\n");
     let before = demo(&[], &[], &[]);
     let after = demo(&[("src/PetStatsCard.ts", broken.as_str())], &[], &[]);
-    let EntrypointQueryError::SelectionMap(selection_map) =
+    let EntrypointQueryError::SelectionMap(FieldSelectionMapError::Located(selection_map)) =
         error(&after, "Query", "PetDetailRoute")
     else {
         unreachable!("the broken field is a selection map error")
     };
     assert_eq!(
         selection_map.location,
-        located("src/PetStatsCard.ts", broken.as_str(), "nope").wrap_some()
+        located("src/PetStatsCard.ts", broken.as_str(), "nope")
     );
     for (parent, field) in [
         ("Query", "HomeRoute"),
@@ -343,7 +343,7 @@ fn a_cycle_fails_its_query_without_panicking_and_other_queries_succeed() {
         assert!(
             matches!(
                 error(&db, "Query", field),
-                EntrypointQueryError::SelectionMap(error)
+                EntrypointQueryError::SelectionMap(FieldSelectionMapError::Located(error))
                     if matches!(error.kind, SelectionMapErrorKind::InlineCycle(_))
             ),
             "{field}"
@@ -371,7 +371,10 @@ fn walk_errors_reach_the_query() {
         )],
     );
     let kind = |parent: &str, field: &str| match error(&db, parent, field) {
-        EntrypointQueryError::SelectionMap(error) => error.kind.wrap_some(),
+        EntrypointQueryError::SelectionMap(FieldSelectionMapError::Located(error)) => {
+            error.kind.wrap_some()
+        }
+        EntrypointQueryError::SelectionMap(FieldSelectionMapError::FieldLookup(_)) => None,
         EntrypointQueryError::Lookup(_)
         | EntrypointQueryError::NotFetchable(_)
         | EntrypointQueryError::TopLevel(_)

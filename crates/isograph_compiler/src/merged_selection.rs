@@ -170,12 +170,21 @@ pub enum NonNullVariableType {
     List(Box<VariableType>),
 }
 
-/// Why a field's merged selection map could not be built: the error, and where it is.
+/// Why a field's merged selection map could not be built.
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum FieldSelectionMapError {
+    /// The lookup of the field itself failed: it has no one definition.
+    #[error("{}", .0.0.message)]
+    FieldLookup(Diagnostic),
+    #[error("{0}")]
+    Located(SelectionMapError),
+}
+
+/// An error of a field's merged selection map, and where it is.
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 #[error("{kind}")]
 pub struct SelectionMapError {
-    /// `None` when the error is the lookup of the field itself, which has no one definition.
-    pub location: Option<DefinitionLocation>,
+    pub location: DefinitionLocation,
     pub kind: SelectionMapErrorKind,
 }
 
@@ -658,18 +667,17 @@ pub fn source_field_declaration<TProfile: CompilationProfile>(
     client: ClientId,
     entity: EntityName,
     selectable: SelectableName,
-) -> Result<SourceFieldDeclaration<'_>, SelectionMapError> {
+) -> Result<SourceFieldDeclaration<'_>, FieldSelectionMapError> {
     let key = SelectableKey { entity, selectable };
     let found = selectable_named(db, client, entity, selectable)
         .as_ref()
-        .map_err(|diagnostic| SelectionMapError {
-            location: None,
-            kind: SelectionMapErrorKind::Lookup(diagnostic.clone()),
-        })?;
+        .map_err(|diagnostic| FieldSelectionMapError::FieldLookup(diagnostic.clone()))?;
     let definition = found.definition;
-    let error = |kind| SelectionMapError {
-        location: definition.wrap_some(),
-        kind,
+    let error = |kind| {
+        FieldSelectionMapError::Located(SelectionMapError {
+            location: definition,
+            kind,
+        })
     };
     match found.kind {
         SelectableKind::Server(_) => {
@@ -720,8 +728,7 @@ impl DeclarationContext<'_> {
             location: DefinitionLocation {
                 path: self.path,
                 span: error.location.with_offset(self.literal_start),
-            }
-            .wrap_some(),
+            },
             kind: error.item,
         }
     }
@@ -735,7 +742,7 @@ pub fn field_selection_map<TProfile: CompilationProfile>(
     client: ClientId,
     entity: EntityName,
     selectable: SelectableName,
-) -> Result<FieldSelectionMap, SelectionMapError> {
+) -> Result<FieldSelectionMap, FieldSelectionMapError> {
     let field = source_field_declaration(db, client, entity, selectable)?;
     let located = |error: WithSpan<SelectionMapErrorKind>| {
         DeclarationContext {
@@ -746,9 +753,9 @@ pub fn field_selection_map<TProfile: CompilationProfile>(
         .located(error)
     };
     if let Some(cycle) = inline_cycle(db, client, SelectableKey { entity, selectable }) {
-        return located(
+        return FieldSelectionMapError::Located(located(
             SelectionMapErrorKind::InlineCycle(cycle).with_span(field.declaration.name.location),
-        )
+        ))
         .wrap_err();
     }
     let variables = field_variables(db, client, entity, selectable).clone()?;
@@ -759,7 +766,8 @@ pub fn field_selection_map<TProfile: CompilationProfile>(
     };
     let selections = match field.declaration.selection_set.as_ref() {
         Some(selection_set) => {
-            merge_selection_set(db, client, context, entity, selection_set.item.reference())?
+            merge_selection_set(db, client, context, entity, selection_set.item.reference())
+                .map_err(FieldSelectionMapError::Located)?
         }
         None => MergedSelectionMap::empty(),
     };
@@ -777,15 +785,17 @@ pub fn field_variables<TProfile: CompilationProfile>(
     client: ClientId,
     entity: EntityName,
     selectable: SelectableName,
-) -> Result<Vec<FieldVariable>, SelectionMapError> {
+) -> Result<Vec<FieldVariable>, FieldSelectionMapError> {
     let field = source_field_declaration(db, client, entity, selectable)?;
     declared_variables(field.declaration).map_err(|error| {
-        DeclarationContext {
-            path: field.path,
-            literal_start: field.literal_start,
-            variables: &[],
-        }
-        .located(error)
+        FieldSelectionMapError::Located(
+            DeclarationContext {
+                path: field.path,
+                literal_start: field.literal_start,
+                variables: &[],
+            }
+            .located(error),
+        )
     })
 }
 
@@ -1157,7 +1167,13 @@ fn client_field_contribution<TProfile: CompilationProfile>(
 ) -> Result<MergedSelectionMap, SelectionMapError> {
     let field = field_selection_map(db, client, key.entity, key.selectable)
         .as_ref()
-        .map_err(Clone::clone)?;
+        .map_err(|error| match error {
+            FieldSelectionMapError::FieldLookup(diagnostic) => context.located(
+                SelectionMapErrorKind::Lookup(diagnostic.clone())
+                    .with_span(selection.name.location),
+            ),
+            FieldSelectionMapError::Located(error) => error.clone(),
+        })?;
     if let Some(unknown) = undeclared_argument(
         context,
         key,

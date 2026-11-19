@@ -14,7 +14,7 @@ use pico_macros::memo;
 use prelude::Postfix;
 
 use crate::merged_selection::{
-    Condition, DeclarationContext, MergedArgument, SelectionMapError, field_variables,
+    Condition, DeclarationContext, FieldSelectionMapError, MergedArgument, field_variables,
     merged_arguments, source_field_declaration, undeclared_argument,
 };
 use crate::normalization_ast::{
@@ -155,7 +155,7 @@ pub enum GenerationError {
     #[error("The declaration of `{}.{}` did not parse completely.", .0.parent_entity_name, .0.selectable_name)]
     IncompleteParse(EntityNameAndSelectableName),
     #[error("{0}")]
-    SelectionMap(SelectionMapError),
+    SelectionMap(FieldSelectionMapError),
     #[error("{0}")]
     IntegerOutOfRange(IntegerOutOfRange),
     #[error("`{}.{}` has no entity to select into.", .0.entity, .0.selectable)]
@@ -488,7 +488,7 @@ fn reader_arguments(
     selection: &Selection,
 ) -> Result<NormalizationArguments, GenerationError> {
     let arguments = merged_arguments(context.declaration, selection.arguments.as_ref())
-        .map_err(GenerationError::SelectionMap)?;
+        .map_err(|error| GenerationError::SelectionMap(FieldSelectionMapError::Located(error)))?;
     normalization_arguments(arguments.merged.reference())
         .map_err(GenerationError::IntegerOutOfRange)
 }
@@ -504,7 +504,7 @@ fn resolver_arguments<TProfile: CompilationProfile>(
     selection: &Selection,
 ) -> Result<NormalizationArguments, GenerationError> {
     let arguments = merged_arguments(context.declaration, selection.arguments.as_ref())
-        .map_err(GenerationError::SelectionMap)?;
+        .map_err(|error| GenerationError::SelectionMap(FieldSelectionMapError::Located(error)))?;
     let variables = field_variables(
         db,
         client,
@@ -522,7 +522,7 @@ fn resolver_arguments<TProfile: CompilationProfile>(
         arguments.reference(),
         variables.as_slice(),
     ) {
-        return GenerationError::SelectionMap(unknown).wrap_err();
+        return GenerationError::SelectionMap(FieldSelectionMapError::Located(unknown)).wrap_err();
     }
     let defaults = variables.iter().filter_map(|variable| {
         variable

@@ -3,7 +3,7 @@ use pico_macros::memo;
 use prelude::Postfix;
 
 use crate::merged_selection::{
-    CompletedSelectionMap, FieldSelectionMap, FieldVariable, SelectionMapError, TopLevelError,
+    CompletedSelectionMap, FieldSelectionMap, FieldSelectionMapError, FieldVariable, TopLevelError,
     field_selection_map,
 };
 use crate::normalization_ast::{IntegerOutOfRange, NormalizationAst, normalization_ast};
@@ -47,7 +47,7 @@ pub enum EntrypointQueryError<TNotFetchable: std::fmt::Display> {
     #[error("{0}")]
     NotFetchable(EntrypointNotFetchableError<TNotFetchable>),
     #[error("{0}")]
-    SelectionMap(SelectionMapError),
+    SelectionMap(FieldSelectionMapError),
     #[error("{0}")]
     TopLevel(TopLevelError),
     #[error("{0}")]

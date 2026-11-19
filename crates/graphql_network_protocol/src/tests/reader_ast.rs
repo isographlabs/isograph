@@ -4,11 +4,11 @@ use common_lang_types::{EntityNameAndSelectableName, SelectionName};
 use intern::string_key::Intern;
 use isograph_compiler::{
     ArtifactInnerType, ArtifactObjectField, ArtifactObjectType, ArtifactSource, Condition,
-    FieldTypes, GenerationError, LinkType, NormalizationArgument, NormalizationArguments,
-    NormalizationObjectEntry, NormalizationValue, ReaderLinkedSelection, ReaderRefinementSelection,
-    ReaderResolverSelection, ReaderScalarSelection, ReaderSelection, ReaderSelectionSet,
-    SelectionMapErrorKind, UnionWrapper, UnknownFieldArgument, Wrapper, WrapperVariant,
-    artifact_sources_in_file, field_types, project_artifacts,
+    FieldSelectionMapError, FieldTypes, GenerationError, LinkType, NormalizationArgument,
+    NormalizationArguments, NormalizationObjectEntry, NormalizationValue, ReaderLinkedSelection,
+    ReaderRefinementSelection, ReaderResolverSelection, ReaderScalarSelection, ReaderSelection,
+    ReaderSelectionSet, SelectionMapErrorKind, UnionWrapper, UnknownFieldArgument, Wrapper,
+    WrapperVariant, artifact_sources_in_file, field_types, project_artifacts,
 };
 use prelude::Postfix;
 
@@ -408,17 +408,17 @@ fn malformed_arguments_are_errors() {
     ));
     assert!(matches!(
         error(&db, "Query", "UndefinedVariable"),
-        GenerationError::SelectionMap(error)
+        GenerationError::SelectionMap(FieldSelectionMapError::Located(error))
             if error.kind == SelectionMapErrorKind::UndefinedVariable("nope".intern().to())
     ));
     assert!(matches!(
         error(&db, "Pet", "PassesQ"),
-        GenerationError::SelectionMap(error)
+        GenerationError::SelectionMap(FieldSelectionMapError::Located(error))
             if matches!(
                 error.kind.reference(),
                 SelectionMapErrorKind::UnknownFieldArgument(UnknownFieldArgument { field, argument })
                     if field.selectable == selectable("X")
-                        && argument.dereference() == "q".intern().to::<common_lang_types::ArgumentName>()
+                        && argument.reference() == "q".intern().to::<common_lang_types::ArgumentName>().reference()
             )
     ));
     assert!(matches!(
