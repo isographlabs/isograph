@@ -73,7 +73,7 @@ pub(crate) struct InternalStorage<Db: Database> {
 
     pub(crate) derived_nodes: BoxcarVec<DerivedNode<Db>>,
     pub(crate) derived_node_dependencies: BoxcarVec<Vec<Dependency>>,
-    pub(crate) source_nodes: BoxcarVec<Option<SourceNode>>,
+    pub(crate) source_nodes: BoxcarVec<SourceNode>,
     pub(crate) params: BoxcarVec<Box<dyn Any>>,
     pub(crate) current_epoch: Epoch,
 }
@@ -132,23 +132,21 @@ impl<Db: Database> Storage<Db> {
     }
 
     fn get_impl<T: 'static>(&self, key: Key) -> Option<&T> {
-        let source_node = self.internal.get_source_node(key)?;
+        // A read of a missing key inserts an absent node, so that a memoized function
+        // that reads the key depends on it, and a later set of the key is a change.
+        let source_node = self.internal.get_or_insert_absent_source_node(key);
 
         self.register_dependency_in_parent_memoized_fn(
             NodeKind::Source(key),
             source_node.time_updated,
         );
-        Some(
-            source_node
-                .value
+        source_node.value.as_ref().map(|value| {
+            value
                 .as_ref()
                 .as_any()
                 .downcast_ref::<T>()
-                .expect(
-                    "unexpected struct type. \
-            This is indicative of a bug in Pico.",
-                ),
-        )
+                .expect("unexpected struct type. This is indicative of a bug in Pico.")
+        })
     }
 
     /// As long as a memoized function is not currently being invoked
@@ -307,43 +305,56 @@ impl<Db: Database> InternalStorage<Db> {
 
     pub fn get_source_node(&self, key: Key) -> Option<&SourceNode> {
         let index = self.source_node_key_to_index.get(&key)?;
+        Some(
+            self.source_nodes
+                .get(index.idx)
+                .expect("indexes should always be valid. This is indicative of a bug in Pico."),
+        )
+    }
+
+    pub(crate) fn get_or_insert_absent_source_node(&self, key: Key) -> &SourceNode {
+        let idx = self
+            .source_node_key_to_index
+            .entry(key)
+            .or_insert_with(|| {
+                self.insert_source_node(SourceNode {
+                    time_updated: self.current_epoch,
+                    value: None,
+                })
+            })
+            .idx;
         self.source_nodes
-            .get(index.idx)
-            .expect(
-                "indexes should always be valid. \
-                This is indicative of a bug in Pico.",
-            )
-            .as_ref()
+            .get(idx)
+            .expect("indexes should always be valid. This is indicative of a bug in Pico.")
     }
 
     pub(crate) fn insert_source_node(&self, source_node: SourceNode) -> Index<SourceNode> {
-        Index::new(self.source_nodes.push(Some(source_node)))
+        Index::new(self.source_nodes.push(source_node))
     }
 
-    /// Sets a source in the database. If there is an existing item and it does not equal
-    /// the new source, increment the current epoch.
+    /// Sets a source in the database. If the key has an absent node, or a source that
+    /// does not equal the new source, increment the current epoch.
+    ///
+    /// A key with no node has never been read, so no memoized function depends on it,
+    /// and inserting it does not increment the epoch.
     fn set_source<T: DynEq>(&mut self, source: T, source_id: SourceId<T>) {
         match self.source_node_key_to_index.entry(source_id.key) {
             Entry::Occupied(occupied_entry) => {
                 let source_node = self
                     .source_nodes
                     .get_mut(occupied_entry.get().idx)
-                    .expect(
-                        "indexes should always be valid. \
-                        This is indicative of a bug in Pico.",
-                    )
-                    .as_mut()
-                    .expect(
-                        "indexes should always point to a non-empty source node. \
-                        This is indicative of a bug in Pico.",
-                    );
-                if !source_node.value.as_ref().dyn_eq(&source) {
+                    .expect("indexes should always be valid. This is indicative of a bug in Pico.");
+                if !source_node
+                    .value
+                    .as_deref()
+                    .is_some_and(|value| value.dyn_eq(&source))
+                {
                     // We cannot call self.increment_epoch() because that borrows
                     // the entire struct, but self.source_nodes is already borrowed
                     let next_epoch = self.current_epoch.increment();
                     *source_node = SourceNode {
                         time_updated: next_epoch,
-                        value: Box::new(source),
+                        value: Some(Box::new(source)),
                     };
                 } else {
                     source_node.time_updated = self.current_epoch;
@@ -352,23 +363,23 @@ impl<Db: Database> InternalStorage<Db> {
             Entry::Vacant(vacant_entry) => {
                 let index = self.insert_source_node(SourceNode {
                     time_updated: self.current_epoch,
-                    value: Box::new(source),
+                    value: Some(Box::new(source)),
                 });
                 vacant_entry.insert(index);
             }
         }
     }
 
+    /// Removes a source from the database. The key keeps its node, which becomes absent.
     pub fn remove_source<T>(&mut self, id: SourceId<T>) {
-        if let Some((_, index)) = self.source_node_key_to_index.remove(&id.key) {
-            self.current_epoch.increment();
-            self.source_nodes
+        if let Some(index) = self.source_node_key_to_index.get(&id.key) {
+            let source_node = self
+                .source_nodes
                 .get_mut(index.idx)
-                .expect(
-                    "indexes should always be valid. \
-                    This is indicative of a bug in Pico.",
-                )
-                .take();
+                .expect("indexes should always be valid. This is indicative of a bug in Pico.");
+            if source_node.value.take().is_some() {
+                source_node.time_updated = self.current_epoch.increment();
+            }
         }
     }
 }
