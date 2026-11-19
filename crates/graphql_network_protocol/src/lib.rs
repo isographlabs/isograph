@@ -16,10 +16,7 @@ use isograph_compiler::{
 };
 use prelude::Postfix;
 
-pub use fetch_plan::{
-    FetchRefinement, GraphQLFetchArgument, GraphQLFetchPlan, GraphQLNodeFetch, GraphQLNotFetchable,
-    GraphQLRootFetch, NodeFieldError, NodeFieldTypeMismatch, graphql_fetch_plan,
-};
+pub use fetch_plan::{GraphQLFetchPlan, GraphQLNotFetchable, graphql_fetch_plan};
 use protocol_data::union_members;
 pub use protocol_data::{
     DuplicateInputField, GraphQLCompositeData, GraphQLEntityData, GraphQLSelectableData,
