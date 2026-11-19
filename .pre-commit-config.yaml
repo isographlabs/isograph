@@ -22,12 +22,14 @@ repos:
         language: system
         types: [rust]
         pass_filenames: false
+      # cargo-clippy and cargo-test read the commit range themselves, deletions
+      # included, so they run on every commit and pick the crates to check.
       - id: cargo-clippy
         name: cargo clippy
-        entry: cargo clippy --workspace --all-targets -- -D warnings
+        entry: ./scripts/cargo-affected.sh clippy --all-targets -- -D warnings
         language: system
-        types: [rust]
         pass_filenames: false
+        always_run: true
       # Clippy cannot ban Ok/Err/Some constructors; this is the enforcement.
       - id: postfix-constructors
         name: postfix constructors
@@ -47,10 +49,10 @@ repos:
         pass_filenames: false
       - id: cargo-test
         name: cargo test
-        entry: cargo test
+        entry: ./scripts/cargo-affected.sh test
         language: system
-        types: [rust]
         pass_filenames: false
+        always_run: true
       - id: swc-plugin-fmt
         name: swc plugin cargo fmt
         entry: cargo fmt --manifest-path crates/swc_isograph_plugin/Cargo.toml -- --check
