@@ -107,6 +107,9 @@ fn dispatch_lsp_request<THostLanguage: HostLanguage>(
             .on_request_sync::<lsp_types::request::WillSaveWaitUntil>(
                 crate::adapter::will_save_wait_until_response::<THostLanguage>,
             )?
+            .on_request_sync::<lsp_types::request::HoverRequest>(
+                crate::adapter::hover_response::<THostLanguage>,
+            )?
             .request();
         ControlFlow::Continue(request)
     };
@@ -567,7 +570,7 @@ mod tests {
             lsp_request(
                 client,
                 id.clone(),
-                "textDocument/hover",
+                "textDocument/definition",
                 serde_json::json!({}),
             ),
         );
@@ -596,7 +599,7 @@ mod tests {
         assert_eq!(error.code, lsp_server::ErrorCode::MethodNotFound as i32);
         assert_eq!(
             error.message,
-            "No handler registered for method 'textDocument/hover'"
+            "No handler registered for method 'textDocument/definition'"
         );
         assert!(
             state
@@ -1521,6 +1524,260 @@ mod tests {
             semantic_tokens(&mut state, &one, HOME_URI),
             Vec::new().wrap_some()
         );
+    }
+
+    fn hover_params(uri: &str, line: u32, character: u32) -> serde_json::Value {
+        serde_json::json!({
+            "textDocument": { "uri": uri },
+            "position": { "line": line, "character": character }
+        })
+    }
+
+    /// The Markdown text of the hover at `line:character`, or `None` for a `null` result.
+    fn hover_text(
+        state: &mut IsographState<TypeScriptHostLanguage>,
+        client: &TestClient,
+        uri: &str,
+        line: u32,
+        character: u32,
+    ) -> Option<String> {
+        let result = request_result(
+            state,
+            client,
+            lsp_types::request::HoverRequest::METHOD,
+            hover_params(uri, line, character),
+        );
+        serde_json::from_value::<Option<lsp_types::Hover>>(result)
+            .expect("hover returns Hover | null")
+            .map(|hover| match hover.contents {
+                lsp_types::HoverContents::Markup(markup) => markup.value,
+                contents => panic!("expected markup contents, got {contents:?}"),
+            })
+    }
+
+    /// The UTF-16 column of the first `needle` in the one-line `line`.
+    fn column(line: &str, needle: &str) -> u32 {
+        let byte = line.find(needle).expect("the fixture contains the needle");
+        line[..byte].encode_utf16().count() as u32
+    }
+
+    /// Client 1's hover at `line:character` of `src/x.ts` on disk as `text`.
+    fn hover_on_disk(text: &str, line: u32, character: u32) -> Option<String> {
+        let mut state = with_config();
+        disk_changed(&mut state, "/tmp/proj/src/x.ts", text);
+        let one = live_client(&mut state, ClientId(1));
+        hover_text(&mut state, &one, X_URI, line, character)
+    }
+
+    fn some(text: &str) -> Option<String> {
+        text.to_owned().wrap_some()
+    }
+
+    #[test]
+    fn hover_names_the_leaf_under_each_char_of_an_entrypoint() {
+        let mut state = with_disk_home();
+        let one = live_client(&mut state, ClientId(1));
+        let mut hover =
+            |needle: &str| hover_text(&mut state, &one, HOME_URI, 0, column(HOME_DISK, needle));
+        assert_eq!(hover("Query"), some("EntityNameWrapper"));
+        assert_eq!(hover("HomeRoute"), some("SelectableNameWrapper"));
+        assert_eq!(hover("entrypoint"), some("EntrypointDeclaration"));
+        assert_eq!(hover("."), some("EntrypointDeclaration"));
+    }
+
+    #[test]
+    fn hover_outside_the_interior_is_null() {
+        let mut state = with_disk_home();
+        let one = live_client(&mut state, ClientId(1));
+        let opening = column(HOME_DISK, "`");
+        let closing = HOME_DISK
+            .rfind('`')
+            .expect("the fixture has a closing backtick") as u32;
+        assert_eq!(hover_text(&mut state, &one, HOME_URI, 0, 1), None);
+        assert_eq!(
+            hover_text(&mut state, &one, HOME_URI, 0, column(HOME_DISK, "iso(")),
+            None
+        );
+        assert_eq!(hover_text(&mut state, &one, HOME_URI, 0, opening), None);
+        assert!(hover_text(&mut state, &one, HOME_URI, 0, opening + 1).is_some());
+        assert_eq!(hover_text(&mut state, &one, HOME_URI, 0, closing), None);
+    }
+
+    #[test]
+    fn hover_contents_are_markdown() {
+        let mut state = with_disk_home();
+        let one = live_client(&mut state, ClientId(1));
+        let result = request_result(
+            &mut state,
+            &one,
+            lsp_types::request::HoverRequest::METHOD,
+            hover_params(HOME_URI, 0, column(HOME_DISK, "Query")),
+        );
+        assert_eq!(result["contents"]["kind"], serde_json::json!("markdown"));
+        assert_eq!(
+            result["contents"]["value"],
+            serde_json::json!("EntityNameWrapper")
+        );
+    }
+
+    #[test]
+    fn hover_reads_the_clients_buffer_and_disk_after_did_close() {
+        let mut state = with_disk_home();
+        let one = live_client(&mut state, ClientId(1));
+        let two = live_client(&mut state, ClientId(2));
+        handle(&mut state, did_open(one.client, HOME_URI, FIELD_X));
+        let id = column(FIELD_X, "id");
+        assert_eq!(
+            hover_text(&mut state, &one, HOME_URI, 0, id),
+            some("SelectionNameWrapper")
+        );
+        assert_eq!(hover_text(&mut state, &two, HOME_URI, 0, id), None);
+        let disk_query = column(HOME_DISK, "Query");
+        assert_eq!(
+            hover_text(&mut state, &two, HOME_URI, 0, disk_query),
+            some("EntityNameWrapper")
+        );
+        assert_eq!(hover_text(&mut state, &one, HOME_URI, 0, disk_query), None);
+        handle(&mut state, did_close(one.client, HOME_URI));
+        assert_eq!(hover_text(&mut state, &one, HOME_URI, 0, id), None);
+        assert_eq!(
+            hover_text(&mut state, &one, HOME_URI, 0, disk_query),
+            some("EntityNameWrapper")
+        );
+    }
+
+    #[test]
+    fn hover_after_did_change_reads_the_changed_buffer() {
+        let mut state = with_disk_home();
+        let one = live_client(&mut state, ClientId(1));
+        handle(&mut state, did_open(one.client, HOME_URI, FIELD_X));
+        let character = column(FIELD_X, "x{");
+        assert_eq!(
+            hover_text(&mut state, &one, HOME_URI, 0, character),
+            some("SelectableNameWrapper")
+        );
+        handle(
+            &mut state,
+            did_change(
+                one.client,
+                HOME_URI,
+                serde_json::json!([{ "text": ENTRYPOINT_A }]),
+            ),
+        );
+        assert_eq!(
+            hover_text(&mut state, &one, HOME_URI, 0, character),
+            some("EntityNameWrapper")
+        );
+    }
+
+    #[test]
+    fn hover_in_two_literals_on_two_lines_resolves_in_each() {
+        let text = format!("{ENTRYPOINT_A}\n{FIELD_X}");
+        assert_eq!(
+            hover_on_disk(&text, 0, column(ENTRYPOINT_A, "Query")),
+            some("EntityNameWrapper")
+        );
+        assert_eq!(
+            hover_on_disk(&text, 1, column(FIELD_X, "id")),
+            some("SelectionNameWrapper")
+        );
+    }
+
+    #[test]
+    fn hover_in_two_literals_on_one_line_resolves_in_each() {
+        let text = format!("{ENTRYPOINT_A} {FIELD_X}");
+        assert_eq!(
+            hover_on_disk(&text, 0, column(&text, "Query.A")),
+            some("EntityNameWrapper")
+        );
+        assert_eq!(
+            hover_on_disk(&text, 0, column(&text, "id")),
+            some("SelectionNameWrapper")
+        );
+        assert_eq!(hover_on_disk(&text, 0, column(&text, ") iso")), None);
+    }
+
+    #[test]
+    fn hover_in_an_empty_or_whitespace_only_literal_is_null() {
+        assert_eq!(hover_on_disk("iso(``)", 0, 4), None);
+        assert_eq!(hover_on_disk("iso(``)", 0, 5), None);
+        assert_eq!(hover_on_disk("iso(`  `)", 0, 5), None);
+        assert_eq!(hover_on_disk("iso(`  `)", 0, 6), None);
+    }
+
+    #[test]
+    fn hover_after_wide_chars_uses_utf16_columns() {
+        for prefix in ["const s = \"😀\"; ", "const s = \"é\"; "] {
+            let text = format!("{prefix}{ENTRYPOINT_A}");
+            assert_eq!(
+                hover_on_disk(&text, 0, column(&text, "Query")),
+                some("EntityNameWrapper"),
+                "after {prefix:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn hover_after_crlf_and_cr_is_on_the_next_line() {
+        for line_break in ["\r\n", "\r"] {
+            let text = format!("const x = 1;{line_break}{ENTRYPOINT_A}");
+            assert_eq!(
+                hover_on_disk(&text, 1, column(ENTRYPOINT_A, "Query")),
+                some("EntityNameWrapper"),
+                "after {line_break:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn hover_on_an_unknown_keyword_is_the_slot() {
+        let text = "iso(`fieldd Query.foo`)";
+        assert_eq!(
+            hover_on_disk(text, 0, column(text, "fieldd")),
+            some("IsoLiteralSlot")
+        );
+    }
+
+    #[test]
+    fn hover_past_the_line_end_or_the_last_line_is_null() {
+        let mut state = with_disk_home();
+        let one = live_client(&mut state, ClientId(1));
+        let end = HOME_DISK.len() as u32;
+        assert_eq!(hover_text(&mut state, &one, HOME_URI, 0, end), None);
+        assert_eq!(hover_text(&mut state, &one, HOME_URI, 0, end + 1), None);
+        assert_eq!(hover_text(&mut state, &one, HOME_URI, 1, 0), None);
+    }
+
+    #[test]
+    fn hover_of_a_path_without_text_is_null() {
+        let mut state = with_config();
+        let one = live_client(&mut state, ClientId(1));
+        assert_eq!(hover_text(&mut state, &one, HOME_URI, 0, 0), None);
+    }
+
+    #[test]
+    fn hover_of_a_non_file_uri_is_null() {
+        let mut state = with_disk_home();
+        let one = live_client(&mut state, ClientId(1));
+        assert_eq!(
+            hover_text(&mut state, &one, "untitled:Untitled-1", 0, 0),
+            None
+        );
+    }
+
+    #[test]
+    fn hover_from_a_client_that_never_started_returns_no_effects() {
+        let mut state = with_disk_home();
+        let effects = handle(
+            &mut state,
+            lsp_request(
+                ClientId(1),
+                lsp_server::RequestId::from(1),
+                lsp_types::request::HoverRequest::METHOD,
+                hover_params(HOME_URI, 0, column(HOME_DISK, "Query")),
+            ),
+        );
+        assert!(effects.is_empty());
     }
 
     #[test]

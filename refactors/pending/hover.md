@@ -449,7 +449,7 @@ The `isograph_extract_typescript` memo tests that call `literal_id_at_location` 
 - A hover from a client that never started returns no effects.
 - The result's `contents.kind` is `markdown`.
 
-`lsp_request_returns_method_not_found` uses `textDocument/definition`, which stays unregistered. `lsp_socket.rs`'s initialize capabilities test asserts `hoverProvider` is `true`.
+`lsp_request_returns_method_not_found` uses `textDocument/definition`, which stays unregistered. So do the `lsp_socket.rs` tests that expect `MethodNotFound` (`unknown_request_after_initialize_is_method_not_found_then_hello_world`, `unknown_request_is_still_method_not_found`, and `dropping_one_connection_leaves_the_other_able_to_hover`, renamed `dropping_one_connection_leaves_the_other_answered`). `lsp_socket.rs`'s initialize capabilities test asserts `hoverProvider` is `true`.
 
 Every `handle` test that reads a client's buffer sends that client's didOpen before its first read of the path, so `file_contents` has a dependency on the open-file map (pico.md, Keyed reads depend on their key).
 

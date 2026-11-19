@@ -40,6 +40,16 @@ pub(crate) fn semantic_tokens_response<THostLanguage: HostLanguage>(
         .wrap_ok()
 }
 
+pub(crate) fn hover_response<THostLanguage: HostLanguage>(
+    db: &IsographDb<THostLanguage>,
+    client: ClientId,
+    params: lsp_types::HoverParams,
+) -> LSPRuntimeResult<<lsp_types::request::HoverRequest as lsp_types::request::Request>::Result> {
+    let position = params.text_document_position_params;
+    let path = relative_from_uri(db, position.text_document.uri.reference()).map_err(lsp_error)?;
+    isograph_lsp::hover_for_position(db, client, path, position.position).wrap_ok()
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
 pub(crate) enum DidChangeError {
     #[error("didChange carried {0} content changes; full document sync sends exactly one")]
