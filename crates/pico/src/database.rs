@@ -23,6 +23,10 @@ pub trait DatabaseDyn {
 pub trait Database: DatabaseDyn + Sized {
     fn get_storage(&self) -> &Storage<Self>;
     fn get<T: 'static>(&self, id: SourceId<T>) -> &T;
+    /// Records a dependency on this source ID even when the source is absent.
+    fn try_get<T: 'static>(&self, id: SourceId<T>) -> Option<&T> {
+        self.get_storage().try_get(id)
+    }
     /// Because `T` is a `Singleton`, unlike `get` this does not require `id: SourceId<T>`
     fn get_singleton<T: 'static + Singleton>(&self) -> Option<&T>;
     fn intern_value<T: Clone + Hash + DynEq + 'static>(&self, value: T) -> MemoRef<T>;
@@ -120,17 +124,18 @@ impl<Db: Database> Storage<Db> {
     }
 
     pub fn get<T: 'static>(&self, id: SourceId<T>) -> &T {
-        self.get_impl(id.key).expect(
+        self.try_get(id).expect(
             "Source node not found in database. SourceId should not be used \
             after the corresponding source node is removed.",
         )
     }
 
     pub fn get_singleton<T: 'static + Singleton>(&self) -> Option<&T> {
-        self.get_impl(T::get_singleton_key())
+        self.try_get(T::get_singleton_key().into())
     }
 
-    fn get_impl<T: 'static>(&self, key: Key) -> Option<&T> {
+    pub fn try_get<T: 'static>(&self, id: SourceId<T>) -> Option<&T> {
+        let key = id.key;
         let (value, time_updated) = self.internal.source_value_and_epoch(key);
         self.register_dependency_in_parent_memoized_fn(NodeKind::Source(key), time_updated);
         value.map(|value| {

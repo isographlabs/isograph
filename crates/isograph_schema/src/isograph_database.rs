@@ -23,8 +23,6 @@ pub struct IsographDatabase<TCompilationProfile: CompilationProfile> {
     iso_literal_map: IsoLiteralMap,
     #[tracked]
     standard_sources: StandardSources,
-    #[tracked]
-    open_file_map: OpenFileMap,
     phantom_data: PhantomData<TCompilationProfile>,
 }
 
@@ -46,9 +44,6 @@ pub struct IsoLiteralsSource {
     pub relative_path: RelativePathToSourceFile,
     pub content: String,
 }
-
-#[derive(Debug, Default)]
-pub struct OpenFileMap(pub HashMap<RelativePathToSourceFile, SourceId<OpenFileSource>>);
 
 #[derive(Debug, Clone, PartialEq, Eq, Source)]
 pub struct OpenFileSource {
@@ -86,14 +81,8 @@ impl<TCompilationProfile: CompilationProfile> IsographDatabase<TCompilationProfi
         self.get(self.standard_sources.schema_source_id)
     }
 
-    pub fn get_open_file(
-        &self,
-        file: RelativePathToSourceFile,
-    ) -> Option<SourceId<OpenFileSource>> {
-        // TODO this really should be untracked, or at minimum,
-        // untracked (if the value is Some), and tracked (otherwise).
-        // See [this issue](https://github.com/isographlabs/isograph/issues/787)
-        self.get_open_file_map().tracked().0.get(&file).cloned()
+    pub fn get_open_file(&self, file: RelativePathToSourceFile) -> Option<&OpenFileSource> {
+        self.try_get(OpenFileSource::id_for_key(&file))
     }
 
     pub fn remove_schema_extension(
@@ -155,23 +144,14 @@ impl<TCompilationProfile: CompilationProfile> IsographDatabase<TCompilationProfi
     }
 
     pub fn insert_open_file(&mut self, relative_path: RelativePathToSourceFile, content: String) {
-        let source_id = self.set(OpenFileSource {
+        self.set(OpenFileSource {
             relative_path,
             content,
         });
-        self.get_open_file_map_mut()
-            .tracked()
-            .0
-            .insert(relative_path, source_id);
     }
 
-    pub fn remove_open_file(&mut self, relative_path: RelativePathToSourceFile) -> bool {
-        self.get_open_file_map_mut()
-            .tracked()
-            .0
-            .remove(&relative_path)
-            .map(|source_id| self.remove(source_id))
-            .is_some()
+    pub fn remove_open_file(&mut self, relative_path: RelativePathToSourceFile) {
+        self.remove(OpenFileSource::id_for_key(&relative_path));
     }
 
     pub fn print_location_fn<'a>(&'a self, color: bool) -> PrintLocationFn<'a> {
@@ -259,8 +239,8 @@ fn file_text_at_location<TCompilationProfile: CompilationProfile>(
     // TODO do something smarter
 
     // First, check if its open
-    if let Some(text) = db.get_open_file(relative_path) {
-        return db.get(text).content.clone().wrap_some();
+    if let Some(open_file) = db.get_open_file(relative_path) {
+        return open_file.content.clone().wrap_some();
     }
 
     // Check if it's an iso literal
