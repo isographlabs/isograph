@@ -84,12 +84,12 @@ A plain function: `IsographResolutionNode<'db>` borrows the parse stored in `par
 
 ```rust
 // from crates/isograph_lsp/src/hover.rs
-fn ast_at_lsp_position<'db, THostLanguage: HostLanguage>(
-    db: &'db IsographDb<THostLanguage>,
+fn ast_at_lsp_position<THostLanguage: HostLanguage>(
+    db: &IsographDb<THostLanguage>,
     client: ClientId,
     path: RelativePathToSourceFile,
     position: lsp_types::Position,
-) -> Option<(&'db ParsedIsoLiteral, Span)> {
+) -> Option<(&ParsedIsoLiteral, Span)> {
     let (literal_id, cursor) = iso_literal_at_lsp_position(db, client, path, position)?;
     (parsed_iso_literal_by_id(db, literal_id)?, cursor).wrap_some()
 }

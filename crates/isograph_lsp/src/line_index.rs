@@ -133,6 +133,15 @@ pub fn line_index<THostLanguage: HostLanguage>(
     LineIndex::new(contents).wrap_some()
 }
 
+pub(crate) fn byte_offset_at_lsp_position<THostLanguage: HostLanguage>(
+    db: &IsographDb<THostLanguage>,
+    client: ClientId,
+    path: RelativePathToSourceFile,
+    position: lsp_types::Position,
+) -> Option<u32> {
+    line_index(db, client, path).as_ref()?.byte_offset(position)
+}
+
 /// `\n`, `\r`, and `\r\n` (one break). Same set as `IsographLangTokenKind::LineBreak`.
 fn line_breaks(text: &str) -> Vec<LineBreak> {
     let bytes = text.as_bytes();
