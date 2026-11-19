@@ -995,6 +995,7 @@ dependencies = [
  "common_lang_types",
  "intern",
  "isograph_parser",
+ "nonempty",
  "pico",
  "pico_macros",
  "prelude",

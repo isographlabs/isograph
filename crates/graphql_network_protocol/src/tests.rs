@@ -1110,3 +1110,267 @@ fn an_input_field_defined_twice_is_an_error() {
         Err(GraphQLSelectableLookupError::DuplicateInputField(_))
     ));
 }
+
+mod field_types {
+    use common_lang_types::{EntityNameAndSelectableName, SelectionName};
+    use intern::string_key::Intern;
+    use isograph_compiler::{
+        ArtifactInnerType, ArtifactInputType, ArtifactObjectField, ArtifactObjectType, FieldTypes,
+        FileMembership, GenerationError, IncludeFile, Loadability, ScalarKind, ScalarValueKind,
+        SelectedClientField, UnionWrapper, Wrapper, WrapperVariant, field_types,
+    };
+    use prelude::Postfix;
+
+    use super::{CLIENT, Db, db_with, entity, path, selectable};
+
+    const SOURCE_FILE: FileMembership = FileMembership {
+        source_file: IncludeFile::Include,
+        schema_file: IncludeFile::Skip,
+    };
+
+    const SCHEMA: &str = "scalar String scalar ID scalar Int \
+        type Pet { \"The pet's ID\" id: ID! firstName: String! nickname: String \
+        friends: [Pet!]! checkins(limit: Int): [Pet!]! } \
+        input Filter { and: [Filter!] name: String }";
+
+    /// A database with `SCHEMA` and one source file whose literals are `literals`, each exported
+    /// and called with a resolver.
+    fn db_with_literals(literals: &[&str]) -> Db {
+        let mut db = db_with(&[("schema.graphql", SCHEMA)]);
+        let text = literals
+            .iter()
+            .enumerate()
+            .map(|(index, literal)| {
+                format!("export const f{index} = iso(`{literal}`)(() => null);\n")
+            })
+            .collect::<String>();
+        db.insert_disk_file(path("src/a.ts"), SOURCE_FILE, text);
+        db
+    }
+
+    fn named(parent: &str, field: &str) -> EntityNameAndSelectableName {
+        EntityNameAndSelectableName {
+            parent_entity_name: entity(parent),
+            selectable_name: selectable(field),
+        }
+    }
+
+    fn types(db: &Db, parent: &str, field: &str) -> Result<FieldTypes, GenerationError> {
+        field_types(db, CLIENT, named(parent, field)).clone()
+    }
+
+    fn key(name: &str) -> SelectionName {
+        name.intern().to()
+    }
+
+    fn string() -> ArtifactInnerType {
+        ArtifactInnerType::Scalar(ScalarKind::Known(ScalarValueKind::String))
+    }
+
+    fn nullable<T>(variant: WrapperVariant<T>) -> Wrapper<T> {
+        Wrapper::Union(UnionWrapper(vec![variant, WrapperVariant::Null]))
+    }
+
+    fn data_field<'a>(object: &'a ArtifactObjectType, name: &str) -> &'a ArtifactObjectField {
+        object
+            .0
+            .iter()
+            .find(|field| field.key == key(name))
+            .expect("the fixture selects this key")
+    }
+
+    #[test]
+    fn server_fields_keep_their_wrappers() {
+        let db = db_with_literals(&["field Pet.f { firstName, nickname, friends { firstName } }"]);
+        let data = types(&db, "Pet", "f").expect("the fixture is valid").data;
+        assert_eq!(
+            data_field(&data, "firstName").type_,
+            Wrapper::Inner(string())
+        );
+        assert_eq!(
+            data_field(&data, "nickname").type_,
+            nullable(WrapperVariant::Inner(string()))
+        );
+        assert_eq!(
+            data_field(&data, "friends").type_,
+            Wrapper::List(
+                Wrapper::Inner(ArtifactInnerType::Object(ArtifactObjectType(
+                    ArtifactObjectField {
+                        key: key("firstName"),
+                        description: None,
+                        type_: Wrapper::Inner(string()),
+                    }
+                    .wrap_vec()
+                )))
+                .boxed()
+            )
+        );
+    }
+
+    #[test]
+    fn keys_are_aliases_in_selection_order_with_descriptions() {
+        let db = db_with_literals(&["field Pet.f { n: nickname, id }"]);
+        let data = types(&db, "Pet", "f").expect("the fixture is valid").data;
+        assert_eq!(
+            data.0.iter().map(|field| field.key).collect::<Vec<_>>(),
+            vec![key("n"), key("id")]
+        );
+        assert_eq!(
+            data_field(&data, "id").description,
+            "The pet's ID"
+                .intern()
+                .to::<common_lang_types::DescriptionValue>()
+                .wrap_some()
+        );
+        assert_eq!(data_field(&data, "n").description, None);
+    }
+
+    #[test]
+    fn a_selected_client_field_is_its_output_type_and_is_selected() {
+        let db = db_with_literals(&[
+            "field Pet.f { firstName }",
+            "field Pet.g { f, friends { f @loadable } }",
+        ]);
+        let types = types(&db, "Pet", "g").expect("the fixture is valid");
+        assert_eq!(
+            data_field(&types.data, "f").type_,
+            Wrapper::Inner(ArtifactInnerType::ClientFieldOutput(named("Pet", "f")))
+        );
+        assert_eq!(
+            types.selected,
+            vec![
+                SelectedClientField {
+                    field: named("Pet", "f"),
+                    loadability: Loadability::Eager,
+                },
+                SelectedClientField {
+                    field: named("Pet", "f"),
+                    loadability: Loadability::Loadable,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn a_selected_pointer_is_its_target_wrapper_of_the_nested_object() {
+        let db = db_with_literals(&[
+            "field Pet.p to Pet { id }",
+            "field Pet.g { p { firstName } }",
+        ]);
+        let types = types(&db, "Pet", "g").expect("the fixture is valid");
+        assert_eq!(
+            data_field(&types.data, "p").type_,
+            nullable(WrapperVariant::Inner(ArtifactInnerType::Object(
+                ArtifactObjectType(
+                    ArtifactObjectField {
+                        key: key("firstName"),
+                        description: None,
+                        type_: Wrapper::Inner(string()),
+                    }
+                    .wrap_vec()
+                )
+            )))
+        );
+        assert_eq!(
+            types
+                .selected
+                .iter()
+                .map(|selected| selected.field)
+                .collect::<Vec<_>>(),
+            vec![named("Pet", "p")]
+        );
+    }
+
+    #[test]
+    fn malformed_selections_are_errors() {
+        let db = db_with_literals(&[
+            "field Pet.a { firstName { x } }",
+            "field Pet.b { friends }",
+            "field Pet.c",
+            "field Pet.d { c { x } }",
+            "field Pet.e { nope }",
+        ]);
+        assert!(matches!(
+            types(&db, "Pet", "a"),
+            Err(GenerationError::SelectionSetOnScalar(_))
+        ));
+        assert!(matches!(
+            types(&db, "Pet", "b"),
+            Err(GenerationError::MissingSelectionSet(_))
+        ));
+        assert!(matches!(
+            types(&db, "Pet", "d"),
+            Err(GenerationError::SelectionSetOnClientField(_))
+        ));
+        assert!(matches!(
+            types(&db, "Pet", "e"),
+            Err(GenerationError::Lookup(_))
+        ));
+        let c = types(&db, "Pet", "c").expect("a field with no selection set is valid");
+        assert_eq!(c.data, ArtifactObjectType(Vec::new()));
+        assert_eq!(c.parameters, None);
+    }
+
+    #[test]
+    fn variables_are_parameters_and_input_objects_are_expanded_once() {
+        let db = db_with_literals(&["field Pet.f($id: ID!, $limit: Int, $filter: Filter) { id }"]);
+        let parameters = types(&db, "Pet", "f")
+            .expect("the fixture is valid")
+            .parameters
+            .expect("the fixture declares variables");
+        let types_by_name = parameters
+            .parameters
+            .iter()
+            .map(|parameter| (parameter.name.to_string(), parameter.type_.clone()))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            types_by_name,
+            vec![
+                (
+                    "id".to_owned(),
+                    Wrapper::Inner(ArtifactInputType::Scalar(ScalarKind::Known(
+                        ScalarValueKind::String
+                    )))
+                ),
+                (
+                    "limit".to_owned(),
+                    nullable(WrapperVariant::Inner(ArtifactInputType::Scalar(
+                        ScalarKind::Known(ScalarValueKind::Number)
+                    )))
+                ),
+                (
+                    "filter".to_owned(),
+                    nullable(WrapperVariant::Inner(ArtifactInputType::InputObject(
+                        entity("Filter")
+                    )))
+                ),
+            ]
+        );
+        assert_eq!(
+            parameters.input_objects.keys().copied().collect::<Vec<_>>(),
+            vec![entity("Filter")]
+        );
+        let and = parameters.input_objects[&entity("Filter")]
+            .iter()
+            .find(|field| field.name == selectable("and"))
+            .expect("Filter has `and`");
+        assert_eq!(
+            and.type_,
+            nullable(WrapperVariant::List(
+                Wrapper::Inner(ArtifactInputType::InputObject(entity("Filter"))).boxed()
+            ))
+        );
+    }
+
+    #[test]
+    fn an_unrelated_edit_leaves_the_types_equal() {
+        let mut db = db_with_literals(&["field Pet.f { firstName }"]);
+        let before = types(&db, "Pet", "f");
+        db.insert_disk_file(
+            path("src/b.ts"),
+            SOURCE_FILE,
+            "export const g = iso(`field Pet.g { id }`)(() => null);\n".to_owned(),
+        );
+        assert_eq!(types(&db, "Pet", "f"), before);
+    }
+}

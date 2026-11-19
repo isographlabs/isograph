@@ -12,8 +12,8 @@ use span::Span;
 
 use crate::wrapper::{Wrapper, wrapper_of_type_annotation};
 use crate::{
-    ClientId, CompilationProfile, IsographDb, NetworkProtocol, parsed_iso_literals_in_file,
-    source_file_paths,
+    ClientId, CompilationProfile, HostLanguage, IsographDb, NetworkProtocol,
+    parsed_iso_literals_in_file, source_file_paths,
 };
 
 /// A node of the schema graph.
@@ -130,6 +130,10 @@ impl ClientPointerTarget {
         }
     }
 }
+
+/// The host-language context of a profile's iso literals.
+pub type LiteralContextOf<TProfile> =
+    <<TProfile as CompilationProfile>::HostLanguage as HostLanguage>::LiteralContext;
 
 /// The entity and selectable types of a profile.
 pub type ProfileEntity<TProfile> =
@@ -441,11 +445,13 @@ pub(crate) fn source_selectable_definitions<TProfile: CompilationProfile>(
         .collect()
 }
 
-/// An iso literal item parsed in a source file, with the byte offset of its literal in that file.
-pub(crate) struct SourceIsoLiteralItem<'db> {
+/// An iso literal item parsed in a source file, with the byte offset of its literal in that file
+/// and its literal's host-language context.
+pub(crate) struct SourceIsoLiteralItem<'db, TLiteralContext> {
     pub path: RelativePathToSourceFile,
     pub literal_start: u32,
     pub item: &'db IsoLiteralItem,
+    pub context: &'db TLiteralContext,
 }
 
 /// Every iso literal item parsed in a source file `client` reads. A literal with parse errors
@@ -453,7 +459,7 @@ pub(crate) struct SourceIsoLiteralItem<'db> {
 pub(crate) fn source_iso_literal_items<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
-) -> impl Iterator<Item = SourceIsoLiteralItem<'_>> {
+) -> impl Iterator<Item = SourceIsoLiteralItem<'_, LiteralContextOf<TProfile>>> {
     source_file_paths(db, client).iter().flat_map(move |path| {
         parsed_iso_literals_in_file(db, client, path.dereference())
             .iter()
@@ -464,6 +470,7 @@ pub(crate) fn source_iso_literal_items<TProfile: CompilationProfile>(
                     path: path.dereference(),
                     literal_start: extraction.iso_literal_start_index.0 as u32,
                     item: item.item.reference(),
+                    context: extraction.context.reference(),
                 }
                 .wrap_some()
             })
@@ -471,7 +478,7 @@ pub(crate) fn source_iso_literal_items<TProfile: CompilationProfile>(
 }
 
 /// The selectable `declaration`, in the literal at byte `literal_start` of `path`, defines.
-fn selectable_of_declaration(
+pub(crate) fn selectable_of_declaration(
     path: RelativePathToSourceFile,
     literal_start: u32,
     declaration: &SelectableDeclaration,

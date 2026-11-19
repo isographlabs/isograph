@@ -1,3 +1,4 @@
+mod artifact_types;
 mod artifacts;
 mod compiler_errors;
 mod database;
@@ -13,6 +14,11 @@ mod test_profile;
 mod validation;
 mod wrapper;
 
+pub use artifact_types::{
+    ArtifactInnerType, ArtifactInputField, ArtifactInputType, ArtifactObjectField,
+    ArtifactObjectType, ArtifactParameter, FieldDeclaration, FieldTypes, GenerationError,
+    Loadability, ParametersType, SelectedClientField, field_declaration, field_types,
+};
 pub use artifacts::{ArtifactPath, ArtifactSource, LiteralParseFailed, artifact_sources_in_file};
 pub use compiler_errors::{CompilerError, ProfileCompilerError, compiler_errors_in_file};
 pub use database::{
@@ -30,8 +36,8 @@ pub use merged_selection::{MergedTarget, NonNullVariableType, VariableType};
 pub use references::{ReferenceTarget, references_in_file};
 pub use schema::{
     ClientFieldKind, ClientPointerTarget, DefinitionLocation, Entity, EntityKind, EntityOrigin,
-    ProfileEntity, ProfileLookupError, ProfileSelectable, ProtocolEntity, ProtocolSelectable,
-    ScalarKind, ScalarValueKind, Selectable, SelectableKind, ServerSelectable,
+    LiteralContextOf, ProfileEntity, ProfileLookupError, ProfileSelectable, ProtocolEntity,
+    ProtocolSelectable, ScalarKind, ScalarValueKind, Selectable, SelectableKind, ServerSelectable,
     SourceSelectableDefinition, SourceSelectableKind, entity_named, selectable_named,
     selectables_for_entity,
 };
