@@ -9,6 +9,6 @@ const artifact: IsographEntrypoint<Query__SpeciesRoute__param, Query__SpeciesRou
   name: "Query.SpeciesRoute",
   queryText: Query__SpeciesRoute__query_text,
   normalizationAst: Query__SpeciesRoute__normalization_ast,
-  readerArtifact: Query__SpeciesRoute__resolver_reader
+  readerArtifact: ()=>Query__SpeciesRoute__resolver_reader()
 };
 export default artifact;

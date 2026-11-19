@@ -13,4 +13,4 @@ export const SetTagline = iso(`
   return data.set_pet_tagline.pet.tagline;
 });
 
-console.log(iso(`entrypoint Mutation.SetTagline`));
+export const SetTaglineEntrypoint = iso(`entrypoint Mutation.SetTagline`);

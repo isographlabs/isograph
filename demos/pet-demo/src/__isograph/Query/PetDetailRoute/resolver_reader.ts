@@ -6,63 +6,63 @@ import Pet__PetBestFriendCard__resolver_reader from "./../../Pet/PetBestFriendCa
 import Pet__PetCheckinsCard__resolver_reader from "./../../Pet/PetCheckinsCard/resolver_reader";
 import Pet__PetStatsCard__resolver_reader from "./../../Pet/PetStatsCard/resolver_reader";
 import Pet__fullName__resolver_reader from "./../../Pet/fullName/resolver_reader";
-const readerArtifact: ReaderArtifact<Query__PetDetailRoute__param, Query__PetDetailRoute__output_type, "Query"> = {
-  readerAst: [
-    {
-      kind: "Linked",
-      alias: "pet",
-      selectableName: "pet",
-      arguments: [
-        [
-          "id",
+const readerArtifact = (): ReaderArtifact<Query__PetDetailRoute__param, Query__PetDetailRoute__output_type, "Query"> =>({
+    readerAst: [
+      {
+        kind: "Linked",
+        alias: "pet",
+        selectableName: "pet",
+        arguments: [
+          [
+            "id",
+            {
+              kind: "Variable",
+              name: "id"
+            }
+          ]
+        ],
+        selections: [
           {
-            kind: "Variable",
-            name: "id"
+            kind: "Scalar",
+            alias: "id",
+            selectableName: "id",
+            arguments: null
+          },
+          {
+            kind: "Resolver",
+            alias: "fullName",
+            arguments: null,
+            readerArtifact: Pet__fullName__resolver_reader
+          },
+          {
+            kind: "Resolver",
+            alias: "PetStatsCard",
+            arguments: null,
+            readerArtifact: Pet__PetStatsCard__resolver_reader
+          },
+          {
+            kind: "Resolver",
+            alias: "PetCheckinsCard",
+            arguments: [
+              [
+                "limit",
+                {
+                  kind: "Literal",
+                  value: 5
+                }
+              ]
+            ],
+            readerArtifact: Pet__PetCheckinsCard__resolver_reader
+          },
+          {
+            kind: "Resolver",
+            alias: "PetBestFriendCard",
+            arguments: null,
+            readerArtifact: Pet__PetBestFriendCard__resolver_reader
           }
         ]
-      ],
-      selections: [
-        {
-          kind: "Scalar",
-          alias: "id",
-          selectableName: "id",
-          arguments: null
-        },
-        {
-          kind: "Resolver",
-          alias: "fullName",
-          arguments: null,
-          readerArtifact: Pet__fullName__resolver_reader
-        },
-        {
-          kind: "Resolver",
-          alias: "PetStatsCard",
-          arguments: null,
-          readerArtifact: Pet__PetStatsCard__resolver_reader
-        },
-        {
-          kind: "Resolver",
-          alias: "PetCheckinsCard",
-          arguments: [
-            [
-              "limit",
-              {
-                kind: "Literal",
-                value: 5
-              }
-            ]
-          ],
-          readerArtifact: Pet__PetCheckinsCard__resolver_reader
-        },
-        {
-          kind: "Resolver",
-          alias: "PetBestFriendCard",
-          arguments: null,
-          readerArtifact: Pet__PetBestFriendCard__resolver_reader
-        }
-      ]
-    }
-  ],
-  resolver: resolver
-};
+      }
+    ],
+    resolver: resolver
+  });
 export default readerArtifact;

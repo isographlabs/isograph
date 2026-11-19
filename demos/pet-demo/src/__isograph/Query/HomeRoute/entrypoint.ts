@@ -9,6 +9,6 @@ const artifact: IsographEntrypoint<Query__HomeRoute__param, Query__HomeRoute__ou
   name: "Query.HomeRoute",
   queryText: Query__HomeRoute__query_text,
   normalizationAst: Query__HomeRoute__normalization_ast,
-  readerArtifact: Query__HomeRoute__resolver_reader
+  readerArtifact: ()=>Query__HomeRoute__resolver_reader()
 };
 export default artifact;

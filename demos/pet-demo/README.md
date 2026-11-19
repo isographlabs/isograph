@@ -20,24 +20,25 @@ From the i2 repo root, after `pnpm install`:
 pnpm --filter pet-demo log-entrypoints
 ```
 
-`scripts/log-entrypoints.cjs` registers `@babel/register` with `@babel/preset-typescript`, the local `@isograph/babel-plugin`, and `@babel/plugin-transform-modules-commonjs`, so Node compiles each file under `src/` as it is required. The script then requires `HomeRoute`, `PetDetailRoute`, `SpeciesRoute`, and `SetTagline`. The Babel plugin replaces each ``iso(`entrypoint ...`)`` call with an import of the generated artifact in `src/__isograph/`, and each module logs that artifact:
+`scripts/log-entrypoints.cjs` registers `@babel/register` with `@babel/preset-typescript`, the local `@isograph/babel-plugin`, and `@babel/plugin-transform-modules-commonjs`, so Node compiles each file under `src/` as it is required. The script then requires `HomeRoute`, `PetDetailRoute`, `SpeciesRoute`, and `SetTagline`. Each exports its entrypoint literal as `<Module>Entrypoint`, and the Babel plugin replaces each ``iso(`entrypoint ...`)`` call with an import of the generated `entrypoint.ts` in `src/__isograph/`. The script logs each entrypoint artifact with its `readerArtifact` called:
 
 ```text
 {
   kind: 'Entrypoint',
   name: 'Query.HomeRoute',
-  normalizationAst: {},
-  readerArtifact: {}
+  queryText: 'query HomeRoute {\n' + ...,
+  normalizationAst: { discriminatorResponseKey: '__typename', root: { entityName: 'Query', id: '__ROOT' }, selections: [ [Object] ] },
+  readerArtifact: { readerAst: [ [Object] ], resolver: [Function: HomeRoute] }
 }
 ```
 
-and the same object for `Query.PetDetailRoute`, `Query.SpeciesRoute`, and `Mutation.SetTagline`. `normalizationAst` and `readerArtifact` are the default exports of the entrypoint folder's `normalization_ast.ts` and `resolver_reader.ts`, which are empty objects until readers and normalization ASTs are generated.
+and the same shape for `Query.PetDetailRoute`, `Query.SpeciesRoute`, and `Mutation.SetTagline`. An entrypoint's `readerArtifact` is a function that returns the field's reader artifact, so that loading the entrypoint artifact does not read the reader artifact's module, which imports the field's source file.
 
 The script reads the committed artifacts. It does not run the daemon, so after changing a literal, run the daemon in this directory first.
 
 ## Config
 
-`isograph.config.json` sets `source_files` to `src/**/*.ts`, `schema` to `schema/**/*.graphql`, and `output_directory` to `src`, so the daemon writes artifacts into `src/__isograph/`. That folder is generated and committed: running the daemon in this directory rewrites it. It holds `iso.ts`, `tsconfig.json`, a param type per field, a parameters type per field with variables, output types and reader stubs per upstream's reachability rules, an entrypoint, normalization AST, `query_text.ts`, and `query_text.graphql` per entrypoint, and a link type per pointer target.
+`isograph.config.json` sets `source_files` to `src/**/*.ts`, `schema` to `schema/**/*.graphql`, and `output_directory` to `src`, so the daemon writes artifacts into `src/__isograph/`. That folder is generated and committed: running the daemon in this directory rewrites it. It holds `iso.ts`, `tsconfig.json`, a param type per field, a parameters type per field with variables, output types and reader artifacts per upstream's reachability rules, an entrypoint, normalization AST, `query_text.ts`, and `query_text.graphql` per entrypoint, and a link type per entity a field is declared on or a pointer points to.
 
 ## Schema
 

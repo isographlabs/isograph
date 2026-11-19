@@ -11,4 +11,4 @@ export const HomeRoute = iso(`
   return data.pets.map((pet) => pet.PetSummaryCard);
 });
 
-console.log(iso(`entrypoint Query.HomeRoute`));
+export const HomeRouteEntrypoint = iso(`entrypoint Query.HomeRoute`);

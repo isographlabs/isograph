@@ -18,4 +18,4 @@ export const SpeciesRoute = iso(`
   return data.petsBySpecies.map((pet) => pet.fullName);
 });
 
-console.log(iso(`entrypoint Query.SpeciesRoute`));
+export const SpeciesRouteEntrypoint = iso(`entrypoint Query.SpeciesRoute`);

@@ -9,6 +9,6 @@ const artifact: IsographEntrypoint<Query__PetDetailRoute__param, Query__PetDetai
   name: "Query.PetDetailRoute",
   queryText: Query__PetDetailRoute__query_text,
   normalizationAst: Query__PetDetailRoute__normalization_ast,
-  readerArtifact: Query__PetDetailRoute__resolver_reader
+  readerArtifact: ()=>Query__PetDetailRoute__resolver_reader()
 };
 export default artifact;

@@ -1,8 +1,9 @@
 'use strict';
 
 // Compiles the demo's sources with the Isograph Babel plugin as Node requires
-// them, then requires every module that has an entrypoint literal. Each of
-// those modules logs the artifact its entrypoint literal is replaced with.
+// them, then requires every module that has an entrypoint literal and logs the
+// artifact its exported entrypoint literal is replaced with, with the reader
+// artifact its `readerArtifact` function returns.
 
 const path = require('node:path');
 
@@ -22,6 +23,14 @@ require('@babel/register')({
   ],
 });
 
-['HomeRoute', 'PetDetailRoute', 'SpeciesRoute', 'SetTagline'].forEach(
-  (moduleName) => require(path.join(sourceDirectory, moduleName)),
-);
+for (const moduleName of [
+  'HomeRoute',
+  'PetDetailRoute',
+  'SpeciesRoute',
+  'SetTagline',
+]) {
+  const entrypoint = require(path.join(sourceDirectory, moduleName))[
+    `${moduleName}Entrypoint`
+  ];
+  console.log({ ...entrypoint, readerArtifact: entrypoint.readerArtifact() });
+}

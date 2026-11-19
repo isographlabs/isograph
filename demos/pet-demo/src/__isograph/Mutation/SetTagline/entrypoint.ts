@@ -9,6 +9,6 @@ const artifact: IsographEntrypoint<Mutation__SetTagline__param, Mutation__SetTag
   name: "Mutation.SetTagline",
   queryText: Mutation__SetTagline__query_text,
   normalizationAst: Mutation__SetTagline__normalization_ast,
-  readerArtifact: Mutation__SetTagline__resolver_reader
+  readerArtifact: ()=>Mutation__SetTagline__resolver_reader()
 };
 export default artifact;
