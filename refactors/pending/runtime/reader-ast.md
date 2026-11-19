@@ -721,6 +721,13 @@ i2's base plan needs no thunk:
 
 So every generated reader import graph is acyclic. Eager pointers (Client pointers, Later) break the last point and need thunks or a cycle check.
 
+Open question (found while implementing change 5; not decided). The argument above covers imports between reader artifacts only. A reader artifact also imports its resolver's source file, and a source file that holds an `entrypoint` literal imports that entrypoint's artifact through the Babel plugin, which imports the reader. When a field and its entrypoint are in one file, as in every pet demo route and every store.md fixture source, the import graph has the cycle `S.ts -> S/entrypoint.ts -> S/resolver_reader.ts -> S.ts`. Whichever module the cycle is entered at reads an import that is not initialized yet:
+
+- Entered at the reader (vitest, `import reader from ".../Query/PetDetail/resolver_reader"`): `reader.resolver` is the function, and `entrypoint.readerArtifact` is `undefined`.
+- Entered at the source file (the pet demo's `pnpm --filter pet-demo log-entrypoints`, CommonJS through `@babel/register`): every printed entrypoint has `readerArtifact: { readerAst: [..], resolver: undefined }`.
+
+Under native ES modules, either case is a `ReferenceError` (temporal dead zone) instead of `undefined`. `tsc` cannot see it. Upstream avoids it by making every reader artifact a thunk (`const artifact = (): EagerReaderArtifact<..> => ({ .. })`), so no import is read while a module evaluates. Options: (a) reader artifacts and the entrypoint's `readerArtifact` are thunks, as upstream, which changes `ReaderArtifact`, `ReaderResolverSelection.readerArtifact`, `IsographEntrypoint.readerArtifact`, and `read`; (b) `resolver` alone is a thunk (`resolver: () => resolver`) and the entrypoint's `readerArtifact` is a thunk, which keeps reader ASTs plain data; (c) a compile error for an `entrypoint` literal in a file that declares a field the entrypoint reaches, which leaves the cycle possible through any other import path.
+
 ### `FieldArtifacts`
 
 Before:
