@@ -154,7 +154,7 @@ fn selectable_of_declaration(
 }
 
 /// The entity a type annotation names, under its list and nullability wrappers. `None` for
-/// `[]`, which names no entity.
+/// a list whose inner type did not parse (`[!]`), which names no entity.
 fn named_entity_of_type_annotation(type_annotation: &TypeAnnotation) -> Option<EntityName> {
     match type_annotation {
         TypeAnnotation::Named(named) => named.name.item.0.wrap_some(),
@@ -190,7 +190,7 @@ pub struct Selectable {
 }
 ```
 
-Before: `pub target_entity: EntityName`. `None` departs from `mental-model.md`, where a field without `to` points at an anonymous entity. Nothing can be selected on that anonymous entity, so i2 represents it as no target; `to []` (no named entity) is also `None`.
+Before: `pub target_entity: EntityName`. `None` departs from `mental-model.md`, where a field without `to` points at an anonymous entity. Nothing can be selected on that anonymous entity, so i2 represents it as no target; a list whose inner type did not parse (`to [!]`) names no entity and is also `None`. `to []` fails the whole declaration in the parser, so it defines nothing.
 
 ```rust
 // from crates/isograph_compiler/src/schema.rs
@@ -313,7 +313,7 @@ When the `NetworkProtocol` integration lands, `entity_named` and `selectable_nam
 `crates/isograph_lsp` (memo level; files inserted with source membership before the first lookup):
 
 - `entity Pet` in `src/Pet.ts`, `field Pet.fullName` in `src/fullName.ts`, `field Pet.x { fullName }` in `src/x.ts`: hover on `fullName` in `src/x.ts` is `field **Pet.fullName**`; definition is `src/fullName.ts` at the span of `fullName`; hover and definition on `Pet` in `src/x.ts` name `src/Pet.ts` at `Pet`.
-- `field Pet.owner to Pet` and `field Pet.x { owner { fullName } }`: hover on the nested `fullName` is `Pet.fullName`; hover on `owner` shows `: **Pet**`; `to [Pet!]` and `to Pet` both give target `Pet`; `to []` gives `None`.
+- `field Pet.owner to Pet` and `field Pet.x { owner { fullName } }`: hover on the nested `fullName` is `Pet.fullName`; hover on `owner` shows `: **Pet**`; `to [Pet!]` and `to Pet` both give target `Pet`; `to [!]` gives `None`.
 - `field Pet.plain` and `field Pet.x { plain { id } }`: hover on `id` is `None`; `selectable_target` of `Pet.plain` is the no-target error.
 - two `entity Pet` (two files, and two literals in one file): hover on `Pet` is `None`; `entity_named` is the duplicate error.
 - a broken literal in another file (`field Pet.y { ) }`) leaves the results above unchanged; a broken literal that still parsed `entity Pet` contributes it.
