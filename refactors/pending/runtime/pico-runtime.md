@@ -37,9 +37,9 @@ From the goal and the decisions this doc, store.md, and reader-ast.md settle:
 - R1. A render does no work. `snapshot` is a lookup; a render reads no store value and calls no resolver.
 - R2. Eager. Every resolver result a retained query's entrypoint reaches is computed inside the `normalize` that retains the query, and is current when every later `normalize` returns.
 - R3. Order. After a write, an entry recomputes only after every stored result it reads is current. No entry is computed from a stale input, and no entry is computed twice for one write.
-- R4. Equality cutoff is an optimization. It is not a requirement, and no candidate can guarantee it. An entry whose recomputed result is `===` to its previous result does not mark its dependents. This stops propagation at a primitive result and at a result that is a stored or reused object. A result that is a new object is never `===` the previous one, so it always propagates, even when it is structurally equal. A general structural equality over arbitrary JavaScript values (functions, class instances, cycles) cannot be both correct and cheap, so the runtime does not attempt one. Server values keep a guaranteed check: `normalize` compares each value it writes with the stored one by `jsonEqual` (change 1), which is well-defined because both are JSON values parsed from a response, with no functions, class instances, or cycles. With `Rex` to `Ray`, `Initial` recomputes to `"R"`, a string `===` the previous one, and nothing above it recomputes. With `Rex` to `Ray`, a resolver that returns `{ length: data.name.length }` recomputes to a new `{ length: 3 }`, and every entry that reads it recomputes.
+- R4. Equality cutoff is an optimization. It is not a requirement, and no candidate can guarantee it. An entry whose recomputed result is `===` to its previous result does not mark its dependents. This stops propagation at a primitive result and at a result that is a stored or reused object. A result that is a new object is never `===` the previous one, so it always propagates, even when it is structurally equal. A general structural equality over arbitrary JavaScript values (functions, class instances, cycles) cannot be both correct and cheap, so the runtime does not attempt one. Server values keep a check at write time: `normalize` compares each value it writes with the stored one by the shape the AST gives it (change 1), as upstream does: a leaf by `===`, a link by `entityName` and `id`, and a list of links item by item and by length. A leaf whose value is a JSON object or list is a new object on every response, so it always counts as changed. Without the check, every response marks every written field changed and the whole retained tree recomputes on every response. With `Rex` to `Ray`, `Initial` recomputes to `"R"`, a string `===` the previous one, and nothing above it recomputes. With `Rex` to `Ray`, a resolver that returns `{ length: data.name.length }` recomputes to a new `{ length: 3 }`, and every entry that reads it recomputes.
 
-  Upstream never compares resolver outputs either. `callSubscriptionIfDataChanged` (`subscribe.ts:111-162`) re-reads the data the reader AST selects with `readButDoNotEvaluate` (`:117-136`) and compares that data, not the resolver's result, with `mergeObjectsUsingReaderAst(subscription.readerAst, oldItem, newItem)` (`:138-142`), calling the callback when the merge does not return the old item (`:152`). The merge (`areEqualWithDeepComparison.ts:4-121`) walks the reader AST, so it compares only store data: scalars by `===` (`:22-23`), lists item by item (`:33-53`), linked selections recursively (`:24-29`), links by entity and id (`:96-113`), nested resolver values by `===` (`:84-95`), and client pointers as always unequal (`:65-69`). Where a part is equal it writes the old value into the new object (`:77-82`, `:48`, `:110`) and returns the old object when every part is equal (`:120`), so equality also keeps identity stable. The well-defined place for structural equality is therefore a resolver's inputs, which are store data shaped by the reader AST. Under 3b an entry recomputes only when an input it read changed: a server input is JSON compared by `normalize`'s `jsonEqual` at write time, and a resolver input by `===`. Reading data along the reader AST and keeping the old object where the new data is equal (upstream's merge) is the way to give a snapshot stable identity, which `useSyncExternalStore` requires of `getSnapshot` (network-and-subscriptions.md, The snapshot: `subscriptionSnapshot` returns the same object until a re-read is unequal; react.md's `useSubscriptionSnapshot` relies on it).
+  Upstream never compares resolver outputs either. `callSubscriptionIfDataChanged` (`subscribe.ts:111-162`) re-reads the data the reader AST selects with `readButDoNotEvaluate` (`:117-136`) and compares that data, not the resolver's result, with `mergeObjectsUsingReaderAst(subscription.readerAst, oldItem, newItem)` (`:138-142`), calling the callback when the merge does not return the old item (`:152`). The merge (`areEqualWithDeepComparison.ts:4-121`) walks the reader AST, so it compares only store data: scalars by `===` (`:22-23`), lists item by item (`:33-53`), linked selections recursively (`:24-29`), links by entity and id (`:96-113`), nested resolver values by `===` (`:84-95`), and client pointers as always unequal (`:65-69`). Where a part is equal it writes the old value into the new object (`:77-82`, `:48`, `:110`) and returns the old object when every part is equal (`:120`), so equality also keeps identity stable. The well-defined place for structural equality is therefore a resolver's inputs, which are store data shaped by the reader AST. Under 3b an entry recomputes only when an input it read changed: a server input is compared by `normalize` at write time by its AST shape (change 1), and a resolver input by `===`. Reading data along the reader AST and keeping the old object where the new data is equal (upstream's merge) is the way to give a snapshot stable identity, which `useSyncExternalStore` requires of `getSnapshot` (network-and-subscriptions.md, The snapshot: `subscriptionSnapshot` returns the same object until a re-read is unequal; react.md's `useSubscriptionSnapshot` relies on it).
 - R5. Observers are called once per write, after level 1 settles, and a `snapshot` inside a callback returns a settled result.
 - R6. One entry per client field, record, and argument values, shared by every parent and query that reads it (The same resolver selected twice).
 - R7. Dependencies follow the data. A recomputation can read different inputs than the previous one (a link moved from `Pet:2` to `Pet:3`, a `MissingData` that became present). The next write is judged against the inputs of the last computation only.
@@ -326,7 +326,7 @@ The simplest eager baseline. No dependencies stored at all. After every write, s
 - R2: 1 fails; the rest meet it.
 - R3: 1 fails "nothing twice"; 2, 3a, 3b, 3c, 4, 5 meet it.
 - R4, an optimization: 2, 3a, 3b, 3c, 4 stop propagation at an entry whose result is `===` its previous one (a primitive, or a stored or reused object), and propagate every new object. 1 compares only at the subscription; 5 only at the root. No candidate compares resolver outputs structurally, because that comparison is not well-defined on arbitrary JavaScript values.
-- Structural equality on inputs: the one place it is well-defined is a resolver's inputs, which are store data shaped by the reader AST. 1 does it at the subscription with upstream's `mergeObjectsUsingReaderAst`, which also keeps the old object when equal and so gives stable identity. 2, 3a, 3b, 3c, 4 get the server half from `normalize`'s `jsonEqual` (an equal write changes no input, so nothing is marked or stamped) and compare resolver inputs by `===`. A snapshot whose identity must stay stable across a recomputation with equal data needs upstream's merge applied to the data read along the reader AST; it does not need structural equality on outputs.
+- Structural equality on inputs: the one place it is well-defined is a resolver's inputs, which are store data shaped by the reader AST. 1 does it at the subscription with upstream's `mergeObjectsUsingReaderAst`, which also keeps the old object when equal and so gives stable identity. 2, 3a, 3b, 3c, 4 get the server half from `normalize`'s comparison by AST shape (change 1: an unchanged write changes no input, so nothing is marked or stamped; a leaf whose value is a JSON object or list always counts as changed) and compare resolver inputs by `===`. A snapshot whose identity must stay stable across a recomputation with equal data needs upstream's merge applied to the data read along the reader AST; it does not need structural equality on outputs.
 - R5 and R7: every candidate meets them.
 - R10: 3b allows it: marking already runs in `normalize` apart from settlement, an entry that settlement skips keeps its mark, so it stays recorded as stale, `settle` takes its roots, and the observed count is the observers at a location plus the observed `dependents`. 2 allows it: nothing is verified until demanded, and a deferred pass is a later verification of fewer roots; each pass still walks every live edge under its roots. 4 allows it: Preact keeps unsubscribed computeds lazy and queues effects to the end of a batch, so priority goes on that queue. 3a and 3c fail without redesign: their propagation recomputes every affected entry as it goes, so skipping an unobserved entry leaves it stale with no record of it; the lazy variant needs a stale mark per entry and a pull on read, which is 3b's state and bring-up-to-date, and priorities need one bucket queue or count pass per priority. 5 allows it per root at full cost per pass. 1 has nothing stored to defer; scheduling exists only in React's re-render.
 - R6: 1 fails; the rest meet it.
@@ -342,7 +342,7 @@ For a sense of scale, from no measurement: a screen with 2,000 live entries aver
 
 The eager requirement removes the one thing pico's epochs are for: pull verification exists so that undemanded memos are never visited, and R2 demands every live entry after every write, so 2 visits every live edge on every write while `normalize` already holds the exact set of changed locations and discards it into stamps. Push from that set bounds each write by what it affects, and among the push orderings 3b is the only one that needs no ordering state beyond a three-valued state per entry: its order is the same recursion as pico's verification (dependencies brought up to date in recorded order before the entry), restricted to the marked entries, so R3 holds by the argument pico's design already makes. 3a with static heights visits fewer entries (it never walks the `Check` part of `A`), but it recomputes entries no root reaches until `garbageCollect`, has no lazy mode for open decision 3 (b) or for a plain `read`, and needs a height per artifact; 3c and 4 add counters or versions to 3b without a new property; 5 meets the requirements and runs every live resolver on every write; 1 fails R1, R2, R3, and R6. R10 separates 3b from 3a further: 3a and 3c need 3b's marks to be lazy at all, while 3b gets both laziness and deferral from what it already has (marking in `normalize`, `settle` over a set of roots, and `dependents` from which an observed count is derived), and changes 1 to 4 need no field that a later scheduler would remove. The cost 3b takes on is the inverse edge set: memory per edge and an invariant (the dependents sets equal the inverse of the dependency lists) whose violation is a silently stale result. That is contained by making one function, `setDependencies`, the only writer of either side. The inverse also pays for itself elsewhere: it is the reference count constructors and destructors need (Follow-ups 1, open decision 11), and the index open decision 6 (b) needs. Removing epochs also removes the tag and stamp from every server value, so records stay store.md's untagged maps and `check`, `garbageCollect`'s mark, and the reader's server reads do not change.
 
-3b still wins with equality cutoff reduced to a `===` optimization. Its bound on a write comes from the reverse edges, not from equality: only entries that read a changed location, directly or through other entries, are marked, and `normalize`'s `jsonEqual` keeps an equal server value out of `C`. When every resolver returns a new object, `A'` is `A`, and 3b recomputes exactly the entries that read what changed; 5 recomputes all of `L`, and 2 still compares all of `E`. Against 3a the case does not change: 3a visits `A'` and 3b visits `A`, and with no cutoff the two sets are equal, so 3a's one advantage disappears while its lack of a lazy mode and its height per artifact remain. What weaker cutoff costs 3b is the value of the `Check` state: `Check` exists only so that a dependent of a `===` result becomes `Clean` without computing. Marking every transitive dependent `Dirty` would keep R3 and give up cutoff entirely. `Check` is kept because the cutoff it gives is real for primitive results (`Initial`, `Monogram`, `Signature`, `ShapeLabel`) and for resolvers that return a stored or reused object, and it costs one more state value and the `Check` walk over `A`.
+3b still wins with equality cutoff reduced to a `===` optimization. Its bound on a write comes from the reverse edges, not from equality: only entries that read a changed location, directly or through other entries, are marked, and `normalize`'s comparison by AST shape (change 1) keeps an unchanged server value out of `C`. When every resolver returns a new object, `A'` is `A`, and 3b recomputes exactly the entries that read what changed; 5 recomputes all of `L`, and 2 still compares all of `E`. Against 3a the case does not change: 3a visits `A'` and 3b visits `A`, and with no cutoff the two sets are equal, so 3a's one advantage disappears while its lack of a lazy mode and its height per artifact remain. What weaker cutoff costs 3b is the value of the `Check` state: `Check` exists only so that a dependent of a `===` result becomes `Clean` without computing. Marking every transitive dependent `Dirty` would keep R3 and give up cutoff entirely. `Check` is kept because the cutoff it gives is real for primitive results (`Initial`, `Monogram`, `Signature`, `ShapeLabel`) and for resolvers that return a stored or reused object, and it costs one more state value and the `Check` walk over `A`.
 
 ### What depends on this choice
 
@@ -357,7 +357,7 @@ Depends on the held architecture (3b) in changes 1 to 3.
 Each change is one commit, in order. Step A is optional and independent of 1 to 4.
 
 - Step A. Re-read every subscription after each write, upstream's mechanism, with v1's `read`. No memoization.
-- 1. `Store` becomes an object, and `normalize` skips an equal value (prefactor).
+- 1. `Store` becomes an object, and `normalize` skips an unchanged value (prefactor).
 - 2. Stored resolver results: `read` stores each resolver's result with its dependencies and their inverse; `normalize` and `garbageCollect` mark the entries that read what they changed; a read brings a marked entry up to date (3b).
 - 3. Level 1: `normalize` retains its query, computes the entries its entrypoint reaches, and settles every retained query after each write. `garbageCollect` reads the retained queries from the store and deletes unreached entries.
 - 4. Level 2: `listen` and `snapshot`, called after settlement.
@@ -436,7 +436,7 @@ const result = useSyncExternalStore(
 );
 ```
 
-## 1. `Store` becomes an object, and `normalize` skips an equal value
+## 1. `Store` becomes an object, and `normalize` skips an unchanged value
 
 Depends on the held architecture (3b): with epochs, this change would instead tag every value (Candidate 2).
 
@@ -465,35 +465,51 @@ export function createStore(): Store;
 
 `StoreRecord`, `StoreValue`, `StoreLink`, `StoreKey`, `JsonValue`, and `Variables` are store.md's, unchanged: a record holds only server values, untagged. Changes 2 to 4 add fields to `Store`; this change makes it an object so they have a place. Every v1 function reads `store.records` where it read `store`.
 
-### `normalize` skips an equal value
+### `normalize` skips an unchanged value
 
 Before (store.md, `normalize`): every selected value is written with `record.set(key, value)`, and there is no change detection.
 
-After, every write goes through:
+After, every write goes through `writeValue`. `normalize` already knows each value's shape from the AST: a selection with `target: null` writes a `LeafValue`, and a selection with a `target` writes a `CompositeValue`. It passes that shape, and the comparison follows it, as upstream's does (`normalizeScalarField` and `normalizeLinkedField`, `cache.ts:232-341`). There is no generic deep equality.
 
 ```ts
 // from libs/isograph-runtime/src/normalize.ts
-/** Writes `value` under `key`, unless the stored value is `jsonEqual` to it. */
-function writeValue(record: StoreRecord, key: StoreKey, value: StoreValue): void;
+/** A value `normalize` writes, with the shape its selection gives it. */
+type WrittenValue =
+  | { readonly kind: 'Leaf'; readonly value: LeafValue }
+  | { readonly kind: 'Composite'; readonly value: CompositeValue };
 
-/** Structural equality of JSON values: object keys in any order, list items in order. */
-export function jsonEqual(a: JsonValue, b: JsonValue): boolean;
+/** Writes `written.value` under `key`, unless the stored value is unchanged by `isUnchanged`. */
+function writeValue(record: StoreRecord, key: StoreKey, written: WrittenValue): void;
+
+/** `Leaf`: `stored === written.value`. `Composite`: `compositeUnchanged(stored, written.value)`. */
+function isUnchanged(stored: StoreValue, written: WrittenValue): boolean;
+
+/** `null`: `stored` is `null`. A link: `stored` is a link with the same `entityName` and `id`.
+ * A list: `stored` is a list of the same length whose items are `compositeUnchanged` in order. */
+function compositeUnchanged(stored: StoreValue, written: CompositeValue): boolean;
 ```
 
-- Absent key, or a value that is not `jsonEqual`: `record.set(key, value)`.
-- A `jsonEqual` value: nothing; the stored value's identity stays.
+- Absent key, or a value `isUnchanged` rejects: `record.set(key, written.value)`.
+- An unchanged value: nothing; the stored value's identity stays.
 
-A link is a `JsonValue` (`{ entityName, id }`) and a composite value is `null`, a link, or lists of these, so one equality covers leaves and composites. Its reader is change 2: an equal write marks nothing.
+`compositeUnchanged` reads `stored` as `StoreValue`, because `record.get` returns that type; it narrows by `isArray` and by `typeof stored === 'object'`, with no cast. Each comparison costs one `===` for a leaf and one step per link for a composite, one comparison per written field.
 
-Deltas from upstream: upstream compares a scalar with `!==` (`cache.ts:248-249`), so a list leaf or a `JSON` object counts as changed on every response, and compares links by id (`dataIdsAreTheSame`, `cache.ts:372-393`). Here a list leaf with equal items is unchanged, because otherwise every response would recompute every resolver that reads one. This structural comparison is well-defined where a resolver result comparison is not: both operands are JSON values parsed from a response, with no functions, class instances, or cycles, so `jsonEqual` is correct and costs at most the size of the value written. It and `resultsEqual`'s comparison of `MissingData`, which the runtime builds from strings and links, are the only structural comparisons in changes 1 to 4 (R4).
+Its reader is change 2: an unchanged write marks nothing. The check exists because without it every response marks every written field changed, so every refetch of a retained query recomputes every resolver entry under it, and the whole retained tree recomputes on every response. Whether the comparison earns its cost against that recomputation is not measured.
+
+A leaf whose JSON value is an object or a list (a `JSON` custom scalar, or a list of scalars such as `tags: [String!]`) is a new object on every response, so `===` counts it as changed on every rewrite, and every entry that reads it recomputes on every response. The normalization AST does not record a leaf's list wrapping or its scalar type, so `normalize` cannot compare these by shape. Such values are rare.
+
+Deltas from upstream: upstream compares a scalar with `!==` (`cache.ts:248-249`) and a `null` write as unchanged when the stored value is `null` (`cache.ts:243-246`, `:270-273`); `===` on a leaf covers both. Upstream compares a single link by `__link` and `__typename` (`cache.ts:337-338`) and a list of links by length and then item by item (`dataIdsAreTheSame`, `cache.ts:372-393`). Here a link is compared by `entityName` and `id`, the fields of `StoreLink`, and lists nest at any depth (store.md's `CompositeValue`), so `compositeUnchanged` recurses where upstream's list check is one level. Upstream returns `RecordHasBeenUpdated` up the walk; here `writeValue` acts on the result at the write. The only structural comparison in changes 1 to 4 besides `compositeUnchanged` is `resultsEqual`'s comparison of `MissingData`, which the runtime builds from strings and links (R4).
 
 ### Tests
 
 store.md's tests change mechanically: `new Map()` becomes `createStore()`; `storeOf` returns a `Store` whose `records` are the literal's; `expect(store).toEqual(storeOf({ .. }))` is unchanged; `expect(store).toEqual(new Map())` becomes `expect(store).toEqual(createStore())`. New cases in `test/normalize.test.ts`:
 
-- `tags: ["a"]` then `tags: ["a"]` keeps the first list object (`toBe`); then `tags: ["b"]` stores the new list.
-- `settings` objects with the same keys in another order are equal: the first object stays.
-- Normalizing the same `PetDetail` response twice leaves every value `toBe` the one after the first.
+- A link `bestFriend` to `Pet:2` written twice: the first link object stays (`toBe`); then `Pet:3` stores the new link.
+- A list of links `checkins` with the same ids in the same order: the first list object stays (`toBe`); one fewer item, or two items swapped, stores the new list.
+- `petGrid` with equal links and `null` items at every depth: the first outer list object stays (`toBe`); one inner item changed stores a new outer list.
+- `stats: null` then `stats: null`: the record holds `null`, and change 2 marks nothing for `stats`.
+- `tags: ["a"]` then `tags: ["a"]` stores the new list (`not.toBe` the first), and a `settings` object written twice stores the new object: a leaf compares by `===`.
+- Normalizing the same `PetDetail` response twice leaves every link and list of links `toBe` the one after the first, and every string, number, boolean, and `null` leaf `toBe` it.
 
 ## 2. Stored resolver results
 
@@ -680,7 +696,7 @@ function markCheck(entry: ResolverEntry): void {
 
 Callers, after change 1's `writeValue`:
 
-- `writeValue` gains `store` and `owner: StoreLink`, and after `record.set` calls `markChanged(store, { kind: 'ValueChanged', record: owner, storeKey: key })`. An equal value marks nothing.
+- `writeValue` gains `store` and `owner: StoreLink`, and after `record.set` calls `markChanged(store, { kind: 'ValueChanged', record: owner, storeKey: key })`. An unchanged value marks nothing.
 - Creating a record calls `markChanged(store, { kind: 'RecordCreated', record })`.
 - `garbageCollect`'s sweep calls `markChanged(store, { kind: 'RecordDeleted', record })` for each record before deleting it, then deletes the record's resolver entries, calling `setDependencies(store, entry, [])` on each.
 
@@ -1167,7 +1183,7 @@ An observer keeps its entry current (settlement brings observed locations up to 
 
 ## Docs this doc amends
 
-- `refactors/pending/runtime/store.md`: "`pico-runtime.md` stays parked" is replaced by this doc as the step after v1. `Store` becomes `{ records }`, `createStore`, and `jsonEqual` with equal values skipped (change 1); `normalize` and `garbageCollect` call `markChanged`, and `Store` gains `resolvers` and `serverDependents` (change 2); `normalize` becomes `writeResponse` and the exported `normalize` retains and settles, `garbageCollect` reads `store.retained` and deletes unreached resolver entries, and `RetainedQuery` becomes `Retention` (change 3); its test helper `storeOf` returns the new `Store`.
+- `refactors/pending/runtime/store.md`: "`pico-runtime.md` stays parked" is replaced by this doc as the step after v1. `Store` becomes `{ records }`, `createStore`, and `writeValue` skipping a value unchanged by its AST shape (change 1); `normalize` and `garbageCollect` call `markChanged`, and `Store` gains `resolvers` and `serverDependents` (change 2); `normalize` becomes `writeResponse` and the exported `normalize` retains and settles, `garbageCollect` reads `store.retained` and deletes unreached resolver entries, and `RetainedQuery` becomes `Retention` (change 3); its test helper `storeOf` returns the new `Store`.
 - `refactors/pending/runtime/reader-ast.md`: `ReaderArtifact.selectableName` and its printing; `ReadResult` gains `ReadResolverThrew`; `read` stores and reuses resolver results; "The store is unchanged by every read" and "A resolver that throws propagates out of `read`" change as change 2's Tests state. Its note that this doc's `computeResolver` and `readSelection` replace its `read` is superseded by change 2.
 - `refactors/pending/runtime/normalization-ast-mount-markers.md`: candidate 6 is answered by Resolver markers (held: no marker); its open question on how this doc models a mount is answered by `Retention` and settlement.
 
@@ -1318,7 +1334,7 @@ Settled: (a).
 - (b) A comparator the field declares. Not taken: a directive, and v1 parses none.
 - (c) Structural equality of resolver outputs. Not taken: outputs can be functions, class instances, React elements, or cyclic, so no comparison is both correct and cheap.
 
-Upstream's deep comparison, `mergeObjectsUsingReaderAst`, applies where the compared values are store data shaped by a reader AST: subscription delivery in Step A (`selectionSetDataAreEqual`, network-and-subscriptions.md, Semantics) and the selection-set results of Follow-ups 8. In changes 1 to 4, server values are compared by `jsonEqual` at write time and notification compares stored result identity, so neither needs it.
+Upstream's deep comparison, `mergeObjectsUsingReaderAst`, applies where the compared values are store data shaped by a reader AST: subscription delivery in Step A (`selectionSetDataAreEqual`, network-and-subscriptions.md, Semantics) and the selection-set results of Follow-ups 8. In changes 1 to 4, server values are compared by their AST shape at write time (change 1) and notification compares stored result identity, so neither needs it.
 
 ### 8. A resolver that reads or writes the store
 
