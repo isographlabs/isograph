@@ -1050,6 +1050,7 @@ with `entrypoint Query.PetSummary`, `entrypoint Query.PetSummaries`, `entrypoint
 - Shape: `Pet:1.stats` set by hand to `"x"` makes `PetDetail`'s read throw the non-link message naming `Pet:1` and `stats`.
 - Degenerate cases: a `Linked` node over `[]` reads `[]`; an empty reader AST passes `{}` to its resolver.
 - The store is unchanged by every read.
+- No caching: `PetSummary` with `{ id: "1" }` is normalized and read once, with `vi.spyOn(artifact, "resolver")` on the imported reader artifacts of `Query.PetSummary`, `Pet.PetName`, and `Pet.RecentCheckins` (the objects the `Resolver` nodes' `readerArtifact` imports reach, so the spies see the nested calls; `PetSummary` resolves `PetName` and `RecentCheckins`, a chain of two levels). Each spy has one call. Then `normalize` writes data no read selects (`PetLists` writing `Pet:9`) and data the read selects (`PetDetail` changing `Pet:1`'s `name`), and the test reads again with the same variables: every spy has two calls, `PetName`'s whose input changed and `RecentCheckins`'s whose input did not. v1 has no memoization, so every resolver runs on every read. This test is expected to change when the pico-style runtime lands (`refactors/pending/runtime/pico-runtime.md`): then only resolvers whose inputs changed run again, and `RecentCheckins`'s spy stays at one call.
 
 ### Loading reader artifacts
 
