@@ -136,7 +136,7 @@ export type ServerEntry = {
 
 export type ResolverEntry = {
   readonly kind: 'Resolver';
-  readonly artifact: ReaderArtifact<ResolverParam, unknown>;
+  readonly artifact: ReaderArtifact<ResolverParam, unknown, EntityName>;
   readonly variables: Variables;
   readonly result: ReadResult<unknown>;
   /** The epoch in which `result` last changed. */
@@ -209,7 +209,7 @@ Data structures common to the three orderings below:
 // from libs/isograph-runtime/src/store.ts
 export type DerivedNode = {
   readonly location: DerivedNodeLocation;
-  readonly artifact: ReaderArtifact<ResolverParam, unknown>;
+  readonly artifact: ReaderArtifact<ResolverParam, unknown, EntityName>;
   readonly variables: Variables;
   result: ReadResult<unknown>;
   /** What the last computation read, in read order. */
@@ -1193,8 +1193,17 @@ Before:
 
 ```ts
 // from libs/isograph-runtime/src/artifacts.ts
-export type ReaderArtifact<TParam, TOutput> = {
+export type ReaderArtifact<
+  TParam extends ResolverParam<TEntityName>,
+  TOutput,
+  TEntityName extends EntityName,
+> = {
   readonly readerAst: ReaderSelectionSet;
+  /**
+   * A method signature, so TypeScript compares its parameter bivariantly: an artifact
+   * declared with one field's param type is also a
+   * `ReaderArtifact<ResolverParam, TOutput, EntityName>`.
+   */
   resolver(param: TParam): TOutput;
 };
 ```
@@ -1203,10 +1212,19 @@ After:
 
 ```ts
 // from libs/isograph-runtime/src/artifacts.ts
-export type ReaderArtifact<TParam, TOutput> = {
+export type ReaderArtifact<
+  TParam extends ResolverParam<TEntityName>,
+  TOutput,
+  TEntityName extends EntityName,
+> = {
   /** The client field's selectable name: the prefix of its resolver store key. */
   readonly selectableName: string;
   readonly readerAst: ReaderSelectionSet;
+  /**
+   * A method signature, so TypeScript compares its parameter bivariantly: an artifact
+   * declared with one field's param type is also a
+   * `ReaderArtifact<ResolverParam, TOutput, EntityName>`.
+   */
   resolver(param: TParam): TOutput;
 };
 ```
@@ -1493,7 +1511,7 @@ export type ReadHooks<TFailure> = {
   readonly readValue: (record: StoreLink, storeKey: StoreKey) => void;
   /** The result of `artifact` on `root` with `variables`. */
   readonly readResolver: (
-    artifact: ReaderArtifact<ResolverParam, unknown>,
+    artifact: ReaderArtifact<ResolverParam, unknown, EntityName>,
     root: StoreLink,
     variables: Variables,
   ) => ReadResult<unknown> | TFailure;
@@ -1504,7 +1522,7 @@ export type ReadHooks<TFailure> = {
 export function readData<TFailure>(
   store: Store,
   hooks: ReadHooks<TFailure>,
-  artifact: ReaderArtifact<ResolverParam, unknown>,
+  artifact: ReaderArtifact<ResolverParam, unknown, EntityName>,
   root: StoreLink,
   variables: Variables,
 ): ReadResult<SelectionSetData> | TFailure;
@@ -1575,10 +1593,10 @@ The stored read:
 // from libs/isograph-runtime/src/storedResults.ts
 /** The stored result of `artifact` on `root` with `variables`: computed when absent, recomputed
  * when `Stale`, and otherwise returned as stored. */
-export function readStoredResult<TOutput>(
+export function readStoredResult<TEntityName extends EntityName, TOutput>(
   environment: IsographEnvironment,
-  artifact: ReaderArtifact<ResolverParam, TOutput>,
-  root: StoreLink,
+  artifact: ReaderArtifact<ResolverParam<TEntityName>, TOutput, TEntityName>,
+  root: NoInfer<Link<TEntityName>>,
   variables: Variables,
 ): ResolverResult<TOutput> {
   if (storeRecord(environment.store, root) === undefined) {
@@ -1596,7 +1614,7 @@ export function readStoredResult<TOutput>(
 /** The derived node definition of `artifact` on the present record `root` with `variables`. */
 export function resolverDefinition(
   store: Store,
-  artifact: ReaderArtifact<ResolverParam, unknown>,
+  artifact: ReaderArtifact<ResolverParam, unknown, EntityName>,
   root: StoreLink,
   variables: Variables,
 ): DerivedNodeDefinition<ResolverResult<unknown>> {
@@ -1631,7 +1649,7 @@ function contextHooks(
 }
 ```
 
-The cast in `readStoredResult` is the one place a stored `ResolverResult<unknown>` is returned at the caller's type; the invariant is in its comment. The computation closes over `store`, the environment's `Map`, which is written in place and never replaced (network-and-subscriptions.md, The environment).
+The cast in `readStoredResult` is the one place a stored `ResolverResult<unknown>` is returned at the caller's type; the invariant is in its comment. Its type parameters and `root` parameter are `read`'s (`libs/isograph-runtime/src/read.ts`), and its artifact passes to `resolverDefinition`'s `ReaderArtifact<ResolverParam, unknown, EntityName>` because `resolver` is a method signature. The computation closes over `store`, the environment's `Map`, which is written in place and never replaced (network-and-subscriptions.md, The environment).
 
 Every reader of any key on a record also reported the record's presence, so a deletion reports one source instead of the record's keys, including keys read while absent, which the store cannot enumerate. A computation that stops at the first `MissingData` records the sources read up to it, which are exactly what its result depends on.
 
@@ -1728,7 +1746,7 @@ export type ReadResolverThrew = {
 // from libs/isograph-runtime/src/storedResults.ts
 /** `artifact.resolver` called with `data`; a throw becomes `ResolverThrew`. */
 function callResolver(
-  artifact: ReaderArtifact<ResolverParam, unknown>,
+  artifact: ReaderArtifact<ResolverParam, unknown, EntityName>,
   root: StoreLink,
   data: SelectionSetData,
   variables: Variables,
@@ -1854,7 +1872,7 @@ After:
 /** What `normalizeData` needs from an `entrypoint.ts` artifact. */
 export type Entrypoint<TOutput> = {
   readonly normalizationAst: NormalizationAst;
-  readonly readerArtifact: () => ReaderArtifact<ResolverParam, TOutput>;
+  readonly readerArtifact: () => ReaderArtifact<ResolverParam, TOutput, EntityName>;
 };
 
 /**
@@ -1883,7 +1901,7 @@ export function normalizeData<TOutput>(
 export type Retention<TOutput> = {
   readonly ast: NormalizationAst;
   readonly variables: Variables;
-  readonly artifact: ReaderArtifact<ResolverParam, TOutput>;
+  readonly artifact: ReaderArtifact<ResolverParam, TOutput, EntityName>;
   /** `ast.root` and `resolverStoreKey(artifact.selectableName, variables)`. */
   readonly location: DerivedNodeLocation;
   /** Removes the root hold `retainRoot` added. */
