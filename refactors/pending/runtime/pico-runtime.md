@@ -273,7 +273,7 @@ write   name changed: Initial queued at 0
 drain 0 Initial      recompute "R" === "R": nothing queued   (Initial call 1)
 ```
 
-The unchanged `Initial` stops propagation at once: `Monogram`, `Signature`, `Badge`, and `BadgePage` are never visited. A changed `Initial` queues `Monogram` and `Signature`, and `Badge` is queued once although both change.
+The unchanged `Initial` stops propagation at once: `Monogram`, `Signature`, `Badge`, and `BadgePage` are never visited. A changed `Initial` queues `Monogram` and `Signature`, and `Badge` is queued once although both change. The `===` cutoff stops propagation only when a resolver returns the same value; a resolver that returns a new object on each run never cuts off, so these traces, whose resolvers return strings, show the best case.
 
 New object, an observer at `ShapePage`, `Rex` to `Ray`: `NameShape` (0) recomputes to a new `{ length: 3 }`, which queues `ShapeLabel` (1); `ShapeLabel` recomputes to `"3 letters"`, `===` the old string, so `ShapePage` (2) is not queued.
 
@@ -1185,7 +1185,7 @@ export function resolverStoreKey(
 ): StoreKey;
 ```
 
-The variables are the field's own: for a `Resolver` node, `childVariables(variables, selection.arguments)` (reader-ast.md, The read function), which holds the arguments the selection passes and the compiler-written defaults, and omits an unpassed variable with no default; for a top-level `read`, the read's variables. `PetName` on `Pet:1` is `PetName`; `RecentCheckins` selected with no argument is `RecentCheckins____n___2`; `PetSummary` read with `{ id: "1" }` is `PetSummary____id___"1"` on `Query.__ROOT`. Two selections of one client field with equal argument values on one record are one key, whatever their aliases.
+The variables are the field's own: for a `Resolver` node, `childVariables(variables, selection.arguments)` (reader-ast.md, The read function), which holds the arguments the selection passes and the compiler-written defaults, and omits an unpassed variable with no default; for a top-level `read`, the read's variables. `PetName` on `Pet:1` is `PetName`; `RecentCheckins` selected with no argument is `RecentCheckins____n___2`; `PetSummary` read with `{ id: "1" }` is `PetSummary____id___"1"` on `Query.__ROOT`. Two selections of one client field with equal argument values on one record are one key, whatever their aliases. The format can make two keys equal: a selectable named `F____n___2` read with no variables and `F` read with `{ n: 2 }` are both `F____n___2`, the same property the server `storeKey` has (`libs/isograph-runtime/src/storeKey.ts:13-34`).
 
 The key needs the client field's selectable name, which v1's reader artifact does not carry (reader-ast.md drops upstream's `fieldName` because nothing read it, `reader.ts:26-37`). It does now:
 
