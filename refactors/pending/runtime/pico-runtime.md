@@ -1243,6 +1243,19 @@ export type DerivedNodeDefinition<TValue> = {
 
 The context is a parameter, built per computation by `compute`, as the walk's `ReadHooks` is; there is no ambient "current computation" (MobX's `globalState.trackingDerivation`, Reactively's `CurrentReaction`). The engine knows nothing about what a derived node computes: the caller supplies the computation, the owner, and the id. Resolver derived nodes are the one derived node kind changes 2 to 4 create; Other derived node kinds lists the kinds the follow-ups add and the parts of the API they need.
 
+`Computation`, `ComputeContext`, and `DerivedNodeDefinition` are internal to the runtime. User code never receives a `ComputeContext`, an environment, or a store. A computation records a dependency only by calling `readSource` or `readDerivedNode`, so a computation that user code wrote as a closure could read a value without calling `readSource`; its derived node would not be marked when that value changes, and it would return its old result with no error. User code reads only through isograph syntax: a selection in a reader AST, which the reader walk reads, and each `ReadHooks` hook the walk calls reports the source it reads. The walk is therefore the only reader of a source on behalf of user code, and no read goes unrecorded.
+
+A source other than a store field is exposed to user code the same way, as a selection in a reader AST, so the walk records its read as it records a server field read. The first such source is the state of a network request. Adding a source kind adds:
+
+- isograph syntax for the selection;
+- a reader AST node kind for it;
+- a `ReadHooks` hook the walk calls at that node, which `contextHooks` implements by calling `context.readSource` with the kind's `SourceId` constructor in `sources.ts`, as `readValue` calls it with `valueSource` (for a request, `requestSource(key: RequestKey): SourceId`);
+- in every writer of that source, the source among the sources it passes to `markChanged`, as `normalizeData` passes `changeSource` of each `StoreChange`.
+
+The syntax and the reader AST node's shape are not decided. Which request a request-state selection refers to is open decision 20.
+
+Derived node kinds the runtime itself defines, such as the suspension decision (Other derived node kinds), are runtime code, and their computations call `ComputeContext` directly.
+
 A derived node is mutated in place (`value`, `state`, `dependencies`), because other nodes' `dependents` sets and `DerivedNodeDependency`s hold it by identity. A source dependency is a `SourceId`, because a server value has no object to point at and a record may not exist yet. A derived node dependency is the derived node, because `dependents` holds nodes and change 4's needed counts walk from a node to the nodes it reads. `graph.ts` imports `getOrInsert` from `util.ts` and nothing else.
 
 ```ts
@@ -2314,6 +2327,8 @@ The engine is general over derived node kinds only as far as the follow-ups that
 - A derived node's computation and id come from its creator (`DerivedNodeDefinition`, `track`, `readDerivedNode`, `retainRoot`); no engine function builds one. Follow-up 10 needs it: a runtime-defined computation is not a resolver and has no resolver store key.
 - The graph's value type is a parameter, `TValue`. Follow-up 10 needs it: a derived value or a selector's value is not a `ResolverResult`, so that follow-up widens the environment's graph to a union of the kinds' values, and `valuesEqual` to a function that compares two values of one kind and answers unequal for two kinds.
 - Heights are the engine's: `createDerivedNode` and `recompute` set a derived node's height from what its computation read (change 4, Heights), so a caller supplies none. Follow-up 10 needs it: a runtime-defined computation has no artifact that could carry a height.
+- Sources are opaque `SourceId`s, and the engine never inspects one. A source other than a store field, first the state of a network request, needs only a `SourceId` constructor beside `recordSource` and `valueSource`, a reader AST node and walk hook that report it, and its writers' `markChanged` calls (The engine (2a), after `ComputeContext`). User code reaches such a source only through a selection, never through a `ComputeContext`.
+- A derived node kind the runtime defines for its own use is runtime code over `ComputeContext`. The first is the suspension decision of react.md: a derived node that reads a root resolver derived node with `readDerivedNode` and the entrypoint request's state with `readSource(requestSource(key))`, and yields `Ok`, `Suspend`, `Throw`, or `ReadStore` according to the `whileInFlight: WhileInFlight` and `onNetworkError: OnNetworkError` options (react.md, `NetworkRequestReaderOptions`). Its value is not a `ResolverResult`, so it is one of the kinds the widened value type of Follow-ups 10 covers.
 
 ## Later
 
@@ -2550,5 +2565,17 @@ A derived node that recomputes during the drain of bucket `h` and reads a derive
 - (a) Accept it. Cost: R3's "no derived node is computed from a stale input, and no derived node is computed twice for one write" holds only for reads below the reader's height; the resolver is called with stale data, and that result is stored and queues its dependents before the second recomputation replaces it. Observers are notified once, after `settle`, so none receives the stale result.
 - (b) Before a read returns a derived node at or above the reader's height, bring up to date every `Queued` derived node it reads, transitively, lowest height first. Cost: a walk of the derived nodes that derived node reads, transitively, on every upward read during `settle`, and `Queued` derived nodes recomputed out of bucket order.
 - (c) Discard the computation: after a recomputation that read a derived node at or above its own height, store neither its result nor its dependents' invalidation, raise the derived node, and queue it at its new height. Cost: the resolver is still called twice, and the discarded call still receives stale data; nothing stale is stored.
+
+Not decided.
+
+### 20. Which request a request-state selection refers to
+
+A request-state selection (The engine (2a), after `ComputeContext`) reads the state of one request, and the walk reports `requestSource(key)` for it. The question is how the selection determines `key`.
+
+A derived node is keyed by (field, record, variables) (`resolverDerivedNode(root, resolverStoreKey(artifact.selectableName, variables))`), not by request. The same resolver on the same record, reached from two entrypoints, is one derived node with one value. "The request that fetched me" has no single value for that derived node, and keying the selection that way would split the derived node per request, which breaks that sharing.
+
+A key that the reader's own location determines works. A loadable field's request is such a key. The loadable query of `P.f @loadable` is the entrypoint query of `entrypoint P.f` with `P`'s wrapper, whose wrapper variable is the parent record's id (graphql-protocol/node-entrypoints-and-loadable.md, `@loadable` later), and the request cache keys a request on the query text and the operation variables, `entrypoint.queryText + JSON.stringify(stableCopy(variables))` (network-and-subscriptions.md, The request cache, `NetworkRequestKey`; the same key is `RequestKey` in its Request entries in the store). That key is a function of (record, field, arguments), all of which the reader holds at the selection.
+
+The state of an entrypoint's own request stays with the caller of `fetchEntrypoint`, which holds the returned `PromiseWrapper`; in React it reaches a component through the suspension derived node (Other derived node kinds), not through a selection.
 
 Not decided.
