@@ -2374,7 +2374,7 @@ The engine is general over derived node kinds only as far as the follow-ups that
 
 ## Follow-ups
 
-The user's design notes, recorded for later. None of them is part of Step A or changes 1 to 4, and none is approved; 10 is the user's planned addition. Upstream paths here follow the doc's convention; `isograph-react-disposable-state/` paths are under `isograph/libs/isograph-react-disposable-state/src`, and `isograph-disposable-types/` paths are under `isograph/libs/isograph-disposable-types/src`.
+The user's design notes, recorded for later. None of them is part of Step A or changes 1 to 4, and none is approved; 10 is the user's planned addition, and 11 is held. Upstream paths here follow the doc's convention; `isograph-react-disposable-state/` paths are under `isograph/libs/isograph-react-disposable-state/src`, and `isograph-disposable-types/` paths are under `isograph/libs/isograph-disposable-types/src`.
 
 ### 1. Constructors and destructors at normalization time
 
@@ -2469,6 +2469,44 @@ React constraint: `useSyncExternalStore` performs a store update as blocking eve
 ### 10. Runtime-defined computations
 
 A memoized computation the runtime or a user defines at run time, which reads other derived nodes: a derived value over several resolver results, a selector a hook creates. Its height comes from what its computation reads, as every derived node's does (change 4, Heights), so the bucket queue places it. What it needs from the engine is a caller-supplied id and computation and a wider value type (Other derived node kinds).
+
+### 11. The fetch decision from the root derived node
+
+Held, not approved, and not part of changes 1 to 4; it needs changes 2 and 3. With `shouldFetch` `IfNecessary` (network-and-subscriptions.md, `fetchEntrypoint`), `fetchEntrypoint` decides from the root derived node of the entrypoint on its variables instead of from `check` over the normalization AST. `Ok` (or `ResolverThrew`) means the data is present; `MissingData` means fetch.
+
+```ts
+// from libs/isograph-runtime/src/network.ts
+// fetchEntrypoint, before (network-and-subscriptions.md):
+    case "IfNecessary":
+      return check(environment.store, entrypoint.normalizationAst, variables).kind === "EnoughData"
+        ? retainQueryWithoutMakingNetworkRequest(environment, entrypoint.normalizationAst, variables)
+        : makeNetworkRequest(environment, entrypoint, variables, fetchOptions);
+// after:
+    case "IfNecessary":
+      return readStoredResult(
+        environment,
+        entrypoint.readerArtifact(),
+        entrypoint.normalizationAst.root,
+        variables,
+      ).kind === "MissingData"
+        ? makeNetworkRequest(environment, entrypoint, variables, fetchOptions)
+        : retainQueryWithoutMakingNetworkRequest(environment, entrypoint.normalizationAst, variables);
+```
+
+- A repeated call with no write between is a lookup: the root derived node is `Clean`, and `track` returns its stored result. After a write that reached it, the call recomputes it (`Stale`), or `settle` already did (needed). `check` walks the whole normalization AST on every call.
+- A root derived node this call creates is outside any retention until `normalizeData`'s root hold or a `listen` reaches it; `collect` (change 3) disposes it otherwise.
+
+Why a complete read implies that the normalization AST's data is present:
+
+- The normalization AST is the merge of the reader ASTs the entrypoint reaches, with the same variables (query-generation.md, Merging), plus the selections `complete` adds: the discriminator and the identity (`crates/isograph_compiler/src/merged_selection.rs:1555-1560`). The discriminator has no normalization node (`normalization_node`, `crates/isograph_compiler/src/normalization_ast.rs:135-140`), so `normalize` does not store it and `check` does not look it up. An `Ok` root means every reader the entrypoint reaches read every selection it selects, along current links and refinements, which are the positions `check` visits.
+- The identity is an ordinary `Selection` in the normalization AST: `CompletedSelection::Identity` becomes a `NormalizationNode::Selection` with a leaf target (`normalization_ast.rs:141-150`). `complete` adds it only for an entity whose identity is `Select`; an entity whose identity is `Fixed` or `Omit` has no `id` selection (`merged_selection.rs:1555-1558`). A reader need not select `id`, but `normalize` writes it in the pass that creates the record: `compositeValue` calls `recordAt`, which inserts the record, and then `writeSelections` over the target's selections, which hold the identity (`libs/isograph-runtime/src/normalize.ts:151-158`; `recordAt` at `:163-169`, `writeSelections` at `:52-79`; v1 line numbers, before change 1). So a present record of a `Select` entity holds its `id`.
+- The exception is a `normalize` that threw part-way (open decision 17). Its writes stay, so a record can exist without its `id` while every selection a reader reads is present. The root is then `Ok` where `check` reports `MissingData`, and no fetch is made. The data the readers read is present.
+- `@loadable` selections are not an exception. i2 accepts `@loadable` with no effect beyond validation: the query selects the field's selections and the parent's reader reads the field exactly as without the directive (graphql-protocol/node-entrypoints-and-loadable.md, the opening section and its example). No other normalization AST selection in i2 today is outside every reader: `complete` adds only the two selections above.
+- `ResolverThrew` is not equivalent to `check`. The walk stops at a nested `ResolverThrew` (`allOk` stops at the first result that is not `Ok`), so the selections after the throwing resolver in each enclosing selection set are not read, and data missing there does not show in the root's result. Treating `ResolverThrew` as present skips a fetch that `check` would make, and that fetch could change the throwing resolver's inputs. Treating it as a reason to fetch sends a request on every call while the resolver throws. The user's statement holds it as present; this difference is not settled.
+
+Components (later): a component field's data is read at render (components-in-userland.md, A field whose result is a closure), so the root derived node does not cover it unless each component field has a data derived node computed with the root (components-in-userland.md, Under changes 2 to 4, and its open question 3). Until then, an entrypoint that reaches a component field needs `check`.
+
+`check` stays a plain function exported from the package index (`libs/isograph-runtime/src/index.ts:43`); `test/check.test.ts` calls it.
 
 ## Open decisions
 
