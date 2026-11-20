@@ -395,7 +395,7 @@ Every read of a stored result is a pull: `track`, a computation's `readDerivedNo
 
 - Observed derived nodes. `settle` pulls each derived node an observer is at (`graph.observers`), and `notify` then calls each observer whose value changed (change 4). This is open decision 28 (a); its (b) leaves observed derived nodes marked, calls their observers, and lets the reader pull.
 - Mounted derived nodes with an effect (Values with lifecycles). `settle` pulls each, and `reconcileEffects` replaces the effect of each whose value changed. Changes 1 to 4 have none.
-- The nested derived nodes of a subscription. `callSubscriptions`, after `normalizeData`, re-reads every subscription, and the re-read pulls each nested derived node through `storedResultHooks` (change 2, Subscriptions).
+- The nested derived nodes of a subscription. `callSubscriptions`, which `normalizeData` and `garbageCollectEnvironment` call last, re-reads every subscription, and the re-read pulls each nested derived node through `storedResultHooks` (change 2, Subscriptions).
 
 Every other marked derived node stays marked until a read pulls it: a retained query nobody observes (open decision 3, held (b)), a plain `readStoredResult`'s result, the derived nodes of a disposed retention.
 
@@ -683,7 +683,7 @@ export function reportCallbackError(f: () => void): void;
 - No overlap filter: store.md's `normalize` records no `EncounteredIds`, so every subscription is re-read, where upstream skips the ones whose records do not overlap (`subscribe.ts:74-79`).
 - Order does not matter for correctness: every re-read runs after the write finished and reads the whole store, so nothing reads a stale input. Nothing is shared: a resolver two subscriptions reach runs once per subscription per write.
 
-Costs: every write re-reads every subscription and re-runs every nested resolver under it; a nested resolver that returns a new object makes its parent's data unequal on every write (upstream has the same, `areEqualWithDeepComparison.ts:84-95`), so its callback fires on every write. With the callback being React's `setState`, a demo renders correctly and slowly. Change 2b keeps the mechanism and removes the nested cost (change 2, Subscriptions): `makeNetworkRequest` calls `callSubscriptions` after `normalizeData`, every subscription is still re-read on every write, and its reader AST is still walked, but `readSubscription` reads each nested resolver through the graph, so a nested resolver whose inputs did not change is not called and its value is `===` the one delivered before. Changes 3 and 4 keep that.
+Costs: every write re-reads every subscription and re-runs every nested resolver under it; a nested resolver that returns a new object makes its parent's data unequal on every write (upstream has the same, `areEqualWithDeepComparison.ts:84-95`), so its callback fires on every write. With the callback being React's `setState`, a demo renders correctly and slowly. Change 2b keeps the mechanism and removes the nested cost (change 2, Subscriptions): `normalizeData` and `garbageCollectEnvironment` call `callSubscriptions` (change 2, The environment), every subscription is still re-read on every write, and its reader AST is still walked, but `readSubscription` reads each nested resolver through the graph, so a nested resolver whose inputs did not change is not called and its value is `===` the one delivered before. Changes 3 and 4 keep that.
 
 ## End-user experience
 
@@ -1483,8 +1483,8 @@ Delta from network-and-subscriptions.md's `IsographEnvironment`: `graph`, whose 
 ```ts
 // from libs/isograph-runtime/src/environment.ts
 /** `normalize` of `response` into `environment.store`, then marks every derived node that read
- * what it changed, and every derived node above those. On a `PartialWriteError`, marks the changes
- * it carries and rethrows it. */
+ * what it changed, and every derived node above those, and re-reads every subscription. On a
+ * `PartialWriteError`, marks the changes it carries and re-reads every subscription, then rethrows it. */
 export function normalizeData(
   environment: IsographEnvironment,
   ast: NormalizationAst,
@@ -1492,9 +1492,11 @@ export function normalizeData(
   variables: Variables,
 ): void {
   markChanged(environment.graph, writeOrMark(environment, ast, response, variables).map(changeSource));
+  callSubscriptions(environment);
 }
 
-/** `normalize`'s changes; on a `PartialWriteError`, marks its changes before rethrowing. */
+/** `normalize`'s changes; on a `PartialWriteError`, marks its changes and re-reads every
+ * subscription before rethrowing. */
 function writeOrMark(
   environment: IsographEnvironment,
   ast: NormalizationAst,
@@ -1506,17 +1508,19 @@ function writeOrMark(
   } catch (error: unknown) {
     if (error instanceof PartialWriteError) {
       markChanged(environment.graph, error.changes.map(changeSource));
+      callSubscriptions(environment);
     }
     throw error;
   }
 }
 
 /** `garbageCollect` of the store, keeping what the retained queries reach, then deletes the
- * derived nodes of each deleted record and marks their readers. */
+ * derived nodes of each deleted record, marks their readers, and re-reads every subscription. */
 export function garbageCollectEnvironment(environment: IsographEnvironment): void {
   garbageCollect(environment.store, Array.from(environment.retainedQueries)).forEach((record) =>
     deleteSource(environment.graph, recordSource(record)),
   );
+  callSubscriptions(environment);
 }
 ```
 
@@ -1533,7 +1537,34 @@ export function garbageCollect(
 
 Its sweep builds the list from the records it deletes; store.md's tests ignore it, and new cases in `test/garbageCollection.test.ts` assert it (Tests).
 
-`makeNetworkRequest` (network-and-subscriptions.md) calls `normalizeData(environment, entrypoint.normalizationAst, response, variables)` where it called `normalize(environment.store, ..)`, then `callSubscriptions(environment)` as before.
+Every write through the environment re-reads the subscriptions, including a response that throws part-way and a collection. The landed code misses both. `makeNetworkRequest` calls `callSubscriptions` after `normalize` in the same `.then` body (`libs/isograph-runtime/src/network.ts:139-155`, `normalize` at `:143-148`, `callSubscriptions` at `:149`), so a `normalize` that throws part-way leaves its writes in the store and exits to `.catch` (`:156`) without re-reading any subscription; and `garbageCollectEnvironment` (`libs/isograph-runtime/src/environment.ts`) deletes records and re-reads none, so a subscription whose records were deleted keeps delivering its old data until the next write. Upstream has both gaps: its `makeNetworkRequest` calls `callSubscriptions` inside the `.then` after `normalizeData` (`isograph/libs/isograph-react/src/core/makeNetworkRequest.ts:254-271`), and a throw there reaches `.catch` (`:299-319`), which reverts an optimistic layer only; its `garbageCollectEnvironment` calls no subscription (`garbageCollection.ts:65-86`). From 2b the re-read moves into the environment's writes, `normalizeData` and `garbageCollectEnvironment` above, and `makeNetworkRequest` no longer calls it:
+
+```ts
+// from libs/isograph-runtime/src/network.ts
+// makeNetworkRequest's .then, before (Step A):
+    .then((response) => {
+      if (status.kind === 'Disposed') {
+        return;
+      }
+      normalize(
+        environment.store,
+        entrypoint.normalizationAst,
+        response,
+        variables,
+      );
+      callSubscriptions(environment);
+      const onComplete = fetchOptions?.onComplete;
+// after:
+    .then((response) => {
+      if (status.kind === 'Disposed') {
+        return;
+      }
+      normalizeData(environment, entrypoint.normalizationAst, response, variables);
+      const onComplete = fetchOptions?.onComplete;
+```
+
+`network.ts` stops importing `normalize` and `callSubscriptions`; it imports `normalizeData` from `environment.ts`, and keeps `reportCallbackError` from `subscribe.ts` until change 4 moves it to `util.ts`. `environment.ts` imports `callSubscriptions` from `subscribe.ts`, whose imports from `environment.ts` are types only, so the modules form no cycle at run time. A `PartialWriteError` still rejects the request; the subscriptions were re-read before the rethrow, so they deliver the partial write's data. A test in `test/subscribe.test.ts`: a response that changes `Pet:1.name` and then lacks a required key, through `fetchEntrypoint`: the request's wrapper is `Err`, and the subscription to `PetDetail` was called once with the new name. A second: a subscription to `PetDetail`, `unretainQuery` of its query, and `garbageCollectEnvironment`: the subscription is called once, with `MissingData`.
+
 
 ### Subscriptions (2b)
 
@@ -1879,6 +1910,7 @@ export function retainRoot<TValue>(
 2. `settle(environment.graph)` (change 4).
 3. `retainEntrypoint`: holds the new retention's root (Computing the new root), then adds the retention to `environment.retainedQueries`, after the root hold returns, so a throw leaves nothing retained that the caller holds no handle to.
 4. `notify(environment.graph)` (change 4).
+5. `callSubscriptions(environment)` (change 2b, after every write).
 
 ```ts
 // from libs/isograph-runtime/src/environment.ts
@@ -1890,6 +1922,7 @@ export function normalizeData(
   variables: Variables,
 ): void {
   markChanged(environment.graph, writeOrMark(environment, ast, response, variables).map(changeSource));
+  callSubscriptions(environment);
 }
 // after:
 export function normalizeData<TOutput>(
@@ -1902,7 +1935,9 @@ export function normalizeData<TOutput>(
     environment.graph,
     writeOrMark(environment, entrypoint.normalizationAst, response, variables).map(changeSource),
   );
-  return retainEntrypoint(environment, entrypoint, variables);
+  const retention = retainEntrypoint(environment, entrypoint, variables);
+  callSubscriptions(environment);
+  return retention;
 }
 ```
 
@@ -2046,6 +2081,7 @@ Depends on the held architecture in its derived node part.
   garbageCollect(environment.store, Array.from(environment.retainedQueries)).forEach((record) =>
     deleteSource(environment.graph, recordSource(record)),
   );
+  callSubscriptions(environment);
 // after:
   garbageCollect(environment.store, Array.from(environment.retainedQueries)).forEach((record) =>
     deleteSource(environment.graph, recordSource(record)),
@@ -2056,7 +2092,10 @@ Depends on the held architecture in its derived node part.
       Array.from(subscription.readDerivedNodes),
     ),
   );
+  callSubscriptions(environment);
 ```
+
+`collect` runs before the re-read and reads each subscription's `readDerivedNodes` from its last read; the re-read then pulls any nested derived node it reads again.
 
 ```ts
 // from libs/isograph-runtime/src/graph.ts
@@ -2330,7 +2369,9 @@ A response that throws part-way must settle too. From this change observers are 
     environment.graph,
     writeOrMark(environment, entrypoint.normalizationAst, response, variables).map(changeSource),
   );
-  return retainEntrypoint(environment, entrypoint, variables);
+  const retention = retainEntrypoint(environment, entrypoint, variables);
+  callSubscriptions(environment);
+  return retention;
 // after:
   markChanged(
     environment.graph,
@@ -2339,10 +2380,12 @@ A response that throws part-way must settle too. From this change observers are 
   settle(environment.graph);
   const retention = retainEntrypoint(environment, entrypoint, variables);
   notify(environment.graph);
+  callSubscriptions(environment);
   return retention;
 
 // writeOrMark, before (change 2):
-/** `normalize`'s changes; on a `PartialWriteError`, marks its changes before rethrowing. */
+/** `normalize`'s changes; on a `PartialWriteError`, marks its changes and re-reads every
+ * subscription before rethrowing. */
 function writeOrMark(
   environment: IsographEnvironment,
   ast: NormalizationAst,
@@ -2354,13 +2397,14 @@ function writeOrMark(
   } catch (error: unknown) {
     if (error instanceof PartialWriteError) {
       markChanged(environment.graph, error.changes.map(changeSource));
+      callSubscriptions(environment);
     }
     throw error;
   }
 }
 // after:
-/** `normalize`'s changes; on a `PartialWriteError`, marks its changes, settles, and notifies
- * before rethrowing. */
+/** `normalize`'s changes; on a `PartialWriteError`, marks its changes, settles, notifies, and
+ * re-reads every subscription before rethrowing. */
 function writeOrMark(
   environment: IsographEnvironment,
   ast: NormalizationAst,
@@ -2374,6 +2418,7 @@ function writeOrMark(
       markChanged(environment.graph, error.changes.map(changeSource));
       settle(environment.graph);
       notify(environment.graph);
+      callSubscriptions(environment);
     }
     throw error;
   }
@@ -2396,6 +2441,7 @@ The partial write retains nothing: `retainEntrypoint` does not run, as in change
   );
   settle(environment.graph);
   notify(environment.graph);
+  callSubscriptions(environment);
 ```
 
 Work per write: marking visits each derived node that read a changed source and each `Clean` derived node above those, once; `settle` takes one step per observer and pulls the marked derived nodes the observed ones read; a pulled derived node recomputes only when an input changed value. The traces are in Candidate 3b.
@@ -2499,7 +2545,7 @@ An observer keeps its derived node current (`settle` pulls it after every write)
 ## Docs this doc amends
 
 - `refactors/pending/runtime/store.md`: "`pico-runtime.md` stays parked" is replaced by this doc as the step after v1. `Store` is unchanged, and its functions keep their parameters and its tests hold. `normalize` writes through `writeValue`, skipping a value unchanged by its AST shape, returns `ReadonlyArray<StoreChange>`, and throws `PartialWriteError` (change 1); the package index stops exporting `normalize`, which `normalizeData` replaces there (change 2b, open decision 17); `garbageCollect` returns the links of the records it deleted (change 2).
-- `refactors/pending/runtime/network-and-subscriptions.md`: `IsographEnvironment` gains `graph`, which `createIsographEnvironment` creates (change 2). `environment.ts` gains `normalizeData` (change 2), which takes the entrypoint and returns a `Retention` that `environment.retainedQueries` also holds (change 3), and settles and notifies (change 4); `garbageCollectEnvironment` deletes the derived nodes of deleted records (change 2), collects unreached nodes (change 3), and settles and notifies (change 4). `makeNetworkRequest` calls `normalizeData` where it called `normalize` (change 2), and from change 3 holds the returned `Retention` and disposes it in its cleanup. Its Why the store-only functions stay store-only holds: the functions that need the graph take the environment. `retainQueryWithoutMakingNetworkRequest` takes the entrypoint, holds a `Retention` from `retainEntrypoint`, and disposes it in its cleanup (change 3, Serving from the store). Its change 7 keeps request entries in `environment.requests`, beside the store, and `Store` stays store.md's nested map; this doc adds no field to `Store` either. Its `readSubscription` reads with `readData` and `storedResultHooks` instead of `readButDoNotEvaluate`, `SubscriptionResult` gains `ReadResolverThrew`, `ReadErr` is only a broken store invariant, and `subscriptionResultsAreEqual` compares two `ResolverThrew` by `===` of their errors (change 2, Subscriptions).
+- `refactors/pending/runtime/network-and-subscriptions.md`: `IsographEnvironment` gains `graph`, which `createIsographEnvironment` creates (change 2). `environment.ts` gains `normalizeData` (change 2), which re-reads every subscription after every write, a partial one included (change 2, The environment), takes the entrypoint and returns a `Retention` that `environment.retainedQueries` also holds (change 3), and settles and notifies (change 4); `garbageCollectEnvironment` deletes the derived nodes of deleted records and re-reads every subscription (change 2), collects unreached nodes (change 3), and settles and notifies (change 4). `makeNetworkRequest` calls `normalizeData` where it called `normalize` and `callSubscriptions` (change 2), and from change 3 holds the returned `Retention` and disposes it in its cleanup. Its Why the store-only functions stay store-only holds: the functions that need the graph take the environment. `retainQueryWithoutMakingNetworkRequest` takes the entrypoint, holds a `Retention` from `retainEntrypoint`, and disposes it in its cleanup (change 3, Serving from the store). Its change 7 keeps request entries in `environment.requests`, beside the store, and `Store` stays store.md's nested map; this doc adds no field to `Store` either. Its `readSubscription` reads with `readData` and `storedResultHooks` instead of `readButDoNotEvaluate`, `SubscriptionResult` gains `ReadResolverThrew`, `ReadErr` is only a broken store invariant, and `subscriptionResultsAreEqual` compares two `ResolverThrew` by `===` of their errors (change 2, Subscriptions).
 - `refactors/pending/runtime/react.md`: `unwrapOrSuspend` throws `result.error` on `ResolverThrew` as it does on `Err`; without that arm a `ResolverThrew` reaches the `MissingData` path and suspends (change 2, Subscriptions).
 - `refactors/pending/runtime/components-in-userland.md`: `useClosureData`'s switch gains `case 'ResolverThrew': throw result.error;` (change 2, Subscriptions).
 - `refactors/pending/runtime/reader-ast.md`: `ReaderArtifact.selectableName` and its printing; the walk takes `ReadHooks<TFailure>` and `readButDoNotEvaluate` passes v1's hooks, so `read` and `readButDoNotEvaluate` keep their behavior and its tests hold unchanged; `ResolverResult` adds `ReadResolverThrew` to `ReadResult` for stored results, and `ReadResult` is unchanged (change 2). Its `read` stays, and `readStoredResult` is the stored read beside it (change 2).
