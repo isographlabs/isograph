@@ -6,7 +6,7 @@ Upstream references are the checkout at `/Users/rbalicki/code/isograph` (commit 
 
 ## Goal
 
-Renders do no work. The `normalizeData` that retains a query computes every resolver result its entrypoint reaches. After every later write, every result an observer needs (an observed location's, or one a needed result reads) is recomputed inside that write when one of its inputs changed, lowest height first; every other result the write reaches is marked `Stale` and recomputed when next read. A render reads a precomputed value and nothing else.
+Renders do no work. The `normalizeData` that retains a query, or the `retainQueryWithoutMakingNetworkRequest` that retains a query served from the store, computes every resolver result its entrypoint reaches. After every later write, every result an observer needs (an observed location's, or one a needed result reads) is recomputed inside that write when one of its inputs changed, lowest height first; every other result the write reaches is marked `Stale` and recomputed when next read. A render reads a precomputed value and nothing else.
 
 Upstream reads and evaluates during render. `useReadAndSubscribe` reads the fragment's data in a `useState` initializer (`react/useReadAndSubscribe.ts:33-35`), `useResult` calls the resolver in the render body (`react/useResult.ts:45-64`), every nested eager resolver is called again on every read (`read.ts:600`), and the component subscribes in an effect after the render (`react/useRerenderOnChange.ts:21-37`, `subscribe.ts:15-40`). After a write, `callSubscriptions` re-reads every subscription whose recorded records overlap the written ones (`subscribe.ts:63-109`, called at `makeNetworkRequest.ts:271`). The deviation is the user's: no read-and-subscribe during render, because a render that reads and evaluates does resolver work on the render path, repeats it for every component that reads the same resolver, and needs a second read in the effect to catch writes between render and subscribe (`subscribe.ts:32-36`).
 
@@ -1891,13 +1891,13 @@ export function normalizeData<TOutput>(
 
 `Entrypoint` is structural: the generated `entrypoint.ts` object (`IsographEntrypoint`, whose `readerArtifact` is a function returning the artifact, `libs/isograph-runtime/src/artifacts.ts`) is assignable, and `TOutput` is inferred from its reader artifact's declared type. No compiler change.
 
-`normalize` stays the store's write, with change 1's return value; nothing is renamed. `makeNetworkRequest` passes the entrypoint and holds the returned `Retention` (Retention).
+`normalize` stays the store's write, with change 1's return value; nothing is renamed. `makeNetworkRequest` passes the entrypoint and holds the returned `Retention` (Retention). `retainQueryWithoutMakingNetworkRequest` serves a query from the store without `normalizeData`, so it holds the root through `retainEntrypoint` (Serving from the store).
 
 ### Retention
 
 ```ts
 // from libs/isograph-runtime/src/retention.ts
-/** One `normalizeData` call's hold on its query's records and its entrypoint's resolver result. */
+/** One `retainEntrypoint` call's hold on its query's records and its entrypoint's resolver result. */
 export type Retention<TOutput> = {
   readonly ast: NormalizationAst;
   readonly variables: Variables;
@@ -1948,9 +1948,34 @@ export function retainRoot<TValue>(
 
 1. `normalize(environment.store, entrypoint.normalizationAst, response, variables)`, and `markChanged` of its changes (change 2).
 2. `settle(environment.graph)` (change 4).
-3. Holds the new retention's root (Computing the new root).
-4. Adds the retention to `environment.retainedQueries`, after the root hold returns, so a throw leaves nothing retained that the caller holds no handle to.
-5. `notify(environment.graph)` (change 4).
+3. `retainEntrypoint`: holds the new retention's root (Computing the new root), then adds the retention to `environment.retainedQueries`, after the root hold returns, so a throw leaves nothing retained that the caller holds no handle to.
+4. `notify(environment.graph)` (change 4).
+
+```ts
+// from libs/isograph-runtime/src/environment.ts
+// normalizeData, before (change 2):
+export function normalizeData(
+  environment: IsographEnvironment,
+  ast: NormalizationAst,
+  response: JsonObject,
+  variables: Variables,
+): void {
+  markChanged(environment.graph, writeOrMark(environment, ast, response, variables).map(changeSource));
+}
+// after:
+export function normalizeData<TOutput>(
+  environment: IsographEnvironment,
+  entrypoint: Entrypoint<TOutput>,
+  response: JsonObject,
+  variables: Variables,
+): Retention<TOutput> {
+  markChanged(
+    environment.graph,
+    writeOrMark(environment, entrypoint.normalizationAst, response, variables).map(changeSource),
+  );
+  return retainEntrypoint(environment, entrypoint, variables);
+}
+```
 
 A derived node is live while a held root or an observed location reaches it through `Derived` dependencies. Several retentions of one entrypoint with equal variables have one `location` and one derived node, with one root hold each; a resolver shared by several queries is one derived node reached from several roots. The reference count of the user's design is implicit: a derived node stays live while any held root or observed location reaches it, and `dispose` of one retention leaves it live while another does. An explicit count would be computed from the root holds, the observers, and `dependents` (change 2); open decision 11.
 
@@ -1959,21 +1984,120 @@ A derived node is live while a held root or an observed location reaches it thro
 Depends on the held architecture.
 
 ```ts
-// from libs/isograph-runtime/src/environment.ts
-// in normalizeData, after normalize and markChanged (and change 4's settle), with `artifact` the
-// entrypoint's `readerArtifact()` and `ast` its `normalizationAst`:
-const location: DerivedNodeLocation = {
-  record: ast.root,
-  storeKey: resolverStoreKey(artifact.selectableName, variables),
-};
-const [, releaseRoot] = retainRoot(
-  environment.graph,
-  resolverDerivedNode(location.record, location.storeKey),
-  () => resolverDefinition(environment.store, artifact, ast.root, variables),
-);
+// from libs/isograph-runtime/src/retention.ts
+/** Holds the root derived node of `entrypoint` on `variables`, computing it and every result it
+ * reaches when absent or `Stale`, and adds the retention to `environment.retainedQueries`. Writes
+ * nothing to the store. */
+export function retainEntrypoint<TOutput>(
+  environment: IsographEnvironment,
+  entrypoint: Entrypoint<TOutput>,
+  variables: Variables,
+): Retention<TOutput> {
+  const ast = entrypoint.normalizationAst;
+  const artifact = entrypoint.readerArtifact();
+  const location: DerivedNodeLocation = {
+    record: ast.root,
+    storeKey: resolverStoreKey(artifact.selectableName, variables),
+  };
+  const [, releaseRoot] = retainRoot(
+    environment.graph,
+    resolverDerivedNode(location.record, location.storeKey),
+    () => resolverDefinition(environment.store, artifact, ast.root, variables),
+  );
+  const retention: Retention<TOutput> = { ast, variables, artifact, location, releaseRoot };
+  environment.retainedQueries.add(retention);
+  return retention;
+}
 ```
 
-`ast.root` is present: `normalize` inserts it before writing anything. The derived nodes the new retention reaches are computed here, children before parents: the root's computation reads each `Resolver` node through `readDerivedNode`, which computes the child, or brings it up to date, first. This is the bottom-up order the user's design creates them in on the way back up the response (Resolver markers, below). A derived node already stored and `Clean` is read as is; one that is `Stale` recomputes. A `normalizeData` of an already retained entrypoint and variables whose response changed nothing calls no resolver.
+When `normalizeData` calls it, `ast.root` is present: `normalize` inserts it before writing anything. When `retainQueryWithoutMakingNetworkRequest` calls it, `ast.root` can be absent (Serving from the store). The derived nodes the new retention reaches are computed here, children before parents: the root's computation reads each `Resolver` node through `readDerivedNode`, which computes the child, or brings it up to date, first. This is the bottom-up order the user's design creates them in on the way back up the response (Resolver markers, below). A derived node already stored and `Clean` is read as is; one that is `Stale` recomputes. A `normalizeData` of an already retained entrypoint and variables whose response changed nothing calls no resolver.
+
+### Serving from the store
+
+`fetchEntrypoint` serves a query without a request in two cases (`libs/isograph-runtime/src/network.ts:71-104`): `shouldFetch` `No`, and `IfNecessary` when `check` reports `EnoughData`. Both call `retainQueryWithoutMakingNetworkRequest`, which retains the query's AST and makes no `normalizeData` call, so under change 3 as written above it holds no root and computes no result: a query served from the store has no root derived node, `snapshot` at its location returns `undefined`, and a `listen` there only registers, against the Goal. It holds and computes the root as `normalizeData` does, through `retainEntrypoint`:
+
+```ts
+// from libs/isograph-runtime/src/network.ts
+// before (network-and-subscriptions.md, `fetchEntrypoint`):
+function retainQueryWithoutMakingNetworkRequest(
+  environment: IsographEnvironment,
+  ast: NormalizationAst,
+  variables: Variables,
+): ItemCleanupPair<PromiseWrapper<void, unknown>> {
+  let status: NetworkRequestStatus = {
+    kind: 'Undisposed',
+    retainedQuery: retainArtifact(environment, ast, variables),
+  };
+  return [
+    wrapResolvedValue(undefined),
+    () => {
+      if (status.kind === 'Undisposed') {
+        unretainQuery(environment, status.retainedQuery);
+        status = { kind: 'Disposed' };
+      }
+    },
+  ];
+}
+// after:
+function retainQueryWithoutMakingNetworkRequest<TOutput>(
+  environment: IsographEnvironment,
+  entrypoint: Entrypoint<TOutput>,
+  variables: Variables,
+): ItemCleanupPair<PromiseWrapper<void, unknown>> {
+  let status: RetentionStatus = {
+    kind: 'Undisposed',
+    retention: retainEntrypoint(environment, entrypoint, variables),
+  };
+  return [
+    wrapResolvedValue(undefined),
+    () => {
+      if (status.kind === 'Undisposed') {
+        dispose(environment, status.retention);
+        status = { kind: 'Disposed' };
+      }
+    },
+  ];
+}
+
+type RetentionStatus = RetentionStatusUndisposed | NetworkRequestStatusDisposed;
+
+type RetentionStatusUndisposed = {
+  readonly kind: 'Undisposed';
+  readonly retention: Retention<unknown>;
+};
+```
+
+```ts
+// from libs/isograph-runtime/src/network.ts
+// fetchEntrypoint, before:
+    case 'No':
+      return retainQueryWithoutMakingNetworkRequest(
+        environment,
+        entrypoint.normalizationAst,
+        variables,
+      );
+    case 'IfNecessary':
+      return check(environment.store, entrypoint.normalizationAst, variables)
+        .kind === 'EnoughData'
+        ? retainQueryWithoutMakingNetworkRequest(
+            environment,
+            entrypoint.normalizationAst,
+            variables,
+          )
+        : makeNetworkRequest(environment, entrypoint, variables, fetchOptions);
+// after:
+    case 'No':
+      return retainQueryWithoutMakingNetworkRequest(environment, entrypoint, variables);
+    case 'IfNecessary':
+      return check(environment.store, entrypoint.normalizationAst, variables)
+        .kind === 'EnoughData'
+        ? retainQueryWithoutMakingNetworkRequest(environment, entrypoint, variables)
+        : makeNetworkRequest(environment, entrypoint, variables, fetchOptions);
+```
+
+Deltas: the function takes the entrypoint instead of its AST; its status holds the `Retention` instead of a `RetainedQuery`, and its cleanup calls `dispose`, which removes the retention from `environment.retainedQueries` as `unretainQuery` removed the `RetainedQuery`, and releases the root hold. `retainArtifact` keeps its one other caller, `makeNetworkRequest`. `IsographEntrypoint<TParam, TOutput, TEntityName>` is assignable to `Entrypoint<TOutput>` (`normalizeData`). The retain is still taken when the call is made, so no write between the call and a later read can be missed: a write after `retainEntrypoint` marks or queues the root as it would after `normalizeData`. No `settle` or `notify` runs: outside a write the queue is empty (Reads during recalculation), and the root hold recomputes only `Stale` or new derived nodes, whose dependents are `Stale`, so no observed value changes.
+
+Under `IfNecessary` the root record is present, because `check` found every selection of the AST, starting at `ast.root`. Under `No` it can be absent. What the root hold does then is open decision 21 (held (a): the root derived node is created and computes `MissingData` for the absent record).
 
 ### Unobserved results are lazy
 
@@ -2027,6 +2151,8 @@ Reason for (a): every marker in (b) is already reachable from the root through r
 - `FriendPage` retained, then a `PetDetail` response for `Pet:1` whose `bestFriend` is `Pet:3` (`PetDetail` selects no `nickname` under `bestFriend`): the next `readStoredResult` of `FriendPage` recomputes `FriendLabel`, which reads `PetName` on `Pet:3`, and returns `MissingData` naming `Pet:3`; `garbageCollectEnvironment` keeps `Pet:3`, which `FriendPage`'s AST reaches through the new link.
 - A throwing resolver in one retained query: `normalizeData` returns, that query's root holds `ResolverThrew`, and another retained query's stored results are unchanged.
 - A derived node stored by a plain `readStoredResult` outside any retention is disposed by `garbageCollectEnvironment`; one under a held root is kept.
+- Served from the store: after `normalizeData` of `BadgePage` with `{ id: "1" }` and `dispose` of its retention, `fetchEntrypoint` of `BadgePage` with `shouldFetch` `IfNecessary` sends no request (the network function is not called), calls none of the five resolvers (their derived nodes are `Clean`), and `environment.retainedQueries` holds one more `Retention`, whose `location` has a stored derived node; the returned cleanup removes it, and `garbageCollectEnvironment` then leaves `environment.graph.derivedNodes` empty.
+- `shouldFetch` `No` on `new Map()`: the call sends no request, and the derived node at the `Retention`'s `location` holds `MissingData` naming `Query.__ROOT`; a later `normalizeData` of `BadgePage`'s response calls each of the five resolvers once.
 - `dispose` of `FriendPage`'s retention, then a change to `Pet:2.name` before `garbageCollectEnvironment`: no resolver is called.
 - store.md's GC tests and network-and-subscriptions.md's tests of `garbageCollectEnvironment` are unchanged: the first call `garbageCollect` with a retained list and compare the store with `storeOf`; the second retain through `retainQuery` and compare `environment.store`.
 
@@ -2369,7 +2495,7 @@ An observer keeps its derived node current (it makes the node needed, so a write
 ## Docs this doc amends
 
 - `refactors/pending/runtime/store.md`: "`pico-runtime.md` stays parked" is replaced by this doc as the step after v1. `Store` is unchanged, and its functions keep their parameters and its tests hold. `normalize` writes through `writeValue`, skipping a value unchanged by its AST shape, returns `ReadonlyArray<StoreChange>`, and throws `PartialWriteError` (change 1); the package index stops exporting `normalize`, which `normalizeData` replaces there (change 2b, open decision 17); `garbageCollect` returns the links of the records it deleted (change 2).
-- `refactors/pending/runtime/network-and-subscriptions.md`: `IsographEnvironment` gains `graph`, which `createIsographEnvironment` creates (change 2). `environment.ts` gains `normalizeData` (change 2), which takes the entrypoint and returns a `Retention` that `environment.retainedQueries` also holds (change 3), and settles and notifies (change 4); `garbageCollectEnvironment` deletes the derived nodes of deleted records (change 2), collects unreached nodes (change 3), and settles and notifies (change 4). `makeNetworkRequest` calls `normalizeData` where it called `normalize` (change 2), and from change 3 holds the returned `Retention` and disposes it in its cleanup. Its Why the store-only functions stay store-only holds: the functions that need the graph take the environment. Its change 7 keeps request entries in `environment.requests`, beside the store, and `Store` stays store.md's nested map; this doc adds no field to `Store` either.
+- `refactors/pending/runtime/network-and-subscriptions.md`: `IsographEnvironment` gains `graph`, which `createIsographEnvironment` creates (change 2). `environment.ts` gains `normalizeData` (change 2), which takes the entrypoint and returns a `Retention` that `environment.retainedQueries` also holds (change 3), and settles and notifies (change 4); `garbageCollectEnvironment` deletes the derived nodes of deleted records (change 2), collects unreached nodes (change 3), and settles and notifies (change 4). `makeNetworkRequest` calls `normalizeData` where it called `normalize` (change 2), and from change 3 holds the returned `Retention` and disposes it in its cleanup. Its Why the store-only functions stay store-only holds: the functions that need the graph take the environment. `retainQueryWithoutMakingNetworkRequest` takes the entrypoint, holds a `Retention` from `retainEntrypoint`, and disposes it in its cleanup (change 3, Serving from the store). Its change 7 keeps request entries in `environment.requests`, beside the store, and `Store` stays store.md's nested map; this doc adds no field to `Store` either.
 - `refactors/pending/graphql-protocol/normalization-ast.md`: `MergedSelectionTarget::Leaf`, `CompletedSelectionTarget::Leaf`, and `NormalizationTarget::Leaf` carry a `ListDepth`; the TypeScript `NormalizationSelection` becomes `NormalizationLeafSelection | NormalizationCompositeSelection`, and a leaf selection prints `listDepth` after `target` (change 1).
 - `refactors/pending/runtime/reader-ast.md`: `ReaderArtifact.selectableName` and its printing; the walk takes `ReadHooks<TFailure>` and `readButDoNotEvaluate` passes v1's hooks, so `read` and `readButDoNotEvaluate` keep their behavior and its tests hold unchanged; `ResolverResult` adds `ReadResolverThrew` to `ReadResult` for stored results, and `ReadResult` is unchanged (change 2). Its note that this doc's `computeResolver` and `readSelection` replace its `read` is superseded: its `read` stays, and `readStoredResult` is the stored read beside it (change 2).
 - `refactors/pending/runtime/normalization-ast-mount-markers.md`: candidate 6 is answered by Resolver markers (held: no marker); its open question on how this doc models a mount is answered by `Retention` and settlement.
@@ -2532,10 +2658,10 @@ Held, not approved, and not part of changes 1 to 4; it needs changes 2 and 3. Wi
 
 ```ts
 // from libs/isograph-runtime/src/network.ts
-// fetchEntrypoint, before (network-and-subscriptions.md):
+// fetchEntrypoint, before (change 3, Serving from the store):
     case "IfNecessary":
       return check(environment.store, entrypoint.normalizationAst, variables).kind === "EnoughData"
-        ? retainQueryWithoutMakingNetworkRequest(environment, entrypoint.normalizationAst, variables)
+        ? retainQueryWithoutMakingNetworkRequest(environment, entrypoint, variables)
         : makeNetworkRequest(environment, entrypoint, variables, fetchOptions);
 // after:
     case "IfNecessary":
@@ -2546,11 +2672,11 @@ Held, not approved, and not part of changes 1 to 4; it needs changes 2 and 3. Wi
         variables,
       ).kind === "MissingData"
         ? makeNetworkRequest(environment, entrypoint, variables, fetchOptions)
-        : retainQueryWithoutMakingNetworkRequest(environment, entrypoint.normalizationAst, variables);
+        : retainQueryWithoutMakingNetworkRequest(environment, entrypoint, variables);
 ```
 
 - A repeated call with no write between is a lookup: the root derived node is `Clean`, and `track` returns its stored result. After a write that reached it, the call recomputes it (`Stale`), or `settle` already did (needed). `check` walks the whole normalization AST on every call.
-- A root derived node this call creates is outside any retention until `normalizeData`'s root hold or a `listen` reaches it; `collect` (change 3) disposes it otherwise.
+- A root derived node this call creates is outside any retention until `retainEntrypoint`'s root hold (in `normalizeData`, or in `retainQueryWithoutMakingNetworkRequest` on the branch that serves from the store) or a `listen` reaches it; `collect` (change 3) disposes it otherwise.
 
 Why a complete read implies that the normalization AST's data is present:
 
@@ -2735,3 +2861,10 @@ A key that the reader's own location determines works. A loadable field's reques
 The state of an entrypoint's own request stays with the caller of `fetchEntrypoint`, which holds the returned `PromiseWrapper`; in React it reaches a component through the suspension derived node (Other derived node kinds), not through a selection.
 
 Not decided.
+
+### 21. The root hold of a query served from the store whose root record is absent
+
+`fetchEntrypoint` with `shouldFetch` `No` calls `retainQueryWithoutMakingNetworkRequest` whatever the store holds (`libs/isograph-runtime/src/network.ts:89-94`), so `retainEntrypoint` can run while `ast.root` is absent (change 3, Serving from the store). `readStoredResult` and `contextHooks` create no derived node on an absent record; they record `recordSource` and return `noRecord` (change 2, The store's side). `retainRoot` has no such branch.
+
+- (a) Create the root derived node anyway. Its computation is `resolverDefinition`'s: `readData` reports `readRecord(ast.root)` and returns `noRecord`, so the node holds `MissingData` naming the root and depends on `recordSource(ast.root)`. The first `normalize` that writes the root reports `RecordCreated` for it (change 1, `recordAt`), which marks or queues the node. Held, not decided. Reason: the retention then has a node at its `location` from the call on, so a `listen` there makes it needed and a later write computes it as for any retention. Cost: a derived node whose owner record is absent, the one exception to "no derived node on an absent record"; `deleteSource` does not reach it until the record exists and is deleted, and `collect` disposes it once no root holds it.
+- (b) Hold no root while `ast.root` is absent: `retainEntrypoint` adds the `Retention` to `environment.retainedQueries` and its `releaseRoot` does nothing. Cost: the location has no node; a later `normalizeData` of another entrypoint that writes the root creates none, so the first read of the location computes on demand, and a `listen` there only registers.
