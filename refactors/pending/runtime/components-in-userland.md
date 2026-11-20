@@ -100,7 +100,7 @@ Two consequences of the `??=`:
 
 ## The user's idea
 
-The component's stable location is determined by the record id, the field, and the variables. That is a resolver store key on a record (pico-runtime.md, The resolver store key). Store the component there, on the record, as change 2 stores a resolver result, and it is deleted with the record: change 3's `garbageCollect` deletes the records no retention reaches, and with them every resolver entry they hold, and sweeps resolver entries on surviving records that no retained or observed location reaches.
+The component's stable location is determined by the record id, the field, and the variables. That is a resolver store key on a record (pico-runtime.md, The resolver store key). Store the component there, on the record, as change 2 stores a resolver result, and it is deleted with the record: change 3's `garbageCollect` deletes the records no retention reaches, and with them every derived node they hold, and sweeps derived nodes on surviving records that no retained or observed location reaches.
 
 The rest of this doc asks how much of that userland can do without `@component` and without runtime code that knows about components. The closure field below needs runtime code that knows that a resolver can create a wrapper; it needs none that knows React.
 
@@ -332,7 +332,7 @@ This needs change 1's tagged entries and nothing else of changes 1 to 4. v1's `S
 Freeing:
 
 - store.md's `garbageCollect` deletes a record no retained query reaches, with every entry on it, the wrapper's included. Nothing else holds the wrapper except a parent's data that held it and the React tree that renders it, and both are dropped when the parent re-reads and the component unmounts.
-- Under change 3, the sweep of resolver entries on surviving records also sweeps closure entries that no retained or observed location reaches. A parent that selects the closure field reaches it through its `Entry` dependency.
+- Under change 3, the sweep of derived nodes on surviving records also sweeps closure derived nodes that no retained or observed location reaches. A parent that selects the closure field reaches it through its `Entry` dependency.
 - A record collected and later normalized again gets a new wrapper, so a component that was mounted across the collection remounts (open question 4). Upstream's leaked cache keeps the old one (What upstream does).
 
 Reading while writing: `closureWrapper` writes the store during a read. It advances no epoch, and no dependency observed the key before the write: the only reader of the key is a read of the closure field, which creates the entry before it records a dependency on it. Under change 2 that dependency is `Entry(record, key)` with `observed` the creation epoch, which changes only when the entry is deleted and created again; `garbageCollect` advances the epoch when it deletes, so the recreated entry's `timeUpdated` differs. pico-runtime.md open decision 8 concerns a resolver that reaches the store; this write is the runtime's, and does not break verification for the reason above.
@@ -500,7 +500,7 @@ This is the split option 2 builds out of `PetCardFetched` and `PetCardData` (Opt
 
 - Change 2: a parent that selects a closure field records one dependency on the closure entry. Its observed `timeUpdated` changes only when the entry is deleted and created again, so the parent's entry never recomputes for the closure's data.
 - Change 3: settlement does not compute the closure's data, because no parent depends on it. A component's render then reads its data, which pico-runtime.md's goal ("Renders do no work") excludes. The alternative is a second entry per closure entry, holding the data read as a `ResolverEntry`, which settlement computes when a retained root reaches the closure entry and which the component observes. Open question 3.
-- Change 4: Step A's `readAndSubscribe`, `subscriptionSnapshot`, and `listenToSubscription` are replaced by `listen` and `snapshot`, which take an `EntryLocation`, and `useClosureData` keeps its `useSyncExternalStore` shape with them as `subscribe` and `getSnapshot`. `useClosureData` then needs that second entry's location, so change 4 decides open question 3.
+- Change 4: Step A's `readAndSubscribe`, `subscriptionSnapshot`, and `listenToSubscription` are replaced by `listen` and `snapshot`, which take a `DerivedNodeLocation`, and `useClosureData` keeps its `useSyncExternalStore` shape with them as `subscribe` and `getSnapshot`. `useClosureData` then needs that second derived node's location, so change 4 decides open question 3.
 
 ### Without runtime support
 
@@ -607,7 +607,7 @@ export function useFragment<TEntityName extends EntityName, TOutput>(
   variables: Variables,
 ): TOutput {
   const store = useStore();
-  const location: EntryLocation = {
+  const location: DerivedNodeLocation = {
     record: link,
     storeKey: resolverStoreKey(artifact.selectableName, variables),
   };
@@ -615,7 +615,7 @@ export function useFragment<TEntityName extends EntityName, TOutput>(
     (onStoreChange) => listen(store, location, onStoreChange),
     () => snapshot(store, location),
   );
-  // The entry at `location` was computed by `artifact`: one selectable of one entity has one
+  // The derived node at `location` was computed by `artifact`: one selectable of one entity has one
   // reader artifact (change 2, `read`).
   return unwrapForRender(result as ReadResult<TOutput> | undefined);
 }
@@ -665,7 +665,7 @@ As written, this does not fetch the card's data. Query generation inlines the se
 
 #### Fetching the component's data without the field depending on it
 
-`PetCard` has to select something that brings `PetCardData`'s selections into the query. If it selects `PetCardData` directly, its resolver entry depends on `PetCardData`'s entry, re-runs when the card's data changes, and returns a new function: the closure problem again, though the function does not use the value. The selection has to reach `PetCardData` through a field whose own result does not change. In userland that is a field whose resolver returns a constant:
+`PetCard` has to select something that brings `PetCardData`'s selections into the query. If it selects `PetCardData` directly, its derived node depends on `PetCardData`'s derived node, re-runs when the card's data changes, and returns a new function: the closure problem again, though the function does not use the value. The selection has to reach `PetCardData` through a field whose own result does not change. In userland that is a field whose resolver returns a constant:
 
 ```ts
 // from demos/pet-demo/src/PetCard.tsx
@@ -842,7 +842,7 @@ Option 2 under change 2 (`id`, a constant-returning field, a data field, and `us
 - Kind: closure built by hand over an eager field whose inputs never change.
 - Ergonomics: three iso literals per component, a hand-built link, and arguments repeated in the hook call.
 - Type safety: `useFragment` checks the artifact's output type, and, typed as reader-ast.md's `read` is (`ReaderArtifact<ResolverParam<TEntityName>, TOutput, TEntityName>` and `NoInfer<Link<TEntityName>>`), that the link's entity is the artifact's parent entity. It does not check that the variables are the ones the selection passed (`Variables` is any JSON map).
-- Garbage collection: the component lives in `PetCard`'s resolver entry on `Pet:1` and is deleted with the record or by change 3's sweep.
+- Garbage collection: the component lives in `PetCard`'s derived node on `Pet:1` and is deleted with the record or by change 3's sweep.
 - React: stable across data changes; the component re-renders alone on its own data; the parent does not re-render. The component suspends at its own boundary only when its data goes missing after the parent rendered; data missing at the parent's read blocks the parent.
 - Support needed: changes 2 to 4, and a React package with `useStore`, `useFragment`, and a store provider. No compiler change. Records without an identity selectable and fields on abstract entities get their link from `ResolverParam.link` (reader-ast.md, A resolver's own link).
 
