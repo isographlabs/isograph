@@ -1163,7 +1163,9 @@ function markCheck<TValue>(node: DerivedNode<TValue>): void {
 }
 
 /** The pull. `Check`: brings the `Derived` dependencies up to date until one marks `node` `Dirty`.
- * `Dirty` then: recomputes. The node ends `Clean`. Does nothing to a `Clean` derived node. */
+ * `Dirty` then: recomputes. The node ends `Clean`. Does nothing to a `Clean` derived node. A throw
+ * out of a computation propagates before the mark is set, so the node keeps its mark, value, and
+ * dependencies, and the next pull retries it. */
 function bringUpToDate<TValue>(graph: RecomputationGraph<TValue>, node: DerivedNode<TValue>): void {
   if (stateOf(node).mark === 'Check') {
     checkDependencies(graph, node);
@@ -1262,6 +1264,8 @@ A pull is `bringUpToDate`. A `Clean` derived node returns at once. A `Check` der
 The walk in recorded order is sound when a recomputation would read other dependencies. A computation's later reads depend only on what it read earlier, so up to the first dependency whose value changed, the recorded reads are the reads a recomputation would make, and the walk stops at that dependency. A source dependency needs no walk: a changed source marked its readers `Dirty` directly.
 
 A derived node recomputes at most once per write. It ends `Clean` after its pull, and only marking makes it non-`Clean`. `markChanged` runs in a write, before any pull. `recompute`'s marking of dependents runs during a pull and reaches only non-`Clean` derived nodes, by the invariant below, so it never re-marks a derived node pulled earlier in the same pass. The parent whose read reached the node is computing or checking; marking it `Dirty` makes a checking parent recompute, and a computing parent reads the new value and ends `Clean`. Keeping the old value when `valuesEqual` holds keeps its identity, which the cutoff and change 4's notification read.
+
+A throw during a pull never leaves a derived node `Clean`. `compute` throws before `recompute` calls `setDependencies` and before it compares or stores a value, and `bringUpToDate` sets the mark only after `recompute` returns, so the node keeps its mark (`Dirty`), its previous value, and its previous dependencies and dependents. A checking ancestor whose `checkDependencies` was running keeps its mark too, and a `createDerivedNode` whose computation throws stores nothing. Every later pull of the node recomputes it again, and a later `markChanged` of a source it read leaves it `Dirty`. A resolver's own throw does not propagate: `callResolver` stores it as `ResolverThrew` (open decision 5 (a)), a value, and the node ends `Clean`. What does propagate is a throw of the walk outside the resolver, such as `linkAt` on a non-link (open decision 22).
 
 Invariant, outside a call that is pulling: every dependent of a non-`Clean` derived node is non-`Clean`. Marking keeps it, because a derived node that leaves `Clean` marks its dependents `Check`. A new dependent is added only by a computation, which pulled the derived node first, and a pulled node ends `Clean` only after every node it read was pulled. So every derived node a `Clean` node reads is `Clean`, transitively. `markCheck` stops at a marked derived node because the invariant says its dependents are marked too, so a second write to a source costs one step per node that read it.
 
@@ -1687,6 +1691,7 @@ New, in `test/graph.test.ts` (2a), with literal ids and computations that read s
 - Cutoff on the pull: an outer node reads an inner node that read `a`; after `markChanged([a])`, with the inner computation returning a value `valuesEqual` accepts, `track` of the outer runs the inner computation once and the outer computation zero times, and both end `Clean`.
 - Dependencies follow the last computation: a computation that read `a` and then, after `markChanged([a])`, reads `b` instead is not marked by a later `markChanged([a])`, and `sourceDependents` no longer holds a set for `a`.
 - `deleteSource` of a derived node's owner: `derivedNodes` no longer holds the node, `owned` no longer holds the owner, and an outer node that read it is `Dirty`.
+- A computation that throws: an outer node reads an inner node that read `a`; after `markChanged([a])`, with the inner computation throwing, `track` of the outer throws that error; the inner node is `Dirty` and the outer `Check`, the inner value is `toBe` its value before the write, and `sourceDependents` still holds the inner node under `a`. A second `track` throws again and runs the inner computation once more. After the inner computation stops throwing, the next `track` runs it once, returns the new value, and both nodes end `Clean`.
 - Degenerate: `deleteSource` of a source nothing owns or read changes nothing.
 
 New, in `test/memo.test.ts` (2b), over an environment built with `createIsographEnvironment(new Map(), deferredNetwork().networkFunction)`. Call counts come from `vi.spyOn(readerArtifact, 'resolver')`, which replaces the method on the one artifact object every `Resolver` node reads. Fixture sources added to store.md's fixture project:
@@ -1733,6 +1738,7 @@ In this change nothing settles after a write; each case writes with `normalizeDa
 - Missing then present: a read of `FriendPage` with `Pet:2` lacking `nickname` is `MissingData`; after `nickname` is written, the next read is `Ok` and calls `PetName`.
 - Absent record: `FriendPage` read while `Pet:1.bestFriend` links a `Pet:9` absent from the store is `MissingData` naming `Pet:9`; after `normalizeData` writes `Pet:9` with `name` and `nickname`, the next read is `Ok`.
 - A deleted record: after `garbageCollectEnvironment` deletes `Pet:2`, the next read of a stored `FriendPage` result is `MissingData` with `recordLink` `Pet:2`, not the stored `Ok`, and `environment.graph.derivedNodes` holds no derived node of `Pet:2`.
+- A throw outside the resolver: after a read of `FriendPage` with `{ id: "1" }`, the test sets `Pet:1.bestFriend` to the string `"x"` with `environment.store.get('Pet')?.get('1')?.set('bestFriend', 'x')` and calls `markChanged(environment.graph, [valueSource(Pet:1, 'bestFriend')])`. `readStoredResult` of `FriendPage` throws `linkAt`'s "holds a non-link under the composite store key" error, and a second call throws it again and calls `FriendLabel`'s resolver zero times. After `normalizeData` of a `PetDetail` response whose `bestFriend` is `Pet:2`, the next `readStoredResult` of `FriendPage` is `Ok`.
 - A resolver that throws: `readStoredResult` returns `ResolverThrew` with the error, the field's selectable name, and the record; its parent's result is the same `ResolverThrew` object. `read` of the same artifact throws, as in v1.
 - A partial write: a response that throws part-way after changing `Pet:1.name`: `normalizeData` rethrows the `PartialWriteError`, and the next read of `BadgePage` calls `Initial` once.
 - `resolverStoreKey`: `RecentCheckins` with `{ n: 2 }` is `RecentCheckins____n___2`; `{}` is `RecentCheckins`; `{ b: 1, a: "x" }` is `X____a___"x"____b___1`.
@@ -2852,7 +2858,7 @@ Not decided; it arises with client pointers.
 
 ### 19. An upward read during `settle`
 
-Closed: the question does not arise under held 3b. It was 3a's: a derived node recomputing in its height's bucket could read a `Clean` derived node at or above that height whose own input was still queued, and recompute from that derived node's result from before the write. Under 3b there are no buckets, and every read is a pull, which brings the derived node read up to date, its inputs first, before returning its value (Ordering).
+Closed: the question does not arise under held 3b. Under 3a as written, with this decision's (a), an upward read during the drain stored a result computed from `FriendCard` on `Pet:1`'s value from before the write as `Clean` until `FriendCard`'s own change requeued the reader. It was 3a's: a derived node recomputing in its height's bucket could read a `Clean` derived node at or above that height whose own input was still queued, and recompute from that derived node's result from before the write. Under 3b there are no buckets, and every read is a pull, which brings the derived node read up to date, its inputs first, before returning its value (Ordering).
 
 ### 20. Which request a request-state selection refers to
 
@@ -2877,9 +2883,11 @@ Not decided.
 
 `callResolver` catches only the resolver's throw (change 2, Results, equality, and a resolver that throws). The walk that `resolverDefinition`'s computation runs before it throws on a broken store invariant: `linkAt` on a non-link under a composite store key (`libs/isograph-runtime/src/store.ts:74-87`, the throw at `:81`, reached from `readLinkedValue`, `read.ts:226`), and `storeKey`'s `variableValue` on a missing variable (`storeKey.ts:56-63`, the throw at `:59`, reached from `readSelection`, `read.ts:131` and `:133`). Step A's read catches both as `ReadErr` (`readSubscription`, `subscribe.ts:120-131`); the stored read catches neither.
 
+Under 3a this lost the node: `bringUpToDate` removed it from its bucket before recomputing, so a throw such as `linkAt`'s at `store.ts:81` on a non-link under `Pet:1.bestFriend` left it `Queued` in no bucket; `invalidate` skipped it because it was not `Clean`, `settle` never reached it, and `snapshot` returned its value from before the corruption forever. Held 3b removes that: there is no bucket, and the rule change 2's engine keeps is that any throw that propagates out of a pull leaves the node marked with its previous dependencies, never `Clean`, and the next pull retries it (change 2, The engine; its Tests cover it).
+
 Under held 3b, a throw out of `compute` propagates out of `recompute` before `setDependencies` records the new reads, and out of `bringUpToDate` before it sets the mark `Clean`. The derived node keeps its mark, its previous value, and its previous dependencies, and the next pull of it (a read, or the next write's `settle`) recomputes it again. A checking ancestor whose `checkDependencies` was running keeps its mark too. A throw out of `createDerivedNode`'s `compute` stores nothing. Either propagates out of `readStoredResult`, `retainRoot`, or `observe`. A throw during `settle` stops its loop: the observed derived nodes after it stay marked, and `normalizeData` skips `retainEntrypoint` and `notify` and throws.
 
-- (a) `compute` catches any throw from the computation and stores it as the derived node's value, as the subscription path stores `ReadErr`. Held, not decided. Reason: `bringUpToDate` returns normally, so the node ends `Clean`, `settle` continues, and `notify` runs; the dependencies the computation recorded before the throw are kept, so a write that repairs one of them recomputes the node. Cost: an engine bug in a computation is also stored as a value instead of surfacing as a throw.
+- (a) `compute` catches any throw from the computation and stores it as the derived node's value, as the subscription path stores `ReadErr`. Held, not decided. Reason: `bringUpToDate` returns normally, so the node ends `Clean`, `settle` continues, and `notify` runs; the dependencies the computation recorded before the throw are kept, so a write that repairs one of them recomputes the node. Cost: an engine bug in a computation is also stored as a value instead of surfacing as a throw. It departs from the rule the body keeps: the node ends `Clean` holding `Err`, and it is retried only when a source or derived node it recorded before the throw changes, not on the next pull.
 
   ```ts
   // from libs/isograph-runtime/src/graph.ts
