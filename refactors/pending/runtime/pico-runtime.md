@@ -476,7 +476,7 @@ components-in-userland.md says a closure field's wrapper is "stored on the recor
 
 ### Costs of the ids
 
-- An id per read. Each server read in a computation builds two strings (`recordSource`, `valueSource`) and each resolver read one (`resolverDerivedNode`; `resolverStoreKey` is built in any design), and `setDependencies` does one `Map` lookup per id. A store-coupled engine does the same reads as three nested `Map` lookups with no string built. The order of growth is the same; the string building is the extra, and it is not measured. An interned object per (entity, id, store key) avoids the string but needs an intern table, whose derived nodes need the same lifetime rule as `sourceDependents` (deleted when no node reads them), so it is `sourceDependents` again under a second name; the string is held.
+- An id per read. Each server read in a computation builds two strings (`recordSource`, `valueSource`) and each resolver read one (`resolverDerivedNode`; `resolverStoreKey` is built in any design), and `setDependencies` does one `Map` lookup per id. A store-coupled engine does the same reads as three nested `Map` lookups with no string built. The order of growth is the same; the string building is the extra, and it is not measured. An interned object per (entity, id, store key) avoids the string but needs an intern table, whose members need the same lifetime rule as `sourceDependents` (deleted when no node reads them), so it is `sourceDependents` again under a second name; the string is held.
 - A presence edge per (derived node, record read): one more `sourceDependents` set member than a store-coupled engine keeps for a node that read a present record.
 - A map lookup instead of a field: a derived node does not sit in a per-record map, so deleting a record finds its nodes through `owned`, one more map kept by node creation and disposal.
 - The casts in the id functions.
@@ -559,11 +559,11 @@ A constructor that throws. Options:
 
 - (a) The derived node's value becomes `ResolverThrew` (open decision 5 (a)), held as `NotConstructed`; the old value is released through `pendingReleases`, as any replacement; the dependents are invalidated. Held. Reason: `setDependencies` has already recorded the new computation's reads, so a derived node that kept its old value would hold a value that no recorded input explains, and it would stay stale until one of the new inputs changes.
 - (b) Keep the old holding and value, and record the error elsewhere. Cost: the stale value above, and a second place an error lives.
-- (c) Propagate out of `normalize`. Cost: open decision 5 (b)'s, every needed derived node left unsettled.
+- (c) Propagate out of `normalizeData`. Cost: open decision 5 (b)'s, every needed derived node left unsettled.
 
 A destructor that throws. Options:
 
-- (a) `flushReleases` runs every remaining cleanup, then rethrows one error as is or several as an `AggregateError`, open decision 9's rule; `normalize` combines them with `notify`'s errors into one `AggregateError` when both threw. The derived node is unaffected: it dropped the value before the cleanup ran. Held.
+- (a) `flushReleases` runs every remaining cleanup, then rethrows one error as is or several as an `AggregateError`, open decision 9's rule; `normalizeData` and `garbageCollectEnvironment` combine them with `notify`'s errors into one `AggregateError` when both threw. The derived node is unaffected: it dropped the value before the cleanup ran. Held.
 - (b) Stop at the first throw. Cost: later resources leak.
 
 A cleanup is never called twice by the engine; a handle's own second-call throw (`CacheItem.ts:125-130`) is not reachable from it.
@@ -576,7 +576,7 @@ A cleanup is never called twice by the engine; a handle's own second-call throw 
 - 4, handles: the derived node's value is the handle; `snapshot` returns it, a lookup, readable during render.
 - 5, deduplication: under R6, two retained queries that reach the same pointer on the same record already share one derived node, so the key Follow-ups 5 names (the record, the selectable, the variables) is the node's id and needs no registry. Sharing across different derived nodes (two pointers that return the same target) needs a key of the follow-up itself: the target link, the target fragment's selectable, and its variables. A recomputation to a new target constructs under the new key.
 - 6, a destructor and an in-flight follow-up: the deferred release calls the follow-up's cleanup, which aborts its request through the `AbortSignal` the network function accepts.
-- 7, deferral: `flushReleases` is the batch. It can be handed to the caller-supplied scheduler instead of run at the end of `normalize`, and a handle released and retained again before the batch runs is not destroyed, because the second retain reached it first. A constructor that defers its own setup returns the handle at once and schedules the rest; the engine sees only the pair.
+- 7, deferral: `flushReleases` is the batch. It can be handed to the caller-supplied scheduler instead of run at the end of `normalizeData` and `garbageCollectEnvironment`, and a handle released and retained again before the batch runs is not destroyed, because the second retain reached it first. A constructor that defers its own setup returns the handle at once and schedules the rest; the engine sees only the pair.
 
 ## Steps
 
@@ -1250,7 +1250,7 @@ A source other than a store field is exposed to user code the same way, as a sel
 - isograph syntax for the selection;
 - a reader AST node kind for it;
 - a `ReadHooks` hook the walk calls at that node, which `contextHooks` implements by calling `context.readSource` with the kind's `SourceId` constructor in `sources.ts`, as `readValue` calls it with `valueSource` (for a request, `requestSource(key: RequestKey): SourceId`);
-- in every writer of that source, the source among the sources it passes to `markChanged`, as `normalizeData` passes `changeSource` of each `StoreChange`.
+- in every writer of that source, the source among the sources it passes to `markChanged`, as `normalizeData` passes `changeSource` of each `StoreChange`, and `deleteSource` of the source in a writer that deletes what the source names, as `garbageCollectEnvironment` calls it with `recordSource` of each deleted record (for a request entry, network-and-subscriptions.md, Request entries in the store).
 
 The syntax and the reader AST node's shape are not decided. Which request a request-state selection refers to is open decision 20.
 
@@ -1386,8 +1386,8 @@ function compute<TValue>(
 }
 
 /**
- * Replaces `derived node.dependencies` with `next`, and removes `node` from the dependents of each old
- * dependency and adds it to those of each new one. Deletes an `sourceDependents` set left empty.
+ * Replaces `node.dependencies` with `next`, and removes `node` from the dependents of each old
+ * dependency and adds it to those of each new one. Deletes a `sourceDependents` set left empty.
  */
 function setDependencies<TValue>(
   graph: RecomputationGraph<TValue>,
@@ -1395,7 +1395,7 @@ function setDependencies<TValue>(
   next: ReadonlyArray<GraphDependency<TValue>>,
 ): void;
 
-/** `setDependencies(graph, derived node, [])`, then removes `node` from `derivedNodes` and from its owner's
+/** `setDependencies(graph, node, [])`, then removes `node` from `derivedNodes` and from its owner's
  * `owned` set, deleting the set when it is left empty. */
 function disposeDerivedNode<TValue>(graph: RecomputationGraph<TValue>, node: DerivedNode<TValue>): void;
 ```
@@ -1979,7 +1979,7 @@ Reason for (a): every marker in (b) is already reachable from the root through r
 
 Depends on the held architecture, except `listen`, `snapshot`, and `Observed`.
 
-This change adds observers, and with them needed derived nodes: a derived node is needed when an observer is at its location or a needed derived node reads it. A write recomputes the needed derived nodes whose inputs changed inside `normalize`, lowest height first, and marks every other derived node it reaches `Stale`, as change 2 does.
+This change adds observers, and with them needed derived nodes: a derived node is needed when an observer is at its location or a needed derived node reads it. A write recomputes the needed derived nodes whose inputs changed inside `normalizeData`, lowest height first, and marks every other derived node it reaches `Stale`, as change 2 does.
 
 ### Heights
 
@@ -1996,7 +1996,7 @@ function heightAbove<TValue>(dependencies: ReadonlyArray<GraphDependency<TValue>
   );
 }
 
-/** Sets `derived node.height` to `height`, moving the node to `graph.queue[height]` when it is in its
+/** Sets `node.height` to `height`, moving the node to `graph.queue[height]` when it is in its
  * bucket, then raises each dependent whose height is not above `height` to one more, transitively. */
 function raiseHeight<TValue>(
   graph: RecomputationGraph<TValue>,
@@ -2068,7 +2068,7 @@ export type DerivedNodeState = 'Clean' | 'Queued' | 'Stale';
 
 ```ts
 // from libs/isograph-runtime/src/graph.ts
-/** Adds one to `derived node.neededCount`; when it was 0, adds one to that of each derived node it reads. */
+/** Adds one to `node.neededCount`; when it was 0, adds one to that of each derived node it reads. */
 function addNeed<TValue>(node: DerivedNode<TValue>): void {
   node.neededCount += 1;
   if (node.neededCount === 1) {
@@ -2076,7 +2076,7 @@ function addNeed<TValue>(node: DerivedNode<TValue>): void {
   }
 }
 
-/** Subtracts one from `derived node.neededCount`; when it reaches 0, subtracts one from that of each derived node it reads. */
+/** Subtracts one from `node.neededCount`; when it reaches 0, subtracts one from that of each derived node it reads. */
 function removeNeed<TValue>(node: DerivedNode<TValue>): void {
   node.neededCount -= 1;
   if (node.neededCount === 0) {
@@ -2091,7 +2091,7 @@ function derivedNodeDependencies<TValue>(node: DerivedNode<TValue>): Set<Derived
 Writers of `neededCount`:
 
 - `createDerivedNode` starts it, and `rootCount`, at the number of callbacks `graph.observers` holds at its id, before `setDependencies`, so an observed derived node created by a computation needs what it reads.
-- `setDependencies`, when `derived node.neededCount > 0`, calls `addNeed` on each distinct `Derived` dependency of `next` that the old list does not hold, and `removeNeed` on each distinct `Derived` dependency of the old list that `next` does not hold. Distinct, because `dependents` is a set: a dependency recorded twice is one edge.
+- `setDependencies`, when `node.neededCount > 0`, calls `addNeed` on each distinct `Derived` dependency of `next` that the old list does not hold, and `removeNeed` on each distinct `Derived` dependency of the old list that `next` does not hold. Distinct, because `dependents` is a set: a dependency recorded twice is one edge.
 - `observe` and its stop function (`listen` and `snapshot`, below).
 - Disposing a derived node calls `setDependencies(graph, node, [])`, which removes its need from what it read when it was needed.
 
@@ -2313,7 +2313,7 @@ An observer keeps its derived node current (it makes the node needed, so a write
 ## Docs this doc amends
 
 - `refactors/pending/runtime/store.md`: "`pico-runtime.md` stays parked" is replaced by this doc as the step after v1. `Store` is unchanged, and its functions keep their parameters and its tests hold. `normalize` writes through `writeValue`, skipping a value unchanged by its AST shape, returns `ReadonlyArray<StoreChange>`, and throws `PartialWriteError` (change 1); `garbageCollect` returns the links of the records it deleted (change 2).
-- `refactors/pending/runtime/network-and-subscriptions.md`: `IsographEnvironment` gains `graph`, which `createIsographEnvironment` creates (change 2). `environment.ts` gains `normalizeData` (change 2), which takes the entrypoint and returns a `Retention` that `environment.retainedQueries` also holds (change 3), and settles and notifies (change 4); `garbageCollectEnvironment` deletes the derived nodes of deleted records (change 2), collects unreached nodes (change 3), and settles and notifies (change 4). `makeNetworkRequest` calls `normalizeData` where it called `normalize` (change 2), and from change 3 holds the returned `Retention` and disposes it in its cleanup. Its Why the store-only functions stay store-only holds: the functions that need the graph take the environment. Its change 7 is the only change that makes `Store` an object; this doc adds no field to `Store`.
+- `refactors/pending/runtime/network-and-subscriptions.md`: `IsographEnvironment` gains `graph`, which `createIsographEnvironment` creates (change 2). `environment.ts` gains `normalizeData` (change 2), which takes the entrypoint and returns a `Retention` that `environment.retainedQueries` also holds (change 3), and settles and notifies (change 4); `garbageCollectEnvironment` deletes the derived nodes of deleted records (change 2), collects unreached nodes (change 3), and settles and notifies (change 4). `makeNetworkRequest` calls `normalizeData` where it called `normalize` (change 2), and from change 3 holds the returned `Retention` and disposes it in its cleanup. Its Why the store-only functions stay store-only holds: the functions that need the graph take the environment. Its change 7 keeps request entries in `environment.requests`, beside the store, and `Store` stays store.md's nested map; this doc adds no field to `Store` either.
 - `refactors/pending/graphql-protocol/normalization-ast.md`: `MergedSelectionTarget::Leaf`, `CompletedSelectionTarget::Leaf`, and `NormalizationTarget::Leaf` carry a `ListDepth`; the TypeScript `NormalizationSelection` becomes `NormalizationLeafSelection | NormalizationCompositeSelection`, and a leaf selection prints `listDepth` after `target` (change 1).
 - `refactors/pending/runtime/reader-ast.md`: `ReaderArtifact.selectableName` and its printing; the walk takes `ReadHooks<TFailure>` and `readButDoNotEvaluate` passes v1's hooks, so `read` and `readButDoNotEvaluate` keep their behavior and its tests hold unchanged; `ResolverResult` adds `ReadResolverThrew` to `ReadResult` for stored results, and `ReadResult` is unchanged (change 2). Its note that this doc's `computeResolver` and `readSelection` replace its `read` is superseded: its `read` stays, and `readStoredResult` is the stored read beside it (change 2).
 - `refactors/pending/runtime/normalization-ast-mount-markers.md`: candidate 6 is answered by Resolver markers (held: no marker); its open question on how this doc models a mount is answered by `Retention` and settlement.
@@ -2386,7 +2386,7 @@ A destructor needs to know when the last reference goes away. Retention (change 
 
 ### 2. A client pointer is a function plus a follow-up query
 
-A client pointer's resolver runs at normalization time, like any other resolver result in settlement, and returns an id. When the target record lacks the data the selection through the pointer needs (a `check` of the target's normalization AST at that record reports `MissingData`), `normalize` starts a follow-up query for that record (a refetch through `derived node(id:)`). The follow-up is a retained child of the parent retention: the parent's `dispose` releases it, and so does a later settlement in which the pointer returns a different id. This is candidate 4 of `refactors/pending/runtime/normalization-ast-mount-markers.md`, with the client pointer of its candidate 5 as the thing that starts it.
+A client pointer's resolver runs at normalization time, like any other resolver result in settlement, and returns an id. When the target record lacks the data the selection through the pointer needs (a `check` of the target's normalization AST at that record reports `MissingData`), `normalize` starts a follow-up query for that record (a refetch through `node(id:)`). The follow-up is a retained child of the parent retention: the parent's `dispose` releases it, and so does a later settlement in which the pointer returns a different id. This is candidate 4 of `refactors/pending/runtime/normalization-ast-mount-markers.md`, with the client pointer of its candidate 5 as the thing that starts it.
 
 ### 3. A pointer whose target is one of the records it read
 
@@ -2397,7 +2397,7 @@ Costs:
 - Overfetching: the query fetches `name` for every friend, not only the one the pointer returns.
 - The guarantee must be enforced. Either the returned id's type admits only ids the resolver read (a type-level restriction), or `normalize` treats a returned id outside the read set as missing data and falls back to the follow-up query of note 2.
 
-This differs from upstream's eager pointer. Upstream merges the pointer's own reader selections (`friends { id }`) into the parent query, as for any client field read eagerly (`merge_client_object_field` at `isograph_schema/src/create_merged_selection_set.rs:852-900`, called at `:642`), and fetches the selection through the pointer by a refetch through `derived node(id:)` (`:1135-1233`; `read.ts:859-970`). The two compose: the pointer's reader selections are merged, and the target fragment's selections are spread at the places the reader selections read ids.
+This differs from upstream's eager pointer. Upstream merges the pointer's own reader selections (`friends { id }`) into the parent query, as for any client field read eagerly (`merge_client_object_field` at `isograph_schema/src/create_merged_selection_set.rs:852-900`, called at `:642`), and fetches the selection through the pointer by a refetch through `node(id:)` (`:1135-1233`; `read.ts:859-970`). The two compose: the pointer's reader selections are merged, and the target fragment's selections are spread at the places the reader selections read ids.
 
 ### 4. Handles
 
