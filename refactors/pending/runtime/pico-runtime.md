@@ -405,9 +405,9 @@ Held 3a's bound does not depend on equality cutoff, which stays a `===` optimiza
 
 ### What depends on this choice
 
-Written for held 3a, and changed if another candidate is chosen: Steps; change 2 except The resolver store key and Results, equality, and a resolver that throws; Ordering; change 3's Computing the new root, Unobserved results are lazy, and Garbage collection; change 4 except `listen`, `snapshot`, and `Observed`; the engine's functions in changes 2 to 4; Values with lifecycles' Replacement and release; the mentions of `dependents` and marking in Follow-ups 1, 8, and 9; and open decisions 2, 3, 4, 6, 8, 11, 14, 15, 16, 18, and 19. Each of those sections in Steps and changes 2 to 4 opens with a line saying so.
+Written for held 3a, and changed if another candidate is chosen: Steps; change 2 except The resolver store key and Results, equality, and a resolver that throws; Ordering; change 3's Computing the new root, Serving from the store, Unobserved results are lazy, and Garbage collection; change 4 except `listen`, `snapshot`, and `Observed`; the engine's functions in changes 2 to 4; Values with lifecycles' Replacement and release; the mentions of `dependents` and marking in Follow-ups 1, 8, and 9; and open decisions 2, 3, 4, 6, 8, 11, 14, 15, 16, 18, 19, and 22. Each of those sections in Steps and changes 2 to 4 opens with a line saying so.
 
-Independent of it: Two levels, Step A, End-user experience, change 1, The resolver store key with `ReaderArtifact.selectableName`, Results, equality, and a resolver that throws, change 3's `normalizeData` signature, `Retention`, and Resolver markers, change 4's `listen`, `snapshot`, and `Observed`, The engine, the store, and the environment, Other derived node kinds, Later, the rest of Follow-ups, and open decisions 1, 5, 7, 9, 10, 12, 13, and 17.
+Independent of it: Two levels, Step A, End-user experience, change 1, The resolver store key with `ReaderArtifact.selectableName`, Results, equality, and a resolver that throws, change 3's `normalizeData` signature, `Retention`, and Resolver markers, change 4's `listen`, `snapshot`, and `Observed`, The engine, the store, and the environment, Other derived node kinds, Later, the rest of Follow-ups, and open decisions 1, 5, 7, 9, 10, 12, 13, 17, 20, 21, 23, 24, and 25.
 
 ## The engine, the store, and the environment
 
