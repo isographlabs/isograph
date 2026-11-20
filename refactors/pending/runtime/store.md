@@ -922,7 +922,7 @@ The package's upstream build (The package): `package.json`, the three `tsconfig`
 
 - `refactors/pending/graphql-protocol/normalization-ast.md`: `conditionHolds` is removed and the condition loses `responseKey` (Conditions; normalization-ast.md's own text says so); `tsconfig.json` `target` is `ES2022`.
 - `refactors/pending/artifact-set-and-types.md`, Per field: `P/f/parameters_type.ts` is `{ readonly v: T; readonly w: T | null; }`, every parameter required, and each local input object type `{ readonly f: T; readonly g: T | null; }`, every field required (Variables); its test "`readonly limit?: number | null | void`" is `readonly limit: number | null`.
-- `refactors/pending/runtime/pico-runtime.md`: the store is `Store` above, not upstream's layered store; `normalize`, `check`, and `garbageCollect` land here; its retained queries with a release buffer (intro, section 10, change 7) and its `log` option are dropped.
+- `refactors/pending/runtime/pico-runtime.md`: the store is `Store` above, not upstream's layered store; `normalize`, `check`, and `garbageCollect` land here; its retained queries with a release buffer are dropped (pico-runtime.md now records a release buffer as later work, Follow-ups 7, Deferral).
 
 ## Later
 

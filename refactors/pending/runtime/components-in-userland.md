@@ -624,7 +624,7 @@ export function useFragment<TEntityName extends EntityName, TOutput>(
 function unwrapForRender<T>(result: ReadResult<T> | undefined): T;
 ```
 
-`listen`, `snapshot`, `EntryLocation`, `resolverStoreKey`, and `ReaderArtifact.selectableName` are changes 2 and 4. `useStore` reads the store from a React context provider. The hook is the general fragment-reading hook pico-runtime.md sketches (End-user experience, `useResolverResult`), addressed by a link instead of a retention. It knows nothing about components.
+`resolverStoreKey` and `ReaderArtifact.selectableName` are pico-runtime.md's change 2, `DerivedNodeLocation` its change 3, and `listen` and `snapshot` its change 4. `useStore` reads the store from a React context provider. The hook is the general fragment-reading hook pico-runtime.md sketches (End-user experience, `useResolverResult`), addressed by a link instead of a retention. It knows nothing about components.
 
 The user code:
 
@@ -812,7 +812,7 @@ Change 2 makes every resolver result stable until one of its recorded inputs cha
 Whether that suffices depends on what the component's resolver depends on:
 
 - A resolver whose dependencies never change (`id` only, or `id` and a field that backdates) returns the same function for the record's lifetime. This is options 1 and 2 under change 2: stable with no memo, and freed with the record.
-- A resolver that closes over data re-runs when the data changes and returns a new function. `===` equality (pico-runtime.md, Results, equality) makes every entry that reads it re-run as well. When the parent is itself a component-returning resolver that reads `data.PetCard`, the parent gets a new function too and remounts, and so on up to the first resolver that does not return a component. A change of one pet's `tagline` remounts every component on the path from that card to the root.
+- A resolver that closes over data re-runs when the data changes and returns a new function. `===` equality (pico-runtime.md, Results, equality, and a resolver that throws) makes every entry that reads it re-run as well. When the parent is itself a component-returning resolver that reads `data.PetCard`, the parent gets a new function too and remounts, and so on up to the first resolver that does not return a component. A change of one pet's `tagline` remounts every component on the path from that card to the root.
 - A recomputation the user did not cause gives a new function: `garbageCollect` deletes `Pet:1` and a later `normalize` writes it again; or no retained or observed location reaches the entry, change 3 sweeps it, and a later read recomputes it. A mounted component's entry is reached through its parent's retention, so neither happens while the parent query is retained. Upstream's leaked cache keeps identity across both (What upstream does).
 
 Change 2 therefore solves storage and freeing for eager results. It does not solve where a component's data comes from; a closure does.
