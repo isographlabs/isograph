@@ -372,7 +372,7 @@ The simplest eager baseline. No dependencies stored at all. After every write, s
 
 - R1: 1 fails (render calls the resolver); 2, 3a, 3b, 3c, 4, 5 meet it.
 - R2: 1 fails; the rest meet it.
-- R3: 1 fails "nothing twice"; 2, 3a, 3b, 3c, 4, 5 meet it.
+- R3: 1 fails "nothing twice"; 2, 3b, 3c, 4, 5 meet it. Held 3a meets it only with open decision 19 (c): change 4's code as written is 19 (a), under which an upward read during `settle` calls a resolver with a stale input and recomputes its derived node twice in one pass (Ordering, Once per pass).
 - R4, an optimization: 2, 3a, 3b, 3c, 4 stop propagation at a derived node whose result is `===` its previous one (a primitive, or a stored or reused object), and propagate every new object. Held 3a stops it on the push and not on a read of a `Stale` derived node (open decision 15). 1 compares only at the subscription; 5 only at the root. No candidate compares resolver outputs structurally, because that comparison is not well-defined on arbitrary JavaScript values.
 - Structural equality on inputs: the one place it is well-defined is a resolver's inputs, which are store data shaped by the reader AST. 1 does it at the subscription with upstream's `mergeObjectsUsingReaderAst`, which also keeps the old object when equal and so gives stable identity. 2, 3a, 3b, 3c, 4 get the server half from `normalize`'s comparison by AST shape (change 1: an unchanged write changes no source, so nothing is queued, marked, or stamped; a leaf whose value is a JSON object or list always counts as changed) and compare resolver inputs by `===`. A snapshot whose identity must stay stable across a recomputation with equal data needs upstream's merge applied to the data read along the reader AST; it does not need structural equality on outputs.
 - R5 and R7: every candidate meets them.
@@ -545,7 +545,7 @@ Disposing a derived node (`collect`, `deleteSource`) pushes its pair's cleanup t
 
 Ordering guarantees:
 
-- A constructor runs inside its derived node's computation, so after every input it reads is current (R3), and at most once per node per pass.
+- A constructor runs inside its derived node's computation, so after every input it reads is current (R3), and at most once per node per pass. Both hold for a derived node recomputed during `settle` only under open decision 19 (c).
 - A new value is constructed before the old one is released.
 - No value is released while a derived node holds it.
 - A replaced or disposed value is released after every observer of that settlement was notified, so a `snapshot` in a callback never returns a released value, and each cleanup runs exactly once, in the order the values were replaced or disposed.
@@ -2014,7 +2014,7 @@ When `normalizeData` calls it, `ast.root` is present: `normalize` inserts it bef
 
 ### Serving from the store
 
-`fetchEntrypoint` serves a query without a request in two cases (`libs/isograph-runtime/src/network.ts:71-104`): `shouldFetch` `No`, and `IfNecessary` when `check` reports `EnoughData`. Both call `retainQueryWithoutMakingNetworkRequest`, which retains the query's AST and makes no `normalizeData` call, so under change 3 as written above it holds no root and computes no result: a query served from the store has no root derived node, `snapshot` at its location returns `undefined`, and a `listen` there only registers, against the Goal. It holds and computes the root as `normalizeData` does, through `retainEntrypoint`:
+`fetchEntrypoint` serves a query without a request in two cases (`libs/isograph-runtime/src/network.ts:71-105`): `shouldFetch` `No`, and `IfNecessary` when `check` reports `EnoughData`. Both call `retainQueryWithoutMakingNetworkRequest`, which retains the query's AST and makes no `normalizeData` call, so under change 3 as written above it holds no root and computes no result: a query served from the store has no root derived node, `snapshot` at its location returns `undefined`, and a `listen` there only registers, against the Goal. It holds and computes the root as `normalizeData` does, through `retainEntrypoint`:
 
 ```ts
 // from libs/isograph-runtime/src/network.ts
