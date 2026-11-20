@@ -6,7 +6,7 @@ Upstream references are the checkout at `/Users/rbalicki/code/isograph` (commit 
 
 ## Goal
 
-Renders do no work. The `normalizeData` that retains a query, or the `retainQueryWithoutMakingNetworkRequest` that retains a query served from the store, computes every resolver result its entrypoint reaches. After every later write, every result an observer needs (an observed location's, or one a needed result reads) is recomputed inside that write when one of its inputs changed, lowest height first; every other result the write reaches is marked `Stale` and recomputed when next read. A render reads a precomputed value and nothing else.
+Renders do no work. The `normalizeData` that retains a query, or the `retainQueryWithoutMakingNetworkRequest` that retains a query served from the store, computes every resolver result its entrypoint reaches. After every later write, the write marks every stored result that read what it changed, and every result above those, and runs no resolver. A pull clears a mark: it brings what the result read up to date first, and recomputes the result only when one of its inputs changed value. Before the write returns, the runtime pulls every observed result (open decision 28, held (a)) and every mounted result with an effect (Values with lifecycles). Every other marked result is pulled when next read. A render reads a precomputed value and nothing else.
 
 Upstream reads and evaluates during render. `useReadAndSubscribe` reads the fragment's data in a `useState` initializer (`react/useReadAndSubscribe.ts:33-35`), `useResult` calls the resolver in the render body (`react/useResult.ts:45-64`), every nested eager resolver is called again on every read (`read.ts:600`), and the component subscribes in an effect after the render (`react/useRerenderOnChange.ts:21-37`, `subscribe.ts:15-40`). After a write, `callSubscriptions` re-reads every subscription whose recorded records overlap the written ones (`subscribe.ts:63-109`, called at `makeNetworkRequest.ts:271`). The deviation is the user's: no read-and-subscribe during render, because a render that reads and evaluates does resolver work on the render path, repeats it for every component that reads the same resolver, and needs a second read in the effect to catch writes between render and subscribe (`subscribe.ts:32-36`).
 
@@ -15,12 +15,12 @@ Upstream reads and evaluates during render. `useReadAndSubscribe` reads the frag
 ```text
 level 2: observers        listen(location, onChange)  snapshot(location)
                                  ^ notified after level 1 settles
-level 1: resolver graph   a DerivedNode per (record, resolver store key), in environment.graph, recomputed after normalizeData
+level 1: resolver graph   a DerivedNode per (record, resolver store key), in environment.graph, marked by normalizeData, pulled by reads
                                  ^ reads
 store:                    server values on records, in environment.store, written by normalize
 ```
 
-Level 1 is the resolver graph, held on the environment beside the store (The engine, the store, and the environment). Its derived nodes are stored resolver results, one per client field, record, and argument values. Its edges are each derived node's dependencies: the server values and the other resolver results its reader AST read. How level 1 brings its derived nodes up to date after a write, and which edges it stores to do so, is the Recomputation architecture below. `normalizeData`, the environment's write, owns level 1: it computes the derived nodes a newly retained query reaches, and after every write it recomputes the derived nodes observers need, in height order, and marks the others `Stale`. Level 1 owns ordering. No level 2 code runs while level 1 is computing.
+Level 1 is the resolver graph, held on the environment beside the store (The engine, the store, and the environment). Its derived nodes are stored resolver results, one per client field, record, and argument values. Its edges are each derived node's dependencies: the server values and the other resolver results its reader AST read. How level 1 brings its derived nodes up to date after a write, and which edges it stores to do so, is the Recomputation architecture below. `normalizeData`, the environment's write, owns level 1: it computes the derived nodes a newly retained query reaches, and after every write it marks the derived nodes the write reaches and pulls the observed ones. Level 1 owns ordering: a pull brings a derived node's inputs up to date before the node uses them. No level 2 code runs while level 1 is computing.
 
 Level 2 is observers. An observer names one location of level 1 (a record and a resolver store key) and a no-argument callback. It holds no value. After level 1 settles, each observer whose location's stored result changed is called once. `snapshot` returns the stored result and computes nothing. This is the shape React's `useSyncExternalStore(subscribe, getSnapshot)` takes (Level 2), so a React package can render from level 2 while `@isograph/runtime` stays React-free.
 
@@ -28,24 +28,24 @@ With React, components are resolver results too (`@component`, Later): a compone
 
 ## Recomputation architecture
 
-How level 1 keeps its derived nodes current after a write. pico's algorithm (global epoch, `time_updated` and `time_verified`, verification of dependencies before a derived node, backdating) is one candidate, not a given. pico was built for the compiler, where an LSP request demands one memo and everything else stays unverified; the runtime's goal makes every observed derived node demanded after every write. This section states the requirements, lays out five candidates against three examples, and compares them. The option it ends on, 3a with heights computed per derived node at run time and `Stale` marks for derived nodes nobody needs, is held by the user's direction; it is not approved for implementation. The candidates are written against the store's functions: a write is a `normalize` or a `garbageCollect`, and the state a candidate keeps is described without saying where it lives. Under the held design that state lives in `environment.graph`, and the writes are `normalizeData` and `garbageCollectEnvironment`, which call the store's functions (The engine, the store, and the environment).
+How level 1 keeps its derived nodes current after a write. pico's algorithm (global epoch, `time_updated` and `time_verified`, verification of dependencies before a derived node, backdating) is one candidate, not a given. pico was built for the compiler, where an LSP request demands one memo and everything else stays unverified; the runtime's goal makes every observed derived node demanded after every write. This section states the requirements, lays out five candidates against three examples, and compares them. The option it ends on, 3b (mark, then pull), is held by the user's direction, and the user rejected 3a's recomputation inside the write; it is not approved for implementation. The candidates are written against the store's functions: a write is a `normalize` or a `garbageCollect`, and the state a candidate keeps is described without saying where it lives. Under the held design that state lives in `environment.graph`, and the writes are `normalizeData` and `garbageCollectEnvironment`, which call the store's functions (The engine, the store, and the environment).
 
 ### Requirements
 
 From the goal and the decisions this doc, store.md, and reader-ast.md settle:
 
 - R1. A render does no work. `snapshot` is a lookup; a render reads no store value and calls no resolver.
-- R2. Eager where observed. The `normalize` that retains a query computes its entrypoint's result and every result that result reaches. After every later `normalize` or `garbageCollect`, every needed result is current when it returns: a derived node is needed when an observer is at its location or a needed derived node reads it. A result nobody needs is current when read: a write that reaches it marks it `Stale`, and the next read recomputes it (open decision 3, held (b)). A `snapshot` of a `Stale` result returns its last computed value; `listen` brings it up to date (change 4).
+- R2. Eager where observed. The `normalize` that retains a query computes its entrypoint's result and every result that result reaches. After every later `normalize` or `garbageCollect`, every observed result is current when it returns (open decision 28, held (a); its (b) moves that pull to the reader). A result nobody observes is current when read: a write that reaches it marks it, and the next read pulls it (open decision 3, held (b)). A `snapshot` of a marked result returns its last computed value; `listen` brings it up to date (change 4).
 - R3. Order. After a write, a derived node recomputes only after every stored result it reads is current. No derived node is computed from a stale input, and no derived node is computed twice for one write.
 - R4. Equality cutoff is an optimization. It is not a requirement, and no candidate can guarantee it. A derived node whose recomputed result is `===` to its previous result does not mark its dependents. This stops propagation at a primitive result and at a result that is a stored or reused object. A result that is a new object is never `===` the previous one, so it always propagates, even when it is structurally equal. A general structural equality over arbitrary JavaScript values (functions, class instances, cycles) cannot be both correct and cheap, so the runtime does not attempt one. Server values keep a check at write time: `normalize` compares each value it writes with the stored one by the shape the AST gives it (change 1), as upstream does: a leaf by `===`, a link by `entityName` and `id`, and a list of links item by item and by length. A leaf whose value is a JSON object or list is a new object on every response, so it always counts as changed. Without the check, every response marks every written field changed and the whole retained tree recomputes on every response. With `Rex` to `Ray`, `Initial` recomputes to `"R"`, a string `===` the previous one, and nothing above it recomputes. With `Rex` to `Ray`, a resolver that returns `{ length: data.name.length }` recomputes to a new `{ length: 3 }`, and every derived node that reads it recomputes.
 
-  Upstream never compares resolver outputs either. `callSubscriptionIfDataChanged` (`subscribe.ts:111-162`) re-reads the data the reader AST selects with `readButDoNotEvaluate` (`:117-136`) and compares that data, not the resolver's result, with `mergeObjectsUsingReaderAst(subscription.readerAst, oldItem, newItem)` (`:138-142`), calling the callback when the merge does not return the old item (`:152`). The merge (`areEqualWithDeepComparison.ts:4-121`) walks the reader AST, so it compares only store data: scalars by `===` (`:22-23`), lists item by item (`:33-53`), linked selections recursively (`:24-29`), links by entity and id (`:96-113`), nested resolver values by `===` (`:84-95`), and client pointers as always unequal (`:65-69`). Where a part is equal it writes the old value into the new object (`:77-82`, `:48`, `:110`) and returns the old object when every part is equal (`:120`), so equality also keeps identity stable. The well-defined place for structural equality is therefore a resolver's inputs, which are store data shaped by the reader AST. Under held 3a a derived node recomputes only when an input it read changed: a source is compared by `normalize` at write time by its AST shape (change 1), and a derived node by `===`. Reading data along the reader AST and keeping the old object where the new data is equal (upstream's merge) is the way to give a snapshot stable identity, which `useSyncExternalStore` requires of `getSnapshot` (network-and-subscriptions.md, The snapshot: `subscriptionSnapshot` returns the same object until a re-read is unequal; react.md's `useSubscriptionSnapshot` relies on it).
+  Upstream never compares resolver outputs either. `callSubscriptionIfDataChanged` (`subscribe.ts:111-162`) re-reads the data the reader AST selects with `readButDoNotEvaluate` (`:117-136`) and compares that data, not the resolver's result, with `mergeObjectsUsingReaderAst(subscription.readerAst, oldItem, newItem)` (`:138-142`), calling the callback when the merge does not return the old item (`:152`). The merge (`areEqualWithDeepComparison.ts:4-121`) walks the reader AST, so it compares only store data: scalars by `===` (`:22-23`), lists item by item (`:33-53`), linked selections recursively (`:24-29`), links by entity and id (`:96-113`), nested resolver values by `===` (`:84-95`), and client pointers as always unequal (`:65-69`). Where a part is equal it writes the old value into the new object (`:77-82`, `:48`, `:110`) and returns the old object when every part is equal (`:120`), so equality also keeps identity stable. The well-defined place for structural equality is therefore a resolver's inputs, which are store data shaped by the reader AST. Under held 3b a derived node recomputes only when an input it read changed: a source is compared by `normalize` at write time by its AST shape (change 1), and a derived node by `===`. Reading data along the reader AST and keeping the old object where the new data is equal (upstream's merge) is the way to give a snapshot stable identity, which `useSyncExternalStore` requires of `getSnapshot` (network-and-subscriptions.md, The snapshot: `subscriptionSnapshot` returns the same object until a re-read is unequal; react.md's `useSubscriptionSnapshot` relies on it).
 - R5. Observers are called once per write, after level 1 settles, and a `snapshot` inside a callback returns a settled result.
 - R6. One derived node per client field, record, and argument values, shared by every parent and query that reads it (The same resolver selected twice).
 - R7. Dependencies follow the data. A recomputation can read different inputs than the previous one (a link moved from `Pet:2` to `Pet:3`, a `MissingData` that became present). The next write is judged against the inputs of the last computation only.
 - R8. `normalize` is the only writer of server values. It knows exactly which (record, store key) pairs it changed and which records it created, and returns them (change 1). `garbageCollect` is the only deleter, knows which records it deleted, and returns them (change 2).
 - R9. Minimal machinery: the fewest stored fields and functions that meet R1 to R3 and R5 to R8, give R4's optimization, and allow R10.
-- R10. Scheduled recalculation can be added later without redesign (Follow-ups 9). It has two halves. The first is laziness: a derived node nobody needs is only marked on a write and is recomputed when next read. Changes 2 to 4 build it. The second is deferral: a caller-supplied scheduler decides when, and at which priority, observed derived nodes are brought up to date, with observers notified once per pass that settled them. Changes 1 to 4 do not build it, and the architecture must allow it without undoing anything in them. Deferral requires that marking a write is separate from recomputing, that a pass can leave a derived node marked for a later pass, and that the observers needing a derived node are counted on the derived node.
+- R10. Scheduled recalculation can be added later without redesign (Follow-ups 9). It has two halves. The first is laziness: a derived node nobody observes is only marked on a write and is pulled when next read. Changes 2 to 4 build it. The second is deferral: a caller-supplied scheduler decides when, and at which priority, observed derived nodes are brought up to date, with observers notified once per pass that settled them. Changes 1 to 4 do not build it, and the architecture must allow it without undoing anything in them. Deferral requires that marking a write is separate from recomputing, that a pass can leave a derived node marked for a later pass, and that a pass can choose which observed derived nodes it pulls.
 
 Cost terms used below, per write:
 
@@ -197,7 +197,7 @@ Chain, `Pet:2.name`: verifying `FriendPage` computes `PetName` on `Pet:2`, then 
 - Equality cutoff: backdating, with `===` as the equality. A resolver that returns a new object gets a new `timeUpdated` on every computation, so every derived node that reads it computes.
 - Failure modes: `garbageCollect` deletes entries, which pico never does (pico.md, Source: `remove` keeps the source node and stamps an epoch), so a dependency compares the observed epoch for equality instead of pico's newer-than (`execute_memoized_function.rs:192-206`), and a delete must advance the epoch. A read of an absent key records `observed: null`. Every server-value reader (`check`, `garbageCollect`, `read`) narrows a tagged entry, and a `ResolverEntry` under a server store key is a new broken-invariant throw site.
 
-What epochs buy: correctness without reverse edges. A derived node nobody demands is never visited, a dependency list is rebuilt from scratch on each computation so there is no inverse to keep consistent, and deleting a derived node unlinks nothing. In pico's setting this is the right trade: a compiler with a whole project's memos answers a hover by verifying the few it demands. In the runtime, R2 demands every observed derived node after every write, and held 3a is lazy for every other derived node through `Stale` marks, so pull verification's laziness buys nothing the push lacks; what remains is a walk over every edge under the observed roots on every write, and a stamp on every server value.
+What epochs buy: correctness without reverse edges. A derived node nobody demands is never visited, a dependency list is rebuilt from scratch on each computation so there is no inverse to keep consistent, and deleting a derived node unlinks nothing. In pico's setting this is the right trade: a compiler with a whole project's memos answers a hover by verifying the few it demands. In the runtime, R2 demands every observed derived node after every write, and held 3b is lazy for every other derived node through its marks, so epoch verification's laziness buys nothing 3b's marks lack; what remains is a walk over every edge under the observed roots on every write, and a stamp on every server value.
 
 ### Candidate 3: push along reverse edges
 
@@ -237,7 +237,7 @@ What remains is order. Three ways.
 
 Jane Street's Incremental: "stabilize traverses the DAG in topological order starting at variables that changed", taking "the lowest-height node" from a recompute heap, recomputing it, and enqueueing its parents when its value changed; a node's height is less than its parents' (`src/incremental_intf.ml` of `janestreet/incremental`). Its heights are dynamic: `bind` creates nodes whose height must exceed the bind's left-hand side, and heights are adjusted as the graph changes.
 
-In isograph each derived node's height is computed at run time from the derived nodes it read (change 4, Heights). When a derived node's computation finishes, its height is 0 when it read no other stored resolver result, else `1 + max(height)` over the derived nodes it read. Every derived node it read was brought up to date by that read, so their heights are known. A derived node's height is above the height of every derived node it reads.
+In isograph each derived node's height would be computed at run time from the derived nodes it read. When a derived node's computation finishes, its height is 0 when it read no other stored resolver result, else `1 + max(height)` over the derived nodes it read. Every derived node it read was brought up to date by that read, so their heights are known. A derived node's height is above the height of every derived node it reads.
 
 Heights depend on data, because what a derived node reads depends on data:
 
@@ -249,7 +249,7 @@ A height set by one computation can be too low for a later one: after a write se
 
 Under changes 1 to 4 the runtime graph has no cycle. Every `Resolver` node of `F`'s reader AST selects a field that query generation inlines into `F` (`inlined_fields`, `crates/isograph_compiler/src/merged_selection.rs`), and a cycle of inlined fields is an `InlineCycle` query error (query-generation.md, Cycles). A derived node of `F` on a record is computed by reading `F`'s reader AST from that record and calling `F`'s resolver with the data read. The resolver receives `data` and `parameters` and no store (open decision 8 covers a closure that reaches one), so every stored result the derived node reads is read by a `Resolver` node of `F`'s reader AST: a derived node of one of the fields it selects, on whichever record the links lead to. Links choose the record, never the field, so a cycle of derived nodes would be a cycle of client field selections, and there is none. So adjustment never reaches the dependency that started it. This argument is this doc's, not Incremental's. An eager client pointer makes a cycle of derived nodes possible (open decision 18).
 
-A write: each derived node that read a changed source goes into bucket `height`; buckets are drained lowest first; each derived node recomputes, and when its result is unequal (`===`, R4) its dependents go into their buckets; when it is equal nothing is queued. A derived node read during a recomputation usually has a lower height, so its bucket is already drained and it is current. A derived node read at or above the reader's height (an upward read, one of the data-dependent cases above) abandons the reader's computation before the reader's resolver runs; the reader is raised above it and queued again at its new height (Ordering; open decision 19, held (c)). Nothing is marked before it is known to need recomputing: the work of a write is the derived nodes that recompute and the direct dependents of the ones whose result changed.
+A write: each derived node that read a changed source goes into bucket `height`; buckets are drained lowest first; each derived node recomputes, and when its result is unequal (`===`, R4) its dependents go into their buckets; when it is equal nothing is queued. A derived node read during a recomputation usually has a lower height, so its bucket is already drained and it is current. A derived node read at or above the reader's height (an upward read, one of the data-dependent cases above) can be `Clean` with an input still queued below it, so it returns its result from before the write. R3 then needs the reader's computation abandoned at that read, before the reader's resolver runs, and the reader raised above the node it read and queued again at its new height; without the abandon, the reader's resolver runs once with the stale result and again after the queued input recomputes. Nothing is marked before it is known to need recomputing: the work of a write is the derived nodes that recompute and the direct dependents of the ones whose result changed.
 
 Diamond, with an observer at `BadgePage`, so every derived node is needed. Heights `Initial` 0, `Monogram` 1, `Signature` 1, `Badge` 2, `BadgePage` 3. `Rex` to `Max`:
 
@@ -284,9 +284,9 @@ A link set from `null`, an observer at `FriendPage` with `{ id: "4" }`, `Pet:4.b
 - Cost per write: `O(|A'| + dependents of A')` plus one step per bucket up to the largest height queued, plus the adjustment walk after each upward read. Nothing that will not recompute is visited, except the dependents adjustment raises.
 - Failure mode of plain 3a: it recomputes every derived node with a changed input, whether or not anything needs it. A derived node whose retention was disposed, or that a plain `read` stored, recomputes on every relevant write until `garbageCollect` deletes it.
 
-Held 3a adds `Stale` marks for derived nodes nobody needs (change 4). Each derived node counts the observers at its location plus its needed dependents (`neededCount`); it is needed when the count is above 0. A derived node whose input changed is queued when it is needed. Otherwise it and its dependents, transitively, are marked `Stale` and not queued; the marking stops at a derived node already `Stale`. A read of a `Stale` derived node recomputes it, and each `Stale` derived node it reads is brought up to date by that read first. Every dependent of a derived node nobody needs is itself not needed, so `Stale` marking never reaches a needed derived node, and the queue never holds a derived node nobody needs.
+3a with `Stale` marks adds them for derived nodes nobody needs. It recomputes inside a write exactly the needed derived nodes: those an observer is at, and those a needed derived node reads, transitively. A retained derived node nobody observes is not needed, so a write marks it `Stale` and does not recompute it. Each derived node counts the observers at its location plus its needed dependents (`neededCount`); it is needed when the count is above 0. A derived node whose input changed is queued when it is needed. Otherwise it and its dependents, transitively, are marked `Stale` and not queued; the marking stops at a derived node already `Stale`. A read of a `Stale` derived node recomputes it, and each `Stale` derived node it reads is brought up to date by that read first. Every dependent of a derived node nobody needs is itself not needed, so `Stale` marking never reaches a needed derived node, and the queue never holds a derived node nobody needs.
 
-Diamond, `BadgePage` retained and not observed, `Rex` to `Max`: `Initial` is not needed, so it, `Monogram`, `Signature`, `Badge`, and `BadgePage` are marked `Stale` and no resolver runs in the write. A later `listen` at `BadgePage` reads it: `BadgePage` recomputes, its read of `Badge` recomputes `Badge`, whose read of `Monogram` recomputes `Monogram`, whose read of `Initial` recomputes `Initial`; then `Badge`'s read of `Signature` recomputes `Signature`, reading the `Clean` `Initial`. Each once. `Rex` to `Ray` the same way recomputes all five on that read: a `Stale` derived node recomputes when read whether or not what it reads changed (open decision 15).
+Diamond, `BadgePage` retained and not observed, `Rex` to `Max`: `Initial` is not needed, so it, `Monogram`, `Signature`, `Badge`, and `BadgePage` are marked `Stale` and no resolver runs in the write. A later `listen` at `BadgePage` reads it: `BadgePage` recomputes, its read of `Badge` recomputes `Badge`, whose read of `Monogram` recomputes `Monogram`, whose read of `Initial` recomputes `Initial`; then `Badge`'s read of `Signature` recomputes `Signature`, reading the `Clean` `Initial`. Each once. `Rex` to `Ray` the same way recomputes all five on that read: a `Stale` derived node recomputes when read whether or not what it reads changed.
 
 #### 3b. Mark, then bring up to date (Reactively, MobX)
 
@@ -295,13 +295,13 @@ Reactively's algorithm (`packages/core/src/core.ts` of `milomg/reactively`): eac
 Here the derived node gains `state: 'Clean' | 'Check' | 'Dirty'`. A write, step by step:
 
 1. While writing, `normalize` marks: for each changed location in `C`, every derived node in its dependents set becomes `Dirty`; a derived node that was `Clean` marks its dependents `Check`, recursively, stopping at a derived node not `Clean`. Marking runs no resolver.
-2. Settlement brings the marked roots up to date: the derived nodes that are both marked by this write or an earlier one and the stored result at a retained or observed location. It does not visit an unmarked root. A `Clean` derived node returns at once. A `Check` derived node brings its `Resolver` dependencies up to date in recorded order and stops at the first after which it is `Dirty`. A `Dirty` derived node recomputes; each stored result it reads is brought up to date first, by the read. A recomputed derived node whose result is unequal sets its dependents `Dirty`. The derived node ends `Clean`.
+2. Settlement brings the marked roots up to date: the derived nodes that are both marked by this write or an earlier one and the stored result at an observed location. It does not visit an unmarked root. A `Clean` derived node returns at once. A `Check` derived node brings its `Resolver` dependencies up to date in recorded order and stops at the first after which it is `Dirty`. A `Dirty` derived node recomputes; each stored result it reads is brought up to date first, by the read. A recomputed derived node whose result is unequal sets its dependents `Dirty`. The derived node ends `Clean`.
 
 Diamond, `Rex` to `Max`:
 
 ```text
 mark   name changed: Initial Dirty; Monogram, Signature, Badge, BadgePage Check
-       marked roots: BadgePage (the only retained location; Initial, Monogram, Signature, Badge are marked and are not roots)
+       marked roots: BadgePage (the only observed location; Initial, Monogram, Signature, Badge are marked and are not roots)
 settle BadgePage         Check: dependencies in order
   Badge                  Check: dependencies in order
     Monogram             Check: dependencies in order
@@ -319,7 +319,7 @@ BadgePage                Dirty: recompute                        (BadgePage call
 
 `Rex` to `Ray`: `Initial` recomputes `"R"`, `===` the old string, so `Monogram` and `Signature` stay `Check`; `Monogram` finds no dependency made it `Dirty` and becomes `Clean`; so do `Signature`, `Badge`, and `BadgePage`. One call, five derived nodes visited. A write to `Pet:1.tagline` marks nothing in the diamond, so `BadgePage` is not a marked root and settlement does not visit it.
 
-With observers on `Badge` and `Initial` as well as the retained `BadgePage`, the marked roots are `Initial`, `Badge`, and `BadgePage`. Settlement brings each up to date in any order; the first brings up to date every marked derived node it reaches by the recursion, and the later ones find those derived nodes `Clean`. The calls are the same as in the trace above.
+With observers on `Badge` and `Initial` as well as on `BadgePage`, the marked roots are `Initial`, `Badge`, and `BadgePage`. Settlement brings each up to date in any order; the first brings up to date every marked derived node it reaches by the recursion, and the later ones find those derived nodes `Clean`. The calls are the same as in the trace above.
 
 Why `Check` marks exist. A pure push from the `Dirty` derived nodes (recompute each `Dirty` derived node, and only when its result changed, mark its direct dependents `Dirty`) visits fewer derived nodes: it never touches the dependents of an unchanged result, so `Rex` to `Ray` visits `Initial` alone. It needs an order, though. In the diamond, `Badge` reads both `Monogram` and `Signature`; pushed from `Monogram` first, it recomputes with the stale `Signature` and again after `Signature` recomputes, which R3 forbids. Holding `Badge` until every changed input is done is 3a's heights or 3c's pending-input counts. 3b instead marks every transitive dependent `Check` eagerly, while marking, and resolves the order by pulling: a derived node brings its dependencies up to date before it decides. The price is that settlement clears the `Check` marks above an unchanged result (`Monogram`, `Signature`, `Badge`, `BadgePage` when `Initial` recomputes to `"R"`), so settlement costs `O(marked)` where the pure push costs `O(recomputed)`. Marking already visits those derived nodes, so the order of growth of a write is the same.
 
@@ -343,7 +343,7 @@ Chain, `Pet:2.name`: marking makes `PetName` on `Pet:2` `Dirty` and `FriendLabel
 - Ordering: a derived node recomputes only after every stored result it reads was brought up to date, because the only ways it reaches one are the `Check` walk and the read during recomputation, and both bring it up to date first. It recomputes at most once per write: after recomputing it is `Clean`, and only a dependency's recomputation can make it `Dirty` again, and every dependency was brought up to date before it.
 - Laziness: a derived node no settled location reaches keeps its mark and is not recomputed; a later `read` brings it up to date. Marking stops at marked derived nodes, so repeated writes cost `O(1)` per already marked derived node.
 - Marked roots suffice. Every dependent of a derived node that is not `Clean` is not `Clean` (a derived node that leaves `Clean` marks its dependents, and a new dependent is added only by a computation, which brought the derived node up to date first), so a root that reaches a marked derived node is itself marked. Settling the marked roots therefore settles every root that reaches anything this write changed, and an unmarked root costs nothing.
-- Cost per write: marking `O(|A| + edges within A)`; settlement `O(marked roots)` to start, plus `O(|A| + edges within A)` for the walk; `A'` recomputations. No term grows with the number of retained or observed locations `R`.
+- Cost per write: marking `O(|A| + edges within A)`; settlement `O(marked roots)` to start, plus `O(|A| + edges within A)` for the walk; `A'` recomputations. Held 3b finds the marked roots by visiting every observed location, one step for each that is `Clean` (Held: 3b).
 - Failure mode it shares with 3a and 3c: the inverse must equal the forward lists exactly. A missed removal keeps a dead derived node in a set (memory, and a mark that does nothing); a missed addition loses a mark and leaves a stale result with no error. One function writing both sides is the guard.
 
 #### 3c. Pending-input counts
@@ -372,40 +372,42 @@ The simplest eager baseline. No dependencies stored at all. After every write, s
 
 - R1: 1 fails (render calls the resolver); 2, 3a, 3b, 3c, 4, 5 meet it.
 - R2: 1 fails; the rest meet it.
-- R3: 1 fails "nothing twice"; 2, 3b, 3c, 4, 5 meet it. Held 3a meets it only with open decision 19 (c): change 4's code as written is 19 (a), under which an upward read during `settle` calls a resolver with a stale input and recomputes its derived node twice in one pass (Ordering, Once per pass).
-- R4, an optimization: 2, 3a, 3b, 3c, 4 stop propagation at a derived node whose result is `===` its previous one (a primitive, or a stored or reused object), and propagate every new object. Held 3a stops it on the push and not on a read of a `Stale` derived node (open decision 15). 1 compares only at the subscription; 5 only at the root. No candidate compares resolver outputs structurally, because that comparison is not well-defined on arbitrary JavaScript values.
+- R3: 1 fails "nothing twice"; 2, held 3b, 3c, 4, 5 meet it. 3a meets it only if an upward read during the drain abandons the reading computation and requeues it higher (Candidate 3a); without the abandon, the reader's resolver is called with a stale input and its derived node recomputes twice in one pass.
+- R4, an optimization: 2, 3a, 3b, 3c, 4 stop propagation at a derived node whose result is `===` its previous one (a primitive, or a stored or reused object), and propagate every new object. 3a with `Stale` marks stops it on the push and not on a read of a `Stale` derived node. Held 3b stops it on every pull (open decision 15 (b); 15 (a) removes it). 1 compares only at the subscription; 5 only at the root. No candidate compares resolver outputs structurally, because that comparison is not well-defined on arbitrary JavaScript values.
 - Structural equality on inputs: the one place it is well-defined is a resolver's inputs, which are store data shaped by the reader AST. 1 does it at the subscription with upstream's `mergeObjectsUsingReaderAst`, which also keeps the old object when equal and so gives stable identity. 2, 3a, 3b, 3c, 4 get the server half from `normalize`'s comparison by AST shape (change 1: an unchanged write changes no source, so nothing is queued, marked, or stamped; a leaf whose value is a JSON object or list always counts as changed) and compare resolver inputs by `===`. A snapshot whose identity must stay stable across a recomputation with equal data needs upstream's merge applied to the data read along the reader AST; it does not need structural equality on outputs.
 - R5 and R7: every candidate meets them.
-- R10: held 3a meets the lazy half from day one: a derived node nobody needs is marked `Stale` and recomputed when read. Deferral needs no new state: a deferred write marks as if nothing were needed, so every derived node its changes reach becomes `Stale`, and the observed derived nodes the marking reaches are recorded for the deferred pass, which brings them up to date by the read path and notifies their observers (Follow-ups 9). 3b allows it: marking already runs in `normalize` apart from settlement, a derived node that settlement skips keeps its mark, `settle` iterates the marked roots and a scheduler chooses which of them each pass settles, and the observed count is the observers at a location plus the observed `dependents`. 2 allows it: nothing is verified until demanded, and a deferred pass is a later verification of fewer roots; each pass still walks every live edge under its roots. 4 allows it: Preact keeps unsubscribed computeds lazy and queues effects to the end of a batch, so priority goes on that queue. Plain 3a and 3c fail: their propagation recomputes every affected derived node as it goes, so skipping an unobserved derived node leaves it stale with no record of it. 5 allows it per root at full cost per pass. 1 has nothing stored to defer; scheduling exists only in React's re-render.
+- R10: held 3b meets the lazy half from day one: marking runs in the write apart from the pull, and a derived node nobody observes keeps its mark until read. Deferral needs no new state: `settle` iterates the observed locations, and a scheduler chooses which of them each pass pulls; a derived node a pass skips keeps its mark (Follow-ups 9). 3a with `Stale` marks allows it: a deferred write marks as if nothing were needed, so every derived node its changes reach becomes `Stale`, and the observed derived nodes the marking reaches are recorded for the deferred pass. 2 allows it: nothing is verified until demanded, and a deferred pass is a later verification of fewer roots; each pass still walks every live edge under its roots. 4 allows it: Preact keeps unsubscribed computeds lazy and queues effects to the end of a batch, so priority goes on that queue. Plain 3a and 3c fail: their propagation recomputes every affected derived node as it goes, so skipping an unobserved derived node leaves it stale with no record of it. 5 allows it per root at full cost per pass. 1 has nothing stored to defer; scheduling exists only in React's re-render.
 - R6: 1 fails; the rest meet it.
 - R8, what each does with `C`: 1 needs it at record granularity; 2 turns it into stamps and rediscovers it by walking `E`; 3a, 3b, 3c, 4 start from it; 5 ignores it.
-- Per write with a small change on a large screen: 1 `O(overlapping subscription trees)`; 2 `O(R + E)`; held 3a the `A'` recomputations among needed derived nodes plus the dependents of those whose result changed, and one `Stale` mark per derived node nobody needs that the write reaches and that is not `Stale` already; 3b and 3c `O(A)` (3b starts settlement from the marked roots); 5 `O(L)` resolver calls.
-- Memory beyond the results: 2 a tag and epoch on all `S` server values, two epochs and forward edges per derived node; 3a, 3b, 3c, 4 forward and reverse edges, plus a dependents index for the server locations live derived nodes read (only those, not all of `S`); held 3a a state, a needed count, and a height per derived node, and the bucket queue; 3b a state per derived node; 4 a version per edge.
-- Machinery (R9): 2 has the fewest invariants (no inverse to keep). Held 3a adds the inverse, a three-valued state, the needed count, the bucket queue, and height adjustment after an upward read. 3b adds the inverse, a three-valued state, mark, and bring-up-to-date. 3c and 4 add 3b's pieces plus counters or versions.
-- Unreached derived nodes (a disposed retention before `garbageCollect`, a plain `read` outside any retention, a retained query nobody observes): 2, held 3a, 3b, 4 do not recompute them until read; held 3a marks each `Stale` once and later writes stop at it. Plain 3a and 3c recompute them.
-- A read of a derived node nobody needs, after a write that reached it: 3b brings its dependencies up to date in order and skips the recomputation when none changed; held 3a recomputes every `Stale` derived node the read reaches (open decision 15).
+- Per write with a small change on a large screen: 1 `O(overlapping subscription trees)`; 2 `O(R + E)`; 3a with `Stale` marks the `A'` recomputations among needed derived nodes plus the dependents of those whose result changed, and one `Stale` mark per derived node nobody needs that the write reaches and that is not `Stale` already; held 3b `O(A)` marking, one step per observed location, and the pull of the marked derived nodes the observed ones read; 3c `O(A)`; 5 `O(L)` resolver calls.
+- Memory beyond the results: 2 a tag and epoch on all `S` server values, two epochs and forward edges per derived node; 3a, 3b, 3c, 4 forward and reverse edges, plus a dependents index for the server locations live derived nodes read (only those, not all of `S`); 3a with `Stale` marks a state, a needed count, and a height per derived node, and the bucket queue; held 3b a mark per derived node; 4 a version per edge.
+- Machinery (R9): 2 has the fewest invariants (no inverse to keep). 3a with `Stale` marks adds the inverse, a three-valued state, the needed count, the bucket queue, height adjustment after an upward read, and the abandon of an upward read. Held 3b adds the inverse, a three-valued mark, marking, and the pull. 3c and 4 add 3b's pieces plus counters or versions.
+- Unreached derived nodes (a disposed retention before `garbageCollect`, a plain `read` outside any retention, a retained query nobody observes): 2, 3a with `Stale` marks, held 3b, and 4 do not recompute them until read; 3a and 3b mark each once and later writes stop at it. Plain 3a and 3c recompute them.
+- A read of a derived node nobody observes, after a write that reached it: held 3b brings its dependencies up to date in order and skips the recomputation when none changed (open decision 15 (b)); 3a with `Stale` marks recomputes every `Stale` derived node the read reaches.
 
-For a sense of scale, from no measurement: a screen with 2,000 live derived nodes averaging 5 dependencies is 10,000 epoch comparisons, each two or three `Map` lookups, for every write under 2, including a write of one field that one derived node reads; under held 3a the same write recomputes that derived node, and visits its dependents only if its result changed.
+For a sense of scale, from no measurement: a screen with 2,000 live derived nodes averaging 5 dependencies is 10,000 epoch comparisons, each two or three `Map` lookups, for every write under 2, including a write of one field that one derived node reads; under 3a the same write recomputes that derived node, and visits its dependents only if its result changed; under held 3b it marks that derived node and every derived node above it, and the pull of each observed location above it walks those marks and recomputes what changed.
 
-### Held: 3a, height-ordered push with heights per derived node and `Stale` marks
+### Held: 3b, mark, then pull
 
-The eager requirement removes the one thing pico's epochs are for: pull verification exists so that undemanded memos are never visited, and R2 demands every observed derived node after every write, so 2 visits every edge under the observed roots on every write while `normalize` already holds the exact set of changed locations and discards it into stamps. Push from that set bounds each write by what it affects.
+A write marks and a pull recomputes. `markChanged` marks `Dirty` each derived node that read a changed source, and `Check` every derived node above those, stopping at a derived node already marked; it runs no resolver. A pull is `bringUpToDate` (change 2, The engine): a `Clean` derived node returns at once; a `Check` derived node brings its `Derived` dependencies up to date in recorded order and recomputes only when one of them recomputed to a value `valuesEqual` rejects (open decision 15 (b)); a `Dirty` derived node recomputes, and each derived node its computation reads is pulled first. Nothing computes while marking, so no resolver reads a half-written store.
 
-Among the push orderings, held 3a does the least work. A write recomputes the needed derived nodes that read a changed source; a derived node whose result changed queues its direct dependents, and one whose result is `===` its previous one queues nothing. Nothing is marked in advance: there are no `Check` marks to set while writing and none to clear above an unchanged result, which 3b pays for with a walk over `A` (Candidate 3b, Why `Check` marks exist). In the diamond with `Rex` to `Ray`, held 3a visits `Initial`; 3b marks and then clears `Monogram`, `Signature`, `Badge`, and `BadgePage`. With no cutoff (every resolver returns a new object), `A'` is `A` and the two make the same recomputations; held 3a still skips 3b's marking walk. Its ordering state is one bucket queue, an array indexed by height, drained lowest first.
+Every read of a stored result is a pull: `track`, a computation's `readDerivedNode`, `retainRoot`, `observe`, and `settle`. Which derived nodes are pulled before a write returns:
 
-The classic objection to 3a is the cost of maintaining heights: Incremental keeps heights consistent as `bind` changes the graph, adjusting a node's height and its parents' when a new edge would point upward. Held 3a pays that cost only where data makes an edge point upward. A derived node's height comes from what its computation read (Candidate 3a). Most recomputations read only derived nodes below the derived node: a dependency that moves with a link (`PetName` on `Pet:2` to `PetName` on `Pet:3`) keeps its height, and the recomputation compares one height per derived node it read. A recomputation that reads a derived node at or above its own height (a link set from `null`, a refinement on a record of another entity, an eager client pointer) runs the adjustment walk over the dependents whose heights rise (change 4, Heights).
+- Observed derived nodes. `settle` pulls each derived node an observer is at (`graph.observers`), and `notify` then calls each observer whose value changed (change 4). This is open decision 28 (a); its (b) leaves observed derived nodes marked, calls their observers, and lets the reader pull.
+- Mounted derived nodes with an effect (Values with lifecycles). `settle` pulls each, and `reconcileEffects` replaces the effect of each whose value changed. Changes 1 to 4 have none.
+- The nested derived nodes of a subscription. `callSubscriptions`, after `normalizeData`, re-reads every subscription, and the re-read pulls each nested derived node through `storedResultHooks` (change 2, Subscriptions).
 
-The earlier objection to 3a here was its lack of a lazy mode: it recomputed derived nodes no root reaches until `garbageCollect`, and R10's laziness needed 3b's marks. `Stale` marks for derived nodes nobody needs remove it from day one. A needed derived node is never `Stale`, a derived node nobody needs is never queued, and the needed count that separates them is the observed count R10 asks for. Laziness costs one `Stale` mark per derived node nobody needs that a write reaches; marking stops at a derived node already `Stale`, so a second write to the same source marks nothing new.
+Every other marked derived node stays marked until a read pulls it: a retained query nobody observes (open decision 3, held (b)), a plain `readStoredResult`'s result, the derived nodes of a disposed retention.
 
-3b is the considered alternative (open decision 2 (b)). It keeps the cutoff on a read of a derived node nobody needs, which held 3a gives up (open decision 15), and it needs no height. It marks every transitive dependent of a changed source on every write and walks the marked derived nodes again to settle, where held 3a visits the derived nodes that recompute and the dependents of those that changed. 3c and 4 add counters or versions to 3b without a new property; 5 meets the requirements and runs every live resolver on every write; 1 fails R1, R2, R3, and R6.
+Against 3a, 3b pays the marking walk. Every transitive dependent of a changed source is marked on every write, and the pull of an observed location above an unchanged result walks those marks again and clears them (Candidate 3b, Why `Check` marks exist). In the diamond with `Rex` to `Ray` under an observer at `BadgePage`, 3a visits `Initial`; 3b marks `Monogram`, `Signature`, `Badge`, and `BadgePage`, and `settle`'s pull of `BadgePage` clears them. With no cutoff (every resolver returns a new object), `A'` is `A` and the two make the same recomputations. In return, 3b computes nothing inside the marking, keeps the cutoff on the read of a derived node nobody observes, and has no height, no bucket queue, no needed count, no height adjustment, and no abandon of an upward read. The pull is the only place a resolver runs, so the read path and the post-write path are one function.
 
-The cost held 3a takes on is the inverse edge set: memory per edge and an invariant (the dependents sets equal the inverse of the dependency lists) whose violation is a silently stale result. That is contained by making one function, `setDependencies`, the only writer of either side. The inverse also pays for itself elsewhere: it carries the needed counts, it is the reference count constructors and destructors need (Follow-ups 1, open decision 11), and it is the index open decision 6 (b) needs. Removing epochs also removes the tag and stamp from every server value, so records stay store.md's untagged maps and `check`, `garbageCollect`'s mark, and the reader's server reads do not change.
+The cost held 3b takes on is the inverse edge set: memory per edge and an invariant (the dependents sets equal the inverse of the dependency lists) whose violation is a silently stale result. That is contained by making one function, `setDependencies`, the only writer of either side. The inverse also pays for itself elsewhere: it is the reference count constructors and destructors need (Follow-ups 1, open decision 11), and it is the index open decision 6 (b) needs. Removing epochs also removes the tag and stamp from every server value, so records stay store.md's untagged maps and `check`, `garbageCollect`'s mark, and the reader's server reads do not change.
 
-Held 3a's bound does not depend on equality cutoff, which stays a `===` optimization (R4): only needed derived nodes that read a changed source recompute, and `normalize`'s comparison by AST shape (change 1) keeps an unchanged server value out of `C`. When every resolver returns a new object, held 3a recomputes exactly the needed part of `A`; 5 recomputes all of `L`, and 2 still compares every edge under the observed roots.
+Held 3b's bound does not depend on equality cutoff, which stays a `===` optimization (R4): marking visits `A` once per write and stops at derived nodes already marked; only pulled derived nodes recompute, and only when an input changed; and `normalize`'s comparison by AST shape (change 1) keeps an unchanged server value out of `C`. 5 recomputes all of `L`, and 2 compares every edge under the observed roots.
 
 ### What depends on this choice
 
-Written for held 3a, and changed if another candidate is chosen: Steps; change 2 except The resolver store key and Results, equality, and a resolver that throws; Ordering; change 3's Computing the new root, Serving from the store, Unobserved results are lazy, and Garbage collection; change 4 except `listen`, `snapshot`, and `Observed`; the engine's functions in changes 2 to 4; Values with lifecycles' Replacement and release; the mentions of `dependents` and marking in Follow-ups 1, 8, and 9; and open decisions 2, 3, 4, 6, 8, 11, 14, 15, 16, 18, 19, 22, 26, and 27. Each of those sections in Steps and changes 2 to 4 opens with a line saying so.
+Written for held 3b, and changed if another candidate is chosen: Steps; change 2 except The resolver store key and Results, equality, and a resolver that throws; Ordering; change 3's Computing the new root, Serving from the store, Unobserved results are lazy, and Garbage collection; change 4 except `listen`, `snapshot`, and `Observed`; the engine's functions in changes 2 to 4; Values with lifecycles' Reconciliation; the mentions of `dependents` and marking in Follow-ups 1, 8, 9, and 10; and open decisions 2, 3, 4, 6, 8, 11, 14, 15, 16, 18, 19, 22, 26, 27, and 28. Each of those sections in Steps and changes 2 to 4 opens with a line saying so.
 
 Independent of it: Two levels, Step A, End-user experience, change 1, The resolver store key with `ReaderArtifact.selectableName`, Results, equality, and a resolver that throws, change 3's `normalizeData` signature, `Retention`, and Resolver markers, change 4's `listen`, `snapshot`, and `Observed`, The engine, the store, and the environment, Other derived node kinds, Later, the rest of Follow-ups, and open decisions 1, 5, 7, 9, 10, 12, 13, 17, 20, 21, 23, 24, and 25.
 
@@ -418,7 +420,7 @@ environment  IsographEnvironment { store, graph, retainedQueries, networkFunctio
              normalizeData, garbageCollectEnvironment, readStoredResult, dispose, listen, snapshot
 store        Store = Map<EntityName, Map<RecordId, StoreRecord>>
              normalize, check, garbageCollect, read, readButDoNotEvaluate
-graph        RecomputationGraph<ResolverResult<unknown>> { derivedNodes, sourceDependents, owned, queue, observers, valuesEqual }
+graph        RecomputationGraph<ResolverResult<unknown>> { derivedNodes, sourceDependents, owned, observers, valuesEqual }
              track, markChanged, deleteSource, retainRoot, collect, settle, observe, valueOf, notify
 ```
 
@@ -460,7 +462,7 @@ A layered store breaks the last two. With an optimistic layer over the base laye
 Two obligations, and nothing else couples the engine to the store. The store's functions meet neither alone: `normalize` and `garbageCollect` return what they changed and the walk reports through hooks, and the environment's functions forward both to the graph.
 
 - Report every read. Each read a computation makes goes through the walk, whose hooks call `readSource` with `recordSource` and `valueSource` of the location read. For a layered store this is the effective location: one source per (record, store key), whichever layer answered.
-- Report every effective change. After an operation that changes what a read would return, the environment calls `markChanged` with every source whose effective value changed, and `deleteSource` for each record whose effective presence went from present to absent (from absent to present is `markChanged` of its `recordSource`). It may report more: a source reported but unchanged costs a recomputation of each needed reader, which cuts off by `===` or recomputes to an equal result, and a `Stale` mark on each other reader. It must not report fewer: an unreported change is a stale result with no error. Settlement runs after the operation and before notification.
+- Report every effective change. After an operation that changes what a read would return, the environment calls `markChanged` with every source whose effective value changed, and `deleteSource` for each record whose effective presence went from present to absent (from absent to present is `markChanged` of its `recordSource`). It may report more. It must not report fewer: an unreported change is a stale result with no error. A source reported but unchanged costs a `Dirty` mark on each reader and a recomputation of each reader when it is next pulled, which cuts off by `valuesEqual` or recomputes to an equal result. Settlement runs after the operation and before notification.
 
 For the layered store of Later's optimistic writes:
 
@@ -470,7 +472,7 @@ For the layered store of Later's optimistic writes:
 
 ### Lifetime still follows records
 
-A derived node's `owner` is the `recordSource` of the record it was computed on. `deleteSource(graph, recordSource(record))` invalidates every reader of the record (every reader of any key on it read its presence), invalidates the dependents of every derived node the record owns, and disposes those nodes. A store-coupled engine does the same through its record grouping; here the engine does it without knowing what a record is. An invalidated dependent recomputes, by the queue when it is needed or by the next read when it is `Stale`, finds the record absent, and records only `recordSource`, with no derived node (change 2, the store's side). No computation reaches a disposed derived node: every one of its dependents was invalidated, a recomputation reads the record's presence instead, and a `Stale` node recomputes without walking its old dependencies.
+A derived node's `owner` is the `recordSource` of the record it was computed on. `deleteSource(graph, recordSource(record))` marks `Dirty` every reader of the record (every reader of any key on it read its presence) and the dependents of every derived node the record owns, and disposes those nodes. A store-coupled engine does the same through its record grouping; here the engine does it without knowing what a record is. A dependent marked `Dirty` recomputes when next pulled (by `settle` when it is observed, otherwise by its next read), finds the record absent, and records only `recordSource`, with no derived node (change 2, the store's side). No pull reaches a disposed derived node: every dependent of it read the owner's `recordSource` before reading it (`contextHooks`), so `markChanged` of that source marked every dependent `Dirty`; a `Dirty` node recomputes without walking its old dependencies, and a recomputation reads the record's presence instead.
 
 components-in-userland.md says a closure field's wrapper is "stored on the record, and freed with it". "Stored on the record" does not hold literally: derived nodes live in `environment.graph`, beside the store. It holds as "keyed by the record": the wrapper is the value of the derived node `resolverDerivedNode(record, storeKey)` in `graph.derivedNodes`. "Freed with the record" holds through `owner`: deleting the record calls `deleteSource` with its `recordSource`, which disposes the wrapper's derived node. The wrapper's computation reads only the record's presence (its `createWrapper` receives no data), so no write recomputes it while the record lives.
 
@@ -485,113 +487,126 @@ What the opaque ids buy: the engine has no import from the store, so a layered s
 
 ## Values with lifecycles
 
-Status: design analysis, held options, not decided. Nothing in changes 1 to 4 produces a value with a lifecycle; this lands with the first feature that does (Follow-ups 1, 2, 4), and changes 1 to 4 must not preclude it.
+Status: design analysis, held options, not decided. Nothing in changes 1 to 4 has an effect; this lands with the first feature that does (Follow-ups 1, 2, 4), and changes 1 to 4 must not preclude it.
 
-A stored result can be a handle: a value with a constructor and a destructor, reference-counted, the `ItemCleanupPair<T>` shape of `@isograph/disposable-types` (`isograph-disposable-types/index.ts:2`). Examples: a client pointer's follow-up query (Follow-ups 2), a handle a retain returns (Follow-ups 4), a closure component whose wrapper holds a subscription. Held 3a handles them if the engine owns each derived node's value lifecycle: a node acquires its value when it computes, and releases it when the value is replaced or the node is disposed.
+A derived node's computation is pure. It reads through its `ComputeContext`, returns a value, and acquires nothing. It runs whenever a pull reaches a marked or absent derived node: inside a write's `settle`, inside `listen`, inside a `readStoredResult` that a React render makes and React then discards, and, once forks exist, in a world that is never committed (Follow-ups 12). A computation that subscribed, fetched, or retained would acquire a resource in each of those pulls, and nothing would release it when the render or the world is discarded.
+
+A resource that a derived node's value needs is therefore the node's effect, run apart from its computation:
+
+- An effect is set up when its derived node is mounted, at React's commit: `observe`, which `listen` calls from `useSyncExternalStore`'s subscribe, sets it up with the node's value after bringing the node up to date.
+- It is torn down when the node is unmounted (the last callback at its id is removed by the function `observe` returns), when the node is disposed, or when a write gives the node a value `valuesEqual` rejects; in the last case the effect is set up again with the new value first.
+- It never runs inside a computation, and it runs only in the committed world (Follow-ups 12).
+
+Examples: a client pointer's follow-up query (Follow-ups 2), a handle a retain returns (Follow-ups 4), a client root's subscription to an external value (Other derived node kinds), a closure component's subscription.
 
 ### The hook
 
-A derived node's computation is created with a kind; the engine cannot tell an `ItemCleanupPair` from a plain array value at run time, so the kind comes from compiler-written data (the artifact's kind), not from the returned value.
+A derived node's effect comes with its definition. The engine cannot tell from a returned value whether it holds a resource, so the kind comes from compiler-written data (the artifact's kind), not from the value.
 
 ```ts
 // from libs/isograph-runtime/src/graph.ts
-export type Computation<TValue> = PlainComputation<TValue> | DisposableComputation<TValue>;
-
-/** A computation whose value holds nothing to release. */
-export type PlainComputation<TValue> = {
-  readonly kind: 'Plain';
-  compute(context: ComputeContext<TValue>): TValue;
+/** What creating an absent derived node needs. */
+export type DerivedNodeDefinition<TValue> = {
+  readonly owner: SourceId;
+  readonly computation: Computation<TValue>;
+  /** Set up while the node is mounted. */
+  readonly effect: NodeEffect<TValue>;
 };
 
-/** A computation whose value can hold a resource. */
-export type DisposableComputation<TValue> = {
-  readonly kind: 'Disposable';
-  compute(context: ComputeContext<TValue>): Constructed<TValue>;
+/** `None`: the node's value needs no resource. `Effect`: `setUp` acquires what `value` needs and
+ * returns its teardown. */
+export type NodeEffect<TValue> =
+  | { readonly kind: 'None' }
+  | { readonly kind: 'Effect'; readonly setUp: (value: TValue) => CleanupFn };
+
+/** The observers of one derived node. */
+export type Observed<TValue> = {
+  readonly callbacks: Set<() => void>;
+  /** The value the callbacks were last called for, or were registered at. */
+  notified: TValue | undefined;
+  /** The effect of the derived node at this id, while it is mounted. */
+  effect: ObservedEffect<TValue>;
 };
 
-/** `Constructed`: the constructor ran; the engine calls the cleanup exactly once.
- * `NotConstructed`: nothing was acquired (the data read was `MissingData`, or the constructor threw). */
-export type Constructed<TValue> =
-  | { readonly kind: 'Constructed'; readonly pair: ItemCleanupPair<TValue> }
-  | { readonly kind: 'NotConstructed'; readonly value: TValue };
-
-/** What a derived node holds. */
-export type Holding<TValue> =
-  | { readonly kind: 'Value'; readonly value: TValue }
-  | { readonly kind: 'Resource'; readonly pair: ItemCleanupPair<TValue> };
+/** `NotSetUp`: the node has no effect, no node is stored at the id, or `setUp` threw.
+ * `SetUp`: `setUp` ran with `value`; `tearDown` releases it. */
+export type ObservedEffect<TValue> =
+  | { readonly kind: 'NotSetUp' }
+  | { readonly kind: 'SetUp'; readonly value: TValue; readonly tearDown: CleanupFn };
 ```
 
-These types replace change 2's `Computation<TValue>`. `DerivedNode.value` becomes `holding: Holding<TValue>`; the derived node's value is `holding.value` or `holding.pair[0]`. `RecomputationGraph` gains `readonly pendingReleases: CleanupFn[]`, the cleanups of replaced and disposed values not yet run, and:
+These replace change 2's `DerivedNodeDefinition` and change 4's `Observed`. `DerivedNode` gains `readonly effect: NodeEffect<TValue>`, copied from its definition by `createDerivedNode`. `RecomputationGraph` gains `readonly pendingTeardowns: CleanupFn[]`, the teardowns of replaced and disposed effects not yet run, and:
 
 ```ts
 // from libs/isograph-runtime/src/graph.ts
-/** Runs and empties `pendingReleases` in order, each cleanup through `reportCallbackError`. Never throws. */
-export function flushReleases<TValue>(graph: RecomputationGraph<TValue>): void;
+/** For each mounted derived node with an effect whose value is not `===` the value its effect was
+ * set up with: sets up the effect with the new value, then pushes the old teardown to
+ * `pendingTeardowns`. Each `setUp` runs through `reportCallbackError`. Never throws. */
+export function reconcileEffects<TValue>(graph: RecomputationGraph<TValue>): void;
+
+/** Runs and empties `pendingTeardowns` in order, each teardown through `reportCallbackError`. Never throws. */
+export function flushTeardowns<TValue>(graph: RecomputationGraph<TValue>): void;
 ```
 
-For the runtime, a resolver whose artifact is disposable reads its data as any resolver does; on `Ok` it calls the constructor with the data and returns `Constructed` with `[ok(handle), cleanup]`; on `MissingData` it returns `NotConstructed`.
+For the runtime, a resolver whose artifact has an effect reads its data and returns its value as any resolver does; the artifact's effect receives the stored `ResolverResult` and sets up only on `Ok`.
 
-Contract on a constructor: a constructor that can return a `===` value on two calls (a handle deduplicated by key) reference-counts it, so each pair's cleanup releases only its own retain. Follow-ups 5's registry is that count; each holding derived node holds one retain.
+Contract on `setUp`: a `setUp` that can return a `===` resource on two calls (a handle deduplicated by key) reference-counts it, so each teardown releases only its own retain. Follow-ups 5's registry is that count; each mounted derived node holds one retain.
 
-### Replacement and release
+### Reconciliation
 
-`recompute` of a `Disposable` derived node, after `setDependencies`:
+The runtime pulls the mounted derived nodes with an effect after every write, whether or not open decision 28 pulls observed derived nodes: an effect whose inputs changed must be replaced even when no reader reads the node. `settle` pulls every derived node whose `Observed` has a callback and whose `effect` is not `None`; under open decision 28 (a) that is a subset of the observed derived nodes it already pulls.
 
-1. The computation runs, so the new value is constructed before anything is released. A shared resource reached again (the same follow-up for the same target) gets a second retain, not a teardown and a rebuild.
-2. When the new value is `valuesEqual` to the old (`===` for `Ok`), the derived node keeps its old holding, and the new pair's cleanup runs at once: it drops the second retain while the first still holds the resource, and no observer sees a change. Dependents are not marked: R4's cutoff works for handles deduplicated by key.
-3. Otherwise the derived node holds the new holding, the old pair's cleanup is pushed to `pendingReleases`, and the dependents are invalidated, as change 4's `recompute` does.
-
-Disposing a derived node (`collect`, `deleteSource`) pushes its pair's cleanup to `pendingReleases`. `normalizeData` runs `settle`, the new root's `retainRoot`, `notify`, then `flushReleases`; `garbageCollectEnvironment` runs `settle`, `notify`, and `flushReleases` at its end.
+`normalizeData` runs `settle`, the new root's `retainRoot`, `notify`, `reconcileEffects`, then `flushTeardowns`; `garbageCollectEnvironment` runs `settle`, `notify`, `reconcileEffects`, and `flushTeardowns` at its end. `observe` sets up the effect of the node it mounts after bringing it up to date, and its stop function, when it removes the last callback, pushes the teardown to `pendingTeardowns` and flushes. `disposeDerivedNode` of a mounted node (`deleteSource`; `collect` keeps every node with `rootCount > 0`) pushes its teardown.
 
 Ordering guarantees:
 
-- A constructor runs inside its derived node's computation, so after every input it reads is current (R3), and at most once per node per pass. Both hold for a derived node recomputed during `settle` only under open decision 19 (c).
-- A new value is constructed before the old one is released.
-- No value is released while a derived node holds it.
-- A replaced or disposed value is released after every observer of that settlement was notified, so a `snapshot` in a callback never returns a released value, and each cleanup runs exactly once, in the order the values were replaced or disposed.
-- Under React, release after notification is not late enough: a concurrent render can still be on screen showing the old value until the commit of the re-render. The engine's retain is one retain among others. The React package takes its own retain on the handle it renders: a temporary retain at render, converted to a permanent retain at commit, and released when the component unmounts or commits a newer value (network-and-subscriptions.md, the two-phase lifetime; `CacheItem.temporaryRetain`, `CacheItem.ts:195-256`, and `permanentRetainIfNotDisposed`, `:114-193`). The handle is destroyed when the engine's release and React's both happened, so a committed tree never holds a destroyed handle. The handle the constructor returns is therefore retainable by others: a `CacheItem`, or an entry of a registry that counts retains as network-and-subscriptions.md change 7's `RequestEntry` does.
+- No effect runs inside a computation, so a pull from a discarded render or an uncommitted world acquires nothing.
+- A new effect is set up before the old one is torn down. A shared resource reached again (the same follow-up for the same target) gets a second retain, not a teardown and a rebuild.
+- An effect whose node's new value is `===` the old one is left as is: R4's cutoff works for effects.
+- A replaced or disposed effect is torn down after every observer of that settlement was notified, so a `snapshot` in a callback never returns a value whose resource was released, and each teardown runs exactly once, in the order the effects were replaced or disposed.
+- Under React, teardown after notification is not late enough: a concurrent render can still be on screen showing the old value until the commit of the re-render. The engine's retain is one retain among others. The React package takes its own retain on the handle it renders: a temporary retain at render, converted to a permanent retain at commit, and released when the component unmounts or commits a newer value (network-and-subscriptions.md, the two-phase lifetime; `CacheItem.temporaryRetain`, `CacheItem.ts:195-256`, and `permanentRetainIfNotDisposed`, `:114-193`). The resource is destroyed when the engine's teardown and React's release both happened, so a committed tree never holds a destroyed resource.
 
-Garbage collection: `collect` and `deleteSource` dispose derived nodes, which releases their values. Under held open decision 11 (a), a derived node no root reaches keeps its value until the next `garbageCollect`, and under held 3a it is `Stale` or `Clean` and not recomputed until read: the derived node of a pointer whose target moved keeps its old follow-up alive until collection. That is Follow-ups 7's batched destruction; 11 (b) would release at the release of the last root instead.
+A retained query nobody renders mounts nothing, so its derived nodes set up no effect: a retained, unrendered pointer starts no follow-up query. That is the difference from Follow-ups 1, whose constructor runs at normalization time (open decision 13).
 
 ### Failures
 
-A constructor that throws. Options:
+A `setUp` that throws. Options:
 
-- (a) The derived node's value becomes `ResolverThrew` (open decision 5 (a)), held as `NotConstructed`; the old value is released through `pendingReleases`, as any replacement; the dependents are invalidated. Held. Reason: `setDependencies` has already recorded the new computation's reads, so a derived node that kept its old value would hold a value that no recorded input explains, and it would stay stale until one of the new inputs changes.
-- (b) Keep the old holding and value, and record the error elsewhere. Cost: the stale value above, and a second place an error lives.
-- (c) Propagate out of `normalizeData`. Cost: open decision 5 (b)'s, every needed derived node left unsettled.
+- (a) `reconcileEffects` and `observe` run `setUp` through `reportCallbackError`; the effect becomes `NotSetUp`, the old effect is torn down as for any replacement, and the next value the node takes sets up again. Held. Reason: open decision 9's rule, and a failed effect does not change the node's value, which the computation alone determines.
+- (b) Keep the old effect. Cost: a resource set up for a value the node no longer has.
+- (c) Propagate out of `normalizeData`. Cost: the remaining effects are not reconciled and the write's caller sees an effect's failure.
 
-A destructor that throws. Options:
+A teardown that throws. Options:
 
-- (a) `flushReleases` runs each cleanup through `reportCallbackError`, open decision 9's rule: a throw is rethrown in its own microtask, and the remaining cleanups run. `flushReleases`, `normalizeData`, and `garbageCollectEnvironment` do not throw on a destructor's error. The derived node is unaffected: it dropped the value before the cleanup ran. Held.
+- (a) `flushTeardowns` runs each teardown through `reportCallbackError`, open decision 9's rule: a throw is rethrown in its own microtask, and the remaining teardowns run. `flushTeardowns`, `normalizeData`, and `garbageCollectEnvironment` do not throw on a teardown's error. Held.
 - (b) Stop at the first throw. Cost: later resources leak.
 
-A cleanup is never called twice by the engine; a handle's own second-call throw (`CacheItem.ts:125-130`) is not reachable from it.
+A teardown is never called twice by the engine; a handle's own second-call throw (`CacheItem.ts:125-130`) is not reachable from it.
 
 ### Relation to Follow-ups 1 to 7
 
-- 1, constructors and destructors: the `Disposable` computation is the constructor, at the derived node's first computation; the cleanup is the destructor, run when the derived node's value is replaced or the node is disposed. "The last handle referencing that derived node" is the handle's own count: the engine holds one retain per holding node, React holds its own.
-- 2, client pointer and follow-up query: the pointer's derived node returns `[ok(handle), cleanup]` for the follow-up of its target. A recomputation that returns another id constructs the new follow-up and then releases the old one after notification; the parent retention's `dispose` releases it through `collect`.
-- 3, a pointer whose target it read: no lifecycle; it removes the follow-up instead.
-- 4, handles: the derived node's value is the handle; `snapshot` returns it, a lookup, readable during render.
-- 5, deduplication: under R6, two retained queries that reach the same pointer on the same record already share one derived node, so the key Follow-ups 5 names (the record, the selectable, the variables) is the node's id and needs no registry. Sharing across different derived nodes (two pointers that return the same target) needs a key of the follow-up itself: the target link, the target fragment's selectable, and its variables. A recomputation to a new target constructs under the new key.
-- 6, a destructor and an in-flight follow-up: the deferred release calls the follow-up's cleanup, which aborts its request through the `AbortSignal` the network function accepts.
-- 7, deferral: `flushReleases` is the batch. It can be handed to the caller-supplied scheduler instead of run at the end of `normalizeData` and `garbageCollectEnvironment`, and a handle released and retained again before the batch runs is not destroyed, because the second retain reached it first. A constructor that defers its own setup returns the handle at once and schedules the rest; the engine sees only the pair.
+- 1, constructors and destructors: Follow-ups 1 runs the constructor at normalization time and ties lifetime to retain and release, not render. The effect split runs it at mount commit and tears it down at unmount, which is render lifetime. The two conflict; open decision 13 records it.
+- 2, client pointer and follow-up query: the pointer's computation returns its target; the follow-up query of that target is its effect. A write that moves the target sets up the new follow-up and then tears down the old one after notification.
+- 3, a pointer whose target it read: no effect; it removes the follow-up instead.
+- 4, handles: the derived node's value is the handle the effect retains; `snapshot` returns it, a lookup, readable during render.
+- 5, deduplication: under R6, two components that mount the same pointer on the same record share one derived node and one `Observed`, so one effect. Sharing across different derived nodes (two pointers that return the same target) needs a key of the follow-up itself: the target link, the target fragment's selectable, and its variables.
+- 6, a destructor and an in-flight follow-up: the teardown aborts the follow-up's request through the `AbortSignal` the network function accepts.
+- 7, deferral: `flushTeardowns` is the batch. It can be handed to the caller-supplied scheduler instead of run at the end of `normalizeData` and `garbageCollectEnvironment`, and a handle released and retained again before the batch runs is not destroyed, because the second retain reached it first.
 
 ## Steps
 
-Depends on the held architecture (3a with heights per derived node and `Stale` marks) in changes 2 to 4.
+Depends on the held architecture (3b, mark, then pull) in changes 2 to 4.
 
 Each change is one commit, in order; change 2 is two. Step A has landed and is independent of 1 to 4.
 
 - Step A (landed). Re-read every subscription after each write, upstream's mechanism, with `readButDoNotEvaluate`. No memoization.
 - 1. `normalize` skips an unchanged value and returns the changes it made (prefactor). `Store` stays store.md's nested map.
-- 2a. `graph.ts`, the engine's lazy half, over opaque `SourceId`s and `DerivedNodeId`s, importing nothing from the store, the reader, or the environment: derived nodes, `setDependencies`, `markChanged` marking `Stale`, `bringUpToDate`, `track`, `deleteSource`. Its tests use literal ids.
-- 2b. Stored resolver results. The environment gains `graph`. The reader's walk takes `ReadHooks`, and `readStoredResult` reads a resolver through the graph, storing each resolver's result with its dependencies and their inverse. `normalizeData` marks `Stale` every derived node that read what `normalize` changed and every node that reads those, transitively, stopping at a node already `Stale`; `garbageCollectEnvironment` does the same for each record `garbageCollect` deleted and disposes the derived nodes the record owned. A read of a `Stale` derived node recomputes it, each node it reads brought up to date by that read first. There are no observers, so nothing is needed, nothing is queued, and no height exists. `readSubscription` reads each subscription with `storedResultHooks`, so the subscription re-read that `callSubscriptions` runs after every write reads each nested resolver through the graph: the subscription's own reader AST is walked on every write, as in Step A, and a nested resolver whose inputs did not change is not called and returns its stored result.
-- 3. Level 1 retention. `normalizeData` takes the entrypoint, computes its root result and every result that result reaches by a read of the root, holds the root in the graph, and adds its `Retention` to `environment.retainedQueries`. `garbageCollectEnvironment` disposes the derived nodes that no held root and no current subscription's last read reaches; each `Subscription` records the derived nodes its last read read directly. A later write marks a retained query's affected derived nodes `Stale`.
-- 4. Level 2 and the height-ordered push. Derived nodes gain `height`, set from what each computation read and raised by adjustment after an upward read, `neededCount`, and the state `Queued`; the graph gains the bucket queue and the observers. `listen` brings its derived node up to date and adds to the needed counts; `snapshot` is a lookup. A write queues each needed derived node whose input changed and marks the others `Stale`; `settle` drains the queue lowest height first, queuing the direct dependents of each derived node whose result changed. Observers are notified once, after the pass. `garbageCollectEnvironment` settles and notifies after its deletions.
+- 2a. `graph.ts`, the engine, over opaque `SourceId`s and `DerivedNodeId`s, importing nothing from the store, the reader, or the environment: derived nodes and their state record (`stateOf`), `setDependencies`, `markChanged` marking `Dirty` and `Check`, the pull (`bringUpToDate`, with the cutoff of open decision 15 (b)), `track`, `deleteSource`. Its tests use literal ids.
+- 2b. Stored resolver results. The environment gains `graph`. The reader's walk takes `ReadHooks`, and `readStoredResult` reads a resolver through the graph, storing each resolver's result with its dependencies and their inverse. `normalizeData` marks `Dirty` every derived node that read what `normalize` changed and `Check` every node that reads those, transitively, stopping at a node already marked; `garbageCollectEnvironment` does the same for each record `garbageCollect` deleted and disposes the derived nodes the record owned. A read pulls a marked derived node: a `Check` node is verified through its dependencies and recomputes only when one of them changed value. There are no observers, so nothing is pulled after a write. `readSubscription` reads each subscription with `storedResultHooks`, so the subscription re-read that `callSubscriptions` runs after every write pulls each nested resolver through the graph: the subscription's own reader AST is walked on every write, as in Step A, and a nested resolver whose inputs did not change is not called and returns its stored result.
+- 3. Level 1 retention. `normalizeData` takes the entrypoint, computes its root result and every result that result reaches by a read of the root, holds the root in the graph, and adds its `Retention` to `environment.retainedQueries`. `garbageCollectEnvironment` disposes the derived nodes that no held root and no current subscription's last read reaches; each `Subscription` records the derived nodes its last read read directly. A later write marks a retained query's affected derived nodes.
+- 4. Level 2 and the post-write pull. The graph gains the observers. `listen` brings its derived node up to date and holds it as a root; `snapshot` is a lookup. After a write's marking, `settle` pulls every observed derived node, and observers are notified once, after the pull (open decision 28, held (a)). `garbageCollectEnvironment` settles and notifies after its deletions.
 
-Values with lifecycles (open decision 13) adds no change here: it is a later change, with the first feature that produces a disposable value, and adds `Disposable` computations, `holding`, `pendingReleases`, and `flushReleases` to the engine.
+Values with lifecycles (open decision 13) adds no change here: it is a later change, with the first feature that produces a value with an effect, and adds `NodeEffect`, `Observed.effect`, `pendingTeardowns`, `reconcileEffects`, and `flushTeardowns` to the engine.
 
 ## Step A: re-read every subscription after each write
 
@@ -687,12 +702,12 @@ normalizeData(environment, petSummaryEntrypoint, sameResponse, { id: '1' });
 // No resolver ran, onChange was not called.
 
 normalizeData(environment, petSummaryEntrypoint, responseWithNewNickname, { id: '1' });
-// PetName on Pet:1 (height 0), then PetSummary (height 1), ran once each; RecentCheckins did not.
+// PetName on Pet:1, then PetSummary, ran once each inside normalizeData; RecentCheckins did not.
 // onChange was called once, after both ran; snapshot returns the new result.
 
 stop();
 normalizeData(environment, petDetailEntrypoint, petDetailWithNewName, { id: '1', skip: null });
-// Nobody observes PetSummary: PetName on Pet:1 and PetSummary are marked Stale and did not run.
+// Nobody observes PetSummary: the write marked PetName on Pet:1 and PetSummary and ran neither.
 // snapshot(environment, location) still returns the previous result.
 const stopAgain = listen(environment, location, onChange);
 // listen ran PetName on Pet:1 and PetSummary once each; snapshot returns the new result.
@@ -916,7 +931,7 @@ Depends on the held architecture throughout, except The resolver store key and R
 
 Two commits: 2a, the engine (`graph.ts`, The engine); 2b, the store's side and the environment (The store's side, The environment).
 
-A resolver's result is stored in `environment.graph` as a derived node, under an id built from the record it was read on and the client field's resolver store key. Reading a resolver whose inputs did not change returns the stored result without calling the resolver. `normalizeData` and `garbageCollectEnvironment` mark `Stale` the derived nodes that read what `normalize` and `garbageCollect` changed, and the nodes that read those; the next read of a `Stale` derived node recomputes it. This change has no observers, so no derived node is needed and every mark is `Stale`; change 4 queues the needed derived nodes instead. The production reader of stored results in this change is the subscription re-read: `readSubscription` reads each nested resolver of a subscription's reader AST through the graph (Subscriptions).
+A resolver's result is stored in `environment.graph` as a derived node, under an id built from the record it was read on and the client field's resolver store key. Reading a resolver whose inputs did not change returns the stored result without calling the resolver. `normalizeData` and `garbageCollectEnvironment` mark `Dirty` the derived nodes that read what `normalize` and `garbageCollect` changed, and `Check` the nodes that read those; the next read of a marked derived node pulls it. This change has no observers, so nothing is pulled after a write; change 4 pulls the observed derived nodes. The production reader of stored results in this change is the subscription re-read: `readSubscription` reads each nested resolver of a subscription's reader AST through the graph (Subscriptions).
 
 A resolver derived node, in the rest of this doc, is the derived node of one resolver store key on one record.
 ### The resolver store key
@@ -1006,19 +1021,28 @@ export type DerivedNode<TValue> = {
   /** The source whose deletion disposes this derived node: the presence of the record it was computed on. */
   readonly owner: SourceId;
   readonly computation: Computation<TValue>;
+  /** The value, mark, and dependencies of the last computation. Read and written only through `stateOf`. */
+  readonly state: DerivedNodeState<TValue>;
+  /** Every derived node whose dependencies hold a `Derived` dependency on this one. Written only by `setDependencies`. */
+  readonly dependents: Set<DerivedNode<TValue>>;
+};
+
+/** What the derived node's last computation established, and whether it is still current. */
+export type DerivedNodeState<TValue> = {
   value: TValue;
-  state: DerivedNodeState;
+  mark: DerivedNodeMark;
   /** What the last computation read, in read order. Written only by `setDependencies`. */
   dependencies: ReadonlyArray<GraphDependency<TValue>>;
-  /** Every derived node whose `dependencies` hold a `Derived` dependency on this one. Written only by `setDependencies`. */
-  readonly dependents: Set<DerivedNode<TValue>>;
 };
 
 /**
  * `Clean`: `value` is what a computation against the store would return.
- * `Stale`: a source it read changed, or a derived node it reads is `Stale`. It recomputes when read.
+ * `Check`: a derived node it reads, directly or transitively, is `Dirty`. A pull brings its `Derived`
+ * dependencies up to date in recorded order and recomputes it only when that marks it `Dirty`.
+ * `Dirty`: a source it read changed, or a derived node it read recomputed to a value `valuesEqual`
+ * rejects. A pull recomputes it.
  */
-export type DerivedNodeState = 'Clean' | 'Stale';
+export type DerivedNodeMark = 'Clean' | 'Check' | 'Dirty';
 
 export type GraphDependency<TValue> = SourceDependency | DerivedNodeDependency<TValue>;
 export type SourceDependency = { readonly kind: 'Source'; readonly source: SourceId };
@@ -1030,8 +1054,8 @@ export type Computation<TValue> = (context: ComputeContext<TValue>) => TValue;
 export type ComputeContext<TValue> = {
   /** Records that the computation read `source`. */
   readSource(source: SourceId): void;
-  /** Brings the derived node `id` up to date, creating it from `create()` when absent, records the
-   * dependency, and returns its value. */
+  /** Pulls the derived node `id`, creating it from `create()` when absent, records the dependency,
+   * and returns its value. */
   readDerivedNode(id: DerivedNodeId, create: () => DerivedNodeDefinition<TValue>): TValue;
 };
 
@@ -1057,7 +1081,9 @@ The syntax and the reader AST node's shape are not decided. Which request a requ
 
 Derived node kinds the runtime itself defines, such as the suspension decision (Other derived node kinds), are runtime code, and their computations call `ComputeContext` directly.
 
-A derived node is mutated in place (`value`, `state`, `dependencies`), because other nodes' `dependents` sets and `DerivedNodeDependency`s hold it by identity. A source dependency is a `SourceId`, because a server value has no object to point at and a record may not exist yet. A derived node dependency is the derived node, because `dependents` holds nodes and change 4's needed counts walk from a node to the nodes it reads. `graph.ts` imports `getOrInsert` from `util.ts` and nothing else.
+A derived node is mutated in place (its state record), because other nodes' `dependents` sets and `DerivedNodeDependency`s hold it by identity. A source dependency is a `SourceId`, because a server value has no object to point at and a record may not exist yet. A derived node dependency is the derived node, because `dependents` holds nodes and a `Check` node's pull walks from a node to the nodes it reads. `graph.ts` imports `getOrInsert` from `util.ts` and nothing else.
+
+`stateOf` is the one accessor of a derived node's value, mark, and dependencies: every read and write of them in the engine goes through it, and nothing else touches `node.state`. They are what one computation of the node established, and Follow-ups 12 layers exactly that record per world. `id`, `owner`, `computation`, and `dependents` are not per computation and stay on the node.
 
 ```ts
 // from libs/isograph-runtime/src/graph.ts
@@ -1067,41 +1093,46 @@ export function createGraph<TValue>(
   return { derivedNodes: new Map(), sourceDependents: new Map(), owned: new Map(), valuesEqual };
 }
 
-/** The value of the derived node `id`, created from `create()` when absent and brought up to date.
+/** The value of the derived node `id`, created from `create()` when absent and pulled.
  * Records no dependency: the caller is not a derived node. */
 export function track<TValue>(
   graph: RecomputationGraph<TValue>,
   id: DerivedNodeId,
   create: () => DerivedNodeDefinition<TValue>,
 ): TValue {
-  return upToDateDerivedNode(graph, id, create).value;
+  return stateOf(upToDateDerivedNode(graph, id, create)).value;
 }
 
-/** Marks `Stale` every `Clean` derived node that read one of `sources`, with its `Clean` dependents,
- * transitively. Runs no computation. */
+/** Marks `Dirty` every derived node that read one of `sources`, and `Check` every `Clean` derived node
+ * that reads one of those, transitively. Runs no computation. */
 export function markChanged<TValue>(
   graph: RecomputationGraph<TValue>,
   sources: ReadonlyArray<SourceId>,
 ): void {
-  sources.forEach((source) => graph.sourceDependents.get(source)?.forEach(markStale));
+  sources.forEach((source) => graph.sourceDependents.get(source)?.forEach(markDirty));
 }
 
-/** `markChanged(graph, [source])`, then marks the dependents of every derived node `source` owns, and
- * disposes those derived nodes. */
+/** `markChanged(graph, [source])`, then marks `Dirty` the dependents of every derived node `source`
+ * owns, and disposes those derived nodes. */
 export function deleteSource<TValue>(
   graph: RecomputationGraph<TValue>,
   source: SourceId,
 ): void {
   markChanged(graph, [source]);
   const owned = graph.owned.get(source);
-  owned?.forEach((node) => node.dependents.forEach(markStale));
+  owned?.forEach((node) => node.dependents.forEach(markDirty));
   owned?.forEach((node) => disposeDerivedNode(graph, node));
 }
 ```
 
 ```ts
 // from libs/isograph-runtime/src/graph.ts
-/** The derived node `id`, created from `create()` when absent, and brought up to date. */
+/** The state record of `node`. */
+function stateOf<TValue>(node: DerivedNode<TValue>): DerivedNodeState<TValue> {
+  return node.state;
+}
+
+/** The derived node `id`, created from `create()` when absent, and pulled. */
 function upToDateDerivedNode<TValue>(
   graph: RecomputationGraph<TValue>,
   id: DerivedNodeId,
@@ -1112,22 +1143,46 @@ function upToDateDerivedNode<TValue>(
   return node;
 }
 
-/** Marks a `Clean` derived node `Stale`, then its dependents. A derived node already `Stale` is left as is. */
-function markStale<TValue>(node: DerivedNode<TValue>): void {
-  if (node.state !== 'Clean') {
-    return;
+/** Marks `node` `Dirty`; when it was `Clean`, marks its dependents `Check` first. */
+function markDirty<TValue>(node: DerivedNode<TValue>): void {
+  const state = stateOf(node);
+  if (state.mark === 'Clean') {
+    node.dependents.forEach(markCheck);
   }
-  node.state = 'Stale';
-  node.dependents.forEach(markStale);
+  state.mark = 'Dirty';
 }
 
-/** Recomputes a `Stale` derived node, then marks it `Clean`. Does nothing to a `Clean` derived node. */
-function bringUpToDate<TValue>(graph: RecomputationGraph<TValue>, node: DerivedNode<TValue>): void {
-  if (node.state === 'Clean') {
+/** Marks a `Clean` derived node `Check`, then its dependents. A marked derived node is left as is. */
+function markCheck<TValue>(node: DerivedNode<TValue>): void {
+  const state = stateOf(node);
+  if (state.mark !== 'Clean') {
     return;
   }
-  recompute(graph, node);
-  node.state = 'Clean';
+  state.mark = 'Check';
+  node.dependents.forEach(markCheck);
+}
+
+/** The pull. `Check`: brings the `Derived` dependencies up to date until one marks `node` `Dirty`.
+ * `Dirty` then: recomputes. The node ends `Clean`. Does nothing to a `Clean` derived node. */
+function bringUpToDate<TValue>(graph: RecomputationGraph<TValue>, node: DerivedNode<TValue>): void {
+  if (stateOf(node).mark === 'Check') {
+    checkDependencies(graph, node);
+  }
+  if (stateOf(node).mark === 'Dirty') {
+    recompute(graph, node);
+  }
+  stateOf(node).mark = 'Clean';
+}
+
+/** Pulls each `Derived` dependency of `node`, in recorded order, until one recomputes to a new value,
+ * which marks `node` `Dirty`. */
+function checkDependencies<TValue>(graph: RecomputationGraph<TValue>, node: DerivedNode<TValue>): void {
+  stateOf(node).dependencies.some((dependency) => {
+    if (dependency.kind === 'Derived') {
+      bringUpToDate(graph, dependency.node);
+    }
+    return stateOf(node).mark === 'Dirty';
+  });
 }
 
 /** Computes a new derived node, stores it `Clean` in `derivedNodes` and under its owner in `owned`, and
@@ -1142,9 +1197,7 @@ function createDerivedNode<TValue>(
     id,
     owner: definition.owner,
     computation: definition.computation,
-    value: computed.value,
-    state: 'Clean',
-    dependencies: [],
+    state: { value: computed.value, mark: 'Clean', dependencies: [] },
     dependents: new Set(),
   };
   setDependencies(graph, node, computed.dependencies);
@@ -1153,12 +1206,15 @@ function createDerivedNode<TValue>(
   return node;
 }
 
-/** Recomputes `node`; stores the new value when `valuesEqual` rejects it against the old one. */
+/** Recomputes `node`; when `valuesEqual` rejects the new value against the old one, stores it and
+ * marks the dependents `Dirty`. */
 function recompute<TValue>(graph: RecomputationGraph<TValue>, node: DerivedNode<TValue>): void {
   const computed = compute(graph, node.computation);
   setDependencies(graph, node, computed.dependencies);
-  if (!graph.valuesEqual(node.value, computed.value)) {
-    node.value = computed.value;
+  const state = stateOf(node);
+  if (!graph.valuesEqual(state.value, computed.value)) {
+    state.value = computed.value;
+    node.dependents.forEach(markDirty);
   }
 }
 
@@ -1180,15 +1236,15 @@ function compute<TValue>(
     readDerivedNode: (id, create) => {
       const node = upToDateDerivedNode(graph, id, create);
       dependencies.push({ kind: 'Derived', node });
-      return node.value;
+      return stateOf(node).value;
     },
   });
   return { value, dependencies };
 }
 
 /**
- * Replaces `node.dependencies` with `next`, and removes `node` from the dependents of each old
- * dependency and adds it to those of each new one. Deletes a `sourceDependents` set left empty.
+ * Replaces `stateOf(node).dependencies` with `next`, and removes `node` from the dependents of each
+ * old dependency and adds it to those of each new one. Deletes a `sourceDependents` set left empty.
  */
 function setDependencies<TValue>(
   graph: RecomputationGraph<TValue>,
@@ -1201,13 +1257,15 @@ function setDependencies<TValue>(
 function disposeDerivedNode<TValue>(graph: RecomputationGraph<TValue>, node: DerivedNode<TValue>): void;
 ```
 
-A `Stale` derived node recomputes without checking whether anything it read changed. Its reads of other derived nodes go through `readDerivedNode`, which brings each one up to date first, so its computation sees current inputs (R3). It recomputes once: it ends `Clean`, and only marking makes it `Stale` again, and marking does not run during a read. `recompute` marks no dependent: by the invariant below, every dependent of a `Stale` derived node is `Stale` already, except the parent whose read reached it, which is computing and ends `Clean` having read the new value. Keeping the old value when `valuesEqual` holds keeps its identity, which change 4's cutoff and notification read.
+A pull is `bringUpToDate`. A `Clean` derived node returns at once. A `Check` derived node pulls each `Derived` dependency in recorded order and stops at the first after which it is `Dirty`: a dependency that recomputed to a new value marked its dependents `Dirty` (`recompute`). A derived node still `Check` after the walk read nothing that changed, and ends `Clean` without recomputing; that is the cutoff on the pull (open decision 15 (b); 15 (a), recorded as the user's specification, recomputes every marked derived node). A `Dirty` derived node recomputes, and its computation's reads of other derived nodes go through `readDerivedNode`, which pulls each one first, so the computation sees current inputs (R3).
 
-A read of `Stale` derived nodes has no equality cutoff: after `Rex` to `Ray`, the next read of `BadgePage` recomputes `Monogram`, `Signature`, `Badge`, and `BadgePage` although `Initial`'s result is `===` the old one (open decision 15). Change 4 gives needed derived nodes the cutoff.
+The walk in recorded order is sound when a recomputation would read other dependencies. A computation's later reads depend only on what it read earlier, so up to the first dependency whose value changed, the recorded reads are the reads a recomputation would make, and the walk stops at that dependency. A source dependency needs no walk: a changed source marked its readers `Dirty` directly.
 
-Invariant, outside a call that is computing a derived node: every dependent of a `Stale` node is `Stale`. Marking keeps it, because a derived node that becomes `Stale` marks its dependents. A new dependent is added only by a computation, which brought the derived node up to date first, and a recomputed node ends `Clean` only after every node it read was brought up to date. `markStale` stops at a derived node already `Stale` because the invariant says its dependents are `Stale` too, so a second write to a source costs one step per node that read it.
+A derived node recomputes at most once per write. It ends `Clean` after its pull, and only marking makes it non-`Clean`. `markChanged` runs in a write, before any pull. `recompute`'s marking of dependents runs during a pull and reaches only non-`Clean` derived nodes, by the invariant below, so it never re-marks a derived node pulled earlier in the same pass. The parent whose read reached the node is computing or checking; marking it `Dirty` makes a checking parent recompute, and a computing parent reads the new value and ends `Clean`. Keeping the old value when `valuesEqual` holds keeps its identity, which the cutoff and change 4's notification read.
 
-The marking is transitive because nothing computes during a write: whether a derived node's value changes is known only by computing it. Change 4 keeps this marking for derived nodes nobody needs and replaces it, for needed nodes, by queuing the direct dependents of a node whose value changed.
+Invariant, outside a call that is pulling: every dependent of a non-`Clean` derived node is non-`Clean`. Marking keeps it, because a derived node that leaves `Clean` marks its dependents `Check`. A new dependent is added only by a computation, which pulled the derived node first, and a pulled node ends `Clean` only after every node it read was pulled. So every derived node a `Clean` node reads is `Clean`, transitively. `markCheck` stops at a marked derived node because the invariant says its dependents are marked too, so a second write to a source costs one step per node that read it.
+
+The marking is transitive because nothing computes during a write: whether a derived node's value changes is known only by computing it. `Check` is what lets a pull skip the recomputation above an unchanged result.
 
 A derived node's dependents of both kinds together are the inverse of the dependency lists: `node.dependents` for `Derived` dependencies, `sourceDependents` for `Source` dependencies. `setDependencies` is the only writer of either side; a violation is a silently stale result. Removing every old edge and adding every new one is `O(old + new)`; Reactively keeps the matching prefix instead (`update`, `packages/core/src/core.ts`), which saves set operations and not order of growth. A dependency recorded twice (two selections of one field on one record) is one edge in each set.
 
@@ -1337,8 +1395,8 @@ The stored read:
 
 ```ts
 // from libs/isograph-runtime/src/storedResults.ts
-/** The stored result of `artifact` on `root` with `variables`: computed when absent, recomputed
- * when `Stale`, and otherwise returned as stored. */
+/** The stored result of `artifact` on `root` with `variables`: computed when absent, pulled when
+ * marked, and otherwise returned as stored. */
 export function readStoredResult<TEntityName extends EntityName, TOutput>(
   environment: IsographEnvironment,
   artifact: ReaderArtifact<ResolverParam<TEntityName>, TOutput, TEntityName>,
@@ -1399,7 +1457,7 @@ The cast in `readStoredResult` is the one place a stored `ResolverResult<unknown
 
 Every reader of any key on a record also reported the record's presence, so a deletion reports one source instead of the record's keys, including keys read while absent, which the store cannot enumerate. A computation that stops at the first `MissingData` records the sources read up to it, which are exactly what its result depends on.
 
-What reads a stored resolver result: `readStoredResult`; `storedResultHooks`, for each nested resolver of a subscription's reader AST (Subscriptions); a parent's `Resolver` node while the parent computes; `normalizeData`'s hold of a new retention's root (change 3); settlement and `listen` (change 4); `snapshot` (change 4). `normalize`, `check`, `garbageCollect`, `read`, and `readButDoNotEvaluate` never read one.
+What reads a stored resolver result: `readStoredResult`; `storedResultHooks`, for each nested resolver of a subscription's reader AST (Subscriptions); a parent's `Resolver` node while the parent computes; `normalizeData`'s hold of a new retention's root (change 3); `settle` and `listen` (change 4); `snapshot` (change 4), which pulls nothing. `normalize`, `check`, `garbageCollect`, `read`, and `readButDoNotEvaluate` never read one.
 
 ### The environment (2b)
 
@@ -1420,8 +1478,9 @@ Delta from network-and-subscriptions.md's `IsographEnvironment`: `graph`, whose 
 
 ```ts
 // from libs/isograph-runtime/src/environment.ts
-/** `normalize` of `response` into `environment.store`, then marks `Stale` every derived node that read
- * what it changed. On a `PartialWriteError`, marks the changes it carries and rethrows it. */
+/** `normalize` of `response` into `environment.store`, then marks every derived node that read
+ * what it changed, and every derived node above those. On a `PartialWriteError`, marks the changes
+ * it carries and rethrows it. */
 export function normalizeData(
   environment: IsographEnvironment,
   ast: NormalizationAst,
@@ -1611,9 +1670,9 @@ function callResolver(
 export function resultsEqual(a: ResolverResult<unknown>, b: ResolverResult<unknown>): boolean;
 ```
 
-v1's `ReadResult` is unchanged, so `read` and `readButDoNotEvaluate`, which never produce `ResolverThrew`, do not admit it in their types. v1 lets a throw propagate out of `read` (reader-ast.md, Semantics), and still does. In a stored result it is a value, because changes 3 and 4 run resolvers inside `normalizeData` (the new root's, and every needed derived node's): a throw that propagated would abort `normalizeData`, and leave the other observed nodes unsettled. Open decision 5.
+v1's `ReadResult` is unchanged, so `read` and `readButDoNotEvaluate`, which never produce `ResolverThrew`, do not admit it in their types. v1 lets a throw propagate out of `read` (reader-ast.md, Semantics), and still does. In a stored result it is a value, because changes 3 and 4 run resolvers inside `normalizeData` (the new root's, and every observed derived node's): a throw that propagated would abort `normalizeData`, and leave the other observed nodes unsettled. Open decision 5.
 
-Equality is upstream's for resolver values, `===` (`areEqualWithDeepComparison.ts:84-95`), as pico's is the value's `==`. It is R4's optimization, not a guarantee. A resolver that returns a `===` primitive or the same object queues none of its dependents (change 4); one that returns a new object is unequal on every recomputation, structurally equal or not, and every derived node that reads it recomputes. `MissingData` is compared field by field because the runtime builds it from strings and links, where structural equality is well-defined. Open decision 7 settles `===`.
+Equality is upstream's for resolver values, `===` (`areEqualWithDeepComparison.ts:84-95`), as pico's is the value's `==`. It is R4's optimization, not a guarantee. A resolver that returns a `===` primitive or the same object marks none of its dependents (change 2, The engine); one that returns a new object is unequal on every recomputation, structurally equal or not, and every derived node that reads it recomputes. `MissingData` is compared field by field because the runtime builds it from strings and links, where structural equality is well-defined. Open decision 7 settles `===`.
 
 ### Tests
 
@@ -1622,11 +1681,12 @@ Equality is upstream's for resolver values, `===` (`areEqualWithDeepComparison.t
 New, in `test/graph.test.ts` (2a), with literal ids and computations that read sources from a map the test holds and report them through `context.readSource`:
 
 - A derived node read twice with `track` with no `markChanged` between: its computation runs once, and both values are `===`.
-- `markChanged` of a source the derived node read: the next `track` runs the computation once. Of a source it did not read: none. Of `[]`: none.
+- `markChanged` of a source the derived node read: the node's mark is `Dirty` and its dependent's `Check`; the next `track` runs the computation once. Of a source it did not read: none. Of `[]`: none.
 - A derived node whose computation reads another node: `markChanged` of the inner node's source recomputes both on the next `track` of the outer; the inner computation runs before the outer's finishes.
 - A recomputed value that `valuesEqual` accepts keeps the old value object (`toBe`).
+- Cutoff on the pull: an outer node reads an inner node that read `a`; after `markChanged([a])`, with the inner computation returning a value `valuesEqual` accepts, `track` of the outer runs the inner computation once and the outer computation zero times, and both end `Clean`.
 - Dependencies follow the last computation: a computation that read `a` and then, after `markChanged([a])`, reads `b` instead is not marked by a later `markChanged([a])`, and `sourceDependents` no longer holds a set for `a`.
-- `deleteSource` of a derived node's owner: `derivedNodes` no longer holds the node, `owned` no longer holds the owner, and an outer node that read it is `Stale`.
+- `deleteSource` of a derived node's owner: `derivedNodes` no longer holds the node, `owned` no longer holds the owner, and an outer node that read it is `Dirty`.
 - Degenerate: `deleteSource` of a source nothing owns or read changes nothing.
 
 New, in `test/memo.test.ts` (2b), over an environment built with `createIsographEnvironment(new Map(), deferredNetwork().networkFunction)`. Call counts come from `vi.spyOn(readerArtifact, 'resolver')`, which replaces the method on the one artifact object every `Resolver` node reads. Fixture sources added to store.md's fixture project:
@@ -1659,8 +1719,8 @@ In this change nothing settles after a write; each case writes with `normalizeDa
 - `environment.store` is unchanged by every `readStoredResult`: it is `toEqual` the same `storeOf` before and after. After `PetSummary` with `{ id: "1" }`, `environment.graph.derivedNodes` holds `resolverDerivedNode` of `Query.__ROOT` and `PetSummary____id___"1"`, of `Pet:1` and `PetName`, and of `Pet:1` and `RecentCheckins____n___2`, and no other.
 - A second read with no write between: every resolver's call count is unchanged, and the result is `===` the first read's. (v1's `read`: every count doubles.)
 - Diamond, `Pet:1.name` `Rex` to `Max`: `Initial`, `Monogram`, `Signature`, `Badge`, and `BadgePage` are each called once; `Badge` receives `{ Monogram: "M.", Signature: "M " }` on its one call; `Initial` is called once although `Monogram` and `Signature` both select it.
-- Diamond, `Rex` to `Ray`: on the next read, `Initial`, `Monogram`, `Signature`, `Badge`, and `BadgePage` are each called once, and `Initial` returns `"R"`: a read of `Stale` derived nodes has no cutoff (open decision 15; change 4's Tests cover the cutoff for observed derived nodes).
-- New object, `Pet:1.name` `Rex` to `Ray`, after a read of `ShapePage` with `{ id: "1" }`: the next read calls `NameShape`, `ShapeLabel`, and `ShapePage` once each; `NameShape`'s stored result is `toEqual` and not `toBe` the previous one.
+- Diamond, `Rex` to `Ray`: on the next read, `Initial` is called once and returns `"R"`; `Monogram`, `Signature`, `Badge`, and `BadgePage` are called zero times, and the read's result is `toBe` the previous one (open decision 15 (b)).
+- New object, `Pet:1.name` `Rex` to `Ray`, after a read of `ShapePage` with `{ id: "1" }`: the next read calls `NameShape` and `ShapeLabel` once each and `ShapePage` zero times; `NameShape`'s stored result is `toEqual` and not `toBe` the previous one.
 - Diamond, only `nickname` changes: `Signature`, `Badge`, `BadgePage` once each; `Initial` and `Monogram` zero.
 - Chain across fragments, `Pet:1.bestFriend` is `Pet:2`; `FriendPage` with `{ id: "1" }` and `PetSummary` with `{ id: "2" }` read, then `Pet:2.name` changes, then both read again in either order: `PetName` on `Pet:2` is called once; `FriendLabel`, `FriendCard`, `FriendPage`, and `PetSummary` once each; `RecentCheckins` zero.
 - Unrelated write: only `Pet:1.tagline` changes: `FriendCard` and `FriendPage` once; `FriendLabel` and `PetName` zero.
@@ -1693,14 +1753,13 @@ New in `test/garbageCollection.test.ts`: `garbageCollect` with nothing retained 
 
 Depends on the held architecture.
 
-A write can make several stored results stale at once. R3 holds on the read path, and on the push for every read of a derived node below the reader's height. An upward read during the push breaks it in change 4's code as written; held open decision 19 (c) restores it by abandoning the computation at that read (Once per pass, below):
+A write can mark many stored results at once. R3 holds on every pull:
 
-- Heights (change 4, Heights). A derived node's height is above the height of every derived node it reads. Its computation sets the height from what it read, and adjustment raises it and its dependents, transitively, when a recomputation reads a derived node at or above it. Change 2 has no heights.
-- The read path (change 2, The engine). A `Stale` derived node recomputes when read, and each derived node its computation reads is brought up to date by that read first. It recomputes once: it ends `Clean`, and only marking, which does not run during a read, makes it `Stale` again. The recursion terminates because the runtime graph has no cycle (Cycles, below).
-- The push (change 4, Settlement). `settle` drains bucket 0, then bucket 1, and so on. A derived node of height `h` recomputes after every bucket below `h` is empty. Each derived node it reads is `Clean`, `Queued`, `Stale`, or absent, and the read brings a `Queued`, `Stale`, or absent one up to date before returning; under held open decision 19 (c), a read of a stored derived node at or above `h`, `Queued` included, abandons the computation instead. A derived node it reads below `h` is current: everything that derived node reads is lower still, and those buckets are empty. During the drain of bucket `h`, two things add to the queue, and both add above `h`. First, a recomputed derived node whose result changed queues its dependents. That derived node was `Queued` at a height at or above `h`, so its dependents are above `h`, or it was `Stale`, so its dependents are `Stale` (change 2's invariant) or the derived node computing, and it queues none. Second, adjustment moves a raised `Queued` derived node to a higher bucket. The derived node that started the raise recomputed during the drain of `h`, so it was `Queued` at a height at or above `h` or was `Stale`. Its `Queued` dependents are above its old height, so above `h`, and adjustment only raises them. A `Stale` derived node's dependents are `Stale` or computing, and neither is in a bucket. So no bucket at or below `h` gains a derived node once its drain has started.
-- Once per pass. A derived node recomputes at most once per pass when every derived node it reads is below it. An upward read can break this. A derived node `X` of `field Pet.Y { bestFriend { FriendCard } }` on `Pet:5`, observed, with `Pet:5.bestFriend` `null`, has height 0, and `FriendCard` on `Pet:1` is needed by an observer at `FriendPage`, at height 2. One write sets `Pet:5.bestFriend` to `Pet:1` and changes `Pet:2.name`, which queues `X` and `PetName` on `Pet:2` at 0. When `X` drains first, it reads `FriendCard` on `Pet:1`, `Clean`, which returns its result from before the write, because `PetName` on `Pet:2` below it has not recomputed; `X` rises to 3. Then `PetName` on `Pet:2` recomputes and its change queues `FriendLabel` at 1, `FriendLabel` queues `FriendCard` at 2, and `FriendCard` queues `X` at 3, which recomputes a second time. Every result is current when `settle` returns, and observers are notified once, after it; `X`'s resolver was called twice, once with stale data, which R3 excludes. Under held open decision 19 (c), `X`'s computation is abandoned at its read of `FriendCard` on `Pet:1`, before `X`'s resolver runs; `X` rises to 3 and is queued there, and recomputes once, after `FriendCard`. A read during `settle` of a `Queued` derived node, by the drained derived node or by any derived node computed on demand under it, abandons the same way.
+- The pull (change 2, The engine). A marked derived node is brought up to date only by a pull, and a pull brings every derived node a computation reads up to date before returning its value: a `Check` node's recorded dependencies by `checkDependencies`, and every read by `readDerivedNode`. So no resolver runs with a stale input. A derived node recomputes at most once per write: it ends `Clean`, and during pulls only `recompute`'s marking of dependents runs, which reaches only non-`Clean` derived nodes. The recursion terminates because the runtime graph has no cycle (Cycles, below).
+- The post-write pull (change 4, Settlement). `settle` pulls the observed derived nodes in `graph.observers` order. The order changes neither which resolvers run nor how often: the first pull that reaches a marked derived node brings it up to date, and later pulls find it `Clean`.
+- No height. A pull of any derived node at any time brings its inputs up to date first, so no read can reach a derived node whose own inputs are pending (change 4, No heights).
 
-Equality cutoff is `recompute`'s, by `resultsEqual`, on the push: a derived node whose result is `===` its previous one queues nothing. A new object always queues its dependents. The read path has no cutoff (open decision 15). Cutoff is an optimization (R4); R3 holds whether or not any result cuts off. The traces are in Candidate 3a.
+Equality cutoff is `recompute`'s and the pull's, by `resultsEqual`. A derived node whose recomputed result `valuesEqual` accepts keeps its old value and marks no dependent, and a `Check` derived node none of whose dependencies recomputed to a new value ends `Clean` without recomputing (open decision 15 (b)). A new object always marks its dependents `Dirty`. Cutoff is an optimization (R4); R3 holds whether or not any result cuts off. The traces are in Candidate 3b.
 
 ### The same resolver selected twice
 
@@ -1708,10 +1767,10 @@ Two selections of one client field on one record with equal argument values are 
 
 ### Reads during recalculation
 
-- A level 2 callback never runs during recalculation: change 4 calls callbacks only after `settle` has emptied the queue, so every needed derived node is `Clean`. A callback that calls `snapshot` receives the stored result, which is current for every needed derived node; one that calls `readStoredResult` receives a current result for any derived node, because the read recomputes a `Stale` one. A callback that calls `normalizeData` runs a nested write, settlement, and notification; when it returns, the outer notification loop compares each remaining observer's stored result with the one it last notified, so no observer is called twice for one result or receives an older result after a newer one.
-- A `readStoredResult` outside a write is the read path. It meets no `Queued` derived node, because `normalizeData` and `garbageCollectEnvironment` empty the queue before they return.
-- A resolver that reads or writes the store (through a closure, since its parameter holds no store) during its own computation breaks the guarantee: its inner `readStoredResult` records no dependency on the outer derived node, and an inner `normalizeData` marks and queues derived nodes while an outer recomputation is reading them. Open decision 8.
-- Cycles: none under changes 1 to 4. The static reader graph has none (a cycle of client field selections is an `InlineCycle` query error, query-generation.md, Cycles), and every runtime dependency goes to a derived node of a field the reader AST selects (Candidate 3a), so no derived node is reached again while it computes, marking terminates, and adjustment never reaches the dependency that started it. An eager client pointer makes a cycle of derived nodes possible (open decision 18).
+- A level 2 callback never runs during recalculation: change 4 calls callbacks only after `settle` pulled every observed derived node, so each is `Clean`, and so is every derived node it reads (change 2's invariant). A callback that calls `snapshot` receives the current result of every observed derived node; one that calls `readStoredResult` receives a current result for any derived node, because the read pulls it. A callback that calls `normalizeData` runs a nested write, settlement, and notification; when it returns, the outer notification loop compares each remaining observer's stored result with the one it last notified, so no observer is called twice for one result or receives an older result after a newer one.
+- A `readStoredResult` outside a write is the same pull `settle` makes.
+- A resolver that reads or writes the store (through a closure, since its parameter holds no store) during its own computation breaks the guarantee: its inner `readStoredResult` records no dependency on the outer derived node, and an inner `normalizeData` marks derived nodes while an outer recomputation is reading them. Open decision 8.
+- Cycles: none under changes 1 to 4. The static reader graph has none (a cycle of client field selections is an `InlineCycle` query error, query-generation.md, Cycles), and every runtime dependency goes to a derived node of a field the reader AST selects (Candidate 3a), so no derived node is reached again while it is pulled. Marking terminates on any graph, because it stops at a derived node already marked. An eager client pointer makes a cycle of derived nodes possible (open decision 18).
 
 ## 3. Level 1: `normalizeData` retains and computes its root
 
@@ -1850,7 +1909,7 @@ Depends on the held architecture.
 ```ts
 // from libs/isograph-runtime/src/retention.ts
 /** Holds the root derived node of `entrypoint` on `variables`, computing it and every result it
- * reaches when absent or `Stale`, and adds the retention to `environment.retainedQueries`. Writes
+ * reaches when absent or marked, and adds the retention to `environment.retainedQueries`. Writes
  * nothing to the store. */
 export function retainEntrypoint<TOutput>(
   environment: IsographEnvironment,
@@ -1874,7 +1933,7 @@ export function retainEntrypoint<TOutput>(
 }
 ```
 
-When `normalizeData` calls it, `ast.root` is present: `normalize` inserts it before writing anything. When `retainQueryWithoutMakingNetworkRequest` calls it, `ast.root` can be absent (Serving from the store). The derived nodes the new retention reaches are computed here, children before parents: the root's computation reads each `Resolver` node through `readDerivedNode`, which computes the child, or brings it up to date, first. This is the bottom-up order the user's design creates them in on the way back up the response (Resolver markers, below). A derived node already stored and `Clean` is read as is; one that is `Stale` recomputes. A `normalizeData` of an already retained entrypoint and variables whose response changed nothing calls no resolver.
+When `normalizeData` calls it, `ast.root` is present: `normalize` inserts it before writing anything. When `retainQueryWithoutMakingNetworkRequest` calls it, `ast.root` can be absent (Serving from the store). The derived nodes the new retention reaches are computed here, children before parents: the root's computation reads each `Resolver` node through `readDerivedNode`, which computes the child, or brings it up to date, first. This is the bottom-up order the user's design creates them in on the way back up the response (Resolver markers, below). A derived node already stored and `Clean` is read as is; one that is marked is pulled. A `normalizeData` of an already retained entrypoint and variables whose response changed nothing calls no resolver.
 
 ### Serving from the store
 
@@ -1959,7 +2018,7 @@ type RetentionStatusUndisposed = {
         : makeNetworkRequest(environment, entrypoint, variables, fetchOptions);
 ```
 
-Deltas: the function takes the entrypoint instead of its AST; its status holds the `Retention` instead of a `RetainedQuery`, and its cleanup calls `dispose`, which removes the retention from `environment.retainedQueries` as `unretainQuery` removed the `RetainedQuery`, and releases the root hold. `retainArtifact` keeps its one other caller, `makeNetworkRequest`. `IsographEntrypoint<TParam, TOutput, TEntityName>` is assignable to `Entrypoint<TOutput>` (`normalizeData`). The retain is still taken when the call is made, so no write between the call and a later read can be missed: a write after `retainEntrypoint` marks or queues the root as it would after `normalizeData`. No `settle` or `notify` runs: outside a write the queue is empty (Reads during recalculation), and the root hold recomputes only `Stale` or new derived nodes, whose dependents are `Stale`, so no observed value changes.
+Deltas: the function takes the entrypoint instead of its AST; its status holds the `Retention` instead of a `RetainedQuery`, and its cleanup calls `dispose`, which removes the retention from `environment.retainedQueries` as `unretainQuery` removed the `RetainedQuery`, and releases the root hold. `retainArtifact` keeps its one other caller, `makeNetworkRequest`. `IsographEntrypoint<TParam, TOutput, TEntityName>` is assignable to `Entrypoint<TOutput>` (`normalizeData`). The retain is still taken when the call is made, so no write between the call and a later read can be missed: a write after `retainEntrypoint` marks or queues the root as it would after `normalizeData`. No `settle` or `notify` runs: the root hold pulls only marked or new derived nodes, and after the last write's `settle` every observed derived node is `Clean` and reads no marked one (change 2's invariant), so no observed value changes.
 
 Under `IfNecessary` the root record is present, because `check` found every selection of the AST, starting at `ast.root`. Under `No` it can be absent. What the root hold does then is open decision 21 (held (a): the root derived node is created and computes `MissingData` for the absent record).
 
@@ -1967,7 +2026,7 @@ Under `IfNecessary` the root record is present, because `check` found every sele
 
 Depends on the held architecture.
 
-After the `normalizeData` that retains a query, a later write recomputes its derived nodes only when an observer needs them (change 4). Until change 4 there are no observers, so a later write marks a retained query's affected derived nodes `Stale`, and the next read of them recomputes them: a `readStoredResult`, a subscription's re-read of a nested resolver (change 2, Subscriptions), or the root hold of the next `normalizeData` of the same entrypoint and variables. Retention keeps records and derived nodes alive for `garbageCollectEnvironment`; it does not keep derived nodes current. Open decision 3.
+After the `normalizeData` that retains a query, a later write marks its affected derived nodes, and only a pull brings them up to date; from change 4 `settle` pulls the observed ones. Until change 4 there are no observers, so the next read of them pulls them: a `readStoredResult`, a subscription's re-read of a nested resolver (change 2, Subscriptions), or the root hold of the next `normalizeData` of the same entrypoint and variables. Retention keeps records and derived nodes alive for `garbageCollectEnvironment`; it does not keep derived nodes current. Open decision 3.
 
 ### Garbage collection
 
@@ -2187,7 +2246,7 @@ A read that throws keeps the ids it reported before the throw: those derived nod
 Cost: one `Set` per subscription read, with one insertion per `Resolver` node the subscription's reader AST walks, which the walk already visits; one array of every subscription's ids per `garbageCollectEnvironment`. A write pays only for the sets its re-reads fill; only `garbageCollectEnvironment` builds the array.
 
 - Records: store.md's mark and sweep, from each member of `environment.retainedQueries`, with `garbageCollect`'s parameters unchanged. A derived node a retention reaches never loses a record: it reads only what its reader ASTs select along current links, and the retained query's normalization AST is the merge of those reader ASTs with the same variables (query-generation.md), so every record it reads is marked. A derived node reached only from an observed location or from a subscription can lose its records (Level 2). Each deleted record goes through `deleteSource`, which disposes its derived nodes (change 2).
-- Derived nodes: nodes that held roots, observed locations, and current subscriptions' last reads reach through `Derived` dependencies are kept; every other derived node is disposed by `disposeDerivedNode`, so no `dependents` set or `sourceDependents` set keeps it. A disposed derived node has no kept dependent: a kept node that read it would make it reachable. Derived nodes a plain `readStoredResult` stored outside any retention and subscription, those of a disposed retention, and those only an unsubscribed subscription read, are collected this way, `Stale` or not. A nested derived node a current subscription read survives `garbageCollectEnvironment` with its stored value, so the subscription's next re-read returns the same object and calls no callback.
+- Derived nodes: nodes that held roots, observed locations, and current subscriptions' last reads reach through `Derived` dependencies are kept; every other derived node is disposed by `disposeDerivedNode`, so no `dependents` set or `sourceDependents` set keeps it. A disposed derived node has no kept dependent: a kept node that read it would make it reachable. Derived nodes a plain `readStoredResult` stored outside any retention and subscription, those of a disposed retention, and those only an unsubscribed subscription read, are collected this way, marked or not. A nested derived node a current subscription read survives `garbageCollectEnvironment` with its stored value, so the subscription's next re-read returns the same object and calls no callback.
 
 ### Resolver markers
 
@@ -2216,235 +2275,47 @@ Reason for (a): every marker in (b) is already reachable from the root through r
 - `dispose` of `FriendPage`'s retention, then a change to `Pet:2.name` before `garbageCollectEnvironment`: no resolver is called.
 - store.md's GC tests and network-and-subscriptions.md's tests of `garbageCollectEnvironment` are unchanged: the first call `garbageCollect` with a retained list and compare the store with `storeOf`; the second retain through `retainQuery` and compare `environment.store`.
 
-## 4. Level 2 and the height-ordered push
+## 4. Level 2 and the post-write pull
 
 Depends on the held architecture, except `listen`, `snapshot`, and `Observed`.
 
-This change adds observers, and with them needed derived nodes: a derived node is needed when an observer is at its location or a needed derived node reads it. A write recomputes the needed derived nodes whose inputs changed inside `normalizeData`, lowest height first, and marks every other derived node it reaches `Stale`, as change 2 does.
+This change adds observers. A write marks (change 2); `settle` then pulls every derived node an observer is at, and `notify` calls each observer whose value changed (open decision 28, held (a)). A derived node nobody observes stays marked until a read pulls it (open decision 3, held (b)).
 
-### Heights
+### No heights
 
-A derived node's height comes from what its computation read. `createDerivedNode` sets it; `recompute` raises it when the computation read a derived node at or above it. Its reader is the bucket queue (Settlement), so it lands in this change.
+3b needs no height. A pull brings a derived node's inputs up to date before the node uses them, through `readDerivedNode` and `checkDependencies`, so the order of recomputations within a pass is the order of the reads, whatever the graph's shape. The order in which `settle` pulls the observed derived nodes changes nothing (Ordering). A read that would be upward under 3a (a link set from `null`, a refinement on a record of another entity, an eager client pointer) is one more pull of a derived node that may be marked, and needs no adjustment.
 
-```ts
-// from libs/isograph-runtime/src/graph.ts
-/** 0 when `dependencies` hold no `Derived` dependency, else one more than the largest `height` among them. */
-function heightAbove<TValue>(dependencies: ReadonlyArray<GraphDependency<TValue>>): number {
-  return dependencies.reduce(
-    (height, dependency) =>
-      dependency.kind === 'Derived' ? Math.max(height, dependency.node.height + 1) : height,
-    0,
-  );
-}
+Nothing of heights remains in the engine: no field, no queue, no adjustment, and no abandon. Heights remain only in Candidate 3a. A scheduler that orders passes (Follow-ups 9) orders observers by priority, not by height.
 
-/** Sets `node.height` to `height`, moving the node to `graph.queue[height]` when it is in its
- * bucket, then raises each dependent whose height is not above `height` to one more, transitively. */
-function raiseHeight<TValue>(
-  graph: RecomputationGraph<TValue>,
-  node: DerivedNode<TValue>,
-  height: number,
-): void {
-  if (graph.queue[node.height]?.delete(node) === true) {
-    bucket(graph, height).add(node);
-  }
-  node.height = height;
-  node.dependents.forEach((dependent) => {
-    if (dependent.height <= height) {
-      raiseHeight(graph, dependent, height + 1);
-    }
-  });
-}
-```
-
-```ts
-// from libs/isograph-runtime/src/graph.ts
-// createDerivedNode, before (change 2):
-    value: computed.value,
-    state: 'Clean',
-// after:
-    value: computed.value,
-    state: 'Clean',
-    height: heightAbove(computed.dependencies),
-
-// recompute, before (change 2):
-  const computed = compute(graph, node.computation);
-  setDependencies(graph, node, computed.dependencies);
-// after:
-  const computed = compute(graph, node.computation);
-  setDependencies(graph, node, computed.dependencies);
-  const height = heightAbove(computed.dependencies);
-  if (height > node.height) {
-    raiseHeight(graph, node, height);
-  }
-```
-
-Every derived node a computation read was brought up to date by `readDerivedNode` before the computation used its value, so `heightAbove` reads final heights. A new derived node has no dependents yet, so `createDerivedNode` raises nothing. `recompute` raises before Propagation's `invalidate` of its dependents, so a dependent is queued at its raised height. A derived node that is computing is not in a bucket (`bringUpToDate` removed it), so `raiseHeight` moves only `Queued` nodes waiting in their buckets.
-
-Raising during `settle` never adds to a drained bucket. The derived node that starts a raise recomputed during the drain of bucket `h`, so it was `Queued` at a height at or above `h` or was `Stale`. A `Queued` dependent of it has a height above its old height, so above `h`, and moves only upward; the dependents of a `Stale` derived node are `Stale` or the node computing, and neither is in a bucket (Ordering).
-
-Cost: `heightAbove` is one comparison per dependency of every computation. `raiseHeight` runs only after a recomputation that read a derived node at or above its own height, and visits the raised nodes and their dependents. A dependent reachable along several paths of the raised region can be raised once per path that raises it further. Nothing lowers a height, so a derived node whose computation later reads lower nodes keeps the bucket it reached.
-
-`raiseHeight` reaching the dependency that started the raise is a cycle of derived nodes. Changes 1 to 4 cannot reach it (Ordering, Cycles); without a check the recursion would not terminate on one. What the runtime does there is open decision 18.
-
-### Needed derived nodes
-
-```ts
-// from libs/isograph-runtime/src/graph.ts
-export type DerivedNode<TValue> = {
-  // .. change 2 and 3's fields, and:
-  /** Above the height of every derived node this one reads. Set by `createDerivedNode`, raised by `recompute` (Heights). */
-  height: number;
-  /** The callbacks `observe` holds at this derived node plus the dependents whose `neededCount` is
-   * above 0. The derived node is needed when it is above 0. */
-  neededCount: number;
-};
-
-/**
- * `Clean`: `value` is what a computation against the store would return.
- * `Queued`: needed, and an input it read changed; it is in `graph.queue[height]`.
- * `Stale`: not needed, and a source it read changed or a derived node it reads is `Stale`. It recomputes when read.
- */
-export type DerivedNodeState = 'Clean' | 'Queued' | 'Stale';
-```
-
-```ts
-// from libs/isograph-runtime/src/graph.ts
-/** Adds one to `node.neededCount`; when it was 0, adds one to that of each derived node it reads. */
-function addNeed<TValue>(node: DerivedNode<TValue>): void {
-  node.neededCount += 1;
-  if (node.neededCount === 1) {
-    derivedNodeDependencies(node).forEach(addNeed);
-  }
-}
-
-/** Subtracts one from `node.neededCount`; when it reaches 0, subtracts one from that of each derived node it reads. */
-function removeNeed<TValue>(node: DerivedNode<TValue>): void {
-  node.neededCount -= 1;
-  if (node.neededCount === 0) {
-    derivedNodeDependencies(node).forEach(removeNeed);
-  }
-}
-
-/** The distinct derived nodes of `node`'s `Derived` dependencies. */
-function derivedNodeDependencies<TValue>(node: DerivedNode<TValue>): Set<DerivedNode<TValue>>;
-```
-
-Writers of `neededCount`:
-
-- `createDerivedNode` starts it, and `rootCount`, at the number of callbacks `graph.observers` holds at its id, before `setDependencies`, so an observed derived node created by a computation needs what it reads.
-- `setDependencies`, when `node.neededCount > 0`, calls `addNeed` on each distinct `Derived` dependency of `next` that the old list does not hold, and `removeNeed` on each distinct `Derived` dependency of the old list that `next` does not hold. Distinct, because `dependents` is a set: a dependency recorded twice is one edge.
-- `observe` and its stop function (`listen` and `snapshot`, below).
-- Disposing a derived node calls `setDependencies(graph, node, [])`, which removes its need from what it read when it was needed.
-
-Invariants, outside a call that is computing a derived node:
-
-- `neededCount` is the callbacks at the derived node's id plus the number of its dependents whose `neededCount` is above 0.
-- Every dependent of a `Stale` derived node is `Stale` (change 2). So every derived node a `Clean` node reads is `Clean`, and so is everything below it.
-- Every derived node's height is above the height of every node it reads (Heights).
-- No needed derived node is `Stale`, and every `Queued` node is needed.
-- When `normalizeData` and `garbageCollectEnvironment` return, no derived node is `Queued`.
-
-Why a kept count. A write decides "needed?" for every derived node it invalidates, and the answer must cost `O(1)`. Computing it on demand walks the derived node's dependents upward until an observed node, so each decision costs the node's ancestors, on every write. Marking the needed region from every observer down before each write costs the whole observed region per write, the `O(L)` the push exists to avoid. The count costs work only where neededness changes: `observe` and its stop function walk the region that becomes needed or stops being needed, and `setDependencies` of a needed derived node walks the dependencies it gained or lost. Counting is exact because the graph has no cycle (Ordering). The count is the observed count R10 and Follow-ups 9 ask for. Open decision 16.
-
-### Propagation
-
-```ts
-// from libs/isograph-runtime/src/graph.ts
-/** An input of `node` changed. A `Clean` needed derived node is queued at its height. A `Clean` derived node
- * nobody needs is marked `Stale` with its dependents. A `Queued` or `Stale` derived node already
- * recomputes before it is read. */
-function invalidate<TValue>(graph: RecomputationGraph<TValue>, node: DerivedNode<TValue>): void {
-  if (node.state !== 'Clean') {
-    return;
-  }
-  if (node.neededCount > 0) {
-    node.state = 'Queued';
-    bucket(graph, node.height).add(node);
-  } else {
-    markStale(node);
-  }
-}
-
-/** `graph.queue[height]`, after appending an empty set for every missing index up to it. */
-function bucket<TValue>(graph: RecomputationGraph<TValue>, height: number): Set<DerivedNode<TValue>>;
-```
-
-```ts
-// from libs/isograph-runtime/src/graph.ts
-// markChanged, before (change 2):
-  sources.forEach((source) => graph.sourceDependents.get(source)?.forEach(markStale));
-// after:
-  sources.forEach((source) =>
-    graph.sourceDependents.get(source)?.forEach((node) => invalidate(graph, node)),
-  );
-
-// deleteSource, before (change 2):
-  owned?.forEach((node) => node.dependents.forEach(markStale));
-// after:
-  owned?.forEach((node) => node.dependents.forEach((dependent) => invalidate(graph, dependent)));
-```
-
-`markStale` keeps change 2's body. It reaches only derived nodes nobody needs: a dependent of a node nobody needs is itself not needed, so it never meets a `Queued` node. `disposeDerivedNode` also removes a `Queued` derived node from its bucket.
-
-```ts
-// from libs/isograph-runtime/src/graph.ts
-// recompute, before (change 2):
-  if (!graph.valuesEqual(node.value, computed.value)) {
-    node.value = computed.value;
-  }
-// after:
-  if (!graph.valuesEqual(node.value, computed.value)) {
-    node.value = computed.value;
-    node.dependents.forEach((dependent) => invalidate(graph, dependent));
-  }
-
-// bringUpToDate, before (change 2):
-  if (node.state === 'Clean') {
-    return;
-  }
-  recompute(graph, node);
-  node.state = 'Clean';
-// after:
-  if (node.state === 'Clean') {
-    return;
-  }
-  if (node.state === 'Queued') {
-    bucket(graph, node.height).delete(node);
-  }
-  recompute(graph, node);
-  node.state = 'Clean';
-```
-
-The derived node keeps its state while its computation runs, so a node its read recomputes to a new value does not invalidate it again; it reads the new value and ends `Clean`. On the read path the new `forEach` changes nothing, because a recomputed `Stale` derived node's dependents are `Stale` already; on the push it queues the needed dependents and marks the others `Stale`.
-
-### Settlement
+### Observed derived nodes
 
 ```ts
 // from libs/isograph-runtime/src/graph.ts
 export type RecomputationGraph<TValue> = {
   // .. change 2's fields, and:
-  /** Index `h` holds every `Queued` derived node of height `h`. No index is a hole. */
-  readonly queue: Array<Set<DerivedNode<TValue>>>;
   readonly observers: Map<DerivedNodeId, Observed<TValue>>;
 };
 
-/** Recomputes every `Queued` derived node, lowest height first, until the queue is empty. */
+/** Pulls every stored derived node an observer is at, in `observers` order. */
 export function settle<TValue>(graph: RecomputationGraph<TValue>): void {
-  for (const nodes of graph.queue) {
-    for (const node of nodes) {
+  graph.observers.forEach((_observed, id) => {
+    const node = graph.derivedNodes.get(id);
+    if (node !== undefined) {
       bringUpToDate(graph, node);
     }
-  }
+  });
 }
 ```
 
-`createGraph` starts `queue` and `observers` empty. A `for..of` over an array reads its length at each step, and one over a set visits members added during the walk and tolerates deleting the current one, so `settle` reaches buckets appended while it runs. By Ordering, a bucket gains no derived node once its drain has started, so each bucket is empty when the walk leaves it. Buckets stay in the array, empty; its length is one more than the largest height ever queued. The loop is a state machine over a queue that grows during the walk, which the iterator combinators do not express.
+`createGraph` starts `observers` empty. `settle` costs one lookup per observer and returns at once for a `Clean` one, plus the pulls of the marked derived nodes the observed ones read. `notify` iterates the observers too, so a write costs `O(observers)` before any recomputation. Recording the observed derived nodes that marking reaches (one `graph.observers.has(node.id)` per marked node) would make `settle` `O(marked observed)`, and is not needed while `notify` is `O(observers)`. A computation adds no observer (callbacks run in `notify`), so the `forEach` meets no entry added during it.
 
-The code above lets an upward read during `settle` bring the derived node it reads up to date (open decision 19 (a)). Held (c) changes `compute`, `createDerivedNode`, `recompute`, `bringUpToDate`, and `settle` as open decision 19 states, after its two open choices (how the drained height reaches `compute`, and the abandon's type) are made.
+Observed derived nodes are the only derived nodes the runtime pulls after a write in changes 1 to 4. A subscription's nested derived nodes are pulled by its re-read in `callSubscriptions` (change 2, Subscriptions), and the mounted derived nodes with an effect by `settle` when Values with lifecycles lands.
 
-`normalizeData` runs `settle` after `normalize` and `markChanged` and before the root hold (change 3). The root hold queues nothing: every derived node it recomputes is `Stale` or new, and the dependents of a `Stale` node are `Stale`. So the queue is empty when `notify` runs.
+### Settlement
 
-A response that throws part-way must settle too. From this change `markChanged` queues needed derived nodes, so `writeOrMark` as change 2 wrote it, which marks the `PartialWriteError`'s changes and rethrows, would leave them `Queued` when `normalizeData` throws: the invariant that no derived node is `Queued` when `normalizeData` returns breaks, and the observers of what the write changed are not called. Changes 2 and 3 have no queue, so their marking of a partial write is complete.
+`normalizeData` runs `settle` after `normalize` and `markChanged` and before the root hold (change 3). The root hold changes no observed value: every derived node it pulls is marked or new, and after `settle` every observed derived node is `Clean`, so by change 2's invariant none of them reads a marked one. `notify` runs last.
+
+A response that throws part-way must settle too. From this change observers are called after a write, so `writeOrMark` as change 2 wrote it, which marks the `PartialWriteError`'s changes and rethrows, would leave the observed derived nodes the partial write reached marked and their observers uncalled, and `snapshot` would return the values from before the write until another write. Changes 2 and 3 have no observers, so their marking of a partial write is complete.
 
 ```ts
 // from libs/isograph-runtime/src/environment.ts
@@ -2503,7 +2374,7 @@ function writeOrMark(
 }
 ```
 
-The partial write retains nothing: `retainEntrypoint` does not run, as in change 3. `notify` never throws (open decision 9), so the rethrown error is the `PartialWriteError`. `settle` throws only when a computation throws outside its resolver (open decision 22); under 22's held (a) it does not, so the `PartialWriteError` is not replaced by another error. The doc comment of `normalizeData` (change 3) gains: "On a `PartialWriteError`, settles and calls observers before rethrowing it." `garbageCollectEnvironment` runs `settle` and then `notify` after `collect`: a needed derived node that read a deleted record was queued by `deleteSource`'s invalidation and recomputes to `MissingData`, and a node disposed while `Queued` left its bucket when it was disposed.
+The partial write retains nothing: `retainEntrypoint` does not run, as in change 3. `notify` never throws (open decision 9), so the rethrown error is the `PartialWriteError`. `settle` throws only when a computation throws outside its resolver (open decision 22). The doc comment of `normalizeData` (change 3) gains: "On a `PartialWriteError`, settles and calls observers before rethrowing it." `garbageCollectEnvironment` runs `settle` and then `notify` after `collect`: an observed derived node that read a deleted record was marked `Dirty` by `deleteSource` and recomputes to `MissingData`, and `collect` disposes no observed derived node (its `rootCount` is above 0).
 
 ```ts
 // from libs/isograph-runtime/src/environment.ts
@@ -2521,9 +2392,9 @@ The partial write retains nothing: `retainEntrypoint` does not run, as in change
   notify(environment.graph);
 ```
 
-Work per write: the needed derived nodes that read a changed source recompute; the derived nodes nobody needs that read one are marked `Stale` with their dependents, once; each recomputed derived node whose value changed invalidates its direct dependents; and `settle` takes one step per bucket. Nothing is visited whose inputs are unchanged. The traces are in Candidate 3a.
+Work per write: marking visits each derived node that read a changed source and each `Clean` derived node above those, once; `settle` takes one step per observer and pulls the marked derived nodes the observed ones read; a pulled derived node recomputes only when an input changed value. The traces are in Candidate 3b.
 
-A scheduler (Follow-ups 9) leaves the queue as is; deferral marks instead of queuing.
+A scheduler (Follow-ups 9) chooses which observers a pass pulls; the others keep their marks.
 
 ### `listen` and `snapshot`
 
@@ -2536,8 +2407,8 @@ export type Observed<TValue> = {
   notified: TValue | undefined;
 };
 
-/** Adds `onChange` at `id`; when the derived node exists, brings it up to date, then adds one to its
- * `rootCount` and its `neededCount`. Returns the function that removes all three. */
+/** Adds `onChange` at `id`; when the derived node exists, pulls it, then adds one to its `rootCount`.
+ * Returns the function that removes both. */
 export function observe<TValue>(
   graph: RecomputationGraph<TValue>,
   id: DerivedNodeId,
@@ -2555,7 +2426,7 @@ export function notify<TValue>(graph: RecomputationGraph<TValue>): void;
 ```ts
 // from libs/isograph-runtime/src/observe.ts
 /** Calls `onChange` after each settlement that changed the result stored at `location`, and
- * makes that result needed. Returns the function that stops it. */
+ * keeps that result current after every write. Returns the function that stops it. */
 export function listen(
   environment: IsographEnvironment,
   location: DerivedNodeLocation,
@@ -2577,29 +2448,29 @@ export function snapshot(
 `observe`:
 
 1. Adds `onChange` to the `Observed` at `id` in `graph.observers`, creating it.
-2. When a derived node is stored at `id`: `bringUpToDate` on it, then adds one to `rootCount` and calls `addNeed`. Bringing it up to date first leaves it `Clean`, and so every derived node below it (Needed derived nodes, the invariants), so the region that becomes needed holds no `Stale` node. The derived nodes it recomputes were `Stale`, and their dependents are `Stale`, so nothing is queued and no other observer's value changes.
+2. When a derived node is stored at `id`: `bringUpToDate` on it, then adds one to `rootCount`. The pull leaves it `Clean`, and every derived node below it. The derived nodes it recomputes were marked, and by change 2's invariant no observed derived node reads one, so no other observer's value changes.
 3. Sets `notified` to the derived node's value.
 
-The returned function removes the callback, subtracts one from `rootCount` and calls `removeNeed` on the derived node stored at `id` when there is one, and removes the `Observed` when it has no callback left. When no derived node is stored at `id`, `observe` only registers, and `createDerivedNode` starts the node's `rootCount` and `neededCount` at the callbacks there.
+The returned function removes the callback, subtracts one from the `rootCount` of the derived node stored at `id` when there is one, and removes the `Observed` when it has no callback left. When no derived node is stored at `id`, `observe` only registers, and `createDerivedNode` starts the node's `rootCount` at the callbacks there.
 
-A location that is `Stale` when a component first renders: `snapshot` returns the last computed result (R1: it computes nothing). `listen`, in React's subscribe, brings it up to date, and `useSyncExternalStore` compares the snapshot after subscribing and renders again with the current result. Open decision 3.
+A location that is marked when a component first renders: `snapshot` returns the last computed result (R1: it computes nothing). `listen`, in React's subscribe, brings it up to date, and `useSyncExternalStore` compares the snapshot after subscribing and renders again with the current result. Open decision 3.
 
-Notification, after settlement in `normalizeData` and `garbageCollectEnvironment`: for each `Observed` in `graph.observers` in insertion order, the derived node's value is compared by identity with `notified`; when different, `notified` is set and each callback is called once. Identity suffices because `recompute` keeps the value object when `valuesEqual` holds. An observed resolver that returns a new object on every recomputation notifies on every recomputation (R4); a stable identity for it would come from upstream's merge of the data it reads, not from comparing its output. Each callback is called through `reportCallbackError` (`libs/isograph-runtime/src/subscribe.ts:157-167`), as `callSubscriptions` calls each subscription's callback and listeners: a throw is rethrown in its own microtask, the loop continues, and `notify` never throws (open decision 9). `graph.ts` imports nothing but `util.ts`, so change 4 moves `reportCallbackError` from `subscribe.ts` to `util.ts`, unchanged; `subscribe.ts` and `network.ts` import it from there. The loop is `O(observers)`; a list of the observed derived nodes `recompute` changed would make it `O(changed)`, and is not needed while observers are the mounted components of one screen.
+Notification, after settlement in `normalizeData` and `garbageCollectEnvironment`: for each `Observed` in `graph.observers` in insertion order, the derived node's value is compared by identity with `notified`; when different, `notified` is set and each callback is called once. Identity suffices because `recompute` keeps the value object when `valuesEqual` holds, and a `Check` node verified without recomputing keeps it too. An observed resolver that returns a new object on every recomputation notifies on every recomputation (R4); a stable identity for it would come from upstream's merge of the data it reads, not from comparing its output. Each callback is called through `reportCallbackError` (`libs/isograph-runtime/src/subscribe.ts:157-167`), as `callSubscriptions` calls each subscription's callback and listeners: a throw is rethrown in its own microtask, the loop continues, and `notify` never throws (open decision 9). `graph.ts` imports nothing but `util.ts`, so change 4 moves `reportCallbackError` from `subscribe.ts` to `util.ts`, unchanged; `subscribe.ts` and `network.ts` import it from there. The loop is `O(observers)`; a list of the observed derived nodes `recompute` changed would make it `O(changed)`, and is not needed while observers are the mounted components of one screen.
 
 What each level owns:
 
-- Level 1 holds values, dependencies, dependents, states, root holds, needed counts, and the queue. It runs user code (resolvers).
+- Level 1 holds values, dependencies, dependents, marks, and root holds. It runs user code (resolvers).
 - Level 2 holds the observed ids, callbacks, and the last-notified identity. It runs no resolver, and is notified only after level 1 settled, once per changed derived node per settlement.
 
-A parent component never re-renders with a stale child: every needed derived node is `Clean` before the first callback, and every node a mounted component observes is needed, so any `snapshot` during a re-render a callback caused returns the settled value, whatever the order callbacks run in. React additionally batches the `setState`s that `useSyncExternalStore` calls in one notification loop into one render.
+A parent component never re-renders with a stale child: every observed derived node is `Clean` before the first callback, and so is every derived node it reads, so any `snapshot` during a re-render a callback caused returns the settled value, whatever the order callbacks run in. React additionally batches the `setState`s that `useSyncExternalStore` calls in one notification loop into one render.
 
 What React needs, and gets without `@isograph/runtime` knowing React: `useSyncExternalStore(subscribe, getSnapshot)` where `subscribe(onStoreChange)` returns an unsubscribe function (`listen`), and `getSnapshot` returns the same value while nothing changed and is pure and cheap (`snapshot`, a lookup). How a component learns its location (the derived node a parent's result names) is the React package's, with `@component` (Later).
 
-An observer keeps its derived node current (it makes the node needed, so a write that reaches it recomputes it) and keeps the node through `collect` (its `rootCount`), but retains no record: data stays only while a retention keeps it. A location whose record `garbageCollectEnvironment` deleted has no stored derived node, and `snapshot` returns `undefined`.
+An observer keeps its derived node current (`settle` pulls it after every write) and keeps the node through `collect` (its `rootCount`), but retains no record: data stays only while a retention keeps it. A location whose record `garbageCollectEnvironment` deleted has no stored derived node, and `snapshot` returns `undefined`.
 
 ### Tests
 
-`test/graph.test.ts` gains, with literal ids: a derived node that reads no node has height 0, and one that reads nodes of heights 0 and 2 has height 3. Two needed derived nodes that both read source `a`, the second also reading the first (heights 0 and 1): `markChanged([a])` then `settle` runs the height-0 computation before the height-1 one, each once. A derived node nobody needs that read `a` is `Stale` after `markChanged([a])` and is not recomputed by `settle`. `observe` of an absent id registers only; the derived node created later starts with `rootCount` and `neededCount` 1. Adjustment: a needed derived node of height 0 whose recomputation after `markChanged` reads a node of height 1 has height 2, and its dependent of height 1 has height 3; a `Queued` dependent it raises is recomputed after the derived nodes below its new height. A derived node of height 2 whose recomputation reads no node keeps height 2.
+`test/graph.test.ts` gains, with literal ids: two observed derived nodes that both read source `a`, the second also reading the first: `markChanged([a])` then `settle` runs the first's computation before the second's, each once. A derived node nobody observes that read `a` is `Dirty` after `markChanged([a])`, and `settle` does not run its computation. An observed derived node whose inner dependency recomputes to a value `valuesEqual` accepts: `settle` runs only the inner computation, and `notify` calls no callback. `observe` of an absent id registers only; the derived node created later starts with `rootCount` 1.
 
 `test/level2.test.ts`, over an environment built with `createIsographEnvironment(new Map(), deferredNetwork().networkFunction)`:
 
@@ -2609,7 +2480,7 @@ An observer keeps its derived node current (it makes the node needed, so a write
 - Diamond, an observer at `BadgePage`, only `nickname` changes: `Signature`, `Badge`, `BadgePage` once each; `Initial` and `Monogram` zero.
 - New object, an observer at `ShapePage`, `Rex` to `Ray`: `NameShape` and `ShapeLabel` are called once each, `ShapePage` zero times, and the observer is not called. An observer at `NameShape` as well is called once, because its new `{ length: 3 }` is not `===` the old one.
 - Two observers, at `FriendPage` and at `PetSummary` with `{ id: "2" }`: one write to `Pet:2.name` calls `PetName` on `Pet:2` once, `FriendLabel`, `FriendCard`, `FriendPage`, and `PetSummary` once each, `RecentCheckins` zero, and each observer once.
-- One of two paths needed: an observer at `FriendPage`, `PetSummary` with `{ id: "2" }` retained and not observed; `Pet:2.name` changes: `PetName` on `Pet:2`, `FriendLabel`, `FriendCard`, and `FriendPage` are called once each inside the `normalizeData`, and `PetSummary` zero times; the next `readStoredResult` of `PetSummary` calls `PetSummary` once and `PetName` zero times.
+- One of two paths observed: an observer at `FriendPage`, `PetSummary` with `{ id: "2" }` retained and not observed; `Pet:2.name` changes: `PetName` on `Pet:2`, `FriendLabel`, `FriendCard`, and `FriendPage` are called once each inside the `normalizeData`, and `PetSummary` zero times; the next `readStoredResult` of `PetSummary` calls `PetSummary` once and `PetName` zero times.
 - Retained, not observed: `BadgePage` retained, `Rex` to `Max` through a `PetDetail` response: none of `BadgePage`'s resolvers is called inside that `normalizeData`, and `snapshot` at `BadgePage` returns the previous result; `listen` at `BadgePage` then calls each of the five once and calls no callback, and `snapshot` returns the new result.
 - The stop function: after the only observer at `BadgePage` stops, `Rex` to `Max` calls no resolver; `snapshot` still works.
 - A link set from `null` under an observer at `FriendPage` with `{ id: "4" }`, `Pet:4.bestFriend` `null`: a write that sets it to `Pet:2` calls `FriendLabel` on `Pet:4`, `PetName` on `Pet:2`, `FriendCard`, and `FriendPage` once each. Then `Pet:2.name` changes: `PetName` on `Pet:2`, `FriendLabel` on `Pet:4`, `FriendCard`, and `FriendPage` are called once each, in that order.
@@ -2638,7 +2509,7 @@ The engine is general over derived node kinds only as far as the follow-ups that
 - A derived node's owner is a caller-supplied `SourceId` (`DerivedNodeDefinition.owner`). Closure-component derived nodes (components-in-userland.md) need it: the wrapper is a node at the closure field's resolver store key, owned by the record's `recordSource`, whose computation reads only the record's presence (The engine, the store, and the environment, Lifetime still follows records), and a second node per closure derived node for its data read is that doc's open question 3. Both are resolver-shaped derived nodes, so they need nothing else beyond change 2's resolver nodes.
 - A derived node's computation and id come from its creator (`DerivedNodeDefinition`, `track`, `readDerivedNode`, `retainRoot`); no engine function builds one. Follow-up 10 needs it: a runtime-defined computation is not a resolver and has no resolver store key.
 - The graph's value type is a parameter, `TValue`. Follow-up 10 needs it: a derived value or a selector's value is not a `ResolverResult`, so that follow-up widens the environment's graph to a union of the kinds' values, and `valuesEqual` to a function that compares two values of one kind and answers unequal for two kinds.
-- Heights are the engine's: `createDerivedNode` and `recompute` set a derived node's height from what its computation read (change 4, Heights), so a caller supplies none. Follow-up 10 needs it: a runtime-defined computation has no artifact that could carry a height.
+- Ordering is the engine's: a pull brings a derived node's inputs up to date before the node uses them, so a caller supplies no order. Follow-up 10 needs it: a runtime-defined computation has no artifact that could carry one.
 - Sources are opaque `SourceId`s, and the engine never inspects one. A source other than a store field, first the state of a network request, needs only a `SourceId` constructor beside `recordSource` and `valueSource`, a reader AST node and walk hook that report it, and its writers' `markChanged` calls (The engine (2a), after `ComputeContext`). User code reaches such a source only through a selection, never through a `ComputeContext`.
 - Browser-owned state, such as a `localStorage` key or a cookie, is a possible later source kind. It is not planned.
   - The key is one source per (storage, key name). A coarser source, one per storage, marks every reader of that storage on any change to any key, and each of those readers recomputes.
@@ -2680,7 +2551,7 @@ The engine is general over derived node kinds only as far as the follow-ups that
 - `@component`: a component is a resolver result, stored and settled like any other; a mounted component observes its own derived node.
 - Client pointers, `@loadable`, refetch queries (reader-ast.md, Later): each adds derived nodes or retentions, and the markers of normalization-ast-mount-markers.md.
 - Optimistic writes: a layer of server entries that settlement reads through. What the layered store must report to the recomputation engine is The engine, the store, and the environment, What the environment must report.
-- Eager client pointers: a pointer node that reads client fields on its target lets a derived node of a field read a derived node of the same field on another record. Height adjustment orders it (change 4, Heights; open decision 14); a cycle of derived nodes through the pointer is open decision 18.
+- Eager client pointers: a pointer node that reads client fields on its target lets a derived node of a field read a derived node of the same field on another record. The pull orders it (open decision 14); a cycle of derived nodes through the pointer is open decision 18.
 
 ## Follow-ups
 
@@ -2747,30 +2618,30 @@ Costs:
 - A key per selection set: the compiler emits it into the reader artifact, and two selection sets must get equal keys exactly when they read the same fields with the same arguments.
 - Equality of selection-set results: the stored result is a fresh object on each computation, so it needs upstream's `mergeObjectsUsingReaderAst` (`areEqualWithDeepComparison.ts:55-121`) applied to the read result, keeping the old object where the new data is equal, or every recomputation is unequal and invalidates every resolver that depends on it. The merge is well-defined here because a selection set's result is store data shaped by the reader AST; a nested resolver value in it is compared by `===`, as upstream does (`:84-95`).
 
-Relation to changes 2 and 3: the stored selection-set result is an extra level between server values and resolver derived nodes. A resolver derived node depends on a selection-set derived node, the selection-set derived node depends on server values and on the resolver derived nodes of the `Resolver` nodes it contains, and marking and bringing up to date walk that level as they walk a resolver derived node. Under held 3a the level needs no rule of its own for heights: a selection-set derived node's height comes from the resolver derived nodes it reads, and a resolver derived node's from its selection-set derived node (change 4, Heights).
+Relation to changes 2 and 3: the stored selection-set result is an extra level between server values and resolver derived nodes. A resolver derived node depends on a selection-set derived node, the selection-set derived node depends on server values and on the resolver derived nodes of the `Resolver` nodes it contains, and marking and bringing up to date walk that level as they walk a resolver derived node. Under held 3b the level needs no rule of its own: marking and the pull walk a selection-set derived node as they walk a resolver derived node.
 
 ### 9. Scheduled recalculation
 
 Partly future work; R10 requires that the architecture allows it. The user wants control over when recalculation runs:
 
-- Unobserved derived nodes are lazy. A derived node no observer needs (an unmounted component's result, a retained query nobody renders) is only marked on a write and is recomputed when next read. Changes 2 to 4 build this: it is the `Stale` state and the needed count.
+- Unobserved derived nodes are lazy. A derived node nobody observes (an unmounted component's result, a retained query nobody renders) is only marked on a write and is pulled when next read. Changes 2 to 4 build this: it is the marks, and `settle`'s pull of the observed derived nodes only.
 - Deferred work. Some recalculation and re-rendering runs later at lower priority, for example the work caused by a write that came from user input. In the React layer this corresponds to `startTransition` and `useDeferredValue`. `@isograph/runtime` stays React-free and takes the caller-supplied scheduler of note 7; the scheduler decides when each pending pass runs.
 
-What deferral changes in the requirements: R2 becomes "every needed result is current when the pass for its priority finishes; a result nobody needs is current when read". R5 becomes "observers are called once per pass", not once per write.
+What deferral changes in the requirements: R2 becomes "every observed result is current when the pass for its priority finishes; a result nobody observes is current when read". R5 becomes "observers are called once per pass", not once per write.
 
 What deferral needs on top of changes 1 to 4:
 
 - A priority on a write (`normalizeData` called inside a transition) or on an observer (a component rendered with a deferred value).
-- A deferred write invalidates as if no derived node were needed: `markStale` from each derived node that read a changed source, so every derived node the write reaches becomes `Stale`, and the observed derived nodes the marking reaches are recorded under the write's priority. This lifts "no needed derived node is `Stale`" until the deferred pass runs.
-- An urgent write that reaches a needed `Stale` derived node queues it, where `invalidate` would otherwise skip a non-`Clean` derived node. Its recomputation reads the deferred changes below it too, so the urgent pass shows them early for that derived node, as React does when a transition and an urgent update touch the same state.
-- A deferred pass brings each recorded observed derived node up to date by the read path and notifies its observers. A derived node an urgent pass already brought up to date is `Clean`, and the deferred pass reads it as is. A second deferred write before the pass marks on top of the existing marks, so the pass recomputes each derived node once for both writes. The read path has no cutoff (open decision 15), so a deferred pass recomputes every `Stale` derived node it reads.
+- A deferred write marks as every write does. `settle` of a pass pulls only the observed derived nodes of that pass's priority, and the others keep their marks until their pass. This lifts "every observed derived node is `Clean` when the write returns" until the deferred pass runs.
+- An urgent pull of a derived node that a deferred write also marked reads the deferred changes below it too, so the urgent pass shows them early for that derived node, as React does when a transition and an urgent update touch the same state.
+- A deferred pass pulls each observed derived node of its priority and notifies its observers. A derived node an urgent pass already pulled is `Clean`, and the deferred pass reads it as is. A second write before the pass marks on top of the existing marks, so the pass recomputes each derived node once for both writes.
 
 Fit with each candidate:
 
-- Held 3a: laziness is built. Deferral is the deferred write's `Stale` marking and the recorded observed derived nodes, plus `invalidate` queuing a needed `Stale` derived node; no state is added.
-- 3b: marking is already separate from bringing up to date. Laziness is "mark only, and skip `bringUpToDate`, for derived nodes whose observed count is zero". Deferral is "the scheduler chooses which derived nodes of the marked roots each pass brings up to date".
+- Held 3b: marking is already separate from pulling, and a derived node a pass skips keeps its mark. Deferral is `settle` choosing which observers each pass pulls; no state is added.
+- 3a with `Stale` marks: a deferred write marks every derived node it reaches `Stale`, and the observed derived nodes the marking reaches are recorded under the write's priority; an urgent write that reaches a needed `Stale` derived node queues it.
 - 2: laziness is native, because nothing is verified until demanded, and deferral is the scheduler choosing when to verify which roots. Each deferred pass still walks every live edge under its roots.
-- Plain 3a and 3c: neither has a lazy mode. Skipping an unobserved derived node leaves it stale with no record that it is stale, so they need held 3a's `Stale` mark.
+- Plain 3a and 3c: neither has a lazy mode. Skipping an unobserved derived node leaves it stale with no record that it is stale.
 - 4: Preact already keeps unsubscribed computeds lazy and defers effects to the end of a batch; priority would be added to its effect queue.
 - 5: both work per root, at full cost per pass and with no cutoff below the root.
 
@@ -2778,7 +2649,7 @@ React constraint: `useSyncExternalStore` performs a store update as blocking eve
 
 ### 10. Runtime-defined computations
 
-A memoized computation the runtime or a user defines at run time, which reads other derived nodes: a derived value over several resolver results, a selector a hook creates. Its height comes from what its computation reads, as every derived node's does (change 4, Heights), so the bucket queue places it. What it needs from the engine is a caller-supplied id and computation and a wider value type (Other derived node kinds).
+A memoized computation the runtime or a user defines at run time, which reads other derived nodes: a derived value over several resolver results, a selector a hook creates. The pull orders it as it orders every derived node, from what its computation reads. What it needs from the engine is a caller-supplied id and computation and a wider value type (Other derived node kinds).
 
 ### 11. The fetch decision from the root derived node
 
@@ -2803,7 +2674,7 @@ Held, not approved, and not part of changes 1 to 4; it needs changes 2 and 3. Wi
         : retainQueryWithoutMakingNetworkRequest(environment, entrypoint, variables);
 ```
 
-- A repeated call with no write between is a lookup: the root derived node is `Clean`, and `track` returns its stored result. After a write that reached it, the call recomputes it (`Stale`), or `settle` already did (needed). `check` walks the whole normalization AST on every call.
+- A repeated call with no write between is a lookup: the root derived node is `Clean`, and `track` returns its stored result. After a write that reached it, the call pulls it, or `settle` already did (observed). `check` walks the whole normalization AST on every call.
 - A root derived node this call creates is outside any retention until `retainEntrypoint`'s root hold (in `normalizeData`, or in `retainQueryWithoutMakingNetworkRequest` on the branch that serves from the store) or a `listen` reaches it; `collect` (change 3) disposes it otherwise.
 
 Why a complete read implies that the normalization AST's data is present:
@@ -2829,8 +2700,8 @@ Components (later): a component field's data is read at render (components-in-us
 
 The candidates and their comparison are Recomputation architecture.
 
-- (a) 3a with heights per derived node and `Stale` marks (held, the user's direction). A write queues each needed derived node that read a changed source, drains the queue lowest height first, and queues a derived node's direct dependents only when its result changed; a derived node nobody needs is marked `Stale` with its dependents and recomputed when read. Cost: the inverse of every dependency list, kept by `setDependencies`; a state, a needed count, and a height per derived node; height adjustment after a recomputation reads a derived node at or above its own height; no cutoff on a read of a `Stale` derived node (open decision 15); an abandoned partial walk and a re-run in a higher bucket after an upward read during `settle` (open decision 19, held (c)).
-- (b) 3b, mark along reverse edges, then bring up to date (the considered alternative). Cost: the inverse, a state per derived node, and every transitive dependent of a changed source marked `Check` on every write and walked again by settlement. Benefit: no height, and cutoff on reads of derived nodes nobody needs.
+- (a) 3b, mark along reverse edges, then pull (held, the user's direction). A write marks `Dirty` each derived node that read a changed source and `Check` every derived node above those, and runs no resolver; a pull verifies a `Check` derived node through its dependencies and recomputes a derived node only when an input changed value; `settle` pulls the observed derived nodes after each write (open decision 28). Cost: the inverse of every dependency list, kept by `setDependencies`; a mark per derived node; every transitive dependent of a changed source marked on every write and walked again by the pull of an observed location above it.
+- (b) 3a with heights per derived node and `Stale` marks. Rejected by the user: it recomputes the needed derived nodes inside the write. A write queues each needed derived node (observed, or read by a needed one) that read a changed source, drains the queue lowest height first, and queues a derived node's direct dependents only when its result changed; a derived node nobody needs, a retained one included, is marked `Stale` with its dependents and recomputed when read. Cost: the inverse; a state, a needed count, and a height per derived node; height adjustment after a recomputation reads a derived node at or above its own height; no cutoff on a read of a `Stale` derived node; an abandoned partial walk and a re-run in a higher bucket after an upward read during the drain.
 - (c) 2, pico's pull with epochs. Cost: every live edge under the observed roots compared on every write, and a tag and epoch on every server value; benefit: no inverse to keep.
 - (d) 5, full re-run per write. Cost: every live resolver on every write, and no equality cutoff below the roots.
 
@@ -2838,10 +2709,10 @@ Not approved for implementation.
 
 ### 3. Eager computation for retained queries nobody observes
 
-- (a) Every retained root is brought up to date after every write. Cost: every retained query's affected resolvers run on every write, rendered or not (a prefetched route, a screen kept retained after navigation); under held 3a, `neededCount` would count retentions as well as observers.
-- (b) A write recomputes only needed derived nodes; a retained root nobody observes is `Stale` after a write that reaches it and is brought up to date when `listen` attaches, in the subscribe call, not in render (held, the user's choice). Cost: the first render of a newly observed `Stale` location reads the last computed result, and `useSyncExternalStore` renders again after `listen` brings it up to date.
+- (a) Every retained root is brought up to date after every write. Cost: every retained query's affected resolvers run on every write, rendered or not (a prefetched route, a screen kept retained after navigation); under held 3b, `settle` would pull every held root as well as every observed derived node.
+- (b) A write pulls only observed derived nodes; a retained root nobody observes stays marked after a write that reaches it and is pulled when `listen` attaches, in the subscribe call, not in render (held, the user's choice). Cost: the first render of a newly observed marked location reads the last computed result, and `useSyncExternalStore` renders again after `listen` brings it up to date.
 - (c) Per retention, a choice between (a) and (b). Cost: an option on `normalizeData`.
-- (d) (b), and `snapshot` brings a `Stale` derived node up to date before it returns. A write between the retention and the mount (or between two mounts) marks the location `Stale`, and under (b) the first render reads the result from before that write, then `listen` recomputes it and `useSyncExternalStore` renders a second time. Under (d) the first render reads the current result and `listen` finds the node `Clean`, so there is one render. Cost: a render computes when the location is `Stale`, which the Goal and R1 exclude (`snapshot` is a lookup), and which is the deviation from upstream the Goal gives its reason for: resolver work on the render path, once per stale location per render. A `Clean` location is still a lookup, and the work moves from `listen` to the render rather than adding to it. `valueOf` gains a `bringUpToDate`, so `snapshot` is no longer pure while the node is `Stale`; React requires `getSnapshot` to return the same value while nothing changed, which holds because the recomputation ends `Clean` and later calls return the stored value. Listed as an option; (b) is the user's choice.
+- (d) (b), and `snapshot` pulls a marked derived node before it returns. A write between the retention and the mount (or between two mounts) marks the location, and under (b) the first render reads the result from before that write, then `listen` pulls it and `useSyncExternalStore` renders a second time. Under (d) the first render reads the current result and `listen` finds the node `Clean`, so there is one render. Cost: a render computes when the location is marked, which the Goal and R1 exclude (`snapshot` is a lookup), and which is the deviation from upstream the Goal gives its reason for: resolver work on the render path, once per marked location per render. A `Clean` location is still a lookup, and the work moves from `listen` to the render rather than adding to it. `valueOf` gains a `bringUpToDate`, so `snapshot` is no longer pure while the node is marked; React requires `getSnapshot` to return the same value while nothing changed, which holds because the pull ends `Clean` and later calls return the stored value. Under held 3b a marked derived node whose inputs come back equal is verified without recomputing and returns the same object. Open decision 28 (b) depends on this option. Listed as an option; (b) is the user's choice.
 
 ### 4. Where derived nodes live
 
@@ -2850,7 +2721,7 @@ Not approved for implementation.
 
 ### 5. A resolver that throws
 
-- (a) Stored as `ResolverThrew`, propagated to parents like `MissingData` (held). Reason: `normalizeData` runs resolvers (the new root's, and every needed derived node's).
+- (a) Stored as `ResolverThrew`, propagated to parents like `MissingData` (held). Reason: `normalizeData` runs resolvers (the new root's, and every observed derived node's).
 - (b) Propagate the exception, v1's behavior. Cost: one broken resolver aborts `normalizeData` for every query and leaves level 1 unsettled.
 
 ### 6. Garbage collection from live resolver dependencies
@@ -2878,13 +2749,13 @@ Upstream's deep comparison, `mergeObjectsUsingReaderAst`, applies where the comp
 
 pico guards writes, not reads: `Database::set`, `remove`, `remove_singleton`, and `run_garbage_collection` call `assert_empty_dependency_stack`, which panics with "Cannot modify database while a memoized function is being invoked." when a memo is running (`crates/pico/src/database.rs:151-170`, the assertion at `:193-198`). A memo that calls another memo is a read, recorded on pico's dependency stack, which is ambient state. Here a computation's reads are recorded only through its `ComputeContext`, a parameter (change 2, The engine), so an inner `readStoredResult` from a closure is unrecorded, where pico's would be recorded; that is why (b) guards reads as well.
 
-Callbacks are outside this decision. Level 2 callbacks run in `notify`, after `settle` emptied the queue, and a callback that calls `normalizeData` runs a nested write with its own settlement and notification (Reads during recalculation). A Step A callback runs in `callSubscriptions`, after `normalize` returned. The release callbacks of Values with lifecycles run in `flushReleases`, after `notify`. None runs while a computation runs, so none is reentrant into level 1. A computation's call of `readStoredResult`, `normalizeData`, or `garbageCollectEnvironment` is the only reentrant path.
+Callbacks are outside this decision. Level 2 callbacks run in `notify`, after `settle` pulled every observed derived node, and a callback that calls `normalizeData` runs a nested write with its own settlement and notification (Reads during recalculation). A Step A callback runs in `callSubscriptions`, after `normalize` returned. The effects of Values with lifecycles are set up in `reconcileEffects` and `observe` and torn down in `flushTeardowns`, after `notify`. None runs while a computation runs, so none is reentrant into level 1. A computation's call of `readStoredResult`, `normalizeData`, or `garbageCollectEnvironment` is the only reentrant path.
 
 Not held.
 
 ### 9. Callback errors
 
-Settled: (c), the landed rule. `callSubscriptions` calls each callback and listener through `reportCallbackError`, which never throws (`libs/isograph-runtime/src/subscribe.ts:96-118`, `:157-167`), and network-and-subscriptions.md settles it (Decisions, 3. A callback that throws, (a); its Deltas from Step A replace this decision's former (a)). Change 4's `notify` and the later `flushReleases` follow it.
+Settled: (c), the landed rule. `callSubscriptions` calls each callback and listener through `reportCallbackError`, which never throws (`libs/isograph-runtime/src/subscribe.ts:96-118`, `:157-167`), and network-and-subscriptions.md settles it (Decisions, 3. A callback that throws, (a); its Deltas from Step A replace this decision's former (a)). Change 4's `notify` and the later `reconcileEffects` and `flushTeardowns` follow it.
 
 - (a) Call every callback, then rethrow one error or an `AggregateError`. Cost: the `normalizeData` whose response was written throws for an observer's failure, so the request that called it becomes `Err`, a failure the network did not have (network-and-subscriptions.md, Decisions, 3 (c)).
 - (b) Propagate the first throw. Cost: later observers miss the change until the next write.
@@ -2899,7 +2770,7 @@ Taken: (a). Step A landed as network-and-subscriptions.md's `readAndSubscribe`, 
 
 ### 11. When a derived node no root reaches is deleted
 
-- (a) By `garbageCollect`'s sweep (held, change 3). Under held 3a such a derived node is marked `Stale` by the first write that reaches it, and later writes stop at it, so it costs no recomputation until then. Matches v1's caller-driven collection and Follow-ups 7's deferral.
+- (a) By `garbageCollect`'s sweep (held, change 3). Under held 3b such a derived node is marked by the first write that reaches it, and later writes stop at it, so it costs no recomputation until then. Matches v1's caller-driven collection and Follow-ups 7's deferral.
 - (b) By reference count: a derived node's count is its `rootCount` plus `dependents.size`; `dispose`, the stop function of `listen`, and `setDependencies` decrement it, and at zero the derived node is disposed and `setDependencies(graph, node, [])` decrements its dependencies in turn. Cost: a count kept on three paths, and deletion in the middle of a write. It is what constructors and destructors need (Follow-ups 1).
 
 ### 12. Coupling of the recomputation engine to the store
@@ -2915,25 +2786,26 @@ Settled: (a).
 
 The analysis is Values with lifecycles.
 
-- (a) The engine owns each derived node's value lifecycle (held): `Disposable` computations return an `ItemCleanupPair`; a new value is constructed before the old is released; releases are deferred until after notification and flushed in order; a `===` value keeps the old holding and releases the new retain at once. A constructor that throws stores `ResolverThrew` and releases the old value (held); a destructor that throws is reported by `reportCallbackError` and does not stop the flush (held, open decision 9).
-- (b) Lifecycles outside the engine: a disposable value lives in a registry the resolver's code calls, and the engine stores only the handle. Cost: nothing releases a handle when the derived node's value is replaced or the node is disposed, so the registry needs its own reachability, which is the engine's again.
+- (a) Computation and effect are split (held, the user's direction). A computation is pure and runs on every pull, in any world and in any render. A resource the value needs is the node's effect: set up at mount commit (`observe`), torn down on unmount, on disposal, or when a write gives the node a new value, after the new effect is set up; teardowns are deferred until after notification and flushed in order; a `===` value leaves the effect as is. After a write the runtime pulls the mounted derived nodes with an effect and reconciles their effects (`reconcileEffects`). A `setUp` that throws is reported and leaves the effect `NotSetUp` (held); a teardown that throws is reported and does not stop the flush (held, open decision 9). Cost: a resource exists only while its node is mounted, so a retained query nobody renders acquires nothing. That conflicts with Follow-ups 1, the user's note, whose constructor runs at normalization time and whose lifetime follows retain and release rather than render.
+- (b) The engine constructs inside the computation: a `Disposable` computation returns an `ItemCleanupPair`, the engine holds it, and releases it when the value is replaced or the node is disposed. Not held: a computation runs in every pull, including one a discarded concurrent render makes and, with forks, one in a world that is never committed, so it would acquire a resource whose release no commit or unmount triggers.
+- (c) Lifecycles outside the engine: a disposable value lives in a registry the resolver's code calls, and the engine stores only the handle. Cost: nothing releases a handle when the derived node's value is replaced or the node is disposed, so the registry needs its own reachability, which is the engine's again.
 
 Not decided: the user's choice.
 
 ### 14. Heights and eager client pointers
 
-Settled: heights are per derived node and adjusted at run time (change 4, Heights). An eager pointer (reader-ast.md, Client pointers, Later) reads client fields on its target: `field Pet.Card { bestFriend { Card } }`, with `bestFriend` a pointer, is not an `InlineCycle`, and the derived node of `Card` on `Pet:1` reads the derived node of `Card` on `Pet:2`. That read is one more data-dependent dependency, and adjustment raises the derived node of `Card` on `Pet:1` above it. A cycle of derived nodes through the pointer is open decision 18.
+Settled: no heights under held 3b (change 4, No heights). An eager pointer (reader-ast.md, Client pointers, Later) reads client fields on its target: `field Pet.Card { bestFriend { Card } }`, with `bestFriend` a pointer, is not an `InlineCycle`, and the derived node of `Card` on `Pet:1` reads the derived node of `Card` on `Pet:2`. That read is one more `Derived` dependency, and the pull brings the derived node on `Pet:2` up to date before the one on `Pet:1` uses it. A cycle of derived nodes through the pointer is open decision 18.
 
-### 15. Cutoff on a read of a `Stale` derived node
+### 15. Cutoff on a pull of a marked derived node
 
-- (a) A `Stale` derived node recomputes when read, its reads bringing the `Stale` derived nodes below it up to date first (held, the user's specification). Cost: no cutoff on the read path. After `Rex` to `Ray` on an unobserved `BadgePage`, the next read recomputes all five derived nodes where the push recomputes `Initial` alone; attaching `listen` to a retained screen recomputes every `Stale` derived node under it.
-- (b) Two lazy states. `Dirty`: a source it read changed, or a derived node it reads recomputed to a new result. `Stale`: a derived node it reads, directly or transitively, is `Dirty` or `Stale`. A read brings a `Stale` derived node's `Resolver` dependencies up to date in recorded order and recomputes it only when that made it `Dirty`; `recompute` marks its direct dependents `Dirty` on the read path. This is 3b's `Check` restricted to derived nodes nobody needs; the push keeps no such marks. Cost: one more state value, the dependency walk on reads, and a marking on the read path.
+Open. Held 3b, as the user stated it for change 4, puts the cutoff on the pull: a marked derived node that is read brings its dependencies up to date first, and when none of them changed value it is verified without recomputing. That is (b). (a) is recorded as the user's specification and conflicts with it. This doc does not settle the conflict; changes 2 and 4 are written for (b).
+
+- (a) A marked derived node recomputes when read, its reads bringing the marked derived nodes below it up to date first (the user's specification). Under held 3b every derived node, observed or not, is brought up to date by a pull, so (a) removes the cutoff everywhere, not only on reads of derived nodes nobody observes: after `Rex` to `Ray` under an observer at `BadgePage`, `settle` recomputes all five derived nodes where (b) recomputes `Initial` alone, and the observer is called because `BadgePage`'s resolver returns a new object. The mark needs one non-`Clean` value, `Check` and `checkDependencies` go, and `recompute` marks no dependent.
+- (b) Two marks, `Dirty` and `Check`. A pull of a `Check` derived node brings its `Derived` dependencies up to date in recorded order and recomputes it only when one of them recomputed to a value `valuesEqual` rejects; `recompute` marks its direct dependents `Dirty` (change 2, The engine). Cost: one more mark value, the dependency walk on pulls, and a marking during the pull.
 
 ### 16. How the engine knows a derived node is needed
 
-- (a) A count per derived node, kept current: the observers at its location plus its needed dependents (held, change 4, Needed derived nodes). Cost: `listen`, its stop function, and `setDependencies` of a needed derived node walk the region whose neededness changes.
-- (b) On demand: walk an invalidated derived node's dependents upward to an observed location. Cost: the ancestors of every invalidated derived node, on every write.
-- (c) Per write: mark the needed region from every observer down before invalidating. Cost: the whole observed region on every write.
+Closed: under held 3b the engine does not decide, for a marked derived node, whether something needs it. Marking marks every reader, observed or not, and `settle` starts from the observed ids in `graph.observers` (and, with Values with lifecycles, the mounted derived nodes with an effect), one step per observer, as `notify` does. A count per derived node (the observers at its location plus its needed dependents), an upward walk per invalidated derived node, and a per-write marking of the needed region were 3a's ways to decide it in `O(1)` per invalidated node; 3b has no decision to make.
 
 ### 17. A response that throws part-way
 
@@ -2942,47 +2814,17 @@ Settled: heights are per derived node and adjusted at run time (change 4, Height
 - (a) `normalize` catches the throw and rethrows a `PartialWriteError` carrying the changes made before it and the original error as `cause`, with the original message; `normalizeData` marks those changes, and from change 4 settles and notifies, then rethrows (held, change 1, change 2, and change 4's Settlement). Reason: a derived node that read a value written before the throw is marked, as it would be for a write that did not throw. Once the graph lands (change 2b), only `normalizeData` is exported from the package index, and `normalize` is internal: a module export that `environment.ts` and the tests import (held). Reason: a write through `normalize` alone marks nothing, so every derived node that read what it changed returns its old result with no error.
 - (b) No wrapping: the changes are lost with the throw. Cost: every derived node that read a value written before the throw returns its old result until another write reaches the same source, with no error.
 - (c) `normalize` validates the whole response against the AST before it writes. Cost: a second walk of every response, and `recordLink`'s checks run in both walks.
-- (d) On any throw, `normalizeData` marks every derived node. Cost: every live derived node recomputes or is marked `Stale` after one malformed response.
+- (d) On any throw, `normalizeData` marks every derived node. Cost: every live derived node is marked after one malformed response, and every observed one recomputes.
 
 ### 18. A cycle of derived nodes
 
-Changes 1 to 4 cannot form one (Ordering, Cycles). An eager client pointer can: with `field Pet.Card { bestFriend { Card } }`, `Pet:1.bestFriend` `Pet:2`, and `Pet:2.bestFriend` `Pet:1`, the derived node of `Card` on `Pet:1` reads the derived node of `Card` on `Pet:2`, which reads the derived node on `Pet:1`. Two places reach it. A `Stale` or absent derived node's computation reads a derived node that is computing, and `bringUpToDate` would recompute that derived node again inside its own computation. And `raiseHeight` reaches the dependency that started the raise. Neither has a check today; both recurse without end. Incremental fails at the second place with "adding edge made graph cyclic" (`ensure_height_requirement`, `src/adjust_heights_heap.ml` of `janestreet/incremental`).
+Changes 1 to 4 cannot form one (Ordering, Cycles). An eager client pointer can: with `field Pet.Card { bestFriend { Card } }`, `Pet:1.bestFriend` `Pet:2`, and `Pet:2.bestFriend` `Pet:1`, the derived node of `Card` on `Pet:1` reads the derived node of `Card` on `Pet:2`, which reads the derived node on `Pet:1`. The pull reaches it: a marked or absent derived node's computation reads a derived node that is computing, and `bringUpToDate` would recompute that derived node again inside its own computation; `checkDependencies` of a `Check` derived node on the cycle recurses the same way. Neither has a check today; both recurse without end. Marking terminates on a cycle, because it stops at a derived node already marked. Incremental fails on a cycle with "adding edge made graph cyclic" (`ensure_height_requirement`, `src/adjust_heights_heap.ml` of `janestreet/incremental`).
 
 Not decided; it arises with client pointers.
 
 ### 19. An upward read during `settle`
 
-A derived node that recomputes during the drain of bucket `h` and reads a derived node at or above `h` can read a `Clean` derived node whose own dependency, at any depth, is still `Queued`, and receives that derived node's result from before the write. Every result is current when `settle` returns, because the `Queued` dependency's change reaches the reading derived node, raised by then, in a bucket not yet drained; but the reading derived node recomputes twice in one pass, once from a stale input (Ordering, Once per pass).
-
-The same holds one level down, and Ordering's argument does not cover it. A derived node that is absent or `Stale` when a computation during `settle` reads it is computed on demand by that read (`createDerivedNode` or `recompute`, through `upToDateDerivedNode`). Its computation can read a `Queued` derived node, which change 4's `bringUpToDate` recomputes out of bucket order, or a `Clean` derived node at or above `h` that holds its result from before the write. So any rule for the drained derived node's own reads must also apply to the reads of every derived node computed on demand under it, recursively.
-
-- (a) Accept it. Cost: R3's "no derived node is computed from a stale input, and no derived node is computed twice for one write" holds only for reads below the reader's height; the resolver is called with stale data, and that result is stored and queues its dependents before the second recomputation replaces it. Observers are notified once, after `settle`, so none receives the stale result.
-- (b) Before a read returns a derived node at or above the reader's height, bring up to date every `Queued` derived node it reads, transitively, lowest height first. Cost: a walk of the derived nodes that derived node reads, transitively, on every upward read during `settle`, and `Queued` derived nodes recomputed out of bucket order. Not held: the recomputations run as a nested drain while the reading derived node's walk is half done and its new dependencies are half collected in `compute`'s local list and not yet recorded by `setDependencies`, so `invalidate` and `raiseHeight` run against a graph whose edges for that derived node are its old ones.
-- (c) Abandon the computation at the upward read, before any resolver above the read runs; raise the derived node above the derived node it read and queue it again at its new height (held). Reason: the reader walk (`readData` with `contextHooks`) collects all data before `callResolver` runs, so a computation abandoned at its first read of a derived node at or above `h` has not called its resolver. When `settle` reaches the new bucket, every bucket below it is drained, so the derived node recomputes once in the pass, from current inputs, and every resolver runs at most once per pass with current inputs (R3). Cost: the partial walk before the abandoned read is discarded, and the derived nodes computed on demand under it that were abandoned walk again on the re-run. Not held (a): it breaks R3.
-
-Held: (c). Not decided.
-
-How (c) is implemented against change 2's read path (`upToDateDerivedNode`, `bringUpToDate`, `createDerivedNode`, `compute`) and change 4's `recompute` and `settle`:
-
-- Detection is in `compute`, in the `readDerivedNode` closure of the context it builds, which is the one place a computation reads a derived node. During the drain of bucket `h`, before it calls `upToDateDerivedNode`, it looks up `graph.derivedNodes.get(id)`. When a derived node is stored there with `height >= h`, in any state, the closure does not bring it up to date and returns an abandon that carries that derived node's height. `h` is the height of the derived node `settle` is bringing up to date, not the height of the derived node whose computation made the read.
-- A `Queued` derived node has height `>= h`, because every bucket below `h` is empty (Ordering), so every read of a `Queued` derived node during `settle` abandons. A `Clean` derived node below `h` is current: everything it reads is lower, `Clean` (change 2's invariant), and not `Queued`. A `Clean` derived node at or above `h` can have a `Queued` dependency at some depth; the rule abandons without walking to find out. An absent derived node has no height; it is created by `createDerivedNode`, whose `compute` checks each of its reads against the same `h`. A `Stale` derived node below `h` is recomputed by the read, and its reads are checked against the same `h`. So the rule covers derived nodes computed on demand, recursively, and comparing with `h` rather than with the nested reader's height does not abandon a read of a current derived node between the two heights.
-- The abandon propagates as a value, by the convention the walk already has. `contextHooks`'s `readResolver` returns the abandon as part of its `TFailure`; `allOk` stops at the first result whose `kind` is not `Ok` and returns it unchanged, so the walk makes no read after the abandoned one; `missingDataFor` applies only to `MissingData`; `readData` returns the abandon; and `resolverDefinition`'s computation returns `data` unchanged when `data.kind !== 'Ok'`, so `callResolver` is not called. `compute` receives the abandon in place of a value and returns it to its caller, so the abandon passes out through every computation between the read and the drained derived node.
-- `createDerivedNode` that receives an abandon from `compute` returns it without building the derived node: nothing is added to `derivedNodes` or `owned`, and `setDependencies` is not called, so no edge names it. The next read of its id calls `create()` again and computes it.
-- `recompute` that receives an abandon leaves the derived node's `value` and `dependencies` unchanged, calls neither `setDependencies` nor `raiseHeight` from `heightAbove`, and invalidates no dependent. A `Stale` derived node computed on demand stays `Stale`; change 2's invariant holds, because its dependents are `Stale` or are the computations being abandoned.
-- `bringUpToDate` of the drained derived node, when `recompute` reports an abandon carrying height `k`, does not mark it `Clean`. The derived node stays `Queued`; `raiseHeight(graph, node, k + 1)` raises it and its dependents, and `bucket(graph, k + 1).add(node)` queues it, since `bringUpToDate` removed it from its bucket. `k >= h`, so the bucket is above `h`, and no drained bucket gains a derived node (Ordering).
-- The re-run. When `settle` drains bucket `k + 1`, the derived node of height `k` is current, so the re-run's read of it does not abandon. A derived node created on demand between them gets a height of at most `k + 1`; when it equals the drained height, `recompute`'s existing raise (change 4, Heights) puts the re-run derived node above it after a computation from current inputs. In Ordering's trace, `X` abandons at its read of `FriendCard` on `Pet:1` (height 2), rises to 3, and is queued at 3; `PetName` on `Pet:2`, `FriendLabel`, and `FriendCard` recompute in buckets 0 to 2; `FriendCard`'s invalidation of `X` finds it `Queued`; `X` recomputes once in bucket 3 and its resolver is called once.
-- Termination. Each abandon raises the drained derived node strictly, because `k + 1 > h`. Under changes 1 to 4 every edge, recorded or read, goes from a derived node of a field to a derived node of a field its reader AST selects, and that graph of client field selections has no cycle (Ordering, Cycles). Every height set by `heightAbove`, by `raiseHeight`, or by an abandon is one more than the height of a derived node whose field is below its own in that graph (for an abandon under a derived node computed on demand, below by at least two). So no derived node's height exceeds the largest height at the start of the pass plus the longest chain of client field selections below its field, and the abandons of one pass are finite. A cycle of derived nodes through an eager pointer is open decision 18.
-- Outside `settle` nothing is `Queued` (Reads during recalculation), so the read path (`track`, `retainRoot`, `observe`) makes no check and never abandons.
-
-Two choices the doc does not establish:
-
-- How `h` reaches the closure.
-  - (i) A parameter: `settle` passes the drained height to `bringUpToDate`, which passes it through `recompute`, `compute`, the context's `readDerivedNode`, `upToDateDerivedNode`, and `createDerivedNode`; `track`, `retainRoot`, and `observe` pass a value that means no drain, such as `{ kind: 'Read' }` against `{ kind: 'Drain'; height: number }`. This follows change 2's rule that the context is a parameter built per computation, with no ambient current computation. Cost: one more parameter on six functions.
-  - (ii) A field on `RecomputationGraph` holding the drained height or none, set by `settle` around each bucket. Cost: graph state that every read path must find unset; it is the same shape as open decision 8 (b)'s phase field.
-- The abandon's type. The engine must tell it from a `TValue` without inspecting `TValue`.
-  - (i) A tagged union: a computation returns `{ kind: 'Value'; value: TValue } | Abandoned`, with `Abandoned = { kind: 'Abandoned'; height: number }`, and `readDerivedNode` returns the same union; `contextHooks` unwraps `Value` and passes `Abandoned` as part of `ReadHooks<ReadResolverThrew | Abandoned>`. Cost: every computation wraps its value.
-  - (ii) `Abandoned` is a class the engine exports, tested with `instanceof`, and a computation returns `TValue | Abandoned`. Cost: correctness rests on no `TValue` being an `Abandoned` instance, which no type enforces.
-  - Under either, `track`, `retainRoot`, and `observe` never receive an abandon, and their types must not admit one (AGENTS.md, Panic and UnexpectedError). With a parameter (the first choice's (i)), the abandon type can ride on it as `never` on the read path, as `evaluatingHooks` is `ReadHooks<never>`; the computation type then becomes generic over it.
+Closed: the question does not arise under held 3b. It was 3a's: a derived node recomputing in its height's bucket could read a `Clean` derived node at or above that height whose own input was still queued, and recompute from that derived node's result from before the write. Under 3b there are no buckets, and every read is a pull, which brings the derived node read up to date, its inputs first, before returning its value (Ordering).
 
 ### 20. Which request a request-state selection refers to
 
@@ -3000,16 +2842,16 @@ Not decided.
 
 `fetchEntrypoint` with `shouldFetch` `No` calls `retainQueryWithoutMakingNetworkRequest` whatever the store holds (`libs/isograph-runtime/src/network.ts:89-94`), so `retainEntrypoint` can run while `ast.root` is absent (change 3, Serving from the store). `readStoredResult` and `contextHooks` create no derived node on an absent record; they record `recordSource` and return `noRecord` (change 2, The store's side). `retainRoot` has no such branch.
 
-- (a) Create the root derived node anyway. Its computation is `resolverDefinition`'s: `readData` reports `readRecord(ast.root)` and returns `noRecord`, so the node holds `MissingData` naming the root and depends on `recordSource(ast.root)`. The first `normalize` that writes the root reports `RecordCreated` for it (change 1, `recordAt`), which marks or queues the node. Held, not decided. Reason: the retention then has a node at its `location` from the call on, so a `listen` there makes it needed and a later write computes it as for any retention. Cost: a derived node whose owner record is absent, the one exception to "no derived node on an absent record"; `deleteSource` does not reach it until the record exists and is deleted, and `collect` disposes it once no root holds it.
+- (a) Create the root derived node anyway. Its computation is `resolverDefinition`'s: `readData` reports `readRecord(ast.root)` and returns `noRecord`, so the node holds `MissingData` naming the root and depends on `recordSource(ast.root)`. The first `normalize` that writes the root reports `RecordCreated` for it (change 1, `recordAt`), which marks the node `Dirty`. Held, not decided. Reason: the retention then has a node at its `location` from the call on, so a `listen` there observes it and a later write's `settle` pulls it as for any retention. Cost: a derived node whose owner record is absent, the one exception to "no derived node on an absent record"; `deleteSource` does not reach it until the record exists and is deleted, and `collect` disposes it once no root holds it.
 - (b) Hold no root while `ast.root` is absent: `retainEntrypoint` adds the `Retention` to `environment.retainedQueries` and its `releaseRoot` does nothing. Cost: the location has no node; a later `normalizeData` of another entrypoint that writes the root creates none, so the first read of the location computes on demand, and a `listen` there only registers.
 
 ### 22. A throw inside a computation outside its resolver
 
 `callResolver` catches only the resolver's throw (change 2, Results, equality, and a resolver that throws). The walk that `resolverDefinition`'s computation runs before it throws on a broken store invariant: `linkAt` on a non-link under a composite store key (`libs/isograph-runtime/src/store.ts:74-87`, the throw at `:81`, reached from `readLinkedValue`, `read.ts:226`), and `storeKey`'s `variableValue` on a missing variable (`storeKey.ts:56-63`, the throw at `:59`, reached from `readSelection`, `read.ts:131` and `:133`). Step A's read catches both as `ReadErr` (`readSubscription`, `subscribe.ts:120-131`); the stored read catches neither.
 
-Under change 4, `bringUpToDate` deletes a `Queued` derived node from its bucket before it calls `recompute` (change 4, Propagation). A throw out of `compute` then leaves the node `Queued` and in no bucket, with its old value and dependencies. `settle`'s loop exits with the throw, so every derived node still in the queue stays `Queued`; `normalizeData` skips `retainEntrypoint` and `notify` and throws. Later, `invalidate` skips the node because it is not `Clean`, and `settle` never reaches it because no bucket holds it, so no write recomputes it again. On the read path (change 2), a throw out of `createDerivedNode`'s `compute` stores nothing, a throw out of `recompute` leaves a `Stale` node `Stale`, and either propagates out of `readStoredResult`, `retainRoot`, or `observe`.
+Under held 3b, a throw out of `compute` propagates out of `recompute` before `setDependencies` records the new reads, and out of `bringUpToDate` before it sets the mark `Clean`. The derived node keeps its mark, its previous value, and its previous dependencies, and the next pull of it (a read, or the next write's `settle`) recomputes it again. A checking ancestor whose `checkDependencies` was running keeps its mark too. A throw out of `createDerivedNode`'s `compute` stores nothing. Either propagates out of `readStoredResult`, `retainRoot`, or `observe`. A throw during `settle` stops its loop: the observed derived nodes after it stay marked, and `normalizeData` skips `retainEntrypoint` and `notify` and throws.
 
-- (a) `compute` catches any throw from the computation and stores it as the derived node's value, as the subscription path stores `ReadErr`. Held, not decided. Reason: `bringUpToDate` returns normally, so the node ends `Clean`, the queue drains, and `notify` runs; the dependencies the computation recorded before the throw are kept, so a write that repairs one of them recomputes the node. Cost: an engine bug in a computation is also stored as a value instead of surfacing as a throw.
+- (a) `compute` catches any throw from the computation and stores it as the derived node's value, as the subscription path stores `ReadErr`. Held, not decided. Reason: `bringUpToDate` returns normally, so the node ends `Clean`, `settle` continues, and `notify` runs; the dependencies the computation recorded before the throw are kept, so a write that repairs one of them recomputes the node. Cost: an engine bug in a computation is also stored as a value instead of surfacing as a throw.
 
   ```ts
   // from libs/isograph-runtime/src/graph.ts
@@ -3074,7 +2916,8 @@ Under change 4, `bringUpToDate` deletes a `Queued` derived node from its bucket 
   ```
 
   `ReadErr` is the landed type of `subscribe.ts`, imported as a type. `createIsographEnvironment` passes `createGraph(resultsEqual, (error) => ({ kind: 'Err', error }))`; `resultsEqual` compares two `Err` by `===` of their errors, as `subscriptionResultsAreEqual` does; `contextHooks` and `storedResultHooks` return `ReadHooks<ReadResolverThrew | ReadErr>`, so a nested `Err` passes up the walk unchanged (`allOk`), as a nested `ResolverThrew` does; `SubscriptionResult` already admits both (change 2, Subscriptions). A nested derived node's throw is caught by its own `compute`, so the outer `compute` catches only throws of the outer computation's own walk. `ResolverThrew` stays: it names the field and record whose resolver threw, where `Err` is a broken invariant of the store. An abandon under open decision 19 (c) is a returned value, not a throw, so (a) does not catch it.
-- (b) `bringUpToDate` restores the node and `settle` rethrows after draining the rest. `bringUpToDate` catches the throw, sets the node `Clean` with its old value and dependencies, and returns the error to `settle`; `settle` drains the rest of the queue, and `normalizeData` runs `notify` and then rethrows the first error, or an `AggregateError` of several. Cost: the node holds a value no current input explains, the stale-value cost of Values with lifecycles' failure (b); `normalizeData` throws for a broken store invariant after a response was written, so the request that called it becomes `Err`; and the read path needs the same restore in `createDerivedNode` and `recompute`.
+- (b) `bringUpToDate` restores the node and `settle` rethrows after pulling the rest. `bringUpToDate` catches the throw, sets the node `Clean` with its old value and dependencies, and returns the error to `settle`; `settle` pulls the rest of the observed derived nodes, and `normalizeData` runs `notify` and then rethrows the first error, or an `AggregateError` of several. Cost: the node holds a value no current input explains; `normalizeData` throws for a broken store invariant after a response was written, so the request that called it becomes `Err`; and the read path needs the same restore in `createDerivedNode` and `recompute`.
+- (c) Propagate, and leave the node marked with its previous value and dependencies; the next pull retries it. This is the body as written (change 2, The engine). Cost: `settle` stops at the throw, so the observed derived nodes after it are not pulled and no observer is called for the write; the throw reaches the caller of `normalizeData`, so the request that called it becomes `Err`.
 
 ### 23. Two client fields of one name on an abstract entity and on a concrete entity
 
@@ -3115,13 +2958,13 @@ The compiler accepts `field Node.Label` beside `field Pet.Label` when `Pet` impl
 
 react.md and the landed runtime create a component's subscription at render: `useSubscription` calls `readAndSubscribe` under a temporary retain at render and retains it permanently at commit (`refactors/pending/runtime/react.md:359`, `:864-877`; network-and-subscriptions.md, The two-phase lifetime, `:709-719`). Between render and commit the subscription exists, so every write that changes its read updates `delivered` and calls its callback (that section's step 2), and a render that never commits releases it when the temporary retain expires (step 4). React hands its listener over only at commit, so `listenToSubscription` is the commit-time half.
 
-Level 2 has no render-time half. `observe`, the body of `listen`, runs in React's `subscribe`, at commit (change 4, `listen` and `snapshot`), and it is what makes the derived node needed and adds to its `rootCount`. `snapshot` at render is a lookup that holds nothing. Between render and commit the location's derived node is needed only if something else needs it, so a write in that window marks it `Stale`, and `listen` at commit recomputes it and `useSyncExternalStore` renders again (open decision 3's cost). The derived node is kept through `collect` in that window only if a held root reaches it, and a derived node at a location no held root reaches is not. react.md settles part of the mapping: under change 4 `listen` and `snapshot` take the places of `listenToSubscription` and `subscriptionSnapshot`, and the hook keeps its shape (`react.md:905`, `:1292`). It settles nothing for `readAndSubscribe`'s render-time part.
+Level 2 has no render-time half. `observe`, the body of `listen`, runs in React's `subscribe`, at commit (change 4, `listen` and `snapshot`), and it is what puts the derived node among those `settle` pulls and adds to its `rootCount`. `snapshot` at render is a lookup that holds nothing. Between render and commit the location's derived node is pulled after a write only if another observer is at it, so a write in that window leaves it marked, and `listen` at commit pulls it and `useSyncExternalStore` renders again (open decision 3's cost). The derived node is kept through `collect` in that window only if a held root reaches it, and a derived node at a location no held root reaches is not. react.md settles part of the mapping: under change 4 `listen` and `snapshot` take the places of `listenToSubscription` and `subscriptionSnapshot`, and the hook keeps its shape (`react.md:905`, `:1292`). It settles nothing for `readAndSubscribe`'s render-time part.
 
-Open: what level 2 offers at render in place of `readAndSubscribe` under a temporary retain. Candidates: no render-time step, the `listen`-at-commit behavior above; a render-time hold, an `ItemCleanupPair` that makes the location needed and adds to its `rootCount` from render, under react.md's temporary retain, with `listen` adding only the callback at commit; or a render-time `rootCount` hold alone, which keeps the derived node through `collect` without making it needed. Not held: no doc settles it.
+Open: what level 2 offers at render in place of `readAndSubscribe` under a temporary retain. Candidates: no render-time step, the `listen`-at-commit behavior above; a render-time hold, an `ItemCleanupPair` that puts the location among those `settle` pulls and adds to its `rootCount` from render, under react.md's temporary retain, with `listen` adding only the callback at commit; or a render-time `rootCount` hold alone, which keeps the derived node through `collect` without `settle` pulling it. Not held: no doc settles it.
 
 ### 25. Who calls `garbageCollectEnvironment`
 
-`garbageCollectEnvironment` runs only when a caller calls it: releasing a request unretains its query and does not collect (`refactors/pending/runtime/network-and-subscriptions.md:84`, `:531`), and the landed function is called by no other runtime function (`libs/isograph-runtime/src/environment.ts`). Under changes 2 to 4 it is also the only function that disposes derived nodes (`deleteSource` and `collect`, change 3, Garbage collection), so a derived node a plain `readStoredResult` stored outside any retention and subscription, one that only an unsubscribed subscription read, the derived nodes of a disposed retention, and those of a pointer whose target moved live until the next call, `Stale` or `Clean` (open decision 11 (a)). When the React package calls it is react.md's open decision 1 (`refactors/pending/runtime/react.md:1297-1305`: after every disposal, never automatically, or upstream's buffer of 10), not held. This doc adds no option of its own; its open decision 11 (b) would dispose derived nodes without a call, by reference count.
+`garbageCollectEnvironment` runs only when a caller calls it: releasing a request unretains its query and does not collect (`refactors/pending/runtime/network-and-subscriptions.md:84`, `:531`), and the landed function is called by no other runtime function (`libs/isograph-runtime/src/environment.ts`). Under changes 2 to 4 it is also the only function that disposes derived nodes (`deleteSource` and `collect`, change 3, Garbage collection), so a derived node a plain `readStoredResult` stored outside any retention and subscription, one that only an unsubscribed subscription read, the derived nodes of a disposed retention, and those of a pointer whose target moved live until the next call, marked or `Clean` (open decision 11 (a)). When the React package calls it is react.md's open decision 1 (`refactors/pending/runtime/react.md:1297-1305`: after every disposal, never automatically, or upstream's buffer of 10), not held. This doc adds no option of its own; its open decision 11 (b) would dispose derived nodes without a call, by reference count.
 
 ### 26. Whether `readDataForOnComplete` reads through the graph
 
@@ -3137,4 +2980,18 @@ A subscription is not a derived node and holds no root hold, so without a rule `
 
 - (a) Each `Subscription` records `readDerivedNodes: ReadonlySet<DerivedNodeId>`, the ids of the nested derived nodes its last read read directly, which `storedResultHooks` reports through `onReadDerivedNode`. `readAndSubscribe` sets it and `callSubscriptions` replaces it on every re-read. `garbageCollectEnvironment` passes every current subscription's ids to `collect` as `extraRoots`. Held, not decided. Reason: it is upstream's shape (a set filled by the read and replaced on the next one); unsubscribing needs no release, because `collect` reads `environment.subscriptions` when it runs; a throw part-way through a read leaves nothing to balance. Cost: a `Set` per subscription read, one insertion per `Resolver` node the subscription's reader AST walks, an array per `garbageCollectEnvironment`, and a second parameter on `collect`. Under open decision 11 (b) it does not suffice: a reference count that reaches zero disposes the node in the middle of a write, before any `collect`, so a subscription-only node would need (b)'s holds.
 - (b) Each subscription holds one root hold (`rootCount`) on each nested derived node its last read read directly. A re-read takes holds on the new set and releases the holds of the old one; the unsubscribe cleanup releases them. `collect` is unchanged. Cost: a new engine function that adds a root hold without `retainRoot`'s bring-up-to-date (the walk already brought the node up to date), a hold and a release per nested derived node per subscription per write, a cleanup list per subscription, and holds left unbalanced when a read throws part-way unless the re-read releases in a `finally`. Benefit: `rootCount` stays the one root mechanism, and it carries over to open decision 11 (b) and Follow-ups 1.
-- (c) `garbageCollectEnvironment` walks each current subscription's reader AST from its root link with hooks that report each nested resolver's id, and passes the ids to `collect`. Nothing is recorded on the subscription. Cost: every subscription's reader AST is walked once more per `garbageCollectEnvironment`; the walk's `readResolver` hook must return each nested resolver's value, and `readStoredResult` recomputes a `Stale` one, so collection calls resolvers; and the ids can differ from what the subscription's `delivered` holds when a write has not yet been followed by `callSubscriptions`.
+- (c) `garbageCollectEnvironment` walks each current subscription's reader AST from its root link with hooks that report each nested resolver's id, and passes the ids to `collect`. Nothing is recorded on the subscription. Cost: every subscription's reader AST is walked once more per `garbageCollectEnvironment`; the walk's `readResolver` hook must return each nested resolver's value, and `readStoredResult` pulls a marked one, so collection calls resolvers; and the ids can differ from what the subscription's `delivered` holds when a write has not yet been followed by `callSubscriptions`.
+
+### 28. Observers: pull, then call back, or call back, then the reader pulls
+
+Under held 3b a write only marks. Something must pull an observed derived node before its observer sees the new value, and the observer must learn that it may have changed.
+
+- (a) Pull, then call back. Held, not decided. `settle` pulls every observed derived node before the write returns, and `notify` calls each observer whose value is not `===` its `notified` (change 4). Subscriptions do the same through `callSubscriptions`, which re-reads each one and calls its callback with the new `SubscriptionResult` only when `subscriptionResultsAreEqual` rejects it against `delivered`. Reason: it keeps R1 and the Goal ("Renders do no work": `snapshot` is a lookup) and open decision 3 (b), the user's choice, which puts the pull in `listen` and not in render; and it keeps the landed subscription API, whose `callback: (result: SubscriptionResult) => void` (`libs/isograph-runtime/src/subscribe.ts`, `readAndSubscribe`) needs the result before the subscription decides whether to call back. Cost: every observed derived node a write marks is pulled inside the write, including one whose component will not re-render soon (an offscreen tree, a deferred one), and the write's caller pays for it.
+- (b) Call back, then the reader pulls. After marking, `notify` calls each observer whose derived node is not `Clean`, which means its value may have changed; the reader pulls when it reads. React's `getSnapshot` pulls the derived node; a marked node whose dependencies come back equal is verified without recomputing and returns the same object, so React does not re-render. The runtime itself pulls only the mounted derived nodes with an effect (Values with lifecycles). Costs:
+  - `snapshot` computes when its derived node is marked. That is open decision 3 (d), and it conflicts with R1 and the Goal, which record the user's deviation from upstream ("no read-and-subscribe during render"), and with 3 (b), the user's choice. A pull during a render React discards leaves its computed values stored; they are correct for later reads, because computations are pure (Values with lifecycles).
+  - An observer is called for every write that marks its derived node, including one whose pull cuts off and changes nothing. React then calls `getSnapshot`, receives the same object, and skips the render. A non-React observer that does work in its callback does that work for nothing unless it pulls and compares first.
+  - Subscriptions. `callSubscriptions` decides whether to call back by re-reading and comparing with `delivered`, so it cannot call back before reading. Either subscriptions keep (a) while level 2 takes (b), or the subscription API changes: the callback becomes `() => void`, `subscriptionSnapshot` re-reads a subscription that was called back and has not read since, keeping `delivered` when `subscriptionResultsAreEqual` holds, and every subscriber that needs the result calls `subscriptionSnapshot`. `readAndSubscribe`, `listenToSubscription`, and react.md's `useSubscription` change with it.
+  - Open decision 27 (a) holds under both. `readDerivedNodes` is what the last read went through; under (b) the last read is the last `subscriptionSnapshot`, not the last write. Between a write and that read it names the previous read's derived nodes, and `collect` keeps them.
+  - The notify loop finds the marked observed derived nodes by iterating `graph.observers`, as (a)'s does.
+
+The body is written for (a).
