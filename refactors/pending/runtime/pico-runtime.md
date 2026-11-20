@@ -2930,3 +2930,76 @@ Not decided.
 
 - (a) Create the root derived node anyway. Its computation is `resolverDefinition`'s: `readData` reports `readRecord(ast.root)` and returns `noRecord`, so the node holds `MissingData` naming the root and depends on `recordSource(ast.root)`. The first `normalize` that writes the root reports `RecordCreated` for it (change 1, `recordAt`), which marks or queues the node. Held, not decided. Reason: the retention then has a node at its `location` from the call on, so a `listen` there makes it needed and a later write computes it as for any retention. Cost: a derived node whose owner record is absent, the one exception to "no derived node on an absent record"; `deleteSource` does not reach it until the record exists and is deleted, and `collect` disposes it once no root holds it.
 - (b) Hold no root while `ast.root` is absent: `retainEntrypoint` adds the `Retention` to `environment.retainedQueries` and its `releaseRoot` does nothing. Cost: the location has no node; a later `normalizeData` of another entrypoint that writes the root creates none, so the first read of the location computes on demand, and a `listen` there only registers.
+
+### 22. A throw inside a computation outside its resolver
+
+`callResolver` catches only the resolver's throw (change 2, Results, equality, and a resolver that throws). The walk that `resolverDefinition`'s computation runs before it throws on a broken store invariant: `linkAt` on a non-link under a composite store key (`libs/isograph-runtime/src/store.ts:74-87`, the throw at `:81`, reached from `readLinkedValue`, `read.ts:226`), and `storeKey`'s `variableValue` on a missing variable (`storeKey.ts:56-63`, the throw at `:59`, reached from `readSelection`, `read.ts:131` and `:133`). Step A's read catches both as `ReadErr` (`readSubscription`, `subscribe.ts:120-131`); the stored read catches neither.
+
+Under change 4, `bringUpToDate` deletes a `Queued` derived node from its bucket before it calls `recompute` (change 4, Propagation). A throw out of `compute` then leaves the node `Queued` and in no bucket, with its old value and dependencies. `settle`'s loop exits with the throw, so every derived node still in the queue stays `Queued`; `normalizeData` skips `retainEntrypoint` and `notify` and throws. Later, `invalidate` skips the node because it is not `Clean`, and `settle` never reaches it because no bucket holds it, so no write recomputes it again. On the read path (change 2), a throw out of `createDerivedNode`'s `compute` stores nothing, a throw out of `recompute` leaves a `Stale` node `Stale`, and either propagates out of `readStoredResult`, `retainRoot`, or `observe`.
+
+- (a) `compute` catches any throw from the computation and stores it as the derived node's value, as the subscription path stores `ReadErr`. Held, not decided. Reason: `bringUpToDate` returns normally, so the node ends `Clean`, the queue drains, and `notify` runs; the dependencies the computation recorded before the throw are kept, so a write that repairs one of them recomputes the node. Cost: an engine bug in a computation is also stored as a value instead of surfacing as a throw.
+
+  ```ts
+  // from libs/isograph-runtime/src/graph.ts
+  export type RecomputationGraph<TValue> = {
+    // .. change 2's fields, and:
+    /** The value a derived node holds when its computation threw `error`: `{ kind: 'Err', error }`
+     * in the runtime. */
+    readonly thrownValue: (error: unknown) => TValue;
+  };
+
+  export function createGraph<TValue>(
+    valuesEqual: (a: TValue, b: TValue) => boolean,
+    thrownValue: (error: unknown) => TValue,
+  ): RecomputationGraph<TValue>;
+
+  // compute, before (change 2):
+    const value = computation({
+      readSource: (source) => {
+        dependencies.push({ kind: 'Source', source });
+      },
+      readDerivedNode: (id, create) => {
+        const node = upToDateDerivedNode(graph, id, create);
+        dependencies.push({ kind: 'Derived', node });
+        return node.value;
+      },
+    });
+    return { value, dependencies };
+  // after:
+    const value = runComputation(graph, computation, {
+      readSource: (source) => {
+        dependencies.push({ kind: 'Source', source });
+      },
+      readDerivedNode: (id, create) => {
+        const node = upToDateDerivedNode(graph, id, create);
+        dependencies.push({ kind: 'Derived', node });
+        return node.value;
+      },
+    });
+    return { value, dependencies };
+
+  /** `computation(context)`; a throw becomes `graph.thrownValue(error)`. */
+  function runComputation<TValue>(
+    graph: RecomputationGraph<TValue>,
+    computation: Computation<TValue>,
+    context: ComputeContext<TValue>,
+  ): TValue {
+    try {
+      return computation(context);
+    } catch (error: unknown) {
+      return graph.thrownValue(error);
+    }
+  }
+  ```
+
+  ```ts
+  // from libs/isograph-runtime/src/read.ts
+  // before (change 2):
+  export type ResolverResult<T> = ReadResult<T> | ReadResolverThrew;
+  // after:
+  /** A stored resolver result: v1's `ReadResult`, the resolver threw, or the read threw. */
+  export type ResolverResult<T> = ReadResult<T> | ReadResolverThrew | ReadErr;
+  ```
+
+  `ReadErr` is the landed type of `subscribe.ts`, imported as a type. `createIsographEnvironment` passes `createGraph(resultsEqual, (error) => ({ kind: 'Err', error }))`; `resultsEqual` compares two `Err` by `===` of their errors, as `subscriptionResultsAreEqual` does; `contextHooks` returns `ReadHooks<ReadResolverThrew | ReadErr>`, so a nested `Err` passes up the walk unchanged (`allOk`), as a nested `ResolverThrew` does. A nested derived node's throw is caught by its own `compute`, so the outer `compute` catches only throws of the outer computation's own walk. `ResolverThrew` stays: it names the field and record whose resolver threw, where `Err` is a broken invariant of the store. An abandon under open decision 19 (c) is a returned value, not a throw, so (a) does not catch it.
+- (b) `bringUpToDate` restores the node and `settle` rethrows after draining the rest. `bringUpToDate` catches the throw, sets the node `Clean` with its old value and dependencies, and returns the error to `settle`; `settle` drains the rest of the queue, and `normalizeData` runs `notify` and then rethrows the first error, or an `AggregateError` of several. Cost: the node holds a value no current input explains, the stale-value cost of Values with lifecycles' failure (b); `normalizeData` throws for a broken store invariant after a response was written, so the request that called it becomes `Err`; and the read path needs the same restore in `createDerivedNode` and `recompute`.
