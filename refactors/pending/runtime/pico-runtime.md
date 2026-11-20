@@ -405,7 +405,7 @@ Held 3a's bound does not depend on equality cutoff, which stays a `===` optimiza
 
 ### What depends on this choice
 
-Written for held 3a, and changed if another candidate is chosen: Steps; change 2 except The resolver store key and Results, equality, and a resolver that throws; Ordering; change 3's Computing the new root, Serving from the store, Unobserved results are lazy, and Garbage collection; change 4 except `listen`, `snapshot`, and `Observed`; the engine's functions in changes 2 to 4; Values with lifecycles' Replacement and release; the mentions of `dependents` and marking in Follow-ups 1, 8, and 9; and open decisions 2, 3, 4, 6, 8, 11, 14, 15, 16, 18, 19, 22, and 26. Each of those sections in Steps and changes 2 to 4 opens with a line saying so.
+Written for held 3a, and changed if another candidate is chosen: Steps; change 2 except The resolver store key and Results, equality, and a resolver that throws; Ordering; change 3's Computing the new root, Serving from the store, Unobserved results are lazy, and Garbage collection; change 4 except `listen`, `snapshot`, and `Observed`; the engine's functions in changes 2 to 4; Values with lifecycles' Replacement and release; the mentions of `dependents` and marking in Follow-ups 1, 8, and 9; and open decisions 2, 3, 4, 6, 8, 11, 14, 15, 16, 18, 19, 22, 26, and 27. Each of those sections in Steps and changes 2 to 4 opens with a line saying so.
 
 Independent of it: Two levels, Step A, End-user experience, change 1, The resolver store key with `ReaderArtifact.selectableName`, Results, equality, and a resolver that throws, change 3's `normalizeData` signature, `Retention`, and Resolver markers, change 4's `listen`, `snapshot`, and `Observed`, The engine, the store, and the environment, Other derived node kinds, Later, the rest of Follow-ups, and open decisions 1, 5, 7, 9, 10, 12, 13, 17, 20, 21, 23, 24, and 25.
 
@@ -588,7 +588,7 @@ Each change is one commit, in order; change 2 is two. Step A has landed and is i
 - 1. `normalize` skips an unchanged value and returns the changes it made (prefactor). `Store` stays store.md's nested map.
 - 2a. `graph.ts`, the engine's lazy half, over opaque `SourceId`s and `DerivedNodeId`s, importing nothing from the store, the reader, or the environment: derived nodes, `setDependencies`, `markChanged` marking `Stale`, `bringUpToDate`, `track`, `deleteSource`. Its tests use literal ids.
 - 2b. Stored resolver results. The environment gains `graph`. The reader's walk takes `ReadHooks`, and `readStoredResult` reads a resolver through the graph, storing each resolver's result with its dependencies and their inverse. `normalizeData` marks `Stale` every derived node that read what `normalize` changed and every node that reads those, transitively, stopping at a node already `Stale`; `garbageCollectEnvironment` does the same for each record `garbageCollect` deleted and disposes the derived nodes the record owned. A read of a `Stale` derived node recomputes it, each node it reads brought up to date by that read first. There are no observers, so nothing is needed, nothing is queued, and no height exists. `readSubscription` reads each subscription with `storedResultHooks`, so the subscription re-read that `callSubscriptions` runs after every write reads each nested resolver through the graph: the subscription's own reader AST is walked on every write, as in Step A, and a nested resolver whose inputs did not change is not called and returns its stored result.
-- 3. Level 1 retention. `normalizeData` takes the entrypoint, computes its root result and every result that result reaches by a read of the root, holds the root in the graph, and adds its `Retention` to `environment.retainedQueries`. `garbageCollectEnvironment` disposes the derived nodes no held root reaches. A later write marks a retained query's affected derived nodes `Stale`.
+- 3. Level 1 retention. `normalizeData` takes the entrypoint, computes its root result and every result that result reaches by a read of the root, holds the root in the graph, and adds its `Retention` to `environment.retainedQueries`. `garbageCollectEnvironment` disposes the derived nodes that no held root and no current subscription's last read reaches; each `Subscription` records the derived nodes its last read read directly. A later write marks a retained query's affected derived nodes `Stale`.
 - 4. Level 2 and the height-ordered push. Derived nodes gain `height`, set from what each computation read and raised by adjustment after an upward read, `neededCount`, and the state `Queued`; the graph gains the bucket queue and the observers. `listen` brings its derived node up to date and adds to the needed counts; `snapshot` is a lookup. A write queues each needed derived node whose input changed and marks the others `Stale`; `settle` drains the queue lowest height first, queuing the direct dependents of each derived node whose result changed. Observers are notified once, after the pass. `garbageCollectEnvironment` settles and notifies after its deletions.
 
 Values with lifecycles (open decision 13) adds no change here: it is a later change, with the first feature that produces a disposable value, and adds `Disposable` computations, `holding`, `pendingReleases`, and `flushReleases` to the engine.
@@ -1044,7 +1044,7 @@ export type DerivedNodeDefinition<TValue> = {
 
 The context is a parameter, built per computation by `compute`, as the walk's `ReadHooks` is; there is no ambient "current computation" (MobX's `globalState.trackingDerivation`, Reactively's `CurrentReaction`). The engine knows nothing about what a derived node computes: the caller supplies the computation, the owner, and the id. Resolver derived nodes are the one derived node kind changes 2 to 4 create; Other derived node kinds lists the kinds the follow-ups add and the parts of the API they need.
 
-`Computation`, `ComputeContext`, and `DerivedNodeDefinition` are internal to the runtime. User code never receives a `ComputeContext`, an environment, or a store. A computation records a dependency only by calling `readSource` or `readDerivedNode`, so a computation that user code wrote as a closure could read a value without calling `readSource`; its derived node would not be marked when that value changes, and it would return its old result with no error. User code reads only through isograph syntax: a selection in a reader AST, which the reader walk reads, and inside a computation each `ReadHooks` hook the walk calls reports the source it reads (`contextHooks`). The walk is therefore the only reader of a source on behalf of user code, and no read inside a computation goes unrecorded. A subscription's re-read is not a computation and records nothing (Subscriptions); it is re-read after every write.
+`Computation`, `ComputeContext`, and `DerivedNodeDefinition` are internal to the runtime. User code never receives a `ComputeContext`, an environment, or a store. A computation records a dependency only by calling `readSource` or `readDerivedNode`, so a computation that user code wrote as a closure could read a value without calling `readSource`; its derived node would not be marked when that value changes, and it would return its old result with no error. User code reads only through isograph syntax: a selection in a reader AST, which the reader walk reads, and inside a computation each `ReadHooks` hook the walk calls reports the source it reads (`contextHooks`). The walk is therefore the only reader of a source on behalf of user code, and no read inside a computation goes unrecorded. A subscription's re-read is not a computation and records no dependency (Subscriptions); it is re-read after every write. From change 3 it records the ids of the nested derived nodes it read, which `collect` keeps (change 3, Garbage collection).
 
 A source other than a store field is exposed to user code the same way, as a selection in a reader AST, so the walk records its read as it records a server field read. The first such source is the state of a network request. Adding a source kind adds:
 
@@ -1474,7 +1474,7 @@ Its sweep builds the list from the records it deletes; store.md's tests ignore i
 
 ### Subscriptions (2b)
 
-Step A's re-read reads every nested resolver with `readButDoNotEvaluate`, which calls each one through `read` on every write. From 2b the re-read reads nested resolvers through the graph. The subscription is not a derived node: its read records nothing, and `callSubscriptions` still re-reads every subscription after every write and walks its whole reader AST.
+Step A's re-read reads every nested resolver with `readButDoNotEvaluate`, which calls each one through `read` on every write. From 2b the re-read reads nested resolvers through the graph. The subscription is not a derived node: its read records no dependency, and `callSubscriptions` still re-reads every subscription after every write and walks its whole reader AST.
 
 ```ts
 // from libs/isograph-runtime/src/subscribe.ts
@@ -1576,7 +1576,7 @@ What this changes for a subscription:
 - `readAndSubscribe`'s first read is `readSubscription` too, so subscribing computes and stores the nested results it reaches.
 - A nested resolver that throws is delivered as `ResolverThrew` where Step A delivered `Err`. Its stored result is the same object until a write changes the resolver's inputs, so a re-read after an unrelated write is equal and calls no callback, where Step A called it on every write.
 - A write must go through `normalizeData`. A direct `normalize` marks nothing, and the next re-read returns the stored nested results from before it (The engine, the store, and the environment, What this costs).
-- In 2b the derived nodes a subscription's read stores are disposed only when `garbageCollectEnvironment` deletes their owner record. From change 3, `collect` also disposes every derived node no held root reaches, and a subscription holds no root: a nested derived node that only a subscription reads is disposed by the next `garbageCollectEnvironment`, and the next re-read recomputes it. When its resolver returns a new object, that re-read is unequal and the callback is called once.
+- In 2b the derived nodes a subscription's read stores are disposed only when `garbageCollectEnvironment` deletes their owner record. From change 3, `collect` disposes every derived node no root reaches, and the derived nodes each current subscription's last read read directly are roots: each `Subscription` records their ids in `readDerivedNodes`, filled by `storedResultHooks` (change 3, Garbage collection; open decision 27). A nested derived node a current subscription reads therefore keeps its stored value through `garbageCollectEnvironment`, and the next re-read calls no callback for it.
 
 The other readers of the walk do not go through the graph. `read` and `readButDoNotEvaluate` keep v1's hooks (The store's side), so their exports and reader-ast.md's tests keep v1's behavior. `readDataForOnComplete` (`libs/isograph-runtime/src/network.ts:195-218`) calls `read`, which calls the entrypoint's resolver and every nested resolver again after each response; whether it reads through the graph is open decision 26. components-in-userland.md's closure wrapper calls `readButDoNotEvaluate` when the wrapper is called; that doc is not part of the current work.
 
@@ -1973,6 +1973,8 @@ After the `normalizeData` that retains a query, a later write recomputes its der
 
 Depends on the held architecture in its derived node part.
 
+`collect` keeps two kinds of root: a derived node with `rootCount > 0` (a held retention root, and from change 4 an observed location), and a derived node that a current subscription's last read read directly. The second kind exists because a subscription holds no root hold: without it, a nested derived node that only a subscription reads is disposed by every `garbageCollectEnvironment`, the next re-read recomputes it, and when its resolver returns a new object that re-read is unequal and the subscription's callback is called with data that did not change. How `collect` obtains the second kind is open decision 27 (held (a)).
+
 ```ts
 // from libs/isograph-runtime/src/environment.ts
 // garbageCollectEnvironment, before (change 2):
@@ -1983,17 +1985,209 @@ Depends on the held architecture in its derived node part.
   garbageCollect(environment.store, Array.from(environment.retainedQueries)).forEach((record) =>
     deleteSource(environment.graph, recordSource(record)),
   );
-  collect(environment.graph);
+  collect(
+    environment.graph,
+    Array.from(environment.subscriptions).flatMap((subscription) =>
+      Array.from(subscription.readDerivedNodes),
+    ),
+  );
 ```
 
 ```ts
 // from libs/isograph-runtime/src/graph.ts
-/** Disposes every derived node that no node with `rootCount > 0` reaches through `Derived` dependencies. */
-export function collect<TValue>(graph: RecomputationGraph<TValue>): void;
+/** Disposes every derived node that no node with `rootCount > 0` and no node in `extraRoots` reaches
+ * through `Derived` dependencies. An id in `extraRoots` with no stored derived node roots nothing. */
+export function collect<TValue>(
+  graph: RecomputationGraph<TValue>,
+  extraRoots: ReadonlyArray<DerivedNodeId>,
+): void;
 ```
 
-- Records: store.md's mark and sweep, from each member of `environment.retainedQueries`, with `garbageCollect`'s parameters unchanged. A derived node a retention reaches never loses a record: it reads only what its reader ASTs select along current links, and the retained query's normalization AST is the merge of those reader ASTs with the same variables (query-generation.md), so every record it reads is marked. A derived node reached only from an observed location can lose its records (Level 2). Each deleted record goes through `deleteSource`, which disposes its derived nodes (change 2).
-- Derived nodes: nodes that held roots and observed locations reach through `Derived` dependencies are kept; every other derived node is disposed by `disposeDerivedNode`, so no `dependents` set or `sourceDependents` set keeps it. A disposed derived node has no kept dependent: a kept node that read it would make it reachable. Derived nodes a plain `readStoredResult` stored outside any retention, those that only a subscription's re-read reads (change 2, Subscriptions), and those of a disposed retention, are collected this way, `Stale` or not. A subscription's next re-read recomputes a collected nested derived node, and when its resolver returns a new object, that re-read is unequal and the subscription's callback is called once.
+`collect` takes ids, not `DerivedNode`s, because the engine knows nothing about subscriptions and because `deleteSource`, which runs first, can have disposed a node a subscription read: `graph.derivedNodes.get(id)` returns `undefined` for it, and it roots nothing. An id read twice, by two subscriptions or twice by one, is one root.
+
+The subscription records the derived nodes its last read went through. Upstream's `FragmentSubscription` records the records its last read visited in the same way, replaced on each re-read (`encounteredDataAndRecords`, `isograph/libs/isograph-react/src/core/IsographEnvironment.ts:49`, written at `subscribe.ts:160`).
+
+```ts
+// from libs/isograph-runtime/src/subscribe.ts
+// before (change 2):
+export type Subscription = {
+  readonly artifact: ReaderArtifact<ResolverParam, unknown, EntityName>;
+  readonly root: StoreLink;
+  readonly variables: Variables;
+  /** The result last read: at subscribe, or the last one the callback received. */
+  delivered: SubscriptionResult;
+  readonly callback: (result: SubscriptionResult) => void;
+  /** Called after each change to `delivered`, after `callback`. */
+  readonly listeners: Set<() => void>;
+};
+// after:
+export type Subscription = {
+  readonly artifact: ReaderArtifact<ResolverParam, unknown, EntityName>;
+  readonly root: StoreLink;
+  readonly variables: Variables;
+  /** The result last read: at subscribe, or the last one the callback received. */
+  delivered: SubscriptionResult;
+  /** The derived nodes of the nested resolvers the last read read. Read by `garbageCollectEnvironment`. */
+  readDerivedNodes: ReadonlySet<DerivedNodeId>;
+  readonly callback: (result: SubscriptionResult) => void;
+  /** Called after each change to `delivered`, after `callback`. */
+  readonly listeners: Set<() => void>;
+};
+
+/** A subscription read: what it delivers, and the derived nodes of the nested resolvers it read. */
+type SubscriptionRead = {
+  readonly result: SubscriptionResult;
+  readonly readDerivedNodes: ReadonlySet<DerivedNodeId>;
+};
+```
+
+```ts
+// from libs/isograph-runtime/src/storedResults.ts
+// storedResultHooks, before (change 2):
+/** Hooks for a read that is not a derived node: nothing is recorded, and each nested resolver is
+ * read by `readStoredResult`. */
+export function storedResultHooks(environment: IsographEnvironment): ReadHooks<ReadResolverThrew> {
+  return {
+    readRecord: () => {},
+    readValue: () => {},
+    readResolver: (artifact, root, variables) => readStoredResult(environment, artifact, root, variables),
+  };
+}
+// after:
+/** Hooks for a read that is not a derived node: no dependency is recorded, each nested resolver is
+ * read by `readStoredResult`, and its derived node's id is passed to `onReadDerivedNode` first. */
+export function storedResultHooks(
+  environment: IsographEnvironment,
+  onReadDerivedNode: (id: DerivedNodeId) => void,
+): ReadHooks<ReadResolverThrew> {
+  return {
+    readRecord: () => {},
+    readValue: () => {},
+    readResolver: (artifact, root, variables) => {
+      onReadDerivedNode(resolverDerivedNode(root, resolverStoreKey(artifact.selectableName, variables)));
+      return readStoredResult(environment, artifact, root, variables);
+    },
+  };
+}
+```
+
+The id is reported before `readStoredResult` and whether or not the record is present. When `root` is absent, `readStoredResult` returns `noRecord` and stores nothing, so the id names no derived node and `collect` skips it; when a later write inserts the record, the next re-read creates the node and reports the same id again. The hook reports only the nested resolvers the subscription's own reader AST selects; a derived node those read is reached from them through `Derived` dependencies, so `collect` keeps it without the subscription naming it.
+
+```ts
+// from libs/isograph-runtime/src/subscribe.ts
+// readSubscription, before (change 2):
+function readSubscription(
+  environment: IsographEnvironment,
+  artifact: ReaderArtifact<ResolverParam, unknown, EntityName>,
+  root: StoreLink,
+  variables: Variables,
+): SubscriptionResult {
+  try {
+    return readData(environment.store, storedResultHooks(environment), artifact, root, variables);
+  } catch (error: unknown) {
+    return { kind: 'Err', error };
+  }
+}
+// after:
+function readSubscription(
+  environment: IsographEnvironment,
+  artifact: ReaderArtifact<ResolverParam, unknown, EntityName>,
+  root: StoreLink,
+  variables: Variables,
+): SubscriptionRead {
+  const readDerivedNodes = new Set<DerivedNodeId>();
+  const hooks = storedResultHooks(environment, (id) => {
+    readDerivedNodes.add(id);
+  });
+  try {
+    return { result: readData(environment.store, hooks, artifact, root, variables), readDerivedNodes };
+  } catch (error: unknown) {
+    return { result: { kind: 'Err', error }, readDerivedNodes };
+  }
+}
+```
+
+A read that throws keeps the ids it reported before the throw: those derived nodes are stored, and the next re-read walks the same path up to the broken invariant.
+
+```ts
+// from libs/isograph-runtime/src/subscribe.ts
+// readAndSubscribe, before (change 2):
+  const subscription: Subscription = {
+    artifact: readerArtifact,
+    root: link,
+    variables,
+    delivered: readSubscription(environment, readerArtifact, link, variables),
+    callback,
+    listeners: new Set(),
+  };
+// after:
+  const read = readSubscription(environment, readerArtifact, link, variables);
+  const subscription: Subscription = {
+    artifact: readerArtifact,
+    root: link,
+    variables,
+    delivered: read.result,
+    readDerivedNodes: read.readDerivedNodes,
+    callback,
+    listeners: new Set(),
+  };
+```
+
+```ts
+// from libs/isograph-runtime/src/subscribe.ts
+// callSubscriptions, before (change 2):
+  environment.subscriptions.forEach((subscription) => {
+    const result = readSubscription(
+      environment,
+      subscription.artifact,
+      subscription.root,
+      subscription.variables,
+    );
+    if (
+      !subscriptionResultsAreEqual(
+        subscription.artifact,
+        subscription.delivered,
+        result,
+      )
+    ) {
+      subscription.delivered = result;
+      reportCallbackError(() => subscription.callback(result));
+      subscription.listeners.forEach((listener) =>
+        reportCallbackError(listener),
+      );
+    }
+  });
+// after:
+  environment.subscriptions.forEach((subscription) => {
+    const read = readSubscription(
+      environment,
+      subscription.artifact,
+      subscription.root,
+      subscription.variables,
+    );
+    subscription.readDerivedNodes = read.readDerivedNodes;
+    if (
+      !subscriptionResultsAreEqual(
+        subscription.artifact,
+        subscription.delivered,
+        read.result,
+      )
+    ) {
+      subscription.delivered = read.result;
+      reportCallbackError(() => subscription.callback(read.result));
+      subscription.listeners.forEach((listener) =>
+        reportCallbackError(listener),
+      );
+    }
+  });
+```
+
+`readDerivedNodes` is replaced on every re-read, equal or not. Two `Ok` results that `selectionSetDataAreEqual` finds equal followed the same links with the same variables, so they read the same derived nodes. Two `MissingData` results are equal wherever the data is missing, so the new read can have read other nested resolvers, and the new set names what the next re-read will read. `subscribe.ts` imports `DerivedNodeId` as a type from `graph.ts`, and `storedResults.ts` already imports `resolverDerivedNode` and `resolverStoreKey`. The unsubscribe cleanup is unchanged: deleting the subscription from `environment.subscriptions` removes its ids from the next `collect`.
+
+Cost: one `Set` per subscription read, with one insertion per `Resolver` node the subscription's reader AST walks, which the walk already visits; one array of every subscription's ids per `garbageCollectEnvironment`. A write pays only for the sets its re-reads fill; only `garbageCollectEnvironment` builds the array.
+
+- Records: store.md's mark and sweep, from each member of `environment.retainedQueries`, with `garbageCollect`'s parameters unchanged. A derived node a retention reaches never loses a record: it reads only what its reader ASTs select along current links, and the retained query's normalization AST is the merge of those reader ASTs with the same variables (query-generation.md), so every record it reads is marked. A derived node reached only from an observed location or from a subscription can lose its records (Level 2). Each deleted record goes through `deleteSource`, which disposes its derived nodes (change 2).
+- Derived nodes: nodes that held roots, observed locations, and current subscriptions' last reads reach through `Derived` dependencies are kept; every other derived node is disposed by `disposeDerivedNode`, so no `dependents` set or `sourceDependents` set keeps it. A disposed derived node has no kept dependent: a kept node that read it would make it reachable. Derived nodes a plain `readStoredResult` stored outside any retention and subscription, those of a disposed retention, and those only an unsubscribed subscription read, are collected this way, `Stale` or not. A nested derived node a current subscription read survives `garbageCollectEnvironment` with its stored value, so the subscription's next re-read returns the same object and calls no callback.
 
 ### Resolver markers
 
@@ -2015,6 +2209,8 @@ Reason for (a): every marker in (b) is already reachable from the root through r
 - `FriendPage` retained, then a `PetDetail` response for `Pet:1` whose `bestFriend` is `Pet:3` (`PetDetail` selects no `nickname` under `bestFriend`): the next `readStoredResult` of `FriendPage` recomputes `FriendLabel`, which reads `PetName` on `Pet:3`, and returns `MissingData` naming `Pet:3`; `garbageCollectEnvironment` keeps `Pet:3`, which `FriendPage`'s AST reaches through the new link.
 - A throwing resolver in one retained query: `normalizeData` returns, that query's root holds `ResolverThrew`, and another retained query's stored results are unchanged.
 - A derived node stored by a plain `readStoredResult` outside any retention is disposed by `garbageCollectEnvironment`; one under a held root is kept.
+- A nested derived node only a subscription reads: `normalizeData` of `ShapePage` with `{ id: "1" }`, `dispose` of its `Retention`, `retainQuery` of `ShapePage`'s normalization AST with `{ id: "1" }` (records kept, no root hold), and `readAndSubscribe` of `ShapeLabel`'s reader artifact at `Pet:1`. `garbageCollectEnvironment` disposes the derived nodes of `ShapePage` and `ShapeLabel` and keeps the one of `NameShape` on `Pet:1`; a following `callSubscriptions` calls neither `NameShape`'s resolver nor the subscription's callback. After the subscription's cleanup, `garbageCollectEnvironment` disposes the derived node of `NameShape`.
+- A link move under a subscription: `normalizeData` of `FriendPage` and of `PetSummary` with `{ id: "2" }`, `dispose` of both `Retention`s, `retainQuery` of both normalization ASTs with their variables, and `readAndSubscribe` of `FriendLabel`'s reader artifact at `Pet:1`. A `PetDetail` response moves `Pet:1.bestFriend` to `Pet:3` (with `name` and `nickname`), `dispose` of the `Retention` its `normalizeData` returns, then `callSubscriptions`. `garbageCollectEnvironment` keeps the derived node of `PetName` on `Pet:3` and disposes the one on `Pet:2`, while `Pet:2` stays in `environment.store`.
 - Served from the store: after `normalizeData` of `BadgePage` with `{ id: "1" }` and `dispose` of its retention, `fetchEntrypoint` of `BadgePage` with `shouldFetch` `IfNecessary` sends no request (the network function is not called), calls none of the five resolvers (their derived nodes are `Clean`), and `environment.retainedQueries` holds one more `Retention`, whose `location` has a stored derived node; the returned cleanup removes it, and `garbageCollectEnvironment` then leaves `environment.graph.derivedNodes` empty.
 - `shouldFetch` `No` on `new Map()`: the call sends no request, and the derived node at the `Retention`'s `location` holds `MissingData` naming `Query.__ROOT`; a later `normalizeData` of `BadgePage`'s response calls each of the five resolvers once.
 - `dispose` of `FriendPage`'s retention, then a change to `Pet:2.name` before `garbageCollectEnvironment`: no resolver is called.
@@ -2315,7 +2511,12 @@ The partial write retains nothing: `retainEntrypoint` does not run, as in change
   garbageCollect(environment.store, Array.from(environment.retainedQueries)).forEach((record) =>
     deleteSource(environment.graph, recordSource(record)),
   );
-  collect(environment.graph);
+  collect(
+    environment.graph,
+    Array.from(environment.subscriptions).flatMap((subscription) =>
+      Array.from(subscription.readDerivedNodes),
+    ),
+  );
   settle(environment.graph);
   notify(environment.graph);
 ```
@@ -2920,12 +3121,20 @@ Open: what level 2 offers at render in place of `readAndSubscribe` under a tempo
 
 ### 25. Who calls `garbageCollectEnvironment`
 
-`garbageCollectEnvironment` runs only when a caller calls it: releasing a request unretains its query and does not collect (`refactors/pending/runtime/network-and-subscriptions.md:84`, `:531`), and the landed function is called by no other runtime function (`libs/isograph-runtime/src/environment.ts`). Under changes 2 to 4 it is also the only function that disposes derived nodes (`deleteSource` and `collect`, change 3, Garbage collection), so a derived node a plain `readStoredResult` stored outside any retention, one that only a subscription's re-read reads, the derived nodes of a disposed retention, and those of a pointer whose target moved live until the next call, `Stale` or `Clean` (open decision 11 (a)). When the React package calls it is react.md's open decision 1 (`refactors/pending/runtime/react.md:1297-1305`: after every disposal, never automatically, or upstream's buffer of 10), not held. This doc adds no option of its own; its open decision 11 (b) would dispose derived nodes without a call, by reference count.
+`garbageCollectEnvironment` runs only when a caller calls it: releasing a request unretains its query and does not collect (`refactors/pending/runtime/network-and-subscriptions.md:84`, `:531`), and the landed function is called by no other runtime function (`libs/isograph-runtime/src/environment.ts`). Under changes 2 to 4 it is also the only function that disposes derived nodes (`deleteSource` and `collect`, change 3, Garbage collection), so a derived node a plain `readStoredResult` stored outside any retention and subscription, one that only an unsubscribed subscription read, the derived nodes of a disposed retention, and those of a pointer whose target moved live until the next call, `Stale` or `Clean` (open decision 11 (a)). When the React package calls it is react.md's open decision 1 (`refactors/pending/runtime/react.md:1297-1305`: after every disposal, never automatically, or upstream's buffer of 10), not held. This doc adds no option of its own; its open decision 11 (b) would dispose derived nodes without a call, by reference count.
 
 ### 26. Whether `readDataForOnComplete` reads through the graph
 
 `readDataForOnComplete` (`libs/isograph-runtime/src/network.ts:195-218`) gives `onComplete` the entrypoint's value after `makeNetworkRequest` normalized the response. It calls `read` with v1's hooks, so it calls the entrypoint's resolver and every nested resolver once more per response, a nested resolver's throw propagates out of it and makes the request `Err`, and `MissingData` throws "This is indicative of a bug in Isograph.". Upstream's `readDataForOnComplete` does the same: `readButDoNotEvaluate`, then the resolver (`isograph/libs/isograph-react/src/core/makeNetworkRequest.ts:362-420`). Under change 2 the subscriptions' re-reads read nested resolvers through the graph (change 2, Subscriptions), so the value `onComplete` receives holds nested values that are not `===` the ones the subscriptions deliver for the same response.
 
 - (a) Unchanged: `read`. Held, not decided, because it is upstream's behavior. Cost: every resolver the entrypoint reaches is called once more per response with `onComplete`, and the nested values `onComplete` receives are separate objects from the stored results.
-- (b) `readData(environment.store, storedResultHooks(environment), ..)`, then the entrypoint's resolver. Nested resolvers are read through the graph and keep their stored identity; the entrypoint's resolver is called once per response. Cost: a nested `ResolverThrew` is a value in the walk's result, so `readDataForOnComplete` rethrows its `error` to keep the request's `Err`, or `onComplete`'s type admits it.
+- (b) `readData(environment.store, storedResultHooks(environment, () => {}), ..)`, then the entrypoint's resolver; from change 3 `storedResultHooks` takes `onReadDerivedNode` (change 3, Garbage collection), and `readDataForOnComplete` keeps nothing it reports. Nested resolvers are read through the graph and keep their stored identity; the entrypoint's resolver is called once per response. Cost: a nested `ResolverThrew` is a value in the walk's result, so `readDataForOnComplete` rethrows its `error` to keep the request's `Err`, or `onComplete`'s type admits it.
 - (c) `readStoredResult(environment, entrypoint.readerArtifact(), entrypoint.normalizationAst.root, variables)`. The entrypoint's result is stored as the root derived node. From change 3 it is the derived node `normalizeData`'s `retainEntrypoint` already computed and holds, at the returned `Retention`'s `location`, so the read is a lookup. Cost: `ResolverThrew` and `MissingData` are values, so `readDataForOnComplete` rethrows the first's `error` and throws on the second, as it throws today; in change 2 the root derived node it stores is disposed only when `garbageCollectEnvironment` deletes `Query.__ROOT`.
+
+### 27. How `collect` keeps the derived nodes subscriptions read
+
+A subscription is not a derived node and holds no root hold, so without a rule `collect` (change 3, Garbage collection) disposes every nested derived node that only a subscription reads, the next re-read recomputes it, and a resolver that returns a new object makes that re-read unequal and calls the callback with data that did not change. The user's direction is that `collect` treats the derived nodes current subscriptions read as roots. Upstream stores no resolver results, so it has no such rule; its subscriptions record what their last read visited (`encounteredDataAndRecords`, `isograph/libs/isograph-react/src/core/IsographEnvironment.ts:49`, replaced at `subscribe.ts:160`) and use it to skip re-reads, not to keep data.
+
+- (a) Each `Subscription` records `readDerivedNodes: ReadonlySet<DerivedNodeId>`, the ids of the nested derived nodes its last read read directly, which `storedResultHooks` reports through `onReadDerivedNode`. `readAndSubscribe` sets it and `callSubscriptions` replaces it on every re-read. `garbageCollectEnvironment` passes every current subscription's ids to `collect` as `extraRoots`. Held, not decided. Reason: it is upstream's shape (a set filled by the read and replaced on the next one); unsubscribing needs no release, because `collect` reads `environment.subscriptions` when it runs; a throw part-way through a read leaves nothing to balance. Cost: a `Set` per subscription read, one insertion per `Resolver` node the subscription's reader AST walks, an array per `garbageCollectEnvironment`, and a second parameter on `collect`. Under open decision 11 (b) it does not suffice: a reference count that reaches zero disposes the node in the middle of a write, before any `collect`, so a subscription-only node would need (b)'s holds.
+- (b) Each subscription holds one root hold (`rootCount`) on each nested derived node its last read read directly. A re-read takes holds on the new set and releases the holds of the old one; the unsubscribe cleanup releases them. `collect` is unchanged. Cost: a new engine function that adds a root hold without `retainRoot`'s bring-up-to-date (the walk already brought the node up to date), a hold and a release per nested derived node per subscription per write, a cleanup list per subscription, and holds left unbalanced when a read throws part-way unless the re-read releases in a `finally`. Benefit: `rootCount` stays the one root mechanism, and it carries over to open decision 11 (b) and Follow-ups 1.
+- (c) `garbageCollectEnvironment` walks each current subscription's reader AST from its root link with hooks that report each nested resolver's id, and passes the ids to `collect`. Nothing is recorded on the subscription. Cost: every subscription's reader AST is walked once more per `garbageCollectEnvironment`; the walk's `readResolver` hook must return each nested resolver's value, and `readStoredResult` recomputes a `Stale` one, so collection calls resolvers; and the ids can differ from what the subscription's `delivered` holds when a write has not yet been followed by `callSubscriptions`.
