@@ -2382,7 +2382,68 @@ export function settle<TValue>(graph: RecomputationGraph<TValue>): void {
 
 The code above lets an upward read during `settle` bring the derived node it reads up to date (open decision 19 (a)). Held (c) changes `compute`, `createDerivedNode`, `recompute`, `bringUpToDate`, and `settle` as open decision 19 states, after its two open choices (how the drained height reaches `compute`, and the abandon's type) are made.
 
-`normalizeData` runs `settle` after `normalize` and `markChanged` and before the root hold (change 3). The root hold queues nothing: every derived node it recomputes is `Stale` or new, and the dependents of a `Stale` node are `Stale`. So the queue is empty when `notify` runs. `garbageCollectEnvironment` runs `settle` and then `notify` after `collect`: a needed derived node that read a deleted record was queued by `deleteSource`'s invalidation and recomputes to `MissingData`, and a node disposed while `Queued` left its bucket when it was disposed.
+`normalizeData` runs `settle` after `normalize` and `markChanged` and before the root hold (change 3). The root hold queues nothing: every derived node it recomputes is `Stale` or new, and the dependents of a `Stale` node are `Stale`. So the queue is empty when `notify` runs.
+
+A response that throws part-way must settle too. From this change `markChanged` queues needed derived nodes, so `writeOrMark` as change 2 wrote it, which marks the `PartialWriteError`'s changes and rethrows, would leave them `Queued` when `normalizeData` throws: the invariant that no derived node is `Queued` when `normalizeData` returns breaks, and the observers of what the write changed are not called. Changes 2 and 3 have no queue, so their marking of a partial write is complete.
+
+```ts
+// from libs/isograph-runtime/src/environment.ts
+// normalizeData, before (change 3):
+  markChanged(
+    environment.graph,
+    writeOrMark(environment, entrypoint.normalizationAst, response, variables).map(changeSource),
+  );
+  return retainEntrypoint(environment, entrypoint, variables);
+// after:
+  markChanged(
+    environment.graph,
+    writeOrMark(environment, entrypoint.normalizationAst, response, variables).map(changeSource),
+  );
+  settle(environment.graph);
+  const retention = retainEntrypoint(environment, entrypoint, variables);
+  notify(environment.graph);
+  return retention;
+
+// writeOrMark, before (change 2):
+/** `normalize`'s changes; on a `PartialWriteError`, marks its changes before rethrowing. */
+function writeOrMark(
+  environment: IsographEnvironment,
+  ast: NormalizationAst,
+  response: JsonObject,
+  variables: Variables,
+): ReadonlyArray<StoreChange> {
+  try {
+    return normalize(environment.store, ast, response, variables);
+  } catch (error: unknown) {
+    if (error instanceof PartialWriteError) {
+      markChanged(environment.graph, error.changes.map(changeSource));
+    }
+    throw error;
+  }
+}
+// after:
+/** `normalize`'s changes; on a `PartialWriteError`, marks its changes, settles, and notifies
+ * before rethrowing. */
+function writeOrMark(
+  environment: IsographEnvironment,
+  ast: NormalizationAst,
+  response: JsonObject,
+  variables: Variables,
+): ReadonlyArray<StoreChange> {
+  try {
+    return normalize(environment.store, ast, response, variables);
+  } catch (error: unknown) {
+    if (error instanceof PartialWriteError) {
+      markChanged(environment.graph, error.changes.map(changeSource));
+      settle(environment.graph);
+      notify(environment.graph);
+    }
+    throw error;
+  }
+}
+```
+
+The partial write retains nothing: `retainEntrypoint` does not run, as in change 3. `notify` never throws (open decision 9), so the rethrown error is the `PartialWriteError`. `settle` throws only when a computation throws outside its resolver (open decision 22); under 22's held (a) it does not, so the `PartialWriteError` is not replaced by another error. The doc comment of `normalizeData` (change 3) gains: "On a `PartialWriteError`, settles and calls observers before rethrowing it." `garbageCollectEnvironment` runs `settle` and then `notify` after `collect`: a needed derived node that read a deleted record was queued by `deleteSource`'s invalidation and recomputes to `MissingData`, and a node disposed while `Queued` left its bucket when it was disposed.
 
 ```ts
 // from libs/isograph-runtime/src/environment.ts
@@ -2490,6 +2551,7 @@ An observer keeps its derived node current (it makes the node needed, so a write
 - Link move under an observer at `FriendPage`: `Pet:1.bestFriend` moves to `Pet:3` (with `name` and `nickname`): inside that `normalizeData`, `FriendLabel` is called once and `PetName` on `Pet:3` once. Then `Pet:2.name` changes: no resolver is called. Then `Pet:3.name` changes: `PetName` on `Pet:3`, `FriendLabel`, `FriendCard`, and `FriendPage` are called once each.
 - An observer at `FriendPage` whose retention was disposed: `garbageCollectEnvironment` deletes the records, calls the observer once inside it, `snapshot` returns `undefined`, and `environment.store` is `toEqual(new Map())`.
 - A callback that calls `normalizeData` with another change: the nested call notifies; each observer receives each result once.
+- A partial write under an observer at `BadgePage`: a response that changes `Pet:1.name` from `Rex` to `Max` and then throws: inside that `normalizeData`, `Initial`, `Monogram`, `Signature`, `Badge`, and `BadgePage` are each called once, the observer is called once, and then `normalizeData` throws the `PartialWriteError`; `snapshot` at `BadgePage` returns the new result.
 - A callback that throws, with `queueMicrotask` stubbed as `test/subscribe.test.ts`'s `stubQueueMicrotask` does: the other observers are still called, `normalizeData` returns its `Retention`, and running the queued task throws the callback's error; two that throw queue two tasks, one per error.
 
 ## Docs this doc amends
