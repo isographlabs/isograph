@@ -2550,12 +2550,12 @@ The engine is general over derived node kinds only as far as the follow-ups that
 
 - `@component`: a component is a resolver result, stored and settled like any other; a mounted component observes its own derived node.
 - Client pointers, `@loadable`, refetch queries (reader-ast.md, Later): each adds derived nodes or retentions, and the markers of normalization-ast-mount-markers.md.
-- Optimistic writes: a layer of server entries that settlement reads through. What the layered store must report to the recomputation engine is The engine, the store, and the environment, What the environment must report.
+- Optimistic writes: a layer of server entries that settlement reads through, and later a tree of them (Follow-ups 12). What the layered store must report to the recomputation engine is The engine, the store, and the environment, What the environment must report.
 - Eager client pointers: a pointer node that reads client fields on its target lets a derived node of a field read a derived node of the same field on another record. The pull orders it (open decision 14); a cycle of derived nodes through the pointer is open decision 18.
 
 ## Follow-ups
 
-The user's design notes, recorded for later. None of them is part of Step A or changes 1 to 4, and none is approved; 10 is the user's planned addition, and 11 is held. Upstream paths here follow the doc's convention; `isograph-react-disposable-state/` paths are under `isograph/libs/isograph-react-disposable-state/src`, and `isograph-disposable-types/` paths are under `isograph/libs/isograph-disposable-types/src`.
+The user's design notes, recorded for later. None of them is part of Step A or changes 1 to 4, and none is approved; 10 is the user's planned addition, 11 is held, and 12 is a stated goal that constrains changes 2 to 4. Upstream paths here follow the doc's convention; `isograph-react-disposable-state/` paths are under `isograph/libs/isograph-react-disposable-state/src`, and `isograph-disposable-types/` paths are under `isograph/libs/isograph-disposable-types/src`.
 
 ### 1. Constructors and destructors at normalization time
 
@@ -2688,6 +2688,34 @@ Why a complete read implies that the normalization AST's data is present:
 Components (later): a component field's data is read at render (components-in-userland.md, A field whose result is a closure), so the root derived node does not cover it unless each component field has a data derived node computed with the root (components-in-userland.md, Under changes 2 to 4, and its open question 3). Until then, an entrypoint that reaches a component field needs `check`.
 
 `check` stays a plain function exported from the package index (`libs/isograph-runtime/src/index.ts:43`); `test/check.test.ts` calls it.
+
+### 12. Forks: a tree of optimistic worlds
+
+A stated goal, not built now. Changes 2 to 4 must keep the constraint below so that forks can be added without redesign.
+
+Upstream keeps optimistic state as a stack of layers:
+
+- Storage. `environment.store` is the child-most layer (`isograph/libs/isograph-react/src/core/IsographEnvironment.ts:74`). Each layer has a `parentStoreLayer` and one `childStoreLayer`, and holds `data: StoreLayerData`, a sparse map from typename and id to a partial record of plain values, in which a `null` record is a deletion (`IsographEnvironment.ts:165-169`). The base layer's child is an optimistic layer or none; the other kinds are network response, `startUpdate`, optimistic network response, and optimistic updater layers (`optimisticProxy.ts:100-159`).
+- Reads. A read of a field walks from the child-most layer toward the base and returns the first value a layer holds; a layer that holds `null` for the record ends the walk as absent (`getStoreRecordProxy`, `optimisticProxy.ts:24-44`; `getMutableStoreRecordProxy`, `:46-98`, the field walk at `:53-69`). A write through the proxy goes to the child-most layer (`:89-95`).
+- An optimistic response. `makeOptimisticUpdate` pushes an optimistic network response layer, normalizes the optimistic response into it, and calls `callSubscriptions` with the records it wrote (`makeNetworkRequest.ts:495-544`; `addOptimisticNetworkResponseStoreLayer`, `optimisticProxy.ts:268-289`).
+- A network response under an optimistic layer. `addNetworkResponseStoreLayer` writes into the base or a network response layer when that is the child-most layer, and otherwise pushes a new network response layer above the optimistic one, so an unrelated response shadows the optimistic values for the fields it writes (`optimisticProxy.ts:161-183`; called at `makeNetworkRequest.ts:254` and `writeData.ts:39`). A `startUpdate` above an optimistic layer becomes a `startUpdate` layer that keeps its updater for re-execution, and one on the base layer writes into it (`addStartUpdateStoreLayer`, `optimisticProxy.ts:203-240`).
+- Commit and rollback. Upstream never merges an optimistic layer into its parent; it always reverts it. When the real response arrives, `revertOptimisticStoreLayerAndMaybeReplace` empties the optimistic layer, normalizes the response into a new network response layer in its place (`optimisticProxy.ts:406-431`), re-runs the updater of every `startUpdate` and optimistic updater layer above it and keeps the network response layers (`reexecuteUpdatesAndMergeData`, `:332-364`), and splices the optimistic layer out: into the base, by merging every layer down to the next optimistic one (`mergeLayersWithDataIntoBaseLayer`, `:303-316`, used at `:451-459`), or by merging two adjacent network response layers (`:460-477`), or by relinking (`:478-486`). On a network error and on dispose the same function runs with no response, which is rollback (`makeNetworkRequest.ts:305-316`, `:322-334`). Merging the layers that cannot be reverted into the base is upstream's commit.
+- Notification. After a revert, `compareData` compares the merged data of the reverted layers with the merged data that replaced them, by record, each field by `!==` ("TODO: compare links, compare arrays", `optimisticProxy.ts:506-544`, the comparison at `:533-534`), and `callSubscriptions` re-reads every subscription whose records overlap the changed ones (`:488-492`; `subscribe.ts:63-109`).
+- Garbage collection runs only when the base layer is the only layer (`garbageCollection.ts:65-68`).
+
+A fork generalizes upstream's stack to a tree of layers. A stack is a tree with one path. A world is a path from the base layer to a layer, and a read in world `W` takes, for each location, the value of the deepest layer on `W`'s path that holds it, which is upstream's read when the tree has one path. Two forks of one parent are two worlds that share the parent's layers and nothing below their fork point, such as two optimistic mutations a user can confirm or cancel independently, or a transition's world beside the committed one.
+
+The constraint on changes 2 to 4. A derived node's state in one world (its value, its mark, and the dependencies of the computation that produced that value) lives together in one record, `DerivedNodeState`, and the engine reads and writes it only through one accessor, `stateOf` (change 2, The engine). Later, that record is layered per world: `states: Map<Layer, DerivedNodeState>` on the derived node, and `stateOf` in world `W` takes the state of the deepest layer on `W`'s path. What is not per world stays on the node: its id, owner, computation, and dependents. Effects run only in the committed world (Values with lifecycles): a pull in a fork runs computations and sets up nothing.
+
+Future work that follows from the layering:
+
+- The accessor. A read in `W` must not copy an inherited state, or the copy goes stale when the ancestor's state changes; a write in `W` must not change a state `W` inherits. The layered `stateOf` copies the inherited record into `W`'s layer before a write.
+- Dependents are the union across worlds: a derived node is in a source's or node's `dependents` while any layer's state lists that dependency.
+- Heights: none under held 3b. Under 3a they would be the maximum across worlds.
+- 3b's marks are per layer. A write to layer `L` marks the states of `L` and of every layer below `L` in the tree, since every world through `L` reads it; a node whose state in `L` is inherited gets its own marked state in `L`.
+- Sources follow the same rule. Under open decision 29 (a) a source cell holds one value per layer that wrote it, and a read in `W` takes the deepest on `W`'s path.
+- Garbage collection roots become (derived node, world) pairs; a root hold and an observer belong to a world.
+- Committing a layer merges its overrides, the source values and derived node states it holds, into its parent, and its children re-parent to the parent; a removed layer's overrides are dropped, and the environment marks each location whose effective value changed in each world below it (The engine, the store, and the environment, What the environment must report).
 
 ## Open decisions
 
