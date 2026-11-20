@@ -107,7 +107,7 @@ Chain, `Pet:2.name`: the `FriendPage` component and the `PetSummary` component b
 - Equality cutoff: at the subscription only, on the data the reader AST selects, where structural comparison is well-defined; the merge keeps the old object, so a subscription's data keeps its identity across an equal re-read. No resolver output is compared except as a nested value by `===`: a nested resolver that returns a new object makes its parent's data unequal on every re-read.
 - Against the requirements: fails R1 (the render calls the fragment's resolver, and the first render reads the store), R2 (nothing is computed at normalization), R3's "nothing twice" (a shared resolver runs once per subscription, and once per path inside one), and R6. Meets R5 for the subscription callbacks and R7. Of R4's optimization it has none below the subscription: every resolver under an overlapping subscription runs.
 
-Step A is this candidate with v1's `read` and no overlap filter.
+Step A, landed, is this candidate with `readButDoNotEvaluate` and no overlap filter.
 
 ### Candidate 2: pico's pull, epochs and verification
 
@@ -582,9 +582,9 @@ A cleanup is never called twice by the engine; a handle's own second-call throw 
 
 Depends on the held architecture (3a with heights per derived node and `Stale` marks) in changes 2 to 4.
 
-Each change is one commit, in order; change 2 is two. Step A is optional and independent of 1 to 4.
+Each change is one commit, in order; change 2 is two. Step A has landed and is independent of 1 to 4.
 
-- Step A. Re-read every subscription after each write, upstream's mechanism, with v1's `read`. No memoization.
+- Step A (landed). Re-read every subscription after each write, upstream's mechanism, with `readButDoNotEvaluate`. No memoization.
 - 1. Leaf selections in the normalization AST record their list depth, and `normalize` skips an unchanged value and returns the changes it made (prefactor). `Store` stays store.md's nested map.
 - 2a. `graph.ts`, the engine's lazy half, over opaque `SourceId`s and `DerivedNodeId`s, importing nothing from the store, the reader, or the environment: derived nodes, `setDependencies`, `markChanged` marking `Stale`, `bringUpToDate`, `track`, `deleteSource`. Its tests use literal ids.
 - 2b. Stored resolver results. The environment gains `graph`. The reader's walk takes `ReadHooks`, and `readStoredResult` reads a resolver through the graph, storing each resolver's result with its dependencies and their inverse. `normalizeData` marks `Stale` every derived node that read what `normalize` changed and every node that reads those, transitively, stopping at a node already `Stale`; `garbageCollectEnvironment` does the same for each record `garbageCollect` deleted and disposes the derived nodes the record owned. A read of a `Stale` derived node recomputes it, each node it reads brought up to date by that read first. There are no observers, so nothing is needed, nothing is queued, and no height exists.
@@ -595,43 +595,80 @@ Values with lifecycles (open decision 13) adds no change here: it is a later cha
 
 ## Step A: re-read every subscription after each write
 
-A step close to upstream that lets a React demo exist before the memoized runtime. It is not the final design: it is read-plus-subscribe, with the read on every write.
+Landed (open decision 10, taken as (a)). Step A is network-and-subscriptions.md's Subscriptions (`refactors/pending/runtime/network-and-subscriptions.md:16`, `:1597`), in `libs/isograph-runtime/src/subscribe.ts`. It is close to upstream and is not the final design: it is read-plus-subscribe, with the read on every write.
 
 ```ts
 // from libs/isograph-runtime/src/subscribe.ts
-export type Subscription = {
-  readonly artifact: ReaderArtifact<ResolverParam, unknown>;
-  readonly root: StoreLink;
-  readonly variables: Variables;
-  /** The data the callback last received the result of. */
-  delivered: ReadResult<SelectionSetData>;
-  /** A method signature, so a `Subscription<T>` callback is assignable (reader-ast.md, Why `resolver` is a method signature). */
-  callback(result: ReadResult<unknown>): void;
+/** What a subscription delivers: the reader's data, `MissingData`, or what the read threw. */
+export type SubscriptionResult =
+  | ReadOk<SelectionSetData>
+  | ReadMissingData
+  | ReadErr;
+
+/** A read that threw: a nested resolver threw, or a store invariant broke (store.md, Errors). */
+export type ReadErr = {
+  readonly kind: 'Err';
+  readonly error: unknown;
 };
 
-/** Adds a subscription to `subscriptions`, with `delivered` read now. Returns the function that removes it. */
-export function subscribe<TOutput>(
-  store: Store,
-  subscriptions: Set<Subscription>,
-  artifact: ReaderArtifact<ResolverParam, TOutput>,
-  root: StoreLink,
+export type Subscription = {
+  readonly artifact: ReaderArtifact<ResolverParam, unknown, EntityName>;
+  readonly root: StoreLink;
+  readonly variables: Variables;
+  /** The result last read: at subscribe, or the last one the callback received. */
+  delivered: SubscriptionResult;
+  readonly callback: (result: SubscriptionResult) => void;
+  /** Called after each change to `delivered`, after `callback`. */
+  readonly listeners: Set<() => void>;
+};
+
+/**
+ * Reads `readerArtifact` at `link` now and subscribes: after every write, re-reads and calls
+ * `callback` when the result changed. Returns the subscription, whose `subscriptionSnapshot`
+ * is the read, and the cleanup that unsubscribes.
+ */
+export function readAndSubscribe<TEntityName extends EntityName>(
+  environment: IsographEnvironment,
+  readerArtifact: ReaderArtifact<
+    ResolverParam<TEntityName>,
+    unknown,
+    TEntityName
+  >,
+  link: NoInfer<Link<TEntityName>>,
   variables: Variables,
-  callback: (result: ReadResult<TOutput>) => void,
+  callback: (result: SubscriptionResult) => void,
+): ItemCleanupPair<Subscription>;
+
+/** The subscription's last result: the same object until a write changes the read. */
+export function subscriptionSnapshot(
+  subscription: Subscription,
+): SubscriptionResult;
+
+/** Calls `listener` after each change to `subscriptionSnapshot(subscription)`, until the
+ * returned function is called. */
+export function listenToSubscription(
+  subscription: Subscription,
+  listener: () => void,
 ): () => void;
 
-/** Re-reads every subscription's data and calls its callback with the resolver's result when the data changed. */
-export function callSubscriptions(
-  store: Store,
-  subscriptions: ReadonlySet<Subscription>,
-): void;
+/**
+ * Re-reads every subscription in `environment.subscriptions`, in insertion order, and calls
+ * each one's callback when its result changed. Never throws.
+ */
+export function callSubscriptions(environment: IsographEnvironment): void;
+
+/** Calls `f`; a throw is rethrown in its own microtask, so it reaches the host's uncaught-error
+ * handler and does not stop the caller. */
+export function reportCallbackError(f: () => void): void;
 ```
 
-- The caller holds the `Set`, as v1's caller holds the retained list (store.md, `garbageCollect`); upstream holds it on the environment (`IsographEnvironment.ts:80`). The write site calls `callSubscriptions` after `normalize`, as upstream's write sites do (`makeNetworkRequest.ts:271`, `:542`, `writeData.ts:55`).
-- `callSubscriptions` reads each subscription's data with v1's `readSelectionSet` (exported from `read.ts`), compares it with `delivered` by upstream's rule (`mergeObjectsUsingReaderAst`, `areEqualWithDeepComparison.ts:55-121`: store data along the reader AST, scalars by `===`, lists item by item, linked selections recursively; nested `Resolver` values by `===`, `:84-95`), and when unequal stores it and calls the callback with `ok(artifact.resolver({ data, parameters: variables }))`, or with the `MissingData`.
-- No overlap filter: v1's `normalize` records no `EncounteredIds` (store.md, `normalize`), so every subscription is re-read, where upstream skips the ones whose records do not overlap (`subscribe.ts:74-79`).
+- The subscriptions live on the environment (`environment.subscriptions`, `libs/isograph-runtime/src/environment.ts`), as upstream's do (`IsographEnvironment.ts:80`). `makeNetworkRequest` calls `callSubscriptions(environment)` after `normalize` (`libs/isograph-runtime/src/network.ts:143-149`), as upstream's write sites do (`makeNetworkRequest.ts:271`, `:542`, `writeData.ts:55`).
+- Each read is `readButDoNotEvaluate` (`readSubscription`, `subscribe.ts:120-131`): the reader's data with every nested resolver called, and the subscription's own resolver not called. A throw from the read becomes `ReadErr`. The callback receives the `SubscriptionResult`, not the resolver's value; react.md's hook calls the resolver in render (react.md, Reading, `useResult`).
+- `callSubscriptions` compares each re-read with `delivered` (`subscriptionResultsAreEqual`, `subscribe.ts:135-155`): `Ok` results by `selectionSetDataAreEqual` (`areEqualWithDeepComparison.ts`, upstream's `mergeObjectsUsingReaderAst` rule without the recycling: store data along the reader AST, scalars by `===`, lists item by item, linked selections recursively, nested `Resolver` values by `===`), two `MissingData` as equal, two `Err` by `===` of their errors. When unequal it sets `delivered`, then calls the callback and each listener through `reportCallbackError`.
+- No overlap filter: store.md's `normalize` records no `EncounteredIds`, so every subscription is re-read, where upstream skips the ones whose records do not overlap (`subscribe.ts:74-79`).
 - Order does not matter for correctness: every re-read runs after the write finished and reads the whole store, so nothing reads a stale input. Nothing is shared: a resolver two subscriptions reach runs once per subscription per write.
 
-Costs: every write re-reads every subscription and re-runs every nested resolver under it; a nested resolver that returns a new object makes its parent's data unequal on every write (upstream has the same, `areEqualWithDeepComparison.ts:84-95`), so its callback fires on every write. With the callback being React's `setState`, a demo renders correctly and slowly. Changes 1 to 4 replace it; nothing in them builds on it.
+Costs: every write re-reads every subscription and re-runs every nested resolver under it; a nested resolver that returns a new object makes its parent's data unequal on every write (upstream has the same, `areEqualWithDeepComparison.ts:84-95`), so its callback fires on every write. With the callback being React's `setState`, a demo renders correctly and slowly. Changes 1 to 4 keep it (change 2b's `makeNetworkRequest` calls `callSubscriptions` after `normalizeData`); nothing in them builds on it.
 
 ## End-user experience
 
@@ -2573,10 +2610,10 @@ Not held.
 
 ### 10. Step A
 
+Taken: (a). Step A landed as network-and-subscriptions.md's `readAndSubscribe`, `subscriptionSnapshot`, `listenToSubscription`, and `callSubscriptions` (`libs/isograph-runtime/src/subscribe.ts`), and network-and-subscriptions.md records this decision as taken (`refactors/pending/runtime/network-and-subscriptions.md:1597`).
+
 - (a) Ship it before change 1, for a React demo.
 - (b) Skip it. Cost: no React demo until change 4.
-
-Not held: the user's choice.
 
 ### 11. When a derived node no root reaches is deleted
 
