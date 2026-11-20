@@ -525,7 +525,7 @@ These types replace change 2's `Computation<TValue>`. `DerivedNode.value` become
 
 ```ts
 // from libs/isograph-runtime/src/graph.ts
-/** Runs and empties `pendingReleases` in order; then rethrows one error, or an `AggregateError` of several. */
+/** Runs and empties `pendingReleases` in order, each cleanup through `reportCallbackError`. Never throws. */
 export function flushReleases<TValue>(graph: RecomputationGraph<TValue>): void;
 ```
 
@@ -563,7 +563,7 @@ A constructor that throws. Options:
 
 A destructor that throws. Options:
 
-- (a) `flushReleases` runs every remaining cleanup, then rethrows one error as is or several as an `AggregateError`, open decision 9's rule; `normalizeData` and `garbageCollectEnvironment` combine them with `notify`'s errors into one `AggregateError` when both threw. The derived node is unaffected: it dropped the value before the cleanup ran. Held.
+- (a) `flushReleases` runs each cleanup through `reportCallbackError`, open decision 9's rule: a throw is rethrown in its own microtask, and the remaining cleanups run. `flushReleases`, `normalizeData`, and `garbageCollectEnvironment` do not throw on a destructor's error. The derived node is unaffected: it dropped the value before the cleanup ran. Held.
 - (b) Stop at the first throw. Cost: later resources leak.
 
 A cleanup is never called twice by the engine; a handle's own second-call throw (`CacheItem.ts:125-130`) is not reachable from it.
@@ -2295,7 +2295,8 @@ export function observe<TValue>(
 /** The derived node's value as of its last computation, or `undefined` when no node is stored. Computes nothing. */
 export function valueOf<TValue>(graph: RecomputationGraph<TValue>, id: DerivedNodeId): TValue | undefined;
 
-/** Calls each observer whose derived node's value is not `===` its `notified`; open decision 9's error rule. */
+/** Calls each observer whose derived node's value is not `===` its `notified`, each callback through
+ * `reportCallbackError` (open decision 9). Never throws. */
 export function notify<TValue>(graph: RecomputationGraph<TValue>): void;
 ```
 
@@ -2331,7 +2332,7 @@ The returned function removes the callback, subtracts one from `rootCount` and c
 
 A location that is `Stale` when a component first renders: `snapshot` returns the last computed result (R1: it computes nothing). `listen`, in React's subscribe, brings it up to date, and `useSyncExternalStore` compares the snapshot after subscribing and renders again with the current result. Open decision 3.
 
-Notification, after settlement in `normalizeData` and `garbageCollectEnvironment`: for each `Observed` in `graph.observers` in insertion order, the derived node's value is compared by identity with `notified`; when different, `notified` is set and each callback is called once. Identity suffices because `recompute` keeps the value object when `valuesEqual` holds. An observed resolver that returns a new object on every recomputation notifies on every recomputation (R4); a stable identity for it would come from upstream's merge of the data it reads, not from comparing its output. Callbacks that throw do not stop the loop; after it, one error is rethrown as is and several as an `AggregateError` (open decision 9). The loop is `O(observers)`; a list of the observed derived nodes `recompute` changed would make it `O(changed)`, and is not needed while observers are the mounted components of one screen.
+Notification, after settlement in `normalizeData` and `garbageCollectEnvironment`: for each `Observed` in `graph.observers` in insertion order, the derived node's value is compared by identity with `notified`; when different, `notified` is set and each callback is called once. Identity suffices because `recompute` keeps the value object when `valuesEqual` holds. An observed resolver that returns a new object on every recomputation notifies on every recomputation (R4); a stable identity for it would come from upstream's merge of the data it reads, not from comparing its output. Each callback is called through `reportCallbackError` (`libs/isograph-runtime/src/subscribe.ts:157-167`), as `callSubscriptions` calls each subscription's callback and listeners: a throw is rethrown in its own microtask, the loop continues, and `notify` never throws (open decision 9). `graph.ts` imports nothing but `util.ts`, so change 4 moves `reportCallbackError` from `subscribe.ts` to `util.ts`, unchanged; `subscribe.ts` and `network.ts` import it from there. The loop is `O(observers)`; a list of the observed derived nodes `recompute` changed would make it `O(changed)`, and is not needed while observers are the mounted components of one screen.
 
 What each level owns:
 
@@ -2363,7 +2364,7 @@ An observer keeps its derived node current (it makes the node needed, so a write
 - Link move under an observer at `FriendPage`: `Pet:1.bestFriend` moves to `Pet:3` (with `name` and `nickname`): inside that `normalizeData`, `FriendLabel` is called once and `PetName` on `Pet:3` once. Then `Pet:2.name` changes: no resolver is called. Then `Pet:3.name` changes: `PetName` on `Pet:3`, `FriendLabel`, `FriendCard`, and `FriendPage` are called once each.
 - An observer at `FriendPage` whose retention was disposed: `garbageCollectEnvironment` deletes the records, calls the observer once inside it, `snapshot` returns `undefined`, and `environment.store` is `toEqual(new Map())`.
 - A callback that calls `normalizeData` with another change: the nested call notifies; each observer receives each result once.
-- A callback that throws: the other observers are still called, then `normalizeData` throws it; two that throw give an `AggregateError` of both.
+- A callback that throws, with `queueMicrotask` stubbed as `test/subscribe.test.ts`'s `stubQueueMicrotask` does: the other observers are still called, `normalizeData` returns its `Retention`, and running the queued task throws the callback's error; two that throw queue two tasks, one per error.
 
 ## Docs this doc amends
 
@@ -2623,8 +2624,11 @@ Not held.
 
 ### 9. Callback errors
 
-- (a) Call every callback, then rethrow one error or an `AggregateError` (held). Reason: one failing observer must not leave others stale.
+Settled: (c), the landed rule. `callSubscriptions` calls each callback and listener through `reportCallbackError`, which never throws (`libs/isograph-runtime/src/subscribe.ts:96-118`, `:157-167`), and network-and-subscriptions.md settles it (Decisions, 3. A callback that throws, (a); its Deltas from Step A replace this decision's former (a)). Change 4's `notify` and the later `flushReleases` follow it.
+
+- (a) Call every callback, then rethrow one error or an `AggregateError`. Cost: the `normalizeData` whose response was written throws for an observer's failure, so the request that called it becomes `Err`, a failure the network did not have (network-and-subscriptions.md, Decisions, 3 (c)).
 - (b) Propagate the first throw. Cost: later observers miss the change until the next write.
+- (c) Call each callback through `reportCallbackError`: a throw is rethrown in its own microtask, so it reaches the host's uncaught-error handler, and the loop continues. Cost: the error surfaces with no stack frame of the write that caused it, and a test that expects it stubs `queueMicrotask`.
 
 ### 10. Step A
 
@@ -2651,7 +2655,7 @@ Settled: (a).
 
 The analysis is Values with lifecycles.
 
-- (a) The engine owns each derived node's value lifecycle (held): `Disposable` computations return an `ItemCleanupPair`; a new value is constructed before the old is released; releases are deferred until after notification and flushed in order; a `===` value keeps the old holding and releases the new retain at once. A constructor that throws stores `ResolverThrew` and releases the old value (held); a destructor that throws does not stop the flush, and the errors are rethrown together (held).
+- (a) The engine owns each derived node's value lifecycle (held): `Disposable` computations return an `ItemCleanupPair`; a new value is constructed before the old is released; releases are deferred until after notification and flushed in order; a `===` value keeps the old holding and releases the new retain at once. A constructor that throws stores `ResolverThrew` and releases the old value (held); a destructor that throws is reported by `reportCallbackError` and does not stop the flush (held, open decision 9).
 - (b) Lifecycles outside the engine: a disposable value lives in a registry the resolver's code calls, and the engine stores only the handle. Cost: nothing releases a handle when the derived node's value is replaced or the node is disposed, so the registry needs its own reachability, which is the engine's again.
 
 Not decided: the user's choice.
