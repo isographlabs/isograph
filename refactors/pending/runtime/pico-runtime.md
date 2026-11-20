@@ -2505,6 +2505,59 @@ export function snapshot(
 
 The returned function removes the callback, subtracts one from the `rootCount` of the derived node stored at `id` when there is one, and removes the `Observed` when it has no callback left. When no derived node is stored at `id`, `observe` only registers, and `createDerivedNode` starts the node's `rootCount` at the callbacks there.
 
+A derived node created at an observed id outside a write. `listen` at a location with no stored derived node only registers, and `snapshot` returns `undefined`. When a later call creates the node, `snapshot` changes from `undefined` to a result, and its observers must be called. Inside `normalizeData` and `garbageCollectEnvironment` the `notify` that ends the write calls them, because `notified` is `undefined`. Outside a write two calls create a resolver derived node: `readStoredResult` (through `track`) and `retainQueryWithoutMakingNetworkRequest` (through `retainEntrypoint` and `retainRoot`, change 3, Serving from the store), which runs no `notify`. Without a call there, the observer is never called for the created value, and a component rendering `undefined` stays on it until a write changes the node.
+
+```ts
+// from libs/isograph-runtime/src/graph.ts
+export type RecomputationGraph<TValue> = {
+  // .. change 2's fields, `observers`, and:
+  /** The ids, each with an `Observed` in `observers`, at which `createDerivedNode` created a derived
+   * node since the last notification. Emptied by `notify` and `notifyCreated`. */
+  readonly createdObserved: Set<DerivedNodeId>;
+};
+
+/** For each id in `createdObserved`: when the derived node's value is not `===` its `notified`, sets
+ * `notified` and calls each callback through `reportCallbackError`. Empties the set. Never throws. */
+export function notifyCreated<TValue>(graph: RecomputationGraph<TValue>): void;
+```
+
+`createDerivedNode` adds `id` to `graph.createdObserved` after storing the node when `graph.observers` holds an `Observed` at `id`, where it already starts `rootCount` at that `Observed`'s callbacks. `notify` empties the set after its loop, which already compares every observer. `createGraph` starts the set empty.
+
+```ts
+// from libs/isograph-runtime/src/storedResults.ts
+// readStoredResult, before (change 2):
+  return track(
+    environment.graph,
+    resolverDerivedNode(root, resolverStoreKey(artifact.selectableName, variables)),
+    () => resolverDefinition(environment.store, artifact, root, variables),
+  ) as ResolverResult<TOutput>;
+// after:
+  const result = track(
+    environment.graph,
+    resolverDerivedNode(root, resolverStoreKey(artifact.selectableName, variables)),
+    () => resolverDefinition(environment.store, artifact, root, variables),
+  ) as ResolverResult<TOutput>;
+  notifyCreated(environment.graph);
+  return result;
+```
+
+```ts
+// from libs/isograph-runtime/src/network.ts
+// retainQueryWithoutMakingNetworkRequest, before (change 3):
+  let status: RetentionStatus = {
+    kind: 'Undisposed',
+    retention: retainEntrypoint(environment, entrypoint, variables),
+  };
+// after:
+  let status: RetentionStatus = {
+    kind: 'Undisposed',
+    retention: retainEntrypoint(environment, entrypoint, variables),
+  };
+  notifyCreated(environment.graph);
+```
+
+A pull that creates derived nodes below the one it was asked for can create one at an observed id too; the same set holds it. A `readStoredResult` that `storedResultHooks` makes during `callSubscriptions` can therefore call level 2 observers in the middle of the subscription re-reads; every value they read is current, because the write's `settle` ran first. Cost: one `Map` lookup per created derived node, and one empty-set check per `readStoredResult`. A `readStoredResult` made during a React render that creates an observed node calls observers during that render, which React reports as an update during render; the React package renders from `snapshot`, which creates nothing. The alternative, `listen` taking the location's definition and creating the node itself, makes `snapshot` defined from `listen` on, and still needs this for a node created at an id that `listen` was given without a definition.
+
 A location that is marked when a component first renders: `snapshot` returns the last computed result (R1: it computes nothing). `listen`, in React's subscribe, brings it up to date, and `useSyncExternalStore` compares the snapshot after subscribing and renders again with the current result. Open decision 3.
 
 Notification, after settlement in `normalizeData` and `garbageCollectEnvironment`: for each `Observed` in `graph.observers` in insertion order, the derived node's value is compared by identity with `notified`; when different, `notified` is set and each callback is called once. Identity suffices because `recompute` keeps the value object when `valuesEqual` holds, and a `Check` node verified without recomputing keeps it too. An observed resolver that returns a new object on every recomputation notifies on every recomputation (R4); a stable identity for it would come from upstream's merge of the data it reads, not from comparing its output. Each callback is called through `reportCallbackError` (`libs/isograph-runtime/src/subscribe.ts:157-167`), as `callSubscriptions` calls each subscription's callback and listeners: a throw is rethrown in its own microtask, the loop continues, and `notify` never throws (open decision 9). `graph.ts` imports nothing but `util.ts`, so change 4 moves `reportCallbackError` from `subscribe.ts` to `util.ts`, unchanged; `subscribe.ts` and `network.ts` import it from there. The loop is `O(observers)`; a list of the observed derived nodes `recompute` changed would make it `O(changed)`, and is not needed while observers are the mounted components of one screen.
@@ -2539,6 +2592,7 @@ An observer keeps its derived node current (`settle` pulls it after every write)
 - Link move under an observer at `FriendPage`: `Pet:1.bestFriend` moves to `Pet:3` (with `name` and `nickname`): inside that `normalizeData`, `FriendLabel` is called once and `PetName` on `Pet:3` once. Then `Pet:2.name` changes: no resolver is called. Then `Pet:3.name` changes: `PetName` on `Pet:3`, `FriendLabel`, `FriendCard`, and `FriendPage` are called once each.
 - An observer at `FriendPage` whose retention was disposed: `garbageCollectEnvironment` deletes the records, calls the observer once inside it, `snapshot` returns `undefined`, and `environment.store` is `toEqual(new Map())`.
 - A callback that calls `normalizeData` with another change: the nested call notifies; each observer receives each result once.
+- A derived node created at an observed location outside a write: `listen` at `BadgePage`'s location with `{ id: "1" }` on an empty store; `snapshot` returns `undefined`. `normalizeData` of `PetDetail`'s response, then `fetchEntrypoint` of `BadgePage` with `shouldFetch` `IfNecessary`, which serves from the store: the observer is called once, inside `fetchEntrypoint`, and `snapshot` returns the `Ok` result. In another environment, `listen` at `Badge` on `Pet:1`, then `normalizeData` of `PetDetail`'s response, then `readStoredResult` of `BadgePage`'s reader artifact at `Query.__ROOT` with `{ id: "1" }`: the observer at `Badge` is called once, inside `readStoredResult`.
 - A partial write under an observer at `BadgePage`: a response that changes `Pet:1.name` from `Rex` to `Max` and then throws: inside that `normalizeData`, `Initial`, `Monogram`, `Signature`, `Badge`, and `BadgePage` are each called once, the observer is called once, and then `normalizeData` throws the `PartialWriteError`; `snapshot` at `BadgePage` returns the new result.
 - A callback that throws, with `queueMicrotask` stubbed as `test/subscribe.test.ts`'s `stubQueueMicrotask` does: the other observers are still called, `normalizeData` returns its `Retention`, and running the queued task throws the callback's error; two that throw queue two tasks, one per error.
 
