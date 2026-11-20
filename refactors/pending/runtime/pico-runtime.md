@@ -3003,3 +3003,38 @@ Under change 4, `bringUpToDate` deletes a `Queued` derived node from its bucket 
 
   `ReadErr` is the landed type of `subscribe.ts`, imported as a type. `createIsographEnvironment` passes `createGraph(resultsEqual, (error) => ({ kind: 'Err', error }))`; `resultsEqual` compares two `Err` by `===` of their errors, as `subscriptionResultsAreEqual` does; `contextHooks` returns `ReadHooks<ReadResolverThrew | ReadErr>`, so a nested `Err` passes up the walk unchanged (`allOk`), as a nested `ResolverThrew` does. A nested derived node's throw is caught by its own `compute`, so the outer `compute` catches only throws of the outer computation's own walk. `ResolverThrew` stays: it names the field and record whose resolver threw, where `Err` is a broken invariant of the store. An abandon under open decision 19 (c) is a returned value, not a throw, so (a) does not catch it.
 - (b) `bringUpToDate` restores the node and `settle` rethrows after draining the rest. `bringUpToDate` catches the throw, sets the node `Clean` with its old value and dependencies, and returns the error to `settle`; `settle` drains the rest of the queue, and `normalizeData` runs `notify` and then rethrows the first error, or an `AggregateError` of several. Cost: the node holds a value no current input explains, the stale-value cost of Values with lifecycles' failure (b); `normalizeData` throws for a broken store invariant after a response was written, so the request that called it becomes `Err`; and the read path needs the same restore in `createDerivedNode` and `recompute`.
+
+### 23. Two client fields of one name on an abstract entity and on a concrete entity
+
+A resolver derived node's id is (record, `resolverStoreKey(artifact.selectableName, variables)`) (change 2, The resolver store key), and the record is the concrete one: `normalize` stores a record under the entity its response object names (`recordEntityName`, `libs/isograph-runtime/src/recordId.ts:50-68`). A client field can be declared on an abstract entity and read on a concrete record: `field Node.NodeLink` (`libs/isograph-runtime/fixtures/store/src/NodeLink.ts`) is selected under `node(id: $id)` (`fixtures/store/src/Links.ts`), whose target is `interface Node`, and is read on `Pet:1` when the response's `__typename` is `Pet`.
+
+The compiler accepts `field Node.Label` beside `field Pet.Label` when `Pet` implements `Node`. Its one duplicate check is per (entity, selectable name): `selectable_definitions` counts the source declarations and the protocol's definition of `entity_name.selectable_name` (`crates/isograph_compiler/src/schema.rs:278-294`), and `selectable_named` reports "defined more than once" only for that pair (`:322-344`). A selection resolves on its parent's static entity, so `node(id: "1") { Label }` reads `Node.Label` and `pet(id: "1") { Label }` reads `Pet.Label` (`selectable_named(db, client, parent, name)`, `crates/isograph_compiler/src/merged_selection.rs:1105`, `:1321`). No check in `crates/isograph_compiler/src` relates a concrete entity's selectables to those of an abstract entity it implements. Both reads on `Pet:1` compute the id `resolverDerivedNode(Pet:1, "Label")`: the second read returns the first field's stored result, and `readStoredResult`'s invariant comment ("one selectable of one entity has one reader artifact") does not hold, because the record's entity is not the declaring entity.
+
+- (a) The resolver store key names the declaring entity. Held, not decided. The reader artifact carries it, and the key is `<declaring entity>.<selectable name>` and then the argument chunks: `Node.Label` and `Pet.Label` on `Pet:1` are two derived nodes. A GraphQL name cannot hold `.`, so the prefix of one field's key is never another field's. The body of this doc stays written with `selectableName` alone until this is decided; every key in it (`PetName`, `RecentCheckins____n___2`, `PetSummary____id___"1"`) gains its entity prefix under (a).
+
+  ```ts
+  // from libs/isograph-runtime/src/artifacts.ts
+  // ReaderArtifact, change 2's after, and:
+    /** The entity the client field is declared on: the parent entity, abstract or concrete. */
+    readonly parentEntityName: EntityName;
+  ```
+
+  ```ts
+  // from libs/isograph-runtime/src/storeKey.ts
+  // before (change 2):
+  export function resolverStoreKey(
+    selectableName: string,
+    variables: Variables,
+  ): StoreKey;
+  // after:
+  /** `parentEntityName`, `.`, `selectableName`, then one `____<name>___<stableStringify(value)>`
+   * chunk per entry of `variables`, names in code unit order. */
+  export function resolverStoreKey(
+    artifact: Pick<ReaderArtifact<ResolverParam, unknown, EntityName>, 'parentEntityName' | 'selectableName'>,
+    variables: Variables,
+  ): StoreKey;
+  ```
+
+  `reader_artifact_file` writes `parentEntityName: String(field.field.parent_entity_name)` before `selectableName`. Callers pass the artifact where they passed `artifact.selectableName` (`readStoredResult`, `contextHooks`, `retainEntrypoint`). Cost: a longer key per resolver read, and one more field per reader artifact.
+- (b) The compiler rejects `field Pet.Label` when an abstract entity that `Pet` implements declares a client field `Label`, and the reverse. Cost: a validation that reads the protocol's implements relation (`NetworkProtocol::concrete_types`, used at `crates/isograph_compiler/src/artifact_types.rs:901-923`) for every client field declaration, and a rule upstream does not state.
+- (c) Accept the collision. Cost: two different resolvers share one stored result on a record, with no error.
