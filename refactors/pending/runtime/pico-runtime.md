@@ -409,7 +409,7 @@ Held 3b's bound does not depend on equality cutoff, which stays a `===` optimiza
 
 Written for held 3b, and changed if another candidate is chosen: Steps; change 2 except The resolver store key and Results, equality, and a resolver that throws; Ordering; change 3's Computing the new root, Serving from the store, Unobserved results are lazy, and Garbage collection; change 4 except `listen`, `snapshot`, and `Observed`; the engine's functions in changes 2 to 4; Values with lifecycles' Reconciliation; the mentions of `dependents` and marking in Follow-ups 1, 8, 9, and 10; and open decisions 2, 3, 4, 6, 8, 11, 14, 15, 16, 18, 19, 22, 26, 27, and 28. Each of those sections in Steps and changes 2 to 4 opens with a line saying so.
 
-Independent of it: Two levels, Step A, End-user experience, change 1, The resolver store key with `ReaderArtifact.selectableName`, Results, equality, and a resolver that throws, change 3's `normalizeData` signature, `Retention`, and Resolver markers, change 4's `listen`, `snapshot`, and `Observed`, The engine, the store, and the environment, Other derived node kinds, Later, the rest of Follow-ups, and open decisions 1, 5, 7, 9, 10, 12, 13, 17, 20, 21, 23, 24, and 25.
+Independent of it: Two levels, Step A, End-user experience, change 1, The resolver store key with `ReaderArtifact.selectableName`, Results, equality, and a resolver that throws, change 3's `normalizeData` signature, `Retention`, and Resolver markers, change 4's `listen`, `snapshot`, and `Observed`, The engine, the store, and the environment, Other derived node kinds, Later, the rest of Follow-ups, and open decisions 1, 5, 7, 9, 10, 12, 13, 17, 20, 21, 23, 24, 25, and 29.
 
 ## The engine, the store, and the environment
 
@@ -2995,3 +2995,152 @@ Under held 3b a write only marks. Something must pull an observed derived node b
   - The notify loop finds the marked observed derived nodes by iterating `graph.observers`, as (a)'s does.
 
 The body is written for (a).
+
+### 29. Sources as cell objects
+
+A source is today an opaque `SourceId` string that `sources.ts` builds per read, and the engine finds a source's readers in `graph.sourceDependents: Map<SourceId, Set<DerivedNode>>` (change 2, The engine). The alternative stores each source as an object that carries its own readers, and the engine uses that object's identity.
+
+- (a) Each source is a cell object that carries its dependents. Held, not decided. A record field is stored as a `ValueCell`, `{ contents, dependents }`, instead of a raw value; a record's presence is a `RecordCell`, which also holds the derived nodes the record owns. The engine reads `cell.dependents` where it read `sourceDependents.get(id)`, and no id is built on a read. A deleted record drops its value cells, and with them their dependents sets. The body of this doc stays written for (b) until this is decided.
+- (b) `SourceId` strings and `sourceDependents`, as the body is written. Cost: two strings built per server read and a `Map` lookup per id in `setDependencies` (The engine, the store, and the environment, Costs of the ids), a `sourceDependents` entry per location read, deleted only when its last reader recomputes, and the `owned` map.
+
+Explicitly rejected, and not an option: storing derived nodes inside store records. Derived nodes stay in `graph.derivedNodes` under their `DerivedNodeId` (open decision 4 (a)); under (a) only sources move into the store.
+
+The engine's types under (a):
+
+```ts
+// from libs/isograph-runtime/src/graph.ts
+/** A value a computation can read. The engine holds the source's readers on it and never reads its value. */
+export type Source<TValue> = {
+  /** The derived nodes whose last computation read this source. Written only by `setDependencies`. */
+  readonly dependents: Set<DerivedNode<TValue>>;
+};
+
+/** A source whose deletion disposes the derived nodes created with it as owner: a record's presence. */
+export type OwnerSource<TValue> = Source<TValue> & {
+  /** The derived nodes created with this owner. Written only by `createDerivedNode` and `disposeDerivedNode`. */
+  readonly owned: Set<DerivedNode<TValue>>;
+};
+
+/** The recomputation graph: derived nodes by id. */
+export type RecomputationGraph<TValue> = {
+  readonly derivedNodes: Map<DerivedNodeId, DerivedNode<TValue>>;
+  /** Whether two values of a derived node are equal, for cutoff: `resultsEqual` in the runtime. */
+  readonly valuesEqual: (a: TValue, b: TValue) => boolean;
+};
+
+export type DerivedNode<TValue> = {
+  readonly id: DerivedNodeId;
+  /** The source whose deletion disposes this derived node: the presence of the record it was computed on. */
+  readonly owner: OwnerSource<TValue>;
+  readonly computation: Computation<TValue>;
+  /** The value, mark, and dependencies of the last computation. Read and written only through `stateOf`. */
+  readonly state: DerivedNodeState<TValue>;
+  /** Every derived node whose dependencies hold a `Derived` dependency on this one. Written only by `setDependencies`. */
+  readonly dependents: Set<DerivedNode<TValue>>;
+};
+
+export type GraphDependency<TValue> = SourceDependency<TValue> | DerivedNodeDependency<TValue>;
+export type SourceDependency<TValue> = { readonly kind: 'Source'; readonly source: Source<TValue> };
+export type DerivedNodeDependency<TValue> = { readonly kind: 'Derived'; readonly node: DerivedNode<TValue> };
+
+export type ComputeContext<TValue> = {
+  /** Records that the computation read `source`. */
+  readSource(source: Source<TValue>): void;
+  /** Pulls the derived node `id`, creating it from `create()` when absent, records the dependency,
+   * and returns its value. */
+  readDerivedNode(id: DerivedNodeId, create: () => DerivedNodeDefinition<TValue>): TValue;
+};
+
+/** What creating an absent derived node needs. */
+export type DerivedNodeDefinition<TValue> = {
+  readonly owner: OwnerSource<TValue>;
+  readonly computation: Computation<TValue>;
+};
+
+/** Marks `Dirty` every derived node that read one of `sources`, and `Check` every `Clean` derived node
+ * that reads one of those, transitively. Runs no computation. */
+export function markChanged<TValue>(sources: ReadonlyArray<Source<TValue>>): void {
+  sources.forEach((source) => source.dependents.forEach(markDirty));
+}
+
+/** `markChanged([owner])`, then marks `Dirty` the dependents of every derived node `owner` owns, and
+ * disposes those derived nodes. */
+export function deleteSource<TValue>(graph: RecomputationGraph<TValue>, owner: OwnerSource<TValue>): void {
+  markChanged([owner]);
+  owner.owned.forEach((node) => node.dependents.forEach(markDirty));
+  owner.owned.forEach((node) => disposeDerivedNode(graph, node));
+}
+```
+
+The store's types under (a):
+
+```ts
+// from libs/isograph-runtime/src/store.ts
+/** Every record cell: `EntityName`, then record id. A cell is kept while it has a reader, whether the
+ * record is present or not. */
+export type Store = Map<EntityName, Map<RecordId, RecordCell>>;
+
+/** A record's presence, the derived nodes that read it, and the derived nodes it owns. */
+export type RecordCell = OwnerSource<ResolverResult<unknown>> & {
+  /** The record's value cells, or `ABSENT` when a reader read the record while the store did not hold it. */
+  values: StoreRecord | typeof ABSENT;
+};
+
+/** One record's value cells by store key. */
+export type StoreRecord = Map<StoreKey, ValueCell>;
+
+/** One value of a record and the derived nodes that read it. */
+export type ValueCell = Source<ResolverResult<unknown>> & {
+  /** The value, or `MISSING` when a reader looked the key up and the record held no value (missing data). */
+  contents: StoreValue | typeof MISSING;
+};
+
+/** A record cell that only readers created: the store does not hold the record. */
+export const ABSENT: unique symbol = Symbol('Absent');
+
+/** A value cell that only readers created: the record holds no value under the key. */
+export const MISSING: unique symbol = Symbol('Missing');
+```
+
+`ABSENT` and `MISSING` are symbols, so no JSON value equals them and a `===` test narrows `values` and `contents` with no cast. A cell for a record or key that is not in the store exists because a computation that found it absent must be marked when it appears; that is what today's `recordSource` and `valueSource` ids of an absent record or key are, kept in `sourceDependents`.
+
+What each use of `SourceId` in this doc becomes under (a):
+
+- `SourceId` and its brand (The engine (2a)): removed; `Source<TValue>` and `OwnerSource<TValue>`. `DerivedNodeId` stays: derived nodes are still found by id (`graph.derivedNodes`, `graph.observers`, `retainRoot`, `Subscription.readDerivedNodes` of open decision 27, which are `DerivedNodeId`s and unchanged).
+- `RecomputationGraph.sourceDependents`: removed; `Source.dependents`. `setDependencies` adds and removes `node` in `dependency.source.dependents`, and deletes no set: an empty set stays on its cell, and `garbageCollect` drops cells.
+- `RecomputationGraph.owned`: removed; `OwnerSource.owned`. `createDerivedNode` adds to `definition.owner.owned`, and `disposeDerivedNode` removes from `node.owner.owned`.
+- `DerivedNode.owner` and `DerivedNodeDefinition.owner`: `OwnerSource<TValue>`, the record cell. `resolverDefinition`'s `owner: recordSource(root)` becomes `owner: recordCell(store, root)`.
+- `SourceDependency.source` and `ComputeContext.readSource`: take a `Source<TValue>`.
+- `markChanged(graph, sources)`: `markChanged(sources)`; it touches only the sources and the derived nodes they reach, so it takes no graph.
+- `deleteSource(graph, source)`: takes the `OwnerSource`; it still takes the graph, to remove disposed derived nodes from `graph.derivedNodes`.
+- `sources.ts`: `recordSource(record)` becomes `recordCell(store, record): RecordCell`, which returns the store's cell or inserts an `ABSENT` one; `valueSource(record, storeKey)` becomes `valueCell(record: RecordCell & { values: StoreRecord }, storeKey): ValueCell`, which returns the record's cell or inserts a `MISSING` one; `changeSource` is removed (below); `resolverDerivedNode` stays. The casts that minted `SourceId`s go.
+- `contextHooks` (change 2, The store's side): `readRecord` calls `context.readSource(recordCell(store, record))`, `readValue` calls `context.readSource(valueCell(..))`, and `readResolver` reads the root's record cell. `ReadHooks` keeps its parameters (links and store keys); the hook does a second lookup of the cell the walk already looked up, where today it builds a string.
+- `normalizeData`'s `markChanged(graph, changes.map(changeSource))` and `writeOrMark`: see `normalize` below.
+- `garbageCollectEnvironment`'s `deleteSource(graph, recordSource(record))`: `garbageCollect` returns the record cells it emptied, and `garbageCollectEnvironment` calls `deleteSource(graph, cell)` for each.
+- `requestSource(key)` (The engine (2a), after `ComputeContext`; open decision 20): the request entry in `environment.requests` (network-and-subscriptions.md, Request entries in the store, `RequestEntry`) holds the cell; removing an entry calls `markChanged([cell])`.
+- Other derived node kinds: a browser-owned value's mirror entry holds its cell, and each client-root selectable's provider entry holds its cell; the provider's subscription calls `markChanged([cell])`. A closure component's wrapper is owned by the record cell.
+- Open decision 6 (b): the index of live records is each record cell's `dependents`.
+- Open decision 12 (a): the engine still imports nothing from the store; the store's types import `Source`, `OwnerSource`, and `DerivedNode` from `graph.ts` and `ResolverResult` from `read.ts`.
+- Open decision 21 (a): the root derived node on an absent root record is owned by that record's `ABSENT` cell, which its computation's read inserted; the first `normalize` that writes the root fills the cell's `values` and marks it.
+- Open decision 27's ids are `DerivedNodeId`s and do not change.
+- The engine's tests (change 2, Tests) build literal sources, `{ dependents: new Set() }`, where they used literal ids.
+
+What `normalize` does under (a). The user's statement is that `normalize` writes `cell.contents` and calls `markChanged` of the cell. Held. `writeValue` gets or inserts the value cell, compares `contents` with `isUnchanged` (change 1), and on a change writes `contents` and calls `markChanged([cell])`; `recordAt` on a cell that is `ABSENT` sets `values` and calls `markChanged([cell])`. Consequences:
+
+- `normalize` imports `markChanged` from `graph.ts`, so a store function depends on the engine. It needs no graph argument, because `markChanged` takes none.
+- A write is marked as it happens, so a response that throws part-way is marked up to the throw with no help. `PartialWriteError.changes` and the `ReadonlyArray<StoreChange>` `normalize` returns (change 1) lose their one production reader, `normalizeData`'s `markChanged`; change 1's tests would be their only reader, and a value only tests read does not exist (AGENTS.md, Coding standards). `normalizeData` still catches a throw to run `settle` and `notify` before rethrowing (change 4). Open decision 17 (a) changes with it.
+- The alternative is that `normalize` returns the changed cells and `normalizeData` calls `markChanged`, as the body's `changeSource` does with ids. That keeps change 1's return value, decision 17 (a), and a store that calls nothing in the engine.
+
+Costs of (a):
+
+- Memory. Every stored field is a `ValueCell` and its `Set`, two objects, where store.md and upstream store a plain value: upstream's `StoreRecord` is an object of `DataTypeValueScalar | DataTypeValueLinked` (`isograph/libs/isograph-react/src/core/IsographEnvironment.ts:150-158`), and store.md's is `Map<StoreKey, StoreValue>` (`libs/isograph-runtime/src/store.ts`). Creating the `Set` on the first reader would save the second object for a field no computation reads, at the cost of a nullable field.
+- Every field is wrapped. A store where some fields are cells and some are raw values cannot tell a raw `JSON` scalar that holds `{ contents, dependents }` from a cell, so the wrapping is total.
+- Every store reader unwraps. `check`, `read`, `readButDoNotEvaluate`, `garbageCollect`'s mark, and `normalize`'s comparison read `contents` and `values` and treat `MISSING` and `ABSENT` as absent. `garbageCollect`'s sweep sets a deleted record's `values` to `ABSENT` and keeps the cell while it has dependents or owned nodes; it deletes an `ABSENT` record cell and a `MISSING` value cell whose `dependents` and `owned` are empty. It cannot delete one with a reader: that reader found it absent, and a later write that creates it would make a new cell and mark nothing.
+- Store snapshots and serialization unwrap. A test compares `unwrapStore(environment.store)` with `storeOf(..)`, where `unwrapStore` drops `ABSENT` records and `MISSING` values and replaces each cell by its contents; store.md's and reader-ast.md's tests change to compare that, and `toEqual` on the cells themselves would compare `dependents` sets. A store written out for hydration is unwrapped the same way, and one read in is wrapped.
+- store.md's `Store` type changes, so The engine, the store, and the environment's "What this keeps" (store.md's `Store` type and its tests unchanged) no longer holds.
+
+What (a) buys: no string building and no `sourceDependents` lookup per read; a deleted record drops its cells' dependents with it instead of leaving `sourceDependents` entries until each reader recomputes; and the `owned` index is a field of the record cell.
+
+Upstream's optimistic layers, against (a). Upstream stores each layer's writes in that layer: a layer holds `data: StoreLayerData`, a sparse map from typename and id to a partial record of plain values (`IsographEnvironment.ts:165-169`; the layer types, `optimisticProxy.ts:100-159`); a read walks the layers from the child-most to the base and takes the first layer that holds the field (`getMutableStoreRecordProxy`, `optimisticProxy.ts:46-69`); a write goes to the child-most layer (`:89-95`). Under (a) a layered store keeps per-cell overrides: one `ValueCell` per (record, store key), holding the base value and each layer's value for it, and each layer keeping the set of cells it wrote. That deviates from upstream's per-layer record storage. Reason: a cell's `dependents` are the readers of the effective location, whichever layer answered (The engine, the store, and the environment, What the environment must report). With a cell per layer, a reader that read the base cell would not be in the dependents of the cell an optimistic layer creates for the same key, so that write would mark nothing. One cell per location makes every layer's write to it a `markChanged` of the one cell, and removing a layer a `markChanged` of each cell in its set whose effective value changed. A layered store that kept upstream's per-layer maps of plain values, and one cell per location in the base layer that every layer's write marks, would match upstream's storage; it needs a base cell for every location any layer writes, read or not. Follow-ups 12 states what forks need of this.
+
+Not decided: the user's choice.
