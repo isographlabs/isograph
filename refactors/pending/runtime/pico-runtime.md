@@ -435,7 +435,7 @@ Isograph runtime (`libs/isograph-runtime/src`):
 
 - `store.ts`: `Store`, `RecordContainer`, `RecordPresence`, `StoreSourceNode`, `ResolverNode`, `MISSING`, `Missing`, `recordContainer`, `containerAt`, `presentContainerAt`, `sourceNodeAt`, `storeValue`, `recordPresence`, `storeSnapshot`, `PlainStore`, `deleteRecord`.
 - `read.ts`: `ResolverResult`, `ReadResolverOk`, `OkOrigin`, `ReadResolverThrew`, `ReadHooks`, `readData`, `readStoreValue`, `readButDoNotEvaluate`, `evaluatingHooks`, `read`, `readSelection`, `linkTargetValue`, `eachLink`, `nested`.
-- `artifacts.ts`: the reader AST (`ReaderSelection` and its four kinds, `ReaderLinkTarget`, `DefaultReader`) and `NormalizationTarget`. `store.ts`: `SELF_KEY`. `recordId.ts`: `omittedRecordId`. `normalize.ts`: `leafRecords`.
+- `artifacts.ts`: the reader AST (`ReaderSelection` and its five kinds, `ReaderLinkTarget`, `DefaultReader`) and `NormalizationTarget`. `store.ts`: `VALUE_KEY`. `recordId.ts`: `omittedRecordId`. `normalize.ts`: `leafRecords`.
 - `storedResults.ts`: `readStoredResult`, `resolverNodeAt`, `resolverComputation`, `contextHooks`, `callResolver`, `resolverResultsEqual`; later `collect`, which iterates the containers' `derived` maps, calls the engine's reachability walk, and calls `disposeDerivedNode` and removes each unreached node from its container.
 - `storeKey.ts`: `resolverStoreKey`. `artifacts.ts`: `ReaderArtifact.selectableName`.
 - `normalize.ts`: `WrittenValue`, `writeValue`, `isUnchanged`, `leafUnchanged`, `compositeUnchanged`.
@@ -718,7 +718,7 @@ export function resolverResultsEqual(
 ```
 
 - A resolver's return value: `outputEqual`, `===` unless the field supplies one (open decision 7). A primitive or a reused object cuts off; a new object marks the dependents.
-- Objects the runtime itself creates get a structural rule. `MissingData` is built from strings and links. A fragment's data object is assembled by the walk (`readSelectionSet`, `read.ts:101-121`); when a resolver returns that object (`({ data }) => data`, as every store fixture resolver does), the result is tagged `WalkData` and two such results compare by `selectionSetDataAreEqual` (`libs/isograph-runtime/src/areEqualWithDeepComparison.ts:9-67`): `Self` and `Derived` values by `===`, a `Link` or `DerivedLink` value by its target per linked record with lists by length and item, a `Selections` target recursively, and a `Bare` target's `read` output by `===`. That is upstream's `mergeObjectsUsingReaderAst` rule (`areEqualWithDeepComparison.ts:55-121`) without the recycling. So `{ initials }` assembled by the walk compares equal when `initials` is the same string, and a link moved to a record with equal data cuts off.
+- Objects the runtime itself creates get a structural rule. `MissingData` is built from strings and links. A fragment's data object is assembled by the walk (`readSelectionSet`, `read.ts:101-121`); when a resolver returns that object (`({ data }) => data`, as every store fixture resolver does), the result is tagged `WalkData` and two such results compare by `selectionSetDataAreEqual` (`libs/isograph-runtime/src/areEqualWithDeepComparison.ts:9-67`): `Value` and `Derived` values by `===`, a `Link`, `Self`, or `DerivedLink` value by its target per linked record with lists by length and item, a `Selections` target recursively, and a `Bare` target's `read` output by `===`. That is upstream's `mergeObjectsUsingReaderAst` rule (`areEqualWithDeepComparison.ts:55-121`) without the recycling. So `{ initials }` assembled by the walk compares equal when `initials` is the same string, and a link moved to a record with equal data cuts off.
 - Source writes: `normalize` compares the value it writes with the stored one by the shape the AST gives it, `leafUnchanged` and `compositeUnchanged` (normalize writes source nodes), as upstream does (`normalizeScalarField`, `cache.ts:232-249`; `normalizeLinkedField` and `dataIdsAreTheSame`, `:255-393`).
 
 ```ts
@@ -832,7 +832,7 @@ function evaluatingHooks(store: Store): ReadHooks<never> {
 
 ## Selections in the Isograph layer
 
-Every selection follows a link to an entity's record, and scalars are entities. A scalar field's value is its own record: `Pet:1.name` holds a link to the `String` record `Pet:1.name`, whose source node `__self` holds the string. So every position the walk reads at is a record link, and a derived node computed on a scalar lives in the scalar record's container. The compiler side (validation, query text, type generation, the per-type default reader modules, generated refinement fields) is `refactors/pending/language/linked-only-selections.md`. The engine is unchanged.
+Every selection follows a link to an entity's record, and scalars are entities. A scalar field's value is its own record: `Pet:1.name` holds a link to the `String` record `Pet:1.name`, whose source node `__value` holds the string. So every position the walk reads at is a record link, and a derived node computed on a scalar lives in the scalar record's container. The compiler side (validation, query text, type generation, the per-type default reader modules, generated refinement fields) is `refactors/pending/language/linked-only-selections.md`. The engine is unchanged.
 
 ### The reader AST
 
@@ -844,6 +844,7 @@ export type ReaderSelectionSet = ReadonlyArray<ReaderSelection>;
 export type ReaderSelection =
   | ReaderLinkSelection
   | ReaderSelfSelection
+  | ReaderValueSelection
   | ReaderDerivedSelection
   | ReaderDerivedLinkSelection;
 
@@ -857,9 +858,17 @@ export type ReaderLinkSelection = {
   readonly target: ReaderLinkTarget;
 };
 
-/** `__self` on a scalar record: the stored value, as is. */
+/** `__self`: the record the walk is at, then `target` at it. Reads nothing. */
 export type ReaderSelfSelection = {
   readonly kind: 'Self';
+  readonly alias: string;
+  readonly target: ReaderLinkTarget;
+};
+
+/** The stored value of a value record, `__value`, as is. Only a generated default reader of a value
+ * entity (a scalar) selects it. */
+export type ReaderValueSelection = {
+  readonly kind: 'Value';
   readonly alias: string;
 };
 
@@ -891,18 +900,18 @@ export type ReaderLinkTarget =
  * `read` maps its data to the bare selection's value. */
 export type DefaultReader<TData extends SelectionSetData, TOutput> = {
   readonly readerAst: ReaderSelectionSet;
-  /** A method signature, so that a reader of `{ readonly __self: string }` is assignable. */
+  /** A method signature, so that a reader of `{ readonly value: string }` is assignable. */
   read(data: TData): TOutput;
 };
 ```
 
-Before (`libs/isograph-runtime/src/artifacts.ts:144-193`): `ReaderSelection` is the union of `ReaderScalarSelection` (`kind: 'Scalar'`, the stored value whole), `ReaderLinkedSelection` (`kind: 'Linked'`, `selections`), `ReaderRefinementSelection` (`kind: 'Refinement'`, `condition`, `selections`), and `ReaderResolverSelection` (`kind: 'Resolver'`). The mapping: `Linked` is `Link` with `selections` moved into a `Selections` target; `Scalar` is `Link` with a `Bare` target whose default reader reads `Self`; `Resolver` is `Derived`, unchanged but for the kind; `Refinement` is `DerivedLink` of the compiler-generated refinement field. `Condition` stays, for the normalization AST.
+Before (`libs/isograph-runtime/src/artifacts.ts:144-193`): `ReaderSelection` is the union of `ReaderScalarSelection` (`kind: 'Scalar'`, the stored value whole), `ReaderLinkedSelection` (`kind: 'Linked'`, `selections`), `ReaderRefinementSelection` (`kind: 'Refinement'`, `condition`, `selections`), and `ReaderResolverSelection` (`kind: 'Resolver'`). The mapping: `Linked` is `Link` with `selections` moved into a `Selections` target; `Scalar` is `Link` with a `Bare` target whose default reader reads `Value`; `Resolver` is `Derived`, unchanged but for the kind; `Refinement` is `DerivedLink` of the compiler-generated refinement field. `Condition` stays, for the normalization AST.
 
-Each kind admits only the targets its value can take. A `Link` holds links, so it never returns a link to user code; a `Self` and a `Derived` take no target, because their values are not links in v0. The walk has no case for a value of the wrong shape other than `linkAt`'s throw on a store that disagrees with the AST. `DerivedLink` exists because a refinement is a derived node whose value is a link; under linked-only-selections.md open decision 5 (a) every derived output is a link and `DerivedLink` folds into `Derived`.
+Each kind admits only the targets its value can take. A `Link` and a `Self` hold links, so they never return a link to user code; a `Value` and a `Derived` take no target, because their values are not links in v0. `__self` is the user-facing selection of the current record (`__self { name }` at `Pet:1` reads `name` at `Pet:1`; `__self { toUppercase }` at `String:Pet:1.name` reads `toUppercase` there; bare `__self` applies the record entity's default reader). `__value` is the raw read and is not a user selectable. The recursion ends: a bare `__self` at a scalar record walks `String`'s default reader, whose one selection is a `Value`, which takes no target. The walk has no case for a value of the wrong shape other than `linkAt`'s throw on a store that disagrees with the AST. `DerivedLink` exists because a refinement is a derived node whose value is a link; under linked-only-selections.md open decision 5 (a) every derived output is a link and `DerivedLink` folds into `Derived`.
 
-The runtime names no entity and holds no default reader. `String/default_reader.ts` is `[{ kind: 'Self', alias: '__self' }]` with `read: (data) => data.__self`; `Pet/default_reader.ts` is `[]` with `read: () => empty`, one frozen empty object (linked-only-selections.md, Default reader modules).
+The runtime names no entity and holds no default reader. `String/default_reader.ts` is `[{ kind: 'Value', alias: 'value' }]` with `read: (data) => data.value`; `Pet/default_reader.ts` is `[]` with `read: () => empty`, one frozen empty object (linked-only-selections.md, Default reader modules).
 
-The index exports `ReaderSelection`, `ReaderSelectionSet`, `ReaderLinkSelection`, `ReaderSelfSelection`, `ReaderDerivedSelection`, `ReaderDerivedLinkSelection`, `ReaderLinkTarget`, `DefaultReader`, `NormalizationTarget`, and `NormalizationLeafTarget`, and stops exporting `ReaderLinkedSelection`, `ReaderRefinementSelection`, `ReaderResolverSelection`, and `ReaderScalarSelection` (`libs/isograph-runtime/src/index.ts`).
+The index exports `ReaderSelection`, `ReaderSelectionSet`, `ReaderLinkSelection`, `ReaderSelfSelection`, `ReaderValueSelection`, `ReaderDerivedSelection`, `ReaderDerivedLinkSelection`, `ReaderLinkTarget`, `DefaultReader`, `NormalizationTarget`, and `NormalizationLeafTarget`, and stops exporting `ReaderLinkedSelection`, `ReaderRefinementSelection`, `ReaderResolverSelection`, and `ReaderScalarSelection` (`libs/isograph-runtime/src/index.ts`).
 
 ### Scalar records
 
@@ -918,7 +927,7 @@ export type NormalizationSelection = {
 
 export type NormalizationTarget = NormalizationLeafTarget | NormalizationCompositeTarget;
 
-/** A scalar entity: each value is written to the `__self` of its own record. */
+/** A scalar entity: each value is written to the `__value` of its own record. */
 export type NormalizationLeafTarget = {
   readonly kind: 'Leaf';
   readonly entityName: EntityName;
@@ -939,8 +948,9 @@ Before (`artifacts.ts:28-45`): `target: NormalizationCompositeTarget | null`, `n
 
 ```ts
 // from libs/isograph-runtime/src/store.ts
-/** The store key of a scalar record's value. GraphQL reserves names that start with `__`. */
-export const SELF_KEY: StoreKey = '__self';
+/** The store key of a value record's value. GraphQL reserves names that start with `__`, and the
+ * name differs from the `__self` selection. */
+export const VALUE_KEY: StoreKey = '__value';
 
 // from libs/isograph-runtime/src/recordId.ts
 /** The id of a record with no identity of its own: the parent's link, the selectable name, one
@@ -980,7 +990,7 @@ export function omittedRecordId(
     : compositeValue(normalization, selection, target, value, link, [], [...path, responseKey]);
   writeValue(normalization, link, key, { kind: 'Composite', value: written });
 
-/** `value` with each scalar written to the `__self` of its record and replaced by the link to it;
+/** `value` with each scalar written to the `__value` of its record and replaced by the link to it;
  * `null` at any level is `null`. Throws on a non-list where `depth` says list. */
 function leafRecords(
   normalization: Normalization,
@@ -1005,18 +1015,18 @@ function leafRecords(
   }
   const link = { entityName: target.entityName, id: omittedRecordId(parent, selection, listIndexes, normalization.variables) };
   presentContainerAt(normalization.store, link);
-  writeValue(normalization, link, SELF_KEY, { kind: 'Leaf', value });
+  writeValue(normalization, link, VALUE_KEY, { kind: 'Leaf', value });
   return link;
 }
 ```
 
-`presentContainerAt` is `recordAt` (`normalize.ts:163-169`) until core change 7. A rewrite with a new value changes only `__self`: the parent's link is unchanged, so `compositeUnchanged` skips it. The parent's key changes when the value becomes or stops being `null`, or a list's length or item nullness changes.
+`presentContainerAt` is `recordAt` (`normalize.ts:163-169`) until core change 7. A rewrite with a new value changes only `__value`: the parent's link is unchanged, so `compositeUnchanged` skips it. The parent's key changes when the value becomes or stops being `null`, or a list's length or item nullness changes.
 
-`check` and the garbage collector's mark follow a `Leaf` target as they follow a `Composite` one, one level: for each link under the key (`linksIn`), `check` yields the linked record when it is absent or its `__self` is missing (`libs/isograph-runtime/src/check.ts:47-68`), and the mark yields the linked record and does not recurse (`libs/isograph-runtime/src/garbageCollection.ts:68-86`). A scalar record no retained query reaches, such as `Pet:1.tags.2` after the list shrank to two, is swept; `deleteRecord` disposes the derived nodes it owns.
+`check` and the garbage collector's mark follow a `Leaf` target as they follow a `Composite` one, one level: for each link under the key (`linksIn`), `check` yields the linked record when it is absent or its `__value` is missing (`libs/isograph-runtime/src/check.ts:47-68`), and the mark yields the linked record and does not recurse (`libs/isograph-runtime/src/garbageCollection.ts:68-86`). A scalar record no retained query reaches, such as `Pet:1.tags.2` after the list shrank to two, is swept; `deleteRecord` disposes the derived nodes it owns.
 
 `storeSnapshot` returns scalar records as stored (open decision 22).
 
-Costs: one record container and one more source node per scalar value; two engine reads per bare scalar selection (the parent's key, then `__self`), of which the first edge fires only on the transitions above. The walk, `check`, and the mark read the store only through the accessors (`sourceNodeAt`, `storeValue`, `recordPresence`), so storing a scalar inline in its parent later changes the accessors and `leafRecords`, not the readers.
+Costs: one record container and one more source node per scalar value; two engine reads per bare scalar selection (the parent's key, then `__value`), of which the first edge fires only on the transitions above. The walk, `check`, and the mark read the store only through the accessors (`sourceNodeAt`, `storeValue`, `recordPresence`), so storing a scalar inline in its parent later changes the accessors and `leafRecords`, not the readers.
 
 ### The walk
 
@@ -1038,7 +1048,9 @@ function readSelection<TFailure>(
       return nested(selection.alias, root, linkTargetValue(hooks, selection.target, value.value, root, key, variables));
     }
     case 'Self':
-      return readStoreValue(hooks, root, SELF_KEY);
+      return nested(selection.alias, root, linkTargetValue(hooks, selection.target, root, root, selection.alias, variables));
+    case 'Value':
+      return readStoreValue(hooks, root, VALUE_KEY);
     case 'Derived':
       return nested(
         selection.alias,
@@ -1090,8 +1102,9 @@ function eachLink<TFailure>(
 ): ReadResult<unknown> | TFailure;
 ```
 
-- Every read is through `hooks`, so a `Bare` target's default reader records its reads (`__self`) on the computation that walks it, and creates no node.
-- `MISSING` under a `Link`'s key or on `__self`, and `MissingData` or `ResolverThrew` from a derived node, end the selection before its target applies, as `MISSING` ended v1's `Scalar` and `Linked` cases.
+- Every read is through `hooks`, so a `Bare` target's default reader records its reads (`__value`) on the computation that walks it, and creates no node.
+- `MISSING` under a `Link`'s key or on `__value`, and `MissingData` or `ResolverThrew` from a derived node, end the selection before its target applies, as `MISSING` ended v1's `Scalar` and `Linked` cases.
+- `Self` reads nothing: its value is `root`. A `Self` with a `Bare` target at an object record returns the empty object, and at a scalar record the value.
 - A `DerivedLink` passes no variables: a refinement takes no arguments (linked-only-selections.md, `ArgumentsOnRefinement`).
 - `ReadHooks`, `readData`, `resolverNodeAt`, `resolverComputation`, and `contextHooks` keep their signatures: a position is a record link. A derived node on a scalar is `resolverNodeAt(store, artifact, String:Pet:1.name, variables)`, keyed `toUppercase` in that record's `derived`.
 
@@ -1106,7 +1119,7 @@ field Query.PetDetailPage($id: ID!) { pet(id: $id) { n1: name n2: name { toUpper
 field String.toUppercase { __self }
 ```
 
-The generated artifacts are in linked-only-selections.md, Generated files for the example. The store holds `Query:__ROOT.pet____id___"1"` linking to `Pet:1`; `Pet:1.name` linking to `String:Pet:1.name`, whose `__self` is `"Ricky"`; `Pet:1.bestFriend` linking to `Pet:2`; `Pet:2.name` linking to `String:Pet:2.name`, whose `__self` is `"Mango"`. `PetDetailPage` is read with `{ id: "1" }`; its node is `PetDetailPage____id___"1"` on `Query:__ROOT`. `X.__self` is the `__self` source node of the scalar record `X`.
+The generated artifacts are in linked-only-selections.md, Generated files for the example. The store holds `Query:__ROOT.pet____id___"1"` linking to `Pet:1`; `Pet:1.name` linking to `String:Pet:1.name`, whose `__value` is `"Ricky"`; `Pet:1.bestFriend` linking to `Pet:2`; `Pet:2.name` linking to `String:Pet:2.name`, whose `__value` is `"Mango"`. `PetDetailPage` is read with `{ id: "1" }`; its node is `PetDetailPage____id___"1"` on `Query:__ROOT`. `X.__value` is the `__value` source node of the scalar record `X`.
 
 First read:
 
@@ -1114,28 +1127,29 @@ First read:
 read PetDetailPage: absent -> create Dirty, no value -> recompute at Query:__ROOT
   pet: Link Query:__ROOT.pet____id___"1" -> dependents {PetDetailPage} -> Pet:1 -> Selections at Pet:1
     n1: Link Pet:1.name -> dependents {PetDetailPage} -> String:Pet:1.name -> Bare String__default_reader
-      Self String:Pet:1.name.__self -> dependents {PetDetailPage} -> "Ricky" -> read -> "Ricky"
+      Value String:Pet:1.name.__value -> dependents {PetDetailPage} -> "Ricky" -> read -> "Ricky"
     n2: Link Pet:1.name -> second entry in PetDetailPage's dependencies -> String:Pet:1.name -> Selections
       toUppercase: Derived -> String:Pet:1.name.derived "toUppercase" absent -> create Dirty -> recompute at String:Pet:1.name
-        Self String:Pet:1.name.__self -> dependents {PetDetailPage, toUppercase@String:Pet:1.name} -> "Ricky"
+        __self: Self -> String:Pet:1.name, no read -> Bare String__default_reader
+          Value String:Pet:1.name.__value -> dependents {PetDetailPage, toUppercase@String:Pet:1.name} -> "Ricky" -> read -> "Ricky"
         resolver({ data: { __self: "Ricky" }, parameters: {}, link: String:Pet:1.name }) -> toUppercase Clean "RICKY"
       toUppercase@String:Pet:1.name.dependents = {PetDetailPage}
     bestFriend: Link Pet:1.bestFriend -> dependents {PetDetailPage} -> Pet:2 -> Selections at Pet:2
-      name: Link Pet:2.name -> String:Pet:2.name -> Bare -> Self String:Pet:2.name.__self -> "Mango"
+      name: Link Pet:2.name -> String:Pet:2.name -> Bare -> Value String:Pet:2.name.__value -> "Mango"
   resolver -> PetDetailPage Clean p1 = { pet: { n1: "Ricky", n2: { toUppercase: "RICKY" }, bestFriend: { name: "Mango" } } }
 ```
 
 ```text
-PetDetailPage reads:                 Query:__ROOT.pet____id___"1", Pet:1.name, String:Pet:1.name.__self, Pet:1.name,
-                                     toUppercase@String:Pet:1.name, Pet:1.bestFriend, Pet:2.name, String:Pet:2.name.__self
-toUppercase@String:Pet:1.name reads: String:Pet:1.name.__self
+PetDetailPage reads:                 Query:__ROOT.pet____id___"1", Pet:1.name, String:Pet:1.name.__value, Pet:1.name,
+                                     toUppercase@String:Pet:1.name, Pet:1.bestFriend, Pet:2.name, String:Pet:2.name.__value
+toUppercase@String:Pet:1.name reads: String:Pet:1.name.__value
 ```
 
 Write `Pet:1.name`:
 
 ```text
 normalize Pet:1.name = "Rex": Pet:1.name's link unchanged -> not written
-  String:Pet:1.name.__self = "Rex" -> dependents {PetDetailPage, toUppercase@String:Pet:1.name} -> both Dirty
+  String:Pet:1.name.__value = "Rex" -> dependents {PetDetailPage, toUppercase@String:Pet:1.name} -> both Dirty
 read PetDetailPage: Dirty -> recompute
   n1 "Rex"; n2: toUppercase Dirty -> recompute "REX" !== "RICKY" -> Clean "REX"; bestFriend -> PetDetailPage Clean p2
 ```
@@ -1143,7 +1157,7 @@ read PetDetailPage: Dirty -> recompute
 Write `Pet:2.name`:
 
 ```text
-normalize Pet:2.name = "Moe": String:Pet:2.name.__self -> dependents {PetDetailPage} -> Dirty
+normalize Pet:2.name = "Moe": String:Pet:2.name.__value -> dependents {PetDetailPage} -> Dirty
 read PetDetailPage: Dirty -> recompute: n2 -> toUppercase@String:Pet:1.name Clean -> "REX", not run -> PetDetailPage Clean p3
 ```
 
@@ -1152,13 +1166,13 @@ Only `PetDetailPage`'s resolver runs: the scalar's client field is not called ag
 Write `Pet:1.name` to a value with the same uppercase:
 
 ```text
-normalize Pet:1.name = "rex": String:Pet:1.name.__self -> dependents {PetDetailPage, toUppercase} -> both Dirty
+normalize Pet:1.name = "rex": String:Pet:1.name.__value -> dependents {PetDetailPage, toUppercase} -> both Dirty
 read PetDetailPage: Dirty -> recompute
   n1 "rex"; n2: toUppercase Dirty -> recompute "REX" === "REX" -> Clean, keeps "REX", marks nothing
   -> PetDetailPage Clean p4 (n1 changed)
 ```
 
-`toUppercase` cuts off, but `PetDetailPage` reruns anyway, because `n1` reads `String:Pet:1.name.__self` directly through `String`'s default reader. Without `n1`, `PetDetailPage` reads `Pet:1.name` (the link, unchanged) and the `toUppercase` node, so the same write marks `toUppercase` `Dirty` and `PetDetailPage` `Check`, the pull recomputes `toUppercase` to `"REX"`, and `PetDetailPage` ends `Clean` without running.
+`toUppercase` cuts off, but `PetDetailPage` reruns anyway, because `n1` reads `String:Pet:1.name.__value` directly through `String`'s default reader. Without `n1`, `PetDetailPage` reads `Pet:1.name` (the link, unchanged) and the `toUppercase` node, so the same write marks `toUppercase` `Dirty` and `PetDetailPage` `Check`, the pull recomputes `toUppercase` to `"REX"`, and `PetDetailPage` ends `Clean` without running.
 
 A refinement, `field Query.F { node(id: "1") { asPet { name } } }`:
 
@@ -1168,8 +1182,8 @@ read F: recompute at Query:__ROOT
     asPet: DerivedLink -> Pet:1.derived "asPet" absent -> create Dirty -> recompute at Pet:1: empty reader AST, reads nothing
       resolver({ data: {}, parameters: {}, link: Pet:1 }) -> Pet:1 -> asPet Clean Pet:1, dependencies []
     asPet@Pet:1.dependents = {F} -> Selections at Pet:1
-      name: Link Pet:1.name -> String:Pet:1.name -> Bare -> Self String:Pet:1.name.__self -> dependents {F}
-normalize Pet:1.name = "Rex": String:Pet:1.name.__self -> {F} -> F Dirty; asPet@Pet:1 is not marked
+      name: Link Pet:1.name -> String:Pet:1.name -> Bare -> Value String:Pet:1.name.__value -> dependents {F}
+normalize Pet:1.name = "Rex": String:Pet:1.name.__value -> {F} -> F Dirty; asPet@Pet:1 is not marked
 read F: Dirty -> recompute -> asPet@Pet:1 Clean, not run -> F Clean
 delete Pet:1 -> Pet:1.derived = {asPet} -> dispose asPet -> F Dirty
 ```
@@ -1321,7 +1335,7 @@ function leafUnchanged(stored: unknown, written: LeafValue): boolean {
 function compositeUnchanged(stored: StoreValue, written: CompositeValue): boolean;
 ```
 
-Deltas from v1 (`normalize.ts`): `writeSelection` builds a `WrittenValue` and calls `writeValue` where it called `record.set` (`:96-109`): `Composite` for every selection's key, since after core change 4 a leaf's key holds links to scalar records, and `Leaf` for a scalar record's `__self` (`leafRecords`, Scalar records); `writeSelections` and `compositeValue` pass the record's link where they passed its `StoreRecord`; `recordAt` is `presentContainerAt` (`:163-169`). An unchanged value keeps its identity.
+Deltas from v1 (`normalize.ts`): `writeSelection` builds a `WrittenValue` and calls `writeValue` where it called `record.set` (`:96-109`): `Composite` for every selection's key, since after core change 4 a leaf's key holds links to scalar records, and `Leaf` for a scalar record's `__value` (`leafRecords`, Scalar records); `writeSelections` and `compositeValue` pass the record's link where they passed its `StoreRecord`; `recordAt` is `presentContainerAt` (`:163-169`). An unchanged value keeps its identity.
 
 Deltas from upstream: upstream compares a scalar with `!==` only (`cache.ts:248-249`), so a list of scalars counts as changed on every response; here a leaf list compares by length and item at any depth. Upstream compares a link by `__link` and `__typename` and a list of links one level deep (`cache.ts:337-338`, `:372-393`); here a link compares by `entityName` and `id`, and lists nest at any depth. A leaf that is a JSON object compares by `===`, so it counts as changed on every rewrite: one mark too many, never a missed one.
 
@@ -1473,7 +1487,7 @@ Each is one commit, in order; each is independently shippable.
 1. Prefactor: `normalize` skips an unchanged value (`writeValue`, `isUnchanged`, `leafUnchanged`, `compositeUnchanged`) on v1's plain store. Observable: normalizing the same response twice keeps every stored list and link object (`toBe`). In the pet script, the `PetDetailRoute` response leaves `Pet:0.firstName`'s stored value untouched.
 2. Prefactor: the walk takes `ReadHooks`; an absent record reads as all keys missing; `noRecord`'s two checks go (Absent records). `read` and `readButDoNotEvaluate` use `evaluatingHooks`. Observable: an absent root's `MissingData` reads "No value for pet____id___"1" on Query:__ROOT"; `Constant` on an absent record is `Ok`. The pet script's output is unchanged.
 3. Prefactor: the selection kinds on v1's language (linked-only-selections.md, change 1). The compiler emits `Link` with a `Selections` target for a v1 linked selection, `Derived` for a client field, and `DerivedLink` of a generated refinement field (`Node/asPet/`) for a refinement; a v1 scalar selection keeps v1's `Scalar` kind until change 4. `reader_artifact_file` writes `selectableName` first (`Pet/PetName/resolver_reader.ts` gains `selectableName: "PetName",`). The walk reads the new kinds through v1's hooks. Observable: every generated artifact is regenerated in the new shape; the pet script's output is unchanged; the runtime's read tests pass unchanged.
-4. Prefactor: scalar records (linked-only-selections.md, change 2; Scalar records). The normalization AST's `Leaf` target, `SELF_KEY`, `omittedRecordId`, `leafRecords`, and `check`'s and the mark's `Leaf` case; `Self`, the `Bare` target, `DefaultReader`, and a `default_reader.ts` per scalar entity a reader selects; the `Scalar` kind goes. Observable: `storeSnapshot` after normalizing `PetDetail`'s response holds `Pet:1.name` as a link to `String:Pet:1.name` with `__self` `"Ricky"`; every read returns the values it returned before; normalizing a response that changes only `Pet:1.name` writes only `String:Pet:1.name.__self`; the pet script's output is unchanged.
+4. Prefactor: scalar records (linked-only-selections.md, change 2; Scalar records). The normalization AST's `Leaf` target, `VALUE_KEY`, `omittedRecordId`, `leafRecords`, and `check`'s and the mark's `Leaf` case; `Self` and `Value`, the `Bare` target, `DefaultReader`, and a `default_reader.ts` per scalar entity a reader selects; the `Scalar` kind goes. Observable: `storeSnapshot` after normalizing `PetDetail`'s response holds `Pet:1.name` as a link to `String:Pet:1.name` with `__value` `"Ricky"`; every read returns the values it returned before; normalizing a response that changes only `Pet:1.name` writes only `String:Pet:1.name.__value`; the pet script's output is unchanged.
 5. Prefactor: linked-only selections (linked-only-selections.md, change 3). Validation, query generation, and reader generation accept bare object selections, selection sets on scalars, and client fields on scalar entities; the object default reader. Observable: `read` of the Example's `PetDetailPage` on the store fixture returns `{ pet: { n1: "Ricky", n2: { toUppercase: "RICKY" }, bestFriend: { name: "Mango" } } }`, calling `toUppercase` on every read; a bare `bestFriend` is `{}` or `null`.
 6. Prefactor: the engine package (The engine package): `libs/<engine directory>` with `src/graph.ts` and `src/index.ts` as The graph and The engine's public API write them, `test/graph.test.ts`, its `package.json`, tsconfig, tsdown, and vitest files, and its two pre-commit hooks. Nothing in the Isograph runtime imports it yet. Observable: `pnpm --filter <engine package> test` passes the sum, parity, and label example (`sum` and `parity` run twice, `label` once); `pnpm compile-libs` writes its `dist/index.cjs` and `dist/index.mjs`; its `package.json` lists no dependencies. Its reader is the stated goal, a project outside Isograph; the runtime is its first workspace caller in change 7.
 7. Prefactor: the store becomes record containers (`RecordContainer`, `presence`, `sources`, the accessors, `storeSnapshot`, `deleteRecord` without derived nodes). The runtime gains its dependency on the engine (The engine package) and its three pre-commit hooks match the engine's directory. A container's `sources` hold the engine's source nodes: `sourceNodeAt` calls `createSourceNode`, `storeValue` and `storeSnapshot` call `sourceValue`, `writeValue` calls `writeSource`, and `deleteRecord` calls `markSourceChanged` for each source node. No derived node exists, so every `dependents` set stays empty and `writeSource` and `markSourceChanged` mark nothing. `check`, `garbageCollect`, `read`, and `normalize` read and write through the accessors; tests compare `storeSnapshot`. Observable: none in behavior; `environment.store` is no longer v1's nested map, and `storeSnapshot(environment.store)` is.
@@ -1881,5 +1895,5 @@ A standalone engine holds nodes of different value types in one graph (a `Derive
 
 ### 22. `storeSnapshot` and scalar records
 
-- (a) `storeSnapshot` returns the store as stored: each scalar value is a record of its scalar entity with `__self`, and the parent's key holds the link. Held. Reason: the snapshot is the store's server data, and the runtime cannot tell a scalar record from another record without a field that records it. Cost: every store test fixture (`storeOf`, `test/fixtures.ts`) lists scalar records.
-- (b) `RecordContainer` gains `origin: 'Response' | 'ScalarValue'`, written by `leafRecords`, and `storeSnapshot` inlines each `ScalarValue` record's `__self` into the key that links to it. Cost: a field on every container read only by the snapshot; `storeFrom(plain)` still cannot tell which plain values are scalars, so a store built from a `PlainStore` needs the normalization AST.
+- (a) `storeSnapshot` returns the store as stored: each scalar value is a record of its scalar entity with `__value`, and the parent's key holds the link. Held. Reason: the snapshot is the store's server data, and the runtime cannot tell a scalar record from another record without a field that records it. Cost: every store test fixture (`storeOf`, `test/fixtures.ts`) lists scalar records.
+- (b) `RecordContainer` gains `origin: 'Response' | 'ScalarValue'`, written by `leafRecords`, and `storeSnapshot` inlines each `ScalarValue` record's `__value` into the key that links to it. Cost: a field on every container read only by the snapshot; `storeFrom(plain)` still cannot tell which plain values are scalars, so a store built from a `PlainStore` needs the normalization AST.
