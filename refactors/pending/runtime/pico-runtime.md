@@ -1206,7 +1206,7 @@ function callResolver(
 }
 ```
 
-The computation closes over `store`, the environment's `Map`, which is written in place and never replaced (network-and-subscriptions.md, The environment). The cast in `readStoredResult` is the one place a stored `ResolverResult<unknown>` is returned at the caller's type. Its type parameters and `root` parameter are `read`'s. `readStoredResult` takes the store, as `read` does; every function that reads or writes the graph takes the store, because the store is the graph.
+The computation closes over `store`, the environment's `Store` (`{ graph, records }`, The store), whose `records` map is written in place and which is never replaced (network-and-subscriptions.md, The environment). The cast in `readStoredResult` is the one place a stored `ResolverResult<unknown>` is returned at the caller's type. Its type parameters and `root` parameter are `read`'s. `readStoredResult` takes the store, as `read` does; every function that reads or writes the graph takes the store, because the store is the graph.
 
 A resolver computation keeps the engine's contract that a computation must not throw (reactive-engine.md, Throws): `callResolver` catches the resolver's own throw into `ResolverThrew`, a value. The one throw it does not catch is the engine's `GraphWriteDuringComputationError`, from a resolver that wrote the store through a closure: `callResolver` rethrows it, so it propagates out of `readStoredResult` (open decision 30). Any other throw out of `resolverComputation` or out of `resolverResultsEqual` is a broken programmer invariant: a store that disagrees with the reader AST (`linkAt` on a non-link, `libs/isograph-runtime/src/store.ts:74-86`), a missing variable (`variableValue`, `storeKey.ts:56-63`), or a field-supplied `outputEqual` that throws (open decision 7). It propagates out of `readStoredResult`; `readSubscription`'s `try` (`libs/isograph-runtime/src/subscribe.ts:126-130`) catches what escapes a subscription re-read as `ReadErr`.
 
@@ -1358,19 +1358,28 @@ read FP: root absent -> create root Absent, FP Dirty, no value -> recompute FP: 
 
 ## End-user experience
 
-The pet demo's fetch-and-read script (`demos/pet-demo/src/fetchAndRead.ts`, `demos/pet-demo/README.md`, Fetching and reading) reads with `readStoredResult` where it read with `read`, and prints the same output. Its graph:
+The pet demo's fetch-and-read script (`demos/pet-demo/src/fetchAndRead.ts`, `demos/pet-demo/README.md`, Fetching and reading) reads with `readStoredResult` where it read with `read`, and prints the same output. Scalars are records (Scalar records): `String:Pet:0.tagline` is the `String` record with id `Pet:0.tagline`, `X.__value` is its `__value` source node, and `Pet:0.tagline` is the source node on `Pet:0` that holds the link to it. Its graph:
 
 ```text
-HomeRoute reads: Query.__ROOT.pets, Pet:0.id, PetSummaryCard@Pet:0, Pet:1.id, PetSummaryCard@Pet:1
-PetSummaryCard@Pet:n reads: Pet:n.id, fullName@Pet:n, Pet:n.nickname, Pet:n.age, Pet:n.picture, Pet:n.tagline, Pet:n.species
-fullName@Pet:n reads: Pet:n.firstName, Pet:n.lastName
+HomeRoute reads:            Query:__ROOT.pets, Pet:0.id, ID:Pet:0.id.__value, PetSummaryCard@Pet:0,
+                            Pet:1.id, ID:Pet:1.id.__value, PetSummaryCard@Pet:1
+PetSummaryCard@Pet:0 reads: Pet:0.id, ID:Pet:0.id.__value, fullName@Pet:0,
+                            Pet:0.nickname, String:Pet:0.nickname.__value, Pet:0.age, Int:Pet:0.age.__value,
+                            Pet:0.picture, Url:Pet:0.picture.__value, Pet:0.tagline, String:Pet:0.tagline.__value,
+                            Pet:0.species, PetSpecies:Pet:0.species.__value
+PetSummaryCard@Pet:1 reads: the same at Pet:1, except that Pet:1.nickname is null and links to no scalar record
+fullName@Pet:n reads:       Pet:n.firstName, String:Pet:n.firstName.__value, Pet:n.lastName, String:Pet:n.lastName.__value
 ```
 
 ```text
 read HomeRoute: creates and runs HomeRoute, PetSummaryCard@Pet:0, @Pet:1, fullName@Pet:0, @Pet:1, once each
-PetDetailRoute response: Pet:0.firstName "Makayla" -> leafUnchanged -> no write; likewise every HomeRoute input -> nothing marked
-SetTagline response: Pet:0.id "0" -> unchanged
-                     Pet:0.tagline "I AM FULL" -> {PetSummaryCard@Pet:0} -> Dirty -> {HomeRoute} -> Check
+PetDetailRoute response: Pet:0.firstName -> link String:Pet:0.firstName -> compositeUnchanged accepts -> no write
+                         String:Pet:0.firstName.__value "Makayla" -> leafUnchanged accepts -> no write
+                         likewise every HomeRoute input -> nothing marked
+SetTagline response: Pet:0.id -> link ID:Pet:0.id -> compositeUnchanged accepts; ID:Pet:0.id.__value "0" -> leafUnchanged accepts
+                     Pet:0.tagline -> link String:Pet:0.tagline -> compositeUnchanged accepts -> nothing marked
+                     String:Pet:0.tagline.__value "I AM FULL" -> leafUnchanged rejects -> {PetSummaryCard@Pet:0} -> Dirty
+                       -> {HomeRoute} -> Check
 read HomeRoute: Check -> PetSummaryCard@Pet:0 Dirty -> recompute (fullName@Pet:0 Clean, not run)
   -> "Makayla Balicki: I AM FULL" !== old -> HomeRoute Dirty -> recompute HomeRoute
   -> PetSummaryCard@Pet:1 Clean, not run -> HomeRoute Clean
@@ -1833,7 +1842,7 @@ The user's design notes, recorded for later. None is part of the core, and none 
 
 ## Docs this doc amends
 
-- `refactors/pending/runtime/store.md`: `Store` becomes `Map<EntityName, Map<RecordId, RecordContainer>>`; its functions read and write through the accessors; `normalize` skips unchanged values and marks as it writes; `garbageCollect`'s sweep calls `deleteRecord`; its tests compare `storeSnapshot(store)` with `storeOf(..)`, which returns a `PlainStore`.
+- `refactors/pending/runtime/store.md`: `Store` becomes `{ readonly graph: Graph; readonly records: Map<EntityName, Map<RecordId, RecordContainer>> }` (The store); its functions read and write through the accessors; `normalize` skips unchanged values and marks as it writes; `garbageCollect`'s sweep calls `deleteRecord`; its tests compare `storeSnapshot(store)` with `storeOf(..)`, which returns a `PlainStore`.
 - `refactors/pending/runtime/reader-ast.md`: the reader AST is `{ alias, fieldName, arguments, selections }` and the walk reads each field's origin from entity tables (Selections in the Isograph layer); `ReaderArtifact.parentEntityName`, `selectableName`, and `tables`; the walk takes `ReadHooks`; an absent record reads as all keys missing, which changes its two absent-root `reason` assertions and makes `Constant` on an absent record `Ok`; `readStoredResult` is the stored read beside `read`.
 - `refactors/pending/runtime/network-and-subscriptions.md`: its "`Store` stays store.md's nested map" no longer holds; the request entry's state is a source node on the entry, not `requestSource(key): SourceId`; `readSubscription` reads nested resolvers through the graph and `SubscriptionResult` gains `ReadResolverThrew` (core change 9); `makeNetworkRequest` re-reads subscriptions in a `finally` after `normalize`, and `garbageCollectEnvironment` re-reads them after the sweep (core change 9).
 - `refactors/pending/runtime/react.md`: `unwrapOrSuspend` throws `result.error` on `ResolverThrew`; `getSnapshot` pulls (Later: keeping values up to date automatically), against its rule that a render reads and computes nothing.
