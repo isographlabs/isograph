@@ -167,8 +167,8 @@ export {
 
 ```ts
 // from libs/reactive-graph/src/graph.ts
-/** One graph of source and derived nodes. It holds the guard that rejects a write, a disposal, or
- * a top-level pull while a computation runs (open decision 2). Created by `createGraph`; every
+/** One graph of source and derived nodes. It holds the guard that rejects a write or a disposal
+ * while a computation runs (open decision 2). Created by `createGraph`; every
  * public function but the constructors and `sourceValue` takes it first. */
 export type Graph = {
   /** The number of computations running. Incremented and decremented only by `compute`. A count,
@@ -287,8 +287,8 @@ export function createDerivedNode<TValue>(
   equal: (previous: TValue, next: TValue) => boolean,
 ): DerivedNode<TValue>;
 
-/** The value of `source`, read without recording a dependency. For code outside a computation;
- * inside one it records nothing (open decision 10). */
+/** The value of `source`, read without recording a dependency. Inside a computation it is an
+ * untracked read (decision 10). */
 export function sourceValue<TValue>(source: SourceNode<TValue>): TValue;
 
 /** When `source.equal` rejects the stored value and `value`, sets `source`'s value and marks its
@@ -308,9 +308,9 @@ export function markSourceChanged(
   source: SourceNode<unknown>,
 ): void;
 
-/** `node`'s current value: `Clean` returns it, `Check` verifies, `Dirty` recomputes. Throws while a
- * computation runs: a computation reads other nodes through its context. A computation or an
- * equality must not throw (Throws). */
+/** `node`'s current value: `Clean` returns it, `Check` verifies, `Dirty` recomputes. Inside a
+ * computation it is an untracked read: it records no dependency of the running computation
+ * (decision 10). A computation or an equality must not throw (Throws). */
 export function pull<TValue>(graph: Graph, node: DerivedNode<TValue>): TValue;
 
 /** Removes `node` from the dependents of everything it read, resets it to never computed, and marks
@@ -414,11 +414,11 @@ function stateOf<TValue>(node: DerivedNode<TValue>): StateSlot<TValue> {
 ```ts
 // from libs/reactive-graph/src/graph.ts
 /** Throws when a computation of `graph` is running. Called first by every public function that
- * writes the graph and by the public `pull`. */
+ * writes the graph. */
 function assertNotComputing(graph: Graph): void {
   if (graph.computingDepth > 0) {
     throw new Error(
-      'Cannot write or pull the graph while a computation is running.',
+      'Cannot write the graph while a computation is running.',
     );
   }
 }
@@ -501,13 +501,8 @@ function markCheck<TValue>(node: DerivedNode<TValue>): void {
 
 ```ts
 // from libs/reactive-graph/src/graph.ts
+/** Called by the consumer, by `readDerived`, and by `verify`. */
 export function pull<TValue>(graph: Graph, node: DerivedNode<TValue>): TValue {
-  assertNotComputing(graph);
-  return pullNode(graph, node);
-}
-
-/** The unguarded pull. Called by `pull` after the guard, by `readDerived`, and by `verify`. */
-function pullNode<TValue>(graph: Graph, node: DerivedNode<TValue>): TValue {
   const state = stateOf(node).state;
   switch (state.mark) {
     case 'Clean':
@@ -529,7 +524,7 @@ function verify<TValue>(
 ): TValue {
   state.dependencies.some((dependency) => {
     if (dependency.kind === 'Derived') {
-      pullNode(graph, dependency.node);
+      pull(graph, dependency.node);
     }
     return stateOf(node).state.mark === 'Dirty';
   });
@@ -600,7 +595,7 @@ function compute<TValue>(
         return source.value;
       },
       readDerived: (node) => {
-        const read = pullNode(graph, node);
+        const read = pull(graph, node);
         dependencies.push({ kind: 'Derived', node });
         return read;
       },
@@ -729,7 +724,7 @@ pull(graph, banner); // 'Free shipping' (runs all three)
 ## Rules
 
 - A computation reads nodes only through its `context`: `context.readSource(source)` and `context.readDerived(node)`. A read through a closure or `sourceValue` is not recorded, and the node will not recompute when that value changes.
-- A computation is a pure function of what it reads. It does not write a source, dispose a node, or call `pull`; each of those throws while a computation runs.
+- A computation is a pure function of what it reads. It does not write a source or dispose a node; each of those throws while a computation runs. A `sourceValue` or `pull` inside a computation is an untracked read: it returns the value and records no dependency.
 - Each derived node has an equality. When a recomputed value is equal to the previous one, the node keeps the previous value object and the nodes above it do not recompute. The engine has no default: pass `(a, b) => a === b` for identity, or your own comparator for values you build fresh on each run.
 - Each source node has an equality too. A `writeSource` of a value equal to the stored one stores nothing and marks nothing. `markSourceChanged` marks a source whose value object you changed in place.
 - A computation and an equality must not throw. A throw is a programmer error: it propagates out of `pull`, and the engine guarantees only that its own state is as it was before that pull.
@@ -737,7 +732,7 @@ pull(graph, banner); // 'Free shipping' (runs all three)
 - A computation must not read its own node, directly or through other nodes.
 ````
 
-The README's rules restate the engine's behavior under the options the body is written for: open decision 2 (f), 9 (a), and 10 (a). Each decision that changes names the README line it changes.
+The README's rules restate the engine's behavior under the options the body is written for: open decision 2 (f) and 9 (a). Each decision that changes names the README line it changes.
 
 ## The design
 
@@ -767,7 +762,7 @@ Two pulls with no write between them run nothing the second time. A pull of a `C
 
 When the computation returns, `recompute` replaces the node's dependency list with the new one and moves the reverse edges with `setDependencies`. The new list replaces the old one even when the value came back equal. A read that a branch skips is not a dependency: a node that stopped reading `a` is not marked by a write of `a`.
 
-Only `readSource` and `readDerived` record. A computation that reads a source through `sourceValue`, or a derived node through `pull`, records nothing; `pull` throws during a computation (the guard), `sourceValue` does not (open decision 10). pico has the same hole and the same rule: `MemoRef::lookup` reads without recording and `lookup_tracked` records (`crates/pico/src/memo_ref.rs:57`, `:80`; pico.md, Memo).
+Only `readSource` and `readDerived` record. A computation that reads a source through `sourceValue`, or a derived node through `pull`, records nothing: both are untracked reads, allowed inside a computation (decision 10). pico has the same hole and the same rule: `MemoRef::lookup` reads without recording and `lookup_tracked` records (`crates/pico/src/memo_ref.rs:57`, `:80`; pico.md, Memo).
 
 ### Verification
 
@@ -800,7 +795,7 @@ p finishes -> setDependencies: c.dependents = {p} -> p Clean, over a Dirty c
 write s again -> c already Dirty -> stop -> p is never marked
 ```
 
-The guard rejects `writeSource`, `markSourceChanged`, `disposeDerivedNode`, and the public `pull` while `graph.computingDepth > 0`. A read through the context is allowed, because it records the dependency. A public `pull` inside a computation is rejected because it records nothing on the outer node. Open decision 2.
+The guard rejects `writeSource`, `markSourceChanged`, and `disposeDerivedNode` while `graph.computingDepth > 0`. It covers writes only. A read through the context records the dependency. A `sourceValue` or `pull` inside a computation is an untracked read: it records no dependency of the running computation and writes no source (decision 10). Open decision 2.
 
 ## Comparison with the Rust pico crate
 
@@ -838,7 +833,7 @@ The engine takes Reactively's marking and pull, pico's equality, guard, and per-
 
 The tests assert values with `toBe` and `toEqual`, and assert which computations ran by counting calls in a `calls` object each test owns. Counting re-invocations is allowed: which writes make which computations run again is the engine's own dependency tracking (AGENTS.md, Tests). No test reads a node's `slot`, `dependents`, or mark, and no test calls an unexported function: marks and edges are implementation, and each test observes them only through values and call counts. There are no snapshot tests and no fixture files; every input is built in the test.
 
-The tests are written under the options the body is written for: open decision 2 (f), 9 (a), and 10 (a). Each test whose assertions change under another option says how.
+The tests are written under the options the body is written for: open decision 2 (f) and 9 (a). Each test whose assertions change under another option says how.
 
 ### The pico crate's tests
 
@@ -892,7 +887,7 @@ Top-level files:
 
 `tracking_field`:
 
-- `correctness.rs:17` `tracking_field_correctness`: ports as `dependencies.test.ts` "sourceValue inside a computation records nothing". Delta: pico's untracked iteration of a `#[tracked]` map becomes `sourceValue` inside a computation, which is the engine's untracked read (open decision 10), and pico's tracked iteration becomes `readSource`.
+- `correctness.rs:17` `tracking_field_correctness`: ports as `dependencies.test.ts` "sourceValue inside a computation records nothing". Delta: pico's untracked iteration of a `#[tracked]` map becomes `sourceValue` inside a computation, which is the engine's untracked read (decision 10), and pico's tracked iteration becomes `readSource`.
 - `efficiency.rs:23` `untracked_efficiency`, `:57` `tracked_inefficiency`: do not port. They pin the `#[tracked]` counter's granularity (a tracked read depends on the whole map); the engine has no tracked map, and a consumer that wants per-key granularity holds one source per key, which the port of `unrelated_source_changes` covers.
 - `never_written.rs:54` `iteration_before_first_write_then_insert_reruns`, `:79` `untracked_miss_then_tracked_then_insert_reruns`, `:91` `first_tracked_write_writes_counter_zero`: do not port. They pin the tracked counter's never-written singleton; the engine has neither.
 
@@ -1459,12 +1454,28 @@ describe('recorded dependencies', () => {
     expect(pull(graph, untrackedCount)).toBe(1);
 
     writeSource(graph, items, ['asdf', 'isograph']);
-    // open decision 10 (a). Under (b) the first pull of untrackedCount throws.
     expect(pull(graph, untrackedCount)).toBe(1);
     expect(pull(graph, trackedCount)).toBe(2);
 
     writeSource(graph, items, ['asdf', 'isograph', 'database']);
     expect(pull(graph, trackedCount)).toBe(3);
+  });
+
+  test('pull inside a computation records nothing', () => {
+    const graph = createGraph();
+    const calls = { outer: 0 };
+    const count = createSourceNode(1, strictEqual);
+    const doubled = createDerivedNode((context) => context.readSource(count) * 2, strictEqual);
+    const outer = createDerivedNode(() => {
+      calls.outer += 1;
+      return pull(graph, doubled);
+    }, strictEqual);
+    expect(pull(graph, outer)).toBe(2);
+
+    writeSource(graph, count, 2);
+    expect(pull(graph, outer)).toBe(2);
+    expect(pull(graph, doubled)).toBe(4);
+    expect(calls.outer).toBe(1);
   });
 });
 ```
@@ -1630,7 +1641,7 @@ import {
 
 const strictEqual = (previous: unknown, next: unknown): boolean => previous === next;
 
-const guardMessage = 'Cannot write or pull the graph while a computation is running.';
+const guardMessage = 'Cannot write the graph while a computation is running.';
 
 describe('the write-during-computation guard', () => {
   test.each([
@@ -1640,7 +1651,6 @@ describe('the write-during-computation guard', () => {
       'disposeDerivedNode',
       (graph: Graph) => disposeDerivedNode(graph, createDerivedNode(() => 0, strictEqual)),
     ],
-    ['pull', (graph: Graph) => pull(graph, createDerivedNode(() => 0, strictEqual))],
   ])('%s inside a computation throws', (_name, action) => {
     const graph = createGraph();
     const node = createDerivedNode(() => {
@@ -2051,7 +2061,7 @@ AGENTS.md says we do not have anything we do not use, and tests-only is not a re
 
 pico-runtime.md is not edited by this doc. These are the differences to apply there once the decisions settle:
 
-- The engine's public functions take a `Graph` first under open decision 2 (f), and the index exports `createGraph` and `Graph`. pico-runtime.md's The engine's public API, its use without Isograph, and its Which layer owns each item write the signatures without a graph. Which layer owns each item gains `Graph`, `createGraph`, `assertNotComputing`, `pullNode`, `neverComputed`, and `dependentsOf`.
+- The engine's public functions take a `Graph` first under open decision 2 (f), and the index exports `createGraph` and `Graph`. pico-runtime.md's The engine's public API, its use without Isograph, and its Which layer owns each item write the signatures without a graph. Which layer owns each item gains `Graph`, `createGraph`, `assertNotComputing`, `neverComputed`, and `dependentsOf`.
 - `disposeDerivedNode` resets the node to never computed (Disposal, open decision 9). pico-runtime.md's body leaves the state, which lets a later pull return a value no source explains.
 - `compute` counts running computations in a `finally`, under open decision 2 (f).
 - The tests are the files of Tests instead of one `test/graph.test.ts`, and the package has a `README.md`.
@@ -2060,6 +2070,7 @@ pico-runtime.md is not edited by this doc. These are the differences to apply th
 - The derived nodes must form a directed acyclic graph, and the engine has no cycle check (decision 4). pico-runtime.md open decision 8's options go.
 - The engine defines no equality and exports no `sameValue`; every `createDerivedNode` caller supplies `equal`, and the Isograph layer passes `===` (decision 6).
 - `createSourceNode` takes a required `equal`, and `writeSource` stores nothing and marks nothing when it accepts (decision 8). pico-runtime.md's `createSourceNode` callers in `store.ts` pass `===`.
+- A `sourceValue` or `pull` inside a computation is an untracked read, and the guard covers writes only (decision 10). pico-runtime.md's guard on `pull` goes.
 - New open decisions 8, 9, 10, and 11 below.
 
 ## Open decisions
@@ -2070,12 +2081,12 @@ The package is `@isograph/reactive-graph` and its directory is `libs/reactive-gr
 
 ### 2. A write during a computation
 
-pico-runtime.md open decision 2, restated in engine terms. A computation that reaches a source or a node through a closure can write, dispose, or pull at the top level while it computes (The design, Writes during a computation). pico rejects every write while a memo runs (`assert_empty_dependency_stack`, `crates/pico/src/database.rs:193-198`, called from `set`, `remove`, `remove_singleton`, and `run_garbage_collection`, `:151-170`). Reactively and Preact allow it.
+pico-runtime.md open decision 2, restated in engine terms. A computation that reaches a source or a node through a closure can write or dispose while it computes (The design, Writes during a computation). pico rejects every write while a memo runs (`assert_empty_dependency_stack`, `crates/pico/src/database.rs:193-198`, called from `set`, `remove`, `remove_singleton`, and `run_garbage_collection`, `:151-170`). Reactively and Preact allow it.
 
 - (a) No guard. A write inside a computation is undefined behavior. Cost: the stale `Clean` of the trace, with no error.
 - (d) A write counter on an engine object, read by `compute` before and after the computation; when it moved, `recompute` leaves the node `Dirty`. Cost: the engine object and a counter every write increments; it repairs the computing node only, and the write still ran.
 - (e) After `setDependencies`, `recompute` leaves the node `Dirty` when a recorded derived dependency is not `Clean`. Cost: one check per dependency per recompute; a source the computation read before the write changed it is not covered.
-- (f) `Graph` holds `computingDepth`; `writeSource`, `markSourceChanged`, `disposeDerivedNode`, and `pull` take it first and throw while it is positive; `readDerived` and `verify` call the unguarded `pullNode`. The body of this doc. Cost: every public call but the constructors and `sourceValue` takes a `Graph`; a node passed to another graph's functions is not detected.
+- (f) `Graph` holds `computingDepth`; `writeSource`, `markSourceChanged`, and `disposeDerivedNode` take it first and throw while it is positive; `pull` takes it first and does not throw, because a `pull` inside a computation is an untracked read (decision 10). The body of this doc. Cost: every public call but the constructors and `sourceValue` takes a `Graph`; a node passed to another graph's functions is not detected.
 - (g) As (f), but each node holds its graph, set by the constructors (Option (g)). Cost: one field per node; only the constructors change signature; a cross-graph read is detectable and throws.
 
 pico-runtime.md's (b) and (c) are guards on the Isograph environment. A closure that holds the store reaches the engine's functions without passing them, so they are not engine options. Not held. The API is written under (f) (The public API).
@@ -2117,16 +2128,11 @@ Writing an equal value does not propagate. A source takes a required equality, a
 New. pico-runtime.md's body leaves a disposed node's state as it was, so a `Clean` node pulled after disposal returns its old value although no source lists it; that is a defect, not an option. pico removes a collected memo's revision, and the next call of the memo computes it again (`crates/pico/tests/absent_source/garbage_collection.rs:46`).
 
 - (a) Disposal resets the node to never computed; a later pull computes it from scratch and reattaches its edges. The body of this doc. Held. Reason: pico's behavior. Cost: a consumer that pulls a node it disposed gets a working node again instead of an error.
-- (b) A fourth state, `Disposed`; `pullNode` throws on it, and so does a dependent's recomputation that reads it. Cost: every `switch` on the mark gains a case, and a dependent marked `Dirty` by the disposal throws on its next pull when its computation still reads the node.
+- (b) A fourth state, `Disposed`; `pull` throws on it, and so does a dependent's recomputation that reads it. Cost: every `switch` on the mark gains a case, and a dependent marked `Dirty` by the disposal throws on its next pull when its computation still reads the node.
 
-### 10. An untracked read inside a computation
+### 10. An untracked read inside a computation (decided)
 
-New. `sourceValue` records nothing. Called inside a computation, it reads a value the node will not be marked for (`dependencies.test.ts`, "sourceValue inside a computation records nothing"). pico allows the same hole: `MemoRef::lookup` reads without recording and `lookup_tracked` records (`crates/pico/src/memo_ref.rs:57`, `:80`), and `#[tracked]` maps have `untracked()`.
-
-- (a) Allowed. Held. Reason: pico's behavior; a deliberate untracked read inside a computation has uses (reading a value that only affects logging). Cost: a mistaken untracked read is a silently stale value.
-- (b) `sourceValue` takes the graph and throws while `computingDepth > 0`. Cost: under open decision 2 (f), every read outside a computation passes a graph; a deliberate untracked read is impossible.
-
-Recording the read is not an option: `sourceValue` has no context, and finding the running computation from it needs the ambient tracking the engine does not have.
+Allowed. `sourceValue(source)`, and a `pull` called inside a computation outside its context, read without recording a dependency of the running computation, like pico's untracked lookup (`MemoRef::lookup`, `crates/pico/src/memo_ref.rs:57`, against `lookup_tracked`, `:80`), Preact's `peek()`, and Solid's `untrack`. An untracked read writes no source and marks nothing. The write-during-computation guard (decision 2) covers writes only: `writeSource`, `markSourceChanged`, and `disposeDerivedNode`. `dependencies.test.ts` "sourceValue inside a computation records nothing" and "pull inside a computation records nothing" assert that a later write to what was read untracked does not mark the node.
 
 ### 11. Whether the package ships before its first caller
 
