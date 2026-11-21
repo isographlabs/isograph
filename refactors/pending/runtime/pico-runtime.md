@@ -305,6 +305,142 @@ function setDependencies(
 
 A throw out of a computation propagates out of `compute`, and a throw out of `equal` propagates out of `recompute`, before `setDependencies` and before any state is written, so the node keeps its mark, its previous value, and its previous dependencies and dependents, and the next pull recomputes it again. A verifying ancestor keeps its mark too. `recompute` calls `equal` before `setDependencies` for that reason: called after, a throw from `equal` would leave the node in the `dependents` sets of the new dependencies while its state lists the old ones, and a later `setDependencies` from the old list would never remove it from the sets only the failed run added. Calling `equal` first changes nothing else: `equal` compares two values and reads no node, and both branches store `computed.dependencies`, so a link that moved to a record with equal data still cuts off and the node depends on the new record. `resolverResultsEqual` does not throw; a field-supplied `outputEqual` (open decision 7) can. A resolver's own throw does not propagate: it is a stored value (Equality, `ResolverThrew`). What propagates is a throw of the walk outside the resolver, such as `linkAt` on a non-link (`libs/isograph-runtime/src/store.ts:74-86`). Open decision 3 covers that throw.
 
+## The engine and the Isograph runtime
+
+The engine is `graph.ts` in its own package (The engine package). It imports nothing. The Isograph runtime imports the engine's public API and nothing else from it: no Isograph function reads or writes a node's `value`, `dependents`, or `slot`, and no Isograph function calls `stateOf`, `markDirty`, `markCheck`, `verify`, `recompute`, `compute`, or `setDependencies`. The engine's public behavior is pico's: which values a read returns, which computations run again on a write, cutoff by equality, dependencies recorded per computation, and (open decision 2) a write during a computation failing. Reverse edges and marks are internal, as pico's epochs are.
+
+### The engine's public API
+
+```ts
+// from libs/<engine directory>/src/index.ts
+export {
+  type Computation,
+  type ComputeContext,
+  createDerivedNode,
+  createSourceNode,
+  type DerivedNode,
+  disposeDerivedNode,
+  markSourceChanged,
+  pull,
+  sameValue,
+  type SourceNode,
+  sourceValue,
+  writeSource,
+} from './graph';
+```
+
+```ts
+// from libs/<engine directory>/src/graph.ts
+export type SourceNode<TValue> = {
+  value: TValue;
+  readonly dependents: Set<AnyDerivedNode>;
+};
+export type DerivedNode<TValue> = {
+  readonly computation: Computation<TValue>;
+  equal(previous: TValue, next: TValue): boolean;
+  readonly slot: StateSlot<TValue>;
+  readonly dependents: Set<AnyDerivedNode>;
+};
+export type Computation<TValue> = (context: ComputeContext) => TValue;
+export type ComputeContext = {
+  readSource<TValue>(source: SourceNode<TValue>): TValue;
+  readDerived<TValue>(node: DerivedNode<TValue>): TValue;
+};
+
+export function createSourceNode<TValue>(value: TValue): SourceNode<TValue>;
+export function createDerivedNode<TValue>(
+  computation: Computation<TValue>,
+  equal: (previous: TValue, next: TValue) => boolean,
+): DerivedNode<TValue>;
+export function sourceValue<TValue>(source: SourceNode<TValue>): TValue;
+export function writeSource<TValue>(source: SourceNode<TValue>, value: TValue): void;
+export function markSourceChanged(source: SourceNode<unknown>): void;
+export function pull<TValue>(node: DerivedNode<TValue>): TValue;
+export function disposeDerivedNode(node: AnyDerivedNode): void;
+export function sameValue(previous: unknown, next: unknown): boolean;
+```
+
+Every export has a caller in the Isograph runtime: `createSourceNode` and `sourceValue` in `store.ts`, `writeSource` in `normalize.ts` and `test/fixtures.ts`, `markSourceChanged` and `disposeDerivedNode` in `deleteRecord`, `createDerivedNode`, `pull`, and `sameValue` in `storedResults.ts`, and the four types in `store.ts` and `storedResults.ts`. `AnyDerivedNode`, `StateSlot`, `DerivedNodeState`, its three states, `PreviousValue`, and `Dependency` are exported from `graph.ts` for the declaration of `DerivedNode`, and not from the package index: no caller names them. Open decision 21 covers that a consumer can still write a node's fields.
+
+### A use without Isograph
+
+Two sources and two derived nodes of different value types:
+
+```ts
+// from libs/<engine directory>/test/graph.test.ts
+import { expect, test } from 'vitest';
+import { createDerivedNode, createSourceNode, pull, sameValue, writeSource } from '../src';
+
+test('a write recomputes what changed and cuts off at an equal value', () => {
+  const calls = { sum: 0, parity: 0, label: 0 };
+  const a = createSourceNode(1);
+  const b = createSourceNode(2);
+  const sum = createDerivedNode((context) => {
+    calls.sum += 1;
+    return context.readSource(a) + context.readSource(b);
+  }, sameValue);
+  const parity = createDerivedNode((context) => {
+    calls.parity += 1;
+    return context.readDerived(sum) % 2 === 0 ? 'even' : 'odd';
+  }, sameValue);
+  const label = createDerivedNode((context) => {
+    calls.label += 1;
+    return `the sum is ${context.readDerived(parity)}`;
+  }, sameValue);
+
+  const first = pull(label);
+  expect(first).toBe('the sum is odd');
+  expect(calls).toEqual({ sum: 1, parity: 1, label: 1 });
+
+  writeSource(a, 3);
+  expect(calls).toEqual({ sum: 1, parity: 1, label: 1 });
+  expect(pull(label)).toBe(first);
+  expect(calls).toEqual({ sum: 2, parity: 2, label: 1 });
+});
+```
+
+```text
+read label: Dirty, no value -> recompute label
+  parity: Dirty, no value -> recompute parity
+    sum: Dirty, no value -> recompute sum
+      a -> a.dependents = {sum}
+      b -> b.dependents = {sum}
+      sum Clean 3
+    sum.dependents = {parity}
+    parity Clean "odd"
+  parity.dependents = {label}
+  label Clean "the sum is odd"
+write a = 3 -> a.dependents = {sum} -> sum Dirty -> sum.dependents = {parity} -> parity Check
+            -> parity.dependents = {label} -> label Check
+read label: Check -> parity Check -> sum Dirty -> recompute sum: a, b -> 5 !== 3 -> sum Clean 5
+  -> sum.dependents = {parity} -> parity Dirty
+  -> recompute parity: sum Clean -> "odd" === "odd" -> parity Clean, keeps "odd" -> label Clean without running
+```
+
+The write runs nothing. The read runs `sum` and `parity` once each and not `label`, and returns the same string.
+
+### Which layer owns each item
+
+Engine (`libs/<engine directory>/src/graph.ts`):
+
+- Types: `SourceNode`, `DerivedNode`, `AnyDerivedNode`, `StateSlot`, `DerivedNodeState`, `CleanState`, `CheckState`, `DirtyState`, `PreviousValue`, `Dependency`, `Computation`, `ComputeContext`, `Computed`.
+- Marks `Clean`, `Check`, `Dirty`; `markDirty`, `markCheck`; `markSourceChanged`.
+- `pull`, `verify`, `recompute`, `compute` (the context and dependency recording), `setDependencies`, `stateOf`.
+- `createSourceNode`, `createDerivedNode`, `sourceValue`, `writeSource`, `disposeDerivedNode`, `sameValue` (moved from `storedResults.ts`).
+- The write-during-computation guard, under whichever option open decision 2 takes.
+- A cycle check, if open decision 8 adds one.
+- Later: `rootCount` and `retainRoot` (Later: retention); the reachability walk `collect` needs, as a function over root nodes that returns the derived nodes they reach through `Derived` dependencies (Later: collecting derived nodes); `listen`, `notify`, and node effects with `reconcileEffects` (Later: keeping values up to date automatically); layers, worlds, `stateOf(node, world)`, and source overrides read through `readSource` and `sourceValue` (Later: a DAG of graphs).
+
+Isograph runtime (`libs/isograph-runtime/src`):
+
+- `store.ts`: `Store`, `RecordContainer`, `RecordPresence`, `StoreSourceNode`, `ResolverNode`, `MISSING`, `Missing`, `recordContainer`, `containerAt`, `presentContainerAt`, `sourceNodeAt`, `storeValue`, `recordPresence`, `storeSnapshot`, `PlainStore`, `deleteRecord`.
+- `read.ts`: `ResolverResult`, `ReadResolverOk`, `OkOrigin`, `ReadResolverThrew`, `ReadHooks`, `readData`, `readStoreValue`, `readButDoNotEvaluate`, `evaluatingHooks`, `read`.
+- `storedResults.ts`: `readStoredResult`, `resolverNodeAt`, `resolverComputation`, `contextHooks`, `callResolver`, `resolverResultsEqual`; later `collect`, which iterates the containers' `derived` maps, calls the engine's reachability walk, and calls `disposeDerivedNode` and removes each unreached node from its container.
+- `storeKey.ts`: `resolverStoreKey`. `artifacts.ts`: `ReaderArtifact.selectableName`.
+- `normalize.ts`: `WrittenValue`, `writeValue`, `isUnchanged`, `leafUnchanged`, `compositeUnchanged`.
+- `check`, `garbageCollect` (mark and sweep), `test/fixtures.ts`'s `storeFrom`, the subscription re-read (`readSubscription`, `storedResultHooks`, `callSubscriptions`, `subscriptionResultsAreEqual`).
+- Later: `retention.ts` (`Retention`, `retainEntrypoint`, `dispose`, `Entrypoint`), the fetch decision, subscriptions as derived nodes, React's `useSyncExternalStore` hook, and `normalize` writing into a layer.
+
 ## The store
 
 The store is the set of source nodes. A record is a container that holds its source nodes by store key and the derived nodes it owns by resolver store key.
@@ -1246,3 +1382,11 @@ A standalone engine holds nodes of different value types in one graph (a `Derive
 - (a) `===`, upstream's comparison of resolver values (`areEqualWithDeepComparison.ts:84-95`). The body is written for (a) until this is decided. Cost: the `0` and `-0` cutoff above.
 - (b) `Object.is`. Held, not decided. Reason: it is the comparison the Equality section's rule admits; it answers equal for `NaN` and `NaN` (indistinguishable) and unequal for `0` and `-0` (distinguishable). Cost: a deviation from upstream's `===` for resolver values, and a resolver that returns `-0` and then `0` marks its readers.
 - (c) No engine default: `createDerivedNode` callers write their own. Cost: every caller restates `===` or `Object.is`; Isograph's `resolverNodeAt` and the usage example need one anyway.
+
+### 21. Whether a consumer can write a node's fields
+
+`SourceNode` and `DerivedNode` are plain object types, and their fields are visible to every consumer of the package. A consumer that writes `dependents` breaks the rule that the `dependents` sets are the inverse of the dependency lists (Pull, `setDependencies`), and the result is a silently stale value.
+
+- (a) Plain object types; each field's comment names its only reader and writer (The graph). Held, not decided. Reason: (b) and (c) each cost a cast or a sound-but-slower link type. Cost: the field comments are the only guard, against AGENTS.md's "Never rely on discipline what we can enforce with newtypes", once the engine has consumers outside this repo.
+- (b) Classes with ES private fields (AGENTS.md, TypeScript): `class SourceNode<TValue> { #value; #dependents }` and `class DerivedNode<TValue> { #computation; #equal; #slot; #dependents }`. `setDependencies` and `markSourceChanged` read another class's private fields through module-local functions assigned in each class's `static {}` block (ES2022, `tsconfig.build.json`'s `target`). Cost: a private field `#equal: (previous: TValue, next: TValue) => boolean` makes `DerivedNode<number>` not assignable to `DerivedNode<unknown>` (checked with this repo's `tsc` 5.6.3), so the erased link of open decision 19 (a) no longer type-checks; (b) needs open decision 19 (c) or a cast at each link. A node cannot be wrapped in a `Proxy` (AGENTS.md, TypeScript).
+- (c) Opaque public types: the index exports `SourceNode<TValue>` and `DerivedNode<TValue>` as branded types with no visible fields, and `graph.ts` casts each to its field type. Cost: a cast in every engine function that receives a node.
