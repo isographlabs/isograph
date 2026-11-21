@@ -184,13 +184,37 @@ pub struct NormalizationLeafTarget {
 pub struct ListDepth(pub u32);
 
 impl<T> Wrapper<T> {
-    /// The number of `List` layers, when every variant of a union has the same number;
-    /// `None` otherwise.
-    pub fn list_depth(&self) -> Option<ListDepth>;
+    /// The number of `List` layers along the non-`Null` variants, when every non-`Null` variant
+    /// of each union has the same number; `None` otherwise.
+    pub fn list_depth(&self) -> Option<ListDepth> {
+        match self {
+            Wrapper::Inner(_) => ListDepth(0).wrap_some(),
+            Wrapper::List(list) => list.list_depth().map(|depth| ListDepth(depth.0 + 1)),
+            Wrapper::Union(union) => {
+                let mut depths = union.0.iter().filter_map(|variant| match variant {
+                    WrapperVariant::Inner(_) => ListDepth(0).wrap_some().wrap_some(),
+                    WrapperVariant::List(list) => {
+                        list.list_depth().map(|depth| ListDepth(depth.0 + 1)).wrap_some()
+                    }
+                    WrapperVariant::Null => None,
+                });
+                let first = depths.next().unwrap_or(ListDepth(0).wrap_some())?;
+                depths.all(|depth| depth == first.wrap_some()).then_some(first)
+            }
+        }
+    }
 }
 ```
 
-Before: `NormalizationTarget::Leaf` is a unit variant (`crates/isograph_compiler/src/normalization_ast.rs:51-56`, built at `:146`), and the composite target and each conditional carry a `CompletedIdentity`. The identity of a composite target and of a conditional goes: the runtime reads the concrete entity's table (`recordIdentity`'s search of the conditionals goes with it, `libs/isograph-runtime/src/recordId.ts:73-84`). `MergedSelectionTarget::Leaf` and `CompletedSelectionTarget::Leaf` (`merged_selection.rs`) carry the same `NormalizationLeafTarget`, built in `server_contribution` from `target_name` and `server.target.list_depth()`. A protocol type whose union variants differ in list depth is `SelectionMapErrorKind::MixedListDepth(SelectableKey)`, "`P.f` mixes list and non-list types." No GraphQL type has such a union. Two merged leaf selections with one key have one target, since the target follows from the selectable. Query generation is unchanged by the identity's move: `complete` still adds the discriminator and the identity selection to the query (`merged_selection.rs:1547-1566`).
+`Null` adds no layer and is not compared: a nullable `W` is `Union([W, Null])` (`crates/isograph_compiler/src/wrapper.rs:5-6`), so `W` and `W | null` have the same depth. A union whose only variant is `Null` has depth 0, since its only value is `null`. By type, on the store fixture's schema (`libs/isograph-runtime/fixtures/store/schema/schema.graphql`):
+
+- `name: String!`, `Inner(String)`: 0.
+- `nickname: String`, `Union([Inner(String), Null])`: 0.
+- `tags: [String]`, `Union([List(Union([Inner(String), Null])), Null])`: 1.
+- `pets: [Pet!]!`, `List(Inner(Pet))`: 1.
+- `petGrid: [[Pet]]`: 2.
+
+Before: `NormalizationTarget::Leaf` is a unit variant (`crates/isograph_compiler/src/normalization_ast.rs:51-56`, built at `:146`), and the composite target and each conditional carry a `CompletedIdentity`. The identity of a composite target and of a conditional goes: the runtime reads the concrete entity's table (`recordIdentity`'s search of the conditionals goes with it, `libs/isograph-runtime/src/recordId.ts:73-84`). `MergedSelectionTarget::Leaf` and `CompletedSelectionTarget::Leaf` (`merged_selection.rs`) carry the same `NormalizationLeafTarget`, built in `server_contribution` from `target_name` and `server.target.list_depth()`. A protocol type whose non-`Null` union variants differ in list depth is `SelectionMapErrorKind::MixedListDepth(SelectableKey)`, "`P.f` mixes list and non-list types." No GraphQL type has such a union: a GraphQL union type is a union of entities, and a wrapper union arises only from nullability, whose second variant is `Null`. Two merged leaf selections with one key have one target, since the target follows from the selectable. Query generation is unchanged by the identity's move: `complete` still adds the discriminator and the identity selection to the query (`merged_selection.rs:1547-1566`).
 
 `normalization_ast.rs` in `typescript_artifacts` prints `target: { kind: "Leaf", entityName: "String", listDepth: 0 }` where it printed `target: null` (`crates/typescript_artifacts/src/normalization_ast.rs:91-95`), `target: { kind: "Composite", entity, selections }` for a composite, no `identity`, and `tables: { Pet: () => Pet__entity_table(), .. }`, each entry an `ArtifactValue::ImportCallThunk` (`crates/typescript_artifacts/src/module.rs:44-57`). The runtime types are pico-runtime.md's.
 
