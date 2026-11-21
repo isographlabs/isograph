@@ -528,20 +528,25 @@ export type Observed<TValue> = {
   effect: ObservedEffect<TValue>;
 };
 
-/** `NotSetUp`: the node has no effect, no node is stored at the id, or `setUp` threw.
- * `SetUp`: `setUp` ran with `value`; `tearDown` releases it. */
+/** `NotSetUp`: the node has no effect, or no node is stored at the id.
+ * `SetUp`: `setUp` ran with `value`; `tearDown` releases it.
+ * `SetUpThrew`: `setUp` threw for `value`; nothing is held. */
 export type ObservedEffect<TValue> =
   | { readonly kind: 'NotSetUp' }
-  | { readonly kind: 'SetUp'; readonly value: TValue; readonly tearDown: CleanupFn };
+  | { readonly kind: 'SetUp'; readonly value: TValue; readonly tearDown: CleanupFn }
+  | { readonly kind: 'SetUpThrew'; readonly value: TValue };
 ```
 
 These replace change 2's `DerivedNodeDefinition` and change 4's `Observed`. `DerivedNode` gains `readonly effect: NodeEffect<TValue>`, copied from its definition by `createDerivedNode`. `RecomputationGraph` gains `readonly pendingTeardowns: CleanupFn[]`, the teardowns of replaced and disposed effects not yet run, and:
 
 ```ts
 // from libs/isograph-runtime/src/graph.ts
-/** For each mounted derived node with an effect whose value is not `===` the value its effect was
- * set up with: sets up the effect with the new value, then pushes the old teardown to
- * `pendingTeardowns`. Each `setUp` runs through `reportCallbackError`. Never throws. */
+/** For each `Observed` with a callback whose id holds a stored derived node with an `Effect`:
+ * `NotSetUp`: sets up the effect with the node's value. `SetUp` or `SetUpThrew` with a `value` not `===`
+ * the node's value: sets up the effect with the node's value, then pushes the old teardown of a
+ * `SetUp` to `pendingTeardowns`. Otherwise leaves the effect as is. A `setUp` that throws leaves
+ * `SetUpThrew` with the value it was called with. Each `setUp` runs through `reportCallbackError`.
+ * Never throws. */
 export function reconcileEffects<TValue>(graph: RecomputationGraph<TValue>): void;
 
 /** Runs and empties `pendingTeardowns` in order, each teardown through `reportCallbackError`. Never throws. */
@@ -556,7 +561,9 @@ Contract on `setUp`: a `setUp` that can return a `===` resource on two calls (a 
 
 The runtime pulls the mounted derived nodes with an effect after every write, whether or not open decision 28 pulls observed derived nodes: an effect whose inputs changed must be replaced even when no reader reads the node. `settle` pulls every derived node whose `Observed` has a callback and whose `effect` is not `None`; under open decision 28 (a) that is a subset of the observed derived nodes it already pulls.
 
-`normalizeData` runs `settle`, the new root's `retainRoot`, `notify`, `reconcileEffects`, then `flushTeardowns`; `garbageCollectEnvironment` runs `settle`, `notify`, `reconcileEffects`, and `flushTeardowns` at its end. `observe` sets up the effect of the node it mounts after bringing it up to date, and its stop function, when it removes the last callback, pushes the teardown to `pendingTeardowns` and flushes. `disposeDerivedNode` of a mounted node (`deleteSource`; `collect` keeps every node with `rootCount > 0`) pushes its teardown.
+`normalizeData` runs `settle`, the new root's `retainRoot` (`retainEntrypoint`), then `notify`, `callSubscriptions`, `reconcileEffects`, and `flushTeardowns`; the last four run in change 4's `finally`, so they run when `settle` or the root hold throws. `garbageCollectEnvironment` runs `settle` and then, in its `finally`, `notify`, `callSubscriptions`, `reconcileEffects`, and `flushTeardowns`. `flushTeardowns` runs after `callSubscriptions` because a subscription's callback is an observer of the settlement too, and the ordering guarantee below tears a replaced effect down only after every observer was notified. `reconcileEffects` runs after `callSubscriptions` because a subscription's re-read can create a derived node at a mounted id (change 4, `listen` and `snapshot`), and `reconcileEffects` then sets up that node's effect in the same write.
+
+`observe` sets up the effect of the node it mounts after bringing it up to date. When no node is stored at the id, `observe` only registers and the effect stays `NotSetUp`; it is set up when the node is created: inside a write by that write's `reconcileEffects` (`NotSetUp` with a stored node), and outside a write by `notifyCreated`, which, after calling an id's callbacks, sets up the effect of the node created there when its `effect` is `Effect`. `notifyCreated` pushes no teardown, because a created node's `Observed.effect` was `NotSetUp`, so it does not flush; it runs after `track` or `retainRoot` returned, so no `setUp` runs inside a computation. A `readStoredResult` that a render makes can therefore set up an effect during the render; the node is mounted, because an `observe` already registered at its id at a commit. `observe`'s stop function, when it removes the last callback, pushes the teardown of a `SetUp` effect to `pendingTeardowns` and flushes. `disposeDerivedNode` of a mounted node (`deleteSource`; `collect` keeps every node with `rootCount > 0`) pushes the teardown of a `SetUp` effect and sets `Observed.effect` to `NotSetUp`, so a node created later at the id is set up again.
 
 Ordering guarantees:
 
@@ -572,7 +579,7 @@ A retained query nobody renders mounts nothing, so its derived nodes set up no e
 
 A `setUp` that throws. Options:
 
-- (a) `reconcileEffects` and `observe` run `setUp` through `reportCallbackError`; the effect becomes `NotSetUp`, the old effect is torn down as for any replacement, and the next value the node takes sets up again. Held. Reason: open decision 9's rule, and a failed effect does not change the node's value, which the computation alone determines.
+- (a) `reconcileEffects`, `observe`, and `notifyCreated` run `setUp` through `reportCallbackError`; the effect becomes `SetUpThrew` with the value `setUp` was called with, the old effect is torn down as for any replacement, and the next value the node takes (a value not `===` that one) sets up again. Held. Reason: open decision 9's rule, and a failed effect does not change the node's value, which the computation alone determines.
 - (b) Keep the old effect. Cost: a resource set up for a value the node no longer has.
 - (c) Propagate out of `normalizeData`. Cost: the remaining effects are not reconciled and the write's caller sees an effect's failure.
 
@@ -606,7 +613,7 @@ Each change is one commit, in order; change 2 is two. Step A has landed and is i
 - 3. Level 1 retention. `normalizeData` takes the entrypoint, computes its root result and every result that result reaches by a read of the root, holds the root in the graph, and adds its `Retention` to `environment.retainedQueries`. `garbageCollectEnvironment` disposes the derived nodes that no held root and no current subscription's last read reaches; each `Subscription` records the derived nodes its last read read directly. A later write marks a retained query's affected derived nodes.
 - 4. Level 2 and the post-write pull. The graph gains the observers. `listen` brings its derived node up to date and holds it as a root; `snapshot` is a lookup. After a write's marking, `settle` pulls every observed derived node, and observers are notified once, after the pull (open decision 28, held (a)). `garbageCollectEnvironment` settles and notifies after its deletions.
 
-Values with lifecycles (open decision 13) adds no change here: it is a later change, with the first feature that produces a value with an effect, and adds `NodeEffect`, `Observed.effect`, `pendingTeardowns`, `reconcileEffects`, and `flushTeardowns` to the engine.
+Values with lifecycles (open decision 13) adds no change here: it is a later change, with the first feature that produces a value with an effect, and adds `NodeEffect`, `Observed.effect`, `pendingTeardowns`, `reconcileEffects`, `flushTeardowns`, and the effect setup in `notifyCreated` to the engine.
 
 ## Step A: re-read every subscription after each write
 
@@ -2907,7 +2914,7 @@ The review's scenario holds under held 3b. A derived node `P` is `Dirty` and rec
 
 pico guards writes, not reads, as (c) does: `Database::set`, `remove`, `remove_singleton`, and `run_garbage_collection` call `assert_empty_dependency_stack`, which panics with "Cannot modify database while a memoized function is being invoked." when a memo is running (`crates/pico/src/database.rs:151-170`, the assertion at `:193-198`). A memo that calls another memo is a read, recorded on pico's dependency stack, which is ambient state. Here a computation's reads are recorded only through its `ComputeContext`, a parameter (change 2, The engine), so an inner `readStoredResult` from a closure is unrecorded, where pico's would be recorded; that is why (b) guards reads as well.
 
-Callbacks are outside this decision. Level 2 callbacks run in `notify`, after `settle` pulled every observed derived node, and a callback that calls `normalizeData` runs a nested write with its own settlement and notification (Reads during recalculation). A Step A callback runs in `callSubscriptions`, after `normalize` returned. The effects of Values with lifecycles are set up in `reconcileEffects` and `observe` and torn down in `flushTeardowns`, after `notify`. None runs while a computation runs, so none is reentrant into level 1. A computation's call of `readStoredResult`, `normalizeData`, or `garbageCollectEnvironment` is the only reentrant path.
+Callbacks are outside this decision. Level 2 callbacks run in `notify`, after `settle` pulled every observed derived node, and a callback that calls `normalizeData` runs a nested write with its own settlement and notification (Reads during recalculation). A Step A callback runs in `callSubscriptions`, after `normalize` returned. The effects of Values with lifecycles are set up in `reconcileEffects`, `observe`, and `notifyCreated` and torn down in `flushTeardowns`, after `notify` and `callSubscriptions`. None runs while a computation runs, so none is reentrant into level 1. A computation's call of `readStoredResult`, `normalizeData`, or `garbageCollectEnvironment` is the only reentrant path.
 
 Not held.
 
@@ -2944,7 +2951,7 @@ Settled: (a).
 
 The analysis is Values with lifecycles.
 
-- (a) Computation and effect are split (held, the user's direction). A computation is pure and runs on every pull, in any world and in any render. A resource the value needs is the node's effect: set up at mount commit (`observe`), torn down on unmount, on disposal, or when a write gives the node a new value, after the new effect is set up; teardowns are deferred until after notification and flushed in order; a `===` value leaves the effect as is. After a write the runtime pulls the mounted derived nodes with an effect and reconciles their effects (`reconcileEffects`). A `setUp` that throws is reported and leaves the effect `NotSetUp` (held); a teardown that throws is reported and does not stop the flush (held, open decision 9). Cost: a resource exists only while its node is mounted, so a retained query nobody renders acquires nothing. That conflicts with Follow-ups 1, the user's note, whose constructor runs at normalization time and whose lifetime follows retain and release rather than render.
+- (a) Computation and effect are split (held, the user's direction). A computation is pure and runs on every pull, in any world and in any render. A resource the value needs is the node's effect: set up at mount commit (`observe`), torn down on unmount, on disposal, or when a write gives the node a new value, after the new effect is set up; teardowns are deferred until after notification and flushed in order; a `===` value leaves the effect as is. After a write the runtime pulls the mounted derived nodes with an effect and reconciles their effects (`reconcileEffects`). A `setUp` that throws is reported and leaves the effect `SetUpThrew` with its value (held); a teardown that throws is reported and does not stop the flush (held, open decision 9). Cost: a resource exists only while its node is mounted, so a retained query nobody renders acquires nothing. That conflicts with Follow-ups 1, the user's note, whose constructor runs at normalization time and whose lifetime follows retain and release rather than render.
 - (b) The engine constructs inside the computation: a `Disposable` computation returns an `ItemCleanupPair`, the engine holds it, and releases it when the value is replaced or the node is disposed. Not held: a computation runs in every pull, including one a discarded concurrent render makes and, with forks, one in a world that is never committed, so it would acquire a resource whose release no commit or unmount triggers.
 - (c) Lifecycles outside the engine: a disposable value lives in a registry the resolver's code calls, and the engine stores only the handle. Cost: nothing releases a handle when the derived node's value is replaced or the node is disposed, so the registry needs its own reachability, which is the engine's again.
 
