@@ -725,7 +725,7 @@ Every table and artifact module default-exports a function, and every reference 
 
 A refinement `asPet` on `Node` is a derived field the compiler generates on `Node` with target `Pet` (linked-only-selections.md, Generated refinement fields). Its reader AST is empty and its resolver is `({ link }) => (link.entityName === 'Pet' ? { entityName: 'Pet', id: link.id } : null)`: a link's `entityName` is the `__typename` `normalize` stored the record under (`recordEntityName`, `libs/isograph-runtime/src/recordId.ts:50-68`), so the resolver reads nothing. When the value is a link, the walk continues at it as `Pet`. Its node on `Pet:1` is keyed `Node.asPet/{}` in `Pet:1`'s `derived`, has no dependencies, is computed once and never marked, and is disposed with its record. Cost: one node per record per selected refinement, and one edge per reader.
 
-`__self` is not in a table. It is a field of every entity whose value is the current record's link, read as the same entity, so `__self { name }` at `Pet:1` reads `name` at `Pet:1` as `Pet`, and a bare `__self` at a scalar record reads `__value`. The walk recognizes the name (open decision 27).
+`__self` is not in a table. It is a field of every entity whose value is the current record's link, read as the same entity, so `__self { name }` at `Pet:1` reads `name` at `Pet:1` as `Pet`, and a bare `__self` at a scalar record reads `__value`. The walk recognizes the name (open decision 27). It arrives in core change 7, which gives the code.
 
 ### The walk
 
@@ -766,8 +766,6 @@ function readSelection<TFailure>(
 ): ReadResult<unknown> | TFailure {
   const field = fieldOf(table, entity, selection.fieldName);
   switch (field.kind) {
-    case 'Self':
-      return nested(selection.alias, record, readAt(hooks, tables, selection.selections, record, entity, variables));
     case 'Source': {
       const key = storeKey(selection.fieldName, selection.arguments, variables);
       const value = readStoreValue(hooks, record, key);
@@ -818,12 +816,12 @@ function readAt<TFailure>(
   }
 }
 
-/** The origin of `fieldName` on `entity`: `__self`, or its table entry. Throws when the table has no
- * entry: the compiler lists every field of the entity. */
-function fieldOf(table: EntityTable, entity: EntityName, fieldName: string): FieldEntry | { readonly kind: 'Self' };
+/** The entry of `fieldName` in `entity`'s table. Throws when the table has no entry: the compiler
+ * lists every field of the entity. Core change 7 adds `__self`. */
+export function fieldOf(table: EntityTable, entity: EntityName, fieldName: string): FieldEntry;
 
 /** `tables[entity]()`. Throws when absent: the compiler imports every entity the walk reads at. */
-function tableOf(tables: EntityTables, entity: EntityName): EntityTable;
+export function tableOf(tables: EntityTables, entity: EntityName): EntityTable;
 
 /** A linked derived field's non-`null` value as a link. Throws when it is not one: the field's resolver
  * is generated and returns a link or `null`. */
@@ -844,7 +842,7 @@ function eachLink<TFailure>(
 
 At the record `R` read as entity `E`, for the selection `{ alias, fieldName, arguments, selections }`:
 
-- The entry of `fieldName` in `E`'s table decides the value `v`: a `Source` reads the source node of the store key on `R`; a `Derived` pulls its derived node on `R`; `__self` is `R`, read as `E`.
+- The entry of `fieldName` in `E`'s table decides the value `v`: a `Source` reads the source node of the store key on `R`; a `Derived` pulls its derived node on `R`; from core change 7, `__self` is `R`, read as `E`.
 - `MISSING` is `MissingData`. A derived node's `MissingData` or `ResolverThrew` passes up unchanged. `null` is `null`.
 - A source's list maps item by item at any depth. A derived value is never mapped.
 - A `Derived` entry with target `null` returns `v` as is: the walk does not inspect an opaque output.
@@ -1522,6 +1520,32 @@ Each is one commit, in order; each is independently shippable.
    Tests. Every generated artifact under `libs/isograph-runtime/fixtures/store/src/__isograph` and `demos/pet-demo/src/__isograph` is regenerated: reader ASTs in the minimal shape, one `entity_table.ts` per imported entity, `parentEntityName`, `selectableName`, and `tables` on each reader artifact, and `tables` on each normalization AST. The landed tests of `test/read.test.ts`, `test/normalize.test.ts`, `test/check.test.ts`, `test/garbageCollection.test.ts`, and `test/subscribe.test.ts` keep their assertions. New: in `test/read.test.ts`, "a Node-typed node(id:) selection of asPet on a Checkin record is null", "asPet on a Pet record reads the selections at the record as Pet", and "a Source entry missing from the entity table throws"; in `test/normalize.test.ts`, "the record id comes from the entity table's storage", and "a response naming an entity with no table throws"; in `test/subscribe.test.ts`, "a link moved to a record with equal data is equal".
 
 7. Prefactor: linked-only selections (linked-only-selections.md, change 3). Validation, query generation, and reader generation accept bare object selections, selection sets on scalars, client fields on scalar entities, and `__self`. Observable: `read` of the Example's `PetDetailPage` on the store fixture returns `{ pet: { n1: "Ricky", n2: { toUppercase: "RICKY" }, bestFriend: { name: "Mango" } } }`, calling `toUppercase` on every read; a bare `bestFriend` is `EMPTY_DATA` or `null`.
+
+   The walk's `__self`, in this change:
+
+   ```ts
+   // from libs/isograph-runtime/src/read.ts
+   // core change 7
+   // fieldOf, before (core change 6, The walk):
+   export function fieldOf(table: EntityTable, entity: EntityName, fieldName: string): FieldEntry;
+   // after:
+   /** The origin of `fieldName` on `entity`: `__self`, or its table entry. Throws when the table has no
+    * entry: the compiler lists every field of the entity. */
+   export function fieldOf(
+     table: EntityTable,
+     entity: EntityName,
+     fieldName: string,
+   ): FieldEntry | { readonly kind: 'Self' };
+
+   // readSelection's switch gains, before `case 'Source'`:
+       case 'Self':
+         return nested(selection.alias, record, readAt(hooks, tables, selection.selections, record, entity, variables));
+
+   // from libs/isograph-runtime/src/areEqualWithDeepComparison.ts
+   // selectionValuesAreEqual's switch gains, before `case 'Source'`:
+       case 'Self':
+         return targetValuesAreEqual(tables, entity, selection.selections, delivered, read);
+   ```
 
    Tests. The store fixture gains the Example's fields (`field Query.PetDetailPage`, `field String.toUppercase`, linked-only-selections.md, Generated files for the example). New: in `test/read.test.ts`, "PetDetailPage reads n1, n2 through toUppercase, and bestFriend", "a bare bestFriend is EMPTY_DATA, or null when the link is null", "a bare __self on a scalar record is its value", and "__self with a selection set reads at the same record".
 
