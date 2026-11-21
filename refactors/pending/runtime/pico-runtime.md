@@ -425,7 +425,7 @@ The functions are written under open decision 2 (f): `writeSource`, `markSourceC
 Two sources and two derived nodes of different value types:
 
 ```ts
-// from libs/reactive-graph/test/graph.test.ts
+// from libs/reactive-graph/test/recompute.test.ts
 import { expect, test } from 'vitest';
 import { createDerivedNode, createGraph, createSourceNode, pull, writeSource } from '../src';
 
@@ -519,6 +519,7 @@ The engine is a workspace library beside the Isograph runtime, at `libs/reactive
 ```text
 libs/reactive-graph/
   package.json
+  README.md                the package README (reactive-engine.md, The package README)
   tsconfig.json            references tsconfig.package.json and tsconfig.test.json
   tsconfig.package.json    extends ../../tsconfig.build.json, includes src/**/*.ts
   tsconfig.test.json       extends ../../tsconfig.build.json, includes test/**/*.ts
@@ -526,7 +527,13 @@ libs/reactive-graph/
   vitest.config.ts         typecheck enabled with tsconfig.test.json
   src/graph.ts
   src/index.ts
-  test/graph.test.ts
+  test/recompute.test.ts      chains, reuse, cutoff, marking and short circuit, pull order, diamond
+  test/dependencies.test.ts   recorded order, branch changes, repeated reads, absence as a value, untracked reads
+  test/errors.test.ts         a throwing computation leaves the graph's state unchanged
+  test/disposal.test.ts       disposal
+  test/guard.test.ts          the write-during-computation guard (open decision 2 (f))
+  test/degenerate.test.ts     degenerate nodes, sources, and values
+  test/graph.test-d.ts        types
 ```
 
 ```json
@@ -629,7 +636,15 @@ The runtime resolves the engine through `node_modules` to its `dist`, as it reso
         files: '^libs/(isograph-runtime|isograph-disposable-types|reactive-graph)/'
 ```
 
-The engine's tests are `test/graph.test.ts`: the use without Isograph (The engine and the Isograph runtime), and the traces of Traces rebuilt over plain source nodes: a `Check` node that ends `Clean` without running, a `Check` node whose derived dependency changed, a dependency set that changes between computations (the link retarget), a throw out of a computation that leaves the node's mark and edges, and disposal marking the disposed node's dependents. Each counts computation calls and asserts values with `toBe`.
+The engine's tests are the files of `refactors/pending/runtime/reactive-engine.md`, Tests, which also lists the ports of the Rust pico crate's tests; the use without Isograph (The engine and the Isograph runtime) is in `test/recompute.test.ts`. Each test counts computation calls and asserts values with `toBe` and `toEqual`. The `README.md` is reactive-engine.md's The package README.
+
+CI: `.github/workflows/js.yml`'s `babel-plugin` job runs `pnpm compile-libs`, which turbo runs for every workspace package with a `compile-libs` script, so the engine is type-checked and built there with no change. The job gains one step after "Test @isograph/disposable-types":
+
+```yaml
+# from .github/workflows/js.yml
+      - name: Test @isograph/reactive-graph
+        run: pnpm --filter @isograph/reactive-graph test
+```
 
 ## The store
 
@@ -1551,7 +1566,7 @@ Each is one commit, in order; each is independently shippable.
 3. Prefactor: the selection kinds on v1's language (linked-only-selections.md, change 1). The compiler emits `Link` with a `Selections` target for a v1 linked selection, `Derived` for a client field, and `DerivedLink` of a generated refinement field (`Node/asPet/`) for a refinement; a v1 scalar selection keeps v1's `Scalar` kind until change 4. `reader_artifact_file` writes `selectableName` first (`Pet/PetName/resolver_reader.ts` gains `selectableName: "PetName",`). The walk reads the new kinds through v1's hooks. Observable: every generated artifact is regenerated in the new shape; the pet script's output is unchanged; the runtime's read tests pass unchanged.
 4. Prefactor: scalar records (linked-only-selections.md, change 2; Scalar records). The normalization AST's `Leaf` target, `VALUE_KEY`, `omittedRecordId`, `leafRecords`, and `check`'s and the mark's `Leaf` case; `Self` and `Value`, the `Bare` target, `DefaultReader`, and a `default_reader.ts` per scalar entity a reader selects; the `Scalar` kind goes. Observable: `storeSnapshot` after normalizing `PetDetail`'s response holds `Pet:1.name` as a link to `String:Pet:1.name` with `__value` `"Ricky"`; every read returns the values it returned before; normalizing a response that changes only `Pet:1.name` writes only `String:Pet:1.name.__value`; the pet script's output is unchanged.
 5. Prefactor: linked-only selections (linked-only-selections.md, change 3). Validation, query generation, and reader generation accept bare object selections, selection sets on scalars, and client fields on scalar entities; the object default reader. Observable: `read` of the Example's `PetDetailPage` on the store fixture returns `{ pet: { n1: "Ricky", n2: { toUppercase: "RICKY" }, bestFriend: { name: "Mango" } } }`, calling `toUppercase` on every read; a bare `bestFriend` is `{}` or `null`.
-6. Prefactor: the engine package (The engine package): `libs/reactive-graph` with `src/graph.ts` and `src/index.ts` as The graph and The engine's public API write them, `test/graph.test.ts`, its `package.json`, tsconfig, tsdown, and vitest files, and its two pre-commit hooks. Nothing in the Isograph runtime imports it yet. Observable: `pnpm --filter @isograph/reactive-graph test` passes the sum, parity, and label example (`sum` and `parity` run twice, `label` once); `pnpm compile-libs` writes its `dist/index.cjs` and `dist/index.mjs`; its `package.json` lists no dependencies. Its reader is the stated goal, a project outside Isograph; the runtime is its first workspace caller in change 7.
+6. Prefactor: the engine package (The engine package): `libs/reactive-graph` with `src/graph.ts` and `src/index.ts` as The graph and The engine's public API write them, its test files and `README.md`, its `package.json`, tsconfig, tsdown, and vitest files, its two pre-commit hooks, and its CI step. Nothing in the Isograph runtime imports it yet. Observable: `pnpm --filter @isograph/reactive-graph test` passes the sum, parity, and label example (`sum` and `parity` run twice, `label` once); `pnpm compile-libs` writes its `dist/index.cjs` and `dist/index.mjs`; its `package.json` lists no dependencies. Its reader is the stated goal, a project outside Isograph; the runtime is its first workspace caller in change 7.
 7. Prefactor: the store becomes record containers (`RecordContainer`, `presence`, `sources`, the accessors, `storeSnapshot`, `deleteRecord` without derived nodes). The runtime gains its dependency on the engine (The engine package) and its three pre-commit hooks match the engine's directory. A container's `sources` hold the engine's source nodes: `sourceNodeAt` calls `createSourceNode` with `isUnchanged(key)`, so `normalize`'s comparison moves out of `normalize` into each source's `equal`, `storeValue` and `storeSnapshot` call `sourceValue`, `writeValue` calls `writeSource`, and `deleteRecord` calls `markSourceChanged` for each source node. No derived node exists, so every `dependents` set stays empty and `writeSource` and `markSourceChanged` mark nothing. `check`, `garbageCollect`, `read`, and `normalize` read and write through the accessors; tests compare `storeSnapshot`. Observable: none in behavior; `environment.store` is no longer v1's nested map, and `storeSnapshot(environment.store)` is.
 8. The graph in the Isograph runtime: `RecordContainer.derived`, `readStoredResult`, `resolverNodeAt` (`createDerivedNode` with `resolverResultsEqual(artifact, identical)`), `resolverComputation`, `contextHooks` (`context.readSource`, `context.readDerived`), `callResolver`, `ResolverResult` with `WalkData`, `resolverResultsEqual`, `resolverStoreKey`, `deleteRecord` disposing owned nodes with `disposeDerivedNode`. The engine is unchanged. The package index adds `readStoredResult` and the types `ResolverResult`, `ReadResolverOk`, `OkOrigin`, `ReadResolverThrew`; `StoreRecord` becomes `RecordContainer`. The pet script reads with `readStoredResult`. Observable: End-user experience above, and the Example's traces: after a write to `Pet:2.name`, a read of `PetDetailPage` does not call `toUppercase`; after a write that leaves `toUppercase`'s result equal, a reader without `n1` does not rerun.
 9. The subscription re-read reads nested resolvers through the graph. `readSubscription` reads with `readData(storedResultHooks(store), ..)`, whose `readValue` is `storeValue` (nothing recorded) and whose `readResolver` is `readStoredResult`; `SubscriptionResult` gains `ReadResolverThrew`, `ReadErr` is only a broken store invariant, and `subscriptionResultsAreEqual` compares two `ResolverThrew` by `===` of their errors. Without it, the landed re-read (`libs/isograph-runtime/src/subscribe.ts:120-131`) calls every nested resolver on every write through v1's `read`. `makeNetworkRequest` calls `callSubscriptions` in a `finally` after `normalize`, so a response that throws part-way re-reads the subscriptions over the writes it made (open decision 4), and `garbageCollectEnvironment` calls `callSubscriptions` after the sweep, so a subscription that read a deleted record is re-read. Neither call depends on subscriptions being derived nodes. `callSubscriptions` never throws (`libs/isograph-runtime/src/subscribe.ts:92-95`; `readSubscription` catches a throwing pull as `ReadErr`, `:126-130`), so `normalize`'s throw still reaches the `.catch`. Observable: in the pet script, the subscription's re-read after the tagline write calls `PetSummaryCard` on `Pet:0` only, and a re-read after an unrelated write calls no resolver and does not call the callback; a response that changes `Pet:0.tagline` and then throws delivers the new tagline to the subscription; a collection that deletes a record a subscription read delivers that subscription's `MissingData`.
