@@ -836,7 +836,50 @@ Each is one commit, in order; each is independently shippable.
 2. Prefactor: the walk takes `ReadHooks`; an absent record reads as all keys missing; `noRecord`'s two checks go (Absent records). `read` and `readButDoNotEvaluate` use `evaluatingHooks`. Observable: an absent root's `MissingData` reads "No value for pet____id___"1" on Query:__ROOT"; `Constant` on an absent record is `Ok`. The pet script's output is unchanged.
 3. Prefactor: the store becomes record containers (`RecordContainer`, `presence`, `sources` of `{ value }`, the accessors, `storeSnapshot`, `deleteRecord` without derived nodes). `check`, `garbageCollect`, `read`, and `normalize` read and write through the accessors; tests compare `storeSnapshot`. `SourceNode` has `value` only in this change. Observable: none in behavior; `environment.store` is no longer v1's nested map, and `storeSnapshot(environment.store)` is.
 4. The graph: `graph.ts` (`SourceNode.dependents`, `DerivedNode`, `stateOf`, mark, pull with short circuit, `setDependencies`, `disposeDerivedNode`), `RecordContainer.derived`, `writeSource` in `writeValue`, `readStoredResult`, `resolverNodeAt`, `contextHooks`, `ResolverResult` with `WalkData`, `resolverResultsEqual`, `resolverStoreKey`, `ReaderArtifact.selectableName` and the compiler's printing of it, `deleteRecord` disposing owned nodes. The package index adds `readStoredResult` and the types `ResolverResult`, `ReadResolverOk`, `OkOrigin`, `ReadResolverThrew`; `StoreRecord` becomes `RecordContainer`. The pet script reads with `readStoredResult`. Observable: End-user experience above.
-5. The subscription re-read reads nested resolvers through the graph. `readSubscription` reads with `readData(storedResultHooks(store), ..)`, whose `readValue` is `storeValue` (nothing recorded) and whose `readResolver` is `readStoredResult`; `SubscriptionResult` gains `ReadResolverThrew`, `ReadErr` is only a broken store invariant, and `subscriptionResultsAreEqual` compares two `ResolverThrew` by `===` of their errors. Without it, the landed re-read (`libs/isograph-runtime/src/subscribe.ts:120-131`) calls every nested resolver on every write through v1's `read`. Observable: in the pet script, the subscription's re-read after the tagline write calls `PetSummaryCard` on `Pet:0` only, and a re-read after an unrelated write calls no resolver and does not call the callback.
+5. The subscription re-read reads nested resolvers through the graph. `readSubscription` reads with `readData(storedResultHooks(store), ..)`, whose `readValue` is `storeValue` (nothing recorded) and whose `readResolver` is `readStoredResult`; `SubscriptionResult` gains `ReadResolverThrew`, `ReadErr` is only a broken store invariant, and `subscriptionResultsAreEqual` compares two `ResolverThrew` by `===` of their errors. Without it, the landed re-read (`libs/isograph-runtime/src/subscribe.ts:120-131`) calls every nested resolver on every write through v1's `read`. `makeNetworkRequest` calls `callSubscriptions` in a `finally` after `normalize`, so a response that throws part-way re-reads the subscriptions over the writes it made (open decision 4), and `garbageCollectEnvironment` calls `callSubscriptions` after the sweep, so a subscription that read a deleted record is re-read. Neither call depends on subscriptions being derived nodes. `callSubscriptions` never throws (`libs/isograph-runtime/src/subscribe.ts:92-95`; `readSubscription` catches a throwing pull as `ReadErr`, `:126-130`), so `normalize`'s throw still reaches the `.catch`. Observable: in the pet script, the subscription's re-read after the tagline write calls `PetSummaryCard` on `Pet:0` only, and a re-read after an unrelated write calls no resolver and does not call the callback; a response that changes `Pet:0.tagline` and then throws delivers the new tagline to the subscription; a collection that deletes a record a subscription read delivers that subscription's `MissingData`.
+
+   ```ts
+   // from libs/isograph-runtime/src/network.ts
+   // makeNetworkRequest's .then body, before (libs/isograph-runtime/src/network.ts:143-149):
+         normalize(
+           environment.store,
+           entrypoint.normalizationAst,
+           response,
+           variables,
+         );
+         callSubscriptions(environment);
+   // after:
+         try {
+           normalize(
+             environment.store,
+             entrypoint.normalizationAst,
+             response,
+             variables,
+           );
+         } finally {
+           callSubscriptions(environment);
+         }
+   ```
+
+   ```ts
+   // from libs/isograph-runtime/src/environment.ts
+   // before (libs/isograph-runtime/src/environment.ts:62-66):
+   export function garbageCollectEnvironment(
+     environment: IsographEnvironment,
+   ): void {
+     garbageCollect(environment.store, Array.from(environment.retainedQueries));
+   }
+   // after:
+   /** `garbageCollect` of the store, keeping what the retained queries reach, then the subscription re-read. */
+   export function garbageCollectEnvironment(
+     environment: IsographEnvironment,
+   ): void {
+     garbageCollect(environment.store, Array.from(environment.retainedQueries));
+     callSubscriptions(environment);
+   }
+   ```
+
+   `environment.ts` imports `callSubscriptions` from `./subscribe`, which imports only types from `./environment`.
 
 ## Later: retention and the fetch decision
 
@@ -930,7 +973,7 @@ export function collect(store: Store, extraRoots: Iterable<ResolverNode>): void;
 
 Not part of the core. Observers, subscriptions, and effects are derived nodes that are read again as needed. A write marks; whoever needs a value pulls. No resolver runs during a write, and a retained query nobody observes stays marked until something reads it (the user's choice).
 
-- Subscriptions. A subscription is a derived node whose computation is `readData(contextHooks(store, context), artifact, root, variables)` without the subscription's own resolver, and whose equality is `subscriptionResultsAreEqual` (`libs/isograph-runtime/src/subscribe.ts:135-155`): the data is an object the walk assembled, so it compares by `selectionSetDataAreEqual`. The `Subscription` holds its node, which lives in no container; unsubscribing disposes it. `callSubscriptions` pulls each subscription's node after every write and calls the callback when the pulled value is not `===` `delivered`; a `Clean` node is one step, and a marked one verifies, so the reader AST is walked only when something it read changed. `makeNetworkRequest` calls `callSubscriptions` in a `finally` after `normalize`, so a response that throws part-way also re-reads (open decision 4); `garbageCollectEnvironment` calls it after the sweep. This replaces core change 5's re-read.
+- Subscriptions. A subscription is a derived node whose computation is `readData(contextHooks(store, context), artifact, root, variables)` without the subscription's own resolver, and whose equality is `subscriptionResultsAreEqual` (`libs/isograph-runtime/src/subscribe.ts:135-155`): the data is an object the walk assembled, so it compares by `selectionSetDataAreEqual`. The `Subscription` holds its node, which lives in no container; unsubscribing disposes it. `callSubscriptions` pulls each subscription's node after every write and calls the callback when the pulled value is not `===` `delivered`; a `Clean` node is one step, and a marked one verifies, so the reader AST is walked only when something it read changed. `callSubscriptions` keeps core change 5's call sites. This replaces core change 5's `readSubscription`.
 - React. `useSyncExternalStore(subscribe, getSnapshot)`: `listen(node, onChange)` adds an observer and a root hold; after a write, `notify` calls each observer whose node is not `Clean`; React then calls `getSnapshot`, which is `pull(node)`. A node whose inputs came back equal is verified without recomputing and returns the same object, so React does not render again. `getSnapshot` pulls during render; an observer whose node stays marked is called on every write until something pulls it.
 - Loaders. loaders.md's effect-set nodes are derived nodes that the runtime pulls after every write (`reconcileEffectRoots`), and its loader items are source nodes (loaders.md, An item that changes over time; After a write).
 - Callback errors. Every callback, listener, and observer runs through `reportCallbackError` (`libs/isograph-runtime/src/subscribe.ts:159-167`): a throw is rethrown in its own microtask and the loop continues (network-and-subscriptions.md, Decisions, 3).
@@ -992,7 +1035,7 @@ The user's design notes, recorded for later. None is part of the core, and none 
 
 - `refactors/pending/runtime/store.md`: `Store` becomes `Map<EntityName, Map<RecordId, RecordContainer>>`; its functions read and write through the accessors; `normalize` skips unchanged values and marks as it writes; `garbageCollect`'s sweep calls `deleteRecord`; its tests compare `storeSnapshot(store)` with `storeOf(..)`, which returns a `PlainStore`.
 - `refactors/pending/runtime/reader-ast.md`: `ReaderArtifact.selectableName`; the walk takes `ReadHooks`; an absent record reads as all keys missing, which changes its two absent-root `reason` assertions and makes `Constant` on an absent record `Ok`; `readStoredResult` is the stored read beside `read`.
-- `refactors/pending/runtime/network-and-subscriptions.md`: its "`Store` stays store.md's nested map" no longer holds; the request entry's state is a source node on the entry, not `requestSource(key): SourceId`; `readSubscription` reads nested resolvers through the graph and `SubscriptionResult` gains `ReadResolverThrew` (core change 5); `makeNetworkRequest` re-reads subscriptions in a `finally` (Later: keeping values up to date automatically).
+- `refactors/pending/runtime/network-and-subscriptions.md`: its "`Store` stays store.md's nested map" no longer holds; the request entry's state is a source node on the entry, not `requestSource(key): SourceId`; `readSubscription` reads nested resolvers through the graph and `SubscriptionResult` gains `ReadResolverThrew` (core change 5); `makeNetworkRequest` re-reads subscriptions in a `finally` after `normalize`, and `garbageCollectEnvironment` re-reads them after the sweep (core change 5).
 - `refactors/pending/runtime/react.md`: `unwrapOrSuspend` throws `result.error` on `ResolverThrew`; `getSnapshot` pulls (Later: keeping values up to date automatically), against its rule that a render reads and computes nothing.
 - `refactors/pending/runtime/components-in-userland.md`: `useClosureData`'s switch gains `case 'ResolverThrew': throw result.error;`; a closure field's wrapper is a derived node in its record container's `derived`, owned and freed with the record.
 - `refactors/pending/runtime/loaders.md`: edited with this rewrite where its references to this doc's sections and `SourceId`s broke.
@@ -1052,7 +1095,7 @@ A second question arises once something pulls inside a write (`reconcileEffects`
 
 `normalize` writes in place and throws at the first position that does not match the AST (store.md, Errors).
 
-- (a) `normalize` marks each write as it makes it (`writeValue`), and its throw propagates as v1's error; the writes before it and their marks stand. The caller re-reads subscriptions in a `finally` (Later: keeping values up to date automatically). Held: upstream keeps a partial write too (`normalizeData` writes in place, `cache.ts:77-85`; a throw reaches `makeNetworkRequest`'s `.catch`, `makeNetworkRequest.ts:299-319`).
+- (a) `normalize` marks each write as it makes it (`writeValue`), and its throw propagates as v1's error; the writes before it and their marks stand. `makeNetworkRequest` re-reads subscriptions in a `finally` after `normalize` (core change 5). Held: upstream keeps a partial write too (`normalizeData` writes in place, `cache.ts:77-85`; a throw reaches `makeNetworkRequest`'s `.catch`, `makeNetworkRequest.ts:299-319`).
 - (b) `normalize` validates the whole response before it writes. Cost: a second walk of every response.
 - (c) `normalize` writes into a layer (Later: a DAG of graphs) that is committed when the walk ends and discarded on a throw. Cost: needs layers; a malformed response writes nothing.
 
