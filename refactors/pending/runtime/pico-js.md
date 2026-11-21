@@ -142,26 +142,28 @@ Every edge is an object reference, held in both directions: a derived node's dep
 
 ## The public API
 
-Every public function takes the node it acts on and nothing else. There is no graph object: a graph is the set of nodes that its edges connect (decision 2).
+Every public function takes the node it acts on, and `readSource` and `readDerived` also take the reading computation's `Context`. There is no graph object: a graph is the set of nodes that its edges connect (decision 2).
 
 ```ts
 // from libs/isograph-pico-js/src/index.ts
 export {
   type Computation,
-  type ComputeContext,
+  type Context,
   createDerivedNode,
   createSourceNode,
   type DerivedNode,
   disposeDerivedNode,
   markSourceChanged,
   pull,
+  readDerived,
+  readSource,
   type SourceNode,
   sourceValue,
   writeSource,
 } from './graph';
 ```
 
-`AnyDerivedNode`, `NodeState`, `PrecalculatedValue`, `Status`, and `AnyNode` are exported from `graph.ts` because the declaration of `DerivedNode` names them, and not from the package index: no consumer names them. `MISSING`, `Missing`, and `Option` are not exported from `graph.ts`; tsc 5.6 emits them as local declarations in `graph.d.ts` beside the exported `DerivedNode` and `NodeState` that name them. Open decision 7 (pico-runtime.md open decision 21) covers that a consumer can still read and write a node's fields.
+`AnyDerivedNode`, `NodeState`, `PrecalculatedValue`, `Status`, and `AnyNode` are exported from `graph.ts` because the declaration of `DerivedNode` names them, and not from the package index: no consumer names them. `MISSING`, `Missing`, `Option`, and `CONTEXT` are not exported from `graph.ts`; tsc 5.6 emits them as local declarations in `graph.d.ts` beside the exported `DerivedNode`, `NodeState`, and `Context` that name them. Nodes are plain objects whose fields a consumer can read and write (decision 7, decided).
 
 ### Types
 
@@ -169,7 +171,7 @@ export {
 // from libs/isograph-pico-js/src/graph.ts
 /** A value set from outside the graph, and the derived nodes whose last computation read it. */
 export type SourceNode<TValue> = {
-  /** Tells a source from a derived node in a dependency list. */
+  /** Tells a source from a derived node in a dependency list. Read only by `verify`. */
   readonly kind: 'Source';
   /** Read only by `readSource` and `sourceValue`. Written only by `writeSource`. */
   value: TValue;
@@ -183,7 +185,7 @@ export type SourceNode<TValue> = {
 
 /** A computation's value, kept until an input it read changes. */
 export type DerivedNode<TValue> = {
-  /** Tells a derived node from a source in a dependency list. */
+  /** Tells a derived node from a source in a dependency list. Read only by `verify`. */
   readonly kind: 'Derived';
   readonly computation: Computation<TValue>;
   /** Whether two values of this node are equal, for cutoff. Called only by `recompute`, with the
@@ -195,11 +197,10 @@ export type DerivedNode<TValue> = {
    * disposed. Read and written only through `stateOf`. */
   precalculated: Option<PrecalculatedValue<TValue>>;
   /** The reads of the running computation, in read order; between computations, a spare buffer that
-   * is the dependency list before the last recomputation. Pushed to only by `context`, cleared only
-   * by `compute`, and swapped with `PrecalculatedValue.dependencies` only by `commitReads`. */
+   * is the dependency list before the last recomputation. Pushed to only by `readSource` and
+   * `readDerived`, cleared only by `compute`, and swapped with `PrecalculatedValue.dependencies` only
+   * by `commitReads`. */
   reads: AnyNode[];
-  /** Passed to every run of `computation`. Built once by `createDerivedNode`. */
-  readonly context: ComputeContext;
   /** Every derived node whose dependencies hold this one. Written only by `setDependencies`. On the
    * node, not in `PrecalculatedValue`, because it outlives this node's value: after disposal its
    * former readers are `Dirty` and still name this node until their recomputation removes them. */
@@ -239,18 +240,17 @@ type Option<TValue> = TValue | Missing;
 /** A node of any kind and value type: the element of a dependency list. */
 export type AnyNode = SourceNode<unknown> | AnyDerivedNode;
 
-/** A derived node's computation. It reads every node through `context`, is a pure function of
- * what it reads, and is synchronous: every read happens before it returns. */
-export type Computation<TValue> = (context: ComputeContext) => TValue;
+/** A derived node's computation. It reads every node with `readSource(context, ..)` and
+ * `readDerived(context, ..)`, is a pure function of what it reads, and is synchronous: every read
+ * happens before it returns. */
+export type Computation<TValue> = (context: Context) => TValue;
 
-/** The reads a computation makes. Built once per derived node by `createDerivedNode`; there is no
- * ambient current computation. Read only while its computation runs (Pull). */
-export type ComputeContext = {
-  /** Records that the computation read `source`, and returns its value. */
-  readSource<TValue>(source: SourceNode<TValue>): TValue;
-  /** Pulls `node`, records that the computation read it, and returns its value. */
-  readDerived<TValue>(node: DerivedNode<TValue>): TValue;
-};
+/** The derived node whose computation is running, typed opaque. `compute` passes the node itself;
+ * `readSource` and `readDerived` cast it back (The context). */
+export type Context = { readonly [CONTEXT]: 'Context' };
+
+/** The brand of `Context`. A type-only declaration: no value exists at runtime. Not exported. */
+declare const CONTEXT: unique symbol;
 ```
 
 `TValue` is per node: a `DerivedNode<string>` reads a `DerivedNode<number>` and a `SourceNode<number>`. The links hold `AnyDerivedNode` and `SourceNode<unknown>`, and the engine's functions are generic in the node they receive, so a node reached through `dependents` is handled at `TValue = unknown`. `equals` is a method signature: under `strict` (`tsconfig.build.json`), TypeScript checks the parameters of a function-typed property contravariantly and those of a method bivariantly, so with `readonly equals: (previous: TValue, next: TValue) => boolean` a `DerivedNode<number>` is not assignable to `DerivedNode<unknown>`. The engine calls `equals` only in `recompute`, with two values the node's own computation produced, so the bivariance admits no call the engine makes with a value of another type (open decision 5).
@@ -279,6 +279,14 @@ export function createDerivedNode<TValue>(
  * untracked read (decision 10). */
 export function sourceValue<TValue>(source: SourceNode<TValue>): TValue;
 
+/** Records that the computation running with `context` read `source`, and returns its value. Called
+ * only inside that computation, with the `Context` it received (The context). */
+export function readSource<TValue>(context: Context, source: SourceNode<TValue>): TValue;
+
+/** Pulls `node`, records that the computation running with `context` read it, and returns its value.
+ * Called only inside that computation, with the `Context` it received (The context). */
+export function readDerived<TValue>(context: Context, node: DerivedNode<TValue>): TValue;
+
 /** When `source.equals` rejects the stored value and `value`, sets `source`'s value and marks its
  * dependents; when it accepts, stores nothing and marks nothing (decision 8). Runs no computation.
  * Must not be called inside a computation or an equality (Writes during a computation). */
@@ -300,7 +308,7 @@ export function pull<TValue>(node: DerivedNode<TValue>): TValue;
 export function disposeDerivedNode(node: AnyDerivedNode): void;
 ```
 
-Callers. In the Isograph runtime (pico-runtime.md, The engine and the Isograph runtime): `createSourceNode` and `sourceValue` in `store.ts`; `writeSource` in `normalize.ts` and `test/fixtures.ts`; `markSourceChanged` and `disposeDerivedNode` in `deleteRecord`; `createDerivedNode` and `pull` in `storedResults.ts`, which passes `resolverResultsEqual(artifact, identical)` as each node's equality, with `===` as its default output equality. Outside Isograph: the consumer's own code, as in The package README.
+Callers. In the Isograph runtime (pico-runtime.md, The engine and the Isograph runtime): `createSourceNode` and `sourceValue` in `store.ts`; `writeSource` in `normalize.ts` and `test/fixtures.ts`; `markSourceChanged` and `disposeDerivedNode` in `deleteRecord`; `createDerivedNode`, `pull`, `readSource`, and `readDerived` in `storedResults.ts`, which passes `resolverResultsEqual(artifact, identical)` as each node's equality, with `===` as its default output equality. Outside Isograph: the consumer's own code, as in The package README.
 
 ## The implementation
 
@@ -321,26 +329,14 @@ export function createDerivedNode<TValue>(
   computation: Computation<TValue>,
   equals: (previous: TValue, next: TValue) => boolean,
 ): DerivedNode<TValue> {
-  const node: DerivedNode<TValue> = {
+  return {
     kind: 'Derived',
     computation,
     equals,
     precalculated: MISSING,
     reads: [],
-    context: {
-      readSource: (source) => {
-        node.reads.push(source);
-        return source.value;
-      },
-      readDerived: (read) => {
-        const value = pull(read);
-        node.reads.push(read);
-        return value;
-      },
-    },
     dependents: new Set(),
   };
-  return node;
 }
 
 export function sourceValue<TValue>(source: SourceNode<TValue>): TValue {
@@ -527,23 +523,47 @@ function commitReads<TValue>(node: DerivedNode<TValue>, precalculated: Precalcul
 /** The previous dependency list of a first computation and the next one of a disposal. Never written. */
 const NO_DEPENDENCIES: ReadonlyArray<AnyNode> = [];
 
-/** Runs `node`'s computation with `node.context`, which records each read in `node.reads`, in read
- * order. */
+/** Runs `node`'s computation with `node` as its `Context`, so that `readSource` and `readDerived`
+ * record each read in `node.reads`, in read order. */
 function compute<TValue>(node: DerivedNode<TValue>): TValue {
   node.reads.length = 0;
-  return node.computation(node.context);
+  return node.computation(node as unknown as Context);
+}
+
+export function readSource<TValue>(context: Context, source: SourceNode<TValue>): TValue {
+  readerOf(context).reads.push(source);
+  return source.value;
+}
+
+export function readDerived<TValue>(context: Context, node: DerivedNode<TValue>): TValue {
+  const value = pull(node);
+  readerOf(context).reads.push(node);
+  return value;
+}
+
+/** The derived node `compute` passed as `context`. Called only by `readSource` and `readDerived`. */
+function readerOf(context: Context): AnyDerivedNode {
+  return context as unknown as AnyDerivedNode;
 }
 ```
+
+### The context
+
+A computation's `Context` is the derived node whose computation is running. `compute` passes the node itself, typed as the opaque `Context`, and `readSource` and `readDerived` cast it back and push onto its `reads`. A node allocates no context object and no closure: the node is the context. The two casts, in `compute` and `readerOf`, are the only casts in the engine. A consumer cannot build a `Context` without a cast, so a `Context` that reaches `readSource` or `readDerived` came from `compute` unless the consumer cast.
+
+A computation uses its `Context` only as the first argument of `readSource` and `readDerived`, and only while it runs. Any other use breaks the contract, and the engine does not check it (decision 2): a cast to read or write the node's fields, a read through the `Context` after the computation returned (from an `async` computation after an `await`, or through a `Context` the computation stored), or a read through the `Context` from inside another node's computation. A read after the computation returned pushes into `node.reads`, which after `commitReads` is the buffer the next `compute` clears, so the read is lost and a later write to what it read does not mark the node; during a later computation of the same node it adds an entry that computation never made. A read through another node's `Context` records the dependency on that other node.
+
+There are two read functions in place of one `read(context, node)` that switches on `node.kind`: every caller knows statically whether it reads a source or a derived node, and a switch would test again what the caller's type already established, at a comparison per read.
 
 - `verify` reads the node's state again after each dependency's pull, because a dependency's `recompute` marks this node `Dirty` through `dependents`. It is a `for` loop with `break` in place of `some`, which allocated a closure per verify; a verify is one step of every pull of a `Check` node.
 - `readDerived` records the dependency after the pull returns. A pull that throws records nothing, and the throw leaves the reading computation, so no dependency list holds a node whose pull threw.
 - `recompute` calls `equals` before `commitReads`, which calls `setDependencies`. A throw out of `equals` then leaves the node's dependency list and every `dependents` set consistent. Called after, a throw would leave the node in the `dependents` sets of the new dependencies while its state lists the old ones, and a later `setDependencies` from the old list would never remove it from the sets only the failed run added. Both branches store the new reads as the dependency list, so a node whose value came back equal still depends on what it read this time.
 - A node that was never computed or was disposed holds `MISSING` in place of a `PrecalculatedValue`, so its value cannot be read without first ruling `MISSING` out. Its first pull is `computeFirst`, which calls no `equals`. Marking never reaches such a node, because a node in a `dependents` set was computed. The `PrecalculatedValue` is allocated once per first computation; every later mark change and recomputation writes `status` and `value` in place, so marking and recomputing allocate no state object.
-- A node's dependency list (`PrecalculatedValue.dependencies`) and `node.reads` are two arrays the node owns, swapped by every `commitReads`: the reads become the dependency list, and the previous dependency list becomes the buffer the next computation clears and fills. A computation allocates no array, no result object, and no context: `compute` returns the value alone, and `context` and its two closures are built once per node. A throw out of the computation or out of `equals` leaves `node.reads` partly filled and the state untouched; the next `compute` clears it. `createDerivedNode` allocates the first `reads` buffer and `computeFirst` the next, one array per first computation; no array is shared between two nodes, and `NO_DEPENDENCIES` is only read. The dependency lists are `AnyNode[]` in place of `ReadonlyArray`, because the engine reuses them as buffers.
-- A computation is synchronous, and a read through its context after it returned breaks the contract. Such a read (from an `async` computation after an `await`, or through a context the computation stored) pushes into `node.reads`, which after the swap is the buffer the next `compute` clears, so the read is lost and a later write to what it read does not mark the node; during a later computation of the same node it adds an entry that computation never made. The engine does not check it (decision 2).
-- The context is a parameter built once per node. There is no ambient current computation (Reactively's `CurrentReaction`, Preact's `evalContext`), so a computation's reads cannot be recorded on the wrong node, and two graphs never share tracking state.
+- A node's dependency list (`PrecalculatedValue.dependencies`) and `node.reads` are two arrays the node owns, swapped by every `commitReads`: the reads become the dependency list, and the previous dependency list becomes the buffer the next computation clears and fills. A computation allocates no array, no result object, and no context: `compute` returns the value alone and passes the node as its own `Context` (The context). A throw out of the computation or out of `equals` leaves `node.reads` partly filled and the state untouched; the next `compute` clears it. `createDerivedNode` allocates the first `reads` buffer and `computeFirst` the next, one array per first computation; no array is shared between two nodes, and `NO_DEPENDENCIES` is only read. The dependency lists are `AnyNode[]` in place of `ReadonlyArray`, because the engine reuses them as buffers.
+- A computation is synchronous; a read through its `Context` after it returned breaks the contract (The context).
+- The context is a parameter: the running node itself. There is no ambient current computation (Reactively's `CurrentReaction`, Preact's `evalContext`), so a computation that keeps its contract cannot have its reads recorded on another node, and two graphs never share tracking state.
 
-`pull`, `verify`, `recompute`, `compute`, and `readDerived` recurse: a pull goes down one chain of calls per level of derived nodes below the pulled node, about five frames per level on the `recompute` path (`pull`, `recompute`, `compute`, the computation, `readDerived`) and three on the `verify` path (`pull`, `verify`, the `some` callback). The depth limit is the host's call stack. Pull depth is a contract on the consumer (open decision 12): the derived nodes below any node a consumer pulls must be well below the limit. In Node 24 with its default stack, a one-frame recursive function reaches about 10,000 frames before `RangeError`, so the limit is an estimated 2,000 levels of derived nodes at five frames per level; larger frames in a computation lower it. The estimate is not measured against the engine. The engine does not raise the limit, does not catch the `RangeError`, and has no iterative pull. A pull that overflows throws `RangeError`, and in that case alone the engine does not guarantee its own state. The overflow can fire in any frame at the limit, including a `setDependencies` callback after it removed `node` from some `dependents` sets of `previous` and before it added `node` to those of `next`, so a node's edges may be partly moved, and its dependency list then names a dependency whose `dependents` set does not hold it. Marking is iterative (Mark) and never overflows. In the Isograph runtime, pull depth is bounded by client field nesting: each resolver node reads a client field it selects through `readDerived`, so the levels below a node are the nesting depth of client fields selected by client fields.
+`pull`, `verify`, `recompute`, `compute`, and `readDerived` recurse: a pull goes down one chain of calls per level of derived nodes below the pulled node, about five frames per level on the `recompute` path (`pull`, `recompute`, `compute`, the computation, `readDerived`) and two on the `verify` path (`pull`, `verify`). The depth limit is the host's call stack. Pull depth is a contract on the consumer (open decision 12): the derived nodes below any node a consumer pulls must be well below the limit. In Node 24 with its default stack, a one-frame recursive function reaches about 10,000 frames before `RangeError`, so the limit is an estimated 2,000 levels of derived nodes at five frames per level; larger frames in a computation lower it. The estimate is not measured against the engine. The engine does not raise the limit, does not catch the `RangeError`, and has no iterative pull. A pull that overflows throws `RangeError`, and in that case alone the engine does not guarantee its own state. The overflow can fire in any frame at the limit, including a `setDependencies` callback after it removed `node` from some `dependents` sets of `previous` and before it added `node` to those of `next`, so a node's edges may be partly moved, and its dependency list then names a dependency whose `dependents` set does not hold it. Marking is iterative (Mark) and never overflows. In the Isograph runtime, pull depth is bounded by client field nesting: each resolver node reads a client field it selects through `readDerived`, so the levels below a node are the nesting depth of client fields selected by client fields.
 
 ### Dependencies
 
@@ -640,6 +660,8 @@ import {
   createDerivedNode,
   createSourceNode,
   pull,
+  readDerived,
+  readSource,
   writeSource,
 } from '@isograph/pico-js';
 
@@ -647,15 +669,15 @@ const price = createSourceNode(100, (a, b) => a === b);
 const quantity = createSourceNode(3, (a, b) => a === b);
 
 const total = createDerivedNode(
-  (context) => context.readSource(price) * context.readSource(quantity),
+  (context) => readSource(context, price) * readSource(context, quantity),
   (a, b) => a === b,
 );
 const isLargeOrder = createDerivedNode(
-  (context) => context.readDerived(total) >= 1000,
+  (context) => readDerived(context, total) >= 1000,
   (a, b) => a === b,
 );
 const banner = createDerivedNode(
-  (context) => (context.readDerived(isLargeOrder) ? 'Free shipping' : ''),
+  (context) => (readDerived(context, isLargeOrder) ? 'Free shipping' : ''),
   (a, b) => a === b,
 );
 
@@ -668,8 +690,8 @@ pull(banner); // 'Free shipping' (runs all three)
 
 ## Rules
 
-- A computation reads nodes only through its `context`: `context.readSource(source)` and `context.readDerived(node)`. A read through a closure or `sourceValue` is not recorded, and the node will not recompute when that value changes.
-- A computation is synchronous. Every read through its `context` happens before it returns. The engine does not check this: a read through a context after its computation returned, such as a read after an `await`, is recorded with no edge, and the node does not recompute when that value changes.
+- A computation reads nodes only with the `context` it receives: `readSource(context, source)` and `readDerived(context, node)`. A read through a closure, `sourceValue`, or `pull` is not recorded, and the node will not recompute when that value changes.
+- The `context` is an opaque token. A computation passes its own `context` only to `readSource` and `readDerived`, and only while it runs. The engine does not check this: a read through a context after its computation returned, such as a read after an `await`, is lost, and the node does not recompute when that value changes.
 - A computation is a pure function of what it reads. It does not write a source or dispose a node. The engine does not check this: a write inside a computation can leave the computing node holding a value computed from an input that changed during its run, and every later pull returns that stale value with no error. A `sourceValue` or `pull` inside a computation is an untracked read: it returns the value and records no dependency.
 - An equality, of a source or of a derived node, does not write a source or dispose a node either. The engine does not check this, and a violation leaves values stale in the same way.
 - Each derived node has an equality. When a recomputed value is equal to the previous one, the node keeps the previous value object and the nodes above it do not recompute. The engine has no default: pass `(a, b) => a === b` for identity, or your own comparator for values you build fresh on each run.
@@ -692,7 +714,7 @@ A source node is an input fact: a value the graph does not compute. The consumer
 
 A source is written with `writeSource(source, value)`. The write compares the stored value with the new one by the source's `equals`. When `equals` accepts, the write stores nothing and marks nothing; when it rejects, the write sets the value and marks (decision 8). The engine defines no equality of its own, for sources as for derived nodes (decision 6). `markSourceChanged(source)` marks without setting, for a consumer that changed the value object in place or whose source went away.
 
-Code outside a computation reads a source with `sourceValue(source)`, which records nothing. A computation reads it with `context.readSource(source)`.
+Code outside a computation reads a source with `sourceValue(source)`, which records nothing. A computation reads it with `readSource(context, source)`, passing the `Context` it received.
 
 A source is not collected by the engine. It lives as long as the consumer and the dependency lists of its readers hold it.
 
@@ -700,13 +722,13 @@ A source is not collected by the engine. It lives as long as the consumer and th
 
 A derived node is a computation, an equality, a state, and a set of dependents. The consumer creates it with `createDerivedNode(computation, equals)` and holds the returned object. The object is the node's identity. A consumer that wants one node per key (pico's memo arguments) keeps its own map from key to node; the engine has no memo table. The Isograph runtime's record containers are such a map.
 
-The computation receives a `ComputeContext` and returns the value. It must be a pure function of what it reads through the context: no clock, no network, no read through a closure. It must be synchronous, because the dependency list is final when the computation returns; the engine does not check it (decision 2). A computation runs only during a pull: first on the first pull that reaches the node, and again on a pull that finds it `Dirty`. It never runs during a write.
+The computation receives a `Context`, which is its own node typed opaque (The context), and returns the value. It must be a pure function of what it reads with `readSource` and `readDerived`: no clock, no network, no read through a closure. It must be synchronous, because the dependency list is final when the computation returns; the engine does not check it (decision 2). A computation runs only during a pull: first on the first pull that reaches the node, and again on a pull that finds it `Dirty`. It never runs during a write.
 
 Two pulls with no write between them run nothing the second time. A pull of a `Clean` node is one step.
 
 ### How dependencies are recorded
 
-`compute` clears the node's `reads` buffer and passes the node's `context`. `readSource` appends the source node and returns its value. `readDerived` pulls the node, appends it, and returns its value. The list is in read order and keeps repeats.
+`compute` clears the node's `reads` buffer and passes the node itself as the `Context`. `readSource(context, source)` appends the source node to the reading node's `reads` and returns its value. `readDerived(context, node)` pulls `node`, appends it, and returns its value. The list is in read order and keeps repeats.
 
 When the computation returns, `recompute` replaces the node's dependency list with the new one and moves the reverse edges with `setDependencies`. The new list replaces the old one even when the value came back equal. A read that a branch skips is not a dependency: a node that stopped reading `a` is not marked by a write of `a`.
 
@@ -874,6 +896,8 @@ import {
   createSourceNode,
   type DerivedNode,
   pull,
+  readDerived,
+  readSource,
   writeSource,
 } from '../src';
 
@@ -886,7 +910,7 @@ describe('ported from crates/pico/tests', () => {
     const input = createSourceNode('asdf', strictEqual);
     const firstLetter = createDerivedNode((context) => {
       calls.firstLetter += 1;
-      return context.readSource(input).charAt(0);
+      return readSource(context, input).charAt(0);
     }, strictEqual);
 
     expect(pull(firstLetter)).toBe('a');
@@ -903,11 +927,11 @@ describe('ported from crates/pico/tests', () => {
     const input = createSourceNode('asdf', strictEqual);
     const firstLetter = createDerivedNode((context) => {
       calls.firstLetter += 1;
-      return context.readSource(input).charAt(0);
+      return readSource(context, input).charAt(0);
     }, strictEqual);
     const capitalized = createDerivedNode((context) => {
       calls.capitalized += 1;
-      return context.readDerived(firstLetter).toUpperCase();
+      return readDerived(context, firstLetter).toUpperCase();
     }, strictEqual);
 
     expect(pull(capitalized)).toBe('A');
@@ -950,11 +974,11 @@ describe('ported from crates/pico/tests', () => {
     const input = createSourceNode('asdf', strictEqual);
     const firstLetter = createDerivedNode((context) => {
       calls.firstLetter += 1;
-      return context.readSource(input).charAt(0);
+      return readSource(context, input).charAt(0);
     }, strictEqual);
     const exclaimed = createDerivedNode((context) => {
       calls.exclaimed += 1;
-      return `${context.readDerived(firstLetter)}!`;
+      return `${readDerived(context, firstLetter)}!`;
     }, strictEqual);
 
     expect(pull(firstLetter)).toBe('a');
@@ -968,7 +992,7 @@ describe('ported from crates/pico/tests', () => {
     // firstLetter and exclaimed as above, plus:
     const questioned = createDerivedNode((context) => {
       calls.questioned += 1;
-      return `${context.readDerived(firstLetter)}?`;
+      return `${readDerived(context, firstLetter)}?`;
     }, strictEqual);
 
     expect(pull(exclaimed)).toBe('a!');
@@ -982,7 +1006,7 @@ describe('ported from crates/pico/tests', () => {
     const input = createSourceNode('asdf', strictEqual);
     const firstLetter = createDerivedNode((context) => {
       calls.firstLetter += 1;
-      return context.readSource(input).charAt(0);
+      return readSource(context, input).charAt(0);
     }, strictEqual);
     const unchanged = createDerivedNode(() => {
       calls.unchanged += 1;
@@ -990,8 +1014,8 @@ describe('ported from crates/pico/tests', () => {
     }, strictEqual);
     const capitalized = createDerivedNode((context) => {
       calls.capitalized += 1;
-      context.readDerived(unchanged);
-      return context.readDerived(firstLetter).toUpperCase();
+      readDerived(context, unchanged);
+      return readDerived(context, firstLetter).toUpperCase();
     }, strictEqual);
 
     expect(pull(capitalized)).toBe('A');
@@ -1011,7 +1035,7 @@ describe('ported from crates/pico/tests', () => {
     const other = createSourceNode('isograph', strictEqual);
     const firstLetter = createDerivedNode((context) => {
       calls.firstLetter += 1;
-      return context.readSource(input).charAt(0);
+      return readSource(context, input).charAt(0);
     }, strictEqual);
 
     expect(pull(firstLetter)).toBe('a');
@@ -1027,7 +1051,7 @@ describe('ported from crates/pico/tests', () => {
     const letter = createDerivedNode(
       (context) => {
         calls.letter += 1;
-        return { letter: context.readSource(input).charAt(0) };
+        return { letter: readSource(context, input).charAt(0) };
       },
       (previous, next) => previous.letter === next.letter,
     );
@@ -1068,14 +1092,14 @@ describe('ported from crates/pico/tests', () => {
     );
     const keynes = createDerivedNode(
       (context) =>
-        context
-          .readSource(table)
-          .find((economist) => economist.name === 'John Maynard Keynes'),
+        readSource(context, table).find(
+          (economist) => economist.name === 'John Maynard Keynes',
+        ),
       economistsEqual,
     );
     const bestBook = createDerivedNode((context) => {
       calls.bestBook += 1;
-      return context.readDerived(keynes)?.bestBook;
+      return readDerived(context, keynes)?.bestBook;
     }, strictEqual);
 
     expect(pull(bestBook)).toBe('General theory');
@@ -1106,11 +1130,11 @@ describe('marking and the short circuit', () => {
     const count = createSourceNode(1, strictEqual);
     const doubled = createDerivedNode((context) => {
       calls.doubled += 1;
-      return context.readSource(count) * 2;
+      return readSource(context, count) * 2;
     }, strictEqual);
     const label = createDerivedNode((context) => {
       calls.label += 1;
-      return `${context.readDerived(doubled)}`;
+      return `${readDerived(context, doubled)}`;
     }, strictEqual);
     pull(label);
 
@@ -1127,11 +1151,11 @@ describe('marking and the short circuit', () => {
     const count = createSourceNode(1, strictEqual);
     const parity = createDerivedNode((context) => {
       calls.parity += 1;
-      return context.readSource(count) % 2 === 0 ? 'even' : 'odd';
+      return readSource(context, count) % 2 === 0 ? 'even' : 'odd';
     }, strictEqual);
     const label = createDerivedNode((context) => {
       calls.label += 1;
-      return `the count is ${context.readDerived(parity)}`;
+      return `the count is ${readDerived(context, parity)}`;
     }, strictEqual);
     const first = pull(label);
 
@@ -1149,15 +1173,15 @@ describe('marking and the short circuit', () => {
     const count = createSourceNode(20, strictEqual);
     const clamped = createDerivedNode((context) => {
       calls.clamped += 1;
-      return Math.min(context.readSource(count), 10);
+      return Math.min(readSource(context, count), 10);
     }, strictEqual);
     const doubled = createDerivedNode((context) => {
       calls.doubled += 1;
-      return context.readDerived(clamped) * 2;
+      return readDerived(context, clamped) * 2;
     }, strictEqual);
     const label = createDerivedNode((context) => {
       calls.label += 1;
-      return `${context.readDerived(doubled)}`;
+      return `${readDerived(context, doubled)}`;
     }, strictEqual);
     expect(pull(label)).toBe('20');
 
@@ -1171,15 +1195,15 @@ describe('marking and the short circuit', () => {
     const count = createSourceNode(1, strictEqual);
     const left = createDerivedNode((context) => {
       calls.left += 1;
-      return context.readSource(count) + 1;
+      return readSource(context, count) + 1;
     }, strictEqual);
     const right = createDerivedNode((context) => {
       calls.right += 1;
-      return context.readSource(count) * 2;
+      return readSource(context, count) * 2;
     }, strictEqual);
     const bottom = createDerivedNode((context) => {
       calls.bottom += 1;
-      return context.readDerived(left) + context.readDerived(right);
+      return readDerived(context, left) + readDerived(context, right);
     }, strictEqual);
     expect(pull(bottom)).toBe(4);
 
@@ -1195,7 +1219,7 @@ describe('marking and the short circuit', () => {
     const chain: ReadonlyArray<DerivedNode<number>> = Array.from({ length: 100_000 }, (_, index) =>
       createDerivedNode((context) => {
         const below = chain[index - 1];
-        return below === undefined ? context.readSource(count) : context.readDerived(below) + 1;
+        return below === undefined ? readSource(context, count) : readDerived(context, below) + 1;
       }, strictEqual),
     );
     expect(chain.map((node) => pull(node)).at(-1)).toBe(99_999);
@@ -1211,15 +1235,15 @@ describe('marking and the short circuit', () => {
       const b = createSourceNode(2, strictEqual);
       const sum = createDerivedNode((context) => {
         calls.sum += 1;
-        return context.readSource(a) + context.readSource(b);
+        return readSource(context, a) + readSource(context, b);
       }, strictEqual);
       const parity = createDerivedNode((context) => {
         calls.parity += 1;
-        return context.readDerived(sum) % 2 === 0 ? 'even' : 'odd';
+        return readDerived(context, sum) % 2 === 0 ? 'even' : 'odd';
       }, strictEqual);
       const label = createDerivedNode((context) => {
         calls.label += 1;
-        return `the sum is ${context.readDerived(parity)}`;
+        return `the sum is ${readDerived(context, parity)}`;
       }, strictEqual);
       pull(label);
       writeSource(a, 3);
@@ -1250,6 +1274,8 @@ import {
   createDerivedNode,
   createSourceNode,
   pull,
+  readDerived,
+  readSource,
   sourceValue,
   writeSource,
 } from '../src';
@@ -1265,15 +1291,15 @@ describe('recorded dependencies', () => {
     const y = createSourceNode(10, strictEqual);
     const gate = createDerivedNode((context) => {
       calls.gate += 1;
-      return context.readSource(x) % 2 === 0 ? 'even' : 'odd';
+      return readSource(context, x) % 2 === 0 ? 'even' : 'odd';
     }, strictEqual);
     const other = createDerivedNode((context) => {
       calls.other += 1;
-      return context.readSource(y) * 2;
+      return readSource(context, y) * 2;
     }, strictEqual);
     const node = createDerivedNode((context) => {
       calls.node += 1;
-      return context.readDerived(gate) === 'even' ? context.readDerived(other) : 0;
+      return readDerived(context, gate) === 'even' ? readDerived(context, other) : 0;
     }, strictEqual);
     expect(pull(node)).toBe(20);
 
@@ -1293,7 +1319,7 @@ describe('recorded dependencies', () => {
     const b = createSourceNode(2, strictEqual);
     const pick = createDerivedNode((context) => {
       calls.pick += 1;
-      return context.readSource(useA) ? context.readSource(a) : context.readSource(b);
+      return readSource(context, useA) ? readSource(context, a) : readSource(context, b);
     }, strictEqual);
     expect(pull(pick)).toBe(1);
 
@@ -1315,11 +1341,11 @@ describe('recorded dependencies', () => {
     const count = createSourceNode(1, strictEqual);
     const inner = createDerivedNode((context) => {
       calls.inner += 1;
-      return context.readSource(count) * 2;
+      return readSource(context, count) * 2;
     }, strictEqual);
     const outer = createDerivedNode((context) => {
       calls.outer += 1;
-      return context.readDerived(inner) + context.readDerived(inner);
+      return readDerived(context, inner) + readDerived(context, inner);
     }, strictEqual);
     expect(pull(outer)).toBe(4);
 
@@ -1334,7 +1360,7 @@ describe('recorded dependencies', () => {
     const config = createSourceNode('a', strictEqual);
     const twice = createDerivedNode((context) => {
       calls.twice += 1;
-      return `${context.readSource(config)}${context.readSource(config)}`;
+      return `${readSource(context, config)}${readSource(context, config)}`;
     }, strictEqual);
     expect(pull(twice)).toBe('aa');
 
@@ -1351,7 +1377,7 @@ describe('recorded dependencies', () => {
     const config = createSourceNode<string | typeof MISSING>(MISSING, strictEqual);
     const name = createDerivedNode((context) => {
       calls.name += 1;
-      const value = context.readSource(config);
+      const value = readSource(context, config);
       return value === MISSING ? null : value;
     }, strictEqual);
     expect(pull(name)).toBe(null);
@@ -1370,7 +1396,7 @@ describe('recorded dependencies', () => {
     writeSource(config, 'a');
     const name = createDerivedNode((context) => {
       calls.name += 1;
-      const value = context.readSource(config);
+      const value = readSource(context, config);
       return value === MISSING ? null : value;
     }, strictEqual);
     expect(pull(name)).toBe('a');
@@ -1394,7 +1420,7 @@ describe('recorded dependencies', () => {
     const items = createSourceNode<ReadonlyArray<string>>(['asdf'], strictEqual);
     const untrackedCount = createDerivedNode(() => sourceValue(items).length, strictEqual);
     const trackedCount = createDerivedNode(
-      (context) => context.readSource(items).length,
+      (context) => readSource(context, items).length,
       strictEqual,
     );
     expect(pull(untrackedCount)).toBe(1);
@@ -1415,8 +1441,8 @@ describe('recorded dependencies', () => {
     const b = createSourceNode(10, strictEqual);
     const node = createDerivedNode((context) => {
       calls.node += 1;
-      context.readSource(trigger);
-      return context.readSource(useA) ? context.readSource(a) : context.readSource(b);
+      readSource(context, trigger);
+      return readSource(context, useA) ? readSource(context, a) : readSource(context, b);
     }, strictEqual);
     expect(pull(node)).toBe(1);
 
@@ -1438,7 +1464,7 @@ describe('recorded dependencies', () => {
   test('pull inside a computation records nothing', () => {
     const calls = { outer: 0 };
     const count = createSourceNode(1, strictEqual);
-    const doubled = createDerivedNode((context) => context.readSource(count) * 2, strictEqual);
+    const doubled = createDerivedNode((context) => readSource(context, count) * 2, strictEqual);
     const outer = createDerivedNode(() => {
       calls.outer += 1;
       return pull(doubled);
@@ -1464,6 +1490,8 @@ import {
   createDerivedNode,
   createSourceNode,
   pull,
+  readDerived,
+  readSource,
   writeSource,
 } from '../src';
 
@@ -1474,7 +1502,7 @@ test('a throwing computation leaves the graph state unchanged', () => {
   const count = createSourceNode(1, strictEqual);
   const scaled = createDerivedNode((context) => {
     calls.scaled += 1;
-    const value = context.readSource(count);
+    const value = readSource(context, count);
     if (value < 0) {
       throw new Error('negative');
     }
@@ -1482,7 +1510,7 @@ test('a throwing computation leaves the graph state unchanged', () => {
   }, strictEqual);
   const parent = createDerivedNode((context) => {
     calls.parent += 1;
-    return `${context.readDerived(scaled)}`;
+    return `${readDerived(context, scaled)}`;
   }, strictEqual);
   expect(pull(parent)).toBe('10');
 
@@ -1511,6 +1539,8 @@ import {
   createSourceNode,
   disposeDerivedNode,
   pull,
+  readDerived,
+  readSource,
   writeSource,
 } from '../src';
 
@@ -1521,7 +1551,7 @@ describe('disposeDerivedNode (open decision 9 (a))', () => {
     const calls = { equals: 0 };
     const count = createSourceNode(1, strictEqual);
     const node = createDerivedNode(
-      (context) => context.readSource(count),
+      (context) => readSource(context, count),
       (previous, next) => {
         calls.equals += 1;
         return previous === next;
@@ -1544,11 +1574,11 @@ describe('disposeDerivedNode (open decision 9 (a))', () => {
     const count = createSourceNode(1, strictEqual);
     const scaled = createDerivedNode((context) => {
       calls.scaled += 1;
-      return context.readSource(count) * 10;
+      return readSource(context, count) * 10;
     }, strictEqual);
     const parent = createDerivedNode((context) => {
       calls.parent += 1;
-      return `${context.readDerived(scaled)}`;
+      return `${readDerived(context, scaled)}`;
     }, strictEqual);
     expect(pull(parent)).toBe('10');
 
@@ -1576,7 +1606,7 @@ describe('disposeDerivedNode (open decision 9 (a))', () => {
     // scaled as above
     const parent = createDerivedNode((context) => {
       calls.parent += 1;
-      return context.readSource(useScaled) ? context.readDerived(scaled) : 0;
+      return readSource(context, useScaled) ? readDerived(context, scaled) : 0;
     }, strictEqual);
     expect(pull(parent)).toBe(10);
 
@@ -1597,7 +1627,7 @@ describe('disposeDerivedNode (open decision 9 (a))', () => {
     const count = createSourceNode(1, strictEqual);
     const node = createDerivedNode((context) => {
       calls.node += 1;
-      return context.readSource(count);
+      return readSource(context, count);
     }, strictEqual);
 
     disposeDerivedNode(node);
@@ -1620,6 +1650,8 @@ import {
   disposeDerivedNode,
   markSourceChanged,
   pull,
+  readDerived,
+  readSource,
   sourceValue,
   writeSource,
 } from '../src';
@@ -1636,11 +1668,11 @@ describe('degenerate cases', () => {
     }, strictEqual);
     const parity = createDerivedNode((context) => {
       calls.parity += 1;
-      return context.readSource(count) % 2 === 0 ? 'even' : 'odd';
+      return readSource(context, count) % 2 === 0 ? 'even' : 'odd';
     }, strictEqual);
     const reader = createDerivedNode((context) => {
       calls.reader += 1;
-      return `${context.readDerived(constant)} ${context.readDerived(parity)}`;
+      return `${readDerived(context, constant)} ${readDerived(context, parity)}`;
     }, strictEqual);
     expect(pull(reader)).toBe('fixed odd');
 
@@ -1669,7 +1701,7 @@ describe('degenerate cases', () => {
     const count = createSourceNode(1, strictEqual);
     const node = createDerivedNode((context) => {
       calls.node += 1;
-      return context.readSource(count);
+      return readSource(context, count);
     }, strictEqual);
     expect(calls.node).toBe(0);
     expect(pull(node)).toBe(1);
@@ -1685,11 +1717,11 @@ describe('degenerate cases', () => {
     const structuralItems = createSourceNode<ReadonlyArray<number>>([1, 2], sameElements);
     const strictReader = createDerivedNode((context) => {
       calls.strictReader += 1;
-      return context.readSource(strictItems).length;
+      return readSource(context, strictItems).length;
     }, strictEqual);
     const structuralReader = createDerivedNode((context) => {
       calls.structuralReader += 1;
-      return context.readSource(structuralItems).length;
+      return readSource(context, structuralItems).length;
     }, strictEqual);
     expect(pull(strictReader)).toBe(2);
     expect(pull(structuralReader)).toBe(2);
@@ -1714,7 +1746,7 @@ describe('degenerate cases', () => {
   test('markSourceChanged after the value object changed in place', () => {
     const scores = createSourceNode(new Map([['a', 1]]), strictEqual);
     const score = createDerivedNode(
-      (context) => context.readSource(scores).get('a'),
+      (context) => readSource(context, scores).get('a'),
       strictEqual,
     );
     expect(pull(score)).toBe(1);
@@ -1730,12 +1762,12 @@ describe('degenerate cases', () => {
     const count = createSourceNode(1, strictEqual);
     const nothing = createDerivedNode((context) => {
       calls.nothing += 1;
-      context.readSource(count);
+      readSource(context, count);
       return undefined;
     }, strictEqual);
     const parent = createDerivedNode((context) => {
       calls.parent += 1;
-      return context.readDerived(nothing) === undefined;
+      return readDerived(context, nothing) === undefined;
     }, strictEqual);
     expect(pull(parent)).toBe(true);
     expect(pull(nothing)).toBe(undefined);
@@ -1749,20 +1781,20 @@ describe('degenerate cases', () => {
     const calls = { strictParent: 0, objectIsParent: 0 };
     const count = createSourceNode(1, strictEqual);
     const strictNaN = createDerivedNode(
-      (context) => context.readSource(count) * Number.NaN,
+      (context) => readSource(context, count) * Number.NaN,
       strictEqual,
     );
     const objectIsNaN = createDerivedNode(
-      (context) => context.readSource(count) * Number.NaN,
+      (context) => readSource(context, count) * Number.NaN,
       Object.is,
     );
     const strictParent = createDerivedNode((context) => {
       calls.strictParent += 1;
-      return Number.isNaN(context.readDerived(strictNaN));
+      return Number.isNaN(readDerived(context, strictNaN));
     }, strictEqual);
     const objectIsParent = createDerivedNode((context) => {
       calls.objectIsParent += 1;
-      return Number.isNaN(context.readDerived(objectIsNaN));
+      return Number.isNaN(readDerived(context, objectIsNaN));
     }, strictEqual);
     expect(pull(strictParent)).toBe(true);
     expect(pull(objectIsParent)).toBe(true);
@@ -1775,15 +1807,15 @@ describe('degenerate cases', () => {
 
   test('the supplied equals decides cutoff for 0 and -0', () => {
     const sign = createSourceNode(1, strictEqual);
-    const strictZero = createDerivedNode((context) => context.readSource(sign) * 0, strictEqual);
-    const objectIsZero = createDerivedNode((context) => context.readSource(sign) * 0, Object.is);
+    const strictZero = createDerivedNode((context) => readSource(context, sign) * 0, strictEqual);
+    const objectIsZero = createDerivedNode((context) => readSource(context, sign) * 0, Object.is);
     const describeZero = (value: number) => (Object.is(value, -0) ? 'negative zero' : 'zero');
     const strictParent = createDerivedNode(
-      (context) => describeZero(context.readDerived(strictZero)),
+      (context) => describeZero(readDerived(context, strictZero)),
       strictEqual,
     );
     const objectIsParent = createDerivedNode(
-      (context) => describeZero(context.readDerived(objectIsZero)),
+      (context) => describeZero(readDerived(context, objectIsZero)),
       strictEqual,
     );
     expect(pull(strictParent)).toBe('zero');
@@ -1804,20 +1836,26 @@ import { expectTypeOf, test } from 'vitest';
 import {
   createDerivedNode,
   createSourceNode,
+  type Context,
   type DerivedNode,
   pull,
+  readDerived,
+  readSource,
   writeSource,
 } from '../src';
 import { type AnyDerivedNode } from '../src/graph';
 
 const strictEqual = (previous: unknown, next: unknown): boolean => previous === next;
 
-test('readDerived and pull return the node’s value type', () => {
+test('readSource, readDerived, and pull return the node’s value type', () => {
   const count = createSourceNode(1, strictEqual);
-  const doubled = createDerivedNode((context) => context.readSource(count) * 2, strictEqual);
+  const doubled = createDerivedNode((context) => {
+    expectTypeOf(readSource(context, count)).toEqualTypeOf<number>();
+    return readSource(context, count) * 2;
+  }, strictEqual);
   const label = createDerivedNode((context) => {
-    expectTypeOf(context.readDerived(doubled)).toEqualTypeOf<number>();
-    return `${context.readDerived(doubled)}`;
+    expectTypeOf(readDerived(context, doubled)).toEqualTypeOf<number>();
+    return `${readDerived(context, doubled)}`;
   }, strictEqual);
   expectTypeOf(pull(label)).toEqualTypeOf<string>();
 });
@@ -1825,6 +1863,20 @@ test('readDerived and pull return the node’s value type', () => {
 test('a derived node of any value type is an AnyDerivedNode', () => {
   expectTypeOf<DerivedNode<number>>().toMatchTypeOf<AnyDerivedNode>();
   expectTypeOf<DerivedNode<ReadonlyArray<string>>>().toMatchTypeOf<AnyDerivedNode>();
+});
+
+test('a Context is opaque, and a node is not a Context', () => {
+  const count = createSourceNode(1, strictEqual);
+  const doubled = createDerivedNode((context) => readSource(context, count) * 2, strictEqual);
+  expectTypeOf<Context>().not.toMatchTypeOf<AnyDerivedNode>();
+  // @ts-expect-error a derived node passed as a Context
+  readSource(doubled, count);
+  createDerivedNode((context) => {
+    // @ts-expect-error a Context has no reads field
+    void context.reads;
+    // @ts-expect-error a source node read with readDerived
+    return readDerived(context, count);
+  }, strictEqual);
 });
 
 test('writes and equalities are typed by the node', () => {
@@ -1933,7 +1985,7 @@ export default defineConfig({
 
 Deltas of `tsconfig.test.json` from the runtime's: no `paths` entry and no `fixtures/**/*.ts`, because the tests import `../src` and there are no fixtures. Deltas of `vitest.config.ts`: no Babel plugin. With `typecheck.enabled`, vitest type-checks `graph.test-d.ts` as the runtime's `read.test-d.ts` is.
 
-TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`; every type field is `readonly` except `SourceNode.value`, `DerivedNode.precalculated`, `DerivedNode.reads`, and the fields of `PrecalculatedValue`, which the engine writes; arrays are `ReadonlyArray` except the dependency lists and `reads`, which the engine reuses as buffers (Pull). The engine has no class, so the ES private field rule applies only under open decision 7 (b). oxlint's `switch-exhaustiveness-check` and `strict-boolean-expressions` (`.oxlintrc.json`) hold for every `switch` and condition in the body.
+TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`; every type field is `readonly` except `SourceNode.value`, `DerivedNode.precalculated`, `DerivedNode.reads`, and the fields of `PrecalculatedValue`, which the engine writes; arrays are `ReadonlyArray` except the dependency lists and `reads`, which the engine reuses as buffers (Pull). The engine has no class (decision 7), so the ES private field rule does not apply. oxlint's `switch-exhaustiveness-check` and `strict-boolean-expressions` (`.oxlintrc.json`) hold for every `switch` and condition in the body.
 
 ### Pre-commit hooks
 
@@ -1985,7 +2037,7 @@ pico-runtime.md holds no copy of the engine. It references this doc by section f
 
 - The engine has no write-during-computation check and no graph object; a computation or an equality that writes breaks the contract and leaves values silently stale (Writes during a computation, decision 2). pico-runtime.md's `callResolver` catches every throw of a resolver into `ResolverThrew` (pico-runtime.md open decision 30).
 - Marking walks a work list: `markDirty` over a set, `markOneDirty`, and `markCheck` (Mark).
-- A computation is synchronous; a read through its context after it returned breaks the contract, and the engine does not check it (Pull, decision 2).
+- A computation is synchronous, and its `Context` is the running node, used only as the first argument of `readSource` and `readDerived` while it runs; any other use breaks the contract, and the engine does not check it (The context, decision 2).
 - Disposal resets the node to never computed (Disposal, open decision 9).
 - A computation and an equality must not throw, and the engine guarantees only that its own state is not corrupted (Throws, decision 3).
 - The derived nodes form a directed acyclic graph, and the engine has no cycle check (Cycles, decision 4).
@@ -2003,7 +2055,7 @@ The package is `@isograph/pico-js` and its directory is `libs/isograph-pico-js` 
 
 ### 2. A write during a computation (decided)
 
-Decided by the user: no guard and no database object. The engine gives up no performance to prevent misuse, and misuse is a documented contract (Goal). A computation and an equality must not write a source or dispose a node; a violation leaves the cache silently stale (Writes during a computation), and the engine runs no check to catch it. There is no `Graph`: every public function takes only the node it acts on (`writeSource(source, value)`, `markSourceChanged(source)`, `pull(node)`, `disposeDerivedNode(node)`). Deviation from pico, which rejects every write while a memo runs (`assert_empty_dependency_stack`, `crates/pico/src/database.rs:193-198`) and passes the database to every call (`Database::set`, `:151`): the check costs a counter raised and lowered around every computation and every equality and a test on every write, and the database parameter exists in the engine only to carry that counter.
+Decided by the user: no guard and no database object. The engine gives up no performance to prevent misuse, and misuse is a documented contract (Goal). A computation and an equality must not write a source or dispose a node; a violation leaves the cache silently stale (Writes during a computation), and the engine runs no check to catch it. There is no `Graph`: every public function takes the node it acts on (`writeSource(source, value)`, `markSourceChanged(source)`, `pull(node)`, `disposeDerivedNode(node)`), and the two read functions also take the running computation's `Context`, which is that computation's node (`readSource(context, source)`, `readDerived(context, node)`). Deviation from pico, which rejects every write while a memo runs (`assert_empty_dependency_stack`, `crates/pico/src/database.rs:193-198`) and passes the database to every call (`Database::set`, `:151`): the check costs a counter raised and lowered around every computation and every equality and a test on every write, and the database parameter exists in the engine only to carry that counter.
 
 ### 3. A throw out of a computation or an equality (decided)
 
@@ -2025,13 +2077,9 @@ pico-runtime.md open decision 19, restated.
 
 The engine defines no equality. `createDerivedNode` requires `equals`, with no optional parameter and no default, and the engine exports no comparison function. `===` is the Isograph layer's default, which it passes to each node it creates (pico-runtime.md open decision 20; upstream Isograph's comparison of resolver values, `areEqualWithDeepComparison.ts:84-95` in `../isograph`). Under `===`, a node whose value is `NaN` never cuts off, so its readers recompute on every recomputation of it, and a change from `0` to `-0` cuts off, so its readers keep `0`. A caller that supplies its own `equals` gets that comparison and is not affected by the Isograph default. `degenerate.test.ts`'s last two tests assert that the supplied `equals` decides cutoff.
 
-### 7. Whether a consumer can write a node's fields
+### 7. Whether a consumer can write a node's fields (decided)
 
-pico-runtime.md open decision 21, restated. The types are plain object types whose fields every consumer sees, and a consumer that writes `dependents`, `precalculated`, or `reads` breaks an invariant silently.
-
-- (a) Plain object types; each field's comment names its only reader and writer. Held, not decided. Reason: (b) and (c) each cost a cast or a slower link type. Cost: the comments are the only guard, against AGENTS.md's "Never rely on discipline what we can enforce with newtypes".
-- (b) Classes with ES private fields, with module-local accessors assigned in each class's `static {}` block. Cost: a private `#equals` makes `DerivedNode<number>` not assignable to `DerivedNode<unknown>`, so it needs open decision 5 (c) or a cast per link; a node cannot be wrapped in a `Proxy`.
-- (c) Opaque branded public types, cast to field types inside `graph.ts`. Cost: a cast in every engine function that receives a node.
+pico-runtime.md open decision 21, restated. Decided by the user: nodes are plain objects of plain object types, and the engine has no class. Each field's comment names its only reader and writer. A consumer that writes `dependents`, `precalculated`, or `reads` breaks the contract silently, and the engine does not check it (decision 2). This deviates from AGENTS.md's "Never rely on discipline what we can enforce with newtypes" for the node types. Reason: classes with ES private fields make `DerivedNode<number>` not assignable to `DerivedNode<unknown>` through a private `#equals`, which needs decision 5 (c) or a cast per link, and opaque node types cost a cast in every engine function that receives a node. The `Context` is opaque (The context), because it costs two casts in total.
 
 ### 8. Whether `writeSource` compares the new value with the old (decided)
 
