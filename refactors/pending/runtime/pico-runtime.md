@@ -540,7 +540,7 @@ Every table and artifact module default-exports a function, and every reference 
 
 ### Refinements
 
-A refinement `asPet` on `Node` is a derived field the compiler generates on `Node` with target `Pet` (linked-only-selections.md, Generated refinement fields). Its reader AST is empty and its resolver is `({ link }) => (link.entityName === 'Pet' ? { entityName: 'Pet', id: link.id } : null)`: a link's `entityName` is the `__typename` `normalize` stored the record under (`recordEntityName`, `libs/isograph-runtime/src/recordId.ts:50-68`), so the resolver reads nothing. When the value is a link, the walk continues at it as `Pet`. Its node on `Pet:1` is keyed `Node.asPet` in `Pet:1`'s `derived`, has no dependencies, is computed once and never marked, and is disposed with its record. Cost: one node per record per selected refinement, and one edge per reader.
+A refinement `asPet` on `Node` is a derived field the compiler generates on `Node` with target `Pet` (linked-only-selections.md, Generated refinement fields). Its reader AST is empty and its resolver is `({ link }) => (link.entityName === 'Pet' ? { entityName: 'Pet', id: link.id } : null)`: a link's `entityName` is the `__typename` `normalize` stored the record under (`recordEntityName`, `libs/isograph-runtime/src/recordId.ts:50-68`), so the resolver reads nothing. When the value is a link, the walk continues at it as `Pet`. Its node on `Pet:1` is keyed `Node.asPet/{}` in `Pet:1`'s `derived`, has no dependencies, is computed once and never marked, and is disposed with its record. Cost: one node per record per selected refinement, and one edge per reader.
 
 `__self` is not in a table. It is a field of every entity whose value is the current record's link, read as the same entity, so `__self { name }` at `Pet:1` reads `name` at `Pet:1` as `Pet`, and a bare `__self` at a scalar record reads `__value`. The walk recognizes the name (open decision 27).
 
@@ -670,7 +670,7 @@ At the record `R` read as entity `E`, for the selection `{ alias, fieldName, arg
 - A `Derived` entry with target `null` returns `v` as is: the walk does not inspect an opaque output.
 - A link with `selections` is read there as the entry's target; a link with `selections: null` reads its record's `__value` when the target is `Leaf` and is `EMPTY_DATA` when it is `Composite`.
 - Every read is through `hooks`, so a bare scalar's `__value` read is recorded on the computation that walks it, and creates no node.
-- `ReadHooks`, `resolverNodeAt`, `resolverComputation`, and `contextHooks` keep their signatures: a position is a record link. A derived node on a scalar is `resolverNodeAt(store, artifact, String:Pet:1.name, variables)`, keyed `String.toUppercase` in that record's `derived`.
+- `ReadHooks`, `resolverNodeAt`, `resolverComputation`, and `contextHooks` keep their signatures: a position is a record link. A derived node on a scalar is `resolverNodeAt(store, artifact, String:Pet:1.name, variables)`, keyed `String.toUppercase/{}` in that record's `derived`.
 
 An absent record keeps the rule of Absent records: a source field on it reads a `MISSING` source node and is `MissingData`; a derived field on a link to it still creates its node in the `Absent` container, because the table is static; a bare composite selection on it reads nothing and is `EMPTY_DATA`; creating the record writes the source nodes those readers read and marks them.
 
@@ -828,7 +828,7 @@ field Query.PetDetailPage($id: ID!) { pet(id: $id) { n1: name n2: name { toUpper
 field String.toUppercase { __self }
 ```
 
-The generated artifacts are in linked-only-selections.md, Generated files for the example. The store holds `Query:__ROOT.pet____id___"1"` linking to `Pet:1`; `Pet:1.name` linking to `String:Pet:1.name`, whose `__value` is `"Ricky"`; `Pet:1.bestFriend` linking to `Pet:2`; `Pet:2.name` linking to `String:Pet:2.name`, whose `__value` is `"Mango"`. `PetDetailPage` is read with `{ id: "1" }`; its node is `Query.PetDetailPage____id___"1"` on `Query:__ROOT`. `X.__value` is the `__value` source node of the scalar record `X`; `T.f` names the entry of `f` in `T`'s table.
+The generated artifacts are in linked-only-selections.md, Generated files for the example. The store holds `Query:__ROOT.pet____id___"1"` linking to `Pet:1`; `Pet:1.name` linking to `String:Pet:1.name`, whose `__value` is `"Ricky"`; `Pet:1.bestFriend` linking to `Pet:2`; `Pet:2.name` linking to `String:Pet:2.name`, whose `__value` is `"Mango"`. `PetDetailPage` is read with `{ id: "1" }`; its node is `Query.PetDetailPage/{"id":"1"}` on `Query:__ROOT`. `X.__value` is the `__value` source node of the scalar record `X`; `T.f` names the entry of `f` in `T`'s table.
 
 First read:
 
@@ -838,7 +838,7 @@ read PetDetailPage: absent -> create Dirty, no value -> recompute at Query:__ROO
     n1: Pet.name Source, target String -> Pet:1.name -> {PetDetailPage} -> String:Pet:1.name, no selections
       String shape Leaf -> String:Pet:1.name.__value -> {PetDetailPage} -> "Ricky"
     n2: Pet.name Source -> Pet:1.name (second entry) -> String:Pet:1.name -> selections at String:Pet:1.name as String
-      toUppercase: String.toUppercase Derived, target null -> String:Pet:1.name.derived "String.toUppercase" absent -> create Dirty
+      toUppercase: String.toUppercase Derived, target null -> String:Pet:1.name.derived "String.toUppercase/{}" absent -> create Dirty
         -> recompute at String:Pet:1.name as String, with toUppercase's tables
         __self -> String:Pet:1.name as String, no selections -> String shape Leaf
           -> String:Pet:1.name.__value -> {PetDetailPage, toUppercase@String:Pet:1.name} -> "Ricky"
@@ -918,17 +918,17 @@ A refinement, `field Query.F { node(id: "1") { asPet { name } } }`:
 ```text
 read F: recompute at Query:__ROOT as Query
   node: Query.node Source, target Node -> Query:__ROOT.node____id___"1" -> {F} -> Pet:1 -> selections at Pet:1 as Node
-    asPet: Node.asPet Derived, target Pet -> Pet:1.derived "Node.asPet" absent -> create Dirty
+    asPet: Node.asPet Derived, target Pet -> Pet:1.derived "Node.asPet/{}" absent -> create Dirty
       -> recompute at Pet:1 as Node: empty reader AST, reads nothing
       resolver({ data: {}, parameters: {}, link: Pet:1 }) -> link.entityName is "Pet" -> Pet:1 -> asPet Clean Pet:1, dependencies []
     asPet@Pet:1.dependents = {F} -> Pet:1 is a link -> selections at Pet:1 as Pet
       name: Pet.name -> Pet:1.name -> String:Pet:1.name -> Leaf -> String:Pet:1.name.__value -> {F}
 normalize Pet:1.name = "Rex": String:Pet:1.name.__value -> {F} -> F Dirty; asPet@Pet:1 is not marked
 read F: Dirty -> recompute -> asPet@Pet:1 Clean, not run -> F Clean
-delete Pet:1 -> Pet:1.derived = {Node.asPet} -> dispose asPet -> F Dirty
+delete Pet:1 -> Pet:1.derived = {Node.asPet/{}} -> dispose asPet -> F Dirty
 ```
 
-On a `Checkin` record the same selection reads `Node.asPet` on `Checkin:7`, whose resolver returns `null`, and `asPet` is `null`.
+On a `Checkin` record the same selection reads `Node.asPet/{}` on `Checkin:7`, whose resolver returns `null`, and `asPet` is `null`.
 
 Duplicate dependency entries. A computation that reads one node twice records it twice (`PetDetailPage` reads `Pet:1.name` for `n1` and for `n2`). The `dependents` set holds the reader once (reactive-engine.md, Dependencies). `verify` skips `Source` entries and finds a second `Derived` entry of the same node `Clean`, one step. The list is kept as read: deduplicating costs a set per computation on every read to shorten a list by entries that cost one step each.
 
@@ -950,10 +950,6 @@ export function readStoredResult<TEntityName extends EntityName, TOutput>(
   root: NoInfer<Link<TEntityName>>,
   variables: Variables,
 ): ResolverResult<TOutput> {
-  // The node under `artifact`'s resolver store key on `root` was created from `artifact` only once
-  // open decision 1 is decided. Until then the key is `selectableName` and variables alone, which is
-  // wrong: `field Node.Label` and `field Pet.Label` read on `Pet:1` get one node, and so do a field
-  // `F____n___2` with no variables and `F` with `{ n: 2 }`.
   return pull(store.graph, resolverNodeAt(store, artifact, root, variables)) as ResolverResult<TOutput>;
 }
 
@@ -1013,15 +1009,17 @@ The resolver store key:
 
 ```ts
 // from libs/isograph-runtime/src/storeKey.ts
-/** `<parentEntityName>.<selectableName>`, then one `____<name>___<stableStringify(value)>` chunk per
- * entry of `variables`, names in code unit order: `argumentChunks`'s format. */
+/** `<parentEntityName>.<selectableName>/<variables>`, with `<variables>` the field's variables as
+ * `JSON.stringify(stableCopy(variables))` writes them (open decision 1). */
 export function resolverStoreKey(
   field: Pick<ReaderArtifact<ResolverParam, unknown, EntityName>, 'parentEntityName' | 'selectableName'>,
   variables: Variables,
-): StoreKey;
+): StoreKey {
+  return `${field.parentEntityName}.${field.selectableName}/${JSON.stringify(stableCopy(variables))}`;
+}
 ```
 
-The variables are the field's own: for a `Derived` entry, `childVariables(variables, selection.arguments)` (`read.ts:232-242`); for a top-level read, the read's variables. `PetName` on `Pet:1` is `Pet.PetName`; `PetSummary` read with `{ id: "1" }` is `Query.PetSummary____id___"1"` on `Query.__ROOT`; `NodeLink` read under `node(id: $id)` on `Pet:1` is `Node.NodeLink`, a different field from any `Pet.NodeLink`. The entity is part of the key because one record is read as several entities (Entity tables). A GraphQL name cannot hold `.`. Two selections of one field with equal argument values on one record are one node, whatever their aliases, read by both parents. The format can collide; open decision 1.
+The variables are the field's own: for a `Derived` entry, `childVariables(variables, selection.arguments)` (`read.ts:232-242`); for a top-level read, the read's variables. `PetName` on `Pet:1` is `Pet.PetName/{}`; `PetSummary` read with `{ id: "1" }` is `Query.PetSummary/{"id":"1"}` on `Query:__ROOT`; `NodeLink` read under `node(id: $id)` on `Pet:1` is `Node.NodeLink/{}`, a different field from any `Pet.NodeLink/{}`. The entity is part of the key because one record is read as several entities (Entity tables). The variables are upstream's encoding (`stableIdForFragmentReference`, `FragmentReference.ts:75-79`; open decision 1). A GraphQL name cannot hold `.` or `/`, so the key is injective: the first `.` ends the entity name, the first `/` ends the selectable name, and the rest is the JSON. Two selections of one field with equal argument values on one record are one node, whatever their aliases, read by both parents.
 
 The key needs the client field's entity and selectable name, and the walk needs the tables of the entities it reads at, which v1's reader artifact does not carry:
 
@@ -1425,16 +1423,16 @@ The user's design notes, recorded for later. None is part of the core, and none 
 
 ### 1. The resolver store key format
 
-A resolver node's key in its container is `resolverStoreKey(artifact, variables)`: `<parentEntityName>.<selectableName>` and the argument chunks (Stored resolver results).
+A resolver node's key in its container is `resolverStoreKey(artifact, variables)`: `<parentEntityName>.<selectableName>/` and the variables (Stored resolver results).
 
-Decided by the model: the key names the field's entity. There are no abstract entities, and one record is read as several entities: `User:4` read through `actor` is read as `Actor`, and `Actor.foo` and `User.foo` on `User:4` are different fields (Entity tables), so a key without the entity would give both one node. This was option (a); `ReaderArtifact.parentEntityName` carries the entity. Upstream's per-(record, field) key `stableIdForFragmentReference` names the typename and the field name (`FragmentReference.ts:75-79`).
+Decided by the model: the key names the field's entity. There are no abstract entities, and one record is read as several entities: `User:4` read through `actor` is read as `Actor`, and `Actor.foo` and `User.foo` on `User:4` are different fields (Entity tables), so a key without the entity would give both one node. This was option (a); `ReaderArtifact.parentEntityName` carries the entity.
 
-The remaining question is the argument chunks. A GraphQL name may contain `_`, so a field named `F____n___2` read with no variables and `F` read with `{ n: 2 }` both have the key `E.F____n___2` (`argumentChunks`, `libs/isograph-runtime/src/storeKey.ts:22-34`). Upstream's server key has the same format and collision (`getParentRecordKey`, `cache.ts:454-479`; `:594-595`).
+The remaining question is how the key encodes the variables. Upstream's key for a field's cached result on a record is `stableIdForFragmentReference`: `` `${root.__typename}/${root.__link}/${fieldName}/${JSON.stringify(stableCopy(variables))}` `` (`FragmentReference.ts:75-79`). It names the record, the field, and the variables as JSON of their stable copy; it does not use the server store key's argument chunks. The chunk format (`____<name>___<value>`) is upstream's server store key only (`getParentRecordKey`, `cache.ts:454-479`; `:594-595`), and it collides: a GraphQL name may contain `_`, so a field named `F____n___2` read with no variables and `F` read with `{ n: 2 }` both have the chunk key `F____n___2` (`argumentChunks`, `libs/isograph-runtime/src/storeKey.ts:22-34`).
 
-- (a) Accept the collision. Cost: two fields share one stored result, with no error.
-- (b) A key that cannot collide: a separator outside the name alphabet, `` `${parentEntityName}.${selectableName}(${name}:${json},..)` ``, or `JSON.stringify([parentEntityName, selectableName, entries])` with `entries` the `[name, stableCopy(value)]` pairs in code unit order. Both are injective. Cost: the resolver key no longer shares the server key's format. The server `storeKey` keeps upstream's format; its collision is store.md's.
+- (a) Upstream's encoding: `` `${parentEntityName}.${selectableName}/${JSON.stringify(stableCopy(variables))}` ``. The container supplies the record, which upstream's key spells as typename and link. Held, not decided. Reason: upstream's behavior, and it is injective: a GraphQL name holds no `.` and no `/`, so `F____n___2` with no variables is `E.F____n___2/{}` and `F` with `{ n: 2 }` is `E.F/{"n":2}`. Cost: the resolver key does not share the server key's format. The server `storeKey` keeps upstream's chunk format; its collision is store.md's.
+- (b) The chunk format, `argumentChunks` of the variables after the selectable name. Cost: the `F____n___2` collision; two fields share one stored result, with no error.
 
-Not decided. The body is written with the chunk format.
+The body is written with (a).
 
 ### 2. A write during a computation
 
