@@ -579,7 +579,7 @@ Every selection follows a link to an entity's record, and scalars are entities (
 Two structures carry what the runtime needs, and they stay separate:
 
 - The response normalization AST, one per operation, shaped by the server fields the query fetches, as upstream's is (`NormalizationAst`, Scalar records).
-- The entity table, one per entity, shared by every operation and every reader, generated from the schema and the client field declarations (`EntityTable`, Entity tables).
+- The entity table, one per entity, shared by every operation and every reader, generated from the entity's protocol selectables, its generated refinement fields, and the client fields on it whose reader artifact is generated (`EntityTable`, Entity tables; linked-only-selections.md, open decision 4).
 
 ### The reader AST
 
@@ -618,7 +618,8 @@ export type EntityTables = { readonly [entityName: string]: () => EntityTable };
  * record of the entity gets its id. The default export of an `entity_table.ts` artifact is a function
  * returning it. */
 export type EntityTable = {
-  /** Every field of the entity, by field name. */
+  /** Every protocol selectable and generated refinement field of the entity, and each client field
+   * on it whose reader artifact is generated, by field name. */
   readonly fields: { readonly [fieldName: string]: FieldEntry };
   /** What a selection of the entity with no selection set reads. */
   readonly shape: EntityShape;
@@ -710,7 +711,7 @@ const entityTable = (): EntityTable => ({
 export default entityTable;
 ```
 
-The `Node` table lists `id`, `NodeLink`, and each generated refinement field a reader selects on `Node` (`asPet: { kind: 'Derived', target: 'Pet', artifact: Node__asPet__resolver_reader }`). The `Query` table's storage is `{ kind: 'Fixed', id: '__ROOT' }`.
+The `Node` table lists `NodeLink`, `__typename`, `asBlogItem`, `asCheckin`, `asPet`, and `id`: every refinement field `graphql_selectables` gives `Node`, one per object type that implements it, whether or not a reader selects it (`asPet: { kind: 'Derived', target: 'Pet', artifact: Node__asPet__resolver_reader }`; linked-only-selections.md, Generated files for the example). The `Query` table's storage is `{ kind: 'Fixed', id: '__ROOT' }`.
 
 Who imports a table:
 
@@ -1531,7 +1532,7 @@ Each is one commit, in order; each is independently shippable.
 
    Tests. `storeSnapshot(store)` replaces `store` wherever a test compares the store: `expect(store).toEqual(storeOf(..))` in `test/normalize.test.ts` and `test/garbageCollection.test.ts`, `expect(store).toEqual(before)` with `before = storeSnapshot(store)` in place of `structuredClone(store)` (`test/check.test.ts:236-242`), and `expect(environment.store).toEqual(new Map())` in `test/network.test.ts` (`:114`, `:181`, `:209`, `:230`, `:295`, `:423`), `test/environment.test.ts:95`, and `test/garbageCollection.test.ts` (`:42`, `:46`), which compare with `new Map()` as a `PlainStore`. Every store a test builds with `new Map()` is `createStore()` (`test/check.test.ts:36`, `:44`, `:48`; `test/garbageCollection.test.ts:34`, `:44`, `:105`; `test/network.test.ts:44`, `:332`; `test/environment.test.ts:23`, `:38`, `:61`; `test/read.test.ts:97`, `:521`, `:703`; `test/subscribe.test.ts:50`, `:610`, `:634`). Every in-place mutation of a stored record goes through The store's test fixtures rule: a key deleted (`test/check.test.ts:114`, `:179`, `:187`, `:193`) builds the store with `storeFrom` without that key; a record deleted (`test/check.test.ts:122`, `:137`, `:164`, `:188`, `:213`; `test/garbageCollection.test.ts:135`; `test/read.test.ts:570`) calls `deleteRecord`; a value set (`test/read.test.ts:328`, `test/subscribe.test.ts:492`) calls `writeSource(store.graph, sourceNodeAt(..), 'x')`. New: in `test/store.test.ts`, "deleteRecord of an absent record changes nothing", "deleteRecord of the last record of an entity removes the entity from storeSnapshot", "storeSnapshot omits Absent containers and MISSING source nodes", and "storeFrom then storeSnapshot is the identity on a PlainStore".
 
-6. Prefactor: entity tables and the minimal reader AST (linked-only-selections.md, change 2). The compiler emits `ReaderSelection` as `{ alias, fieldName, arguments, selections }`, an `entity_table.ts` per entity a reader artifact or normalization AST imports, `ReaderArtifact.parentEntityName`, `selectableName`, and `tables`, `NormalizationAst.tables`, and a generated refinement field (`Node/asPet/`) per selected refinement; the normalization AST loses `identity`. The runtime gains `EntityTable`, the walk of Selections in the Isograph layer (`fieldOf`, `tableOf`, `readAt`, `EMPTY_DATA`), `recordId` over `RecordStorage` and `storageOf`, `storeKey(name, args, variables)`, and `selectionSetDataAreEqual` over tables; the four v1 selection kinds and `NormalizationIdentity` go. Observable: every generated artifact is regenerated in the new shape; every read returns the values it returned before; a `Node`-typed `node(id:)` selection of `asPet { name }` on a `Checkin` record is `null`; the pet script's output is unchanged.
+6. Prefactor: entity tables and the minimal reader AST (linked-only-selections.md, change 2). The compiler emits `ReaderSelection` as `{ alias, fieldName, arguments, selections }`, an `entity_table.ts` per entity a reader artifact or normalization AST imports, `ReaderArtifact.parentEntityName`, `selectableName`, and `tables`, `NormalizationAst.tables`, and a generated refinement field (`Node/asPet/`) for every refinement of each entity whose table is generated, selected or not; the normalization AST loses `identity`. The runtime gains `EntityTable`, the walk of Selections in the Isograph layer (`fieldOf`, `tableOf`, `readAt`, `EMPTY_DATA`), `recordId` over `RecordStorage` and `storageOf`, `storeKey(name, args, variables)`, and `selectionSetDataAreEqual` over tables; the four v1 selection kinds and `NormalizationIdentity` go. Observable: every generated artifact is regenerated in the new shape; every read returns the values it returned before; a `Node`-typed `node(id:)` selection of `asPet { name }` on a `Checkin` record is `null`; the pet script's output is unchanged.
 
    Tests. Every generated artifact under `libs/isograph-runtime/fixtures/store/src/__isograph` and `demos/pet-demo/src/__isograph` is regenerated: reader ASTs in the minimal shape, one `entity_table.ts` per imported entity, `parentEntityName`, `selectableName`, and `tables` on each reader artifact, and `tables` on each normalization AST. The landed tests of `test/read.test.ts`, `test/normalize.test.ts`, `test/check.test.ts`, `test/garbageCollection.test.ts`, and `test/subscribe.test.ts` keep their assertions. New: in `test/read.test.ts`, "a Node-typed node(id:) selection of asPet on a Checkin record is null", "asPet on a Pet record reads the selections at the record as Pet", and "a Source entry missing from the entity table throws"; in `test/normalize.test.ts`, "the record id comes from the entity table's storage", and "a response naming an entity with no table throws"; in `test/subscribe.test.ts`, "a link moved to a record with equal data is equal".
 
