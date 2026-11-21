@@ -658,7 +658,7 @@ Derived or source is decided at compile time per (entity, field name), and recor
 
 `RecordStorage` is what the normalization AST carried per selection as `NormalizationIdentity` (`Select`, `Omit`, `Fixed`, `libs/isograph-runtime/src/artifacts.ts:54-62`); it is a property of the entity, so it moves to the table. `OwnId` keeps `Select`'s `selectableName`: the identity selection is the protocol's (`IdentitySelection::Select(name)`, `crates/graphql_network_protocol/src/print_operation.rs:453`), and dropping the name would hard-code `id` in the runtime. Scalars and objects with no identity are `FromParent` records: `Pet:1.name`, `Pet:1.stats`, and in v0 `date { hour }` is the `FromParent` record `Pet:1.date` with its own container (Follow-ups 11).
 
-`shape` exists because a bare selection must know whether the record holds a value: a bare `name` reads `__value` and a bare `bestFriend` reads nothing. It is a property of the entity (`EntityShape`, `crates/isograph_compiler/src/schema.rs`), and the alternative of reading `__value` and treating `MISSING` as an object is open decision 29.
+`shape` exists because a bare selection must know whether the record holds a value: a bare `name` reads `__value` and a bare `bestFriend` reads nothing. It is a property of the entity (`EntityShape`, `crates/isograph_compiler/src/protocol_shape.rs:5`), and the alternative of reading `__value` and treating `MISSING` as an object is open decision 29.
 
 Generated modules, one per entity, at `<Entity>/entity_table.ts`:
 
