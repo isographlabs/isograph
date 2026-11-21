@@ -250,12 +250,13 @@ export type Dependency =
   | { readonly kind: 'Source'; readonly source: SourceNode<unknown> }
   | { readonly kind: 'Derived'; readonly node: AnyDerivedNode };
 
-/** A derived node's computation. It reads every node through `context`, and is a pure function of
- * what it reads. */
+/** A derived node's computation. It reads every node through `context`, is a pure function of
+ * what it reads, and is synchronous: every read happens before it returns. */
 export type Computation<TValue> = (context: ComputeContext) => TValue;
 
 /** The reads a computation makes. Built per computation by `compute`; there is no ambient current
- * computation. */
+ * computation. Valid only until its computation returns or throws; a read through it after that
+ * throws. */
 export type ComputeContext = {
   /** Records that the computation read `source`, and returns its value. */
   readSource<TValue>(source: SourceNode<TValue>): TValue;
@@ -611,26 +612,45 @@ type Computed<TValue> = {
   readonly dependencies: ReadonlyArray<Dependency>;
 };
 
-/** Runs `computation` inside `guarded` with a context that records what it reads, in read order. */
+/** Whether a computation's context still records reads. `Open` until the computation returns or
+ * throws, then `Closed`. */
+type ContextStatus = 'Open' | 'Closed';
+
+/** Runs `computation` inside `guarded` with a context that records what it reads, in read order.
+ * The context closes when the computation returns or throws. */
 function compute<TValue>(
   graph: Graph,
   computation: Computation<TValue>,
 ): Computed<TValue> {
   const dependencies: Dependency[] = [];
-  const value = guarded(graph, () =>
-    computation({
-      readSource: (source) => {
-        dependencies.push({ kind: 'Source', source });
-        return source.value;
-      },
-      readDerived: (node) => {
-        const read = pull(graph, node);
-        dependencies.push({ kind: 'Derived', node });
-        return read;
-      },
-    }),
-  );
-  return { value, dependencies };
+  let status: ContextStatus = 'Open';
+  const assertOpen = (): void => {
+    if (status === 'Closed') {
+      throw new Error(
+        'Cannot read through a context after its computation returned.',
+      );
+    }
+  };
+  try {
+    const value = guarded(graph, () =>
+      computation({
+        readSource: (source) => {
+          assertOpen();
+          dependencies.push({ kind: 'Source', source });
+          return source.value;
+        },
+        readDerived: (node) => {
+          assertOpen();
+          const read = pull(graph, node);
+          dependencies.push({ kind: 'Derived', node });
+          return read;
+        },
+      }),
+    );
+    return { value, dependencies };
+  } finally {
+    status = 'Closed';
+  }
 }
 ```
 
@@ -638,6 +658,7 @@ function compute<TValue>(
 - `readDerived` records the dependency after the pull returns. A pull that throws records nothing, and the throw leaves the reading computation, so no dependency list holds a node whose pull threw.
 - `recompute` calls `equal` before `setDependencies`. A throw out of `equal` then leaves the node's dependency list and every `dependents` set consistent. Called after, a throw would leave the node in the `dependents` sets of the new dependencies while its state lists the old ones, and a later `setDependencies` from the old list would never remove it from the sets only the failed run added. Both branches store `computed.dependencies`, so a node whose value came back equal still depends on what it read this time.
 - The `finally` in `guarded` restores `computingDepth` when the computation or the equality throws, so the graph accepts writes after a failed pull or a failed `writeSource`.
+- The context closes in `compute`'s `finally`. `recompute` stores the array `compute` returned as the node's dependency list, and `readSource` and `readDerived` push onto that array. A read after the computation returned (from an `async` computation after an `await`, or through a context the computation stored) would otherwise add an entry to the stored list with no matching `dependents` edge, so a later write to what it read would not mark the node. The closed context throws instead.
 - The context is a parameter built per computation. There is no ambient current computation (Reactively's `CurrentReaction`, Preact's `evalContext`), so a computation's reads cannot be recorded on the wrong node, and two graphs never share tracking state.
 
 ### Dependencies
@@ -751,6 +772,7 @@ pull(graph, banner); // 'Free shipping' (runs all three)
 ## Rules
 
 - A computation reads nodes only through its `context`: `context.readSource(source)` and `context.readDerived(node)`. A read through a closure or `sourceValue` is not recorded, and the node will not recompute when that value changes.
+- A computation is synchronous. Every read through its `context` happens before it returns; a read through a context after its computation returned throws, so an `async` computation that reads after an `await` throws.
 - A computation is a pure function of what it reads. It does not write a source or dispose a node; each of those throws while a computation runs. A `sourceValue` or `pull` inside a computation is an untracked read: it returns the value and records no dependency.
 - An equality, of a source or of a derived node, does not write a source or dispose a node; each of those throws while an equality runs.
 - Each derived node has an equality. When a recomputed value is equal to the previous one, the node keeps the previous value object and the nodes above it do not recompute. The engine has no default: pass `(a, b) => a === b` for identity, or your own comparator for values you build fresh on each run.
@@ -780,7 +802,7 @@ A source is not collected by the engine. It lives as long as the consumer and th
 
 A derived node is a computation, an equality, a state, and a set of dependents. The consumer creates it with `createDerivedNode(computation, equal)` and holds the returned object. The object is the node's identity. A consumer that wants one node per key (pico's memo arguments) keeps its own map from key to node; the engine has no memo table. The Isograph runtime's record containers are such a map.
 
-The computation receives a `ComputeContext` and returns the value. It must be a pure function of what it reads through the context: no clock, no network, no read through a closure. A computation runs only during a pull: first on the first pull that reaches the node, and again on a pull that finds it `Dirty`. It never runs during a write.
+The computation receives a `ComputeContext` and returns the value. It must be a pure function of what it reads through the context: no clock, no network, no read through a closure. It must be synchronous: the context closes when the computation returns or throws, and a read through a closed context throws, because the dependency list is final when the computation returns. A computation runs only during a pull: first on the first pull that reaches the node, and again on a pull that finds it `Dirty`. It never runs during a write.
 
 Two pulls with no write between them run nothing the second time. A pull of a `Clean` node is one step.
 
@@ -1322,6 +1344,7 @@ A test whose comment says "setup as in" repeats that test's setup lines in the f
 // from libs/reactive-graph/test/dependencies.test.ts
 import { describe, expect, test } from 'vitest';
 import {
+  type ComputeContext,
   createDerivedNode,
   createGraph,
   createSourceNode,
@@ -1505,6 +1528,34 @@ describe('recorded dependencies', () => {
     expect(pull(graph, outer)).toBe(2);
     expect(pull(graph, doubled)).toBe(4);
     expect(calls.outer).toBe(1);
+  });
+
+  test('a read through a context after its computation returned throws and records nothing', () => {
+    const graph = createGraph();
+    const calls = { node: 0 };
+    const count = createSourceNode(1, strictEqual);
+    const late = createSourceNode(10, strictEqual);
+    const lateDerived = createDerivedNode((context) => context.readSource(late), strictEqual);
+    const contexts: ComputeContext[] = [];
+    const node = createDerivedNode((context) => {
+      calls.node += 1;
+      contexts.push(context);
+      return context.readSource(count);
+    }, strictEqual);
+    expect(pull(graph, node)).toBe(1);
+
+    const closedMessage = 'Cannot read through a context after its computation returned.';
+    contexts.forEach((context) => {
+      expect(() => context.readSource(late)).toThrow(closedMessage);
+      expect(() => context.readDerived(lateDerived)).toThrow(closedMessage);
+    });
+
+    writeSource(graph, late, 11);
+    expect(pull(graph, node)).toBe(1);
+    expect(calls.node).toBe(1);
+    writeSource(graph, count, 2);
+    expect(pull(graph, node)).toBe(2);
+    expect(calls.node).toBe(2);
   });
 });
 ```
