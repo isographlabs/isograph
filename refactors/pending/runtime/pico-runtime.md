@@ -379,8 +379,6 @@ function okResultsEqual(
     case 'WalkData':
       return (
         next.origin === 'WalkData' &&
-        isSelectionSetData(previous.value) &&
-        isSelectionSetData(next.value) &&
         selectionSetDataAreEqual(artifact.tables, artifact.parentEntityName, artifact.readerAst, previous.value, next.value)
       );
     case 'ResolverValue':
@@ -402,7 +400,7 @@ function missingDataAreEqual(previous: ReadMissingData, next: ReadMissingData): 
 }
 ```
 
-A `WalkData` value is the `SelectionSetData` the walk assembled (`callResolver`), so `isSelectionSetData` (`areEqualWithDeepComparison.ts:69-71`, exported for this) holds for both; `ReadResolverOk<T>` types `value` as `T`, so the narrowing is a check, not a cast.
+`okResultsEqual` takes `ReadResolverOk<unknown>`, whose `WalkData` variant types `value` as `unknown & SelectionSetData`, which is `SelectionSetData`. The `WalkData` arm narrows `previous` by `previous.origin` and `next` by `next.origin === 'WalkData'`, so both values reach `selectionSetDataAreEqual` as `SelectionSetData` with no runtime check and no cast. `callResolver` is the only producer, and it builds the `WalkData` variant from its `data` parameter (Stored resolver results).
 
 The structural rule over tables:
 
@@ -461,7 +459,7 @@ function targetValuesAreEqual(
 }
 ```
 
-Before (`libs/isograph-runtime/src/areEqualWithDeepComparison.ts:9-44`): `selectionSetDataAreEqual(selections, delivered, read)` and a `switch` on `selection.kind`. `valuesAreEqual` (`:48-67`) is unchanged, and `isSelectionSetData` (`:69-71`) is exported. `fieldOf` and `tableOf` are exported from `read.ts` for this file. Core change 6 changes it; core change 7 adds the `Self` case.
+Before (`libs/isograph-runtime/src/areEqualWithDeepComparison.ts:9-44`): `selectionSetDataAreEqual(selections, delivered, read)` and a `switch` on `selection.kind`. `valuesAreEqual` (`:48-67`) and `isSelectionSetData` (`:69-71`) are unchanged; `isSelectionSetData` stays module-local, because `okResultsEqual` narrows by `origin`. `fieldOf` and `tableOf` are exported from `read.ts` for this file. Core change 6 changes it; core change 7 adds the `Self` case.
 
 - A resolver's return value: `outputEqual`, `===` unless the field supplies one (open decision 7). A primitive or a reused object cuts off; a new object marks the dependents.
 - Objects the runtime itself creates get a structural rule. `MissingData` is built from strings and links. A fragment's data object is assembled by the walk (`readSelectionSet`, `read.ts:101-121`); when a resolver returns that object (`({ data }) => data`, as every store fixture resolver does), the result is tagged `WalkData` and two such results compare by `selectionSetDataAreEqual` over the artifact's tables at its parent entity (below), which reads each selection's entry in the entity's table as the walk does: a `Derived` entry with target `null` compares by `===`; a `Source` entry, a `Derived` entry with a target, and `__self` compare `null` to `null`, lists by length and item at any depth, and each linked record's value by its selections recursively (at the entry's target) or, with `selections: null`, by `===` (a scalar's `__value`, or `EMPTY_DATA`). That is upstream's `mergeObjectsUsingReaderAst` rule (`areEqualWithDeepComparison.ts:55-121`) without the recycling. So `{ initials }` assembled by the walk compares equal when `initials` is the same string, a link moved to a record with equal data cuts off, and an opaque derived output is never compared structurally.
@@ -472,15 +470,13 @@ Before (`libs/isograph-runtime/src/areEqualWithDeepComparison.ts:9-44`): `select
 /** A stored resolver result: `Ok`, `MissingData`, or the resolver threw. */
 export type ResolverResult<T> = ReadResolverOk<T> | ReadMissingData | ReadResolverThrew;
 
-/** The resolver returned `value`. */
-export type ReadResolverOk<T> = {
-  readonly kind: 'Ok';
-  readonly value: T;
-  /** `WalkData`: `value` is the data object the walk assembled for this call. `ResolverValue`: any other value. */
-  readonly origin: OkOrigin;
-};
+/** The resolver returned `value`. `WalkData`: `value` is the data object the walk assembled for this
+ * call. `ResolverValue`: any other value. */
+export type ReadResolverOk<T> =
+  | { readonly kind: 'Ok'; readonly origin: 'WalkData'; readonly value: T & SelectionSetData }
+  | { readonly kind: 'Ok'; readonly origin: 'ResolverValue'; readonly value: T };
 
-export type OkOrigin = 'WalkData' | 'ResolverValue';
+export type OkOrigin = ReadResolverOk<unknown>['origin'];
 
 /** The resolver of `selectableName` on `recordLink` threw `error`. */
 export type ReadResolverThrew = {
@@ -491,7 +487,7 @@ export type ReadResolverThrew = {
 };
 ```
 
-`ReadResolverOk<T>` is assignable to v1's `ReadOk<T>`, so a parent's walk reads `.value` from either. v1's `ReadResult` is unchanged. Returned values are shared, not copied, as upstream's are (`read.ts:616-634`): resolvers and callers must not mutate a stored value or a stored result, because a mutation changes it with no write and marks nothing.
+The `WalkData` variant's `value` is `T & SelectionSetData`, not `SelectionSetData` alone. The value is the object the resolver returned, so it has the resolver's output type `T`, and it is the walk's data, so it is `SelectionSetData`; the type states both. Under `value: SelectionSetData` a caller of `readStoredResult` at `TOutput` would read `.value` as `TOutput | SelectionSetData` and need a narrowing that the resolver's declared output already rules out. Under `T & SelectionSetData`, `.value` on either variant is assignable to `T`, so `readStoredResult`'s callers (`valueOrThrow` in the pet script, the fetch decision, `storedResultHooks`) read `.value` as `TOutput` with no change, and at `T = unknown` the `WalkData` value is `SelectionSetData`, which `okResultsEqual` reads. Both variants are assignable to v1's `ReadOk<T>`, so a parent's walk reads `.value` from either, and `ResolverResult<unknown>` is assignable to `ReadHooks`'s `ReadResult<unknown> | TFailure`. v1's `ReadResult` is unchanged. Returned values are shared, not copied, as upstream's are (`read.ts:616-634`): resolvers and callers must not mutate a stored value or a stored result, because a mutation changes it with no write and marks nothing.
 
 A separate future exploration, `refactors/pending/runtime/fragment-getters.md`, considers exposing fragment data through getters; this doc materializes fragment data.
 
@@ -1198,7 +1194,9 @@ function callResolver(
 ): ResolverResult<unknown> {
   try {
     const value = artifact.resolver({ data, parameters: variables, link: root });
-    return { kind: 'Ok', value, origin: value === data ? 'WalkData' : 'ResolverValue' };
+    return value === data
+      ? { kind: 'Ok', origin: 'WalkData', value: data }
+      : { kind: 'Ok', origin: 'ResolverValue', value };
   } catch (error: unknown) {
     if (error instanceof GraphWriteDuringComputationError) {
       throw error;
@@ -1207,6 +1205,8 @@ function callResolver(
   }
 }
 ```
+
+The `WalkData` arm stores `data`, the `SelectionSetData` parameter, which is the same object as `value`; `value` is `unknown` and does not type-check as the `WalkData` variant's `SelectionSetData`.
 
 The computation closes over `store`, the environment's `Store` (`{ graph, records }`, The store), whose `records` map is written in place and which is never replaced (network-and-subscriptions.md, The environment). The cast in `readStoredResult` is the one place a stored `ResolverResult<unknown>` is returned at the caller's type. Its type parameters and `root` parameter are `read`'s. `readStoredResult` takes the store, as `read` does; every function that reads or writes the graph takes the store, because the store is the graph.
 
@@ -1673,7 +1673,7 @@ Each is one commit, in order; each is independently shippable.
    }
    ```
 
-   Core change 6 changes the `Ok` arm's call from `selectionSetDataAreEqual(artifact.readerAst, ..)` to the tables form (Equality); this change adds the `ResolverThrew` arm. `storedResultHooks` is exported from `storedResults.ts` for `subscribe.ts` and not from the package index.
+   Core change 6 changes the `Ok` arm's call from `selectionSetDataAreEqual(artifact.readerAst, ..)` to the tables form (Equality); this change adds the `ResolverThrew` arm. A subscription's `Ok` is `readData`'s `ReadOk<SelectionSetData>`, not a `ReadResolverOk`: the subscription reads the reader AST and calls no resolver of its own, and a nested resolver's `ReadResolverOk` enters the data as its `.value` through the walk, so neither variant of `ReadResolverOk` reaches `SubscriptionResult` and `subscriptionResultsAreEqual` reads no `origin`. `storedResultHooks` is exported from `storedResults.ts` for `subscribe.ts` and not from the package index.
 
    Tests, in `libs/isograph-runtime/test/subscribe.test.ts`. The landed tests that change:
 
