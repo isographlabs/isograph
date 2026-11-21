@@ -969,7 +969,7 @@ export type ReaderSelection = {
 
 Before (`libs/isograph-runtime/src/artifacts.ts:144-193`): `ReaderSelection` is the union of `ReaderScalarSelection` (`kind: 'Scalar'`), `ReaderLinkedSelection` (`kind: 'Linked'`, `selections`), `ReaderRefinementSelection` (`kind: 'Refinement'`, `condition`, `selections`), and `ReaderResolverSelection` (`kind: 'Resolver'`, `readerArtifact`). The mapping: `Scalar` is a selection with `selections: null`; `Linked` keeps its `selections`; `Refinement` is a selection of the generated refinement field (`asPet`) with its `selections`; `Resolver` is a selection with `selections: null` whose field the entity table lists as `Derived`. `selectableName` is `fieldName`, upstream's name for it (`ReaderScalarField.fieldName` and `ReaderLinkedField.fieldName`, `../isograph/libs/isograph-react/src/core/reader.ts`). `Condition` stays, for the normalization AST.
 
-The AST carries no kind, no artifact import, and no target. Whether a field is a source or derived, and which entity its value links to, are properties of (entity, field name), and the walk reads them from the entity table. The compiler rejects a selection set on a client field's opaque output (`fullName { toUppercase }`, linked-only-selections.md open decision 5 (b)); the AST type does not encode that rule, and the walk relies on the compiler.
+The AST carries no kind, no artifact import, and no target. Whether a field is a source or derived, and which entity its value links to, are properties of (entity, field name), and the walk reads them from the entity table. The compiler rejects a selection set on a client field's opaque output (`fullName { toUppercase }`, linked-only-selections.md open decision 2 (b)); the AST type does not encode that rule, and the walk relies on the compiler.
 
 `storeKey` takes the name and the arguments: `storeKey(name: string, args: Arguments | null, variables: Variables): StoreKey`, so `normalize`, `check`, and the mark pass `selection.selectableName` and the walk passes `selection.fieldName` (`libs/isograph-runtime/src/storeKey.ts:13-21`).
 
@@ -1086,7 +1086,7 @@ Every table and artifact module default-exports a function, and every reference 
 
 ### Refinements
 
-A refinement `asPet` on `Node` is a derived field the compiler generates on `Node` with target `Pet` (linked-only-selections.md, Generated refinement fields). Its reader AST is empty and its resolver is `({ link }) => (link.entityName === 'Pet' ? link : null)`: a link's `entityName` is the `__typename` `normalize` stored the record under (`recordEntityName`, `libs/isograph-runtime/src/recordId.ts:50-68`), so the resolver reads nothing. When the value is a link, the walk continues at it as `Pet`. Its node on `Pet:1` is keyed `Node.asPet` in `Pet:1`'s `derived`, has no dependencies, is computed once and never marked, and is disposed with its record. Cost: one node per record per selected refinement, and one edge per reader.
+A refinement `asPet` on `Node` is a derived field the compiler generates on `Node` with target `Pet` (linked-only-selections.md, Generated refinement fields). Its reader AST is empty and its resolver is `({ link }) => (link.entityName === 'Pet' ? { entityName: 'Pet', id: link.id } : null)`: a link's `entityName` is the `__typename` `normalize` stored the record under (`recordEntityName`, `libs/isograph-runtime/src/recordId.ts:50-68`), so the resolver reads nothing. When the value is a link, the walk continues at it as `Pet`. Its node on `Pet:1` is keyed `Node.asPet` in `Pet:1`'s `derived`, has no dependencies, is computed once and never marked, and is disposed with its record. Cost: one node per record per selected refinement, and one edge per reader.
 
 `__self` is not in a table. It is a field of every entity whose value is the current record's link, read as the same entity, so `__self { name }` at `Pet:1` reads `name` at `Pet:1` as `Pet`, and a bare `__self` at a scalar record reads `__value`. The walk recognizes the name (open decision 27).
 
@@ -1466,7 +1466,7 @@ read F: recompute at Query:__ROOT as Query
   node: Query.node Source, target Node -> Query:__ROOT.node____id___"1" -> {F} -> Pet:1 -> selections at Pet:1 as Node
     asPet: Node.asPet Derived, target Pet -> Pet:1.derived "Node.asPet" absent -> create Dirty
       -> recompute at Pet:1 as Node: empty reader AST, reads nothing
-      resolver({ data: {}, parameters: {}, link: Pet:1 }) -> Pet:1.entityName is "Pet" -> Pet:1 -> asPet Clean Pet:1, dependencies []
+      resolver({ data: {}, parameters: {}, link: Pet:1 }) -> link.entityName is "Pet" -> Pet:1 -> asPet Clean Pet:1, dependencies []
     asPet@Pet:1.dependents = {F} -> Pet:1 is a link -> selections at Pet:1 as Pet
       name: Pet.name -> Pet:1.name -> String:Pet:1.name -> Leaf -> String:Pet:1.name.__value -> {F}
 normalize Pet:1.name = "Rex": String:Pet:1.name.__value -> {F} -> F Dirty; asPet@Pet:1 is not marked
@@ -1581,7 +1581,7 @@ export type ReaderArtifact<TParam extends ResolverParam<TEntityName>, TOutput, T
 // after:
 export type ReaderArtifact<TParam extends ResolverParam<TEntityName>, TOutput, TEntityName extends EntityName> = {
   /** The entity the client field is declared on: the entity the walk reads its root as. */
-  readonly parentEntityName: TEntityName;
+  readonly parentEntityName: EntityName;
   /** The client field's selectable name. */
   readonly selectableName: string;
   readonly readerAst: ReaderSelectionSet;
@@ -1591,7 +1591,7 @@ export type ReaderArtifact<TParam extends ResolverParam<TEntityName>, TOutput, T
 };
 ```
 
-`reader_artifact_file` (`crates/typescript_artifacts/src/reader_artifact.rs`) writes `parentEntityName` and `selectableName` as the object's first entries and `tables` after `readerAst`; `Pet/PetName/resolver_reader.ts` gains `parentEntityName: 'Pet', selectableName: 'PetName',` and `tables: { Pet: Pet__entity_table, String: String__entity_table }`. `TEntityName` is the parent entity's name: there are no abstract entities, so the union of concrete entities' names the type's comment names (`artifacts.ts:110-114`) goes.
+`reader_artifact_file` (`crates/typescript_artifacts/src/reader_artifact.rs`) writes `parentEntityName` and `selectableName` as the object's first entries and `tables` after `readerAst`; `Pet/PetName/resolver_reader.ts` gains `parentEntityName: 'Pet', selectableName: 'PetName',` and `tables: { Pet: Pet__entity_table, String: String__entity_table }`. `TEntityName` stays the entity name of the records the field is read on, which is what `link.entityName` holds (`artifacts.ts:110-114`): the parent entity, or for an entity whose records are stored under other entities (`Node`, read on `Pet:1`), the union of those entities' names. So `parentEntityName` is an `EntityName`, not `TEntityName`: `Node` is not in `'Pet' | 'Checkin' | 'BlogItem'`.
 
 ## `normalize` writes source nodes
 
@@ -1952,6 +1952,8 @@ The user's design notes, recorded for later. None is part of the core, and none 
 10. Runtime-defined computations: a memoized computation the runtime or a user defines at run time over other derived nodes, which needs a caller-supplied computation and a wider value type (Later: other derived node kinds).
 
 11. An `Embedded` storage kind: a record of an entity with `Embedded` storage is stored as one value in its parent's source node, with no container of its own (`date { hour }` held whole in `Pet:1.date`). Cost: the walk reads fields out of a value as well as out of a record, a second representation the store does not have in v0, and every reader of `date` is marked together when any field of it changes. Benefit: one container and its source nodes fewer per such object. In v0 such an object is a `FromParent` record (Entity tables).
+
+12. Entity tables loaded as needed. In v0 a reader artifact imports the table of every entity its walk reads at, and a table imports the reader artifact of every derived field it lists, so the bundle that holds one reader holds every client field of those entities that the project selects, and their tables in turn. A table, or each entry's artifact, loaded on demand (`import()`) when the walk first reads at that entity cuts that cost, and needs the walk to wait for a module, which v0's synchronous walk cannot.
 
 ## Docs this doc amends
 
