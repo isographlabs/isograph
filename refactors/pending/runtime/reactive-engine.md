@@ -672,7 +672,7 @@ pico-runtime.md open decision 3 (a) has the Isograph runtime catch the walk's th
 
 ### Cycles
 
-The body has no cycle check. A computation that reads its own node, directly or through other nodes, makes `pullNode` re-enter a node that is recomputing or verifying. With no check, the re-entry recurses until the JavaScript stack overflows and a `RangeError` propagates as any throw does. Marking terminates on a cycle, because it stops at a marked node. Open decision 4 lists the options.
+The derived nodes and the reads between them must form a directed acyclic graph. A computation that reads its own node, directly or through other nodes, is a programmer error, as a throw is (Throws), and the engine has no cycle check. In the Isograph layer the compiler guarantees acyclicity: `SelectionMapErrorKind::InlineCycle` (`crates/isograph_compiler/src/merged_selection.rs:240`, found by `inline_cycle`, `:1352`) rejects a static cycle of field selections, so no runtime node reads itself.
 
 ## The package README
 
@@ -806,7 +806,7 @@ The data model is pico's:
 - An equal recomputation cuts off: pico keeps `time_updated` when `prev_value == value` (`update_derived_node`, `execute_memoized_function.rs:163`); the engine keeps the previous value object and does not mark dependents.
 - Verification walks dependencies in recorded order and stops at the first changed one (`any_dependency_changed`, `execute_memoized_function.rs:183-206`, an `Iterator::any` over the list; `derived_node_changed_since`, `:208-247`, re-executes a derived dependency to find out).
 - A write during a computation fails (`assert_empty_dependency_stack`, `database.rs:193-198`; open decision 2).
-- A cycle fails, in pico by a panic (`assert_no_cycles`, `dependency.rs:95-99`; open decision 4).
+- A cycle is not supported. pico panics (`assert_no_cycles`, `dependency.rs:95-99`); the engine has no check, and a cycle is a programmer error (Cycles).
 
 Invalidation differs:
 
@@ -825,7 +825,7 @@ Observable behavior is the same: for any sequence of writes and reads, both retu
 
 Reactively is the same scheme. Its states are `CacheClean`, `CacheCheck`, and `CacheDirty`. `set` marks direct observers `CacheDirty` through `stale`, which marks their observers `CacheCheck` and stops at a node already at or above the requested state. `updateIfNecessary` walks `sources` in order when `CacheCheck`, breaks when the node becomes `CacheDirty`, and then calls `update`. Its default equality is `===` (`defaultEquality`), per node through `equals`. A throw out of the function propagates and leaves the state and the links unchanged, as the engine's does. It has no cycle check. Its differences from the engine: an ambient `CurrentReaction` global records reads where the engine passes a context; `set` compares and skips an equal value, where `writeSource` does not (open decision 8); it reuses the unchanged prefix of the source list; and it schedules effects (`stabilize`), which the engine's core has none of.
 
-Preact signals uses versions instead of marks. Every signal has a `_version`, a global `globalVersion` counts writes, and each dependency link (a doubly linked list `Node` with `_source`, `_target`, and `_version`) records the version the target last saw. A computed decides with `needsToRecompute`, which walks its sources in order and returns at the first whose version changed, refreshing derived sources as it goes: pico's epochs per link, with pico's in-order walk. Writes notify effects eagerly through flags (`OUTDATED`, `NOTIFIED`). Its comparison is `!==`, a setter with an equal value notifies nothing, and a computed that throws stores the error (`HAS_ERROR`) and rethrows it on read; the engine forbids the throw (Throws). It throws "Cycle detected" when a computed is read while `RUNNING`, which is open decision 4 (b). It records reads through an ambient `evalContext`, and a signal written inside a computed is allowed.
+Preact signals uses versions instead of marks. Every signal has a `_version`, a global `globalVersion` counts writes, and each dependency link (a doubly linked list `Node` with `_source`, `_target`, and `_version`) records the version the target last saw. A computed decides with `needsToRecompute`, which walks its sources in order and returns at the first whose version changed, refreshing derived sources as it goes: pico's epochs per link, with pico's in-order walk. Writes notify effects eagerly through flags (`OUTDATED`, `NOTIFIED`). Its comparison is `!==`, a setter with an equal value notifies nothing, and a computed that throws stores the error (`HAS_ERROR`) and rethrows it on read; the engine forbids the throw (Throws). It throws "Cycle detected" when a computed is read while `RUNNING`; the engine has no cycle check (Cycles). It records reads through an ambient `evalContext`, and a signal written inside a computed is allowed.
 
 The engine takes Reactively's marking and pull, pico's equality, guard, and per-computation dependency recording, and neither library's ambient tracking context.
 
@@ -833,7 +833,7 @@ The engine takes Reactively's marking and pull, pico's equality, guard, and per-
 
 The tests assert values with `toBe` and `toEqual`, and assert which computations ran by counting calls in a `calls` object each test owns. Counting re-invocations is allowed: which writes make which computations run again is the engine's own dependency tracking (AGENTS.md, Tests). No test reads a node's `slot`, `dependents`, or mark, and no test calls an unexported function: marks and edges are implementation, and each test observes them only through values and call counts. There are no snapshot tests and no fixture files; every input is built in the test.
 
-The tests are written under the options the body is written for: open decision 2 (f), 4 with no check, 6 (b) where a test depends on it, 8 (a), 9 (a), and 10 (a). Each test whose assertions change under another option says how.
+The tests are written under the options the body is written for: open decision 2 (f), 6 (b) where a test depends on it, 8 (a), 9 (a), and 10 (a). Each test whose assertions change under another option says how.
 
 ### The pico crate's tests
 
@@ -847,7 +847,7 @@ Top-level files:
 - `basic_multi_function_chain.rs:21` `multi_function_chain`: ports as "a chain recomputes every node whose input changed".
 - `basic_multi_function_chain.rs:48` `multi_function_chain_with_irrelevant_change`: ports as "an equal value cuts off the node above it".
 - `basic_multi_function_chain.rs:75` `sequential_functions_with_memoref_param`: ports as "a top-level pull of an inner node, then of the node above it". Delta: pico passes the inner memo's `MemoRef` as the outer memo's argument and reads it with `lookup_tracked`; the engine's outer computation closes over the inner node and reads it with `readDerived`. The `MemoRef` parameter is pico representation; the behavior kept is that pulling the inner node first does not change what the outer pull runs.
-- `cyclic_dependency_panic.rs:11` `test_calls_itself`, `:20` `test_calls_calls_itself`, `:29` `test_a`, `:38` `test_calls_a`: port as `cycles.test.ts`'s four tests. Delta: pico panics; the engine's pull throws (a `RangeError` with no check, open decision 4 (a); "Cyclic dependency detected." under (b)).
+- `cyclic_dependency_panic.rs:11` `test_calls_itself`, `:20` `test_calls_calls_itself`, `:29` `test_a`, `:38` `test_calls_a`: do not port. Each asserts only that pico detects the cycle and panics, and the engine has no cycle check (Cycles).
 - `equal_reset_after_unrelated_epoch.rs:14` `equal_reset_after_unrelated_epoch_does_not_rerun`: does not port. It pins epoch bookkeeping: an unrelated set advances the epoch, and a later equal set of the read source must not move that source's `time_updated`. The engine has no epoch, and an unrelated write reaches no reader of another source; the behavior left is "an equal write", which the port of `overriding_same_source` covers.
 - `intern.rs:12` `intern`, `intern_ref.rs:12` `intern_ref`, `intern_then_intern_ref.rs:10` `intern_then_intern_ref`: do not port. They pin `intern_value` and `intern_ref` identity; the engine interns nothing.
 - `intern_ref_chain.rs:14` `intern_ref_chain`: ports as "a node's own equality cuts off a selection out of a changed collection". Delta: pico cuts off because `intern_ref` of an equal value keeps its `time_updated`; the engine cuts off because the selecting node's `equal` compares the selected element's fields. The behavior kept is that a reader of one element does not run when other elements change.
@@ -900,7 +900,6 @@ libs/reactive-graph/test/
   errors.test.ts         a throwing computation leaves the graph's state unchanged
   disposal.test.ts       disposal
   guard.test.ts          the write-during-computation guard (open decision 2 (f))
-  cycles.test.ts         cycles (open decision 4)
   degenerate.test.ts     degenerate nodes, sources, and values
   graph.test-d.ts        types
 ```
@@ -1656,92 +1655,6 @@ describe('the write-during-computation guard', () => {
 });
 ```
 
-### `cycles.test.ts`
-
-Written for open decision 4 (a), no check: each pull throws a `RangeError` when the stack overflows. Under (b) each `toThrow()` becomes `toThrow('Cyclic dependency detected.')`. Every test ends by writing a source, which asserts that the guard was released.
-
-```ts
-// from libs/reactive-graph/test/cycles.test.ts
-import { describe, expect, test } from 'vitest';
-import {
-  createDerivedNode,
-  createGraph,
-  createSourceNode,
-  type DerivedNode,
-  pull,
-  sameValue,
-  writeSource,
-} from '../src';
-
-describe('cycles', () => {
-  // crates/pico/tests/cyclic_dependency_panic.rs:11
-  test('a node that reads itself throws', () => {
-    const graph = createGraph();
-    const callsItself: DerivedNode<number> = createDerivedNode(
-      (context) => context.readDerived(callsItself),
-      sameValue,
-    );
-    expect(() => pull(graph, callsItself)).toThrow();
-    writeSource(graph, createSourceNode(0), 1);
-  });
-
-  // crates/pico/tests/cyclic_dependency_panic.rs:20
-  test('a node that reads a node that reads itself throws', () => {
-    // callsItself as above
-    const callsCallsItself = createDerivedNode(
-      (context) => context.readDerived(callsItself),
-      sameValue,
-    );
-    expect(() => pull(graph, callsCallsItself)).toThrow();
-    writeSource(graph, createSourceNode(0), 1);
-  });
-
-  // crates/pico/tests/cyclic_dependency_panic.rs:29
-  test('two nodes that read each other throw', () => {
-    const graph = createGraph();
-    const a: DerivedNode<number> = createDerivedNode(
-      (context) => context.readDerived(b),
-      sameValue,
-    );
-    const b: DerivedNode<number> = createDerivedNode(
-      (context) => context.readDerived(a),
-      sameValue,
-    );
-    expect(() => pull(graph, a)).toThrow();
-    writeSource(graph, createSourceNode(0), 1);
-  });
-
-  // crates/pico/tests/cyclic_dependency_panic.rs:38
-  test('a node that reads into a cycle throws', () => {
-    // a and b as above
-    const callsA = createDerivedNode((context) => context.readDerived(a), sameValue);
-    expect(() => pull(graph, callsA)).toThrow();
-    writeSource(graph, createSourceNode(0), 1);
-  });
-
-  test('a cycle formed by a dependency change throws on verification', () => {
-    const graph = createGraph();
-    const closeLoop = createSourceNode(false);
-    const b: DerivedNode<number> = createDerivedNode(
-      (context) => (context.readSource(closeLoop) ? context.readDerived(a) : 1),
-      sameValue,
-    );
-    const a: DerivedNode<number> = createDerivedNode(
-      (context) => context.readDerived(b) + 1,
-      sameValue,
-    );
-    expect(pull(graph, a)).toBe(2);
-
-    writeSource(graph, closeLoop, true);
-    expect(() => pull(graph, a)).toThrow();
-    writeSource(graph, closeLoop, false);
-    expect(pull(graph, a)).toBe(2);
-  });
-});
-```
-
-The last test reaches the cycle through `verify`: `a` is `Check`, its verification recomputes `b`, and `b` reads `a`. A check under open decision 4 (b) must cover a node that is verifying, not only one that is recomputing. Its last assertion holds under both options: after the throw, `a` and `b` are still marked, and the write that opens the loop lets them compute.
-
 ### `degenerate.test.ts`
 
 ```ts
@@ -2101,6 +2014,7 @@ pico-runtime.md is not edited by this doc. These are the differences to apply th
 - The tests are the files of Tests instead of one `test/graph.test.ts`, and the package has a `README.md`.
 - The CI step of CI.
 - A computation and an equality must not throw, and the engine guarantees only that its own state is not corrupted (decision 3). pico-runtime.md open decision 3's engine-side options go.
+- The derived nodes must form a directed acyclic graph, and the engine has no cycle check (decision 4). pico-runtime.md open decision 8's options go.
 - New open decisions 8, 9, 10, and 11 below.
 
 ## Open decisions
@@ -2125,48 +2039,9 @@ pico-runtime.md's (b) and (c) are guards on the Isograph environment. A closure 
 
 A computation and an equality must not throw; a throw is a programmer error (Throws). The engine guarantees only that its own state is not corrupted, which holds because the throw leaves before any state is written (pico-runtime.md open decision 3).
 
-### 4. A cycle of derived nodes
+### 4. A cycle of derived nodes (decided)
 
-pico-runtime.md open decision 8, restated. A cycle check belongs to the engine, because `pullNode` is where a node is re-entered, through `recompute` or `verify` (`cycles.test.ts`, the last test). pico panics with "Cyclic dependency detected. This is not supported in pico." when a memo on the dependency stack is entered again (`assert_no_cycles`, `crates/pico/src/dependency.rs:95-99`). Preact throws "Cycle detected". Reactively does not check.
-
-- (a) No check. The recursion overflows the stack and a `RangeError` propagates (Throws). Cost: the error names no node, and a computation that catches errors from `readDerived` catches it at some depth and ends `Clean` there.
-- (b) The graph holds the nodes being verified or recomputed, and `pullNode` throws on re-entry:
-
-  ```ts
-  // from libs/reactive-graph/src/graph.ts
-  // under open decision 4 (b); deltas from the body
-  export type Graph = {
-    computingDepth: number;
-    /** The derived nodes being verified or recomputed. Written only by `pullNode`. */
-    readonly entered: Set<AnyDerivedNode>;
-  };
-
-  function pullNode<TValue>(graph: Graph, node: DerivedNode<TValue>): TValue {
-    const state = stateOf(node).state;
-    if (state.mark === 'Clean') {
-      return state.value;
-    }
-    if (graph.entered.has(node)) {
-      throw new Error('Cyclic dependency detected.');
-    }
-    graph.entered.add(node);
-    try {
-      switch (state.mark) {
-        case 'Check':
-          return verify(graph, node, state);
-        case 'Dirty':
-          return recompute(graph, node, state);
-      }
-    } finally {
-      graph.entered.delete(node);
-    }
-  }
-  ```
-
-  pico's behavior. Cost: a set insertion and removal per verification and recomputation; the set needs the `Graph` of open decision 2 (f) or (g).
-- (c) A fourth state, `Computing`, written during `verify` and `recompute` and restored afterwards. Cost: every `switch` on the mark gains a case, the state before entry must be restored on a throw, and a layered `stateOf` must hold it per layer.
-
-Not held in pico-runtime.md, because the Isograph core cannot form a cycle until eager client pointers. By AGENTS.md's rule the candidate is (b), pico's behavior.
+The derived nodes must form a directed acyclic graph; a cycle is a programmer error, and the engine has no cycle check (Cycles). In the Isograph layer, `InlineCycle` rejects static field-selection cycles, so no runtime node cycle forms (pico-runtime.md open decision 8).
 
 ### 5. How the engine types the links between nodes of different value types
 
