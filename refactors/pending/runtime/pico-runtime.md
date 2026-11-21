@@ -448,6 +448,14 @@ What this costs:
 - A `ReadHooks` parameter on every function of the reader's walk, and one hooks object per computation.
 - A caller that writes `environment.store` with `normalize` directly, and not through `normalizeData`, leaves the derived nodes that read what it changed unmarked, and they return their old results until another write reaches them. From change 2b the package index exports `normalizeData` and not `normalize` (open decision 17), so such a caller is code inside the package. `normalize` stays a module export that `environment.ts` and the tests import, as store.md's helpers are (store.md, The package). This is network-and-subscriptions.md's rule for `callSubscriptions` (Why the store-only functions stay store-only): a write through the environment is `normalizeData`.
 
+### The package index
+
+What `libs/isograph-runtime/src/index.ts` exports of the functions and types above, per change. A function or type is exported when a caller outside the package uses it, or when an exported function's signature names it; nothing else is (AGENTS.md, Coding standards: we do not have anything we do not use). The tests import the modules directly, as they import `normalize` (store.md, The package).
+
+- Change 2b. Adds `normalizeData` and removes `normalize` (open decision 17). Adds `type ReadResolverThrew`, because the exported `SubscriptionResult` gains it (Subscriptions). `readStoredResult` is not exported: its callers are `storedResultHooks`, `fetchEntrypoint` under Follow-ups 11, and the tests, all inside the package.
+- Change 3. Adds `type Retention` and `type DerivedNodeLocation`, because the exported `normalizeData` returns a `Retention` and `Retention.location` is a `DerivedNodeLocation`, and `dispose`, because it is the only function that ends a `Retention` a caller outside the package holds. `readStoredResult` stays unexported.
+- Change 4. Adds `listen` and `snapshot`, the `subscribe` and `getSnapshot` of the React package's `useSyncExternalStore` in place of `listenToSubscription` and `subscriptionSnapshot` (react.md, `:905`, `:1292`), and `type ResolverResult`, because `snapshot` returns it. `readStoredResult` stays unexported.
+
 ### Why a store-agnostic engine
 
 The alternative (open decision 12 (b)) writes the recomputation graph in the store's shape:
