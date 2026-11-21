@@ -373,40 +373,46 @@ export function markSourceChanged(source: SourceNode<unknown>): void {
  * `source.dependents` by `writeSource` and `markSourceChanged`, and with `node.dependents` by
  * `recompute` (a node whose value changed) and `disposeDerivedNode`. */
 function markDirty(nodes: ReadonlySet<AnyDerivedNode>): void {
-  markCheck([...nodes].flatMap(markOneDirty));
+  const work: AnyDerivedNode[] = [];
+  const push = (dependent: AnyDerivedNode): void => {
+    work.push(dependent);
+  };
+  nodes.forEach((node) => {
+    if (markOneDirty(node) === 'Clean') {
+      node.dependents.forEach(push);
+    }
+  });
+  markCheck(work);
 }
 
-/** `Clean`: becomes `Dirty`, and returns its dependents, which `markDirty` marks `Check`. `Check`:
- * becomes `Dirty` and returns none, because its dependents are already marked. `Dirty`: unchanged,
- * returns none. Called only by `markDirty`. */
-function markOneDirty(node: AnyDerivedNode): ReadonlyArray<AnyDerivedNode> {
+/** Marks `node` `Dirty` and returns the mark it had. A `Clean` node's dependents are then marked
+ * `Check` by `markDirty`; a `Check` node's dependents are already marked; a `Dirty` node is
+ * unchanged. Called only by `markDirty`. */
+function markOneDirty(node: AnyDerivedNode): DerivedNodeState<unknown>['mark'] {
   const slot = stateOf(node);
   const state = slot.state;
   switch (state.mark) {
     case 'Clean':
-      slot.state = {
-        mark: 'Dirty',
-        previous: state.value,
-        dependencies: state.dependencies,
-      };
-      return [...node.dependents];
     case 'Check':
       slot.state = {
         mark: 'Dirty',
         previous: state.value,
         dependencies: state.dependencies,
       };
-      return [];
+      return state.mark;
     case 'Dirty':
-      return [];
+      return state.mark;
   }
 }
 
-/** Marks every `Clean` node of `start`, and every `Clean` node above those, `Check`. A marked node
- * is left as is, and the nodes above it are not visited. Walks an explicit work list, so the call
- * stack does not grow with the height of the graph. Called only by `markDirty`. */
-function markCheck(start: ReadonlyArray<AnyDerivedNode>): void {
-  const work = [...start];
+/** Marks every `Clean` node of `work`, and every `Clean` node above those, `Check`. A marked node is
+ * left as is, and the nodes above it are not visited. Walks `work`, which it owns, as an explicit
+ * work list, so the call stack does not grow with the height of the graph. Called only by
+ * `markDirty`. */
+function markCheck(work: AnyDerivedNode[]): void {
+  const push = (dependent: AnyDerivedNode): void => {
+    work.push(dependent);
+  };
   let node = work.pop();
   while (node !== undefined) {
     const slot = stateOf(node);
@@ -417,14 +423,14 @@ function markCheck(start: ReadonlyArray<AnyDerivedNode>): void {
         value: state.value,
         dependencies: state.dependencies,
       };
-      node.dependents.forEach((dependent) => work.push(dependent));
+      node.dependents.forEach(push);
     }
     node = work.pop();
   }
 }
 ```
 
-`markDirty` and `markCheck` never add or remove an element of a `dependents` set, and each copies a set into an array before it marks, so no set is iterated while marking.
+`markDirty` and `markCheck` never add or remove an element of a `dependents` set, so each iterates the sets directly while it marks. A write allocates one work array and two `push` closures per `markDirty` call, and nothing per marked node: no copy of a `dependents` set, no array per node from `markOneDirty`, and no closure per node in `markCheck`.
 
 Marking does not recurse. `markCheck` is a loop over a work list, the worklist case of AGENTS.md (Iterators), so its stack depth is the same for a chain of ten nodes and a chain of 100,000, and marking runs to completion on a graph of any height. A recursive `markCheck` would overflow the call stack on a tall enough chain; the `RangeError` would leave the nodes below the overflow `Check` and the nodes above it `Clean`, a `Clean` dependent of a node that is not `Clean`, and a later write could not repair it, because marking stops at the direct reader, which is already `Dirty`. `work` holds at most one entry per `dependents` edge the walk reaches. Each dependent is pushed singly, so no call receives a set's size in arguments.
 
