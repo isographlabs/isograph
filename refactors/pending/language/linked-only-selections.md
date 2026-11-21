@@ -4,10 +4,11 @@ Status: under discussion. Not approved for implementation. The runtime side (sca
 
 ## The model
 
-Every selection follows a link to an entity's record. Scalars (`String`, `Int`, `Float`, `Boolean`, `ID`, and custom scalars) are entities, and a scalar field's value is its own record: `Pet:1.name` holds a link to the `String` record `Pet:1.name`, whose source field `__self` holds the string. The selection's kind decides what it reads and which targets it takes:
+Every selection follows a link to an entity's record. Scalars (`String`, `Int`, `Float`, `Boolean`, `ID`, and custom scalars) are entities, and a scalar field's value is its own record: `Pet:1.name` holds a link to the `String` record `Pet:1.name`, whose source field `__value` holds the string. The selection's kind decides what it reads and which targets it takes:
 
 - `Link`: a server field, whose source node holds a link, `null`, or a list of these. Its target is `Selections` (the selection set, read at each linked record) or `Bare` (the target entity's default reader, walked at each linked record, then its `read` called on the data). `String`'s default reader reads `__self` and returns it; an object entity's reads nothing and returns an empty object.
-- `Self`: `__self` on a scalar entity, the stored value as is. It takes no target. It is the only selection that returns a stored value without following a link.
+- `Self`: `__self`, on every entity, the record the walk is at. It reads nothing and takes the targets `Link` takes: `__self { name }` at `Pet:1` reads `name` at `Pet:1`, `__self { toUppercase }` at `String:Pet:1.name` reads `toUppercase` there, and a bare `__self` applies the record entity's default reader.
+- `Value`: the stored value of a scalar record, its `__value` source, as is. It takes no target, and it is not a user selectable: only a generated default reader of a scalar entity selects it. `String`'s default reader is `[{ kind: 'Value', alias: 'value' }]` with `read: (data) => data.value`, so a bare `__self` at a scalar record ends at a `Value`.
 - `Derived`: a client field, whose derived node's value is returned as is. It takes no target in v0 (open decision 5).
 - `DerivedLink`: a refinement, whose derived node's value is a link or `null`. Its target is `Selections` or `Bare`, as `Link`'s.
 - `null` stays `null` at every list level, and lists map.
@@ -17,7 +18,7 @@ Consequences for the language:
 - `name` returns the string. `name {}` returns `{}`. They differ: an empty selection set is not `String`'s default reader.
 - `bestFriend` and `bestFriend {}` both return `{}` or `null`, because an object entity's default reader reads nothing and returns the empty object.
 - `name { toUppercase }` selects the client field `toUppercase` declared on `String`, read at the record `String:Pet:1.name`.
-- `field String.toUppercase { __self }` is a client field on a scalar entity; its resolver reads the value as `data.__self` (open decision 7).
+- `field String.toUppercase { __self }` is a client field on a scalar entity; its resolver reads the value as `data.__self`, a bare `__self` through `String`'s default reader (open decision 6).
 - A selection set on a client field's result is rejected in v0, as upstream rejects it (open decision 5).
 
 ## Upstream
@@ -59,8 +60,10 @@ pub struct ReaderSelectionSet(pub Vec<ReaderSelection>);
 pub enum ReaderSelection {
     /// A protocol selectable: its source node on the record holds a link, `null`, or a list.
     Link(ReaderLinkSelection),
-    /// `__self` on a scalar entity: the value of the scalar record's `__self` source node.
-    SelfValue(ReaderSelfSelection),
+    /// `__self`: the record the walk is at, then its target there. Reads nothing.
+    SelfRecord(ReaderSelfSelection),
+    /// The `__value` source node of a scalar record. Only in generated default readers.
+    Value(ReaderValueSelection),
     /// A client field: its derived node's value, as is.
     Derived(ReaderDerivedSelection),
     /// A refinement: its derived node's value, a link or `null`.
@@ -76,9 +79,15 @@ pub struct ReaderLinkSelection {
     pub target: ReaderLinkTarget,
 }
 
-/// The alias of a `__self` selection.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ReaderSelfSelection(pub SelectionName);
+pub struct ReaderSelfSelection {
+    pub alias: SelectionName,
+    pub target: ReaderLinkTarget,
+}
+
+/// The alias of a `Value` selection.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ReaderValueSelection(pub SelectionName);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ReaderDerivedSelection {
@@ -108,9 +117,9 @@ pub enum ReaderLinkTarget {
 }
 ```
 
-Before (`crates/isograph_compiler/src/reader_ast.rs:11-54`): `ReaderSelection` is an enum of `Scalar(ReaderScalarSelection)`, `Linked(ReaderLinkedSelection)`, `Refinement(ReaderRefinementSelection)`, and `Resolver(ReaderResolverSelection)`. `ReaderScalarSelection` (a stored scalar read whole) goes: a scalar is a `Link` to its record, read through `String`'s default reader, whose own reader AST is one `SelfValue`. `ReaderLinkedSelection` becomes `ReaderLinkSelection` with `selections` moved into `ReaderLinkTarget::Selections`. `ReaderResolverSelection` becomes `ReaderDerivedSelection` unchanged. `ReaderRefinementSelection`'s `condition` becomes a generated refinement field read by `DerivedLink` (Generated refinement fields); a refinement takes no arguments (`ArgumentsOnRefinement`), so `ReaderDerivedLinkSelection` has none.
+Before (`crates/isograph_compiler/src/reader_ast.rs:11-54`): `ReaderSelection` is an enum of `Scalar(ReaderScalarSelection)`, `Linked(ReaderLinkedSelection)`, `Refinement(ReaderRefinementSelection)`, and `Resolver(ReaderResolverSelection)`. `ReaderScalarSelection` (a stored scalar read whole) goes: a scalar is a `Link` to its record, read through `String`'s default reader, whose own reader AST is one `Value`. `ReaderLinkedSelection` becomes `ReaderLinkSelection` with `selections` moved into `ReaderLinkTarget::Selections`. `ReaderResolverSelection` becomes `ReaderDerivedSelection` unchanged. `ReaderRefinementSelection`'s `condition` becomes a generated refinement field read by `DerivedLink` (Generated refinement fields); a refinement takes no arguments (`ArgumentsOnRefinement`), so `ReaderDerivedLinkSelection` has none.
 
-`DerivedLink` is a fourth kind beside the three of the model: a refinement is a derived node (pico-runtime.md, Refinements) whose value is a link, so it needs a link target, which `Derived` does not take in v0. Under open decision 5 (a), `Derived` gains the same `ReaderLinkTarget`, and `DerivedLink` folds into it.
+`DerivedLink` is a fifth kind beside `Link`, `Self`, `Value`, and `Derived`: a refinement is a derived node (pico-runtime.md, Refinements) whose value is a link, so it needs a link target, which `Derived` does not take in v0. Under open decision 5 (a), `Derived` gains the same `ReaderLinkTarget`, and `DerivedLink` folds into it.
 
 ## Normalization AST (compiler)
 
@@ -149,7 +158,7 @@ Before: `NormalizationTarget::Leaf` is a unit variant (`crates/isograph_compiler
 
 ### `__self`
 
-Every scalar entity has the selectable `__self`. `selectable_definitions` (`crates/isograph_compiler/src/schema.rs:347`) returns it for the name `__self` on a scalar entity when no declaration defines that name, and `Definitions::Duplicated` when a `field S.__self` declaration also does, which `DuplicateDefinition` reports. GraphQL reserves names that start with `__` for introspection, so no schema field collides with it.
+Every entity has the selectable `__self`. `selectable_definitions` (`crates/isograph_compiler/src/schema.rs:347`) returns it for the name `__self` on every entity when no declaration defines that name, and `Definitions::Duplicated` when a `field E.__self` declaration also does, which `DuplicateDefinition` reports. GraphQL reserves names that start with `__` for introspection, so no schema field collides with it. `__value` is a store key (`VALUE_KEY`, pico-runtime.md), not a selectable; a user selection named `__value` is `UnknownSelectable`.
 
 ```rust
 // from crates/isograph_compiler/src/schema.rs
@@ -160,16 +169,16 @@ pub enum SelectableKind<TSelectableData> {
     ClientPointer(ClientPointerTarget),
     /// Defined by the network protocol.
     Server(ServerSelectable<TSelectableData>),
-    /// `__self`, on every scalar entity: the value of the scalar record.
-    SelfValue,
+    /// `__self`, on every entity: the record the selection is read at.
+    SelfRecord,
 }
 ```
 
-`target_entity` returns `None` for `SelfValue`, so a selection set on `__self` is `SelectionSetOnFieldWithoutTarget`. `__self` on an object entity is open decision 6.
+`target_entity` returns `self.parent_entity` for `SelfRecord`, so validation checks a selection set on `__self` against the same entity, and `target_errors` applies as for a server field.
 
 ### Client fields on scalars
 
-A `field` declaration may name a scalar parent (`field String.toUppercase { __self }`). Its resolver receives `link: Link<'String'>`, the scalar record's link, and `data.__self`.
+A `field` declaration may name a scalar parent (`field String.toUppercase { __self }`). Its resolver receives `link: Link<'String'>`, the scalar record's link, and `data.__self`, the string.
 
 ## Validation
 
@@ -226,7 +235,7 @@ A client pointer's selection still needs a selection set (upstream's `:157`, ope
 
 Removed: `ValidationError::SelectionSetOnLeaf` and `ValidationError::MissingSelectionSet` (`:40-43`), and `InvalidEntityError::LeafParent` (`:74-78`).
 
-Kept, with their messages: `InvalidEntityError::LeafTarget` (a pointer to a scalar, upstream's `:135`); `SelectionSetOnFieldWithoutTarget` (a selection set on a client field or on `__self`, upstream's `:309`); `InputTarget`; `InvalidEntityError::InputParent` and `InvalidEntityError::InputTarget`; `UnknownEntity`, `UnknownSelectable`, `DuplicateDefinition`, `DuplicateResponseName`, `MissingFieldArgument`, `UnknownFieldArgument`, `Argument`, `EntrypointNotFetchable`, `LoadableParentNotFetchable`. `__self` with arguments is `UnknownFieldArgument`.
+Kept, with their messages: `InvalidEntityError::LeafTarget` (a pointer to a scalar, upstream's `:135`); `SelectionSetOnFieldWithoutTarget` (a selection set on a client field, upstream's `:309`); `InputTarget`; `InvalidEntityError::InputParent` and `InvalidEntityError::InputTarget`; `UnknownEntity`, `UnknownSelectable`, `DuplicateDefinition`, `DuplicateResponseName`, `MissingFieldArgument`, `UnknownFieldArgument`, `Argument`, `EntrypointNotFetchable`, `LoadableParentNotFetchable`. `__self` with arguments is `UnknownFieldArgument`.
 
 ## Query generation
 
@@ -270,10 +279,10 @@ Kept, with their messages: `InvalidEntityError::LeafTarget` (a pointer to a scal
     };
 ```
 
-- A leaf with a selection set adds the leaf alone. A selection set on a scalar entity adds nothing to the query: a scalar entity has no protocol selectable, `__self` is the leaf the parent selection already requests, and a client field on a scalar entity selects only `__self` and other client fields on that entity. The nested set is not merged; validation checks it.
+- A leaf with a selection set adds the leaf alone. A selection set on a scalar entity adds nothing to the query: a scalar entity has no protocol selectable, `__self` there reads the scalar record the parent selection already requests, and a client field on a scalar entity selects only `__self` and other client fields on that entity. The nested set is not merged; validation checks it.
 - A composite without a selection set adds an empty map, and `complete` adds the discriminator and the identity (`merged_selection.rs:1547-1566`), so the query requests `bestFriend { __typename id }`, which distinguishes `null` and gives the normalizer the record's id.
 - A refinement without a selection set adds a conditional with an empty map; `complete` adds its discriminator and identity.
-- `selection_contribution` gains `SelectableKind::SelfValue => MergedSelectionMap::empty().wrap_ok()`.
+- `selection_contribution` gains `SelectableKind::SelfRecord`: on an object entity with a selection set, `merge_selection_set` of that set on the same entity; otherwise an empty map.
 - `SelectionMapErrorKind::SelectionSetOnLeaf` and `MissingSelectionSet` (`:230-232`) go.
 
 ## Reader generation and types
@@ -284,7 +293,7 @@ Kept, with their messages: `InvalidEntityError::LeafTarget` (a pointer to a scal
 - Server field, scalar target, set: `Link` with `Selections` of the set on the scalar entity, type `ArtifactInnerType::Object(nested)`.
 - Server field, object target, no set: `Link` with `Bare(target)`, type `ArtifactInnerType::EmptyObject`.
 - Server field, object target, set: `Link` with `Selections`, type `Object(nested)` (unchanged).
-- `__self`: `SelfValue`, type the parent scalar's type.
+- `__self`: `SelfRecord` with `Selections` or `Bare(parent entity)`; type `Object(nested)`, or bare the parent's own bare type (`EmptyObject` for an object entity, the scalar's type for a scalar entity), not nullable.
 - Refinement (`SelectableShape::Refinement`): `DerivedLink { field: (abstract entity, asT) }` with `Selections` or `Bare(T)`; type `Object(nested)` or `EmptyObject`, nullable. `ArgumentsOnRefinement` stays.
 - Client field without a set: `Derived`, type `ClientFieldOutput(field)` (unchanged). With a set: `GenerationError::SelectionSetOnClientField` (unchanged).
 - Client pointer: `SelectionRead::NotRead` (unchanged; open decision 4).
@@ -353,8 +362,13 @@ fn selection_value(selection: &ReaderSelection) -> ArtifactValue {
             entry("arguments", arguments_value(link.arguments.reference())),
             entry("target", link_target_value(link.target.reference())),
         ]),
-        ReaderSelection::SelfValue(self_value) => {
-            ArtifactValue::Object(vec![kind("Self"), entry("alias", string(self_value.0))])
+        ReaderSelection::SelfRecord(self_record) => ArtifactValue::Object(vec![
+            kind("Self"),
+            entry("alias", string(self_record.alias)),
+            entry("target", link_target_value(self_record.target.reference())),
+        ]),
+        ReaderSelection::Value(value) => {
+            ArtifactValue::Object(vec![kind("Value"), entry("alias", string(value.0))])
         }
         ReaderSelection::Derived(derived) => ArtifactValue::Object(vec![
             kind("Derived"),
@@ -416,8 +430,8 @@ pub struct DefaultReaderArtifact {
 }
 
 pub enum DefaultReaderKind {
-    /// A scalar entity: reads `__self` and returns it, at the scalar's type.
-    SelfValue(ScalarKind),
+    /// A scalar entity: reads `__value` and returns it, at the scalar's type.
+    Value(ScalarKind),
     /// An object entity: reads nothing and returns the one empty object.
     EmptyObject,
 }
@@ -444,8 +458,8 @@ pub(crate) enum TypeScriptItem {
 /// A function whose body the compiler writes.
 #[derive(Clone, Debug, PartialEq)]
 pub enum GeneratedFunction {
-    /// `(data) => data.__self`
-    ReadSelf,
+    /// `(data) => data.value`
+    ReadValue,
     /// `() => empty`
     ReadEmptyObject,
     /// `({ link }: P) => (link.entityName === "E" ? link : null)`
@@ -579,6 +593,7 @@ import type { ReaderArtifact } from '@isograph/runtime';
 import type { String__toUppercase__output_type } from './output_type';
 import type { String__toUppercase__param } from './param_type';
 import { toUppercase as resolver } from './../../../ToUppercase';
+import String__default_reader from './../default_reader';
 
 const readerArtifact = (): ReaderArtifact<
   String__toUppercase__param,
@@ -586,7 +601,9 @@ const readerArtifact = (): ReaderArtifact<
   'String'
 > => ({
   selectableName: 'toUppercase',
-  readerAst: [{ kind: 'Self', alias: '__self' }],
+  readerAst: [
+    { kind: 'Self', alias: '__self', target: { kind: 'Bare', defaultReader: String__default_reader } },
+  ],
   resolver: resolver,
 });
 export default readerArtifact;
@@ -613,9 +630,9 @@ export type String__toUppercase__param = {
 // libs/isograph-runtime/fixtures/store/src/__isograph/String/default_reader.ts
 import type { DefaultReader } from '@isograph/runtime';
 
-const defaultReader = (): DefaultReader<{ readonly __self: string }, string> => ({
-  readerAst: [{ kind: 'Self', alias: '__self' }],
-  read: (data) => data.__self,
+const defaultReader = (): DefaultReader<{ readonly value: string }, string> => ({
+  readerAst: [{ kind: 'Value', alias: 'value' }],
+  read: (data) => data.value,
 });
 export default defaultReader;
 ```
@@ -659,7 +676,7 @@ The normalization AST's `name` selection, before and after:
 
 - `inner_type` prints `EmptyObject` as `Readonly<Record<PropertyKey, never>>`.
 - A selection set on a scalar prints the nested object type, as a selection set on an object does.
-- `__self`'s data field is the parent scalar's type, printed by `scalar_type` (`crates/typescript_artifacts/src/generate_types.rs:440-449`).
+- A bare `__self` on a scalar entity is the scalar's type, printed by `scalar_type` (`crates/typescript_artifacts/src/generate_types.rs:440-449`).
 - `param_type_file` is unchanged: a field on a scalar entity has `link: S____link__output_type`.
 
 ## Changes
@@ -667,7 +684,7 @@ The normalization AST's `name` selection, before and after:
 Each is one commit, in order; each is independently shippable. They are pico-runtime.md's core changes 3, 4, and 5.
 
 1. The selection kinds on v1's language, before scalar records. The compiler emits `Link` with `Selections` for a v1 linked selection, `Derived` for a client field, and `DerivedLink` of a generated refinement field for a refinement; a v1 scalar selection stays v1's `Scalar` kind (the value read whole) until change 2. The runtime walk reads the new AST. Validation is unchanged. Observable: every artifact under `demos/pet-demo/src/__isograph` and the runtime fixtures is regenerated in the new shape, with `Node/asPet/` style refinement fields; the pet script prints the same output.
-2. Scalar records. The normalization AST's `Leaf` target; `normalize`, `check`, and the garbage collector's mark handle scalar records (pico-runtime.md, Scalar records); `__self` and `SelfValue`; a scalar selection becomes `Link` with `Bare(scalar)` and the `Scalar` kind goes; `default_reader.ts` per scalar entity a reader selects. Observable: a normalized store holds a `String` record per scalar value with its `__self`; reads return the same values; the pet script prints the same output.
+2. Scalar records. The normalization AST's `Leaf` target; `normalize`, `check`, and the garbage collector's mark handle scalar records (pico-runtime.md, Scalar records); `__self` (`SelfRecord`) and `Value`; a scalar selection becomes `Link` with `Bare(scalar)` and the `Scalar` kind goes; `default_reader.ts` per scalar entity a reader selects. Observable: a normalized store holds a `String` record per scalar value with its `__self`; reads return the same values; the pet script prints the same output.
 3. Linked-only selections. Validation, query generation, and reader generation accept bare object selections, selection sets on scalars, and client fields on scalar entities; `EmptyObject`; the object default reader. Observable: the example compiles to the artifacts above; `read` of `PetDetailPage` on the store fixture returns `{ pet: { n1: 'Ricky', n2: { toUppercase: 'RICKY' }, bestFriend: { name: 'Mango' } } }`; a bare `bestFriend` returns `{}` or `null`, and its query text is `bestFriend { __typename id }`.
 
 ## Open decisions
@@ -675,7 +692,7 @@ Each is one commit, in order; each is independently shippable. They are pico-run
 ### 1. A custom scalar's default reader
 
 - (a) The config supplies it: each `custom_scalar_types` entry gains an optional default reader import beside its type import (`custom_scalar_imports`, `crates/typescript_artifacts/src/generate_types.rs:473-490`). Cost: a config field and its validation.
-- (b) The compiler generates the built-in scalars' default reader, `__self` at the scalar's type (`scalar_type`, `unknown` without a config entry). Held. Reason: upstream's behavior; upstream has no default reader and returns every scalar whole (`case 'Scalar'`, `../isograph/libs/isograph-react/src/core/read.ts`), as i2 does today. (a) can be added later at the same path.
+- (b) The compiler generates the built-in scalars' default reader, `__value` at the scalar's type (`scalar_type`, `unknown` without a config entry). Held. Reason: upstream's behavior; upstream has no default reader and returns every scalar whole (`case 'Scalar'`, `../isograph/libs/isograph-react/src/core/read.ts`), as i2 does today. (a) can be added later at the same path.
 
 ### 2. Which entities get default reader modules
 
@@ -699,16 +716,10 @@ Each is one commit, in order; each is independently shippable. They are pico-run
 
 `fullName { toUppercase }` with `fullName` a client field returning a string: a resolver's output is not a record, so `toUppercase` has no record to live on.
 
-- (a) The runtime creates a record for the output, keyed from the producing derived node's record and resolver store key (`Pet:1.fullName`), whose `__self` is the derived node's value. `Derived` then takes `ReaderLinkTarget` as `Link` does, client pointers and outputs are both links, and `DerivedLink` folds into `Derived`; `Self` stays the only read of a value as is. Cost: a record whose `__self` is a derived node, which the store does not have; `fullName` needs `to String` (today `LeafTarget`) so the compiler knows the output entity.
+- (a) The runtime creates a record for the output, keyed from the producing derived node's record and resolver store key (`Pet:1.fullName`), whose `__value` is the derived node's value. `Derived` then takes `ReaderLinkTarget` as `Link` does, client pointers and outputs are both links, and `DerivedLink` folds into `Derived`; `Self` stays the only read of a value as is. Cost: a record whose `__value` is a derived node, which the store does not have; `fullName` needs `to String` (today `LeafTarget`) so the compiler knows the output entity.
 - (b) Rejected in v0: `SelectionSetOnClientField` and `SelectionSetOnFieldWithoutTarget` stay. Held. Reason: upstream rejects an object selection of a client field (`validate_selection_sets.rs:309`).
 
-### 6. `__self` on an object entity
+### 6. How a client field on a scalar entity reads the scalar
 
-- (a) Not in v0: `__self` exists on scalar entities only. Held. Reason: nothing reads it; a resolver already receives `link`.
-- (b) A source field `normalize` writes with the record's own link. Cost: one more source node per record, written once.
-- (c) A generated derived field returning `link`, as upstream's `__link` is a generated client field on every object entity (`add_link_fields.rs:14-38`). Cost: one node per record that selects it.
-
-### 7. How a client field on a scalar entity reads the scalar
-
-- (a) A `__self` selection: `field String.toUppercase { __self }`, read as `data.__self` through a `Self` selection. Held. Reason: every value a resolver reads arrives through a selection, recorded by the walk; the resolver's `link` is the scalar record's, as for every field.
+- (a) A `__self` selection: `field String.toUppercase { __self }`, read as `data.__self` through a bare `Self`, which walks `String`'s default reader. Held. Reason: every value a resolver reads arrives through a selection, recorded by the walk; the resolver's `link` is the scalar record's, as for every field.
 - (b) The value as a resolver parameter (`{ data, parameters, link, value }`). Cost: a read outside the walk, which the runtime makes for fields on scalar entities only, a case the runtime has nowhere else.
