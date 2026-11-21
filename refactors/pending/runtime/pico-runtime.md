@@ -298,21 +298,27 @@ type Computed<TValue> = {
   readonly dependencies: ReadonlyArray<Dependency>;
 };
 
-/** Runs `computation` with a context that collects what it reads, in read order. */
+/** Runs `computation` with a context that collects what it reads, in read order, while
+ * `graph.computingDepth` counts it. */
 function compute<TValue>(graph: Graph, computation: Computation<TValue>): Computed<TValue> {
   const dependencies: Dependency[] = [];
-  const value = computation({
-    readSource: (source) => {
-      dependencies.push({ kind: 'Source', source });
-      return source.value;
-    },
-    readDerived: (node) => {
-      const read = pull(graph, node);
-      dependencies.push({ kind: 'Derived', node });
-      return read;
-    },
-  });
-  return { value, dependencies };
+  graph.computingDepth += 1;
+  try {
+    const value = computation({
+      readSource: (source) => {
+        dependencies.push({ kind: 'Source', source });
+        return source.value;
+      },
+      readDerived: (node) => {
+        const read = pull(graph, node);
+        dependencies.push({ kind: 'Derived', node });
+        return read;
+      },
+    });
+    return { value, dependencies };
+  } finally {
+    graph.computingDepth -= 1;
+  }
 }
 
 /** Removes `node` from the dependents of each of `previous` and adds it to those of each of `next`. */
@@ -330,6 +336,7 @@ function setDependencies(
 - Top-level pull order does not affect values. The graph is a DAG and every computation is pure, so the first pull that reaches a marked node brings it up to date and every later pull finds it `Clean`. Which nodes run and how often is the same in any order.
 - No order is stored: a pull brings a node's inputs up to date before the node uses them, through `readDerived` and `verify`.
 - `setDependencies` is the only writer of `dependents`. Removing every old edge and adding every new one is `O(old + new)`; a dependency read twice is one member of each set. A violation of "the dependents sets are the inverse of the dependency lists" is a silently stale result, which one writer guards.
+- `compute` decrements `computingDepth` in a `finally`, so the count is restored when a computation throws and the graph accepts writes afterwards.
 - The context is a parameter built per computation; there is no ambient current computation (MobX's `globalState.trackingDerivation`, Reactively's `CurrentReaction`).
 
 A throw out of a computation propagates out of `compute`, and a throw out of `equal` propagates out of `recompute`, before `setDependencies` and before any state is written, so the node keeps its mark, its previous value, and its previous dependencies and dependents, and the next pull recomputes it again. A verifying ancestor keeps its mark too. `recompute` calls `equal` before `setDependencies` for that reason: called after, a throw from `equal` would leave the node in the `dependents` sets of the new dependencies while its state lists the old ones, and a later `setDependencies` from the old list would never remove it from the sets only the failed run added. Calling `equal` first changes nothing else: `equal` compares two values and reads no node, and both branches store `computed.dependencies`, so a link that moved to a record with equal data still cuts off and the node depends on the new record. `resolverResultsEqual` does not throw; a field-supplied `outputEqual` (open decision 7) can. A resolver's own throw does not propagate: it is a stored value (Equality, `ResolverThrew`). What propagates is a throw of the walk outside the resolver, such as `linkAt` on a non-link (`libs/isograph-runtime/src/store.ts:74-86`). Open decision 3 covers that throw.
