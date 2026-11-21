@@ -430,7 +430,7 @@ function markCheck(work: AnyDerivedNode[]): void {
 }
 ```
 
-`markDirty` and `markCheck` never add or remove an element of a `dependents` set, so each iterates the sets directly while it marks. A write allocates one work array and two `push` closures per `markDirty` call, and nothing per marked node: no copy of a `dependents` set, no array per node from `markOneDirty`, and no closure per node in `markCheck`.
+`markDirty` and `markCheck` never add or remove an element of a `dependents` set, so each iterates the sets directly while it marks. A write allocates one work array and three closures per `markDirty` call, and nothing per marked node: no copy of a `dependents` set, no array per node from `markOneDirty`, and no closure per node in `markCheck`.
 
 Marking does not recurse. `markCheck` is a loop over a work list, the worklist case of AGENTS.md (Iterators), so its stack depth is the same for a chain of ten nodes and a chain of 100,000, and marking runs to completion on a graph of any height. A recursive `markCheck` would overflow the call stack on a tall enough chain; the `RangeError` would leave the nodes below the overflow `Check` and the nodes above it `Clean`, a `Clean` dependent of a node that is not `Clean`, and a later write could not repair it, because marking stops at the direct reader, which is already `Dirty`. `work` holds at most one entry per `dependents` edge the walk reaches. Each dependent is pushed singly, so no call receives a set's size in arguments.
 
@@ -458,12 +458,14 @@ function verify<TValue>(
   node: DerivedNode<TValue>,
   state: CheckState<TValue>,
 ): TValue {
-  state.dependencies.some((dependency) => {
+  for (const dependency of state.dependencies) {
     if (dependency.kind === 'Derived') {
       pull(dependency);
     }
-    return stateOf(node).state.mark === 'Dirty';
-  });
+    if (stateOf(node).state.mark === 'Dirty') {
+      break;
+    }
+  }
   const after = stateOf(node).state;
   switch (after.mark) {
     case 'Dirty':
@@ -533,7 +535,7 @@ function compute<TValue>(computation: Computation<TValue>): Computed<TValue> {
 }
 ```
 
-- `verify` reads the node's state again after each dependency's pull, because a dependency's `recompute` marks this node `Dirty` through `dependents`.
+- `verify` reads the node's state again after each dependency's pull, because a dependency's `recompute` marks this node `Dirty` through `dependents`. It is a `for` loop with `break` in place of `some`, which allocated a closure per verify; a verify is one step of every pull of a `Check` node.
 - `readDerived` records the dependency after the pull returns. A pull that throws records nothing, and the throw leaves the reading computation, so no dependency list holds a node whose pull threw.
 - `recompute` calls `equals` before `setDependencies`. A throw out of `equals` then leaves the node's dependency list and every `dependents` set consistent. Called after, a throw would leave the node in the `dependents` sets of the new dependencies while its state lists the old ones, and a later `setDependencies` from the old list would never remove it from the sets only the failed run added. Both branches store `computed.dependencies`, so a node whose value came back equal still depends on what it read this time.
 - `recompute` calls no `equals` when the previous value is `MISSING`. A computation cannot return `MISSING`, because no module exports it, so `previous === MISSING` means only that the node was never computed or was disposed.
@@ -546,23 +548,44 @@ function compute<TValue>(computation: Computation<TValue>): Computed<TValue> {
 
 ```ts
 // from libs/isograph-pico-js/src/graph.ts
-/** Removes `node` from the dependents of each of `previous` and adds it to those of each of `next`.
- * The only writer of any `dependents` set. Called by `recompute` and `disposeDerivedNode`. */
+/** Removes `node` from the dependents of each of `previous` and adds it to those of each of `next`;
+ * nothing when the two lists hold the same nodes in the same order. The only writer of any
+ * `dependents` set. Called by `recompute` and `disposeDerivedNode`. */
 function setDependencies(
   node: AnyDerivedNode,
   previous: ReadonlyArray<AnyNode>,
   next: ReadonlyArray<AnyNode>,
 ): void {
-  previous.forEach((dependency) => dependency.dependents.delete(node));
-  next.forEach((dependency) => dependency.dependents.add(node));
+  if (sameDependencies(previous, next)) {
+    return;
+  }
+  for (const dependency of previous) {
+    dependency.dependents.delete(node);
+  }
+  for (const dependency of next) {
+    dependency.dependents.add(node);
+  }
+}
+
+/** Whether `previous` and `next` hold the same node at every index. */
+function sameDependencies(previous: ReadonlyArray<AnyNode>, next: ReadonlyArray<AnyNode>): boolean {
+  if (previous.length !== next.length) {
+    return false;
+  }
+  for (let index = 0; index < previous.length; index += 1) {
+    if (previous[index] !== next[index]) {
+      return false;
+    }
+  }
+  return true;
 }
 ```
 
-A dependency list holds the nodes themselves, and each node carries its own `kind`, one field per node and nothing per edge, so `readSource` and `readDerived` allocate nothing per read: each pushes the node it read. Removing every old edge and then adding every new one is `O(old + new)`. Removal runs first, so a dependency in both lists ends present, and a dependency read twice is one member of its set. A violation of "the `dependents` sets are the inverse of the dependency lists" is a silently stale result, which one writer guards.
+A dependency list holds the nodes themselves, and each node carries its own `kind`, one field per node and nothing per edge, so `readSource` and `readDerived` allocate nothing per read: each pushes the node it read. A computation is a pure function of what it reads, so a recomputation over unchanged inputs reads the same nodes in the same order. `setDependencies` checks that case first: `n` pointer comparisons, no `Set` operation, and no allocation, and it is correct with duplicate entries, because equal lists name the same edges. A patch that keeps a common prefix and rewrites the tail would be wrong with duplicates unless each edge carried a count, and a hash-based diff of the two lists is not faster than removing and re-adding: it still costs at least two hash operations per kept dependency and allocates a set. Otherwise, removing every old edge and then adding every new one is `O(old + new)`. The loops are `for` loops in place of `forEach`, which allocated a closure per call over `node`. Removal runs first, so a dependency in both lists ends present, and a dependency read twice is one member of its set. A violation of "the `dependents` sets are the inverse of the dependency lists" is a silently stale result, which one writer guards.
 
 The dependency list keeps a node read twice as two entries. pico drops a read equal to the last one recorded (`TrackedDependencies::push`, `crates/pico/src/dependency.rs:33-41`). The engine does not: `Set.add` makes the edge idempotent, and the second verify step on that node finds it `Clean` and returns at once, so dropping repeats would cost a comparison per read to save a step that costs one.
 
-Reactively reuses the unchanged prefix of the previous source list (`CurrentGets`, `CurrentGetsIndex`) to avoid detaching and reattaching it. The engine replaces the whole list. The prefix reuse saves set operations on a recomputation that reads what it read before; it is an optimization behind the same `setDependencies` contract and can be added later without an API change.
+Reactively reuses the unchanged prefix of the previous source list (`CurrentGets`, `CurrentGetsIndex`) to avoid detaching and reattaching it. The engine skips the `Set` operations only when the whole list is unchanged, for the duplicate-entry reason above.
 
 ### Disposal
 
@@ -1378,6 +1401,34 @@ describe('recorded dependencies', () => {
 
     writeSource(items, ['asdf', 'isograph', 'database']);
     expect(pull(trackedCount)).toBe(3);
+  });
+
+  test('a recompute that reads the same nodes keeps its edges', () => {
+    const calls = { node: 0 };
+    const trigger = createSourceNode(0, strictEqual);
+    const useA = createSourceNode(true, strictEqual);
+    const a = createSourceNode(1, strictEqual);
+    const b = createSourceNode(10, strictEqual);
+    const node = createDerivedNode((context) => {
+      calls.node += 1;
+      context.readSource(trigger);
+      return context.readSource(useA) ? context.readSource(a) : context.readSource(b);
+    }, strictEqual);
+    expect(pull(node)).toBe(1);
+
+    writeSource(trigger, 1);
+    expect(pull(node)).toBe(1);
+    expect(calls.node).toBe(2);
+
+    writeSource(a, 2);
+    expect(pull(node)).toBe(2);
+    expect(calls.node).toBe(3);
+
+    writeSource(useA, false);
+    expect(pull(node)).toBe(10);
+    writeSource(a, 3);
+    expect(pull(node)).toBe(10);
+    expect(calls.node).toBe(4);
   });
 
   test('pull inside a computation records nothing', () => {
