@@ -173,8 +173,8 @@ export type SourceNode<TValue> = {
   value: TValue;
   /** Whether a written value equals the stored one. Called only by `writeSource`, with the stored
    * value and the written one. Must not write a source or dispose a node (Writes during a
-   * computation). A method signature, as `DerivedNode.equal` is. */
-  equal(previous: TValue, next: TValue): boolean;
+   * computation). A method signature, as `DerivedNode.equals` is. */
+  equals(previous: TValue, next: TValue): boolean;
   /** Written only by `setDependencies`. */
   readonly dependents: Set<AnyDerivedNode>;
 };
@@ -186,7 +186,7 @@ export type DerivedNode<TValue> = {
    * node's previous value and the value its computation just returned. Must not write a source or
    * dispose a node (Writes during a computation). A method signature, so that a `DerivedNode<T>` is
    * an `AnyDerivedNode` (open decision 5). */
-  equal(previous: TValue, next: TValue): boolean;
+  equals(previous: TValue, next: TValue): boolean;
   /** Value, mark, and dependencies. Read and written only through `stateOf`. */
   readonly slot: StateSlot<TValue>;
   /** Every derived node whose dependencies hold this one. Written only by `setDependencies`. */
@@ -222,7 +222,7 @@ export type CheckState<TValue> = {
   readonly dependencies: ReadonlyArray<Dependency>;
 };
 
-/** A source node it read was written, or a derived node it read recomputed to a value `equal`
+/** A source node it read was written, or a derived node it read recomputed to a value `equals`
  * rejected, or it was never computed, or it was disposed. */
 export type DirtyState<TValue> = {
   readonly mark: 'Dirty';
@@ -254,33 +254,33 @@ export type ComputeContext = {
 };
 ```
 
-`TValue` is per node: a `DerivedNode<string>` reads a `DerivedNode<number>` and a `SourceNode<number>`. The links hold `AnyDerivedNode` and `SourceNode<unknown>`, and the engine's functions are generic in the node they receive, so a node reached through `dependents` is handled at `TValue = unknown`. `equal` is a method signature: under `strict` (`tsconfig.build.json`), TypeScript checks the parameters of a function-typed property contravariantly and those of a method bivariantly, so with `readonly equal: (previous: TValue, next: TValue) => boolean` a `DerivedNode<number>` is not assignable to `DerivedNode<unknown>`. The engine calls `equal` only in `recompute`, with two values the node's own computation produced, so the bivariance admits no call the engine makes with a value of another type (open decision 5).
+`TValue` is per node: a `DerivedNode<string>` reads a `DerivedNode<number>` and a `SourceNode<number>`. The links hold `AnyDerivedNode` and `SourceNode<unknown>`, and the engine's functions are generic in the node they receive, so a node reached through `dependents` is handled at `TValue = unknown`. `equals` is a method signature: under `strict` (`tsconfig.build.json`), TypeScript checks the parameters of a function-typed property contravariantly and those of a method bivariantly, so with `readonly equals: (previous: TValue, next: TValue) => boolean` a `DerivedNode<number>` is not assignable to `DerivedNode<unknown>`. The engine calls `equals` only in `recompute`, with two values the node's own computation produced, so the bivariance admits no call the engine makes with a value of another type (open decision 5).
 
-`equal` returns `boolean`. It is a comparator, a pure yes or no with no domain names (AGENTS.md, Booleans).
+`equals` returns `boolean`. It is a comparator, a pure yes or no with no domain names (AGENTS.md, Booleans). The name `equals` matches the equality option of TC39 Signals' `Signal.State` and `Signal.Computed`.
 
 ### Functions
 
 ```ts
 // from libs/isograph-pico-js/src/graph.ts
-/** A source node holding `value`, read by no derived node. `equal` decides whether a later write
+/** A source node holding `value`, read by no derived node. `equals` decides whether a later write
  * changes it. */
 export function createSourceNode<TValue>(
   value: TValue,
-  equal: (previous: TValue, next: TValue) => boolean,
+  equals: (previous: TValue, next: TValue) => boolean,
 ): SourceNode<TValue>;
 
 /** A derived node that was never computed: `Dirty`, no value, no dependencies. Its computation
  * first runs on the first pull that reaches it. */
 export function createDerivedNode<TValue>(
   computation: Computation<TValue>,
-  equal: (previous: TValue, next: TValue) => boolean,
+  equals: (previous: TValue, next: TValue) => boolean,
 ): DerivedNode<TValue>;
 
 /** The value of `source`, read without recording a dependency. Inside a computation it is an
  * untracked read (decision 10). */
 export function sourceValue<TValue>(source: SourceNode<TValue>): TValue;
 
-/** When `source.equal` rejects the stored value and `value`, sets `source`'s value and marks its
+/** When `source.equals` rejects the stored value and `value`, sets `source`'s value and marks its
  * dependents; when it accepts, stores nothing and marks nothing (decision 8). Runs no computation.
  * Must not be called inside a computation or an equality (Writes during a computation). */
 export function writeSource<TValue>(source: SourceNode<TValue>, value: TValue): void;
@@ -313,18 +313,18 @@ Callers. In the Isograph runtime (pico-runtime.md, The engine and the Isograph r
 // from libs/isograph-pico-js/src/graph.ts
 export function createSourceNode<TValue>(
   value: TValue,
-  equal: (previous: TValue, next: TValue) => boolean,
+  equals: (previous: TValue, next: TValue) => boolean,
 ): SourceNode<TValue> {
-  return { value, equal, dependents: new Set() };
+  return { value, equals, dependents: new Set() };
 }
 
 export function createDerivedNode<TValue>(
   computation: Computation<TValue>,
-  equal: (previous: TValue, next: TValue) => boolean,
+  equals: (previous: TValue, next: TValue) => boolean,
 ): DerivedNode<TValue> {
   return {
     computation,
-    equal,
+    equals,
     slot: { state: neverComputed() },
     dependents: new Set(),
   };
@@ -351,7 +351,7 @@ function stateOf<TValue>(node: DerivedNode<TValue>): StateSlot<TValue> {
 ```ts
 // from libs/isograph-pico-js/src/graph.ts
 export function writeSource<TValue>(source: SourceNode<TValue>, value: TValue): void {
-  if (source.equal(source.value, value)) {
+  if (source.equals(source.value, value)) {
     return;
   }
   source.value = value;
@@ -438,7 +438,7 @@ export function pull<TValue>(node: DerivedNode<TValue>): TValue {
   }
 }
 
-/** Pulls each `Derived` dependency in recorded order until one recomputes to a value its `equal`
+/** Pulls each `Derived` dependency in recorded order until one recomputes to a value its `equals`
  * rejects, which marks `node` `Dirty`; then recomputes `node`. Otherwise `node` ends `Clean`
  * without running. */
 function verify<TValue>(
@@ -468,8 +468,8 @@ function verify<TValue>(
 }
 
 /** Runs the computation, compares its value with the previous one, replaces the dependencies, and
- * stores the new value unless `equal` accepted it, in which case the previous value object stays.
- * A new value marks the dependents `Dirty`. A throw out of the computation or out of `equal` is a
+ * stores the new value unless `equals` accepted it, in which case the previous value object stays.
+ * A new value marks the dependents `Dirty`. A throw out of the computation or out of `equals` is a
  * programmer error; it leaves the state and every `dependents` set untouched. */
 function recompute<TValue>(
   node: DerivedNode<TValue>,
@@ -477,7 +477,7 @@ function recompute<TValue>(
 ): TValue {
   const computed = compute(node.computation);
   const previous = state.previous;
-  if (previous.kind === 'Value' && node.equal(previous.value, computed.value)) {
+  if (previous.kind === 'Value' && node.equals(previous.value, computed.value)) {
     setDependencies(node, state.dependencies, computed.dependencies);
     stateOf(node).state = {
       mark: 'Clean',
@@ -522,7 +522,7 @@ function compute<TValue>(computation: Computation<TValue>): Computed<TValue> {
 
 - `verify` reads the node's state again after each dependency's pull, because a dependency's `recompute` marks this node `Dirty` through `dependents`.
 - `readDerived` records the dependency after the pull returns. A pull that throws records nothing, and the throw leaves the reading computation, so no dependency list holds a node whose pull threw.
-- `recompute` calls `equal` before `setDependencies`. A throw out of `equal` then leaves the node's dependency list and every `dependents` set consistent. Called after, a throw would leave the node in the `dependents` sets of the new dependencies while its state lists the old ones, and a later `setDependencies` from the old list would never remove it from the sets only the failed run added. Both branches store `computed.dependencies`, so a node whose value came back equal still depends on what it read this time.
+- `recompute` calls `equals` before `setDependencies`. A throw out of `equals` then leaves the node's dependency list and every `dependents` set consistent. Called after, a throw would leave the node in the `dependents` sets of the new dependencies while its state lists the old ones, and a later `setDependencies` from the old list would never remove it from the sets only the failed run added. Both branches store `computed.dependencies`, so a node whose value came back equal still depends on what it read this time.
 - A computation is synchronous, and a read through its context after it returned breaks the contract. `recompute` stores the array `compute` returned as the node's dependency list, and `readSource` and `readDerived` push onto that array, so a read after the computation returned (from an `async` computation after an `await`, or through a context the computation stored) adds an entry to the stored list with no matching `dependents` edge, and a later write to what it read does not mark the node. The engine does not check it (decision 2).
 - The context is a parameter built per computation. There is no ambient current computation (Reactively's `CurrentReaction`, Preact's `evalContext`), so a computation's reads cannot be recorded on the wrong node, and two graphs never share tracking state.
 
@@ -581,7 +581,7 @@ Without the reset, a `Clean` node disposed by `setDependencies` and marking alon
 
 ### Throws
 
-A computation and an equality must not throw. A throw out of either is a programmer error, and the engine defines no behavior for the node that threw: no retry, no stored error, no value. The engine guarantees only that its own state is not corrupted. A throw out of a computation propagates out of `compute`, and a throw out of `equal` propagates out of `recompute`, before `setDependencies` and before any state is written, so every mark, value, dependency list, and `dependents` set is as it was before the throwing run. A throw out of a source's `equal` propagates out of `writeSource` before the value is set and before any marking. Nodes pulled inside the failed computation before the throw are `Clean` and correct, because each pull completed.
+A computation and an equality must not throw. A throw out of either is a programmer error, and the engine defines no behavior for the node that threw: no retry, no stored error, no value. The engine guarantees only that its own state is not corrupted. A throw out of a computation propagates out of `compute`, and a throw out of `equals` propagates out of `recompute`, before `setDependencies` and before any state is written, so every mark, value, dependency list, and `dependents` set is as it was before the throwing run. A throw out of a source's `equals` propagates out of `writeSource` before the value is set and before any marking. Nodes pulled inside the failed computation before the throw are `Clean` and correct, because each pull completed.
 
 A `RangeError` from a pull that exceeds the call stack is the one throw this guarantee does not cover (Pull, open decision 12). It can leave from inside `setDependencies`, after some edges moved, so after it the engine's state is not guaranteed. Pull depth is a contract: a graph whose pull depth stays well below the stack limit never overflows.
 
@@ -657,9 +657,9 @@ This section is the engine's counterpart of `docs-website/docs/design-docs/pico.
 
 ### Sources
 
-A source node is an input fact: a value the graph does not compute. The consumer creates it with `createSourceNode(value, equal)` and holds the returned object. The object is the source's identity. There is no key, no lookup by key, and no absent source: a source exists from creation and always holds a value. A consumer that needs "not set yet" stores a value of its own that says so (`undefined`, a sentinel symbol, or a tagged union), and readers depend on that value like any other. The Isograph runtime's `MISSING` is such a value.
+A source node is an input fact: a value the graph does not compute. The consumer creates it with `createSourceNode(value, equals)` and holds the returned object. The object is the source's identity. There is no key, no lookup by key, and no absent source: a source exists from creation and always holds a value. A consumer that needs "not set yet" stores a value of its own that says so (`undefined`, a sentinel symbol, or a tagged union), and readers depend on that value like any other. The Isograph runtime's `MISSING` is such a value.
 
-A source is written with `writeSource(source, value)`. The write compares the stored value with the new one by the source's `equal`. When `equal` accepts, the write stores nothing and marks nothing; when it rejects, the write sets the value and marks (decision 8). The engine defines no equality of its own, for sources as for derived nodes (decision 6). `markSourceChanged(source)` marks without setting, for a consumer that changed the value object in place or whose source went away.
+A source is written with `writeSource(source, value)`. The write compares the stored value with the new one by the source's `equals`. When `equals` accepts, the write stores nothing and marks nothing; when it rejects, the write sets the value and marks (decision 8). The engine defines no equality of its own, for sources as for derived nodes (decision 6). `markSourceChanged(source)` marks without setting, for a consumer that changed the value object in place or whose source went away.
 
 Code outside a computation reads a source with `sourceValue(source)`, which records nothing. A computation reads it with `context.readSource(source)`.
 
@@ -667,7 +667,7 @@ A source is not collected by the engine. It lives as long as the consumer and th
 
 ### Derived nodes
 
-A derived node is a computation, an equality, a state, and a set of dependents. The consumer creates it with `createDerivedNode(computation, equal)` and holds the returned object. The object is the node's identity. A consumer that wants one node per key (pico's memo arguments) keeps its own map from key to node; the engine has no memo table. The Isograph runtime's record containers are such a map.
+A derived node is a computation, an equality, a state, and a set of dependents. The consumer creates it with `createDerivedNode(computation, equals)` and holds the returned object. The object is the node's identity. A consumer that wants one node per key (pico's memo arguments) keeps its own map from key to node; the engine has no memo table. The Isograph runtime's record containers are such a map.
 
 The computation receives a `ComputeContext` and returns the value. It must be a pure function of what it reads through the context: no clock, no network, no read through a closure. It must be synchronous, because the dependency list is final when the computation returns; the engine does not check it (decision 2). A computation runs only during a pull: first on the first pull that reaches the node, and again on a pull that finds it `Dirty`. It never runs during a write.
 
@@ -689,7 +689,7 @@ The walk stops at the first changed dependency because the recomputation that fo
 
 ### Cutoff
 
-`equal(previous, next)` decides whether the nodes above a recomputed node recompute. When it accepts, the node keeps the previous value object, so a reader comparing by identity sees no change, and its dependents stay as marked: a `Check` dependent then verifies to `Clean` without running. When it rejects, the node stores the new value and marks its dependents `Dirty`.
+`equals(previous, next)` decides whether the nodes above a recomputed node recompute. When it accepts, the node keeps the previous value object, so a reader comparing by identity sees no change, and its dependents stay as marked: a `Check` dependent then verifies to `Clean` without running. When it rejects, the node stores the new value and marks its dependents `Dirty`.
 
 An equality may answer equal only when no reader can tell the two values apart. An equality that answers equal for distinguishable values makes readers keep a stale value. An equality that answers unequal for indistinguishable values costs recomputation, never a wrong value. The engine has no comparison of its own; the caller supplies every equality (decision 6). A consumer whose computation builds a new object on each run supplies a structural comparator, or the nodes above it recompute on every change below.
 
@@ -712,7 +712,7 @@ p finishes -> setDependencies: c.dependents = {p} -> p Clean, over a Dirty c
 write s again -> c already Dirty -> stop -> p is never marked
 ```
 
-An equality runs while the engine is between two writes of its own state: `writeSource` calls `source.equal` before it sets the value, and `recompute` calls `node.equal` after the computation returned and before `setDependencies`. A write from inside either leaves a node `Clean` over a changed input in the same way. Reads are not restricted: a `sourceValue` or `pull` inside a computation is an untracked read, which records no dependency of the running computation and writes no source (decision 10).
+An equality runs while the engine is between two writes of its own state: `writeSource` calls `source.equals` before it sets the value, and `recompute` calls `node.equals` after the computation returned and before `setDependencies`. A write from inside either leaves a node `Clean` over a changed input in the same way. Reads are not restricted: a `sourceValue` or `pull` inside a computation is an untracked read, which records no dependency of the running computation and writes no source (decision 10).
 
 ## Comparison with the Rust pico crate
 
@@ -729,7 +729,7 @@ Invalidation differs:
 - pico has a database-wide epoch. A write that changes a source increments it and stamps the source (`set_source`, `database.rs:310-329`). A demanded memo verified in the current epoch returns at once (`node_verified_in_current_epoch`, `execute_memoized_function.rs:80`); otherwise pico walks its dependencies and compares each one's `time_updated` with the memo's `time_verified`. After any write anywhere, the first demand of a memo walks every dependency beneath it, though it runs nothing that did not change. The engine marks on write through reverse edges, so a write costs the nodes above it and a pull after an unrelated write is one step.
 - pico keeps forward edges only, as ids into storage; the engine keeps object references in both directions.
 - pico checks source dependencies during verification; the engine does not, because a changed source already marked its readers `Dirty`.
-- pico's `set` compares the new source value with the old one and does not advance the epoch when they are equal (`database.rs:321`). The engine's `writeSource` compares by the source's `equal` and marks nothing when they are equal (decision 8).
+- pico's `set` compares the new source value with the old one and does not advance the epoch when they are equal (`database.rs:321`). The engine's `writeSource` compares by the source's `equals` and marks nothing when they are equal (decision 8).
 - pico finds a memo by its function and arguments, interned as `DerivedNodeId`; the engine has no keys, and the consumer holds node objects.
 - pico has one equality per type (`PartialEq` through `DynEq`); the engine has one per node.
 - pico removes a source by key, and a later `get` of its id panics (`removing_params.rs`); the engine has no removal, and a source object cannot dangle.
@@ -741,7 +741,7 @@ Observable behavior is the same: for any sequence of writes and reads that keeps
 
 ## Comparison with Reactively and Preact signals
 
-Reactively is the same scheme. Its states are `CacheClean`, `CacheCheck`, and `CacheDirty`. `set` marks direct observers `CacheDirty` through `stale`, which marks their observers `CacheCheck` and stops at a node already at or above the requested state. `updateIfNecessary` walks `sources` in order when `CacheCheck`, breaks when the node becomes `CacheDirty`, and then calls `update`. Its default equality is `===` (`defaultEquality`), per node through `equals`. `update` assigns the new value to `_value` (`:222`) before it compares it with the old one (`:259`), so an equal recomputation marks no observer and keeps the new value object. The engine keeps the previous value object on an equal recomputation (Cutoff), so a reader that holds the old object holds the node's current value. A throw out of the function propagates from `:222`, before the links are updated (`:224-251`) and before the state is set `CacheClean` (`:269`), so the state, the links, and `_value` are unchanged, as the engine's are; but `update` has already called and cleared the node's `onCleanup` callbacks (`:218-221`), so a later successful run does not call them. The engine has no cleanup callbacks. It has no cycle check. Its differences from the engine: an ambient `CurrentReaction` global records reads where the engine passes a context; `set` compares by `equals` and skips an equal value, as `writeSource` does by the source's `equal`; it reuses the unchanged prefix of the source list; and it schedules effects (`stabilize`), which the engine's core has none of.
+Reactively is the same scheme. Its states are `CacheClean`, `CacheCheck`, and `CacheDirty`. `set` marks direct observers `CacheDirty` through `stale`, which marks their observers `CacheCheck` and stops at a node already at or above the requested state. `updateIfNecessary` walks `sources` in order when `CacheCheck`, breaks when the node becomes `CacheDirty`, and then calls `update`. Its default equality is `===` (`defaultEquality`), per node through `equals`. `update` assigns the new value to `_value` (`:222`) before it compares it with the old one (`:259`), so an equal recomputation marks no observer and keeps the new value object. The engine keeps the previous value object on an equal recomputation (Cutoff), so a reader that holds the old object holds the node's current value. A throw out of the function propagates from `:222`, before the links are updated (`:224-251`) and before the state is set `CacheClean` (`:269`), so the state, the links, and `_value` are unchanged, as the engine's are; but `update` has already called and cleared the node's `onCleanup` callbacks (`:218-221`), so a later successful run does not call them. The engine has no cleanup callbacks. It has no cycle check. Its differences from the engine: an ambient `CurrentReaction` global records reads where the engine passes a context; `set` compares by `equals` and skips an equal value, as `writeSource` does by the source's `equals`; it reuses the unchanged prefix of the source list; and it schedules effects (`stabilize`), which the engine's core has none of.
 
 Preact signals uses versions instead of marks. Every signal has a `_version`, a global `globalVersion` counts writes, and each dependency link (a doubly linked list `Node` with `_source`, `_target`, and `_version`) records the version the target last saw. A computed decides with `needsToRecompute`, which walks its sources in order and returns at the first whose version changed, refreshing derived sources as it goes: pico's epochs per link, with pico's in-order walk. Writes notify effects eagerly through flags (`OUTDATED`, `NOTIFIED`). Its comparison is `!==`, a setter with an equal value notifies nothing, and a computed that throws stores the error (`HAS_ERROR`) and rethrows it on read; the engine forbids the throw (Throws). It throws "Cycle detected" when a computed is read while `RUNNING`; the engine has no cycle check (Cycles). It records reads through an ambient `evalContext`, and a signal written inside a computed is allowed.
 
@@ -778,7 +778,7 @@ Top-level files:
 - `cyclic_dependency_panic.rs:11` `test_calls_itself`, `:20` `test_calls_calls_itself`, `:29` `test_a`, `:38` `test_calls_a`: do not port. Each asserts only that pico detects the cycle and panics, and the engine has no cycle check (Cycles).
 - `equal_reset_after_unrelated_epoch.rs:14` `equal_reset_after_unrelated_epoch_does_not_rerun`: does not port. It pins epoch bookkeeping: an unrelated set advances the epoch, and a later equal set of the read source must not move that source's `time_updated`. The engine has no epoch, and an unrelated write reaches no reader of another source; the behavior left is "an equal write", which the port of `overriding_same_source` covers.
 - `intern.rs:12` `intern`, `intern_ref.rs:12` `intern_ref`, `intern_then_intern_ref.rs:10` `intern_then_intern_ref`: do not port. They pin `intern_value` and `intern_ref` identity; the engine interns nothing.
-- `intern_ref_chain.rs:14` `intern_ref_chain`: ports as "a node's own equality cuts off a selection out of a changed collection". Delta: pico cuts off because `intern_ref` of an equal value keeps its `time_updated`; the engine cuts off because the selecting node's `equal` compares the selected element's fields. The behavior kept is that a reader of one element does not run when other elements change.
+- `intern_ref_chain.rs:14` `intern_ref_chain`: ports as "a node's own equality cuts off a selection out of a changed collection". Delta: pico cuts off because `intern_ref` of an equal value keeps its `time_updated`; the engine cuts off because the selecting node's `equals` compares the selected element's fields. The behavior kept is that a reader of one element does not run when other elements change.
 - `overriding_same_source.rs:14` `overriding_same_source`: ports as "writing an equal value". No delta: the write marks nothing, and neither the reader of the source nor the node above it runs.
 - `partial_reuse_multi_function.rs:16` `multi_chain_reuse`: ports as "two readers share one computation of their dependency".
 - `partial_reuse_single_chain.rs:15` `single_chain_reuse`: ports as "a node pulled before its reader is not computed again for the reader".
@@ -1909,7 +1909,7 @@ pico-runtime.md holds no copy of the engine. It references this doc by section f
 - A computation and an equality must not throw, and the engine guarantees only that its own state is not corrupted (Throws, decision 3).
 - The derived nodes form a directed acyclic graph, and the engine has no cycle check (Cycles, decision 4).
 - Pull depth is a contract on the consumer; a pull that overflows the call stack throws `RangeError`, after which the engine does not guarantee its state; marking is iterative (Pull, decision 12). pico-runtime.md relies on client field nesting to bound it.
-- The engine defines no equality; `createSourceNode` and `createDerivedNode` take a required `equal` (decisions 6 and 8). pico-runtime.md's store passes `isUnchanged(key)` to each source node and `resolverResultsEqual(artifact, identical)` to each resolver node.
+- The engine defines no equality; `createSourceNode` and `createDerivedNode` take a required `equals` (decisions 6 and 8). pico-runtime.md's store passes `isUnchanged(key)` to each source node and `resolverResultsEqual(artifact, identical)` to each resolver node.
 - A `sourceValue` or `pull` inside a computation is an untracked read (decision 10).
 
 pico-runtime.md's open decisions that restate this doc's state the same status: its 2 is this doc's 2; its 3 is 3; 8 is 4; 18 is 1; 19 is 5; 20 is 6; 21 is 7; 23 is 8; 24 is 9; 25 is 10; 26 is 11. When one of these is decided, both docs change in one commit.
@@ -1936,25 +1936,25 @@ The derived nodes must form a directed acyclic graph; a cycle is a programmer er
 
 pico-runtime.md open decision 19, restated.
 
-- (a) `AnyDerivedNode = DerivedNode<unknown>`, with `equal` a method signature so that `DerivedNode<T>` is assignable to it. Held, not decided. Reason: no cast and no wrapper; the engine calls `equal` only with two values the node's own computation produced. Cost: method bivariance also accepts a call such as `(node as AnyDerivedNode).equal('a', 'b')` on a `DerivedNode<number>`; only code outside the engine could make it.
+- (a) `AnyDerivedNode = DerivedNode<unknown>`, with `equals` a method signature so that `DerivedNode<T>` is assignable to it. Held, not decided. Reason: no cast and no wrapper; the engine calls `equals` only with two values the node's own computation produced. Cost: method bivariance also accepts a call such as `(node as AnyDerivedNode).equals('a', 'b')` on a `DerivedNode<number>`; only code outside the engine could make it.
 - (b) One value type per graph. Cost: a consumer whose nodes have different value types declares a union and narrows every `readDerived` result.
 - (c) An existential encoding: a link holds `<R>(visit: <T>(node: DerivedNode<T>) => R) => R`. Cost: one closure per link and a call per traversal step; it is sound.
 
 ### 6. The engine's identity equality (decided)
 
-The engine defines no equality. `createDerivedNode` requires `equal`, with no optional parameter and no default, and the engine exports no comparison function. `===` is the Isograph layer's default, which it passes to each node it creates (pico-runtime.md open decision 20; upstream Isograph's comparison of resolver values, `areEqualWithDeepComparison.ts:84-95` in `../isograph`). Under `===`, a node whose value is `NaN` never cuts off, so its readers recompute on every recomputation of it, and a change from `0` to `-0` cuts off, so its readers keep `0`. A caller that supplies its own `equal` gets that comparison and is not affected by the Isograph default. `degenerate.test.ts`'s last two tests assert that the supplied `equal` decides cutoff.
+The engine defines no equality. `createDerivedNode` requires `equals`, with no optional parameter and no default, and the engine exports no comparison function. `===` is the Isograph layer's default, which it passes to each node it creates (pico-runtime.md open decision 20; upstream Isograph's comparison of resolver values, `areEqualWithDeepComparison.ts:84-95` in `../isograph`). Under `===`, a node whose value is `NaN` never cuts off, so its readers recompute on every recomputation of it, and a change from `0` to `-0` cuts off, so its readers keep `0`. A caller that supplies its own `equals` gets that comparison and is not affected by the Isograph default. `degenerate.test.ts`'s last two tests assert that the supplied `equals` decides cutoff.
 
 ### 7. Whether a consumer can write a node's fields
 
 pico-runtime.md open decision 21, restated. The types are plain object types whose fields every consumer sees, and a consumer that writes `dependents` or `slot` breaks an invariant silently.
 
 - (a) Plain object types; each field's comment names its only reader and writer. Held, not decided. Reason: (b) and (c) each cost a cast or a slower link type. Cost: the comments are the only guard, against AGENTS.md's "Never rely on discipline what we can enforce with newtypes".
-- (b) Classes with ES private fields, with module-local accessors assigned in each class's `static {}` block. Cost: a private `#equal` makes `DerivedNode<number>` not assignable to `DerivedNode<unknown>`, so it needs open decision 5 (c) or a cast per link; a node cannot be wrapped in a `Proxy`.
+- (b) Classes with ES private fields, with module-local accessors assigned in each class's `static {}` block. Cost: a private `#equals` makes `DerivedNode<number>` not assignable to `DerivedNode<unknown>`, so it needs open decision 5 (c) or a cast per link; a node cannot be wrapped in a `Proxy`.
 - (c) Opaque branded public types, cast to field types inside `graph.ts`. Cost: a cast in every engine function that receives a node.
 
 ### 8. Whether `writeSource` compares the new value with the old (decided)
 
-Writing an equal value does not propagate. A source takes a required equality, as a derived node does: `createSourceNode(value, equal)`, and `writeSource` compares the stored value with the new one by that `equal`; when it accepts, `writeSource` stores nothing and marks nothing. The engine still defines no equality of its own (decision 6). `markSourceChanged` stays, for a value object changed in place. This matches pico (`set_source`, `crates/pico/src/database.rs:310-329`), Reactively's `set`, and Preact's setter, with the equality supplied by the caller.
+Writing an equal value does not propagate. A source takes a required equality, as a derived node does: `createSourceNode(value, equals)`, and `writeSource` compares the stored value with the new one by that `equals`; when it accepts, `writeSource` stores nothing and marks nothing. The engine still defines no equality of its own (decision 6). `markSourceChanged` stays, for a value object changed in place. This matches pico (`set_source`, `crates/pico/src/database.rs:310-329`), Reactively's `set`, and Preact's setter, with the equality supplied by the caller.
 
 ### 9. A pull of a disposed node
 
