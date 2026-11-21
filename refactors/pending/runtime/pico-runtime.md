@@ -548,8 +548,10 @@ export function readStoredResult<TEntityName extends EntityName, TOutput>(
   root: NoInfer<Link<TEntityName>>,
   variables: Variables,
 ): ResolverResult<TOutput> {
-  // The node under `artifact.selectableName`'s resolver store key on `root` was created from
-  // `artifact`: one selectable of one entity has one reader artifact (open decision 1).
+  // The node under `artifact`'s resolver store key on `root` was created from `artifact` only once
+  // open decision 1 is decided. Until then the key is `selectableName` and variables alone, which is
+  // wrong: `field Node.Label` and `field Pet.Label` read on `Pet:1` get one node, and so do a field
+  // `F____n___2` with no variables and `F` with `{ n: 2 }`.
   return pull(resolverNodeAt(store, artifact, root, variables)) as ResolverResult<TOutput>;
 }
 
