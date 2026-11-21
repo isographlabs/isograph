@@ -302,8 +302,8 @@ export function markSourceChanged(
 ): void;
 
 /** `node`'s current value: `Clean` returns it, `Check` verifies, `Dirty` recomputes. Throws while a
- * computation runs: a computation reads other nodes through its context. Propagates a throw out of a
- * computation or an equality it runs (open decision 3). */
+ * computation runs: a computation reads other nodes through its context. A computation or an
+ * equality must not throw (Throws). */
 export function pull<TValue>(graph: Graph, node: DerivedNode<TValue>): TValue;
 
 /** Removes `node` from the dependents of everything it read, resets it to never computed, and marks
@@ -545,8 +545,8 @@ function verify<TValue>(
 
 /** Runs the computation, compares its value with the previous one, replaces the dependencies, and
  * stores the new value unless `equal` accepted it, in which case the previous value object stays.
- * A new value marks the dependents `Dirty`. A throw out of the computation or out of `equal` leaves
- * the state and every `dependents` set untouched. */
+ * A new value marks the dependents `Dirty`. A throw out of the computation or out of `equal` is a
+ * programmer error; it leaves the state and every `dependents` set untouched. */
 function recompute<TValue>(
   graph: Graph,
   node: DerivedNode<TValue>,
@@ -666,9 +666,9 @@ pico-runtime.md's body of `disposeDerivedNode` (The graph) calls `setDependencie
 
 ### Throws
 
-A throw out of a computation propagates out of `compute`, and a throw out of `equal` propagates out of `recompute`, before `setDependencies` and before any state is written. The node keeps its mark, its previous value, its dependencies, and its place in the `dependents` sets of those dependencies. The next pull recomputes it again. A verifying ancestor keeps its `Check` mark, because the throw leaves `verify` before it writes, and its next pull verifies again. Nodes pulled inside the failed computation before the throw are `Clean` and correct, because each pull completed.
+A computation and an equality must not throw. A throw out of either is a programmer error, and the engine defines no behavior for the node that threw: no retry, no stored error, no value. The engine guarantees only that its own state is not corrupted. A throw out of a computation propagates out of `compute`, and a throw out of `equal` propagates out of `recompute`, before `setDependencies` and before any state is written, so every mark, value, dependency list, and `dependents` set is as it was before the throwing run. The `finally` in `compute` restores `computingDepth`, so the graph accepts writes after the throw. Nodes pulled inside the failed computation before the throw are `Clean` and correct, because each pull completed.
 
-This is open decision 3 option (a) in engine terms, and is what both pico-runtime.md open decision 3 (a) (the Isograph runtime catches the walk's throw inside its computation and returns it as a value) and (c) (propagate) need from the engine. Open decision 3 lists the engine options that change it.
+pico-runtime.md open decision 3 (a) has the Isograph runtime catch the walk's throw inside its computation and return it as a value, so an Isograph computation does not throw.
 
 ### Cycles
 
@@ -727,12 +727,12 @@ pull(graph, banner); // 'Free shipping' (runs all three)
 - A computation is a pure function of what it reads. It does not write a source, dispose a node, or call `pull`; each of those throws while a computation runs.
 - Each derived node has an equality. When a recomputed value is equal to the previous one, the node keeps the previous value object and the nodes above it do not recompute. Pass `sameValue` for identity, or your own comparator for values you build fresh on each run.
 - `writeSource` always marks. Skip the call when the value did not change.
-- A throw out of a computation propagates out of `pull`. The node keeps its previous value and is computed again on the next pull.
+- A computation and an equality must not throw. A throw is a programmer error: it propagates out of `pull`, and the engine guarantees only that its own state is as it was before that pull.
 - `disposeDerivedNode` detaches a node you no longer need. Nodes that read it recompute on their next pull.
 - A computation must not read its own node, directly or through other nodes.
 ````
 
-The README's rules restate the engine's behavior under the options the body is written for: open decision 2 (f), 3 (a), 8 (a), 9 (a), and 10 (a). Each decision that changes names the README line it changes.
+The README's rules restate the engine's behavior under the options the body is written for: open decision 2 (f), 8 (a), 9 (a), and 10 (a). Each decision that changes names the README line it changes.
 
 ## The design
 
@@ -825,7 +825,7 @@ Observable behavior is the same: for any sequence of writes and reads, both retu
 
 Reactively is the same scheme. Its states are `CacheClean`, `CacheCheck`, and `CacheDirty`. `set` marks direct observers `CacheDirty` through `stale`, which marks their observers `CacheCheck` and stops at a node already at or above the requested state. `updateIfNecessary` walks `sources` in order when `CacheCheck`, breaks when the node becomes `CacheDirty`, and then calls `update`. Its default equality is `===` (`defaultEquality`), per node through `equals`. A throw out of the function propagates and leaves the state and the links unchanged, as the engine's does. It has no cycle check. Its differences from the engine: an ambient `CurrentReaction` global records reads where the engine passes a context; `set` compares and skips an equal value, where `writeSource` does not (open decision 8); it reuses the unchanged prefix of the source list; and it schedules effects (`stabilize`), which the engine's core has none of.
 
-Preact signals uses versions instead of marks. Every signal has a `_version`, a global `globalVersion` counts writes, and each dependency link (a doubly linked list `Node` with `_source`, `_target`, and `_version`) records the version the target last saw. A computed decides with `needsToRecompute`, which walks its sources in order and returns at the first whose version changed, refreshing derived sources as it goes: pico's epochs per link, with pico's in-order walk. Writes notify effects eagerly through flags (`OUTDATED`, `NOTIFIED`). Its comparison is `!==`, a setter with an equal value notifies nothing, and a computed that throws stores the error (`HAS_ERROR`) and rethrows it on read, which is open decision 3 (c). It throws "Cycle detected" when a computed is read while `RUNNING`, which is open decision 4 (b). It records reads through an ambient `evalContext`, and a signal written inside a computed is allowed.
+Preact signals uses versions instead of marks. Every signal has a `_version`, a global `globalVersion` counts writes, and each dependency link (a doubly linked list `Node` with `_source`, `_target`, and `_version`) records the version the target last saw. A computed decides with `needsToRecompute`, which walks its sources in order and returns at the first whose version changed, refreshing derived sources as it goes: pico's epochs per link, with pico's in-order walk. Writes notify effects eagerly through flags (`OUTDATED`, `NOTIFIED`). Its comparison is `!==`, a setter with an equal value notifies nothing, and a computed that throws stores the error (`HAS_ERROR`) and rethrows it on read; the engine forbids the throw (Throws). It throws "Cycle detected" when a computed is read while `RUNNING`, which is open decision 4 (b). It records reads through an ambient `evalContext`, and a signal written inside a computed is allowed.
 
 The engine takes Reactively's marking and pull, pico's equality, guard, and per-computation dependency recording, and neither library's ambient tracking context.
 
@@ -833,7 +833,7 @@ The engine takes Reactively's marking and pull, pico's equality, guard, and per-
 
 The tests assert values with `toBe` and `toEqual`, and assert which computations ran by counting calls in a `calls` object each test owns. Counting re-invocations is allowed: which writes make which computations run again is the engine's own dependency tracking (AGENTS.md, Tests). No test reads a node's `slot`, `dependents`, or mark, and no test calls an unexported function: marks and edges are implementation, and each test observes them only through values and call counts. There are no snapshot tests and no fixture files; every input is built in the test.
 
-The tests are written under the options the body is written for: open decision 2 (f), 3 (a), 4 with no check, 6 (b) where a test depends on it, 8 (a), 9 (a), and 10 (a). Each test whose assertions change under another option says how.
+The tests are written under the options the body is written for: open decision 2 (f), 4 with no check, 6 (b) where a test depends on it, 8 (a), 9 (a), and 10 (a). Each test whose assertions change under another option says how.
 
 ### The pico crate's tests
 
@@ -897,7 +897,7 @@ Top-level files:
 libs/reactive-graph/test/
   recompute.test.ts      ports of chains, reuse, cutoff; marking and short circuit; pull order; diamond
   dependencies.test.ts   recorded order, branch changes, repeated reads, absence as a value, untracked reads
-  errors.test.ts         a throw out of a computation or an equality
+  errors.test.ts         a throwing computation leaves the graph's state unchanged
   disposal.test.ts       disposal
   guard.test.ts          the write-during-computation guard (open decision 2 (f))
   cycles.test.ts         cycles (open decision 4)
@@ -1464,9 +1464,11 @@ describe('recorded dependencies', () => {
 
 ### `errors.test.ts`
 
+A computation must not throw (Throws). The one test asserts the non-corruption guarantee, observed through values and call counts after the throw; it asserts nothing about the node that threw.
+
 ```ts
 // from libs/reactive-graph/test/errors.test.ts
-import { describe, expect, test } from 'vitest';
+import { expect, test } from 'vitest';
 import {
   createDerivedNode,
   createGraph,
@@ -1476,96 +1478,38 @@ import {
   writeSource,
 } from '../src';
 
-describe('a throw out of a computation (open decision 3 (a))', () => {
-  test('propagates, keeps the previous value, and is retried on the next pull', () => {
-    const graph = createGraph();
-    const calls = { scaled: 0, parent: 0 };
-    const count = createSourceNode(1);
-    const scaled = createDerivedNode((context) => {
-      calls.scaled += 1;
-      const value = context.readSource(count);
-      if (value < 0) {
-        throw new Error('negative');
-      }
-      return value * 10;
-    }, sameValue);
-    const parent = createDerivedNode((context) => {
-      calls.parent += 1;
-      return `${context.readDerived(scaled)}`;
-    }, sameValue);
-    expect(pull(graph, parent)).toBe('10');
+test('a throwing computation leaves the graph state unchanged', () => {
+  const graph = createGraph();
+  const calls = { scaled: 0, parent: 0 };
+  const count = createSourceNode(1);
+  const scaled = createDerivedNode((context) => {
+    calls.scaled += 1;
+    const value = context.readSource(count);
+    if (value < 0) {
+      throw new Error('negative');
+    }
+    return value * 10;
+  }, sameValue);
+  const parent = createDerivedNode((context) => {
+    calls.parent += 1;
+    return `${context.readDerived(scaled)}`;
+  }, sameValue);
+  expect(pull(graph, parent)).toBe('10');
 
-    writeSource(graph, count, -1);
-    expect(() => pull(graph, parent)).toThrow('negative');
-    expect(calls).toEqual({ scaled: 2, parent: 1 });
-    expect(() => pull(graph, parent)).toThrow('negative');
-    expect(calls).toEqual({ scaled: 3, parent: 1 });
+  writeSource(graph, count, -1);
+  expect(() => pull(graph, parent)).toThrow('negative');
 
-    writeSource(graph, count, 1);
-    expect(pull(graph, parent)).toBe('10');
-    expect(calls).toEqual({ scaled: 4, parent: 1 });
-  });
+  writeSource(graph, count, 2);
+  expect(pull(graph, parent)).toBe('20');
+  expect(calls).toEqual({ scaled: 3, parent: 2 });
 
-  test('a node whose first computation throws has no value and is retried', () => {
-    const graph = createGraph();
-    const calls = { node: 0 };
-    const count = createSourceNode(-1);
-    const node = createDerivedNode((context) => {
-      calls.node += 1;
-      const value = context.readSource(count);
-      if (value < 0) {
-        throw new Error('negative');
-      }
-      return value;
-    }, sameValue);
-    expect(() => pull(graph, node)).toThrow('negative');
-    expect(() => pull(graph, node)).toThrow('negative');
-    expect(calls.node).toBe(2);
-
-    writeSource(graph, count, 5);
-    expect(pull(graph, node)).toBe(5);
-    expect(calls.node).toBe(3);
-  });
-
-  test('a throw out of equal propagates and leaves the node to recompute', () => {
-    const graph = createGraph();
-    const calls = { echoed: 0, parent: 0 };
-    const text = createSourceNode('a');
-    const echoed = createDerivedNode(
-      (context) => {
-        calls.echoed += 1;
-        return context.readSource(text);
-      },
-      (previous, next) => {
-        if (next === 'boom') {
-          throw new Error('cannot compare');
-        }
-        return previous === next;
-      },
-    );
-    const parent = createDerivedNode((context) => {
-      calls.parent += 1;
-      return `${context.readDerived(echoed)}!`;
-    }, sameValue);
-    expect(pull(graph, parent)).toBe('a!');
-
-    writeSource(graph, text, 'boom');
-    expect(() => pull(graph, parent)).toThrow('cannot compare');
-    expect(() => pull(graph, parent)).toThrow('cannot compare');
-    expect(calls).toEqual({ echoed: 3, parent: 1 });
-
-    writeSource(graph, text, 'b');
-    expect(pull(graph, parent)).toBe('b!');
-    expect(calls).toEqual({ echoed: 4, parent: 2 });
-
-    writeSource(graph, text, 'c');
-    expect(pull(graph, parent)).toBe('c!');
-    expect(calls).toEqual({ echoed: 5, parent: 3 });
-  });
+  writeSource(graph, count, 3);
+  expect(pull(graph, parent)).toBe('30');
+  expect(calls).toEqual({ scaled: 4, parent: 3 });
 });
 ```
 
-The last two writes of the equality test assert that the failed runs left `echoed` in the `dependents` set of `text`: a lost edge would make the `'c'` write mark nothing and the pull return `'b!'`.
+The write after the throw succeeds, which asserts that `computingDepth` was restored. The `3` write recomputes both nodes, which asserts that the throwing run left `scaled` in the `dependents` set of `count` and `parent` in that of `scaled`.
 
 ### `disposal.test.ts`
 
@@ -1708,19 +1652,6 @@ describe('the write-during-computation guard', () => {
 
     writeSource(graph, other, 2);
     expect(sourceValue(other)).toBe(2);
-  });
-
-  test('a throw out of a nested computation releases the guard', () => {
-    const graph = createGraph();
-    const count = createSourceNode(0);
-    const inner = createDerivedNode(() => {
-      throw new Error('inner');
-    }, sameValue);
-    const outer = createDerivedNode((context) => context.readDerived(inner), sameValue);
-    expect(() => pull(graph, outer)).toThrow('inner');
-
-    writeSource(graph, count, 1);
-    expect(sourceValue(count)).toBe(1);
   });
 });
 ```
@@ -2169,6 +2100,7 @@ pico-runtime.md is not edited by this doc. These are the differences to apply th
 - `compute` counts running computations in a `finally`, under open decision 2 (f).
 - The tests are the files of Tests instead of one `test/graph.test.ts`, and the package has a `README.md`.
 - The CI step of CI.
+- A computation and an equality must not throw, and the engine guarantees only that its own state is not corrupted (decision 3). pico-runtime.md open decision 3's engine-side options go.
 - New open decisions 8, 9, 10, and 11 below.
 
 ## Open decisions
@@ -2189,26 +2121,15 @@ pico-runtime.md open decision 2, restated in engine terms. A computation that re
 
 pico-runtime.md's (b) and (c) are guards on the Isograph environment. A closure that holds the store reaches the engine's functions without passing them, so they are not engine options. Not held. The API is written under (f) (The public API).
 
-### 3. A throw out of a computation or an equality
+### 3. A throw out of a computation or an equality (decided)
 
-pico-runtime.md open decision 3, restated in engine terms. Its held option (a) catches the walk's throw inside the Isograph computation and needs the engine to propagate; its (c) propagates; both are engine option (a).
-
-- (a) Propagate. The node keeps its mark, its previous value, its dependencies, and its `dependents` edges; a verifying ancestor keeps `Check`; the next pull computes it again. The body of this doc, Reactively's behavior, and the nearest to pico's (a panicking memo leaves its revision unchanged as the stack unwinds). Cost: every pull of the node and of every node above it runs the computation again and throws until an input changes the outcome.
-- (b) `recompute` catches, restores the node `Clean` with its previous value and dependencies, and rethrows (pico-runtime.md 3 (b)). Cost: the node then holds a value no current input explains, and the next pull returns it without throwing.
-- (c) Store the throw. `CleanState` and `CheckState` hold `{ kind: 'Value'; value } | { kind: 'Threw'; error }`, the node ends `Clean` with the dependencies recorded before the throw, `pull` rethrows a stored error, and `equal` is not called for a `Threw`: two `Threw` compare by `===` of their errors (pico-runtime.md 3 (d); Preact's `HAS_ERROR`). Cost: every state and `PreviousValue` gains a variant, and the node is not retried until an input it recorded changes.
-
-A throw out of `equal`:
-
-- (i) As a throw out of the computation, under whichever option above. The body of this doc.
-- (ii) Treated as unequal: the new value is stored and dependents are marked. Cost: a broken comparator surfaces as extra recomputation instead of an error.
-
-Not decided.
+A computation and an equality must not throw; a throw is a programmer error (Throws). The engine guarantees only that its own state is not corrupted, which holds because the throw leaves before any state is written (pico-runtime.md open decision 3).
 
 ### 4. A cycle of derived nodes
 
 pico-runtime.md open decision 8, restated. A cycle check belongs to the engine, because `pullNode` is where a node is re-entered, through `recompute` or `verify` (`cycles.test.ts`, the last test). pico panics with "Cyclic dependency detected. This is not supported in pico." when a memo on the dependency stack is entered again (`assert_no_cycles`, `crates/pico/src/dependency.rs:95-99`). Preact throws "Cycle detected". Reactively does not check.
 
-- (a) No check. The recursion overflows the stack and a `RangeError` propagates (open decision 3). Cost: the error names no node, and a computation that catches errors from `readDerived` catches it at some depth and ends `Clean` there.
+- (a) No check. The recursion overflows the stack and a `RangeError` propagates (Throws). Cost: the error names no node, and a computation that catches errors from `readDerived` catches it at some depth and ends `Clean` there.
 - (b) The graph holds the nodes being verified or recomputed, and `pullNode` throws on re-entry:
 
   ```ts
