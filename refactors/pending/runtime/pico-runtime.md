@@ -47,21 +47,21 @@ The calls the Isograph runtime makes, by export of the engine's index (pico-js.m
 - `markSourceChanged`: `deleteRecord`, for each source node of the deleted container (The store).
 - `createDerivedNode`: `resolverNodeAt`, with `resolverComputation(..)` and `resolverResultsEqual(artifact, identical)` (Stored resolver results).
 - `pull`: `readStoredResult` (Stored resolver results).
-- `readSource` and `readDerived`: `contextHooks`, with the `Context` the resolver computation receives (Stored resolver results).
+- `readSource` and `readDerived`: `contextHooks`, with the node the resolver computation receives (Stored resolver results).
 - `disposeDerivedNode`: `deleteRecord`, for each derived node the deleted container owns (core change 8).
-- The types `SourceNode`, `DerivedNode`, `Computation`, and `Context`: `store.ts` and `storedResults.ts`.
+- The types `SourceNode`, `DerivedNode`, `AnyDerivedNode`, and `Computation`: `store.ts` and `storedResults.ts`.
 
-Every export has a caller in the Isograph runtime. The computation of a resolver node reads only with `readSource` and `readDerived` on the `Context` it receives (`contextHooks`, Stored resolver results), so the runtime makes no untracked read inside a computation (open decision 25).
+Every export has a caller in the Isograph runtime. The computation of a resolver node reads only with `readSource` and `readDerived` on the node it receives (`contextHooks`, Stored resolver results), so the runtime makes no untracked read inside a computation (open decision 25).
 
 ### Which layer owns each item
 
 Engine (`libs/isograph-pico-js/src/graph.ts`), as pico-js.md's Types and The implementation define them:
 
-- Types: `SourceNode`, `DerivedNode`, `AnyDerivedNode`, `NodeState`, `PrecalculatedValue`, `Status`, `AnyNode`, `Computation`, `Context`, and the unexported `MISSING`, `Missing`, `Option`, and `CONTEXT`.
+- Types: `SourceNode`, `DerivedNode`, `AnyDerivedNode`, `NodeState`, `PrecalculatedValue`, `Status`, `AnyNode`, `Computation`, and the unexported `MISSING`, `Missing`, and `Option`.
 - The marks `Clean`, `Check`, and `Dirty`.
 - Construction and plain reads: `createSourceNode`, `createDerivedNode`, `sourceValue`, `stateOf`.
 - Mark: `writeSource`, `markSourceChanged`, `markDirty`, `markOneDirty`, `markCheck`.
-- Pull: `pull`, `computeFirst`, `verify`, `recompute`, `commitReads`, `compute`, and the dependency recording: `readSource`, `readDerived` (pico-js.md, The context).
+- Pull: `pull`, `computeFirst`, `verify`, `recompute`, `commitReads`, `compute`, and the dependency recording: `readSource`, `readDerived` (pico-js.md, The reader).
 - Dependencies: `setDependencies`.
 - Disposal: `disposeDerivedNode`.
 - Later: `rootCount` and `retainRoot` (Later: retention); the reachability walk `collect` needs, as a function over root nodes that returns the derived nodes they reach through `Derived` dependencies (Later: collecting derived nodes); `listen`, `notify`, and node effects with `reconcileEffects` (Later: keeping values up to date automatically); layers, worlds, `stateOf(node, world)`, and source overrides read through `readSource` and `sourceValue` (Later: a DAG of graphs).
@@ -162,7 +162,7 @@ export type StoreRecord = Map<StoreKey, StoreValue>;
 
 `Store` is the user's `Map<EntityName, Map<RecordId, Map<StoreKey, SourceNode>>>` with two additions. `derived` puts a resolver derived node in the container of the record it was computed on, so that container is its owner: deleting the record disposes it with no `owned` map and no id table. Server keys and resolver store keys are separate maps, so a server field and a client field of one name do not collide. `presence` keeps v1's distinction between a record `normalize` wrote with no values (EmptyStats's `stats {}` writes an empty `PetStats` record, `test/normalize.test.ts:270`) and no record, for the readers that are not computations. `MISSING` is a symbol, so no JSON value equals it, and `isMissing` narrows with no cast. `MISSING` is internal to `store.ts`: `store.ts` holds every write of it (`sourceNodeAt`'s new source node, `storeValue`, and `deleteRecord` under open decision 31 (b)) and every comparison with it (`isUnchanged`, `storeSnapshot`, `isMissing`); every other module tests a value with `isMissing` and names only the type `Missing`; `normalize` writes only present values and never names it. The package index exports none of `MISSING`, `Missing`, and `isMissing`, and no public type names `Missing`: a public result reports an absent key as `MissingData` with its record and key, and `storeSnapshot` omits a key whose source holds `MISSING` (`PlainStore` has no representation of an absent key).
 
-There is no `SourceId`, no `DerivedNodeId`, no `sourceDependents` map, and no `RecomputationGraph` object. The environment's `store` holds every node of the graph. `createIsographEnvironment` keeps its parameters (`libs/isograph-runtime/src/environment.ts:34-45`): it takes `store: Store` and builds no store, and its callers still pass `new Map()` (`demos/pet-demo/src/fetchAndRead.ts:19`, and the tests). The store builds every node with the engine's `createSourceNode` and `createDerivedNode` and reads a source's value with `sourceValue` or `readSource(context, ..)`; no store function reads or writes a node's fields.
+There is no `SourceId`, no `DerivedNodeId`, no `sourceDependents` map, and no `RecomputationGraph` object. The environment's `store` holds every node of the graph. `createIsographEnvironment` keeps its parameters (`libs/isograph-runtime/src/environment.ts:34-45`): it takes `store: Store` and builds no store, and its callers still pass `new Map()` (`demos/pet-demo/src/fetchAndRead.ts:19`, and the tests). The store builds every node with the engine's `createSourceNode` and `createDerivedNode` and reads a source's value with `sourceValue` or `readSource(reader, ..)`; no store function reads or writes a node's fields.
 
 ### Accessors
 
@@ -1142,8 +1142,8 @@ Duplicate dependency entries. A computation that reads one node twice records it
 ```ts
 // from libs/isograph-runtime/src/storedResults.ts
 import {
+  type AnyDerivedNode,
   type Computation,
-  type Context,
   createDerivedNode,
   pull,
   readDerived,
@@ -1180,24 +1180,24 @@ export function resolverNodeAt(
   );
 }
 
-/** Reads `artifact`'s reader AST at `root` through `context`, then calls the resolver. */
+/** Reads `artifact`'s reader AST at `root` through `reader`, then calls the resolver. */
 function resolverComputation(
   store: Store,
   artifact: ReaderArtifact<ResolverParam, unknown, EntityName>,
   root: StoreLink,
   variables: Variables,
 ): Computation<ResolverResult<unknown>> {
-  return (context) => {
-    const data = readData(contextHooks(store, context), artifact, root, variables);
+  return (reader) => {
+    const data = readData(contextHooks(store, reader), artifact, root, variables);
     return data.kind === 'Ok' ? callResolver(artifact, root, data.value, variables) : data;
   };
 }
 
-/** Hooks that report each source node read to `context` and read each nested resolver as a derived node. */
-function contextHooks(store: Store, context: Context): ReadHooks<ReadResolverThrew> {
+/** Hooks that record each source node read on `reader` and read each nested resolver as a derived node. */
+function contextHooks(store: Store, reader: AnyDerivedNode): ReadHooks<ReadResolverThrew> {
   return {
-    readValue: (record, key) => readSource(context, sourceNodeAt(store, record, key)),
-    readResolver: (artifact, root, variables) => readDerived(context, resolverNodeAt(store, artifact, root, variables)),
+    readValue: (record, key) => readSource(reader, sourceNodeAt(store, record, key)),
+    readResolver: (artifact, root, variables) => readDerived(reader, resolverNodeAt(store, artifact, root, variables)),
   };
 }
 
@@ -1226,7 +1226,7 @@ The computation closes over `store`, the environment's `Store` (The store), whic
 
 A resolver computation keeps the engine's contract that a computation must not throw (pico-js.md, Throws): `callResolver` catches every throw of the resolver into `ResolverThrew`, a value (open decision 30). Any other throw out of `resolverComputation` or out of `resolverResultsEqual` is a broken programmer invariant: a store that disagrees with the reader AST (`linkAt` on a non-link, `libs/isograph-runtime/src/store.ts:74-86`), a missing variable (`variableValue`, `storeKey.ts:56-63`), or a field-supplied `outputEqual` that throws (open decision 7). It propagates out of `readStoredResult`; `readSubscription`'s `try` (`libs/isograph-runtime/src/subscribe.ts:126-130`) catches what escapes a subscription re-read as `ReadErr`.
 
-Every read inside a computation goes through the walk, so none goes unrecorded. User code never receives a `Context` or the store. `contextHooks` closes over the `Context` and the walk calls it only before the computation returns, so every read keeps the engine's `Context` contract (pico-js.md, The context). A resolver that writes the store through a closure breaks the engine's contract, and the engine does not check it (pico-js.md, Writes during a computation; open decision 2).
+Every read inside a computation goes through the walk, so none goes unrecorded. User code never receives the reading node or the store. `contextHooks` closes over the reading node and the walk calls it only before the computation returns, so every read keeps the engine's reader contract (pico-js.md, The reader). A resolver that writes the store through a closure breaks the engine's contract, and the engine does not check it (pico-js.md, Writes during a computation; open decision 2).
 
 The resolver store key:
 
@@ -1801,7 +1801,7 @@ export function collect(store: Store, extraRoots: Iterable<ResolverNode>): void;
 
 Not part of the core. Observers, subscriptions, and effects are derived nodes that are read again as needed. A write marks; whoever needs a value pulls. No resolver runs during a write, and a retained query nobody observes stays marked until something reads it (the user's choice).
 
-- Subscriptions. A subscription is a derived node whose computation is `readData(contextHooks(store, context), artifact, root, variables)` without the subscription's own resolver, and whose equality is `subscriptionResultsAreEqual` (`libs/isograph-runtime/src/subscribe.ts:135-155`): the data is an object the walk assembled, so it compares by `selectionSetDataAreEqual`. The `Subscription` holds its node, which lives in no container; unsubscribing disposes it. `callSubscriptions` pulls each subscription's node after every write and calls the callback when the pulled value is not `===` `delivered`; a `Clean` node is one step, and a marked one verifies, so the reader AST is walked only when something it read changed. `callSubscriptions` keeps core change 9's call sites. This replaces core change 9's `readSubscription`.
+- Subscriptions. A subscription is a derived node whose computation is `readData(contextHooks(store, reader), artifact, root, variables)` without the subscription's own resolver, and whose equality is `subscriptionResultsAreEqual` (`libs/isograph-runtime/src/subscribe.ts:135-155`): the data is an object the walk assembled, so it compares by `selectionSetDataAreEqual`. The `Subscription` holds its node, which lives in no container; unsubscribing disposes it. `callSubscriptions` pulls each subscription's node after every write and calls the callback when the pulled value is not `===` `delivered`; a `Clean` node is one step, and a marked one verifies, so the reader AST is walked only when something it read changed. `callSubscriptions` keeps core change 9's call sites. This replaces core change 9's `readSubscription`.
 - React. `useSyncExternalStore(subscribe, getSnapshot)`: `listen(node, onChange)` adds an observer and a root hold; after a write, `notify` calls each observer whose node is not `Clean`; React then calls `getSnapshot`, which is `pull(store.graph, node)`. A node whose inputs came back equal is verified without recomputing and returns the same object, so React does not render again. `getSnapshot` pulls during render; an observer whose node stays marked is called on every write until something pulls it.
 - Loaders. loaders.md's effect-set nodes are derived nodes that the runtime pulls after every write (`reconcileEffectRoots`), and its loader items are source nodes (loaders.md, An item that changes over time; After a write).
 - Callback errors. Every callback, listener, and observer runs through `reportCallbackError` (`libs/isograph-runtime/src/subscribe.ts:159-167`): a throw is rethrown in its own microtask and the loop continues (network-and-subscriptions.md, Decisions, 3).
@@ -1843,7 +1843,7 @@ A source other than a server field is a source node its owner holds, written wit
   ```
 
   A block is allowed when its entity's record is determined by the node's key: the parent entity, or a singleton whose identity is `Fixed` (`CompletedIdentity::Fixed(FixedRecordId)`, `crates/isograph_compiler/src/merged_selection.rs:1450-1458`). A client root's type is static and its values come from a provider `createIsographEnvironment` requires per declared root; each provider selectable is a source node and its subscription writes it. Relay's live resolvers are the precedent: a `LiveState<T>` with `read()` and `subscribe(cb)` (Relay docs, Live Fields). Upstream has no client root and no client-only source.
-- Runtime-defined computations (Follow-ups 10) and the suspension decision of react.md are derived nodes whose computations call `readSource` and `readDerived` with their `Context` directly; their values are not `ResolverResult`s, and each is a `DerivedNode` of its own value type (pico-js.md, Types; open decision 19).
+- Runtime-defined computations (Follow-ups 10) and the suspension decision of react.md are derived nodes whose computations call `readSource` and `readDerived` with the node they receive directly; their values are not `ResolverResult`s, and each is a `DerivedNode` of its own value type (pico-js.md, Types; open decision 19).
 
 A derived node whose computation reads nothing (a refinement, Selections in the Isograph layer) could later be evaluated in the walk without a node.
 
@@ -2049,7 +2049,7 @@ This deviates from AGENTS.md's "Never rely on discipline what we can enforce wit
 
 ### 25. An untracked read inside a computation (decided)
 
-`refactors/pending/runtime/pico-js.md` open decision 10. Decided by the user: allowed. `sourceValue` and a `pull` called inside a computation outside its context read without recording a dependency. The Isograph layer makes no untracked read inside a computation: `resolverComputation` reads only through `contextHooks`.
+`refactors/pending/runtime/pico-js.md` open decision 10. Decided by the user: allowed. `sourceValue` and a `pull` called inside a computation read without recording a dependency. The Isograph layer makes no untracked read inside a computation: `resolverComputation` reads only through `contextHooks`.
 
 ### 26. Whether the engine package ships before its first caller (decided)
 
