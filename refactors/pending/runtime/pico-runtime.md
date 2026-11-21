@@ -27,10 +27,10 @@ FC reads: root.2, root.3, other.2, other.3
 
 ## The graph
 
-The graph is the engine package's one module, `src/graph.ts` (The engine package). The package's name and directory are open decision 18; snippets write them as `<engine package>` and `libs/<engine directory>`. pico's shape: a source node holds a value that the outside world sets, and a derived node holds the value of a computation over source nodes and other derived nodes (`source.rs:83-86`, `derived_node.rs:55-58`, both kept by one database, `database.rs:78-80`). pico finds nodes by id and keeps forward edges only. Here every edge is an object reference, and each node holds both directions: a derived node's `dependencies` point down, and every node's `dependents` point up. Deviation reason: marking walks `dependents` from the written node, so a write costs the nodes it reaches, not the live graph (pico's epoch verification walks every dependency under the demanded memo).
+The graph is the engine package's one module, `src/graph.ts` (The engine package). The package is `@isograph/reactive-graph` in `libs/reactive-graph` (open decision 18). pico's shape: a source node holds a value that the outside world sets, and a derived node holds the value of a computation over source nodes and other derived nodes (`source.rs:83-86`, `derived_node.rs:55-58`, both kept by one database, `database.rs:78-80`). pico finds nodes by id and keeps forward edges only. Here every edge is an object reference, and each node holds both directions: a derived node's `dependencies` point down, and every node's `dependents` point up. Deviation reason: marking walks `dependents` from the written node, so a write costs the nodes it reaches, not the live graph (pico's epoch verification walks every dependency under the demanded memo).
 
 ```ts
-// from libs/<engine directory>/src/graph.ts
+// from libs/reactive-graph/src/graph.ts
 /** A value set from outside the graph, and the derived nodes whose last computation read it. */
 export type SourceNode<TValue> = {
   /** Read only by `readSource` and `sourceValue`. Written only by `writeSource`. */
@@ -111,7 +111,7 @@ The marks are Reactively's `CacheClean`, `CacheCheck`, and `CacheDirty` (`packag
 `graph.ts` imports nothing, and names no record, key, artifact, or Isograph type.
 
 ```ts
-// from libs/<engine directory>/src/graph.ts
+// from libs/reactive-graph/src/graph.ts
 /** The slot of `node`'s state. Every read and write of a node's value, mark, and dependencies goes
  * through it. Not exported from the package. */
 function stateOf<TValue>(node: DerivedNode<TValue>): StateSlot<TValue> {
@@ -174,7 +174,7 @@ export function sameValue(previous: unknown, next: unknown): boolean {
 ### Mark
 
 ```ts
-// from libs/<engine directory>/src/graph.ts
+// from libs/reactive-graph/src/graph.ts
 /** `Clean`: becomes `Dirty` and marks its dependents `Check`. `Check`: becomes `Dirty`; its dependents
  * are already marked. `Dirty`: unchanged. */
 function markDirty<TValue>(node: DerivedNode<TValue>): void {
@@ -212,7 +212,7 @@ Invariant, outside a pull: every dependent of a node that is not `Clean` is not 
 ### Pull
 
 ```ts
-// from libs/<engine directory>/src/graph.ts
+// from libs/reactive-graph/src/graph.ts
 export function pull<TValue>(node: DerivedNode<TValue>): TValue {
   const state = stateOf(node).state;
   switch (state.mark) {
@@ -312,7 +312,7 @@ The engine is `graph.ts` in its own package (The engine package). It imports not
 ### The engine's public API
 
 ```ts
-// from libs/<engine directory>/src/index.ts
+// from libs/reactive-graph/src/index.ts
 export {
   type Computation,
   type ComputeContext,
@@ -330,7 +330,7 @@ export {
 ```
 
 ```ts
-// from libs/<engine directory>/src/graph.ts
+// from libs/reactive-graph/src/graph.ts
 export type SourceNode<TValue> = {
   value: TValue;
   readonly dependents: Set<AnyDerivedNode>;
@@ -367,7 +367,7 @@ Every export has a caller in the Isograph runtime: `createSourceNode` and `sourc
 Two sources and two derived nodes of different value types:
 
 ```ts
-// from libs/<engine directory>/test/graph.test.ts
+// from libs/reactive-graph/test/graph.test.ts
 import { expect, test } from 'vitest';
 import { createDerivedNode, createSourceNode, pull, sameValue, writeSource } from '../src';
 
@@ -421,7 +421,7 @@ The write runs nothing. The read runs `sum` and `parity` once each and not `labe
 
 ### Which layer owns each item
 
-Engine (`libs/<engine directory>/src/graph.ts`):
+Engine (`libs/reactive-graph/src/graph.ts`):
 
 - Types: `SourceNode`, `DerivedNode`, `AnyDerivedNode`, `StateSlot`, `DerivedNodeState`, `CleanState`, `CheckState`, `DirtyState`, `PreviousValue`, `Dependency`, `Computation`, `ComputeContext`, `Computed`.
 - Marks `Clean`, `Check`, `Dirty`; `markDirty`, `markCheck`; `markSourceChanged`.
@@ -454,10 +454,10 @@ Isograph runtime (`libs/isograph-runtime/src`):
 
 ## The engine package
 
-The engine is a workspace library beside the Isograph runtime, at `libs/<engine directory>` (open decision 18), covered by `pnpm-workspace.yaml`'s `libs/*`. Its build and test setup copies `libs/isograph-runtime`'s, without the Babel plugin, which only the runtime's fixtures need.
+The engine is a workspace library beside the Isograph runtime, at `libs/reactive-graph` (open decision 18), covered by `pnpm-workspace.yaml`'s `libs/*`. Its build and test setup copies `libs/isograph-runtime`'s, without the Babel plugin, which only the runtime's fixtures need.
 
 ```text
-libs/<engine directory>/
+libs/reactive-graph/
   package.json
   tsconfig.json            references tsconfig.package.json and tsconfig.test.json
   tsconfig.package.json    extends ../../tsconfig.build.json, includes src/**/*.ts
@@ -470,9 +470,9 @@ libs/<engine directory>/
 ```
 
 ```json
-// from libs/<engine directory>/package.json
+// from libs/reactive-graph/package.json
 {
-  "name": "<engine package>",
+  "name": "@isograph/reactive-graph",
   "description": "A graph of source nodes and derived nodes, recomputed on read when an input changed.",
   "private": true,
   "main": "./dist/index.cjs",
@@ -496,7 +496,7 @@ libs/<engine directory>/
   "repository": {
     "type": "git",
     "url": "git+https://github.com/isographlabs/isograph.git",
-    "directory": "libs/<engine directory>"
+    "directory": "libs/reactive-graph"
   },
   "sideEffects": false,
   "module": "./dist/index.mjs",
@@ -513,7 +513,7 @@ libs/<engine directory>/
 Deltas from `libs/isograph-runtime/package.json`: `name`, `description`, and `repository.directory`; `dependencies` is empty; `devDependencies` drops `@babel/core` and `@isograph/babel-plugin`. `private: true` stays, as the runtime's and `@isograph/disposable-types`'s do: publishing to npm is distribution, which `IN_PROGRESS.md` lists as not planned.
 
 ```ts
-// from libs/<engine directory>/tsconfig.test.json
+// from libs/reactive-graph/tsconfig.test.json
 {
   "extends": "../../tsconfig.build.json",
   "compilerOptions": {
@@ -525,7 +525,7 @@ Deltas from `libs/isograph-runtime/package.json`: `name`, `description`, and `re
 ```
 
 ```ts
-// from libs/<engine directory>/vitest.config.ts
+// from libs/reactive-graph/vitest.config.ts
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
@@ -541,7 +541,7 @@ The Isograph runtime depends on the engine:
 // from libs/isograph-runtime/package.json
   "dependencies": {
     "@isograph/disposable-types": "workspace:*",
-    "<engine package>": "workspace:*"
+    "@isograph/reactive-graph": "workspace:*"
   },
 ```
 
@@ -553,20 +553,20 @@ The runtime resolves the engine through `node_modules` to its `dist`, as it reso
 # from .pre-commit-config.yaml
       - id: engine-test
         name: engine test
-        entry: pnpm --filter <engine package> test
+        entry: pnpm --filter @isograph/reactive-graph test
         language: system
-        files: '^libs/<engine directory>/'
+        files: '^libs/reactive-graph/'
         pass_filenames: false
       - id: engine-typecheck
         name: engine typecheck
-        entry: pnpm --filter <engine package> tsc
+        entry: pnpm --filter @isograph/reactive-graph tsc
         language: system
-        files: '^(libs/<engine directory>/|tsconfig\.build\.json$)'
+        files: '^(libs/reactive-graph/|tsconfig\.build\.json$)'
         pass_filenames: false
       # runtime-dependencies-build and runtime-typecheck, files:
-        files: '^(libs/isograph-runtime/|libs/isograph-disposable-types/|libs/<engine directory>/|tsconfig\.build\.json$)'
+        files: '^(libs/isograph-runtime/|libs/isograph-disposable-types/|libs/reactive-graph/|tsconfig\.build\.json$)'
       # runtime-test, files:
-        files: '^libs/(isograph-runtime|isograph-disposable-types|<engine directory>)/'
+        files: '^libs/(isograph-runtime|isograph-disposable-types|reactive-graph)/'
 ```
 
 The engine's tests are `test/graph.test.ts`: the use without Isograph (The engine and the Isograph runtime), and the traces of Traces rebuilt over plain source nodes: a `Check` node that ends `Clean` without running, a `Check` node whose derived dependency changed, a dependency set that changes between computations (the link retarget), a throw out of a computation that leaves the node's mark and edges, and disposal marking the disposed node's dependents. Each counts computation calls and asserts values with `toBe`.
@@ -577,7 +577,7 @@ The store is the set of source nodes. A record is a container that holds its sou
 
 ```ts
 // from libs/isograph-runtime/src/store.ts
-import { createSourceNode, type DerivedNode, type SourceNode, sourceValue } from '<engine package>';
+import { createSourceNode, type DerivedNode, type SourceNode, sourceValue } from '@isograph/reactive-graph';
 
 /** Every record container: `EntityName`, then record id. */
 export type Store = Map<EntityName, Map<RecordId, RecordContainer>>;
@@ -1194,7 +1194,7 @@ Duplicate dependency entries. A computation that reads one node twice records it
 
 ```ts
 // from libs/isograph-runtime/src/storedResults.ts
-import { type Computation, type ComputeContext, createDerivedNode, pull, sameValue } from '<engine package>';
+import { type Computation, type ComputeContext, createDerivedNode, pull, sameValue } from '@isograph/reactive-graph';
 
 /** The stored result of `artifact` on `root` with `variables`, pulled. */
 export function readStoredResult<TEntityName extends EntityName, TOutput>(
@@ -1297,7 +1297,7 @@ export type ReaderArtifact<TParam extends ResolverParam<TEntityName>, TOutput, T
 
 ```ts
 // from libs/isograph-runtime/src/normalize.ts
-import { sourceValue, writeSource } from '<engine package>';
+import { sourceValue, writeSource } from '@isograph/reactive-graph';
 
 /** A value `normalize` writes, with the shape its selection gives it. */
 type WrittenValue =
@@ -1489,7 +1489,7 @@ Each is one commit, in order; each is independently shippable.
 3. Prefactor: the selection kinds on v1's language (linked-only-selections.md, change 1). The compiler emits `Link` with a `Selections` target for a v1 linked selection, `Derived` for a client field, and `DerivedLink` of a generated refinement field (`Node/asPet/`) for a refinement; a v1 scalar selection keeps v1's `Scalar` kind until change 4. `reader_artifact_file` writes `selectableName` first (`Pet/PetName/resolver_reader.ts` gains `selectableName: "PetName",`). The walk reads the new kinds through v1's hooks. Observable: every generated artifact is regenerated in the new shape; the pet script's output is unchanged; the runtime's read tests pass unchanged.
 4. Prefactor: scalar records (linked-only-selections.md, change 2; Scalar records). The normalization AST's `Leaf` target, `VALUE_KEY`, `omittedRecordId`, `leafRecords`, and `check`'s and the mark's `Leaf` case; `Self` and `Value`, the `Bare` target, `DefaultReader`, and a `default_reader.ts` per scalar entity a reader selects; the `Scalar` kind goes. Observable: `storeSnapshot` after normalizing `PetDetail`'s response holds `Pet:1.name` as a link to `String:Pet:1.name` with `__value` `"Ricky"`; every read returns the values it returned before; normalizing a response that changes only `Pet:1.name` writes only `String:Pet:1.name.__value`; the pet script's output is unchanged.
 5. Prefactor: linked-only selections (linked-only-selections.md, change 3). Validation, query generation, and reader generation accept bare object selections, selection sets on scalars, and client fields on scalar entities; the object default reader. Observable: `read` of the Example's `PetDetailPage` on the store fixture returns `{ pet: { n1: "Ricky", n2: { toUppercase: "RICKY" }, bestFriend: { name: "Mango" } } }`, calling `toUppercase` on every read; a bare `bestFriend` is `{}` or `null`.
-6. Prefactor: the engine package (The engine package): `libs/<engine directory>` with `src/graph.ts` and `src/index.ts` as The graph and The engine's public API write them, `test/graph.test.ts`, its `package.json`, tsconfig, tsdown, and vitest files, and its two pre-commit hooks. Nothing in the Isograph runtime imports it yet. Observable: `pnpm --filter <engine package> test` passes the sum, parity, and label example (`sum` and `parity` run twice, `label` once); `pnpm compile-libs` writes its `dist/index.cjs` and `dist/index.mjs`; its `package.json` lists no dependencies. Its reader is the stated goal, a project outside Isograph; the runtime is its first workspace caller in change 7.
+6. Prefactor: the engine package (The engine package): `libs/reactive-graph` with `src/graph.ts` and `src/index.ts` as The graph and The engine's public API write them, `test/graph.test.ts`, its `package.json`, tsconfig, tsdown, and vitest files, and its two pre-commit hooks. Nothing in the Isograph runtime imports it yet. Observable: `pnpm --filter @isograph/reactive-graph test` passes the sum, parity, and label example (`sum` and `parity` run twice, `label` once); `pnpm compile-libs` writes its `dist/index.cjs` and `dist/index.mjs`; its `package.json` lists no dependencies. Its reader is the stated goal, a project outside Isograph; the runtime is its first workspace caller in change 7.
 7. Prefactor: the store becomes record containers (`RecordContainer`, `presence`, `sources`, the accessors, `storeSnapshot`, `deleteRecord` without derived nodes). The runtime gains its dependency on the engine (The engine package) and its three pre-commit hooks match the engine's directory. A container's `sources` hold the engine's source nodes: `sourceNodeAt` calls `createSourceNode`, `storeValue` and `storeSnapshot` call `sourceValue`, `writeValue` calls `writeSource`, and `deleteRecord` calls `markSourceChanged` for each source node. No derived node exists, so every `dependents` set stays empty and `writeSource` and `markSourceChanged` mark nothing. `check`, `garbageCollect`, `read`, and `normalize` read and write through the accessors; tests compare `storeSnapshot`. Observable: none in behavior; `environment.store` is no longer v1's nested map, and `storeSnapshot(environment.store)` is.
 8. The graph in the Isograph runtime: `RecordContainer.derived`, `readStoredResult`, `resolverNodeAt` (`createDerivedNode` with `resolverResultsEqual(artifact, sameValue)`), `resolverComputation`, `contextHooks` (`context.readSource`, `context.readDerived`), `callResolver`, `ResolverResult` with `WalkData`, `resolverResultsEqual`, `resolverStoreKey`, `deleteRecord` disposing owned nodes with `disposeDerivedNode`. The engine is unchanged. The package index adds `readStoredResult` and the types `ResolverResult`, `ReadResolverOk`, `OkOrigin`, `ReadResolverThrew`; `StoreRecord` becomes `RecordContainer`. The pet script reads with `readStoredResult`. Observable: End-user experience above, and the Example's traces: after a write to `Pet:2.name`, a read of `PetDetailPage` does not call `toUppercase`; after a write that leaves `toUppercase`'s result equal, a reader without `n1` does not rerun.
 9. The subscription re-read reads nested resolvers through the graph. `readSubscription` reads with `readData(storedResultHooks(store), ..)`, whose `readValue` is `storeValue` (nothing recorded) and whose `readResolver` is `readStoredResult`; `SubscriptionResult` gains `ReadResolverThrew`, `ReadErr` is only a broken store invariant, and `subscriptionResultsAreEqual` compares two `ResolverThrew` by `===` of their errors. Without it, the landed re-read (`libs/isograph-runtime/src/subscribe.ts:120-131`) calls every nested resolver on every write through v1's `read`. `makeNetworkRequest` calls `callSubscriptions` in a `finally` after `normalize`, so a response that throws part-way re-reads the subscriptions over the writes it made (open decision 4), and `garbageCollectEnvironment` calls `callSubscriptions` after the sweep, so a subscription that read a deleted record is re-read. Neither call depends on subscriptions being derived nodes. `callSubscriptions` never throws (`libs/isograph-runtime/src/subscribe.ts:92-95`; `readSubscription` catches a throwing pull as `ReadErr`, `:126-130`), so `normalize`'s throw still reaches the `.catch`. Observable: in the pet script, the subscription's re-read after the tagline write calls `PetSummaryCard` on `Pet:0` only, and a re-read after an unrelated write calls no resolver and does not call the callback; a response that changes `Pet:0.tagline` and then throws delivers the new tagline to the subscription; a collection that deletes a record a subscription read delivers that subscription's `MissingData`.
@@ -1542,7 +1542,7 @@ Each is one commit, in order; each is independently shippable.
 Not part of the core. Retaining a query computes nothing: nothing runs at normalization time, and resolvers run when read.
 
 ```ts
-// from libs/<engine directory>/src/graph.ts
+// from libs/reactive-graph/src/graph.ts
 export type DerivedNode<TValue> = {
   // .. the core's fields, and:
   /** Root holds: retentions and observers. Read by `collect`. */
@@ -1855,19 +1855,7 @@ It runs only when a caller calls it (`libs/isograph-runtime/src/environment.ts:6
 
 ### 18. The engine package's name
 
-The name is the user's choice (AGENTS.md, Conflicts). Until it is decided, snippets write the package as `<engine package>` and its directory as `libs/<engine directory>`.
-
-Names in use. This workspace's packages are `isograph` (the root `package.json`), `@isograph/babel-plugin`, `@isograph/disposable-types`, `@isograph/runtime`, `@isograph/plugin-swc` (`libs/*/package.json`), `pet-demo` (`demos/pet-demo/package.json`), and `docs` (`docs-website/package.json`); `vscode-extension/package.json`, outside `pnpm-workspace.yaml`, is also `isograph`. Upstream's are `@isograph/babel-plugin`, `@isograph/compiler`, `@isograph/disposable-types`, `@isograph/react`, `@isograph/react-disposable-state`, `@isograph/reference-counted-pointer`, and `@isograph/plugin-swc` (`../isograph/libs/*/package.json`). Every library directory is `libs/isograph-<name>`. Upstream already ships Isograph-independent utilities under `@isograph`: `@isograph/disposable-types` has no dependencies, and `@isograph/reference-counted-pointer` depends only on it.
-
-The npm registry is not checked. The local npm cache (`~/.npm/_cacache`) and pnpm metadata cache (`~/Library/Caches/pnpm`) hold metadata only for packages this machine installed; of names starting with `pico` they hold `picocolors` and `picomatch`. So whether unscoped `pico` or any candidate below exists on npm is not verified. None of upstream's seven `package.json` files is `private`, so upstream publishes under `@isograph`, and a name under that scope is available to that scope's publishers only.
-
-- `@isograph/pico`, `libs/isograph-pico`. In use by no workspace or upstream package. Conflict: the Rust crate `pico` (`crates/pico/Cargo.toml`, `name = "pico"`; upstream's `crates/pico/Cargo.toml` is the same crate), which AGENTS.md and `docs-website/docs/design-docs/pico.md` call pico. The engine follows pico's model of source and derived nodes and differs from it: object references in both directions instead of ids and forward edges, marks instead of epochs, and no database (The graph). With this name, "pico" in code, docs, and review names two engines, and a sentence that cites pico's behavior (open decision 2 cites `Database::set`) needs the crate path to say which.
-- `@isograph/reactive-graph`, `libs/isograph-reactive-graph`. In use by no workspace or upstream package. No local conflict found.
-- `@isograph/derived-graph`, `libs/isograph-derived-graph`. In use by no workspace or upstream package. No local conflict found.
-- `@isograph/incremental`, `libs/isograph-incremental`. In use by no workspace or upstream package. Conflict: Jane Street's Incremental, an OCaml library of the same kind that this doc cites (open decision 8), so the name suggests its API, which this engine does not have (no heights, no stabilize).
-- An unscoped name (`pico`, `pico-graph`). Not in use locally; its registry state is not verified, and it is outside the scope upstream publishes under.
-
-Not held.
+Decided by the user: `@isograph/reactive-graph`, directory `libs/reactive-graph`. No workspace or upstream package uses the name (`libs/*/package.json`, `../isograph/libs/*/package.json`). Whether the name is free on the npm registry was not verifiable offline; the package is `private: true` (The engine package), so nothing is published under it.
 
 ### 19. How the engine types the links between nodes of different value types
 
