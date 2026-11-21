@@ -1450,7 +1450,8 @@ describe('recorded dependencies', () => {
     const untrackedCount = createDerivedNode(() => sourceValue(items).length, strictEqual);
     const trackedCount = createDerivedNode(
       (context) => context.readSource(items).length,
-        );
+      strictEqual,
+    );
     expect(pull(graph, untrackedCount)).toBe(1);
 
     writeSource(graph, items, ['asdf', 'isograph']);
@@ -1788,7 +1789,8 @@ describe('degenerate cases', () => {
     const scores = createSourceNode(new Map([['a', 1]]), strictEqual);
     const score = createDerivedNode(
       (context) => context.readSource(scores).get('a'),
-        );
+      strictEqual,
+    );
     expect(pull(graph, score)).toBe(1);
 
     sourceValue(scores).set('a', 2);
