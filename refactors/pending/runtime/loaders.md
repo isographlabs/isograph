@@ -251,15 +251,23 @@ function effectEntries(
 
 ### After a write
 
-Under held 3b (pico-runtime.md, Held: 3b, mark, then pull), a write marks and runs nothing. Then:
+Under held 3b (pico-runtime.md, Held: 3b, mark, then pull), a write marks and runs nothing. The full order of a write, with pico-runtime.md change 4's steps in place:
 
-1. `settle` pulls the observed derived nodes (change 4).
-2. `notify` calls the observers whose value changed.
-3. `reconcileEffectRoots` pulls every effect root's effect-set node. The pull brings up to date only the derived nodes on paths to loaders: the links the walk read and the inputs nodes. Every pure field the walk does not read stays marked (`Check` or `Dirty`) until a render or another pull reads it.
-4. For each effect root whose effect-set node's value changed, the reconciler diffs `held` against the new value: it acquires each new key and releases each dropped key, and sets `held`.
-5. For each instance whose current inputs are not `valuesEqual` to the inputs it was loaded with, the reconciler loads again with the new inputs and releases the old load, in the order open decision 6 decides.
-6. `flushTeardowns` runs the releases.
-7. The writes queued during 3 to 6 (an item's `onChange`, a `load` that wrote a source) run as the next write, from step 1.
+1. The write marks: `normalizeData`'s `normalize` and `markChanged` (change 2b), `garbageCollectEnvironment`'s `deleteSource` and `collect` (changes 2b and 3), or a queued write's `markChanged`.
+2. `settle` pulls the observed derived nodes (change 4).
+3. In `normalizeData` only, `retainEntrypoint` holds the new retention's root (change 3).
+4. `notify` calls the observers whose value changed, and empties `createdObserved` (change 4).
+5. `callSubscriptions` re-reads every subscription (change 2b).
+6. `reconcileEffectRoots` pulls every effect root's effect-set node. The pull brings up to date only the derived nodes on paths to loaders: the links the walk read and the inputs nodes. Every pure field the walk does not read stays marked (`Check` or `Dirty`) until a render or another pull reads it.
+7. For each effect root whose effect-set node's value changed, the reconciler diffs `held` against the new value: it acquires each new key and releases each dropped key, and sets `held`.
+8. For each instance whose current inputs are not `valuesEqual` to the inputs it was loaded with, the reconciler loads again with the new inputs and releases the old load, in the order open decision 6 decides.
+9. `notifyCreated` calls the observers of each derived node steps 6 to 8 created at an observed id (change 4). An inputs node's computation reads its `inputs` reader artifact through `contextHooks`, which creates the resolver derived nodes that artifact selects, and one of those can be at an observed id.
+10. `flushTeardowns` runs the releases, after every observer of the write was called in steps 4, 5, and 9.
+11. The writes queued during 6 to 9 (an item's `onChange`, a `load` that wrote a source) run as the next write, from step 1.
+
+Steps 4 to 10 run in change 4's `finally`, so they run when step 2 or 3 throws (pico-runtime.md open decision 22). `writeOrMark`'s `PartialWriteError` branch runs steps 2 and 4 to 10, and skips 3, as change 4 skips the root hold there. Steps 6 to 8 change no value an observer was notified of in step 4: after `settle`, every observed derived node is `Clean` and reads no marked derived node (pico-runtime.md change 2's invariant), and the effect-set pull brings up to date only marked or new derived nodes.
+
+This differs from pico-runtime.md's Values with lifecycles (Reconciliation), whose order is `settle`, the root hold, `notify`, `callSubscriptions`, `reconcileEffects`, `flushTeardowns`, and whose `settle` pulls the mounted derived nodes with an effect together with the observed ones, before `notify`. Here `settle` pulls the observed derived nodes only, and the effect-set nodes are pulled in step 6, after `notify` and `callSubscriptions`. In both orders a resource is acquired and released only after the observers were called. This order replaces pico-runtime.md's only if the user takes this doc's direction for pico-runtime.md open decision 13 (What this changes in other docs); until then pico-runtime.md's Values with lifecycles stands.
 
 ```ts
 // from libs/isograph-runtime/src/loaders.ts
@@ -462,7 +470,7 @@ What the user sees:
 None of these is edited by this doc.
 
 - pico-runtime.md, change 4: the derived nodes the runtime pulls after a write are the observed ones (`settle`) and the effect-set nodes of mounted queries (`reconcileEffectRoots`). "Mounted derived nodes with an effect" in Held: 3b's list and in the Goal become effect-set nodes of effect roots.
-- pico-runtime.md, Values with lifecycles: effects move from derived nodes to loader instances. `DerivedNodeDefinition.effect`, `NodeEffect`, `ObservedEffect`, and `reconcileEffects` are replaced by `LoaderArtifact.load`, `LoaderInstance`, and `reconcileEffectRoots`. An effect is set up when an effect root reaches its instance, not when `observe` mounts its node; a component observing a node no longer starts anything. Reconciliation sets up the new effect before tearing down the old; whether loaders keep that order for an instance whose inputs changed is open decision 6. The rule "a retained query nobody renders mounts nothing" holds with mount meaning `mountQuery`.
+- pico-runtime.md, Values with lifecycles, if the user takes this doc's direction for its open decision 13: effects move from derived nodes to loader instances, and After a write's order replaces Reconciliation's. `DerivedNodeDefinition.effect`, `NodeEffect`, `ObservedEffect`, and `reconcileEffects` are replaced by `LoaderArtifact.load`, `LoaderInstance`, and `reconcileEffectRoots`. An effect is set up when an effect root reaches its instance, not when `observe` mounts its node; a component observing a node no longer starts anything. Reconciliation sets up the new effect before tearing down the old; whether loaders keep that order for an instance whose inputs changed is open decision 6. The rule "a retained query nobody renders mounts nothing" holds with mount meaning `mountQuery`.
 - pico-runtime.md, open decision 13: (a) places lifecycles in the engine per derived node; this doc places them per loader instance in the runtime, with the engine unchanged except the widened value type of Follow-ups 10.
 - pico-runtime.md, Follow-ups 1, 2, 4, 5, 6: a client pointer's follow-up query is a built-in loader keyed by the pointer's target; deduplication (Follow-ups 5) is sharing by `LoaderInstanceKey`; cancellation (Follow-ups 6) is the loader's cleanup aborting the request.
 - pico-runtime.md, Follow-ups 11: the fetch decision becomes the fetch loader's inputs (The query fetch as a loader).
@@ -521,13 +529,13 @@ Upstream has no counterpart. Held: (a), reason: it reuses the reader AST seam.
 
 The instance's key does not change when its inputs change, so the question is only the order of the old load's release and the new `load` for one instance. pico-runtime.md's Reconciliation holds, for derived-node effects, "A new effect is set up before the old one is torn down", and tears the old one down after notification ("A replaced or disposed effect is torn down after every observer of that settlement was notified").
 
-- (a) Cleanup, then load. In step 5 the reconciler calls the old `unsubscribe` and `cleanup`, then `load(newInputs)`, and stores the new `Loaded` state. Never two live resources for one instance, which an exclusive resource needs (one socket per user, one lock, an SDK that allows one watch per id). Costs:
+- (a) Cleanup, then load. In step 8 the reconciler calls the old `unsubscribe` and `cleanup`, then `load(newInputs)`, and stores the new `Loaded` state. Never two live resources for one instance, which an exclusive resource needs (one socket per user, one lock, an SDK that allows one watch per id). Costs:
   - A window with no resource. Between the old cleanup and the moment the new resource is live (for a socket, until it reconnects), events the outside world sends are delivered to neither; a loader that must not lose them needs its own replay.
   - What readers see. `cleanup` and `load` run in the same synchronous step, and no pull happens between them, so no reader observes `NotLoaded` from the order alone. Readers see the new item's first `read()`, which for a resource that connects asynchronously is its not-ready value; that is the same gap at the item's level. Readers do observe `NotLoaded` (or `LoadThrew`) when the new `load` throws, since the old item is already gone.
   - It is React's `useEffect` order (the previous effect's cleanup runs before the next effect).
-- (b) Load, then cleanup after notify, pico-runtime.md's Reconciliation order. In step 5 the reconciler calls `load(newInputs)`, calls the old `unsubscribe` at once (so the old item's `onChange` no longer marks `loaderItemSource(key)`), stores the new `Loaded` state, queues `markChanged(environment.graph, [loaderItemSource(key)])`, and holds the old `cleanup` for the next pass: step 7 runs the queued write, whose `settle` and `notify` move readers to the new item, and that pass's `flushTeardowns` runs the old cleanup. No gap: readers move from the old item's value to the new item's value, and a new `load` that throws leaves the old resource live until the flush. Costs:
+- (b) Load, then cleanup after notify, pico-runtime.md's Reconciliation order. In step 8 the reconciler calls `load(newInputs)`, calls the old `unsubscribe` at once (so the old item's `onChange` no longer marks `loaderItemSource(key)`), stores the new `Loaded` state, queues `markChanged(environment.graph, [loaderItemSource(key)])`, and holds the old `cleanup` for the next pass: step 11 runs the queued write, whose `settle` and `notify` move readers to the new item, and that pass's `flushTeardowns` runs the old cleanup. No gap: readers move from the old item's value to the new item's value, and a new `load` that throws leaves the old resource live until the flush. Costs:
   - Two live resources for one instance between `load` and the flush. An exclusive resource fails or evicts the old one, and a server that counts connections counts two.
-  - A cleanup held for the next pass is one more list on the environment, and After a write's step 6 flushes only the cleanups held from an earlier pass, so the old item is not released before readers moved off it.
+  - A cleanup held for the next pass is one more list on the environment, and After a write's step 10 flushes only the cleanups held from an earlier pass, so the old item is not released before readers moved off it.
 - (c) Per loader, a declaration option. `LoaderArtifact` gains `readonly reloadOrder: ReloadOrder`, with `export type ReloadOrder = 'CleanupThenLoad' | 'LoadThenCleanup'`, written by the compiler from an argument of the loader directive (open decision 1), with a default. It holds up: the right order is a property of the resource, which only the loader's author knows (exclusive resources need (a); a gapless display needs (b)), and both orders use the reconciler's existing steps. Costs: one more directive argument and a default to choose; the built-in loaders each pick one (the fetch loader and `eager` have no exclusive resource, so (b)).
 - (d) Hand-off: `load(inputs, previous)` receives the old item and cleanup and decides itself, returning the new pair; the runtime never calls the old cleanup when `load` took it over. Costs: every loader handles the case; the runtime cannot tell whether the old resource was released.
 
@@ -539,7 +547,7 @@ Held: none. Undecided.
 
 A `load` may write a source synchronously (a live item's initial value, a localStorage read), and an item's `onChange` may fire during another load.
 
-- (a) Queue them; after `flushTeardowns`, run the queue as the next write (step 7 of After a write). Held. Cost: a loop that ends only when loads stop writing; a loader that writes on every load of an instance whose inputs it changes does not terminate.
+- (a) Queue them; after `flushTeardowns`, run the queue as the next write (step 11 of After a write). Held. Cost: a loop that ends only when loads stop writing; a loader that writes on every load of an instance whose inputs it changes does not terminate.
 - (b) Forbid synchronous writes: `markChanged` from inside `load` throws. Cost: an initial value shows one write late.
 - (c) Re-enter: mark and settle inside the reconciler. Cost: a pull during a diff; the reconciler's `held` maps change under it.
 
