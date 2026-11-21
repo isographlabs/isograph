@@ -167,7 +167,6 @@ export {
 
 ```ts
 // from libs/isograph-pico-js/src/graph.ts
-/** A value that code outside the graph sets. */
 export type SourceNode<TValue> = {
   readonly kind: 'Source';
   value: TValue;
@@ -175,7 +174,6 @@ export type SourceNode<TValue> = {
   readonly dependents: Set<DerivedNode<unknown>>;
 };
 
-/** A computation's value, which the node keeps until an input it read changes. */
 export type DerivedNode<TValue> = {
   readonly kind: 'Derived';
   readonly computation: Computation<TValue>;
@@ -185,14 +183,12 @@ export type DerivedNode<TValue> = {
   readonly dependents: Set<DerivedNode<unknown>>;
 };
 
-/** The first computation after creation or disposal allocates it, and later computations write its fields in place. */
 export type PrecalculatedValue<TValue> = {
   value: TValue;
   status: Status;
   dependencies: (SourceNode<unknown> | DerivedNode<unknown>)[];
 };
 
-/** `Clean` means `value` is current, `Check` means a derived node below may have changed, and `Dirty` means an input changed. */
 export type Status = 'Clean' | 'Check' | 'Dirty';
 
 const MISSING: unique symbol = Symbol('Missing');
@@ -288,7 +284,6 @@ export function markSourceDirty(source: SourceNode<unknown>): void {
   markDirty(source.dependents);
 }
 
-/** `markDirty` marks each of `nodes` `Dirty` and every `Clean` node above them `Check`. */
 function markDirty(nodes: ReadonlySet<DerivedNode<unknown>>): void {
   const work: DerivedNode<unknown>[] = [];
   const push = (dependent: DerivedNode<unknown>): void => {
@@ -302,7 +297,6 @@ function markDirty(nodes: ReadonlySet<DerivedNode<unknown>>): void {
   markCheck(work);
 }
 
-/** `markOneDirty` returns the status `node` had before it became `Dirty`, or `MISSING` when it has no precalculated value. */
 function markOneDirty(node: DerivedNode<unknown>): Option<Status> {
   const precalculated = node.precalculated;
   if (precalculated === MISSING) {
@@ -358,7 +352,6 @@ function assertNever(value: never): never {
   throw new Error(`Unhandled variant: ${String(value)}`);
 }
 
-/** `computeFirst` calls no `equals` and marks no dependent, because a never-computed node has no dependents and every dependent of a disposed node is `Dirty`. */
 function computeFirst<TValue>(node: DerivedNode<TValue>): TValue {
   const value = compute(node);
   const dependencies = node.reads;
@@ -447,7 +440,6 @@ There are two read functions in place of one `read(reader, node)` that switches 
 
 ```ts
 // from libs/isograph-pico-js/src/graph.ts
-/** `setDependencies` is the only writer of any `dependents` set. */
 function setDependencies(
   node: DerivedNode<unknown>,
   previous: ReadonlyArray<SourceNode<unknown> | DerivedNode<unknown>>,

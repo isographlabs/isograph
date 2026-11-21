@@ -120,15 +120,13 @@ import { createSourceNode, type DerivedNode, type SourceNode } from '@isograph/p
 
 export type Store = Map<EntityName, Map<RecordId, RecordContainer>>;
 
-/** A record container owns the derived nodes computed on its record. */
 export type RecordContainer = {
-  /** No computation reads `presence`. */
   presence: RecordPresence;
   readonly sources: Map<StoreKey, StoreSourceNode>;
   readonly derived: Map<StoreKey, ResolverNode>;
 };
 
-/** `Absent` means a graph read created the container for a record the store does not hold. */
+/** `Absent` means the store holds no record at the container's link. */
 export type RecordPresence = 'Present' | 'Absent';
 
 export type StoreSourceNode = SourceNode<StoreValue | Missing>;
@@ -256,7 +254,6 @@ function presentValues(container: RecordContainer): Map<StoreKey, StoreValue> {
   );
 }
 
-/** `PlainStore` is v1's `Store` shape. */
 export type PlainStore = Map<EntityName, Map<RecordId, Map<StoreKey, StoreValue>>>;
 
 export function deleteRecord(store: Store, link: StoreLink): void {
@@ -550,7 +547,7 @@ Two structures carry what the runtime needs, and they stay separate:
 // from libs/isograph-runtime/src/artifacts.ts
 export type ReaderSelectionSet = ReadonlyArray<ReaderSelection>;
 
-/** `selections` is read at each record the value links to, and it is `null` when the selection has no selection set. */
+/** `selections` is `null` when the selection has no selection set. */
 export type ReaderSelection = {
   readonly alias: string;
   readonly fieldName: string;
@@ -571,10 +568,8 @@ The index exports `ReaderSelection`, `ReaderSelectionSet`, `EntityTable`, `Field
 
 ```ts
 // from libs/isograph-runtime/src/artifacts.ts
-/** `EntityTables` holds the table of each entity that one reader artifact's walk reads at or one normalization AST writes records of. */
 export type EntityTables = { readonly [entityName: string]: () => EntityTable };
 
-/** The default export of an `entity_table.ts` artifact is a function that returns an `EntityTable`. */
 export type EntityTable = {
   /** `fields` holds every protocol selectable and generated refinement field of the entity, and each client field on it whose reader artifact is generated. */
   readonly fields: { readonly [fieldName: string]: FieldEntry };
@@ -592,7 +587,7 @@ export type FieldEntry =
       readonly artifact: () => ReaderArtifact<ResolverParam, unknown, EntityName>;
     };
 
-/** A bare selection of a `Leaf` entity reads the record's `__value`, and a bare selection of a `Composite` entity reads `EMPTY_DATA`. */
+/** A bare selection of a record of a `Leaf` entity is its `__value`, and a bare selection of a record of a `Composite` entity is `EMPTY_DATA`. */
 export type EntityShape = 'Leaf' | 'Composite';
 
 export type RecordStorage =
@@ -694,7 +689,6 @@ export function readData<TFailure>(
   return readSelectionSet(hooks, artifact.tables, artifact.readerAst, root, artifact.parentEntityName, variables);
 }
 
-/** The first result that is not `Ok` ends the read. */
 function readSelectionSet<TFailure>(
   hooks: ReadHooks<TFailure>,
   tables: EntityTables,
@@ -780,7 +774,6 @@ function derivedLink(value: unknown, owner: StoreLink, fieldName: string): Store
 /** `nested` wraps a `MissingData` result with `missingDataFor(alias, root, ..)` and returns any other result unchanged. */
 function nested<T, TFailure>(alias: string, root: StoreLink, result: ReadResult<T> | TFailure): ReadResult<T> | TFailure;
 
-/** `eachLink` is v1's `readLinkedValue` (`read.ts:207-229`) with `f` in place of `readSelectionSet`. */
 function eachLink<TFailure>(
   value: StoreValue,
   owner: StoreLink,
@@ -811,7 +804,6 @@ export type NormalizationAst<TEntityName extends EntityName = EntityName> = {
   readonly discriminatorResponseKey: string;
   readonly root: NormalizationRootRecord<TEntityName>;
   readonly selections: NormalizationSelectionSet;
-  /** `normalize` reads each entity's `storage` from `tables`. */
   readonly tables: EntityTables;
 };
 
@@ -825,11 +817,10 @@ export type NormalizationSelection = {
 
 export type NormalizationTarget = NormalizationLeafTarget | NormalizationCompositeTarget;
 
-/** `normalize` writes each value of a leaf target to the `__value` of its own record. */
 export type NormalizationLeafTarget = {
   readonly kind: 'Leaf';
   readonly entityName: EntityName;
-  /** `normalize` does not descend into arrays below `listDepth`, because a custom scalar's value can be a JSON array that is one value. */
+  /** Arrays below `listDepth` are one value, because a custom scalar's value can be a JSON array. */
   readonly listDepth: number;
 };
 
@@ -1075,7 +1066,6 @@ import {
   readSource,
 } from '@isograph/pico-js';
 
-/** `identical` is the output equality of a resolver whose field supplies none. */
 function identical(previous: unknown, next: unknown): boolean {
   return previous === next;
 }
@@ -1172,7 +1162,6 @@ export type ReaderArtifact<TParam extends ResolverParam<TEntityName>, TOutput, T
 };
 // after:
 export type ReaderArtifact<TParam extends ResolverParam<TEntityName>, TOutput, TEntityName extends EntityName> = {
-  /** The walk reads the root as `parentEntityName`. */
   readonly parentEntityName: EntityName;
   readonly selectableName: string;
   readonly readerAst: ReaderSelectionSet;
@@ -1369,7 +1358,6 @@ Each is one commit, in order; each is independently shippable.
        isUnchanged(selection),
      );
 
-   /** The stored value object stays when `unchanged` accepts the written value. */
    function writeValue(
      record: StoreRecord,
      key: StoreKey,
