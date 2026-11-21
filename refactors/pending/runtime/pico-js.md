@@ -147,7 +147,6 @@ Every public function takes the node it acts on, and `readSource` and `readDeriv
 ```ts
 // from libs/isograph-pico-js/src/index.ts
 export {
-  type AnyDerivedNode,
   type Computation,
   createDerivedNode,
   createSourceNode,
@@ -162,7 +161,7 @@ export {
 } from './graph';
 ```
 
-`AnyDerivedNode` is exported from the package index because a computation receives one and passes it to `readSource` and `readDerived`, so a consumer that writes a function over the reader names it (`contextHooks` in pico-runtime.md). `PrecalculatedValue`, `Status`, and `AnyNode` are exported from `graph.ts` because the declaration of `DerivedNode` names them, and not from the package index: no consumer names them. `MISSING`, `Missing`, and `Option` are not exported from `graph.ts`; tsc 5.6 emits them as local declarations in `graph.d.ts` beside the exported `DerivedNode` that names them. Nodes are plain objects whose fields a consumer can read and write (decision 7, decided).
+`PrecalculatedValue` and `Status` are exported from `graph.ts` because the declaration of `DerivedNode` names them, and not from the package index: no consumer names them. `MISSING`, `Missing`, and `Option` are not exported from `graph.ts`; tsc 5.6 emits them as local declarations in `graph.d.ts` beside the exported `DerivedNode` that names them. Nodes are plain objects whose fields a consumer can read and write (decision 7, decided).
 
 ### Types
 
@@ -173,7 +172,7 @@ export type SourceNode<TValue> = {
   readonly kind: 'Source';
   value: TValue;
   equals(previous: TValue, next: TValue): boolean;
-  readonly dependents: Set<AnyDerivedNode>;
+  readonly dependents: Set<DerivedNode<unknown>>;
 };
 
 /** A computation's value, which the node keeps until an input it read changes. */
@@ -182,17 +181,15 @@ export type DerivedNode<TValue> = {
   readonly computation: Computation<TValue>;
   equals(previous: TValue, next: TValue): boolean;
   precalculated: Option<PrecalculatedValue<TValue>>;
-  reads: AnyNode[];
-  readonly dependents: Set<AnyDerivedNode>;
+  reads: (SourceNode<unknown> | DerivedNode<unknown>)[];
+  readonly dependents: Set<DerivedNode<unknown>>;
 };
-
-export type AnyDerivedNode = DerivedNode<unknown>;
 
 /** The first computation after creation or disposal allocates it, and later computations write its fields in place. */
 export type PrecalculatedValue<TValue> = {
   value: TValue;
   status: Status;
-  dependencies: AnyNode[];
+  dependencies: (SourceNode<unknown> | DerivedNode<unknown>)[];
 };
 
 /** `Clean` means `value` is current, `Check` means a derived node below may have changed, and `Dirty` means an input changed. */
@@ -203,13 +200,11 @@ type Missing = typeof MISSING;
 
 type Option<TValue> = TValue | Missing;
 
-export type AnyNode = SourceNode<unknown> | AnyDerivedNode;
-
 /** A computation is a pure, synchronous function of the nodes it reads with `readSource` and `readDerived`. */
-export type Computation<TValue> = (reader: AnyDerivedNode) => TValue;
+export type Computation<TValue> = (reader: DerivedNode<unknown>) => TValue;
 ```
 
-`TValue` is per node: a `DerivedNode<string>` reads a `DerivedNode<number>` and a `SourceNode<number>`. The links hold `AnyDerivedNode` and `SourceNode<unknown>`, and the engine's functions are generic in the node they receive, so a node reached through `dependents` is handled at `TValue = unknown`. `equals` is a method signature: under `strict` (`tsconfig.build.json`), TypeScript checks the parameters of a function-typed property contravariantly and those of a method bivariantly, so with `readonly equals: (previous: TValue, next: TValue) => boolean` a `DerivedNode<number>` is not assignable to `DerivedNode<unknown>`. The engine calls `equals` only in `recompute`, with two values the node's own computation produced, so the bivariance admits no call the engine makes with a value of another type (open decision 5).
+`TValue` is per node: a `DerivedNode<string>` reads a `DerivedNode<number>` and a `SourceNode<number>`. The links hold `DerivedNode<unknown>` and `SourceNode<unknown>`, written out at each use with no alias, and the engine's functions are generic in the node they receive, so a node reached through `dependents` is handled at `TValue = unknown`. `equals` is a method signature: under `strict` (`tsconfig.build.json`), TypeScript checks the parameters of a function-typed property contravariantly and those of a method bivariantly, so with `readonly equals: (previous: TValue, next: TValue) => boolean` a `DerivedNode<number>` is not assignable to `DerivedNode<unknown>`. The engine calls `equals` only in `recompute`, with two values the node's own computation produced, so the bivariance admits no call the engine makes with a value of another type (open decision 5).
 
 `equals` returns `boolean`. It is a comparator, a pure yes or no with no domain names (AGENTS.md, Booleans). The name `equals` matches the equality option of TC39 Signals' `Signal.State` and `Signal.Computed`.
 
@@ -228,9 +223,9 @@ export function createDerivedNode<TValue>(
   equals: (previous: TValue, next: TValue) => boolean,
 ): DerivedNode<TValue>;
 
-export function readSource<TValue>(reader: AnyDerivedNode, source: SourceNode<TValue>): TValue;
+export function readSource<TValue>(reader: DerivedNode<unknown>, source: SourceNode<TValue>): TValue;
 
-export function readDerived<TValue>(reader: AnyDerivedNode, node: DerivedNode<TValue>): TValue;
+export function readDerived<TValue>(reader: DerivedNode<unknown>, node: DerivedNode<TValue>): TValue;
 
 /** `writeSource` stores and marks nothing when `source.equals` accepts `value`, and it must not run inside a computation or an equality (Writes during a computation). */
 export function writeSource<TValue>(source: SourceNode<TValue>, value: TValue): void;
@@ -242,7 +237,7 @@ export function markSourceDirty(source: SourceNode<unknown>): void;
 export function pull<TValue>(node: DerivedNode<TValue>): TValue;
 
 /** A later pull computes the disposed node again, and `disposeDerivedNode` must not run inside a computation or an equality (Writes during a computation). */
-export function disposeDerivedNode(node: AnyDerivedNode): void;
+export function disposeDerivedNode(node: DerivedNode<unknown>): void;
 ```
 
 In the Isograph runtime (pico-runtime.md, The engine and the Isograph runtime), the callers are `createSourceNode` in `store.ts`, which reads `source.value` for an untracked read; `writeSource` in `normalize.ts` and `test/fixtures.ts`; `markSourceDirty` and `disposeDerivedNode` in `deleteRecord`; `createDerivedNode`, `pull`, `readSource`, and `readDerived` in `storedResults.ts`, which passes `resolverResultsEqual(artifact, identical)` as each node's equality, with `===` as its default output equality. Outside Isograph: the consumer's own code, as in The package README.
@@ -294,9 +289,9 @@ export function markSourceDirty(source: SourceNode<unknown>): void {
 }
 
 /** `markDirty` marks each of `nodes` `Dirty` and every `Clean` node above them `Check`. */
-function markDirty(nodes: ReadonlySet<AnyDerivedNode>): void {
-  const work: AnyDerivedNode[] = [];
-  const push = (dependent: AnyDerivedNode): void => {
+function markDirty(nodes: ReadonlySet<DerivedNode<unknown>>): void {
+  const work: DerivedNode<unknown>[] = [];
+  const push = (dependent: DerivedNode<unknown>): void => {
     work.push(dependent);
   };
   nodes.forEach((node) => {
@@ -308,7 +303,7 @@ function markDirty(nodes: ReadonlySet<AnyDerivedNode>): void {
 }
 
 /** `markOneDirty` returns the status `node` had before it became `Dirty`, or `MISSING` when it has no precalculated value. */
-function markOneDirty(node: AnyDerivedNode): Option<Status> {
+function markOneDirty(node: DerivedNode<unknown>): Option<Status> {
   const precalculated = node.precalculated;
   if (precalculated === MISSING) {
     return MISSING;
@@ -318,8 +313,8 @@ function markOneDirty(node: AnyDerivedNode): Option<Status> {
   return status;
 }
 
-function markCheck(work: AnyDerivedNode[]): void {
-  const push = (dependent: AnyDerivedNode): void => {
+function markCheck(work: DerivedNode<unknown>[]): void {
+  const push = (dependent: DerivedNode<unknown>): void => {
     work.push(dependent);
   };
   let node = work.pop();
@@ -412,19 +407,19 @@ function commitReads<TValue>(node: DerivedNode<TValue>, precalculated: Precalcul
   node.reads = previous;
 }
 
-const NO_DEPENDENCIES: ReadonlyArray<AnyNode> = [];
+const NO_DEPENDENCIES: ReadonlyArray<SourceNode<unknown> | DerivedNode<unknown>> = [];
 
 function compute<TValue>(node: DerivedNode<TValue>): TValue {
   node.reads.length = 0;
   return node.computation(node);
 }
 
-export function readSource<TValue>(reader: AnyDerivedNode, source: SourceNode<TValue>): TValue {
+export function readSource<TValue>(reader: DerivedNode<unknown>, source: SourceNode<TValue>): TValue {
   reader.reads.push(source);
   return source.value;
 }
 
-export function readDerived<TValue>(reader: AnyDerivedNode, node: DerivedNode<TValue>): TValue {
+export function readDerived<TValue>(reader: DerivedNode<unknown>, node: DerivedNode<TValue>): TValue {
   const value = pull(node);
   reader.reads.push(node);
   return value;
@@ -442,7 +437,7 @@ There are two read functions in place of one `read(reader, node)` that switches 
 - `recompute` calls `commitReads` once, before `equals`. Both outcomes store the new reads as the dependency list, so a node whose value came back equal still depends on what it read this time. `equals` compares two values and reads no node, so it does not depend on which dependency list the state holds.
 - `computeFirst` marks no dependent. A node enters a `dependents` set only through the `setDependencies` of a reader whose computation pulled it, so a never-computed node has no dependents. `disposeDerivedNode` marks every dependent of the node it disposes `Dirty`. A dependent stays in that set until its own `recompute` (or its disposal) runs `setDependencies`, and a `Dirty` node leaves `Dirty` only through `recompute`, which either drops the disposed node from its dependencies or pulled it during its computation, while the dependent was still `Dirty`. Every dependent of a node `computeFirst` runs on is therefore `Dirty`, and `markDirty` on `Dirty` nodes changes nothing.
 - A node that was never computed or was disposed holds `MISSING` in place of a `PrecalculatedValue`, so its value cannot be read without first ruling `MISSING` out. Its first pull is `computeFirst`, which calls no `equals`. Marking never reaches such a node, because a node in a `dependents` set was computed. The `PrecalculatedValue` is allocated once per first computation; every later mark change and recomputation writes `status` and `value` in place, so marking and recomputing allocate no state object.
-- A node's dependency list (`PrecalculatedValue.dependencies`) and `node.reads` are two arrays the node owns, swapped by every `commitReads`: the reads become the dependency list, and the previous dependency list becomes the buffer the next computation clears and fills. A computation allocates no array, no result object, and no context object: `compute` returns the value alone and passes the node itself (The reader). A throw out of the computation leaves `node.reads` partly filled and the state untouched; the next `compute` clears it. `createDerivedNode` allocates the first `reads` buffer and `computeFirst` the next, one array per first computation; no array is shared between two nodes, and `NO_DEPENDENCIES` is only read. The dependency lists are `AnyNode[]` in place of `ReadonlyArray`, because the engine reuses them as buffers.
+- A node's dependency list (`PrecalculatedValue.dependencies`) and `node.reads` are two arrays the node owns, swapped by every `commitReads`: the reads become the dependency list, and the previous dependency list becomes the buffer the next computation clears and fills. A computation allocates no array, no result object, and no context object: `compute` returns the value alone and passes the node itself (The reader). A throw out of the computation leaves `node.reads` partly filled and the state untouched; the next `compute` clears it. `createDerivedNode` allocates the first `reads` buffer and `computeFirst` the next, one array per first computation; no array is shared between two nodes, and `NO_DEPENDENCIES` is only read. The dependency lists are `(SourceNode<unknown> | DerivedNode<unknown>)[]` in place of `ReadonlyArray`, because the engine reuses them as buffers.
 - A computation is synchronous; a read through its node after it returned breaks the contract (The reader).
 - The reader is a parameter: the running node itself. There is no ambient current computation (Reactively's `CurrentReaction`, Preact's `evalContext`), so a computation that keeps its contract cannot have its reads recorded on another node, and two graphs never share tracking state.
 
@@ -454,9 +449,9 @@ There are two read functions in place of one `read(reader, node)` that switches 
 // from libs/isograph-pico-js/src/graph.ts
 /** `setDependencies` is the only writer of any `dependents` set. */
 function setDependencies(
-  node: AnyDerivedNode,
-  previous: ReadonlyArray<AnyNode>,
-  next: ReadonlyArray<AnyNode>,
+  node: DerivedNode<unknown>,
+  previous: ReadonlyArray<SourceNode<unknown> | DerivedNode<unknown>>,
+  next: ReadonlyArray<SourceNode<unknown> | DerivedNode<unknown>>,
 ): void {
   if (sameDependencies(previous, next)) {
     return;
@@ -469,7 +464,7 @@ function setDependencies(
   }
 }
 
-function sameDependencies(previous: ReadonlyArray<AnyNode>, next: ReadonlyArray<AnyNode>): boolean {
+function sameDependencies(previous: ReadonlyArray<SourceNode<unknown> | DerivedNode<unknown>>, next: ReadonlyArray<SourceNode<unknown> | DerivedNode<unknown>>): boolean {
   if (previous.length !== next.length) {
     return false;
   }
@@ -492,7 +487,7 @@ Reactively reuses the unchanged prefix of the previous source list (`CurrentGets
 
 ```ts
 // from libs/isograph-pico-js/src/graph.ts
-export function disposeDerivedNode(node: AnyDerivedNode): void {
+export function disposeDerivedNode(node: DerivedNode<unknown>): void {
   const precalculated = node.precalculated;
   if (precalculated !== MISSING) {
     setDependencies(node, precalculated.dependencies, NO_DEPENDENCIES);
@@ -1713,7 +1708,6 @@ import { expectTypeOf, test } from 'vitest';
 import {
   createDerivedNode,
   createSourceNode,
-  type AnyDerivedNode,
   type DerivedNode,
   pull,
   readDerived,
@@ -1736,9 +1730,9 @@ test('readSource, readDerived, and pull return the node’s value type', () => {
   expectTypeOf(pull(label)).toEqualTypeOf<string>();
 });
 
-test('a derived node of any value type is an AnyDerivedNode', () => {
-  expectTypeOf<DerivedNode<number>>().toMatchTypeOf<AnyDerivedNode>();
-  expectTypeOf<DerivedNode<ReadonlyArray<string>>>().toMatchTypeOf<AnyDerivedNode>();
+test('a derived node of any value type is a DerivedNode<unknown>', () => {
+  expectTypeOf<DerivedNode<number>>().toMatchTypeOf<DerivedNode<unknown>>();
+  expectTypeOf<DerivedNode<ReadonlyArray<string>>>().toMatchTypeOf<DerivedNode<unknown>>();
 });
 
 test('a source node is not read with readDerived', () => {
@@ -1935,11 +1929,13 @@ A computation and an equality must not throw; a throw is a programmer error (Thr
 
 The derived nodes must form a directed acyclic graph; a cycle is a programmer error, and the engine has no cycle check (Cycles). In the Isograph layer, `InlineCycle` rejects static field-selection cycles, so no runtime node cycle forms (pico-runtime.md open decision 8).
 
-### 5. How the engine types the links between nodes of different value types
+### 5. How the engine types the links between nodes of different value types (decided)
 
 pico-runtime.md open decision 19, restated.
 
-- (a) `AnyDerivedNode = DerivedNode<unknown>`, with `equals` a method signature so that `DerivedNode<T>` is assignable to it. This option is held and not decided. Reason: no cast and no wrapper; the engine calls `equals` only with two values the node's own computation produced. Cost: method bivariance also accepts a call such as `(node as AnyDerivedNode).equals('a', 'b')` on a `DerivedNode<number>`; only code outside the engine could make it.
+Decided by the user: (a).
+
+- (a) No alias: a link is written `DerivedNode<unknown>`, `SourceNode<unknown>`, or `SourceNode<unknown> | DerivedNode<unknown>` at each use, and `equals` is a method signature so that `DerivedNode<T>` is assignable to `DerivedNode<unknown>`. tsc 5.6 under `strict` accepts pushing a `DerivedNode<number>` into a dependency array, adding one to a `Set<DerivedNode<unknown>>`, and passing one as `reader`, and rejects all three when `equals` is a function-typed property. Reason: no cast and no wrapper; the engine calls `equals` only with two values the node's own computation produced. Cost: method bivariance also accepts a call such as `(node as DerivedNode<unknown>).equals('a', 'b')` on a `DerivedNode<number>`; only code outside the engine could make it.
 - (b) One value type per graph. Cost: a consumer whose nodes have different value types declares a union and narrows every `readDerived` result.
 - (c) An existential encoding: a link holds `<R>(visit: <T>(node: DerivedNode<T>) => R) => R`. Cost: one closure per link and a call per traversal step; it is sound.
 

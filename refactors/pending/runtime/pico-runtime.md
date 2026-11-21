@@ -48,7 +48,7 @@ The calls the Isograph runtime makes, by export of the engine's index (pico-js.m
 - `pull`: `readStoredResult` (Stored resolver results).
 - `readSource` and `readDerived`: `contextHooks`, with the node the resolver computation receives (Stored resolver results).
 - `disposeDerivedNode`: `deleteRecord`, for each derived node the deleted container owns (core change 8).
-- The types `SourceNode`, `DerivedNode`, `AnyDerivedNode`, and `Computation`: `store.ts` and `storedResults.ts`.
+- The types `SourceNode`, `DerivedNode`, and `Computation`: `store.ts` and `storedResults.ts`.
 
 Every export has a caller in the Isograph runtime. The computation of a resolver node reads only with `readSource` and `readDerived` on the node it receives (`contextHooks`, Stored resolver results), so the runtime makes no untracked read inside a computation (open decision 25).
 
@@ -56,7 +56,7 @@ Every export has a caller in the Isograph runtime. The computation of a resolver
 
 Engine (`libs/isograph-pico-js/src/graph.ts`), as pico-js.md's Types and The implementation define them:
 
-- Types: `SourceNode`, `DerivedNode`, `AnyDerivedNode`, `PrecalculatedValue`, `Status`, `AnyNode`, `Computation`, and the unexported `MISSING`, `Missing`, and `Option`.
+- Types: `SourceNode`, `DerivedNode`, `PrecalculatedValue`, `Status`, `Computation`, and the unexported `MISSING`, `Missing`, and `Option`.
 - The marks `Clean`, `Check`, and `Dirty`.
 - Construction: `createSourceNode`, `createDerivedNode`.
 - Mark: `writeSource`, `markSourceDirty`, `markDirty`, `markOneDirty`, `markCheck`.
@@ -1067,9 +1067,9 @@ A computation that reads one node twice records it twice (`PetDetailPage` reads 
 ```ts
 // from libs/isograph-runtime/src/storedResults.ts
 import {
-  type AnyDerivedNode,
   type Computation,
   createDerivedNode,
+  type DerivedNode,
   pull,
   readDerived,
   readSource,
@@ -1114,7 +1114,7 @@ function resolverComputation(
   };
 }
 
-function contextHooks(store: Store, reader: AnyDerivedNode): ReadHooks<ReadResolverThrew> {
+function contextHooks(store: Store, reader: DerivedNode<unknown>): ReadHooks<ReadResolverThrew> {
   return {
     readValue: (record, key) => readSource(reader, sourceNodeAt(store, record, key)),
     readResolver: (artifact, root, variables) => readDerived(reader, resolverNodeAt(store, artifact, root, variables)),
@@ -1905,11 +1905,13 @@ It runs only when a caller calls it (`libs/isograph-runtime/src/environment.ts:6
 
 Decided by the user: `@isograph/pico-js`, directory `libs/isograph-pico-js`. The `-js` suffix keeps the npm name distinct from the Rust crate `pico` (`crates/pico`). The directory follows the mapping of the other library directories, `@isograph/<name>` in `libs/isograph-<name>` (`libs/isograph-runtime`, `libs/isograph-disposable-types`, `libs/isograph-babel-plugin`; `@isograph/plugin-swc` in `libs/isograph-swc-plugin` is the one exception). No workspace or upstream package uses the name (`libs/*/package.json`, `../isograph/libs/*/package.json`). Whether the name is free on the npm registry was not verifiable offline; the package is `private: true` (pico-js.md, The package), so nothing is published under it.
 
-### 19. How the engine types the links between nodes of different value types
+### 19. How the engine types the links between nodes of different value types (decided)
 
 A standalone engine holds nodes of different value types in one graph (a `DerivedNode<string>` that reads a `DerivedNode<number>`), so every `dependents` set and every dependency list holds a node whose value type is erased.
 
-- (a) `AnyDerivedNode = DerivedNode<unknown>`, with `equals` a method signature so that `DerivedNode<T>` is assignable to it (pico-js.md, Types). This option is held and not decided. Reason: no cast and no wrapper; the engine calls `equals` only with two values the node's own computation produced. Cost: TypeScript's method bivariance also accepts a call such as `(node as AnyDerivedNode).equals('a', 'b')` on a `DerivedNode<number>`; only code outside the engine could make it, and the API gives such code no reason to call `equals`.
+`refactors/pending/runtime/pico-js.md` open decision 5. Decided by the user: (a).
+
+- (a) No alias: a link is written `DerivedNode<unknown>`, `SourceNode<unknown>`, or `SourceNode<unknown> | DerivedNode<unknown>` at each use, and `equals` is a method signature so that `DerivedNode<T>` is assignable to `DerivedNode<unknown>` (pico-js.md, Types). Reason: no cast and no wrapper; the engine calls `equals` only with two values the node's own computation produced. Cost: TypeScript's method bivariance also accepts a call such as `(node as DerivedNode<unknown>).equals('a', 'b')` on a `DerivedNode<number>`; only code outside the engine could make it, and the API gives such code no reason to call `equals`.
 - (b) One value type per graph, the previous revision's `SourceNode<TSourceValue, TValue>` and `DerivedNode<TValue>` with `TValue` shared by every node. Cost: a project whose nodes have different value types declares a union and narrows every `readDerived` result; Isograph's own later runtime-defined computations widen `ResolverResult` the same way (Later: other derived node kinds).
 - (c) An existential encoding: a link holds `<R>(visit: <T>(node: DerivedNode<T>) => R) => R`. Cost: one closure per link and a call per traversal step; it is sound.
 
