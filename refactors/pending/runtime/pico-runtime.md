@@ -83,14 +83,14 @@ export type CheckState<TValue> = {
 };
 
 /** A source node it read changed, or a derived node it read recomputed to a value `equal` rejects,
- * or it was never computed. */
+ * or it was never computed, or it was disposed. */
 export type DirtyState<TValue> = {
   readonly mark: 'Dirty';
   readonly previous: PreviousValue<TValue>;
   readonly dependencies: ReadonlyArray<Dependency>;
 };
 
-/** `NoValue`: the node was created and not yet computed. */
+/** `NoValue`: the node was never computed, or it was disposed. */
 export type PreviousValue<TValue> =
   | { readonly kind: 'NoValue' }
   | { readonly kind: 'Value'; readonly value: TValue };
@@ -153,9 +153,14 @@ export function createDerivedNode<TValue>(
   return {
     computation,
     equal,
-    slot: { state: { mark: 'Dirty', previous: { kind: 'NoValue' }, dependencies: [] } },
+    slot: { state: neverComputed() },
     dependents: new Set(),
   };
+}
+
+/** The state of a node that was never computed or was disposed. */
+function neverComputed<TValue>(): DirtyState<TValue> {
+  return { mark: 'Dirty', previous: { kind: 'NoValue' }, dependencies: [] };
 }
 
 /** The value of `source`, read outside a computation. Records nothing. */
@@ -182,11 +187,14 @@ export function markSourceChanged(graph: Graph, source: SourceNode<unknown>): vo
  * computation, where it records nothing on the reading node, as `sourceValue` does. */
 export function pull<TValue>(graph: Graph, node: DerivedNode<TValue>): TValue;
 
-/** Removes `node` from the dependents of everything it read, and marks its dependents `Dirty`. Throws
- * while a computation runs. */
+/** Removes `node` from the dependents of everything it read, resets it to never computed, and marks
+ * its dependents `Dirty`. A later pull computes it again (open decision 24). Throws while a computation
+ * runs. */
 export function disposeDerivedNode(graph: Graph, node: AnyDerivedNode): void {
   assertNotComputing(graph);
-  setDependencies(node, stateOf(node).state.dependencies, []);
+  const slot = stateOf(node);
+  setDependencies(node, slot.state.dependencies, []);
+  slot.state = neverComputed();
   node.dependents.forEach(markDirty);
 }
 
@@ -197,6 +205,8 @@ export function sameValue(previous: unknown, next: unknown): boolean {
 ```
 
 `sameValue` was `storedResults.ts`'s private default output equality (Stored resolver results); it is generic, so it is the engine's, and `resolverNodeAt` imports it. Which comparison it makes is open decision 20.
+
+Disposal resets the node's state as well as its edges. A node that kept its `Clean` state after leaving every `dependents` set would return its old value on every later pull, because no write reaches it. The reset drops the value (`NoValue`), so the engine holds no reference to it, and leaves the state listing no dependency that does not list the node back. The dependents' lists still name the disposed node and `node.dependents` still names them, so the inverse holds until their next recomputation.
 
 `stateOf` is the one accessor of per-node state so that Later: a DAG of graphs can give a node one slot per layer by changing `stateOf` alone. `computation`, `equal`, and `dependents` are not per world and stay on the node.
 
@@ -466,7 +476,7 @@ Engine (`libs/reactive-graph/src/graph.ts`):
 
 - Types: `Graph`, `SourceNode`, `DerivedNode`, `AnyDerivedNode`, `StateSlot`, `DerivedNodeState`, `CleanState`, `CheckState`, `DirtyState`, `PreviousValue`, `Dependency`, `Computation`, `ComputeContext`, `Computed`.
 - Marks `Clean`, `Check`, `Dirty`; `markDirty`, `markCheck`; `markSourceChanged`.
-- `pull`, `verify`, `recompute`, `compute` (the context and dependency recording), `setDependencies`, `stateOf`.
+- `pull`, `verify`, `recompute`, `compute` (the context and dependency recording), `setDependencies`, `stateOf`, `neverComputed`.
 - `createGraph`, `assertNotComputing`, `createSourceNode`, `createDerivedNode`, `sourceValue`, `writeSource`, `disposeDerivedNode`, `sameValue` (moved from `storedResults.ts`).
 - The write-during-computation guard: `Graph.computingDepth` and `assertNotComputing` (open decision 2 (f)).
 - A cycle check, if open decision 8 adds one.
