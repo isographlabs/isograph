@@ -1,10 +1,10 @@
-# Reactive engine: source nodes and derived nodes as a standalone package
+# pico-js: source nodes and derived nodes as a standalone package
 
 Status: under discussion. Not approved for implementation. This doc is the single specification of the engine that `refactors/pending/runtime/pico-runtime.md` places in its own package: the API under each guard option, every function body, disposal, cycles, throws, the README, the design description, the test inventory against the Rust pico crate, the package files, and the open decisions. pico-runtime.md holds no copy of it and references it by section (What this doc changes in pico-runtime.md).
 
 pico paths are under `crates/pico/src` and `crates/pico/tests` of this repo. Reactively is `packages/core/src/core.ts` of `milomg/reactively`, cited by line at commit `9081fa4bf302`. Preact signals is `packages/core/src/index.ts` of `preactjs/signals`, read at its `main` branch, with no line numbers, because no checkout is local. alien-signals is `src/system.ts` of `stackblitz/alien-signals`, cited by line at tag `v3.2.1`.
 
-The package is `@isograph/reactive-graph` in `libs/reactive-graph` (decision 1, decided; pico-runtime.md open decision 18).
+The package is `@isograph/pico-js` in `libs/isograph-pico-js` (decision 1, decided; pico-runtime.md open decision 18).
 
 ## Goal
 
@@ -143,7 +143,7 @@ Every edge is an object reference, held in both directions: a derived node's dep
 The API below is written under open decision 2 option (f): an engine `Graph` object holds the write-during-computation guard, and every public function that reads or writes the graph takes it as its first parameter. Decision 2 is not decided, and (g) is the held option: pico-runtime.md establishes that the guard must be one no caller can bypass and that it lives in the engine (its open decision 2, the paragraph after its options), which leaves (f) and (g), and under (f) a computation that holds a second `Graph` bypasses the guard (open decision 2). (f) has pico's shape, every pico read and write taking the database (`Database::set`, `crates/pico/src/database.rs:151`; a memo's first argument is `&Db`), and the body, the README, and the tests stay in it until decision 2 is decided. Option (g) below is the complete (g) form of the API and of the functions that change. Under (a) every `graph` parameter and `Graph` itself drop out.
 
 ```ts
-// from libs/reactive-graph/src/index.ts
+// from libs/isograph-pico-js/src/index.ts
 export {
   type Computation,
   type ComputeContext,
@@ -167,7 +167,7 @@ export {
 ### Types
 
 ```ts
-// from libs/reactive-graph/src/graph.ts
+// from libs/isograph-pico-js/src/graph.ts
 /** One graph of source and derived nodes. It holds the guard that rejects a write or a disposal
  * while a computation or an equality runs (open decision 2). Created by `createGraph`; every
  * public function but the constructors and `sourceValue` takes it first. */
@@ -273,7 +273,7 @@ export type ComputeContext = {
 ### Functions
 
 ```ts
-// from libs/reactive-graph/src/graph.ts
+// from libs/isograph-pico-js/src/graph.ts
 /** What `writeSource`, `markSourceChanged`, and `disposeDerivedNode` throw while a computation or an
  * equality of the graph runs (The guard). A class, so that a consumer that catches the throws of its
  * own code inside a computation can tell the guard's error from them and rethrow it. */
@@ -340,7 +340,7 @@ Callers. In the Isograph runtime (pico-runtime.md, The engine and the Isograph r
 Under open decision 2 (g), held and not decided, a node records its graph at construction and every public function but `createGraph` and `sourceValue` reads the graph from the node it receives. This is the complete (g) form of The public API and of every function of The implementation that changes. The package index exports the same names. `AnyDerivedNode`, `StateSlot`, `DerivedNodeState`, `CleanState`, `CheckState`, `DirtyState`, `PreviousValue`, `Dependency`, `Computation`, `Computed`, and `ContextStatus` are the types of Types and Pull, unchanged. `neverComputed`, `stateOf`, `assertNotComputing`, `guarded`, `markDirty`, `markOneDirty`, `markCheck`, `setDependencies`, and `dependentsOf` are the functions of The implementation, unchanged: none of them receives a graph from a public caller.
 
 ```ts
-// from libs/reactive-graph/src/graph.ts
+// from libs/isograph-pico-js/src/graph.ts
 // under open decision 2 (g)
 /** One graph of source and derived nodes. It holds the guard that rejects a write or a disposal
  * while a computation or an equality of this graph runs. Created by `createGraph`, and passed only to
@@ -442,7 +442,7 @@ export function disposeDerivedNode(node: AnyDerivedNode): void;
 The functions of The implementation that change under (g):
 
 ```ts
-// from libs/reactive-graph/src/graph.ts
+// from libs/isograph-pico-js/src/graph.ts
 // under open decision 2 (g)
 export function createSourceNode<TValue>(
   graph: Graph,
@@ -597,7 +597,7 @@ The guard cannot be bypassed under (g). A write reads the guard from the source 
 `guard.test.ts` under (g) drops the `graph` argument from every call but the constructors, which take it first, and gains one test:
 
 ```ts
-// from libs/reactive-graph/test/guard.test.ts
+// from libs/isograph-pico-js/test/guard.test.ts
 // under open decision 2 (g)
   test('a read of a node of another graph throws', () => {
     const graph = createGraph();
@@ -630,7 +630,7 @@ The guard cannot be bypassed under (g). A write reads the guard from the source 
 ### Construction and plain reads
 
 ```ts
-// from libs/reactive-graph/src/graph.ts
+// from libs/isograph-pico-js/src/graph.ts
 export function createGraph(): Graph {
   return { computingDepth: 0 };
 }
@@ -673,7 +673,7 @@ function stateOf<TValue>(node: DerivedNode<TValue>): StateSlot<TValue> {
 ### The guard
 
 ```ts
-// from libs/reactive-graph/src/graph.ts
+// from libs/isograph-pico-js/src/graph.ts
 /** Throws `GraphWriteDuringComputationError` when a computation or an equality of `graph` is
  * running. Called first by every public function that writes the graph. */
 function assertNotComputing(graph: Graph): void {
@@ -714,7 +714,7 @@ The message follows pico's "Cannot modify database while a memoized function is 
 ### Mark
 
 ```ts
-// from libs/reactive-graph/src/graph.ts
+// from libs/isograph-pico-js/src/graph.ts
 export function writeSource<TValue>(
   graph: Graph,
   source: SourceNode<TValue>,
@@ -798,7 +798,7 @@ Marking does not recurse. `markCheck` is a loop over a work list, the worklist c
 ### Pull
 
 ```ts
-// from libs/reactive-graph/src/graph.ts
+// from libs/isograph-pico-js/src/graph.ts
 /** Called by the consumer, by `readDerived`, and by `verify`. */
 export function pull<TValue>(graph: Graph, node: DerivedNode<TValue>): TValue {
   const state = stateOf(node).state;
@@ -935,7 +935,7 @@ function compute<TValue>(
 ### Dependencies
 
 ```ts
-// from libs/reactive-graph/src/graph.ts
+// from libs/isograph-pico-js/src/graph.ts
 /** Removes `node` from the dependents of each of `previous` and adds it to those of each of `next`.
  * The only writer of any `dependents` set. Called by `recompute` and `disposeDerivedNode`. */
 function setDependencies(
@@ -967,7 +967,7 @@ Reactively reuses the unchanged prefix of the previous source list (`CurrentGets
 ### Disposal
 
 ```ts
-// from libs/reactive-graph/src/graph.ts
+// from libs/isograph-pico-js/src/graph.ts
 export function disposeDerivedNode(graph: Graph, node: AnyDerivedNode): void {
   assertNotComputing(graph);
   const slot = stateOf(node);
@@ -996,10 +996,10 @@ The derived nodes and the reads between them must form a directed acyclic graph.
 
 ## The package README
 
-`libs/reactive-graph/README.md`, as `libs/isograph-disposable-types/README.md` is for its package. Its text:
+`libs/isograph-pico-js/README.md`, as `libs/isograph-disposable-types/README.md` is for its package. Its text:
 
 ````markdown
-# @isograph/reactive-graph
+# @isograph/pico-js
 
 A graph of values that recomputes on read. You hold source nodes, whose values you set, and derived nodes, whose values are computations over other nodes. The engine records what each computation read. When you write a source, the engine marks the derived nodes that read it, directly or transitively, and runs nothing. When you read a derived node, the engine recomputes it only if something it read changed value, and stops at the first node whose new value equals its old one.
 
@@ -1014,7 +1014,7 @@ import {
   createSourceNode,
   pull,
   writeSource,
-} from '@isograph/reactive-graph';
+} from '@isograph/pico-js';
 
 const graph = createGraph();
 const price = createSourceNode(100, (a, b) => a === b);
@@ -1225,7 +1225,7 @@ Top-level files:
 ### Test files
 
 ```text
-libs/reactive-graph/test/
+libs/isograph-pico-js/test/
   recompute.test.ts      ports of chains, reuse, cutoff; marking and short circuit; pull order; diamond
   dependencies.test.ts   recorded order, branch changes, repeated reads, absence as a value, untracked reads
   errors.test.ts         a throwing computation leaves the graph's state unchanged
@@ -1240,7 +1240,7 @@ Every test file imports from `../src`, which is `src/index.ts`. `graph.test-d.ts
 ### `recompute.test.ts`
 
 ```ts
-// from libs/reactive-graph/test/recompute.test.ts
+// from libs/isograph-pico-js/test/recompute.test.ts
 import { describe, expect, test } from 'vitest';
 import {
   createDerivedNode,
@@ -1638,7 +1638,7 @@ A test whose comment says "setup as in" repeats that test's setup lines in the f
 ### `dependencies.test.ts`
 
 ```ts
-// from libs/reactive-graph/test/dependencies.test.ts
+// from libs/isograph-pico-js/test/dependencies.test.ts
 import { describe, expect, test } from 'vitest';
 import {
   type ComputeContext,
@@ -1862,7 +1862,7 @@ describe('recorded dependencies', () => {
 A computation must not throw (Throws). The one test asserts the non-corruption guarantee, observed through values and call counts after the throw; it asserts nothing about the node that threw.
 
 ```ts
-// from libs/reactive-graph/test/errors.test.ts
+// from libs/isograph-pico-js/test/errors.test.ts
 import { expect, test } from 'vitest';
 import {
   createDerivedNode,
@@ -1910,7 +1910,7 @@ The write after the throw succeeds, which asserts that `computingDepth` was rest
 ### `disposal.test.ts`
 
 ```ts
-// from libs/reactive-graph/test/disposal.test.ts
+// from libs/isograph-pico-js/test/disposal.test.ts
 import { describe, expect, test } from 'vitest';
 import {
   createDerivedNode,
@@ -2002,7 +2002,7 @@ describe('disposeDerivedNode (open decision 9 (a))', () => {
 Written for open decision 2 (f). Under (g) the calls drop the `graph` argument, the constructors take it, and the file gains the cross-graph read test of Option (g). Under (a) the file does not exist.
 
 ```ts
-// from libs/reactive-graph/test/guard.test.ts
+// from libs/isograph-pico-js/test/guard.test.ts
 import { describe, expect, test } from 'vitest';
 import {
   createDerivedNode,
@@ -2091,7 +2091,7 @@ describe('the write-during-computation guard', () => {
 ### `degenerate.test.ts`
 
 ```ts
-// from libs/reactive-graph/test/degenerate.test.ts
+// from libs/isograph-pico-js/test/degenerate.test.ts
 import { describe, expect, test } from 'vitest';
 import {
   createDerivedNode,
@@ -2287,7 +2287,7 @@ describe('degenerate cases', () => {
 ### `graph.test-d.ts`
 
 ```ts
-// from libs/reactive-graph/test/graph.test-d.ts
+// from libs/isograph-pico-js/test/graph.test-d.ts
 import { expectTypeOf, test } from 'vitest';
 import {
   createDerivedNode,
@@ -2334,10 +2334,10 @@ test('writes and equalities are typed by the node', () => {
 
 ### Location and files
 
-The engine is a workspace library at `libs/reactive-graph`, covered by `pnpm-workspace.yaml`'s `libs/*`. Its build and test setup copies `libs/isograph-runtime`'s without the Babel plugin, which only the runtime's fixtures need.
+The engine is a workspace library at `libs/isograph-pico-js`, covered by `pnpm-workspace.yaml`'s `libs/*`. Its build and test setup copies `libs/isograph-runtime`'s without the Babel plugin, which only the runtime's fixtures need.
 
 ```text
-libs/reactive-graph/
+libs/isograph-pico-js/
   package.json
   README.md                 The package README
   tsconfig.json             references tsconfig.package.json and tsconfig.test.json
@@ -2355,9 +2355,9 @@ Adding the package changes `pnpm-lock.yaml` (a new importer, written by `pnpm in
 ### `package.json`
 
 ```json
-// from libs/reactive-graph/package.json
+// from libs/isograph-pico-js/package.json
 {
-  "name": "@isograph/reactive-graph",
+  "name": "@isograph/pico-js",
   "description": "A graph of source nodes and derived nodes, recomputed on read when an input changed.",
   "private": true,
   "main": "./dist/index.cjs",
@@ -2381,7 +2381,7 @@ Adding the package changes `pnpm-lock.yaml` (a new importer, written by `pnpm in
   "repository": {
     "type": "git",
     "url": "git+https://github.com/isographlabs/isograph.git",
-    "directory": "libs/reactive-graph"
+    "directory": "libs/isograph-pico-js"
   },
   "sideEffects": false,
   "module": "./dist/index.mjs",
@@ -2402,7 +2402,7 @@ Deltas from `libs/isograph-runtime/package.json`: `name`, `description`, and `re
 `tsconfig.json`, `tsconfig.package.json`, and `tsdown.config.ts` are the runtime's, byte for byte (`libs/isograph-runtime/tsconfig.json`, `tsconfig.package.json`, `tsdown.config.ts`). The engine compiles under the root `tsconfig.build.json`: `target: ES2022`, `strict`, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `noUnusedLocals`, `noUnusedParameters`.
 
 ```json
-// from libs/reactive-graph/tsconfig.test.json
+// from libs/isograph-pico-js/tsconfig.test.json
 {
   "extends": "../../tsconfig.build.json",
   "compilerOptions": {
@@ -2414,7 +2414,7 @@ Deltas from `libs/isograph-runtime/package.json`: `name`, `description`, and `re
 ```
 
 ```ts
-// from libs/reactive-graph/vitest.config.ts
+// from libs/isograph-pico-js/vitest.config.ts
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
@@ -2432,17 +2432,17 @@ TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`; every type fi
 
 ```yaml
 # from .pre-commit-config.yaml
-      - id: engine-test
+      - id: pico-js-test
         name: engine test
-        entry: pnpm --filter @isograph/reactive-graph test
+        entry: pnpm --filter @isograph/pico-js test
         language: system
-        files: '^libs/reactive-graph/'
+        files: '^libs/isograph-pico-js/'
         pass_filenames: false
-      - id: engine-typecheck
+      - id: pico-js-typecheck
         name: engine typecheck
-        entry: pnpm --filter @isograph/reactive-graph tsc
+        entry: pnpm --filter @isograph/pico-js tsc
         language: system
-        files: '^(libs/reactive-graph/|tsconfig\.build\.json$)'
+        files: '^(libs/isograph-pico-js/|tsconfig\.build\.json$)'
         pass_filenames: false
 ```
 
@@ -2451,9 +2451,9 @@ TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`; every type fi
 ```yaml
 # from .pre-commit-config.yaml
       # runtime-dependencies-build and runtime-typecheck, files:
-        files: '^(libs/isograph-runtime/|libs/isograph-disposable-types/|libs/reactive-graph/|tsconfig\.build\.json$)'
+        files: '^(libs/isograph-runtime/|libs/isograph-disposable-types/|libs/isograph-pico-js/|tsconfig\.build\.json$)'
       # runtime-test, files:
-        files: '^libs/(isograph-runtime|isograph-disposable-types|reactive-graph)/'
+        files: '^libs/(isograph-runtime|isograph-disposable-types|isograph-pico-js)/'
 ```
 
 ### CI
@@ -2462,8 +2462,8 @@ TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`; every type fi
 
 ```yaml
 # from .github/workflows/js.yml
-      - name: Test @isograph/reactive-graph
-        run: pnpm --filter @isograph/reactive-graph test
+      - name: Test @isograph/pico-js
+        run: pnpm --filter @isograph/pico-js test
 ```
 
 ### Readers before the Isograph runtime depends on it
@@ -2489,7 +2489,7 @@ pico-runtime.md's open decisions that restate this doc's state the same status: 
 
 ### 1. The package's name (decided)
 
-The package is `@isograph/reactive-graph` and its directory is `libs/reactive-graph` (pico-runtime.md open decision 18). The directory does not follow the `libs/isograph-<name>` pattern of the other library directories. Whether the name is free on the npm registry was not verified, because the registry was not reachable offline.
+The package is `@isograph/pico-js` and its directory is `libs/isograph-pico-js` (pico-runtime.md open decision 18). The `-js` suffix keeps the npm name distinct from the Rust crate `pico` (`crates/pico`), which the engine ports. The directory follows the mapping of the other library directories, `@isograph/<name>` in `libs/isograph-<name>` (`@isograph/runtime` in `libs/isograph-runtime`, `@isograph/disposable-types` in `libs/isograph-disposable-types`, `@isograph/babel-plugin` in `libs/isograph-babel-plugin`; `@isograph/plugin-swc` in `libs/isograph-swc-plugin` is the one exception). Whether the name is free on the npm registry was not verified, because the registry was not reachable offline.
 
 ### 2. A write during a computation
 
