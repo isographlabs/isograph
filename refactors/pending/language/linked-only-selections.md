@@ -123,24 +123,96 @@ pub enum RecordStorage {
 }
 
 /// The table of `entity` as `client` reads the schema and sources. `reachable` is the set of
-/// fields whose reader artifact `project_artifacts` generates.
+/// fields whose reader artifact `project_artifacts` generates; `roots` is every root entity of
+/// the project's operations.
 pub fn entity_table<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
     entity: EntityName,
     reachable: &BTreeSet<EntityNameAndSelectableName>,
-) -> Result<EntityTable, GenerationError>;
+    roots: &BTreeSet<EntityName>,
+) -> Result<EntityTable, GenerationError> {
+    let found = entity_named(db, client, entity)
+        .clone()
+        .map_err(GenerationError::Lookup)?;
+    let fields = selectables_for_entity(db, client, entity)
+        .clone()
+        .map_err(GenerationError::Lookup)?
+        .into_iter()
+        .filter_map(|selectable| {
+            let field = EntityNameAndSelectableName {
+                parent_entity_name: entity,
+                selectable_name: selectable.name,
+            };
+            let entry = match selectable.kind {
+                SelectableKind::Server(server) => {
+                    let target = server.target.inner_values().next().copied()?;
+                    match TProfile::NetworkProtocol::selectable_shape(server.data.reference()) {
+                        SelectableShape::Direct => FieldEntry::Source(target),
+                        SelectableShape::Refinement => FieldEntry::Derived(DerivedEntry {
+                            field,
+                            target: target.wrap_some(),
+                        }),
+                    }
+                }
+                SelectableKind::ClientField => {
+                    if !reachable.contains(field.reference()) {
+                        return None;
+                    }
+                    FieldEntry::Derived(DerivedEntry { field, target: None })
+                }
+                SelectableKind::ClientPointer(_) | SelectableKind::SelfRecord => return None,
+            };
+            (selectable.name, entry).wrap_some()
+        })
+        .collect();
+    let (shape, storage) = match found.origin.reference() {
+        EntityOrigin::Source => (TableShape::Composite, RecordStorage::FromParent),
+        EntityOrigin::Protocol(data) => match TProfile::NetworkProtocol::entity_shape(data) {
+            EntityShape::Leaf => (TableShape::Leaf, RecordStorage::FromParent),
+            EntityShape::Composite(composite) => {
+                let storage = if roots.contains(entity.reference()) {
+                    RecordStorage::Fixed(FixedRecordId::root())
+                } else {
+                    match composite.identity {
+                        IdentitySelection::Select(name) => RecordStorage::OwnId(name),
+                        IdentitySelection::Omit => RecordStorage::FromParent,
+                    }
+                };
+                (TableShape::Composite, storage)
+            }
+            EntityShape::Input => {
+                return GenerationError::Lookup(Diagnostic::new(
+                    format!("`{entity}` is an input type and has no entity table."),
+                    None,
+                ))
+                .wrap_err();
+            }
+        },
+    };
+    EntityTable {
+        entity,
+        fields,
+        shape,
+        storage,
+    }
+    .wrap_ok()
+}
 ```
 
-`project_artifacts` calls it once per generated table, after it computes `reachable` (`crates/isograph_compiler/src/artifact_types.rs:782-788`). It is a plain function and not a memo: `reachable` is built inside `project_artifacts`, which is not a memo, from every entrypoint of the project.
+`project_artifacts` calls it once per generated table, after it computes `reachable` (`crates/isograph_compiler/src/artifact_types.rs:782-788`). It is a plain function and not a memo: `reachable` is built inside `project_artifacts`, which is not a memo, from every entrypoint of the project. `roots` is the union, over every entrypoint, of its `EntrypointFetch::roots`' `operation` and `others` (`crates/isograph_compiler/src/entrypoint.rs:13-20`, `:85-108`); `complete` gives a root entity's records the same fixed id (`RootEntities::identity_of`, `entrypoint.rs:22-38`). For GraphQL, every operation's `RootEntities` names every root operation type (`root_entities`, `crates/graphql_network_protocol/src/root_operation_types.rs:35-46`), so the union is the schema's `query`, `mutation`, and `subscription` types.
 
-`entity_table` builds:
+The rules, by `SelectableKind`:
 
-- `fields`: every protocol selectable of `entity` as `Source(target)` (`target` from `server.target.inner_values()`, as `inlined_in_selection` reads it, `crates/isograph_compiler/src/merged_selection.rs:1325-1338`), every `field entity.f` declaration without `to` that is in `reachable` as `Derived { target: None }`, and every generated refinement field on `entity` that some reader in the project selects as `Derived { target: Some(T) }`. A client pointer is not read in v0 (open decision 1) and is not listed. A declared client field outside `reachable` is not listed: its reader artifact is not generated (open decision 4).
-- `shape`: `EntityShape::Leaf` is `Leaf`, `EntityShape::Composite(_)` is `Composite` (`crates/isograph_compiler/src/protocol_shape.rs:5-13`).
-- `storage`: from the entity's `CompositeShape.identity` (`protocol_shape.rs:17-20`), `Fixed` for a root entity as `complete` assigns it (`merged_selection.rs:1450-1458`), and `FromParent` for a leaf.
+- `Server` with `SelectableShape::Direct`: `Source(target)`, `target` the first inner entity of `server.target`, as `inlined_in_selection` reads it (`crates/isograph_compiler/src/merged_selection.rs:1325-1338`). `__typename` is one: `graphql_selectables` lists it on every object, interface, and union (`crates/graphql_network_protocol/src/protocol_data.rs:535-538`). A target with no inner entity, which no GraphQL type has, is not listed.
+- `Server` with `SelectableShape::Refinement`: `Derived { field: E.asT, target: Some(T) }`. Every refinement the schema gives the entity is listed, selected or not. i2's GraphQL protocol defines an entity's refinements in `graphql_selectables` (`crates/graphql_network_protocol/src/protocol_data.rs:506-545`): for a union, one `asT` per member, and for an interface, one `asT` per object type that implements it (`object_types_implementing`, `:584`), each only when `T` is an object type (`refinement_to`, `:404-435`). That is the set upstream generates `asT` fields for: one per concrete child of each abstract entity (`../isograph/crates/graphql_network_protocol/src/nested_server_schema/parse_nested_server_schema.rs:362-375`). The set is a function of the schema and the entity, so no project-wide query collects it.
+- `ClientField`: `Derived { field, target: None }` when `field` is in `reachable` (open decision 4).
+- `ClientPointer`: not listed; a client pointer is not read in v0 (open decision 1).
+- `SelfRecord`: not listed; the walk recognizes `__self` by name (pico-runtime.md open decision 27).
 
-Which tables are generated: every entity a reader artifact's `tables` or a normalization AST's `tables` names. `ProjectArtifacts` gains them:
+A source entity's table is `Composite` with `FromParent` storage. No artifact names one in v0: a source entity is reachable only through a client pointer, which is not read, or through an entrypoint, which `EntityNotFetchableError::SourceEntity` rejects (`crates/isograph_compiler/src/entrypoint.rs:46-49`). No artifact names an input entity either, since no selection reads one.
+
+Which tables are generated: every entity the `tables` of a generated reader artifact or of an entrypoint's normalization AST names. The refinement fields' reader artifacts are generated with the tables: for each generated table, `project_artifacts` adds a `FieldArtifacts` with `resolver: FieldResolver::Refinement(T)` for each `Derived` entry whose `target` is `Some(T)` (Generated refinement fields). A refinement artifact's `tables` names only its parent entity, whose table is already generated, so this adds no table. `ProjectArtifacts` gains the tables:
 
 ```rust
 // from crates/isograph_compiler/src/artifact_types.rs
@@ -497,7 +569,7 @@ Kept, with their messages: `InvalidEntityError::LeafTarget` (a pointer to a scal
 - Client field without a set: `selections: None`, type `ClientFieldOutput(field)` (unchanged). With a set: `GenerationError::SelectionSetOnClientField` (unchanged).
 - Client pointer: `SelectionRead::NotRead` (unchanged; open decision 1).
 
-Each selection whose value the walk reads at a record (a server field, a refinement, `__self`) adds its target entity to `FieldTypes::tables`, and each refinement selection adds its generated field to `FieldTypes::selected`, so its reader artifact is generated.
+Each selection whose value the walk reads at a record (a server field, a refinement, `__self`) adds its target entity to `FieldTypes::tables`. A refinement selection does not add its generated field to `FieldTypes::selected`: the refinement's reader artifact is generated with its parent entity's table (Entity tables (compiler)), selected or not.
 
 ```rust
 // from crates/isograph_compiler/src/artifact_types.rs
@@ -527,7 +599,7 @@ pub enum ArtifactInnerType {
 
 ### Generated refinement fields
 
-A refinement `asT` on an entity `A` is a field the compiler generates on `A`, with target `T`, written at `A/asT/resolver_reader.ts` when some reader selects it. Its reader AST is empty, its `tables` lists its parent entity `A` alone (`FieldTypes::tables` holds the parent entity of every field, and the walk looks up the parent's table before it reads the empty reader AST), and its resolver is printed in the artifact: `({ link }) => (link.entityName === 'T' ? { entityName: 'T', id: link.id } : null)`. A `field A.asT` declaration is `DuplicateDefinition` with it.
+A refinement `asT` on an entity `A` is a field the compiler generates on `A`, with target `T`, written at `A/asT/resolver_reader.ts` whenever `A`'s table is generated, whether or not a reader selects it, since `A`'s table lists it and imports that file. Its reader AST is empty, its `tables` lists its parent entity `A` alone (`FieldTypes::tables` holds the parent entity of every field, and the walk looks up the parent's table before it reads the empty reader AST), and its resolver is printed in the artifact: `({ link }) => (link.entityName === 'T' ? { entityName: 'T', id: link.id } : null)`. A `field A.asT` declaration is `DuplicateDefinition` with it.
 
 ```rust
 // from crates/isograph_compiler/src/artifact_types.rs
@@ -779,7 +851,7 @@ export default normalizationAst;
 
 Before, each composite target held `identity: { kind: 'Select', selectableName: 'id' }`; it is `Pet`'s table's `storage` now. The root's record stays in `root`, as upstream's `ROOT_ID` does; `Query`'s table is imported only by an AST that writes `Query` records below the root.
 
-A refinement's reader artifact, emitted when a reader selects `asPet` on `Node`:
+A refinement's reader artifact, emitted for each refinement of `Node` whenever `Node`'s table is generated:
 
 ```ts
 // generated by crates/typescript_artifacts/src/reader_artifact.rs
@@ -814,7 +886,7 @@ export default readerArtifact;
 Each is one commit, in order; each is independently shippable. They are pico-runtime.md's core changes 3, 6, and 7.
 
 1. Scalar records on v1's reader AST. The normalization AST's `Leaf` target with its entity and list depth (`NormalizationLeafTarget`, `ListDepth`, `MixedListDepth`), and `kind: 'Composite'` on the composite target, which keeps its `identity` (Normalization AST (compiler), change 1's printed form); `normalize`, `check`, and the garbage collector's mark handle scalar records (pico-runtime.md, Scalar records); v1's `Scalar` reader kind reads the link, then `__value`. Observable: a normalized store holds a `String` record per scalar value with its `__value`; reads return the same values; the pet script prints the same output.
-2. Entity tables and the minimal reader AST. `ReaderSelection` as a struct; `EntityTable`, `entity_table`, `ProjectArtifacts::entity_tables`, and `E/entity_table.ts`; `FieldTypes::tables`; `parentEntityName`, `selectableName`, and `tables` in every reader artifact; `NormalizationAst::tables` and the identity's removal from composite targets and conditionals (`CompletedIdentity` leaves `NormalizationCompositeTarget` and `NormalizationConditional`); generated refinement fields (`FieldResolver::Refinement`, `GeneratedFunction::Refinement`). Observable: every artifact under `demos/pet-demo/src/__isograph` and the runtime fixtures is regenerated in the new shape, with `E/entity_table.ts` modules and `Node/asPet/` style refinement fields; the pet script prints the same output.
+2. Entity tables and the minimal reader AST. `ReaderSelection` as a struct; `EntityTable`, `entity_table`, `ProjectArtifacts::entity_tables`, and `E/entity_table.ts`; `FieldTypes::tables`; `parentEntityName`, `selectableName`, and `tables` in every reader artifact; `NormalizationAst::tables` and the identity's removal from composite targets and conditionals (`CompletedIdentity` leaves `NormalizationCompositeTarget` and `NormalizationConditional`); generated refinement fields (`FieldResolver::Refinement`, `GeneratedFunction::Refinement`), one per refinement of each entity whose table is generated. Observable: every artifact under `demos/pet-demo/src/__isograph` and the runtime fixtures is regenerated in the new shape, with `E/entity_table.ts` modules and `Node/asPet/` style refinement fields; the pet script prints the same output.
 3. Linked-only selections. Validation, query generation, and reader generation accept bare object selections, selection sets on scalars, client fields on scalar entities, and `__self` (`SelfRecord`, with its `inlined_in_selection` arm); `EmptyObject`. Observable: the example compiles to the artifacts above; `read` of `PetDetailPage` on the store fixture returns `{ pet: { n1: 'Ricky', n2: { toUppercase: 'RICKY' }, bestFriend: { name: 'Mango' } } }`; a bare `bestFriend` returns `{}` or `null`, and its query text is `bestFriend { __typename id }`.
 
 ## Open decisions
