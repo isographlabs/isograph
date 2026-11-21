@@ -450,15 +450,15 @@ function assertNever(value: never): never {
   throw new Error(`Unhandled variant: ${String(value)}`);
 }
 
-/** Computes a node that was never computed or was disposed, stores its value `Clean`, and marks its
- * dependents `Dirty`. Calls no `equals`: there is no previous value. */
+/** Computes a node that was never computed or was disposed and stores its value `Clean`. Calls no
+ * `equals`: there is no previous value. Marks nothing: a never-computed node has no dependents, and
+ * every dependent of a disposed node is `Dirty`. */
 function computeFirst<TValue>(node: DerivedNode<TValue>): TValue {
   const value = compute(node);
   const dependencies = node.reads;
   setDependencies(node, NO_DEPENDENCIES, dependencies);
   node.reads = [];
   stateOf(node).precalculated = { value, status: 'Clean', dependencies };
-  markDirty(node.dependents);
   return value;
 }
 
@@ -472,39 +472,27 @@ function verify<TValue>(
   for (const dependency of precalculated.dependencies) {
     if (dependency.kind === 'Derived') {
       pull(dependency);
-    }
-    if (precalculated.status === 'Dirty') {
-      break;
+      if (precalculated.status === 'Dirty') {
+        return recompute(node, precalculated);
+      }
     }
   }
-  switch (precalculated.status) {
-    case 'Dirty':
-      return recompute(node, precalculated);
-    case 'Check':
-      precalculated.status = 'Clean';
-      return precalculated.value;
-    case 'Clean':
-      return precalculated.value;
-    default:
-      return assertNever(precalculated.status);
-  }
+  precalculated.status = 'Clean';
+  return precalculated.value;
 }
 
-/** Runs the computation, compares its value with the precalculated one, replaces the dependencies,
- * and stores the new value unless `equals` accepted it, in which case the previous value object
- * stays. A new value marks the dependents `Dirty`. A throw out of the computation or out of
- * `equals` is a programmer error; it leaves the state and every `dependents` set untouched. */
+/** Runs the computation, replaces the dependencies, and stores the new value unless `equals` accepted
+ * it, in which case the previous value object stays. A new value marks the dependents `Dirty`. */
 function recompute<TValue>(
   node: DerivedNode<TValue>,
   precalculated: PrecalculatedValue<TValue>,
 ): TValue {
   const value = compute(node);
+  commitReads(node, precalculated);
   if (node.equals(precalculated.value, value)) {
-    commitReads(node, precalculated);
     precalculated.status = 'Clean';
     return precalculated.value;
   }
-  commitReads(node, precalculated);
   precalculated.value = value;
   precalculated.status = 'Clean';
   markDirty(node.dependents);
@@ -555,11 +543,12 @@ A computation uses its `Context` only as the first argument of `readSource` and 
 
 There are two read functions in place of one `read(context, node)` that switches on `node.kind`: every caller knows statically whether it reads a source or a derived node, and a switch would test again what the caller's type already established, at a comparison per read.
 
-- `verify` reads the node's state again after each dependency's pull, because a dependency's `recompute` marks this node `Dirty` through `dependents`. It is a `for` loop with `break` in place of `some`, which allocated a closure per verify; a verify is one step of every pull of a `Check` node.
+- `verify` reads the node's state again after each derived dependency's pull, because a dependency's `recompute` marks this node `Dirty` through `dependents`, and returns `recompute` at the first `Dirty`. A source dependency is not pulled and changes no mark. When the loop ends, the node is `Check`: only this node's own `recompute` or `verify` makes it `Clean`, and neither runs during the loop, because the graph is acyclic (Cycles). It is a `for` loop with `return` in place of `some`, which allocated a closure per verify; a verify is one step of every pull of a `Check` node.
 - `readDerived` records the dependency after the pull returns. A pull that throws records nothing, and the throw leaves the reading computation, so no dependency list holds a node whose pull threw.
-- `recompute` calls `equals` before `commitReads`, which calls `setDependencies`. A throw out of `equals` then leaves the node's dependency list and every `dependents` set consistent. Called after, a throw would leave the node in the `dependents` sets of the new dependencies while its state lists the old ones, and a later `setDependencies` from the old list would never remove it from the sets only the failed run added. Both branches store the new reads as the dependency list, so a node whose value came back equal still depends on what it read this time.
+- `recompute` calls `commitReads` once, before `equals`. Both outcomes store the new reads as the dependency list, so a node whose value came back equal still depends on what it read this time. `equals` compares two values and reads no node, so it does not depend on which dependency list the state holds. `commitReads` writes the dependency list and the `dependents` sets together, so a throw out of `equals` leaves them consistent: the node stays `Dirty` with its old value and its new dependency list, and its next pull recomputes it.
+- `computeFirst` marks no dependent. A node enters a `dependents` set only through the `setDependencies` of a reader whose computation pulled it, so a never-computed node has no dependents. `disposeDerivedNode` marks every dependent of the node it disposes `Dirty`. A dependent stays in that set until its own `recompute` (or its disposal) runs `setDependencies`, and a `Dirty` node leaves `Dirty` only through `recompute`, which either drops the disposed node from its dependencies or pulled it during its computation, while the dependent was still `Dirty`. Every dependent of a node `computeFirst` runs on is therefore `Dirty`, and `markDirty` on `Dirty` nodes changes nothing.
 - A node that was never computed or was disposed holds `MISSING` in place of a `PrecalculatedValue`, so its value cannot be read without first ruling `MISSING` out. Its first pull is `computeFirst`, which calls no `equals`. Marking never reaches such a node, because a node in a `dependents` set was computed. The `PrecalculatedValue` is allocated once per first computation; every later mark change and recomputation writes `status` and `value` in place, so marking and recomputing allocate no state object.
-- A node's dependency list (`PrecalculatedValue.dependencies`) and `node.reads` are two arrays the node owns, swapped by every `commitReads`: the reads become the dependency list, and the previous dependency list becomes the buffer the next computation clears and fills. A computation allocates no array, no result object, and no context: `compute` returns the value alone and passes the node as its own `Context` (The context). A throw out of the computation or out of `equals` leaves `node.reads` partly filled and the state untouched; the next `compute` clears it. `createDerivedNode` allocates the first `reads` buffer and `computeFirst` the next, one array per first computation; no array is shared between two nodes, and `NO_DEPENDENCIES` is only read. The dependency lists are `AnyNode[]` in place of `ReadonlyArray`, because the engine reuses them as buffers.
+- A node's dependency list (`PrecalculatedValue.dependencies`) and `node.reads` are two arrays the node owns, swapped by every `commitReads`: the reads become the dependency list, and the previous dependency list becomes the buffer the next computation clears and fills. A computation allocates no array, no result object, and no context: `compute` returns the value alone and passes the node as its own `Context` (The context). A throw out of the computation leaves `node.reads` partly filled and the state untouched; the next `compute` clears it. `createDerivedNode` allocates the first `reads` buffer and `computeFirst` the next, one array per first computation; no array is shared between two nodes, and `NO_DEPENDENCIES` is only read. The dependency lists are `AnyNode[]` in place of `ReadonlyArray`, because the engine reuses them as buffers.
 - A computation is synchronous; a read through its `Context` after it returned breaks the contract (The context).
 - The context is a parameter: the running node itself. There is no ambient current computation (Reactively's `CurrentReaction`, Preact's `evalContext`), so a computation that keeps its contract cannot have its reads recorded on another node, and two graphs never share tracking state.
 
@@ -632,7 +621,7 @@ Without `MISSING`, a `Clean` node disposed by `setDependencies` and marking alon
 
 ### Throws
 
-A computation and an equality must not throw. A throw out of either is a programmer error, and the engine defines no behavior for the node that threw: no retry, no stored error, no value. The engine guarantees only that its own state is not corrupted. A throw out of a computation propagates out of `compute`, and a throw out of `equals` propagates out of `recompute`, before `setDependencies` and before any state is written, so every mark, value, dependency list, and `dependents` set is as it was before the throwing run. A throw out of a source's `equals` propagates out of `writeSource` before the value is set and before any marking. Nodes pulled inside the failed computation before the throw are `Clean` and correct, because each pull completed.
+A computation and an equality must not throw. A throw out of either is a programmer error, and the engine defines no behavior for the node that threw: no retry, no stored error, no value. The engine guarantees only that its own state is not corrupted. A throw out of a computation propagates out of `compute` before `setDependencies` and before any state is written, so every mark, value, dependency list, and `dependents` set is as it was before the throwing run. A throw out of `equals` propagates out of `recompute` after `commitReads` and before any mark or value is written, so the node stays `Dirty` with its old value, and its dependency list and the `dependents` sets name the new reads, consistently. A throw out of a source's `equals` propagates out of `writeSource` before the value is set and before any marking. Nodes pulled inside the failed computation before the throw are `Clean` and correct, because each pull completed.
 
 A `RangeError` from a pull that exceeds the call stack is the one throw this guarantee does not cover (Pull, open decision 12). It can leave from inside `setDependencies`, after some edges moved, so after it the engine's state is not guaranteed. Pull depth is a contract: a graph whose pull depth stays well below the stack limit never overflows.
 
