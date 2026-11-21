@@ -2055,7 +2055,7 @@ TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`; every type fi
 
 ### Readers before the Isograph runtime depends on it
 
-AGENTS.md says we do not have anything we do not use, and tests-only is not a reader. Until the Isograph runtime calls it, the package's reader is the user's stated goal that the engine is usable by projects outside Isograph (pico-runtime.md, Goal). pico-runtime.md core change 3 ships the package before its first workspace caller on that ground; core change 4 is the first caller of the source functions and core change 5 of the derived-node functions. Open decision 11 restates whether the package ships alone or merges into its first use.
+AGENTS.md says we do not have anything we do not use, and tests-only is not a reader. Until the Isograph runtime calls it, the package's reader is the user's stated goal that the engine is usable by projects outside Isograph (pico-runtime.md, Goal). pico-runtime.md core change 3 ships the package before its first workspace caller on that ground; core change 4 is the first caller of the source functions and core change 5 of the derived-node functions. The package ships alone, as its own change (decision 11).
 
 ## What this doc changes in pico-runtime.md
 
@@ -2071,7 +2071,7 @@ pico-runtime.md is not edited by this doc. These are the differences to apply th
 - The engine defines no equality and exports no `sameValue`; every `createDerivedNode` caller supplies `equal`, and the Isograph layer passes `===` (decision 6).
 - `createSourceNode` takes a required `equal`, and `writeSource` stores nothing and marks nothing when it accepts (decision 8). pico-runtime.md's `createSourceNode` callers in `store.ts` pass `===`.
 - A `sourceValue` or `pull` inside a computation is an untracked read, and the guard covers writes only (decision 10). pico-runtime.md's guard on `pull` goes.
-- New open decisions 8, 9, 10, and 11 below.
+- New decisions 8, 9, 10, and 11 below; 8, 10, and 11 are decided and 9 is open.
 
 ## Open decisions
 
@@ -2134,10 +2134,6 @@ New. pico-runtime.md's body leaves a disposed node's state as it was, so a `Clea
 
 Allowed. `sourceValue(source)`, and a `pull` called inside a computation outside its context, read without recording a dependency of the running computation, like pico's untracked lookup (`MemoRef::lookup`, `crates/pico/src/memo_ref.rs:57`, against `lookup_tracked`, `:80`), Preact's `peek()`, and Solid's `untrack`. An untracked read writes no source and marks nothing. The write-during-computation guard (decision 2) covers writes only: `writeSource`, `markSourceChanged`, and `disposeDerivedNode`. `dependencies.test.ts` "sourceValue inside a computation records nothing" and "pull inside a computation records nothing" assert that a later write to what was read untracked does not mark the node.
 
-### 11. Whether the package ships before its first caller
+### 11. Whether the package ships before its first caller (decided)
 
-New in this doc; pico-runtime.md core change 3 holds (a).
-
-- (a) Its own commit (pico-runtime.md core change 3), with its tests and no Isograph caller. Held. Reason: the user's goal that the engine is usable outside Isograph is its reader (Readers before the Isograph runtime depends on it). Cost: the package exists for two commits with only tests reading it, against AGENTS.md's "nothing we do not use".
-- (b) Merged into core change 4, where `store.ts` first calls `createSourceNode`, `sourceValue`, `writeSource`, and `markSourceChanged`. Cost: a larger commit, and `createDerivedNode`, `pull`, `disposeDerivedNode`, and `sameValue` still have no Isograph caller until core change 5.
-- (c) Merged into core change 5, the first commit in which every export has an Isograph caller. Cost: change 4 then needs the engine's source functions before the package exists, so changes 4 and 5 merge too.
+The package ships alone, as its own change (pico-runtime.md core change 3), with its tests and before the Isograph runtime uses it. Its reader is the user's stated goal that the engine is usable by projects outside Isograph (Readers before the Isograph runtime depends on it).
