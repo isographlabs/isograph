@@ -139,7 +139,8 @@ export type RecordPresence = 'Present' | 'Absent';
 export type StoreSourceNode = SourceNode<StoreValue | Missing>;
 export type ResolverNode = DerivedNode<ResolverResult<unknown>>;
 
-/** A source node's value when the record holds no value under its key: missing data. */
+/** A source node's value when the record holds no value under its key: missing data. From core
+ * change 2. */
 export const MISSING: unique symbol = Symbol('Missing');
 export type Missing = typeof MISSING;
 ```
@@ -213,7 +214,25 @@ function leafUnchanged(stored: StoreValue, written: StoreValue): boolean {
 
 /** `null`: `stored` is `null`. A link: a link with the same `entityName` and `id`. A list: a list of the
  * same length whose items are `compositeUnchanged` in order. */
-function compositeUnchanged(stored: StoreValue, written: StoreValue): boolean;
+function compositeUnchanged(stored: StoreValue, written: StoreValue): boolean {
+  if (stored === null || written === null) {
+    return stored === written;
+  }
+  if (isArray(stored) || isArray(written)) {
+    return (
+      isArray(stored) &&
+      isArray(written) &&
+      stored.length === written.length &&
+      written.every((item, index) => compositeUnchanged(stored[index], item))
+    );
+  }
+  return (
+    typeof stored === 'object' &&
+    typeof written === 'object' &&
+    stored.entityName === written.entityName &&
+    stored.id === written.id
+  );
+}
 
 /** The value of `key` on `link`, or `MISSING`; inserts nothing and records nothing. Callers: v1's read
  * hooks, `check`, the garbage collector's mark, `storeSnapshot`. */
@@ -1215,9 +1234,103 @@ Upstream's collection deletes records only and runs only when the base layer is 
 
 Each is one commit, in order; each is independently shippable.
 
-1. Prefactor: `normalize` skips an unchanged value (`writeValue`, `isUnchanged`, `leafUnchanged`, `compositeUnchanged`) on v1's plain store, comparing before `record.set`. It stays a prefactor rather than folding into the record containers change: it is observable and shippable on the plain store with no engine, and core change 5 moves the same comparison into the source nodes' `equal`, unchanged in behavior. Observable: normalizing the same response twice keeps every stored list and link object (`toBe`). In the pet script, the `PetDetailRoute` response leaves `Pet:0.firstName`'s stored value untouched.
-2. Prefactor: the walk takes `ReadHooks`; an absent record reads as all keys missing; `noRecord`'s two checks go (Absent records). `read` and `readButDoNotEvaluate` use `evaluatingHooks`. Observable: an absent root's `MissingData` reads "No value for pet____id___"1" on Query:__ROOT"; `Constant` on an absent record is `Ok`. The pet script's output is unchanged.
-3. Prefactor: scalar records on v1's reader AST (linked-only-selections.md, change 1; Scalar records). The normalization AST's `Leaf` target with its entity and list depth, `VALUE_KEY`, `omittedRecordId`, `leafRecords` (ids by `omittedRecordId` directly, before entity tables exist), and `check`'s and the mark's `Leaf` case. v1's `Scalar` case reads the link under its key, then `__value` at each linked record, lists mapped. Observable: `storeSnapshot` after normalizing `PetDetail`'s response holds `Pet:1.name` as a link to `String:Pet:1.name` with `__value` `"Ricky"`; every read returns the values it returned before; normalizing a response that changes only `Pet:1.name` writes only `String:Pet:1.name.__value`; the pet script's output is unchanged.
+1. Prefactor: `normalize` skips an unchanged value (`writeValue`, `isUnchanged`, `leafUnchanged`, `compositeUnchanged`) on v1's plain store, comparing before `record.set`. It stays a prefactor rather than folding into the record containers change: it is observable and shippable on the plain store with no engine, and core change 5 moves the same comparison into the source nodes' `equal`, unchanged in behavior. Observable: normalizing the same response twice keeps every stored list and link object (`toBe`). In the pet script, the `PetDetailRoute` response leaves `Pet:0.firstName`'s stored value untouched. The two comparisons live in `normalize.ts` until core change 5 moves them to `store.ts`; `compositeUnchanged` and `leafUnchanged` are the bodies of The store, Accessors, unchanged. On the plain store a leaf is stored under its own key, so the comparison is chosen by the selection's target, not by the key:
+
+   ```ts
+   // from libs/isograph-runtime/src/normalize.ts
+   // core change 1, on v1's plain store
+   // writeSelection, before (normalize.ts:96-109):
+     record.set(
+       storeKey(selection, normalization.variables),
+       selection.target == null
+         ? value
+         : compositeValue(normalization, selection, selection.target, value, link, [], [...path, responseKey]),
+     );
+   // after:
+     writeValue(
+       record,
+       storeKey(selection, normalization.variables),
+       selection.target == null
+         ? value
+         : compositeValue(normalization, selection, selection.target, value, link, [], [...path, responseKey]),
+       isUnchanged(selection),
+     );
+
+   /** Sets `key` on `record` to `value`, unless `record` holds a value under `key` that `unchanged`
+    * accepts, in which case the stored value object stays. An absent key is always written. */
+   function writeValue(
+     record: StoreRecord,
+     key: StoreKey,
+     value: StoreValue,
+     unchanged: (stored: StoreValue, written: StoreValue) => boolean,
+   ): void {
+     const stored = record.get(key);
+     if (stored !== undefined && unchanged(stored, value)) {
+       return;
+     }
+     record.set(key, value);
+   }
+
+   /** The comparison of a value written under `selection`: `leafUnchanged` for a leaf target, which
+    * holds the response's value, and `compositeUnchanged` for a composite one, which holds links. */
+   function isUnchanged(selection: NormalizationSelection): (stored: StoreValue, written: StoreValue) => boolean {
+     return selection.target == null ? leafUnchanged : compositeUnchanged;
+   }
+   ```
+2. Prefactor: the walk takes `ReadHooks`; an absent record reads as all keys missing; `noRecord`'s two checks go (Absent records). `read` and `readButDoNotEvaluate` use `evaluatingHooks`. Observable: an absent root's `MissingData` reads "No value for pet____id___"1" on Query:__ROOT"; `Constant` on an absent record is `Ok`. The pet script's output is unchanged. `MISSING`, `Missing`, and `storeValue` land here on the plain store, for `readStoreValue` and `evaluatingHooks` (The reader walk); core change 5 gives `storeValue` the container body of The store, Accessors, with the same signature:
+
+   ```ts
+   // from libs/isograph-runtime/src/store.ts
+   // core change 2, on v1's plain store
+   /** A value the store does not hold: no record at the link, or no value under the key. */
+   export const MISSING: unique symbol = Symbol('Missing');
+   export type Missing = typeof MISSING;
+
+   /** The value of `key` on `link`, or `MISSING`. */
+   export function storeValue(store: Store, link: StoreLink, key: StoreKey): StoreValue | Missing {
+     const value = storeRecord(store, link)?.get(key);
+     return value === undefined ? MISSING : value;
+   }
+   ```
+3. Prefactor: scalar records on v1's reader AST (linked-only-selections.md, change 1; Scalar records). The normalization AST's `Leaf` target with its entity and list depth, `VALUE_KEY`, `omittedRecordId`, `leafRecords` (ids by `omittedRecordId` directly, before entity tables exist), and `check`'s and the mark's `Leaf` case. v1's `Scalar` case reads the link under its key, then `__value` at each linked record, lists mapped. Observable: the store is v1's nested map until core change 5, so the tests compare it with `storeOf(..)` as they do today (`storeSnapshot` arrives with the containers); after normalizing `PetDetail`'s response (`petDetailResponse()`, `test/fixtures.ts:98-102`) the store holds `Pet:1.name` as the link `{ entityName: 'String', id: 'Pet:1.name' }`, and `String:Pet:1.name` with `__value` `'Rex'`; every read returns the values it returned before; normalizing a response that changes only `Pet:1.name` writes only `String:Pet:1.name.__value`; the pet script's output is unchanged. On the plain store, the leaf comparison is chosen by the key, `writeValue` writes a record, and `leafRecords` takes the id from `omittedRecordId` and the record from `recordAt`; core change 5 replaces `writeValue` and `isUnchanged` with the source-node forms (`normalize` writes source nodes; The store, Accessors), and core change 6 replaces the id with `recordId(.., storageOf(..))` (Scalar records):
+
+   ```ts
+   // from libs/isograph-runtime/src/normalize.ts
+   // core change 3, on v1's plain store
+   // writeSelection, after core change 1's form:
+     const target = selection.target;
+     writeValue(
+       record,
+       storeKey(selection, normalization.variables),
+       target.kind === 'Leaf'
+         ? leafRecords(normalization, selection, target, value, link, [], target.listDepth, [...path, responseKey])
+         : compositeValue(normalization, selection, target, value, link, [], [...path, responseKey]),
+     );
+
+   /** Sets `key` on `record` to `value`, unless `record` holds a value under `key` that `isUnchanged(key)`
+    * accepts. */
+   function writeValue(record: StoreRecord, key: StoreKey, value: StoreValue): void {
+     const stored = record.get(key);
+     if (stored !== undefined && isUnchanged(key)(stored, value)) {
+       return;
+     }
+     record.set(key, value);
+   }
+
+   /** `leafUnchanged` for a scalar record's `__value`, `compositeUnchanged` for every other key, which
+    * holds links. */
+   function isUnchanged(key: StoreKey): (stored: StoreValue, written: StoreValue) => boolean {
+     return key === VALUE_KEY ? leafUnchanged : compositeUnchanged;
+   }
+
+   // leafRecords, Scalar records' body from `const position` to the end, before entity tables and containers:
+     const link = {
+       entityName: target.entityName,
+       id: omittedRecordId(parent, selection, listIndexes, normalization.variables),
+     };
+     writeValue(recordAt(normalization.store, link), VALUE_KEY, value);
+     return link;
+   ```
 4. Prefactor: the engine package, shipped alone before the Isograph runtime uses it (open decision 26). This change implements `refactors/pending/runtime/reactive-engine.md`: `libs/reactive-graph` with `src/graph.ts` and `src/index.ts` as its The public API and The implementation write them, its test files (Tests) and `README.md` (The package README), and its `package.json`, tsconfig, tsdown, and vitest files, its two pre-commit hooks, and its CI step (The package), in the form of whichever option of its open decision 2 is decided. Nothing in the Isograph runtime imports it yet. Observable: `pnpm --filter @isograph/reactive-graph test` passes the sum, parity, and label example (`sum` and `parity` run twice, `label` once); `pnpm compile-libs` writes its `dist/index.cjs` and `dist/index.mjs`; its `package.json` lists no dependencies. Its reader is the stated goal, a project outside Isograph; the runtime is its first workspace caller in change 5.
 5. Prefactor: the store becomes record containers (`Store` with `graph` and `records`, `createStore`, `RecordContainer`, `presence`, `sources`, the accessors, `storeSnapshot`, `deleteRecord` without derived nodes). The runtime gains its dependency on the engine (The engine package and the runtime) and its three pre-commit hooks match the engine's directory. A container's `sources` hold the engine's source nodes: `sourceNodeAt` calls `createSourceNode` with `isUnchanged(key)`, so `normalize`'s comparison moves out of `normalize` into each source's `equal`, `storeValue` and `storeSnapshot` call `sourceValue`, `writeValue` calls `writeSource`, and `deleteRecord` calls `markSourceChanged` for each source node. No derived node exists, so every `dependents` set stays empty and `writeSource` and `markSourceChanged` mark nothing. `check`, `garbageCollect`, `read`, and `normalize` read and write through the accessors; tests compare `storeSnapshot`. Observable: none in behavior; `environment.store` is no longer v1's nested map, and `storeSnapshot(environment.store)` is.
 6. Prefactor: entity tables and the minimal reader AST (linked-only-selections.md, change 2). The compiler emits `ReaderSelection` as `{ alias, fieldName, arguments, selections }`, an `entity_table.ts` per entity a reader artifact or normalization AST imports, `ReaderArtifact.parentEntityName`, `selectableName`, and `tables`, `NormalizationAst.tables`, and a generated refinement field (`Node/asPet/`) per selected refinement; the normalization AST loses `identity`. The runtime gains `EntityTable`, the walk of Selections in the Isograph layer (`fieldOf`, `tableOf`, `readAt`, `EMPTY_DATA`), `recordId` over `RecordStorage` and `storageOf`, `storeKey(name, args, variables)`, and `selectionSetDataAreEqual` over tables; the four v1 selection kinds and `NormalizationIdentity` go. Observable: every generated artifact is regenerated in the new shape; every read returns the values it returned before; a `Node`-typed `node(id:)` selection of `asPet { name }` on a `Checkin` record is `null`; the pet script's output is unchanged.
