@@ -223,17 +223,19 @@ function verify<TValue>(node: DerivedNode<TValue>, state: CheckState<TValue>): T
   }
 }
 
-/** Runs the computation, replaces the dependencies, and stores the new value unless `equal` accepts
- * it against the previous one, in which case the previous value object stays. A new value marks the
- * dependents `Dirty`. A throw out of the computation leaves the state untouched. */
+/** Runs the computation, compares its value with the previous one, replaces the dependencies, and
+ * stores the new value unless `equal` accepted it, in which case the previous value object stays. A
+ * new value marks the dependents `Dirty`. A throw out of the computation or out of `equal` leaves the
+ * state and every `dependents` set untouched. */
 function recompute<TValue>(node: DerivedNode<TValue>, state: DirtyState<TValue>): TValue {
   const computed = compute(node.computation);
-  setDependencies(node, state.dependencies, computed.dependencies);
   const previous = state.previous;
   if (previous.kind === 'Value' && node.equal(previous.value, computed.value)) {
+    setDependencies(node, state.dependencies, computed.dependencies);
     stateOf(node).state = { mark: 'Clean', value: previous.value, dependencies: computed.dependencies };
     return previous.value;
   }
+  setDependencies(node, state.dependencies, computed.dependencies);
   stateOf(node).state = { mark: 'Clean', value: computed.value, dependencies: computed.dependencies };
   node.dependents.forEach(markDirty);
   return computed.value;
@@ -277,7 +279,7 @@ function setDependencies<TValue>(
 - `setDependencies` is the only writer of `dependents`. Removing every old edge and adding every new one is `O(old + new)`; a dependency read twice is one member of each set. A violation of "the dependents sets are the inverse of the dependency lists" is a silently stale result, which one writer guards.
 - The context is a parameter built per computation; there is no ambient current computation (MobX's `globalState.trackingDerivation`, Reactively's `CurrentReaction`).
 
-A throw out of a computation propagates out of `compute` before `setDependencies` and before any state is written, so the node keeps its mark, its previous value, and its previous dependencies and dependents, and the next pull recomputes it again. A verifying ancestor keeps its mark too. A resolver's own throw does not propagate: it is a stored value (Equality, `ResolverThrew`). What propagates is a throw of the walk outside the resolver, such as `linkAt` on a non-link (`libs/isograph-runtime/src/store.ts:74-86`). Open decision 3 covers that throw.
+A throw out of a computation propagates out of `compute`, and a throw out of `equal` propagates out of `recompute`, before `setDependencies` and before any state is written, so the node keeps its mark, its previous value, and its previous dependencies and dependents, and the next pull recomputes it again. A verifying ancestor keeps its mark too. `recompute` calls `equal` before `setDependencies` for that reason: called after, a throw from `equal` would leave the node in the `dependents` sets of the new dependencies while its state lists the old ones, and a later `setDependencies` from the old list would never remove it from the sets only the failed run added. Calling `equal` first changes nothing else: `equal` compares two values and reads no node, and both branches store `computed.dependencies`, so a link that moved to a record with equal data still cuts off and the node depends on the new record. `resolverResultsEqual` does not throw; a field-supplied `outputEqual` (open decision 7) can. A resolver's own throw does not propagate: it is a stored value (Equality, `ResolverThrew`). What propagates is a throw of the walk outside the resolver, such as `linkAt` on a non-link (`libs/isograph-runtime/src/store.ts:74-86`). Open decision 3 covers that throw.
 
 ## The store
 
