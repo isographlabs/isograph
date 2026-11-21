@@ -12,7 +12,7 @@ The engine is a graph of values. A source node holds a value that code outside t
 
 The engine imports nothing. It names no store, record, link, key, reader AST, entity, resolver, or other Isograph type. A project with values of its own types uses it with no Isograph code. The Isograph runtime is one consumer: its server values are source nodes and its resolver results are derived nodes (pico-runtime.md, The engine and the Isograph runtime). This doc describes the engine alone.
 
-The engine's public behavior is pico's: which values a read returns, which computations run again after a write, cutoff by equality, dependencies recorded per computation and replaced after every computation, and a write during a computation failing (open decision 2). Its invalidation differs from pico's. pico stamps sources with epochs and verifies a demanded memo by walking its dependencies. The engine keeps reverse edges and marks the nodes above a write eagerly, then recomputes lazily on a read (Comparison with the Rust pico crate).
+The engine's public behavior is pico's: which values a read returns, which computations run again after a write, cutoff by equality, dependencies recorded per computation and replaced after every computation, and a write during a computation failing (decision 2). Its invalidation differs from pico's. pico stamps sources with epochs and verifies a demanded memo by walking its dependencies. The engine keeps reverse edges and marks the nodes above a write eagerly, then recomputes lazily on a read (Comparison with the Rust pico crate).
 
 ## The model
 
@@ -140,7 +140,7 @@ Every edge is an object reference, held in both directions: a derived node's dep
 
 ## The public API
 
-The API below is written under open decision 2 option (f): an engine `Graph` object holds the write-during-computation guard, and every public function that reads or writes the graph takes it as its first parameter. Decision 2 is not decided, and (g) is the held option: pico-runtime.md establishes that the guard must be one no caller can bypass and that it lives in the engine (its open decision 2, the paragraph after its options), which leaves (f) and (g), and under (f) a computation that holds a second `Graph` bypasses the guard (open decision 2). (f) has pico's shape, every pico read and write taking the database (`Database::set`, `crates/pico/src/database.rs:151`; a memo's first argument is `&Db`), and the body, the README, and the tests stay in it until decision 2 is decided. Option (g) below is the complete (g) form of the API and of the functions that change. Under (a) every `graph` parameter and `Graph` itself drop out.
+The API below follows decision 2: an engine `Graph` object holds the write-during-computation guard, and every public function that reads or writes the graph takes it as its first parameter, as every pico read and write takes the database (`Database::set`, `crates/pico/src/database.rs:151`; a memo's first argument is `&Db`).
 
 ```ts
 // from libs/isograph-pico-js/src/index.ts
@@ -169,7 +169,7 @@ export {
 ```ts
 // from libs/isograph-pico-js/src/graph.ts
 /** One graph of source and derived nodes. It holds the guard that rejects a write or a disposal
- * while a computation or an equality runs (open decision 2). Created by `createGraph`; every
+ * while a computation or an equality runs (decision 2). Created by `createGraph`; every
  * public function but the constructors and `sourceValue` takes it first. */
 export type Graph = {
   /** The number of computations and equalities running. Incremented and decremented only by
@@ -333,295 +333,7 @@ export function pull<TValue>(graph: Graph, node: DerivedNode<TValue>): TValue;
 export function disposeDerivedNode(graph: Graph, node: AnyDerivedNode): void;
 ```
 
-Callers. In the Isograph runtime (pico-runtime.md, The engine and the Isograph runtime): `createGraph` in `createStore`, whose `Store` is `{ readonly graph: Graph; readonly records: ... }` under (f) and (g); `createSourceNode` and `sourceValue` in `store.ts`; `writeSource` in `normalize.ts` and `test/fixtures.ts`; `markSourceChanged` and `disposeDerivedNode` in `deleteRecord`; `createDerivedNode` and `pull` in `storedResults.ts`, which passes `resolverResultsEqual(artifact, identical)` as each node's equality, with `===` as its default output equality; `GraphWriteDuringComputationError` in `callResolver`, which rethrows it. Outside Isograph: the consumer's own code, as in The package README.
-
-### Option (g): each node holds its graph
-
-Under open decision 2 (g), held and not decided, a node records its graph at construction and every public function but `createGraph` and `sourceValue` reads the graph from the node it receives. This is the complete (g) form of The public API and of every function of The implementation that changes. The package index exports the same names. `AnyDerivedNode`, `StateSlot`, `DerivedNodeState`, `CleanState`, `CheckState`, `DirtyState`, `PreviousValue`, `Dependency`, `Computation`, `Computed`, and `ContextStatus` are the types of Types and Pull, unchanged. `neverComputed`, `stateOf`, `assertNotComputing`, `guarded`, `markDirty`, `markOneDirty`, `markCheck`, `setDependencies`, and `dependentsOf` are the functions of The implementation, unchanged: none of them receives a graph from a public caller.
-
-```ts
-// from libs/isograph-pico-js/src/graph.ts
-// under open decision 2 (g)
-/** One graph of source and derived nodes. It holds the guard that rejects a write or a disposal
- * while a computation or an equality of this graph runs. Created by `createGraph`, and passed only to
- * the constructors; every other public function reads it from a node. */
-export type Graph = {
-  /** The number of computations and equalities of this graph running. Incremented and decremented
-   * only by `guarded`. A count, not a two-state enum, because `readDerived` recomputes a node inside
-   * the computation that reads it, and that recomputation calls the node's `equal`. */
-  computingDepth: number;
-};
-
-/** A value set from outside the graph, and the derived nodes whose last computation read it. */
-export type SourceNode<TValue> = {
-  /** The graph whose guard `writeSource` and `markSourceChanged` check, and the only graph whose
-   * computations may read this source through their context. Set only by `createSourceNode`. */
-  readonly graph: Graph;
-  /** Read only by `readSource` and `sourceValue`. Written only by `writeSource`. */
-  value: TValue;
-  /** Whether a written value equals the stored one. Called only by `writeSource`, with the stored
-   * value and the written one, inside `guarded`, so a write or a disposal from it throws. A method
-   * signature, as `DerivedNode.equal` is. */
-  equal(previous: TValue, next: TValue): boolean;
-  /** Written only by `setDependencies`. */
-  readonly dependents: Set<AnyDerivedNode>;
-};
-
-/** A computation's value, kept until an input it read changes. */
-export type DerivedNode<TValue> = {
-  /** The graph whose guard `compute` and `recompute` raise and `disposeDerivedNode` checks, and the
-   * only graph whose computations may read this node through their context. Set only by
-   * `createDerivedNode`. */
-  readonly graph: Graph;
-  readonly computation: Computation<TValue>;
-  /** Whether two values of this node are equal, for cutoff. Called only by `recompute`, with the
-   * node's previous value and the value its computation just returned, inside `guarded`, so a write
-   * or a disposal from it throws. A method signature, so that a `DerivedNode<T>` is an
-   * `AnyDerivedNode` (open decision 5). */
-  equal(previous: TValue, next: TValue): boolean;
-  /** Value, mark, and dependencies. Read and written only through `stateOf`. */
-  readonly slot: StateSlot<TValue>;
-  /** Every derived node whose dependencies hold this one. Written only by `setDependencies`. */
-  readonly dependents: Set<AnyDerivedNode>;
-};
-
-/** The reads a computation makes. Built per computation by `compute`; there is no ambient current
- * computation. Valid only until its computation returns or throws; a read through it after that
- * throws. */
-export type ComputeContext = {
-  /** Records that the computation read `source`, and returns its value. Throws when `source` belongs
-   * to another graph than the computing node. */
-  readSource<TValue>(source: SourceNode<TValue>): TValue;
-  /** Pulls `node`, records that the computation read it, and returns its value. Throws when `node`
-   * belongs to another graph than the computing node. */
-  readDerived<TValue>(node: DerivedNode<TValue>): TValue;
-};
-
-/** A graph with no computation running. */
-export function createGraph(): Graph;
-
-/** A source node of `graph` holding `value`, read by no derived node. `equal` decides whether a
- * later write changes it. */
-export function createSourceNode<TValue>(
-  graph: Graph,
-  value: TValue,
-  equal: (previous: TValue, next: TValue) => boolean,
-): SourceNode<TValue>;
-
-/** A derived node of `graph` that was never computed: `Dirty`, no value, no dependencies. Its
- * computation first runs on the first pull that reaches it. */
-export function createDerivedNode<TValue>(
-  graph: Graph,
-  computation: Computation<TValue>,
-  equal: (previous: TValue, next: TValue) => boolean,
-): DerivedNode<TValue>;
-
-/** The value of `source`, read without recording a dependency. Inside a computation it is an
- * untracked read (decision 10). */
-export function sourceValue<TValue>(source: SourceNode<TValue>): TValue;
-
-/** When `source.equal` rejects the stored value and `value`, sets `source`'s value and marks its
- * dependents; when it accepts, stores nothing and marks nothing (decision 8). Runs no computation.
- * Throws while a computation or an equality of `source.graph` runs. */
-export function writeSource<TValue>(source: SourceNode<TValue>, value: TValue): void;
-
-/** Marks every dependent of `source` `Dirty` and every node above those `Check`, without changing
- * its value. Throws while a computation or an equality of `source.graph` runs. */
-export function markSourceChanged(source: SourceNode<unknown>): void;
-
-/** `node`'s current value: `Clean` returns it, `Check` verifies, `Dirty` recomputes. Inside a
- * computation it is an untracked read, of a node of any graph (decision 10). A computation or an
- * equality must not throw (Throws). */
-export function pull<TValue>(node: DerivedNode<TValue>): TValue;
-
-/** Removes `node` from the dependents of everything it read, resets it to never computed, and marks
- * its dependents `Dirty`. Throws while a computation or an equality of `node.graph` runs. */
-export function disposeDerivedNode(node: AnyDerivedNode): void;
-```
-
-The functions of The implementation that change under (g):
-
-```ts
-// from libs/isograph-pico-js/src/graph.ts
-// under open decision 2 (g)
-export function createSourceNode<TValue>(
-  graph: Graph,
-  value: TValue,
-  equal: (previous: TValue, next: TValue) => boolean,
-): SourceNode<TValue> {
-  return { graph, value, equal, dependents: new Set() };
-}
-
-export function createDerivedNode<TValue>(
-  graph: Graph,
-  computation: Computation<TValue>,
-  equal: (previous: TValue, next: TValue) => boolean,
-): DerivedNode<TValue> {
-  return {
-    graph,
-    computation,
-    equal,
-    slot: { state: neverComputed() },
-    dependents: new Set(),
-  };
-}
-
-export function writeSource<TValue>(source: SourceNode<TValue>, value: TValue): void {
-  assertNotComputing(source.graph);
-  if (guarded(source.graph, () => source.equal(source.value, value))) {
-    return;
-  }
-  source.value = value;
-  markDirty(source.dependents);
-}
-
-export function markSourceChanged(source: SourceNode<unknown>): void {
-  assertNotComputing(source.graph);
-  markDirty(source.dependents);
-}
-
-export function pull<TValue>(node: DerivedNode<TValue>): TValue {
-  const state = stateOf(node).state;
-  switch (state.mark) {
-    case 'Clean':
-      return state.value;
-    case 'Check':
-      return verify(node, state);
-    case 'Dirty':
-      return recompute(node, state);
-  }
-}
-
-function verify<TValue>(node: DerivedNode<TValue>, state: CheckState<TValue>): TValue {
-  state.dependencies.some((dependency) => {
-    if (dependency.kind === 'Derived') {
-      pull(dependency.node);
-    }
-    return stateOf(node).state.mark === 'Dirty';
-  });
-  const after = stateOf(node).state;
-  switch (after.mark) {
-    case 'Dirty':
-      return recompute(node, after);
-    case 'Check':
-      stateOf(node).state = {
-        mark: 'Clean',
-        value: after.value,
-        dependencies: after.dependencies,
-      };
-      return after.value;
-    case 'Clean':
-      return after.value;
-  }
-}
-
-function recompute<TValue>(node: DerivedNode<TValue>, state: DirtyState<TValue>): TValue {
-  const computed = compute(node.graph, node.computation);
-  const previous = state.previous;
-  if (
-    previous.kind === 'Value' &&
-    guarded(node.graph, () => node.equal(previous.value, computed.value))
-  ) {
-    setDependencies(node, state.dependencies, computed.dependencies);
-    stateOf(node).state = {
-      mark: 'Clean',
-      value: previous.value,
-      dependencies: computed.dependencies,
-    };
-    return previous.value;
-  }
-  setDependencies(node, state.dependencies, computed.dependencies);
-  stateOf(node).state = {
-    mark: 'Clean',
-    value: computed.value,
-    dependencies: computed.dependencies,
-  };
-  markDirty(node.dependents);
-  return computed.value;
-}
-
-/** Runs `computation` of a node of `graph` inside `guarded` with a context that records what it
- * reads, in read order. The context closes when the computation returns or throws, and rejects a
- * node of another graph. Called only by `recompute`, with `node.graph`. */
-function compute<TValue>(
-  graph: Graph,
-  computation: Computation<TValue>,
-): Computed<TValue> {
-  const dependencies: Dependency[] = [];
-  let status: ContextStatus = 'Open';
-  const assertReadable = (read: Graph): void => {
-    if (status === 'Closed') {
-      throw new Error(
-        'Cannot read through a context after its computation returned.',
-      );
-    }
-    if (read !== graph) {
-      throw new Error('Cannot read a node of another graph inside a computation.');
-    }
-  };
-  try {
-    const value = guarded(graph, () =>
-      computation({
-        readSource: (source) => {
-          assertReadable(source.graph);
-          dependencies.push({ kind: 'Source', source });
-          return source.value;
-        },
-        readDerived: (node) => {
-          assertReadable(node.graph);
-          const read = pull(node);
-          dependencies.push({ kind: 'Derived', node });
-          return read;
-        },
-      }),
-    );
-    return { value, dependencies };
-  } finally {
-    status = 'Closed';
-  }
-}
-
-export function disposeDerivedNode(node: AnyDerivedNode): void {
-  assertNotComputing(node.graph);
-  const slot = stateOf(node);
-  setDependencies(node, slot.state.dependencies, []);
-  slot.state = neverComputed();
-  markDirty(node.dependents);
-}
-```
-
-Deltas from the (f) bodies: each constructor stores `graph`; `writeSource`, `markSourceChanged`, and `disposeDerivedNode` read the graph from the node they receive; `pull`, `verify`, and `recompute` drop the `graph` parameter and `recompute` passes `node.graph` to `compute` and `guarded`; `compute`'s `assertOpen` becomes `assertReadable`, which also throws on a node of another graph.
-
-The guard cannot be bypassed under (g). A write reads the guard from the source it writes, so a computation that holds a second `Graph` reaches the same guard: in the trace of open decision 2 (f), `writeSource(s, 2)` inside `p`'s computation reads `s.graph`, whose `computingDepth` is 1, and throws. A computation of graph `G` may still write a source of another graph `H` through a closure. That write runs `H`'s guard. It cannot corrupt `G`, because no node of `G` reads a node of `H` through its context: `readSource` and `readDerived` throw on it, so no `dependents` edge crosses graphs and a mark in `H` reaches no node of `G`. When a computation of `H` is running beneath the computation of `G` (a computation of `H` pulls a node of `G` untracked, whose computation writes a source of `H`), `H.computingDepth` is positive and the write throws.
-
-`guard.test.ts` under (g) drops the `graph` argument from every call but the constructors, which take it first, and gains one test:
-
-```ts
-// from libs/isograph-pico-js/test/guard.test.ts
-// under open decision 2 (g)
-  test('a read of a node of another graph throws', () => {
-    const graph = createGraph();
-    const otherGraph = createGraph();
-    const foreignSource = createSourceNode(otherGraph, 0, strictEqual);
-    const foreignNode = createDerivedNode(otherGraph, () => 0, strictEqual);
-    const sourceReader = createDerivedNode(
-      graph,
-      (context) => context.readSource(foreignSource),
-      strictEqual,
-    );
-    const nodeReader = createDerivedNode(
-      graph,
-      (context) => context.readDerived(foreignNode),
-      strictEqual,
-    );
-    const crossGraphMessage = 'Cannot read a node of another graph inside a computation.';
-    expect(() => pull(sourceReader)).toThrow(crossGraphMessage);
-    expect(() => pull(nodeReader)).toThrow(crossGraphMessage);
-
-    writeSource(foreignSource, 1);
-    expect(pull(foreignNode)).toBe(0);
-  });
-```
+Callers. In the Isograph runtime (pico-runtime.md, The engine and the Isograph runtime): `createGraph` in `createStore`, whose `Store` is `{ readonly graph: Graph; readonly records: ... }`; `createSourceNode` and `sourceValue` in `store.ts`; `writeSource` in `normalize.ts` and `test/fixtures.ts`; `markSourceChanged` and `disposeDerivedNode` in `deleteRecord`; `createDerivedNode` and `pull` in `storedResults.ts`, which passes `resolverResultsEqual(artifact, identical)` as each node's equality, with `===` as its default output equality; `GraphWriteDuringComputationError` in `callResolver`, which rethrows it. Outside Isograph: the consumer's own code, as in The package README.
 
 ## The implementation
 
@@ -709,7 +421,7 @@ pull(graph, sum): Dirty -> compute -> 9
     with the guard: computingDepth is 1 inside equal -> throws before a.value is set
 ```
 
-The message follows pico's "Cannot modify database while a memoized function is being invoked." (`crates/pico/src/database.rs:193-198`). The error is its own class, `GraphWriteDuringComputationError` (Functions), because a consumer distinguishes it by type: the Isograph runtime's `callResolver` catches a resolver's throw into a stored value and rethrows this class, so that a programmer error is not memoized as data (pico-runtime.md open decision 30). `instanceof` holds across the package boundary, because the runtime imports the class from the package index. Every other throw of the engine (a read through a closed context, and under (g) a read of a node of another graph) is a plain `Error`; no consumer distinguishes them.
+The message follows pico's "Cannot modify database while a memoized function is being invoked." (`crates/pico/src/database.rs:193-198`). The error is its own class, `GraphWriteDuringComputationError` (Functions), because a consumer distinguishes it by type: the Isograph runtime's `callResolver` catches a resolver's throw into a stored value and rethrows this class, so that a programmer error is not memoized as data (pico-runtime.md open decision 30). `instanceof` holds across the package boundary, because the runtime imports the class from the package index. Every other throw of the engine (a read through a closed context) is a plain `Error`; no consumer distinguishes them.
 
 ### Mark
 
@@ -1056,7 +768,7 @@ pull(graph, banner); // 'Free shipping' (runs all three)
 - Keep the chain of derived nodes below any node you pull well below the call stack limit, an estimated 1,000 levels in Node with its default stack. A pull past the limit throws `RangeError`, and after it the engine does not guarantee its own state. Writes never overflow, at any height.
 ````
 
-The README's rules restate the engine's behavior under the options the body is written for: open decision 2 (f) and 9 (a). Each decision that changes names the README line it changes.
+The README's rules restate the engine's behavior under the option the body is written for: open decision 9 (a). Each decision that changes names the README line it changes.
 
 ## The design
 
@@ -1119,7 +831,7 @@ p finishes -> setDependencies: c.dependents = {p} -> p Clean, over a Dirty c
 write s again -> c already Dirty -> stop -> p is never marked
 ```
 
-The guard rejects `writeSource`, `markSourceChanged`, and `disposeDerivedNode` while `graph.computingDepth > 0`. `computingDepth` is raised around every computation and around every call of an equality (The guard), because an equality is caller code that runs while the engine is between two writes of its own state. The guard covers writes only. A read through the context records the dependency. A `sourceValue` or `pull` inside a computation is an untracked read: it records no dependency of the running computation and writes no source (decision 10). Open decision 2.
+The guard rejects `writeSource`, `markSourceChanged`, and `disposeDerivedNode` while `graph.computingDepth > 0`. `computingDepth` is raised around every computation and around every call of an equality (The guard), because an equality is caller code that runs while the engine is between two writes of its own state. The guard covers writes only. A read through the context records the dependency. A `sourceValue` or `pull` inside a computation is an untracked read: it records no dependency of the running computation and writes no source (decision 10). Decision 2.
 
 ## Comparison with the Rust pico crate
 
@@ -1129,7 +841,7 @@ The data model is pico's:
 - A computation's reads are recorded as it runs, and the list replaces the previous one after each run (`invoke_with_dependency_tracking`, `execute_memoized_function.rs:249`).
 - An equal recomputation cuts off: pico keeps `time_updated` when `prev_value == value` (`update_derived_node`, `execute_memoized_function.rs:163`); the engine keeps the previous value object and does not mark dependents.
 - Verification walks dependencies in recorded order and stops at the first changed one (`any_dependency_changed`, `execute_memoized_function.rs:183-206`, an `Iterator::any` over the list; `derived_node_changed_since`, `:208-247`, re-executes a derived dependency to find out).
-- A write during a computation fails (`assert_empty_dependency_stack`, `database.rs:193-198`; open decision 2).
+- A write during a computation fails (`assert_empty_dependency_stack`, `database.rs:193-198`; decision 2).
 - A cycle is not supported. pico panics (`assert_no_cycles`, `dependency.rs:95-99`); the engine has no check, and a cycle is a programmer error (Cycles).
 
 Invalidation differs:
@@ -1167,7 +879,7 @@ No published library has the engine's contract. Reactively, alien-signals, signa
 
 The tests assert values with `toBe` and `toEqual`, and assert which computations ran by counting calls in a `calls` object each test owns. Counting re-invocations is allowed: which writes make which computations run again is the engine's own dependency tracking (AGENTS.md, Tests). No test reads a node's `slot`, `dependents`, or mark, and no test calls an unexported function: marks and edges are implementation, and each test observes them only through values and call counts. There are no snapshot tests and no fixture files; every input is built in the test.
 
-The tests are written under the options the body is written for: open decision 2 (f) and 9 (a). Each test whose assertions change under another option says how.
+The tests are written under the option the body is written for: open decision 9 (a). Each test whose assertions change under another option says how.
 
 ### The pico crate's tests
 
@@ -1233,7 +945,7 @@ libs/isograph-pico-js/test/
   dependencies.test.ts   recorded order, branch changes, repeated reads, absence as a value, untracked reads
   errors.test.ts         a throwing computation leaves the graph's state unchanged
   disposal.test.ts       disposal
-  guard.test.ts          the write-during-computation guard (open decision 2 (f))
+  guard.test.ts          the write-during-computation guard (decision 2)
   degenerate.test.ts     degenerate nodes, sources, and values
   graph.test-d.ts        types
 ```
@@ -2002,8 +1714,6 @@ describe('disposeDerivedNode (open decision 9 (a))', () => {
 
 ### `guard.test.ts`
 
-Written for open decision 2 (f). Under (g) the calls drop the `graph` argument, the constructors take it, and the file gains the cross-graph read test of Option (g). Under (a) the file does not exist.
-
 ```ts
 // from libs/isograph-pico-js/test/guard.test.ts
 import { describe, expect, test } from 'vitest';
@@ -2487,7 +2197,7 @@ pico-runtime.md holds no copy of the engine. It references this doc by section f
 - The engine defines no equality; `createSourceNode` and `createDerivedNode` take a required `equal` (decisions 6 and 8). pico-runtime.md's store passes `isUnchanged(key)` to each source node and `resolverResultsEqual(artifact, identical)` to each resolver node.
 - A `sourceValue` or `pull` inside a computation is an untracked read, and the guard covers writes only (decision 10).
 
-pico-runtime.md's open decisions that restate this doc's state the same status: its 2 is this doc's 2, (g) held, not decided; its 3 is 3; 8 is 4; 18 is 1; 19 is 5; 20 is 6; 21 is 7; 23 is 8; 24 is 9; 25 is 10; 26 is 11. When one of these is decided, both docs change in one commit.
+pico-runtime.md's open decisions that restate this doc's state the same status: its 2 is this doc's 2; its 3 is 3; 8 is 4; 18 is 1; 19 is 5; 20 is 6; 21 is 7; 23 is 8; 24 is 9; 25 is 10; 26 is 11. When one of these is decided, both docs change in one commit.
 
 ## Open decisions
 
@@ -2495,32 +2205,9 @@ pico-runtime.md's open decisions that restate this doc's state the same status: 
 
 The package is `@isograph/pico-js` and its directory is `libs/isograph-pico-js` (pico-runtime.md open decision 18). The `-js` suffix keeps the npm name distinct from the Rust crate `pico` (`crates/pico`), which the engine ports. The directory follows the mapping of the other library directories, `@isograph/<name>` in `libs/isograph-<name>` (`@isograph/runtime` in `libs/isograph-runtime`, `@isograph/disposable-types` in `libs/isograph-disposable-types`, `@isograph/babel-plugin` in `libs/isograph-babel-plugin`; `@isograph/plugin-swc` in `libs/isograph-swc-plugin` is the one exception). Whether the name is free on the npm registry was not verified, because the registry was not reachable offline.
 
-### 2. A write during a computation
+### 2. A write during a computation (decided)
 
-pico-runtime.md open decision 2, restated in engine terms. A computation that reaches a source or a node through a closure can write or dispose while it computes (The design, Writes during a computation). pico rejects every write while a memo runs (`assert_empty_dependency_stack`, `crates/pico/src/database.rs:193-198`, called from `set`, `remove`, `remove_singleton`, and `run_garbage_collection`, `:151-170`). Reactively and Preact allow it.
-
-- (a) No guard. A write inside a computation is undefined behavior. Cost: the stale `Clean` of the trace, with no error.
-- (d) A write counter on an engine object, read by `compute` before and after the computation; when it moved, `recompute` leaves the node `Dirty`. Cost: the engine object and a counter every write increments; it repairs the computing node only, and the write still ran.
-- (e) After `setDependencies`, `recompute` leaves the node `Dirty` when a recorded derived dependency is not `Clean`. Cost: one check per dependency per recompute; a source the computation read before the write changed it is not covered.
-- (f) `Graph` holds `computingDepth`; `writeSource`, `markSourceChanged`, and `disposeDerivedNode` take it first and throw while it is positive; `pull` takes it first and does not throw, because a `pull` inside a computation is an untracked read (decision 10). The body of this doc. Cost: every public call but the constructors and `sourceValue` takes a `Graph`; a node passed to another graph's functions is not detected. Consequence: the guard checks the `Graph` the caller passes, and a source has no graph of its own, so a computation that writes through a closure with any other `Graph` object passes the guard and leaves the stale `Clean` of the trace in The design, Writes during a computation, with no error:
-
-```text
-g = createGraph()
-s = source(1); c = derived(read s); p = derived(read c, then write s through a closure)
-pull(g, p): p Dirty -> recompute p -> compute: g.computingDepth = 1
-  p reads c: pull(g, c) -> c computed, Clean
-  p's computation calls writeSource(createGraph(), s, 2)
-    assertNotComputing checks the new graph: its computingDepth is 0 -> no throw
-    s.value = 2; s.dependents = {c} -> c Dirty; c.dependents = {} (p is added after compute returns)
-  p finishes -> setDependencies: c.dependents = {p} -> p Clean, over a Dirty c
-writeSource(g, s, 3) -> c already Dirty -> stop -> p is never marked
-pull(g, p) -> Clean -> returns the value computed from s = 1
-```
-
-  The same bypass works with any second `Graph` the closure holds. Under (f) the guard stops an accidental write through the graph the consumer passes everywhere, and it does not stop a write through another graph.
-- (g) As (f), but each node holds its graph, set by the constructors (Option (g)). Held, not decided. Reason: the criterion this decision applies is a guard no caller can bypass (pico-runtime.md open decision 2, the paragraph after its options), and only (g) meets it: `writeSource`, `markSourceChanged`, and `disposeDerivedNode` read the guard from the node they receive, so the trace under (f) throws at `writeSource(s, 2)`. (g) also detects cross-graph wiring: `readSource` and `readDerived` throw on a node of another graph, so no `dependents` edge crosses graphs. Cost: one pointer per node; the constructors take a `Graph` and every other public function drops it; one comparison per context read. Steel-man for (f): a closure that builds a second graph to write is deliberate misuse, and pico's database parameter has the shape of (f). The bypass needs no deliberate misuse when a consumer holds two graphs, and the criterion is that no caller can bypass the guard.
-
-pico-runtime.md's (b) and (c) are guards on the Isograph environment. A closure that holds the store reaches the engine's functions without passing them, so they are not engine options. (g) is held, not decided. The body, the README, and the tests are written under (f) until the decision is made (The public API); Option (g) is the complete (g) form.
+Decided by the user: option (f). `Graph` holds `computingDepth`, the guard of one graph, and every public function but the constructors and `sourceValue` takes it first (`writeSource(graph, source, value)`, `markSourceChanged(graph, source)`, `pull(graph, node)`, `disposeDerivedNode(graph, node)`), matching pico's explicit database parameter (`Database::set`, `crates/pico/src/database.rs:151`; a memo's first argument is `&Db`). `writeSource`, `markSourceChanged`, and `disposeDerivedNode` throw `GraphWriteDuringComputationError` while a computation or an equality of that graph runs, as pico rejects every write while a memo runs (`assert_empty_dependency_stack`, `crates/pico/src/database.rs:193-198`, called from `set`, `remove`, `remove_singleton`, and `run_garbage_collection`, `:151-170`). `pull` does not throw, because a `pull` inside a computation is an untracked read (decision 10). The guard lives in the engine because the engine is usable without Isograph and a standalone consumer has no store (pico-runtime.md open decision 2). The decision accepts one limit. A write that passes a different graph is not caught, and nodes of two graphs wired together are not detected; in the Isograph runtime every function takes the environment's `store.graph`, so this needs a closure that builds and writes through its own graph.
 
 ### 3. A throw out of a computation or an equality (decided)
 
