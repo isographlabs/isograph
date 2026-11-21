@@ -153,7 +153,7 @@ export {
   createSourceNode,
   type DerivedNode,
   disposeDerivedNode,
-  markSourceChanged,
+  markSourceDirty,
   pull,
   readDerived,
   readSource,
@@ -243,8 +243,8 @@ export function readDerived<TValue>(reader: AnyDerivedNode, node: DerivedNode<TV
 /** `writeSource` stores and marks nothing when `source.equals` accepts `value`, and it must not run inside a computation or an equality (Writes during a computation). */
 export function writeSource<TValue>(source: SourceNode<TValue>, value: TValue): void;
 
-/** `markSourceChanged` marks the dependents of `source` without comparing values, and it must not run inside a computation or an equality (Writes during a computation). */
-export function markSourceChanged(source: SourceNode<unknown>): void;
+/** `markSourceDirty` marks the dependents of `source` without comparing values, and it must not run inside a computation or an equality (Writes during a computation). */
+export function markSourceDirty(source: SourceNode<unknown>): void;
 
 /** Inside a computation, `pull` records no dependency (decision 10). */
 export function pull<TValue>(node: DerivedNode<TValue>): TValue;
@@ -253,7 +253,7 @@ export function pull<TValue>(node: DerivedNode<TValue>): TValue;
 export function disposeDerivedNode(node: AnyDerivedNode): void;
 ```
 
-In the Isograph runtime (pico-runtime.md, The engine and the Isograph runtime), the callers are `createSourceNode` and `sourceValue` in `store.ts`; `writeSource` in `normalize.ts` and `test/fixtures.ts`; `markSourceChanged` and `disposeDerivedNode` in `deleteRecord`; `createDerivedNode`, `pull`, `readSource`, and `readDerived` in `storedResults.ts`, which passes `resolverResultsEqual(artifact, identical)` as each node's equality, with `===` as its default output equality. Outside Isograph: the consumer's own code, as in The package README.
+In the Isograph runtime (pico-runtime.md, The engine and the Isograph runtime), the callers are `createSourceNode` and `sourceValue` in `store.ts`; `writeSource` in `normalize.ts` and `test/fixtures.ts`; `markSourceDirty` and `disposeDerivedNode` in `deleteRecord`; `createDerivedNode`, `pull`, `readSource`, and `readDerived` in `storedResults.ts`, which passes `resolverResultsEqual(artifact, identical)` as each node's equality, with `===` as its default output equality. Outside Isograph: the consumer's own code, as in The package README.
 
 ## The implementation
 
@@ -306,7 +306,7 @@ export function writeSource<TValue>(source: SourceNode<TValue>, value: TValue): 
   markDirty(source.dependents);
 }
 
-export function markSourceChanged(source: SourceNode<unknown>): void {
+export function markSourceDirty(source: SourceNode<unknown>): void {
   markDirty(source.dependents);
 }
 
@@ -592,7 +592,7 @@ pull(banner); // 'Free shipping' (runs all three)
 - A computation is a pure function of what it reads. It does not write a source or dispose a node. The engine does not check this: a write inside a computation can leave the computing node holding a value computed from an input that changed during its run, and every later pull returns that stale value with no error. A `sourceValue` or `pull` inside a computation is an untracked read: it returns the value and records no dependency.
 - An equality, of a source or of a derived node, does not write a source or dispose a node either. The engine does not check this, and a violation leaves values stale in the same way.
 - Each derived node has an equality. When a recomputed value is equal to the previous one, the node keeps the previous value object and the nodes above it do not recompute. The engine has no default: pass `(a, b) => a === b` for identity, or your own comparator for values you build fresh on each run.
-- Each source node has an equality too. A `writeSource` of a value equal to the stored one stores nothing and marks nothing. `markSourceChanged` marks a source whose value object you changed in place.
+- Each source node has an equality too. A `writeSource` of a value equal to the stored one stores nothing and marks nothing. `markSourceDirty` marks a source whose value object you changed in place.
 - A computation and an equality must not throw. A throw is a programmer error: it propagates out of `pull`, and the engine guarantees only that its own state is consistent. The node that threw keeps its mark, value, and dependencies; nodes the failed computation pulled before the throw are `Clean` and correct.
 - `disposeDerivedNode` detaches a node you no longer need. Nodes that read it recompute on their next pull.
 - A computation must not read its own node, directly or through other nodes.
@@ -609,7 +609,7 @@ This section is the engine's counterpart of `docs-website/docs/design-docs/pico.
 
 A source node is an input fact: a value the graph does not compute. The consumer creates it with `createSourceNode(value, equals)` and holds the returned object. The object is the source's identity. There is no key, no lookup by key, and no absent source: a source exists from creation and always holds a value. A consumer that needs "not set yet" stores a value of its own that says so (`undefined`, a sentinel symbol, or a tagged union), and readers depend on that value like any other. The Isograph runtime's `MISSING` is such a value.
 
-A source is written with `writeSource(source, value)`. The write compares the stored value with the new one by the source's `equals`. When `equals` accepts, the write stores nothing and marks nothing; when it rejects, the write sets the value and marks (decision 8). The engine defines no equality of its own, for sources as for derived nodes (decision 6). `markSourceChanged(source)` marks without setting, for a consumer that changed the value object in place or whose source went away.
+A source is written with `writeSource(source, value)`. The write compares the stored value with the new one by the source's `equals`. When `equals` accepts, the write stores nothing and marks nothing; when it rejects, the write sets the value and marks (decision 8). The engine defines no equality of its own, for sources as for derived nodes (decision 6). `markSourceDirty(source)` marks without setting, for a consumer that changed the value object in place or whose source went away.
 
 Code outside a computation reads a source with `sourceValue(source)`, which records nothing. A computation reads it with `readSource(reader, source)`, passing the node it received.
 
@@ -1545,7 +1545,7 @@ import {
   createDerivedNode,
   createSourceNode,
   disposeDerivedNode,
-  markSourceChanged,
+  markSourceDirty,
   pull,
   readDerived,
   readSource,
@@ -1589,7 +1589,7 @@ describe('degenerate cases', () => {
   test('a source with no dependents', () => {
     const count = createSourceNode(1, strictEqual);
     writeSource(count, 2);
-    markSourceChanged(count);
+    markSourceDirty(count);
     expect(sourceValue(count)).toBe(2);
   });
 
@@ -1640,7 +1640,7 @@ describe('degenerate cases', () => {
     expect(calls).toEqual({ strictReader: 2, structuralReader: 2 });
   });
 
-  test('markSourceChanged after the value object changed in place', () => {
+  test('markSourceDirty after the value object changed in place', () => {
     const scores = createSourceNode(new Map([['a', 1]]), strictEqual);
     const score = createDerivedNode(
       (reader) => readSource(reader, scores).get('a'),
@@ -1650,7 +1650,7 @@ describe('degenerate cases', () => {
 
     sourceValue(scores).set('a', 2);
     expect(pull(score)).toBe(1);
-    markSourceChanged(scores);
+    markSourceDirty(scores);
     expect(pull(score)).toBe(2);
   });
 
@@ -1945,7 +1945,7 @@ The package is `@isograph/pico-js` and its directory is `libs/isograph-pico-js` 
 
 ### 2. A write during a computation (decided)
 
-Decided by the user: no guard and no database object. The engine gives up no performance to prevent misuse, and misuse is a documented contract (Goal). A computation and an equality must not write a source or dispose a node; a violation leaves the cache silently stale (Writes during a computation), and the engine runs no check to catch it. There is no `Graph`: every public function takes the node it acts on (`writeSource(source, value)`, `markSourceChanged(source)`, `pull(node)`, `disposeDerivedNode(node)`), and the two read functions also take the running computation's `Context`, which is that computation's node (`readSource(reader, source)`, `readDerived(reader, node)`). Deviation from pico, which rejects every write while a memo runs (`assert_empty_dependency_stack`, `crates/pico/src/database.rs:193-198`) and passes the database to every call (`Database::set`, `:151`): the check costs a counter raised and lowered around every computation and every equality and a test on every write, and the database parameter exists in the engine only to carry that counter.
+Decided by the user: no guard and no database object. The engine gives up no performance to prevent misuse, and misuse is a documented contract (Goal). A computation and an equality must not write a source or dispose a node; a violation leaves the cache silently stale (Writes during a computation), and the engine runs no check to catch it. There is no `Graph`: every public function takes the node it acts on (`writeSource(source, value)`, `markSourceDirty(source)`, `pull(node)`, `disposeDerivedNode(node)`), and the two read functions also take the running computation's `Context`, which is that computation's node (`readSource(reader, source)`, `readDerived(reader, node)`). Deviation from pico, which rejects every write while a memo runs (`assert_empty_dependency_stack`, `crates/pico/src/database.rs:193-198`) and passes the database to every call (`Database::set`, `:151`): the check costs a counter raised and lowered around every computation and every equality and a test on every write, and the database parameter exists in the engine only to carry that counter.
 
 ### 3. A throw out of a computation or an equality (decided)
 
@@ -1973,7 +1973,7 @@ pico-runtime.md open decision 21, restated. Decided by the user: nodes are plain
 
 ### 8. Whether `writeSource` compares the new value with the old (decided)
 
-Writing an equal value does not propagate. A source takes a required equality, as a derived node does: `createSourceNode(value, equals)`, and `writeSource` compares the stored value with the new one by that `equals`; when it accepts, `writeSource` stores nothing and marks nothing. The engine still defines no equality of its own (decision 6). `markSourceChanged` stays, for a value object changed in place. This matches pico (`set_source`, `crates/pico/src/database.rs:310-329`), Reactively's `set`, and Preact's setter, with the equality supplied by the caller.
+Writing an equal value does not propagate. A source takes a required equality, as a derived node does: `createSourceNode(value, equals)`, and `writeSource` compares the stored value with the new one by that `equals`; when it accepts, `writeSource` stores nothing and marks nothing. The engine still defines no equality of its own (decision 6). `markSourceDirty` stays, for a value object changed in place. This matches pico (`set_source`, `crates/pico/src/database.rs:310-329`), Reactively's `set`, and Preact's setter, with the equality supplied by the caller.
 
 ### 9. A pull of a disposed node
 
