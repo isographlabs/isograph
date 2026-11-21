@@ -153,6 +153,7 @@ export {
   type DerivedNode,
   disposeDerivedNode,
   type Graph,
+  GraphWriteDuringComputationError,
   markSourceChanged,
   pull,
   type SourceNode,
@@ -273,6 +274,16 @@ export type ComputeContext = {
 
 ```ts
 // from libs/reactive-graph/src/graph.ts
+/** What `writeSource`, `markSourceChanged`, and `disposeDerivedNode` throw while a computation or an
+ * equality of the graph runs (The guard). A class, so that a consumer that catches the throws of its
+ * own code inside a computation can tell the guard's error from them and rethrow it. */
+export class GraphWriteDuringComputationError extends Error {
+  constructor() {
+    super('Cannot write the graph while a computation or an equality is running.');
+    this.name = 'GraphWriteDuringComputationError';
+  }
+}
+
 /** A graph with no computation running. */
 export function createGraph(): Graph;
 
@@ -322,7 +333,7 @@ export function pull<TValue>(graph: Graph, node: DerivedNode<TValue>): TValue;
 export function disposeDerivedNode(graph: Graph, node: AnyDerivedNode): void;
 ```
 
-Callers. In the Isograph runtime (pico-runtime.md, The engine's public API): `createSourceNode` and `sourceValue` in `store.ts`, `writeSource` in `normalize.ts` and `test/fixtures.ts`, `markSourceChanged` and `disposeDerivedNode` in `deleteRecord`, `createDerivedNode` and `pull` in `storedResults.ts`, which passes `===` as each node's equality. Under (f) `createGraph` is called by `createIsographEnvironment` or by whoever builds the `Store`, which becomes `{ readonly graph: Graph; readonly records: ... }` (pico-runtime.md open decision 2 (f)). Outside Isograph: the consumer's own code, as in The package README.
+Callers. In the Isograph runtime (pico-runtime.md, The engine and the Isograph runtime): `createGraph` in `createStore`, whose `Store` is `{ readonly graph: Graph; readonly records: ... }` under (f) and (g); `createSourceNode` and `sourceValue` in `store.ts`; `writeSource` in `normalize.ts` and `test/fixtures.ts`; `markSourceChanged` and `disposeDerivedNode` in `deleteRecord`; `createDerivedNode` and `pull` in `storedResults.ts`, which passes `resolverResultsEqual(artifact, identical)` as each node's equality, with `===` as its default output equality; `GraphWriteDuringComputationError` in `callResolver`, which rethrows it. Outside Isograph: the consumer's own code, as in The package README.
 
 ### Option (g): each node holds its graph
 
@@ -663,13 +674,11 @@ function stateOf<TValue>(node: DerivedNode<TValue>): StateSlot<TValue> {
 
 ```ts
 // from libs/reactive-graph/src/graph.ts
-/** Throws when a computation or an equality of `graph` is running. Called first by every public
- * function that writes the graph. */
+/** Throws `GraphWriteDuringComputationError` when a computation or an equality of `graph` is
+ * running. Called first by every public function that writes the graph. */
 function assertNotComputing(graph: Graph): void {
   if (graph.computingDepth > 0) {
-    throw new Error(
-      'Cannot write the graph while a computation or an equality is running.',
-    );
+    throw new GraphWriteDuringComputationError();
   }
 }
 
@@ -700,7 +709,7 @@ pull(graph, sum): Dirty -> compute -> 9
     with the guard: computingDepth is 1 inside equal -> throws before a.value is set
 ```
 
-The message follows pico's "Cannot modify database while a memoized function is being invoked." (`crates/pico/src/database.rs:193-198`). The engine throws a plain `Error`: no consumer distinguishes the guard's error by type, so no error class exists (AGENTS.md, nothing we do not use).
+The message follows pico's "Cannot modify database while a memoized function is being invoked." (`crates/pico/src/database.rs:193-198`). The error is its own class, `GraphWriteDuringComputationError` (Functions), because a consumer distinguishes it by type: the Isograph runtime's `callResolver` catches a resolver's throw into a stored value and rethrows this class, so that a programmer error is not memoized as data (pico-runtime.md open decision 30). `instanceof` holds across the package boundary, because the runtime imports the class from the package index. Every other throw of the engine (a read through a closed context, and under (g) a read of a node of another graph) is a plain `Error`; no consumer distinguishes them.
 
 ### Mark
 
@@ -1035,8 +1044,8 @@ pull(graph, banner); // 'Free shipping' (runs all three)
 
 - A computation reads nodes only through its `context`: `context.readSource(source)` and `context.readDerived(node)`. A read through a closure or `sourceValue` is not recorded, and the node will not recompute when that value changes.
 - A computation is synchronous. Every read through its `context` happens before it returns; a read through a context after its computation returned throws, so an `async` computation that reads after an `await` throws.
-- A computation is a pure function of what it reads. It does not write a source or dispose a node; each of those throws while a computation runs. A `sourceValue` or `pull` inside a computation is an untracked read: it returns the value and records no dependency.
-- An equality, of a source or of a derived node, does not write a source or dispose a node; each of those throws while an equality runs.
+- A computation is a pure function of what it reads. It does not write a source or dispose a node; each of those throws a `GraphWriteDuringComputationError` while a computation runs. A `sourceValue` or `pull` inside a computation is an untracked read: it returns the value and records no dependency.
+- An equality, of a source or of a derived node, does not write a source or dispose a node; each of those throws a `GraphWriteDuringComputationError` while an equality runs.
 - Each derived node has an equality. When a recomputed value is equal to the previous one, the node keeps the previous value object and the nodes above it do not recompute. The engine has no default: pass `(a, b) => a === b` for identity, or your own comparator for values you build fresh on each run.
 - Each source node has an equality too. A `writeSource` of a value equal to the stored one stores nothing and marks nothing. `markSourceChanged` marks a source whose value object you changed in place.
 - A computation and an equality must not throw. A throw is a programmer error: it propagates out of `pull`, and the engine guarantees only that its own state is consistent. The node that threw keeps its mark, value, and dependencies; nodes the failed computation pulled before the throw are `Clean` and correct.
@@ -1991,6 +2000,7 @@ import {
   createSourceNode,
   disposeDerivedNode,
   type Graph,
+  GraphWriteDuringComputationError,
   markSourceChanged,
   pull,
   sourceValue,
@@ -2009,12 +2019,13 @@ describe('the write-during-computation guard', () => {
       'disposeDerivedNode',
       (graph: Graph) => disposeDerivedNode(graph, createDerivedNode(() => 0, strictEqual)),
     ],
-  ])('%s inside a computation throws', (_name, action) => {
+  ])('%s inside a computation throws a GraphWriteDuringComputationError', (_name, action) => {
     const graph = createGraph();
     const node = createDerivedNode(() => {
       action(graph);
       return 0;
     }, strictEqual);
+    expect(() => pull(graph, node)).toThrow(GraphWriteDuringComputationError);
     expect(() => pull(graph, node)).toThrow(guardMessage);
   });
 
@@ -2403,7 +2414,7 @@ export default defineConfig({
 
 Deltas of `tsconfig.test.json` from the runtime's: no `paths` entry and no `fixtures/**/*.ts`, because the tests import `../src` and there are no fixtures. Deltas of `vitest.config.ts`: no Babel plugin. With `typecheck.enabled`, vitest type-checks `graph.test-d.ts` as the runtime's `read.test-d.ts` is.
 
-TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`; every type field is `readonly` except `SourceNode.value`, `StateSlot.state`, and `Graph.computingDepth`, which the engine writes; arrays are `ReadonlyArray`. The engine has no class, so the ES private field rule applies only under open decision 7 (b). oxlint's `switch-exhaustiveness-check` and `strict-boolean-expressions` (`.oxlintrc.json`) hold for every `switch` and condition in the body.
+TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`; every type field is `readonly` except `SourceNode.value`, `StateSlot.state`, and `Graph.computingDepth`, which the engine writes; arrays are `ReadonlyArray`. The engine's one class is `GraphWriteDuringComputationError`, which has no private state, so the ES private field rule applies only under open decision 7 (b). oxlint's `switch-exhaustiveness-check` and `strict-boolean-expressions` (`.oxlintrc.json`) hold for every `switch` and condition in the body.
 
 ### Pre-commit hooks
 

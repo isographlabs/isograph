@@ -47,6 +47,7 @@ The calls the Isograph runtime makes, by export of the engine's index (reactive-
 - `createDerivedNode`: `resolverNodeAt`, with `resolverComputation(..)` and `resolverResultsEqual(artifact, identical)` (Stored resolver results).
 - `pull`: `readStoredResult` (Stored resolver results).
 - `disposeDerivedNode`: `deleteRecord`, for each derived node the deleted container owns (core change 8).
+- `GraphWriteDuringComputationError`: `callResolver` rethrows it and catches every other throw into `ResolverThrew` (Stored resolver results, open decision 30).
 - The types `Graph`, `SourceNode`, `DerivedNode`, `Computation`, and `ComputeContext`: `store.ts` and `storedResults.ts`.
 
 Every export has a caller in the Isograph runtime. The computation of a resolver node reads only through its `ComputeContext` (`contextHooks`, Stored resolver results), so the runtime makes no untracked read inside a computation (open decision 25).
@@ -58,7 +59,7 @@ Engine (`libs/reactive-graph/src/graph.ts`), as reactive-engine.md's Types, The 
 - Types: `Graph`, `SourceNode`, `DerivedNode`, `AnyDerivedNode`, `StateSlot`, `DerivedNodeState`, `CleanState`, `CheckState`, `DirtyState`, `PreviousValue`, `Dependency`, `Computation`, `ComputeContext`, `Computed`, `ContextStatus`.
 - The marks `Clean`, `Check`, and `Dirty`.
 - Construction and plain reads: `createGraph`, `createSourceNode`, `createDerivedNode`, `neverComputed`, `sourceValue`, `stateOf`.
-- The guard: `Graph.computingDepth`, `assertNotComputing`, `guarded`.
+- The guard: `Graph.computingDepth`, `assertNotComputing`, `guarded`, `GraphWriteDuringComputationError`.
 - Mark: `writeSource`, `markSourceChanged`, `markDirty`, `markOneDirty`, `markCheck`.
 - Pull: `pull`, `verify`, `recompute`, `compute` (the context, its `ContextStatus`, and dependency recording).
 - Dependencies: `setDependencies`, `dependentsOf`.
@@ -82,7 +83,7 @@ Isograph runtime (`libs/isograph-runtime/src`):
 - The write-during-computation guard. It is engine state, because a standalone consumer has no store (reactive-engine.md, The guard). The Isograph `Store` holds the engine `Graph` beside its records under both (f) and (g) (open decision 2).
 - Equality defaults. The engine has none: every node's `equal` is a constructor argument (reactive-engine.md open decision 6). `===` is the Isograph layer's default output equality inside `resolverResultsEqual`, which also reads the reader AST for walk-assembled data, so both stay Isograph's (open decision 20).
 - One value type per graph. A standalone engine has nodes of different types, so `TValue` is per node and the links hold an erased node type (reactive-engine.md, Types; open decision 19). In the Isograph runtime, a resolver node is a `DerivedNode<ResolverResult<unknown>>` and a store source node a `SourceNode<StoreValue | Missing>` (The store).
-- Throws. A computation must not throw (reactive-engine.md, Throws). The engine stores no error and catches nothing; the Isograph layer keeps the contract by catching the resolver's own throw into `ResolverThrew` (Stored resolver results).
+- Throws. A computation must not throw (reactive-engine.md, Throws). The engine stores no error and catches nothing; the Isograph layer keeps the contract by catching the resolver's own throw into `ResolverThrew`, except the engine's `GraphWriteDuringComputationError`, which it rethrows (Stored resolver results, open decision 30).
 - Field visibility. A consumer outside this repo can write a node's fields; open decision 21.
 - Construction. `sourceNodeAt` calls `createSourceNode` and `resolverNodeAt` calls `createDerivedNode`, so the Isograph runtime builds no engine object by hand.
 
@@ -936,7 +937,13 @@ Duplicate dependency entries. A computation that reads one node twice records it
 
 ```ts
 // from libs/isograph-runtime/src/storedResults.ts
-import { type Computation, type ComputeContext, createDerivedNode, pull } from '@isograph/reactive-graph';
+import {
+  type Computation,
+  type ComputeContext,
+  createDerivedNode,
+  GraphWriteDuringComputationError,
+  pull,
+} from '@isograph/reactive-graph';
 
 /** `===`: the output equality of a resolver whose field supplies none. */
 function identical(previous: unknown, next: unknown): boolean {
@@ -989,19 +996,30 @@ function contextHooks(store: Store, context: ComputeContext): ReadHooks<ReadReso
   };
 }
 
-/** `artifact.resolver` called with `data`; `WalkData` when it returned `data` itself; a throw becomes
- * `ResolverThrew`. */
+/** `artifact.resolver` called with `data`; `WalkData` when it returned `data` itself. A throw becomes
+ * `ResolverThrew`, except the engine's `GraphWriteDuringComputationError`, which propagates (open
+ * decision 30). */
 function callResolver(
   artifact: ReaderArtifact<ResolverParam, unknown, EntityName>,
   root: StoreLink,
   data: SelectionSetData,
   variables: Variables,
-): ResolverResult<unknown>;
+): ResolverResult<unknown> {
+  try {
+    const value = artifact.resolver({ data, parameters: variables, link: root });
+    return { kind: 'Ok', value, origin: value === data ? 'WalkData' : 'ResolverValue' };
+  } catch (error: unknown) {
+    if (error instanceof GraphWriteDuringComputationError) {
+      throw error;
+    }
+    return { kind: 'ResolverThrew', selectableName: artifact.selectableName, recordLink: root, error };
+  }
+}
 ```
 
 The computation closes over `store`, the environment's `Map`, which is written in place and never replaced (network-and-subscriptions.md, The environment). The cast in `readStoredResult` is the one place a stored `ResolverResult<unknown>` is returned at the caller's type. Its type parameters and `root` parameter are `read`'s. `readStoredResult` takes the store, as `read` does; every function that reads or writes the graph takes the store, because the store is the graph.
 
-A resolver computation keeps the engine's contract that a computation must not throw (reactive-engine.md, Throws): `callResolver` catches the resolver's own throw into `ResolverThrew`, a value. Any other throw out of `resolverComputation` or out of `resolverResultsEqual` is a broken programmer invariant: a store that disagrees with the reader AST (`linkAt` on a non-link, `libs/isograph-runtime/src/store.ts:74-86`), a missing variable (`variableValue`, `storeKey.ts:56-63`), or a field-supplied `outputEqual` that throws (open decision 7). It propagates out of `readStoredResult`; `readSubscription`'s `try` (`libs/isograph-runtime/src/subscribe.ts:126-130`) catches what escapes a subscription re-read as `ReadErr`.
+A resolver computation keeps the engine's contract that a computation must not throw (reactive-engine.md, Throws): `callResolver` catches the resolver's own throw into `ResolverThrew`, a value. The one throw it does not catch is the engine's `GraphWriteDuringComputationError`, from a resolver that wrote the store through a closure: `callResolver` rethrows it, so it propagates out of `readStoredResult` (open decision 30). Any other throw out of `resolverComputation` or out of `resolverResultsEqual` is a broken programmer invariant: a store that disagrees with the reader AST (`linkAt` on a non-link, `libs/isograph-runtime/src/store.ts:74-86`), a missing variable (`variableValue`, `storeKey.ts:56-63`), or a field-supplied `outputEqual` that throws (open decision 7). It propagates out of `readStoredResult`; `readSubscription`'s `try` (`libs/isograph-runtime/src/subscribe.ts:126-130`) catches what escapes a subscription re-read as `ReadErr`.
 
 Every read inside a computation goes through the walk, so none goes unrecorded. User code never receives a `ComputeContext` or the store. A resolver that reaches the store through a closure is open decision 2.
 
@@ -1631,3 +1649,10 @@ A bare selection of a scalar reads its record's `__value`; a bare selection of a
 
 - (a) The entity table's `shape` says which (`Leaf` or `Composite`, Entity tables). Held. Reason: it is a property of the entity, which the compiler knows (`EntityShape`), and the walk then reads `__value` only on scalar records. Cost: one field per table.
 - (b) The walk reads `__value` at every bare-selected record and treats `MISSING` as an object, `EMPTY_DATA`. Cost: an absent scalar record reads as `EMPTY_DATA` where it is missing data, and every bare-selected object record gains a `MISSING` `__value` source node.
+
+### 30. The guard's error inside a resolver
+
+A resolver that writes the store through a closure (`normalize(store, ..)` while its node computes) makes the engine throw `GraphWriteDuringComputationError` out of `writeSource` (reactive-engine.md, The guard). The error leaves the resolver, so it reaches `callResolver`'s `catch`. The write was rejected, and no engine state changed.
+
+- (a) `callResolver` rethrows `GraphWriteDuringComputationError` and catches every other throw into `ResolverThrew` (Stored resolver results). The throw leaves the computation; the engine leaves the node's state untouched (reactive-engine.md, Throws), so the node stays `Dirty`, and the throw propagates out of `readStoredResult`; a subscription re-read catches it as `ReadErr` (`readSubscription`, `libs/isograph-runtime/src/subscribe.ts:126-130`). Held, not decided. Reason: a write during a computation is a programmer error (reactive-engine.md, The package README, Rules), and a programmer error must not be memoized as data. Stored as `ResolverThrew`, it would be the node's `Clean` value, returned on every read without calling the resolver and passed up by every parent's walk as a resolver's ordinary failure, until an input of the node changed. Cost: the engine exports one error class, and `callResolver` tests the class of every caught throw.
+- (b) `callResolver` catches every throw into `ResolverThrew`, the guard's error included. Cost: the guard's error is memoized as data, as above, and no caller of `readStoredResult` sees a throw for a write the engine rejected.
