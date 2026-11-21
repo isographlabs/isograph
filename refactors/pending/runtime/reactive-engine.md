@@ -1,6 +1,6 @@
 # Reactive engine: source nodes and derived nodes as a standalone package
 
-Status: under discussion. Not approved for implementation. This doc is the complete specification of the engine that `refactors/pending/runtime/pico-runtime.md` (The graph, Mark, Pull, The engine and the Isograph runtime, The engine package, What resists the split) places in its own package. It restates those sections in engine terms, adds what they leave out (the full API under one guard option, disposal of a pulled node, cycles, throws, the README, the design description, and the test inventory against the Rust pico crate), and lists the open decisions. Where this doc and pico-runtime.md differ, What this doc changes in pico-runtime.md names each difference.
+Status: under discussion. Not approved for implementation. This doc is the single specification of the engine that `refactors/pending/runtime/pico-runtime.md` places in its own package: the API under each guard option, every function body, disposal, cycles, throws, the README, the design description, the test inventory against the Rust pico crate, the package files, and the open decisions. pico-runtime.md holds no copy of it and references it by section (What this doc changes in pico-runtime.md).
 
 pico paths are under `crates/pico/src` and `crates/pico/tests` of this repo. Reactively is `packages/core/src/core.ts` of `milomg/reactively`; Preact signals is `packages/core/src/index.ts` of `preactjs/signals` (both read at their `main` branches; no line numbers, because neither checkout is local).
 
@@ -140,7 +140,7 @@ Every edge is an object reference, held in both directions: a derived node's dep
 
 ## The public API
 
-The API below is written under open decision 2 option (f): an engine `Graph` object holds the write-during-computation guard, and every public function that reads or writes the graph takes it as its first parameter. Decision 2 is not decided, and (g) is the held option: pico-runtime.md establishes that the guard must be one no caller can bypass and that it lives in the engine (its open decision 2, last paragraph), which leaves (f) and (g), and under (f) a computation that holds a second `Graph` bypasses the guard (open decision 2). (f) has pico's shape, every pico read and write taking the database (`Database::set`, `crates/pico/src/database.rs:151`; a memo's first argument is `&Db`), and the body, the README, and the tests stay in it until decision 2 is decided. Option (g) below is the complete (g) form of the API and of the functions that change. Under (a) every `graph` parameter and `Graph` itself drop out.
+The API below is written under open decision 2 option (f): an engine `Graph` object holds the write-during-computation guard, and every public function that reads or writes the graph takes it as its first parameter. Decision 2 is not decided, and (g) is the held option: pico-runtime.md establishes that the guard must be one no caller can bypass and that it lives in the engine (its open decision 2, the paragraph after its options), which leaves (f) and (g), and under (f) a computation that holds a second `Graph` bypasses the guard (open decision 2). (f) has pico's shape, every pico read and write taking the database (`Database::set`, `crates/pico/src/database.rs:151`; a memo's first argument is `&Db`), and the body, the README, and the tests stay in it until decision 2 is decided. Option (g) below is the complete (g) form of the API and of the functions that change. Under (a) every `graph` parameter and `Graph` itself drop out.
 
 ```ts
 // from libs/reactive-graph/src/index.ts
@@ -988,7 +988,7 @@ pico-runtime.md's body of `disposeDerivedNode` (The graph) calls `setDependencie
 
 A computation and an equality must not throw. A throw out of either is a programmer error, and the engine defines no behavior for the node that threw: no retry, no stored error, no value. The engine guarantees only that its own state is not corrupted. A throw out of a computation propagates out of `compute`, and a throw out of `equal` propagates out of `recompute`, before `setDependencies` and before any state is written, so every mark, value, dependency list, and `dependents` set is as it was before the throwing run. A throw out of a source's `equal` propagates out of `writeSource` before the value is set and before any marking. The `finally` in `guarded` restores `computingDepth`, so the graph accepts writes after the throw. Nodes pulled inside the failed computation before the throw are `Clean` and correct, because each pull completed.
 
-pico-runtime.md open decision 3 (a) has the Isograph runtime catch the walk's throw inside its computation and return it as a value, so an Isograph computation does not throw.
+pico-runtime.md open decision 3 (decided) keeps the contract in the Isograph runtime: `callResolver` catches a resolver's own throw into a `ResolverThrew` value, so a resolver's throw does not leave an Isograph computation. A throw out of the walk (a store that disagrees with the reader AST, a missing variable) is a broken programmer invariant and propagates out of `pull`, as this section describes, and so does `GraphWriteDuringComputationError`, which `callResolver` rethrows (pico-runtime.md open decision 30).
 
 ### Cycles
 
@@ -2436,7 +2436,7 @@ TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`; every type fi
         pass_filenames: false
 ```
 
-`prettier` and `oxlint` already cover every file in the workspace. When the Isograph runtime gains its dependency on the engine (pico-runtime.md core change 4), the runtime's three hooks also match the engine's directory:
+`prettier` and `oxlint` already cover every file in the workspace. When the Isograph runtime gains its dependency on the engine (pico-runtime.md core change 5), the runtime's three hooks also match the engine's directory:
 
 ```yaml
 # from .pre-commit-config.yaml
@@ -2458,23 +2458,22 @@ TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`; every type fi
 
 ### Readers before the Isograph runtime depends on it
 
-AGENTS.md says we do not have anything we do not use, and tests-only is not a reader. Until the Isograph runtime calls it, the package's reader is the user's stated goal that the engine is usable by projects outside Isograph (pico-runtime.md, Goal). pico-runtime.md core change 3 ships the package before its first workspace caller on that ground; core change 4 is the first caller of the source functions and core change 5 of the derived-node functions. The package ships alone, as its own change (decision 11).
+AGENTS.md says we do not have anything we do not use, and tests-only is not a reader. Until the Isograph runtime calls it, the package's reader is the user's stated goal that the engine is usable by projects outside Isograph (pico-runtime.md, Goal). pico-runtime.md core change 4 ships the package before its first workspace caller on that ground; core change 5 is the first caller of the source functions and core change 8 of the derived-node functions. The package ships alone, as its own change (decision 11).
 
 ## What this doc changes in pico-runtime.md
 
-pico-runtime.md is not edited by this doc. These are the differences to apply there once the decisions settle:
+pico-runtime.md holds no copy of the engine. It references this doc by section for every engine type, function body, test, and package file, and it specifies only the Isograph layer and the calls that layer makes into the engine (pico-runtime.md, The engine). Its core change 4 implements this doc. The engine behaviors pico-runtime.md relies on are this doc's body:
 
-- The engine's public functions take a `Graph` first under open decision 2 (f), and the index exports `createGraph` and `Graph`. pico-runtime.md's The engine's public API, its use without Isograph, and its Which layer owns each item write the signatures without a graph. Which layer owns each item gains `Graph`, `createGraph`, `assertNotComputing`, `neverComputed`, and `dependentsOf`.
-- `disposeDerivedNode` resets the node to never computed (Disposal, open decision 9). pico-runtime.md's body leaves the state, which lets a later pull return a value no source explains.
-- `guarded` counts running computations and equalities in a `finally`, under open decision 2 (f); `compute`, `recompute` (around `node.equal`), and `writeSource` (around `source.equal`) call it, and a write or a disposal from inside an equality throws.
-- The tests are the files of Tests instead of one `test/graph.test.ts`, and the package has a `README.md`.
-- The CI step of CI.
-- A computation and an equality must not throw, and the engine guarantees only that its own state is not corrupted (decision 3). pico-runtime.md open decision 3's engine-side options go.
-- The derived nodes must form a directed acyclic graph, and the engine has no cycle check (decision 4). pico-runtime.md open decision 8's options go.
-- The engine defines no equality and exports no `sameValue`; every `createDerivedNode` caller supplies `equal`, and the Isograph layer passes `===` (decision 6).
-- `createSourceNode` takes a required `equal`, and `writeSource` stores nothing and marks nothing when it accepts (decision 8). pico-runtime.md's `createSourceNode` callers in `store.ts` pass `===`.
-- A `sourceValue` or `pull` inside a computation is an untracked read, and the guard covers writes only (decision 10). pico-runtime.md's guard on `pull` goes.
-- New decisions 8, 9, 10, and 11 below; 8, 10, and 11 are decided and 9 is open.
+- The guard: `guarded` raises `computingDepth` around every computation and every equality, and `assertNotComputing` throws `GraphWriteDuringComputationError` (The guard). pico-runtime.md's `callResolver` rethrows that class and catches every other throw of a resolver into `ResolverThrew` (pico-runtime.md open decision 30).
+- Marking walks a work list: `markDirty` over a set, `markOneDirty`, and `markCheck` (Mark).
+- A computation's context closes when the computation returns or throws (`ContextStatus`, Pull).
+- Disposal resets the node to never computed (Disposal, open decision 9).
+- A computation and an equality must not throw, and the engine guarantees only that its own state is not corrupted (Throws, decision 3).
+- The derived nodes form a directed acyclic graph, and the engine has no cycle check (Cycles, decision 4).
+- The engine defines no equality; `createSourceNode` and `createDerivedNode` take a required `equal` (decisions 6 and 8). pico-runtime.md's store passes `isUnchanged(key)` to each source node and `resolverResultsEqual(artifact, identical)` to each resolver node.
+- A `sourceValue` or `pull` inside a computation is an untracked read, and the guard covers writes only (decision 10).
+
+pico-runtime.md's open decisions that restate this doc's state the same status: its 2 is this doc's 2, (g) held, not decided; its 3 is 3; 8 is 4; 18 is 1; 19 is 5; 20 is 6; 21 is 7; 23 is 8; 24 is 9; 25 is 10; 26 is 11. When one of these is decided, both docs change in one commit.
 
 ## Open decisions
 
@@ -2505,7 +2504,7 @@ pull(g, p) -> Clean -> returns the value computed from s = 1
 ```
 
   The same bypass works with any second `Graph` the closure holds. Under (f) the guard stops an accidental write through the graph the consumer passes everywhere, and it does not stop a write through another graph.
-- (g) As (f), but each node holds its graph, set by the constructors (Option (g)). Held, not decided. Reason: the criterion this decision applies is a guard no caller can bypass (pico-runtime.md open decision 2, last paragraph), and only (g) meets it: `writeSource`, `markSourceChanged`, and `disposeDerivedNode` read the guard from the node they receive, so the trace under (f) throws at `writeSource(s, 2)`. (g) also detects cross-graph wiring: `readSource` and `readDerived` throw on a node of another graph, so no `dependents` edge crosses graphs. Cost: one pointer per node; the constructors take a `Graph` and every other public function drops it; one comparison per context read. Steel-man for (f): a closure that builds a second graph to write is deliberate misuse, and pico's database parameter has the shape of (f). The bypass needs no deliberate misuse when a consumer holds two graphs, and the criterion is that no caller can bypass the guard.
+- (g) As (f), but each node holds its graph, set by the constructors (Option (g)). Held, not decided. Reason: the criterion this decision applies is a guard no caller can bypass (pico-runtime.md open decision 2, the paragraph after its options), and only (g) meets it: `writeSource`, `markSourceChanged`, and `disposeDerivedNode` read the guard from the node they receive, so the trace under (f) throws at `writeSource(s, 2)`. (g) also detects cross-graph wiring: `readSource` and `readDerived` throw on a node of another graph, so no `dependents` edge crosses graphs. Cost: one pointer per node; the constructors take a `Graph` and every other public function drops it; one comparison per context read. Steel-man for (f): a closure that builds a second graph to write is deliberate misuse, and pico's database parameter has the shape of (f). The bypass needs no deliberate misuse when a consumer holds two graphs, and the criterion is that no caller can bypass the guard.
 
 pico-runtime.md's (b) and (c) are guards on the Isograph environment. A closure that holds the store reaches the engine's functions without passing them, so they are not engine options. (g) is held, not decided. The body, the README, and the tests are written under (f) until the decision is made (The public API); Option (g) is the complete (g) form.
 
@@ -2554,4 +2553,4 @@ Allowed. `sourceValue(source)`, and a `pull` called inside a computation outside
 
 ### 11. Whether the package ships before its first caller (decided)
 
-The package ships alone, as its own change (pico-runtime.md core change 3), with its tests and before the Isograph runtime uses it. Its reader is the user's stated goal that the engine is usable by projects outside Isograph (Readers before the Isograph runtime depends on it).
+The package ships alone, as its own change (pico-runtime.md core change 4), with its tests and before the Isograph runtime uses it. Its reader is the user's stated goal that the engine is usable by projects outside Isograph (Readers before the Isograph runtime depends on it).
