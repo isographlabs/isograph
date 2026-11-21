@@ -272,7 +272,7 @@ Change 2 removes the `identity` entry from `composite_target_value` and from the
 
 ### `__self`
 
-Every entity has the selectable `__self`. `selectable_definitions` (`crates/isograph_compiler/src/schema.rs:347`) returns it for the name `__self` on every entity when no declaration defines that name, and `Definitions::Duplicated` when a `field E.__self` declaration also does, which `DuplicateDefinition` reports. GraphQL reserves names that start with `__` for introspection, so no schema field collides with it. `__value` is a store key (`VALUE_KEY`, pico-runtime.md), not a selectable; a user selection named `__value` is `UnknownSelectable`.
+Every entity whose shape is `Leaf` or `Composite` has the selectable `__self`; an input entity does not, since `input_objects` reads an input entity's selectables as its input fields (`crates/isograph_compiler/src/artifact_types.rs:610-640`). GraphQL reserves names that start with `__` for introspection, so no schema field collides with it. `__value` is a store key (`VALUE_KEY`, pico-runtime.md), not a selectable; a user selection named `__value` is `UnknownSelectable`.
 
 ```rust
 // from crates/isograph_compiler/src/schema.rs
@@ -283,12 +283,95 @@ pub enum SelectableKind<TSelectableData> {
     ClientPointer(ClientPointerTarget),
     /// Defined by the network protocol.
     Server(ServerSelectable<TSelectableData>),
-    /// `__self`, on every entity: the record the selection is read at, as the same entity.
+    /// `__self`, on every entity that is not an input entity: the record the selection is read
+    /// at, as the same entity.
     SelfRecord,
+}
+
+/// The name of the `SelfRecord` selectable.
+pub const SELF_RECORD_NAME: &str = "__self";
+
+/// `__self` on `entity_name`, when `selectable_name` is `__self` and the entity exists and is
+/// not an input entity.
+fn self_record_selectable<TProfile: CompilationProfile>(
+    db: &IsographDb<TProfile>,
+    client: ClientId,
+    entity_name: EntityName,
+    selectable_name: SelectableName,
+) -> Option<ProfileSelectable<TProfile>> {
+    if selectable_name.lookup() != SELF_RECORD_NAME {
+        return None;
+    }
+    let entity = entity_named(db, client, entity_name).as_ref().ok()?;
+    match entity.origin.reference() {
+        EntityOrigin::Source => {}
+        EntityOrigin::Protocol(data) => match TProfile::NetworkProtocol::entity_shape(data) {
+            EntityShape::Input => return None,
+            EntityShape::Leaf | EntityShape::Composite(_) => {}
+        },
+    }
+    Selectable {
+        name: selectable_name,
+        parent_entity: entity_name,
+        description: format!("The record itself, as the {entity_name} type.")
+            .intern()
+            .to::<DescriptionValue>()
+            .wrap_some(),
+        definition: None,
+        kind: SelectableKind::SelfRecord,
+    }
+    .wrap_some()
 }
 ```
 
-`target_entity` returns `self.parent_entity` for `SelfRecord`, so validation checks a selection set on `__self` against the same entity, and `target_errors` applies as for a server field. `inlined_in_selection` (`merged_selection.rs:1314-1348`) gains a `SelfRecord` arm that descends into its selection set on `parent`, so `__self { F }` inside `field E.F` is `InlineCycle` (pico-runtime.md open decision 8).
+A source entity is composite, as `target_shape` reads it (`crates/isograph_compiler/src/validation.rs:545-555`). The description follows upstream's generated `__link`, "A store Link for the {} type." (`../isograph/crates/isograph_schema/src/validated_isograph_schema/add_link_fields.rs:24-28`).
+
+Where `__self` is defined:
+
+- `selectable_definitions` (`crates/isograph_compiler/src/schema.rs:278-294`) chains `self_record_selectable(db, client, entity_name, selectable_name)` onto the source definitions it counts. So `selectable_named` returns it for `__self` when no declaration defines that name, and `Definitions::Duplicated` when a `field E.__self` declaration also does, which `DuplicateDefinition` reports.
+- `selectables_for_entity` (the `#[memo]` at `crates/isograph_compiler/src/schema.rs:348`, body `:349-389`) chains `self_record_selectable(db, client, entity_name, SELF_RECORD_NAME.intern().to())` onto `source`, so `__self` is one of the entity's selectables and the LSP's completion (`crates/isograph_lsp/src/completion.rs:135`) offers it. A `field E.__self` declaration makes two definitions under one name, and `selectables_for_entity` drops the name, as it drops every duplicated name.
+
+Every `match` on `SelectableKind` and the `SelfRecord` arm each gains. The search was `SelectableKind::` over `crates/`; the two hits in `crates/isograph_lsp` (`entity_or_selectable.rs:151`, `hover.rs:484`) construct a `ClientPointer` in `#[cfg(test)]` code and match nothing.
+
+- `Selectable::target_entity` (`crates/isograph_compiler/src/schema.rs:108-114`): `SelfRecord => self.parent_entity.wrap_some()`. So `validate_selection` checks a selection set on `__self` against the same entity through `target_errors`, as for a server field (`crates/isograph_compiler/src/validation.rs:494-508`), and hover prints the target.
+- `validate_selection`'s arguments (`crates/isograph_compiler/src/validation.rs:479-492`): `SelfRecord => self_record_argument_errors(key, selection)`, every argument `__self` is passed as `UnknownFieldArgument`. `field_argument_errors` cannot serve: it returns no errors when the field has no declaration (`:607-616`).
+
+  ```rust
+  // from crates/isograph_compiler/src/validation.rs
+  /// `__self` takes no arguments: each one `selection` passes is unknown.
+  fn self_record_argument_errors<TProfile: CompilationProfile>(
+      field: SelectableKey,
+      selection: &Selection,
+  ) -> Vec<WithSpan<ProfileValidationError<TProfile>>> {
+      selection
+          .arguments
+          .iter()
+          .flat_map(|arguments| arguments.item.0.iter())
+          .filter_map(|slot| slot.item.item.as_ref())
+          .map(|argument| {
+              ValidationError::UnknownFieldArgument(UnknownFieldArgument {
+                  field,
+                  argument: argument.item.name.item.0,
+              })
+              .with_span(argument.item.name.location)
+          })
+          .collect()
+  }
+  ```
+
+- `entrypoint_fetch_plan` (`crates/isograph_compiler/src/entrypoint.rs:89-95`): the `if let SelectableKind::Server(_)` becomes a `match` whose `SelfRecord` arm returns the new `EntrypointNotFetchableError::SelfRecord(EntityName)`, "`{0}.__self` is the record itself; an entrypoint names a `field` declaration.", located at the declaration's name like `ProtocolSelectable` (`crates/isograph_compiler/src/validation.rs:405-409`). `ClientField` and `ClientPointer(_)` continue to the fetch plan.
+- `selection_contribution` (`crates/isograph_compiler/src/merged_selection.rs:1118-1132`): `SelfRecord`, as Query generation states.
+- `inlined_in_selection` (`crates/isograph_compiler/src/merged_selection.rs:1314-1348`, its match at `:1324`): `SelfRecord` descends into its selection set on `parent`, so `__self { F }` inside `field E.F` is `InlineCycle` (pico-runtime.md open decision 8); a bare `__self` inlines nothing.
+- `source_field_declaration` (`crates/isograph_compiler/src/merged_selection.rs:713-718`): `SelfRecord` joins the `Server(_)` arm and returns `FieldSelectionMapError::NotASourceField(key)`, whose message (`merged_selection.rs:181`) becomes "`{0}` has no `field` declaration and no selection set to inline.", which holds for both arms.
+- `selection_field` (`crates/isograph_compiler/src/artifact_types.rs:315-470`, its match at `:346`): `SelfRecord`, as Reader generation and types states.
+- `input_objects` (`crates/isograph_compiler/src/artifact_types.rs:624-640`): `SelfRecord` joins the `ClientField | ClientPointer(_)` error arm. `self_record_selectable` defines no `__self` on an input entity, so `selectables_for_entity` of an input object never returns it.
+- `project_artifacts` (`crates/isograph_compiler/src/artifact_types.rs:818-830`): `SelfRecord` returns `GenerationError::Lookup` with "`{E}.__self` is declared in a source file and is the record itself.", as the `Server(_)` arm does for a protocol selectable. A `field E.__self` declaration is `Duplicated`, so `selectable_named` fails before this match; the arm exists because the match is exhaustive.
+
+The LSP:
+
+- Hover on `__self` in `Pet`'s selection set prints `field **Pet.__self**: **Pet**` and, after a blank line, `The record itself, as the Pet type.`, from `selectable_hover_markdown` (`crates/isograph_lsp/src/hover.rs:65-78`) with no change.
+- Go-to-definition on `__self` has no target: `definition` is `None`, and `definition_at_lsp_position` returns `None` (`crates/isograph_lsp/src/definition.rs:9-18`), as for `__typename`, which the protocol defines with no text.
+- Find references on `__self` lists the `__self` selections on that entity: its `reference_target` is `Selectable(SelectableKey { entity, selectable: __self })` (`crates/isograph_lsp/src/entity_or_selectable.rs:33-43`).
 
 ### Client fields on scalars
 
@@ -346,6 +429,8 @@ fn parent_error<TProfile: CompilationProfile>(
 Before: `target_errors` (`validation.rs:559-591`) returned `SelectionSetOnLeaf` for `(Leaf, Some)` and `MissingSelectionSet` for `(Composite, None)`; `parent_error` (`:314-325`) returned `LeafParent` for `Leaf`.
 
 A client pointer's selection still needs a selection set (upstream's `:157`, open decision 1): `validate_selection` reports `ValidationError::PointerMissingSelectionSet(SelectableKey)`, "`P.f` is a client pointer and needs a selection set.", for a `ClientPointer` selection with none, before `target_errors`.
+
+`EntrypointNotFetchableError::SelfRecord(EntityName)` is new, for `entrypoint E.__self` (`__self`).
 
 Removed: `ValidationError::SelectionSetOnLeaf` and `ValidationError::MissingSelectionSet` (`:40-43`), and `InvalidEntityError::LeafParent` (`:74-78`).
 
