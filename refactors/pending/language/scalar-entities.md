@@ -2,15 +2,15 @@
 
 Status: parked note. Not planned and not under discussion for implementation. Nothing here is a decision.
 
-The selection shape rule, scalars as entities with client fields, everything being a link, a scalar value as its own record, the default reader of each target entity as a per-type module, the query text of a bare object selection, and the upstream and i2 rules that reject both shapes moved into plans: `refactors/pending/language/linked-only-selections.md` (compiler, validation, artifacts) and `refactors/pending/runtime/pico-runtime.md`, Selections in the Isograph layer (runtime). The path-keyed and value-keyed identities this note listed for a client field on a scalar are superseded there: the derived node lives in the scalar record's container. What stays parked is below.
+The selection shape rule, scalars as entities with client fields, everything being a link, a scalar value as its own record, the per-entity table that names each field's origin and each entity's record storage, the normalization AST's imports of those tables, the query text of a bare object selection, and the upstream and i2 rules that reject both shapes moved into plans: `refactors/pending/language/linked-only-selections.md` (compiler, validation, artifacts) and `refactors/pending/runtime/pico-runtime.md`, Selections in the Isograph layer (runtime). The path-keyed and value-keyed identities this note listed for a client field on a scalar are superseded there: the derived node lives in the scalar record's container. What stays parked is below.
 
 ## User-defined entities
 
-A source file could declare an entity whose value is a TypeScript type. One candidate syntax is `iso<{ foo: string }>(\`entity FooRef\`)`, which declares the entity `FooRef` with value type `{ foo: string }`. Then `field FooRef.Bar { __self }` receives `{ foo: string }` as `__self`. Its default reader would be its declaration's (linked-only-selections.md, Default reader modules). The syntax is undecided.
+A source file could declare an entity whose value is a TypeScript type. One candidate syntax is `iso<{ foo: string }>(\`entity FooRef\`)`, which declares the entity `FooRef` with value type `{ foo: string }`. Then `field FooRef.Bar { __self }` receives `{ foo: string }` as `__self`. A bare selection of it would read its record's `__value`, as a bare scalar selection does (pico-runtime.md, The walk), and its entity table would come from its declaration. The syntax is undecided.
 
 ## Per-type imports in both ASTs
 
-This is a user direction, parked like the rest of this doc. The reader AST's part, a default reader per target entity as a hoisted per-type module, is planned in linked-only-selections.md. The rest is parked: for every concrete type a reader AST or a normalization AST encounters, the generated artifact imports what that type needs (a constructor or destructor, its TypeScript types, or anything else the type defines), hoisted to the top of the artifact and referenced by local name.
+This is a user direction, parked like the rest of this doc. The planned part is the entity table (linked-only-selections.md, Entity tables): a reader artifact imports the table of each entity its walk reads at, and a normalization AST imports the table of each entity it writes, for the record storage. The rest is parked: for every concrete type a reader AST or a normalization AST encounters, the generated artifact imports what that type needs (a constructor or destructor, its TypeScript types, or anything else the type defines), hoisted to the top of the artifact and referenced by local name.
 
 ### What upstream hoists today
 
@@ -41,5 +41,4 @@ The one per-type import i2 has is for a custom scalar's TypeScript type: `custom
 
 ### What this direction adds beyond the plan
 
-- Imports keyed by concrete type in the normalization AST, not only in the reader AST.
-- Value imports referenced from the normalization AST (for example a type's constructor or destructor), where both upstream and i2 today emit only the type's name as a string.
+- Value imports beyond the table's fields and storage, referenced from either AST: a type's constructor or destructor, or anything else the type defines, where upstream emits only the type's name as a string.
