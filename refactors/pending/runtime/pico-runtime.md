@@ -973,7 +973,7 @@ The AST carries no kind, no artifact import, and no target. Whether a field is a
 
 `storeKey` takes the name and the arguments: `storeKey(name: string, args: Arguments | null, variables: Variables): StoreKey`, so `normalize`, `check`, and the mark pass `selection.selectableName` and the walk passes `selection.fieldName` (`libs/isograph-runtime/src/storeKey.ts:13-21`).
 
-The index exports `ReaderSelection`, `ReaderSelectionSet`, `EntityTable`, `FieldEntry`, `RecordStorage`, `NormalizationTarget`, and `NormalizationLeafTarget`, and stops exporting `ReaderLinkedSelection`, `ReaderRefinementSelection`, `ReaderResolverSelection`, `ReaderScalarSelection`, and `NormalizationIdentity` (`libs/isograph-runtime/src/index.ts`).
+The index exports `ReaderSelection`, `ReaderSelectionSet`, `EntityTable`, `FieldEntry`, `EntityShape`, `RecordStorage`, `EMPTY_DATA`, `NormalizationTarget`, and `NormalizationLeafTarget`, and stops exporting `ReaderLinkedSelection`, `ReaderRefinementSelection`, `ReaderResolverSelection`, `ReaderScalarSelection`, and `NormalizationIdentity` (`libs/isograph-runtime/src/index.ts`).
 
 ### Entity tables
 
