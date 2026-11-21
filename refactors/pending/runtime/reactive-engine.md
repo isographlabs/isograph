@@ -93,9 +93,9 @@ other is never pulled, and its computation does not run
 
 ### Cutoff by per-node equality
 
-Each derived node carries an equality. After a recomputation, the engine compares the previous value with the new one. When the equality accepts, the node keeps the previous value object and does not mark its dependents. When it rejects, the node stores the new value and marks its dependents `Dirty`. The engine's default identity equality is `sameValue`; which comparison it makes is open decision 6 (pico-runtime.md open decision 20).
+Each derived node carries an equality. After a recomputation, the engine compares the previous value with the new one. When the equality accepts, the node keeps the previous value object and does not mark its dependents. When it rejects, the node stores the new value and marks its dependents `Dirty`. The engine defines no equality of its own: every `createDerivedNode` caller supplies one (decision 6). The Isograph layer passes `===`.
 
-A source node has no equality: `writeSource` marks unconditionally, and the caller decides that the value changed (open decision 8).
+Each source node carries an equality too. `writeSource` compares the stored value with the new one, and when the equality accepts, it stores nothing and marks nothing (decision 8).
 
 ### Dynamic dependencies
 
@@ -136,7 +136,7 @@ A node recomputes at most once per write. After its pull it is `Clean`, and duri
 
 ### Reverse edges, no epochs
 
-Every edge is an object reference, held in both directions: a derived node's dependency list points down, and every node's `dependents` set points up. pico keeps forward edges only and finds nodes by id; it decides staleness with epochs (Comparison with the Rust pico crate). The engine needs no epoch: the mark on a node says whether its value is current, and the reverse edges let a write reach exactly the nodes above it. A write costs the nodes it reaches, and a pull of a `Clean` node is one step no matter how many unrelated writes happened. Both designs return the same values and run the same computations, except where open decision 8 differs.
+Every edge is an object reference, held in both directions: a derived node's dependency list points down, and every node's `dependents` set points up. pico keeps forward edges only and finds nodes by id; it decides staleness with epochs (Comparison with the Rust pico crate). The engine needs no epoch: the mark on a node says whether its value is current, and the reverse edges let a write reach exactly the nodes above it. A write costs the nodes it reaches, and a pull of a `Clean` node is one step no matter how many unrelated writes happened. Both designs return the same values and run the same computations.
 
 ## The public API
 
@@ -155,7 +155,6 @@ export {
   type Graph,
   markSourceChanged,
   pull,
-  sameValue,
   type SourceNode,
   sourceValue,
   writeSource,
@@ -182,6 +181,9 @@ export type Graph = {
 export type SourceNode<TValue> = {
   /** Read only by `readSource` and `sourceValue`. Written only by `writeSource`. */
   value: TValue;
+  /** Whether a written value equals the stored one. Called only by `writeSource`, with the stored
+   * value and the written one. A method signature, as `DerivedNode.equal` is. */
+  equal(previous: TValue, next: TValue): boolean;
   /** Written only by `setDependencies`. */
   readonly dependents: Set<AnyDerivedNode>;
 };
@@ -271,8 +273,12 @@ export type ComputeContext = {
 /** A graph with no computation running. */
 export function createGraph(): Graph;
 
-/** A source node holding `value`, read by no derived node. */
-export function createSourceNode<TValue>(value: TValue): SourceNode<TValue>;
+/** A source node holding `value`, read by no derived node. `equal` decides whether a later write
+ * changes it. */
+export function createSourceNode<TValue>(
+  value: TValue,
+  equal: (previous: TValue, next: TValue) => boolean,
+): SourceNode<TValue>;
 
 /** A derived node that was never computed: `Dirty`, no value, no dependencies. Its computation
  * first runs on the first pull that reaches it. */
@@ -285,8 +291,9 @@ export function createDerivedNode<TValue>(
  * inside one it records nothing (open decision 10). */
 export function sourceValue<TValue>(source: SourceNode<TValue>): TValue;
 
-/** Sets `source`'s value and marks its dependents. Runs no computation. The caller decided that
- * the value changed (open decision 8). Throws while a computation runs. */
+/** When `source.equal` rejects the stored value and `value`, sets `source`'s value and marks its
+ * dependents; when it accepts, stores nothing and marks nothing (decision 8). Runs no computation.
+ * Throws while a computation runs. */
 export function writeSource<TValue>(
   graph: Graph,
   source: SourceNode<TValue>,
@@ -310,12 +317,9 @@ export function pull<TValue>(graph: Graph, node: DerivedNode<TValue>): TValue;
  * its dependents `Dirty`. A later pull computes it again (open decision 9). Throws while a
  * computation runs. */
 export function disposeDerivedNode(graph: Graph, node: AnyDerivedNode): void;
-
-/** The identity equality of a node whose value is compared by identity (open decision 6). */
-export function sameValue(previous: unknown, next: unknown): boolean;
 ```
 
-Callers. In the Isograph runtime (pico-runtime.md, The engine's public API): `createSourceNode` and `sourceValue` in `store.ts`, `writeSource` in `normalize.ts` and `test/fixtures.ts`, `markSourceChanged` and `disposeDerivedNode` in `deleteRecord`, `createDerivedNode`, `pull`, and `sameValue` in `storedResults.ts`. Under (f) `createGraph` is called by `createIsographEnvironment` or by whoever builds the `Store`, which becomes `{ readonly graph: Graph; readonly records: ... }` (pico-runtime.md open decision 2 (f)). Outside Isograph: the consumer's own code, as in The package README.
+Callers. In the Isograph runtime (pico-runtime.md, The engine's public API): `createSourceNode` and `sourceValue` in `store.ts`, `writeSource` in `normalize.ts` and `test/fixtures.ts`, `markSourceChanged` and `disposeDerivedNode` in `deleteRecord`, `createDerivedNode` and `pull` in `storedResults.ts`, which passes `===` as each node's equality. Under (f) `createGraph` is called by `createIsographEnvironment` or by whoever builds the `Store`, which becomes `{ readonly graph: Graph; readonly records: ... }` (pico-runtime.md open decision 2 (f)). Outside Isograph: the consumer's own code, as in The package README.
 
 ### Option (g): each node holds its graph
 
@@ -327,6 +331,7 @@ Under open decision 2 (g), a node records its graph at construction and the publ
 export type SourceNode<TValue> = {
   readonly graph: Graph;
   value: TValue;
+  equal(previous: TValue, next: TValue): boolean;
   readonly dependents: Set<AnyDerivedNode>;
 };
 export type DerivedNode<TValue> = {
@@ -339,6 +344,7 @@ export type DerivedNode<TValue> = {
 export function createSourceNode<TValue>(
   graph: Graph,
   value: TValue,
+  equal: (previous: TValue, next: TValue) => boolean,
 ): SourceNode<TValue>;
 export function createDerivedNode<TValue>(
   graph: Graph,
@@ -368,8 +374,11 @@ export function createGraph(): Graph {
   return { computingDepth: 0 };
 }
 
-export function createSourceNode<TValue>(value: TValue): SourceNode<TValue> {
-  return { value, dependents: new Set() };
+export function createSourceNode<TValue>(
+  value: TValue,
+  equal: (previous: TValue, next: TValue) => boolean,
+): SourceNode<TValue> {
+  return { value, equal, dependents: new Set() };
 }
 
 export function createDerivedNode<TValue>(
@@ -398,13 +407,7 @@ export function sourceValue<TValue>(source: SourceNode<TValue>): TValue {
 function stateOf<TValue>(node: DerivedNode<TValue>): StateSlot<TValue> {
   return node.slot;
 }
-
-export function sameValue(previous: unknown, next: unknown): boolean {
-  return previous === next;
-}
 ```
-
-`sameValue` is written for open decision 6 (a), `===`; under the held (b) its body is `Object.is(previous, next)`.
 
 ### The guard
 
@@ -433,6 +436,9 @@ export function writeSource<TValue>(
   value: TValue,
 ): void {
   assertNotComputing(graph);
+  if (source.equal(source.value, value)) {
+    return;
+  }
   source.value = value;
   source.dependents.forEach(markDirty);
 }
@@ -693,25 +699,24 @@ import {
   createGraph,
   createSourceNode,
   pull,
-  sameValue,
   writeSource,
 } from '@isograph/reactive-graph';
 
 const graph = createGraph();
-const price = createSourceNode(100);
-const quantity = createSourceNode(3);
+const price = createSourceNode(100, (a, b) => a === b);
+const quantity = createSourceNode(3, (a, b) => a === b);
 
 const total = createDerivedNode(
   (context) => context.readSource(price) * context.readSource(quantity),
-  sameValue,
+  (a, b) => a === b,
 );
 const isLargeOrder = createDerivedNode(
   (context) => context.readDerived(total) >= 1000,
-  sameValue,
+  (a, b) => a === b,
 );
 const banner = createDerivedNode(
   (context) => (context.readDerived(isLargeOrder) ? 'Free shipping' : ''),
-  sameValue,
+  (a, b) => a === b,
 );
 
 pull(graph, banner); // '' (runs total, isLargeOrder, banner)
@@ -725,14 +730,14 @@ pull(graph, banner); // 'Free shipping' (runs all three)
 
 - A computation reads nodes only through its `context`: `context.readSource(source)` and `context.readDerived(node)`. A read through a closure or `sourceValue` is not recorded, and the node will not recompute when that value changes.
 - A computation is a pure function of what it reads. It does not write a source, dispose a node, or call `pull`; each of those throws while a computation runs.
-- Each derived node has an equality. When a recomputed value is equal to the previous one, the node keeps the previous value object and the nodes above it do not recompute. Pass `sameValue` for identity, or your own comparator for values you build fresh on each run.
-- `writeSource` always marks. Skip the call when the value did not change.
+- Each derived node has an equality. When a recomputed value is equal to the previous one, the node keeps the previous value object and the nodes above it do not recompute. The engine has no default: pass `(a, b) => a === b` for identity, or your own comparator for values you build fresh on each run.
+- Each source node has an equality too. A `writeSource` of a value equal to the stored one stores nothing and marks nothing. `markSourceChanged` marks a source whose value object you changed in place.
 - A computation and an equality must not throw. A throw is a programmer error: it propagates out of `pull`, and the engine guarantees only that its own state is as it was before that pull.
 - `disposeDerivedNode` detaches a node you no longer need. Nodes that read it recompute on their next pull.
 - A computation must not read its own node, directly or through other nodes.
 ````
 
-The README's rules restate the engine's behavior under the options the body is written for: open decision 2 (f), 8 (a), 9 (a), and 10 (a). Each decision that changes names the README line it changes.
+The README's rules restate the engine's behavior under the options the body is written for: open decision 2 (f), 9 (a), and 10 (a). Each decision that changes names the README line it changes.
 
 ## The design
 
@@ -740,9 +745,9 @@ This section is the engine's counterpart of `docs-website/docs/design-docs/pico.
 
 ### Sources
 
-A source node is an input fact: a value the graph does not compute. The consumer creates it with `createSourceNode(value)` and holds the returned object. The object is the source's identity. There is no key, no lookup by key, and no absent source: a source exists from creation and always holds a value. A consumer that needs "not set yet" stores a value of its own that says so (`undefined`, a sentinel symbol, or a tagged union), and readers depend on that value like any other. The Isograph runtime's `MISSING` is such a value.
+A source node is an input fact: a value the graph does not compute. The consumer creates it with `createSourceNode(value, equal)` and holds the returned object. The object is the source's identity. There is no key, no lookup by key, and no absent source: a source exists from creation and always holds a value. A consumer that needs "not set yet" stores a value of its own that says so (`undefined`, a sentinel symbol, or a tagged union), and readers depend on that value like any other. The Isograph runtime's `MISSING` is such a value.
 
-A source is written with `writeSource(graph, source, value)`. The write sets the value and marks. It does not compare: the caller already knows whether the value changed, and a caller that does not know compares before calling (open decision 8). `markSourceChanged(graph, source)` marks without setting, for a consumer that changed the value object in place or whose source went away.
+A source is written with `writeSource(graph, source, value)`. The write compares the stored value with the new one by the source's `equal`. When `equal` accepts, the write stores nothing and marks nothing; when it rejects, the write sets the value and marks (decision 8). The engine defines no equality of its own, for sources as for derived nodes (decision 6). `markSourceChanged(graph, source)` marks without setting, for a consumer that changed the value object in place or whose source went away.
 
 Code outside a computation reads a source with `sourceValue(source)`, which records nothing. A computation reads it with `context.readSource(source)`.
 
@@ -774,7 +779,7 @@ The walk stops at the first changed dependency because the recomputation that fo
 
 `equal(previous, next)` decides whether the nodes above a recomputed node recompute. When it accepts, the node keeps the previous value object, so a reader comparing by identity sees no change, and its dependents stay as marked: a `Check` dependent then verifies to `Clean` without running. When it rejects, the node stores the new value and marks its dependents `Dirty`.
 
-An equality may answer equal only when no reader can tell the two values apart. An equality that answers equal for distinguishable values makes readers keep a stale value. An equality that answers unequal for indistinguishable values costs recomputation, never a wrong value. `sameValue` is the engine's identity comparison (open decision 6). A consumer whose computation builds a new object on each run supplies a structural comparator, or the nodes above it recompute on every change below.
+An equality may answer equal only when no reader can tell the two values apart. An equality that answers equal for distinguishable values makes readers keep a stale value. An equality that answers unequal for indistinguishable values costs recomputation, never a wrong value. The engine has no comparison of its own; the caller supplies every equality (decision 6). A consumer whose computation builds a new object on each run supplies a structural comparator, or the nodes above it recompute on every change below.
 
 pico's equivalent is backdating: an equal recomputation keeps the old `time_updated` (pico.md, Equality and backdating).
 
@@ -813,17 +818,17 @@ Invalidation differs:
 - pico has a database-wide epoch. A write that changes a source increments it and stamps the source (`set_source`, `database.rs:310-329`). A demanded memo verified in the current epoch returns at once (`node_verified_in_current_epoch`, `execute_memoized_function.rs:80`); otherwise pico walks its dependencies and compares each one's `time_updated` with the memo's `time_verified`. After any write anywhere, the first demand of a memo walks every dependency beneath it, though it runs nothing that did not change. The engine marks on write through reverse edges, so a write costs the nodes above it and a pull after an unrelated write is one step.
 - pico keeps forward edges only, as ids into storage; the engine keeps object references in both directions.
 - pico checks source dependencies during verification; the engine does not, because a changed source already marked its readers `Dirty`.
-- pico's `set` compares the new source value with the old one and does not advance the epoch when they are equal (`database.rs:321`). The engine's `writeSource` does not compare (open decision 8).
+- pico's `set` compares the new source value with the old one and does not advance the epoch when they are equal (`database.rs:321`). The engine's `writeSource` compares by the source's `equal` and marks nothing when they are equal (decision 8).
 - pico finds a memo by its function and arguments, interned as `DerivedNodeId`; the engine has no keys, and the consumer holds node objects.
 - pico has one equality per type (`PartialEq` through `DynEq`); the engine has one per node.
 - pico removes a source by key, and a later `get` of its id panics (`removing_params.rs`); the engine has no removal, and a source object cannot dangle.
 - pico collects derived nodes by LRU and reachability; the engine disposes on request.
 
-Observable behavior is the same: for any sequence of writes and reads, both return the same values and run the same computations, except that pico skips a source write of an equal value and the engine marks it (open decision 8).
+Observable behavior is the same: for any sequence of writes and reads, both return the same values and run the same computations, given the same equality per source and per derived node.
 
 ## Comparison with Reactively and Preact signals
 
-Reactively is the same scheme. Its states are `CacheClean`, `CacheCheck`, and `CacheDirty`. `set` marks direct observers `CacheDirty` through `stale`, which marks their observers `CacheCheck` and stops at a node already at or above the requested state. `updateIfNecessary` walks `sources` in order when `CacheCheck`, breaks when the node becomes `CacheDirty`, and then calls `update`. Its default equality is `===` (`defaultEquality`), per node through `equals`. A throw out of the function propagates and leaves the state and the links unchanged, as the engine's does. It has no cycle check. Its differences from the engine: an ambient `CurrentReaction` global records reads where the engine passes a context; `set` compares and skips an equal value, where `writeSource` does not (open decision 8); it reuses the unchanged prefix of the source list; and it schedules effects (`stabilize`), which the engine's core has none of.
+Reactively is the same scheme. Its states are `CacheClean`, `CacheCheck`, and `CacheDirty`. `set` marks direct observers `CacheDirty` through `stale`, which marks their observers `CacheCheck` and stops at a node already at or above the requested state. `updateIfNecessary` walks `sources` in order when `CacheCheck`, breaks when the node becomes `CacheDirty`, and then calls `update`. Its default equality is `===` (`defaultEquality`), per node through `equals`. A throw out of the function propagates and leaves the state and the links unchanged, as the engine's does. It has no cycle check. Its differences from the engine: an ambient `CurrentReaction` global records reads where the engine passes a context; `set` compares by `equals` and skips an equal value, as `writeSource` does by the source's `equal`; it reuses the unchanged prefix of the source list; and it schedules effects (`stabilize`), which the engine's core has none of.
 
 Preact signals uses versions instead of marks. Every signal has a `_version`, a global `globalVersion` counts writes, and each dependency link (a doubly linked list `Node` with `_source`, `_target`, and `_version`) records the version the target last saw. A computed decides with `needsToRecompute`, which walks its sources in order and returns at the first whose version changed, refreshing derived sources as it goes: pico's epochs per link, with pico's in-order walk. Writes notify effects eagerly through flags (`OUTDATED`, `NOTIFIED`). Its comparison is `!==`, a setter with an equal value notifies nothing, and a computed that throws stores the error (`HAS_ERROR`) and rethrows it on read; the engine forbids the throw (Throws). It throws "Cycle detected" when a computed is read while `RUNNING`; the engine has no cycle check (Cycles). It records reads through an ambient `evalContext`, and a signal written inside a computed is allowed.
 
@@ -833,7 +838,7 @@ The engine takes Reactively's marking and pull, pico's equality, guard, and per-
 
 The tests assert values with `toBe` and `toEqual`, and assert which computations ran by counting calls in a `calls` object each test owns. Counting re-invocations is allowed: which writes make which computations run again is the engine's own dependency tracking (AGENTS.md, Tests). No test reads a node's `slot`, `dependents`, or mark, and no test calls an unexported function: marks and edges are implementation, and each test observes them only through values and call counts. There are no snapshot tests and no fixture files; every input is built in the test.
 
-The tests are written under the options the body is written for: open decision 2 (f), 6 (b) where a test depends on it, 8 (a), 9 (a), and 10 (a). Each test whose assertions change under another option says how.
+The tests are written under the options the body is written for: open decision 2 (f), 9 (a), and 10 (a). Each test whose assertions change under another option says how.
 
 ### The pico crate's tests
 
@@ -851,7 +856,7 @@ Top-level files:
 - `equal_reset_after_unrelated_epoch.rs:14` `equal_reset_after_unrelated_epoch_does_not_rerun`: does not port. It pins epoch bookkeeping: an unrelated set advances the epoch, and a later equal set of the read source must not move that source's `time_updated`. The engine has no epoch, and an unrelated write reaches no reader of another source; the behavior left is "an equal write", which the port of `overriding_same_source` covers.
 - `intern.rs:12` `intern`, `intern_ref.rs:12` `intern_ref`, `intern_then_intern_ref.rs:10` `intern_then_intern_ref`: do not port. They pin `intern_value` and `intern_ref` identity; the engine interns nothing.
 - `intern_ref_chain.rs:14` `intern_ref_chain`: ports as "a node's own equality cuts off a selection out of a changed collection". Delta: pico cuts off because `intern_ref` of an equal value keeps its `time_updated`; the engine cuts off because the selecting node's `equal` compares the selected element's fields. The behavior kept is that a reader of one element does not run when other elements change.
-- `overriding_same_source.rs:14` `overriding_same_source`: ports as "writing an equal value". Delta under open decision 8 (a): the reader of the source runs again and the node above it does not; pico's assertion that the reader does not run holds under (b).
+- `overriding_same_source.rs:14` `overriding_same_source`: ports as "writing an equal value". No delta: the write marks nothing, and neither the reader of the source nor the node above it runs.
 - `partial_reuse_multi_function.rs:16` `multi_chain_reuse`: ports as "two readers share one computation of their dependency".
 - `partial_reuse_single_chain.rs:15` `single_chain_reuse`: ports as "a node pulled before its reader is not computed again for the reader".
 - `removing_params.rs:11` `removing_direct_param_causes_panic`, `:26` `removing_indirect_param_causes_panic`: do not port. They pin that a `SourceId` after `remove` is a false proof and `get` panics. The engine has no removal by key, and a source node is an object that cannot dangle. The engine's removal is disposal of a derived node, which `disposal.test.ts` covers.
@@ -916,20 +921,21 @@ import {
   createGraph,
   createSourceNode,
   pull,
-  sameValue,
   writeSource,
 } from '../src';
+
+const strictEqual = (previous: unknown, next: unknown): boolean => previous === next;
 
 describe('ported from crates/pico/tests', () => {
   // crates/pico/tests/basic.rs:14
   test('a derived node recomputes after its source is written', () => {
     const graph = createGraph();
     const calls = { firstLetter: 0 };
-    const input = createSourceNode('asdf');
+    const input = createSourceNode('asdf', strictEqual);
     const firstLetter = createDerivedNode((context) => {
       calls.firstLetter += 1;
       return context.readSource(input).charAt(0);
-    }, sameValue);
+    }, strictEqual);
 
     expect(pull(graph, firstLetter)).toBe('a');
     expect(calls.firstLetter).toBe(1);
@@ -943,15 +949,15 @@ describe('ported from crates/pico/tests', () => {
   test('a chain recomputes every node whose input changed', () => {
     const graph = createGraph();
     const calls = { firstLetter: 0, capitalized: 0 };
-    const input = createSourceNode('asdf');
+    const input = createSourceNode('asdf', strictEqual);
     const firstLetter = createDerivedNode((context) => {
       calls.firstLetter += 1;
       return context.readSource(input).charAt(0);
-    }, sameValue);
+    }, strictEqual);
     const capitalized = createDerivedNode((context) => {
       calls.capitalized += 1;
       return context.readDerived(firstLetter).toUpperCase();
-    }, sameValue);
+    }, strictEqual);
 
     expect(pull(graph, capitalized)).toBe('A');
     expect(calls).toEqual({ firstLetter: 1, capitalized: 1 });
@@ -991,15 +997,15 @@ describe('ported from crates/pico/tests', () => {
   test('a node pulled before its reader is not computed again for the reader', () => {
     const graph = createGraph();
     const calls = { firstLetter: 0, exclaimed: 0 };
-    const input = createSourceNode('asdf');
+    const input = createSourceNode('asdf', strictEqual);
     const firstLetter = createDerivedNode((context) => {
       calls.firstLetter += 1;
       return context.readSource(input).charAt(0);
-    }, sameValue);
+    }, strictEqual);
     const exclaimed = createDerivedNode((context) => {
       calls.exclaimed += 1;
       return `${context.readDerived(firstLetter)}!`;
-    }, sameValue);
+    }, strictEqual);
 
     expect(pull(graph, firstLetter)).toBe('a');
     expect(calls).toEqual({ firstLetter: 1, exclaimed: 0 });
@@ -1013,7 +1019,7 @@ describe('ported from crates/pico/tests', () => {
     const questioned = createDerivedNode((context) => {
       calls.questioned += 1;
       return `${context.readDerived(firstLetter)}?`;
-    }, sameValue);
+    }, strictEqual);
 
     expect(pull(graph, exclaimed)).toBe('a!');
     expect(pull(graph, questioned)).toBe('a?');
@@ -1024,20 +1030,20 @@ describe('ported from crates/pico/tests', () => {
   test('a dependency with no inputs is not computed again when its reader recomputes', () => {
     const graph = createGraph();
     const calls = { firstLetter: 0, capitalized: 0, unchanged: 0 };
-    const input = createSourceNode('asdf');
+    const input = createSourceNode('asdf', strictEqual);
     const firstLetter = createDerivedNode((context) => {
       calls.firstLetter += 1;
       return context.readSource(input).charAt(0);
-    }, sameValue);
+    }, strictEqual);
     const unchanged = createDerivedNode(() => {
       calls.unchanged += 1;
       return 'this node is computed once';
-    }, sameValue);
+    }, strictEqual);
     const capitalized = createDerivedNode((context) => {
       calls.capitalized += 1;
       context.readDerived(unchanged);
       return context.readDerived(firstLetter).toUpperCase();
-    }, sameValue);
+    }, strictEqual);
 
     expect(pull(graph, capitalized)).toBe('A');
     expect(calls).toEqual({ firstLetter: 1, capitalized: 1, unchanged: 1 });
@@ -1053,12 +1059,12 @@ describe('ported from crates/pico/tests', () => {
   test('a write to another source runs nothing', () => {
     const graph = createGraph();
     const calls = { firstLetter: 0 };
-    const input = createSourceNode('asdf');
-    const other = createSourceNode('isograph');
+    const input = createSourceNode('asdf', strictEqual);
+    const other = createSourceNode('isograph', strictEqual);
     const firstLetter = createDerivedNode((context) => {
       calls.firstLetter += 1;
       return context.readSource(input).charAt(0);
-    }, sameValue);
+    }, strictEqual);
 
     expect(pull(graph, firstLetter)).toBe('a');
     writeSource(graph, other, 'pico');
@@ -1070,7 +1076,7 @@ describe('ported from crates/pico/tests', () => {
   test('a pull returns the stored value object', () => {
     const graph = createGraph();
     const calls = { letter: 0 };
-    const input = createSourceNode('asdf');
+    const input = createSourceNode('asdf', strictEqual);
     const letter = createDerivedNode(
       (context) => {
         calls.letter += 1;
@@ -1104,13 +1110,16 @@ describe('ported from crates/pico/tests', () => {
         : previous.name === next.name && previous.bestBook === next.bestBook;
     const graph = createGraph();
     const calls = { bestBook: 0 };
-    const table = createSourceNode<ReadonlyArray<Economist>>([
-      { name: 'John Maynard Keynes', bestBook: 'General theory' },
-      {
-        name: 'Milton Friedman',
-        bestBook: 'A monetary history of the United States',
-      },
-    ]);
+    const table = createSourceNode<ReadonlyArray<Economist>>(
+      [
+        { name: 'John Maynard Keynes', bestBook: 'General theory' },
+        {
+          name: 'Milton Friedman',
+          bestBook: 'A monetary history of the United States',
+        },
+      ],
+      strictEqual,
+    );
     const keynes = createDerivedNode(
       (context) =>
         context
@@ -1121,7 +1130,7 @@ describe('ported from crates/pico/tests', () => {
     const bestBook = createDerivedNode((context) => {
       calls.bestBook += 1;
       return context.readDerived(keynes)?.bestBook;
-    }, sameValue);
+    }, strictEqual);
 
     expect(pull(graph, bestBook)).toBe('General theory');
 
@@ -1142,8 +1151,7 @@ describe('ported from crates/pico/tests', () => {
 
     writeSource(graph, input, 'asdf');
     expect(pull(graph, exclaimed)).toBe('a!');
-    // open decision 8 (a). Under (b): { firstLetter: 1, exclaimed: 1 }.
-    expect(calls).toEqual({ firstLetter: 2, exclaimed: 1 });
+    expect(calls).toEqual({ firstLetter: 1, exclaimed: 1 });
   });
 });
 
@@ -1151,15 +1159,15 @@ describe('marking and the short circuit', () => {
   test('a write runs no computation', () => {
     const graph = createGraph();
     const calls = { doubled: 0, label: 0 };
-    const count = createSourceNode(1);
+    const count = createSourceNode(1, strictEqual);
     const doubled = createDerivedNode((context) => {
       calls.doubled += 1;
       return context.readSource(count) * 2;
-    }, sameValue);
+    }, strictEqual);
     const label = createDerivedNode((context) => {
       calls.label += 1;
       return `${context.readDerived(doubled)}`;
-    }, sameValue);
+    }, strictEqual);
     pull(graph, label);
 
     writeSource(graph, count, 2);
@@ -1173,15 +1181,15 @@ describe('marking and the short circuit', () => {
   test('a direct reader of a written source recomputes; a reader above it recomputes only when that value changed', () => {
     const graph = createGraph();
     const calls = { parity: 0, label: 0 };
-    const count = createSourceNode(1);
+    const count = createSourceNode(1, strictEqual);
     const parity = createDerivedNode((context) => {
       calls.parity += 1;
       return context.readSource(count) % 2 === 0 ? 'even' : 'odd';
-    }, sameValue);
+    }, strictEqual);
     const label = createDerivedNode((context) => {
       calls.label += 1;
       return `the count is ${context.readDerived(parity)}`;
-    }, sameValue);
+    }, strictEqual);
     const first = pull(graph, label);
 
     writeSource(graph, count, 3);
@@ -1196,19 +1204,19 @@ describe('marking and the short circuit', () => {
   test('the short circuit holds through every level above the node that came back equal', () => {
     const graph = createGraph();
     const calls = { clamped: 0, doubled: 0, label: 0 };
-    const count = createSourceNode(20);
+    const count = createSourceNode(20, strictEqual);
     const clamped = createDerivedNode((context) => {
       calls.clamped += 1;
       return Math.min(context.readSource(count), 10);
-    }, sameValue);
+    }, strictEqual);
     const doubled = createDerivedNode((context) => {
       calls.doubled += 1;
       return context.readDerived(clamped) * 2;
-    }, sameValue);
+    }, strictEqual);
     const label = createDerivedNode((context) => {
       calls.label += 1;
       return `${context.readDerived(doubled)}`;
-    }, sameValue);
+    }, strictEqual);
     expect(pull(graph, label)).toBe('20');
 
     writeSource(graph, count, 30);
@@ -1219,19 +1227,19 @@ describe('marking and the short circuit', () => {
   test('a diamond computes each node once per write', () => {
     const graph = createGraph();
     const calls = { left: 0, right: 0, bottom: 0 };
-    const count = createSourceNode(1);
+    const count = createSourceNode(1, strictEqual);
     const left = createDerivedNode((context) => {
       calls.left += 1;
       return context.readSource(count) + 1;
-    }, sameValue);
+    }, strictEqual);
     const right = createDerivedNode((context) => {
       calls.right += 1;
       return context.readSource(count) * 2;
-    }, sameValue);
+    }, strictEqual);
     const bottom = createDerivedNode((context) => {
       calls.bottom += 1;
       return context.readDerived(left) + context.readDerived(right);
-    }, sameValue);
+    }, strictEqual);
     expect(pull(graph, bottom)).toBe(4);
 
     writeSource(graph, count, 2);
@@ -1245,20 +1253,20 @@ describe('marking and the short circuit', () => {
     const build = () => {
       const graph = createGraph();
       const calls = { sum: 0, parity: 0, label: 0 };
-      const a = createSourceNode(1);
-      const b = createSourceNode(2);
+      const a = createSourceNode(1, strictEqual);
+      const b = createSourceNode(2, strictEqual);
       const sum = createDerivedNode((context) => {
         calls.sum += 1;
         return context.readSource(a) + context.readSource(b);
-      }, sameValue);
+      }, strictEqual);
       const parity = createDerivedNode((context) => {
         calls.parity += 1;
         return context.readDerived(sum) % 2 === 0 ? 'even' : 'odd';
-      }, sameValue);
+      }, strictEqual);
       const label = createDerivedNode((context) => {
         calls.label += 1;
         return `the sum is ${context.readDerived(parity)}`;
-      }, sameValue);
+      }, strictEqual);
       pull(graph, label);
       writeSource(graph, a, 3);
       return { graph, calls, sum, label };
@@ -1295,10 +1303,11 @@ import {
   createGraph,
   createSourceNode,
   pull,
-  sameValue,
   sourceValue,
   writeSource,
 } from '../src';
+
+const strictEqual = (previous: unknown, next: unknown): boolean => previous === next;
 
 const MISSING: unique symbol = Symbol('missing');
 
@@ -1306,20 +1315,20 @@ describe('recorded dependencies', () => {
   test('verification stops at the first dependency that changed, in recorded order', () => {
     const graph = createGraph();
     const calls = { gate: 0, other: 0, node: 0 };
-    const x = createSourceNode(2);
-    const y = createSourceNode(10);
+    const x = createSourceNode(2, strictEqual);
+    const y = createSourceNode(10, strictEqual);
     const gate = createDerivedNode((context) => {
       calls.gate += 1;
       return context.readSource(x) % 2 === 0 ? 'even' : 'odd';
-    }, sameValue);
+    }, strictEqual);
     const other = createDerivedNode((context) => {
       calls.other += 1;
       return context.readSource(y) * 2;
-    }, sameValue);
+    }, strictEqual);
     const node = createDerivedNode((context) => {
       calls.node += 1;
       return context.readDerived(gate) === 'even' ? context.readDerived(other) : 0;
-    }, sameValue);
+    }, strictEqual);
     expect(pull(graph, node)).toBe(20);
 
     writeSource(graph, x, 3);
@@ -1334,13 +1343,13 @@ describe('recorded dependencies', () => {
   test('a branch change replaces the dependencies', () => {
     const graph = createGraph();
     const calls = { pick: 0 };
-    const useA = createSourceNode(true);
-    const a = createSourceNode(1);
-    const b = createSourceNode(2);
+    const useA = createSourceNode(true, strictEqual);
+    const a = createSourceNode(1, strictEqual);
+    const b = createSourceNode(2, strictEqual);
     const pick = createDerivedNode((context) => {
       calls.pick += 1;
       return context.readSource(useA) ? context.readSource(a) : context.readSource(b);
-    }, sameValue);
+    }, strictEqual);
     expect(pull(graph, pick)).toBe(1);
 
     writeSource(graph, useA, false);
@@ -1359,15 +1368,15 @@ describe('recorded dependencies', () => {
   test('a derived node read twice is computed once per write', () => {
     const graph = createGraph();
     const calls = { inner: 0, outer: 0 };
-    const count = createSourceNode(1);
+    const count = createSourceNode(1, strictEqual);
     const inner = createDerivedNode((context) => {
       calls.inner += 1;
       return context.readSource(count) * 2;
-    }, sameValue);
+    }, strictEqual);
     const outer = createDerivedNode((context) => {
       calls.outer += 1;
       return context.readDerived(inner) + context.readDerived(inner);
-    }, sameValue);
+    }, strictEqual);
     expect(pull(graph, outer)).toBe(4);
 
     writeSource(graph, count, 2);
@@ -1379,11 +1388,11 @@ describe('recorded dependencies', () => {
   test('a computation that reads one source twice', () => {
     const graph = createGraph();
     const calls = { twice: 0 };
-    const config = createSourceNode('a');
+    const config = createSourceNode('a', strictEqual);
     const twice = createDerivedNode((context) => {
       calls.twice += 1;
       return `${context.readSource(config)}${context.readSource(config)}`;
-    }, sameValue);
+    }, strictEqual);
     expect(pull(graph, twice)).toBe('aa');
 
     writeSource(graph, config, 'b');
@@ -1397,12 +1406,12 @@ describe('recorded dependencies', () => {
   test('a source that holds the consumer’s absence value', () => {
     const graph = createGraph();
     const calls = { name: 0 };
-    const config = createSourceNode<string | typeof MISSING>(MISSING);
+    const config = createSourceNode<string | typeof MISSING>(MISSING, strictEqual);
     const name = createDerivedNode((context) => {
       calls.name += 1;
       const value = context.readSource(config);
       return value === MISSING ? null : value;
-    }, sameValue);
+    }, strictEqual);
     expect(pull(graph, name)).toBe(null);
 
     writeSource(graph, config, 'a');
@@ -1414,7 +1423,7 @@ describe('recorded dependencies', () => {
   test('sourceValue outside a computation, then a reader created after the write', () => {
     const graph = createGraph();
     const calls = { name: 0 };
-    const config = createSourceNode<string | typeof MISSING>(MISSING);
+    const config = createSourceNode<string | typeof MISSING>(MISSING, strictEqual);
     expect(sourceValue(config)).toBe(MISSING);
 
     writeSource(graph, config, 'a');
@@ -1422,7 +1431,7 @@ describe('recorded dependencies', () => {
       calls.name += 1;
       const value = context.readSource(config);
       return value === MISSING ? null : value;
-    }, sameValue);
+    }, strictEqual);
     expect(pull(graph, name)).toBe('a');
     expect(calls.name).toBe(1);
     expect(sourceValue(config)).toBe('a');
@@ -1442,12 +1451,11 @@ describe('recorded dependencies', () => {
   // crates/pico/tests/tracking_field/correctness.rs:17
   test('sourceValue inside a computation records nothing', () => {
     const graph = createGraph();
-    const items = createSourceNode<ReadonlyArray<string>>(['asdf']);
-    const untrackedCount = createDerivedNode(() => sourceValue(items).length, sameValue);
+    const items = createSourceNode<ReadonlyArray<string>>(['asdf'], strictEqual);
+    const untrackedCount = createDerivedNode(() => sourceValue(items).length, strictEqual);
     const trackedCount = createDerivedNode(
       (context) => context.readSource(items).length,
-      sameValue,
-    );
+        );
     expect(pull(graph, untrackedCount)).toBe(1);
 
     writeSource(graph, items, ['asdf', 'isograph']);
@@ -1473,14 +1481,15 @@ import {
   createGraph,
   createSourceNode,
   pull,
-  sameValue,
   writeSource,
 } from '../src';
+
+const strictEqual = (previous: unknown, next: unknown): boolean => previous === next;
 
 test('a throwing computation leaves the graph state unchanged', () => {
   const graph = createGraph();
   const calls = { scaled: 0, parent: 0 };
-  const count = createSourceNode(1);
+  const count = createSourceNode(1, strictEqual);
   const scaled = createDerivedNode((context) => {
     calls.scaled += 1;
     const value = context.readSource(count);
@@ -1488,11 +1497,11 @@ test('a throwing computation leaves the graph state unchanged', () => {
       throw new Error('negative');
     }
     return value * 10;
-  }, sameValue);
+  }, strictEqual);
   const parent = createDerivedNode((context) => {
     calls.parent += 1;
     return `${context.readDerived(scaled)}`;
-  }, sameValue);
+  }, strictEqual);
   expect(pull(graph, parent)).toBe('10');
 
   writeSource(graph, count, -1);
@@ -1521,23 +1530,24 @@ import {
   createSourceNode,
   disposeDerivedNode,
   pull,
-  sameValue,
   writeSource,
 } from '../src';
+
+const strictEqual = (previous: unknown, next: unknown): boolean => previous === next;
 
 describe('disposeDerivedNode (open decision 9 (a))', () => {
   test('marks the dependents Dirty, and their next pull recomputes the disposed node', () => {
     const graph = createGraph();
     const calls = { scaled: 0, parent: 0 };
-    const count = createSourceNode(1);
+    const count = createSourceNode(1, strictEqual);
     const scaled = createDerivedNode((context) => {
       calls.scaled += 1;
       return context.readSource(count) * 10;
-    }, sameValue);
+    }, strictEqual);
     const parent = createDerivedNode((context) => {
       calls.parent += 1;
       return `${context.readDerived(scaled)}`;
-    }, sameValue);
+    }, strictEqual);
     expect(pull(graph, parent)).toBe('10');
 
     disposeDerivedNode(graph, scaled);
@@ -1560,13 +1570,13 @@ describe('disposeDerivedNode (open decision 9 (a))', () => {
   test('a dependent that stops reading a disposed node is detached from it', () => {
     const graph = createGraph();
     const calls = { scaled: 0, parent: 0 };
-    const count = createSourceNode(1);
-    const useScaled = createSourceNode(true);
+    const count = createSourceNode(1, strictEqual);
+    const useScaled = createSourceNode(true, strictEqual);
     // scaled as above
     const parent = createDerivedNode((context) => {
       calls.parent += 1;
       return context.readSource(useScaled) ? context.readDerived(scaled) : 0;
-    }, sameValue);
+    }, strictEqual);
     expect(pull(graph, parent)).toBe(10);
 
     disposeDerivedNode(graph, scaled);
@@ -1584,11 +1594,11 @@ describe('disposeDerivedNode (open decision 9 (a))', () => {
   test('disposing a never-computed node, or a node twice, changes nothing else', () => {
     const graph = createGraph();
     const calls = { node: 0 };
-    const count = createSourceNode(1);
+    const count = createSourceNode(1, strictEqual);
     const node = createDerivedNode((context) => {
       calls.node += 1;
       return context.readSource(count);
-    }, sameValue);
+    }, strictEqual);
 
     disposeDerivedNode(graph, node);
     disposeDerivedNode(graph, node);
@@ -1614,38 +1624,39 @@ import {
   type Graph,
   markSourceChanged,
   pull,
-  sameValue,
   sourceValue,
   writeSource,
 } from '../src';
+
+const strictEqual = (previous: unknown, next: unknown): boolean => previous === next;
 
 const guardMessage = 'Cannot write or pull the graph while a computation is running.';
 
 describe('the write-during-computation guard', () => {
   test.each([
-    ['writeSource', (graph: Graph) => writeSource(graph, createSourceNode(0), 1)],
-    ['markSourceChanged', (graph: Graph) => markSourceChanged(graph, createSourceNode(0))],
+    ['writeSource', (graph: Graph) => writeSource(graph, createSourceNode(0, strictEqual), 1)],
+    ['markSourceChanged', (graph: Graph) => markSourceChanged(graph, createSourceNode(0, strictEqual))],
     [
       'disposeDerivedNode',
-      (graph: Graph) => disposeDerivedNode(graph, createDerivedNode(() => 0, sameValue)),
+      (graph: Graph) => disposeDerivedNode(graph, createDerivedNode(() => 0, strictEqual)),
     ],
-    ['pull', (graph: Graph) => pull(graph, createDerivedNode(() => 0, sameValue))],
+    ['pull', (graph: Graph) => pull(graph, createDerivedNode(() => 0, strictEqual))],
   ])('%s inside a computation throws', (_name, action) => {
     const graph = createGraph();
     const node = createDerivedNode(() => {
       action(graph);
       return 0;
-    }, sameValue);
+    }, strictEqual);
     expect(() => pull(graph, node)).toThrow(guardMessage);
   });
 
   test('a rejected write changes nothing, and the graph accepts writes after the throw', () => {
     const graph = createGraph();
-    const other = createSourceNode(0);
+    const other = createSourceNode(0, strictEqual);
     const writer = createDerivedNode(() => {
       writeSource(graph, other, 1);
       return 0;
-    }, sameValue);
+    }, strictEqual);
     expect(() => pull(graph, writer)).toThrow(guardMessage);
     expect(sourceValue(other)).toBe(0);
 
@@ -1667,28 +1678,29 @@ import {
   disposeDerivedNode,
   markSourceChanged,
   pull,
-  sameValue,
   sourceValue,
   writeSource,
 } from '../src';
+
+const strictEqual = (previous: unknown, next: unknown): boolean => previous === next;
 
 describe('degenerate cases', () => {
   test('a derived node with no dependencies is computed once, never marked, and changed only by disposal', () => {
     const graph = createGraph();
     const calls = { constant: 0, parity: 0, reader: 0 };
-    const count = createSourceNode(1);
+    const count = createSourceNode(1, strictEqual);
     const constant = createDerivedNode(() => {
       calls.constant += 1;
       return 'fixed';
-    }, sameValue);
+    }, strictEqual);
     const parity = createDerivedNode((context) => {
       calls.parity += 1;
       return context.readSource(count) % 2 === 0 ? 'even' : 'odd';
-    }, sameValue);
+    }, strictEqual);
     const reader = createDerivedNode((context) => {
       calls.reader += 1;
       return `${context.readDerived(constant)} ${context.readDerived(parity)}`;
-    }, sameValue);
+    }, strictEqual);
     expect(pull(graph, reader)).toBe('fixed odd');
 
     writeSource(graph, count, 3);
@@ -1706,7 +1718,7 @@ describe('degenerate cases', () => {
 
   test('a source with no dependents', () => {
     const graph = createGraph();
-    const count = createSourceNode(1);
+    const count = createSourceNode(1, strictEqual);
     writeSource(graph, count, 2);
     markSourceChanged(graph, count);
     expect(sourceValue(count)).toBe(2);
@@ -1715,44 +1727,58 @@ describe('degenerate cases', () => {
   test('a pull of a never-computed node computes it once', () => {
     const graph = createGraph();
     const calls = { node: 0 };
-    const count = createSourceNode(1);
+    const count = createSourceNode(1, strictEqual);
     const node = createDerivedNode((context) => {
       calls.node += 1;
       return context.readSource(count);
-    }, sameValue);
+    }, strictEqual);
     expect(calls.node).toBe(0);
     expect(pull(graph, node)).toBe(1);
     expect(pull(graph, node)).toBe(1);
     expect(calls.node).toBe(1);
   });
 
-  test('writing the value a source already holds (open decision 8 (a))', () => {
+  test("the source's equal decides whether a write marks", () => {
     const graph = createGraph();
-    const calls = { reader: 0, parent: 0 };
-    const items = createSourceNode<ReadonlyArray<number>>([1, 2]);
-    const reader = createDerivedNode((context) => {
-      calls.reader += 1;
-      return context.readSource(items).length;
-    }, sameValue);
-    const parent = createDerivedNode((context) => {
-      calls.parent += 1;
-      return context.readDerived(reader) * 2;
-    }, sameValue);
-    expect(pull(graph, parent)).toBe(4);
+    const calls = { strictReader: 0, structuralReader: 0 };
+    const sameElements = (previous: ReadonlyArray<number>, next: ReadonlyArray<number>) =>
+      previous.length === next.length && previous.every((element, index) => element === next[index]);
+    const strictItems = createSourceNode<ReadonlyArray<number>>([1, 2], strictEqual);
+    const structuralItems = createSourceNode<ReadonlyArray<number>>([1, 2], sameElements);
+    const strictReader = createDerivedNode((context) => {
+      calls.strictReader += 1;
+      return context.readSource(strictItems).length;
+    }, strictEqual);
+    const structuralReader = createDerivedNode((context) => {
+      calls.structuralReader += 1;
+      return context.readSource(structuralItems).length;
+    }, strictEqual);
+    expect(pull(graph, strictReader)).toBe(2);
+    expect(pull(graph, structuralReader)).toBe(2);
 
-    writeSource(graph, items, sourceValue(items));
-    expect(pull(graph, parent)).toBe(4);
-    // Under (b): { reader: 1, parent: 1 }.
-    expect(calls).toEqual({ reader: 2, parent: 1 });
+    writeSource(graph, strictItems, sourceValue(strictItems));
+    writeSource(graph, structuralItems, sourceValue(structuralItems));
+    expect(pull(graph, strictReader)).toBe(2);
+    expect(pull(graph, structuralReader)).toBe(2);
+    expect(calls).toEqual({ strictReader: 1, structuralReader: 1 });
+
+    writeSource(graph, strictItems, [1, 2]);
+    writeSource(graph, structuralItems, [1, 2]);
+    expect(pull(graph, strictReader)).toBe(2);
+    expect(pull(graph, structuralReader)).toBe(2);
+    expect(calls).toEqual({ strictReader: 2, structuralReader: 1 });
+
+    writeSource(graph, structuralItems, [1, 2, 3]);
+    expect(pull(graph, structuralReader)).toBe(3);
+    expect(calls).toEqual({ strictReader: 2, structuralReader: 2 });
   });
 
   test('markSourceChanged after the value object changed in place', () => {
     const graph = createGraph();
-    const scores = createSourceNode(new Map([['a', 1]]));
+    const scores = createSourceNode(new Map([['a', 1]]), strictEqual);
     const score = createDerivedNode(
       (context) => context.readSource(scores).get('a'),
-      sameValue,
-    );
+        );
     expect(pull(graph, score)).toBe(1);
 
     sourceValue(scores).set('a', 2);
@@ -1764,16 +1790,16 @@ describe('degenerate cases', () => {
   test('undefined is a value, distinct from never computed', () => {
     const graph = createGraph();
     const calls = { nothing: 0, parent: 0 };
-    const count = createSourceNode(1);
+    const count = createSourceNode(1, strictEqual);
     const nothing = createDerivedNode((context) => {
       calls.nothing += 1;
       context.readSource(count);
       return undefined;
-    }, sameValue);
+    }, strictEqual);
     const parent = createDerivedNode((context) => {
       calls.parent += 1;
       return context.readDerived(nothing) === undefined;
-    }, sameValue);
+    }, strictEqual);
     expect(pull(graph, parent)).toBe(true);
     expect(pull(graph, nothing)).toBe(undefined);
 
@@ -1782,39 +1808,55 @@ describe('degenerate cases', () => {
     expect(calls).toEqual({ nothing: 2, parent: 1 });
   });
 
-  test('NaN under sameValue', () => {
+  test('the supplied equal decides cutoff for NaN', () => {
     const graph = createGraph();
-    const calls = { notANumber: 0, parent: 0 };
-    const count = createSourceNode(1);
-    const notANumber = createDerivedNode((context) => {
-      calls.notANumber += 1;
-      return context.readSource(count) * Number.NaN;
-    }, sameValue);
-    const parent = createDerivedNode((context) => {
-      calls.parent += 1;
-      return Number.isNaN(context.readDerived(notANumber));
-    }, sameValue);
-    expect(pull(graph, parent)).toBe(true);
+    const calls = { strictParent: 0, objectIsParent: 0 };
+    const count = createSourceNode(1, strictEqual);
+    const strictNaN = createDerivedNode(
+      (context) => context.readSource(count) * Number.NaN,
+      strictEqual,
+    );
+    const objectIsNaN = createDerivedNode(
+      (context) => context.readSource(count) * Number.NaN,
+      Object.is,
+    );
+    const strictParent = createDerivedNode((context) => {
+      calls.strictParent += 1;
+      return Number.isNaN(context.readDerived(strictNaN));
+    }, strictEqual);
+    const objectIsParent = createDerivedNode((context) => {
+      calls.objectIsParent += 1;
+      return Number.isNaN(context.readDerived(objectIsNaN));
+    }, strictEqual);
+    expect(pull(graph, strictParent)).toBe(true);
+    expect(pull(graph, objectIsParent)).toBe(true);
 
     writeSource(graph, count, 2);
-    expect(pull(graph, parent)).toBe(true);
-    // open decision 6 (b), Object.is. Under (a), ===: { notANumber: 2, parent: 2 }.
-    expect(calls).toEqual({ notANumber: 2, parent: 1 });
+    expect(pull(graph, strictParent)).toBe(true);
+    expect(pull(graph, objectIsParent)).toBe(true);
+    expect(calls).toEqual({ strictParent: 2, objectIsParent: 1 });
   });
 
-  test('0 and -0 under sameValue', () => {
+  test('the supplied equal decides cutoff for 0 and -0', () => {
     const graph = createGraph();
-    const sign = createSourceNode(1);
-    const zero = createDerivedNode((context) => context.readSource(sign) * 0, sameValue);
-    const parent = createDerivedNode(
-      (context) => (Object.is(context.readDerived(zero), -0) ? 'negative zero' : 'zero'),
-      sameValue,
+    const sign = createSourceNode(1, strictEqual);
+    const strictZero = createDerivedNode((context) => context.readSource(sign) * 0, strictEqual);
+    const objectIsZero = createDerivedNode((context) => context.readSource(sign) * 0, Object.is);
+    const describeZero = (value: number) => (Object.is(value, -0) ? 'negative zero' : 'zero');
+    const strictParent = createDerivedNode(
+      (context) => describeZero(context.readDerived(strictZero)),
+      strictEqual,
     );
-    expect(pull(graph, parent)).toBe('zero');
+    const objectIsParent = createDerivedNode(
+      (context) => describeZero(context.readDerived(objectIsZero)),
+      strictEqual,
+    );
+    expect(pull(graph, strictParent)).toBe('zero');
+    expect(pull(graph, objectIsParent)).toBe('zero');
 
     writeSource(graph, sign, -1);
-    // open decision 6 (b), Object.is. Under (a), === keeps 0 and parent stays 'zero'.
-    expect(pull(graph, parent)).toBe('negative zero');
+    expect(pull(graph, strictParent)).toBe('zero');
+    expect(pull(graph, objectIsParent)).toBe('negative zero');
   });
 });
 ```
@@ -1830,19 +1872,20 @@ import {
   createSourceNode,
   type DerivedNode,
   pull,
-  sameValue,
   writeSource,
 } from '../src';
 import { type AnyDerivedNode } from '../src/graph';
 
+const strictEqual = (previous: unknown, next: unknown): boolean => previous === next;
+
 test('readDerived and pull return the node’s value type', () => {
   const graph = createGraph();
-  const count = createSourceNode(1);
-  const doubled = createDerivedNode((context) => context.readSource(count) * 2, sameValue);
+  const count = createSourceNode(1, strictEqual);
+  const doubled = createDerivedNode((context) => context.readSource(count) * 2, strictEqual);
   const label = createDerivedNode((context) => {
     expectTypeOf(context.readDerived(doubled)).toEqualTypeOf<number>();
     return `${context.readDerived(doubled)}`;
-  }, sameValue);
+  }, strictEqual);
   expectTypeOf(pull(graph, label)).toEqualTypeOf<string>();
 });
 
@@ -1853,7 +1896,7 @@ test('a derived node of any value type is an AnyDerivedNode', () => {
 
 test('writes and equalities are typed by the node', () => {
   const graph = createGraph();
-  const count = createSourceNode(1);
+  const count = createSourceNode(1, strictEqual);
   // @ts-expect-error a string written to a number source
   writeSource(graph, count, 'one');
   createDerivedNode(
@@ -2015,6 +2058,8 @@ pico-runtime.md is not edited by this doc. These are the differences to apply th
 - The CI step of CI.
 - A computation and an equality must not throw, and the engine guarantees only that its own state is not corrupted (decision 3). pico-runtime.md open decision 3's engine-side options go.
 - The derived nodes must form a directed acyclic graph, and the engine has no cycle check (decision 4). pico-runtime.md open decision 8's options go.
+- The engine defines no equality and exports no `sameValue`; every `createDerivedNode` caller supplies `equal`, and the Isograph layer passes `===` (decision 6).
+- `createSourceNode` takes a required `equal`, and `writeSource` stores nothing and marks nothing when it accepts (decision 8). pico-runtime.md's `createSourceNode` callers in `store.ts` pass `===`.
 - New open decisions 8, 9, 10, and 11 below.
 
 ## Open decisions
@@ -2051,13 +2096,9 @@ pico-runtime.md open decision 19, restated.
 - (b) One value type per graph. Cost: a consumer whose nodes have different value types declares a union and narrows every `readDerived` result.
 - (c) An existential encoding: a link holds `<R>(visit: <T>(node: DerivedNode<T>) => R) => R`. Cost: one closure per link and a call per traversal step; it is sound.
 
-### 6. The engine's identity equality
+### 6. The engine's identity equality (decided)
 
-pico-runtime.md open decision 20, restated. An equality may answer equal only when no reader can tell the values apart (The design, Cutoff). `===` answers equal for `0` and `-0`, which a reader can tell apart, and unequal for `NaN` and `NaN`, which costs recomputation only (`degenerate.test.ts`, the last two tests).
-
-- (a) `===`: upstream Isograph's comparison of resolver values (`areEqualWithDeepComparison.ts:84-95` in `../isograph`), Reactively's `defaultEquality`, and Preact's `!==`. The body is written for (a). Cost: a node whose value moves from `0` to `-0` cuts off and its readers keep `0`.
-- (b) `Object.is`. Held, not decided. Reason: it is the comparison the correctness rule admits. Cost: a deviation from upstream Isograph, Reactively, and Preact; a node that returns `-0` and then `0` marks its readers.
-- (c) No default: every `createDerivedNode` caller writes its own. Cost: every caller restates `===` or `Object.is`.
+The engine defines no equality. `createDerivedNode` requires `equal`, with no optional parameter and no default, and the engine exports no comparison function. `===` is the Isograph layer's default, which it passes to each node it creates (pico-runtime.md open decision 20; upstream Isograph's comparison of resolver values, `areEqualWithDeepComparison.ts:84-95` in `../isograph`). Under `===`, a node whose value is `NaN` never cuts off, so its readers recompute on every recomputation of it, and a change from `0` to `-0` cuts off, so its readers keep `0`. A caller that supplies its own `equal` gets that comparison and is not affected by the Isograph default. `degenerate.test.ts`'s last two tests assert that the supplied `equal` decides cutoff.
 
 ### 7. Whether a consumer can write a node's fields
 
@@ -2067,12 +2108,9 @@ pico-runtime.md open decision 21, restated; it covers `Graph` as well. The types
 - (b) Classes with ES private fields, with module-local accessors assigned in each class's `static {}` block. Cost: a private `#equal` makes `DerivedNode<number>` not assignable to `DerivedNode<unknown>`, so it needs open decision 5 (c) or a cast per link; a node cannot be wrapped in a `Proxy`.
 - (c) Opaque branded public types, cast to field types inside `graph.ts`. Cost: a cast in every engine function that receives a node or a graph.
 
-### 8. Whether `writeSource` compares the new value with the old
+### 8. Whether `writeSource` compares the new value with the old (decided)
 
-New. pico's `set` does not advance the epoch when the new value `==` the stored one (`set_source`, `crates/pico/src/database.rs:310-329`); Reactively's `set` and Preact's setter skip an equal value too.
-
-- (a) No comparison: `writeSource` always marks, and the caller decides that the value changed. The body of this doc and of pico-runtime.md. Held. Reason: the Isograph consumer compares before it writes, with knowledge the engine does not have (`normalize`'s `isUnchanged`, pico-runtime.md core change 1), so (b) would make it compare twice or pass a comparator that always answers unequal; a standalone consumer compares at the call. Cost: a deviation from pico, Reactively, and Preact; a consumer that writes an equal value runs the readers of the source again, which is work and never a wrong value, because each reader's own equality still cuts off above it (`overriding_same_source`'s port, `degenerate.test.ts`).
-- (b) A source carries an equality: `createSourceNode(value, equal)`, and `writeSource` sets the value and marks only when `equal(previous, value)` rejects. Cost: one more argument on every source, and the Isograph consumer's double comparison above.
+Writing an equal value does not propagate. A source takes a required equality, as a derived node does: `createSourceNode(value, equal)`, and `writeSource` compares the stored value with the new one by that `equal`; when it accepts, `writeSource` stores nothing and marks nothing. The engine still defines no equality of its own (decision 6). `markSourceChanged` stays, for a value object changed in place. This matches pico (`set_source`, `crates/pico/src/database.rs:310-329`), Reactively's `set`, and Preact's setter, with the equality supplied by the caller.
 
 ### 9. A pull of a disposed node
 
