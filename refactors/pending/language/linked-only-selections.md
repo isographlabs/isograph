@@ -57,20 +57,19 @@ Validation rejects both, matching upstream: `target_errors` (`crates/isograph_co
 
 ```rust
 // from crates/isograph_compiler/src/reader_ast.rs
-/// What a reader reads for one selection set, in selection order.
+/// The selections keep the order of the selection set.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ReaderSelectionSet(pub Vec<ReaderSelection>);
 
-/// One selection of the field `field_name` of the entity the walk reads the record as.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ReaderSelection {
-    /// The key of the value in the resolver's `data`: the reader alias, else the field name.
+    /// The resolver's `data` holds the value under `alias`: the reader alias, else the field name.
     pub alias: SelectionName,
     pub field_name: SelectableName,
-    /// For a server field, the arguments of its store key; for a client field, the arguments the
-    /// selection passes and the default of each of the field's variables it does not pass.
+    /// A server field's arguments are its store key's, and a client field's are the ones the
+    /// selection passes plus the default of each of the field's variables it does not pass.
     pub arguments: NormalizationArguments,
-    /// `None` when the selection has no selection set.
+    /// `selections` is `None` when the selection has no selection set.
     pub selections: Option<ReaderSelectionSet>,
 }
 ```
@@ -81,11 +80,10 @@ Before (`crates/isograph_compiler/src/reader_ast.rs:11-54`): `ReaderSelection` i
 
 ```rust
 // from crates/isograph_compiler/src/entity_table.rs
-/// What the runtime needs about one entity, shared by every reader and every normalization AST.
+/// Every reader and every normalization AST of the entity share its table.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EntityTable {
     pub entity: EntityName,
-    /// By field name.
     pub fields: BTreeMap<SelectableName, FieldEntry>,
     pub shape: TableShape,
     pub storage: RecordStorage,
@@ -93,20 +91,20 @@ pub struct EntityTable {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FieldEntry {
-    /// A protocol selectable, by its target entity.
+    /// `Source` holds the target entity of a protocol selectable.
     Source(EntityName),
     Derived(DerivedEntry),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DerivedEntry {
-    /// The field whose reader artifact the table imports.
+    /// The table imports this field's reader artifact.
     pub field: EntityNameAndSelectableName,
-    /// The entity its value links to; `None` for a client field, whose value is opaque.
+    /// `target` is `None` for a client field whose value is opaque.
     pub target: Option<EntityName>,
 }
 
-/// `EntityShape` without `Input`, which has no table.
+/// An input entity has no table, so `TableShape` has no `Input`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TableShape {
     Leaf,
@@ -115,17 +113,16 @@ pub enum TableShape {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RecordStorage {
-    /// `IdentitySelection::Select(name)`.
+    /// `OwnId` comes from `IdentitySelection::Select(name)`.
     OwnId(SelectableName),
-    /// `IdentitySelection::Omit`, and every leaf entity.
+    /// `FromParent` comes from `IdentitySelection::Omit` and from every leaf entity.
     FromParent,
-    /// A root entity (`RootEntities`): `CompletedIdentity::Fixed`.
+    /// `Fixed` is a root entity's (`RootEntities`) `CompletedIdentity::Fixed`.
     Fixed(FixedRecordId),
 }
 
-/// The table of `entity` as `client` reads the schema and sources. `reachable` is the set of
-/// fields whose reader artifact `project_artifacts` generates; `roots` is every root entity of
-/// the project's operations.
+/// `reachable` is the set of fields whose reader artifact `project_artifacts` generates, and
+/// `roots` is every root entity of the project's operations.
 pub fn entity_table<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
@@ -222,7 +219,7 @@ pub struct ProjectArtifacts<TLiteralContext> {
     pub entities: Vec<EntityName>,
     pub entrypoints: Vec<EntrypointArtifacts>,
     pub link_types: Vec<LinkType>,
-    /// The table of every entity some artifact imports, sorted by entity.
+    /// `entity_tables` holds the table of every entity some artifact imports, sorted by entity.
     pub entity_tables: Vec<EntityTable>,
 }
 ```
@@ -237,21 +234,20 @@ A leaf selection names its scalar entity and its list depth, because `normalize`
 // from crates/isograph_compiler/src/normalization_ast.rs
 pub struct NormalizationAst {
     // .. the existing fields, and:
-    /// Every entity whose records `normalize` writes with this AST: each `Known` composite target,
-    /// each entity a `Discriminator` target can name (`NetworkProtocol::concrete_types`), each leaf
-    /// target, and each conditional's entity. Sorted.
+    /// `tables` holds, sorted, every entity whose records `normalize` writes with this AST: each
+    /// `Known` composite target, each entity a `Discriminator` target can name
+    /// (`NetworkProtocol::concrete_types`), each leaf target, and each conditional's entity.
     pub tables: BTreeSet<EntityName>,
 }
 
 pub enum NormalizationTarget {
-    /// A scalar entity: each value is written to its own record.
+    /// `normalize` writes each value of a leaf target to its own record.
     Leaf(NormalizationLeafTarget),
     Composite(NormalizationCompositeTarget),
 }
 
 pub struct NormalizationLeafTarget {
     pub entity: EntityName,
-    /// The number of list levels of the selectable's type.
     pub list_depth: ListDepth,
 }
 
@@ -260,8 +256,8 @@ pub struct NormalizationLeafTarget {
 pub struct ListDepth(pub u32);
 
 impl<T> Wrapper<T> {
-    /// The number of `List` layers along the non-`Null` variants, when every non-`Null` variant
-    /// of each union has the same number; `None` otherwise.
+    /// `list_depth` returns `None` when the non-`Null` variants of a union differ in their number
+    /// of `List` layers.
     pub fn list_depth(&self) -> Option<ListDepth> {
         match self {
             Wrapper::Inner(_) => ListDepth(0).wrap_some(),
@@ -350,22 +346,22 @@ Every entity whose shape is `Leaf` or `Composite` has the selectable `__self`; a
 ```rust
 // from crates/isograph_compiler/src/schema.rs
 pub enum SelectableKind<TSelectableData> {
-    /// `field P.f` with no `to`: its value is what its resolver returns.
+    /// A `field P.f` declaration with no `to` is a `ClientField`, whose value is what its resolver
+    /// returns.
     ClientField,
-    /// `field P.f to T`: its resolver returns a link to a `T`.
+    /// A `field P.f to T` declaration is a `ClientPointer`, whose resolver returns a link to a `T`.
     ClientPointer(ClientPointerTarget),
-    /// Defined by the network protocol.
+    /// The network protocol defines each `Server` selectable.
     Server(ServerSelectable<TSelectableData>),
-    /// `__self`, on every entity that is not an input entity: the record the selection is read
-    /// at, as the same entity.
+    /// `__self` exists on every entity that is not an input entity, and it reads the record it is
+    /// selected at as the same entity.
     SelfRecord,
 }
 
-/// The name of the `SelfRecord` selectable.
 pub const SELF_RECORD_NAME: &str = "__self";
 
-/// `__self` on `entity_name`, when `selectable_name` is `__self` and the entity exists and is
-/// not an input entity.
+/// `self_record_selectable` returns `None` unless `selectable_name` is `__self` and the entity
+/// exists and is not an input entity.
 fn self_record_selectable<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
@@ -411,7 +407,7 @@ Every `match` on `SelectableKind` and the `SelfRecord` arm each gains. The searc
 
   ```rust
   // from crates/isograph_compiler/src/validation.rs
-  /// `__self` takes no arguments: each one `selection` passes is unknown.
+  /// `__self` takes no arguments, so each argument `selection` passes is unknown.
   fn self_record_argument_errors<TProfile: CompilationProfile>(
       field: SelectableKey,
       selection: &Selection,
@@ -454,13 +450,13 @@ A `field` declaration may name a scalar parent (`field String.toUppercase { __se
 
 ```rust
 // from crates/isograph_compiler/src/validation.rs
-/// What a selection of a selectable whose target entity has this shape needs.
 enum TargetShape {
-    /// Read bare (its record's `__value`) or through a selection set at each value's record.
+    /// A `Leaf` target is read bare (its record's `__value`) or through a selection set at each
+    /// value's record.
     Leaf,
-    /// Never selected.
+    /// No selection selects an `Input` target.
     Input,
-    /// Read bare (nothing) or through a selection set at each record.
+    /// A `Composite` target is read bare (nothing) or through a selection set at each record.
     Composite,
 }
 
@@ -579,17 +575,17 @@ pub struct FieldTypes {
     pub parameters: Option<ParametersType>,
     pub reader_ast: ReaderSelectionSet,
     pub selected: Vec<EntityNameAndSelectableName>,
-    /// The parent entity and every entity the walk of `reader_ast` reads a record as, at any
-    /// depth. A nested client field's artifact lists its own.
+    /// `tables` holds the parent entity and every entity the walk of `reader_ast` reads a record
+    /// as, at any depth, and a nested client field's artifact lists its own.
     pub tables: BTreeSet<EntityName>,
 }
 
 pub enum ArtifactInnerType {
     Scalar(ScalarKind),
     Object(ArtifactObjectType),
-    /// What a client field's resolver returns: its `output_type` artifact.
+    /// A `ClientFieldOutput` is the client field's `output_type` artifact.
     ClientFieldOutput(EntityNameAndSelectableName),
-    /// What a bare selection of an object entity reads: `EMPTY_DATA`.
+    /// An `EmptyObject` is what a bare selection of an object entity reads, `EMPTY_DATA`.
     EmptyObject,
 }
 ```
@@ -609,11 +605,10 @@ pub struct FieldArtifacts<TLiteralContext> {
     pub resolver: FieldResolver<TLiteralContext>,
 }
 
-/// Where the field's resolver is defined.
 pub enum FieldResolver<TLiteralContext> {
-    /// A `field` declaration's export.
+    /// `Declared` is a `field` declaration's export.
     Declared(FieldDeclarationSource<TLiteralContext>),
-    /// A refinement to this entity: the compiler writes the resolver in the reader artifact.
+    /// For `Refinement`, the compiler writes the resolver in the reader artifact.
     Refinement(EntityName),
 }
 ```
@@ -638,7 +633,7 @@ fn selection_value(selection: &ReaderSelection) -> ArtifactValue {
     ])
 }
 
-/// `{ E: E__entity_table, .. }`, one entry per entity, sorted.
+/// `tables_value` prints `{ E: E__entity_table, .. }`, one entry per entity, sorted.
 fn tables_value(tables: &BTreeSet<EntityName>) -> ArtifactValue {
     ArtifactValue::Object(
         tables
@@ -648,7 +643,7 @@ fn tables_value(tables: &BTreeSet<EntityName>) -> ArtifactValue {
     )
 }
 
-/// `E/entity_table.ts`.
+/// The path is `E/entity_table.ts`.
 pub(crate) fn entity_table_path(entity: EntityName) -> ArtifactPath;
 ```
 
@@ -662,14 +657,14 @@ Before: `selection_value` (`reader_artifact.rs:102-148`) matched `Scalar`, `Link
 // from crates/typescript_artifacts/src/module.rs
 pub enum ArtifactValue {
     // .. the existing variants, and:
-    /// A function the compiler writes.
     GeneratedFunction(GeneratedFunction),
 }
 
-/// A function whose body the compiler writes.
+/// The compiler writes the body of a `GeneratedFunction`.
 #[derive(Clone, Debug, PartialEq)]
 pub enum GeneratedFunction {
-    /// `({ link }) => (link.entityName === "E" ? { entityName: "E", id: link.id } : null)`
+    /// `Refinement(E)` prints `({ link }) => (link.entityName === "E" ? { entityName: "E", id:
+    /// link.id } : null)`.
     Refinement(EntityName),
 }
 ```

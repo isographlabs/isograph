@@ -169,80 +169,48 @@ export {
 
 ```ts
 // from libs/isograph-pico-js/src/graph.ts
-/** A value set from outside the graph, and the derived nodes whose last computation read it. */
+/** A value that code outside the graph sets. */
 export type SourceNode<TValue> = {
-  /** Tells a source from a derived node in a dependency list. Read only by `verify`. */
   readonly kind: 'Source';
-  /** Read only by `readSource` and `sourceValue`. Written only by `writeSource`. */
   value: TValue;
-  /** Whether a written value equals the stored one. Called only by `writeSource`, with the stored
-   * value and the written one. Must not write a source or dispose a node (Writes during a
-   * computation). A method signature, as `DerivedNode.equals` is. */
   equals(previous: TValue, next: TValue): boolean;
-  /** Written only by `setDependencies`. */
   readonly dependents: Set<AnyDerivedNode>;
 };
 
-/** A computation's value, kept until an input it read changes. */
+/** A computation's value, which the node keeps until an input it read changes. */
 export type DerivedNode<TValue> = {
-  /** Tells a derived node from a source in a dependency list. Read only by `verify`. */
   readonly kind: 'Derived';
   readonly computation: Computation<TValue>;
-  /** Whether two values of this node are equal, for cutoff. Called only by `recompute`, with the
-   * node's previous value and the value its computation just returned. Must not write a source or
-   * dispose a node (Writes during a computation). A method signature, so that a `DerivedNode<T>` is
-   * an `AnyDerivedNode` (open decision 5). */
   equals(previous: TValue, next: TValue): boolean;
-  /** The last computed value and its status; `MISSING` when the node was never computed or was
-   * disposed. Read and written only through `stateOf`. */
+  /** It is `MISSING` when the node was never computed or was disposed, and only `stateOf` reads or writes it. */
   precalculated: Option<PrecalculatedValue<TValue>>;
-  /** The reads of the running computation, in read order; between computations, a spare buffer that
-   * is the dependency list before the last recomputation. Pushed to only by `readSource` and
-   * `readDerived`, cleared only by `compute`, and swapped with `PrecalculatedValue.dependencies` only
-   * by `commitReads`. */
   reads: AnyNode[];
-  /** Every derived node whose dependencies hold this one. Written only by `setDependencies`. On the
-   * node, not in `PrecalculatedValue`, because it outlives this node's value: after disposal its
-   * former readers are `Dirty` and still name this node until their recomputation removes them. */
   readonly dependents: Set<AnyDerivedNode>;
 };
 
-/** A derived node of any value type: the element of every `dependents` set and a member of `AnyNode`. */
 export type AnyDerivedNode = DerivedNode<unknown>;
 
-/** The part of a derived node that a later layered graph keeps once per layer. `stateOf` returns it. */
+/** A layered graph keeps this part of a derived node once per layer. */
 export type NodeState<TValue> = Pick<DerivedNode<TValue>, 'precalculated'>;
 
-/** What one computation established: its value, whether that value is still current, and the nodes
- * it read. Allocated once, by the node's first computation after creation or disposal; its fields
- * are written in place after that. */
+/** The first computation after creation or disposal allocates it, and later computations write its fields in place. */
 export type PrecalculatedValue<TValue> = {
   value: TValue;
   status: Status;
-  /** The nodes the computation read, in read order. A node read twice appears twice. */
   dependencies: AnyNode[];
 };
 
-/** `Clean`: `value` is what the computation would return now. `Check`: a derived node this one
- * reads, directly or transitively, is `Dirty`, and `value` may be current. `Dirty`: a source node
- * the last computation read was written, or a derived node it read recomputed to a value its
- * `equals` rejected. */
+/** `Clean` means `value` is current, `Check` means a derived node below may have changed, and `Dirty` means an input changed. */
 export type Status = 'Clean' | 'Check' | 'Dirty';
 
-/** The precalculated value of a node that was never computed or was disposed. Not exported from
- * `graph.ts`. */
 const MISSING: unique symbol = Symbol('Missing');
 type Missing = typeof MISSING;
 
-/** `TValue`, or `MISSING` for no value. Not exported. */
 type Option<TValue> = TValue | Missing;
 
-/** A node of any kind and value type: the element of a dependency list. */
 export type AnyNode = SourceNode<unknown> | AnyDerivedNode;
 
-/** A derived node's computation. It receives the node being computed, reads every node with
- * `readSource(reader, ..)` and `readDerived(reader, ..)`, is a pure function of what it reads, and is
- * synchronous: every read happens before it returns. */
+/** A computation is a pure, synchronous function of the nodes it reads with `readSource` and `readDerived`. */
 export type Computation<TValue> = (reader: AnyDerivedNode) => TValue;
 ```
 
@@ -254,53 +222,38 @@ export type Computation<TValue> = (reader: AnyDerivedNode) => TValue;
 
 ```ts
 // from libs/isograph-pico-js/src/graph.ts
-/** A source node holding `value`, read by no derived node. `equals` decides whether a later write
- * changes it. */
 export function createSourceNode<TValue>(
   value: TValue,
   equals: (previous: TValue, next: TValue) => boolean,
 ): SourceNode<TValue>;
 
-/** A derived node that was never computed: `Dirty`, no value, no dependencies. Its computation
- * first runs on the first pull that reaches it. */
+/** The computation of the returned node first runs on the first pull that reaches it. */
 export function createDerivedNode<TValue>(
   computation: Computation<TValue>,
   equals: (previous: TValue, next: TValue) => boolean,
 ): DerivedNode<TValue>;
 
-/** The value of `source`, read without recording a dependency. Inside a computation it is an
- * untracked read (decision 10). */
+/** Inside a computation, `sourceValue` records no dependency (decision 10). */
 export function sourceValue<TValue>(source: SourceNode<TValue>): TValue;
 
-/** Records that `reader`'s running computation read `source`, and returns its value (The reader). */
 export function readSource<TValue>(reader: AnyDerivedNode, source: SourceNode<TValue>): TValue;
 
-/** Pulls `node`, records that `reader`'s running computation read it, and returns its value (The
- * reader). */
 export function readDerived<TValue>(reader: AnyDerivedNode, node: DerivedNode<TValue>): TValue;
 
-/** When `source.equals` rejects the stored value and `value`, sets `source`'s value and marks its
- * dependents; when it accepts, stores nothing and marks nothing (decision 8). Runs no computation.
- * Must not be called inside a computation or an equality (Writes during a computation). */
+/** `writeSource` stores and marks nothing when `source.equals` accepts `value`, and it must not run inside a computation or an equality (Writes during a computation). */
 export function writeSource<TValue>(source: SourceNode<TValue>, value: TValue): void;
 
-/** Marks every dependent of `source` `Dirty` and every node above those `Check`, without changing
- * its value: for a consumer whose source went away or whose value object it changed in place.
- * Must not be called inside a computation or an equality (Writes during a computation). */
+/** `markSourceChanged` marks the dependents of `source` without comparing values, and it must not run inside a computation or an equality (Writes during a computation). */
 export function markSourceChanged(source: SourceNode<unknown>): void;
 
-/** `node`'s current value: `Clean` returns it, `Check` verifies, `Dirty` recomputes. Inside a
- * computation it is an untracked read: it records no dependency of the running computation
- * (decision 10). A computation or an equality must not throw (Throws). */
+/** Inside a computation, `pull` records no dependency (decision 10). */
 export function pull<TValue>(node: DerivedNode<TValue>): TValue;
 
-/** Removes `node` from the dependents of everything it read, resets it to never computed, and marks
- * its dependents `Dirty`. A later pull computes it again (open decision 9). Must not be called
- * inside a computation or an equality (Writes during a computation). */
+/** A later pull computes the disposed node again, and `disposeDerivedNode` must not run inside a computation or an equality (Writes during a computation). */
 export function disposeDerivedNode(node: AnyDerivedNode): void;
 ```
 
-Callers. In the Isograph runtime (pico-runtime.md, The engine and the Isograph runtime): `createSourceNode` and `sourceValue` in `store.ts`; `writeSource` in `normalize.ts` and `test/fixtures.ts`; `markSourceChanged` and `disposeDerivedNode` in `deleteRecord`; `createDerivedNode`, `pull`, `readSource`, and `readDerived` in `storedResults.ts`, which passes `resolverResultsEqual(artifact, identical)` as each node's equality, with `===` as its default output equality. Outside Isograph: the consumer's own code, as in The package README.
+In the Isograph runtime (pico-runtime.md, The engine and the Isograph runtime), the callers are `createSourceNode` and `sourceValue` in `store.ts`; `writeSource` in `normalize.ts` and `test/fixtures.ts`; `markSourceChanged` and `disposeDerivedNode` in `deleteRecord`; `createDerivedNode`, `pull`, `readSource`, and `readDerived` in `storedResults.ts`, which passes `resolverResultsEqual(artifact, identical)` as each node's equality, with `===` as its default output equality. Outside Isograph: the consumer's own code, as in The package README.
 
 ## The implementation
 
@@ -335,9 +288,7 @@ export function sourceValue<TValue>(source: SourceNode<TValue>): TValue {
   return source.value;
 }
 
-/** The holder of `node`'s precalculated value. Every read and write of it goes through `stateOf`, so
- * that a later layered graph, which keeps a `NodeState` per layer, changes this function alone. Not
- * exported. */
+/** Every read and write of `precalculated` goes through `stateOf`, so that a layered graph changes this function alone. */
 function stateOf<TValue>(node: DerivedNode<TValue>): NodeState<TValue> {
   return node;
 }
@@ -359,9 +310,7 @@ export function markSourceChanged(source: SourceNode<unknown>): void {
   markDirty(source.dependents);
 }
 
-/** Marks each of `nodes` `Dirty` and every `Clean` node above them `Check`. Called with
- * `source.dependents` by `writeSource` and `markSourceChanged`, and with `node.dependents` by
- * `recompute` (a node whose value changed) and `disposeDerivedNode`. */
+/** `markDirty` marks each of `nodes` `Dirty` and every `Clean` node above them `Check`. */
 function markDirty(nodes: ReadonlySet<AnyDerivedNode>): void {
   const work: AnyDerivedNode[] = [];
   const push = (dependent: AnyDerivedNode): void => {
@@ -375,11 +324,7 @@ function markDirty(nodes: ReadonlySet<AnyDerivedNode>): void {
   markCheck(work);
 }
 
-/** Sets `node`'s status to `Dirty` and returns the status it had. A `Clean` node's dependents are
- * then marked `Check` by `markDirty`; a `Check` node's dependents are already marked. A node in a
- * `dependents` set was computed, so its precalculated value is not `MISSING`; for a `MISSING` node
- * it changes nothing and returns `MISSING`, which marks nothing above it. Called only by
- * `markDirty`. */
+/** `markOneDirty` returns the status `node` had before it became `Dirty`, or `MISSING` when it has no precalculated value. */
 function markOneDirty(node: AnyDerivedNode): Option<Status> {
   const precalculated = stateOf(node).precalculated;
   if (precalculated === MISSING) {
@@ -390,10 +335,6 @@ function markOneDirty(node: AnyDerivedNode): Option<Status> {
   return status;
 }
 
-/** Marks every `Clean` node of `work`, and every `Clean` node above those, `Check`. A marked node is
- * left as is, and the nodes above it are not visited. Walks `work`, which it owns, as an explicit
- * work list, so the call stack does not grow with the height of the graph. Called only by
- * `markDirty`. */
 function markCheck(work: AnyDerivedNode[]): void {
   const push = (dependent: AnyDerivedNode): void => {
     work.push(dependent);
@@ -418,7 +359,6 @@ Marking does not recurse. `markCheck` is a loop over a work list, the worklist c
 
 ```ts
 // from libs/isograph-pico-js/src/graph.ts
-/** Called by the consumer, by `readDerived`, and by `verify`. */
 export function pull<TValue>(node: DerivedNode<TValue>): TValue {
   const precalculated = stateOf(node).precalculated;
   if (precalculated === MISSING) {
@@ -436,15 +376,11 @@ export function pull<TValue>(node: DerivedNode<TValue>): TValue {
   }
 }
 
-/** Unreachable when every variant of a union was handled: `value` then has type `never`. Ends every
- * `switch` over a union, so a new variant is a compile error. Not exported. */
 function assertNever(value: never): never {
   throw new Error(`Unhandled variant: ${String(value)}`);
 }
 
-/** Computes a node that was never computed or was disposed and stores its value `Clean`. Calls no
- * `equals`: there is no previous value. Marks nothing: a never-computed node has no dependents, and
- * every dependent of a disposed node is `Dirty`. */
+/** `computeFirst` calls no `equals` and marks no dependent, because a never-computed node has no dependents and every dependent of a disposed node is `Dirty`. */
 function computeFirst<TValue>(node: DerivedNode<TValue>): TValue {
   const value = compute(node);
   const dependencies = node.reads;
@@ -454,9 +390,6 @@ function computeFirst<TValue>(node: DerivedNode<TValue>): TValue {
   return value;
 }
 
-/** Pulls each dependency whose `kind` is `Derived`, in recorded order, until one recomputes to a value
- * its `equals` rejects, which marks `node` `Dirty`; then recomputes `node`. Otherwise `node` ends
- * `Clean` without running. */
 function verify<TValue>(
   node: DerivedNode<TValue>,
   precalculated: PrecalculatedValue<TValue>,
@@ -473,8 +406,6 @@ function verify<TValue>(
   return precalculated.value;
 }
 
-/** Runs the computation, replaces the dependencies, and stores the new value unless `equals` accepted
- * it, in which case the previous value object stays. A new value marks the dependents `Dirty`. */
 function recompute<TValue>(
   node: DerivedNode<TValue>,
   precalculated: PrecalculatedValue<TValue>,
@@ -491,8 +422,6 @@ function recompute<TValue>(
   return value;
 }
 
-/** Makes `node.reads` the dependency list of `precalculated` and moves the edges, then keeps the
- * previous list as `node.reads`, the buffer the next `compute` clears. Called only by `recompute`. */
 function commitReads<TValue>(node: DerivedNode<TValue>, precalculated: PrecalculatedValue<TValue>): void {
   const previous = precalculated.dependencies;
   setDependencies(node, previous, node.reads);
@@ -500,7 +429,6 @@ function commitReads<TValue>(node: DerivedNode<TValue>, precalculated: Precalcul
   node.reads = previous;
 }
 
-/** The previous dependency list of a first computation and the next one of a disposal. Never written. */
 const NO_DEPENDENCIES: ReadonlyArray<AnyNode> = [];
 
 function compute<TValue>(node: DerivedNode<TValue>): TValue {
@@ -541,9 +469,7 @@ There are two read functions in place of one `read(reader, node)` that switches 
 
 ```ts
 // from libs/isograph-pico-js/src/graph.ts
-/** Removes `node` from the dependents of each of `previous` and adds it to those of each of `next`;
- * nothing when the two lists hold the same nodes in the same order. The only writer of any
- * `dependents` set. Called by `recompute` and `disposeDerivedNode`. */
+/** `setDependencies` is the only writer of any `dependents` set. */
 function setDependencies(
   node: AnyDerivedNode,
   previous: ReadonlyArray<AnyNode>,
@@ -560,7 +486,6 @@ function setDependencies(
   }
 }
 
-/** Whether `previous` and `next` hold the same node at every index. */
 function sameDependencies(previous: ReadonlyArray<AnyNode>, next: ReadonlyArray<AnyNode>): boolean {
   if (previous.length !== next.length) {
     return false;
@@ -916,7 +841,7 @@ describe('ported from crates/pico/tests', () => {
 
   // crates/pico/tests/basic_multi_function_chain.rs:48
   test('an equal value cuts off the node above it', () => {
-    // setup as in 'a chain recomputes every node whose input changed'
+    // The setup is the one in 'a chain recomputes every node whose input changed'.
     expect(pull(capitalized)).toBe('A');
     writeSource(input, 'alto');
     expect(pull(capitalized)).toBe('A');
@@ -925,7 +850,7 @@ describe('ported from crates/pico/tests', () => {
 
   // crates/pico/tests/basic_multi_function_chain.rs:75
   test('a top-level pull of an inner node, then of the node above it', () => {
-    // setup as in 'a chain recomputes every node whose input changed'
+    // The setup is the one in 'a chain recomputes every node whose input changed'.
     expect(pull(capitalized)).toBe('A');
     expect(calls).toEqual({ firstLetter: 1, capitalized: 1 });
 
@@ -961,7 +886,7 @@ describe('ported from crates/pico/tests', () => {
 
   // crates/pico/tests/partial_reuse_multi_function.rs:16
   test('two readers share one computation of their dependency', () => {
-    // firstLetter and exclaimed as above, plus:
+    // firstLetter and exclaimed are the nodes above.
     const questioned = createDerivedNode((reader) => {
       calls.questioned += 1;
       return `${readDerived(reader, firstLetter)}?`;
@@ -1087,7 +1012,7 @@ describe('ported from crates/pico/tests', () => {
   // crates/pico/tests/overriding_same_source.rs:14
   test('writing an equal value', () => {
     const calls = { firstLetter: 0, exclaimed: 0 };
-    // firstLetter over input = 'asdf' and exclaimed over firstLetter, as above
+    // firstLetter reads input = 'asdf' and exclaimed reads firstLetter, as above.
     expect(pull(exclaimed)).toBe('a!');
 
     writeSource(input, 'asdf');
@@ -1378,7 +1303,7 @@ describe('recorded dependencies', () => {
 
   // crates/pico/tests/absent_source/missing_key.rs:233
   test('sourceValue outside a computation leaves the readers’ dependency', () => {
-    // config and name as in the previous test
+    // config and name are the nodes of the previous test.
     expect(pull(name)).toBe(null);
     expect(sourceValue(config)).toBe(MISSING);
 
@@ -1562,7 +1487,7 @@ describe('disposeDerivedNode (open decision 9 (a))', () => {
 
   // crates/pico/tests/absent_source/garbage_collection.rs:46
   test('a disposed node recomputes on its next pull and sees writes made after disposal', () => {
-    // count and scaled as above
+    // count and scaled are the nodes above.
     expect(pull(scaled)).toBe(10);
 
     disposeDerivedNode(scaled);
@@ -1575,7 +1500,7 @@ describe('disposeDerivedNode (open decision 9 (a))', () => {
     const calls = { scaled: 0, parent: 0 };
     const count = createSourceNode(1, strictEqual);
     const useScaled = createSourceNode(true, strictEqual);
-    // scaled as above
+    // scaled is the node above.
     const parent = createDerivedNode((reader) => {
       calls.parent += 1;
       return readSource(reader, useScaled) ? readDerived(reader, scaled) : 0;
@@ -1839,18 +1764,18 @@ test('a derived node of any value type is an AnyDerivedNode', () => {
 test('a source node is not read with readDerived', () => {
   const count = createSourceNode(1, strictEqual);
   createDerivedNode((reader) => {
-    // @ts-expect-error a source node read with readDerived
+    // @ts-expect-error readDerived does not take a source node.
     return readDerived(reader, count);
   }, strictEqual);
 });
 
 test('writes and equalities are typed by the node', () => {
   const count = createSourceNode(1, strictEqual);
-  // @ts-expect-error a string written to a number source
+  // @ts-expect-error writeSource does not write a string to a number source.
   writeSource(count, 'one');
   createDerivedNode(
     () => 1,
-    // @ts-expect-error an equality over strings for a number node
+    // @ts-expect-error a number node does not take an equality over strings.
     (previous: string, next: string) => previous === next,
   );
 });
@@ -2034,7 +1959,7 @@ The derived nodes must form a directed acyclic graph; a cycle is a programmer er
 
 pico-runtime.md open decision 19, restated.
 
-- (a) `AnyDerivedNode = DerivedNode<unknown>`, with `equals` a method signature so that `DerivedNode<T>` is assignable to it. Held, not decided. Reason: no cast and no wrapper; the engine calls `equals` only with two values the node's own computation produced. Cost: method bivariance also accepts a call such as `(node as AnyDerivedNode).equals('a', 'b')` on a `DerivedNode<number>`; only code outside the engine could make it.
+- (a) `AnyDerivedNode = DerivedNode<unknown>`, with `equals` a method signature so that `DerivedNode<T>` is assignable to it. This option is held and not decided. Reason: no cast and no wrapper; the engine calls `equals` only with two values the node's own computation produced. Cost: method bivariance also accepts a call such as `(node as AnyDerivedNode).equals('a', 'b')` on a `DerivedNode<number>`; only code outside the engine could make it.
 - (b) One value type per graph. Cost: a consumer whose nodes have different value types declares a union and narrows every `readDerived` result.
 - (c) An existential encoding: a link holds `<R>(visit: <T>(node: DerivedNode<T>) => R) => R`. Cost: one closure per link and a call per traversal step; it is sound.
 
@@ -2044,7 +1969,7 @@ The engine defines no equality. `createDerivedNode` requires `equals`, with no o
 
 ### 7. Whether a consumer can write a node's fields (decided)
 
-pico-runtime.md open decision 21, restated. Decided by the user: nodes are plain objects of plain object types, and the engine has no class. Each field's comment names its only reader and writer. A consumer that writes `dependents`, `precalculated`, or `reads` breaks the contract silently, and the engine does not check it (decision 2). This deviates from AGENTS.md's "Never rely on discipline what we can enforce with newtypes" for the node types. Reason: classes with ES private fields make `DerivedNode<number>` not assignable to `DerivedNode<unknown>` through a private `#equals`, which needs decision 5 (c) or a cast per link, and opaque node types cost a cast in every engine function that receives a node. The `Context` is opaque (The reader), because it costs two casts in total.
+pico-runtime.md open decision 21, restated. Decided by the user: nodes are plain objects of plain object types, and the engine has no class. A consumer that writes `dependents`, `precalculated`, or `reads` breaks the contract silently, and the engine does not check it (decision 2). This deviates from AGENTS.md's "Never rely on discipline what we can enforce with newtypes" for the node types. Reason: classes with ES private fields make `DerivedNode<number>` not assignable to `DerivedNode<unknown>` through a private `#equals`, which needs decision 5 (c) or a cast per link, and opaque node types cost a cast in every engine function that receives a node. The `Context` is opaque (The reader), because it costs two casts in total.
 
 ### 8. Whether `writeSource` compares the new value with the old (decided)
 
@@ -2054,12 +1979,12 @@ Writing an equal value does not propagate. A source takes a required equality, a
 
 A disposal that leaves the node's state as it was is not an option: a `Clean` node pulled after it returns its old value although no source lists it (Disposal). pico removes a collected memo's revision, and the next call of the memo computes it again (`crates/pico/tests/absent_source/garbage_collection.rs:46`).
 
-- (a) Disposal resets the node to never computed; a later pull computes it from scratch and reattaches its edges. The body of this doc. Held. Reason: pico's behavior. Cost: a consumer that pulls a node it disposed gets a working node again instead of an error.
+- (a) Disposal resets the node to never computed; a later pull computes it from scratch and reattaches its edges. This doc's body describes it. This option is held. Reason: pico's behavior. Cost: a consumer that pulls a node it disposed gets a working node again instead of an error.
 - (b) A fourth state, `Disposed`; `pull` throws on it, and so does a dependent's recomputation that reads it. Cost: every `switch` on the mark gains a case, and a dependent marked `Dirty` by the disposal throws on its next pull when its computation still reads the node.
 
 ### 10. An untracked read inside a computation (decided)
 
-Allowed. `sourceValue(source)`, and a `pull` called inside a computation, read without recording a dependency of the running computation, like pico's untracked lookup (`MemoRef::lookup`, `crates/pico/src/memo_ref.rs:57`, against `lookup_tracked`, `:80`), Preact's `peek()`, and Solid's `untrack`. An untracked read writes no source and marks nothing. `dependencies.test.ts` "sourceValue inside a computation records nothing" and "pull inside a computation records nothing" assert that a later write to what was read untracked does not mark the node.
+An untracked read is allowed. `sourceValue(source)`, and a `pull` called inside a computation, read without recording a dependency of the running computation, like pico's untracked lookup (`MemoRef::lookup`, `crates/pico/src/memo_ref.rs:57`, against `lookup_tracked`, `:80`), Preact's `peek()`, and Solid's `untrack`. An untracked read writes no source and marks nothing. `dependencies.test.ts` "sourceValue inside a computation records nothing" and "pull inside a computation records nothing" assert that a later write to what was read untracked does not mark the node.
 
 ### 11. Whether the package ships before its first caller (decided)
 
