@@ -208,14 +208,9 @@ export function disposeDerivedNode(graph: Graph, node: AnyDerivedNode): void {
   slot.state = neverComputed();
   node.dependents.forEach(markDirty);
 }
-
-/** `===`: the equality of a node whose value is compared by identity. */
-export function sameValue(previous: unknown, next: unknown): boolean {
-  return previous === next;
-}
 ```
 
-`sameValue` was `storedResults.ts`'s private default output equality (Stored resolver results); it is generic, so it is the engine's, and `resolverNodeAt` imports it. Which comparison it makes is open decision 20.
+The engine defines no equality and exports no comparison: `equal` is a required argument of `createSourceNode` and `createDerivedNode` (open decision 20).
 
 Disposal resets the node's state as well as its edges. A node that kept its `Clean` state after leaving every `dependents` set would return its old value on every later pull, because no write reaches it. The reset drops the value (`NoValue`), so the engine holds no reference to it, and leaves the state listing no dependency that does not list the node back. The dependents' lists still name the disposed node and `node.dependents` still names them, so the inverse holds until their next recomputation.
 
@@ -381,7 +376,6 @@ export {
   type Graph,
   markSourceChanged,
   pull,
-  sameValue,
   type SourceNode,
   sourceValue,
   writeSource,
@@ -422,10 +416,9 @@ export function writeSource<TValue>(graph: Graph, source: SourceNode<TValue>, va
 export function markSourceChanged(graph: Graph, source: SourceNode<unknown>): void;
 export function pull<TValue>(graph: Graph, node: DerivedNode<TValue>): TValue;
 export function disposeDerivedNode(graph: Graph, node: AnyDerivedNode): void;
-export function sameValue(previous: unknown, next: unknown): boolean;
 ```
 
-The functions are written under open decision 2 (f): `writeSource`, `markSourceChanged`, and `disposeDerivedNode` take the graph and throw while a computation runs, and `pull` takes the graph because `compute` counts running computations on it. Every export has a caller in the Isograph runtime: `createGraph` in `createStore`, `createSourceNode` and `sourceValue` in `store.ts`, `writeSource` in `normalize.ts` and `test/fixtures.ts`, `markSourceChanged` and `disposeDerivedNode` in `deleteRecord`, `createDerivedNode`, `pull`, and `sameValue` in `storedResults.ts`, and the five types in `store.ts` and `storedResults.ts`. `AnyDerivedNode`, `StateSlot`, `DerivedNodeState`, its three states, `PreviousValue`, and `Dependency` are exported from `graph.ts` for the declaration of `DerivedNode`, and not from the package index: no caller names them. Open decision 21 covers that a consumer can still write a node's fields.
+The functions are written under open decision 2 (f): `writeSource`, `markSourceChanged`, and `disposeDerivedNode` take the graph and throw while a computation runs, and `pull` takes the graph because `compute` counts running computations on it. Every export has a caller in the Isograph runtime: `createGraph` in `createStore`, `createSourceNode` and `sourceValue` in `store.ts`, `writeSource` in `normalize.ts` and `test/fixtures.ts`, `markSourceChanged` and `disposeDerivedNode` in `deleteRecord`, `createDerivedNode` and `pull` in `storedResults.ts`, and the five types in `store.ts` and `storedResults.ts`. `AnyDerivedNode`, `StateSlot`, `DerivedNodeState`, its three states, `PreviousValue`, and `Dependency` are exported from `graph.ts` for the declaration of `DerivedNode`, and not from the package index: no caller names them. Open decision 21 covers that a consumer can still write a node's fields.
 
 ### A use without Isograph
 
@@ -434,7 +427,9 @@ Two sources and two derived nodes of different value types:
 ```ts
 // from libs/reactive-graph/test/graph.test.ts
 import { expect, test } from 'vitest';
-import { createDerivedNode, createGraph, createSourceNode, pull, sameValue, writeSource } from '../src';
+import { createDerivedNode, createGraph, createSourceNode, pull, writeSource } from '../src';
+
+const sameValue = (previous: unknown, next: unknown): boolean => previous === next;
 
 test('a write recomputes what changed and cuts off at an equal value', () => {
   const graph = createGraph();
@@ -492,7 +487,7 @@ Engine (`libs/reactive-graph/src/graph.ts`):
 - Types: `Graph`, `SourceNode`, `DerivedNode`, `AnyDerivedNode`, `StateSlot`, `DerivedNodeState`, `CleanState`, `CheckState`, `DirtyState`, `PreviousValue`, `Dependency`, `Computation`, `ComputeContext`, `Computed`.
 - Marks `Clean`, `Check`, `Dirty`; `markDirty`, `markCheck`; `markSourceChanged`.
 - `pull`, `verify`, `recompute`, `compute` (the context and dependency recording), `setDependencies`, `stateOf`, `neverComputed`.
-- `createGraph`, `assertNotComputing`, `createSourceNode`, `createDerivedNode`, `sourceValue`, `writeSource`, `disposeDerivedNode`, `sameValue` (moved from `storedResults.ts`).
+- `createGraph`, `assertNotComputing`, `createSourceNode`, `createDerivedNode`, `sourceValue`, `writeSource`, `disposeDerivedNode`.
 - The write-during-computation guard: `Graph.computingDepth` and `assertNotComputing` (open decision 2 (f)).
 - A cycle check, if open decision 8 adds one.
 - Later: `rootCount` and `retainRoot` (Later: retention); the reachability walk `collect` needs, as a function over root nodes that returns the derived nodes they reach through `Derived` dependencies (Later: collecting derived nodes); `listen`, `notify`, and node effects with `reconcileEffects` (Later: keeping values up to date automatically); layers, worlds, `stateOf(node, world)`, and source overrides read through `readSource` and `sourceValue` (Later: a DAG of graphs).
@@ -512,7 +507,7 @@ Isograph runtime (`libs/isograph-runtime/src`):
 
 - `stateOf` and layering. Later: a DAG of graphs gives a node one slot per world by changing `stateOf`, and a source one value per world. That holds across the package boundary only if the Isograph runtime never reads a node's fields, so the runtime reads a source through `readSource` and `sourceValue` and never calls `stateOf`, which the package does not export. Layers are then the engine's (Later: a DAG of graphs).
 - The write-during-computation guard. It is engine state, because a standalone consumer has no store: an engine `Graph` that every engine write takes (open decision 2 (f), the body), and the Isograph `Store` holds the graph beside its records.
-- Equality defaults. `sameValue` was private to `storedResults.ts`. It is generic, so it moves to the engine and `resolverNodeAt` imports it; `resolverResultsEqual` stays Isograph's, because it reads the reader AST. Which comparison `sameValue` makes is open decision 20.
+- Equality defaults. The engine has none: every node's `equal` is a constructor argument. `===` is the Isograph layer's default output equality inside `resolverResultsEqual`, which also reads the reader AST for walk-assembled data, so both stay Isograph's (open decision 20).
 - One value type per graph. The previous revision typed every node of a graph with one `TValue`, `ResolverResult<unknown>` in the core. A standalone engine has nodes of different types, so `TValue` is per node and the links hold an erased node type (The graph, open decision 19).
 - A throw outside the resolver. Open decision 3 (a) stored the throw in `compute` as an Isograph `ReadErr`; under the split the catch is in `resolverComputation`, or the engine stores throws generically (open decision 3 (d)).
 - Field visibility. A consumer outside this repo can write a node's fields; open decision 21.
@@ -802,7 +797,7 @@ A resolver selected on an absent record (a parent reads a link to `Pet:9`, and `
 
 ### Equality
 
-Each derived node has an equality function, used for cutoff: `recompute` keeps the previous value object and marks no dependent when `equal(previous, next)` holds. The default is the engine's `sameValue`, `===` (open decision 20).
+Each derived node has an equality function, used for cutoff: `recompute` keeps the previous value object and marks no dependent when `equal(previous, next)` holds. The engine has no default (open decision 20): each resolver node's equality is `resolverResultsEqual`, whose output equality is `===` unless the field supplies one (open decision 7).
 
 Correctness: an equality function only decides whether the dependents recompute. One that answers unequal for equal values makes them recompute from equal inputs to their old values, which costs work and never yields a wrong value. One that answers equal for unequal values yields a wrong value, so every rule other than `===` must answer equal only when every position a reader can observe is `===`.
 
@@ -1296,7 +1291,12 @@ Duplicate dependency entries. A computation that reads one node twice records it
 
 ```ts
 // from libs/isograph-runtime/src/storedResults.ts
-import { type Computation, type ComputeContext, createDerivedNode, pull, sameValue } from '@isograph/reactive-graph';
+import { type Computation, type ComputeContext, createDerivedNode, pull } from '@isograph/reactive-graph';
+
+/** `===`: the output equality of a resolver whose field supplies none. */
+function identical(previous: unknown, next: unknown): boolean {
+  return previous === next;
+}
 
 /** The stored result of `artifact` on `root` with `variables`, pulled. */
 export function readStoredResult<TEntityName extends EntityName, TOutput>(
@@ -1323,7 +1323,7 @@ export function resolverNodeAt(
   return getOrInsert(
     containerAt(store, root).derived,
     resolverStoreKey(artifact.selectableName, variables),
-    () => createDerivedNode(resolverComputation(store, artifact, root, variables), resolverResultsEqual(artifact, sameValue)),
+    () => createDerivedNode(resolverComputation(store, artifact, root, variables), resolverResultsEqual(artifact, identical)),
   );
 }
 
@@ -1563,7 +1563,7 @@ Each is one commit, in order; each is independently shippable.
 5. Prefactor: linked-only selections (linked-only-selections.md, change 3). Validation, query generation, and reader generation accept bare object selections, selection sets on scalars, and client fields on scalar entities; the object default reader. Observable: `read` of the Example's `PetDetailPage` on the store fixture returns `{ pet: { n1: "Ricky", n2: { toUppercase: "RICKY" }, bestFriend: { name: "Mango" } } }`, calling `toUppercase` on every read; a bare `bestFriend` is `{}` or `null`.
 6. Prefactor: the engine package (The engine package): `libs/reactive-graph` with `src/graph.ts` and `src/index.ts` as The graph and The engine's public API write them, `test/graph.test.ts`, its `package.json`, tsconfig, tsdown, and vitest files, and its two pre-commit hooks. Nothing in the Isograph runtime imports it yet. Observable: `pnpm --filter @isograph/reactive-graph test` passes the sum, parity, and label example (`sum` and `parity` run twice, `label` once); `pnpm compile-libs` writes its `dist/index.cjs` and `dist/index.mjs`; its `package.json` lists no dependencies. Its reader is the stated goal, a project outside Isograph; the runtime is its first workspace caller in change 7.
 7. Prefactor: the store becomes record containers (`RecordContainer`, `presence`, `sources`, the accessors, `storeSnapshot`, `deleteRecord` without derived nodes). The runtime gains its dependency on the engine (The engine package) and its three pre-commit hooks match the engine's directory. A container's `sources` hold the engine's source nodes: `sourceNodeAt` calls `createSourceNode` with `isUnchanged(key)`, so `normalize`'s comparison moves out of `normalize` into each source's `equal`, `storeValue` and `storeSnapshot` call `sourceValue`, `writeValue` calls `writeSource`, and `deleteRecord` calls `markSourceChanged` for each source node. No derived node exists, so every `dependents` set stays empty and `writeSource` and `markSourceChanged` mark nothing. `check`, `garbageCollect`, `read`, and `normalize` read and write through the accessors; tests compare `storeSnapshot`. Observable: none in behavior; `environment.store` is no longer v1's nested map, and `storeSnapshot(environment.store)` is.
-8. The graph in the Isograph runtime: `RecordContainer.derived`, `readStoredResult`, `resolverNodeAt` (`createDerivedNode` with `resolverResultsEqual(artifact, sameValue)`), `resolverComputation`, `contextHooks` (`context.readSource`, `context.readDerived`), `callResolver`, `ResolverResult` with `WalkData`, `resolverResultsEqual`, `resolverStoreKey`, `deleteRecord` disposing owned nodes with `disposeDerivedNode`. The engine is unchanged. The package index adds `readStoredResult` and the types `ResolverResult`, `ReadResolverOk`, `OkOrigin`, `ReadResolverThrew`; `StoreRecord` becomes `RecordContainer`. The pet script reads with `readStoredResult`. Observable: End-user experience above, and the Example's traces: after a write to `Pet:2.name`, a read of `PetDetailPage` does not call `toUppercase`; after a write that leaves `toUppercase`'s result equal, a reader without `n1` does not rerun.
+8. The graph in the Isograph runtime: `RecordContainer.derived`, `readStoredResult`, `resolverNodeAt` (`createDerivedNode` with `resolverResultsEqual(artifact, identical)`), `resolverComputation`, `contextHooks` (`context.readSource`, `context.readDerived`), `callResolver`, `ResolverResult` with `WalkData`, `resolverResultsEqual`, `resolverStoreKey`, `deleteRecord` disposing owned nodes with `disposeDerivedNode`. The engine is unchanged. The package index adds `readStoredResult` and the types `ResolverResult`, `ReadResolverOk`, `OkOrigin`, `ReadResolverThrew`; `StoreRecord` becomes `RecordContainer`. The pet script reads with `readStoredResult`. Observable: End-user experience above, and the Example's traces: after a write to `Pet:2.name`, a read of `PetDetailPage` does not call `toUppercase`; after a write that leaves `toUppercase`'s result equal, a reader without `n1` does not rerun.
 9. The subscription re-read reads nested resolvers through the graph. `readSubscription` reads with `readData(storedResultHooks(store), ..)`, whose `readValue` is `storeValue` (nothing recorded) and whose `readResolver` is `readStoredResult`; `SubscriptionResult` gains `ReadResolverThrew`, `ReadErr` is only a broken store invariant, and `subscriptionResultsAreEqual` compares two `ResolverThrew` by `===` of their errors. Without it, the landed re-read (`libs/isograph-runtime/src/subscribe.ts:120-131`) calls every nested resolver on every write through v1's `read`. `makeNetworkRequest` calls `callSubscriptions` in a `finally` after `normalize`, so a response that throws part-way re-reads the subscriptions over the writes it made (open decision 4), and `garbageCollectEnvironment` calls `callSubscriptions` after the sweep, so a subscription that read a deleted record is re-read. Neither call depends on subscriptions being derived nodes. `callSubscriptions` never throws (`libs/isograph-runtime/src/subscribe.ts:92-95`; `readSubscription` catches a throwing pull as `ReadErr`, `:126-130`), so `normalize`'s throw still reaches the `.catch`. Observable: in the pet script, the subscription's re-read after the tagline write calls `PetSummaryCard` on `Pet:0` only, and a re-read after an unrelated write calls no resolver and does not call the callback; a response that changes `Pet:0.tagline` and then throws delivers the new tagline to the subscription; a collection that deletes a record a subscription read delivers that subscription's `MissingData`.
 
    ```ts
@@ -1853,9 +1853,9 @@ A second question arises once something pulls inside a write (`reconcileEffects`
 
 ### 7. How a field supplies its output equality
 
-`resolverNodeAt` passes `sameValue` as `outputEqual`. A user who returns a new object per call (`{ length: data.name.length }`) and wants cutoff supplies a comparator, such as a deep equality. A comparator must answer equal only for values no reader can tell apart (Equality).
+`resolverNodeAt` passes `identical` (`===`) as `outputEqual`. A user who returns a new object per call (`{ length: data.name.length }`) and wants cutoff supplies a comparator, such as a deep equality. A comparator must answer equal only for values no reader can tell apart (Equality).
 
-- (a) A second argument to the function a field literal returns: `iso(`field Pet.Shape { name }`)(resolver, { equal: deepEqual })`. The Babel plugin replaces a field literal with `x => x` (`libs/isograph-babel-plugin/compileTag.js:53`); the replacement becomes `(resolver, options) => Object.assign(resolver, options)`, so the export is still the resolver function, now carrying `equal`. The generated `IdentityWithParam` (`fixtures/store/src/__isograph/iso.ts:44-48`) gains the optional parameter and returns the resolver's type with `readonly equal?: (previous: TOutput, next: TOutput) => boolean`, and `resolverNodeAt` passes `artifact.resolver.equal ?? sameValue`. Held, not decided. Reason: it is the simplest: no directive, no new iso syntax, no compiler change beyond the generated `iso` overload, and the comparator sits next to the resolver it belongs to. Cost: a property written onto the user's function object, and an optional property on the resolver's type.
+- (a) A second argument to the function a field literal returns: `iso(`field Pet.Shape { name }`)(resolver, { equal: deepEqual })`. The Babel plugin replaces a field literal with `x => x` (`libs/isograph-babel-plugin/compileTag.js:53`); the replacement becomes `(resolver, options) => Object.assign(resolver, options)`, so the export is still the resolver function, now carrying `equal`. The generated `IdentityWithParam` (`fixtures/store/src/__isograph/iso.ts:44-48`) gains the optional parameter and returns the resolver's type with `readonly equal?: (previous: TOutput, next: TOutput) => boolean`, and `resolverNodeAt` passes `artifact.resolver.equal ?? identical`. Held, not decided. Reason: it is the simplest: no directive, no new iso syntax, no compiler change beyond the generated `iso` overload, and the comparator sits next to the resolver it belongs to. Cost: a property written onto the user's function object, and an optional property on the resolver's type.
 - (b) A declaration directive naming a built-in comparator (`field Pet.Shape @equality(kind: Deep) { name }`), from which the compiler writes `outputEqual: deepEqual` imported from the runtime. Cost: i2 accepts no declaration directive yet (`DeclarationDirectiveName` is empty, `crates/isograph_parser/src/directives.rs:38-41`); only built-in comparators.
 - (c) A map from selectable to comparator passed to `createIsographEnvironment`. Cost: the comparator is far from its field and keyed by a string the compiler does not check.
 - (d) No API: a resolver that wants cutoff returns a stable value itself. Cost: no cutoff for object outputs without user memoization.
@@ -1937,13 +1937,9 @@ A standalone engine holds nodes of different value types in one graph (a `Derive
 - (b) One value type per graph, the previous revision's `SourceNode<TSourceValue, TValue>` and `DerivedNode<TValue>` with `TValue` shared by every node. Cost: a project whose nodes have different value types declares a union and narrows every `readDerived` result; Isograph's own later runtime-defined computations widen `ResolverResult` the same way (Later: other derived node kinds).
 - (c) An existential encoding: a link holds `<R>(visit: <T>(node: DerivedNode<T>) => R) => R`. Cost: one closure per link and a call per traversal step; it is sound.
 
-### 20. The engine's identity equality
+### 20. The engine's identity equality (decided)
 
-`sameValue` is `===`. The Equality section's correctness rule says an equality may answer equal only when every position a reader can observe is the same. `===` answers equal for `0` and `-0`, which a reader can tell apart (`Object.is(x, -0)`, `1 / x`), so a computation whose value moves from `0` to `-0` cuts off and its readers keep the old value. `===` answers unequal for `NaN` and `NaN`, which recomputes the readers from equal inputs: work, never a wrong value.
-
-- (a) `===`, upstream's comparison of resolver values (`areEqualWithDeepComparison.ts:84-95`). The body is written for (a) until this is decided. Cost: the `0` and `-0` cutoff above.
-- (b) `Object.is`. Held, not decided. Reason: it is the comparison the Equality section's rule admits; it answers equal for `NaN` and `NaN` (indistinguishable) and unequal for `0` and `-0` (distinguishable). Cost: a deviation from upstream's `===` for resolver values, and a resolver that returns `-0` and then `0` marks its readers.
-- (c) No engine default: `createDerivedNode` callers write their own. Cost: every caller restates `===` or `Object.is`; Isograph's `resolverNodeAt` and the usage example need one anyway.
+Decided by the user: the engine has no default equality and exports no comparison; `equal` is a required argument of `createDerivedNode` and of `createSourceNode` (`refactors/pending/runtime/reactive-engine.md` open decision 6). The Isograph layer does not depend on an engine default: every resolver node passes `resolverResultsEqual(artifact, outputEqual)`, whose `outputEqual` is `===` (`identical`, upstream's comparison of resolver values, `areEqualWithDeepComparison.ts:84-95`) unless the field supplies one, beside the structural rule for walk-assembled data (Equality); every store source node passes `isUnchanged(key)` (The store).
 
 ### 21. Whether a consumer can write a node's fields
 
