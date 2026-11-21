@@ -1918,6 +1918,8 @@ export function retainRoot<TValue>(
 4. `notify(environment.graph)` (change 4).
 5. `callSubscriptions(environment)` (change 2b, after every write).
 
+Steps 4 and 5 run in a `finally`, so they run when step 2 or 3 throws (a computation that throws outside its resolver, open decision 22), and the throw then propagates. Change 2b's rule that every write through the environment re-reads the subscriptions holds for that write too. Neither `notify` nor `callSubscriptions` throws (open decision 9), so the `finally` never replaces the error.
+
 ```ts
 // from libs/isograph-runtime/src/environment.ts
 // normalizeData, before (change 2):
@@ -1941,9 +1943,11 @@ export function normalizeData<TOutput>(
     environment.graph,
     writeOrMark(environment, entrypoint.normalizationAst, response, variables).map(changeSource),
   );
-  const retention = retainEntrypoint(environment, entrypoint, variables);
-  callSubscriptions(environment);
-  return retention;
+  try {
+    return retainEntrypoint(environment, entrypoint, variables);
+  } finally {
+    callSubscriptions(environment);
+  }
 }
 ```
 
@@ -2375,19 +2379,23 @@ A response that throws part-way must settle too. From this change observers are 
     environment.graph,
     writeOrMark(environment, entrypoint.normalizationAst, response, variables).map(changeSource),
   );
-  const retention = retainEntrypoint(environment, entrypoint, variables);
-  callSubscriptions(environment);
-  return retention;
+  try {
+    return retainEntrypoint(environment, entrypoint, variables);
+  } finally {
+    callSubscriptions(environment);
+  }
 // after:
   markChanged(
     environment.graph,
     writeOrMark(environment, entrypoint.normalizationAst, response, variables).map(changeSource),
   );
-  settle(environment.graph);
-  const retention = retainEntrypoint(environment, entrypoint, variables);
-  notify(environment.graph);
-  callSubscriptions(environment);
-  return retention;
+  try {
+    settle(environment.graph);
+    return retainEntrypoint(environment, entrypoint, variables);
+  } finally {
+    notify(environment.graph);
+    callSubscriptions(environment);
+  }
 
 // writeOrMark, before (change 2):
 /** `normalize`'s changes; on a `PartialWriteError`, marks its changes and re-reads every
@@ -2422,16 +2430,19 @@ function writeOrMark(
   } catch (error: unknown) {
     if (error instanceof PartialWriteError) {
       markChanged(environment.graph, error.changes.map(changeSource));
-      settle(environment.graph);
-      notify(environment.graph);
-      callSubscriptions(environment);
+      try {
+        settle(environment.graph);
+      } finally {
+        notify(environment.graph);
+        callSubscriptions(environment);
+      }
     }
     throw error;
   }
 }
 ```
 
-The partial write retains nothing: `retainEntrypoint` does not run, as in change 3. `notify` never throws (open decision 9), so the rethrown error is the `PartialWriteError`. `settle` throws only when a computation throws outside its resolver (open decision 22). The doc comment of `normalizeData` (change 3) gains: "On a `PartialWriteError`, settles and calls observers before rethrowing it." `garbageCollectEnvironment` runs `settle` and then `notify` after `collect`: an observed derived node that read a deleted record was marked `Dirty` by `deleteSource` and recomputes to `MissingData`, and `collect` disposes no observed derived node (its `rootCount` is above 0).
+`notify` and `callSubscriptions` run in a `finally` in both functions, so a throw out of `settle` or the root hold still calls the observers whose derived nodes were pulled and re-reads every subscription (change 2b's rule) before it propagates. Neither throws (open decision 9), so the `finally` never replaces an error. The partial write retains nothing: `retainEntrypoint` does not run, as in change 3. When `settle` returns, the rethrown error is the `PartialWriteError`. `settle` throws only when a computation throws outside its resolver (open decision 22); in `writeOrMark` that throw propagates out of the `finally` in place of the `PartialWriteError`, and which of the two errors the caller receives is open decision 22. The doc comment of `normalizeData` (change 3) gains: "On a `PartialWriteError`, settles and calls observers before rethrowing it." `garbageCollectEnvironment` runs `settle` and then, in a `finally`, `notify` and `callSubscriptions` after `collect`: an observed derived node that read a deleted record was marked `Dirty` by `deleteSource` and recomputes to `MissingData`, and `collect` disposes no observed derived node (its `rootCount` is above 0).
 
 ```ts
 // from libs/isograph-runtime/src/environment.ts
@@ -2445,9 +2456,12 @@ The partial write retains nothing: `retainEntrypoint` does not run, as in change
       Array.from(subscription.readDerivedNodes),
     ),
   );
-  settle(environment.graph);
-  notify(environment.graph);
-  callSubscriptions(environment);
+  try {
+    settle(environment.graph);
+  } finally {
+    notify(environment.graph);
+    callSubscriptions(environment);
+  }
 ```
 
 Work per write: marking visits each derived node that read a changed source and each `Clean` derived node above those, once; `settle` takes one step per observer and pulls the marked derived nodes the observed ones read; a pulled derived node recomputes only when an input changed value. The traces are in Candidate 3b.
@@ -2995,7 +3009,7 @@ Not decided.
 
 Under 3a this lost the node: `bringUpToDate` removed it from its bucket before recomputing, so a throw such as `linkAt`'s at `store.ts:81` on a non-link under `Pet:1.bestFriend` left it `Queued` in no bucket; `invalidate` skipped it because it was not `Clean`, `settle` never reached it, and `snapshot` returned its value from before the corruption forever. Held 3b removes that: there is no bucket, and the rule change 2's engine keeps is that any throw that propagates out of a pull leaves the node marked with its previous dependencies, never `Clean`, and the next pull retries it (change 2, The engine; its Tests cover it).
 
-Under held 3b, a throw out of `compute` propagates out of `recompute` before `setDependencies` records the new reads, and out of `bringUpToDate` before it sets the mark `Clean`. The derived node keeps its mark, its previous value, and its previous dependencies, and the next pull of it (a read, or the next write's `settle`) recomputes it again. A checking ancestor whose `checkDependencies` was running keeps its mark too. A throw out of `createDerivedNode`'s `compute` stores nothing. Either propagates out of `readStoredResult`, `retainRoot`, or `observe`. A throw during `settle` stops its loop: the observed derived nodes after it stay marked, and `normalizeData` skips `retainEntrypoint` and `notify` and throws.
+Under held 3b, a throw out of `compute` propagates out of `recompute` before `setDependencies` records the new reads, and out of `bringUpToDate` before it sets the mark `Clean`. The derived node keeps its mark, its previous value, and its previous dependencies, and the next pull of it (a read, or the next write's `settle`) recomputes it again. A checking ancestor whose `checkDependencies` was running keeps its mark too. A throw out of `createDerivedNode`'s `compute` stores nothing. Either propagates out of `readStoredResult`, `retainRoot`, or `observe`. A throw during `settle` stops its loop: the observed derived nodes after it stay marked, and `normalizeData` skips `retainEntrypoint`, runs `notify` and `callSubscriptions` in its `finally` (change 4, Settlement), and throws. `notify` calls the observers whose derived nodes the loop pulled before the throw and whose values changed; the observers after it are not called. `garbageCollectEnvironment` runs the same `finally`.
 
 - (a) `compute` catches any throw from the computation and stores it as the derived node's value, as the subscription path stores `ReadErr`. Held, not decided. Reason: `bringUpToDate` returns normally, so the node ends `Clean`, `settle` continues, and `notify` runs; the dependencies the computation recorded before the throw are kept, so a write that repairs one of them recomputes the node. Cost: an engine bug in a computation is also stored as a value instead of surfacing as a throw. It departs from the rule the body keeps: the node ends `Clean` holding `Err`, and it is retried only when a source or derived node it recorded before the throw changes, not on the next pull.
 
@@ -3062,8 +3076,16 @@ Under held 3b, a throw out of `compute` propagates out of `recompute` before `se
   ```
 
   `ReadErr` is the landed type of `subscribe.ts`, imported as a type. `createIsographEnvironment` passes `createGraph(resultsEqual, (error) => ({ kind: 'Err', error }))`; `resultsEqual` compares two `Err` by `===` of their errors, as `subscriptionResultsAreEqual` does; `contextHooks` and `storedResultHooks` return `ReadHooks<ReadResolverThrew | ReadErr>`, so a nested `Err` passes up the walk unchanged (`allOk`), as a nested `ResolverThrew` does; `SubscriptionResult` already admits both (change 2, Subscriptions). A nested derived node's throw is caught by its own `compute`, so the outer `compute` catches only throws of the outer computation's own walk. `ResolverThrew` stays: it names the field and record whose resolver threw, where `Err` is a broken invariant of the store. An abandon under open decision 19 (c) is a returned value, not a throw, so (a) does not catch it.
-- (b) `bringUpToDate` restores the node and `settle` rethrows after pulling the rest. `bringUpToDate` catches the throw, sets the node `Clean` with its old value and dependencies, and returns the error to `settle`; `settle` pulls the rest of the observed derived nodes, and `normalizeData` runs `notify` and then rethrows the first error, or an `AggregateError` of several. Cost: the node holds a value no current input explains; `normalizeData` throws for a broken store invariant after a response was written, so the request that called it becomes `Err`; and the read path needs the same restore in `createDerivedNode` and `recompute`.
-- (c) Propagate, and leave the node marked with its previous value and dependencies; the next pull retries it. This is the body as written (change 2, The engine). Cost: `settle` stops at the throw, so the observed derived nodes after it are not pulled and no observer is called for the write; the throw reaches the caller of `normalizeData`, so the request that called it becomes `Err`.
+- (b) `bringUpToDate` restores the node and `settle` rethrows after pulling the rest. `bringUpToDate` catches the throw, sets the node `Clean` with its old value and dependencies, and returns the error to `settle`; `settle` pulls the rest of the observed derived nodes, and `normalizeData` runs `notify` and `callSubscriptions` and then rethrows the first error, or an `AggregateError` of several. Cost: the node holds a value no current input explains; `normalizeData` throws for a broken store invariant after a response was written, so the request that called it becomes `Err`; and the read path needs the same restore in `createDerivedNode` and `recompute`.
+- (c) Propagate, and leave the node marked with its previous value and dependencies; the next pull retries it. This is the body as written (change 2, The engine). Cost: `settle` stops at the throw, so the observed derived nodes after it are not pulled and their observers are not called for the write; the throw reaches the caller of `normalizeData`, so the request that called it becomes `Err`.
+
+A second question arises under (b) and (c), and not under (a), where `settle` does not throw: which error the caller receives when `settle` throws inside `writeOrMark`'s `PartialWriteError` branch (change 4, Settlement). The body as written propagates `settle`'s error out of the `finally`, so the caller does not receive the `PartialWriteError`.
+
+- (i) `settle`'s error, the body as written. Cost: the `PartialWriteError`, which names the malformed response and carries the original error as `cause`, is lost.
+- (ii) The `PartialWriteError`; `settle`'s error is reported through `reportCallbackError`. Cost: the broken store invariant surfaces in a microtask with no stack frame of the write, and the caller sees only the response's failure.
+- (iii) An `AggregateError` of the `PartialWriteError` and `settle`'s error. Cost: a caller that tests `instanceof PartialWriteError` no longer matches.
+
+Not decided.
 
 ### 23. Two client fields of one name on an abstract entity and on a concrete entity
 
