@@ -395,7 +395,7 @@ pub enum ArtifactInnerType {
 
 ### Generated refinement fields
 
-A refinement `asT` on an entity `A` is a field the compiler generates on `A`, with target `T`, written at `A/asT/resolver_reader.ts` when some reader selects it. Its reader AST is empty, its tables are empty, and its resolver is printed in the artifact: `({ link }) => (link.entityName === 'T' ? { entityName: 'T', id: link.id } : null)`. A `field A.asT` declaration is `DuplicateDefinition` with it.
+A refinement `asT` on an entity `A` is a field the compiler generates on `A`, with target `T`, written at `A/asT/resolver_reader.ts` when some reader selects it. Its reader AST is empty, its `tables` lists its parent entity `A` alone (`FieldTypes::tables` holds the parent entity of every field, and the walk looks up the parent's table before it reads the empty reader AST), and its resolver is printed in the artifact: `({ link }) => (link.entityName === 'T' ? { entityName: 'T', id: link.id } : null)`. A `field A.asT` declaration is `DuplicateDefinition` with it.
 
 ```rust
 // from crates/isograph_compiler/src/artifact_types.rs
@@ -654,6 +654,7 @@ A refinement's reader artifact, emitted when a reader selects `asPet` on `Node`:
 // libs/isograph-runtime/fixtures/store/src/__isograph/Node/asPet/resolver_reader.ts
 import type { Link, ReaderArtifact, ResolverParam } from '@isograph/runtime';
 import type { Node____link__output_type } from './../__link/output_type';
+import Node__entity_table from './../entity_table';
 
 const readerArtifact = (): ReaderArtifact<
   ResolverParam<Node____link__output_type['entityName']>,
@@ -663,7 +664,7 @@ const readerArtifact = (): ReaderArtifact<
   parentEntityName: 'Node',
   selectableName: 'asPet',
   readerAst: [],
-  tables: {},
+  tables: { Node: Node__entity_table },
   resolver: ({ link }) => (link.entityName === 'Pet' ? { entityName: 'Pet', id: link.id } : null),
 });
 export default readerArtifact;
