@@ -1581,6 +1581,8 @@ Every write through the environment re-reads the subscriptions, including a resp
       const onComplete = fetchOptions?.onComplete;
 ```
 
+`normalizeData` and `garbageCollectEnvironment` have no guard against a call from inside a computation, a resolver that reaches the environment through a closure: the body is open decision 8 (a) by omission, not by decision, and that decision's scenario, in which a `Clean` derived node reads a `Dirty` one, is reachable as written.
+
 `network.ts` stops importing `normalize` and `callSubscriptions`; it imports `normalizeData` from `environment.ts`, and keeps `reportCallbackError` from `subscribe.ts` until change 4 moves it to `util.ts`. `environment.ts` imports `callSubscriptions` from `subscribe.ts`, whose imports from `environment.ts` are types only, so the modules form no cycle at run time. A `PartialWriteError` still rejects the request; the subscriptions were re-read before the rethrow, so they deliver the partial write's data. A test in `test/subscribe.test.ts`: a response that changes `Pet:1.name` and then lacks a required key, through `fetchEntrypoint`: the request's wrapper is `Err`, and the subscription to `PetDetail` was called once with the new name. A second: a subscription to `PetDetail`, `unretainQuery` of its query, and `garbageCollectEnvironment`: the subscription is called once, with `MissingData`.
 
 
@@ -2927,7 +2929,7 @@ pico guards writes, not reads, as (c) does: `Database::set`, `remove`, `remove_s
 
 Callbacks are outside this decision. Level 2 callbacks run in `notify`, after `settle` pulled every observed derived node, and a callback that calls `normalizeData` runs a nested write with its own settlement and notification (Reads during recalculation). A Step A callback runs in `callSubscriptions`, after `normalize` returned. The effects of Values with lifecycles are set up in `reconcileEffects`, `observe`, and `notifyCreated` and torn down in `flushTeardowns`, after `notify` and `callSubscriptions`. None runs while a computation runs, so none is reentrant into level 1. A computation's call of `readStoredResult`, `normalizeData`, or `garbageCollectEnvironment` is the only reentrant path.
 
-Not held.
+Not held. The body behaves as (a) by omission: changes 2 to 4 add no phase field, no write counter, and no dependency check, so a computation that reaches `normalizeData` or `garbageCollectEnvironment` through a closure runs unguarded, and the scenario above (a `Clean` derived node that reads a `Dirty` one, and a derived node pulled inside its own computation) is reachable in the code as written until this is decided.
 
 ### 9. Callback errors
 
