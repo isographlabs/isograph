@@ -39,7 +39,7 @@ The Isograph runtime imports the engine's package index and nothing else from it
 
 The calls the Isograph runtime makes, by export of the engine's index (reactive-engine.md, The public API):
 
-- `createGraph`: `createStore` (The store).
+- `createGraph`: `createStore` (The store), which the caller of `createIsographEnvironment` calls.
 - `createSourceNode`: `sourceNodeAt`, with `MISSING` and `isUnchanged(key)` (The store).
 - `sourceValue`: `storeValue` and `storeSnapshot` (The store).
 - `writeSource`: `normalize`'s `writeValue` (`normalize` writes source nodes), and `storeFrom` in `test/fixtures.ts`.
@@ -117,7 +117,8 @@ export type Store = {
   readonly records: Map<EntityName, Map<RecordId, RecordContainer>>;
 };
 
-/** A store with no record. Caller: `createIsographEnvironment`. */
+/** A store with no record. Callers: whoever creates the environment, which passes it to
+ * `createIsographEnvironment` (`demos/pet-demo/src/fetchAndRead.ts:19`, the tests), and `storeFrom`. */
 export function createStore(): Store {
   return { graph: createGraph(), records: new Map() };
 }
@@ -155,7 +156,7 @@ export type StoreRecord = Map<StoreKey, StoreValue>;
 
 `records` is the user's `Map<EntityName, Map<RecordId, Map<StoreKey, SourceNode>>>` with two additions. `derived` puts a resolver derived node in the container of the record it was computed on, so that container is its owner: deleting the record disposes it with no `owned` map and no id table. Server keys and resolver store keys are separate maps, so a server field and a client field of one name do not collide. `presence` keeps v1's distinction between a record `normalize` wrote with no values (EmptyStats's `stats {}` writes an empty `PetStats` record, `test/normalize.test.ts:270`) and no record, for the readers that are not computations. `MISSING` is a symbol, so no JSON value equals it, and `=== MISSING` narrows with no cast.
 
-There is no `SourceId`, no `DerivedNodeId`, no `sourceDependents` map, and no `RecomputationGraph` object. The environment's `store` is the whole graph: `graph` is the guard every engine write on its nodes passes, and `records` holds the nodes. `createIsographEnvironment` calls `createStore` where it built `new Map()`. The store builds every node with the engine's `createSourceNode` and `createDerivedNode` and reads a source's value with `sourceValue` or `ComputeContext.readSource`; no store function reads or writes a node's fields.
+There is no `SourceId`, no `DerivedNodeId`, no `sourceDependents` map, and no `RecomputationGraph` object. The environment's `store` is the whole graph: `graph` is the guard every engine write on its nodes passes, and `records` holds the nodes. `createIsographEnvironment` keeps its parameters (`libs/isograph-runtime/src/environment.ts:34-45`): it takes `store: Store` and builds no store. Its callers pass `createStore()` where they passed `new Map()` (`demos/pet-demo/src/fetchAndRead.ts:19`, and the tests, core change 5), and the package index exports `createStore`. The store builds every node with the engine's `createSourceNode` and `createDerivedNode` and reads a source's value with `sourceValue` or `ComputeContext.readSource`; no store function reads or writes a node's fields.
 
 ### Accessors
 
