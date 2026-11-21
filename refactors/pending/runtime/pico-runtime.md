@@ -44,6 +44,9 @@ export type Graph = {
 export type SourceNode<TValue> = {
   /** Read only by `readSource` and `sourceValue`. Written only by `writeSource`. */
   value: TValue;
+  /** Whether a written value equals the stored one, so that `writeSource` marks nothing. A method
+   * signature, as `DerivedNode.equal` is. */
+  equal(previous: TValue, next: TValue): boolean;
   /** Written only by `setDependencies`. */
   readonly dependents: Set<AnyDerivedNode>;
 };
@@ -115,6 +118,8 @@ The marks are Reactively's `CacheClean`, `CacheCheck`, and `CacheDirty` (`packag
 
 `TValue` is per node: a `DerivedNode<string>` reads a `DerivedNode<number>` and a `SourceNode<number>`. The links between nodes hold `AnyDerivedNode` and `SourceNode<unknown>`, and the engine's functions are generic in the node they receive, so a node reached through `dependents` is handled at `TValue = unknown`. `equal` is a method signature so that a `DerivedNode<number>` is an `AnyDerivedNode`: under `strict` (`tsconfig.build.json`), TypeScript checks the parameters of a function-typed property contravariantly and those of a method bivariantly, so with `readonly equal: (previous: TValue, next: TValue) => boolean` a `DerivedNode<number>` is not assignable to `DerivedNode<unknown>`. The engine calls `node.equal` only in `recompute`, with the node's previous value and the value its own computation just returned, so the bivariance admits no call the engine makes with a value of another type. Open decision 19. In the Isograph runtime, a resolver node is a `DerivedNode<ResolverResult<unknown>>` and a store source node a `SourceNode<StoreValue | Missing>` (The store).
 
+A write of an equal value does not propagate: `writeSource` compares with the source's own `equal` and marks nothing when it accepts, as pico's `set` does not advance the epoch for an equal value (`set_source`, `crates/pico/src/database.rs:310-329`). `equal` is required: the engine cannot know what equal means for a consumer's values (open decision 23).
+
 `readSource` returns the value it records, so a computation never reads `source.value` itself. Code outside a computation reads a source's value with `sourceValue`, which records nothing. No code outside `graph.ts` reads or writes `value`, `dependents`, or `slot`.
 
 `graph.ts` imports nothing, and names no record, key, artifact, or Isograph type.
@@ -140,9 +145,12 @@ function assertNotComputing(graph: Graph): void {
   }
 }
 
-/** A source node holding `value`, read by no derived node. */
-export function createSourceNode<TValue>(value: TValue): SourceNode<TValue> {
-  return { value, dependents: new Set() };
+/** A source node holding `value`, read by no derived node, whose writes compare by `equal`. */
+export function createSourceNode<TValue>(
+  value: TValue,
+  equal: (previous: TValue, next: TValue) => boolean,
+): SourceNode<TValue> {
+  return { value, equal, dependents: new Set() };
 }
 
 /** A derived node that was never computed: `Dirty`, no value, no dependencies. */
@@ -168,10 +176,13 @@ export function sourceValue<TValue>(source: SourceNode<TValue>): TValue {
   return source.value;
 }
 
-/** Sets `source.value` and marks its dependents. The caller decided the value changed. Throws while a
- * computation runs. */
+/** Sets `source.value` and marks its dependents, unless `source.equal` accepts `value`, in which case
+ * the stored value object stays and nothing is marked. Throws while a computation runs. */
 export function writeSource<TValue>(graph: Graph, source: SourceNode<TValue>, value: TValue): void {
   assertNotComputing(graph);
+  if (source.equal(source.value, value)) {
+    return;
+  }
   source.value = value;
   source.dependents.forEach(markDirty);
 }
@@ -382,6 +393,7 @@ export {
 export type Graph = { computingDepth: number };
 export type SourceNode<TValue> = {
   value: TValue;
+  equal(previous: TValue, next: TValue): boolean;
   readonly dependents: Set<AnyDerivedNode>;
 };
 export type DerivedNode<TValue> = {
@@ -397,7 +409,10 @@ export type ComputeContext = {
 };
 
 export function createGraph(): Graph;
-export function createSourceNode<TValue>(value: TValue): SourceNode<TValue>;
+export function createSourceNode<TValue>(
+  value: TValue,
+  equal: (previous: TValue, next: TValue) => boolean,
+): SourceNode<TValue>;
 export function createDerivedNode<TValue>(
   computation: Computation<TValue>,
   equal: (previous: TValue, next: TValue) => boolean,
@@ -424,8 +439,8 @@ import { createDerivedNode, createGraph, createSourceNode, pull, sameValue, writ
 test('a write recomputes what changed and cuts off at an equal value', () => {
   const graph = createGraph();
   const calls = { sum: 0, parity: 0, label: 0 };
-  const a = createSourceNode(1);
-  const b = createSourceNode(2);
+  const a = createSourceNode(1, sameValue);
+  const b = createSourceNode(2, sameValue);
   const sum = createDerivedNode((context) => {
     calls.sum += 1;
     return context.readSource(a) + context.readSource(b);
@@ -489,7 +504,7 @@ Isograph runtime (`libs/isograph-runtime/src`):
 - `artifacts.ts`: the reader AST (`ReaderSelection` and its five kinds, `ReaderLinkTarget`, `DefaultReader`) and `NormalizationTarget`. `store.ts`: `VALUE_KEY`. `recordId.ts`: `omittedRecordId`. `normalize.ts`: `leafRecords`.
 - `storedResults.ts`: `readStoredResult`, `resolverNodeAt`, `resolverComputation`, `contextHooks`, `callResolver`, `resolverResultsEqual`; later `collect`, which iterates the containers' `derived` maps, calls the engine's reachability walk, and calls `disposeDerivedNode` and removes each unreached node from its container.
 - `storeKey.ts`: `resolverStoreKey`. `artifacts.ts`: `ReaderArtifact.selectableName`.
-- `normalize.ts`: `WrittenValue`, `writeValue`, `isUnchanged`, `leafUnchanged`, `compositeUnchanged`.
+- `normalize.ts`: `writeValue`. `store.ts`: `isUnchanged`, `leafUnchanged`, `compositeUnchanged`.
 - `check`, `garbageCollect` (mark and sweep), `test/fixtures.ts`'s `storeFrom`, the subscription re-read (`readSubscription`, `storedResultHooks`, `callSubscriptions`, `subscriptionResultsAreEqual`).
 - Later: `retention.ts` (`Retention`, `retainEntrypoint`, `dispose`, `Entrypoint`), the fetch decision, subscriptions as derived nodes, React's `useSyncExternalStore` hook, and `normalize` writing into a layer.
 
@@ -707,8 +722,34 @@ export function presentContainerAt(store: Store, link: StoreLink): RecordContain
 /** The source node of `key` on `link`, inserted with `MISSING` (and its container `Absent`) when
  * absent. Callers: `normalize`'s `writeValue` and the graph read's `readValue` hook. */
 export function sourceNodeAt(store: Store, link: StoreLink, key: StoreKey): StoreSourceNode {
-  return getOrInsert(containerAt(store, link).sources, key, () => createSourceNode<StoreValue | Missing>(MISSING));
+  return getOrInsert(containerAt(store, link).sources, key, () => createSourceNode(MISSING, isUnchanged(key)));
 }
+
+/** The equality of the source node of `key`: `leafUnchanged` for a scalar record's `__value`, which
+ * holds the response's value, and `compositeUnchanged` for every other key, which holds links. `MISSING`
+ * equals only `MISSING`. */
+function isUnchanged(key: StoreKey): (previous: StoreValue | Missing, next: StoreValue | Missing) => boolean {
+  const unchanged = key === VALUE_KEY ? leafUnchanged : compositeUnchanged;
+  return (previous, next) =>
+    previous === MISSING || next === MISSING ? previous === next : unchanged(previous, next);
+}
+
+/** `written` a list: `stored` is a list of the same length whose items are `leafUnchanged` in order, at
+ * any depth. Otherwise `stored === written`. */
+function leafUnchanged(stored: StoreValue, written: StoreValue): boolean {
+  if (!isArray(written)) {
+    return stored === written;
+  }
+  return (
+    isArray(stored) &&
+    stored.length === written.length &&
+    written.every((item, index) => leafUnchanged(stored[index], item))
+  );
+}
+
+/** `null`: `stored` is `null`. A link: a link with the same `entityName` and `id`. A list: a list of the
+ * same length whose items are `compositeUnchanged` in order. */
+function compositeUnchanged(stored: StoreValue, written: StoreValue): boolean;
 
 /** The value of `key` on `link`, or `MISSING`; inserts nothing and records nothing. Callers: v1's read
  * hooks, `check`, the garbage collector's mark, `storeSnapshot`. */
@@ -780,7 +821,7 @@ export function resolverResultsEqual(
 
 - A resolver's return value: `outputEqual`, `===` unless the field supplies one (open decision 7). A primitive or a reused object cuts off; a new object marks the dependents.
 - Objects the runtime itself creates get a structural rule. `MissingData` is built from strings and links. A fragment's data object is assembled by the walk (`readSelectionSet`, `read.ts:101-121`); when a resolver returns that object (`({ data }) => data`, as every store fixture resolver does), the result is tagged `WalkData` and two such results compare by `selectionSetDataAreEqual` (`libs/isograph-runtime/src/areEqualWithDeepComparison.ts:9-67`): `Value` and `Derived` values by `===`, a `Link`, `Self`, or `DerivedLink` value by its target per linked record with lists by length and item, a `Selections` target recursively, and a `Bare` target's `read` output by `===`. That is upstream's `mergeObjectsUsingReaderAst` rule (`areEqualWithDeepComparison.ts:55-121`) without the recycling. So `{ initials }` assembled by the walk compares equal when `initials` is the same string, and a link moved to a record with equal data cuts off.
-- Source writes: `normalize` compares the value it writes with the stored one by the shape the AST gives it, `leafUnchanged` and `compositeUnchanged` (normalize writes source nodes), as upstream does (`normalizeScalarField`, `cache.ts:232-249`; `normalizeLinkedField` and `dataIdsAreTheSame`, `:255-393`).
+- Source writes: each store source node compares a written value with the stored one by `isUnchanged` (The store): `leafUnchanged` for `__value` and `compositeUnchanged` for every other key, as upstream does (`normalizeScalarField`, `cache.ts:232-249`; `normalizeLinkedField` and `dataIdsAreTheSame`, `:255-393`).
 
 ```ts
 // from libs/isograph-runtime/src/read.ts
@@ -1049,7 +1090,7 @@ export function omittedRecordId(
   const written = target.kind === 'Leaf'
     ? leafRecords(normalization, selection, target, value, link, [], target.listDepth, [...path, responseKey])
     : compositeValue(normalization, selection, target, value, link, [], [...path, responseKey]);
-  writeValue(normalization, link, key, { kind: 'Composite', value: written });
+  writeValue(normalization, link, key, written);
 
 /** `value` with each scalar written to the `__value` of its record and replaced by the link to it;
  * `null` at any level is `null`. Throws on a non-list where `depth` says list. */
@@ -1076,7 +1117,7 @@ function leafRecords(
   }
   const link = { entityName: target.entityName, id: omittedRecordId(parent, selection, listIndexes, normalization.variables) };
   presentContainerAt(normalization.store, link);
-  writeValue(normalization, link, VALUE_KEY, { kind: 'Leaf', value });
+  writeValue(normalization, link, VALUE_KEY, value);
   return link;
 }
 ```
@@ -1354,49 +1395,19 @@ export type ReaderArtifact<TParam extends ResolverParam<TEntityName>, TOutput, T
 
 ## `normalize` writes source nodes
 
-`normalize` keeps its parameters and its `void` return (`libs/isograph-runtime/src/normalize.ts:31-50`). It writes each value into its source node and marks as it writes. A write `isUnchanged` accepts writes nothing and marks nothing.
+`normalize` keeps its parameters and its `void` return (`libs/isograph-runtime/src/normalize.ts:31-50`). It writes each value into its source node with `writeSource`, which marks as it writes. A value the source's equality accepts (`isUnchanged`, The store) writes nothing and marks nothing, and the stored value object keeps its identity.
 
 ```ts
 // from libs/isograph-runtime/src/normalize.ts
-import { sourceValue, writeSource } from '@isograph/reactive-graph';
+import { writeSource } from '@isograph/reactive-graph';
 
-/** A value `normalize` writes, with the shape its selection gives it. */
-type WrittenValue =
-  | { readonly kind: 'Leaf'; readonly value: LeafValue }
-  | { readonly kind: 'Composite'; readonly value: CompositeValue };
-
-/** Writes `written.value` into the source node of `key` on `link`, which marks its readers, unless the
- * stored value is unchanged by `isUnchanged`. */
-function writeValue(normalization: Normalization, link: StoreLink, key: StoreKey, written: WrittenValue): void {
-  const source = sourceNodeAt(normalization.store, link, key);
-  const stored = sourceValue(source);
-  if (stored === MISSING || !isUnchanged(stored, written)) {
-    writeSource(normalization.store.graph, source, written.value);
-  }
+/** Writes `value` into the source node of `key` on `link`. */
+function writeValue(normalization: Normalization, link: StoreLink, key: StoreKey, value: StoreValue): void {
+  writeSource(normalization.store.graph, sourceNodeAt(normalization.store, link, key), value);
 }
-
-/** `Leaf`: `leafUnchanged`. `Composite`: `compositeUnchanged`. */
-function isUnchanged(stored: StoreValue, written: WrittenValue): boolean;
-
-/** `written` a list: `stored` is a list of the same length whose items are `leafUnchanged` in order, at
- * any depth. Otherwise `stored === written`. */
-function leafUnchanged(stored: unknown, written: LeafValue): boolean {
-  if (!isArray(written)) {
-    return stored === written;
-  }
-  return (
-    isArray(stored) &&
-    stored.length === written.length &&
-    written.every((item, index) => leafUnchanged(stored[index], item))
-  );
-}
-
-/** `null`: `stored` is `null`. A link: a link with the same `entityName` and `id`. A list: a list of the
- * same length whose items are `compositeUnchanged` in order. */
-function compositeUnchanged(stored: StoreValue, written: CompositeValue): boolean;
 ```
 
-Deltas from v1 (`normalize.ts`): `writeSelection` builds a `WrittenValue` and calls `writeValue` where it called `record.set` (`:96-109`): `Composite` for every selection's key, since after core change 4 a leaf's key holds links to scalar records, and `Leaf` for a scalar record's `__value` (`leafRecords`, Scalar records); `writeSelections` and `compositeValue` pass the record's link where they passed its `StoreRecord`; `recordAt` is `presentContainerAt` (`:163-169`). An unchanged value keeps its identity.
+Deltas from v1 (`normalize.ts`): `writeSelection` calls `writeValue` where it called `record.set` (`:96-109`), and `leafRecords` calls it for a scalar record's `__value` (Scalar records); `writeSelections` and `compositeValue` pass the record's link where they passed its `StoreRecord`; `recordAt` is `presentContainerAt` (`:163-169`). The comparison core change 1 adds to `normalize` on v1's plain store moves into the source nodes' equality in core change 7, where source nodes first exist: `leafUnchanged` and `compositeUnchanged` move from `normalize.ts` to `store.ts`, and the key decides which applies, because after core change 4 only `__value` holds a leaf.
 
 Deltas from upstream: upstream compares a scalar with `!==` only (`cache.ts:248-249`), so a list of scalars counts as changed on every response; here a leaf list compares by length and item at any depth. Upstream compares a link by `__link` and `__typename` and a list of links one level deep (`cache.ts:337-338`, `:372-393`); here a link compares by `entityName` and `id`, and lists nest at any depth. A leaf that is a JSON object compares by `===`, so it counts as changed on every rewrite: one mark too many, never a missed one.
 
@@ -1545,13 +1556,13 @@ Upstream's collection deletes records only and runs only when the base layer is 
 
 Each is one commit, in order; each is independently shippable.
 
-1. Prefactor: `normalize` skips an unchanged value (`writeValue`, `isUnchanged`, `leafUnchanged`, `compositeUnchanged`) on v1's plain store. Observable: normalizing the same response twice keeps every stored list and link object (`toBe`). In the pet script, the `PetDetailRoute` response leaves `Pet:0.firstName`'s stored value untouched.
+1. Prefactor: `normalize` skips an unchanged value (`writeValue`, `isUnchanged`, `leafUnchanged`, `compositeUnchanged`) on v1's plain store, comparing before `record.set`. It stays a prefactor rather than folding into the record containers change: it is observable and shippable on the plain store with no engine, and core change 7 moves the same comparison into the source nodes' `equal`, unchanged in behavior. Observable: normalizing the same response twice keeps every stored list and link object (`toBe`). In the pet script, the `PetDetailRoute` response leaves `Pet:0.firstName`'s stored value untouched.
 2. Prefactor: the walk takes `ReadHooks`; an absent record reads as all keys missing; `noRecord`'s two checks go (Absent records). `read` and `readButDoNotEvaluate` use `evaluatingHooks`. Observable: an absent root's `MissingData` reads "No value for pet____id___"1" on Query:__ROOT"; `Constant` on an absent record is `Ok`. The pet script's output is unchanged.
 3. Prefactor: the selection kinds on v1's language (linked-only-selections.md, change 1). The compiler emits `Link` with a `Selections` target for a v1 linked selection, `Derived` for a client field, and `DerivedLink` of a generated refinement field (`Node/asPet/`) for a refinement; a v1 scalar selection keeps v1's `Scalar` kind until change 4. `reader_artifact_file` writes `selectableName` first (`Pet/PetName/resolver_reader.ts` gains `selectableName: "PetName",`). The walk reads the new kinds through v1's hooks. Observable: every generated artifact is regenerated in the new shape; the pet script's output is unchanged; the runtime's read tests pass unchanged.
 4. Prefactor: scalar records (linked-only-selections.md, change 2; Scalar records). The normalization AST's `Leaf` target, `VALUE_KEY`, `omittedRecordId`, `leafRecords`, and `check`'s and the mark's `Leaf` case; `Self` and `Value`, the `Bare` target, `DefaultReader`, and a `default_reader.ts` per scalar entity a reader selects; the `Scalar` kind goes. Observable: `storeSnapshot` after normalizing `PetDetail`'s response holds `Pet:1.name` as a link to `String:Pet:1.name` with `__value` `"Ricky"`; every read returns the values it returned before; normalizing a response that changes only `Pet:1.name` writes only `String:Pet:1.name.__value`; the pet script's output is unchanged.
 5. Prefactor: linked-only selections (linked-only-selections.md, change 3). Validation, query generation, and reader generation accept bare object selections, selection sets on scalars, and client fields on scalar entities; the object default reader. Observable: `read` of the Example's `PetDetailPage` on the store fixture returns `{ pet: { n1: "Ricky", n2: { toUppercase: "RICKY" }, bestFriend: { name: "Mango" } } }`, calling `toUppercase` on every read; a bare `bestFriend` is `{}` or `null`.
 6. Prefactor: the engine package (The engine package): `libs/reactive-graph` with `src/graph.ts` and `src/index.ts` as The graph and The engine's public API write them, `test/graph.test.ts`, its `package.json`, tsconfig, tsdown, and vitest files, and its two pre-commit hooks. Nothing in the Isograph runtime imports it yet. Observable: `pnpm --filter @isograph/reactive-graph test` passes the sum, parity, and label example (`sum` and `parity` run twice, `label` once); `pnpm compile-libs` writes its `dist/index.cjs` and `dist/index.mjs`; its `package.json` lists no dependencies. Its reader is the stated goal, a project outside Isograph; the runtime is its first workspace caller in change 7.
-7. Prefactor: the store becomes record containers (`RecordContainer`, `presence`, `sources`, the accessors, `storeSnapshot`, `deleteRecord` without derived nodes). The runtime gains its dependency on the engine (The engine package) and its three pre-commit hooks match the engine's directory. A container's `sources` hold the engine's source nodes: `sourceNodeAt` calls `createSourceNode`, `storeValue` and `storeSnapshot` call `sourceValue`, `writeValue` calls `writeSource`, and `deleteRecord` calls `markSourceChanged` for each source node. No derived node exists, so every `dependents` set stays empty and `writeSource` and `markSourceChanged` mark nothing. `check`, `garbageCollect`, `read`, and `normalize` read and write through the accessors; tests compare `storeSnapshot`. Observable: none in behavior; `environment.store` is no longer v1's nested map, and `storeSnapshot(environment.store)` is.
+7. Prefactor: the store becomes record containers (`RecordContainer`, `presence`, `sources`, the accessors, `storeSnapshot`, `deleteRecord` without derived nodes). The runtime gains its dependency on the engine (The engine package) and its three pre-commit hooks match the engine's directory. A container's `sources` hold the engine's source nodes: `sourceNodeAt` calls `createSourceNode` with `isUnchanged(key)`, so `normalize`'s comparison moves out of `normalize` into each source's `equal`, `storeValue` and `storeSnapshot` call `sourceValue`, `writeValue` calls `writeSource`, and `deleteRecord` calls `markSourceChanged` for each source node. No derived node exists, so every `dependents` set stays empty and `writeSource` and `markSourceChanged` mark nothing. `check`, `garbageCollect`, `read`, and `normalize` read and write through the accessors; tests compare `storeSnapshot`. Observable: none in behavior; `environment.store` is no longer v1's nested map, and `storeSnapshot(environment.store)` is.
 8. The graph in the Isograph runtime: `RecordContainer.derived`, `readStoredResult`, `resolverNodeAt` (`createDerivedNode` with `resolverResultsEqual(artifact, sameValue)`), `resolverComputation`, `contextHooks` (`context.readSource`, `context.readDerived`), `callResolver`, `ResolverResult` with `WalkData`, `resolverResultsEqual`, `resolverStoreKey`, `deleteRecord` disposing owned nodes with `disposeDerivedNode`. The engine is unchanged. The package index adds `readStoredResult` and the types `ResolverResult`, `ReadResolverOk`, `OkOrigin`, `ReadResolverThrew`; `StoreRecord` becomes `RecordContainer`. The pet script reads with `readStoredResult`. Observable: End-user experience above, and the Example's traces: after a write to `Pet:2.name`, a read of `PetDetailPage` does not call `toUppercase`; after a write that leaves `toUppercase`'s result equal, a reader without `n1` does not rerun.
 9. The subscription re-read reads nested resolvers through the graph. `readSubscription` reads with `readData(storedResultHooks(store), ..)`, whose `readValue` is `storeValue` (nothing recorded) and whose `readResolver` is `readStoredResult`; `SubscriptionResult` gains `ReadResolverThrew`, `ReadErr` is only a broken store invariant, and `subscriptionResultsAreEqual` compares two `ResolverThrew` by `===` of their errors. Without it, the landed re-read (`libs/isograph-runtime/src/subscribe.ts:120-131`) calls every nested resolver on every write through v1's `read`. `makeNetworkRequest` calls `callSubscriptions` in a `finally` after `normalize`, so a response that throws part-way re-reads the subscriptions over the writes it made (open decision 4), and `garbageCollectEnvironment` calls `callSubscriptions` after the sweep, so a subscription that read a deleted record is re-read. Neither call depends on subscriptions being derived nodes. `callSubscriptions` never throws (`libs/isograph-runtime/src/subscribe.ts:92-95`; `readSubscription` catches a throwing pull as `ReadErr`, `:126-130`), so `normalize`'s throw still reaches the `.catch`. Observable: in the pet script, the subscription's re-read after the tagline write calls `PetSummaryCard` on `Pet:0` only, and a re-read after an unrelated write calls no resolver and does not call the callback; a response that changes `Pet:0.tagline` and then throws delivers the new tagline to the subscription; a collection that deletes a record a subscription read delivers that subscription's `MissingData`.
 
