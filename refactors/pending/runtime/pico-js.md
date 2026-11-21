@@ -443,7 +443,15 @@ export function pull<TValue>(node: DerivedNode<TValue>): TValue {
       return verify(node, precalculated);
     case 'Dirty':
       return recompute(node, precalculated);
+    default:
+      return assertNever(precalculated.status);
   }
+}
+
+/** Unreachable when every variant of a union was handled: `value` then has type `never`. Ends every
+ * `switch` over a union, so a new variant is a compile error. Not exported. */
+function assertNever(value: never): never {
+  throw new Error(`Unhandled variant: ${String(value)}`);
 }
 
 /** Computes a node that was never computed or was disposed, stores its value `Clean`, and marks its
@@ -481,6 +489,8 @@ function verify<TValue>(
       return precalculated.value;
     case 'Clean':
       return precalculated.value;
+    default:
+      return assertNever(precalculated.status);
   }
 }
 

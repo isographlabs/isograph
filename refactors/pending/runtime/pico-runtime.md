@@ -99,6 +99,18 @@ The package's files, its two pre-commit hooks, and its CI step are pico-js.md, T
 
 The runtime resolves the engine through `node_modules` to its `dist`, as it resolves `@isograph/disposable-types`: `tsconfig.build.json`'s `"@isograph/*": ["./libs/*"]` maps to a directory without the `isograph-` prefix, which does not exist. turbo's `tsc` task depends on `^compile-libs` (`turbo.json`), so the engine is built before the runtime is type-checked. In the same change the runtime's three pre-commit hooks match the engine's directory (pico-js.md, Pre-commit hooks).
 
+### Exhaustive switches
+
+Every `switch` over a union in the Isograph runtime ends in `default: return assertNever(..)`, so a new variant is a compile error at every switch that does not handle it. Neither `libs/isograph-runtime/src` nor upstream's `libs/*/src` defines one, so `util.ts` gains it:
+
+```ts
+// from libs/isograph-runtime/src/util.ts
+/** Unreachable when every variant of a union was handled: `value` then has type `never`. */
+export function assertNever(value: never): never {
+  throw new Error(`Unhandled variant: ${String(value)}`);
+}
+```
+
 ## The store
 
 The store is the set of source nodes. A record is a container that holds its source nodes by store key and the derived nodes it owns by resolver store key.
@@ -354,6 +366,8 @@ export function resolverResultsEqual(
         return next.kind === 'MissingData' && missingDataAreEqual(previous, next);
       case 'ResolverThrew':
         return next.kind === 'ResolverThrew' && previous.error === next.error;
+      default:
+        return assertNever(previous.kind);
     }
   };
 }
@@ -374,6 +388,8 @@ function okResultsEqual(
       );
     case 'ResolverValue':
       return next.origin === 'ResolverValue' && outputEqual(previous.value, next.value);
+    default:
+      return assertNever(previous.origin);
   }
 }
 
@@ -430,6 +446,8 @@ function selectionValuesAreEqual(
         ? delivered === read
         : valuesAreEqual(delivered, read, (a, b) => targetValuesAreEqual(tables, target, selection.selections, a, b));
     }
+    default:
+      return assertNever(field.kind);
   }
 }
 
@@ -783,6 +801,8 @@ function readSelection<TFailure>(
           : readAt(hooks, tables, selection.selections, derivedLink(derived.value, record, selection.fieldName), target, variables),
       );
     }
+    default:
+      return assertNever(field.kind);
   }
 }
 
@@ -799,11 +819,14 @@ function readAt<TFailure>(
   if (selections !== null) {
     return readSelectionSet(hooks, tables, selections, link, entity, variables);
   }
-  switch (tableOf(tables, entity).shape) {
+  const shape = tableOf(tables, entity).shape;
+  switch (shape) {
     case 'Leaf':
       return readStoreValue(hooks, link, VALUE_KEY);
     case 'Composite':
       return ok(EMPTY_DATA);
+    default:
+      return assertNever(shape);
   }
 }
 
@@ -1665,6 +1688,8 @@ Each is one commit, in order; each is independently shippable.
          return result.kind === 'ResolverThrew' && delivered.error === result.error;
        case 'Err':
          return result.kind === 'Err' && delivered.error === result.error;
+       default:
+         return assertNever(delivered.kind);
      }
    }
    ```
